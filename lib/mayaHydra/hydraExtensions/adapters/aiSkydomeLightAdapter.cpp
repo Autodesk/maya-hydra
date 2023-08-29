@@ -20,6 +20,7 @@
 #include <mayaHydraLib/adapters/lightAdapter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
+#include <mayaHydraLib/mayaHydraSceneProducer.h>
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
@@ -46,7 +47,8 @@ class MayaHydraAiSkyDomeLightAdapter : public MayaHydraLightAdapter
     ///Temp folder path from the OS
     static std::string                  _tmpFolderPath; 
 
-    /**_dummyTexturePath is the fullpath filename for a dummy 1x1 texture file used when there is no texture connected to the color of the Arnold sky dome light
+    /**_dummyTexturePath is the fullpath filename for a dummy 1x1 texture file used when there 
+     * is no texture connected to the color of the Arnold sky dome light
     * as Hydra always wants a texture and ignores the color if no texture is present.
     */
     std::string                         _dummyTextureFullPathFilename; 
@@ -55,10 +57,6 @@ class MayaHydraAiSkyDomeLightAdapter : public MayaHydraLightAdapter
     
     ///Is the color attribute of the sky dome light connected to something ?
     bool _colorIsConnected  = false;
-
-    ///When we do a live update of the dummy texture, since the fullpath filename hasn't changed, Hydra doesn't reload it, it wants a new filename...
-    ///So we'll use a suffix to alternate between 2 suffixes
-    bool _usingSuffix1      = true; 
 
 public:
     MayaHydraAiSkyDomeLightAdapter(MayaHydraSceneProducer* producer, const MDagPath& dag)
@@ -82,17 +80,15 @@ public:
             }
         }
         
-	    _dummyTextureFilenameOnly = TfStringPrintf("/AiSkyDomeLight__%p", this);
+	    _dummyTextureFilenameOnly = TfStringPrintf("/HydraAiSkyDomeLightTex__%p__tmp.png", this);
     }
 
     virtual ~MayaHydraAiSkyDomeLightAdapter()
     {
-        //Delete the dummy texture files if they exist
+        // Delete the dummy texture files if they exist
         if (! _dummyTextureFullPathFilename.empty()){
-            auto dummyTextureFullPathFilename1 = _tmpFolderPath + _dummyTextureFilenameOnly + std::string("_1.png");
-            auto dummyTextureFullPathFilename2 = _tmpFolderPath + _dummyTextureFilenameOnly + std::string("_2.png");
+            auto dummyTextureFullPathFilename1 = _tmpFolderPath + _dummyTextureFilenameOnly;
             std::remove(dummyTextureFullPathFilename1.c_str());
-            std::remove(dummyTextureFullPathFilename2.c_str());
         }
     }
 
@@ -114,7 +110,7 @@ public:
             plug.connectedTo(conns, true, false);
             _colorIsConnected = (conns.length() > 0);
             if (_colorIsConnected){
-                return VtValue(GfVec3f(1.0f, 1.0f, 1.0f));//When there is a connection, return a white color.
+                return VtValue(GfVec3f(1.0f, 1.0f, 1.0f));// When there is a connection, return a white color.
             }
             
             // If no texture is found then get unconnected plug value and make a 1x1 texture of constant color using it.
@@ -147,21 +143,10 @@ public:
             if (_pTextureManager){
                 auto pTexture = _pTextureManager->acquireTexture("", desc, texData);//In memory
                 if (pTexture && (!_tmpFolderPath.empty()) && (!_dummyTextureFilenameOnly.empty())){
-
                     pTexture->setHasAlpha(true);
-
-                    //Save the dummy texture to the temp folder as hydra needs a texture file path
-                    //When we do a live update of the dummy texture, such as when the color has changed, 
-                    //we need to change the filename as when keeping the same filename, Hydra doesn't reload it. It wants a new filename...
-                    //So we'll alternate a suffix everytime we save it.
-                    _dummyTextureFullPathFilename       = _tmpFolderPath + _dummyTextureFilenameOnly;
-                    if (_usingSuffix1){
-                        _dummyTextureFullPathFilename   += "_1.png";
-                    }else{
-                        _dummyTextureFullPathFilename   += "_2.png";
-                    }
-                    _usingSuffix1 = !_usingSuffix1;//So we use the other suffix for next saving
-                    _pTextureManager->saveTexture(pTexture, MString(_dummyTextureFullPathFilename.c_str())); //This texture will be used in the HdLightTokens->textureFile parameter
+                    _dummyTextureFullPathFilename = _tmpFolderPath + _dummyTextureFilenameOnly;
+                    // This texture will be used in the HdLightTokens->textureFile parameter
+                    _pTextureManager->saveTexture(pTexture, MString(_dummyTextureFullPathFilename.c_str()));                     
                 }
             }
             return VtValue(GfVec3f(r,g,b));
@@ -196,18 +181,26 @@ public:
         } else if (paramName == HdLightTokens->textureFile) {
             // Be aware that dome lights in HdStorm always need a texture to work correctly,
             // the color is not used if no texture is present. 
-            if (! _colorIsConnected){
-                if (! _dummyTextureFullPathFilename.empty()){
-                    return VtValue(SdfAssetPath(_dummyTextureFullPathFilename, _dummyTextureFullPathFilename));// SdfAssetPath requires both "path" "resolvedPath"
-                } 
-                
-                return VtValue(SdfAssetPath());//this will produce a warning but hopefully is an edge case as it means we were not able to create a dummy texture
+
+            if (!_colorIsConnected){
+                if (!_dummyTextureFullPathFilename.empty()){
+                    // Update Hydra texture resource everytime Domelight color is tweaked.
+                    auto getResourReg = GetSceneProducer()->GetRenderIndex().GetResourceRegistry();
+                    if (TF_VERIFY(getResourReg, "Unable to update AikSkyDomelights constant color"))
+                        getResourReg->ReloadResource(TfToken("texture"), _dummyTextureFullPathFilename);
+                    // SdfAssetPath requires both "path" and "resolvedPath"
+                    return VtValue(SdfAssetPath(_dummyTextureFullPathFilename, _dummyTextureFullPathFilename));
+                }                
+                // this will produce a warning but hopefully is an edge case as 
+                // it means we were not able to create a dummy texture
+                return VtValue(SdfAssetPath());
             }
 
             MPlugArray conns;
             light.findPlug("color", true).connectedTo(conns, true, false);
             if (conns.length() < 1) {
-                return VtValue(SdfAssetPath());//Should never happen as it has been tested before with its equivalent : _colorIsConnected
+                // Should never happen as it has been tested before with its equivalent : _colorIsConnected
+                return VtValue(SdfAssetPath());
             }
             MFnDependencyNode file(conns[0].node(), &status);
             if (ARCH_UNLIKELY(
@@ -215,9 +208,10 @@ public:
                 // Be aware that dome lights in HdStorm always need a texture to work correctly,
                 // the color is not used if no texture is present. 
                 if (! _dummyTextureFullPathFilename.empty()){
-                    return VtValue(SdfAssetPath(_dummyTextureFullPathFilename, _dummyTextureFullPathFilename));// SdfAssetPath requires both "path" "resolvedPath"
+                    // SdfAssetPath requires both "path" "resolvedPath"
+                    return VtValue(SdfAssetPath(_dummyTextureFullPathFilename, _dummyTextureFullPathFilename));
                 } else {
-                    return VtValue(SdfAssetPath());//this will produce a warning but hopefully is an edge case
+                    return VtValue(SdfAssetPath());// this will produce a warning but hopefully is an edge case
                 }
             }
 
