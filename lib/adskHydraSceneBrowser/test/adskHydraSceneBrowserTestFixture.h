@@ -1,0 +1,63 @@
+
+#ifndef ADSK_HYDRA_SCENE_BROWSER_TEST_FIXTURE_H
+#define ADSK_HYDRA_SCENE_BROWSER_TEST_FIXTURE_H
+
+#include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/gf/vec2f.h>
+#include <pxr/base/gf/vec3d.h>
+#include <pxr/base/gf/vec3f.h>
+#include <pxr/base/vt/array.h>
+#include <pxr/base/vt/value.h>
+#include <pxr/imaging/hd/sceneIndex.h>
+
+#include <gtest/gtest.h>
+
+#include <dataSourceTreeWidget.h>
+#include <dataSourceValueTreeView.h>
+#include <sceneIndexDebuggerWidget.h>
+#include <sceneIndexTreeWidget.h>
+
+struct DataSourceEntry
+{
+    pxr::TfToken                name;
+    pxr::HdDataSourceBaseHandle dataSource;
+};
+
+class AdskHydraSceneBrowserTestFixture : public ::testing::Test
+{
+public:
+    AdskHydraSceneBrowserTestFixture() = default;
+    ~AdskHydraSceneBrowserTestFixture() override = default;
+
+    void SetUp() override;
+    void TearDown() override;
+
+    static void SetReferenceSceneIndex(pxr::HdSceneIndexBasePtr referenceSceneIndex);
+
+protected:
+    void ComparePrimHierarchy(
+        bool compareDataSourceHierarchy = false,
+        bool compareDataSourceValues = false);
+
+    void
+    CompareDataSourceHierarchy(DataSourceEntry rootDataSourceEntry, bool compareValues = false);
+
+    void CompareDataSourceValue(pxr::HdSampledDataSourceHandle sampledDataSource);
+
+    void CompareValueContent(const pxr::VtValue& value);
+
+    template <typename ElementType> void CompareIfArray(const pxr::VtValue& value);
+
+    template <typename ElementType>
+    void CompareArrayContents(const pxr::VtArray<ElementType>& vtArray);
+
+    std::unique_ptr<pxr::HduiSceneIndexDebuggerWidget> _sceneBrowserWidget
+        = std::make_unique<pxr::HduiSceneIndexDebuggerWidget>();
+    pxr::HduiSceneIndexTreeWidget*    _primHierarchyWidget = nullptr;
+    pxr::HduiDataSourceTreeWidget*    _dataSourceHierarchyWidget = nullptr;
+    pxr::HduiDataSourceValueTreeView* _dataSourceValueView = nullptr;
+
+    static pxr::HdSceneIndexBasePtr sceneIndex;
+};
+
+#endif // ADSK_HYDRA_SCENE_BROWSER_TEST_FIXTURE_H

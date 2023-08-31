@@ -51,7 +51,7 @@ maya_set_plugin_properties(${TARGET_NAME})
 # -----------------------------------------------------------------------------
 if(IS_MACOSX OR IS_LINUX) 
     mayaUsd_init_rpath(rpath "lib/maya")
-    mayaUsd_add_rpath(rpath "${CMAKE_INSTALL_PREFIX}/lib/adskHydraSceneBrowser")
+    mayaUsd_add_rpath(rpath "${CMAKE_INSTALL_PREFIX}/lib")
     mayaUsd_install_rpath(rpath ${TARGET_NAME})
 endif()
 
