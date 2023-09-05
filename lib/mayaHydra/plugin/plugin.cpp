@@ -40,10 +40,6 @@
 
 // Maya plugin init/uninit functions
 
-#if PXR_VERSION < 2211
-#error USD version v0.22.11+ required
-#endif
-
 #if MAYA_API_VERSION < 20240000
 #error Maya API version 2024+ required
 #endif

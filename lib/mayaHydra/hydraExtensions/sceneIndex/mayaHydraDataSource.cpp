@@ -30,9 +30,7 @@
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/lightSchema.h>
 #include <pxr/imaging/hd/materialBindingSchema.h>
-#if PXR_VERSION >= 2308
 #include <pxr/imaging/hd/materialBindingsSchema.h>
-#endif
 #include <pxr/imaging/hd/materialConnectionSchema.h>
 #include <pxr/imaging/hd/materialNetworkSchema.h>
 #include <pxr/imaging/hd/materialNodeSchema.h>
@@ -76,11 +74,7 @@ MayaHydraDataSource::GetNames()
     result.push_back(HdPrimvarsSchemaTokens->primvars);
 
     if (HdPrimTypeIsGprim(_type)) {
-#if PXR_VERSION < 2308
-        result.push_back(HdMaterialBindingSchemaTokens->materialBinding);
-#else
         result.push_back(HdMaterialBindingsSchema::GetSchemaToken());
-#endif
         result.push_back(HdLegacyDisplayStyleSchemaTokens->displayStyle);
         result.push_back(HdVisibilitySchemaTokens->visibility);
         result.push_back(HdXformSchemaTokens->xform);
@@ -159,11 +153,7 @@ MayaHydraDataSource::Get(const TfToken& name)
         return _GetPrimvarsDataSource();
     }
     else if (name ==
-#if PXR_VERSION < 2308
-             HdMaterialBindingSchemaTokens->materialBinding
-#else
              HdMaterialBindingsSchema::GetSchemaToken()
-#endif             
              ) {
        return _GetMaterialBindingDataSource();
     }
@@ -267,19 +257,6 @@ TfToken MayaHydraDataSource::_InterpolationAsToken(HdInterpolation interpolation
 HdDataSourceBaseHandle
 MayaHydraDataSource::_GetMaterialBindingDataSource()
 {
-#if PXR_VERSION < 2308
-    SdfPath path = _sceneIndex->GetMaterialId(_id);
-    if (path.IsEmpty()) {
-        return nullptr;
-    }
-    HdDataSourceBaseHandle bindingPath =
-        HdRetainedTypedSampledDataSource<SdfPath>::New(path);
-
-    TfToken t = HdMaterialBindingSchemaTokens->allPurpose;
-    HdContainerDataSourceHandle binding =
-        HdMaterialBindingSchema::BuildRetained(1, &t, &bindingPath);
-    return binding;
-#else
     const SdfPath path = _sceneIndex->GetMaterialId(_id);
     if (path.IsEmpty()) {
         return nullptr;
@@ -297,7 +274,6 @@ MayaHydraDataSource::_GetMaterialBindingDataSource()
     return
         HdMaterialBindingsSchema::BuildRetained(
             TfArraySize(purposes), purposes, materialBindingSources);
-#endif
 }
 
 static bool
@@ -387,9 +363,7 @@ _ConvertHdMaterialNetworkToHdDataSources(
                     HdRetainedTypedSampledDataSource<TfToken>::New(
                         node.identifier),
                     nullptr /*renderContextNodeIdentifiers*/
-#if PXR_VERSION >= 2308
                     , nullptr /* nodeTypeInfo */ 
-#endif
             ));
         }
 
