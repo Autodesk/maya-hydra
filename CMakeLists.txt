@@ -172,14 +172,14 @@ endif()
 #------------------------------------------------------------------------------
 add_subdirectory(lib)
 
-if((BUILD_HDSB_PLUGIN OR BUILD_HDSBLIB) AND IS_WINDOWS) # Only build for windows until it can be tested on Linux and MacOS
+if(BUILD_HDSB_PLUGIN OR BUILD_HDSBLIB)
     add_subdirectory(lib/adskHydraSceneBrowser)
 endif()
 
 #------------------------------------------------------------------------------
 # plugin
 #------------------------------------------------------------------------------
-if(BUILD_HDSB_PLUGIN AND IS_WINDOWS) # Only build for windows until it can be tested on Linux and MacOS
+if(BUILD_HDSB_PLUGIN)
     add_subdirectory(plugin/mayaHydraSceneBrowser)
     if (BUILD_TESTS)
         add_subdirectory(plugin/mayaHydraSceneBrowserTest)

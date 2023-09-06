@@ -80,6 +80,9 @@ foreach(SOURCE IN ITEMS ${SOURCES})
     
     # Patch in '#include <QString>' to make sure we can use QLatin1StringView
     prepend_include(FILE_CONTENTS "#include <QString>")
+
+    # Remove an unused lambda capture to fix a warning-treated-as-error on MacOS
+    string(REGEX REPLACE "\(\\[this, menu\), menuTreeWidget\(\\]\\(QTreeWidgetItem \\*item, int column\\)\)" "\\1\\2" FILE_CONTENTS "${FILE_CONTENTS}")
     
     file(WRITE "${PATCH_LOCATION}/${SOURCE}" "${FILE_CONTENTS}")
 endforeach()

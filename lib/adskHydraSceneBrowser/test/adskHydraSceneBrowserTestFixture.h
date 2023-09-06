@@ -44,6 +44,8 @@ protected:
 
     void CompareDataSourceValue(pxr::HdSampledDataSourceHandle sampledDataSource);
 
+    bool MatchesFallbackTextOutput(const std::string& text);
+
     void CompareValueContent(const pxr::VtValue& value);
 
     template <typename ElementType> void CompareIfArray(const pxr::VtValue& value);

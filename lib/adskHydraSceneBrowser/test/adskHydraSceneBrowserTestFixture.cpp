@@ -20,6 +20,7 @@
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
 #include <iostream>
+#include <regex>
 #include <stack>
 #include <vector>
 
@@ -215,6 +216,17 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceValue(
     }
 }
 
+bool AdskHydraSceneBrowserTestFixture::MatchesFallbackTextOutput(const std::string& text) {
+    // Regex for matching the fallback text output used for types that don't provide a custom one.
+    // Identifies a literal <', followed by a valid C++ class name, then a literal ', then a
+    // space, an @ symbol and another space, a hexadecimal 32 to 64 bit address (case-insensitive,
+    // potentially prefixed with 0x), and finally a literal >. Example matches :
+    // <'ArResolverContext' @ 0x251ffa80>
+    // <'ArResolverContext' @ 000001D3A4296670>
+    std::regex fallbackTextOutputRegex("<'[a-zA-Z_][a-zA-Z_0-9]*' @ (0x)?[0-9a-fA-F]{8,16}>");
+    return std::regex_match(text, fallbackTextOutputRegex);
+}
+
 void AdskHydraSceneBrowserTestFixture::CompareValueContent(const pxr::VtValue& value)
 {
     QAbstractItemModel* dataSourceItemModel = _dataSourceValueView->model();
@@ -229,7 +241,35 @@ void AdskHydraSceneBrowserTestFixture::CompareValueContent(const pxr::VtValue& v
     valueStream << value;
     std::string expectedValue = valueStream.str();
 
-    EXPECT_EQ(actualValue, expectedValue);
+    if (!MatchesFallbackTextOutput(expectedValue)) {
+        // Happy path : the concrete type of the VtValue supports text output.
+        // (this is an assumption and not a truly reliable check; see the not-so-happy path
+        // for more details)
+        EXPECT_EQ(actualValue, expectedValue);
+    } else {
+        // Not-so-happy path : the concrete type of the VtValue does not support text output.
+        //
+        // If a type does not provide custom text output, this will cause Vt_StreamOutGeneric to be
+        // called by Vt_StreamOutImpl (see streamOut.h/.cpp). This function outputs the name of the
+        // concrete type followed by the address of the held object. Example outputs :
+        // <'ArResolverContext' @ 0x251ffa80>
+        // <'ArResolverContext' @ 000001D3A4296670>
+        //
+        // Since it is possible that some data sources return a copy of their underlying object when
+        // calling GetValue(), the object held by the VtValue passed in as the parameter to this
+        // function may differ from the one held by the VtValue used by the scene browser. In such
+        // cases, the printed addresses won't match and the test will fail.
+        //
+        // This workaround instead compares the values only up to their type name in these cases.
+        // The regex check could technically prevent fully comparing values if their custom text
+        // output perfectly matches the regex, but this seems very unlikely.
+        std::string valueTypeName = value.GetTypeName();
+        size_t      indexOfTypeName = expectedValue.find(valueTypeName);
+        size_t      substringComparisonLength = indexOfTypeName + valueTypeName.size();
+        EXPECT_EQ(
+            actualValue.substr(0, substringComparisonLength),
+            expectedValue.substr(0, substringComparisonLength));
+    }
 }
 
 template <typename ElementType>
@@ -245,7 +285,7 @@ void AdskHydraSceneBrowserTestFixture::CompareArrayContents(
     const pxr::VtArray<ElementType>& vtArray)
 {
     QAbstractItemModel* dataSourceItemModel = _dataSourceValueView->model();
-    EXPECT_EQ(dataSourceItemModel->rowCount(), vtArray.size());
+    EXPECT_EQ(static_cast<size_t>(dataSourceItemModel->rowCount()), vtArray.size());
 
     size_t nbRowsToTraverse
         = std::min(static_cast<size_t>(dataSourceItemModel->rowCount()), vtArray.size());
