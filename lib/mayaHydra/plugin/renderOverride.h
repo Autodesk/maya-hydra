@@ -89,7 +89,7 @@ public:
 
     void ClearHydraResources();
     void SelectionChanged();
-
+    void SetRenderPurposeTags(const MayaHydraParams& delegateParams) { _SetRenderPurposeTags(delegateParams); };
     MString uiName() const override { return MString(_rendererDesc.displayName.GetText()); }
 
     MHWRender::DrawAPI supportedDrawAPIs() const override;
@@ -119,6 +119,7 @@ private:
     void              _SelectionChanged();
     void              _DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext);
     HdRenderDelegate* _GetRenderDelegate();
+    void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
 
     void _PickByRegion(
         HdxPickHitVector& outHits,

@@ -67,7 +67,7 @@ int _profilerCategory = MProfiler::addCategory(
     "Events for MayaHydraSceneDelegate");
 
 #if PXR_VERSION < 2308
-#error USD version v0.28.08+ required
+#error USD version v0.23.08+ required
 #endif
 
 #if MAYA_API_VERSION < 20240000

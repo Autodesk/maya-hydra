@@ -531,14 +531,7 @@ MStatus MtohRenderOverride::Render(
     }
 
     // Set Purpose tags
-    TfTokenVector mhRenderTags = {HdRenderTagTokens->geometry};
-    if (delegateParams.renderPurpose)
-        mhRenderTags.push_back(HdRenderTagTokens->render);
-    if (delegateParams.proxyPurpose)
-        mhRenderTags.push_back(HdRenderTagTokens->proxy);
-    if (delegateParams.guidePurpose)
-        mhRenderTags.push_back(HdRenderTagTokens->guide);
-    _taskController->SetRenderTags(mhRenderTags);
+    SetRenderPurposeTags(delegateParams);
 
     _taskController->SetFreeCameraMatrices(
         GetGfMatrixFromMaya(
@@ -641,6 +634,18 @@ MtohRenderOverride* MtohRenderOverride::_GetByName(TfToken rendererName)
         }
     }
     return nullptr;
+}
+
+void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegateParams)
+{
+    TfTokenVector mhRenderTags = {HdRenderTagTokens->geometry};
+    if (delegateParams.renderPurpose)
+        mhRenderTags.push_back(HdRenderTagTokens->render);
+    if (delegateParams.proxyPurpose)
+        mhRenderTags.push_back(HdRenderTagTokens->proxy);
+    if (delegateParams.guidePurpose)
+        mhRenderTags.push_back(HdRenderTagTokens->guide);
+    _taskController->SetRenderTags(mhRenderTags);
 }
 
 void MtohRenderOverride::_InitHydraResources()

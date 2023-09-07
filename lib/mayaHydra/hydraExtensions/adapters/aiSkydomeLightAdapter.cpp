@@ -185,9 +185,9 @@ public:
             if (!_colorIsConnected){
                 if (!_dummyTextureFullPathFilename.empty()){
                     // Update Hydra texture resource everytime Domelight color is tweaked.
-                    auto getResourReg = GetSceneProducer()->GetRenderIndex().GetResourceRegistry();
-                    if (TF_VERIFY(getResourReg, "Unable to update AikSkyDomelights constant color"))
-                        getResourReg->ReloadResource(TfToken("texture"), _dummyTextureFullPathFilename);
+                    auto resourceReg = GetSceneProducer()->GetRenderIndex().GetResourceRegistry();
+                    if (TF_VERIFY(resourceReg, "Unable to update AikSkyDomelights constant color"))
+                        resourceReg->ReloadResource(TfToken("texture"), _dummyTextureFullPathFilename);
                     // SdfAssetPath requires both "path" and "resolvedPath"
                     return VtValue(SdfAssetPath(_dummyTextureFullPathFilename, _dummyTextureFullPathFilename));
                 }                
