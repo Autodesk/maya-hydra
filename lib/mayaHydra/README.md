@@ -12,31 +12,40 @@ The goal for _Hydra for Maya_ is to introduce Hydra as an open source viewport f
 
 With the _Hydra for Maya_ plugin, you can:
 
-- Use Storm as the default render delegate for Maya's viewport.
-- Render and interact with most of Maya's node types.
-- Use different render delegates using USD/Hydra's plugin system.
-- Natively view USD data with USD Extension for Maya through HdSceneIndex.
-- Use Hydra side-by-side with Maya's current Viewport 2.0.
+- Use Storm as the default render delegate for Maya's viewport
+- Render and interact with most of Maya's node types
+- Use different render delegates using USD/Hydra's plugin system
+- Natively view USD data with USD Extension for Maya through HdSceneIndex
+- Use Hydra side-by-side with Maya's current Viewport 2.0
+- MaterialX is supported within a USD stage
 
-## Current Limitations
+## Known Issues
 
-The _Hydra for Maya_ plugin has the following isses and limitations:.
+- Only direct texture inputs are supported for Maya materials
+- Limited support for Maya shader networks
+- Drawing issues with selection and highlighting
+- Hydra shading differs from Maya's Viewport 2.0
+- Animation Ghosting has the wrong shading
+- Current limitations with USD prims:
+  - Maya layers don't show effect
+  - Isolate Select only functions with Maya nodes
+  - Viewport display modes like Xray, wireframe or default shading do not function
+  - Selection highlighting not showing
+  - Gprims currently don't cast shadows in Storm
 
-- The USD stage is only viewable. Interactive transform edits are not working with the v22.11 USD release (Fixed by https://github.com/PixarAnimationStudios/USD/commit/9516b96e90).
-- UsdGeomCapsule, UsdGeomCone, UsdGeomCube, UsdGeomCylinder, and UsdGeomSphere are not supported. UsdGeomMesh can be used as an alternative.
-- MaterialX is not supported.
-- Only direct texture inputs are supported for Maya materials.
-- Limited support for Maya shader networks.
-- Drawing issues with selection and highlighting.
-- Hydra shading differs from Maya's Viewport 2.0.
-- Blue Pencil is not supported.
-- Screen space effects like depth of field and motion blur are not supported through Storm.
-- The following Maya node types are not viewable:
+## Currently not supported
+- Backface culling
+- Screen space effects like depth of field and motion blur
+- Arnold lights except the aiSkyDomeLight
+- Following Maya node types:
   - Bifrost
   - nParticles
   - Fluid
-- Arnold lights are not supported with Storm.
-- Animation Ghosting has the wrong shading.
+- Blue Pencil
+- Maya's volume and ambient light
+- Hardware Fog
+- Maya's procedural textures (e.g. noise or pattern)
+
 
 ## Detailed Documentation
 + [Building the mayaHydra.mll plugin](./doc/mayaHydraBuild.md)
