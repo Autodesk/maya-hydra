@@ -9,6 +9,7 @@ set(TEST_SCRIPT_FILES
     testNamespaces.py
     testVisibility.py
     testStageAddPrim.py
+    testNewSceneWithStage.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py
     cpp/testMayaUsdUfeItems.py
