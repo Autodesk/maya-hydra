@@ -33,11 +33,6 @@ option(CMAKE_WANT_MATERIALX_BUILD "Enable building with MaterialX (experimental)
 set(PXR_OVERRIDE_PLUGINPATH_NAME PXR_PLUGINPATH_NAME
     CACHE STRING "Name of env var USD searches to find plugins")
     
-option(BUILD_HDSBLIB "Build Hydra Scene Browser library (hdui)." OFF)
- # Note: if BUILD_HDSB_PLUGIN is set to 'ON', the Hydra Scene Browser library 
- # will be built by default because it is a dependency of the plugin.
-option(BUILD_HDSB_PLUGIN "Build Hydra Scene Browser plugin for Maya." OFF)
-
 #------------------------------------------------------------------------------
 # internal flags to control build
 #------------------------------------------------------------------------------
@@ -145,6 +140,24 @@ if(TARGET hdMtlx)
     endif()
 endif()
 
+if(MAYA_APP_VERSION VERSION_GREATER 2024)
+    # Look for Qt6 in the Maya devkit.
+    # The Qt6 archive in the Maya devkit contains everything needed for the normal cmake find_package.
+    set(CMAKE_PREFIX_PATH "${MAYA_DEVKIT_LOCATION}/Qt")
+    set(WANT_QT_VERSION 6.5)
+    find_package(Qt6 ${WANT_QT_VERSION} COMPONENTS Core Widgets QUIET)
+    if (Qt6_FOUND)
+        message(STATUS "Found Qt ${Qt6_VERSION} in Maya devkit. Hydra Scene Browser will be built.")
+        set(BUILD_HDSB_PLUGIN TRUE)
+    else()
+        message(WARNING "Could not find Qt ${WANT_QT_VERSION} in Maya devkit directory: ${MAYA_DEVKIT_LOCATION}. \
+                        You must extract Qt.tar.gz. Hydra Scene Browser will not be built.")
+    endif()
+else()
+    message(WARNING "Maya ${MAYA_APP_VERSION} does not contain Qt6 in its devkit \
+                    (Qt6 has been added to the Maya devkit as of Maya 2025). Hydra Scene Browser will not be built.")
+endif()
+
 #------------------------------------------------------------------------------
 # compiler configuration
 #------------------------------------------------------------------------------
@@ -172,7 +185,7 @@ endif()
 #------------------------------------------------------------------------------
 add_subdirectory(lib)
 
-if(BUILD_HDSB_PLUGIN OR BUILD_HDSBLIB)
+if(BUILD_HDSB_PLUGIN)
     add_subdirectory(lib/adskHydraSceneBrowser)
 endif()
 

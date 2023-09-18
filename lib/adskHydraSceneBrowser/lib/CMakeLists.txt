@@ -1,24 +1,19 @@
 # -----------------------------------------------------------------------------
-# setup Qt
+# set target name
 # -----------------------------------------------------------------------------
-if(DEFINED QT_LOCATION)
-    if(NOT DEFINED QT_VERSION)
-        set(QT_VERSION "6.5")
-    endif()
-    set(CMAKE_PREFIX_PATH "${QT_LOCATION}")
-    find_package(Qt6 ${QT_VERSION} COMPONENTS Core Widgets REQUIRED)
-    if(Qt6_FOUND)
-        message(STATUS "QT_LOCATION set. Building adskHydraSceneBrowser enabled.")
-    endif()
-else()
-    message(STATUS "QT_LOCATION not set. Building adskHydraSceneBrowser will be disabled.")
+set(TARGET_NAME adskHydraSceneBrowser)
+
+# -----------------------------------------------------------------------------
+# Qt safeguard
+# -----------------------------------------------------------------------------
+if (NOT Qt6_FOUND)
+    message(WARNING "No Qt6 package found. Cannot build ${TARGET_NAME}.")
     return()
 endif()
 
 # -----------------------------------------------------------------------------
-# setup adskHydraSceneBrowser library
+# add library
 # -----------------------------------------------------------------------------
-set(TARGET_NAME adskHydraSceneBrowser)
 add_library(${TARGET_NAME} SHARED adskHydraSceneBrowserApi.h)
 
 # -----------------------------------------------------------------------------
@@ -134,6 +129,10 @@ target_include_directories(${TARGET_NAME}
 set_target_properties(Qt6::Core PROPERTIES INTERFACE_COMPILE_DEFINITIONS QT_NO_KEYWORDS)
 
 target_compile_definitions(${TARGET_NAME} 
+    PUBLIC
+        $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:TBB_USE_DEBUG>
+        $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_DEBUG_PYTHON>
+        $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_LINKING_PYTHON>
     PRIVATE 
         HDUI_EXPORT
 )
