@@ -12,33 +12,22 @@ class TestMayaUsdUfeItems(mtohUtils.MayaHydraBaseTestCase):
 
     def setupUsdStage(self):
         import mayaUsd
-        import usdUtils
-        import ufe
-        
+        import mayaUsd_createStageWithNewLayer
+        from pxr import UsdGeom, UsdLux
+
         self.setHdStormRenderer()
-
-        proxyShapeUfePathString, proxyShapeUfePath, proxyShapeUfeItem = usdUtils.createSimpleStage()
-        stage = mayaUsd.lib.GetPrim(proxyShapeUfePathString).GetStage()
-
-        # Create a light prim
-        rectLightName = "myRectLight"
-        rectLightPrim = stage.DefinePrim('/' + rectLightName, 'RectLight')
-        rectLightUfePathString = proxyShapeUfePathString + ',/' + rectLightName
-        rectLightUfePath = ufe.PathString.path(rectLightUfePathString)
-        rectLightUfeItem = ufe.Hierarchy.createItem(rectLightUfePath)
-
-        # Create a geometry prim
-        sphereName = "mySphere"
-        sphere = cmds.polySphere(name=sphereName)
-        mayaUsd.lib.PrimUpdaterManager.duplicate(cmds.ls(sphere, long=True)[0], proxyShapeUfePathString)
-
+        cmds.refresh()
+        usdProxyShapeUfePathString = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        usdStage = mayaUsd.lib.GetPrim(usdProxyShapeUfePathString).GetStage()
+        UsdGeom.Cylinder.Define(usdStage, "/USDCylinder")
+        UsdLux.RectLight.Define(usdStage, "/USDRectLight")
         cmds.refresh()
 
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
-    def test_SkipMayaUsdUfeItems(self):
+    def test_SkipMayaUsdUfeLights(self):
         self.setupUsdStage()
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(f="MayaUsdUfeItems.skipUsdUfeItems")
+            cmds.mayaHydraCppTest(f="MayaUsdUfeItems.skipUsdUfeLights")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

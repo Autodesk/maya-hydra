@@ -24,6 +24,10 @@ For example, to run testVisibility on RelWithDebInfo :
 
 ```ctest -C RelWithDebInfo -VV --output-on-failure -R testVisibility```
 
+### Running tests with MayaUSD
+
+Some tests require the MayaUSD plugin to be loaded in order to be run. If MayaUSD cannot be loaded, those tests will be skipped. In order for the test framework to find and load MayaUSD, you must specify the path to where MayaUSD is installed, using either the -DMAYAUSD_LOCATION CMake flag, or the --mayausd-location parameter for [build.py](../../../../../build.py). Note that the test framework will not find MayaUSD using the MAYA_MODULE_PATH environment variable.
+
 # MayaHydra tests folder structure
 
 The [current folder](./) contains :
