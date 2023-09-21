@@ -14,13 +14,15 @@ import sys
 HD_STORM = "HdStormRendererPlugin"
 HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
 
-def checkForMayaUsdPlugin():
+def checkForPlugin(pluginName: str):
     try:
-        cmds.loadPlugin('mayaUsdPlugin')
+        cmds.loadPlugin(pluginName)
     except:
         return False
-    
     return True
+
+def checkForMayaUsdPlugin():
+    return checkForPlugin('mayaUsdPlugin')
 
 class MayaHydraBaseTestCase(unittest.TestCase):
     '''Base class for mayaHydra unit tests without image comparison.'''

@@ -8,6 +8,7 @@ set(TEST_SCRIPT_FILES
     testMeshes.py
     testNamespaces.py
     testVisibility.py
+    testSceneBrowser.py
     testStageAddPrim.py
     testNewSceneWithStage.py
     cpp/testCppFramework.py
