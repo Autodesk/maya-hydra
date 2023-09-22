@@ -77,8 +77,6 @@ protected:
     void _CalculateShadowParams(MFnLight& light, HdxShadowParams& params);
     MAYAHYDRALIB_API
     bool _GetVisibility() const override;
-    MAYAHYDRALIB_API
-    bool IsAnArnoldSkyDomeLight(const MDagPath& dag) const;
 
     GfMatrix4d _shadowProjectionMatrix;
     bool       _isLightingOn = true;

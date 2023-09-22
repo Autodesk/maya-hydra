@@ -80,8 +80,6 @@ public:
         const MColor&            wireframecolor)
     {
     }
-    virtual void AddArnoldLight(const MDagPath& dag) { }
-    virtual void RemoveArnoldLight(const MDagPath& dag) { }
 
     /// \brief Notifies the scene delegate when a material tag changes.
     ///

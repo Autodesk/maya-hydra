@@ -466,6 +466,23 @@ void MayaHydraSceneDelegate::Populate()
     }
 }
 
+MayaHydraSceneDelegate::LightDagPathMap 
+MayaHydraSceneDelegate::_GetActiveLightPaths() const 
+{
+    LightDagPathMap activeLightPaths;
+    activeLightPaths.reserve(_lightAdapters.size());
+    // By the time this function is called _lightAdapters should already have been populated
+    // with both Maya and Arnold light adapters. The adapters contain the DagPath information
+    // we store it here in unordered_map for fast retrieval
+    for(const auto& entry : _lightAdapters)
+    {
+        const auto& dagpath = entry.second->GetDagPath();
+        activeLightPaths.emplace(dagpath.fullPathName().asChar(), 
+                                 dagpath);
+    }
+    return activeLightPaths;
+}
+
 //
 void MayaHydraSceneDelegate::PreFrame(const MHWRender::MDrawContext& context)
 {
@@ -586,17 +603,12 @@ void MayaHydraSceneDelegate::PreFrame(const MHWRender::MDrawContext& context)
         return;
     }
 
-    // Some 3rd parties lights may be ignored by the call to
-    // MHWRender::MDrawContext::numberOfActiveLights (like the Arnold lights which are seen by Maya
-    // as locators)
-    std::vector<MDagPath> activelightPaths
-        = _arnoldLightPaths; // We suppose the Arnold lights are always active
-
+    LightDagPathMap globalLightPaths = _GetActiveLightPaths();
     constexpr auto considerAllSceneLights = MHWRender::MDrawContext::kFilteredIgnoreLightLimit;
     MStatus        status;
     const auto     numLights = context.numberOfActiveLights(considerAllSceneLights, &status);
 
-    if ((!status || numLights == 0) && (0 == activelightPaths.size())) {
+    if ((!status || numLights == 0) && (0 == globalLightPaths.size())) {
         _MapAdapter<MayaHydraLightAdapter>(
             [](MayaHydraLightAdapter* a) { a->SetLightingOn(false); },
             _lightAdapters); // Turn off all lights
@@ -618,8 +630,12 @@ void MayaHydraSceneDelegate::PreFrame(const MHWRender::MDrawContext& context)
             // If this is a UFE light created by maya-usd, it will have already added it to Hydra
             continue;
         }
-
-        activelightPaths.push_back(lightPath);
+        
+        // we do a fast look up here for any new lights that may have been added
+        auto found = globalLightPaths.find(lightPath.fullPathName().asChar());
+        if (found == globalLightPaths.end())
+            globalLightPaths.emplace(lightPath.fullPathName().asChar(), 
+                                     lightPath);
 
         if (!lightParam->getParameter(MHWRender::MLightParameterInformation::kShadowOn, intVals)
             || intVals.length() < 1 || intVals[0] != 1) {
@@ -640,17 +656,17 @@ void MayaHydraSceneDelegate::PreFrame(const MHWRender::MDrawContext& context)
     // Turn on active lights, turn off non-active lights, and add non-created active lights.
     _MapAdapter<MayaHydraLightAdapter>(
         [&](MayaHydraLightAdapter* a) {
-            auto it = std::find(activelightPaths.begin(), activelightPaths.end(), a->GetDagPath());
-            if (it != activelightPaths.end()) {
+            auto lgtAdapter = globalLightPaths.find(a->GetDagPath().fullPathName().asChar());
+            if (lgtAdapter != globalLightPaths.end()) {
                 a->SetLightingOn(true);
-                activelightPaths.erase(it);
+                globalLightPaths.erase(lgtAdapter);
             } else {
                 a->SetLightingOn(false);
             }
         },
         _lightAdapters);
-    for (const auto& lightPath : activelightPaths) {
-        CreateLightAdapter(lightPath);
+    for(const auto& entry : globalLightPaths) {
+        CreateLightAdapter(entry.second);
     }
 }
 
@@ -1577,19 +1593,6 @@ SdfPath MayaHydraSceneDelegate::SetCameraViewport(const MDagPath& camPath, const
         return camID;
     }
     return {};
-}
-
-void MayaHydraSceneDelegate::AddArnoldLight(const MDagPath& dag)
-{
-    _arnoldLightPaths.push_back(dag);
-}
-
-void MayaHydraSceneDelegate::RemoveArnoldLight(const MDagPath& dag)
-{
-    const auto it = std::find(_arnoldLightPaths.begin(), _arnoldLightPaths.end(), dag);
-    if (it != _arnoldLightPaths.end()) {
-        _arnoldLightPaths.erase(it);
-    }
 }
 
 VtValue MayaHydraSceneDelegate::GetShadingStyle(SdfPath const& id)

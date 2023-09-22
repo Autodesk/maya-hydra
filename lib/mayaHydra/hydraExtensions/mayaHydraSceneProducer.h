@@ -123,9 +123,6 @@ public:
     void SetDefaultLightEnabled(const bool enabled);
     void SetDefaultLight(const GlfSimpleLight& light);
 
-    void AddArnoldLight(const MDagPath& dag);
-    void RemoveArnoldLight(const MDagPath& dag);
-
     bool IsHdSt() const;
 
     bool GetPlaybackRunning() const;

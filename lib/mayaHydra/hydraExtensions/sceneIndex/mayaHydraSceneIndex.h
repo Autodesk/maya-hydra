@@ -53,7 +53,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class MayaHydraSceneIndex;
 TF_DECLARE_REF_PTRS(MayaHydraSceneIndex);
-
 /**
  * \brief MayaHydraSceneIndex is a scene index to produce the hydra scene from Maya native scene.
  */
@@ -145,9 +144,6 @@ public:
     void AddNewInstance(const MDagPath& dag);
     void UpdateLightVisibility(const MDagPath& dag);
 
-    void AddArnoldLight(const MDagPath& dag);
-    void RemoveArnoldLight(const MDagPath& dag);
-
     void MaterialTagChanged(const SdfPath& id);
     SdfPath GetMaterialId(const SdfPath& id);
     VtValue GetMaterialResource(const SdfPath& id);
@@ -197,6 +193,9 @@ private:
     SdfPath _GetRenderItemPrimPath(const MRenderItem& ri);
     SdfPath GetMaterialPath(const MObject& obj);
     bool _CreateMaterial(const SdfPath& id, const MObject& obj);
+    
+    using LightDagPathMap = std::unordered_map<std::string, MDagPath>;
+    LightDagPathMap _GetActiveLightPaths() const;
     static VtValue CreateMayaDefaultMaterial();
 private:
     // ------------------------------------------------------------------------
@@ -231,7 +230,6 @@ private:
     using LightAdapterCreator
         = std::function<MayaHydraLightAdapterPtr(MayaHydraSceneProducer*, const MDagPath&)>;
     std::vector<std::pair<MObject, LightAdapterCreator>> _lightsToAdd;
-    std::vector<MDagPath> _arnoldLightPaths;
     std::vector<SdfPath> _materialTagsChanged;
 
     bool _useDefaultMaterial = false;
