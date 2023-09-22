@@ -789,12 +789,12 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         return;
     }
    
-    LightDagPathMap globalLightPaths = _GetActiveLightPaths();
+    LightDagPathMap activeLightPaths = _GetActiveLightPaths();
     constexpr auto considerAllSceneLights = MHWRender::MDrawContext::kFilteredIgnoreLightLimit;
     MStatus        status;
     const auto     numLights = context.numberOfActiveLights(considerAllSceneLights, &status);
 
-    if ((!status || numLights == 0) && (0 == globalLightPaths.size())) {
+    if ((!status || numLights == 0) && (0 == activeLightPaths.size())) {
         _MapAdapter<MayaHydraLightAdapter>(
             [](MayaHydraLightAdapter* a) { a->SetLightingOn(false); },
             _lightAdapters); // Turn off all lights
@@ -818,9 +818,9 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         }
 
         // we do a fast look up here for any new lights that may have been added
-        auto found = globalLightPaths.find(lightPath.fullPathName().asChar());
-        if (found == globalLightPaths.end())
-            globalLightPaths.emplace(lightPath.fullPathName().asChar(), 
+        auto found = activeLightPaths.find(lightPath.fullPathName().asChar());
+        if (found == activeLightPaths.end())
+            activeLightPaths.emplace(lightPath.fullPathName().asChar(), 
                                      lightPath);
 
         if (!lightParam->getParameter(MHWRender::MLightParameterInformation::kShadowOn, intVals)
@@ -842,16 +842,16 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
     // Turn on active lights, turn off non-active lights, and add non-created active lights.
     _MapAdapter<MayaHydraLightAdapter>(
         [&](MayaHydraLightAdapter* a) {
-            auto lgtAdapter = globalLightPaths.find(a->GetDagPath().fullPathName().asChar());
-            if (lgtAdapter != globalLightPaths.end()) {
+            auto lgtAdapter = activeLightPaths.find(a->GetDagPath().fullPathName().asChar());
+            if (lgtAdapter != activeLightPaths.end()) {
                 a->SetLightingOn(true);
-                globalLightPaths.erase(lgtAdapter);
+                activeLightPaths.erase(lgtAdapter);
             } else {
                 a->SetLightingOn(false);
             }
         },
         _lightAdapters);
-    for(const auto& entry : globalLightPaths) {
+    for(const auto& entry : activeLightPaths) {
         CreateLightAdapter(entry.second);
     }
 }
