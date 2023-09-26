@@ -32,6 +32,10 @@
 #include <mayaHydraLib/interface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
 
+#include <flowViewport/tokens.h>
+#include <flowViewport/debugCodes.h>
+#include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
+
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/type.h>
@@ -39,9 +43,7 @@
 #include <ufe/hierarchy.h>
 #include <ufe/namedSelection.h>
 #include <ufe/path.h>
-#include <ufe/pathSegment.h>
 #include <ufe/pathString.h>
-#include <ufe/rtid.h>
 #include <ufe/selection.h>
 
 #include <ufeExtensions/Global.h>
@@ -691,12 +693,21 @@ void MtohRenderOverride::_InitHydraResources()
         SdfPath(),
         _isUsingHdSt);
 
-    _mayaHydraSceneProducer.reset(new MayaHydraSceneProducer(_ID, delegateInitData, !_hasDefaultLighting));
+    // Render index proxy sets up the Flow Viewport merging scene index, must
+    // be created first, as it is required for:
+    // - Maya scene producer, which needs the render index proxy to insert
+    //   itself.
+
+    _renderIndexProxy = std::make_unique<Fvp::RenderIndexProxy>(_renderIndex);
+
+    _mayaHydraSceneProducer.reset(new MayaHydraSceneProducer(*_renderIndexProxy, _ID, delegateInitData, !_hasDefaultLighting));
 
     VtValue selectionTrackerValue(_selectionTracker);
     _engine.SetTaskContextData(HdxTokens->selectionState, selectionTrackerValue);
 
     _mayaHydraSceneProducer->Populate();
+
+    _renderIndex->InsertSceneIndex(_renderIndexProxy->GetMergingSceneIndex(), SdfPath::AbsoluteRootPath());
 
     _renderIndex->GetChangeTracker().AddCollection(_selectionCollection.GetName());
     _SelectionChanged();
@@ -719,7 +730,7 @@ void MtohRenderOverride::_InitHydraResources()
         }
     }
     if (!_sceneIndexRegistry) {
-        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndex));
+        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(*_renderIndexProxy));
     }
 
     _initializationSucceeded = true;
@@ -924,18 +935,18 @@ void MtohRenderOverride::_PopulateSelectionList(
                     // prefix will be prepended to rprims tied to that scene index automatically.
                     SdfPath localPath(
                         pickedPath.ReplacePrefix(registration->sceneIndexPathPrefix, SdfPath("/")));
-                    Ufe::Path interpetedPath(registration->interpretRprimPathFn(
+                    Ufe::Path interpretedPath(registration->interpretRprimPathFn(
                         registration->pluginSceneIndex, localPath));
 
                     // If this is a maya UFE path, then select using MSelectionList
                     // This is because the NamedSelection ignores Ufe items made from maya ufe path
-                    if (interpetedPath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
-                        selectionList.add(UfeExtensions::ufeToDagPath(interpetedPath));
+                    if (interpretedPath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
+                        selectionList.add(UfeExtensions::ufeToDagPath(interpretedPath));
                         worldSpaceHitPts.append(
                             hit.worldSpaceHitPoint[0],
                             hit.worldSpaceHitPoint[1],
                             hit.worldSpaceHitPoint[2]);
-                    } else if (auto si = Ufe::Hierarchy::createItem(interpetedPath)) {
+                    } else if (auto si = Ufe::Hierarchy::createItem(interpretedPath)) {
                         ufeSel->append(si);
                     }
                 }

@@ -19,7 +19,8 @@
 
 #include <mayaHydraLib/api.h>
 
-#include <pxr/imaging/hd/renderIndex.h>
+#include <flowViewport/flowViewport.h>
+
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
@@ -29,13 +30,19 @@
 #include <maya/MNodeMessage.h>
 #include <maya/MObject.h>
 #include <maya/MObjectHandle.h>
-#include <ufe/path.h>
 #include <ufe/rtid.h>
-#include <ufe/sceneItem.h>
 #include <ufe/ufe.h>
 
 #include <atomic>
 #include <unordered_map>
+
+UFE_NS_DEF {
+class Path;
+}
+
+namespace FVP_NS_DEF {
+class RenderIndexProxy;
+}
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -70,9 +77,12 @@ struct MayaHydraSceneIndexRegistration
 class MayaHydraSceneIndexRegistry
 {
 public:
+
+    using Registrations = std::unordered_map<SdfPath, MayaHydraSceneIndexRegistrationPtr, SdfPath::Hash>;
+
     static constexpr Ufe::Rtid kInvalidUfeRtid = 0;
     MAYAHYDRALIB_API
-    MayaHydraSceneIndexRegistry(HdRenderIndex* renderIndex);
+    MayaHydraSceneIndexRegistry(Fvp::RenderIndexProxy& renderIndexProxy);
 
     MAYAHYDRALIB_API
     ~MayaHydraSceneIndexRegistry();
@@ -81,17 +91,20 @@ public:
     MayaHydraSceneIndexRegistrationPtr
     GetSceneIndexRegistrationForRprim(const SdfPath& rprimPath) const;
 
+    MAYAHYDRALIB_API
+    const Registrations& GetRegistrations() const;
+
 private:
     void
     _AddSceneIndexForNode(MObject& dagNode); // dagNode non-const because of callback registration
     bool        _RemoveSceneIndexForNode(const MObject& dagNode);
     static void _SceneIndexNodeAddedCallback(MObject& obj, void* clientData);
     static void _SceneIndexNodeRemovedCallback(MObject& obj, void* clientData);
-    HdRenderIndex* _renderIndex = nullptr;
+    Fvp::RenderIndexProxy& _renderIndexProxy;
 
     MCallbackIdArray _sceneIndexDagNodeMessageCallbacks;
 
-    std::unordered_map<SdfPath, MayaHydraSceneIndexRegistrationPtr, SdfPath::Hash> _registrations;
+    Registrations _registrations;
     // Maintain alternative way to retrieve registration based on MObjectHandle. This is faster to
     // retrieve the registration upon callback whose event argument is the node itself.
     struct _HashObjectHandle

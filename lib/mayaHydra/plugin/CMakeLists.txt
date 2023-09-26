@@ -82,6 +82,7 @@ target_link_libraries(${TARGET_NAME}
     PRIVATE 
         mayaHydraLib
         ufeExtensions
+        flowViewport
         $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
 )
 

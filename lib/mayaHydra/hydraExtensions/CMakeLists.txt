@@ -130,6 +130,7 @@ else()
             usdSkel
             usdUtils
             ufeExtensions
+            flowViewport
             ${MAYA_LIBRARIES}
         PRIVATE
             $<$<BOOL:${USD_001905_BUILD}>:hio>

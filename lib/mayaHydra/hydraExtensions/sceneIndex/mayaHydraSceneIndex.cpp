@@ -31,6 +31,7 @@
 #include <maya/MShaderManager.h>
 #include <maya/MString.h>
 
+#include <mayaHydraLib/debugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/hydraUtils.h>
@@ -38,6 +39,10 @@
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
+
+#include <ufeExtensions/Global.h>
+
+#include <ufe/pathString.h>
 
 #include <pxr/base/tf/envSetting.h>
 #include <pxr/imaging/hd/meshSchema.h>
@@ -362,7 +367,6 @@ VtValue MayaHydraSceneIndex::_mayaDefaultMaterial;
 SdfPath MayaHydraSceneIndex::_mayaDefaultLightPath; // Common to all scene indexes
 
 MayaHydraSceneIndex::MayaHydraSceneIndex(
-    SdfPath& id,
     MayaHydraDelegate::InitData& initData,
     bool lightEnabled)
     : _ID(initData.delegateID)
@@ -600,6 +604,23 @@ void MayaHydraSceneIndex::PopulateSelectedPaths(
     SdfPathVector& selectedSdfPaths,
     const HdSelectionSharedPtr& selection)
 {
+}
+
+SdfPath MayaHydraSceneIndex::SceneIndexPath(const Ufe::Path& appPath) const
+{
+    TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
+        .Msg("MayaHydraSceneIndex::SceneIndexPath(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
+
+    // We only handle Maya objects, so if the UFE path is not a Maya object,
+    // early out with failure.
+    if (appPath.runTimeId() != UfeExtensions::getMayaRunTimeId()) {
+        return {};
+    }
+
+    // Not the best implementation performance-wise, as ufeToDagPath converts
+    // the UFE path to a string, then does a Dag path lookup with the string.
+    constexpr bool isSprim = false; // Can't handle sprims as of 15-Aug-2023.
+    return GetPrimPath(UfeExtensions::ufeToDagPath(appPath), isSprim);
 }
 
 SdfPath MayaHydraSceneIndex::SetCameraViewport(const MDagPath& camPath, const GfVec4d& viewport)
@@ -1106,7 +1127,7 @@ SdfPath MayaHydraSceneIndex::_GetRenderItemPrimPath(const MRenderItem& ri)
     return GetRenderItemPrimPath(_rprimPath, ri);
 }
 
-SdfPath MayaHydraSceneIndex::GetPrimPath(const MDagPath& dg, bool isSprim)
+SdfPath MayaHydraSceneIndex::GetPrimPath(const MDagPath& dg, bool isSprim) const
 {
     if (isSprim) {
         return _GetPrimPath(_sprimPath, dg);

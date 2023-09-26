@@ -17,6 +17,8 @@
 #ifndef MAYAHYDRASCENEPRODUCER_H
 #define MAYAHYDRASCENEPRODUCER_H
 
+#include <flowViewport/flowViewport.h>
+
 #include <maya/MDagPath.h>
 #include <maya/MFrameContext.h>
 #include <maya/MObject.h>
@@ -38,6 +40,10 @@
 #include <pxr/imaging/hd/rendererPlugin.h>
 #include <pxr/imaging/hdx/taskController.h>
 
+namespace FVP_NS_DEF {
+class RenderIndexProxy;
+}
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class MayaHydraSceneDelegate;
@@ -48,15 +54,16 @@ class MtohDefaultLightDelegate;
  * \brief MayaHydraSceneProducer is used to produce the hydra scene from Maya native scene.
  * Under the hood, the work is delegated to MayaHydraSceneIndex or MayaHydraSceneDelegate, depends on
  * if MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX is enabled or not. 
- * Note that MayaHydraSceneDelegate could be depreciated in the future.
+ * Note that MayaHydraSceneDelegate could be deprecated in the future.
  */
 class MAYAHYDRALIB_API MayaHydraSceneProducer
 {
 public:
     MayaHydraSceneProducer(
-        SdfPath& id,
+        Fvp::RenderIndexProxy&       renderIndexProxy,
+        const SdfPath&               id,
         MayaHydraDelegate::InitData& initData,
-        bool lightEnabled);
+        bool                         lightEnabled);
     ~MayaHydraSceneProducer();
 
     // Propogate scene changes from Maya to Hydra
@@ -136,7 +143,9 @@ public:
     GfInterval GetCurrentTimeSamplingInterval() const;
 
     // Return the id of underlying delegate by name (MayaHydraSceneIndex or MayaHydraSceneDelegate)
-    SdfPath GetDelegateID(TfToken name);
+    SdfPath GetDelegateID(TfToken name) const;
+
+    MayaHydraSceneIndexRefPtr GetSceneIndex() const { return _sceneIndex; }
 
     void MaterialTagChanged(const SdfPath& id);
 
@@ -191,8 +200,10 @@ private:
     std::shared_ptr<MayaHydraSceneDelegate> _sceneDelegate;
     std::vector<MayaHydraDelegatePtr> _delegates;
     std::unique_ptr<MtohDefaultLightDelegate> _defaultLightDelegate;
+
     // SceneIndex
     MayaHydraSceneIndexRefPtr _sceneIndex;
+    Fvp::RenderIndexProxy&    _renderIndexProxy;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

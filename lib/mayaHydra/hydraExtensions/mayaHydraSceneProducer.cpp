@@ -21,6 +21,8 @@
 #include <mayaHydraLib/delegates/delegateRegistry.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
+
 #include <pxr/base/tf/envSetting.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -34,9 +36,11 @@ bool enableMayaNativeSceneIndex() {
 }
 
 MayaHydraSceneProducer::MayaHydraSceneProducer(
-    SdfPath& id,
+    Fvp::RenderIndexProxy&       renderIndexProxy,
+    const SdfPath&               id,
     MayaHydraDelegate::InitData& initData,
-    bool lightEnabled)
+    bool                         lightEnabled
+) : _renderIndexProxy(renderIndexProxy)
 {
     if (enableMayaNativeSceneIndex())
     {
@@ -44,7 +48,7 @@ MayaHydraSceneProducer::MayaHydraSceneProducer(
         initData.delegateID = id.AppendChild(
             TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this)));
         initData.producer = this;
-        _sceneIndex = MayaHydraSceneIndex::New(id, initData, lightEnabled);
+        _sceneIndex = MayaHydraSceneIndex::New(initData, lightEnabled);
         TF_VERIFY(_sceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
     }
     else
@@ -113,7 +117,7 @@ void MayaHydraSceneProducer::Populate()
     {
         _sceneIndex->Populate();
         // Call InsertSceneIndex before prims are added to scene index, would it be better to call later?
-        _sceneIndex->GetRenderIndex().InsertSceneIndex(_sceneIndex, SdfPath::AbsoluteRootPath());
+        _renderIndexProxy.InsertSceneIndex(_sceneIndex, SdfPath::AbsoluteRootPath());
     }
     else
     {
@@ -374,7 +378,7 @@ void MayaHydraSceneProducer::MarkSprimDirty(const SdfPath& id, HdDirtyBits dirty
     }
 }
 
-SdfPath MayaHydraSceneProducer::GetDelegateID(TfToken name)
+SdfPath MayaHydraSceneProducer::GetDelegateID(TfToken name) const
 {
     if (enableMayaNativeSceneIndex())
     {

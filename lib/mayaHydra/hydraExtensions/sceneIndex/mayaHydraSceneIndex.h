@@ -34,6 +34,8 @@
 #include <mayaHydraLib/adapters/cameraAdapter.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDefaultLightDataSource.h>
 
+#include "flowViewport/sceneIndex/fvpPathInterface.h"
+
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
 #include <pxr/imaging/hdx/pickTask.h>
@@ -48,7 +50,6 @@
 
 #include <unordered_map>
 
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 class MayaHydraSceneIndex;
@@ -56,7 +57,7 @@ TF_DECLARE_REF_PTRS(MayaHydraSceneIndex);
 /**
  * \brief MayaHydraSceneIndex is a scene index to produce the hydra scene from Maya native scene.
  */
-class MAYAHYDRALIB_API MayaHydraSceneIndex : public HdRetainedSceneIndex
+class MAYAHYDRALIB_API MayaHydraSceneIndex : public HdRetainedSceneIndex, public Fvp::PathInterface
 {
 public:
     enum RebuildFlags : uint32_t
@@ -66,10 +67,10 @@ public:
     };
     template <typename T> using AdapterMap = std::unordered_map<SdfPath, T, SdfPath::Hash>;
 
-    static MayaHydraSceneIndexRefPtr New(SdfPath& id,
+    static MayaHydraSceneIndexRefPtr New(
         MayaHydraDelegate::InitData& initData,
         bool lightEnabled) {
-        return TfCreateRefPtr(new MayaHydraSceneIndex(id, initData, lightEnabled));
+        return TfCreateRefPtr(new MayaHydraSceneIndex(initData, lightEnabled));
     }
 
     ~MayaHydraSceneIndex();
@@ -158,7 +159,7 @@ public:
 
     HdMeshTopology GetMeshTopology(const SdfPath& id);
 
-    SdfPath GetPrimPath(const MDagPath& dg, bool isSprim);
+    SdfPath GetPrimPath(const MDagPath& dg, bool isSprim) const;
 
     SdfPath GetLightedPrimsRootPath() const;
 
@@ -168,10 +169,10 @@ public:
 
     MayaHydraSceneProducer* GetProducer() { return _producer; };
 
+    SdfPath SceneIndexPath(const Ufe::Path& appPath) const override;
    
 private:
     MayaHydraSceneIndex(
-        SdfPath& id,
         MayaHydraDelegate::InitData& initData,
         bool lightEnabled);
 

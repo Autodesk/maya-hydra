@@ -1,1 +1,2 @@
 add_subdirectory(mayaHydra)
+add_subdirectory(flowViewport)

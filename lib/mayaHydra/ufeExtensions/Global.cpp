@@ -35,19 +35,25 @@ namespace UfeExtensions {
 PXR_NAMESPACE_USING_DIRECTIVE
 
 constexpr char kMayaRunTimeName[] = "Maya-DG";
+constexpr char kUSDRunTimeName[] = "USD";
 constexpr char kSdfPathSeparator = '/';
 
 Ufe::Rtid getMayaRunTimeId()
 {
-    static Ufe::Rtid        g_MayaRtid;
-    static std::atomic_bool once { true };
-    if (once) {
-        once = false;
-        // Replace the Maya hierarchy handler with ours.
-        auto& runTimeMgr = Ufe::RunTimeMgr::instance();
-        g_MayaRtid = runTimeMgr.getId(kMayaRunTimeName);
+    static std::atomic<Ufe::Rtid> mayaRtid{0};
+    if (!mayaRtid) {
+        mayaRtid = Ufe::RunTimeMgr::instance().getId(kMayaRunTimeName);
     }
-    return g_MayaRtid;
+    return mayaRtid;
+}
+
+Ufe::Rtid getUsdRunTimeId()
+{
+    static std::atomic<Ufe::Rtid> usdRtid{0};
+    if (!usdRtid) {
+        usdRtid = Ufe::RunTimeMgr::instance().getId(kUSDRunTimeName);
+    }
+    return usdRtid;
 }
 
 MDagPath nameToDagPath(const std::string& name)
