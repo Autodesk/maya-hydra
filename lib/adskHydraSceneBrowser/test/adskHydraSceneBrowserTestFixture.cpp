@@ -218,12 +218,17 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceValue(
 
 bool AdskHydraSceneBrowserTestFixture::MatchesFallbackTextOutput(const std::string& text) {
     // Regex for matching the fallback text output used for types that don't provide a custom one.
-    // Identifies a literal <', followed by a valid C++ class name, then a literal ', then a
-    // space, an @ symbol and another space, a hexadecimal 32 to 64 bit address (case-insensitive,
+    // Identifies a literal <', followed by a valid C++ type name (possibly templated), then a literal ',
+    // then a space, an @ symbol and another space, a hexadecimal 32 to 64 bit address (case-insensitive,
     // potentially prefixed with 0x), and finally a literal >. Example matches :
-    // <'ArResolverContext' @ 0x251ffa80>
-    // <'ArResolverContext' @ 000001D3A4296670>
-    std::regex fallbackTextOutputRegex("<'[a-zA-Z_][a-zA-Z_0-9]*' @ (0x)?[0-9a-fA-F]{8,16}>");
+    // <'ArResolverContext' @ 0x251ffa80> // Linux
+    // <'ArResolverContext' @ 000001D3A4296670> // Windows
+    // <'vector<SdfPath, allocator<SdfPath> >' @ 0x261b8c20> // Linux
+    // <'vector<SdfPath,allocator<SdfPath> >' @ 000001D49F3390B0> // Windows
+
+    // The space in the second [] group is intentional and must be matched,
+    // see the above templated examples
+    std::regex fallbackTextOutputRegex("<'[a-zA-Z_][ a-zA-Z_0-9<>,&*()]*' @ (0x)?[0-9a-fA-F]{8,16}>");
     return std::regex_match(text, fallbackTextOutputRegex);
 }
 
