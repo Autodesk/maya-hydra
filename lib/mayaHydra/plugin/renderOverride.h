@@ -38,6 +38,8 @@
 #include <mayaHydraLib/mayaHydraSceneProducer.h>
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
+#include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
+#include <flowViewport/selection/fvpSelectionTracker.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
@@ -60,6 +62,11 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
+
+#include <ufe/ufe.h>
+UFE_NS_DEF {
+class SelectionChanged;
+}
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Remove this using statement once the following code is moved into the MayaHydra namespace
@@ -104,7 +111,7 @@ public:
         const MHWRender::MDataServerOperation::MViewportScene& scene);
 
     void ClearHydraResources();
-    void SelectionChanged();
+    void SelectionChanged(const Ufe::SelectionChanged& notification);
     void SetRenderPurposeTags(const MayaHydraParams& delegateParams) { _SetRenderPurposeTags(delegateParams); };
     MString uiName() const override { return MString(_rendererDesc.displayName.GetText()); }
 
@@ -132,7 +139,6 @@ private:
 
     void              _InitHydraResources();
     void              _RemovePanel(MString panelName);
-    void              _SelectionChanged();
     void              _DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext);
     HdRenderDelegate* _GetRenderDelegate();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
@@ -169,11 +175,12 @@ private:
         MSelectionList&                  selectionList,
         MPointArray&                     worldSpaceHitPts);
 
+    void _AddPluginSelectionHighlighting();
+
     // Callbacks
     static void _ClearHydraCallback(void* data);
     static void _TimerCallback(float, float, void* data);
     static void _PlayblastingChanged(bool state, void*);
-    static void _SelectionChangedCallback(void* data);
     static void _PanelDeletedCallback(const MString& panelName, void* data);
     static void _RendererChangedCallback(
         const MString& panelName,
@@ -212,12 +219,14 @@ private:
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
     std::unique_ptr<Fvp::RenderIndexProxy>    _renderIndexProxy;
     HdRenderIndex*                            _renderIndex = nullptr;
-    HdxSelectionTrackerSharedPtr              _selectionTracker;
+    Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
+    Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
+    class SelectionObserver;
+    using SelectionObserverPtr = std::shared_ptr<SelectionObserver>;
+    SelectionObserverPtr                      _mayaSelectionObserver;
     HdRprimCollection                         _renderCollection { HdTokens->geometry,
                                           HdReprSelector(HdReprTokens->refined),
                                           SdfPath::AbsoluteRootPath() };
-    HdRprimCollection                         _selectionCollection { HdReprTokens->wire,
-                                             HdReprSelector(HdReprTokens->wire) };
 
     HdRprimCollection _pointSnappingCollection {
         HdTokens->geometry,
@@ -239,7 +248,6 @@ private:
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
     bool       _hasDefaultLighting = false;
-    bool       _selectionChanged = true;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -131,26 +131,6 @@ void MayaHydraSceneProducer::Populate()
     }
 }
 
-void MayaHydraSceneProducer::PopulateSelectedPaths(
-    const MSelectionList& mayaSelection,
-    SdfPathVector& selectedSdfPaths,
-    const HdSelectionSharedPtr& selection)
-{
-    if (enableMayaNativeSceneIndex())
-    {
-        return _sceneIndex->PopulateSelectedPaths(
-            mayaSelection,
-            selectedSdfPaths,
-            selection);
-    }
-    else
-    {
-        for (auto& it : _delegates) {
-            it->PopulateSelectedPaths(mayaSelection, selectedSdfPaths, selection);
-        }
-    }
-}
-
 SdfPath MayaHydraSceneProducer::SetCameraViewport(const MDagPath& camPath, const GfVec4d& viewport)
 {
     if (enableMayaNativeSceneIndex())

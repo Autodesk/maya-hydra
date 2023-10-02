@@ -35,6 +35,12 @@
 #include <flowViewport/tokens.h>
 #include <flowViewport/debugCodes.h>
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
+#include <flowViewport/selection/fvpSelectionTask.h>
+// FLOW_VIEWPORT_TODO Hard-coded prototype code to support wireframe selection
+// highlighting for USD.  The MayaHydra plugin architecture should enable the
+// Hydra data provider plugin to specify the selection highlighting scene index
+// of its choice, or even none at all.  PPT, 18-Sep-2023.
+#include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -44,7 +50,10 @@
 #include <ufe/namedSelection.h>
 #include <ufe/path.h>
 #include <ufe/pathString.h>
-#include <ufe/selection.h>
+#include <ufe/observableSelection.h>
+#include <ufe/globalSelection.h>
+#include <ufe/selectionNotification.h>
+#include <ufe/observer.h>
 
 #include <ufeExtensions/Global.h>
 
@@ -75,6 +84,7 @@ template <typename T> inline void hash_combine(std::size_t& seed, const T& value
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
+#include <pxr/imaging/hdx/selectionTask.h>
 #include <pxr/imaging/hdx/colorizeSelectionTask.h>
 #include <pxr/imaging/hdx/pickTask.h>
 #include <pxr/imaging/hdx/renderTask.h>
@@ -96,6 +106,7 @@ template <typename T> inline void hash_combine(std::size_t& seed, const T& value
 #include <maya/MSelectionList.h>
 #include <maya/MTimerMessage.h>
 #include <maya/MUiMessage.h>
+#include <maya/MFileIO.h>
 
 #include <atomic>
 #include <chrono>
@@ -105,6 +116,37 @@ template <typename T> inline void hash_combine(std::size_t& seed, const T& value
 int _profilerCategory = MProfiler::addCategory(
     "MtohRenderOverride (mayaHydra)",
     "Events from mayaHydra render override");
+
+namespace {
+
+// Replace the builtin and fixed colorize selection and selection tasks from
+// Hydra with our own Flow Viewport selection task.  The Hydra tasks are not
+// configurable and cannot be replaced by plugin behavior.  Currently, the Flow
+// Viewport selection task is a no-op.  PPT, 2-Oct-2023.
+
+void replaceSelectionTask(PXR_NS::HdTaskSharedPtrVector* tasks)
+{
+    // For TF_WARN and TF_AXIOM macros.
+    PXR_NAMESPACE_USING_DIRECTIVE
+
+    TF_AXIOM(tasks);
+
+    auto isSnTask = [](const HdTaskSharedPtr& task) {
+        return std::dynamic_pointer_cast<HdxColorizeSelectionTask>(task) || 
+            std::dynamic_pointer_cast<HdxSelectionTask>(task);
+    };
+
+    auto found = std::find_if(tasks->begin(), tasks->end(), isSnTask);
+
+    if (found == tasks->end()) {
+        TF_WARN("Fvp::SelectionTask not inserted into render task vector!");
+        return;
+    }
+
+    *found = HdTaskSharedPtr(new Fvp::SelectionTask);
+}
+
+}
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
@@ -160,6 +202,29 @@ int GetNearestHitIndex(
 }
 } // namespace
 
+class MtohRenderOverride::SelectionObserver : public Ufe::Observer
+{
+public:
+    SelectionObserver(MtohRenderOverride& renderOverride)
+        : Ufe::Observer(), _renderOverride(renderOverride)
+    {}
+
+    void operator()(const Ufe::Notification& notification) override 
+    {
+        // During Maya file read, each node will be selected in turn, so we get
+        // notified for each node in the scene.  Prune this out.
+        if (MFileIO::isOpeningFile()) {
+            return;
+        }
+
+        _renderOverride.SelectionChanged(
+            dynamic_cast<const Ufe::SelectionChanged&>(notification));
+    }
+
+private:
+    MtohRenderOverride& _renderOverride;
+};
+
 // MtohRenderOverride is a rendering override class for the viewport to use Hydra instead of VP2.0.
 MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
     : MHWRender::MRenderOverride(desc.overrideName.GetText())
@@ -168,7 +233,8 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
     , _globals(MtohRenderGlobals::GetInstance())
     , _hgi(Hgi::CreatePlatformDefaultHgi())
     , _hgiDriver { HgiTokens->renderDriver, VtValue(_hgi.get()) }
-    , _selectionTracker(new HdxSelectionTracker)
+    , _fvpSelectionTracker(new Fvp::SelectionTracker)
+    , _mayaSelectionObserver(std::make_shared<SelectionObserver>(*this))
     , _isUsingHdSt(desc.rendererName == MtohTokens->HdStormRendererPlugin)
 {
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
@@ -192,11 +258,11 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
     if (status) {
         _callbacks.append(id);
     }
-    id = MEventMessage::addEventCallback(
-        MString("SelectionChanged"), _SelectionChangedCallback, this, &status);
-    if (status) {
-        _callbacks.append(id);
-    }
+
+    // Observe the UFE selection.
+    auto sn = Ufe::GlobalSelection::get();
+    TF_AXIOM(sn);
+    sn->addObserver(_mayaSelectionObserver);
 
     // Setup the playblast watch.
     // _playBlasting is forced to true here so we can just use _PlayblastingChanged below
@@ -464,6 +530,13 @@ MStatus MtohRenderOverride::Render(
             }
         }
 
+        // Replace the existing HdxTaskController selection task (Storm) or
+        // colorize selection task (non-Storm) with our selection task by
+        // editing the task list, since HdxTaskController is not configurable.
+        // As the existence of either task depends on AOV support, they may not
+        // be present, so we may have nothing to replace.  PPT, 11-Aug-2023.
+        replaceSelectionTask(&tasks);
+
         if (scene.changed()) {
             if (_mayaHydraSceneProducer) {
                 _mayaHydraSceneProducer->HandleCompleteViewportScene(
@@ -499,8 +572,6 @@ MStatus MtohRenderOverride::Render(
             return MStatus::kFailure;
         }
     }
-
-    _SelectionChanged();
 
     const auto      displayStyle = drawContext.getDisplayStyle();
     MayaHydraParams delegateParams = _globals.delegateParams;
@@ -608,15 +679,6 @@ MStatus MtohRenderOverride::Render(
 #endif
         renderFrame(true);
 
-        // This causes issues with the embree delegate and potentially others.
-        // (i.e. rendering a wireframe via collections isn't supported by other delegates)
-        if (_globals.wireframeSelectionHighlight && !_selectionCollection.GetRootPaths().empty()) {
-            _taskController->SetCollection(_selectionCollection);
-            renderFrame();
-            // XXX: This call isn't 'free' and will be done again on the next
-            // MtohRenderOverride::Render call anyway
-            _taskController->SetCollection(_renderCollection);
-        }
     } else {
         renderFrame(true);
     }
@@ -695,6 +757,8 @@ void MtohRenderOverride::_InitHydraResources()
 
     // Render index proxy sets up the Flow Viewport merging scene index, must
     // be created first, as it is required for:
+    // - Selection scene index, which uses the Flow Viewport merging scene
+    //   index as input.
     // - Maya scene producer, which needs the render index proxy to insert
     //   itself.
 
@@ -702,15 +766,21 @@ void MtohRenderOverride::_InitHydraResources()
 
     _mayaHydraSceneProducer.reset(new MayaHydraSceneProducer(*_renderIndexProxy, _ID, delegateInitData, !_hasDefaultLighting));
 
-    VtValue selectionTrackerValue(_selectionTracker);
-    _engine.SetTaskContextData(HdxTokens->selectionState, selectionTrackerValue);
+    VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
+    _engine.SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
 
     _mayaHydraSceneProducer->Populate();
 
-    _renderIndex->InsertSceneIndex(_renderIndexProxy->GetMergingSceneIndex(), SdfPath::AbsoluteRootPath());
+    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_renderIndexProxy->GetMergingSceneIndex());
 
-    _renderIndex->GetChangeTracker().AddCollection(_selectionCollection.GetName());
-    _SelectionChanged();
+    if (!_sceneIndexRegistry) {
+        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(*_renderIndexProxy));
+    }
+
+    _AddPluginSelectionHighlighting();
+
+    // Set the initial selection onto the selection scene index.
+    _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
 
     if (auto* renderDelegate = _GetRenderDelegate()) {
         // Pull in any options that may have changed due file-open.
@@ -729,11 +799,35 @@ void MtohRenderOverride::_InitHydraResources()
             break;
         }
     }
-    if (!_sceneIndexRegistry) {
-        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(*_renderIndexProxy));
-    }
 
     _initializationSucceeded = true;
+}
+
+void MtohRenderOverride::_AddPluginSelectionHighlighting()
+{
+    TF_AXIOM(_selectionSceneIndex);
+    TF_AXIOM(_renderIndex);
+
+    // Hydra data provider plugin selection highlighting is set up as a chain
+    // of scene indices. 
+
+    // FLOW_VIEWPORT_TODO  Hard-coded prototype code to support wireframe
+    // selection highlighting for USD.  The MayaHydra plugin architecture
+    // should enable the Hydra data provider plugin to specify the selection
+    // highlighting scene index of its choice, or even none at all.
+
+    // This hard-coded prototype adds a wireframe selection highlighting scene
+    // index to the single registered scene index plugin, on the assumption
+    // that this plugin scene index is USD.  PPT, 18-Sep-2023.
+
+    const auto& registrations = _sceneIndexRegistry->GetRegistrations();
+    // If there are no plugin registrations yet, nothing to do.
+    if (registrations.empty()) {
+        return;
+    }
+    auto usdSelectionHighlightingSceneIndex = Fvp::WireframeSelectionHighlightSceneIndex::New(_selectionSceneIndex, registrations.begin()->first);
+
+    _renderIndex->InsertSceneIndex(usdSelectionHighlightingSceneIndex, SdfPath::AbsoluteRootPath());
 }
 
 void MtohRenderOverride::ClearHydraResources()
@@ -746,6 +840,7 @@ void MtohRenderOverride::ClearHydraResources()
         .Msg("MtohRenderOverride::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
     _mayaHydraSceneProducer = nullptr;
+    _selectionSceneIndex = nullptr;
 
     // Cleanup internal context data that keep references to data that is now
     // invalid.
@@ -773,7 +868,6 @@ void MtohRenderOverride::ClearHydraResources()
     _viewport = GfVec4d(0, 0, 0, 0);
     _initializationSucceeded = false;
     _initializationAttempted = false;
-    SelectionChanged();
 }
 
 void MtohRenderOverride::_RemovePanel(MString panelName)
@@ -789,29 +883,69 @@ void MtohRenderOverride::_RemovePanel(MString panelName)
     }
 }
 
-void MtohRenderOverride::SelectionChanged() { _selectionChanged = true; }
-
-void MtohRenderOverride::_SelectionChanged()
+void MtohRenderOverride::SelectionChanged(
+    const Ufe::SelectionChanged& notification
+)
 {
-    if (!_selectionChanged) {
+    TF_DEBUG(FVP_APP_SELECTION_CHANGE)
+        .Msg("MtohRenderOverride::SelectionChanged(Ufe::SelectionChanged) called.\n");
+
+    if (!_initializationSucceeded) {
         return;
     }
-    _selectionChanged = false;
-    MSelectionList sel;
-    if (!TF_VERIFY(MGlobal::getActiveSelectionList(sel))) {
-        return;
-    }
-    SdfPathVector selectedPaths;
-    auto          selection = std::make_shared<HdSelection>();
 
-    if (_mayaHydraSceneProducer) {
-        _mayaHydraSceneProducer->PopulateSelectedPaths(sel, selectedPaths, selection);
+    TF_AXIOM(_selectionSceneIndex);
+
+    // Two considerations: 
+    // 1) Reading from the Maya active selection list only returns
+    //    Maya objects, so must read from the UFE selection.
+    // 2) The UFE selection does not have Maya component selections.
+    //    When we are ready to support these, must be read from the Maya
+    //    selection.  A tricky aspect is that the UFE selection
+    //    notification is sent before the Maya selection is ready, so
+    //    reading the Maya selection must be done from the Maya selection
+    //    changed callback, not the UFE selection changed callback.
+    using SnOp = Ufe::SelectionCompositeNotification::Op;
+    static auto appendSn = [this](const SnOp& op) {
+        _selectionSceneIndex->AddSelection(op.item->path());
+    };
+    // FLOW_VIEWPORT_TODO  Support selection remove, insert.  PPT, 18-Sep-2023
+    static auto removeSn = [](const SnOp&) {
+        TF_WARN("Remove from selection not supported.");
+    };
+    static auto insertSn = [](const SnOp&) {
+        TF_WARN("Insert into selection not supported.");
+    };
+    static auto clearSn = [this](const SnOp&) {
+        _selectionSceneIndex->ClearSelection();
+    };
+    static auto replaceWithSn = [this](const SnOp& op) {
+        _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+    };
+    static std::function<void(const SnOp&)> changeSn[] = {appendSn, removeSn, insertSn, clearSn, replaceWithSn};
+
+    if (notification.opType() == 
+        Ufe::SelectionChanged::SelectionCompositeNotification) {
+
+        const auto& compositeNotification = notification.staticCast<Ufe::SelectionCompositeNotification>();
+
+        for (const auto& op : compositeNotification) {
+            changeSn[op.opType](op);
+        }
+    }
+    else {
+        SnOp op(notification);
+
+        changeSn[op.opType](op);
     }
 
-    _selectionCollection.SetRootPaths(selectedPaths);
-    _selectionTracker->SetSelection(HdSelectionSharedPtr(selection));
-    TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SELECTION)
-        .Msg("MtohRenderOverride::_SelectionChanged - num selected: %lu\n", selectedPaths.size());
+
+    // FLOW_VIEWPORT_TODO  Clarify new Flow Viewport selection tracker
+    // architecture.  Here is where we would set the selection onto the
+    // selection tracker, or trackers, if data provider plugins need to have
+    // their own selection tracker.  The selection tracker makes the selection
+    // and selection-derived data availabel to a selection task or selection
+    // tasks through the task context data.  PPT, 18-Sep-2023
 }
 
 MHWRender::DrawAPI MtohRenderOverride::supportedDrawAPIs() const
@@ -998,7 +1132,7 @@ void MtohRenderOverride::_PickByRegion(
 
         // Exclude selected Rprims to avoid self-snapping issue.
         pickParams.collection = _pointSnappingCollection;
-        pickParams.collection.SetExcludePaths(_selectionCollection.GetRootPaths());
+        pickParams.collection.SetExcludePaths(_selectionSceneIndex->GetFullySelectedPaths());
     }
     else {
         pickParams.collection = _renderCollection;
@@ -1184,18 +1318,6 @@ void MtohRenderOverride::_RenderOverrideChangedCallback(
     if (newOverride != instance->name()) {
         instance->_RemovePanel(panelName);
     }
-}
-
-void MtohRenderOverride::_SelectionChangedCallback(void* data)
-{
-    TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SELECTION)
-        .Msg("MtohRenderOverride::_SelectionChangedCallback() (normal maya "
-             "selection triggered)\n");
-    auto* instance = reinterpret_cast<MtohRenderOverride*>(data);
-    if (!TF_VERIFY(instance)) {
-        return;
-    }
-    instance->SelectionChanged();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

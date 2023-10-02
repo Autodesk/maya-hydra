@@ -107,3 +107,4 @@ endif()
 # subdirectories
 # -----------------------------------------------------------------------------
 add_subdirectory(sceneIndex)
+add_subdirectory(selection)

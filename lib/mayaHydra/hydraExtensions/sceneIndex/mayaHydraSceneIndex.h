@@ -83,12 +83,6 @@ public:
     // Populate data from Maya
     void Populate();
 
-    // Populate selected paths from Maya
-    void PopulateSelectedPaths(
-        const MSelectionList& mayaSelection,
-        SdfPathVector& selectedSdfPaths,
-        const HdSelectionSharedPtr& selection);
-
     // Add hydra pick points and items to Maya's selection list
     bool AddPickHitToSelectionList(
         const HdxPickHit& hit,

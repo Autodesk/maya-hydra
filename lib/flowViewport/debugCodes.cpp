@@ -23,31 +23,27 @@ TF_REGISTRY_FUNCTION(TfDebug)
 {
     TF_DEBUG_ENVIRONMENT_SYMBOL(
         PXR_NS::FVP_SELECTION_SCENE_INDEX,
-        "Print information about the Flow Viewport selection scene index in the MayaHydra viewport");
+        "Print information about the Flow Viewport selection scene index.");
 
     TF_DEBUG_ENVIRONMENT_SYMBOL(
         PXR_NS::FVP_SELECTION_TASK,
-        "Print information about the Flow Viewport selection task in the MayaHydra viewport");
+        "Print information about the Flow Viewport selection task.");
 
     TF_DEBUG_ENVIRONMENT_SYMBOL(
         PXR_NS::FVP_SELECTION_TRACKER,
-        "Print information about the Flow Viewport selection tracker in the MayaHydra viewport");
+        "Print information about the Flow Viewport selection tracker.");
 
     TF_DEBUG_ENVIRONMENT_SYMBOL(
         PXR_NS::FVP_APP_SELECTION_CHANGE,
-        "Print information about application selection changes sent to the MayaHydra viewport");
+        "Print information about application selection changes sent to the Flow Viewport.");
 
     TF_DEBUG_ENVIRONMENT_SYMBOL(
         PXR_NS::FVP_MERGING_SCENE_INDEX,
-        "Print information about the Flow Viewport merging scene index for the MayaHydra viewport");
-
-    TF_DEBUG_ENVIRONMENT_SYMBOL(
-        PXR_NS::FVP_PASS_THROUGH_SCENE_INDEX,
-        "Print information about the Flow Viewport pass through scene index for the MayaHydra viewport");
+        "Print information about the Flow Viewport merging scene index.");
 
     TF_DEBUG_ENVIRONMENT_SYMBOL(
         PXR_NS::FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX,
-        "Print information about the Flow Viewport wireframe selection highlight scene index for the MayaHydra viewport");
+        "Print information about the Flow Viewport wireframe selection highlight scene index.");
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

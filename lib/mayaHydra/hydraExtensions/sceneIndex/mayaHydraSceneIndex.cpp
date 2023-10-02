@@ -127,10 +127,9 @@ namespace {
     template<> inline SdfPath maybePrepend<MRenderItem>(
         const MRenderItem& ri, const SdfPath& inPath
         ) {
-        // Prepend Maya node name, for organisation and readability.
-        std::string dependNodeNameString(MFnDependencyNode(ri.sourceDagPath().node()).name().asChar());
-        SanitizeNameForSdfPath(dependNodeNameString);
-        return SdfPath(dependNodeNameString).AppendPath(inPath);
+        // Prepend Maya path, for organisation and readability.
+        auto sdfDagPath = DagPathToSdfPath(ri.sourceDagPath(), false, false).MakeRelativePath(SdfPath::AbsoluteRootPath());
+        return sdfDagPath.AppendPath(inPath);
     }
 
     ///Returns false if this object should not be lighted, true if it should be lighted
@@ -597,13 +596,6 @@ VtValue MayaHydraSceneIndex::CreateMayaDefaultMaterial()
     networkMap.map.insert({ HdMaterialTerminalTokens->surface, std::move(network) });
     networkMap.terminals.push_back(_mayaDefaultMaterialPath);
     return VtValue(networkMap);
-}
-
-void MayaHydraSceneIndex::PopulateSelectedPaths(
-    const MSelectionList& mayaSelection,
-    SdfPathVector& selectedSdfPaths,
-    const HdSelectionSharedPtr& selection)
-{
 }
 
 SdfPath MayaHydraSceneIndex::SceneIndexPath(const Ufe::Path& appPath) const
