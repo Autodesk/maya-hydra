@@ -281,8 +281,8 @@ finally:
     # Adjust PATH and PYTHONPATH to include USD.
     # These should come last (esp PYTHONPATH, in case another module is overriding
     # with pkgutil)
-   if (DEFINED MAYAUSD_TO_USD_RELATIVE_PATH)
-        set(USD_INSTALL_LOCATION "${CMAKE_INSTALL_PREFIX}/${MAYAUSD_TO_USD_RELATIVE_PATH}")
+   if (DEFINED MAYAHYDRA_TO_USD_RELATIVE_PATH)
+        set(USD_INSTALL_LOCATION "${CMAKE_INSTALL_PREFIX}/${MAYAHYDRA_TO_USD_RELATIVE_PATH}")
     else()
         set(USD_INSTALL_LOCATION ${PXR_USD_LOCATION})
     endif()
