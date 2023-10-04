@@ -490,15 +490,15 @@ def BuildAndInstall(context, buildArgs, stages):
                            "or choose a different location to install to."
                            .format(dir=dir))
                 sys.exit(1)
-        Print("""Success MayaUSD build and install !!!!""")
+        Print("""Success MayaHydra build and install !!!!""")
 
 def RunTests(context,extraArgs):
     RunCTest(context,extraArgs)
-    Print("""Success running MayaUSD tests !!!!""")
+    Print("""Success running MayaHydra tests !!!!""")
 
 def Package(context):
     RunMakeZipArchive(context)
-    Print("""Success packaging MayaUSD !!!!""")
+    Print("""Success packaging MayaHydra !!!!""")
     Print('Archived package is available in {pkgDir}'.format(pkgDir=context.pkgDir))
 
 ############################################################
