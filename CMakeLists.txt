@@ -36,9 +36,9 @@ set(PXR_OVERRIDE_PLUGINPATH_NAME PXR_PLUGINPATH_NAME
 #------------------------------------------------------------------------------
 # internal flags to control build
 #------------------------------------------------------------------------------
-# MAYAUSD_TO_USD_RELATIVE_PATH : Set this variable to any relative path from install
-#                                folder to USD location. If defined will set relative
-#                                rpaths for USD libraries.
+# MAYAHYDRA_TO_USD_RELATIVE_PATH : Set this variable to any relative path from install
+#                                  folder to USD location. If defined will set relative
+#                                  rpaths for USD libraries.
 
 #------------------------------------------------------------------------------
 # global options
@@ -180,7 +180,6 @@ if (BUILD_TESTS)
     fetch_googletest()
     enable_testing()
     add_subdirectory(test)
-    set(MAYAUSD_GTEST_PATH "PATH+:=lib/gtest")
 endif()
 
 #------------------------------------------------------------------------------
@@ -205,8 +204,8 @@ endif()
 #------------------------------------------------------------------------------
 # install
 #------------------------------------------------------------------------------
-if (DEFINED MAYAUSD_TO_USD_RELATIVE_PATH)
-    set(USD_INSTALL_LOCATION "${CMAKE_INSTALL_PREFIX}/${MAYAUSD_TO_USD_RELATIVE_PATH}")
+if (DEFINED MAYAHYDRA_TO_USD_RELATIVE_PATH)
+    set(USD_INSTALL_LOCATION "${CMAKE_INSTALL_PREFIX}/${MAYAHYDRA_TO_USD_RELATIVE_PATH}")
 else()
     set(USD_INSTALL_LOCATION ${PXR_USD_LOCATION})
 endif()
