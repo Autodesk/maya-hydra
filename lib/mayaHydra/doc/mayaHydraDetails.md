@@ -6,9 +6,9 @@ The MayaHydra code is a Maya plugin using the MRenderOverride API. This API bind
 
 ### Maya API Additions
 
-We have begun adding new APIs to Maya to provide efficient access to renderable viewport data.  The experimental MDataServerOperation gives an MRenderOverride plugin like MayaHydra access to Viewport 2.0's internal copy of renderable scene data.  MayaHydra can use this as an option to render data provided by Viewport 2.0, instead of having to reconstruct internal Maya features to match viewport appearance and the behavior of Maya features.
+We have begun adding new APIs to Maya to provide efficient access to renderable viewport data.  The experimental MDataServerOperation(Maya 2024 onwards) gives an MRenderOverride plugin like MayaHydra access to Viewport 2.0's internal copy of renderable scene data.  MayaHydra can use this as an option to render data provided by Viewport 2.0, instead of having to reconstruct internal Maya features to match viewport appearance and the behavior of Maya features.
 
-### Hybrid Viewport Rendering
+### Hybrid Viewport Rendering 
 MRenderOverride API allows a plugin interface to execute Hydra rendering from within Maya's viewport model. The MDataServerOperation is stacked with Maya native pre and post scene render passes. The pre and post scene render is controlled by Maya which does the rendering of elements like HUDs, GreasePencils and Manipulators. However, rendering of these elements could be delegated to Hydra in the future.
 
 ```mermaid
@@ -22,7 +22,7 @@ graph LR
 ```
 
 ### Color Management(CM)
-Maya's Color Managment is applied to all applicable viewports including overrides. MayaHydra plugin override inherits this behavior. So the final frame rendered out from Hydra undergoes Maya's CM. All workflows pertaining to CM within Maya remain the same so user can configure CM with MayaHydra as they would for a VP2 viewport. 
+Maya's Color Managment is applied to all applicable viewports including viewport overrides. MayaHydra plugin override inherits this behavior. So the final frame rendered out from Hydra undergoes Maya's CM. All workflows pertaining to CM within Maya remain the same so user can configure CM with MayaHydra as they would for a VP2 viewport. 
 
 Hydra also support CM internally via Hydra Tasks. In the current version of the plugin, Hydra's CM is not applied. There are a couple of blockers for this to implemented at the moment(5th Oct 2023). USD is on OCIO v1 and Maya uses OCIO v2. There are some incompatibities with these two version and can lead to unpredictable behaviour.
 
