@@ -823,6 +823,7 @@ void MtohRenderOverride::_AddPluginSelectionHighlighting()
     const auto& registrations = _sceneIndexRegistry->GetRegistrations();
     // If there are no plugin registrations yet, nothing to do.
     if (registrations.empty()) {
+        _renderIndex->InsertSceneIndex(_selectionSceneIndex, SdfPath::AbsoluteRootPath());
         return;
     }
     auto usdSelectionHighlightingSceneIndex = Fvp::WireframeSelectionHighlightSceneIndex::New(_selectionSceneIndex, registrations.begin()->first);
@@ -839,8 +840,9 @@ void MtohRenderOverride::ClearHydraResources()
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
-    _mayaHydraSceneProducer = nullptr;
-    _selectionSceneIndex = nullptr;
+    _renderIndexProxy.reset();
+    _mayaHydraSceneProducer.reset();
+    _selectionSceneIndex.Reset();
 
     // Cleanup internal context data that keep references to data that is now
     // invalid.
@@ -863,7 +865,7 @@ void MtohRenderOverride::ClearHydraResources()
         _rendererPlugin = nullptr;
     }
 
-    _sceneIndexRegistry = nullptr;
+    _sceneIndexRegistry.reset();
 
     _viewport = GfVec4d(0, 0, 0, 0);
     _initializationSucceeded = false;

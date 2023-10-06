@@ -47,6 +47,13 @@ class MayaHydraBaseTestCase(unittest.TestCase):
         cmds.refresh(f=1)
         self.delegateId = cmds.mayaHydra(renderer=HD_STORM,
                                     sceneDelegateId="MayaHydraSceneDelegate")
+        
+    def setViewport2Renderer(self):
+        self.activeEditor = cmds.playblast(activeEditor=1)
+        # Empty string for rendererOverrideName unsets any currently active override, thus returning to VP2
+        cmds.modelEditor(self.activeEditor, e=1, rendererOverrideName="")
+        cmds.refresh(f=1)
+        self.delegateId = ""
 
     def setBasicCam(self, dist=DEFAULT_CAM_DIST):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
