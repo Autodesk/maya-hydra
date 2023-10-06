@@ -27,7 +27,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DEFINE_ENV_SETTING(MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX, false,
+TF_DEFINE_ENV_SETTING(MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX, true,
     "Enable scene index for Maya native scene.");
 
 bool enableMayaNativeSceneIndex() {
