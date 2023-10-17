@@ -1,28 +1,78 @@
-# What is USD for Maya?
+# Hydra for Maya (Technology Preview)
 
-USD for Maya is a project to create a Maya plugin, as well as reusable libraries, that provide translation and editing capabilities for Pixar Animation Studios Universal Scene Description (USD).
+The _Hydra for Maya_ project creates a Maya plugin that replaces the main Maya viewport with a Hydra viewer. _Hydra for Maya_ is developed and maintained by Autodesk. The project and this documentation are a work-in-progress and under active development. The contents of this repository are fully open source and open to contributions under the [Apache license](../../doc/LICENSE.md)!
 
-Read more about Pixar's USD [here](http://openusd.org)
-
+Hydra is the rendering API included with [Pixar's USD](http://openusd.org/).
 
 ## Motivation
-*Why yet another Maya plugin?*
 
-As USD gains in popularity many studios have been wondering what plugin they should deploy within their pipelines.  Two popular choices, used individually as well as together, have been the Pixar USDMaya plugin that has been part of USD itself, and Animal Logic's, which was separately released as Open Source.  Both plugins have a strong community of users, but some have questioned when Autodesk would eventually release an officially supported plugin themselves.  The goal of this project is to work directly with Pixar and Animal Logic, as well as other key contributors, in order to merge the best of both into a single supported plugin.  
+The goal for _Hydra for Maya_ is to introduce Hydra as an open source viewport framework for Maya to extend the viewport render engine through Hydra render delegates. _Hydra for Maya_ uses the previous Maya to Hydra (MtoH) code, which is part of MayaUSD, as a foundation to build on. You can find more details on what changed from MtoH [here](./doc/mayaHydraDetails.md). 
+With _Hydra for Maya_ we are fully leveraging the new [SceneIndex API (aka Hydra v2)](https://openusd.org/release/api/class_hd_scene_index_base.html#details) for more flexibility and customizability over the Hydra scene graph. Therefore the HdSceneDelegate is *not supported* by this plugin.
 
-Pixar maintains a list of contributors to USD in their documentation [here](https://graphics.pixar.com/usd/docs/USD-Contributors.html), and as we start working together to merge the two existing plugins it is also important to acknowledge the amount of work that individuals put in on the Animal Logic plugin as well.  The list of those contributors is kept [here](doc/AL_CONTRIBUTORS.md).
+_Hydra for Maya_ is currently a Technology Preview; we are just laying the foundation and there is still work ahead. As the plugin evolves and the Hydra technology matures, you can expect changes to API and to face limitations.
 
-## Getting Help
-Both Animal Logic and Pixar have their own Google interest groups which will remain great places to go with questions.
+## What's it good for?
 
-Pixar forum is [here](https://groups.google.com/forum/#!forum/usd-interest)  
-Animal Logic forum is [here](https://groups.google.com/forum/#!forum/al_usdmaya-discussion)
+This project allows you to use Hydra (the pluggable USD render ecosystem)
+and Storm (the OpenGL renderer for Hydra, bundled with USD), as an
+alternative to Viewport 2.0.
 
+Using Hydra has big benefits for offline renderers: any renderer that
+implements a Hydra render delegate can now have an interactive render viewport
+in Maya, along with support for render proxies.
+
+As an example, when paired with
+[arnold-usd](https://github.com/Autodesk/arnold-usd) (Arnold's USD plugin +
+render delegate), it provides an Arnold render of the viewport, where both maya
+objects and USD objects (through proxies) can be modified interactively.
+
+This could also be particularly useful for newer renderers, like Radeon
+ProRender (which already has a
+[render delegate](https://github.com/GPUOpen-LibrariesAndSDKs/RadeonProRenderUSD)),
+or in-house renderers, as an easier means of implementing an interactive
+render viewport.
+
+What about HdStorm, Hydra's OpenGL renderer? Why would you want to use HdStorm
+instead of "normal" Viewport 2.0, given that there are other methods for displaying
+USD proxies in Viewport 2.0? Some potential reasons include: 
+
+- Using HdStorm gives lighting and shading between Hydra-enabled applications:
+  Maya, Katana, usdview, etc
+- HdStorm is open source: you can add core features as you need them
+- HdStorm is extensible: you can create plugins for custom objects, which then allows
+  them to be displayed not just in Maya, but any Hydra-enabled application
+
+## Known Limitations
+
+- Only direct texture inputs are supported for Maya materials
+- Limited support for Maya shader networks
+- Drawing issues with selection and highlighting
+- Hydra shading differs from Maya's Viewport 2.0
+- Animation Ghosting has the wrong shading
+- Current limitations with USD prims:
+  - Maya layers don't show effect
+  - Isolate Select only functions with Maya nodes
+  - Viewport display modes like Xray, wireframe or default shading do not function
+  - Selection highlighting not showing
+  - Gprims currently don't cast shadows in Storm
+- No material bindings on GeomSubsets (Hydra v2 limitation)
+
+## Currently not supported
+
+- Backface culling
+- Screen space effects like depth of field and motion blur
+- Arnold lights except the aiSkyDomeLight
+- Following Maya node types:
+  - Bifrost
+  - nParticles
+  - Fluid
+- Blue Pencil
+- Maya's volume and ambient light
+- Hardware Fog
+- Maya's procedural textures (e.g. noise or pattern)
 
 ## Detailed Documentation
 
-+ [Contributing](doc/CONTRIBUTING.md)
-+ [Building](doc/build.md)
-+ [Coding guidelines](doc/codingGuidelines.md)
-+ [License](doc/LICENSE.md)
-+ [Plugins documentation](README_DOC.md)
++ [Building the mayaHydra.mll plugin](./lib/mayaHydra/doc/mayaHydraBuild.md)
++ [Technical details of MayaHydra](./lib/mayaHydra/doc/mayaHydraDetails.md)
++ [Selection in MayaHydra](./lib/mayaHydra/doc/mayaHydraSelection.md)
