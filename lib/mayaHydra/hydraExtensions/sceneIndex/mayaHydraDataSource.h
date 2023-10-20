@@ -58,7 +58,7 @@ private:
     MayaHydraSceneIndex* _sceneIndex = nullptr;
     MayaHydraAdapter* _adapter = nullptr;
 
-    std::atomic_bool _primvarsBuilt;
+    std::atomic_bool _primvarsBuilt{false};
     HdContainerDataSourceAtomicHandle _primvars;
 };
 
