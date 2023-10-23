@@ -97,7 +97,7 @@ public:
     void AddSelection(const Ufe::Path& appPath);
 
     FVP_API
-    void RemoveSelection(const PXR_NS::SdfPath &usdPath);
+    void RemoveSelection(const Ufe::Path& appPath);
 
     FVP_API
     void ReplaceSelection(const Ufe::Selection& selection);

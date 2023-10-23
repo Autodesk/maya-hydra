@@ -168,24 +168,11 @@ SelectionSceneIndex::GetPrim(const SdfPath &primPath) const
 
     HdSceneIndexPrim result = _GetInputSceneIndex()->GetPrim(primPath);
     if (!result.dataSource) {
-        TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
-            .Msg("SelectionSceneIndex::GetPrim(%s) returned without data source.\n", primPath.GetText());
-
-        if (_selection->IsSelected(primPath)) {
-            // _PrimSource requires an input data source.  Add an empty one if
-            // none exists.
-            result.dataSource = HdRetainedContainerDataSource::New();
-        }
-        else {
-            return result;
-        }
+        return result;
     }
     
     result.dataSource = _PrimSource::New(
         result.dataSource, _selection, primPath);
-
-    TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
-        .Msg("SelectionSceneIndex::GetPrim(%s) returned with data source.\n", primPath.GetText());
 
     return result;
 }
@@ -224,6 +211,26 @@ SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
         selectionBuilder.Build());
 
     _SendPrimsDirtied({{sceneIndexPath, selectionsSchemaDefaultLocator}});
+}
+
+void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
+{
+    TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
+        .Msg("SelectionSceneIndex::RemoveSelection(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
+
+    // Call our input scene index to convert the application path to a scene
+    // index path.  If there is no path, or the path is not selected, early out.
+    auto sceneIndexPath = SceneIndexPath(appPath);
+
+    if (sceneIndexPath.IsEmpty() ||
+        (_selection->pathToState.erase(sceneIndexPath) != 1)) {
+        return;
+    }
+
+    HdSceneIndexObserver::DirtiedPrimEntries entry;
+    entry.emplace_back(sceneIndexPath, selectionsSchemaDefaultLocator);
+
+    _SendPrimsDirtied(entry);
 }
 
 void
@@ -349,9 +356,15 @@ SelectionSceneIndex::_PrimsRemoved(
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::_PrimsRemoved() called.\n");
 
-    // FLOW_VIEWPORT_TODO  In interactive use application data removal will be
-    // preceded by a selection change.  This is insufficient, must provide a
-    // complete implementation.  PPT, 18-Sep-2023.
+    if (!_selection->pathToState.empty()) {
+        for (const auto &entry : entries) {
+            auto it = _selection->pathToState.lower_bound(entry.primPath);
+            while (it != _selection->pathToState.end() &&
+                   it->first.HasPrefix(entry.primPath)) {
+                it = _selection->pathToState.erase(it);
+            }
+        }
+    }
 
     _SendPrimsRemoved(entries);
 }

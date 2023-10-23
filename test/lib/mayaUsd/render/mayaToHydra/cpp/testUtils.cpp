@@ -22,6 +22,7 @@
 
 #include <pxr/imaging/hd/dataSourceLegacyPrim.h>
 #include <pxr/imaging/hd/xformSchema.h>
+#include <pxr/imaging/hd/filteringSceneIndex.h>
 
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
@@ -210,6 +211,33 @@ void SceneIndexInspector::_WriteLeafDataSource(
         dataSourceDescription = "Unidentified data source type";
     }
     outStream << selfPrefix << dataSourceDescription << " : " << dataSourceName << "\n";
+}
+
+HdSceneIndexBaseRefPtr findSceneIndexInTree(
+    const HdSceneIndexBaseRefPtr&                             sceneIndex,
+    const std::function<bool(const HdSceneIndexBaseRefPtr&)>& predicate
+)
+{
+    if (predicate(sceneIndex)) {
+        return sceneIndex;
+    }
+    auto filteringSi = TfDynamic_cast<HdFilteringSceneIndexBaseRefPtr>(
+        sceneIndex);
+    // End recursion at leaf scene indices, which are not filtering scene
+    // indices.
+    if (!filteringSi) {
+        return {};
+    }
+
+    auto sceneIndices = filteringSi->GetInputScenes();
+    if (!sceneIndices.empty()) {
+        for (const auto& childSceneIndex : sceneIndices) {
+            if (auto si = findSceneIndexInTree(childSceneIndex, predicate)) {
+                return si;
+            }
+        }
+    }
+    return {};
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
