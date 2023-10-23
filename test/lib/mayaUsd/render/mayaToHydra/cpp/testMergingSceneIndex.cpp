@@ -8,56 +8,12 @@
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
-#include <maya/MDagPath.h>
-#include <maya/MString.h>
-
 #include <ufe/pathString.h>
 
 #include <gtest/gtest.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 using namespace MayaHydra;
-
-namespace {
-
-class SceneIndexDisplayNamePred {
-    const std::string _name;
-public:
-    SceneIndexDisplayNamePred(const std::string& name) : _name(name) {}
-
-    bool operator()(const HdSceneIndexBaseRefPtr& sceneIndex) {
-        return sceneIndex->GetDisplayName() == _name;
-    }
-};
-
-HdSceneIndexBaseRefPtr findSceneIndexInTree(
-    const HdSceneIndexBaseRefPtr&                             sceneIndex,
-    const std::function<bool(const HdSceneIndexBaseRefPtr&)>& predicate
-)
-{
-    if (predicate(sceneIndex)) {
-        return sceneIndex;
-    }
-    auto filteringSi = TfDynamic_cast<HdFilteringSceneIndexBaseRefPtr>(
-        sceneIndex);
-    // End recursion at leaf scene indices, which are not filtering scene
-    // indices.
-    if (!filteringSi) {
-        return {};
-    }
-
-    auto sceneIndices = filteringSi->GetInputScenes();
-    if (!sceneIndices.empty()) {
-        for (const auto& childSceneIndex : sceneIndices) {
-            if (auto si = findSceneIndexInTree(childSceneIndex, predicate)) {
-                return si;
-            }
-        }
-    }
-    return {};
-}
-
-}
 
 TEST(FlowViewport, mergingSceneIndex)
 {
@@ -137,20 +93,12 @@ TEST(FlowViewport, mergingSceneIndexAddRemove)
     auto mayaPath = Ufe::PathString::path("|aSphere");
     auto sceneIndexPath = mayaSi->SceneIndexPath(mayaPath);
 
-    // Pending resolution of HYDRA-606, determining validity of Maya scene
-    // index prims by inspecting the data source is not reliable.  Transform
-    // Maya scene index prims are created without a data source, which would
-    // make them invalid.  However, the Flow Viewport selection scene index
-    // transforms an invalid scene index path into a valid one if the invalid
-    // scene index path corresponds to a selection, so any scene index after
-    // the selection scene index (e.g. the terminal scene index) will see a
-    // non-null data source.  When this is resolved, all data source-based
-    // tests below should be uncommented.  PPT, 6-Oct-2023.
-
     // With Maya scene index in the merging scene index, the sphere prim has
     // a valid scene index path.
-    // auto spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
-    // ASSERT_TRUE(spherePrim.dataSource);
+    auto spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
+    ASSERT_TRUE(spherePrim.dataSource);
+    spherePrim = mergingSi->GetPrim(sceneIndexPath);
+    ASSERT_TRUE(spherePrim.dataSource);
 
     // Remove the Maya scene index from the Flow Viewport merging scene index.
     ASSERT_EQ(mergingSi->GetInputScenes().size(), 1u);
@@ -159,17 +107,18 @@ TEST(FlowViewport, mergingSceneIndexAddRemove)
 
     // Without the Maya scene index in the merging scene index, the sphere prim
     // is no longer in the Hydra scene index scene.
-    // spherePrim = mergingSi->GetPrim(sceneIndexPath);
-    // EXPECT_FALSE(spherePrim.dataSource);
-
-    // spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
-    // EXPECT_FALSE(spherePrim.dataSource);
+    spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
+    ASSERT_FALSE(spherePrim.dataSource);
+    spherePrim = mergingSi->GetPrim(sceneIndexPath);
+    ASSERT_FALSE(spherePrim.dataSource);
 
     // Add the Maya scene index back to the Flow Viewport merging scene index,
     // sphere prim will reappear.  We know that the Maya scene index is added
     // with the absolute root path as scene root, so duplicate that here.
     mergingSi->AddInputScene(mayaSi, SdfPath::AbsoluteRootPath());
     ASSERT_EQ(mergingSi->GetInputScenes().size(), 1u);
-    // spherePrim = mergingSi->GetPrim(sceneIndexPath);
-    // EXPECT_TRUE(spherePrim.dataSource);
+    spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
+    ASSERT_TRUE(spherePrim.dataSource);
+    spherePrim = mergingSi->GetPrim(sceneIndexPath);
+    ASSERT_TRUE(spherePrim.dataSource);
 }

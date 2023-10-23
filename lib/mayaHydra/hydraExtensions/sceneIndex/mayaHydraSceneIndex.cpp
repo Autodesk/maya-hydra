@@ -881,7 +881,33 @@ void MayaHydraSceneIndex::InsertPrim(
     auto dataSource = MayaHydraDataSource::New(
         id, typeId, this, adapter);
 
+    // We are a retained scene index, which uses an SdfPathTable to store
+    // prims:
+    // https://github.com/PixarAnimationStudios/OpenUSD/blob/10b62439e9242a55101cf8b200f2c7e02420e1b0/pxr/imaging/hd/retainedSceneIndex.h#L107
+    // And SdfPathTable inserts missing ancestors on inserting a prim:
+    // https://github.com/PixarAnimationStudios/OpenUSD/blob/10b62439e9242a55101cf8b200f2c7e02420e1b0/pxr/usd/sdf/pathTable.h#L53
+    // Unfortunately, inserted ancestors are inserted with the default mapped
+    // type
+    // https://github.com/PixarAnimationStudios/OpenUSD/blob/10b62439e9242a55101cf8b200f2c7e02420e1b0/pxr/usd/sdf/pathTable.h#L722
+    // which for HdSceneIndexPrim is an invalid prim with a null data source.
+    // Therefore, insert missing ancestors ourselves, with a non-null data
+    // source and empty type.
+    _AddPrimAncestors(id);
+
     AddPrims({ { id, typeId, dataSource } });
+}
+
+void MayaHydraSceneIndex::_AddPrimAncestors(const SdfPath& path)
+{
+    const auto& parentPath = path.GetParentPath();
+    if (!GetPrim(parentPath).dataSource) {
+        // Add a parent prim with an empty type and an empty data source, and
+        // recurse up to the next ancestor level.
+        AddPrims(
+            {{ parentPath, TfToken(), HdRetainedContainerDataSource::New() }});
+        _AddPrimAncestors(parentPath);
+    }
+
 }
 
 void MayaHydraSceneIndex::MarkPrimDirty(const SdfPath& id, HdDirtyBits dirtyBits)

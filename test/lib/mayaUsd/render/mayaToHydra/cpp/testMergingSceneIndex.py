@@ -3,7 +3,7 @@ import fixturesUtils
 import mtohUtils
 from testUtils import PluginLoaded
 
-class TestMayaSceneFlattening(mtohUtils.MayaHydraBaseTestCase):
+class TestMergingSceneIndex(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 

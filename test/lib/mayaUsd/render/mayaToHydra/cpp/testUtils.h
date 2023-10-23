@@ -148,6 +148,36 @@ private:
     HdSceneIndexBasePtr _sceneIndex;
 };
 
+class SceneIndexDisplayNamePred {
+    const std::string _name;
+public:
+    SceneIndexDisplayNamePred(const std::string& name) : _name(name) {}
+
+    /**
+     * @brief Predicate to match a scene index display name string.
+     *
+     * @param[in] sceneIndex The scene index to test.
+     *
+     * @return True if the argument scene index matches the display name string, false otherwise.
+     */
+    bool operator()(const HdSceneIndexBaseRefPtr& sceneIndex) {
+        return sceneIndex->GetDisplayName() == _name;
+    }
+};
+
+/**
+ * @brief Find the first scene index matching argument predicate in depth first search.
+ *
+ * @param[in] sceneIndex The root of the scene index tree to search.
+ * @param[in] predicate The predicate that determines a match.
+ *
+ * @return Scene index pointer if the predicate succeeds, otherwise nullptr.
+ */
+HdSceneIndexBaseRefPtr findSceneIndexInTree(
+    const HdSceneIndexBaseRefPtr&                             sceneIndex,
+    const std::function<bool(const HdSceneIndexBaseRefPtr&)>& predicate
+);
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // MAYAHYDRA_TEST_UTILS_H

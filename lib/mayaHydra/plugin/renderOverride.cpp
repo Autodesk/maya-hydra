@@ -772,6 +772,7 @@ void MtohRenderOverride::_InitHydraResources()
     _mayaHydraSceneProducer->Populate();
 
     _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_renderIndexProxy->GetMergingSceneIndex());
+    _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
 
     if (!_sceneIndexRegistry) {
         _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(*_renderIndexProxy));
@@ -911,10 +912,10 @@ void MtohRenderOverride::SelectionChanged(
     static auto appendSn = [this](const SnOp& op) {
         _selectionSceneIndex->AddSelection(op.item->path());
     };
-    // FLOW_VIEWPORT_TODO  Support selection remove, insert.  PPT, 18-Sep-2023
-    static auto removeSn = [](const SnOp&) {
-        TF_WARN("Remove from selection not supported.");
+    static auto removeSn = [this](const SnOp& op) {
+        _selectionSceneIndex->RemoveSelection(op.item->path());
     };
+    // FLOW_VIEWPORT_TODO  Support selection insert.  PPT, 19-Oct-2023
     static auto insertSn = [](const SnOp&) {
         TF_WARN("Insert into selection not supported.");
     };
