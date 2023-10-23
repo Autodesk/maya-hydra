@@ -68,6 +68,7 @@ RenderIndexProxy::RenderIndexProxy(PXR_NS::HdRenderIndex* renderIndex) :
 {
     TF_AXIOM(_renderIndex);
     TF_AXIOM(_mergingSceneIndex);
+    _mergingSceneIndex->SetDisplayName("Flow Viewport Merging Scene Index");
 }
 
 void RenderIndexProxy::InsertSceneIndex(
