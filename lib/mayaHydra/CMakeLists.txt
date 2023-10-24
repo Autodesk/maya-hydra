@@ -1,3 +1,3 @@
-add_subdirectory(plugin)
+add_subdirectory(mayaPlugin)
 add_subdirectory(hydraExtensions)
 add_subdirectory(ufeExtensions)
