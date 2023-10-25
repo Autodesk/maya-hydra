@@ -2,9 +2,7 @@
 // curl -d "DISABLE_MAIL_NOTIFICATIONS=ON" -i -X POST "https://svc_d_ecg:11111111111111111111111111111111@ecg-jenkins.ecs.ads.autodesk.com/job/ecg-mayahydra-preflight-update-submodule-master/buildWithParameters"
 
 GITHUB_ORG_NAME = 'media-and-entertainment'
-// TODO: When project ecg-maya-hydra is created in Jenkins and the jobs moved, this
-//       needs to be updated.
-PROJECT_NAME = 'ecg-maya-usd'
+PROJECT_NAME = 'ecg-maya-hydra'
 pipeline {
     agent {
         label 'mayausd-preload-pool'
