@@ -173,9 +173,7 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail,
     # setting LD_LIBRARY_PATH to IDIFF_LD_LIBRARY_PATH only when we run 
     # idiff using Python's subprocess module.
 
-    if sys.platform == "win32":
-        os.environ["PATH"] = os.environ['IDIFF_LD_LIBRARY_PATH']
-    elif sys.platform == "darwin":
+    if sys.platform == "darwin":
        os.environ["DYLD_LIBRARY_PATH"] = os.environ['IDIFF_LD_LIBRARY_PATH']
     elif sys.platform.startswith("linux"):
         os.environ["LD_LIBRARY_PATH"] = os.environ['IDIFF_LD_LIBRARY_PATH']
