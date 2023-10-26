@@ -164,7 +164,7 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail,
         sys.__stdout__.write("\nimage diffing with {0}".format(cmd))
         sys.__stdout__.flush()
 
-    # LD_LIBRARY_PATH needs to be set for the idiff executable because its 
+    # LD_LIBRARY_PATH(or PATH or DYLD_LIBRARY_PATH) needs to be set for the idiff executable because its 
     # RPATH is absolute rather than relative to ORIGIN, meaning the RPATH 
     # points to the absolute path on the machine where idiff was built.
     # This absence of relative paths for RPATH comes from OpenImageIO.
@@ -172,7 +172,13 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail,
     # because both use incompatible versions of libpng. This is done by 
     # setting LD_LIBRARY_PATH to IDIFF_LD_LIBRARY_PATH only when we run 
     # idiff using Python's subprocess module.
-    os.environ["LD_LIBRARY_PATH"] = os.environ['IDIFF_LD_LIBRARY_PATH']
+
+    if sys.platform == "win32":
+        os.environ["PATH"] = os.environ['IDIFF_LD_LIBRARY_PATH']
+    elif sys.platform == "darwin":
+       os.environ["DYLD_LIBRARY_PATH"] = os.environ['IDIFF_LD_LIBRARY_PATH']
+    elif sys.platform.startswith("linux"):
+        os.environ["LD_LIBRARY_PATH"] = os.environ['IDIFF_LD_LIBRARY_PATH']
     
     # Run idiff command
     proc = subprocess.run(cmd, shell=False, env=os.environ.copy(), stdout=subprocess.PIPE)
