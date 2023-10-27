@@ -1,10 +1,10 @@
-# Contributing to USD For Maya
+# Contributing to Hydra for Maya
 
 ## Contributor License Agreement #
 Before contributing code to this project, we ask that you sign a Contributor License Agreement (CLA).
 
-+ [AutodeskFormCorpContribAgmtForOpenSource.docx](AutodeskFormCorpContribAgmtForOpenSource.docx) please sign this one for corporate use
-+ [AutodeskFormIndContribAgmtForOpenSource.docx](AutodeskFormIndContribAgmtForOpenSource.docx) please sign this one if you're an individual contributor
++ [Hydra for Maya - Corp Contrib Agmt.pdf](<./CLA/Hydra for Maya - Corp Contrib Agmt.pdf>) please sign this one for corporate use
++ [Hydra for Maya - Ind Contrib Agmt.pdf](<./CLA/Hydra for Maya - Ind Contrib Agmt.pdf>) please sign this one if you're an individual contributor
 
 The documents include instructions on where to send the completed forms to.  Once a signed form has been received you will be able to submit pull requests.
 
@@ -13,7 +13,7 @@ The documents include instructions on where to send the completed forms to.  Onc
 
 ### Suggestions
 
-The USD for Maya project is meant to evolve with feedback - the project and its users greatly appreciate any thoughts on ways to improve the design or features. Please use the `enhancement` tag to specifically denote issues that are suggestions - this helps us triage and respond appropriately.
+The _Hydra for Maya_ project is meant to evolve with feedback - the project and its users greatly appreciate any thoughts on ways to improve the design or features. Please use the `enhancement` tag to specifically denote issues that are suggestions - this helps us triage and respond appropriately.
 
 ### Bugs
 
@@ -23,7 +23,7 @@ The best bug reports include a detailed way to predictably reproduce the issue, 
 
 ## Contributing Code
 
-The USD for Maya project accepts and greatly appreciates contributions. The project follows the [fork & pull](https://help.github.com/articles/using-pull-requests/#fork--pull) model for accepting contributions.
+The _Hydra for Maya_ project accepts and greatly appreciates contributions. The project follows the [fork & pull](https://help.github.com/articles/using-pull-requests/#fork--pull) model for accepting contributions.
 
 When contributing code, please also include appropriate tests as part of the pull request, and follow the same comment and coding style as the rest of the project. Take a look through the existing code for examples of the testing and style practices the project follows.
 

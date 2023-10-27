@@ -1,8 +1,8 @@
-This document outlines coding guidelines for contributions to the  [maya-usd](https://github.com/autodesk/maya-usd) project.
+This document outlines coding guidelines for contributions to the  [maya-hydra](https://github.com/autodesk/maya-hydra) project.
 
 # C++ Coding Guidelines
 
-Many of the C++ coding guidelines below are validated and enforced through the use of `clang-format` which is provided by the [LLVM project](https://github.com/llvm/llvm-project). Since the adjustments made by `clang-format` can vary from version to version, we standardize this project on a single `clang-format` version to ensure consistent results for all contributions made to maya-usd.
+Many of the C++ coding guidelines below are validated and enforced through the use of `clang-format` which is provided by the [LLVM project](https://github.com/llvm/llvm-project). Since the adjustments made by `clang-format` can vary from version to version, we standardize this project on a single `clang-format` version to ensure consistent results for all contributions made to maya-hydra.
 
 |                      | Version | Source Code | Release |
 |:--------------------:|:-------:|:-----------:|:-------:|
@@ -61,7 +61,7 @@ Never use reserved identifiers, like underscore followed immediately by an upper
 
 ### Naming (file, type, variable, constant, function, namespace, macro, template parameters, schema names)
 **General Naming Rules**
-MayaUsd strives to use "camel case" naming. That is, each word is capitalized, except possibly the first word:
+The _Hydra for Maya_ project strives to use "camel case" naming. That is, each word is capitalized, except possibly the first word:
 * UpperCamelCase
 * lowerCamelCase
 
@@ -149,9 +149,9 @@ In general, macros should be avoided (see [Modern C++](https://docs.google.com/d
 <Not yet defined, proposals are welcome>
 
 ### Documentation (class, method, variable, comments)
-* [Doxygen ](http://www.doxygen.nl/index.html) will be used to generate documentation from mayaUsd C++ sources.
+* [Doxygen ](http://www.doxygen.nl/index.html) will be used to generate documentation from _Hydra for Maya_ C++ sources.
 * Doxygen tags must be used to document classes, function parameters, function return values, and thrown exceptions.
-* The mayaUsd project does require the use of any Doxygen formatting style ( [Doxygen built-in formatting](http://www.doxygen.nl/manual/commands.html) )
+* The _Hydra for Maya_ project does require the use of any Doxygen formatting style ( [Doxygen built-in formatting](http://www.doxygen.nl/manual/commands.html) )
 * Comments for users of classes and functions must be written in headers files. Comments in definition files are meant for contributors and maintainers.
 
 ### Namespaces
@@ -199,7 +199,7 @@ Headers should be included in the following order, with each section separated b
 
 1. Related header
 2. All private headers
-3. All public headers from this repository (maya-usd)
+3. All public headers from this repository (maya-hydra)
 4. Pixar + USD headers
 5. Autodesk + Maya headers
 6. Other libraries' headers
@@ -228,7 +228,7 @@ Headers should be included in the following order, with each section separated b
 ```
 
 ### Cross-platform development
-* Consult the [build.md](https://github.com/Autodesk/maya-usd/blob/dev/doc/build.md) compatibility table to ensure you use the recommended tool (i.e., compiler, operating system, CMake, etc.) versions.
+* Consult the [build.md](https://github.com/Autodesk/maya-hydra/blob/dev/doc/build.md) compatibility table to ensure you use the recommended tool (i.e., compiler, operating system, CMake, etc.) versions.
 * Before pull requests (PRs) are considered for integration, they must compile and all tests should pass on all suppported platforms.
 
 ### Conditional compilation (Maya, USD version)
@@ -239,7 +239,7 @@ Headers should be included in the following order, with each section separated b
 **USD**
 	* `PXR_VERSION` is the macro to test USD version (`PXR_MAJOR_VERSION` * 10000 + `PXR_MINOR_VERSION` * 100 + `PXR_PATCH_VERSION`)
 
-Respect the minimum supported version for Maya and USD stated in [build.md](https://github.com/Autodesk/maya-usd/blob/dev/doc/build.md) .
+Respect the minimum supported version for Maya and USD stated in [build.md](https://github.com/Autodesk/maya-hydra/blob/dev/doc/build.md) .
 
 ### std over boost
 Recent extensions to the C++ standard introduce many features previously only found in [boost](http://boost.org). To avoid introducing additional dependencies, developers should strive to use functionality in the C++ std over boost. If you encounter usage of boost in the code, consider converting this to the equivalent std mechanism. 
@@ -255,7 +255,7 @@ Our library currently has the following boost dependencies:
 * `boost::hash_combine` is replaced with `MayaUsd::hash_combine` and should be used instead across the project.
 
 ## Modern C++
-Our goal is to develop [maya-usd](https://github.com/autodesk/maya-usd) following modern C++ practices. We’ll follow the [C++ Core Guidelines](http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines) and pay attention to:
+Our goal is to develop [maya-hydra](https://github.com/autodesk/maya-hydra) following modern C++ practices. We’ll follow the [C++ Core Guidelines](http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines) and pay attention to:
 * `using` (vs `typedef`) keyword
 * `virtual`, `override` and `final` keyword
 * `default` and `delete` keywords

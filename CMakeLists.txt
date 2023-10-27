@@ -157,8 +157,8 @@ if(MAYA_APP_VERSION VERSION_GREATER 2024)
                         You must extract Qt.tar.gz. Hydra Scene Browser will not be built.")
     endif()
 else()
-    message(WARNING "Maya ${MAYA_APP_VERSION} does not contain Qt6 in its devkit \
-                    (Qt6 has been added to the Maya devkit as of Maya 2025). Hydra Scene Browser will not be built.")
+    message(WARNING "Maya ${MAYA_APP_VERSION} does not contain Qt6 in its devkit. \
+                    Hydra Scene Browser will not be built.")
 endif()
 
 #------------------------------------------------------------------------------
