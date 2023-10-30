@@ -22,7 +22,20 @@
 
 #include <maya/MApiNamespace.h>
 
+#include <string>
+
 namespace MAYAHYDRA_NS_DEF {
+
+// Names of color tables for indexed colors
+const std::string kActiveColorTableName = "active";
+const std::string kDormantColorTableName = "dormant";
+
+// Color names
+const std::string kLeadColorName = "lead";
+const std::string kPolymeshActiveColorName = "polymeshActive";
+const std::string kPolyVertexColorName = "polyVertex";
+const std::string kPolyEdgeColorName = "polyEdge";
+const std::string kPolyFaceColorName = "polyFace";
 
 /**
  * @brief Get the DAG path of a node from its name

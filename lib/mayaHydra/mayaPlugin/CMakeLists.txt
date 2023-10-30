@@ -7,6 +7,8 @@ add_library(${TARGET_NAME} SHARED)
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME} 
     PRIVATE
+        colorNotFoundException.cpp
+        mayaColorPreferencesTranslator.cpp
         plugin.cpp
         pluginDebugCodes.cpp
         pluginUtils.cpp

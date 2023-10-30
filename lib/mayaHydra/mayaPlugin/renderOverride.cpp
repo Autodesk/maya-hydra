@@ -23,6 +23,7 @@
 
 #include "renderOverride.h"
 
+#include "mayaColorPreferencesTranslator.h"
 #include "pluginDebugCodes.h"
 #include "renderOverrideUtils.h"
 #include "tokens.h"
@@ -33,6 +34,8 @@
 #include <mayaHydraLib/sceneIndex/registration.h>
 
 #include <flowViewport/tokens.h>
+#include <flowViewport/colorPreferences/fvpColorPreferences.h>
+#include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
 #include <flowViewport/debugCodes.h>
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/selection/fvpSelectionTask.h>
@@ -588,8 +591,11 @@ MStatus MtohRenderOverride::Render(
     params.enableLighting = true;
     params.enableSceneMaterials = true;
 
-    MColor colour = M3dView::leadColor();
-    params.wireframeColor = GfVec4f(colour.r, colour.g, colour.b, 1.0f);
+    PXR_NS::GfVec4f wireframeSelectionColor;
+    if (Fvp::ColorPreferences::getInstance().getColor(
+            FvpColorPreferencesTokens->wireframeSelection, wireframeSelectionColor)) {
+        params.wireframeColor = wireframeSelectionColor;
+    }
 
     params.cullStyle = HdCullStyleBackUnlessDoubleSided;
 
