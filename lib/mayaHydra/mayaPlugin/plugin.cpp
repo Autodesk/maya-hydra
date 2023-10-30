@@ -15,6 +15,7 @@
 //
 // Copyright 2023 Autodesk, Inc. All rights reserved.
 //
+#include "mayaColorPreferencesTranslator.h"
 #include "pluginUtils.h"
 #include "renderGlobals.h"
 #include "renderOverride.h"
@@ -24,6 +25,8 @@
 #if defined(MAYAUSD_VERSION)
 #include <mayaUsd/utils/plugRegistryHelper.h>
 #endif
+
+#include <flowViewport/global.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -65,6 +68,27 @@ static std::vector<MtohRenderOverride*> gsRenderOverrides;
 #pragma message("MAYAHYDRA_VERSION is not defined")
 #define PLUGIN_VERSION "Maya-Hydra experimental"
 #endif
+
+void initialize()
+{
+    Fvp::InitializationParams fvpInitParams;
+    fvpInitParams.colorPreferencesNotificationProvider
+        = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+    fvpInitParams.colorPreferencesTranslator
+        = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+    Fvp::initialize(fvpInitParams);
+}
+
+void finalize()
+{
+    Fvp::InitializationParams fvpInitParams;
+    fvpInitParams.colorPreferencesNotificationProvider
+        = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+    fvpInitParams.colorPreferencesTranslator
+        = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+    Fvp::finalize(fvpInitParams);
+    MayaHydra::MayaColorPreferencesTranslator::deleteInstance();
+}
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
@@ -110,11 +134,15 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         }
     }
 
+    initialize();
+
     return ret;
 }
 
 PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 {
+    finalize();
+
     MFnPlugin plugin(obj, "Autodesk", PLUGIN_VERSION, "Any");
     MStatus   ret = MS::kSuccess;
     if (auto* renderer = MHWRender::MRenderer::theRenderer()) {

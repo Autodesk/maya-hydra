@@ -118,6 +118,63 @@ pxr::SdfPath DagPathToSdfPath(
 MAYAHYDRALIB_API
 pxr::SdfPath RenderItemToSdfPath(const MRenderItem& ri, const bool stripNamespaces);
 
+/**
+ * @brief Retrieves an RGB color preference from Maya.
+ *
+ * @param[in] colorName is the color name in Maya to get the color value of.
+ * @param[out] outColor is the color that will be populated if retrieved from Maya.
+ *
+ * @return True if the color retrieval was successful and outColor was populated, false otherwise.
+ */
+MAYAHYDRALIB_API
+bool getRGBAColorPreferenceValue(const std::string& colorName, PXR_NS::GfVec4f& outColor);
+
+/**
+ * @brief Retrieves an indexed color preference's index from Maya.
+ *
+ * @param[in] colorName is the color name in Maya to get the color index of.
+ * @param[in] tableName is to indicate for which table/palette we want to get the index.
+ * @param[out] outIndex is the index value that will be populated if retrieved from Maya.
+ *
+ * @return True if the color index retrieval was successful and outIndex was populated, false
+ * otherwise.
+ */
+MAYAHYDRALIB_API
+bool getIndexedColorPreferenceIndex(
+    const std::string& colorName,
+    const std::string& tableName,
+    size_t&            outIndex);
+
+/**
+ * @brief Retrieves a palette color from Maya's color settings.
+ *
+ * @param[in] tableName is to indicate which table/palette we want to get the color from.
+ * @param[in] index is to indicate which color to get from the palette.
+ * @param[out] outColor is the color that will be populated if retrieved from Maya.
+ *
+ * @return True if the color retrieval was successful and outColor was populated, false otherwise.
+ */
+MAYAHYDRALIB_API
+bool getColorPreferencesPaletteColor(
+    const std::string& tableName,
+    size_t             index,
+    PXR_NS::GfVec4f&   outColor);
+
+/**
+ * @brief Retrieves an indexed/paletted color preference from Maya.
+ *
+ * @param[in] colorName is the color name in Maya to get the color value of.
+ * @param[in] tableName is to indicate which table/palette we want to get the color from.
+ * @param[out] outColor is the color that will be populated if retrieved from Maya.
+ *
+ * @return True if the color retrieval was successful and outColor was populated, false otherwise.
+ */
+MAYAHYDRALIB_API
+bool getIndexedColorPreferenceValue(
+    const std::string& colorName,
+    const std::string& tableName,
+    PXR_NS::GfVec4f&   outColor);
+
 } // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRALIB_MIXED_UTILS_H

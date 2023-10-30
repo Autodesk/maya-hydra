@@ -8,12 +8,14 @@ add_library(${TARGET_NAME} SHARED)
 target_sources(${TARGET_NAME} 
     PRIVATE
         debugCodes.cpp
+        global.cpp
         tokens.cpp
 )
 
 set(HEADERS
     api.h
     debugCodes.h
+    global.h
     tokens.h
 )
 
@@ -106,5 +108,6 @@ endif()
 # -----------------------------------------------------------------------------
 # subdirectories
 # -----------------------------------------------------------------------------
+add_subdirectory(colorPreferences)
 add_subdirectory(sceneIndex)
 add_subdirectory(selection)

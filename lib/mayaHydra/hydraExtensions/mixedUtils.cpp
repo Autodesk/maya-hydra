@@ -21,6 +21,7 @@
 #include <mayaHydraLib/hydraUtils.h>
 
 #include <maya/MDagPath.h>
+#include <maya/MGlobal.h>
 #include <maya/MHWGeometry.h>
 #include <maya/MPlug.h>
 #include <maya/MPlugArray.h>
@@ -107,6 +108,68 @@ SdfPath RenderItemToSdfPath(const MRenderItem& ri, const bool stripNamespaces)
         return SdfPath(internalObjectId);
     }
     return sdfPath;
+}
+
+bool getRGBAColorPreferenceValue(const std::string& colorName, PXR_NS::GfVec4f& outColor)
+{
+    MDoubleArray rgbaColorValues;
+    bool         wasCommandSuccessful = MGlobal::executeCommand(
+        MString("displayRGBColor -q -a ") + MString(colorName.c_str()), rgbaColorValues);
+    if (!wasCommandSuccessful || rgbaColorValues.length() != 4) {
+        return false;
+    }
+    outColor[0] = static_cast<float>(rgbaColorValues[0]);
+    outColor[1] = static_cast<float>(rgbaColorValues[1]);
+    outColor[2] = static_cast<float>(rgbaColorValues[2]);
+    outColor[3] = static_cast<float>(rgbaColorValues[3]);
+    return true;
+}
+
+bool getIndexedColorPreferenceIndex(
+    const std::string& colorName,
+    const std::string& tableName,
+    size_t&            outIndex)
+{
+    MIntArray   indexInPalette;
+    std::string getIndexCommand = "displayColor -q -" + tableName + " " + colorName;
+    bool        wasCommandSuccessful
+        = MGlobal::executeCommand(MString(getIndexCommand.c_str()), indexInPalette);
+    if (!wasCommandSuccessful || indexInPalette.length() != 1) {
+        return false;
+    }
+    outIndex = indexInPalette[0];
+    return true;
+}
+
+bool getColorPreferencesPaletteColor(
+    const std::string& tableName,
+    size_t             index,
+    PXR_NS::GfVec4f&   outColor)
+{
+    MDoubleArray rgbColorValues;
+    std::string  getColorCommand = "colorIndex -q -" + tableName + " " + std::to_string(index);
+    bool         wasCommandSuccessful
+        = MGlobal::executeCommand(MString(getColorCommand.c_str()), rgbColorValues);
+    if (!wasCommandSuccessful || rgbColorValues.length() != 3) {
+        return false;
+    }
+    outColor[0] = static_cast<float>(rgbColorValues[0]);
+    outColor[1] = static_cast<float>(rgbColorValues[1]);
+    outColor[2] = static_cast<float>(rgbColorValues[2]);
+    outColor[3] = 1.0f;
+    return true;
+}
+
+bool getIndexedColorPreferenceValue(
+    const std::string& colorName,
+    const std::string& tableName,
+    PXR_NS::GfVec4f&   outColor)
+{
+    size_t colorIndex = 0;
+    if (getIndexedColorPreferenceIndex(colorName, tableName, colorIndex)) {
+        return getColorPreferencesPaletteColor(tableName, colorIndex, outColor);
+    }
+    return false;
 }
 
 } // namespace MAYAHYDRA_NS_DEF

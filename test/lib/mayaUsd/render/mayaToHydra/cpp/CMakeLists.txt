@@ -12,6 +12,7 @@ add_library(${TARGET_NAME} SHARED)
 target_sources(${TARGET_NAME}
     PRIVATE
         mayaHydraCppTestsCmd.cpp
+        testColorPreferences.cpp
         testCppFramework.cpp
         testMayaSceneFlattening.cpp
         testMayaUsdUfeItems.cpp
