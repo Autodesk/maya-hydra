@@ -35,13 +35,12 @@ Every file should start with the Apache 2.0 licensing statement:
 ### #pragma once vs include guard
 Do not use `#pragma once` to avoid files being `#include’d` multiple times (which can cause duplication of definitions & compilation errors). While it's widely supported, it's a non-standard and non-portable extension. In some cases using `#pragma once` may include two copies of the same file when they are accessible via multiple different paths.
 
-All code should use include guards instead `#pragma once`. For example:
+All code should use include guards instead `#pragma once`.  To ensure uniqueness, include guards must include the path to the included header, with path components converted to uppercase, and separated by an underscore.  For example, for file lib/mayaHydra/hydraExtensions/sceneIndex/mhMayaSceneIndex.h:
 ```cpp
-// file foobar.h:
-#ifndef LIBRARY_FOOBAR_H
-#define LIBRARY_FOOBAR_H
+#ifndef LIB_MAYAHYDRA_HYDRAEXTENSIONS_SCENEINDEX_MHMAYASCENEINDEX_H
+#define LIB_MAYAHYDRA_HYDRAEXTENSIONS_SCENEINDEX_MHMAYASCENEINDEX_H
 // … declarations …
-#endif // LIBRARY_FOOBAR_H
+#endif // LIB_MAYAHYDRA_HYDRAEXTENSIONS_SCENEINDEX_MHMAYASCENEINDEX_H
 ```
 
 Never use reserved identifiers, like underscore followed immediately by an uppercase letter or double underscore. For example, the following is illegal:
@@ -68,22 +67,24 @@ The _Hydra for Maya_ project strives to use "camel case" naming. That is, each w
 While underscores in names (_) (e.g., as separator) are not strictly forbidden, they are strongly discouraged.
 Optimize for readability by selecting names that are clear to others (e.g., people on different teams.)
 Use names that describe the purpose or intent of the object. Do not worry about saving horizontal space. It is more important to make your code easily understandable by others. Minimize the use of abbreviations that would likely be unknown to someone outside your project (especially acronyms and initialisms).
+***Project-Related Naming***
+When using Maya Hydra in code, the string MayaHydra or mayaHydra should be used, depending on required capitalization.  The string maya-hydra should only be used when referring to the Github repository.
+
+**Type Names**
+All type names (i.e., classes, structs, type aliases, enums, and type template parameters) should use UpperCamelCase, with no underscores.  All top-level classes in the MayaHydra namespace should use a short prefix, to categorize them.  Nested classes declared inside another class should not have a prefix.  The only currently defined prefix is Mh; others will be added as appropriate.  For example:
+```cpp
+class MhSceneIndex;
+class MhSceneIndex::Data;
+enum Roles;
+```
 
 **File Names**
 Filenames should be lowerCamelCase and should not include underscores (_) or dashes (-).
 C++ files should end in .cpp and header files should end in .h.
-In general, make your filenames as specific as possible. For example:
+In general, make your filenames as specific as possible.  Where file names declare a single class (which should be the majority of cases), the file name should match the class name, except for the case of the leading character.  For example:
 ```
-stageData.cpp
-stageData.h
-```
-
-**Type Names**
-All type names (i.e., classes, structs, type aliases, enums, and type template parameters) should use UpperCamelCase, with no underscores. For example:
-```cpp
-class MayaUsdStageData;
-class ImportData;
-enum Roles;
+mhSceneIndex.cpp
+mhSceneIndex.h
 ```
 
 **Variable Names**
@@ -125,6 +126,10 @@ Namespace names should be UpperCamelCase. Top-level namespace names are based on
 ```cpp
 namespace MayaAttrs {}
 ```
+***Use of Pixar Namespace***
+For multiple reasons, some code in the maya-hydra repository places symbols in the Pixar namespace.  We intend to move this code to a more appropriate namespace, *e.g.* the MayaHydra namespace.  No new code can add symbols to the Pixar namespace.
+
+When using the Pixar namespace, the PXR_NS macro must be used.  This ensures that the maya-hydra code base can be compatible with developers wishing to compile USD code with a Pixar namespace different from the default (pxr).
 
 **Enumerator Names**
 Enumerators (for both scoped and unscoped enums) should be named like constants (i.e., `kEnumName`.)
