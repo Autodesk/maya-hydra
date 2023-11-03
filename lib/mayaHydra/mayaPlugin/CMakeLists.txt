@@ -18,13 +18,6 @@ target_sources(${TARGET_NAME}
         viewCommand.cpp
 )
 
-if (BUILD_MAYAUSD_LIBRARY)
-    target_sources(${TARGET_NAME} 
-        PRIVATE
-            shadingModeExporter.cpp
-    )
-endif()
-
 set(HEADERS
     pluginUtils.h
 )
