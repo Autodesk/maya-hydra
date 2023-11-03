@@ -43,7 +43,7 @@ std::string ConvertVtValueToString(const pxr::VtValue& val);
 /**
  * @brief Strip \p nsDepth namespaces from \p nodeName.
  *
- * @usage This will turn "taco:foo:bar" into "foo:bar" for \p nsDepth == 1, or "taco:foo:bar" into
+ * This will turn "taco:foo:bar" into "foo:bar" for \p nsDepth == 1, or "taco:foo:bar" into
  * "bar" for \p nsDepth > 1. If \p nsDepth is -1, all namespaces are stripped.
  *
  * @param[in] nodeName is the node name from which to strip namespaces.
@@ -66,8 +66,7 @@ void SanitizeNameForSdfPath(std::string& inOutPathString, bool doStripNamespaces
 /**
  * @brief Get the given SdfPath without its parent path.
  *
- * @usage Get the given SdfPath without its parent path. The result is the last
- * element of the original SdfPath.
+ * The result is the last element of the original SdfPath.
  *
  * @param[in] path is the SdfPath from which to remove the parent path.
  *
@@ -79,8 +78,7 @@ pxr::SdfPath MakeRelativeToParentPath(const pxr::SdfPath& path);
 /**
  * @brief Get the Hydra Xform matrix from a given prim.
  *
- * @usage Get the Hydra Xform matrix from a given prim. This method makes no guarantee on whether
- * the matrix is flattened or not.
+ * This method makes no guarantee on whether the matrix is flattened or not.
  *
  * @param[in] prim is the Hydra prim in the SceneIndex of which to get the transform matrix.
  * @param[out] outMatrix is the transform matrix of the prim.

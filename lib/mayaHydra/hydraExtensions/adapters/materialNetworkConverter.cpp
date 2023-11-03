@@ -1026,48 +1026,4 @@ const MayaHydraShaderParams& MayaHydraMaterialNetworkConverter::GetPreviewShader
     return _previewShaderParams;
 }
 
-const MayaHydraShaderParams&
-MayaHydraMaterialNetworkConverter::GetShaderParams(const TfToken& shaderNodeIdentifier)
-{
-    if (shaderNodeIdentifier == UsdImagingTokens->UsdPreviewSurface)
-        return GetPreviewShaderParams();
-
-    auto it = _defaultShaderParams.find(shaderNodeIdentifier);
-    if (it == _defaultShaderParams.end()) {
-        MayaHydraShaderParams params;
-
-        auto&                 shaderReg = SdrRegistry::GetInstance();
-        SdrShaderNodeConstPtr sdrNode = shaderReg.GetShaderNodeByIdentifier(shaderNodeIdentifier);
-        assert(TF_VERIFY(sdrNode));
-
-        auto inputNames = sdrNode->GetInputNames();
-        params.reserve(inputNames.size());
-
-        std::string              inputNameStr;
-        std::vector<std::string> inputNameStrs;
-        for (auto& inputName : inputNames) {
-            inputNameStr = inputName.GetString();
-            inputNameStrs.push_back(inputNameStr);
-            auto property = sdrNode->GetInput(inputName);
-            if (!TF_VERIFY(property)) {
-                continue;
-            }
-
-            params.emplace_back(
-                inputName, property->GetDefaultValue(), property->GetTypeAsSdfType().first);
-        }
-
-        std::sort(
-            params.begin(),
-            params.end(),
-            [](const MayaHydraShaderParam& a, const MayaHydraShaderParam& b) -> bool {
-                return a.name < b.name;
-            });
-
-        return _defaultShaderParams.insert({ shaderNodeIdentifier, params }).first->second;
-    }
-
-    return it->second;
-}
-
 PXR_NAMESPACE_CLOSE_SCOPE

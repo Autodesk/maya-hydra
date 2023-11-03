@@ -198,9 +198,6 @@ public:
     MAYAHYDRALIB_API
     static const MayaHydraShaderParams& GetPreviewShaderParams();
 
-    MAYAHYDRALIB_API
-    static const MayaHydraShaderParams& GetShaderParams(const TfToken& shaderIdentifier);
-
 private:
     HdMaterialNetwork& _network;
     const SdfPath&     _prefix;

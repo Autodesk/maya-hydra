@@ -32,18 +32,14 @@ class MayaHydraLibInterface
 {
 public:
     /**
-     * @brief Register a terminal scene index
-     *
-     * @usage Register a terminal scene index into the Hydra plugin.
+     * @brief Register a terminal scene index into the Hydra plugin.
      *
      * @param[in] sceneIndex is a pointer to the SceneIndex to be registered.
      */
     virtual void RegisterTerminalSceneIndex(HdSceneIndexBasePtr sceneIndex) = 0;
 
     /**
-     * @brief Unregister a terminal scene index
-     *
-     * @usage Unregister a terminal scene index from the Hydra plugin.
+     * @brief Unregister a terminal scene index from the Hydra plugin.
      *
      * @param[in] sceneIndex is a pointer to the SceneIndex to be unregistered.
      */
@@ -52,17 +48,14 @@ public:
     /**
      * @brief Clear the list of registered terminal scene indices
      *
-     * @usage Clear the list of registered terminal scene indices. This does not delete them, but
-     * just unregisters them.
+     * This does not delete them, but just unregisters them.
      */
     virtual void ClearTerminalSceneIndices() = 0;
 
     /**
-     * @brief Retrieve the list of registered terminal scene indices
+     * @brief Retrieve the list of registered terminal scene indices from the Hydra plugin.
      *
-     * @usage Retrieve the list of registered terminal scene indices from the Hydra plugin.
-     *
-     * @return A reference to the vector of registered terminal scene indices.
+     * @return A const reference to the vector of registered terminal scene indices.
      */
     virtual const SceneIndicesVector& GetTerminalSceneIndices() const = 0;
 };

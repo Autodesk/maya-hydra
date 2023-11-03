@@ -63,8 +63,6 @@ public:
     /**
      * @brief Is used to identify a Maya RenderItem as an aiSkydomeLight triangle shape.
      *
-     * @usage Is used to identify a Maya RenderItem as an aiSkydomeLight triangle shape.
-     *
      * @param[in] renderItem is the Maya RenderItem which you want to test.
      *
      * @return returns true if it is an aiSkydomeLight triangle shape, false if not.
