@@ -10,7 +10,7 @@ We have begun adding new APIs to Maya to provide efficient access to renderable 
 
 ### Change Notifications
 
-The new MDataServerOperation API provides change notifications that better match the requirements of a viewport.  Without this API, a plugin depends on individual attribute change callback notices, something that scales poorly with large scenes.  Instead of these low-level, fine-grained change notices the MayaHydra plugin can leverage the internal change notification system used by vp2.  This system boils down different attributes into simpler categories that better align with Hydra HdDirtyBits.  This internal change notification system is efficiently and thread-safely integrated with the Maya Evaluation Manager and the EM Caching system.
+The MDataServerOperation API provides change notifications that better match the requirements of a viewport.  Without this API, a plugin depends on individual attribute change callback notices, something that scales poorly with large scenes.  Instead of these low-level, fine-grained change notices the MayaHydra plugin can leverage the internal change notification system used by vp2.  This system boils down different attributes into simpler categories that better align with Hydra HdDirtyBits.  This internal change notification system is efficiently and thread-safely integrated with the Maya Evaluation Manager and the EM Caching system.
 
 
 ### Hybrid Viewport Rendering 
@@ -61,6 +61,10 @@ class Base Adapter {
   Material Adapter
 }
 ```
+### Optional Adapter to Maya meshes
+
+It was mentioned earlier that the MRenderItem usage is optional. MayaHydra can be told to use native Maya mesh data instead of MRenderItem by setting the environment variable ```MAYA_HYDRA_USE_MESH_ADAPTER``` to 1. 
+
 ### Integration with MayaUSD and Other Maya Plugin Nodes Using Scene Indices
 
 The maya-usd plugin provides access to USD data files inside Maya by injecting that data into Maya, for Viewport 2.0 to render.  It extracts that data from USD and tweaks it for compatibility with Maya features via a custom Hydra render delegate.  This method doesn't work when the aim is to draw with Hydra Storm or a different render delegate, so we are exploring new methods to integrate MayaHydra with MayaUSD.  MayaUSD continues to facilitate the USD data source (through the MayaUsdProxyShape Maya node) and the editing of that data.  MayaHydra controls the rendering of that data.
@@ -68,7 +72,7 @@ The maya-usd plugin provides access to USD data files inside Maya by injecting t
 Experimentally, we have separated the two plugins so that they no longer link together.  We use USD's HdSceneIndexPluginRegistry interface to query for a registered HdSceneIndex provider for a Maya node, using a naming convention based on the node type name.  Our hope is that this can also be the entry point for third-party plugins to control the viewport rendering of custom node types (MPxLocatorNode or MPxSurfaceShape) purely through the Hydra API instead of through Maya's various viewport APIs.  This could potentially replace the Maya APIs MPxSubsceneOverride, MPxDrawOverride, and MPxGeometryOverride.  
 
 ### Scene Delegate vs Scene Index
-MayaHydra's long term plan is to migrate to using Scene Index completely and remove dependency on SceneDelegates. This aligns with the Pixar's recommendation as Hydra will eventually deprecate Scene Delegate support. During this transition phase, we are supporting both Scene Delegate and Scene Indices. By default, Scene Index is used but it can be overridden to use Scene Delegate using the env var "MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX" to 0. Please note that Scene Delegate mode will not be actively supported and the Scene Index mode is the recommended one.
+MayaHydra's long term plan is to migrate to using Scene Index completely and remove dependency on SceneDelegates. This aligns with the Pixar's recommendation as Hydra will eventually deprecate Scene Delegate support. During this transition phase, we are supporting both Scene Delegate and Scene Indices. By default, Scene Index is used but it can be overridden to use Scene Delegate using the environment variable ```MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX``` to 0. Please note that Scene Delegate mode will not be actively supported and the Scene Index mode is the recommended one.
 
 ### Plugin initialization, render loop and data flow through the plugin.
 As described in the section above, the plugin hooks into Maya Viewport through the MRenderOverride API. 
@@ -123,33 +127,31 @@ sequenceDiagram
 ```mermaid
 
 stateDiagram
-  [MayaFrameRefresh] --> MtohRenderOverride_Render()
-  MtohRenderOverride_Render() --> InitHydraResources
+  [MayaFrameRefresh] --> MtohRenderOverride 
+  MtohRenderOverride --> InitHydraResources() : Render()
 
-  state InitHydraResources {
+  state InitHydraResources() {
       [*] --> HydraResources
-      HydraResources --> RenderDelegate/RenderIndex
-      RenderDelegate/RenderIndex --> SceneIndex/SceneDelegate
-      SceneIndex/SceneDelegate  --> ::Populate() 
-      Populate() -->MeshLightMaterialAdapter : Loop over Maya native nodes
-      MeshLightMaterialAdapter --> SceneIndexPluginsRegistration : Based on node name matching
-      SceneIndexPluginsRegistration --> [*]
+      HydraResources --> MayaHydraSceneProducer() :  RenderDelegate/RenderIndex
+      MayaHydraSceneProducer() --> Populate() : Creates MayaHydra specific Scene Indices internally       
+      Populate() --> MayaHydraAdapter : Loop over Maya native nodes
+      MayaHydraAdapter --> SceneIndexRegistration : Flow Viewport API (WIP) to inject various Scene Indices including USD data and SelectionHighlighting
+      SceneIndexRegistration --> [*]
   }
   
-    state MeshLightMaterialAdapter {
+    state MayaHydraAdapter {
       [*] --> InsertHydraPrims : Shape/Mesh/Light/Material/ArnoldDomelight
       InsertHydraPrims --> [*]
   }
         
-  InitHydraResources --> LoopOverMRenderItems 
+  InitHydraResources() --> HandleCompleteViewportScene() : Loops over MRenderItems using DataServer API
   state RenderItemAdapter {
       [*] --> InsertHydraPrim
       InsertHydraPrim --> [*]
   }      
-  LoopOverMRenderItems --> RenderItemAdapter : Obtained from DataServerAPI
+  HandleCompleteViewportScene() --> RenderItemAdapter : Handles VP2 updates
   RenderItemAdapter --> UpdateDirtiedPrims
-  UpdateDirtiedPrims --> SetHydraRenderParams : Values obtained from VP2 and Maya RenderSettings
+  UpdateDirtiedPrims --> SetHydraRenderParams : Global values obtained from VP2 and Maya RenderSettings
   SetHydraRenderParams --> HydraExecute()
-  HydraExecute() -->   [MayaFrameRefresh]
-
+  HydraExecute() -->  [MayaFrameRefresh]
 ```
