@@ -109,6 +109,7 @@ def snapshot(outputPath, width=400, height=None, hud=False, grid=False, camera=N
         cmds.colorManagementPrefs(e=1, outputTarget="playblast",
                                   outputTransformName=newColorTransform)
         try:
+            cmds.refresh()
             cmds.playblast(cf=outputPath, viewer=False, format="image",
                            frame=cmds.currentTime(q=1), offScreen=1,
                            widthHeight=(width, height), percent=100)
