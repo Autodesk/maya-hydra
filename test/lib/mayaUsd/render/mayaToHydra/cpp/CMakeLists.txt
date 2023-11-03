@@ -25,7 +25,7 @@ target_sources(${TARGET_NAME}
 # -----------------------------------------------------------------------------
 # compiler configuration
 # -----------------------------------------------------------------------------
-mayaUsd_compile_config(${TARGET_NAME})
+mayaHydra_compile_config(${TARGET_NAME})
 
 target_compile_definitions(${TARGET_NAME}
     PRIVATE

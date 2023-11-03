@@ -190,7 +190,7 @@ For source files (.cpp) with an associated header file (.h) that resides in the 
 All included public header files from outside and inside the project should be `#include`’d using angle brackets. For example:
 ```cpp
 #include <pxr/base/tf/stringUtils.h>
-#include <mayaUsd/nodes/stageData.h>
+#include <mayaHydraLib/mayaHydraSceneProducer.h>
 ```
 
 Private project’s header files should be `#include`'d using double quotes, and a relative path. Private headers may live in the same directory or sub-directories, but they should never be included using "._" or ".._" as part of a relative path. For example:
@@ -217,10 +217,10 @@ Headers should be included in the following order, with each section separated b
 
 #include "private/util.h"
  
-#include <mayaUsd/fileio/jobs/jobArgs.h>
-#include <mayaUsd/fileio/jobs/writeJob.h>
-#include <mayaUsd/fileio/shading/shadingModeRegistry.h>
-#include <mayaUsd/fileio/utils/writeUtil.h>
+#include <mayaHydraLib/adapters/adapterRegistry.h>
+#include <mayaHydraLib/adapters/materialNetworkConverter.h>
+#include <mayaHydraLib/adapters/mayaAttrs.h>
+#include <mayaHydraLib/adapters/renderItemAdapter.h>
  
 #include <maya/MFileObject.h>
 #include <maya/MGlobal.h>
@@ -233,7 +233,7 @@ Headers should be included in the following order, with each section separated b
 ```
 
 ### Cross-platform development
-* Consult the [build.md](https://github.com/Autodesk/maya-hydra/blob/dev/doc/build.md) compatibility table to ensure you use the recommended tool (i.e., compiler, operating system, CMake, etc.) versions.
+* Consult the [build.md](./build.md) compatibility table to ensure you use the recommended tool (i.e., compiler, operating system, CMake, etc.) versions.
 * Before pull requests (PRs) are considered for integration, they must compile and all tests should pass on all suppported platforms.
 
 ### Conditional compilation (Maya, USD version)
@@ -255,9 +255,6 @@ Our library currently has the following boost dependencies:
 ***Update:***
 * `boost::filesystem` and `boost::system` are removed. Until the transition to C++17 std::filesystem, [ghc::filesystem](https://github.com/gulrak/filesystem) must be used as an alternative across the project.
 
-* Dependency on `boost::thread` is removed from Animal Logic plugin.
-
-* `boost::hash_combine` is replaced with `MayaUsd::hash_combine` and should be used instead across the project.
 
 ## Modern C++
 Our goal is to develop [maya-hydra](https://github.com/autodesk/maya-hydra) following modern C++ practices. We’ll follow the [C++ Core Guidelines](http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines) and pay attention to:
@@ -273,16 +270,6 @@ Our goal is to develop [maya-hydra](https://github.com/autodesk/maya-hydra) foll
 
 Developers are encouraged to use TF library diagnostic facilities in Maya USD. Please follow below guideline for picking the correct facility: https://graphics.pixar.com/usd/docs/api/page_tf__diagnostic.html
 
-In MayaUSD, `UsdMayaDiagnosticDelegate` converts TF diagnostics into native Maya infos, warnings, and errors. The environment flag `MAYAUSD_SHOW_FULL_DIAGNOSTICS`, controls the granularity of TF error/warning/status messages being displayed in Maya:
-
-e.g
-```
-Error: Failed verification: ' image ' -- Unable to create an image from RetroTVBody_Albedo.png
-```
-vs
-```
-Error: Failed verification: ' image ' -- Unable to create an image from RetroTVBody_Albedo.png -- Coding Error in _LoadTexture at line 422 of C:\maya-usd\lib\mayaUsd\render\vp2RenderDelegate\material.cpp
-```
 
 # Coding guidelines for Python
 We are adopting the [PEP-8](https://www.python.org/dev/peps/pep-0008) style for Python Code with the following modification:
@@ -321,7 +308,7 @@ e.g Boost::filesystem, Boost::system, GTest::GTest
 ## Compiler features/flags/definitions
 1. Setting or appending compiler flags/definitions via CMAKE_CXX_FLAGS is NOT allowed.
 2. Any front-end flags (e.g. -Wno-xxx, cxx_std_xx) should be added to cmake/compiler_config.cmake
-3. All current targets, as well as newly added targets, must use mayaUsd_compile_config function in order to get the project-wide flags/definitions. These flags/definitions are added privately via target_compile_features, target_compile_options, target_compile_definitions. Individual targets are still allowed to call target_compile_definitions, target_compile_features individually for any additional flags/definitions by providing appropriate PUBLIC/INTERFACE/PRIVATE keywords. For example:
+3. All current targets, as well as newly added targets, must use mayaHydra_compile_config  function in order to get the project-wide flags/definitions. These flags/definitions are added privately via target_compile_features, target_compile_options, target_compile_definitions. Individual targets are still allowed to call target_compile_definitions, target_compile_features individually for any additional flags/definitions by providing appropriate PUBLIC/INTERFACE/PRIVATE keywords. For example:
 ```cmake
 # -----------------------------------------------------------------------------
 # compiler configuration
@@ -333,16 +320,11 @@ target_compile_definitions(${UFE_PYTHON_TARGET_NAME}
        MFB_ALT_PACKAGE_NAME=${UFE_PYTHON_MODULE_NAME}
        MFB_PACKAGE_MODULE="${PROJECT_NAME}.${UFE_PYTHON_MODULE_NAME}"
 )
-mayaUsd_compile_config(${UFE_PYTHON_TARGET_NAME})
+mayaHydra_compile_config(${UFE_PYTHON_TARGET_NAME})
 ```
 
 ## Dynamic linking and Run-time Search Path
 Use provided mayaUsd_xxx_rpath() utility functions to handle run-time search path for both MacOSX and Linux.
-
-## Unit Test
-1. Use provided mayaUsd_add_test() function for adding either Gtest or Python tests.
-2. Don't add find_package(GTest REQUIRED) in every CMake file with unit tests.  Gtest setup is handled automatically for you.
-3. For targets that need to link against google test library. Simply add GTest::GTest to target_link_libraries. You don't need to add any Gtest include directory this is done automatically for you.
 
 ## Naming Conventions
  1. CMake commands are case-insensitive. Use lower_case for CMake functions and macros, Use upper_case for CMake variables

@@ -137,7 +137,7 @@ target_compile_definitions(${TARGET_NAME}
         HDUI_EXPORT
 )
 
-mayaUsd_compile_config(${TARGET_NAME}) # TODO : This will have to be changed when moving to a standalone repo.
+mayaHydra_compile_config(${TARGET_NAME}) # TODO : This will have to be changed when moving to a standalone repo.
 
 # -----------------------------------------------------------------------------
 # link libraries

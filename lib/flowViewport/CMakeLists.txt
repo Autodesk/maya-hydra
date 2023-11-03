@@ -49,7 +49,7 @@ target_compile_definitions(${TARGET_NAME}
         # Copy-pasted from lib/mayaUsd/CMakeLists.txt
 )
 
-mayaUsd_compile_config(${TARGET_NAME})
+mayaHydra_compile_config(${TARGET_NAME})
 
 # -----------------------------------------------------------------------------
 # link libraries
