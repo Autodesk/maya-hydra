@@ -20,7 +20,6 @@
 
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
-#include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 
@@ -51,15 +50,19 @@ const HdDataSourceLocator reprSelectorLocator(
 namespace FVP_NS_DEF {
 
 HdSceneIndexBaseRefPtr
-WireframeSelectionHighlightSceneIndex::New(HdSceneIndexBaseRefPtr const &inputSceneIndex, const SdfPath& sceneRoot)
+WireframeSelectionHighlightSceneIndex::New(HdSceneIndexBaseRefPtr const &inputSceneIndex)
 {
-    return TfCreateRefPtr(new WireframeSelectionHighlightSceneIndex(inputSceneIndex, sceneRoot));
+    return TfCreateRefPtr(new WireframeSelectionHighlightSceneIndex(inputSceneIndex));
+}
+
+const HdDataSourceLocator& WireframeSelectionHighlightSceneIndex::ReprSelectorLocator()
+{
+    return reprSelectorLocator;
 }
 
 WireframeSelectionHighlightSceneIndex::
-WireframeSelectionHighlightSceneIndex(HdSceneIndexBaseRefPtr const &inputSceneIndex, const SdfPath& sceneRoot)
+WireframeSelectionHighlightSceneIndex(HdSceneIndexBaseRefPtr const &inputSceneIndex)
   : PassThroughSelectionInterfaceSceneIndexBase(inputSceneIndex)
-  , _sceneRoot(sceneRoot)
 {}
 
 HdSceneIndexPrim
@@ -70,13 +73,12 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
 
     auto prim = _GetInputSceneIndex()->GetPrim(primPath);
 
-    // If this isn't one of our prims, we're not responsible for providing a
-    // selection highlight for it.  Selection highlighting is done only on
-    // meshes.  HYDRA-569: this means that HdsiImplicitSurfaceSceneIndex must
-    // be used before this scene index to convert implicit surfaces (e.g. USD
-    // cube / cone / sphere / capsule primitive types) to meshes.  
-    if (primPath.HasPrefix(_sceneRoot) && 
-        prim.primType == HdPrimTypeTokens->mesh) {
+    // If prim is in excluded hierarchy, don't provide selection highlighting
+    // for it.  Selection highlighting is done only on meshes.  HYDRA-569: this
+    // means that HdsiImplicitSurfaceSceneIndex must be used before this scene
+    // index to convert implicit surfaces (e.g. USD cube / cone / sphere /
+    // capsule primitive types) to meshes.
+    if (!isExcluded(primPath) && prim.primType == HdPrimTypeTokens->mesh) {
         prim.dataSource = HdOverlayContainerDataSource::New(
             { prim.dataSource, HasFullySelectedAncestorInclusive(primPath) ? 
                 sSelectedDisplayStyleDataSource : 
@@ -113,9 +115,9 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
 
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
-        // If the dirtied prim isn't one of ours, we're not responsible for
-        // providing a selection highlight for it.
-        if (entry.primPath.HasPrefix(_sceneRoot) && 
+        // If the dirtied prim is excluded, don't provide selection
+        // highlighting for it.
+        if (!isExcluded(entry.primPath) && 
             entry.dirtyLocators.Contains(
                 HdSelectionsSchema::GetDefaultLocator())) {
             TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
@@ -160,6 +162,25 @@ void WireframeSelectionHighlightSceneIndex::dirtySelectionHighlightRecursive(
     for (const auto& childPath : GetChildPrimPaths(primPath)) {
         dirtySelectionHighlightRecursive(childPath, highlightEntries);
     }
+}
+
+void WireframeSelectionHighlightSceneIndex::addExcludedSceneRoot(
+    const PXR_NS::SdfPath& sceneRoot
+)
+{
+    _excludedSceneRoots.emplace(sceneRoot);
+}
+
+bool WireframeSelectionHighlightSceneIndex::isExcluded(
+    const PXR_NS::SdfPath& sceneRoot
+) const
+{
+    for (const auto& excluded : _excludedSceneRoots) {
+        if (sceneRoot.HasPrefix(excluded)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }

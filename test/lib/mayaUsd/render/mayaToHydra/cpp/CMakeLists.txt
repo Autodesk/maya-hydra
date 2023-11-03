@@ -19,6 +19,7 @@ target_sources(${TARGET_NAME}
         testMergingSceneIndex.cpp
         testSelectionSceneIndex.cpp
         testUtils.cpp
+        testWireframeSelectionHighlightSceneIndex.cpp
 )
 
 # -----------------------------------------------------------------------------
