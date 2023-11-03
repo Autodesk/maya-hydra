@@ -16,9 +16,9 @@
 #include "testUtils.h"
 
 #include <mayaHydraLib/mayaHydra.h>
-#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <maya/MGlobal.h>
+#include <maya/MSelectionList.h>
 
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
 
@@ -26,7 +26,6 @@
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hdx/selectionSceneIndexObserver.h>
 
-#include <ufe/pathString.h>
 #include <ufe/pathString.h>
 
 #include <gtest/gtest.h>

@@ -39,10 +39,6 @@
 #include <flowViewport/debugCodes.h>
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/selection/fvpSelectionTask.h>
-// FLOW_VIEWPORT_TODO Hard-coded prototype code to support wireframe selection
-// highlighting for USD.  The MayaHydra plugin architecture should enable the
-// Hydra data provider plugin to specify the selection highlighting scene index
-// of its choice, or even none at all.  PPT, 18-Sep-2023.
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 
 #include <pxr/base/plug/plugin.h>
@@ -784,7 +780,15 @@ void MtohRenderOverride::_InitHydraResources()
         _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(*_renderIndexProxy));
     }
 
-    _AddPluginSelectionHighlighting();
+    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_selectionSceneIndex));
+    wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
+
+    // At time of writing, wireframe selection highlighting of Maya native data
+    // is done by Maya at render item creation time, so avoid double wireframe
+    // selection highlighting.
+    wfSi->addExcludedSceneRoot(_ID);
+
+    _renderIndex->InsertSceneIndex(wfSi, SdfPath::AbsoluteRootPath());
 
     // Set the initial selection onto the selection scene index.
     _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
@@ -808,34 +812,6 @@ void MtohRenderOverride::_InitHydraResources()
     }
 
     _initializationSucceeded = true;
-}
-
-void MtohRenderOverride::_AddPluginSelectionHighlighting()
-{
-    TF_AXIOM(_selectionSceneIndex);
-    TF_AXIOM(_renderIndex);
-
-    // Hydra data provider plugin selection highlighting is set up as a chain
-    // of scene indices. 
-
-    // FLOW_VIEWPORT_TODO  Hard-coded prototype code to support wireframe
-    // selection highlighting for USD.  The MayaHydra plugin architecture
-    // should enable the Hydra data provider plugin to specify the selection
-    // highlighting scene index of its choice, or even none at all.
-
-    // This hard-coded prototype adds a wireframe selection highlighting scene
-    // index to the single registered scene index plugin, on the assumption
-    // that this plugin scene index is USD.  PPT, 18-Sep-2023.
-
-    const auto& registrations = _sceneIndexRegistry->GetRegistrations();
-    // If there are no plugin registrations yet, nothing to do.
-    if (registrations.empty()) {
-        _renderIndex->InsertSceneIndex(_selectionSceneIndex, SdfPath::AbsoluteRootPath());
-        return;
-    }
-    auto usdSelectionHighlightingSceneIndex = Fvp::WireframeSelectionHighlightSceneIndex::New(_selectionSceneIndex, registrations.begin()->first);
-
-    _renderIndex->InsertSceneIndex(usdSelectionHighlightingSceneIndex, SdfPath::AbsoluteRootPath());
 }
 
 void MtohRenderOverride::ClearHydraResources()

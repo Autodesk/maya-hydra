@@ -18,7 +18,17 @@
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpPassThroughSelectionInterfaceSceneIndex.h"
 
+#include <pxr/imaging/hd/retainedDataSource.h>
+
+#include <set>
+
 namespace FVP_NS_DEF {
+
+// Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
+// type in PXR_NS.
+class WireframeSelectionHighlightSceneIndex;
+typedef PXR_NS::TfRefPtr<WireframeSelectionHighlightSceneIndex> WireframeSelectionHighlightSceneIndexRefPtr;
+typedef PXR_NS::TfRefPtr<const WireframeSelectionHighlightSceneIndex> WireframeSelectionHighlightSceneIndexConstRefPtr;
 
 /// \class WireframeSelectionHighlightSceneIndex
 ///
@@ -32,9 +42,12 @@ public:
 
     FVP_API
     static PXR_NS::HdSceneIndexBaseRefPtr New(
-        const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex,
-        const PXR_NS::SdfPath&                sceneRoot
+        const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex
     );
+
+    FVP_API
+    static
+    const PXR_NS::HdDataSourceLocator& ReprSelectorLocator();
 
     FVP_API
     PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath &primPath) const override;
@@ -42,12 +55,17 @@ public:
     FVP_API
     PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath &primPath) const override;
 
+    // Add a scene root to the set of excluded scene roots.  These are Hydra
+    // scene index prim hierarchies for which wireframe selection highlighting
+    // of meshes is not desired.
+    FVP_API
+    void addExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot);
+
 protected:
 
     FVP_API
     WireframeSelectionHighlightSceneIndex(
-        const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex,
-        const PXR_NS::SdfPath&                sceneRoot
+        const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex
     );
 
     FVP_API
@@ -72,7 +90,9 @@ private:
         PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries* highlightEntries
     );
 
-    const PXR_NS::SdfPath           _sceneRoot;
+    bool isExcluded(const PXR_NS::SdfPath& sceneRoot) const;
+
+    std::set<PXR_NS::SdfPath> _excludedSceneRoots;
 };
 
 }

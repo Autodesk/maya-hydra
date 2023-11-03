@@ -18,6 +18,7 @@ set(TEST_SCRIPT_FILES
     cpp/testMayaUsdUfeItems.py
     cpp/testMergingSceneIndex.py
     cpp/testSelectionSceneIndex.py
+    cpp/testWireframeSelectionHighlightSceneIndex.py
 )
 
 # Test use of mesh adapter code for mesh support, using environment variable.

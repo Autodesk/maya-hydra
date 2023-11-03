@@ -82,6 +82,17 @@ public:
             return {};
         }
 
+        // Determine if the application path maps to our scene index.  At time
+        // of writing the mapping is that the final component of the scene
+        // index prefix is the Maya USD proxy shape node name, which is the
+        // final component of the Ufe::Path first segment.  This is weak and
+        // non-unique, and incrementing integer suffix schemes to fix this are
+        // unintuitive and difficult to understand.  PPT, 26-Oct-2023.
+        if (appPath.getSegments()[0].components().back().string() !=
+            _sceneIndexPathPrefix.GetName()) {
+            return {};
+        }
+
         // The scene index path is composed of 2 parts, in order:
         // 1) The scene index path prefix, which is fixed on construction.
         // 2) The second segment of the UFE path, with each UFE path component
