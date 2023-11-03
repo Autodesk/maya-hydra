@@ -38,9 +38,7 @@ const std::string kPolyEdgeColorName = "polyEdge";
 const std::string kPolyFaceColorName = "polyFace";
 
 /**
- * @brief Get the DAG path of a node from its name
- *
- * @usage Get the DAG path of a node from the Maya scene graph using its name.
+ * @brief Get the DAG path of a node from the Maya scene graph using its name
  *
  * @param[in] nodeName is the name of the node to get the DAG path of.
  * @param[out] outDagPath is the DAG path of the node in the Maya scene graph.
@@ -53,8 +51,8 @@ MStatus GetDagPathFromNodeName(const MString& nodeName, MDagPath& outDagPath);
 /**
  * @brief Get the Maya transform matrix of a node from its DAG path
  *
- * @usage Get the Maya transform matrix of a node from its DAG path. The output transform matrix
- * is the resultant ("flattened") matrix from it and its parents' transforms.
+ * The output transform matrix is the resultant ("flattened") matrix from it and 
+ * its parents' transforms.
  *
  * @param[in] dagPath is the DAG path of the node in the Maya scene graph.
  * @param[out] outMatrix is the Maya transform matrix of the node.
@@ -67,9 +65,8 @@ MStatus GetMayaMatrixFromDagPath(const MDagPath& dagPath, MMatrix& outMatrix);
 /**
  * @brief Determines whether a given DAG path points to a UFE item created by maya-usd
  *
- * @usage Determines whether a given DAG path points to a UFE item created by maya-usd. UFE stands
- * for Universal Front End : the goal of the Universal Front End is to create a DCC-agnostic
- * component that will allow a DCC to browse and edit data in multiple data models.
+ * UFE stands for Universal Front End : the goal of the Universal Front End is to create a 
+ * DCC-agnostic component that will allow a DCC to browse and edit data in multiple data models.
  *
  * @param[in] dagPath is the DAG path of the node in the Maya scene graph.
  * @param[out] returnStatus is an optional output variable to return whether the operation was
@@ -84,9 +81,8 @@ bool IsUfeItemFromMayaUsd(const MDagPath& dagPath, MStatus* returnStatus = nullp
 /**
  * @brief Determines whether a given object is a UFE item created by maya-usd
  *
- * @usage Determines whether a given object is a UFE item created by maya-usd. UFE stands
- * for Universal Front End : the goal of the Universal Front End is to create a DCC-agnostic
- * component that will allow a DCC to browse and edit data in multiple data models.
+ * UFE stands for Universal Front End : the goal of the Universal Front End is to create a 
+ * DCC-agnostic component that will allow a DCC to browse and edit data in multiple data models.
  *
  * @param[in] obj is the object representing the DAG node.
  * @param[out] returnStatus is an optional output variable to return whether the operation was

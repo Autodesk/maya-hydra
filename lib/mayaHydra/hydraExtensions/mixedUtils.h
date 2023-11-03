@@ -86,10 +86,9 @@ bool IsShape(const MDagPath& dagPath);
 /**
  * @brief Converts the given Maya MDagPath \p dagPath into an SdfPath.
  *
- * @usage Converts the given Maya MDagPath \p dagPath into an SdfPath. Elements of the path will be
- * sanitized such that it is a valid SdfPath. If \p mergeTransformAndShape is true and \p dagPath is
- * a shape node, it will return the parent SdfPath of the shape's SdfPath, such that the transform
- * and the shape have the same SdfPath.
+ * Elements of the path will be sanitized such that it is a valid SdfPath. If \p mergeTransformAndShape 
+ * is true and \p dagPath is a shape node, it will return the parent SdfPath of the shape's SdfPath, 
+ * such that the transform and the shape have the same SdfPath.
  *
  * @param[in] dagPath is the DAG path to convert to an SdfPath.
  * @param[in] mergeTransformAndShape determines whether or not to consider the transform and shape
@@ -107,8 +106,7 @@ pxr::SdfPath DagPathToSdfPath(
 /**
  * @brief Creates an SdfPath from the given Maya MRenderItem.
  *
- * @usage Creates an SdfPath from the given Maya MRenderItem. Elements of the path will be sanitized
- * such that it is a valid SdfPath.
+ * Elements of the path will be sanitized such that it is a valid SdfPath.
  *
  * @param[in] ri is the MRenderItem to create the SdfPath for.
  * @param[in] stripNamespaces determines whether or not to strip namespaces from the path.

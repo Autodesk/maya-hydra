@@ -34,9 +34,7 @@ constexpr double DEFAULT_TOLERANCE = std::numeric_limits<double>::epsilon();
 using SceneIndicesVector = std::vector<HdSceneIndexBasePtr>;
 
 /**
- * @brief Retrieve the list of registered terminal scene indices
- *
- * @usage Retrieve the list of registered terminal scene indices from the Hydra plugin.
+ * @brief Retrieve the list of registered terminal scene indices from the Hydra plugin
  *
  * @return A reference to the vector of registered terminal scene indices.
  */
@@ -45,7 +43,7 @@ const SceneIndicesVector& GetTerminalSceneIndices();
 /**
  * @brief Compare a Hydra and a Maya matrix and return whether they are similar
  *
- * @usage Compare a Hydra and a Maya matrix and return whether the difference between each of their
+ * Compare a Hydra and a Maya matrix and return whether the difference between each of their
  * corresponding elements is less than or equal to the given tolerance.
  *
  * @param[in] hydraMatrix is the Hydra matrix
@@ -80,8 +78,7 @@ public:
     /**
      * @brief Retrieve the underlying scene index of this inspector
      *
-     * @usage Retrieve the underlying scene index of this inspector. The returned pointer is
-     * non-owning.
+     * The returned pointer is non-owning.
      *
      * @return A pointer to the underlying scene index of this inspector.
      */
@@ -90,8 +87,7 @@ public:
     /**
      * @brief Retrieve all prims that match the given predicate, up until the maximum amount
      *
-     * @usage Retrieve all prims that match the given predicate, up until the maximum amount. A
-     * maximum amount of 0 means unlimited (all matching prims will be returned).
+     * A maximum amount of 0 means unlimited (all matching prims will be returned).
      *
      * @param[in] predicate is the callable predicate used to determine whether a given prim is
      * desired
@@ -105,7 +101,7 @@ public:
     /**
      * @brief Print the scene index's hierarchy in a tree-like format
      *
-     * @usage Print the scene index's hierarchy in a tree-like format, down to the individual data
+     * Print the scene index's hierarchy in a tree-like format, down to the individual data
      * source level.
      *
      * @param[out] outStream is the stream in which to print the hierarchy
