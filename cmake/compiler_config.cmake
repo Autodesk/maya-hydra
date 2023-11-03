@@ -83,7 +83,7 @@ set(MSVC_DEFINITIONS
 # Use -std=c++11 instead of -std=gnu++11
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-function(mayaUsd_compile_config TARGET)
+function(mayaHydra_compile_config TARGET)
     # required compiler feature
     # Require C++14 if we're either building for Maya 2019 or later, or if we're building against 
     # USD 20.05 or later. Otherwise require C++11.

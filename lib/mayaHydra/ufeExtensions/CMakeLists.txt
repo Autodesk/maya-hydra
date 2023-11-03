@@ -24,7 +24,7 @@ target_compile_definitions(${TARGET_NAME}
         $<$<BOOL:${IS_MACOSX}>:OSMac_>
 )
 
-mayaUsd_compile_config(${TARGET_NAME})
+mayaHydra_compile_config(${TARGET_NAME})
 
 if(NOT BUILD_MAYAUSD_LIBRARY)
     # -----------------------------------------------------------------------------

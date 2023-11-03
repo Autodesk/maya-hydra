@@ -74,7 +74,7 @@ USD proxies in Viewport 2.0? Some potential reasons include:
 ## Detailed Documentation
 
 + [Contributing](./doc/CONTRIBUTING.md)
-+ [Building the mayaHydra.mll plugin](./lib/mayaHydra/doc/mayaHydraBuild.md)
++ [Building the mayaHydra.mll plugin](./doc/build.md)
 + [Coding guidelines](./doc/codingGuidelines.md)
 + [License](./doc/LICENSE.md)
 + [Plugin documentation](./README_DOC.md)

@@ -19,7 +19,7 @@ add_library(${TARGET_NAME} SHARED)
 # -----------------------------------------------------------------------------
 # compiler configuration
 # -----------------------------------------------------------------------------
-mayaUsd_compile_config(${TARGET_NAME})
+mayaHydra_compile_config(${TARGET_NAME})
 
 # -----------------------------------------------------------------------------
 # include directories

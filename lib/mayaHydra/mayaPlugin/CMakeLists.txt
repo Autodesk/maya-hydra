@@ -68,7 +68,7 @@ if(DEFINED MAYAHYDRA_CUT_ID)
     )
 endif()
 
-mayaUsd_compile_config(${TARGET_NAME})
+mayaHydra_compile_config(${TARGET_NAME})
 
 # -----------------------------------------------------------------------------
 # link libraries
