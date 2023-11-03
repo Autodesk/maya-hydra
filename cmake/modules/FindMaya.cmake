@@ -93,12 +93,7 @@ if(IS_MACOSX)
             "$ENV{MAYA_LOCATION}/../.."
             "${MAYA_LOCATION}"
             "$ENV{MAYA_LOCATION}"
-            "/Applications/Autodesk/maya2020"
-            "/Applications/Autodesk/maya2019"
-            "/Applications/Autodesk/maya2018"
-            "/Applications/Autodesk/maya2017"
-            "/Applications/Autodesk/maya2016.5"
-            "/Applications/Autodesk/maya2016"
+            "/Applications/Autodesk/maya2024"
         DOC
             "Maya installation root directory"
     )
@@ -120,12 +115,7 @@ elseif(IS_LINUX)
         HINTS
             "${MAYA_LOCATION}"
             "$ENV{MAYA_LOCATION}"
-            "/usr/autodesk/maya2020-x64"
-            "/usr/autodesk/maya2019-x64"
-            "/usr/autodesk/maya2018-x64"
-            "/usr/autodesk/maya2017-x64"
-            "/usr/autodesk/maya2016.5-x64"
-            "/usr/autodesk/maya2016-x64"
+            "/usr/autodesk/maya2024-x64"
         DOC
             "Maya installation root directory"
     )
@@ -146,12 +136,7 @@ elseif(IS_WINDOWS)
         HINTS
             "${MAYA_LOCATION}"
             "$ENV{MAYA_LOCATION}"
-            "C:/Program Files/Autodesk/Maya2020"
-            "C:/Program Files/Autodesk/Maya2019"
-            "C:/Program Files/Autodesk/Maya2018"
-            "C:/Program Files/Autodesk/Maya2017"
-            "C:/Program Files/Autodesk/Maya2016.5"
-            "C:/Program Files/Autodesk/Maya2016"
+            "C:/Program Files/Autodesk/Maya2024"
         DOC
             "Maya installation root directory"
     )

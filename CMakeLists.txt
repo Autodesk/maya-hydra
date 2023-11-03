@@ -73,7 +73,7 @@ endif()
 # modules and definitions
 #------------------------------------------------------------------------------
 include(cmake/utils.cmake)
-find_package(Maya 2018 REQUIRED)
+find_package(Maya 2024 REQUIRED)
 
 if(APPLE AND BUILD_UB2 AND NOT MAYA_MACOSX_BUILT_WITH_UB2)
     message(WARNING  "Maya was NOT built with Universal Binary 2")
@@ -111,9 +111,9 @@ message(STATUS "   Python_EXECUTABLE   = ${Python_EXECUTABLE}")
 
 include(cmake/jinja.cmake)
 
-find_package(USD 0.20.05 REQUIRED)
+find_package(USD 0.22.11 REQUIRED)
 if (CMAKE_WANT_MATERIALX_BUILD)
-    # Requires at least USD 21.08 for hdMtlx module and USD must have been built with MaterialX:
+    # Requires at least USD 22.11 for hdMtlx module and USD must have been built with MaterialX:
     if(NOT TARGET hdMtlx)
         set(CMAKE_WANT_MATERIALX_BUILD OFF)
         message(WARNING "Disabling MaterialX VP2 rendering: it is not supported by this USD package.")
