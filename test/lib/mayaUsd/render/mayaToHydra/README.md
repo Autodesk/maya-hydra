@@ -73,7 +73,11 @@ Some utilities exist to facilitate image comparison tests. Here is the simplest 
 4. Put the images you want to use for comparison in that folder
 5. Call `self.assertImagesClose`, `self.assertImagesEqual` and/or `self.assertSnapshotClose` with the file names of the images to compare with.
 
-You will need to pass in a fail threshold for individual pixels and a fail percentage for the whole image. Other parameters are also available for you to specify. You can find more information on these parameters on the [idiff documentation page](https://openimageio.readthedocs.io/en/latest/idiff.html).
+For the `assert[...]Close` methods, you will need to pass in a fail threshold for individual pixels and a fail percentage for the whole image. Other parameters are also available for you to specify. You can find more information on these parameters on the [idiff documentation page](https://openimageio.readthedocs.io/en/latest/idiff.html).
+
+The `assertSnapshotClose` method takes a snapshot of the current viewport and compares it with the reference image, to ensure the visual result is similar enough.
+
+To create a reference snapshot, an easy way is to first write your test, and then run it once. The output snapshot of the test will then be located in your build folder under `build/[RelWithDebInfo|Debug]/test/lib/mayaUsd/render/mayaToHydra/[testName]`. If the snapshot corresponds to the expected result, you can then copy it over to your `[TestName]Test` folder as mentioned above in step 3. This ensures that the reference image was created with the same playblast settings that will be used when running the tests (e.g. width and height). If this method doesn't suit you, you can use the playblast command directly in Maya yourself, or any other method that fits your needs.
 
 :warning: **Important note** : While there *is* an `assertSnapshotEqual` method, its use is discouraged, as renders can differ very slightly between renderer architectures.
 
