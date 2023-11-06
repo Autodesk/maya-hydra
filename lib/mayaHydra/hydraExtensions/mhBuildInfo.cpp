@@ -16,8 +16,6 @@
 
 #include <mayaHydraLib/mhBuildInfo.h>
 
-#include <cstdlib>
-
 namespace MAYAHYDRA_NS_DEF {
 
 int         MhBuildInfo::buildNumber() { return MAYAHYDRA_BUILD_NUMBER; }

@@ -1,5 +1,6 @@
 //
 // Copyright 2019 Luma Pictures
+// Copyright 2023 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,13 +28,9 @@
 #include <maya/MGlobal.h>
 #include <maya/MSyntax.h>
 
-PXR_NAMESPACE_OPEN_SCOPE
-// Bring the MayaHydra namespace into scope.
-// The following code currently lives inside the pxr namespace, but it would make more sense to 
-// have it inside the MayaHydra namespace. This using statement allows us to use MayaHydra symbols
-// from within the pxr namespace as if we were in the MayaHydra namespace.
-// Remove this once the code has been moved to the MayaHydra namespace.
-using namespace MayaHydra;
+PXR_NAMESPACE_USING_DIRECTIVE
+
+namespace MAYAHYDRA_NS_DEF {
 
 const MString MtohViewCmd::name("mayaHydra");
 
@@ -306,4 +303,4 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
     return MS::kSuccess;
 }
 
-PXR_NAMESPACE_CLOSE_SCOPE
+}
