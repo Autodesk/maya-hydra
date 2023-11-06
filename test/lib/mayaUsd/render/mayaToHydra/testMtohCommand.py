@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import sys
 import unittest
 
 import maya.cmds as cmds
@@ -115,6 +114,23 @@ class TestCommand(unittest.TestCase):
             self.assertFalse(cmds.getAttr(
                 "defaultRenderGlobals.mtohMotionSampleStart"))            
 
+    def test_versionInfo(self):
+        self.assertGreaterEqual(cmds.mayaHydra(majorVersion=True), 0)
+        self.assertGreaterEqual(cmds.mayaHydra(mjv=True), 0)
+        self.assertGreaterEqual(cmds.mayaHydra(minorVersion=True), 0)
+        self.assertGreaterEqual(cmds.mayaHydra(mnv=True), 0)
+        self.assertGreaterEqual(cmds.mayaHydra(patchVersion=True), 0)
+        self.assertGreaterEqual(cmds.mayaHydra(pv=True), 0)
+
+    def test_buildInfo(self):
+        self.assertGreaterEqual(cmds.mayaHydra(buildNumber=True), 0)
+        self.assertGreaterEqual(cmds.mayaHydra(bn=True), 0)
+        self.assertNotEqual(cmds.mayaHydra(gitCommit=True), '')
+        self.assertNotEqual(cmds.mayaHydra(gc=True), '')
+        self.assertNotEqual(cmds.mayaHydra(gitBranch=True), '')
+        self.assertNotEqual(cmds.mayaHydra(gb=True), '')
+        self.assertNotEqual(cmds.mayaHydra(buildDate=True), '')
+        self.assertNotEqual(cmds.mayaHydra(bd=True), '')
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
