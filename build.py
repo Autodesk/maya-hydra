@@ -92,7 +92,7 @@ def GetCommandOutput(command):
 def GetGitHeadInfo(context):
     """Returns HEAD commit id and date."""
     try:
-        with CurrentWorkingDirectory(context.mayaUsdSrcDir):
+        with CurrentWorkingDirectory(context.mayaHydraSrcDir):
             commitSha = subprocess.check_output('git rev-parse HEAD', shell = True).decode()
             commitDate = subprocess.check_output('git show -s HEAD --format="%ad"', shell = True).decode()
             return commitSha, commitDate
@@ -346,22 +346,22 @@ def RunMakeZipArchive(context):
     pkgDir = context.pkgDir
     variant = BuildVariant(context)
 
-    # extract version from mayausd_version.info
-    mayaUsdVerion = [] 
-    cmakeInfoDir = os.path.join(context.mayaUsdSrcDir, 'cmake')
-    filename = os.path.join(cmakeInfoDir, 'mayausd_version.info')
+    # extract version from mayahydra_version.info
+    mayaHydraVersion = [] 
+    cmakeInfoDir = os.path.join(context.mayaHydraSrcDir, 'cmake')
+    filename = os.path.join(cmakeInfoDir, 'mayahydra_version.info')
     with open(filename, 'r') as filehandle:
         content = filehandle.readlines()
         for current_line in content:
             digitList = re.findall(r'\d+', current_line)
             versionStr = ''.join(str(e) for e in digitList)
-            mayaUsdVerion.append(versionStr)
+            mayaHydraVersion.append(versionStr)
 
-    majorVersion = mayaUsdVerion[0]
-    minorVersion = mayaUsdVerion[1]
-    patchLevel   = mayaUsdVerion[2]  
+    majorVersion = mayaHydraVersion[0]
+    minorVersion = mayaHydraVersion[1]
+    patchLevel   = mayaHydraVersion[2]  
 
-    pkgName = 'MayaUsd' + '-' + majorVersion + '.' + minorVersion + '.' + patchLevel + '-' + (platform.system()) + '-' + variant
+    pkgName = 'MayaHydra' + '-' + majorVersion + '.' + minorVersion + '.' + patchLevel + '-' + (platform.system()) + '-' + variant
     with CurrentWorkingDirectory(buildDir):
         shutil.make_archive(pkgName, 'zip', installDir)
 
@@ -477,7 +477,7 @@ def SetupMayaQt(context):
                     return
 
 def BuildAndInstall(context, buildArgs, stages):
-    with CurrentWorkingDirectory(context.mayaUsdSrcDir):
+    with CurrentWorkingDirectory(context.mayaHydraSrcDir):
         extraArgs = []
         stagesArgs = []
         if context.mayaLocation:
@@ -495,13 +495,6 @@ def BuildAndInstall(context, buildArgs, stages):
         if context.devkitLocation:
             extraArgs.append('-DMAYA_DEVKIT_LOCATION="{devkitLocation}"'
                              .format(devkitLocation=context.devkitLocation))
-
-        # Many people on Windows may not have python with the 
-        # debugging symbol (python27_d.lib) installed, this is the common case.
-        if context.buildDebug and context.debugPython:
-            extraArgs.append('-DMAYAUSD_DEFINE_BOOST_DEBUG_PYTHON_FLAG=ON')
-        else:
-            extraArgs.append('-DMAYAUSD_DEFINE_BOOST_DEBUG_PYTHON_FLAG=OFF')
 
         extraArgs += buildArgs
         stagesArgs += stages
@@ -614,7 +607,7 @@ class InstallContext:
     def __init__(self, args):
 
         # Assume the project's top level cmake is in the current source directory
-        self.mayaUsdSrcDir = os.path.normpath(
+        self.mayaHydraSrcDir = os.path.normpath(
             os.path.join(os.path.abspath(os.path.dirname(__file__))))
 
         # Build type
@@ -701,7 +694,7 @@ if __name__ == "__main__":
     # Summarize
     summaryMsg = """
     Building with settings:
-      Source directory          {mayaUsdSrcDir}
+      Source directory          {mayaHydraSrcDir}
       Workspace directory       {workspaceDir}
       Build directory           {buildDir}
       Install directory         {instDir}
@@ -726,7 +719,7 @@ if __name__ == "__main__":
       CTest arguments           {ctestArgs}"""
 
     summaryMsg = summaryMsg.format(
-        mayaUsdSrcDir=context.mayaUsdSrcDir,
+        mayaHydraSrcDir=context.mayaHydraSrcDir,
         workspaceDir=context.workspaceDir,
         buildDir=context.buildDir,
         instDir=context.instDir,
