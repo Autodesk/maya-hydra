@@ -1,0 +1,63 @@
+//
+// Copyright 2023 Autodesk, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+#pragma once
+
+#include <ufe/ufe.h>
+
+#define FLOWVIEWPORT_MAJOR_VERSION ${FLOWVIEWPORT_MAJOR_VERSION}
+#define FLOWVIEWPORT_MINOR_VERSION ${FLOWVIEWPORT_MINOR_VERSION}
+#define FLOWVIEWPORT_PATCH_LEVEL   ${FLOWVIEWPORT_PATCH_LEVEL}
+#define FLOWVIEWPORT_API_VERSION (FLOWVIEWPORT_MAJOR_VERSION * 10000 + FLOWVIEWPORT_MINOR_VERSION * 100 + FLOWVIEWPORT_PATCH_LEVEL)
+
+// Flow viewport public namespace string will never change.
+#define FVP_NS Fvp
+// C preprocessor trickery to expand arguments.
+#define FLOWVIEWPORT_CONCAT(A, B) FLOWVIEWPORT_CONCAT_IMPL(A, B)
+#define FLOWVIEWPORT_CONCAT_IMPL(A, B) A##B
+// Versioned namespace includes the major version number.
+#define FVP_VERSIONED_NS FLOWVIEWPORT_CONCAT(FVP_NS, _v${FLOWVIEWPORT_MAJOR_VERSION})
+
+// 2023-10-12 : To avoid recreating redundant classes to implement the Observer pattern, 
+// we reuse the UFE classes for it (plus they have already been tested in the wild).
+// Bringing the UFE classes into the FVP namespace allows us to simply copy over the UFE code
+// without having to change the dependent code, should we want to remove the UFE dependency.
+namespace UFE_VERSIONED_NS {
+    class Notification;
+    class Observer;
+    class Subject;
+} // namespace UFE_VERSIONED_NS
+
+namespace FVP_VERSIONED_NS {
+    using UFE_VERSIONED_NS::Notification;
+    using UFE_VERSIONED_NS::Observer;
+    using UFE_VERSIONED_NS::Subject;
+} // namespace FVP_VERSIONED_NS
+
+// With a using namespace declaration, pull in the versioned namespace into the
+// Flow viewport public namespace, to allow client code to use the plain Flow
+// viewport namespace, e.g. Fvp::Class.
+namespace FVP_NS {
+    using namespace FVP_VERSIONED_NS;
+}
+
+// Macro to place the Flow viewport symbols in the versioned namespace, which
+// is how they will appear in the shared library, e.g. Fvp_v1::Class.
+#ifdef DOXYGEN
+#define FVP_NS_DEF FVP_NS
+#else
+#define FVP_NS_DEF FVP_VERSIONED_NS
+#endif
