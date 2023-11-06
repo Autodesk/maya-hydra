@@ -11,6 +11,7 @@ target_sources(${TARGET_NAME}
         hydraUtils.cpp
         interfaceImp.cpp
         mayaUtils.cpp
+        mhBuildInfo.cpp
         mixedUtils.cpp
         mayaHydraSceneProducer.cpp
 )
@@ -144,6 +145,10 @@ endif()
 # -----------------------------------------------------------------------------
 set(SRCFILE ${CMAKE_CURRENT_SOURCE_DIR}/mayaHydra.h.src)
 set(DSTFILE ${CMAKE_BINARY_DIR}/include/mayaHydraLib/mayaHydra.h)
+configure_file(${SRCFILE} ${DSTFILE})
+
+set(SRCFILE ${CMAKE_CURRENT_SOURCE_DIR}/mhBuildInfo.h.src)
+set(DSTFILE ${CMAKE_BINARY_DIR}/include/mayaHydraLib/mhBuildInfo.h)
 configure_file(${SRCFILE} ${DSTFILE})
 
 mayaUsd_promoteHeaderList( 

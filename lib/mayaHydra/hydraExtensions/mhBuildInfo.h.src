@@ -1,0 +1,46 @@
+//
+// Copyright 2023 Autodesk, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+#ifndef LIB_MAYAHYDRA_HYDRAEXTENSIONS_MHBUILDINFO_H
+#define LIB_MAYAHYDRA_HYDRAEXTENSIONS_MHBUILDINFO_H
+
+#include <mayaHydraLib/api.h>
+#include <mayaHydraLib/mayaHydra.h>
+
+// At time of writing Peptide build variables undefined.  PPT, 3-Nov-2023.
+// #define MAYAHYDRA_BUILD_NUMBER ${PEPTIDE_JENKINS_BUILD}
+// #define MAYAHYDRA_GIT_COMMIT   "${PEPTIDE_GIT_COMMIT}"
+// #define MAYAHYDRA_GIT_BRANCH   "${PEPTIDE_GIT_BRANCH}"
+// #define MAYAHYDRA_BUILD_DATE   "${PEPTIDE_PRODUCT_DATE}"
+#define MAYAHYDRA_BUILD_NUMBER 0
+#define MAYAHYDRA_GIT_COMMIT   "aGitCommit"
+#define MAYAHYDRA_GIT_BRANCH   "aGitBranch"
+#define MAYAHYDRA_BUILD_DATE   "aProductDate"
+
+namespace MAYAHYDRA_NS_DEF {
+
+class MAYAHYDRALIB_API MhBuildInfo
+{
+public:
+    static int         buildNumber();
+    static const char* gitCommit();
+    static const char* gitBranch();
+    static const char* buildDate();
+};
+
+}
+
+#endif // LIB_MAYAHYDRA_HYDRAEXTENSIONS_MHBUILDINFO_H

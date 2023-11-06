@@ -20,19 +20,12 @@
 #include "renderOverride.h"
 
 #include <mayaHydraLib/delegates/delegateRegistry.h>
+#include <mayaHydraLib/mhBuildInfo.h>
+#include <mayaHydraLib/mayaHydra.h>
 
 #include <maya/MArgDatabase.h>
 #include <maya/MGlobal.h>
 #include <maya/MSyntax.h>
-
-#if defined(MAYAHYDRA_CUT_ID)
-#define STRINGIFY(x)  #x
-#define TOSTRING(x)   STRINGIFY(x)
-#define PLUGIN_CUT_ID TOSTRING(MAYAHYDRA_CUT_ID)
-#else
-#pragma message("MAYAHYDRA_CUT_ID is not defined")
-#define PLUGIN_CUT_ID "Maya-Hydra unknown cut"
-#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
@@ -79,10 +72,22 @@ constexpr auto _visibleOnlyLong = "-visibleOnly";
 constexpr auto _sceneDelegateId = "-sid";
 constexpr auto _sceneDelegateIdLong = "-sceneDelegateId";
 
-// MAYA-127221: We will need to replace this with a flag inside of the pluginInfo command in an
-// upcoming release.
-constexpr auto _pluginInfoCutId = "-cid";
-constexpr auto _pluginInfoCutIdLong = "-pluginInfoCut";
+// Versioning and build information.
+constexpr auto _majorVersion = "-mjv";
+constexpr auto _minorVersion = "-mnv";
+constexpr auto _patchVersion = "-pv";
+constexpr auto _majorVersionLong = "-majorVersion";
+constexpr auto _minorVersionLong = "-minorVersion";
+constexpr auto _patchVersionLong = "-patchVersion";
+
+constexpr auto _buildNumber = "-bn";
+constexpr auto _gitCommit   = "-gc";
+constexpr auto _gitBranch   = "-gb";
+constexpr auto _buildDate   = "-bd";
+constexpr auto _buildNumberLong = "-buildNumber";
+constexpr auto _gitCommitLong   = "-gitCommit";
+constexpr auto _gitBranchLong   = "-gitBranch";
+constexpr auto _buildDateLong   = "-buildDate";
 
 constexpr auto _rendererId = "-r";
 constexpr auto _rendererIdLong = "-renderer";
@@ -160,7 +165,16 @@ MSyntax MtohViewCmd::createSyntax()
 
     syntax.addFlag(_sceneDelegateId, _sceneDelegateIdLong, MSyntax::kString);
 
-    syntax.addFlag(_pluginInfoCutId, _pluginInfoCutIdLong);
+    // Versioning and build information flags.
+
+    syntax.addFlag(_majorVersion, _majorVersionLong);
+    syntax.addFlag(_minorVersion, _minorVersionLong);
+    syntax.addFlag(_patchVersion, _patchVersionLong);
+
+    syntax.addFlag(_buildNumber, _buildNumberLong);
+    syntax.addFlag(_gitCommit,   _gitCommitLong);
+    syntax.addFlag(_gitBranch,   _gitBranchLong);
+    syntax.addFlag(_buildDate,   _buildDateLong);
 
     return syntax;
 }
@@ -274,13 +288,20 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
         SdfPath delegateId = MtohRenderOverride::RendererSceneDelegateId(
             renderDelegateName, TfToken(sceneDelegateName.asChar()));
         setResult(MString(delegateId.GetText()));
-    } else if (db.isFlagSet(_pluginInfoCutId)) {
-#ifdef MAYAHYDRA_CUT_ID
-        setResult(MString(PLUGIN_CUT_ID));
-#else
-        MGlobal::displayError(MString("MayaHydra cut id is not available"));
-        return MS::kInvalidParameter;
-#endif
+    } else if (db.isFlagSet(_majorVersion)) {
+        setResult(MAYAHYDRA_MAJOR_VERSION);
+    } else if (db.isFlagSet(_minorVersion)) {
+        setResult(MAYAHYDRA_MINOR_VERSION);
+    } else if (db.isFlagSet(_patchVersion)) {
+        setResult(MAYAHYDRA_PATCH_LEVEL);
+    } else if (db.isFlagSet(_buildNumber)) {
+        setResult(MhBuildInfo::buildNumber());
+    } else if (db.isFlagSet(_gitCommit)) {
+        setResult(MhBuildInfo::gitCommit());
+    } else if (db.isFlagSet(_gitBranch)) {
+        setResult(MhBuildInfo::gitBranch());
+    } else if (db.isFlagSet(_buildDate)) {
+        setResult(MhBuildInfo::buildDate());
     }
     return MS::kSuccess;
 }
