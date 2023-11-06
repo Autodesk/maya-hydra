@@ -110,4 +110,5 @@ endif()
 # -----------------------------------------------------------------------------
 add_subdirectory(colorPreferences)
 add_subdirectory(sceneIndex)
+add_subdirectory(API)
 add_subdirectory(selection)
