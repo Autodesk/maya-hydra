@@ -17,12 +17,12 @@
 #ifndef MAYAHYDRALIB_INTERFACE_IMP_H
 #define MAYAHYDRALIB_INTERFACE_IMP_H
 
+//Local headers
 #include <mayaHydraLib/api.h>
-#include <mayaHydraLib/interface.h>
+#include <mayaHydraLib/mayaHydraLibInterface.h>
 
+//Hydra headers
 #include <pxr/imaging/hd/sceneIndex.h>
-
-#include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -30,13 +30,14 @@ class MayaHydraLibInterfaceImp : public MayaHydraLibInterface
 {
 public:
     MayaHydraLibInterfaceImp() = default;
-    virtual ~MayaHydraLibInterfaceImp() = default;
+    virtual ~MayaHydraLibInterfaceImp();
 
-    void                      RegisterTerminalSceneIndex(HdSceneIndexBasePtr) override;
-    void                      UnregisterTerminalSceneIndex(HdSceneIndexBasePtr) override;
+    void                      RegisterTerminalSceneIndex(const HdSceneIndexBaseRefPtr&) override;
+    void                      UnregisterTerminalSceneIndex(const HdSceneIndexBaseRefPtr&) override;
     void                      ClearTerminalSceneIndices() override;
     const SceneIndicesVector& GetTerminalSceneIndices() const override;
-
+    void                      SceneIndexRemoved(const HdSceneIndexBaseRefPtr& _sceneIndex)override;
+    
 private:
     SceneIndicesVector _sceneIndices;
 };

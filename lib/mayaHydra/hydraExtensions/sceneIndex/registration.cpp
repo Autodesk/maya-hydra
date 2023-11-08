@@ -267,7 +267,7 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
 
 #if PXR_VERSION < 2308
 HdSceneIndexBaseRefPtr
-MayaHydraSceneIndexRegistry::_AppendTerminalRenamingSceneIndex(HdSceneIndexBaseRefPtr sceneIndex)
+MayaHydraSceneIndexRegistry::_AppendTerminalRenamingSceneIndex(const HdSceneIndexBaseRefPtr& sceneIndex)
 {    
     // Get the list of renderer supported material network implementations.
     TfTokenVector renderingContexts = 

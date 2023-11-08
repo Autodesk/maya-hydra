@@ -36,10 +36,14 @@
 // limitations under the License.
 //
 
+//Local headers
 #include "flowViewport/sceneIndex/fvpRenderIndexProxy.h"
 #include "flowViewport/sceneIndex/fvpMergingSceneIndex.h"
 
+//Hydra headers
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
+#include <pxr/imaging/hd/renderIndex.h>
+#include <pxr/imaging/hd/renderDelegate.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -121,9 +125,26 @@ void RenderIndexProxy::RemoveSceneIndex(
     }
 }
 
-PXR_NS::HdSceneIndexBaseRefPtr RenderIndexProxy::GetMergingSceneIndex() const
+HdSceneIndexBaseRefPtr RenderIndexProxy::GetMergingSceneIndex() const
 {
     return _mergingSceneIndex;
 }
 
+HdRenderIndex* RenderIndexProxy::GetRenderIndex() const 
+{ 
+    return _renderIndex;
 }
+
+void RenderIndexProxy::GetRendererDisplayName(std::string& outRendererName) const 
+{
+    if (! _renderIndex){
+        return;
+    }
+    auto rd = _renderIndex->GetRenderDelegate();
+    if (! rd){
+        return;
+    }
+    outRendererName = rd->GetRendererDisplayName();
+}
+
+}//end of namespace FVP_NS_DEF

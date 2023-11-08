@@ -60,6 +60,10 @@ public:
             HdxTaskController* taskControllerIn,
             const SdfPath&     delegateIDIn,
             bool               isHdStIn,
+            const std::string& cameraNameIn,
+            int                viewportWidthIn,
+            int                viewportHeightIn,
+            const std::string& rendererNameIn,//Is the Hydra renderer name
             MayaHydraSceneProducer* producerIn = nullptr)
             : name(nameIn)
             , engine(engineIn)
@@ -68,7 +72,11 @@ public:
             , taskController(taskControllerIn)
             , delegateID(delegateIDIn)
             , isHdSt(isHdStIn)
-            , producer(producerIn)
+            , producer(producerIn),
+            cameraName(cameraNameIn),
+            viewportWidth(viewportWidthIn),
+            viewportHeight(viewportHeightIn),
+            rendererName(rendererNameIn)
         {
         }
 
@@ -80,6 +88,14 @@ public:
         SdfPath            delegateID;
         bool               isHdSt;
         MayaHydraSceneProducer* producer;
+        ///name of the camera/viewport.
+        std::string cameraName;
+        ///viewport width.
+        int viewportWidth; 
+        ///viewport height.
+        int viewportHeight; 
+        /// Is the Hydra renderer name for this viewport such as "GL" for Storm or "Arnold" for the Arnold render delegate.
+        std::string rendererName;
     };
 
     MAYAHYDRALIB_API

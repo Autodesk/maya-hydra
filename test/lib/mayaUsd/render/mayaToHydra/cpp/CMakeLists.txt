@@ -20,6 +20,7 @@ target_sources(${TARGET_NAME}
         testSelectionSceneIndex.cpp
         testUtils.cpp
         testWireframeSelectionHighlightSceneIndex.cpp
+        testFlowViewportAPIViewportInformation.cpp
 )
 
 # -----------------------------------------------------------------------------

@@ -30,7 +30,7 @@
 
 #include <mayaHydraLib/delegates/delegateRegistry.h>
 #include <mayaHydraLib/delegates/sceneDelegate.h>
-#include <mayaHydraLib/interface.h>
+#include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
 
 #include <flowViewport/tokens.h>
@@ -105,6 +105,7 @@ template <typename T> inline void hash_combine(std::size_t& seed, const T& value
 #include <maya/MSelectionList.h>
 #include <maya/MTimerMessage.h>
 #include <maya/MUiMessage.h>
+#include <maya/MFnCamera.h>
 #include <maya/MFileIO.h>
 
 #include <atomic>
@@ -565,7 +566,7 @@ MStatus MtohRenderOverride::Render(
     }
 
     if (!_initializationAttempted) {
-        _InitHydraResources();
+        _InitHydraResources(drawContext);
 
         if (!_initializationSucceeded) {
             return MStatus::kFailure;
@@ -714,7 +715,7 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
     _taskController->SetRenderTags(mhRenderTags);
 }
 
-void MtohRenderOverride::_InitHydraResources()
+void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& drawContext)
 {
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::_InitHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
@@ -748,6 +749,24 @@ void MtohRenderOverride::_InitHydraResources()
         _taskController->SetRenderOutputs({ HdAovTokens->color });
     }
 
+    std::string cameraName;
+    int viewportWidth = 0;
+    int viewportHeight = 0;
+
+    //Get information from viewport to be used later
+    MString panelName;
+	if (drawContext.renderingDestination(panelName) == MFrameContext::k3dViewport) { 
+        M3dView view;
+	    if (M3dView::getM3dViewFromModelPanel(panelName, view)){
+            M3dView *viewPtr = const_cast<M3dView*>( &view );
+	        MDagPath dpath;
+	        viewPtr->getCamera(dpath);
+	        MFnCamera viewCamera(dpath);
+	        cameraName = viewCamera.name().asChar();
+            drawContext.getRenderTargetSize(viewportWidth, viewportHeight);
+        }
+    }
+
     MayaHydraDelegate::InitData delegateInitData(
         TfToken(),
         _engine,
@@ -755,7 +774,12 @@ void MtohRenderOverride::_InitHydraResources()
         _rendererPlugin,
         _taskController,
         SdfPath(),
-        _isUsingHdSt);
+        _isUsingHdSt,
+        cameraName,
+        viewportWidth,
+        viewportHeight,
+        _renderDelegate->GetRendererDisplayName()
+    );
 
     // Render index proxy sets up the Flow Viewport merging scene index, must
     // be created first, as it is required for:
@@ -773,14 +797,18 @@ void MtohRenderOverride::_InitHydraResources()
 
     _mayaHydraSceneProducer->Populate();
 
-    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_renderIndexProxy->GetMergingSceneIndex());
+    HdSceneIndexBaseRefPtr lastSceneIndexOfTheChain = _renderIndexProxy->GetMergingSceneIndex();
+
+    //Get the latest scene index of the custom filtering scene indices chain and apply the selection scene index
+    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(lastSceneIndexOfTheChain);
     _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
 
     if (!_sceneIndexRegistry) {
         _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(*_renderIndexProxy));
     }
 
-    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_selectionSceneIndex));
+    lastSceneIndexOfTheChain = _selectionSceneIndex;
+    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(lastSceneIndexOfTheChain));
     wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
 
     // At time of writing, wireframe selection highlighting of Maya native data
@@ -788,7 +816,8 @@ void MtohRenderOverride::_InitHydraResources()
     // selection highlighting.
     wfSi->addExcludedSceneRoot(_ID);
 
-    _renderIndex->InsertSceneIndex(wfSi, SdfPath::AbsoluteRootPath());
+     lastSceneIndexOfTheChain = wfSi;
+    _renderIndex->InsertSceneIndex(lastSceneIndexOfTheChain, SdfPath::AbsoluteRootPath());
 
     // Set the initial selection onto the selection scene index.
     _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());

@@ -137,7 +137,7 @@ private:
 
     static MtohRenderOverride* _GetByName(TfToken rendererName);
 
-    void              _InitHydraResources();
+    void              _InitHydraResources(const MHWRender::MDrawContext& drawContext);
     void              _RemovePanel(MString panelName);
     void              _DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext);
     HdRenderDelegate* _GetRenderDelegate();

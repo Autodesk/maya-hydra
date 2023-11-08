@@ -17,15 +17,16 @@
 #ifndef MAYAHYDRALIB_INTERFACE_H
 #define MAYAHYDRALIB_INTERFACE_H
 
-#include <mayaHydraLib/api.h>
+//Local headers
+#include "mayaHydraLib/api.h"
 
+//Hydra headers
 #include <pxr/imaging/hd/sceneIndex.h>
 
-#include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-using SceneIndicesVector = std::vector<HdSceneIndexBasePtr>;
+using SceneIndicesVector                                        = std::vector<HdSceneIndexBasePtr>;//Be careful, these are not not Ref counted. Elements could become dangling
 
 /// In order to access this interface, call the function GetMayaHydraLibInterface()
 class MayaHydraLibInterface
@@ -36,14 +37,14 @@ public:
      *
      * @param[in] sceneIndex is a pointer to the SceneIndex to be registered.
      */
-    virtual void RegisterTerminalSceneIndex(HdSceneIndexBasePtr sceneIndex) = 0;
+    virtual void RegisterTerminalSceneIndex(const HdSceneIndexBaseRefPtr& sceneIndex) = 0;
 
     /**
      * @brief Unregister a terminal scene index from the Hydra plugin.
      *
      * @param[in] sceneIndex is a pointer to the SceneIndex to be unregistered.
      */
-    virtual void UnregisterTerminalSceneIndex(HdSceneIndexBasePtr sceneIndex) = 0;
+    virtual void UnregisterTerminalSceneIndex(const HdSceneIndexBaseRefPtr& sceneIndex) = 0;
 
     /**
      * @brief Clear the list of registered terminal scene indices
@@ -58,6 +59,13 @@ public:
      * @return A const reference to the vector of registered terminal scene indices.
      */
     virtual const SceneIndicesVector& GetTerminalSceneIndices() const = 0;
+
+    /**
+    *  @brief      Callback function called when a scene index was removed by our Hydra viewport plugin
+    *
+    *  @param[in]  sceneIndex is the new HdSceneIndexBaseRefPtr being removed by our Hydra viewport plugin.
+    */
+    virtual void SceneIndexRemoved(const HdSceneIndexBaseRefPtr& sceneIndex) = 0;
 };
 
 /// Access the MayaHydraLibInterface instance

@@ -20,8 +20,11 @@
 #include <mayaHydraLib/delegates/sceneDelegate.h>
 #include <mayaHydraLib/delegates/delegateRegistry.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+#include <mayaHydraLib/mayaHydraLibInterface.h>
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
+#include <flowViewport/API/interfacesImp/fvpInformationInterfaceImp.h>
+#include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 
 #include <pxr/base/tf/envSetting.h>
 
@@ -50,6 +53,11 @@ MayaHydraSceneProducer::MayaHydraSceneProducer(
         initData.producer = this;
         _sceneIndex = MayaHydraSceneIndex::New(initData, lightEnabled);
         TF_VERIFY(_sceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
+        
+        //Create an HydraViewportInformation instance
+        FVP_NS_DEF::InformationInterface::ViewportInformation* hydraViewportInformation = 
+            new FVP_NS_DEF::InformationInterface::ViewportInformation(_sceneIndex, initData.cameraName, initData.viewportWidth, initData.viewportHeight, initData.rendererName);
+        FVP_NS_DEF::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().AddViewportInformation(*hydraViewportInformation, _renderIndexProxy);
     }
     else
     {
@@ -94,7 +102,10 @@ MayaHydraSceneProducer::~MayaHydraSceneProducer()
 {
     if (enableMayaNativeSceneIndex())
     {
-        _sceneIndex->GetRenderIndex().RemoveSceneIndex(_sceneIndex);
+        FVP_NS_DEF::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveViewportInformation(_sceneIndex);
+        _renderIndexProxy.RemoveSceneIndex(_sceneIndex);
+        _sceneIndex->RemoveCallbacksAndDeleteAdapters();//This should be called before calling _sceneIndex.Reset(); which will call the destructor if the ref count reaches 0
+        _sceneIndex.Reset();
     }
     _delegates.clear();
 }
@@ -116,7 +127,7 @@ void MayaHydraSceneProducer::Populate()
     if (enableMayaNativeSceneIndex())
     {
         _sceneIndex->Populate();
-        // Call InsertSceneIndex before prims are added to scene index, would it be better to call later?
+        //Add the scene index as an input scene index of the merging scene index
         _renderIndexProxy.InsertSceneIndex(_sceneIndex, SdfPath::AbsoluteRootPath());
     }
     else

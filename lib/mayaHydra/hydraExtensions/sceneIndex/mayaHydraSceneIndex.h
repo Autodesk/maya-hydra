@@ -50,6 +50,10 @@
 
 #include <unordered_map>
 
+namespace FVP_NS_DEF {
+class RenderIndexProxy;
+}
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class MayaHydraSceneIndex;
@@ -74,6 +78,9 @@ public:
     }
 
     ~MayaHydraSceneIndex();
+
+    //Call this before the destructor is called.
+    void RemoveCallbacksAndDeleteAdapters();
 
     // ------------------------------------------------------------------------
     // Maya Hydra scene producer implementations
@@ -162,6 +169,8 @@ public:
     bool IsHdSt() const { return _isHdSt; }
 
     MayaHydraSceneProducer* GetProducer() { return _producer; };
+
+    Fvp::RenderIndexProxy& GetRenderIndexProxy();
 
     SdfPath SceneIndexPath(const Ufe::Path& appPath) const override;
    

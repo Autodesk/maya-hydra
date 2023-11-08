@@ -39,6 +39,7 @@
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
+#include <mayaHydraLib/mayaHydraSceneProducer.h>
 
 #include <ufeExtensions/Global.h>
 
@@ -388,9 +389,18 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
 
 MayaHydraSceneIndex::~MayaHydraSceneIndex()
 {
+    //If you get a crash in a callback with a nullptr for _sceneIndex, 
+    // it may be due to the fact that the _sceneIndex pointer has been nulled as its ref count reached 0 but the destructor is still being called.
+    //You should call RemoveCallbacksAndDeleteAdapters(); before the destructor is called.
+}
+
+void MayaHydraSceneIndex::RemoveCallbacksAndDeleteAdapters()
+{
     for (auto callback : _callbacks) {
         MMessage::removeCallback(callback);
     }
+    _callbacks.clear();
+
     _MapAdapter<MayaHydraAdapter>(
         [](MayaHydraAdapter* a) { a->RemoveCallbacks(); },
         _renderItemsAdapters,
@@ -398,7 +408,12 @@ MayaHydraSceneIndex::~MayaHydraSceneIndex()
         _lightAdapters,
         _materialAdapters);
 
-    SetDefaultLightEnabled(false);
+    _renderItemsAdapters.clear();
+    _shapeAdapters.clear();
+    _lightAdapters.clear();
+    _materialAdapters.clear();
+    _cameraAdapters.clear();
+    _renderItemsAdaptersFast.clear();
 }
 
 void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation::MViewportScene& scene, MFrameContext::DisplayStyle ds)
@@ -1457,6 +1472,14 @@ VtValue MayaHydraSceneIndex::GetShadingStyle(SdfPath const& id)
         }
     }
     return VtValue();
+}
+
+Fvp::RenderIndexProxy& MayaHydraSceneIndex::GetRenderIndexProxy()
+{
+    if (! _producer){
+        TF_CODING_ERROR("The MayaHydraSceneProducer pointer should not be a nullptr !");
+    }
+    return _producer->GetRenderIndexProxy();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
