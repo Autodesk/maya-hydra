@@ -16,13 +16,15 @@
 #define FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX_H
 
 #include "flowViewport/api.h"
-#include "flowViewport/sceneIndex/fvpPassThroughSelectionInterfaceSceneIndex.h"
 
+#include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 
 #include <set>
 
 namespace FVP_NS_DEF {
+
+class Selection;
 
 // Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
 // type in PXR_NS.
@@ -36,13 +38,14 @@ typedef PXR_NS::TfRefPtr<const WireframeSelectionHighlightSceneIndex> WireframeS
 /// and their descendants.
 ///
 class WireframeSelectionHighlightSceneIndex 
-    : public PassThroughSelectionInterfaceSceneIndexBase
+    : public PXR_NS::HdSingleInputFilteringSceneIndexBase
 {
 public:
 
     FVP_API
     static PXR_NS::HdSceneIndexBaseRefPtr New(
-        const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex
+        const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
+        const std::shared_ptr<const Selection>& selection
     );
 
     FVP_API
@@ -65,7 +68,8 @@ protected:
 
     FVP_API
     WireframeSelectionHighlightSceneIndex(
-        const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex
+        const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
+        const std::shared_ptr<const Selection>& selection
     );
 
     FVP_API
@@ -93,6 +97,8 @@ private:
     bool isExcluded(const PXR_NS::SdfPath& sceneRoot) const;
 
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
+
+    const std::shared_ptr<const Selection> _selection;
 };
 
 }

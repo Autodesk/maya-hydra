@@ -39,7 +39,6 @@
 #define FVP_SELECTION_SCENE_INDEX_H
 
 #include "flowViewport/api.h"
-#include "flowViewport/sceneIndex/fvpSelectionInterface.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
@@ -56,17 +55,13 @@ class Selection;
 namespace FVP_NS_DEF {
 
 class PathInterface;
+class Selection;
 
 // Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
 // type in PXR_NS.
 class SelectionSceneIndex;
 typedef PXR_NS::TfRefPtr<SelectionSceneIndex> SelectionSceneIndexRefPtr;
 typedef PXR_NS::TfRefPtr<const SelectionSceneIndex> SelectionSceneIndexConstRefPtr;
-
-namespace SelectionSceneIndex_Impl
-{
-using _SelectionSharedPtr = std::shared_ptr<struct _Selection>;
-}
 
 /// \class SelectionSceneIndex
 ///
@@ -75,13 +70,14 @@ using _SelectionSharedPtr = std::shared_ptr<struct _Selection>;
 ///
 class SelectionSceneIndex final
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
-    , public SelectionInterface
     , public PathInterface
 {
 public:
     FVP_API
     static SelectionSceneIndexRefPtr New(
-        PXR_NS::HdSceneIndexBaseRefPtr const &inputSceneIndex);
+        PXR_NS::HdSceneIndexBaseRefPtr const &inputSceneIndex,
+        const std::shared_ptr<Selection>&     selection
+    );
 
     FVP_API
     PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath &primPath) const override;
@@ -106,14 +102,11 @@ public:
     FVP_API
     void ClearSelection();
 
-    //! Selection interface overrides.
-    //@{
     FVP_API
-    bool IsFullySelected(const PXR_NS::SdfPath& primPath) const override;
+    bool IsFullySelected(const PXR_NS::SdfPath& primPath) const;
 
     FVP_API
-    bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath) const override;
-    //@}
+    bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath) const;
 
     //! Path interface override.  Forwards the call to the input scene index, 
     //! and warns about empty return paths.
@@ -141,9 +134,10 @@ protected:
 
 private:
     SelectionSceneIndex(
-        const PXR_NS::HdSceneIndexBaseRefPtr &inputSceneIndex);
+        const PXR_NS::HdSceneIndexBaseRefPtr &inputSceneIndex,
+        const std::shared_ptr<Selection>&     selection);
 
-    SelectionSceneIndex_Impl::_SelectionSharedPtr _selection;
+    const std::shared_ptr<Selection> _selection;
 
     const PathInterface* const _inputSceneIndexPathInterface;
 };

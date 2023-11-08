@@ -773,14 +773,15 @@ void MtohRenderOverride::_InitHydraResources()
 
     _mayaHydraSceneProducer->Populate();
 
-    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_renderIndexProxy->GetMergingSceneIndex());
+    _selection = std::make_shared<Fvp::Selection>();
+    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_renderIndexProxy->GetMergingSceneIndex(), _selection);
     _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
 
     if (!_sceneIndexRegistry) {
         _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(*_renderIndexProxy));
     }
 
-    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_selectionSceneIndex));
+    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_selectionSceneIndex, _selection));
     wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
 
     // At time of writing, wireframe selection highlighting of Maya native data
@@ -826,6 +827,7 @@ void MtohRenderOverride::ClearHydraResources()
     _renderIndexProxy.reset();
     _mayaHydraSceneProducer.reset();
     _selectionSceneIndex.Reset();
+    _selection.reset();
 
     // Cleanup internal context data that keep references to data that is now
     // invalid.
