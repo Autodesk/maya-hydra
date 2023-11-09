@@ -435,10 +435,15 @@ void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContex
                 considerAllSceneLights);
 
             if (hasDirection && !hasPosition) {
+
+                //To simulate a directional light which has no actual position, but doesn't seem to be supported in hydra, we set a position very very far
+                //so it looks like a directional light.
+                static const float farfarAway {1.0e15f};//we use a point on the Z axis far far away
+
                 // Note for devs : if you update more parameters in the default light, don't forget
-                // to update MtohDefaultLightDelegate::SetDefaultLight currently there are only 3 :
+                // to update MtohDefaultLightDelegate::SetDefaultLight and MayaHydraSceneIndex::SetDefaultLight, currently there are only 3 :
                 // position, diffuse, specular
-                _defaultLight.SetPosition({ -direction.x, -direction.y, -direction.z, 0.0f });
+                _defaultLight.SetPosition({ -farfarAway*direction.x, -farfarAway*direction.y, -farfarAway*direction.z, 0.0f });
                 _defaultLight.SetDiffuse(
                     { intensity * color.r, intensity * color.g, intensity * color.b, 1.0f });
                 _defaultLight.SetSpecular(

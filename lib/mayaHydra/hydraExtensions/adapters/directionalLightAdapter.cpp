@@ -53,11 +53,14 @@ public:
 
     void _CalculateLightParams(GlfSimpleLight& light) override
     {
+        //To simulate a directional light which has no actual position, but doesn't seem to be supported in hydra, we set a position very very far
+        //so it looks like a directional light.
         // Directional lights point toward -Z, but we need the opposite
         // for the position so the light acts as a directional light.
-        const auto direction = GfVec4f(0.0, 0.0, 1.0, 0.0) * GetTransform();
+        static const double farfarAway {1.0e15};//we use a point on the Z axis far far away
+        const GfVec4d direction = farfarAway * GetTransform().GetRow(2);//Equivalent to GfVec4d(0.0, 0.0, farfarAway, 0.0) * GetTransform();
         light.SetHasShadow(true);
-        light.SetPosition({ direction[0], direction[1], direction[2], 0.0f });
+        light.SetPosition({ (float)direction[0], (float)direction[1], (float)direction[2], 0.0f });
     }
 
     VtValue Get(const TfToken& key) override
