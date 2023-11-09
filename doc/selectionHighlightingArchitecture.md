@@ -237,11 +237,11 @@ graph BT;
     ph1[Plugin highlighting 1]-->hm;
     subgraph ph[Plugin highlighting]
         ph2[Plugin highlighting 2]-->ph1;
-        roSn[/Read-only Selection/]-->ph1;
-        roSn-->ph2;
+        roSn[/Read-only Selection/]-.->ph1;
+        roSn-.->ph2;
     end
-    sn[Selection scene index]-->ph2;
-    fvpm[Flow Viewport merge]-->sn;
+    snSi[Selection scene index]-->ph2;
+    fvpm[Flow Viewport merge]-->snSi;
     subgraph pd[Plugin data]
         p1[Plugin 1];
         p2[Plugin 2];
@@ -249,7 +249,8 @@ graph BT;
     fvpm-. Path .->p1;
     p1-->fvpm;
     p2-->fvpm;
-    sn1[/Selection/]-->sn;
+    snSi-. Path .->fvpm;
+    sn[/Selection/]-.->snSi;
 ```
 The plugin data and plugin highlighting subtrees are where plugins add their
 scene indices.  The data scene index is required, and the highlighting scene
@@ -336,6 +337,10 @@ HdSingleInputFilteringSceneIndexBase <|-- WireframeSelectionHighlightSceneIndex
 RenderIndexProxy *-- MergingSceneIndex : Owns
 
 SelectionSceneIndex ..> MergingSceneIndex : Path
+
+SelectionSceneIndex o-- Selection : Read / Write
+
+WireframeSelectionHighlightSceneIndex o-- Selection : Read
 ```
 
 ## Algorithmic Complexity

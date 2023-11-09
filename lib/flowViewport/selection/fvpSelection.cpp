@@ -49,7 +49,7 @@ using namespace Fvp;
 
 class SelectionSchemaFullySelectedBuilder {
 public:
-    SelectionSchemaFullySelectedBuilder() : _builder() {
+    SelectionSchemaFullySelectedBuilder() {
         _builder.SetFullySelected(
             HdRetainedTypedSampledDataSource<bool>::New(true));
     }
