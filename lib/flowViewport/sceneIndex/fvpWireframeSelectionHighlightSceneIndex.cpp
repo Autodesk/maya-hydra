@@ -53,7 +53,7 @@ namespace FVP_NS_DEF {
 HdSceneIndexBaseRefPtr
 WireframeSelectionHighlightSceneIndex::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
-    const Selection::ConstPtr&    selection
+    const SelectionConstPtr&      selection
 )
 {
     return TfCreateRefPtr(new WireframeSelectionHighlightSceneIndex(inputSceneIndex, selection));
@@ -67,7 +67,7 @@ const HdDataSourceLocator& WireframeSelectionHighlightSceneIndex::ReprSelectorLo
 WireframeSelectionHighlightSceneIndex::
 WireframeSelectionHighlightSceneIndex(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
-    const Selection::ConstPtr&    selection
+    const SelectionConstPtr&      selection
 )
   : HdSingleInputFilteringSceneIndexBase(inputSceneIndex),
     _selection(selection)

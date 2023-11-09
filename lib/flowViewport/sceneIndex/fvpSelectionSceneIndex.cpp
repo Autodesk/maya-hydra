@@ -63,7 +63,7 @@ public:
     HD_DECLARE_DATASOURCE(_PrimSource);
 
     _PrimSource(HdContainerDataSourceHandle const &inputSource,
-                const Selection::ConstPtr& selection,
+                const SelectionConstPtr& selection,
                 const SdfPath &primPath)
         : _inputSource(inputSource)
         , _selection(selection)
@@ -91,14 +91,14 @@ public:
 
 private:
     HdContainerDataSourceHandle const _inputSource;
-    const Selection::ConstPtr _selection;
+    const SelectionConstPtr _selection;
     const SdfPath _primPath;
 };
 
 SelectionSceneIndexRefPtr
 SelectionSceneIndex::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
-    const Selection::Ptr&         selection
+    const SelectionPtr&           selection
 )
 {
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
@@ -109,7 +109,7 @@ SelectionSceneIndex::New(
 SelectionSceneIndex::
 SelectionSceneIndex(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
-    const Selection::Ptr&         selection
+    const SelectionPtr&           selection
 )
   : HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
   , _selection(selection)

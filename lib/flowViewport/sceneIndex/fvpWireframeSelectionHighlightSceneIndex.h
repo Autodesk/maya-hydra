@@ -16,6 +16,7 @@
 #define FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX_H
 
 #include "flowViewport/api.h"
+#include "flowViewport/selection/fvpSelectionFwd.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -98,7 +99,7 @@ private:
 
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
 
-    const std::shared_ptr<const Selection> _selection;
+    const SelectionConstPtr   _selection;
 };
 
 }

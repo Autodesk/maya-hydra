@@ -43,6 +43,27 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
+namespace {
+
+using namespace Fvp;
+
+class SelectionSchemaFullySelectedBuilder {
+public:
+    SelectionSchemaFullySelectedBuilder() : _builder() {
+        _builder.SetFullySelected(
+            HdRetainedTypedSampledDataSource<bool>::New(true));
+    }
+
+    HdContainerDataSourceHandle Build() { return _builder.Build(); }
+
+private:
+    HdSelectionSchema::Builder _builder;
+};
+
+SelectionSchemaFullySelectedBuilder selectionBuilder;
+
+}
+
 namespace FVP_NS_DEF {
 
 HdDataSourceBaseHandle 
@@ -59,10 +80,6 @@ Selection::Add(const PXR_NS::SdfPath& primPath)
     if (primPath.IsEmpty()) {
         return false;
     }
-
-    HdSelectionSchema::Builder selectionBuilder;
-    selectionBuilder.SetFullySelected(
-        HdRetainedTypedSampledDataSource<bool>::New(true));
 
     _pathToState[primPath].selectionSources.push_back(selectionBuilder.Build());
 
@@ -82,10 +99,6 @@ Selection::Clear()
 
 void Selection::Replace(const PXR_NS::SdfPathVector& selection)
 {
-    HdSelectionSchema::Builder selectionBuilder;
-    selectionBuilder.SetFullySelected(
-        HdRetainedTypedSampledDataSource<bool>::New(true));
-
     Clear();
 
     for (const auto& primPath : selection) {

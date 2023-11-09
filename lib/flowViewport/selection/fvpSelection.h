@@ -17,11 +17,11 @@
 #define FVP_SELECTION_H
 
 #include "flowViewport/api.h"
+#include "flowViewport/selection/fvpSelectionFwd.h"
 
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/usd/sdf/path.h>
 
-#include <memory>
 #include <map>
 
 namespace FVP_NS_DEF {
@@ -42,10 +42,7 @@ class Selection
 {
 public:
 
-    using Ptr      = std::shared_ptr<Selection>;
-    using ConstPtr = std::shared_ptr<const Selection>;
-
-    // Add primPath to selection and return true if it is not empty.
+    // Add primPath to selection and return true if the argument is not empty.
     FVP_API
     bool Add(const PXR_NS::SdfPath& primPath);
 
@@ -53,7 +50,8 @@ public:
     FVP_API
     bool Remove(const PXR_NS::SdfPath& primPath);
 
-    // Add vector of primPath to selection.  Any empty primPath will be skipped.
+    // Replace the selection with the contents of the argument primPath vector.
+    // Any empty primPath in the argument will be skipped.
     FVP_API
     void Replace(const PXR_NS::SdfPathVector& selection);
 

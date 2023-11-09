@@ -4,12 +4,14 @@
 target_sources(${TARGET_NAME}
     PRIVATE
     fvpSelection.cpp
+    fvpSelectionFwd.cpp
     fvpSelectionTask.cpp
     fvpSelectionTracker.cpp
 )
 
 set(HEADERS
     fvpSelection.h
+    fvpSelectionFwd.h
     fvpSelectionTask.h
     fvpSelectionTracker.h
 )

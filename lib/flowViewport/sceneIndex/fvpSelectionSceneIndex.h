@@ -39,6 +39,7 @@
 #define FVP_SELECTION_SCENE_INDEX_H
 
 #include "flowViewport/api.h"
+#include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
@@ -137,7 +138,7 @@ private:
         const PXR_NS::HdSceneIndexBaseRefPtr &inputSceneIndex,
         const std::shared_ptr<Selection>&     selection);
 
-    const std::shared_ptr<Selection> _selection;
+    const SelectionPtr         _selection;
 
     const PathInterface* const _inputSceneIndexPathInterface;
 };
