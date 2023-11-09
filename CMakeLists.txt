@@ -23,11 +23,11 @@ project(maya-usd)
 option(BUILD_TESTS "Build tests." ON)
 option(BUILD_STRICT_MODE "Enforce all warnings as errors." ON)
 option(BUILD_SHARED_LIBS "Build libraries as shared or static." ON)
-option(BUILD_WITH_PYTHON_3 "Build with python 3." OFF)
+option(BUILD_WITH_PYTHON_3 "Build with python 3." ON)
 if(APPLE)
     option(BUILD_UB2 "Build Universal Binary 2 (UB2) Intel64+arm64" OFF)
 endif()
-set(BUILD_WITH_PYTHON_3_VERSION 3.7 CACHE STRING "The version of Python 3 to build with")
+set(BUILD_WITH_PYTHON_3_VERSION 3.10 CACHE STRING "The version of Python 3 to build with")
 option(CMAKE_WANT_MATERIALX_BUILD "Enable building with MaterialX (experimental)." OFF)
 
 set(PXR_OVERRIDE_PLUGINPATH_NAME PXR_PLUGINPATH_NAME
