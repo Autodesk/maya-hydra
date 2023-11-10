@@ -93,7 +93,6 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
                 sUnselectedDisplayStyleDataSource });
     }
     return prim;
-
 }
 
 SdfPathVector

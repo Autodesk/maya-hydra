@@ -82,103 +82,21 @@ provide the following services:
 ## Sample Code
 ### Selection Change
 
-The following selection change code shows the use of the *Path Interface*,
-through the *SceneIndexPath()* method, called on the input scene index.  The
-path interface allows the selection scene index to translate selected
-application paths to selected Hydra scene index paths.
-```
-void
-SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
-{
-    TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
-        .Msg("SelectionSceneIndex::AddSelection(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
-
-    HdSelectionSchema::Builder selectionBuilder;
-    selectionBuilder.SetFullySelected(
-        HdRetainedTypedSampledDataSource<bool>::New(true));
-
-    // Call our input scene index to convert the application path to a scene
-    // index path.
-    auto sceneIndexPath = _inputSceneIndexPathInterface->SceneIndexPath(appPath);
-
-    TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
-        .Msg("    Adding %s to the Hydra selection.\n", sceneIndexPath.GetText());
-
-    _selection->pathToState[sceneIndexPath].selectionSources.push_back(
-        selectionBuilder.Build());
-
-    _SendPrimsDirtied({{sceneIndexPath, locators}});
-}
-```
+This
+[selection change code](../lib/flowViewport/sceneIndex/fvpSelectionSceneIndex.cpp#L150-L167)
+shows the use of the *Path Interface*, through the *SceneIndexPath()* method,
+called on the input scene index.  The path interface allows the selection scene
+index to translate selected application paths to selected Hydra scene index
+paths.
 
 ### Wireframe Selection Highlighting
 
-The following wireframe selection highlighting code shows the use of the
-*Selection*, through the *HasFullySelectedAncestorInclusive()*
-method, called on the input selection.  The selection allows a
-selection highlighting filtering scene index to query selected prims.
-```
-bool WireframeSelectionHighlightSceneIndex::HasFullySelectedAncestorInclusive(const SdfPath& primPath) const
-{
-    return _selection->HasFullySelectedAncestorInclusive(primPath);
-}
-
-HdSceneIndexPrim
-WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
-{
-    TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
-        .Msg("WireframeSelectionHighlightSceneIndex::GetPrim(%s) called.\n", primPath.GetText());
-
-    auto prim = _GetInputSceneIndex()->GetPrim(primPath);
-
-    // If this isn't one of our prims, we're not responsible for providing a
-    // selection highlight for it.
-    if (primPath.HasPrefix(_sceneRoot) && 
-        prim.primType == HdPrimTypeTokens->mesh) {
-        prim.dataSource = HdOverlayContainerDataSource::New(
-            { prim.dataSource, HasFullySelectedAncestorInclusive(primPath) ? 
-                sSelectedDisplayStyleDataSource : 
-                sUnselectedDisplayStyleDataSource });
-    }
-    return prim;
-
-}
-
-void
-WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
-    const HdSceneIndexBase &sender,
-    const HdSceneIndexObserver::DirtiedPrimEntries &entries)
-{
-    TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
-        .Msg("WireframeSelectionHighlightSceneIndex::_PrimsDirtied() called.\n");
-
-    HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
-    for (const auto& entry : entries) {
-        // If the dirtied prim isn't one of ours, we're not responsible for
-        // providing a selection highlight for it.
-        if (entry.primPath.HasPrefix(_sceneRoot) && 
-            entry.dirtyLocators.Contains(
-                HdSelectionsSchema::GetDefaultLocator())) {
-            TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
-                .Msg("    %s selections locator dirty.\n", entry.primPath.GetText());
-            // All mesh prims recursively under the selection dirty prim have a
-            // dirty wireframe selection highlight.
-            dirtySelectionHighlightRecursive(entry.primPath, &highlightEntries);
-        }
-    }
-
-    if (!highlightEntries.empty()) {
-        // Append all incoming dirty entries.
-        highlightEntries.reserve(highlightEntries.size()+entries.size());
-        highlightEntries.insert(
-            highlightEntries.end(), entries.begin(), entries.end());
-        _SendPrimsDirtied(highlightEntries);
-    }
-    else {
-        _SendPrimsDirtied(entries);
-    }
-}
-```
+This
+[wireframe selection highlighting code](../lib/flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.cpp#L76-L97)
+shows the use of the *Selection*, through the
+*HasFullySelectedAncestorInclusive()* method, called on the input selection.
+The selection allows a selection highlighting filtering scene index to query
+selected prims.
 
 ## Design Option Discussion
 
