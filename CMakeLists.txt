@@ -33,6 +33,12 @@ option(CMAKE_WANT_MATERIALX_BUILD "Enable building with MaterialX (experimental)
 set(PXR_OVERRIDE_PLUGINPATH_NAME PXR_PLUGINPATH_NAME
     CACHE STRING "Name of env var USD searches to find plugins")
     
+# Build-related information, expected to be passed in by the parent build.
+set(PEPTIDE_JENKINS_BUILD 0 CACHE STRING "Build number.")
+set(PEPTIDE_GIT_COMMIT "Unknown Git commit" CACHE STRING "Build commit.")
+set(PEPTIDE_GIT_BRANCH "Unknown Git branch" CACHE STRING "Build branch.")
+set(PEPTIDE_PRODUCT_DATE "Unknown build date" CACHE STRING "Build date.")
+
 #------------------------------------------------------------------------------
 # internal flags to control build
 #------------------------------------------------------------------------------

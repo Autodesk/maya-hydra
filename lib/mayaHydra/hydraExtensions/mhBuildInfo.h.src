@@ -20,15 +20,10 @@
 #include <mayaHydraLib/api.h>
 #include <mayaHydraLib/mayaHydra.h>
 
-// At time of writing Peptide build variables undefined.  PPT, 3-Nov-2023.
-// #define MAYAHYDRA_BUILD_NUMBER ${PEPTIDE_JENKINS_BUILD}
-// #define MAYAHYDRA_GIT_COMMIT   "${PEPTIDE_GIT_COMMIT}"
-// #define MAYAHYDRA_GIT_BRANCH   "${PEPTIDE_GIT_BRANCH}"
-// #define MAYAHYDRA_BUILD_DATE   "${PEPTIDE_PRODUCT_DATE}"
-#define MAYAHYDRA_BUILD_NUMBER 0
-#define MAYAHYDRA_GIT_COMMIT   "aGitCommit"
-#define MAYAHYDRA_GIT_BRANCH   "aGitBranch"
-#define MAYAHYDRA_BUILD_DATE   "aProductDate"
+#define MAYAHYDRA_BUILD_NUMBER ${PEPTIDE_JENKINS_BUILD}
+#define MAYAHYDRA_GIT_COMMIT   "${PEPTIDE_GIT_COMMIT}"
+#define MAYAHYDRA_GIT_BRANCH   "${PEPTIDE_GIT_BRANCH}"
+#define MAYAHYDRA_BUILD_DATE   "${PEPTIDE_PRODUCT_DATE}"
 
 namespace MAYAHYDRA_NS_DEF {
 
