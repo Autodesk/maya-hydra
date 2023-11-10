@@ -32,6 +32,7 @@
 #include <mayaHydraLib/delegates/sceneDelegate.h>
 #include <mayaHydraLib/interface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
+#include <mayaHydraLib/hydraUtils.h>
 
 #include <flowViewport/tokens.h>
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
@@ -44,6 +45,7 @@
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/type.h>
+#include <pxr/base/gf/vec3f.h>
 
 #include <ufe/hierarchy.h>
 #include <ufe/namedSelection.h>
@@ -436,14 +438,12 @@ void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContex
 
             if (hasDirection && !hasPosition) {
 
-                //To simulate a directional light which has no actual position, but doesn't seem to be supported in hydra, we set a position very very far
-                //so it looks like a directional light.
-                static const float farfarAway {1.0e15f};//we use a point on the Z axis far far away
-
                 // Note for devs : if you update more parameters in the default light, don't forget
                 // to update MtohDefaultLightDelegate::SetDefaultLight and MayaHydraSceneIndex::SetDefaultLight, currently there are only 3 :
                 // position, diffuse, specular
-                _defaultLight.SetPosition({ -farfarAway*direction.x, -farfarAway*direction.y, -farfarAway*direction.z, 0.0f });
+                GfVec3f position;
+                GetDirectionalLightPositionFromDirectionVector(position, {direction.x, direction.y, direction.z});
+                _defaultLight.SetPosition({ position.data()[0], position.data()[1], position.data()[2], 0.0f });
                 _defaultLight.SetDiffuse(
                     { intensity * color.r, intensity * color.g, intensity * color.b, 1.0f });
                 _defaultLight.SetSpecular(

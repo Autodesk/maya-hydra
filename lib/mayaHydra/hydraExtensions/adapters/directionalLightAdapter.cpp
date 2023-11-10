@@ -18,6 +18,7 @@
 #include <mayaHydraLib/adapters/lightAdapter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/mayaHydraSceneProducer.h>
+#include <mayaHydraLib/hydraUtils.h>
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
@@ -57,10 +58,12 @@ public:
         //so it looks like a directional light.
         // Directional lights point toward -Z, but we need the opposite
         // for the position so the light acts as a directional light.
-        static const double farfarAway {1.0e15};//we use a point on the Z axis far far away
-        const GfVec4d direction = farfarAway * GetTransform().GetRow(2);//Equivalent to GfVec4d(0.0, 0.0, farfarAway, 0.0) * GetTransform();
+        auto zDir = GetTransform().GetRow(2);
+        const GfVec3f lightDirection {(float)-zDir.data()[0], (float)-zDir.data()[1], (float)-zDir.data()[2]};
+        GfVec3f position;
+        MAYAHYDRA_NS_DEF::GetDirectionalLightPositionFromDirectionVector(position, lightDirection);
         light.SetHasShadow(true);
-        light.SetPosition({ (float)direction[0], (float)direction[1], (float)direction[2], 0.0f });
+        light.SetPosition({ position.data()[0], position.data()[1], position.data()[2], 0.0f });
     }
 
     VtValue Get(const TfToken& key) override
