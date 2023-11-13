@@ -24,8 +24,6 @@ class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
-
     def activeModelPanel(self):
         """Return the model panel that will be used for playblasting etc..."""
         for panel in cmds.getPanel(type="modelPanel"):
@@ -33,6 +31,7 @@ class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
                 return panel
 
     #Test directional lights with a sphere in a usd stage 
+    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_DirectionalLights(self):
         cmds.file(new=True, force=True)
         cmds.refresh()

@@ -3,7 +3,6 @@
 //Last modified: Fri, Nov 10, 2023 04:32:50 PM
 //Codeset: 1252
 requires maya "2025ff01";
-requires -nodeType "aiOptions" -nodeType "aiAOVDriver" -nodeType "aiAOVFilter" "mtoa" "5.3.4";
 requires -nodeType "mayaUsdLayerManager" -nodeType "mayaUsdProxyShape" -dataType "pxrUsdStageData"
 		 "mayaUsdPlugin" "0.27.0";
 currentUnit -l centimeter -a degree -t film;
@@ -43,7 +42,6 @@ createNode camera -s -n "topShape" -p "top";
 	setAttr ".man" -type "string" "top_mask";
 	setAttr ".hc" -type "string" "viewSet -t %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -s -n "front";
 	rename -uid "02405014-4E34-BBFE-29DF-91AA9AB4FB78";
 	setAttr ".v" no;
@@ -59,7 +57,6 @@ createNode camera -s -n "frontShape" -p "front";
 	setAttr ".man" -type "string" "front_mask";
 	setAttr ".hc" -type "string" "viewSet -f %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -s -n "side";
 	rename -uid "56F73F85-4EF7-1F10-74F9-78A7320331EF";
 	setAttr ".v" no;
@@ -76,7 +73,6 @@ createNode camera -s -n "sideShape" -p "side";
 	setAttr ".man" -type "string" "side_mask";
 	setAttr ".hc" -type "string" "viewSet -s %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -n "stage1";
 	rename -uid "572BC593-45A8-D62E-274A-AC9996659D7D";
 createNode mayaUsdProxyShape -n "stageShape1" -p "stage1";
@@ -118,19 +114,6 @@ createNode renderLayerManager -n "renderLayerManager";
 createNode renderLayer -n "defaultRenderLayer";
 	rename -uid "4A928CEF-4895-086E-F63F-099F0E74888C";
 	setAttr ".g" yes;
-createNode aiOptions -s -n "defaultArnoldRenderOptions";
-	rename -uid "73A28213-46FE-B26B-74C9-A3941189DB37";
-	setAttr ".version" -type "string" "5.3.4";
-createNode aiAOVFilter -s -n "defaultArnoldFilter";
-	rename -uid "9BAAF1C7-43F9-CB4E-9492-908A8F7D52A9";
-	setAttr ".ai_translator" -type "string" "gaussian";
-createNode aiAOVDriver -s -n "defaultArnoldDriver";
-	rename -uid "1AF430F1-44FD-1B18-5DA3-0C8C23606014";
-	setAttr ".ai_translator" -type "string" "exr";
-createNode aiAOVDriver -s -n "defaultArnoldDisplayDriver";
-	rename -uid "E869C512-498A-A38A-AD04-F79E9F932E84";
-	setAttr ".ai_translator" -type "string" "maya";
-	setAttr ".output_mode" 0;
 createNode script -n "uiConfigurationScriptNode";
 	rename -uid "D89C7BAE-4486-86C1-EF8A-5CAAC7DB389E";
 	setAttr ".b" -type "string" (
