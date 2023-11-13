@@ -309,3 +309,26 @@ endfunction(get_external_project_default_values)
 
 # Create one for all the project using the default list separator
 get_external_project_default_values(MAYAUSD_EXTERNAL_PROJECT_GENERAL_SETTINGS "$<SEMICOLON>")
+
+#
+# Adapted from peptide_compute_timestamps()
+#
+function(mayaHydra_compute_timestamp)
+    # The date is formated the same way Maya formats its date.
+    # weekdday month/day/fullyear, CONCAT(fullyear + month + day + fullhour + minute)
+    string(TIMESTAMP WEEKDAY "%w")
+    set(MH_WEEK_DAYS "Sun" "Mon" "Tue" "Wed" "Thu" "Fri" "Sat")
+    list(GET MH_WEEK_DAYS ${WEEKDAY} WEEKDAY)
+    string(TIMESTAMP PRODUCT_DATE "\"${WEEKDAY} %m/%d/%Y, %Y%m%d%H%M\"")
+
+    set(MH_PRODUCT_DATE "${PRODUCT_DATE}" CACHE STRING "Product Date")
+
+    # For non-Jenkins builds (i.e. developers), don't reset the timestamps
+    # unless a clean build is made. This is annoying as it causes all the
+    # version file to be regenerated and thus all libraries and executable to
+    # be relinked. Else, do force a new timestamp!!!
+    if (NOT PEPTIDE_JENKINS_BUILD EQUAL 0)
+        set(MH_PRODUCT_DATE "${PRODUCT_DATE}" CACHE STRING "Product Date" FORCE)
+    endif()
+endfunction(mayaHydra_compute_timestamp)
+mayaHydra_compute_timestamp()
