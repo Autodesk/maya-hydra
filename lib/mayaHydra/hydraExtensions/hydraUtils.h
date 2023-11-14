@@ -22,6 +22,7 @@
 #include <mayaHydraLib/mayaHydra.h>
 
 #include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/gf/vec3f.h>
 #include <pxr/base/vt/value.h>
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/usd/sdf/path.h>
@@ -38,7 +39,7 @@ namespace MAYAHYDRA_NS_DEF {
  * @return The \p VtValue type and value in string form.
  */
 MAYAHYDRALIB_API
-std::string ConvertVtValueToString(const pxr::VtValue& val);
+std::string ConvertVtValueToString(const PXR_NS::VtValue& val);
 
 /**
  * @brief Strip \p nsDepth namespaces from \p nodeName.
@@ -73,7 +74,7 @@ void SanitizeNameForSdfPath(std::string& inOutPathString, bool doStripNamespaces
  * @return The path without its parent path.
  */
 MAYAHYDRALIB_API
-pxr::SdfPath MakeRelativeToParentPath(const pxr::SdfPath& path);
+PXR_NS::SdfPath MakeRelativeToParentPath(const PXR_NS::SdfPath& path);
 
 /**
  * @brief Get the Hydra Xform matrix from a given prim.
@@ -86,7 +87,21 @@ pxr::SdfPath MakeRelativeToParentPath(const pxr::SdfPath& path);
  * @return True if the operation succeeded, false otherwise.
  */
 MAYAHYDRALIB_API
-bool GetXformMatrixFromPrim(const pxr::HdSceneIndexPrim& prim, pxr::GfMatrix4d& outMatrix);
+bool GetXformMatrixFromPrim(const PXR_NS::HdSceneIndexPrim& prim, PXR_NS::GfMatrix4d& outMatrix);
+
+/**
+ * @brief Get the Hydra Xform matrix from a given prim.
+ *
+ * This method makes no guarantee on whether the matrix is flattened or not.
+ *
+ * @param[in] prim is the Hydra prim in the SceneIndex of which to get the transform matrix.
+ * @param[out] outMatrix is the transform matrix of the prim.
+ *
+ * @return True if the operation succeeded, false otherwise.
+ */
+
+MAYAHYDRALIB_API
+void GetDirectionalLightPositionFromDirectionVector(PXR_NS::GfVec3f& outPosition, const PXR_NS::GfVec3f& direction);
 
 } // namespace MAYAHYDRA_NS_DEF
 
