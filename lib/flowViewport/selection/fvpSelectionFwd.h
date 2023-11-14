@@ -1,3 +1,4 @@
+//
 // Copyright 2023 Autodesk
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,11 +13,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+#ifndef FVP_SELECTION_FWD_H
+#define FVP_SELECTION_FWD_H
 
-#include "flowViewport/sceneIndex/fvpSelectionInterface.h"
+#include "flowViewport/flowViewport.h"
+
+#include <memory>
 
 namespace FVP_NS_DEF {
 
-SelectionInterface::~SelectionInterface() {}
+class Selection;
+
+using SelectionPtr      = std::shared_ptr<Selection>;
+using SelectionConstPtr = std::shared_ptr<const Selection>;
 
 }
+
+#endif

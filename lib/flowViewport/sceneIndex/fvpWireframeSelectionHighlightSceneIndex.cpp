@@ -15,6 +15,7 @@
 //
 
 #include "flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h"
+#include "flowViewport/selection/fvpSelection.h"
 
 #include "flowViewport/debugCodes.h"
 
@@ -50,9 +51,12 @@ const HdDataSourceLocator reprSelectorLocator(
 namespace FVP_NS_DEF {
 
 HdSceneIndexBaseRefPtr
-WireframeSelectionHighlightSceneIndex::New(HdSceneIndexBaseRefPtr const &inputSceneIndex)
+WireframeSelectionHighlightSceneIndex::New(
+    const HdSceneIndexBaseRefPtr& inputSceneIndex,
+    const SelectionConstPtr&      selection
+)
 {
-    return TfCreateRefPtr(new WireframeSelectionHighlightSceneIndex(inputSceneIndex));
+    return TfCreateRefPtr(new WireframeSelectionHighlightSceneIndex(inputSceneIndex, selection));
 }
 
 const HdDataSourceLocator& WireframeSelectionHighlightSceneIndex::ReprSelectorLocator()
@@ -61,8 +65,12 @@ const HdDataSourceLocator& WireframeSelectionHighlightSceneIndex::ReprSelectorLo
 }
 
 WireframeSelectionHighlightSceneIndex::
-WireframeSelectionHighlightSceneIndex(HdSceneIndexBaseRefPtr const &inputSceneIndex)
-  : PassThroughSelectionInterfaceSceneIndexBase(inputSceneIndex)
+WireframeSelectionHighlightSceneIndex(
+    const HdSceneIndexBaseRefPtr& inputSceneIndex,
+    const SelectionConstPtr&      selection
+)
+  : HdSingleInputFilteringSceneIndexBase(inputSceneIndex),
+    _selection(selection)
 {}
 
 HdSceneIndexPrim
@@ -80,12 +88,11 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
     // capsule primitive types) to meshes.
     if (!isExcluded(primPath) && prim.primType == HdPrimTypeTokens->mesh) {
         prim.dataSource = HdOverlayContainerDataSource::New(
-            { prim.dataSource, HasFullySelectedAncestorInclusive(primPath) ? 
+            { prim.dataSource, _selection->HasFullySelectedAncestorInclusive(primPath) ? 
                 sSelectedDisplayStyleDataSource : 
                 sUnselectedDisplayStyleDataSource });
     }
     return prim;
-
 }
 
 SdfPathVector

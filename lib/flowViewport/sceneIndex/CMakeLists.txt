@@ -4,22 +4,18 @@
 target_sources(${TARGET_NAME}
     PRIVATE
     fvpMergingSceneIndex.cpp
-    fvpPassThroughSelectionInterfaceSceneIndex.cpp
     fvpPathInterface.cpp
     fvpPathInterfaceSceneIndex.cpp
     fvpRenderIndexProxy.cpp
-    fvpSelectionInterface.cpp
     fvpSelectionSceneIndex.cpp
     fvpWireframeSelectionHighlightSceneIndex.cpp
 )
 
 set(HEADERS
     fvpMergingSceneIndex.h
-    fvpPassThroughSelectionInterfaceSceneIndex.h
     fvpPathInterface.h
     fvpPathInterfaceSceneIndex.h
     fvpRenderIndexProxy.h
-    fvpSelectionInterface.h
     fvpSelectionSceneIndex.h
     fvpWireframeSelectionHighlightSceneIndex.h
 )

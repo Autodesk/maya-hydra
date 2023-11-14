@@ -38,6 +38,7 @@
 
 #include "flowViewport/sceneIndex/fvpSelectionSceneIndex.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
+#include "flowViewport/selection/fvpSelection.h"
 
 #include "flowViewport/debugCodes.h"
 
@@ -56,53 +57,13 @@ const HdDataSourceLocatorSet selectionsSchemaDefaultLocator{HdSelectionsSchema::
 
 namespace FVP_NS_DEF {
 
-namespace SelectionSceneIndex_Impl
-{
-
-struct _PrimSelectionState
-{
-    // Container data sources conforming to HdSelectionSchema
-    std::vector<HdDataSourceBaseHandle> selectionSources;
-
-    HdDataSourceBaseHandle GetVectorDataSource() {
-        return HdSelectionsSchema::BuildRetained(
-            selectionSources.size(),
-            selectionSources.data());
-    }
-};
-
-struct _Selection
-{
-    bool IsSelected(const SdfPath& primPath) const
-    {
-        return pathToState.find(primPath) != pathToState.end();
-    }
-
-    bool HasSelectedAncestorInclusive(const SdfPath& primPath) const
-    {
-        // FLOW_VIEWPORT_TODO  Prefix tree would be much higher performance
-        // than iterating over the whole selection, especially for a large
-        // selection.  PPT, 13-Sep-2023.
-        for(const auto& entry : pathToState) {
-            if (primPath.HasPrefix(entry.first)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // Maps prim path to data sources to be returned by the vector data
-    // source at locator selections.
-    std::map<SdfPath, _PrimSelectionState> pathToState;
-};
-
 class _PrimSource : public HdContainerDataSource
 {
 public:
     HD_DECLARE_DATASOURCE(_PrimSource);
 
     _PrimSource(HdContainerDataSourceHandle const &inputSource,
-                _SelectionSharedPtr const selection,
+                const SelectionConstPtr& selection,
                 const SdfPath &primPath)
         : _inputSource(inputSource)
         , _selection(selection)
@@ -113,7 +74,7 @@ public:
     TfTokenVector GetNames() override
     {
         TfTokenVector names = _inputSource->GetNames();
-        if (_selection->IsSelected(_primPath)) {
+        if (_selection->IsFullySelected(_primPath)) {
             names.push_back(HdSelectionsSchemaTokens->selections);
         }
         return names;
@@ -122,9 +83,7 @@ public:
     HdDataSourceBaseHandle Get(const TfToken &name) override
     {
         if (name == HdSelectionsSchemaTokens->selections) {
-            auto it = _selection->pathToState.find(_primPath);
-            return (it != _selection->pathToState.end()) ?
-                it->second.GetVectorDataSource() : nullptr;
+            return _selection->GetVectorDataSource(_primPath);
         }
 
         return _inputSource->Get(name);
@@ -132,26 +91,28 @@ public:
 
 private:
     HdContainerDataSourceHandle const _inputSource;
-    _SelectionSharedPtr const _selection;
+    const SelectionConstPtr _selection;
     const SdfPath _primPath;
 };
 
-}
-
-using namespace SelectionSceneIndex_Impl;
-
 SelectionSceneIndexRefPtr
-SelectionSceneIndex::New(HdSceneIndexBaseRefPtr const &inputSceneIndex)
+SelectionSceneIndex::New(
+    const HdSceneIndexBaseRefPtr& inputSceneIndex,
+    const SelectionPtr&           selection
+)
 {
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::New() called.\n");
-    return TfCreateRefPtr(new SelectionSceneIndex(inputSceneIndex));
+    return TfCreateRefPtr(new SelectionSceneIndex(inputSceneIndex, selection));
 }
 
 SelectionSceneIndex::
-SelectionSceneIndex(HdSceneIndexBaseRefPtr const &inputSceneIndex)
+SelectionSceneIndex(
+    const HdSceneIndexBaseRefPtr& inputSceneIndex,
+    const SelectionPtr&           selection
+)
   : HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
-  , _selection(std::make_shared<_Selection>())
+  , _selection(selection)
   , _inputSceneIndexPathInterface(dynamic_cast<const PathInterface*>(&*_GetInputSceneIndex()))
 {
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
@@ -192,25 +153,16 @@ SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::AddSelection(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
 
-    HdSelectionSchema::Builder selectionBuilder;
-    selectionBuilder.SetFullySelected(
-        HdRetainedTypedSampledDataSource<bool>::New(true));
-
     // Call our input scene index to convert the application path to a scene
     // index path.
     auto sceneIndexPath = SceneIndexPath(appPath);
 
-    if (sceneIndexPath.IsEmpty()) {
-        return;
-    }
-
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("    Adding %s to the Hydra selection.\n", sceneIndexPath.GetText());
 
-    _selection->pathToState[sceneIndexPath].selectionSources.push_back(
-        selectionBuilder.Build());
-
-    _SendPrimsDirtied({{sceneIndexPath, selectionsSchemaDefaultLocator}});
+    if (_selection->Add(sceneIndexPath)) {
+        _SendPrimsDirtied({{sceneIndexPath, selectionsSchemaDefaultLocator}});
+    }
 }
 
 void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
@@ -219,18 +171,12 @@ void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
         .Msg("SelectionSceneIndex::RemoveSelection(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
 
     // Call our input scene index to convert the application path to a scene
-    // index path.  If there is no path, or the path is not selected, early out.
+    // index path.
     auto sceneIndexPath = SceneIndexPath(appPath);
 
-    if (sceneIndexPath.IsEmpty() ||
-        (_selection->pathToState.erase(sceneIndexPath) != 1)) {
-        return;
+    if (_selection->Remove(sceneIndexPath)) {
+        _SendPrimsDirtied({{sceneIndexPath, selectionsSchemaDefaultLocator}});
     }
-
-    HdSceneIndexObserver::DirtiedPrimEntries entry;
-    entry.emplace_back(sceneIndexPath, selectionsSchemaDefaultLocator);
-
-    _SendPrimsDirtied(entry);
 }
 
 void
@@ -239,17 +185,18 @@ SelectionSceneIndex::ClearSelection()
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::ClearSelection() called.\n");
 
-    if (_selection->pathToState.empty()) {
+    if (_selection->IsEmpty()) {
         return;
     }
 
     HdSceneIndexObserver::DirtiedPrimEntries entries;
-    entries.reserve(_selection->pathToState.size());
-    for (const auto &pathAndSelections : _selection->pathToState) {
-        entries.emplace_back(pathAndSelections.first, selectionsSchemaDefaultLocator);
+    auto paths = _selection->GetFullySelectedPaths();
+    entries.reserve(paths.size());
+    for (const auto& path : paths) {
+        entries.emplace_back(path, selectionsSchemaDefaultLocator);
     }
 
-    _selection->pathToState.clear();
+    _selection->Clear();
 
     _SendPrimsDirtied(entries);
 }
@@ -259,21 +206,20 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::ReplaceSelection() called.\n");
 
-    HdSelectionSchema::Builder selectionBuilder;
-    selectionBuilder.SetFullySelected(
-        HdRetainedTypedSampledDataSource<bool>::New(true));
-
     // Process the selection replace by performing dirty notification of the
     // existing selection state.  We could do this more efficiently by
     // accounting for overlapping previous and new selections.
     HdSceneIndexObserver::DirtiedPrimEntries entries;
-    entries.reserve(_selection->pathToState.size() + selection.size());
-    for (const auto &pathAndSelections : _selection->pathToState) {
-        entries.emplace_back(pathAndSelections.first, selectionsSchemaDefaultLocator);
+    auto paths = _selection->GetFullySelectedPaths();
+    entries.reserve(paths.size() + selection.size());
+    for (const auto& path : paths) {
+        entries.emplace_back(path, selectionsSchemaDefaultLocator);
     }
 
-    _selection->pathToState.clear();
+    _selection->Clear();
 
+    SdfPathVector sceneIndexSn;
+    sceneIndexSn.reserve(selection.size());
     for (const auto& snItem : selection) {
         // Call our input scene index to convert the application path to a scene
         // index path.
@@ -283,26 +229,24 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
             continue;
         }
 
+        sceneIndexSn.emplace_back(sceneIndexPath);
         TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
             .Msg("    Adding %s to the Hydra selection.\n", sceneIndexPath.GetText());
-
-        _selection->pathToState[sceneIndexPath].selectionSources.push_back(
-            selectionBuilder.Build());
-
         entries.emplace_back(sceneIndexPath, selectionsSchemaDefaultLocator);
     }
 
+    _selection->Replace(sceneIndexSn);
     _SendPrimsDirtied(entries);
 }
 
 bool SelectionSceneIndex::IsFullySelected(const SdfPath& primPath) const
 {
-    return _selection->IsSelected(primPath);
+    return _selection->IsFullySelected(primPath);
 }
 
 bool SelectionSceneIndex::HasFullySelectedAncestorInclusive(const SdfPath& primPath) const
 {
-    return _selection->HasSelectedAncestorInclusive(primPath);
+    return _selection->HasFullySelectedAncestorInclusive(primPath);
 }
 
 SdfPath SelectionSceneIndex::SceneIndexPath(const Ufe::Path& appPath) const
@@ -318,12 +262,7 @@ SdfPath SelectionSceneIndex::SceneIndexPath(const Ufe::Path& appPath) const
 
 SdfPathVector SelectionSceneIndex::GetFullySelectedPaths() const
 {
-    SdfPathVector fullySelectedPaths;
-    fullySelectedPaths.reserve(_selection->pathToState.size());
-    for(const auto& entry : _selection->pathToState) {
-        fullySelectedPaths.emplace_back(entry.first);
-    }
-    return fullySelectedPaths;
+    return _selection->GetFullySelectedPaths();
 }
 
 void
@@ -356,13 +295,9 @@ SelectionSceneIndex::_PrimsRemoved(
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::_PrimsRemoved() called.\n");
 
-    if (!_selection->pathToState.empty()) {
+    if (!_selection->IsEmpty()) {
         for (const auto &entry : entries) {
-            auto it = _selection->pathToState.lower_bound(entry.primPath);
-            while (it != _selection->pathToState.end() &&
-                   it->first.HasPrefix(entry.primPath)) {
-                it = _selection->pathToState.erase(it);
-            }
+            _selection->RemoveHierarchy(entry.primPath);
         }
     }
 
