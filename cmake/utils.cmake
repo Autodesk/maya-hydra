@@ -319,16 +319,16 @@ function(mayaHydra_compute_timestamp)
     string(TIMESTAMP WEEKDAY "%w")
     set(MH_WEEK_DAYS "Sun" "Mon" "Tue" "Wed" "Thu" "Fri" "Sat")
     list(GET MH_WEEK_DAYS ${WEEKDAY} WEEKDAY)
-    string(TIMESTAMP PRODUCT_DATE "\"${WEEKDAY} %m/%d/%Y, %Y%m%d%H%M\"")
+    string(TIMESTAMP BUILD_DATE "\"${WEEKDAY} %m/%d/%Y, %Y%m%d%H%M\"")
 
-    set(MH_PRODUCT_DATE "${PRODUCT_DATE}" CACHE STRING "Product Date")
+    set(MAYAHYDRA_BUILD_DATE "${BUILD_DATE}" CACHE STRING "Build Date")
 
-    # For non-Jenkins builds (i.e. developers), don't reset the timestamps
-    # unless a clean build is made. This is annoying as it causes all the
-    # version file to be regenerated and thus all libraries and executable to
-    # be relinked. Else, do force a new timestamp!!!
-    if (NOT PEPTIDE_JENKINS_BUILD EQUAL 0)
-        set(MH_PRODUCT_DATE "${PRODUCT_DATE}" CACHE STRING "Product Date" FORCE)
+    # For build pipeline builds, force a new timestamp.  For developer builds,
+    # resetting the timestamps is annoying as it causes all the version file to
+    # be regenerated and thus all libraries and executable to be relinked.
+    # Therefore, don't reset the timestamps unless a clean build is made.
+    if (NOT MAYAHYDRA_BUILD_NUMBER EQUAL 0)
+        set(MAYAHYDRA_BUILD_DATE "${BUILD_DATE}" CACHE STRING "Build Date" FORCE)
     endif()
 endfunction(mayaHydra_compute_timestamp)
 mayaHydra_compute_timestamp()
