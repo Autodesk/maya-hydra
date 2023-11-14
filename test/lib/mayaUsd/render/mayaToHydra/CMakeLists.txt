@@ -12,6 +12,7 @@ set(TEST_SCRIPT_FILES
     testSceneBrowser.py
     testStageAddPrim.py
     testNewSceneWithStage.py
+    testDirectionalLights.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py

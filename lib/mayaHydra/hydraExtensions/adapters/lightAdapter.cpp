@@ -190,7 +190,7 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
             GetGfMatrixFromMaya(GetDagPath().inclusiveMatrixInverse()));
 #else
         light.SetTransform(
-            GetGfMatrixFromMaya(GetDagPath().inclusiveMatrix()));
+            GetGfMatrixFromMaya(inclusiveMatrix));
 #endif
         _CalculateLightParams(light);
         return VtValue(light);
