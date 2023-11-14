@@ -82,103 +82,21 @@ provide the following services:
 ## Sample Code
 ### Selection Change
 
-The following selection change code shows the use of the *Path Interface*,
-through the *SceneIndexPath()* method, called on the input scene index.  The
-path interface allows the selection scene index to translate selected
-application paths to selected Hydra scene index paths.
-```
-void
-SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
-{
-    TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
-        .Msg("SelectionSceneIndex::AddSelection(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
-
-    HdSelectionSchema::Builder selectionBuilder;
-    selectionBuilder.SetFullySelected(
-        HdRetainedTypedSampledDataSource<bool>::New(true));
-
-    // Call our input scene index to convert the application path to a scene
-    // index path.
-    auto sceneIndexPath = _inputSceneIndexPathInterface->SceneIndexPath(appPath);
-
-    TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
-        .Msg("    Adding %s to the Hydra selection.\n", sceneIndexPath.GetText());
-
-    _selection->pathToState[sceneIndexPath].selectionSources.push_back(
-        selectionBuilder.Build());
-
-    _SendPrimsDirtied({{sceneIndexPath, locators}});
-}
-```
+This
+[selection change code](../lib/flowViewport/sceneIndex/fvpSelectionSceneIndex.cpp#L150-L167)
+shows the use of the *Path Interface*, through the *SceneIndexPath()* method,
+called on the input scene index.  The path interface allows the selection scene
+index to translate selected application paths to selected Hydra scene index
+paths.
 
 ### Wireframe Selection Highlighting
 
-The following wireframe selection highlighting code shows the use of the
-*Selection Interface*, through the *HasFullySelectedAncestorInclusive()*
-method, called on the input scene index.  The selection interface allows a
-selection highlighting filtering scene index to query selected prims.
-```
-bool WireframeSelectionHighlightSceneIndex::HasFullySelectedAncestorInclusive(const SdfPath& primPath) const
-{
-    return _inputSceneIndexSelectionInterface->HasFullySelectedAncestorInclusive(primPath);
-}
-
-HdSceneIndexPrim
-WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
-{
-    TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
-        .Msg("WireframeSelectionHighlightSceneIndex::GetPrim(%s) called.\n", primPath.GetText());
-
-    auto prim = _GetInputSceneIndex()->GetPrim(primPath);
-
-    // If this isn't one of our prims, we're not responsible for providing a
-    // selection highlight for it.
-    if (primPath.HasPrefix(_sceneRoot) && 
-        prim.primType == HdPrimTypeTokens->mesh) {
-        prim.dataSource = HdOverlayContainerDataSource::New(
-            { prim.dataSource, HasFullySelectedAncestorInclusive(primPath) ? 
-                sSelectedDisplayStyleDataSource : 
-                sUnselectedDisplayStyleDataSource });
-    }
-    return prim;
-
-}
-
-void
-WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
-    const HdSceneIndexBase &sender,
-    const HdSceneIndexObserver::DirtiedPrimEntries &entries)
-{
-    TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
-        .Msg("WireframeSelectionHighlightSceneIndex::_PrimsDirtied() called.\n");
-
-    HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
-    for (const auto& entry : entries) {
-        // If the dirtied prim isn't one of ours, we're not responsible for
-        // providing a selection highlight for it.
-        if (entry.primPath.HasPrefix(_sceneRoot) && 
-            entry.dirtyLocators.Contains(
-                HdSelectionsSchema::GetDefaultLocator())) {
-            TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
-                .Msg("    %s selections locator dirty.\n", entry.primPath.GetText());
-            // All mesh prims recursively under the selection dirty prim have a
-            // dirty wireframe selection highlight.
-            dirtySelectionHighlightRecursive(entry.primPath, &highlightEntries);
-        }
-    }
-
-    if (!highlightEntries.empty()) {
-        // Append all incoming dirty entries.
-        highlightEntries.reserve(highlightEntries.size()+entries.size());
-        highlightEntries.insert(
-            highlightEntries.end(), entries.begin(), entries.end());
-        _SendPrimsDirtied(highlightEntries);
-    }
-    else {
-        _SendPrimsDirtied(entries);
-    }
-}
-```
+This
+[wireframe selection highlighting code](../lib/flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.cpp#L76-L97)
+shows the use of the *Selection*, through the
+*HasFullySelectedAncestorInclusive()* method, called on the input selection.
+The selection allows a selection highlighting filtering scene index to query
+selected prims.
 
 ## Design Option Discussion
 
@@ -237,11 +155,11 @@ graph BT;
     ph1[Plugin highlighting 1]-->hm;
     subgraph ph[Plugin highlighting]
         ph2[Plugin highlighting 2]-->ph1;
-        ph1-. Selection .->ph2;
+        roSn[/Read-only Selection/]-.->ph1;
+        roSn-.->ph2;
     end
-    sn[Selection scene index]-->ph2;
-    ph2-. Selection .->sn;
-    fvpm[Flow Viewport merge]-->sn;
+    snSi[Selection scene index]-->ph2;
+    fvpm[Flow Viewport merge]-->snSi;
     subgraph pd[Plugin data]
         p1[Plugin 1];
         p2[Plugin 2];
@@ -249,7 +167,8 @@ graph BT;
     fvpm-. Path .->p1;
     p1-->fvpm;
     p2-->fvpm;
-    sn-. Path .->fvpm;
+    snSi-. Path .->fvpm;
+    sn[/Selection/]-.->snSi;
 ```
 The plugin data and plugin highlighting subtrees are where plugins add their
 scene indices.  The data scene index is required, and the highlighting scene
@@ -258,10 +177,13 @@ index is optional.
 ### Object Modeling
 
 The object modeling is the following:
+- **Selection**: builtin provided by the Flow Viewport library.
+    - Encapsulates the Hydra selection as scene index paths.
+    - Is shared by the selection scene index and all selection highlighting
+      scene indices.
 - **Selection scene index**: builtin provided by the Flow Viewport library.
-    - Owns and encapsulates the Hydra selection.
+    - Has a pointer to read and write the Hydra selection.
     - Translates the application selection to Hydra selection.
-    - Derives from and implements the selection interface.
 - **Flow Viewport merging scene index**: builtin provided by the Flow Viewport
   library.
     - Receives data from data provider plugin scene indices.
@@ -269,30 +191,27 @@ The object modeling is the following:
 - **Plugin data scene index**: provided by plugin.
     - Injects plugin data into Hydra
 - **Plugin selection highlighting scene index**: provided by plugin.
+    - Has a pointer to a read-only view of the Hydra selection.
     - Processes dirty selection notifications to dirty the appropriate prim(s)
       in plugin data, including hierarchical selection highlighting
     - Adds required geometry or data sources to implement selection
       highlighting
 
-### New Scene Index Mixin Interface Base Classes
+### New Scene Index Mixin Interface Base Class
 
-The Flow Viewport library has two new mixin interface classes:
+The Flow Viewport library has a new mixin interface class:
 
 - **Path Interface**: so that the builtin selection scene index can query
   plugins to translate selected object application paths to selected Hydra
   prim paths. The plugin provides the concrete implementation of this
   interface.
-- **Selection Interface**: so that the plugin selection highlighting scene
-  indices can query the selection scene index for selected object status.
-  Plugins provide a pass-through implementation, and the selection scene index
-  provides the implementation.
 
 ### Implementation Classes
 
 - **Wireframe selection highlighting scene index**: 
     - Uses Hydra HdRepr to add wireframe representation to selected objects
       *and their descendants*.
-    - Requires selected ancestor query from selection interface.
+    - Requires selected ancestor query from selection.
     - Dirties descendants on selection dirty.
 - **Render index proxy**:
     - Provides encapsulated access to the builtin Flow Viewport merging scene
@@ -307,7 +226,7 @@ classDiagram
 class HdSingleInputFilteringSceneIndexBase
 class HdMergingSceneIndex
 
-class SelectionInterface{
+class Selection{
 +IsFullySelected(SdfPath) bool
 +HasFullySelectedAncestorInclusive(SdfPath) bool
 }
@@ -327,18 +246,19 @@ class RenderIndexProxy{
 }
 
 HdSingleInputFilteringSceneIndexBase <|-- SelectionSceneIndex
-SelectionInterface                   <|-- SelectionSceneIndex
 
 HdMergingSceneIndex <|-- MergingSceneIndex
 PathInterface       <|-- MergingSceneIndex
 
 HdSingleInputFilteringSceneIndexBase <|-- WireframeSelectionHighlightSceneIndex
-SelectionInterface                   <|-- WireframeSelectionHighlightSceneIndex
 
 RenderIndexProxy *-- MergingSceneIndex : Owns
 
-WireframeSelectionHighlightSceneIndex ..> SelectionSceneIndex : Selected
 SelectionSceneIndex ..> MergingSceneIndex : Path
+
+SelectionSceneIndex o-- Selection : Read / Write
+
+WireframeSelectionHighlightSceneIndex o-- Selection : Read
 ```
 
 ## Algorithmic Complexity

@@ -3,13 +3,17 @@
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME}
     PRIVATE
-    fvpSelectionTracker.cpp
+    fvpSelection.cpp
+    fvpSelectionFwd.cpp
     fvpSelectionTask.cpp
+    fvpSelectionTracker.cpp
 )
 
 set(HEADERS
-    fvpSelectionTracker.h
+    fvpSelection.h
+    fvpSelectionFwd.h
     fvpSelectionTask.h
+    fvpSelectionTracker.h
 )
 
 # -----------------------------------------------------------------------------
