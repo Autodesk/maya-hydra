@@ -96,6 +96,10 @@ void RenderIndexProxy::RemoveSceneIndex(
     const HdSceneIndexBaseRefPtr &inputScene
 )
 {
+    if (nullptr == inputScene || nullptr == _mergingSceneIndex){
+        return;
+    }
+
     // Copy-pasted and adapted from USD 0.23.08
     // HdRenderIndex::RemoveSceneIndex() code, to preserve prefixing scene
     // index removal capability.  PPT, 1-Sep-2023.
