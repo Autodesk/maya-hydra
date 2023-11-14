@@ -26,7 +26,12 @@ For example, to run testVisibility on RelWithDebInfo :
 
 ### Running tests with MayaUSD
 
-Some tests require the MayaUSD plugin to be loaded in order to be run. If MayaUSD cannot be loaded, those tests will be skipped. In order for the test framework to find and load MayaUSD, you must specify the path to where MayaUSD is installed, using either the -DMAYAUSD_LOCATION CMake flag, or the --mayausd-location parameter for [build.py](../../../../../build.py). Note that the test framework will not find MayaUSD using the MAYA_MODULE_PATH environment variable.
+Some tests require the MayaUSD plugin to be loaded in order to be run. If MayaUSD cannot be loaded, those tests will be skipped. In order for the test framework to find and load MayaUSD, the `-DMAYAUSD_LOCATION` CMake flag must be set to your MayaUSD installation directory when building MayaHydra. For convenience, you can use the `--mayausd-location` parameter when using the [build.py](../../../../../build.py) script, which will set the CMake flag for you with the given argument. The specified path should point to the directory where your MayaUSD `.mod` file resides. Note that the test framework will not find MayaUSD using the MAYA_MODULE_PATH environment variable.
+
+For example, if your MayaUSD `.mod` file resides in `<some-path>/install/RelWithDebInfo`, you could call build.py as such :
+
+```build.py <some-args> --mayausd-location=<some-path>/install/RelWithDebInfo```
+
 
 # MayaHydra tests folder structure
 
