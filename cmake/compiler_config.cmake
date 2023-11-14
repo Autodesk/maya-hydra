@@ -90,7 +90,8 @@ function(mayaHydra_compile_config TARGET)
     if ((MAYA_APP_VERSION VERSION_GREATER_EQUAL 2019) OR (PXR_VERSION VERSION_GREATER_EQUAL 2005))
         target_compile_features(${TARGET} 
             PRIVATE
-                cxx_std_14
+                # USD updated to c++17 for USD v23.11
+                $<IF:$<VERSION_GREATER_EQUAL:${USD_VERSION},0.23.11>,cxx_std_17,cxx_std_14>
         )
     else()
         target_compile_features(${TARGET} 
@@ -107,6 +108,16 @@ function(mayaHydra_compile_config TARGET)
             target_compile_definitions(${TARGET}
                 PRIVATE
                     _GLIBCXX_USE_CXX11_ABI=$<IF:$<BOOL:${MAYA_LINUX_BUILT_WITH_CXX11_ABI}>,1,0>
+            )
+        endif()
+        if(USD_VERSION VERSION_GREATER_EQUAL "0.23.11")
+            # Parts of boost rely on deprecated features of STL that have been removed
+            # from some implementations under C++17 (which USD updated to for 23.11).
+            # This define tells boost not to use those features.
+            # With Visual Studio, boost automatically detects that this flag is needed.
+            target_compile_definitions(${TARGET}
+                PRIVATE
+                    BOOST_NO_CXX98_FUNCTION_BASE
             )
         endif()
     elseif(IS_MSVC)
