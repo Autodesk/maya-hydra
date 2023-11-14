@@ -796,31 +796,8 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     _engine.SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
 
     _mayaHydraSceneProducer->Populate();
-
-    HdSceneIndexBaseRefPtr lastSceneIndexOfTheChain = _renderIndexProxy->GetMergingSceneIndex();
-
-    //Get the latest scene index of the custom filtering scene indices chain and apply the selection scene index
-    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(lastSceneIndexOfTheChain);
-    _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
-
-    if (!_sceneIndexRegistry) {
-        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(*_renderIndexProxy));
-    }
-
-    lastSceneIndexOfTheChain = _selectionSceneIndex;
-    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(lastSceneIndexOfTheChain));
-    wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
-
-    // At time of writing, wireframe selection highlighting of Maya native data
-    // is done by Maya at render item creation time, so avoid double wireframe
-    // selection highlighting.
-    wfSi->addExcludedSceneRoot(_ID);
-
-     lastSceneIndexOfTheChain = wfSi;
-    _renderIndex->InsertSceneIndex(lastSceneIndexOfTheChain, SdfPath::AbsoluteRootPath());
-
-    // Set the initial selection onto the selection scene index.
-    _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+    
+    _CreateSceneIndicesChainAfterMergingSceneIndex();
 
     if (auto* renderDelegate = _GetRenderDelegate()) {
         // Pull in any options that may have changed due file-open.
@@ -882,6 +859,37 @@ void MtohRenderOverride::ClearHydraResources()
     _viewport = GfVec4d(0, 0, 0, 0);
     _initializationSucceeded = false;
     _initializationAttempted = false;
+}
+
+void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex()
+{
+    //This function is where happens the ordering of filtering scene indices that are after the merging scene index
+
+    HdSceneIndexBaseRefPtr lastSceneIndexOfTheChain = _renderIndexProxy->GetMergingSceneIndex();
+
+    //Get the latest scene index of the custom filtering scene indices chain and apply the selection scene index
+    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(lastSceneIndexOfTheChain);
+    _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
+
+    if (!_sceneIndexRegistry) {
+        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(*_renderIndexProxy));
+    }
+
+    lastSceneIndexOfTheChain = _selectionSceneIndex;
+    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(lastSceneIndexOfTheChain));
+    wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
+
+    // At time of writing, wireframe selection highlighting of Maya native data
+    // is done by Maya at render item creation time, so avoid double wireframe
+    // selection highlighting.
+    wfSi->addExcludedSceneRoot(_ID);
+
+     lastSceneIndexOfTheChain = wfSi;
+
+    _renderIndex->InsertSceneIndex(lastSceneIndexOfTheChain, SdfPath::AbsoluteRootPath());
+
+    // Set the initial selection onto the selection scene index.
+    _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
 }
 
 void MtohRenderOverride::_RemovePanel(MString panelName)

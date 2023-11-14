@@ -16,7 +16,7 @@
 #include "mayaHydraSceneBrowserTestCmd.h"
 
 #include <mayaHydraLib/hydraUtils.h>
-#include <mayaHydraLib/mayaHydraLibInterfaceImp.h>
+#include <mayaHydraLib/mayaHydraLibInterface.h>
 
 #include <maya/MArgList.h>
 #include <maya/MFnPlugin.h>

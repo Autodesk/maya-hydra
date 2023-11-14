@@ -135,16 +135,19 @@ HdRenderIndex* RenderIndexProxy::GetRenderIndex() const
     return _renderIndex;
 }
 
-void RenderIndexProxy::GetRendererDisplayName(std::string& outRendererName) const 
+std::string RenderIndexProxy::GetRendererDisplayName() const 
 {
+    static std::string empty;
+
     if (! _renderIndex){
-        return;
+        return empty;
     }
     auto rd = _renderIndex->GetRenderDelegate();
     if (! rd){
-        return;
+        return empty;
     }
-    outRendererName = rd->GetRendererDisplayName();
+    
+    return rd->GetRendererDisplayName();
 }
 
 }//end of namespace FVP_NS_DEF

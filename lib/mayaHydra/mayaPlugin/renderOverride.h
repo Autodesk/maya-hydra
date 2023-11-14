@@ -142,6 +142,7 @@ private:
     void              _DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext);
     HdRenderDelegate* _GetRenderDelegate();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
+    void              _CreateSceneIndicesChainAfterMergingSceneIndex();
 
     void _PickByRegion(
         HdxPickHitVector& outHits,

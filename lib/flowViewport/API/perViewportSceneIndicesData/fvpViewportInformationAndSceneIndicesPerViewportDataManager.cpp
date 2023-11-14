@@ -26,7 +26,7 @@
 
 namespace 
 {
-    static std::mutex _viewportInformationAndSceneIndicesPerViewportDataSet_mutex;
+    std::mutex _viewportInformationAndSceneIndicesPerViewportDataSet_mutex;
 }
 
 PXR_NAMESPACE_USING_DIRECTIVE

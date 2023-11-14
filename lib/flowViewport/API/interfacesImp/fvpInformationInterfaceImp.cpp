@@ -21,25 +21,24 @@
 #include <mutex>
 
 namespace{
-    static std::mutex _viewportInformationClient_mutex;
+    std::mutex _viewportInformationClient_mutex;
 }
     
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
-static InformationInterfaceImp theInterface;
-
 //Set of information clients
 static InformationClientSet _viewportInformationClients;
 
 InformationInterface& InformationInterface::Get() 
 { 
-    return theInterface;
+    return InformationInterfaceImp::Get();
 }
 
-InformationInterfaceImp& InformationInterfaceImp::Get(void)
+InformationInterfaceImp& InformationInterfaceImp::Get()
 {
+    static InformationInterfaceImp theInterface;
     return theInterface;
 }
 

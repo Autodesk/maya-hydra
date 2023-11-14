@@ -92,7 +92,7 @@ public:
     
     ///Get the render delegate display name
     FVP_API
-    void GetRendererDisplayName(std::string& outRendererName) const;
+    std::string GetRendererDisplayName() const;
 
 private:
 

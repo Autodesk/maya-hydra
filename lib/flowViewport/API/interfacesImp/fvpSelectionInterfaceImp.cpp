@@ -21,24 +21,23 @@
 #include <mutex>
 
 namespace{
-    static std::mutex _viewportSelectClient_mutex;
+    std::mutex _viewportSelectClient_mutex;
 }
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
-static SelectionInterfaceImp theInterface;
-
 SelectionClientSet _viewportSelectionClients;
 
 FlowSelectionInterface& FlowSelectionInterface::Get() 
 { 
-    return theInterface;
+    return SelectionInterfaceImp::Get();
 }
 
 SelectionInterfaceImp& SelectionInterfaceImp::Get()
 {
+    static SelectionInterfaceImp theInterface;
     return theInterface;
 }
 

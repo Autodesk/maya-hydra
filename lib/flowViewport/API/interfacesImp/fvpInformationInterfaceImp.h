@@ -24,11 +24,10 @@
 
 namespace FVP_NS_DEF {
 
-///Is a singleton, use InformationInterfaceImp& _getInformationInterfaceImp(void) below to get an instance of that interface
+///Is a singleton, use InformationInterfaceImp& InformationInterfaceImp::Get() to get an instance of that interface
 class InformationInterfaceImp :  public InformationInterface
 {
 public:
-    InformationInterfaceImp()             = default;
     virtual ~InformationInterfaceImp()    = default;
 
     ///Interface accessor
@@ -41,6 +40,9 @@ public:
    
     void SceneIndexAdded(const InformationInterface::ViewportInformation& _viewportInfo);
     void SceneIndexRemoved(const InformationInterface::ViewportInformation& viewportInfo);
+
+private:
+    InformationInterfaceImp()             = default;
 };
 
 } //End of namespace FVP_NS_DEF
