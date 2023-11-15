@@ -834,7 +834,6 @@ void MtohRenderOverride::ClearHydraResources()
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
-    _renderIndexProxy.reset();
     _mayaHydraSceneProducer.reset();
     _selectionSceneIndex.Reset();
     _selection.reset();
@@ -861,6 +860,9 @@ void MtohRenderOverride::ClearHydraResources()
     }
 
     _sceneIndexRegistry.reset();
+
+    //Delete the render index proxy which owns the merging scene index at the end of this function as some previous calls may likely use it to remove some scene indices
+    _renderIndexProxy.reset();
 
     _viewport = GfVec4d(0, 0, 0, 0);
     _initializationSucceeded = false;
