@@ -4,10 +4,10 @@ Selection highlighting changes the in-viewport appearance of selected objects
 or object components.
 
 In the following document we will refer to the software infrastructure that
-supports Hydra rendering in this repository as the Flow Viewport library (name
+supports Hydra rendering in this repository as the Flow Viewport Toolkit (name
 subject to change).
 
-This document will describe the state of Flow Viewport library selection
+This document will describe the state of Flow Viewport Toolkit selection
 highlighting as of 21-Sep-2023.
 
 ## Behavior
@@ -58,10 +58,10 @@ status of objects in the scene, e.g. wireframe or bounding box.
 special way, e.g. object contour, modified object color, or object overlay.
 
 The former approach is handled by having a plugin provide a selection
-highlighting filtering scene index to the Flow Viewport library, and is the
+highlighting filtering scene index to the Flow Viewport Toolkit, and is the
 topic of this document at time of writing (20-Sep-2023).  The
 latter is handled by having a plugin provide a selection highlighting 
-task to the Flow Viewport library, and is currently unimplemented.
+task to the Flow Viewport Toolkit, and is currently unimplemented.
 
 ## Added Geometry Plugin Software Architecture Requirements
 
@@ -126,7 +126,7 @@ The resulting prim selection data source is shown here:
 The resulting prim wireframe display style data source is shown here:
 ![Prim wireframe display style data source](hydraSelectionReprDisplayStyle.png)
 
-### Flow Viewport Library
+### Flow Viewport Toolkit
 
 The complete implementation of selection highlighting is done in a new library
 in the maya-hydra repository.  The library is called `flowViewport`, under the
@@ -177,11 +177,11 @@ index is optional.
 ### Object Modeling
 
 The object modeling is the following:
-- **Selection**: builtin provided by the Flow Viewport library.
+- **Selection**: builtin provided by the Flow Viewport Toolkit.
     - Encapsulates the Hydra selection as scene index paths.
     - Is shared by the selection scene index and all selection highlighting
       scene indices.
-- **Selection scene index**: builtin provided by the Flow Viewport library.
+- **Selection scene index**: builtin provided by the Flow Viewport Toolkit.
     - Has a pointer to read and write the Hydra selection.
     - Translates the application selection to Hydra selection.
 - **Flow Viewport merging scene index**: builtin provided by the Flow Viewport
@@ -199,7 +199,7 @@ The object modeling is the following:
 
 ### New Scene Index Mixin Interface Base Class
 
-The Flow Viewport library has a new mixin interface class:
+The Flow Viewport Toolkit has a new mixin interface class:
 
 - **Path Interface**: so that the builtin selection scene index can query
   plugins to translate selected object application paths to selected Hydra
