@@ -38,8 +38,8 @@ public:
     /// Manager accessor
     static ViewportInformationAndSceneIndicesPerViewportDataManager& Get();
  
-    ///A new Hydra viewport was created, this method takes the ownership of _viewportInfo which has been created on the heap and will be deleted by Flow Viewport
-    void AddViewportInformation(const InformationInterface::ViewportInformation* _viewportInfo, RenderIndexProxy& renderIndexProxy);
+    ///A new Hydra viewport was created
+    void AddViewportInformation(const InformationInterface::ViewportInformation& _viewportInfo, RenderIndexProxy& renderIndexProxy);
     
     ///An Hydra viewport was deleted
     void RemoveViewportInformation(const PXR_NS::HdSceneIndexBaseRefPtr& viewportSceneIndex);

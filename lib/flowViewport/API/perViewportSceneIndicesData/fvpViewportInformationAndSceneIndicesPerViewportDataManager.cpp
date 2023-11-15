@@ -39,30 +39,28 @@ ViewportInformationAndSceneIndicesPerViewportDataManager& ViewportInformationAnd
     return theViewportInformationAndSceneIndicesPerViewportDataManager;
 }
 
-//A new Hydra viewport was created, this method takes the ownership of viewportInfo
-void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInformation(const InformationInterface::ViewportInformation* viewportInfo, Fvp::RenderIndexProxy& renderIndexProxy)
+//A new Hydra viewport was created
+void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, Fvp::RenderIndexProxy& renderIndexProxy)
 {
-    TF_AXIOM(nullptr != viewportInfo);
-
     //Add it in our array if it is not already inside
     {
         std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
 
-        auto findResult = std::find_if(_viewportInformationAndSceneIndicesPerViewportDataSet.begin(), _viewportInformationAndSceneIndicesPerViewportDataSet.end(),
-                    [&viewportInfo](const ViewportInformationAndSceneIndicesPerViewportData* other) { 
-                        return &(other->GetViewportInformation()) == viewportInfo;
+        auto findResult = std::find_if(_viewportInformationAndSceneIndicesPerViewportDataSet.cbegin(), _viewportInformationAndSceneIndicesPerViewportDataSet.cend(),
+                    [&viewportInfo](const ViewportInformationAndSceneIndicesPerViewportData& other) { 
+                        return other.GetViewportInformation() == viewportInfo;
                     }
         );
-        if (findResult == _viewportInformationAndSceneIndicesPerViewportDataSet.end()){
-            const ViewportInformationAndSceneIndicesPerViewportData::CreationParameters creationParams(*viewportInfo, renderIndexProxy);
-            _viewportInformationAndSceneIndicesPerViewportDataSet.insert(new ViewportInformationAndSceneIndicesPerViewportData(creationParams));
+        if (findResult == _viewportInformationAndSceneIndicesPerViewportDataSet.cend()){
+            const ViewportInformationAndSceneIndicesPerViewportData::CreationParameters creationParams(viewportInfo, renderIndexProxy);
+            _viewportInformationAndSceneIndicesPerViewportDataSet.insert(ViewportInformationAndSceneIndicesPerViewportData(creationParams));
         }else{
             return; //It is already inside our array
         }
     }
 
     //Let the registered clients know a new viewport has been added
-    InformationInterfaceImp::Get().SceneIndexAdded(*viewportInfo);
+    InformationInterfaceImp::Get().SceneIndexAdded(viewportInfo);
 }
 
 void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveViewportInformation(const HdSceneIndexBaseRefPtr& viewportSceneIndex)
@@ -72,22 +70,21 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveViewportInf
         std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
     
         auto findResult = std::find_if(_viewportInformationAndSceneIndicesPerViewportDataSet.begin(), _viewportInformationAndSceneIndicesPerViewportDataSet.end(),
-                    [&viewportSceneIndex](const ViewportInformationAndSceneIndicesPerViewportData* other) { return other->GetViewportInformation()._viewportSceneIndex == viewportSceneIndex;});
+                    [&viewportSceneIndex](const ViewportInformationAndSceneIndicesPerViewportData& other) { return other.GetViewportInformation()._viewportSceneIndex == viewportSceneIndex;});
         if (findResult != _viewportInformationAndSceneIndicesPerViewportDataSet.end()){
 
-            const RenderIndexProxy* renderIndexProxy = & (*findResult)->GetRenderIndexProxy();//Get the pointer on the renderIndexProxy
+            InformationInterfaceImp::Get().SceneIndexRemoved(findResult->GetViewportInformation());
+
+            const RenderIndexProxy& renderIndexProxy = findResult->GetRenderIndexProxy();//Get the pointer on the renderIndexProxy
 
             //Destroy the custom filtering scene indices chain
-            if (renderIndexProxy){
-                //Following code is equivalent to calling FilteringSceneIndicesChainManager::GetManager().DestroyFilteringSceneIndicesChain(*renderIndexProxy);
-                //But we cannot do so because of the lock above.
-                auto renderIndex = renderIndexProxy->GetRenderIndex();
-                if (renderIndex && (*findResult)->GetLastFilteringSceneIndexOfTheChain()){
-                    renderIndex->RemoveSceneIndex((*findResult)->GetLastFilteringSceneIndexOfTheChain());//Remove the whole chain from the render index
-                }
+            //Following code is equivalent to calling FilteringSceneIndicesChainManager::GetManager().DestroyFilteringSceneIndicesChain(*renderIndexProxy);
+            //But we cannot do so because of the lock above.
+            auto renderIndex = renderIndexProxy.GetRenderIndex();
+            if (renderIndex && findResult->GetLastFilteringSceneIndexOfTheChain()){
+                renderIndex->RemoveSceneIndex(findResult->GetLastFilteringSceneIndexOfTheChain());//Remove the whole chain from the render index
             }
             
-            delete (*findResult); //delete the ViewportInformationAndSceneIndicesPerViewportData*
             _viewportInformationAndSceneIndicesPerViewportDataSet.erase(findResult);
         }
     }
@@ -99,9 +96,9 @@ ViewportInformationAndSceneIndicesPerViewportDataManager::GetViewportInformation
     std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
 
     auto findResult = std::find_if(_viewportInformationAndSceneIndicesPerViewportDataSet.cbegin(), _viewportInformationAndSceneIndicesPerViewportDataSet.cend(),
-                [&viewportSceneIndex](const ViewportInformationAndSceneIndicesPerViewportData* other) { return other->GetViewportInformation()._viewportSceneIndex == viewportSceneIndex;});
+                [&viewportSceneIndex](const ViewportInformationAndSceneIndicesPerViewportData& other) { return other.GetViewportInformation()._viewportSceneIndex == viewportSceneIndex;});
     if (findResult != _viewportInformationAndSceneIndicesPerViewportDataSet.cend()){
-        return &((*findResult)->GetViewportInformation());
+        return &(findResult->GetViewportInformation());
     }
 
     return nullptr;
@@ -113,9 +110,9 @@ ViewportInformationAndSceneIndicesPerViewportDataManager::GetViewportInformation
     std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
 
     auto findResult = std::find_if(_viewportInformationAndSceneIndicesPerViewportDataSet.cbegin(), _viewportInformationAndSceneIndicesPerViewportDataSet.cend(),
-                [&renderIndexProxy](const ViewportInformationAndSceneIndicesPerViewportData* other) { return &(other->GetRenderIndexProxy()) == &renderIndexProxy;});
+                [&renderIndexProxy](const ViewportInformationAndSceneIndicesPerViewportData& other) { return &(other.GetRenderIndexProxy()) == &renderIndexProxy;});
     if (findResult != _viewportInformationAndSceneIndicesPerViewportDataSet.cend()){
-        return (*findResult);
+        return &(*findResult);
     }
 
     return nullptr;
@@ -127,9 +124,9 @@ ViewportInformationAndSceneIndicesPerViewportDataManager::GetRenderIndexProxyFro
     std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
 
     auto findResult = std::find_if(_viewportInformationAndSceneIndicesPerViewportDataSet.cbegin(), _viewportInformationAndSceneIndicesPerViewportDataSet.cend(),
-                [&viewportSceneIndex](const ViewportInformationAndSceneIndicesPerViewportData* other) { return other->GetViewportInformation()._viewportSceneIndex == viewportSceneIndex;});
+                [&viewportSceneIndex](const ViewportInformationAndSceneIndicesPerViewportData& other) { return other.GetViewportInformation()._viewportSceneIndex == viewportSceneIndex;});
     if (findResult != _viewportInformationAndSceneIndicesPerViewportDataSet.cend()){
-        return &((*findResult)->GetRenderIndexProxy());
+        return &(findResult->GetRenderIndexProxy());
     }
 
     return nullptr;
@@ -141,9 +138,9 @@ const ViewportInformationAndSceneIndicesPerViewportData* ViewportInformationAndS
     std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
 
     auto findResult = std::find_if(_viewportInformationAndSceneIndicesPerViewportDataSet.cbegin(), _viewportInformationAndSceneIndicesPerViewportDataSet.cend(),
-                [&viewportSceneIndex](const ViewportInformationAndSceneIndicesPerViewportData* other) { return other->GetViewportInformation()._viewportSceneIndex == viewportSceneIndex;});
+                [&viewportSceneIndex](const ViewportInformationAndSceneIndicesPerViewportData& other) { return other.GetViewportInformation()._viewportSceneIndex == viewportSceneIndex;});
     if (findResult != _viewportInformationAndSceneIndicesPerViewportDataSet.cend()){
-        return (*findResult);
+        return &(*findResult);
     }
 
     return nullptr;

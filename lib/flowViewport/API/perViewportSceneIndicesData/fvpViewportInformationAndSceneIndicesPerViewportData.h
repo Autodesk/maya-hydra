@@ -41,7 +41,7 @@ public:
     };
 
     ViewportInformationAndSceneIndicesPerViewportData(const CreationParameters& creationParams);
-    virtual ~ViewportInformationAndSceneIndicesPerViewportData();
+    ~ViewportInformationAndSceneIndicesPerViewportData() = default;
     
     const InformationInterface::ViewportInformation& GetViewportInformation()const { return _viewportInformation;}
     const PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndexOfTheChain() const {return _lastFilteringSceneIndexOfTheChain;}
@@ -49,10 +49,14 @@ public:
     void SetInputSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) {_inputSceneIndex = inputSceneIndex;}
     const PXR_NS::HdSceneIndexBaseRefPtr&   GetInputSceneIndex() const {return _inputSceneIndex;}
     
+    //Needed by std::set
+    bool operator < (const ViewportInformationAndSceneIndicesPerViewportData& other)const{
+        return true; //don't care about ordering, is just for std::set.
+    }
 
 private:
-    ///Hydra viewport information, it is owned by this class
-    const InformationInterface::ViewportInformation&                        _viewportInformation;
+    ///Hydra viewport information
+    const InformationInterface::ViewportInformation                         _viewportInformation;
     
     ///Is the scene index we should use as an input for the custom filtering scene indices chain
     PXR_NS::HdSceneIndexBaseRefPtr                                          _inputSceneIndex {nullptr};
@@ -63,7 +67,7 @@ private:
     Fvp::RenderIndexProxy&                                                  _renderIndexProxy;
 };
 
-using ViewportInformationAndSceneIndicesPerViewportDataSet = std::set<ViewportInformationAndSceneIndicesPerViewportData*>;
+using ViewportInformationAndSceneIndicesPerViewportDataSet = std::set<ViewportInformationAndSceneIndicesPerViewportData>;
 
 } //End of namespace FVP_NS_DEF
 

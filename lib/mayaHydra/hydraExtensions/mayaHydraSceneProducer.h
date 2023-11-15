@@ -131,7 +131,7 @@ public:
     SdfPath GetPrimPath(const MDagPath& dg, bool isSprim);
 
     HdRenderIndex& GetRenderIndex();
-    FVP_NS::RenderIndexProxy&  GetRenderIndexProxy(){ return _renderIndexProxy;}
+    Fvp::RenderIndexProxy&  GetRenderIndexProxy(){ return _renderIndexProxy;}
 
     SdfPath GetLightedPrimsRootPath() const;
 

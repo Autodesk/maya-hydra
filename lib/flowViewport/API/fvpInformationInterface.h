@@ -60,6 +60,15 @@ namespace FVP_NS_DEF
 
             ///_rendererName is the Hydra viewport renderer name (example : "GL" for Storm or "Arnold" for the Arnold render delegate)
             const std::string _rendererName;
+
+            ///Comparison operator
+            bool operator ==(const ViewportInformation& other)const{
+                return  _viewportSceneIndex == other._viewportSceneIndex &&
+                        _cameraName == other._cameraName &&
+                        _viewportWidth == other._viewportWidth &&
+                        _viewportHeight == other._viewportHeight&&
+                        _rendererName == other._rendererName;
+            }
         };
 
         /**
@@ -80,9 +89,9 @@ namespace FVP_NS_DEF
         /**
         *  @brief      Get the Hydra viewports information. 
         *
-        *  @param[out] outHydraViewportInformationSet is a set of ViewportInformation to have information about each Hydra viewport in use in the current DCC.
+        *  @param[out] outHydraViewportInformationArray is a set of ViewportInformation to have information about each Hydra viewport in use in the current DCC.
         */
-        virtual void GetViewportsInformation(std::set<const ViewportInformation*>& outHydraViewportInformationSet)const  = 0;
+        virtual void GetViewportsInformation(std::set<const ViewportInformation*>& outHydraViewportInformationArray)const  = 0;
     };
     
     ///Set of InformationInterface::ViewportInformation

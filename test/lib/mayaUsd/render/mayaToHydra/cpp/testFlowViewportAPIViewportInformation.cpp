@@ -30,20 +30,20 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-//Subclass FVP_NS::InformationClient to register this class to receive callbacks.
-class InfoClientTest : public FVP_NS::InformationClient
+//Subclass Fvp::InformationClient to register this class to receive callbacks.
+class InfoClientTest : public Fvp::InformationClient
 {
 public:
     InfoClientTest() = default;
     ~InfoClientTest() override = default;
 
-    //From FVP_NS::InformationClient
-    void SceneIndexAdded(const FVP_NS::InformationInterface::ViewportInformation& viewportInformation)override
+    //From Fvp::InformationClient
+    void SceneIndexAdded(const Fvp::InformationInterface::ViewportInformation& viewportInformation)override
     {
         ++_numSceneIndexAdded;//We want to count the number of times this is called
     }
 
-    void SceneIndexRemoved(const FVP_NS::InformationInterface::ViewportInformation& viewportInformation)override
+    void SceneIndexRemoved(const Fvp::InformationInterface::ViewportInformation& viewportInformation)override
     {
         ++_numSceneIndexRemoved;//We want to count the number of times this is called
     }

@@ -54,11 +54,9 @@ MayaHydraSceneProducer::MayaHydraSceneProducer(
         _sceneIndex = MayaHydraSceneIndex::New(initData, lightEnabled);
         TF_VERIFY(_sceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
         
-        //Create an HydraViewportInformation instance
-        FVP_NS::InformationInterface::ViewportInformation* hydraViewportInformation = 
-            new FVP_NS::InformationInterface::ViewportInformation(_sceneIndex, initData.cameraName, initData.viewportWidth, initData.viewportHeight, initData.rendererName);
-        //This method takes the ownership of the hydraViewportInformation passed to it and will delete it
-        FVP_NS::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().AddViewportInformation(hydraViewportInformation, _renderIndexProxy);
+        //Create an HydraViewportInformation 
+        const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(_sceneIndex, initData.cameraName, initData.viewportWidth, initData.viewportHeight, initData.rendererName);
+        Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().AddViewportInformation(hydraViewportInformation, _renderIndexProxy);
     }
     else
     {
@@ -103,7 +101,7 @@ MayaHydraSceneProducer::~MayaHydraSceneProducer()
 {
     if (enableMayaNativeSceneIndex())
     {
-        FVP_NS::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveViewportInformation(_sceneIndex);
+        Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveViewportInformation(_sceneIndex);
         _renderIndexProxy.RemoveSceneIndex(_sceneIndex);
         _sceneIndex->RemoveCallbacksAndDeleteAdapters();//This should be called before calling _sceneIndex.Reset(); which will call the destructor if the ref count reaches 0
         _sceneIndex.Reset();

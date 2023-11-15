@@ -27,12 +27,5 @@ ViewportInformationAndSceneIndicesPerViewportData::ViewportInformationAndSceneIn
 {
 }
 
-ViewportInformationAndSceneIndicesPerViewportData::~ViewportInformationAndSceneIndicesPerViewportData()
-{
-    //The viewport info is own by this class
-    InformationInterfaceImp::Get().SceneIndexRemoved(_viewportInformation);
-    delete &_viewportInformation;
-}
-
 } //End of namespace FVP_NS_DEF {
 
