@@ -38,8 +38,8 @@ public:
     /// Manager accessor
     static ViewportInformationAndSceneIndicesPerViewportDataManager& Get();
  
-    ///A new Hydra viewport was created
-    void AddViewportInformation(const InformationInterface::ViewportInformation& _viewportInfo, RenderIndexProxy& renderIndexProxy);
+    ///A new Hydra viewport was created, this method takes the ownership of _viewportInfo which has been created on the heap and will be deleted by Flow Viewport
+    void AddViewportInformation(const InformationInterface::ViewportInformation* _viewportInfo, RenderIndexProxy& renderIndexProxy);
     
     ///An Hydra viewport was deleted
     void RemoveViewportInformation(const PXR_NS::HdSceneIndexBaseRefPtr& viewportSceneIndex);
@@ -48,15 +48,10 @@ public:
     const InformationInterface::ViewportInformation* 
     GetViewportInformationFromViewportSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& viewportSceneIndex) const;
 
-    RenderIndexProxy* GetRenderIndexProxyFromViewportSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& viewportSceneIndex) const;
+    const RenderIndexProxy* GetRenderIndexProxyFromViewportSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& viewportSceneIndex) const;
 
-    ViewportInformationAndSceneIndicesPerViewportDataSet&        GetViewportInformationAndSceneIndicesPerViewportDataSet() {return _viewportInformationAndSceneIndicesPerViewportDataSet;}
     const ViewportInformationAndSceneIndicesPerViewportDataSet&  GetViewportInformationAndSceneIndicesPerViewportDataSet() const {return _viewportInformationAndSceneIndicesPerViewportDataSet;}
-
-    ViewportInformationAndSceneIndicesPerViewportData*          GetViewportInformationAndSceneIndicesPerViewportDataFromViewportSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& viewportSceneIndex);
     const ViewportInformationAndSceneIndicesPerViewportData*    GetViewportInformationAndSceneIndicesPerViewportDataFromViewportSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& viewportSceneIndex) const;
-
-    ViewportInformationAndSceneIndicesPerViewportData*          GetViewportInformationAndSceneIndicesPerViewportDataFromRenderIndexProxy(const RenderIndexProxy& renderIndexProxy);
     const ViewportInformationAndSceneIndicesPerViewportData*    GetViewportInformationAndSceneIndicesPerViewportDataFromRenderIndexProxy(const RenderIndexProxy& renderIndexProxy) const;
 
 private:

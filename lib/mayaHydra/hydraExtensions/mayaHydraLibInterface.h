@@ -59,13 +59,6 @@ public:
      * @return A const reference to the vector of registered terminal scene indices.
      */
     virtual const SceneIndicesVector& GetTerminalSceneIndices() const = 0;
-
-    /**
-    *  @brief      Callback function called when a scene index was removed by our Hydra viewport plugin
-    *
-    *  @param[in]  sceneIndex is the new HdSceneIndexBaseRefPtr being removed by our Hydra viewport plugin.
-    */
-    virtual void SceneIndexRemoved(const HdSceneIndexBaseRefPtr& sceneIndex) = 0;
 };
 
 /// Access the MayaHydraLibInterface instance

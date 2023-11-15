@@ -758,9 +758,8 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 	if (drawContext.renderingDestination(panelName) == MFrameContext::k3dViewport) { 
         M3dView view;
 	    if (M3dView::getM3dViewFromModelPanel(panelName, view)){
-            M3dView *viewPtr = const_cast<M3dView*>( &view );
-	        MDagPath dpath;
-	        viewPtr->getCamera(dpath);
+            MDagPath dpath;
+	        view.getCamera(dpath);
 	        MFnCamera viewCamera(dpath);
 	        cameraName = viewCamera.name().asChar();
             drawContext.getRenderTargetSize(viewportWidth, viewportHeight);

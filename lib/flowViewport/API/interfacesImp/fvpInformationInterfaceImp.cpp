@@ -22,14 +22,15 @@
 
 namespace{
     std::mutex _viewportInformationClient_mutex;
+    
+    //Set of information clients
+    FVP_NS_DEF::InformationClientSet _viewportInformationClients;
 }
     
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
-//Set of information clients
-static InformationClientSet _viewportInformationClients;
 
 InformationInterface& InformationInterface::Get() 
 { 
@@ -84,14 +85,14 @@ void InformationInterfaceImp::SceneIndexRemoved(const InformationInterface::View
     }
 }
 
-void InformationInterfaceImp::GetViewportsInformation(std::set<const ViewportInformation*>& outHydraviewportInformationSet)const
+void InformationInterfaceImp::GetViewportsInformation(std::set<const ViewportInformation*>& outHydraViewportInformationSet)const
 {
-    outHydraviewportInformationSet.clear();
-    const ViewportInformationAndSceneIndicesPerViewportDataSet& viewportInformationAndSceneIndicesPerViewportDataVector = 
+    outHydraViewportInformationSet.clear();
+    const ViewportInformationAndSceneIndicesPerViewportDataSet& viewportInformationAndSceneIndicesPerViewportDataSet = 
         ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetViewportInformationAndSceneIndicesPerViewportDataSet();
-    for (const ViewportInformationAndSceneIndicesPerViewportData* viewportInformationAndSceneIndicesPerViewportData : viewportInformationAndSceneIndicesPerViewportDataVector){
+    for (const ViewportInformationAndSceneIndicesPerViewportData* viewportInformationAndSceneIndicesPerViewportData : viewportInformationAndSceneIndicesPerViewportDataSet){
         const InformationInterface::ViewportInformation& viewportInfo = viewportInformationAndSceneIndicesPerViewportData->GetViewportInformation();
-        outHydraviewportInformationSet.insert(&viewportInfo);
+        outHydraViewportInformationSet.insert(&viewportInfo);
     }
 }
 

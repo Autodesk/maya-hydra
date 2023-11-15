@@ -36,7 +36,6 @@ public:
     void                      UnregisterTerminalSceneIndex(const HdSceneIndexBaseRefPtr&) override;
     void                      ClearTerminalSceneIndices() override;
     const SceneIndicesVector& GetTerminalSceneIndices() const override;
-    void                      SceneIndexRemoved(const HdSceneIndexBaseRefPtr& _sceneIndex)override;
     
 private:
     SceneIndicesVector _sceneIndices;

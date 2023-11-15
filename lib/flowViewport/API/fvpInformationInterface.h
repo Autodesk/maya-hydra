@@ -47,7 +47,7 @@ namespace FVP_NS_DEF
                 : _viewportSceneIndex(viewportSceneIndex), _cameraName(cameraName), _viewportWidth(viewportWidth), _viewportHeight(viewportHeight), _rendererName(rendererName) {}
             
             ///_viewportSceneIndex is an Hydra viewport scene index
-            PXR_NS::HdSceneIndexBaseRefPtr _viewportSceneIndex;
+            const PXR_NS::HdSceneIndexBaseRefPtr _viewportSceneIndex;
 
             ///_cameraName is the name of the camera/viewport when the viewport was created, it is not updated if the camera's name has changed.
             const std::string _cameraName;

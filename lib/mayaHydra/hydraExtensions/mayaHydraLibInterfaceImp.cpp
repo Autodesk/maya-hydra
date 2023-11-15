@@ -53,13 +53,4 @@ const SceneIndicesVector& MayaHydraLibInterfaceImp::GetTerminalSceneIndices() co
     return _sceneIndices;
 }
 
-void MayaHydraLibInterfaceImp::SceneIndexRemoved(const HdSceneIndexBaseRefPtr& _sceneIndex)
-{
-    //Remove it from our internal array
-    auto foundResult = std::find(_sceneIndices.begin(), _sceneIndices.end(), _sceneIndex);
-    if(foundResult != _sceneIndices.end()){
-        _sceneIndices.erase(foundResult);
-    }
-}
-
 PXR_NAMESPACE_CLOSE_SCOPE

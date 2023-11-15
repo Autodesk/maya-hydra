@@ -20,7 +20,7 @@
 #include "flowViewport/api.h"
 
 #include <pxr/usd/sdf/path.h>
-#include <vector>
+#include <set>
 
 namespace FVP_NS_DEF 
 {

@@ -39,20 +39,22 @@ ViewportInformationAndSceneIndicesPerViewportDataManager& ViewportInformationAnd
     return theViewportInformationAndSceneIndicesPerViewportDataManager;
 }
 
-//A new Hydra viewport was created
-void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, Fvp::RenderIndexProxy& renderIndexProxy)
+//A new Hydra viewport was created, this method takes the ownership of viewportInfo
+void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInformation(const InformationInterface::ViewportInformation* viewportInfo, Fvp::RenderIndexProxy& renderIndexProxy)
 {
+    TF_AXIOM(nullptr != viewportInfo);
+
     //Add it in our array if it is not already inside
     {
         std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
 
         auto findResult = std::find_if(_viewportInformationAndSceneIndicesPerViewportDataSet.begin(), _viewportInformationAndSceneIndicesPerViewportDataSet.end(),
                     [&viewportInfo](const ViewportInformationAndSceneIndicesPerViewportData* other) { 
-                        return &(other->GetViewportInformation()) == &viewportInfo;
+                        return &(other->GetViewportInformation()) == viewportInfo;
                     }
         );
         if (findResult == _viewportInformationAndSceneIndicesPerViewportDataSet.end()){
-            const ViewportInformationAndSceneIndicesPerViewportData::CreationParameters creationParams(viewportInfo, renderIndexProxy);
+            const ViewportInformationAndSceneIndicesPerViewportData::CreationParameters creationParams(*viewportInfo, renderIndexProxy);
             _viewportInformationAndSceneIndicesPerViewportDataSet.insert(new ViewportInformationAndSceneIndicesPerViewportData(creationParams));
         }else{
             return; //It is already inside our array
@@ -60,7 +62,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInform
     }
 
     //Let the registered clients know a new viewport has been added
-    InformationInterfaceImp::Get().SceneIndexAdded(viewportInfo);
+    InformationInterfaceImp::Get().SceneIndexAdded(*viewportInfo);
 }
 
 void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveViewportInformation(const HdSceneIndexBaseRefPtr& viewportSceneIndex)
@@ -73,7 +75,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveViewportInf
                     [&viewportSceneIndex](const ViewportInformationAndSceneIndicesPerViewportData* other) { return other->GetViewportInformation()._viewportSceneIndex == viewportSceneIndex;});
         if (findResult != _viewportInformationAndSceneIndicesPerViewportDataSet.end()){
 
-            RenderIndexProxy* renderIndexProxy = & (*findResult)->GetRenderIndexProxy();//Get the pointer on the renderIndexProxy
+            const RenderIndexProxy* renderIndexProxy = & (*findResult)->GetRenderIndexProxy();//Get the pointer on the renderIndexProxy
 
             //Destroy the custom filtering scene indices chain
             if (renderIndexProxy){
@@ -105,20 +107,6 @@ ViewportInformationAndSceneIndicesPerViewportDataManager::GetViewportInformation
     return nullptr;
 }
 
-ViewportInformationAndSceneIndicesPerViewportData* 
-ViewportInformationAndSceneIndicesPerViewportDataManager::GetViewportInformationAndSceneIndicesPerViewportDataFromRenderIndexProxy(const RenderIndexProxy& renderIndexProxy)
-{
-    std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
-
-    auto findResult = std::find_if(_viewportInformationAndSceneIndicesPerViewportDataSet.cbegin(), _viewportInformationAndSceneIndicesPerViewportDataSet.cend(),
-                [&renderIndexProxy](const ViewportInformationAndSceneIndicesPerViewportData* other) { return &(other->GetRenderIndexProxy()) == &renderIndexProxy;});
-    if (findResult != _viewportInformationAndSceneIndicesPerViewportDataSet.cend()){
-        return (*findResult);
-    }
-
-    return nullptr;
-}
-
 const ViewportInformationAndSceneIndicesPerViewportData* 
 ViewportInformationAndSceneIndicesPerViewportDataManager::GetViewportInformationAndSceneIndicesPerViewportDataFromRenderIndexProxy(const RenderIndexProxy& renderIndexProxy) const
 {
@@ -133,7 +121,7 @@ ViewportInformationAndSceneIndicesPerViewportDataManager::GetViewportInformation
     return nullptr;
 }
 
-RenderIndexProxy* 
+const RenderIndexProxy* 
 ViewportInformationAndSceneIndicesPerViewportDataManager::GetRenderIndexProxyFromViewportSceneIndex(const HdSceneIndexBaseRefPtr& viewportSceneIndex) const
 {
     std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
@@ -142,21 +130,6 @@ ViewportInformationAndSceneIndicesPerViewportDataManager::GetRenderIndexProxyFro
                 [&viewportSceneIndex](const ViewportInformationAndSceneIndicesPerViewportData* other) { return other->GetViewportInformation()._viewportSceneIndex == viewportSceneIndex;});
     if (findResult != _viewportInformationAndSceneIndicesPerViewportDataSet.cend()){
         return &((*findResult)->GetRenderIndexProxy());
-    }
-
-    return nullptr;
-}
-
-ViewportInformationAndSceneIndicesPerViewportData* 
-ViewportInformationAndSceneIndicesPerViewportDataManager::GetViewportInformationAndSceneIndicesPerViewportDataFromViewportSceneIndex(
-                                                            const HdSceneIndexBaseRefPtr& viewportSceneIndex)
-{
-    std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
-
-    auto findResult = std::find_if(_viewportInformationAndSceneIndicesPerViewportDataSet.begin(), _viewportInformationAndSceneIndicesPerViewportDataSet.end(),
-                [&viewportSceneIndex](const ViewportInformationAndSceneIndicesPerViewportData* other) { return other->GetViewportInformation()._viewportSceneIndex == viewportSceneIndex;});
-    if (findResult != _viewportInformationAndSceneIndicesPerViewportDataSet.cend()){
-        return (*findResult);
     }
 
     return nullptr;

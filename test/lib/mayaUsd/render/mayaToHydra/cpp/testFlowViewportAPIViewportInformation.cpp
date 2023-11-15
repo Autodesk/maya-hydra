@@ -30,20 +30,20 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-//Subclass FVP_NS_DEF::InformationClient to register this class to receive callbacks.
-class InfoClientTest : public FVP_NS_DEF::InformationClient
+//Subclass FVP_NS::InformationClient to register this class to receive callbacks.
+class InfoClientTest : public FVP_NS::InformationClient
 {
 public:
     InfoClientTest() = default;
     ~InfoClientTest() override = default;
 
-    //From FVP_NS_DEF::InformationClient
-    void SceneIndexAdded(const FVP_NS_DEF::InformationInterface::ViewportInformation& viewportInformation)override
+    //From FVP_NS::InformationClient
+    void SceneIndexAdded(const FVP_NS::InformationInterface::ViewportInformation& viewportInformation)override
     {
         ++_numSceneIndexAdded;//We want to count the number of times this is called
     }
 
-    void SceneIndexRemoved(const FVP_NS_DEF::InformationInterface::ViewportInformation& viewportInformation)override
+    void SceneIndexRemoved(const FVP_NS::InformationInterface::ViewportInformation& viewportInformation)override
     {
         ++_numSceneIndexRemoved;//We want to count the number of times this is called
     }
@@ -57,12 +57,13 @@ protected:
 };
 
 
-//Is global instance
-static InfoClientTest _infoClientTest;
+namespace {
+    //Is global instance
+    InfoClientTest _infoClientTest;
 
-//Storm renderer name
-static const std::string _stormRendererName ("GL");
-
+    //Storm renderer name
+    const std::string _stormRendererName ("GL");
+}
 
 //The test is done through 3 Steps :
 

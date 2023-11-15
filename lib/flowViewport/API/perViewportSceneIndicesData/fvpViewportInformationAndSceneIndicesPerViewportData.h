@@ -44,15 +44,9 @@ public:
     virtual ~ViewportInformationAndSceneIndicesPerViewportData();
     
     const InformationInterface::ViewportInformation& GetViewportInformation()const { return _viewportInformation;}
-
-    PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndexOfTheChain() {return _lastFilteringSceneIndexOfTheChain ;}
     const PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndexOfTheChain() const {return _lastFilteringSceneIndexOfTheChain;}
-
-    RenderIndexProxy& GetRenderIndexProxy() {return _renderIndexProxy;}
     const RenderIndexProxy& GetRenderIndexProxy() const {return _renderIndexProxy;}
-
-    void                                    SetInputSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) {_inputSceneIndex = inputSceneIndex;}
-    PXR_NS::HdSceneIndexBaseRefPtr&         GetInputSceneIndex() {return _inputSceneIndex;}
+    void SetInputSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) {_inputSceneIndex = inputSceneIndex;}
     const PXR_NS::HdSceneIndexBaseRefPtr&   GetInputSceneIndex() const {return _inputSceneIndex;}
     
 
