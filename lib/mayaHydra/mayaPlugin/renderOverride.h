@@ -40,6 +40,7 @@
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
 #include <flowViewport/selection/fvpSelectionTracker.h>
+#include <flowViewport/selection/fvpSelectionFwd.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
@@ -222,6 +223,7 @@ private:
     HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
+    Fvp::SelectionPtr                         _selection;
     class SelectionObserver;
     using SelectionObserverPtr = std::shared_ptr<SelectionObserver>;
     SelectionObserverPtr                      _mayaSelectionObserver;

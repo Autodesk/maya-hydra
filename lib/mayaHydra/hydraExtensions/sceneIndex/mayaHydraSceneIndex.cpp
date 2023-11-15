@@ -54,6 +54,12 @@
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
+namespace
+{
+    static std::mutex _adaptersToRecreateMutex;
+    static std::mutex _adaptersToRebuildMutex;
+}
+
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
 // The following code currently lives inside the pxr namespace, but it would make more sense to 
@@ -781,37 +787,49 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
     // We don't need to rebuild something that's already being recreated.
     // Since we have a few elements, linear search over vectors is going to
     // be okay.
-    if (!_adaptersToRecreate.empty()) {
-        for (const auto& it : _adaptersToRecreate) {
-            RecreateAdapter(std::get<0>(it), std::get<1>(it));
-            for (auto itr = _adaptersToRebuild.begin(); itr != _adaptersToRebuild.end(); ++itr) {
-                if (std::get<0>(it) == std::get<0>(*itr)) {
-                    _adaptersToRebuild.erase(itr);
-                    break;
+    //Block for the lifetime of _adaptersToRecreateMutex and _adaptersToRebuildMutex
+    {
+        std::lock_guard<std::mutex> lockRecreate(_adaptersToRecreateMutex);
+        std::lock_guard<std::mutex> lockRebuild(_adaptersToRebuildMutex);
+
+        if (!_adaptersToRecreate.empty()) {
+            for (const auto& it : _adaptersToRecreate) {
+                RecreateAdapter(std::get<0>(it), std::get<1>(it));
+                
+                for (auto itr = _adaptersToRebuild.begin(); itr != _adaptersToRebuild.end(); ++itr) {
+                    if (std::get<0>(it) == std::get<0>(*itr)) {
+                        _adaptersToRebuild.erase(itr);
+                        break;
+                    }
                 }
             }
+            _adaptersToRecreate.clear();
         }
-        _adaptersToRecreate.clear();
     }
-    if (!_adaptersToRebuild.empty()) {
-        for (const auto& it : _adaptersToRebuild) {
-            _FindAdapter<MayaHydraAdapter>(
-                std::get<0>(it),
-                [&](MayaHydraAdapter* a) {
-                    if (std::get<1>(it) & MayaHydraSceneIndex::RebuildFlagCallbacks) {
-                        a->RemoveCallbacks();
-                        a->CreateCallbacks();
-                    }
-            if (std::get<1>(it) & MayaHydraSceneIndex::RebuildFlagPrim) {
-                a->RemovePrim();
-                a->Populate();
+    
+    //Block for the lifetime of _adaptersToRebuildMutex
+    {
+        std::lock_guard<std::mutex> lock(_adaptersToRebuildMutex);
+        if (!_adaptersToRebuild.empty()) {
+            for (const auto& it : _adaptersToRebuild) {
+                _FindAdapter<MayaHydraAdapter>(
+                    std::get<0>(it),
+                    [&](MayaHydraAdapter* a) {
+                        if (std::get<1>(it) & MayaHydraSceneIndex::RebuildFlagCallbacks) {
+                            a->RemoveCallbacks();
+                            a->CreateCallbacks();
+                        }
+                if (std::get<1>(it) & MayaHydraSceneIndex::RebuildFlagPrim) {
+                    a->RemovePrim();
+                    a->Populate();
+                }
+                    },
+                    _shapeAdapters,
+                        _lightAdapters,
+                        _materialAdapters);
             }
-                },
-                _shapeAdapters,
-                    _lightAdapters,
-                    _materialAdapters);
+            _adaptersToRebuild.clear();
         }
-        _adaptersToRebuild.clear();
     }
     if (!IsHdSt()) {
         return;
@@ -1088,6 +1106,8 @@ void MayaHydraSceneIndex::RemoveAdapter(const SdfPath& id)
 
 void MayaHydraSceneIndex::RecreateAdapterOnIdle(const SdfPath& id, const MObject& obj)
 {
+    std::lock_guard<std::mutex> lock(_adaptersToRecreateMutex);
+
     // We expect this to be a small number of objects, so using a simple linear
     // search and a vector is generally a good choice.
     for (auto& it : _adaptersToRecreate) {
@@ -1182,6 +1202,8 @@ SdfPath MayaHydraSceneIndex::GetLightedPrimsRootPath() const
 
 void MayaHydraSceneIndex::RebuildAdapterOnIdle(const SdfPath& id, uint32_t flags)
 {
+    std::lock_guard<std::mutex> lock(_adaptersToRebuildMutex);
+
     // We expect this to be a small number of objects, so using a simple linear
     // search and a vector is generally a good choice.
     for (auto& it : _adaptersToRebuild) {

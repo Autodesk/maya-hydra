@@ -268,31 +268,9 @@ if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MDefines.h")
     endif()
 endif()
 
-# Determine the Python version and switch between mayapy and mayapy2.
+# Find mayapy
 set(MAYAPY_EXE mayapy)
-set(MAYA_PY_VERSION 2)
-if(${MAYA_APP_VERSION} STRGREATER_EQUAL "2021")
-    set(MAYA_PY_VERSION 3)
-
-    # check to see if we have a mayapy2 executable
-    find_program(MAYA_PY_EXECUTABLE2
-            mayapy2
-        HINTS
-            "${MAYA_LOCATION}"
-            "$ENV{MAYA_LOCATION}"
-            "${MAYA_BASE_DIR}"
-        PATH_SUFFIXES
-            Maya.app/Contents/bin/
-            bin/
-        DOC
-            "Maya's Python executable path"
-    )
-    if(NOT BUILD_WITH_PYTHON_3 AND MAYA_PY_EXECUTABLE2)
-        set(MAYAPY_EXE mayapy2)
-        set(MAYA_PY_VERSION 2)
-    endif()
-endif()
-
+set(MAYA_PY_VERSION 3)
 find_program(MAYA_PY_EXECUTABLE
         ${MAYAPY_EXE}
     HINTS

@@ -32,6 +32,7 @@
 #include <mayaHydraLib/delegates/sceneDelegate.h>
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
+#include <mayaHydraLib/hydraUtils.h>
 
 #include <flowViewport/tokens.h>
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
@@ -39,11 +40,13 @@
 #include <flowViewport/debugCodes.h>
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/selection/fvpSelectionTask.h>
+#include <flowViewport/selection/fvpSelection.h>
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/type.h>
+#include <pxr/base/gf/vec3f.h>
 
 #include <ufe/hierarchy.h>
 #include <ufe/namedSelection.h>
@@ -436,10 +439,13 @@ void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContex
                 considerAllSceneLights);
 
             if (hasDirection && !hasPosition) {
+
                 // Note for devs : if you update more parameters in the default light, don't forget
-                // to update MtohDefaultLightDelegate::SetDefaultLight currently there are only 3 :
+                // to update MtohDefaultLightDelegate::SetDefaultLight and MayaHydraSceneIndex::SetDefaultLight, currently there are only 3 :
                 // position, diffuse, specular
-                _defaultLight.SetPosition({ -direction.x, -direction.y, -direction.z, 0.0f });
+                GfVec3f position;
+                GetDirectionalLightPositionFromDirectionVector(position, {direction.x, direction.y, direction.z});
+                _defaultLight.SetPosition({ position.data()[0], position.data()[1], position.data()[2], 0.0f });
                 _defaultLight.SetDiffuse(
                     { intensity * color.r, intensity * color.g, intensity * color.b, 1.0f });
                 _defaultLight.SetSpecular(
@@ -831,6 +837,7 @@ void MtohRenderOverride::ClearHydraResources()
     _renderIndexProxy.reset();
     _mayaHydraSceneProducer.reset();
     _selectionSceneIndex.Reset();
+    _selection.reset();
 
     // Cleanup internal context data that keep references to data that is now
     // invalid.
@@ -866,25 +873,24 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex()
 
     HdSceneIndexBaseRefPtr lastSceneIndexOfTheChain = _renderIndexProxy->GetMergingSceneIndex();
 
-    //Get the latest scene index of the custom filtering scene indices chain and apply the selection scene index
-    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(lastSceneIndexOfTheChain);
+    _selection = std::make_shared<Fvp::Selection>();
+    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(lastSceneIndexOfTheChain, _selection);
     _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
-
+    lastSceneIndexOfTheChain = _selectionSceneIndex;
+  
     if (!_sceneIndexRegistry) {
         _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(*_renderIndexProxy));
     }
 
-    lastSceneIndexOfTheChain = _selectionSceneIndex;
-    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(lastSceneIndexOfTheChain));
+    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_selectionSceneIndex, _selection));
     wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
-
+    
     // At time of writing, wireframe selection highlighting of Maya native data
     // is done by Maya at render item creation time, so avoid double wireframe
     // selection highlighting.
     wfSi->addExcludedSceneRoot(_ID);
-
-     lastSceneIndexOfTheChain = wfSi;
-
+    lastSceneIndexOfTheChain = wfSi;
+  
     _renderIndex->InsertSceneIndex(lastSceneIndexOfTheChain, SdfPath::AbsoluteRootPath());
 
     // Set the initial selection onto the selection scene index.
