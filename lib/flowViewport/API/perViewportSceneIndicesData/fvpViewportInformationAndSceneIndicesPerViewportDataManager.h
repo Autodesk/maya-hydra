@@ -52,7 +52,6 @@ public:
 
     const ViewportInformationAndSceneIndicesPerViewportDataSet&  GetViewportInformationAndSceneIndicesPerViewportDataSet() const {return _viewportInformationAndSceneIndicesPerViewportDataSet;}
     const ViewportInformationAndSceneIndicesPerViewportData*    GetViewportInformationAndSceneIndicesPerViewportDataFromViewportSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& viewportSceneIndex) const;
-    const ViewportInformationAndSceneIndicesPerViewportData*    GetViewportInformationAndSceneIndicesPerViewportDataFromRenderIndexProxy(const RenderIndexProxy& renderIndexProxy) const;
 
 private:
     ///Hydra viewport information

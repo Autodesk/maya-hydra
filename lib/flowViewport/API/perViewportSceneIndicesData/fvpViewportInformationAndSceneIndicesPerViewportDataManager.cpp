@@ -104,20 +104,6 @@ ViewportInformationAndSceneIndicesPerViewportDataManager::GetViewportInformation
     return nullptr;
 }
 
-const ViewportInformationAndSceneIndicesPerViewportData* 
-ViewportInformationAndSceneIndicesPerViewportDataManager::GetViewportInformationAndSceneIndicesPerViewportDataFromRenderIndexProxy(const RenderIndexProxy& renderIndexProxy) const
-{
-    std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
-
-    auto findResult = std::find_if(_viewportInformationAndSceneIndicesPerViewportDataSet.cbegin(), _viewportInformationAndSceneIndicesPerViewportDataSet.cend(),
-                [&renderIndexProxy](const ViewportInformationAndSceneIndicesPerViewportData& other) { return &(other.GetRenderIndexProxy()) == &renderIndexProxy;});
-    if (findResult != _viewportInformationAndSceneIndicesPerViewportDataSet.cend()){
-        return &(*findResult);
-    }
-
-    return nullptr;
-}
-
 const RenderIndexProxy* 
 ViewportInformationAndSceneIndicesPerViewportDataManager::GetRenderIndexProxyFromViewportSceneIndex(const HdSceneIndexBaseRefPtr& viewportSceneIndex) const
 {

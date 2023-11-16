@@ -88,9 +88,9 @@ void InformationInterfaceImp::SceneIndexRemoved(const InformationInterface::View
 void InformationInterfaceImp::GetViewportsInformation(std::set<const ViewportInformation*>& outHydraViewportInformationArray)const
 {
     outHydraViewportInformationArray.clear();
-    const ViewportInformationAndSceneIndicesPerViewportDataSet& viewportInformationAndSceneIndicesPerViewportDataArray = 
+    const ViewportInformationAndSceneIndicesPerViewportDataSet& allViewportInformationAndSceneIndicesPerViewportData = 
         ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetViewportInformationAndSceneIndicesPerViewportDataSet();
-    for (const ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData : viewportInformationAndSceneIndicesPerViewportDataArray){
+    for (const ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData : allViewportInformationAndSceneIndicesPerViewportData){
         const InformationInterface::ViewportInformation& viewportInfo = viewportInformationAndSceneIndicesPerViewportData.GetViewportInformation();
         outHydraViewportInformationArray.insert(&viewportInfo);
     }
