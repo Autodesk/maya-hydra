@@ -35,7 +35,7 @@ bool IsUfeLight(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
     }
     // The shape prim is used to display the light's wireframe and is the only prim we want to allow
     // for UFE lights
-    bool isShapePrim = primPath.GetElementString().find("ufeLightProxyShape") < std::string::npos;
+    bool isShapePrim = primPath.GetElementString().find("ufeLightProxy") < std::string::npos;
     return !isShapePrim;
 }
 
