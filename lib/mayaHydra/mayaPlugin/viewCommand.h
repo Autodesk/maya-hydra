@@ -1,5 +1,6 @@
 //
 // Copyright 2019 Luma Pictures
+// Copyright 2023 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,11 +17,11 @@
 #ifndef MTOH_CMD_H
 #define MTOH_CMD_H
 
-#include <pxr/pxr.h>
+#include <mayaHydraLib/mayaHydra.h>
 
 #include <maya/MPxCommand.h>
 
-PXR_NAMESPACE_OPEN_SCOPE
+namespace MAYAHYDRA_NS_DEF {
 
 class MtohViewCmd : public MPxCommand
 {
@@ -33,6 +34,6 @@ public:
     MStatus doIt(const MArgList& args) override;
 };
 
-PXR_NAMESPACE_CLOSE_SCOPE
+}
 
 #endif // MTOH_CMD_H
