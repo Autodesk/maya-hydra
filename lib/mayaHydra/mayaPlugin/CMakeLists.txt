@@ -61,12 +61,6 @@ if(DEFINED MAYAHYDRA_VERSION)
             MAYAHYDRA_VERSION=${MAYAHYDRA_VERSION}
     )
 endif()
-if(DEFINED MAYAHYDRA_CUT_ID)
-    target_compile_definitions(${TARGET_NAME}
-        PRIVATE
-            MAYAHYDRA_CUT_ID=${MAYAHYDRA_CUT_ID}
-    )
-endif()
 
 mayaHydra_compile_config(${TARGET_NAME})
 

@@ -47,20 +47,16 @@
 #error Maya API version 2024+ required
 #endif
 
-PXR_NAMESPACE_USING_DIRECTIVE
+using namespace MayaHydra;
 
 // Don't use smart pointers in the static vector: when Maya is doing its
 // default "quick exit" that does not uninitialize plugins, the atexit
 // destruction of the overrides in the vector will crash on destruction,
 // because Hydra has already destroyed structures these rely on.  Simply leak
 // the render overrides in this case.
-static std::vector<MtohRenderOverride*> gsRenderOverrides;
+static std::vector<PXR_NS::MtohRenderOverride*> gsRenderOverrides;
 
-#if defined(MAYAUSD_VERSION)
-#define STRINGIFY(x)   #x
-#define TOSTRING(x)    STRINGIFY(x)
-#define PLUGIN_VERSION TOSTRING(MAYAUSD_VERSION)
-#elif defined(MAYAHYDRA_VERSION)
+#if defined(MAYAHYDRA_VERSION)
 #define STRINGIFY(x)   #x
 #define TOSTRING(x)    STRINGIFY(x)
 #define PLUGIN_VERSION TOSTRING(MAYAHYDRA_VERSION)
@@ -101,7 +97,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     // Call one time registration of plugins compiled for same USD version as MayaUSD plugin.
     MayaUsd::registerVersionedPlugins();
 #endif
-    ret = MayaHydraAdapter::Initialize();
+    ret = PXR_NS::MayaHydraAdapter::Initialize();
     if (!ret) {
         return ret;
     }
@@ -126,7 +122,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
     if (auto* renderer = MHWRender::MRenderer::theRenderer()) {
         for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {
-            auto    mtohRenderer = std::make_unique<MtohRenderOverride>(desc);
+            auto    mtohRenderer = std::make_unique<PXR_NS::MtohRenderOverride>(desc);
             MStatus status = renderer->registerOverride(mtohRenderer.get());
             if (status == MS::kSuccess) {
                 gsRenderOverrides.push_back(mtohRenderer.release());

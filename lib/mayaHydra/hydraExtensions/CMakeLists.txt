@@ -11,6 +11,7 @@ target_sources(${TARGET_NAME}
         hydraUtils.cpp
         interfaceImp.cpp
         mayaUtils.cpp
+        mhBuildInfo.cpp
         mixedUtils.cpp
         mayaHydraSceneProducer.cpp
 )
@@ -89,12 +90,6 @@ if(DEFINED MAYAHYDRA_VERSION)
             MAYAHYDRA_VERSION=${MAYAHYDRA_VERSION}
     )
 endif()
-if(DEFINED MAYAHYDRA_CUT_ID)
-    target_compile_definitions(${TARGET_NAME}
-        PRIVATE
-            MAYAHYDRA_CUT_ID=${MAYAHYDRA_CUT_ID}
-    )
-endif()
 
     # -----------------------------------------------------------------------------
     # link libraries
@@ -144,6 +139,10 @@ endif()
 # -----------------------------------------------------------------------------
 set(SRCFILE ${CMAKE_CURRENT_SOURCE_DIR}/mayaHydra.h.src)
 set(DSTFILE ${CMAKE_BINARY_DIR}/include/mayaHydraLib/mayaHydra.h)
+configure_file(${SRCFILE} ${DSTFILE})
+
+set(SRCFILE ${CMAKE_CURRENT_SOURCE_DIR}/mhBuildInfo.h.src)
+set(DSTFILE ${CMAKE_BINARY_DIR}/include/mayaHydraLib/mhBuildInfo.h)
 configure_file(${SRCFILE} ${DSTFILE})
 
 mayaUsd_promoteHeaderList( 

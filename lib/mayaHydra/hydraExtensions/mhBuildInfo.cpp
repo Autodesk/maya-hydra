@@ -1,5 +1,4 @@
 //
-// Copyright 2019 Luma Pictures
 // Copyright 2023 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,26 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#ifndef MTOH_CMD_H
-#define MTOH_CMD_H
 
-#include <mayaHydraLib/mayaHydra.h>
-
-#include <maya/MPxCommand.h>
+#include <mayaHydraLib/mhBuildInfo.h>
 
 namespace MAYAHYDRA_NS_DEF {
 
-class MtohViewCmd : public MPxCommand
-{
-public:
-    static void*   creator() { return new MtohViewCmd(); }
-    static MSyntax createSyntax();
+int         MhBuildInfo::buildNumber() { return MAYAHYDRA_BUILD_NUMBER; }
+const char* MhBuildInfo::gitCommit()   { return MAYAHYDRA_GIT_COMMIT;   }
+const char* MhBuildInfo::gitBranch()   { return MAYAHYDRA_GIT_BRANCH;   }
+const char* MhBuildInfo::buildDate()   { return MAYAHYDRA_BUILD_DATE;   }
 
-    static const MString name;
-
-    MStatus doIt(const MArgList& args) override;
-};
-
-}
-
-#endif // MTOH_CMD_H
+} // namespace MAYAHYDRA_NS_DEF

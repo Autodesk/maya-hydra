@@ -32,6 +32,11 @@ option(CMAKE_WANT_MATERIALX_BUILD "Enable building with MaterialX (experimental)
 set(PXR_OVERRIDE_PLUGINPATH_NAME PXR_PLUGINPATH_NAME
     CACHE STRING "Name of env var USD searches to find plugins")
     
+# Build-related information, expected to be passed in by the parent build.
+set(MAYAHYDRA_BUILD_NUMBER 0 CACHE STRING "Build number.")
+set(MAYAHYDRA_GIT_COMMIT "Unknown_Git_commit" CACHE STRING "Build commit.")
+set(MAYAHYDRA_GIT_BRANCH "Unknown_Git_branch" CACHE STRING "Build branch.")
+
 #------------------------------------------------------------------------------
 # internal flags to control build
 #------------------------------------------------------------------------------
@@ -80,9 +85,6 @@ endif()
 
 include(cmake/mayahydra_version.info)
 set(MAYAHYDRA_VERSION "${MAYAHYDRA_MAJOR_VERSION}.${MAYAHYDRA_MINOR_VERSION}.${MAYAHYDRA_PATCH_LEVEL}")
-if(DEFINED ENV{PLUGIN_CUT_ID})
-    set(MAYAHYDRA_CUT_ID $ENV{PLUGIN_CUT_ID})
-endif()
 
 include(cmake/flowViewport_version.info)
 set(FLOWVIEWPORT_VERSION "${FLOWVIEWPORT_MAJOR_VERSION}.${FLOWVIEWPORT_MINOR_VERSION}.${FLOWVIEWPORT_PATCH_LEVEL}")
