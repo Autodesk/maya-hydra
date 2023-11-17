@@ -42,6 +42,7 @@
 #include <flowViewport/selection/fvpSelectionTask.h>
 #include <flowViewport/selection/fvpSelection.h>
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
+#include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -409,6 +410,14 @@ SdfPath MtohRenderOverride::RendererSceneDelegateId(TfToken rendererName, TfToke
     return SdfPath();
 }
 
+void MtohRenderOverride::_UpdateRenderIndexProxyIfRequired(const MHWRender::MDrawContext& drawContext)
+{
+    //Get model panel name
+    MString modelPanel;
+    drawContext.renderingDestination(modelPanel);
+    Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().UpdateRenderIndexProxy(modelPanel.asChar(), _renderIndexProxy.get());
+}
+
 void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext)
 {
     constexpr auto considerAllSceneLights = MHWRender::MDrawContext::kFilteredIgnoreLightLimit;
@@ -565,6 +574,8 @@ MStatus MtohRenderOverride::Render(
         // Initialization must have failed already, stop trying.
         return MStatus::kFailure;
     }
+
+    _UpdateRenderIndexProxyIfRequired(drawContext);
 
     _DetectMayaDefaultLighting(drawContext);
     if (_needsClear.exchange(false)) {
@@ -755,23 +766,6 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
         _taskController->SetRenderOutputs({ HdAovTokens->color });
     }
 
-    std::string cameraName;
-    int viewportWidth = 0;
-    int viewportHeight = 0;
-
-    //Get information from viewport to be used later
-    MString panelName;
-	if (drawContext.renderingDestination(panelName) == MFrameContext::k3dViewport) { 
-        M3dView view;
-	    if (M3dView::getM3dViewFromModelPanel(panelName, view)){
-            MDagPath dpath;
-	        view.getCamera(dpath);
-	        MFnCamera viewCamera(dpath);
-	        cameraName = viewCamera.name().asChar();
-            drawContext.getRenderTargetSize(viewportWidth, viewportHeight);
-        }
-    }
-
     MayaHydraDelegate::InitData delegateInitData(
         TfToken(),
         _engine,
@@ -779,11 +773,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
         _rendererPlugin,
         _taskController,
         SdfPath(),
-        _isUsingHdSt,
-        cameraName,
-        viewportWidth,
-        viewportHeight,
-        _renderDelegate->GetRendererDisplayName()
+        _isUsingHdSt
     );
 
     // Render index proxy sets up the Flow Viewport merging scene index, must
@@ -904,6 +894,7 @@ void MtohRenderOverride::_RemovePanel(MString panelName)
     auto foundPanelCallbacks = _FindPanelCallbacks(panelName);
     if (foundPanelCallbacks != _renderPanelCallbacks.end()) {
         MMessage::removeCallbacks(foundPanelCallbacks->second);
+        Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveViewportInformation(std::string(panelName.asChar()));
         _renderPanelCallbacks.erase(foundPanelCallbacks);
     }
 
@@ -1008,6 +999,21 @@ MStatus MtohRenderOverride::setup(const MString& destination)
         if (status) {
             newCallbacks.append(id);
         }
+
+        //Get information from viewport
+        std::string cameraName;
+        
+        M3dView view;
+	    if (M3dView::getM3dViewFromModelPanel(destination, view)){//destination is a panel name
+            MDagPath dpath;
+	        view.getCamera(dpath);
+	        MFnCamera viewCamera(dpath);
+	        cameraName = viewCamera.name().asChar();
+        }
+    
+        //Create an HydraViewportInformation 
+        const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(destination.asChar()), cameraName);
+        Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().AddViewportInformation(hydraViewportInformation);
 
         _renderPanelCallbacks.emplace_back(destination, newCallbacks);
     }

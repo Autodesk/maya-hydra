@@ -18,12 +18,13 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 from testUtils import PluginLoaded
+import maya.mel as mel
 
 class TestFlowViewportAPIViewportInformation(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    def test_AddPrimitives(self):
+    def test_RendererSwitching(self):
         with PluginLoaded('mayaHydraCppTests'):
             #Switch to Storm
             self.setHdStormRenderer()
@@ -37,6 +38,35 @@ class TestFlowViewportAPIViewportInformation(mtohUtils.MayaHydraBaseTestCase):
             self.setHdStormRenderer()
             cmds.refresh()
             cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationWithHydraAgain")
+            
+    def test_MultipleViewports(self):
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationMultipleViewportsInit")
+            #switch to 4 views
+            mel.eval('FourViewLayout')
+            #Set focus on persp view
+            cmds.setFocus ('modelPanel4') #Is the persp view
+            #Set Storm as the renderer
+            self.setHdStormRenderer()
+            
+            #Set focus on model Panel 2 (it's an orthographic view : right) 
+            cmds.setFocus ('modelPanel2')
+            #Set Storm as the renderer
+            self.setHdStormRenderer()
+            cmds.refresh()
+            cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationMultipleViewports2Viewports")
+            
+            #Set focus on persp view
+            cmds.setFocus ('modelPanel4') #Is the persp view
+            #Set VP2 as the renderer
+            self.setViewport2Renderer()
+            cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationMultipleViewports1Viewport")
+            
+            #Set focus on model Panel 2 (it's an orthographic view : right) 
+            cmds.setFocus ('modelPanel2')
+            #Set VP2 as the renderer
+            self.setViewport2Renderer()
+            cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationMultipleViewports0Viewport")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

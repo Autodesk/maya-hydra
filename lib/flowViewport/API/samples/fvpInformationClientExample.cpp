@@ -24,7 +24,7 @@ namespace FVP_NS_DEF {
 InformationClientExample::~InformationClientExample()
 { 
     if (_hydraInterface){
-        _hydraInterface->UnregisterInformationClient(*this);
+        _hydraInterface->UnregisterInformationClient(this);
     }
 }
 

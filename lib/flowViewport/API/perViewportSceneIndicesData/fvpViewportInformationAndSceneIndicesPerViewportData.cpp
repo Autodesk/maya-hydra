@@ -22,9 +22,17 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
-ViewportInformationAndSceneIndicesPerViewportData::ViewportInformationAndSceneIndicesPerViewportData(const CreationParameters& creationParams)
-    : _viewportInformation(creationParams._viewportInformation), _renderIndexProxy(creationParams._renderIndexProxy)
+ViewportInformationAndSceneIndicesPerViewportData::ViewportInformationAndSceneIndicesPerViewportData(const InformationInterface::ViewportInformation& viewportInformation)
+    : _viewportInformation(viewportInformation)
 {
+}
+
+void ViewportInformationAndSceneIndicesPerViewportData::SetRenderIndexProxy(RenderIndexProxy* renderIndexProxy) 
+{
+    _renderIndexProxy = renderIndexProxy;
+    if (_renderIndexProxy){
+        _viewportInformation._rendererName = _renderIndexProxy->GetRendererDisplayName();
+    }
 }
 
 } //End of namespace FVP_NS_DEF {

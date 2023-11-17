@@ -16,77 +16,40 @@
 
 //Local headers
 #include "testUtils.h"
-
-//maya hydra
-#include <mayaHydraLib/hydraUtils.h>
-#include <mayaHydraLib/mayaUtils.h>
-
-//Flow viewport headers
-#include <flowViewport/API/fvpInformationInterface.h>
-#include <flowViewport/API/samples/fvpInformationClientExample.h>
+#include "infoClientTest.h"
 
 //Google tests
 #include <gtest/gtest.h>
 
-PXR_NAMESPACE_USING_DIRECTIVE
-
-//Subclass Fvp::InformationClient to register this class to receive callbacks.
-class InfoClientTest : public Fvp::InformationClient
-{
-public:
-    InfoClientTest() = default;
-    ~InfoClientTest() override = default;
-
-    //From Fvp::InformationClient
-    void SceneIndexAdded(const Fvp::InformationInterface::ViewportInformation& viewportInformation)override
-    {
-        ++_numSceneIndexAdded;//We want to count the number of times this is called
-    }
-
-    void SceneIndexRemoved(const Fvp::InformationInterface::ViewportInformation& viewportInformation)override
-    {
-        ++_numSceneIndexRemoved;//We want to count the number of times this is called
-    }
-
-    int GetSceneIndexAdded() const  {return _numSceneIndexAdded;}
-    int GetSceneIndexRemoved() const{return _numSceneIndexRemoved;}
-
-protected:
-    int _numSceneIndexAdded     = 0; 
-    int _numSceneIndexRemoved   = 0;
-};
-
-
 namespace {
-    //Is global instance
+    //Is a global instance
     InfoClientTest _infoClientTest;
 
     //Storm renderer name
     const std::string _stormRendererName ("GL");
 }
 
-//The test is done through 3 Steps :
+//The test is done through 3 Steps in the python script testFlowViewportAPIViewportInformation.py, function test_RendererSwitching
 
 //Step 1) The python script sets Storm as the renderer for the viewport then call viewportInformationWithHydra
-//This is with Hydra, Storm should be the current renderer, check the python script with the same filename as this cpp file
+//This is with Hydra, Storm should be the current renderer
 TEST(FlowViewportAPI, viewportInformationWithHydra)
 {    
     //Get Information interface
     Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
     
     //Register our callbacks client
-    informationInterface.RegisterInformationClient(_infoClientTest);
+    informationInterface.RegisterInformationClient(&_infoClientTest);
     
     //Get all Hydra viewports information
-    Fvp::ViewportInformationSet viewportInformationSet;
-    informationInterface.GetViewportsInformation(viewportInformationSet);
-    ASSERT_EQ(viewportInformationSet.size(), (size_t)1);//We should have 1 hydra viewport
+    Fvp::InformationInterface::ViewportInformationSet allViewportInformation;
+    informationInterface.GetViewportsInformation(allViewportInformation);
+    ASSERT_EQ(allViewportInformation.size(), (size_t)1);//We should have 1 hydra viewport
 
     //Check renderer name
-    auto it = viewportInformationSet.cbegin();
-    ASSERT_NE(it, viewportInformationSet.cend());
-    auto viewportInfo = (*it);
-    ASSERT_EQ(viewportInfo->_rendererName, _stormRendererName);
+    auto it = allViewportInformation.cbegin();
+    ASSERT_NE(it, allViewportInformation.cend());
+    ASSERT_EQ(it->_rendererName, _stormRendererName);
 
     //Check initial count for _infoClientTest callbacks
     ASSERT_EQ(_infoClientTest.GetSceneIndexAdded(), 0);
@@ -104,9 +67,9 @@ TEST(FlowViewportAPI, viewportInformationWithoutHydra)
     Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
     
     //Get all Hydra viewports information
-    Fvp::ViewportInformationSet viewportInformationSet;
-    informationInterface.GetViewportsInformation(viewportInformationSet);
-    ASSERT_EQ(viewportInformationSet.size(), (size_t)0); //we should have no Hydra viewports
+    Fvp::InformationInterface::ViewportInformationSet allViewportInformation;
+    informationInterface.GetViewportsInformation(allViewportInformation);
+    ASSERT_EQ(allViewportInformation.size(), (size_t)0); //we should have no Hydra viewports
 
     //Only SceneIndexRemoved should have been called once
     ASSERT_EQ(_infoClientTest.GetSceneIndexAdded(), 0);
@@ -122,20 +85,19 @@ TEST(FlowViewportAPI, viewportInformationWithHydraAgain)
     Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
     
     //Get all Hydra viewports information
-    Fvp::ViewportInformationSet viewportInformationSet;
-    informationInterface.GetViewportsInformation(viewportInformationSet);
-    ASSERT_EQ(viewportInformationSet.size(), (size_t)1);//We should have 1 hydra viewport
+    Fvp::InformationInterface::ViewportInformationSet allViewportInformation;
+    informationInterface.GetViewportsInformation(allViewportInformation);
+    ASSERT_EQ(allViewportInformation.size(), (size_t)1);//We should have 1 hydra viewport
 
     //Check renderer name
-    auto it = viewportInformationSet.cbegin();
-    ASSERT_NE(it, viewportInformationSet.cend());
-    auto viewportInfo = (*it);
-    ASSERT_EQ(viewportInfo->_rendererName, _stormRendererName);
+    auto it = allViewportInformation.cbegin();
+    ASSERT_NE(it, allViewportInformation.cend());
+    ASSERT_EQ(it->_rendererName, _stormRendererName);
 
     //Both should have been called once only
     ASSERT_EQ(_infoClientTest.GetSceneIndexAdded(), 1);
     ASSERT_EQ(_infoClientTest.GetSceneIndexRemoved(), 1);
 
     //Unregister our callbacks client
-    informationInterface.UnregisterInformationClient(_infoClientTest);
+    informationInterface.UnregisterInformationClient(&_infoClientTest);
 }

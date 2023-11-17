@@ -43,59 +43,53 @@ namespace FVP_NS_DEF
         struct ViewportInformation
         {
             /// Constructor
-            ViewportInformation(const PXR_NS::HdSceneIndexBaseRefPtr& viewportSceneIndex, const std::string& cameraName, const size_t viewportWidth, const size_t viewportHeight, const std::string& rendererName)
-                : _viewportSceneIndex(viewportSceneIndex), _cameraName(cameraName), _viewportWidth(viewportWidth), _viewportHeight(viewportHeight), _rendererName(rendererName) {}
+            ViewportInformation(const std::string& viewportId, const std::string& cameraName)
+                : _viewportId(viewportId), _cameraName(cameraName) {}
             
-            ///_viewportSceneIndex is an Hydra viewport scene index
-            const PXR_NS::HdSceneIndexBaseRefPtr _viewportSceneIndex;
+            ///_viewportId is an Hydra viewport string identifier which is unique for all hydra viewports during a session
+            const std::string _viewportId;
 
             ///_cameraName is the name of the camera/viewport when the viewport was created, it is not updated if the camera's name has changed.
             const std::string _cameraName;
 
-            ///_viewportWidth is the viewport width when the viewport was created, it is not updated if the viewport's size has changed.
-            const int _viewportWidth = 0; 
-
-            ///_viewportHeight is the viewport height when the viewport was created, it is not updated if the viewport's size has changed.
-            const int _viewportHeight = 0; 
-
             ///_rendererName is the Hydra viewport renderer name (example : "GL" for Storm or "Arnold" for the Arnold render delegate)
-            const std::string _rendererName;
+            std::string _rendererName;
 
-            ///Comparison operator
             bool operator ==(const ViewportInformation& other)const{
-                return  _viewportSceneIndex == other._viewportSceneIndex &&
+                return  _viewportId == other._viewportId &&
                         _cameraName == other._cameraName &&
-                        _viewportWidth == other._viewportWidth &&
-                        _viewportHeight == other._viewportHeight&&
                         _rendererName == other._rendererName;
             }
+
+            bool operator <(const ViewportInformation& other) const{ //to be used in std::set
+                return  this < &other;
+            }
         };
+
+        ///Set of InformationInterface::ViewportInformation
+        typedef std::set<InformationInterface::ViewportInformation> ViewportInformationSet;
 
         /**
         *  @brief      Register a set of callbacks through an InformationClient instance
         *
         *  @param[in]  client is the InformationClient.
         */
-        virtual void RegisterInformationClient(const InformationClient& client) = 0;
+        virtual void RegisterInformationClient(InformationClient* client) = 0;
         
         /**
         *  @brief      Unregister an InformationClient instance
         *
         *  @param[in]  client is the InformationClient.
         */
-        virtual void UnregisterInformationClient(const InformationClient& client)= 0;
-
+        virtual void UnregisterInformationClient(InformationClient* client)= 0;
 
         /**
         *  @brief      Get the Hydra viewports information. 
         *
-        *  @param[out] outHydraViewportInformationArray is a set of ViewportInformation to have information about each Hydra viewport in use in the current DCC.
+        *  @param[out] outAllHydraViewportInformation is a set of ViewportInformation to have information about each Hydra viewport in use in the current DCC.
         */
-        virtual void GetViewportsInformation(std::set<const ViewportInformation*>& outHydraViewportInformationArray)const  = 0;
+        virtual void GetViewportsInformation(ViewportInformationSet& outAllHydraViewportInformation)const  = 0;
     };
-    
-    ///Set of InformationInterface::ViewportInformation
-    using ViewportInformationSet = std::set<const InformationInterface::ViewportInformation*>;
 
 }//end of namespace
 

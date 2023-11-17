@@ -19,6 +19,7 @@
 
 //Local headers
 #include "fvpViewportInformationAndSceneIndicesPerViewportData.h"
+#include "flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h"
 
 //Hydra headers
 #include <pxr/imaging/hd/sceneIndex.h>
@@ -39,23 +40,18 @@ public:
     static ViewportInformationAndSceneIndicesPerViewportDataManager& Get();
  
     ///A new Hydra viewport was created
-    void AddViewportInformation(const InformationInterface::ViewportInformation& _viewportInfo, RenderIndexProxy& renderIndexProxy);
+    void AddViewportInformation(const InformationInterface::ViewportInformation& _viewportInfo);
     
     ///An Hydra viewport was deleted
-    void RemoveViewportInformation(const PXR_NS::HdSceneIndexBaseRefPtr& viewportSceneIndex);
+    void RemoveViewportInformation(const std::string& modelPanel);
 
-    /// Retrieve the ViewportInformation from a Hydra viewport scene index
-    const InformationInterface::ViewportInformation* 
-    GetViewportInformationFromViewportSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& viewportSceneIndex) const;
+    const ViewportInformationAndSceneIndicesPerViewportDataSet&  GetViewportInfoAndSceneIndicesPerViewportData() const {return _viewportsInformationAndSceneIndicesPerViewportData;}
 
-    const RenderIndexProxy* GetRenderIndexProxyFromViewportSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& viewportSceneIndex) const;
-
-    const ViewportInformationAndSceneIndicesPerViewportDataSet&  GetViewportInformationAndSceneIndicesPerViewportDataSet() const {return _viewportInformationAndSceneIndicesPerViewportDataSet;}
-    const ViewportInformationAndSceneIndicesPerViewportData*    GetViewportInformationAndSceneIndicesPerViewportDataFromViewportSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& viewportSceneIndex) const;
+    void UpdateRenderIndexProxy(const std::string& modelPanel, RenderIndexProxy* renderIndexProxy);
 
 private:
     ///Hydra viewport information
-    ViewportInformationAndSceneIndicesPerViewportDataSet     _viewportInformationAndSceneIndicesPerViewportDataSet;
+    ViewportInformationAndSceneIndicesPerViewportDataSet     _viewportsInformationAndSceneIndicesPerViewportData;
     
     ViewportInformationAndSceneIndicesPerViewportDataManager() = default;
 };

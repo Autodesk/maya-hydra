@@ -60,10 +60,6 @@ public:
             HdxTaskController* taskControllerIn,
             const SdfPath&     delegateIDIn,
             bool               isHdStIn,
-            const std::string& cameraNameIn,
-            int                viewportWidthIn,
-            int                viewportHeightIn,
-            const std::string& rendererNameIn,//Is the Hydra renderer name
             MayaHydraSceneProducer* producerIn = nullptr)
             : name(nameIn)
             , engine(engineIn)
@@ -72,11 +68,7 @@ public:
             , taskController(taskControllerIn)
             , delegateID(delegateIDIn)
             , isHdSt(isHdStIn)
-            , producer(producerIn),
-            cameraName(cameraNameIn),
-            viewportWidth(viewportWidthIn),
-            viewportHeight(viewportHeightIn),
-            rendererName(rendererNameIn)
+            , producer(producerIn)
         {
         }
 

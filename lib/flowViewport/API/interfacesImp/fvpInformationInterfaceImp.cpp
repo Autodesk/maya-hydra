@@ -43,23 +43,23 @@ InformationInterfaceImp& InformationInterfaceImp::Get()
     return theInterface;
 }
 
-void InformationInterfaceImp::RegisterInformationClient(const InformationClient& client)
+void InformationInterfaceImp::RegisterInformationClient(InformationClient* client)
 {
+    TF_AXIOM(client);
+
     std::lock_guard<std::mutex> lock(_viewportInformationClient_mutex);
 
-    InformationClient* clientNonConst = const_cast<InformationClient*>(&client);
-    auto foundResult = _viewportInformationClients.find(clientNonConst);
+    auto foundResult = _viewportInformationClients.find(client);
     if (foundResult == _viewportInformationClients.cend()){
-        _viewportInformationClients.insert(clientNonConst);
+        _viewportInformationClients.insert(client);
     }
 }
 
-void InformationInterfaceImp::UnregisterInformationClient(const InformationClient& client)
+void InformationInterfaceImp::UnregisterInformationClient(InformationClient* client)
 {
     std::lock_guard<std::mutex> lock(_viewportInformationClient_mutex);
 
-    InformationClient* clientNonConst = const_cast<InformationClient*>(&client);
-    auto foundResult = _viewportInformationClients.find(clientNonConst);
+    auto foundResult = _viewportInformationClients.find(client);
     if (foundResult != _viewportInformationClients.end()){
         _viewportInformationClients.erase(foundResult);
     }
@@ -85,14 +85,14 @@ void InformationInterfaceImp::SceneIndexRemoved(const InformationInterface::View
     }
 }
 
-void InformationInterfaceImp::GetViewportsInformation(std::set<const ViewportInformation*>& outHydraViewportInformationArray)const
+void InformationInterfaceImp::GetViewportsInformation(ViewportInformationSet& outHydraViewportInformationArray)const
 {
     outHydraViewportInformationArray.clear();
     const ViewportInformationAndSceneIndicesPerViewportDataSet& allViewportInformationAndSceneIndicesPerViewportData = 
-        ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetViewportInformationAndSceneIndicesPerViewportDataSet();
+        ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetViewportInfoAndSceneIndicesPerViewportData();
     for (const ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData : allViewportInformationAndSceneIndicesPerViewportData){
         const InformationInterface::ViewportInformation& viewportInfo = viewportInformationAndSceneIndicesPerViewportData.GetViewportInformation();
-        outHydraViewportInformationArray.insert(&viewportInfo);
+        outHydraViewportInformationArray.insert(viewportInfo);
     }
 }
 
