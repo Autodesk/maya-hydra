@@ -415,7 +415,7 @@ void MtohRenderOverride::_UpdateRenderIndexProxyIfRequired(const MHWRender::MDra
     //Get model panel name
     MString modelPanel;
     drawContext.renderingDestination(modelPanel);
-    Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().UpdateRenderIndexProxy(modelPanel.asChar(), _renderIndexProxy.get());
+    Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().UpdateRenderIndexProxy(modelPanel.asChar(), _renderIndexProxy);
 }
 
 void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext)
@@ -783,9 +783,9 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     // - Maya scene producer, which needs the render index proxy to insert
     //   itself.
 
-    _renderIndexProxy = std::make_unique<Fvp::RenderIndexProxy>(_renderIndex);
+    _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(_renderIndex);
 
-    _mayaHydraSceneProducer.reset(new MayaHydraSceneProducer(*_renderIndexProxy, _ID, delegateInitData, !_hasDefaultLighting));
+    _mayaHydraSceneProducer.reset(new MayaHydraSceneProducer(_renderIndexProxy, _ID, delegateInitData, !_hasDefaultLighting));
 
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
     _engine.SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
@@ -851,7 +851,7 @@ void MtohRenderOverride::ClearHydraResources()
 
     _sceneIndexRegistry.reset();
 
-    //Delete the render index proxy which owns the merging scene index at the end of this function as some previous calls may likely use it to remove some scene indices
+    //Decrease ref count on the render index proxy which owns the merging scene index at the end of this function as some previous calls may likely use it to remove some scene indices
     _renderIndexProxy.reset();
 
     _viewport = GfVec4d(0, 0, 0, 0);
@@ -862,6 +862,7 @@ void MtohRenderOverride::ClearHydraResources()
 void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex()
 {
     //This function is where happens the ordering of filtering scene indices that are after the merging scene index
+    TF_AXIOM(_renderIndexProxy);
 
     HdSceneIndexBaseRefPtr lastSceneIndexOfTheChain = _renderIndexProxy->GetMergingSceneIndex();
 
@@ -871,7 +872,7 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex()
     lastSceneIndexOfTheChain = _selectionSceneIndex;
   
     if (!_sceneIndexRegistry) {
-        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(*_renderIndexProxy));
+        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy));
     }
 
     auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_selectionSceneIndex, _selection));

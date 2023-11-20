@@ -36,8 +36,8 @@ public:
     
     const InformationInterface::ViewportInformation& GetViewportInformation()const { return _viewportInformation;}
     const PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndexOfTheChain() const {return _lastFilteringSceneIndexOfTheChain;}
-    void SetRenderIndexProxy(RenderIndexProxy* renderIndexProxy);
-    const RenderIndexProxy* GetRenderIndexProxy() const {return _renderIndexProxy;}
+    void SetRenderIndexProxy(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy);
+    const std::shared_ptr<Fvp::RenderIndexProxy> GetRenderIndexProxy() const {return _renderIndexProxy;}
     void SetInputSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) {_inputSceneIndex = inputSceneIndex;}
     const PXR_NS::HdSceneIndexBaseRefPtr&   GetInputSceneIndex() const {return _inputSceneIndex;}
     
@@ -57,7 +57,7 @@ private:
     PXR_NS::HdSceneIndexBaseRefPtr                                          _lastFilteringSceneIndexOfTheChain {nullptr};
     
     ///Is a render index proxy per viewport to avoid accessing directly the render index
-    Fvp::RenderIndexProxy*                                                  _renderIndexProxy {nullptr};
+    std::shared_ptr<Fvp::RenderIndexProxy>                                 _renderIndexProxy {nullptr};
 };
 
 using ViewportInformationAndSceneIndicesPerViewportDataSet = std::set<ViewportInformationAndSceneIndicesPerViewportData>;

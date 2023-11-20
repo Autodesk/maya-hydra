@@ -170,7 +170,7 @@ public:
 
     MayaHydraSceneProducer* GetProducer() { return _producer; };
 
-    Fvp::RenderIndexProxy& GetRenderIndexProxy();
+    const std::shared_ptr<Fvp::RenderIndexProxy> GetRenderIndexProxy();
 
     SdfPath SceneIndexPath(const Ufe::Path& appPath) const override;
    

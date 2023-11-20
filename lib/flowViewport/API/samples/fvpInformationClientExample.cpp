@@ -23,9 +23,6 @@ namespace FVP_NS_DEF {
 
 InformationClientExample::~InformationClientExample()
 { 
-    if (_hydraInterface){
-        _hydraInterface->UnregisterInformationClient(this);
-    }
 }
 
 //Callback to be able to act when an hydra viewport scene index was added, typical use case is an hydra viewport was created.

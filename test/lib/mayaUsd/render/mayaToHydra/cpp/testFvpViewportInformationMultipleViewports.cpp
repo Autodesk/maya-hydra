@@ -23,7 +23,7 @@
 
 namespace {
     //Is a global instance
-    InfoClientTest _infoClientTest;
+    std::shared_ptr<InfoClientTest> _infoClientTest;
 
     //Storm renderer name
     const std::string _stormRendererName ("GL");
@@ -38,7 +38,8 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewportsInit)
     Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
     
     //Register our callbacks client
-    informationInterface.RegisterInformationClient(&_infoClientTest);
+    _infoClientTest = std::make_shared<InfoClientTest>();
+    informationInterface.RegisterInformationClient(_infoClientTest);
     
     //Get all Hydra viewports information
     Fvp::InformationInterface::ViewportInformationSet allViewportsInformation;
@@ -46,8 +47,8 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewportsInit)
     ASSERT_EQ(allViewportsInformation.size(), (size_t)0);//We should have 0 hydra viewport
 
     //Check initial count for _infoClientTest callbacks
-    ASSERT_EQ(_infoClientTest.GetSceneIndexAdded(), 0);
-    ASSERT_EQ(_infoClientTest.GetSceneIndexRemoved(), 0);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 0);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 0);
 
     //We don't call UnregisterInformationClient on purpose as we want to check if the callbacks are called and will unregister it in the code below
 }
@@ -70,8 +71,8 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports2Viewports)
         ASSERT_EQ(info._rendererName, _stormRendererName);
     }
 
-    ASSERT_EQ(_infoClientTest.GetSceneIndexAdded(), 2);//Has been called twice
-    ASSERT_EQ(_infoClientTest.GetSceneIndexRemoved(), 0);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 2);//Has been called twice
+    ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 0);
 }
 
 //Step 3 : the python script removed hydra from 1 of the 2 viewports
@@ -93,8 +94,8 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports1Viewport)
     }
 
     //Both should have been called once only
-    ASSERT_EQ(_infoClientTest.GetSceneIndexAdded(), 2);
-    ASSERT_EQ(_infoClientTest.GetSceneIndexRemoved(), 1);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 2);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 1);
 }
 
 //Step 4 : the python script removed hydra from the last viewport where hydra was
@@ -111,9 +112,9 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports0Viewport)
     ASSERT_EQ(allViewportsInformation.size(), (size_t)0);//We should not have any hydra viewport
 
    ///Both should have been called once only
-    ASSERT_EQ(_infoClientTest.GetSceneIndexAdded(), 2);
-    ASSERT_EQ(_infoClientTest.GetSceneIndexRemoved(), 2);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 2);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 2);
 
     //Unregister our callbacks client
-    informationInterface.UnregisterInformationClient(&_infoClientTest);
+    informationInterface.UnregisterInformationClient(_infoClientTest);
 }

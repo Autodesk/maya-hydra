@@ -82,7 +82,7 @@ public:
 
     static constexpr Ufe::Rtid kInvalidUfeRtid = 0;
     MAYAHYDRALIB_API
-    MayaHydraSceneIndexRegistry(Fvp::RenderIndexProxy& renderIndexProxy);
+    MayaHydraSceneIndexRegistry(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy);
 
     MAYAHYDRALIB_API
     ~MayaHydraSceneIndexRegistry();
@@ -100,7 +100,7 @@ private:
     bool        _RemoveSceneIndexForNode(const MObject& dagNode);
     static void _SceneIndexNodeAddedCallback(MObject& obj, void* clientData);
     static void _SceneIndexNodeRemovedCallback(MObject& obj, void* clientData);
-    Fvp::RenderIndexProxy& _renderIndexProxy;
+    const std::shared_ptr<Fvp::RenderIndexProxy> _renderIndexProxy;
 
     MCallbackIdArray _sceneIndexDagNodeMessageCallbacks;
 

@@ -76,7 +76,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveViewportInf
 
             InformationInterfaceImp::Get().SceneIndexRemoved(findResult->GetViewportInformation());
 
-            const RenderIndexProxy* renderIndexProxy = findResult->GetRenderIndexProxy();//Get the pointer on the renderIndexProxy
+            const std::shared_ptr<Fvp::RenderIndexProxy> renderIndexProxy = findResult->GetRenderIndexProxy();//Get the pointer on the renderIndexProxy
 
             if(renderIndexProxy){
                 //Destroy the custom filtering scene indices chain
@@ -93,7 +93,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveViewportInf
     }
 }
 
-void ViewportInformationAndSceneIndicesPerViewportDataManager::UpdateRenderIndexProxy(const std::string& modelPanel, RenderIndexProxy* renderIndexProxy)
+void ViewportInformationAndSceneIndicesPerViewportDataManager::UpdateRenderIndexProxy(const std::string& modelPanel, const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy)
 {
     if (! renderIndexProxy){
         return;

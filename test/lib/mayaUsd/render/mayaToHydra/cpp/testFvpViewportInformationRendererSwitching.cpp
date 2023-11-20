@@ -23,7 +23,7 @@
 
 namespace {
     //Is a global instance
-    InfoClientTest _infoClientTest;
+    std::shared_ptr<InfoClientTest> _infoClientTest;
 
     //Storm renderer name
     const std::string _stormRendererName ("GL");
@@ -39,7 +39,8 @@ TEST(FlowViewportAPI, viewportInformationWithHydra)
     Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
     
     //Register our callbacks client
-    informationInterface.RegisterInformationClient(&_infoClientTest);
+    _infoClientTest = std::make_shared<InfoClientTest>();
+    informationInterface.RegisterInformationClient(_infoClientTest);
     
     //Get all Hydra viewports information
     Fvp::InformationInterface::ViewportInformationSet allViewportInformation;
@@ -52,8 +53,8 @@ TEST(FlowViewportAPI, viewportInformationWithHydra)
     ASSERT_EQ(it->_rendererName, _stormRendererName);
 
     //Check initial count for _infoClientTest callbacks
-    ASSERT_EQ(_infoClientTest.GetSceneIndexAdded(), 0);
-    ASSERT_EQ(_infoClientTest.GetSceneIndexRemoved(), 0);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 0);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 0);
 
     //We don't call UnregisterInformationClient on purpose as we want to check if the callbacks are called and will unregister it in the code below
 }
@@ -72,8 +73,8 @@ TEST(FlowViewportAPI, viewportInformationWithoutHydra)
     ASSERT_EQ(allViewportInformation.size(), (size_t)0); //we should have no Hydra viewports
 
     //Only SceneIndexRemoved should have been called once
-    ASSERT_EQ(_infoClientTest.GetSceneIndexAdded(), 0);
-    ASSERT_EQ(_infoClientTest.GetSceneIndexRemoved(), 1);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 0);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 1);
 }
 
 //Step 3 : the python script sets Storm again as the renderer for the viewport then call viewportInformationWithHydraAgain
@@ -95,9 +96,9 @@ TEST(FlowViewportAPI, viewportInformationWithHydraAgain)
     ASSERT_EQ(it->_rendererName, _stormRendererName);
 
     //Both should have been called once only
-    ASSERT_EQ(_infoClientTest.GetSceneIndexAdded(), 1);
-    ASSERT_EQ(_infoClientTest.GetSceneIndexRemoved(), 1);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 1);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 1);
 
     //Unregister our callbacks client
-    informationInterface.UnregisterInformationClient(&_infoClientTest);
+    informationInterface.UnregisterInformationClient(_infoClientTest);
 }

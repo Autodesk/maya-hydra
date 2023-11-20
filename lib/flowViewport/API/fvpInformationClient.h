@@ -56,7 +56,7 @@ namespace FVP_NS_DEF
     };
 
     /// Set of InformationClient
-    using InformationClientSet = std::set<InformationClient*>;
+    using SharedInformationClientPtrSet = std::set<std::shared_ptr<InformationClient>>;
 
 }//end of namespace
 

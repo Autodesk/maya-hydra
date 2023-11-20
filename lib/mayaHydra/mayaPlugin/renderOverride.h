@@ -220,7 +220,7 @@ private:
     HdRendererPlugin*                         _rendererPlugin = nullptr;
     HdxTaskController*                        _taskController = nullptr;
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
-    std::unique_ptr<Fvp::RenderIndexProxy>    _renderIndexProxy;
+    std::shared_ptr<Fvp::RenderIndexProxy>    _renderIndexProxy;
     HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;

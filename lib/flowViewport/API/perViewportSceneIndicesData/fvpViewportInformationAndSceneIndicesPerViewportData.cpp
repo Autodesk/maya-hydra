@@ -27,7 +27,7 @@ ViewportInformationAndSceneIndicesPerViewportData::ViewportInformationAndSceneIn
 {
 }
 
-void ViewportInformationAndSceneIndicesPerViewportData::SetRenderIndexProxy(RenderIndexProxy* renderIndexProxy) 
+void ViewportInformationAndSceneIndicesPerViewportData::SetRenderIndexProxy(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy) 
 {
     _renderIndexProxy = renderIndexProxy;
     if (_renderIndexProxy){

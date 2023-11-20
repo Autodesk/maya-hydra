@@ -39,7 +39,7 @@ bool enableMayaNativeSceneIndex() {
 }
 
 MayaHydraSceneProducer::MayaHydraSceneProducer(
-    Fvp::RenderIndexProxy&       renderIndexProxy,
+    const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy,
     const SdfPath&               id,
     MayaHydraDelegate::InitData& initData,
     bool                         lightEnabled
@@ -97,7 +97,7 @@ MayaHydraSceneProducer::~MayaHydraSceneProducer()
 {
     if (enableMayaNativeSceneIndex())
     {
-        _renderIndexProxy.RemoveSceneIndex(_sceneIndex);
+        _renderIndexProxy->RemoveSceneIndex(_sceneIndex);
         _sceneIndex->RemoveCallbacksAndDeleteAdapters();//This should be called before calling _sceneIndex.Reset(); which will call the destructor if the ref count reaches 0
         _sceneIndex.Reset();
     }
@@ -122,7 +122,7 @@ void MayaHydraSceneProducer::Populate()
     {
         _sceneIndex->Populate();
         //Add the scene index as an input scene index of the merging scene index
-        _renderIndexProxy.InsertSceneIndex(_sceneIndex, SdfPath::AbsoluteRootPath());
+        _renderIndexProxy->InsertSceneIndex(_sceneIndex, SdfPath::AbsoluteRootPath());
     }
     else
     {

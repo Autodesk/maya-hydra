@@ -34,8 +34,8 @@ public:
     static FVP_API InformationInterfaceImp& Get();
 
     //From InformationInterface
-    void RegisterInformationClient(InformationClient* client)override;
-    void UnregisterInformationClient(InformationClient* client)override;
+    void RegisterInformationClient(const std::shared_ptr<InformationClient>& client)override;
+    void UnregisterInformationClient(const std::shared_ptr<InformationClient>& client)override;
     void GetViewportsInformation(ViewportInformationSet& outHydraviewportInformationSet) const override;
    
     void SceneIndexAdded(const InformationInterface::ViewportInformation& _viewportInfo);

@@ -1496,7 +1496,7 @@ VtValue MayaHydraSceneIndex::GetShadingStyle(SdfPath const& id)
     return VtValue();
 }
 
-Fvp::RenderIndexProxy& MayaHydraSceneIndex::GetRenderIndexProxy()
+const std::shared_ptr<Fvp::RenderIndexProxy> MayaHydraSceneIndex::GetRenderIndexProxy()
 {
     if (! _producer){
         TF_CODING_ERROR("The MayaHydraSceneProducer pointer should not be a nullptr !");

@@ -62,7 +62,9 @@ namespace FVP_NS_DEF
             }
 
             bool operator <(const ViewportInformation& other) const{ //to be used in std::set
-                return  this < &other;
+                auto a = {_viewportId, _cameraName, _rendererName};
+                auto b = {other._viewportId, other._cameraName, other._rendererName};
+                return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end());
             }
         };
 
@@ -74,14 +76,14 @@ namespace FVP_NS_DEF
         *
         *  @param[in]  client is the InformationClient.
         */
-        virtual void RegisterInformationClient(InformationClient* client) = 0;
+        virtual void RegisterInformationClient(const std::shared_ptr<InformationClient>& client) = 0;
         
         /**
         *  @brief      Unregister an InformationClient instance
         *
         *  @param[in]  client is the InformationClient.
         */
-        virtual void UnregisterInformationClient(InformationClient* client)= 0;
+        virtual void UnregisterInformationClient(const std::shared_ptr<InformationClient>& client)= 0;
 
         /**
         *  @brief      Get the Hydra viewports information. 

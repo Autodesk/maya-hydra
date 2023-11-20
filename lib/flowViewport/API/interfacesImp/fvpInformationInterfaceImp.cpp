@@ -24,7 +24,7 @@ namespace{
     std::mutex _viewportInformationClient_mutex;
     
     //Set of information clients
-    FVP_NS_DEF::InformationClientSet _viewportInformationClients;
+    FVP_NS_DEF::SharedInformationClientPtrSet _viewportInformationClients;
 }
     
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -43,7 +43,7 @@ InformationInterfaceImp& InformationInterfaceImp::Get()
     return theInterface;
 }
 
-void InformationInterfaceImp::RegisterInformationClient(InformationClient* client)
+void InformationInterfaceImp::RegisterInformationClient(const std::shared_ptr<InformationClient>& client)
 {
     TF_AXIOM(client);
 
@@ -55,7 +55,7 @@ void InformationInterfaceImp::RegisterInformationClient(InformationClient* clien
     }
 }
 
-void InformationInterfaceImp::UnregisterInformationClient(InformationClient* client)
+void InformationInterfaceImp::UnregisterInformationClient(const std::shared_ptr<InformationClient>& client)
 {
     std::lock_guard<std::mutex> lock(_viewportInformationClient_mutex);
 

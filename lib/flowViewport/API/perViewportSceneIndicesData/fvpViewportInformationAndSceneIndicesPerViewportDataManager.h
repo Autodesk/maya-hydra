@@ -47,7 +47,7 @@ public:
 
     const ViewportInformationAndSceneIndicesPerViewportDataSet&  GetViewportInfoAndSceneIndicesPerViewportData() const {return _viewportsInformationAndSceneIndicesPerViewportData;}
 
-    void UpdateRenderIndexProxy(const std::string& modelPanel, RenderIndexProxy* renderIndexProxy);
+    void UpdateRenderIndexProxy(const std::string& modelPanel, const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy);
 
 private:
     ///Hydra viewport information

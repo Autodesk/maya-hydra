@@ -60,7 +60,7 @@ class MAYAHYDRALIB_API MayaHydraSceneProducer
 {
 public:
     MayaHydraSceneProducer(
-        Fvp::RenderIndexProxy&       renderIndexProxy,
+        const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy,
         const SdfPath&               id,
         MayaHydraDelegate::InitData& initData,
         bool                         lightEnabled);
@@ -131,7 +131,7 @@ public:
     SdfPath GetPrimPath(const MDagPath& dg, bool isSprim);
 
     HdRenderIndex& GetRenderIndex();
-    Fvp::RenderIndexProxy&  GetRenderIndexProxy(){ return _renderIndexProxy;}
+    std::shared_ptr<Fvp::RenderIndexProxy>  GetRenderIndexProxy(){ return _renderIndexProxy;}
 
     SdfPath GetLightedPrimsRootPath() const;
 
@@ -198,7 +198,7 @@ private:
 
     // SceneIndex
     MayaHydraSceneIndexRefPtr _sceneIndex;
-    Fvp::RenderIndexProxy&    _renderIndexProxy;
+    const std::shared_ptr<Fvp::RenderIndexProxy> _renderIndexProxy;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

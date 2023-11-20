@@ -184,7 +184,7 @@ namespace {
 constexpr char kDagNodeMessageName[] = { "dagNode" };
 }
 // MayaHydraSceneIndexRegistration is used to register a scene index for a given dag node type.
-MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(Fvp::RenderIndexProxy& renderIndexProxy)
+MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy)
     : _renderIndexProxy(renderIndexProxy)
 {
     // Begin registering of custom scene indices for given node types
@@ -257,7 +257,7 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
     auto          it = _registrationsByObjectHandle.find(dagNodeHandle);
     if (it != _registrationsByObjectHandle.end()) {
         MayaHydraSceneIndexRegistrationPtr registration(it->second);
-        _renderIndexProxy.RemoveSceneIndex(registration->rootSceneIndex);
+        _renderIndexProxy->RemoveSceneIndex(registration->rootSceneIndex);
         _registrationsByObjectHandle.erase(dagNodeHandle);
         _registrations.erase(registration->sceneIndexPathPrefix);
         return true;
@@ -373,7 +373,7 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
                 // prefix, the chosen prefix will be prepended to rprims tied to that scene index
                 // automatically.
                 constexpr bool needsPrefixing = false;
-                _renderIndexProxy.InsertSceneIndex(
+                _renderIndexProxy->InsertSceneIndex(
                     registration->rootSceneIndex, 
                     registration->sceneIndexPathPrefix, needsPrefixing);
                 static SdfPath maya126790Workaround("maya126790Workaround");

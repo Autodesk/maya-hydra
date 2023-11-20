@@ -19,8 +19,8 @@
 
 
 //Flow viewport headers
+#include <flowViewport/API/fvpInformationClient.h>
 #include <flowViewport/API/fvpInformationInterface.h>
-#include <flowViewport/API/samples/fvpInformationClientExample.h>
 
 //Subclass Fvp::InformationClient to register this class to receive callbacks.
 class InfoClientTest : public Fvp::InformationClient
