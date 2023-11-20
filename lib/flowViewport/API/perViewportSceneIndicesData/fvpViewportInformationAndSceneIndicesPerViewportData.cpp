@@ -17,6 +17,7 @@
 //Local headers
 #include "fvpViewportInformationAndSceneIndicesPerViewportData.h"
 #include "flowViewport/API/interfacesImp/fvpInformationInterfaceImp.h"
+#include "flowViewport/sceneIndex/fvpRenderIndexProxy.h"
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -27,7 +28,7 @@ ViewportInformationAndSceneIndicesPerViewportData::ViewportInformationAndSceneIn
 {
 }
 
-void ViewportInformationAndSceneIndicesPerViewportData::SetRenderIndexProxy(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy) 
+void ViewportInformationAndSceneIndicesPerViewportData::SetRenderIndexProxy(const Fvp::RenderIndexProxyPtr& renderIndexProxy) 
 {
     _renderIndexProxy = renderIndexProxy;
     if (_renderIndexProxy){

@@ -37,7 +37,7 @@
 #include <mayaHydraLib/delegates/params.h>
 #include <mayaHydraLib/mayaHydraSceneProducer.h>
 
-#include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
+#include <flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h>
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
 #include <flowViewport/selection/fvpSelectionTracker.h>
 #include <flowViewport/selection/fvpSelectionFwd.h>
@@ -220,7 +220,7 @@ private:
     HdRendererPlugin*                         _rendererPlugin = nullptr;
     HdxTaskController*                        _taskController = nullptr;
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
-    std::shared_ptr<Fvp::RenderIndexProxy>    _renderIndexProxy;
+    Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
     HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;

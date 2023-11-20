@@ -21,6 +21,7 @@
 namespace FVP_NS_DEF {
 
 class RenderIndexProxy;
+using RenderIndexProxyPtr = std::shared_ptr<RenderIndexProxy>;
 
 }//End of namespace FVP_NS_DEF
 
