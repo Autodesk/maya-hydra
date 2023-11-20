@@ -29,14 +29,9 @@ using namespace MayaHydra;
 
 bool IsUfeLight(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
 {
-    bool isUfeLightPrim = primPath.GetElementString().find("ufeLightProxy") < std::string::npos;
-    if (!isUfeLightPrim) {
-        return false;
-    }
-    // The shape prim is used to display the light's wireframe and is the only prim we want to allow
-    // for UFE lights
-    bool isShapePrim = primPath.GetElementString().find("ufeLightProxyShape") < std::string::npos;
-    return !isShapePrim;
+    HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
+    return HdPrimTypeIsLight(prim.primType)
+        && primPath.GetElementString().find("ufeLightProxy") < std::string::npos;
 }
 
 TEST(MayaUsdUfeItems, skipUsdUfeLights)

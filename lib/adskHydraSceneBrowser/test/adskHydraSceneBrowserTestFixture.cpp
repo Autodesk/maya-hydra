@@ -131,7 +131,7 @@ void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(
         if (compareDataSourceHierarchy) {
             _primHierarchyWidget->setCurrentItem(primQtItem);
             CompareDataSourceHierarchy(
-                { primPath.GetElementToken(), prim.dataSource }, compareDataSourceValues);
+                { primPath.GetNameToken(), prim.dataSource }, compareDataSourceValues);
         }
 
         // Prepare next step (need to pop the stack before pushing the next elements)
