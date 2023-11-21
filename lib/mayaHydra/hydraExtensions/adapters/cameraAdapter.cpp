@@ -175,7 +175,7 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
     };
 
     auto hadError = [&](MStatus& status) -> bool {
-        if (ARCH_LIKELY(status))
+        if (status)
             return false;
         TF_WARN(
             "Error in MayaHydraCameraAdapter::GetCameraParamValue(%s): %s",

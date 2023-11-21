@@ -48,7 +48,7 @@ void MayaHydraShapeAdapter::_CalculateExtent()
 {
     MStatus    status;
     MFnDagNode dagNode(GetDagPath(), &status);
-    if (ARCH_LIKELY(status)) {
+    if (status) {
         const auto bb = dagNode.boundingBox();
         const auto mn = bb.min();
         const auto mx = bb.max();

@@ -157,7 +157,7 @@ public:
         MStatus status;
         auto    obj = GetNode();
         auto    id = MNodeMessage::addNodeDirtyCallback(obj, _DirtyMaterialParams, this, &status);
-        if (ARCH_LIKELY(status)) {
+        if (status) {
             AddCallback(id);
         }
         _CreateSurfaceMaterialCallback();

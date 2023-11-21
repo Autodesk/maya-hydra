@@ -37,7 +37,7 @@
 #include <mayaHydraLib/delegates/params.h>
 #include <mayaHydraLib/mayaHydraSceneProducer.h>
 
-#include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
+#include <flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h>
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
 #include <flowViewport/selection/fvpSelectionTracker.h>
 #include <flowViewport/selection/fvpSelectionFwd.h>
@@ -138,11 +138,13 @@ private:
 
     static MtohRenderOverride* _GetByName(TfToken rendererName);
 
-    void              _InitHydraResources();
+    void              _InitHydraResources(const MHWRender::MDrawContext& drawContext);
     void              _RemovePanel(MString panelName);
     void              _DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext);
     HdRenderDelegate* _GetRenderDelegate();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
+    void              _CreateSceneIndicesChainAfterMergingSceneIndex();
+    void              _UpdateRenderIndexProxyIfRequired(const MHWRender::MDrawContext& drawContext);
 
     void _PickByRegion(
         HdxPickHitVector& outHits,
@@ -218,7 +220,7 @@ private:
     HdRendererPlugin*                         _rendererPlugin = nullptr;
     HdxTaskController*                        _taskController = nullptr;
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
-    std::unique_ptr<Fvp::RenderIndexProxy>    _renderIndexProxy;
+    Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
     HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;

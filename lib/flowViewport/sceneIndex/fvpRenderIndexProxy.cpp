@@ -36,10 +36,14 @@
 // limitations under the License.
 //
 
+//Local headers
 #include "flowViewport/sceneIndex/fvpRenderIndexProxy.h"
 #include "flowViewport/sceneIndex/fvpMergingSceneIndex.h"
 
+//Hydra headers
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
+#include <pxr/imaging/hd/renderIndex.h>
+#include <pxr/imaging/hd/renderDelegate.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -92,6 +96,10 @@ void RenderIndexProxy::RemoveSceneIndex(
     const HdSceneIndexBaseRefPtr &inputScene
 )
 {
+    if (nullptr == inputScene || nullptr == _mergingSceneIndex){
+        return;
+    }
+
     // Copy-pasted and adapted from USD 0.23.08
     // HdRenderIndex::RemoveSceneIndex() code, to preserve prefixing scene
     // index removal capability.  PPT, 1-Sep-2023.
@@ -121,9 +129,29 @@ void RenderIndexProxy::RemoveSceneIndex(
     }
 }
 
-PXR_NS::HdSceneIndexBaseRefPtr RenderIndexProxy::GetMergingSceneIndex() const
+HdSceneIndexBaseRefPtr RenderIndexProxy::GetMergingSceneIndex() const
 {
     return _mergingSceneIndex;
 }
 
+HdRenderIndex* RenderIndexProxy::GetRenderIndex() const 
+{ 
+    return _renderIndex;
 }
+
+std::string RenderIndexProxy::GetRendererDisplayName() const 
+{
+    static std::string empty;
+
+    if (! _renderIndex){
+        return empty;
+    }
+    auto rd = _renderIndex->GetRenderDelegate();
+    if (! rd){
+        return empty;
+    }
+    
+    return rd->GetRendererDisplayName();
+}
+
+}//end of namespace FVP_NS_DEF

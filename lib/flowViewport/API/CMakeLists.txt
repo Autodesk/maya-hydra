@@ -2,6 +2,8 @@ set(HEADERS
     fvpSelectionClient.h
     fvpFlowSelectionInterface.h
     fvpVersionInterface.h
+    fvpInformationInterface.h
+    fvpInformationClient.h
 )
 
 # -----------------------------------------------------------------------------
@@ -27,3 +29,4 @@ install(FILES ${HEADERS}
 # -----------------------------------------------------------------------------
 add_subdirectory(interfacesImp)
 add_subdirectory(samples)
+add_subdirectory(perViewportSceneIndicesData)

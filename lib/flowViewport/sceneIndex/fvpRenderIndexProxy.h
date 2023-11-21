@@ -79,11 +79,20 @@ public:
     FVP_API
     void RemoveSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr &inputScene);
 
-    // Return the additional Flow Viewport merging scene index onto which input
-    // scenes are added.  Returned as a base scene index to preserve
-    // encapsulation.
+    /** Return the additional Flow Viewport merging scene index onto which input
+    *   scenes are added.  Returned as a base scene index to preserve
+    *   encapsulation.
+    */
     FVP_API
     PXR_NS::HdSceneIndexBaseRefPtr GetMergingSceneIndex() const;
+
+    ///Get the render index
+    FVP_API
+    PXR_NS::HdRenderIndex*          GetRenderIndex() const;
+    
+    ///Get the render delegate display name
+    FVP_API
+    std::string GetRendererDisplayName() const;
 
 private:
 
@@ -91,6 +100,6 @@ private:
     PXR_NS::HdMergingSceneIndexRefPtr _mergingSceneIndex;
 };
 
-}
+}//End of namespace FVP_NS_DEF
 
-#endif
+#endif //FVP_RENDER_INDEX_PROXY_H

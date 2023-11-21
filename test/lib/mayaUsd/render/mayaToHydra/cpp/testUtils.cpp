@@ -17,7 +17,7 @@
 #include "testUtils.h"
 
 #include <mayaHydraLib/hydraUtils.h>
-#include <mayaHydraLib/interface.h>
+#include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/mixedUtils.h>
 
 #include <pxr/imaging/hd/dataSourceLegacyPrim.h>

@@ -15,7 +15,7 @@
 #include "mayaHydraSceneBrowser.h"
 
 #include <mayaHydraLib/hydraUtils.h>
-#include <mayaHydraLib/interfaceImp.h>
+#include <mayaHydraLib/mayaHydraLibInterface.h>
 
 #include <sceneIndexDebuggerWidget.h>
 

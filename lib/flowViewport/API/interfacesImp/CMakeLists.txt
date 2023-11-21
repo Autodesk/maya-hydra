@@ -5,11 +5,13 @@ target_sources(${TARGET_NAME}
     PRIVATE
     fvpSelectionInterfaceImp.cpp
     fvpVersionInterfaceImp.cpp
+    fvpInformationInterfaceImp.cpp
 )
 
 set(HEADERS
     fvpSelectionInterfaceImp.h
     fvpVersionInterfaceImp.h
+    fvpInformationInterfaceImp.h
 )
 
 # -----------------------------------------------------------------------------

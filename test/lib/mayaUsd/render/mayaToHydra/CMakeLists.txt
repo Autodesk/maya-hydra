@@ -20,6 +20,7 @@ set(TEST_SCRIPT_FILES
     cpp/testMergingSceneIndex.py
     cpp/testSelectionSceneIndex.py
     cpp/testWireframeSelectionHighlightSceneIndex.py
+    cpp/testFlowViewportAPIViewportInformation.py
 )
 
 # Test use of mesh adapter code for mesh support, using environment variable.

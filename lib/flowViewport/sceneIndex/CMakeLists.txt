@@ -16,6 +16,7 @@ set(HEADERS
     fvpPathInterface.h
     fvpPathInterfaceSceneIndex.h
     fvpRenderIndexProxy.h
+    fvpRenderIndexProxyFwd.h
     fvpSelectionSceneIndex.h
     fvpWireframeSelectionHighlightSceneIndex.h
 )

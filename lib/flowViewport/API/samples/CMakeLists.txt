@@ -4,10 +4,12 @@
 target_sources(${TARGET_NAME}
     PRIVATE
     fvpSelectionClientExample.cpp
+    fvpInformationClientExample.cpp
 )
 
 set(HEADERS
     fvpSelectionClientExample.h
+    fvpInformationClientExample.h
 )
 
 # -----------------------------------------------------------------------------

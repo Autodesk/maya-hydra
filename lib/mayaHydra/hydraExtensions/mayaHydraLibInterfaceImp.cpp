@@ -1,4 +1,5 @@
-// Copyright 2023 Autodesk
+//
+// Copyright 2023 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,7 +14,8 @@
 // limitations under the License.
 //
 
-#include "interfaceImp.h"
+//Local headers
+#include "mayaHydraLibInterfaceImp.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -23,7 +25,12 @@ MayaHydraLibInterface& GetMayaHydraLibInterface()
     return libInterface;
 }
 
-void MayaHydraLibInterfaceImp::RegisterTerminalSceneIndex(HdSceneIndexBasePtr sceneIndex)
+MayaHydraLibInterfaceImp::~MayaHydraLibInterfaceImp() 
+{ 
+    ClearTerminalSceneIndices();
+}
+
+void MayaHydraLibInterfaceImp::RegisterTerminalSceneIndex(const HdSceneIndexBaseRefPtr& sceneIndex)
 {
     auto foundSceneIndex = std::find(_sceneIndices.begin(), _sceneIndices.end(), sceneIndex);
     if (foundSceneIndex == _sceneIndices.end()) {
@@ -31,7 +38,7 @@ void MayaHydraLibInterfaceImp::RegisterTerminalSceneIndex(HdSceneIndexBasePtr sc
     }
 }
 
-void MayaHydraLibInterfaceImp::UnregisterTerminalSceneIndex(HdSceneIndexBasePtr sceneIndex)
+void MayaHydraLibInterfaceImp::UnregisterTerminalSceneIndex(const HdSceneIndexBaseRefPtr& sceneIndex)
 {
     auto foundSceneIndex = std::find(_sceneIndices.begin(), _sceneIndices.end(), sceneIndex);
     if (foundSceneIndex != _sceneIndices.end()) {

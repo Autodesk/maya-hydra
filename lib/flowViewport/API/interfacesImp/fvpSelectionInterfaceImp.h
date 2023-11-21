@@ -28,7 +28,6 @@ namespace FVP_NS_DEF {
 class SelectionInterfaceImp :  public FVP_NS_DEF::FlowSelectionInterface
 {
 public:
-    SelectionInterfaceImp()             = default;
     virtual ~SelectionInterfaceImp()    = default;
 
     ///Interface accessor
@@ -40,6 +39,9 @@ public:
     
     //To be called by maya-hydra
     void DummySelectionCallback();
+
+private:
+    SelectionInterfaceImp()             = default;
 };
 
 } //End of namespace FVP_NS_DEF
