@@ -30,7 +30,7 @@
 
 #include <mayaHydraLib/delegates/delegateRegistry.h>
 #include <mayaHydraLib/delegates/sceneDelegate.h>
-#include <mayaHydraLib/interface.h>
+#include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
 #include <mayaHydraLib/hydraUtils.h>
 
@@ -42,6 +42,7 @@
 #include <flowViewport/selection/fvpSelectionTask.h>
 #include <flowViewport/selection/fvpSelection.h>
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
+#include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -108,6 +109,7 @@ template <typename T> inline void hash_combine(std::size_t& seed, const T& value
 #include <maya/MSelectionList.h>
 #include <maya/MTimerMessage.h>
 #include <maya/MUiMessage.h>
+#include <maya/MFnCamera.h>
 #include <maya/MFileIO.h>
 
 #include <atomic>
@@ -408,6 +410,14 @@ SdfPath MtohRenderOverride::RendererSceneDelegateId(TfToken rendererName, TfToke
     return SdfPath();
 }
 
+void MtohRenderOverride::_UpdateRenderIndexProxyIfRequired(const MHWRender::MDrawContext& drawContext)
+{
+    //Get model panel name
+    MString modelPanel;
+    drawContext.renderingDestination(modelPanel);
+    Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().UpdateRenderIndexProxy(modelPanel.asChar(), _renderIndexProxy);
+}
+
 void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext)
 {
     constexpr auto considerAllSceneLights = MHWRender::MDrawContext::kFilteredIgnoreLightLimit;
@@ -565,13 +575,15 @@ MStatus MtohRenderOverride::Render(
         return MStatus::kFailure;
     }
 
+    _UpdateRenderIndexProxyIfRequired(drawContext);
+
     _DetectMayaDefaultLighting(drawContext);
     if (_needsClear.exchange(false)) {
         ClearHydraResources();
     }
 
     if (!_initializationAttempted) {
-        _InitHydraResources();
+        _InitHydraResources(drawContext);
 
         if (!_initializationSucceeded) {
             return MStatus::kFailure;
@@ -720,7 +732,7 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
     _taskController->SetRenderTags(mhRenderTags);
 }
 
-void MtohRenderOverride::_InitHydraResources()
+void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& drawContext)
 {
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::_InitHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
@@ -761,7 +773,8 @@ void MtohRenderOverride::_InitHydraResources()
         _rendererPlugin,
         _taskController,
         SdfPath(),
-        _isUsingHdSt);
+        _isUsingHdSt
+    );
 
     // Render index proxy sets up the Flow Viewport merging scene index, must
     // be created first, as it is required for:
@@ -770,35 +783,16 @@ void MtohRenderOverride::_InitHydraResources()
     // - Maya scene producer, which needs the render index proxy to insert
     //   itself.
 
-    _renderIndexProxy = std::make_unique<Fvp::RenderIndexProxy>(_renderIndex);
+    _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(_renderIndex);
 
-    _mayaHydraSceneProducer.reset(new MayaHydraSceneProducer(*_renderIndexProxy, _ID, delegateInitData, !_hasDefaultLighting));
+    _mayaHydraSceneProducer.reset(new MayaHydraSceneProducer(_renderIndexProxy, _ID, delegateInitData, !_hasDefaultLighting));
 
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
     _engine.SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
 
     _mayaHydraSceneProducer->Populate();
-
-    _selection = std::make_shared<Fvp::Selection>();
-    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_renderIndexProxy->GetMergingSceneIndex(), _selection);
-    _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
-
-    if (!_sceneIndexRegistry) {
-        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(*_renderIndexProxy));
-    }
-
-    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_selectionSceneIndex, _selection));
-    wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
-
-    // At time of writing, wireframe selection highlighting of Maya native data
-    // is done by Maya at render item creation time, so avoid double wireframe
-    // selection highlighting.
-    wfSi->addExcludedSceneRoot(_ID);
-
-    _renderIndex->InsertSceneIndex(wfSi, SdfPath::AbsoluteRootPath());
-
-    // Set the initial selection onto the selection scene index.
-    _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+    
+    _CreateSceneIndicesChainAfterMergingSceneIndex();
 
     if (auto* renderDelegate = _GetRenderDelegate()) {
         // Pull in any options that may have changed due file-open.
@@ -830,7 +824,6 @@ void MtohRenderOverride::ClearHydraResources()
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
-    _renderIndexProxy.reset();
     _mayaHydraSceneProducer.reset();
     _selectionSceneIndex.Reset();
     _selection.reset();
@@ -858,9 +851,43 @@ void MtohRenderOverride::ClearHydraResources()
 
     _sceneIndexRegistry.reset();
 
+    //Decrease ref count on the render index proxy which owns the merging scene index at the end of this function as some previous calls may likely use it to remove some scene indices
+    _renderIndexProxy.reset();
+
     _viewport = GfVec4d(0, 0, 0, 0);
     _initializationSucceeded = false;
     _initializationAttempted = false;
+}
+
+void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex()
+{
+    //This function is where happens the ordering of filtering scene indices that are after the merging scene index
+    TF_AXIOM(_renderIndexProxy);
+
+    HdSceneIndexBaseRefPtr lastSceneIndexOfTheChain = _renderIndexProxy->GetMergingSceneIndex();
+
+    _selection = std::make_shared<Fvp::Selection>();
+    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(lastSceneIndexOfTheChain, _selection);
+    _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
+    lastSceneIndexOfTheChain = _selectionSceneIndex;
+  
+    if (!_sceneIndexRegistry) {
+        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy));
+    }
+
+    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_selectionSceneIndex, _selection));
+    wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
+    
+    // At time of writing, wireframe selection highlighting of Maya native data
+    // is done by Maya at render item creation time, so avoid double wireframe
+    // selection highlighting.
+    wfSi->addExcludedSceneRoot(_ID);
+    lastSceneIndexOfTheChain = wfSi;
+  
+    _renderIndex->InsertSceneIndex(lastSceneIndexOfTheChain, SdfPath::AbsoluteRootPath());
+
+    // Set the initial selection onto the selection scene index.
+    _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
 }
 
 void MtohRenderOverride::_RemovePanel(MString panelName)
@@ -868,6 +895,7 @@ void MtohRenderOverride::_RemovePanel(MString panelName)
     auto foundPanelCallbacks = _FindPanelCallbacks(panelName);
     if (foundPanelCallbacks != _renderPanelCallbacks.end()) {
         MMessage::removeCallbacks(foundPanelCallbacks->second);
+        Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveViewportInformation(std::string(panelName.asChar()));
         _renderPanelCallbacks.erase(foundPanelCallbacks);
     }
 
@@ -972,6 +1000,21 @@ MStatus MtohRenderOverride::setup(const MString& destination)
         if (status) {
             newCallbacks.append(id);
         }
+
+        //Get information from viewport
+        std::string cameraName;
+        
+        M3dView view;
+	    if (M3dView::getM3dViewFromModelPanel(destination, view)){//destination is a panel name
+            MDagPath dpath;
+	        view.getCamera(dpath);
+	        MFnCamera viewCamera(dpath);
+	        cameraName = viewCamera.name().asChar();
+        }
+    
+        //Create an HydraViewportInformation 
+        const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(destination.asChar()), cameraName);
+        Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().AddViewportInformation(hydraViewportInformation);
 
         _renderPanelCallbacks.emplace_back(destination, newCallbacks);
     }

@@ -3,15 +3,13 @@
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME}
     PRIVATE
-    fvpSelectionInterfaceImp.cpp
-    fvpVersionInterfaceImp.cpp
-    fvpInformationInterfaceImp.cpp
+    fvpViewportInformationAndSceneIndicesPerViewportData.cpp
+    fvpViewportInformationAndSceneIndicesPerViewportDataManager.cpp
 )
 
 set(HEADERS
-    fvpSelectionInterfaceImp.h
-    fvpVersionInterfaceImp.h
-    fvpInformationInterfaceImp.h
+    fvpViewportInformationAndSceneIndicesPerViewportData.h
+    fvpViewportInformationAndSceneIndicesPerViewportDataManager.h
 )
 
 # -----------------------------------------------------------------------------
@@ -21,7 +19,7 @@ mayaUsd_promoteHeaderList(
     HEADERS
         ${HEADERS}
     BASEDIR
-        ${TARGET_NAME}/API/interfacesImp
+        ${TARGET_NAME}/API/perViewportSceneIndicesData
 )
 
 # -----------------------------------------------------------------------------
@@ -29,5 +27,5 @@ mayaUsd_promoteHeaderList(
 # -----------------------------------------------------------------------------
 install(FILES ${HEADERS}
     DESTINATION 
-        ${CMAKE_INSTALL_PREFIX}/include/flowViewport/API/interfacesImp
+        ${CMAKE_INSTALL_PREFIX}/include/flowViewport/API/perViewportSceneIndicesData
 )

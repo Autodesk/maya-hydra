@@ -162,9 +162,9 @@ std::string StripNamespaces(const std::string& nodeName, const int nsDepth)
     std::stringstream ss;
 
     const std::vector<std::string> nodeNameParts
-        = PXR_NS::TfStringSplit(nodeName, MayaDagDelimiter);
+        = TfStringSplit(nodeName, MayaDagDelimiter);
 
-    const bool isAbsolute = PXR_NS::TfStringStartsWith(nodeName, MayaDagDelimiter);
+    const bool isAbsolute = TfStringStartsWith(nodeName, MayaDagDelimiter);
 
     for (size_t i = 0u; i < nodeNameParts.size(); ++i) {
         if (i == 0u && isAbsolute) {
@@ -179,7 +179,7 @@ std::string StripNamespaces(const std::string& nodeName, const int nsDepth)
         }
 
         const std::vector<std::string> nsNameParts
-            = PXR_NS::TfStringSplit(nodeNameParts[i], MayaNamespaceDelimiter);
+            = TfStringSplit(nodeNameParts[i], MayaNamespaceDelimiter);
 
         const size_t nodeNameIndex = nsNameParts.size() - 1u;
 
@@ -195,7 +195,7 @@ std::string StripNamespaces(const std::string& nodeName, const int nsDepth)
             startIter += std::min(static_cast<size_t>(nsDepth), nodeNameIndex);
         }
 
-        ss << PXR_NS::TfStringJoin(startIter, nsNameParts.end(), MayaNamespaceDelimiter);
+        ss << TfStringJoin(startIter, nsNameParts.end(), MayaNamespaceDelimiter);
     }
 
     return ss.str();
@@ -219,7 +219,7 @@ void SanitizeNameForSdfPath(std::string& inoutPathString, bool doStripNamespaces
         inoutPathString.begin(),
         inoutPathString.end(),
         MayaDagDelimiter[0],
-        PXR_NS::SdfPathTokens->childDelimiter.GetString()[0]);
+        SdfPathTokens->childDelimiter.GetString()[0]);
     std::replace(inoutPathString.begin(), inoutPathString.end(), MayaNamespaceDelimiter[0], '_');
     std::replace(inoutPathString.begin(), inoutPathString.end(), ',', '_');
     std::replace(inoutPathString.begin(), inoutPathString.end(), ';', '_');

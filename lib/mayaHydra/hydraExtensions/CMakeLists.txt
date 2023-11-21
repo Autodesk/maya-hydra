@@ -9,7 +9,7 @@ target_sources(${TARGET_NAME}
     PRIVATE
         debugCodes.cpp
         hydraUtils.cpp
-        interfaceImp.cpp
+        mayaHydraLibInterfaceImp.cpp
         mayaUtils.cpp
         mhBuildInfo.cpp
         mixedUtils.cpp
@@ -20,8 +20,8 @@ set(HEADERS
     api.h
     debugCodes.h
     hydraUtils.h
-    interface.h
-    interfaceImp.h
+    mayaHydraLibInterface.h
+    mayaHydraLibInterfaceImp.h
     mayaUtils.h
     mixedUtils.h
     mayaHydraSceneProducer.h

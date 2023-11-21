@@ -80,6 +80,14 @@ public:
         SdfPath            delegateID;
         bool               isHdSt;
         MayaHydraSceneProducer* producer;
+        ///name of the camera/viewport.
+        std::string cameraName;
+        ///viewport width.
+        int viewportWidth; 
+        ///viewport height.
+        int viewportHeight; 
+        /// Is the Hydra renderer name for this viewport such as "GL" for Storm or "Arnold" for the Arnold render delegate.
+        std::string rendererName;
     };
 
     MAYAHYDRALIB_API
