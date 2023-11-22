@@ -22,6 +22,7 @@ target_sources(${TARGET_NAME}
         testWireframeSelectionHighlightSceneIndex.cpp
         testFvpViewportInformationMultipleViewports.cpp
         testFvpViewportInformationRendererSwitching.cpp
+        testUsdStageLayerMuting.cpp
 )
 
 # -----------------------------------------------------------------------------
