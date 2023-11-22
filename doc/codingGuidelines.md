@@ -8,6 +8,99 @@ Many of the C++ coding guidelines below are validated and enforced through the u
 |:--------------------:|:-------:|:-----------:|:-------:|
 |  `clang-format`/LLVM |  10.0.0 | [llvmorg-10.0.0 Tag](https://github.com/llvm/llvm-project/tree/llvmorg-10.0.0) | [LLVM 10.0.0](https://github.com/llvm/llvm-project/releases/tag/llvmorg-10.0.0) |
 
+## Modern C++
+Our project uses C++ 17.  Our goal is to develop [maya-hydra](https://github.com/autodesk/maya-hydra) following modern C++ practices. We follow the [C++ Core Guidelines](http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines) and pay attention to:
+* resource management and the Resource Acquisition is Initialization (RAII) idiom
+* `using` (vs `typedef`) keyword
+* `virtual`, `override` and `final` keyword
+* `default` and `delete` keywords
+* `auto` keyword
+* initialization - `{}`
+* `nullptr` keyword
+
+### Forward Declarations
+To reduce compilation coupling, use forward declarations as much as possible, avoiding the inclusion of headers that fully define a type.  To encapsulate pointers to objects and preserve the capability to use forward declarations, use the following idiom.  It ensures that using the pointer declaration does not require including the full class declaration.
+* Declare the pointer type in a separate header file, with a Fwd suffix, e.g. `fvpSelectionFwd.h`.  This is the file that clients can include when using a pointer of the type in their interface:
+```
+//
+// Copyright 2023 Autodesk
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+#ifndef FVP_SELECTION_FWD_H
+#define FVP_SELECTION_FWD_H
+
+#include "flowViewport/flowViewport.h"
+
+#include <memory>
+
+namespace FVP_NS_DEF {
+
+class Selection;
+
+using SelectionPtr      = std::shared_ptr<Selection>;
+using SelectionConstPtr = std::shared_ptr<const Selection>;
+
+}
+
+#endif
+```
+* Include this file in the full declaration of the class, e.g. in `fvpSelection.h`:
+```
+//
+// Copyright 2023 Autodesk
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+#ifndef FVP_SELECTION_H
+#define FVP_SELECTION_H
+
+#include "flowViewport/api.h"
+#include "flowViewport/selection/fvpSelectionFwd.h"
+// [...]
+```
+* Create a trivial .cpp file, e.g. `fvpSelectionFwd.cpp`, that includes the Fwd header to ensure standalone compilation:
+```
+//
+// Copyright 2023 Autodesk
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// Trivial inclusion to ensure header compiles on its own.
+#include "flowViewport/selection/fvpSelectionFwd.h"
+```
+
 ## Foundation/Critical
 ### License notice
 Every file should start with the Apache 2.0 licensing statement:
@@ -115,11 +208,12 @@ const int kMyMagicNumber = 42;
 ```
 
 **Function/Method Names**
-All functions should be lowerCamelCase. This avoids inconsistencies with the MayaAPI and virtual methods. For example:
+By default, method names should be lowerCamelCase.  Exceptions are when a class derives from an existing class, where we adopt the capitalization of the base class, i.e. lowerCamelCase for classes derived from Maya base classes, and UpperCamelCase for classes derived from Hydra base classes.  For example:
 ```cpp
 MString name() const override;
 void registerExitCallback();
 ```
+If a class is declared with multiple inheritance from classes with mixed method names, the default lowerCamelCase should be used, except obviously when overriding methods from a base class.
 
 **Namespace Names**
 Namespace names should be UpperCamelCase. Top-level namespace names are based on the project name.
@@ -255,16 +349,6 @@ Our library currently has the following boost dependencies:
 ***Update:***
 * `boost::filesystem` and `boost::system` are removed. Until the transition to C++17 std::filesystem, [ghc::filesystem](https://github.com/gulrak/filesystem) must be used as an alternative across the project.
 
-
-## Modern C++
-Our goal is to develop [maya-hydra](https://github.com/autodesk/maya-hydra) following modern C++ practices. We’ll follow the [C++ Core Guidelines](http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines) and pay attention to:
-* `using` (vs `typedef`) keyword
-* `virtual`, `override` and `final` keyword
-* `default` and `delete` keywords
-* `auto` keyword
-* initialization - `{}`
-* `nullptr` keyword
-* …
 
 ## Diagnostic Facilities
 
