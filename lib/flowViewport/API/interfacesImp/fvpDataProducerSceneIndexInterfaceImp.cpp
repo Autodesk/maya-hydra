@@ -28,13 +28,13 @@
 
 namespace
 {
-    std::mutex _dataProducerSceneIndicesThatApplyToAllViewports_mutex;
+    std::mutex dataProducerSceneIndicesThatApplyToAllViewports_mutex;
 
     // Are the scene indices that need to be applied to all viewports
-    std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr> _dataProducerSceneIndicesThatApplyToAllViewports;
+    std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr> dataProducerSceneIndicesThatApplyToAllViewports;
 
     // Abstract factory to create the scene index data, an implementation is provided by the DCC
-    FVP_NS::DataProducerSceneIndexDataAbstractFactory* _sceneIndexDataFactory{nullptr};
+    FVP_NS::DataProducerSceneIndexDataAbstractFactory* sceneIndexDataFactory{nullptr};
 }
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -117,13 +117,13 @@ void DataProducerSceneIndexInterfaceImp::removeViewportDataProducerSceneIndex(co
             nonConstViewportInfoAndData.RemoveViewportDataProducerSceneIndex(customDataProducerSceneIndex);
         }
 
-        //Also remove it from the _dataProducerSceneIndicesThatApplyToAllViewports array
-        auto findResult = std::find_if(_dataProducerSceneIndicesThatApplyToAllViewports.begin(), _dataProducerSceneIndicesThatApplyToAllViewports.end(),
+        //Also remove it from the dataProducerSceneIndicesThatApplyToAllViewports array
+        auto findResult = std::find_if(dataProducerSceneIndicesThatApplyToAllViewports.begin(), dataProducerSceneIndicesThatApplyToAllViewports.end(),
                     [&customDataProducerSceneIndex](const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSIData) { 
                         return (dataProducerSIData && dataProducerSIData->GetDataProducerSceneIndex() == customDataProducerSceneIndex);}
         );
-        if (findResult != _dataProducerSceneIndicesThatApplyToAllViewports.end()){
-            _dataProducerSceneIndicesThatApplyToAllViewports.erase(findResult);// Which also decreases ref count
+        if (findResult != dataProducerSceneIndicesThatApplyToAllViewports.end()){
+            dataProducerSceneIndicesThatApplyToAllViewports.erase(findResult);// Which also decreases ref count
         }
     }else{
         //It was applied to a single viewport
@@ -139,17 +139,17 @@ void DataProducerSceneIndexInterfaceImp::_AddDataProducerSceneIndexToAllViewport
     
     //This is a block for the mutex lifetime
     {
-        std::lock_guard<std::mutex> lockDataProducerSceneIndicesDataPerViewport(_dataProducerSceneIndicesThatApplyToAllViewports_mutex);
+        std::lock_guard<std::mutex> lockDataProducerSceneIndicesDataPerViewport(dataProducerSceneIndicesThatApplyToAllViewports_mutex);
         
         //Check if it is already inside our array
-        auto findResult = _dataProducerSceneIndicesThatApplyToAllViewports.find(dataProducerSceneIndexDataNonConst);
-        if (findResult != _dataProducerSceneIndicesThatApplyToAllViewports.cend()){
+        auto findResult = dataProducerSceneIndicesThatApplyToAllViewports.find(dataProducerSceneIndexDataNonConst);
+        if (findResult != dataProducerSceneIndicesThatApplyToAllViewports.cend()){
             return;
         }
 
         //It is not already in dataProducerSceneIndexDataSet
         //Add it with the dataProducer scene indices that need to be applied to all viewports
-        _dataProducerSceneIndicesThatApplyToAllViewports.insert(dataProducerSceneIndexDataNonConst);
+        dataProducerSceneIndicesThatApplyToAllViewports.insert(dataProducerSceneIndexDataNonConst);
     }
 
     //Apply it to all existing hydra viewports
@@ -165,15 +165,15 @@ PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr DataProducerSceneIndexI
                                                                                              const SdfPath& customDataProducerSceneIndexRootPathForInsertion, 
                                                                                              void* dccNode)
 { 
-    TF_AXIOM(_sceneIndexDataFactory);
+    TF_AXIOM(sceneIndexDataFactory);
 
-    if (! _sceneIndexDataFactory){
-        TF_CODING_ERROR("_sceneIndexDataFactory is a nullptr, it should have been provided by a call to GetDataProducerSceneIndexInterfaceImp()->SetSceneIndexDataFactory");
+    if (! sceneIndexDataFactory){
+        TF_CODING_ERROR("sceneIndexDataFactory is a nullptr, it should have been provided by a call to GetDataProducerSceneIndexInterfaceImp()->SetSceneIndexDataFactory");
         return nullptr;
     }
 
     const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters  params(customDataProducerSceneIndex, rendererNames, customDataProducerSceneIndexRootPathForInsertion, dccNode);
-    return _sceneIndexDataFactory->createDataProducerSceneIndexDataBase(params);
+    return sceneIndexDataFactory->createDataProducerSceneIndexDataBase(params);
 }
 
 void DataProducerSceneIndexInterfaceImp::_AddDataProducerSceneIndexToThisViewport(const InformationInterface::ViewportInformation& viewportInformation, 
@@ -216,15 +216,15 @@ void DataProducerSceneIndexInterfaceImp::_AddDataProducerSceneIndexToThisViewpor
 void DataProducerSceneIndexInterfaceImp::hydraViewportSceneIndexAdded(const InformationInterface::ViewportInformation& viewportInfo)
 {
     //Add the dataProducer scene indices that apply to all viewports to this newly created hydra viewport
-    std::lock_guard<std::mutex> lockDataProducerSceneIndicesDataPerViewport(_dataProducerSceneIndicesThatApplyToAllViewports_mutex);
-    for (const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData : _dataProducerSceneIndicesThatApplyToAllViewports){
+    std::lock_guard<std::mutex> lockDataProducerSceneIndicesDataPerViewport(dataProducerSceneIndicesThatApplyToAllViewports_mutex);
+    for (const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData : dataProducerSceneIndicesThatApplyToAllViewports){
         _AddDataProducerSceneIndexToThisViewport(viewportInfo, dataProducerSceneIndexData);
     }
 }
 
 void DataProducerSceneIndexInterfaceImp::setSceneIndexDataFactory(DataProducerSceneIndexDataAbstractFactory& factory) 
 {
-    _sceneIndexDataFactory = &factory;
+    sceneIndexDataFactory = &factory;
 }
 
 } //End of namespace FVP_NS_DEF

@@ -28,7 +28,7 @@
 
 namespace 
 {
-    std::mutex _viewportInformationAndSceneIndicesPerViewportDataSet_mutex;
+    std::mutex viewportInformationAndSceneIndicesPerViewportDataSet_mutex;
     std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr> dummyEmptyArray;
 }
 
@@ -47,7 +47,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInform
 {
     //Add it in our array if it is not already inside
     {
-        std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
+        std::lock_guard<std::mutex> lock(viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
 
         const auto& viewportId = viewportInfo._viewportId;
         auto findResult = std::find_if(_viewportsInformationAndSceneIndicesPerViewportData.begin(), _viewportsInformationAndSceneIndicesPerViewportData.end(),
@@ -68,7 +68,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInform
 
 void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveViewportInformation(const std::string& modelPanel)
 {
-    std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
+    std::lock_guard<std::mutex> lock(viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
     
     auto findResult = std::find_if(_viewportsInformationAndSceneIndicesPerViewportData.begin(), _viewportsInformationAndSceneIndicesPerViewportData.end(),
                 [&modelPanel](const ViewportInformationAndSceneIndicesPerViewportData& other) { return other.GetViewportInformation()._viewportId == modelPanel;});
@@ -93,7 +93,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveViewportInf
 
 const ViewportInformationAndSceneIndicesPerViewportData* ViewportInformationAndSceneIndicesPerViewportDataManager::GetViewportInfoAndDataFromViewportId(const std::string& viewportId)const
 {
-    std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
+    std::lock_guard<std::mutex> lock(viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
 
     auto findResult = std::find_if(_viewportsInformationAndSceneIndicesPerViewportData.cbegin(), _viewportsInformationAndSceneIndicesPerViewportData.cend(),
                     [&viewportId](const ViewportInformationAndSceneIndicesPerViewportData& other) { return other.GetViewportInformation()._viewportId == viewportId;});
@@ -107,7 +107,7 @@ const ViewportInformationAndSceneIndicesPerViewportData* ViewportInformationAndS
 
 ViewportInformationAndSceneIndicesPerViewportData* ViewportInformationAndSceneIndicesPerViewportDataManager::GetViewportInfoAndDataFromViewportId(const std::string& viewportId)
 {
-    std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
+    std::lock_guard<std::mutex> lock(viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
 
     ViewportInformationAndSceneIndicesPerViewportDataSet::iterator findResult = std::find_if(_viewportsInformationAndSceneIndicesPerViewportData.begin(), _viewportsInformationAndSceneIndicesPerViewportData.end(),
                     [&viewportId](const ViewportInformationAndSceneIndicesPerViewportData& other) { return other.GetViewportInformation()._viewportId == viewportId;});
@@ -122,7 +122,7 @@ ViewportInformationAndSceneIndicesPerViewportData* ViewportInformationAndSceneIn
 const std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr>&  
 ViewportInformationAndSceneIndicesPerViewportDataManager::GetDataProducerSceneIndicesDataFromViewportId(const std::string& viewportId)const
 {
-    std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
+    std::lock_guard<std::mutex> lock(viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
 
     for (const auto& viewportInformationAndSceneIndicesPerViewportData : _viewportsInformationAndSceneIndicesPerViewportData){
         const auto& viewportIdFromContainer   = viewportInformationAndSceneIndicesPerViewportData.GetViewportInformation()._viewportId;
@@ -136,7 +136,7 @@ ViewportInformationAndSceneIndicesPerViewportDataManager::GetDataProducerSceneIn
 
 bool ViewportInformationAndSceneIndicesPerViewportDataManager::ModelPanelIsAlreadyRegistered(const std::string& modelPanel)const
 {
-    std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
+    std::lock_guard<std::mutex> lock(viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
 
     auto findResult = std::find_if(_viewportsInformationAndSceneIndicesPerViewportData.cbegin(), _viewportsInformationAndSceneIndicesPerViewportData.cend(),
                     [&modelPanel](const ViewportInformationAndSceneIndicesPerViewportData& other) { return other.GetViewportInformation()._viewportId == modelPanel;});
@@ -147,7 +147,7 @@ bool ViewportInformationAndSceneIndicesPerViewportDataManager::ModelPanelIsAlrea
 void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveAllViewportsInformation()
 { 
     //Block for the lifetime of the lock
-    std::lock_guard<std::mutex> lock(_viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
+    std::lock_guard<std::mutex> lock(viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
     
     for(auto& viewportInfoAndData :_viewportsInformationAndSceneIndicesPerViewportData){
 
