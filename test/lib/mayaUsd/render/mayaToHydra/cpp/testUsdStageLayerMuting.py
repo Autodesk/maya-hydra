@@ -28,11 +28,9 @@ class TestUsdStageLayerMuting(mtohUtils.MayaHydraBaseTestCase):
     SUB_LAYER_CUBE_SIZE = 8.0
 
     def setSubLayerMuted(self, isMuted: bool):
-        import maya.cmds as cmds
         cmds.mayaUsdLayerEditor(self.subLayer.identifier, edit=True, muteLayer=(isMuted, self.usdProxyShapeUfePathString))
 
     def setupUsdStage(self):
-        import maya.cmds as cmds
         import mayaUsd
         import mayaUsd_createStageWithNewLayer
         from pxr import UsdGeom, Sdf

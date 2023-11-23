@@ -150,14 +150,15 @@ public:
     PrimNamePredicate(const std::string& primName) : _primName(primName) {}
 
     /**
-     * @brief Predicate to match a prim name.
+     * @brief Predicate to match a prim name. This class is to be used as a FindPrimPredicate.
      *
-     * @param[in] sceneIndex The scene index in which the prim path to test is contained.
+     * @param[in] _ Unused scene index parameter. Is only present to conform to the 
+     * FindPrimPredicate signature.
      * @param[in] primPath The prim path to test.
      *
      * @return True if the argument prim path's name matches the predicate's prim name, false otherwise.
      */
-    bool operator()(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) {
+    bool operator()(const HdSceneIndexBasePtr& _, const SdfPath& primPath) {
         return primPath.GetName() == _primName;
     }
 
