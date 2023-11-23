@@ -89,7 +89,7 @@ void InformationInterfaceImp::GetViewportsInformation(ViewportInformationSet& ou
 {
     outHydraViewportInformationArray.clear();
     const ViewportInformationAndSceneIndicesPerViewportDataSet& allViewportInformationAndSceneIndicesPerViewportData = 
-        ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetViewportInfoAndSceneIndicesPerViewportData();
+        ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetAllViewportInfoAndData();
     for (const ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData : allViewportInformationAndSceneIndicesPerViewportData){
         const InformationInterface::ViewportInformation& viewportInfo = viewportInformationAndSceneIndicesPerViewportData.GetViewportInformation();
         outHydraViewportInformationArray.insert(viewportInfo);

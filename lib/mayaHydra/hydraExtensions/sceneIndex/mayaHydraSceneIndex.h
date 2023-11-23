@@ -57,7 +57,7 @@ class RenderIndexProxy;
 PXR_NAMESPACE_OPEN_SCOPE
 
 class MayaHydraSceneIndex;
-TF_DECLARE_REF_PTRS(MayaHydraSceneIndex);
+TF_DECLARE_WEAK_AND_REF_PTRS(MayaHydraSceneIndex);
 /**
  * \brief MayaHydraSceneIndex is a scene index to produce the hydra scene from Maya native scene.
  */

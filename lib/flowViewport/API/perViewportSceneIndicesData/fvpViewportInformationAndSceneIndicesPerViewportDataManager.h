@@ -40,14 +40,21 @@ public:
     static ViewportInformationAndSceneIndicesPerViewportDataManager& Get();
  
     ///A new Hydra viewport was created
-    void AddViewportInformation(const InformationInterface::ViewportInformation& _viewportInfo);
+    void AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, const Fvp::RenderIndexProxyPtr& renderIndexProxy);
     
     ///An Hydra viewport was deleted
     void RemoveViewportInformation(const std::string& modelPanel);
 
-    const ViewportInformationAndSceneIndicesPerViewportDataSet&  GetViewportInfoAndSceneIndicesPerViewportData() const {return _viewportsInformationAndSceneIndicesPerViewportData;}
+    const ViewportInformationAndSceneIndicesPerViewportDataSet&  GetAllViewportInfoAndData() const {return _viewportsInformationAndSceneIndicesPerViewportData;}
+    ViewportInformationAndSceneIndicesPerViewportDataSet&  GetAllViewportInfoAndData() {return _viewportsInformationAndSceneIndicesPerViewportData;}
 
-    void UpdateRenderIndexProxy(const std::string& modelPanel, const Fvp::RenderIndexProxyPtr& renderIndexProxy);
+    const ViewportInformationAndSceneIndicesPerViewportData* GetViewportInfoAndDataFromViewportId(const std::string& viewportId)const;
+    ViewportInformationAndSceneIndicesPerViewportData* GetViewportInfoAndDataFromViewportId(const std::string& viewportId);
+
+    const std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr>&  GetDataProducerSceneIndicesDataFromViewportId(const std::string& viewportId)const;
+
+    bool ModelPanelIsAlreadyRegistered(const std::string& modelPanel)const;
+    void RemoveAllViewportsInformation();
 
 private:
     ///Hydra viewport information

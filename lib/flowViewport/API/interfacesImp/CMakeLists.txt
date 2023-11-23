@@ -6,12 +6,14 @@ target_sources(${TARGET_NAME}
     fvpSelectionInterfaceImp.cpp
     fvpVersionInterfaceImp.cpp
     fvpInformationInterfaceImp.cpp
+    fvpDataProducerSceneIndexInterfaceImp.cpp
 )
 
 set(HEADERS
     fvpSelectionInterfaceImp.h
     fvpVersionInterfaceImp.h
     fvpInformationInterfaceImp.h
+    fvpDataProducerSceneIndexInterfaceImp.h
 )
 
 # -----------------------------------------------------------------------------

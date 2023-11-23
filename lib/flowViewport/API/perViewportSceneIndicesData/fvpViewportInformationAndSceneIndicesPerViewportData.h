@@ -21,6 +21,7 @@
 #include "flowViewport/api.h"
 #include "flowViewport/API/fvpInformationInterface.h"
 #include "flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h"
+#include "fvpDataProducerSceneIndexDataBase.h"
 
 namespace FVP_NS_DEF {
 
@@ -31,8 +32,9 @@ namespace FVP_NS_DEF {
 class ViewportInformationAndSceneIndicesPerViewportData
 {
 public:
-    ViewportInformationAndSceneIndicesPerViewportData(const InformationInterface::ViewportInformation& viewportInformation);
-    ~ViewportInformationAndSceneIndicesPerViewportData() = default;
+    ViewportInformationAndSceneIndicesPerViewportData(const InformationInterface::ViewportInformation& viewportInformation, 
+                                                      const Fvp::RenderIndexProxyPtr& renderIndexProxy);
+    ~ViewportInformationAndSceneIndicesPerViewportData();
     
     const InformationInterface::ViewportInformation& GetViewportInformation()const { return _viewportInformation;}
     const PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndexOfTheChain() const {return _lastFilteringSceneIndexOfTheChain;}
@@ -40,7 +42,10 @@ public:
     const Fvp::RenderIndexProxyPtr GetRenderIndexProxy() const {return _renderIndexProxy;}
     void SetInputSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) {_inputSceneIndex = inputSceneIndex;}
     const PXR_NS::HdSceneIndexBaseRefPtr&   GetInputSceneIndex() const {return _inputSceneIndex;}
-    
+    const std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr>& GetDataProducerSceneIndicesData() const {return _dataProducerSceneIndicesData;}
+    std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr>& GetDataProducerSceneIndicesData() {return _dataProducerSceneIndicesData;}
+    void RemoveViewportDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex);
+
     //Needed by std::set
     bool operator < (const ViewportInformationAndSceneIndicesPerViewportData& other)const{
         return _viewportInformation < other._viewportInformation; //Is for std::set.
@@ -50,6 +55,9 @@ private:
     ///Hydra viewport information
     InformationInterface::ViewportInformation                               _viewportInformation;
     
+    ///Are the custom dataProducer scene indices added to this viewport
+    std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr>      _dataProducerSceneIndicesData;
+
     ///Is the scene index we should use as an input for the custom filtering scene indices chain
     PXR_NS::HdSceneIndexBaseRefPtr                                          _inputSceneIndex {nullptr};
 
@@ -58,6 +66,9 @@ private:
     
     ///Is a render index proxy per viewport to avoid accessing directly the render index
     Fvp::RenderIndexProxyPtr                                                _renderIndexProxy {nullptr};
+
+    /// When the render proxy is added to this class, we may have to apply all the _dataProducerSceneIndicesData to this viewport, this is what this function does.
+    void _AddAllDataProducerSceneIndexToMergingSCeneIndex();
 };
 
 using ViewportInformationAndSceneIndicesPerViewportDataSet = std::set<ViewportInformationAndSceneIndicesPerViewportData>;

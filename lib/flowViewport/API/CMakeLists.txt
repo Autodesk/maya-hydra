@@ -4,6 +4,7 @@ set(HEADERS
     fvpVersionInterface.h
     fvpInformationInterface.h
     fvpInformationClient.h
+    fvpDataProducerSceneIndexInterface.h
 )
 
 # -----------------------------------------------------------------------------
