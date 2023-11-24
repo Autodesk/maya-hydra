@@ -580,7 +580,7 @@ void MayaHydraSceneIndex::SetDefaultLight(const GlfSimpleLight& light)
         _mayaDefaultLight.SetDiffuse(light.GetDiffuse());
         _mayaDefaultLight.SetSpecular(light.GetSpecular());
         _mayaDefaultLight.SetPosition(light.GetPosition());
-        MarkPrimDirty(_mayaDefaultLightPath, HdLight::DirtyParams);
+        MarkSprimDirty(_mayaDefaultLightPath, HdLight::DirtyParams);
     }
 }
 
@@ -943,18 +943,33 @@ void MayaHydraSceneIndex::_AddPrimAncestors(const SdfPath& path)
 
 }
 
-void MayaHydraSceneIndex::MarkPrimDirty(const SdfPath& id, HdDirtyBits dirtyBits)
+void MayaHydraSceneIndex::MarkRprimDirty(const SdfPath& id, HdDirtyBits dirtyBits) {
+    _MarkPrimDirty(id, dirtyBits, HdDirtyBitsTranslator::RprimDirtyBitsToLocatorSet);
+}
+
+void MayaHydraSceneIndex::MarkSprimDirty(const SdfPath& id, HdDirtyBits dirtyBits)
 {
-    // Dispatch based on prim type.
+    _MarkPrimDirty(id, dirtyBits, HdDirtyBitsTranslator::SprimDirtyBitsToLocatorSet);
+}
+
+void MayaHydraSceneIndex::MarkBprimDirty(const SdfPath& id, HdDirtyBits dirtyBits)
+{
+    _MarkPrimDirty(id, dirtyBits, HdDirtyBitsTranslator::BprimDirtyBitsToLocatorSet);
+}
+
+void MayaHydraSceneIndex::MarkInstancerDirty(const SdfPath& id, HdDirtyBits dirtyBits)
+{
+    _MarkPrimDirty(id, dirtyBits, HdDirtyBitsTranslator::InstancerDirtyBitsToLocatorSet);
+}
+
+void MayaHydraSceneIndex::_MarkPrimDirty(
+    const SdfPath&          id,
+    HdDirtyBits             dirtyBits,
+    DirtyBitsToLocatorsFunc dirtyBitsToLocatorsFunc)
+{
     HdSceneIndexPrim prim = GetPrim(id);
     HdDataSourceLocatorSet locators;
-    if (HdPrimTypeIsGprim(prim.primType)) {
-        HdDirtyBitsTranslator::RprimDirtyBitsToLocatorSet(prim.primType, dirtyBits, &locators);
-    }
-    else {
-        HdDirtyBitsTranslator::SprimDirtyBitsToLocatorSet(prim.primType, dirtyBits, &locators);
-    }
-
+    dirtyBitsToLocatorsFunc(prim.primType, dirtyBits, &locators);
     if (!locators.IsEmpty()) {
         DirtyPrims({ {id, locators} });
     }
@@ -1254,11 +1269,10 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
         },
         _materialAdapters)) {
         auto& renderIndex = GetRenderIndex();
-        auto& changeTracker = renderIndex.GetChangeTracker();
         for (const auto& rprimId : renderIndex.GetRprimIds()) {
             const auto* rprim = renderIndex.GetRprim(rprimId);
             if (rprim != nullptr && rprim->GetMaterialId() == id) {
-                changeTracker.MarkRprimDirty(rprimId, HdChangeTracker::DirtyMaterialId);
+                MarkRprimDirty(rprimId, HdChangeTracker::DirtyMaterialId);
             }
         }
         if (MObjectHandle(obj).isValid()) {
