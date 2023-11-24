@@ -92,6 +92,8 @@ public:
     // Mark a Rprim in hydra scene as dirty
     void MarkRprimDirty(const SdfPath& id, HdDirtyBits dirtyBits);
 
+    void MarkInstancerDirty(const SdfPath& id, HdDirtyBits dirtyBits);
+
     // Insert a Sprim to hydra scene
     void InsertSprim(
         MayaHydraAdapter* adapter,

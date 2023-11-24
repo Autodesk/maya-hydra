@@ -643,8 +643,7 @@ MStatus MtohRenderOverride::Render(
                 if (_mayaHydraSceneProducer) {
                     params.camera = _mayaHydraSceneProducer->SetCameraViewport(camPath, _viewport);
                     if (vpDirty)
-                        _mayaHydraSceneProducer->GetRenderIndex().GetChangeTracker().MarkSprimDirty(
-                            params.camera, HdCamera::DirtyParams);
+                        _mayaHydraSceneProducer->MarkSprimDirty(params.camera, HdCamera::DirtyParams);
                 }
             }
         } else {
