@@ -88,13 +88,12 @@ TEST(FlowViewportAPI, addPrimitives)
     //Add the data producer scene index which will create the cube grid in the viewport and the scene indices chain to handle visibility/transform updates and node delete/undelete
     hydraViewportDataProducerSceneIndexExample.addDataProducerSceneIndex();
 
-    //Check that the parentSphere primitive exists in the scene index
     //Setup inspector for the first viewport scene index
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), static_cast<size_t>(0));
     SceneIndexInspector inspector(sceneIndices.front());
 
-    // Retrieve the sphere prim in the list of primitives, it is added as a HdTokens->transform primitive type from DataProducerSceneIndexDataBase::AddParentPrimToSceneIndex()
+    // Retrieve the first cube primitive from its Sdfpath and check its visibility
     FindPrimPredicate findFirstCubePrimPredicate
         = [](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
         const std::string primPathString    = primPath.GetAsString();
