@@ -598,7 +598,7 @@ MStatus MtohRenderOverride::Render(
 	            cameraName = viewCamera.name().asChar();
             }
     
-            //Create an HydraViewportInformation 
+            //Create a HydraViewportInformation 
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(panelName.asChar()), cameraName);
             manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy);
         }

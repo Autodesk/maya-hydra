@@ -42,7 +42,7 @@ public:
     ///A new Hydra viewport was created
     void AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, const Fvp::RenderIndexProxyPtr& renderIndexProxy);
     
-    ///An Hydra viewport was deleted
+    ///A Hydra viewport was deleted
     void RemoveViewportInformation(const std::string& modelPanel);
 
     const ViewportInformationAndSceneIndicesPerViewportDataSet&  GetAllViewportInfoAndData() const {return _viewportsInformationAndSceneIndicesPerViewportData;}

@@ -47,7 +47,7 @@ createNode("FlowViewportAPIMayaLocator")
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-///Maya Locator node subclass to create filtering and dataProducer scene indices example, to be used with the flow viewport API.
+///Maya Locator node subclass to create filtering and data producer scene indices example, to be used with the flow viewport API.
 class FlowViewportAPIMayaLocator : public MPxLocatorNode
 {
 public:
@@ -70,7 +70,7 @@ public:
     static	MTypeId		id;
     static	MString		nodeClassification;
 
-    //Maya node attributes that helps creating a 3D grid of Hydra cube mesh primitives to demonstrate how to inject some primitives in an Hydra viewport
+    //Maya node attributes that helps creating a 3D grid of Hydra cube mesh primitives to demonstrate how to inject some primitives in a Hydra viewport
     static MObject mNumCubeLevelsX;
     static MObject mNumCubeLevelsY;
     static MObject mNumCubeLevelsZ;
@@ -83,15 +83,15 @@ public:
     static MObject mDummyInput;//Dummy input to trigger a call to compute
     static MObject mDummyOutput;//Dummy output to trigger a call to compute
     
-    ///3D Grid of cube mesh primitives creation parameters for the dataProducer scene index
+    ///3D Grid of cube mesh primitives creation parameters for the data producer scene index
     Fvp::DataProducerSceneIndexExample::CubeGridCreationParams  _cubeGridParams;
     ///_hydraViewportDataProducerSceneIndexExample is what will inject the 3D grid of Hydra cube mesh primitives into the viewport
     Fvp::DataProducerSceneIndexExample                          _hydraViewportDataProducerSceneIndexExample;
 
 protected:
-    /// _hydraViewportInformationClient is the viewport information example for an Hydra viewport.
+    /// _hydraViewportInformationClient is the viewport information example for a Hydra viewport.
     std::shared_ptr<Fvp::InformationClientExample>          _hydraViewportInformationClient;
-    ///To be used in hydra viewport API to pass the Maya node's MObject for setting callbacks for filtering and dataProducer scene indices
+    ///To be used in hydra viewport API to pass the Maya node's MObject for setting callbacks for filtering and data producer scene indices
     MObject                                                 _thisMObject; 
     ///To check if the MObject of this node has changed
     MObject                                                 _oldMObject; 
@@ -325,7 +325,7 @@ FlowViewportAPIMayaLocator::FlowViewportAPIMayaLocator()
     //Get the version of the flow viewport APIinterface
     Fvp::VersionInterface::Get().GetVersion(majorVersion, minorVersion, patchLevel);
     
-    //DataProducer scene index interface
+    //data producer scene index interface
     Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
 
     //Store the interface pointer into our client for later
@@ -468,7 +468,7 @@ bool FlowViewportAPIMayaLocator::isBounded() const
     return true;
 }
 
-//We return as a bounding box the bounding box of the dataProducer hydra data
+//We return as a bounding box the bounding box of the data producer hydra data
 MBoundingBox FlowViewportAPIMayaLocator::boundingBox() const
 {
     float corner1X, corner1Y, corner1Z, corner2X, corner2Y, corner2Z;
@@ -505,7 +505,7 @@ MStatus FlowViewportAPIMayaLocator::initialize()
 {
     MStatus status;
 
-    //Create input attributes for the 3D grid of Hydra cube mesh primitives creation for the dataProducer scene index
+    //Create input attributes for the 3D grid of Hydra cube mesh primitives creation for the data producer scene index
     MFnNumericAttribute nAttr;
     MFnMatrixAttribute  mAttr;
     

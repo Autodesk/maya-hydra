@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-/* DataProducerSceneIndexDataBase is storing information about a custom dataProducer scene index.
+/* DataProducerSceneIndexDataBase is storing information about a custom data producer scene index.
 *  Since an instance of the DataProducerSceneIndexDataBase class can be shared between multiple viewports, we need ref counting.
 */
 
@@ -41,7 +41,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace FVP_NS_DEF {
 
-/* DataProducerSceneIndexDataBase is storing information about a custom dataProducer scene index which is a scene index that create new primitives.
+/* DataProducerSceneIndexDataBase is storing information about a custom data producer scene index which is a scene index that create new primitives.
 *  Since an instance of the DataProducerSceneIndexDataBase class can be shared between multiple viewports in our records, we need ref counting.
 */
 DataProducerSceneIndexDataBase::DataProducerSceneIndexDataBase(const CreationParameters& params)
@@ -117,7 +117,7 @@ void DataProducerSceneIndexDataBase::AddParentPrimToSceneIndex()
     HdRetainedSceneIndex::AddedPrimEntries  addedPrims;
 
     //We are creating a XForm prim which has only 2 attributes a matrix and a visibility.
-    //This prim will be the parent of all dataProducer scene index primitives so we can change their transform or visibility from the parent
+    //This prim will be the parent of all data producer scene index primitives so we can change their transform or visibility from the parent
     HdRetainedSceneIndex::AddedPrimEntry parentPrimEntry;
     parentPrimEntry.primPath      = _parentPath;
     parentPrimEntry.primType      = HdTokens->transform;

@@ -32,7 +32,7 @@ namespace FVP_NS_DEF {
 class DataProducerSceneIndexDataBase;//Predeclaration
 TF_DECLARE_WEAK_AND_REF_PTRS(DataProducerSceneIndexDataBase);//Be able to use Ref counting pointers on DataProducerSceneIndexDataBase
 
-/** DataProducerSceneIndexDataBase is storing information about a custom dataProducer scene index.
+/** DataProducerSceneIndexDataBase is storing information about a custom data producer scene index.
 *   Since an instance of the DataProducerSceneIndexDataBase class can be shared between multiple viewports in our records, we need ref counting.
 */
  class FVP_API DataProducerSceneIndexDataBase : public TfRefBase, public TfWeakBase

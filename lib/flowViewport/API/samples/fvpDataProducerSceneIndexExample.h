@@ -30,8 +30,8 @@
 
 namespace FVP_NS_DEF {
 
-/** This class is an example on how to inject Hydra prims into an Hydra viewport. 
-*   An dataProducer scene index is a scene index that adds primitives to the current rendering.
+/** This class is an example on how to inject Hydra prims into a Hydra viewport. 
+*   An data producer scene index is a scene index that adds primitives to the current rendering.
 *   We are holding a HdRetainedSceneIndex in this class, as it contains helper functions to add/remove/dirty prims.
 *   Another possibility is that we could also have subclassed HdRetainedSceneIndex.
 *   We are creating a 3D grid of cubes using Hydra mesh primitives.
@@ -46,7 +46,7 @@ public:
     void setHydraInterface(DataProducerSceneIndexInterface* hydraInterface) {_hydraInterface = hydraInterface;}
 
     /**Is called by the DCC node to set its node pointer.
-    * Is also our triggering function to add the dataProducer scene index as we want to wait to have the DCC node pointer value initialized before dataProducer the scene index.
+    * Is also our triggering function to add the data producer scene index as we want to wait to have the DCC node pointer value initialized before dataProducer the scene index.
     */
     void setContainerNode(void* node){_containerNode = node;}
     void setContainerNodeInverseTransform(const PXR_NS::GfMatrix4d& InvTransform);
@@ -84,35 +84,35 @@ public:
         }
 
         /// Number of X levels for the 3D grid of cube prims
-        int                 _numLevelsX;
+        int                 _numLevelsX{10};
         /// Number of Y levels for the 3D grid of cube prims
-        int                 _numLevelsY;
+        int                 _numLevelsY{10};
         /// Number of Z levels for the 3D grid of cube prims
-        int                 _numLevelsZ;
+        int                 _numLevelsZ{1};
         /// Half size of each cube in the 3D grid.
-        double              _halfSize;
+        double              _halfSize{2.0};
         /// Color of each cube in the 3D grid.
-        PXR_NS::GfVec3f     _color;
+        PXR_NS::GfVec3f     _color{0.f, 1.0f, 0.0f};
         /// Opacity of each cube in the 3D grid.
-        double              _opacity;
+        double              _opacity{0.8};
         /// Initial transform of each cube in the 3D grid.
         PXR_NS::GfMatrix4d  _initalTransform;
         /** _deltaTrans.x is the space between 2 cubes on the X axis of the 3D grid.
         *   _deltaTrans.y is the space between 2 cubes on the Y axis of the 3D grid.
         *   _deltaTrans.z is the space between 2 cubes on the Z axis of the 3D grid.
         * */
-        PXR_NS::GfVec3f     _deltaTrans;
+        PXR_NS::GfVec3f     _deltaTrans{5.0f, 5.0f, 5.0f};
         /// if _useInstancing is true, then we are using Hydra instancing to create the cube prims, if it is false then we are not using Hydra instancing.
-        bool                _useInstancing;
+        bool                _useInstancing{false};
     };
 
     ///Set the CubeGridCreationParams
     void setCubeGridParams(const CubeGridCreationParams& params);
 
-    ///Call FlowViewport::DataProducerSceneIndexInterface::_AddDataProducerSceneIndex to add our dataProducer scene index to create the 3D grid of cubes
+    ///Call FlowViewport::DataProducerSceneIndexInterface::_AddDataProducerSceneIndex to add our data producer scene index to create the 3D grid of cubes
     void addDataProducerSceneIndex();
     
-    ///Call the FlowViewport::DataProducerSceneIndexInterface::RemoveViewportDataProducerSceneIndex to remove our dataProducer scene index from the Hydra viewport
+    ///Call the FlowViewport::DataProducerSceneIndexInterface::RemoveViewportDataProducerSceneIndex to remove our data producer scene index from the Hydra viewport
     void removeDataProducerSceneIndex();
 
     /// This class is about geometry (prototype) instancing and holds the instance indices
@@ -144,7 +144,7 @@ protected:
     ///Is the container node inverse transform matrix to remove transform matrix being applied twice for instances
     PXR_NS::GfMatrix4d  _containerNodeInvTransform;
 
-    /// Did we already add this dataProducer scene index to some render index ?
+    /// Did we already add this data producer scene index to some render index ?
     bool   _dataProducerSceneIndexAdded {false};
 
     ///Create a Hydra cube primitive
@@ -169,7 +169,7 @@ protected:
     ///Remove the 3D grid of Hydra cube primitives from the retained scene index. We are using Hydra instancing in this function.
     void _RemoveAllPrimsWithInstancing();
     
-    ///Aggregation of the retained scene index dataProducer prims into Hydra
+    ///Aggregation of the retained scene index data producer prims into Hydra
     PXR_NS::HdRetainedSceneIndexRefPtr  _retainedSceneIndex  {nullptr};
 
     /// 3D grid of cubes primitives parameters

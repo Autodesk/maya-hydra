@@ -55,7 +55,7 @@ private:
     ///Hydra viewport information
     InformationInterface::ViewportInformation                               _viewportInformation;
     
-    ///Are the custom dataProducer scene indices added to this viewport
+    ///Are the custom data producer scene indices added to this viewport
     std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr>      _dataProducerSceneIndicesData;
 
     ///Is the scene index we should use as an input for the custom filtering scene indices chain

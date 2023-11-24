@@ -30,7 +30,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 class MayaDataProducerSceneIndexData;
 TF_DECLARE_WEAK_AND_REF_PTRS(MayaDataProducerSceneIndexData);//Be able to use Ref counting pointers on MayaDataProducerSceneIndexData
 
-/** MayaDataProducerSceneIndexData is storing information about a custom dataProducer scene index.
+/** MayaDataProducerSceneIndexData is storing information about a custom data producer scene index.
 *   Since an instance of the MayaDataProducerSceneIndexData class can be shared between multiple viewports in our records, we need ref counting.
 */
  class MayaDataProducerSceneIndexData : public FVP_NS_DEF::DataProducerSceneIndexDataBase
@@ -51,7 +51,7 @@ public:
     MObjectHandle                       _mObjHandle;
     /// Is the dag path of the Maya node passed in AppendSceneIndex. It is used only when a dccNode was passed.
     MDagPath                            _mayaNodeDagPath;
-    /// Are the callbacks Ids set in maya to forward the changes done in maya on the dataProducer scene index.
+    /// Are the callbacks Ids set in maya to forward the changes done in maya on the data producer scene index.
     MCallbackIdArray                    _nodeMessageCallbackIds;
     /// Are the callbacks Ids set in maya to handle delete and deletion undo/redo
     MCallbackIdArray                    _dGMessageCallbackIds;

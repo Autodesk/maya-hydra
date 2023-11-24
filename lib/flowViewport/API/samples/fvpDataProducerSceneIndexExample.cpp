@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-/* This class is an example on how to inject Hydra prims into an Hydra viewport. We are dataProducer cubes meshes as primitives.
+/* This class is an example on how to add Hydra primitives into a Hydra viewport. We add a grid of cubes meshes as primitives.
     We are using a HdRetainedSceneIndex as it contains helper functions to add/remove/dirty prims.
     We could also have done a subclass of HdRetainedSceneIndex as well.
 */
@@ -395,7 +395,7 @@ void DataProducerSceneIndexExample::_RemoveAllPrimsWithInstancing()
     _isEnabled = false;
 }
 
-//Create an Hydra cube primitive from these parameters
+//Create a Hydra cube primitive from these parameters
 HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubePrim(const SdfPath& cubePath, float halfSize, const GfVec3f& displayColor, 
                                                                                 float opacity, const GfMatrix4d& transform, bool instanced)const
 {
@@ -538,8 +538,11 @@ HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubeP
 void DataProducerSceneIndexExample::addDataProducerSceneIndex()
 {
     if (!_dataProducerSceneIndexAdded && _hydraInterface){
-        _hydraInterface->addDataProducerSceneIndex(_retainedSceneIndex, _containerNode, DataProducerSceneIndexInterface::allViewports, DataProducerSceneIndexInterface::allRenderers, SdfPath::AbsoluteRootPath());
-        _dataProducerSceneIndexAdded                                            = true;
+        const bool res = _hydraInterface->addDataProducerSceneIndex(_retainedSceneIndex, _containerNode, DataProducerSceneIndexInterface::allViewports, DataProducerSceneIndexInterface::allRenderers, SdfPath::AbsoluteRootPath());
+        if (false == res){
+            TF_CODING_ERROR("_hydraInterface->addDataProducerSceneIndex returned false !");
+        }
+        _dataProducerSceneIndexAdded = true;
     }
 }
 
@@ -547,7 +550,7 @@ void DataProducerSceneIndexExample::removeDataProducerSceneIndex()
 { 
     if (_dataProducerSceneIndexAdded && _hydraInterface){
         _hydraInterface->removeViewportDataProducerSceneIndex(_retainedSceneIndex, DataProducerSceneIndexInterface::allViewports);
-        _dataProducerSceneIndexAdded                                            = false;
+        _dataProducerSceneIndexAdded = false;
     }
 }
 

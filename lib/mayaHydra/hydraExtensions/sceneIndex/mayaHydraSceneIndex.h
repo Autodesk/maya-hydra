@@ -242,7 +242,7 @@ private:
     /// _mayaDefaultMaterialPath is common to all scene indexes, it's the SdfPath of
     /// _mayaDefaultMaterial
     static SdfPath _mayaDefaultMaterialPath;
-    /// _mayaDefaultMaterial is an hydra material used to override all materials from the scene when
+    /// _mayaDefaultMaterial is a Hydra material used to override all materials from the scene when
     /// _useDefaultMaterial is true
     static VtValue _mayaDefaultMaterial;
 

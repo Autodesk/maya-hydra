@@ -26,7 +26,7 @@
 namespace FVP_NS_DEF
 {
     /**
-    * Interface to manage data producer scene indices in an Hydra viewport. A data producer scene index is a scene index that adds primitives to the current rendering.
+    * Interface to manage data producer scene indices in a Hydra viewport. A data producer scene index is a scene index that adds primitives to the current rendering.
     * These new primitives are created without the need of a DCC object or a USD stage.
     * To get an instance of the DataProducerSceneIndexInterface class, please use :
     * Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
@@ -59,7 +59,7 @@ namespace FVP_NS_DEF
         *               If it is a nullptr, we won't do anything if the node's attributes changes.
         *               Basically, this is a way for you to set the DCC node as a parent node for all your primitives from the scene index.
         * 
-        *  @param[in]   hydraViewportId is an hydra viewport string identifier to which _customDataProducerSceneIndex needs to be associated to. 
+        *  @param[in]   hydraViewportId is a Hydra viewport string identifier to which customDataProducerSceneIndex needs to be associated to. 
         *               Set it to DataProducerSceneIndexInterface::allViewports to add this data producer scene index to all viewports. 
         *               To retrieve a specific hydra viewport identifier, please use the InformationInterface class.
         * 
@@ -70,11 +70,12 @@ namespace FVP_NS_DEF
         *              Set this parameter to DataProducerSceneIndexInterface::allRenderers to add your scene index to all viewports whatever their renderer is.
         * 
         *  @param[in]  customDataProducerSceneIndexRootPathForInsertion is the root path for insertion used as a second parameter of HdRenderIndex::InsertSceneIndex method.
-        *              e.g : renderIndex.InsertSceneIndex(_customDataProducerSceneIndex, _customDataProducerSceneIndexRootPathForInsertion);
+        *              e.g : renderIndex.InsertSceneIndex(customDataProducerSceneIndex, customDataProducerSceneIndexRootPathForInsertion);
         * 
-        
+        *  @return     true if the operation succeeded, false otherwise.
+        * 
         */
-        virtual void addDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
+        virtual bool addDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
                                                void* dccNode = nullptr,
                                                const std::string& hydraViewportId = allViewports,
                                                const std::string& rendererNames = allRenderers,
@@ -88,7 +89,7 @@ namespace FVP_NS_DEF
         * 
         *  @param[in]  customDataProducerSceneIndex is the custom scene index to remove.
         * 
-        *  @param[in]  hydraViewportId is the hydra viewport string identifier to which _customDataProducerSceneIndex was associated to or DataProducerSceneIndexInterface::allViewports
+        *  @param[in]  hydraViewportId is the hydra viewport string identifier to which customDataProducerSceneIndex was associated to or DataProducerSceneIndexInterface::allViewports
         *               if it was applied to all viewports.
         
         */

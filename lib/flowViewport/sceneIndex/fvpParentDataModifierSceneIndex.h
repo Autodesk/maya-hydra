@@ -29,7 +29,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace FVP_NS_DEF {
 
-//We use a filtering scene index to update the data from a HdRetainedSceneIndex where we inserted a parent prim to be the parent of all prims from a data dataProducer scene index
+//We use a filtering scene index to update the data from a HdRetainedSceneIndex where we inserted a parent prim to be the parent of all prims from a data producer scene index
 // which is hosted in a DCC node.
  
 class ParentDataModifierSceneIndex;

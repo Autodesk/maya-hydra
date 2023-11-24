@@ -15,7 +15,7 @@
 //
 
 
-/// Is the definition of a callbacks InformationClient for an Hydra viewport.
+/// Is the definition of a callbacks InformationClient for a Hydra viewport.
 
 #ifndef FLOW_VIEWPORT_API_INFORMATION_CLIENT_H
 #define FLOW_VIEWPORT_API_INFORMATION_CLIENT_H
@@ -32,22 +32,22 @@ namespace FVP_NS_DEF
     public:
         
         /**
-        *  @brief      Callback function called when an Hydra viewport scene index is being created by our Hydra viewport plugin
+        *  @brief      Callback function called when a Hydra viewport scene index is being created by our Hydra viewport plugin
         *
-        *             This is a callback function that gets called when an Hydra viewport scene index is being created by our Hydra viewport plugin. 
-        *              A typical case is when an Hydra viewport is created.
+        *             This is a callback function that gets called when a Hydra viewport scene index is being created by our Hydra viewport plugin. 
+        *              A typical case is when a Hydra viewport is created.
         * 
-        *  @param[in]  viewportInformation is an Hydra viewport information from the scene index being added by our Hydra viewport plugin.
+        *  @param[in]  viewportInformation is a Hydra viewport information from the scene index being added by our Hydra viewport plugin.
         */
         virtual void SceneIndexAdded(const InformationInterface::ViewportInformation& viewportInformation) = 0;
         
         /**
-        *  @brief      Callback function called when an Hydra viewport scene index is being removed by our Hydra viewport plugin
+        *  @brief      Callback function called when a Hydra viewport scene index is being removed by our Hydra viewport plugin
         *
-        *              This is a callback function that gets called when an Hydra viewport scene index is removed by our Hydra viewport plugin. 
-        *              A typical case is when an Hydra viewport is removed.
+        *              This is a callback function that gets called when a Hydra viewport scene index is removed by our Hydra viewport plugin. 
+        *              A typical case is when a Hydra viewport is removed.
         * 
-        *  @param[in]  viewportInformation is an Hydra viewport information from the scene index being removed by our Hydra viewport plugin.
+        *  @param[in]  viewportInformation is a Hydra viewport information from the scene index being removed by our Hydra viewport plugin.
         */
         virtual void SceneIndexRemoved(const InformationInterface::ViewportInformation& viewportInformation) = 0;
 

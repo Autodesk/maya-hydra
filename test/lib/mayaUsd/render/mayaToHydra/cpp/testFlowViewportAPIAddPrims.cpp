@@ -44,9 +44,9 @@ TEST(FlowViewportAPI, addPrimitives)
 {
     static const MString sphereName("parentSphere");
     static const MString sphereShapeName("parentSphereShape");
-    static const std::string firstCubePath ("/DataProducerSceneIndexExample/cube0_0_0");
+    
 
-    ///3D Grid of cube mesh primitives creation parameters for the dataProducer scene index
+    ///3D Grid of cube mesh primitives creation parameters for the data producer scene index
     Fvp::DataProducerSceneIndexExample::CubeGridCreationParams  cubeGridParams;
     cubeGridParams._numLevelsX      = 5;
     cubeGridParams._numLevelsY      = 5;
@@ -60,10 +60,12 @@ TEST(FlowViewportAPI, addPrimitives)
     //hydraViewportDataProducerSceneIndexExample is what will inject the 3D grid of Hydra cube mesh primitives into the viewport
     Fvp::DataProducerSceneIndexExample  hydraViewportDataProducerSceneIndexExample;
 
+    const std::string firstCubePath (TfStringPrintf("/DataProducerSceneIndexExample/cube_%p0_0_0", &hydraViewportDataProducerSceneIndexExample));
+    
     //Setup cube grid parameters
     hydraViewportDataProducerSceneIndexExample.setCubeGridParams(cubeGridParams);
 
-    //DataProducer scene index interface
+    //Data producer scene index interface
     Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
     
     //Store the interface pointer into our client for later
@@ -95,7 +97,7 @@ TEST(FlowViewportAPI, addPrimitives)
 
     // Retrieve the first cube primitive from its Sdfpath and check its visibility
     FindPrimPredicate findFirstCubePrimPredicate
-        = [](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
+        = [&firstCubePath](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
         const std::string primPathString    = primPath.GetAsString();
         HdSceneIndexPrim prim               = sceneIndex->GetPrim(primPath);
         if (primPathString.find(firstCubePath) != std::string::npos) {

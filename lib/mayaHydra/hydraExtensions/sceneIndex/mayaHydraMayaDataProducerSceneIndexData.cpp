@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-/* MayaDataProducerSceneIndexData is storing information about a custom dataProducer scene index.
+/* MayaDataProducerSceneIndexData is storing information about a custom data producer scene index.
 *  Since an instance of the MayaDataProducerSceneIndexData class can be shared between multiple viewports, we need ref counting.
 */
 
@@ -84,7 +84,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(const FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params) 
     : FVP_NS_DEF::DataProducerSceneIndexDataBase(params)
 {
-    //When the user has passed a maya node we are adding callbacks on various changes to be able to act on the dataProducer scene index prims automatically
+    //When the user has passed a maya node we are adding callbacks on various changes to be able to act on the data producer scene index prims automatically
     if (_dccNode){
         MObject* mObj = reinterpret_cast<MObject*>(_dccNode);
         _mObjHandle   = MObjectHandle(*mObj);

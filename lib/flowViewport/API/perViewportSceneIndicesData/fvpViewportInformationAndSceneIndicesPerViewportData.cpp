@@ -46,7 +46,7 @@ void ViewportInformationAndSceneIndicesPerViewportData::RemoveViewportDataProduc
     auto findResult = std::find_if(_dataProducerSceneIndicesData.begin(), _dataProducerSceneIndicesData.end(),
         [&customDataProducerSceneIndex](const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSIData) { return dataProducerSIData->GetDataProducerSceneIndex() == customDataProducerSceneIndex;});
     if (findResult != _dataProducerSceneIndicesData.end()) {
-        // Remove the dataProducer scene index from the merging scene index through the render proxy
+        // Remove the data producer scene index from the merging scene index through the render proxy
         if (_renderIndexProxy){
             const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData = (*findResult);
             if (dataProducerSceneIndexData && dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain()) {
@@ -72,7 +72,7 @@ void ViewportInformationAndSceneIndicesPerViewportData::_AddAllDataProducerScene
 
     //Add all data producer scene index to the merging scene index through the render index proxy
     for (auto& dataProducerSceneIndexData : _dataProducerSceneIndicesData){
-        // Add the dataProducer scene index to the merging scene index
+        // Add the data producer scene index to the merging scene index
         if (dataProducerSceneIndexData && dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain()) {
             _renderIndexProxy->InsertSceneIndex(dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain(), 
                 dataProducerSceneIndexData->GetCustomDataProducerSceneIndexRootPathForInsertion());

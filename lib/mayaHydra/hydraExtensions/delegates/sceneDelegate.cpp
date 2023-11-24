@@ -256,7 +256,7 @@ TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraDelegateRegistry, MayaHydraSceneDelegate)
         });
 }
 
-// MayaHydraSceneDelegate is an Hydra custom scene delegate used to translate from a Maya scene to
+// MayaHydraSceneDelegate is a Hydra custom scene delegate used to translate from a Maya scene to
 // hydra. If you want to know how to add a custom scene index to this plug-in, then please see the
 // registration.cpp file.
 MayaHydraSceneDelegate::MayaHydraSceneDelegate(const InitData& initData)

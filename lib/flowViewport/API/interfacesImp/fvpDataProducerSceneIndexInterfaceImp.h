@@ -43,7 +43,7 @@ public:
     static FVP_API DataProducerSceneIndexInterfaceImp& get();
 
     ///From FVP_NS_DEF::DataProducerSceneIndexInterface
-    void addDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
+    bool addDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
                                     void* dccNode = nullptr,
                                     const std::string& hydraViewportId = allViewports,
                                     const std::string& rendererNames = allRenderers,
@@ -53,15 +53,16 @@ public:
                                               const std::string& hydraViewportId = allViewports)override;
 
     //Called by flow viewport
+    ///hydraViewportSceneIndexAdded is called when a new hydra viewport is created by the ViewportInformationAndSceneIndicesPerViewportDataManager, it's not a callback.
     void hydraViewportSceneIndexAdded(const InformationInterface::ViewportInformation& viewportInfo);
     void removeAllViewportDataProducerSceneIndices(ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData);
 
-    //Called by the DCC
+    ///Since Flow viewport is DCC agnostic, the DCC will implement a concrete factory and call setSceneIndexDataFactory to register it in this class.
     FVP_API
     void setSceneIndexDataFactory(DataProducerSceneIndexDataAbstractFactory& factory);
 
 protected:
-    void _AddDataProducerSceneIndexToAllViewports(const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData);
+    bool _AddDataProducerSceneIndexToAllViewports(const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData);
     void _AddDataProducerSceneIndexToThisViewport(const InformationInterface::ViewportInformation& viewportInformation, const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData);
     
     PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr _CreateDataProducerSceneIndexData( const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,

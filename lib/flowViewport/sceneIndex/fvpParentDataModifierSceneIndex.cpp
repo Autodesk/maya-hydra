@@ -14,9 +14,9 @@
 // limitations under the License.
 //
 
-//We use a this filtering scene index to update the data from a HdRetainedSceneIndex where we inserted a parent prim to be the parent of all prims from an dataProducer scene index
+//We use a this filtering scene index to update the data from a HdRetainedSceneIndex where we inserted a parent prim to be the parent of all prims from an data producer scene index
 // which is hosted in a DCC node.
-// We only update the data from the parent SdfPath, it has the same transform as the DCC node which contains the data dataProducer scene index.
+// We only update the data from the parent SdfPath, it has the same transform as the DCC node which contains the data producer scene index.
 
 //Local headers
 #include "fvpParentDataModifierSceneIndex.h"
