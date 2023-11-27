@@ -144,6 +144,28 @@ private:
     HdSceneIndexBasePtr _sceneIndex;
 };
 
+class PrimNamePredicate
+{
+public:
+    PrimNamePredicate(const std::string& primName) : _primName(primName) {}
+
+    /**
+     * @brief Predicate to match a prim name. This class is to be used as a FindPrimPredicate.
+     *
+     * @param[in] _ Unused scene index parameter. Is only present to conform to the 
+     * FindPrimPredicate signature.
+     * @param[in] primPath The prim path to test.
+     *
+     * @return True if the argument prim path's name matches the predicate's prim name, false otherwise.
+     */
+    bool operator()(const HdSceneIndexBasePtr& _, const SdfPath& primPath) {
+        return primPath.GetName() == _primName;
+    }
+
+private:
+    const std::string _primName;
+};
+
 class SceneIndexDisplayNamePred {
     const std::string _name;
 public:
