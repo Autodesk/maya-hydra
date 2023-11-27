@@ -1,3 +1,4 @@
 add_subdirectory(mayaPlugin)
 add_subdirectory(hydraExtensions)
 add_subdirectory(ufeExtensions)
+add_subdirectory(flowViewportAPIExamples)

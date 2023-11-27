@@ -21,7 +21,7 @@
 #include <mutex>
 
 namespace{
-    std::mutex _viewportSelectClient_mutex;
+    std::mutex viewportSelectClient_mutex;
 }
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -43,7 +43,7 @@ SelectionInterfaceImp& SelectionInterfaceImp::Get()
 
 void SelectionInterfaceImp::RegisterSelectionClient(SelectionClient& client)
 {
-    std::lock_guard<std::mutex> lock(_viewportSelectClient_mutex);
+    std::lock_guard<std::mutex> lock(viewportSelectClient_mutex);
 
     auto foundResult = _viewportSelectionClients.find(&client);
     if (foundResult == _viewportSelectionClients.cend()){
@@ -53,7 +53,7 @@ void SelectionInterfaceImp::RegisterSelectionClient(SelectionClient& client)
 
 void SelectionInterfaceImp::UnregisterSelectionClient(SelectionClient& client)
 {
-    std::lock_guard<std::mutex> lock(_viewportSelectClient_mutex);
+    std::lock_guard<std::mutex> lock(viewportSelectClient_mutex);
 
     auto foundResult = _viewportSelectionClients.find(&client);
     if (foundResult != _viewportSelectionClients.end()){
@@ -63,7 +63,7 @@ void SelectionInterfaceImp::UnregisterSelectionClient(SelectionClient& client)
 
 void SelectionInterfaceImp::DummySelectionCallback()
 {
-    std::lock_guard<std::mutex> lock(_viewportSelectClient_mutex);
+    std::lock_guard<std::mutex> lock(viewportSelectClient_mutex);
 
     for (auto _selectionClient : _viewportSelectionClients) {
         if (_selectionClient){

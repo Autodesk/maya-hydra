@@ -24,15 +24,14 @@ namespace FVP_NS_DEF {
 #define FLOW_VIEWPORT_API_MINOR_VERSION  1
 #define FLOW_VIEWPORT_API_PATCH_LEVEL    0
 
-static VersionInterfaceImp theInterface;
-
 VersionInterface& VersionInterface::Get() 
 { 
-    return theInterface;
+    return VersionInterfaceImp::Get();
 }
 
 VersionInterfaceImp& VersionInterfaceImp::Get()
 {
+    static VersionInterfaceImp theInterface;
     return theInterface;
 }
 

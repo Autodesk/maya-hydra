@@ -39,14 +39,14 @@ namespace FVP_NS_DEF
         ///Interface accessor
         static FVP_API InformationInterface& Get();
 
-        ///Struct used to store information about an Hydra viewport from the DCC
+        ///Struct used to store information about a Hydra viewport from the DCC
         struct ViewportInformation
         {
             /// Constructor
             ViewportInformation(const std::string& viewportId, const std::string& cameraName)
                 : _viewportId(viewportId), _cameraName(cameraName) {}
             
-            ///_viewportId is an Hydra viewport string identifier which is unique for all hydra viewports during a session
+            ///_viewportId is a Hydra viewport string identifier which is unique for all hydra viewports during a session
             const std::string _viewportId;
 
             ///_cameraName is the name of the camera/viewport when the viewport was created, it is not updated if the camera's name has changed.

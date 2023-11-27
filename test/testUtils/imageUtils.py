@@ -214,11 +214,14 @@ class ImageDiffingTestCase:
         3 -- The images were not the same size and could not be compared.
         4 -- File error: could not find or open input files, etc.
         """
-        
+        #Disable undo
+        cmds.undoInfo(stateWithoutFlush=False)
         proc = imageDiff(imagePath1, imagePath2, verbose=True, 
                             fail=fail, failpercent=failpercent, hardfail=hardfail,
                             warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, 
                             perceptual=perceptual)
+        #Enable undo again
+        cmds.undoInfo(stateWithoutFlush=True)
         if proc.returncode not in (0, 1):
             self.fail(str(proc.stdout))
         return proc.returncode
@@ -228,11 +231,15 @@ class ImageDiffingTestCase:
     
     def assertSnapshotClose(self, refImage, fail, failpercent, hardfail=None, 
                 warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+        #Disable undo so that when we call undo it doesn't undo any operation from self.assertSnapshotClose
+        cmds.undoInfo(stateWithoutFlush=False)
         snapDir = os.path.join(os.path.abspath('.'), self._testMethodName)
         if not os.path.isdir(snapDir):
             os.makedirs(snapDir)
         snapImage = os.path.join(snapDir, os.path.basename(refImage))
         snapshot(snapImage)
+        #Enable undo again
+        cmds.undoInfo(stateWithoutFlush=True)
         
         return self.assertImagesClose(refImage, snapImage, 
                fail=fail, failpercent=failpercent, hardfail=hardfail,

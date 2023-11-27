@@ -22,6 +22,7 @@ target_sources(${TARGET_NAME}
         testWireframeSelectionHighlightSceneIndex.cpp
         testFvpViewportInformationMultipleViewports.cpp
         testFvpViewportInformationRendererSwitching.cpp
+        testFlowViewportAPIAddPrims.cpp
         testUsdStageLayerMuting.cpp
 )
 
@@ -53,6 +54,7 @@ target_link_libraries(${TARGET_NAME}
     PUBLIC
         mayaHydraLib
         ${GTEST_LIBRARIES}
+        flowViewport
 )
 
 # -----------------------------------------------------------------------------
