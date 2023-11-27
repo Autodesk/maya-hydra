@@ -21,6 +21,7 @@ set(TEST_SCRIPT_FILES
     cpp/testSelectionSceneIndex.py
     cpp/testWireframeSelectionHighlightSceneIndex.py
     cpp/testFlowViewportAPIViewportInformation.py
+    cpp/testUsdStageLayerMuting.py
 )
 
 # Test use of mesh adapter code for mesh support, using environment variable.
