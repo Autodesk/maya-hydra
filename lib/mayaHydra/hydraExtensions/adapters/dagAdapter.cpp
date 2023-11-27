@@ -82,8 +82,8 @@ void _TransformNodeDirty(MObject& node, MPlug& plug, void* clientData)
         // that dirty as well...
         if (adapter->IsVisible(false)) {
             // Transform can change while dag path is hidden.
-            adapter->MarkDirty(HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyTransform);
             adapter->InvalidateTransform();
+            adapter->MarkDirty(HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyTransform);
         } else {
             adapter->MarkDirty(HdChangeTracker::DirtyVisibility);
         }
@@ -91,8 +91,8 @@ void _TransformNodeDirty(MObject& node, MPlug& plug, void* clientData)
         // DON'T update visibility from within this callback, since the change
         // has't propagated yet
     } else if (adapter->IsVisible(false)) {
-        adapter->MarkDirty(HdChangeTracker::DirtyTransform);
         adapter->InvalidateTransform();
+        adapter->MarkDirty(HdChangeTracker::DirtyTransform);
     }
 }
 
@@ -210,9 +210,9 @@ void MayaHydraDagAdapter::CreateCallbacks()
 void MayaHydraDagAdapter::MarkDirty(HdDirtyBits dirtyBits)
 {
     if (dirtyBits != 0) {
-        GetSceneProducer()->GetRenderIndex().GetChangeTracker().MarkRprimDirty(GetID(), dirtyBits);
+        GetSceneProducer()->MarkRprimDirty(GetID(), dirtyBits);
         if (IsInstanced()) {
-            GetSceneProducer()->GetRenderIndex().GetChangeTracker().MarkInstancerDirty(GetInstancerID(), dirtyBits);
+            GetSceneProducer()->MarkInstancerDirty(GetInstancerID(), dirtyBits);
         }
         if (dirtyBits & HdChangeTracker::DirtyVisibility) {
             _visibilityDirty = true;

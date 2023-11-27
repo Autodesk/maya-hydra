@@ -72,9 +72,9 @@ void _dirtyTransform(MObject& node, void* clientData)
     TF_UNUSED(node);
     auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
     if (adapter->IsVisible()) {
+        adapter->InvalidateTransform();
         adapter->MarkDirty(
             HdLight::DirtyTransform | HdLight::DirtyParams | HdLight::DirtyShadowParams);
-        adapter->InvalidateTransform();
     }
 }
 
@@ -83,8 +83,8 @@ void _dirtyParams(MObject& node, void* clientData)
     TF_UNUSED(node);
     auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
     if (adapter->IsVisible()) {
-        adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
         adapter->InvalidateTransform();
+        adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
     }
 }
 

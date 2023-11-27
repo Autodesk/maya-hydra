@@ -32,6 +32,7 @@ set(TEST_SCRIPT_FILES
 # both versions of the test in parallel will conflict.
 set(TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshes.py
+    cpp/testMeshAdapterTransform.py
 )
 
 foreach(script ${TEST_SCRIPT_FILES})

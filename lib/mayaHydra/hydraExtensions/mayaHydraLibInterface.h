@@ -26,7 +26,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-using SceneIndicesVector                                        = std::vector<HdSceneIndexBasePtr>;//Be careful, these are not not Ref counted. Elements could become dangling
+using SceneIndicesVector = std::vector<HdSceneIndexBaseRefPtr>;
 
 /// In order to access this interface, call the function GetMayaHydraLibInterface()
 class MayaHydraLibInterface

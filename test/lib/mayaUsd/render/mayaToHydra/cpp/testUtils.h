@@ -31,7 +31,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 constexpr double DEFAULT_TOLERANCE = std::numeric_limits<double>::epsilon();
 
-using SceneIndicesVector = std::vector<HdSceneIndexBasePtr>;
+using SceneIndicesVector = std::vector<HdSceneIndexBaseRefPtr>;
 
 /**
  * @brief Retrieve the list of registered terminal scene indices from the Hydra plugin
@@ -195,6 +195,58 @@ HdSceneIndexBaseRefPtr findSceneIndexInTree(
     const HdSceneIndexBaseRefPtr&                             sceneIndex,
     const std::function<bool(const HdSceneIndexBaseRefPtr&)>& predicate
 );
+
+/**
+* @class A utility class to accumulate and read SceneIndex notifications sent by a SceneIndex.
+*/
+class SceneIndexNotificationsAccumulator : public HdSceneIndexObserver
+{
+public:
+    SceneIndexNotificationsAccumulator(HdSceneIndexBaseRefPtr observedSceneIndex)
+        : _observedSceneIndex(observedSceneIndex)
+    {
+        _observedSceneIndex->AddObserver(HdSceneIndexObserverPtr(this));
+    }
+    ~SceneIndexNotificationsAccumulator() override
+    {
+        _observedSceneIndex->RemoveObserver(HdSceneIndexObserverPtr(this));
+    }
+
+    HdSceneIndexBaseRefPtr GetObservedSceneIndex() { return _observedSceneIndex; }
+
+    const AddedPrimEntries&   GetAddedPrimEntries() { return _addedPrimEntries; }
+    const RemovedPrimEntries& GetRemovedPrimEntries() { return _removedPrimEntries; }
+    const DirtiedPrimEntries& GetDirtiedPrimEntries() { return _dirtiedPrimEntries; }
+    const RenamedPrimEntries& GetRenamedPrimEntries() { return _renamedPrimEntries; }
+
+    void PrimsAdded(const HdSceneIndexBase& sender, const AddedPrimEntries& entries) override
+    {
+        _addedPrimEntries.insert(_addedPrimEntries.end(), entries.begin(), entries.end());
+    }
+
+    void PrimsRemoved(const HdSceneIndexBase& sender, const RemovedPrimEntries& entries) override
+    {
+        _removedPrimEntries.insert(_removedPrimEntries.end(), entries.begin(), entries.end());
+    }
+
+    void PrimsDirtied(const HdSceneIndexBase& sender, const DirtiedPrimEntries& entries) override
+    {
+        _dirtiedPrimEntries.insert(_dirtiedPrimEntries.end(), entries.begin(), entries.end());
+    }
+
+    void PrimsRenamed(const HdSceneIndexBase& sender, const RenamedPrimEntries& entries) override
+    {
+        _renamedPrimEntries.insert(_renamedPrimEntries.end(), entries.begin(), entries.end());
+    }
+
+private:
+    HdSceneIndexBaseRefPtr _observedSceneIndex;
+
+    AddedPrimEntries   _addedPrimEntries;
+    DirtiedPrimEntries _dirtiedPrimEntries;
+    RemovedPrimEntries _removedPrimEntries;
+    RenamedPrimEntries _renamedPrimEntries;
+};
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

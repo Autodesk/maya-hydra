@@ -47,6 +47,7 @@
 #include <pxr/imaging/hd/rendererPlugin.h>
 #include <pxr/imaging/hdx/taskController.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
+#include "pxr/imaging/hd/dirtyBitsTranslator.h"
 
 #include <unordered_map>
 
@@ -106,10 +107,10 @@ public:
     // Remove a primitive from hydra scene
     void RemovePrim(const SdfPath& id);
 
-    // Mark a primitive in hydra scene as dirty
-    void MarkPrimDirty(
-        const SdfPath& id,
-        HdDirtyBits dirtyBits);
+    void MarkRprimDirty(const SdfPath& id, HdDirtyBits dirtyBits);
+    void MarkSprimDirty(const SdfPath& id, HdDirtyBits dirtyBits);
+    void MarkBprimDirty(const SdfPath& id, HdDirtyBits dirtyBits);
+    void MarkInstancerDirty(const SdfPath& id, HdDirtyBits dirtyBits);
 
     // Operation that's performed on rendering a frame
     void PreFrame(const MHWRender::MDrawContext& drawContext);
@@ -202,6 +203,12 @@ private:
     using LightDagPathMap = std::unordered_map<std::string, MDagPath>;
     LightDagPathMap _GetActiveLightPaths() const;
     static VtValue CreateMayaDefaultMaterial();
+
+    using DirtyBitsToLocatorsFunc = std::function<void(TfToken const&, const HdDirtyBits, HdDataSourceLocatorSet*)>;
+    void _MarkPrimDirty(
+        const SdfPath&          id,
+        HdDirtyBits             dirtyBits,
+        DirtyBitsToLocatorsFunc dirtyBitsToLocatorsFunc);
 private:
     // ------------------------------------------------------------------------
     // HdSceneIndexBase implementations

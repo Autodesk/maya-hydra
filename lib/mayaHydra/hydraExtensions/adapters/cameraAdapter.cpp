@@ -102,8 +102,8 @@ void MayaHydraCameraAdapter::CreateCallbacks()
         dag,
         +[](MObject& transformNode, MDagMessage::MatrixModifiedFlags& modified, void* clientData) {
             auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
-            adapter->MarkDirty(HdCamera::DirtyTransform);
             adapter->InvalidateTransform();
+            adapter->MarkDirty(HdCamera::DirtyTransform);
         },
         reinterpret_cast<void*>(this),
         &status);
