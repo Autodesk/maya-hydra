@@ -187,7 +187,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     }
 
     MGeometry* geom = nullptr;
-    if (geomChanged | topoChanged) {
+    if (geomChanged || topoChanged) {
         geom = data._ri.geometry();
     }
     VtIntArray vertexIndices;
