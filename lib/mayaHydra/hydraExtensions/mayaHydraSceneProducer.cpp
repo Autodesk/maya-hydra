@@ -315,11 +315,23 @@ void MayaHydraSceneProducer::MarkRprimDirty(const SdfPath& id, HdDirtyBits dirty
 {
     if (enableMayaNativeSceneIndex())
     {
-        _sceneIndex->MarkPrimDirty(id, dirtyBits);
+        _sceneIndex->MarkRprimDirty(id, dirtyBits);
     }
     else
     {
         _sceneDelegate->GetRenderIndex().GetChangeTracker().MarkRprimDirty(id, dirtyBits);
+    }
+}
+
+void MayaHydraSceneProducer::MarkInstancerDirty(const SdfPath& id, HdDirtyBits dirtyBits)
+{
+    if (enableMayaNativeSceneIndex())
+    {
+        _sceneIndex->MarkInstancerDirty(id, dirtyBits);
+    }
+    else
+    {
+        _sceneDelegate->GetRenderIndex().GetChangeTracker().MarkInstancerDirty(id, dirtyBits);
     }
 }
 
@@ -355,7 +367,7 @@ void MayaHydraSceneProducer::MarkSprimDirty(const SdfPath& id, HdDirtyBits dirty
 {
     if (enableMayaNativeSceneIndex())
     {
-        _sceneIndex->MarkPrimDirty(id, dirtyBits);
+        _sceneIndex->MarkSprimDirty(id, dirtyBits);
     }
     else
     {
