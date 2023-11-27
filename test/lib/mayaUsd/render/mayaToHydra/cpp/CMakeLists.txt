@@ -23,6 +23,7 @@ target_sources(${TARGET_NAME}
         testFvpViewportInformationMultipleViewports.cpp
         testFvpViewportInformationRendererSwitching.cpp
         testFlowViewportAPIAddPrims.cpp
+        testUsdStageLayerMuting.cpp
 )
 
 # -----------------------------------------------------------------------------
