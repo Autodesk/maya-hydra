@@ -38,6 +38,17 @@ const std::string kPolyEdgeColorName = "polyEdge";
 const std::string kPolyFaceColorName = "polyFace";
 
 /**
+ * @brief Retrieve several nodes MObject from their name.
+ *
+ * @param[in] nodeNames are the names of the nodes whose MObject is wanted.
+ * @param[out] outObjects are the MObject of each node retrieved.
+ *
+ * @return The resulting status of the operation.
+ */
+MAYAHYDRALIB_API
+MStatus GetObjectsFromNodeNames(const MStringArray& nodeNames, MObjectArray & outObjects);
+
+/**
  * @brief Get the DAG path of a node from the Maya scene graph using its name
  *
  * @param[in] nodeName is the name of the node to get the DAG path of.
@@ -93,6 +104,30 @@ bool IsUfeItemFromMayaUsd(const MDagPath& dagPath, MStatus* returnStatus = nullp
  */
 MAYAHYDRALIB_API
 bool IsUfeItemFromMayaUsd(const MObject& obj, MStatus* returnStatus = nullptr);
+
+/**
+ * @brief Is it a maya node transform attribute ?
+ *
+ * @param[in] attrName is an attribute's name.
+ *
+ * @return true if this is a maya transform attribute name, false otherwise.
+ */
+MAYAHYDRALIB_API 
+bool IsAMayaTransformAttributeName(const MString& attrName);
+
+/**
+ * @brief Is it a maya node visibility attribute ?
+ *
+ * If so then we fill the outVal with the visibility value
+ * 
+ * @param[in] plug is a MPlug from an attribute.
+ * @param[out] outVal wilml contain true or false if that was a maya visibility attribute 
+ *
+ * @return true if this is a maya visibility attribute name, false otherwise.
+ */
+
+//Is it a maya node visibility attribute ? 
+bool IsAMayaVisibilityAttribute(const MPlug& plug, bool& outVal);
 
 } // namespace MAYAHYDRA_NS_DEF
 

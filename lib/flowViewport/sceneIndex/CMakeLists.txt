@@ -9,6 +9,7 @@ target_sources(${TARGET_NAME}
     fvpRenderIndexProxy.cpp
     fvpSelectionSceneIndex.cpp
     fvpWireframeSelectionHighlightSceneIndex.cpp
+    fvpParentDataModifierSceneIndex.cpp
 )
 
 set(HEADERS
@@ -19,6 +20,7 @@ set(HEADERS
     fvpRenderIndexProxyFwd.h
     fvpSelectionSceneIndex.h
     fvpWireframeSelectionHighlightSceneIndex.h
+    fvpParentDataModifierSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------

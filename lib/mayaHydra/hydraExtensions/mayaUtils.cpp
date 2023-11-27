@@ -22,8 +22,44 @@
 #include <maya/MMatrix.h>
 #include <maya/MPlug.h>
 #include <maya/MSelectionList.h>
+#include <maya/MObjectArray.h>
+#include <maya/MFnAttribute.h>
+
+namespace
+{
+    //To compute the size of an array automatically
+    template<typename T, std::size_t N>
+    constexpr std::size_t arraySize(T(&)[N]) noexcept
+    {
+        return N;
+    }
+
+    ///Is an array of strings that are all maya transform attributes names
+    const char* kMayaTransformAttributesStrings[] = {"translateX", "translateY", "translateZ",
+                                                "rotatePivotTranslateX", "rotatePivotTranslateY", "rotatePivotTranslateZ",
+                                                "rotatePivotX", "rotatePivotY", "rotatePivotZ", 
+                                                "rotateX", "rotateY","rotateZ",
+                                                "rotateAxisX", "rotateAxisY", "rotateAxisZ",
+                                                "scalePivotTranslateX", "scalePivotTranslateY", "scalePivotTranslateZ",
+                                                "scalePivotX", "scalePivotY", "scalePivotZ",
+                                                "shearXY", "shearXZ", "shearYZ",
+                                                "scaleX", "scaleY", "scaleZ",
+                                                "worldMatrix",
+                                                "localPositionX", "localPositionY", "localPosition",
+                                                "translate", "rotate", "scale"
+                                                };
+    //Convert from const char* [] to MStringArray
+    const MStringArray transformAttrNames(kMayaTransformAttributesStrings, arraySize(kMayaTransformAttributesStrings));
+
+    //For visibility attributes
+    const char* visibilityNames[] = {"visibility"};
+    
+    //For visibility attributes
+    const MStringArray visibilityAttrNames = MStringArray(visibilityNames, arraySize(visibilityNames));
+}
 
 namespace MAYAHYDRA_NS_DEF {
+
 
 MStatus GetDagPathFromNodeName(const MString& nodeName, MDagPath& outDagPath)
 {
@@ -68,6 +104,48 @@ bool IsUfeItemFromMayaUsd(const MObject& obj, MStatus* returnStatus)
     }
 
     return IsUfeItemFromMayaUsd(dagPath, returnStatus);
+}
+
+MStatus GetObjectsFromNodeNames(const MStringArray& nodeNames, MObjectArray & outObjects)
+{
+    const unsigned int numObjects = outObjects.length() ;
+    if (nodeNames.length() != numObjects){
+        return MStatus::kInvalidParameter;
+    }
+
+    for (auto& obj : outObjects){
+        obj = MObject::kNullObj;
+    }
+
+    MStatus status;
+    MSelectionList sList;
+    for (const auto& nodeName : nodeNames){
+        status = sList.add(nodeName);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+    }
+
+    for (unsigned int i=0;i<numObjects;++i){
+        status = sList.getDependNode(i, outObjects[i]);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+    }
+    
+    return MS::kSuccess;
+}
+
+bool IsAMayaTransformAttributeName(const MString& attrName)
+{ 
+    return (-1 != transformAttrNames.indexOf(attrName));
+}
+
+bool IsAMayaVisibilityAttribute(const MPlug& plug, bool& outVal)
+{
+    //Get the visibility value from MPlug
+    MFnAttribute attr (plug.attribute());
+    bool isVisibility = -1 != visibilityAttrNames.indexOf(attr.name());
+    if (isVisibility){
+        plug.getValue(outVal);
+    }
+    return isVisibility;
 }
 
 } // namespace MAYAHYDRA_NS_DEF

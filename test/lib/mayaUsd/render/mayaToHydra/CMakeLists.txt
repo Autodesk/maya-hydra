@@ -13,6 +13,7 @@ set(TEST_SCRIPT_FILES
     testStageAddPrim.py
     testNewSceneWithStage.py
     testDirectionalLights.py
+    testFlowViewportAPI.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py
@@ -21,6 +22,7 @@ set(TEST_SCRIPT_FILES
     cpp/testSelectionSceneIndex.py
     cpp/testWireframeSelectionHighlightSceneIndex.py
     cpp/testFlowViewportAPIViewportInformation.py
+    cpp/testFlowViewportAPIAddPrims.py
     cpp/testUsdStageLayerMuting.py
 )
 

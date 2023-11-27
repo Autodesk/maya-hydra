@@ -5,11 +5,14 @@ target_sources(${TARGET_NAME}
     PRIVATE
     fvpViewportInformationAndSceneIndicesPerViewportData.cpp
     fvpViewportInformationAndSceneIndicesPerViewportDataManager.cpp
+    fvpDataProducerSceneIndexDataBase.cpp
 )
 
 set(HEADERS
     fvpViewportInformationAndSceneIndicesPerViewportData.h
     fvpViewportInformationAndSceneIndicesPerViewportDataManager.h
+    fvpDataProducerSceneIndexDataAbstractFactory.h
+    fvpDataProducerSceneIndexDataBase.h
 )
 
 # -----------------------------------------------------------------------------

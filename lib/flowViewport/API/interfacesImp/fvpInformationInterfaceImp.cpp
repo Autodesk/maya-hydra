@@ -21,10 +21,10 @@
 #include <mutex>
 
 namespace{
-    std::mutex _viewportInformationClient_mutex;
+    std::mutex viewportInformationClient_mutex;
     
     //Set of information clients
-    FVP_NS_DEF::SharedInformationClientPtrSet _viewportInformationClients;
+    FVP_NS_DEF::SharedInformationClientPtrSet viewportInformationClients;
 }
     
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -47,28 +47,28 @@ void InformationInterfaceImp::RegisterInformationClient(const std::shared_ptr<In
 {
     TF_AXIOM(client);
 
-    std::lock_guard<std::mutex> lock(_viewportInformationClient_mutex);
+    std::lock_guard<std::mutex> lock(viewportInformationClient_mutex);
 
-    auto foundResult = _viewportInformationClients.find(client);
-    if (foundResult == _viewportInformationClients.cend()){
-        _viewportInformationClients.insert(client);
+    auto foundResult = viewportInformationClients.find(client);
+    if (foundResult == viewportInformationClients.cend()){
+        viewportInformationClients.insert(client);
     }
 }
 
 void InformationInterfaceImp::UnregisterInformationClient(const std::shared_ptr<InformationClient>& client)
 {
-    std::lock_guard<std::mutex> lock(_viewportInformationClient_mutex);
+    std::lock_guard<std::mutex> lock(viewportInformationClient_mutex);
 
-    auto foundResult = _viewportInformationClients.find(client);
-    if (foundResult != _viewportInformationClients.end()){
-        _viewportInformationClients.erase(foundResult);
+    auto foundResult = viewportInformationClients.find(client);
+    if (foundResult != viewportInformationClients.end()){
+        viewportInformationClients.erase(foundResult);
     }
 }
 
 void InformationInterfaceImp::SceneIndexAdded(const InformationInterface::ViewportInformation& _viewportInfo)
 {
-    std::lock_guard<std::mutex> lock(_viewportInformationClient_mutex);
-    for (auto viewportInfoClient : _viewportInformationClients){
+    std::lock_guard<std::mutex> lock(viewportInformationClient_mutex);
+    for (auto viewportInfoClient : viewportInformationClients){
         if (viewportInfoClient){
             viewportInfoClient->SceneIndexAdded(_viewportInfo);
         }
@@ -77,8 +77,8 @@ void InformationInterfaceImp::SceneIndexAdded(const InformationInterface::Viewpo
 
 void InformationInterfaceImp::SceneIndexRemoved(const InformationInterface::ViewportInformation& _viewportInfo)
 {
-    std::lock_guard<std::mutex> lock(_viewportInformationClient_mutex);
-    for (auto viewportInfoClient : _viewportInformationClients){
+    std::lock_guard<std::mutex> lock(viewportInformationClient_mutex);
+    for (auto viewportInfoClient : viewportInformationClients){
         if (viewportInfoClient){
             viewportInfoClient->SceneIndexRemoved(_viewportInfo);
         }
@@ -89,7 +89,7 @@ void InformationInterfaceImp::GetViewportsInformation(ViewportInformationSet& ou
 {
     outHydraViewportInformationArray.clear();
     const ViewportInformationAndSceneIndicesPerViewportDataSet& allViewportInformationAndSceneIndicesPerViewportData = 
-        ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetViewportInfoAndSceneIndicesPerViewportData();
+        ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetAllViewportInfoAndData();
     for (const ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData : allViewportInformationAndSceneIndicesPerViewportData){
         const InformationInterface::ViewportInformation& viewportInfo = viewportInformationAndSceneIndicesPerViewportData.GetViewportInformation();
         outHydraViewportInformationArray.insert(viewportInfo);

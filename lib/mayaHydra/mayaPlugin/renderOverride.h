@@ -36,6 +36,7 @@
 #include <mayaHydraLib/delegates/delegate.h>
 #include <mayaHydraLib/delegates/params.h>
 #include <mayaHydraLib/mayaHydraSceneProducer.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexDataFactoriesSetup.h>
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h>
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
@@ -144,7 +145,6 @@ private:
     HdRenderDelegate* _GetRenderDelegate();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void              _CreateSceneIndicesChainAfterMergingSceneIndex();
-    void              _UpdateRenderIndexProxyIfRequired(const MHWRender::MDrawContext& drawContext);
 
     void _PickByRegion(
         HdxPickHitVector& outHits,
@@ -241,6 +241,12 @@ private:
     GlfSimpleLight _defaultLight;
 
     std::unique_ptr<MayaHydraSceneProducer> _mayaHydraSceneProducer;
+
+    /** This class creates the scene index data factories and set them up into the flow viewport library to be able to create DCC 
+    *   specific scene index data classes without knowing their content in Flow viewport.
+    *   This is done in the constructor of this class
+    */
+    MAYAHYDRA_NS_DEF::SceneIndexDataFactoriesSetup  _sceneIndexDataFactoriesSetup;
 
     SdfPath _ID;
 

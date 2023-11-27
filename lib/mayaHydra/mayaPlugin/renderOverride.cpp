@@ -410,14 +410,6 @@ SdfPath MtohRenderOverride::RendererSceneDelegateId(TfToken rendererName, TfToke
     return SdfPath();
 }
 
-void MtohRenderOverride::_UpdateRenderIndexProxyIfRequired(const MHWRender::MDrawContext& drawContext)
-{
-    //Get model panel name
-    MString modelPanel;
-    drawContext.renderingDestination(modelPanel);
-    Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().UpdateRenderIndexProxy(modelPanel.asChar(), _renderIndexProxy);
-}
-
 void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext)
 {
     constexpr auto considerAllSceneLights = MHWRender::MDrawContext::kFilteredIgnoreLightLimit;
@@ -575,8 +567,6 @@ MStatus MtohRenderOverride::Render(
         return MStatus::kFailure;
     }
 
-    _UpdateRenderIndexProxyIfRequired(drawContext);
-
     _DetectMayaDefaultLighting(drawContext);
     if (_needsClear.exchange(false)) {
         ClearHydraResources();
@@ -587,6 +577,30 @@ MStatus MtohRenderOverride::Render(
 
         if (!_initializationSucceeded) {
             return MStatus::kFailure;
+        }
+    }
+
+    //This code with strings comparison will go away when doing multi viewports
+    MString panelName;
+    auto framecontext = getFrameContext();
+    if (framecontext){
+        framecontext->renderingDestination(panelName);
+        auto& manager = Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get();
+        if (false == manager.ModelPanelIsAlreadyRegistered(panelName.asChar())){
+            //Get information from viewport
+            std::string cameraName;
+    
+            M3dView view;
+	        if (M3dView::getM3dViewFromModelPanel(panelName, view)){
+                MDagPath dpath;
+	            view.getCamera(dpath);
+	            MFnCamera viewCamera(dpath);
+	            cameraName = viewCamera.name().asChar();
+            }
+    
+            //Create a HydraViewportInformation 
+            const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(panelName.asChar()), cameraName);
+            manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy);
         }
     }
 
@@ -824,6 +838,9 @@ void MtohRenderOverride::ClearHydraResources()
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
+    //We don't have any viewport using Hydra any more
+    Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveAllViewportsInformation();
+
     _mayaHydraSceneProducer.reset();
     _selectionSceneIndex.Reset();
     _selection.reset();
@@ -1000,21 +1017,6 @@ MStatus MtohRenderOverride::setup(const MString& destination)
         if (status) {
             newCallbacks.append(id);
         }
-
-        //Get information from viewport
-        std::string cameraName;
-        
-        M3dView view;
-	    if (M3dView::getM3dViewFromModelPanel(destination, view)){//destination is a panel name
-            MDagPath dpath;
-	        view.getCamera(dpath);
-	        MFnCamera viewCamera(dpath);
-	        cameraName = viewCamera.name().asChar();
-        }
-    
-        //Create an HydraViewportInformation 
-        const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(destination.asChar()), cameraName);
-        Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().AddViewportInformation(hydraViewportInformation);
 
         _renderPanelCallbacks.emplace_back(destination, newCallbacks);
     }
