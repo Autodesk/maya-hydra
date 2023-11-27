@@ -54,7 +54,7 @@ namespace FVP_NS_DEF
         * 
         *  @param[in]   customDataProducerSceneIndex is the custom scene index to add.
         * 
-        *  @param[in]   dccNode is a MObject* for Maya or an INode* for 3ds max, if you provide the pointer value, then we automatically track some events such as transform 
+        *  @param[in]   dccNode is a MObject* for Maya, if you provide the pointer value, then we automatically track some events such as transform 
         *               or visibility updated and we hide automatically the primitives from the data producer scene index. 
         *               If it is a nullptr, we won't do anything if the node's attributes changes.
         *               Basically, this is a way for you to set the DCC node as a parent node for all your primitives from the scene index.

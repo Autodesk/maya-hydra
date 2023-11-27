@@ -30,11 +30,22 @@
 
 namespace FVP_NS_DEF {
 
-/** This class is an example on how to inject Hydra prims into a Hydra viewport. 
-*   An data producer scene index is a scene index that adds primitives to the current rendering.
-*   We are holding a HdRetainedSceneIndex in this class, as it contains helper functions to add/remove/dirty prims.
+/** This class is an example on how to add Hydra primitives into a Hydra viewport. 
+*   A data producer scene index is a scene index that adds primitives to the current rendering.
+*   We are holding a HdRetainedSceneIndex in this class, as it contains helper functions to add/remove/dirty primitives.
 *   Another possibility is that we could also have subclassed HdRetainedSceneIndex.
 *   We are creating a 3D grid of cubes using Hydra mesh primitives.
+* 
+*   Usage of this class in done in several steps after creating an instance of this class :
+* 
+*   1. Set the hydra interface by calling setHydraInterface with a DataProducerSceneIndexInterface which you can get with :
+*       Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get()
+*   2. Optionally, set the DCC container node (for example : a MObject* for maya) by calling the setContainerNode function.
+*   3. Optionally, if you want to change the grid of cubes primitives, call setCubeGridParams
+*   4. Optionally, if you are using instancing on the cube primitives, call setContainerNodeInverseTransform with the suitable transform from your DCC node.
+*   5. Call addDataProducerSceneIndex() which will add the data producer scene index to all viewports
+* 
+*   The call to removeDataProducerSceneIndex() which will remove the primitives from the viewport is done in the destructor of this class.
 */
 class FVP_API DataProducerSceneIndexExample
 {
@@ -83,11 +94,11 @@ public:
                     (_useInstancing     == other._useInstancing);
         }
 
-        /// Number of X levels for the 3D grid of cube prims
+        /// Number of X levels for the 3D grid of cube primitives
         int                 _numLevelsX{10};
-        /// Number of Y levels for the 3D grid of cube prims
+        /// Number of Y levels for the 3D grid of cube primitives
         int                 _numLevelsY{10};
-        /// Number of Z levels for the 3D grid of cube prims
+        /// Number of Z levels for the 3D grid of cube primitives
         int                 _numLevelsZ{1};
         /// Half size of each cube in the 3D grid.
         double              _halfSize{2.0};
@@ -102,7 +113,7 @@ public:
         *   _deltaTrans.z is the space between 2 cubes on the Z axis of the 3D grid.
         * */
         PXR_NS::GfVec3f     _deltaTrans{5.0f, 5.0f, 5.0f};
-        /// if _useInstancing is true, then we are using Hydra instancing to create the cube prims, if it is false then we are not using Hydra instancing.
+        /// if _useInstancing is true, then we are using Hydra instancing to create the cube primitives, if it is false then we are not using Hydra instancing.
         bool                _useInstancing{false};
     };
 
@@ -115,7 +126,7 @@ public:
     ///Call the FlowViewport::DataProducerSceneIndexInterface::RemoveViewportDataProducerSceneIndex to remove our data producer scene index from the Hydra viewport
     void removeDataProducerSceneIndex();
 
-    /// This class is about geometry (prototype) instancing and holds the instance indices
+    /// This internal class is about geometry instancing and holds the instance indices
     class _InstanceIndicesDataSource : public PXR_NS::HdVectorDataSource
     {
     public:
@@ -132,14 +143,14 @@ public:
 
 protected:
 
-    ///Store the Hydra interface
+    ///Store the DataProducerSceneIndexInterface
     DataProducerSceneIndexInterface* _hydraInterface {nullptr};
     
     /// Enabled state of this client to enable/disable the scene indices
     bool    _isEnabled {false};
 
-    /// Container node from a DCC (maya or 3dsmax for example)
-    void*  _containerNode {nullptr};//Is a MObject* for Maya or an INode* for 3ds max
+    /// Container node from a DCC (maya for example)
+    void*  _containerNode {nullptr};//Is a MObject* for Maya
 
     ///Is the container node inverse transform matrix to remove transform matrix being applied twice for instances
     PXR_NS::GfMatrix4d  _containerNodeInvTransform;
@@ -169,13 +180,13 @@ protected:
     ///Remove the 3D grid of Hydra cube primitives from the retained scene index. We are using Hydra instancing in this function.
     void _RemoveAllPrimsWithInstancing();
     
-    ///Aggregation of the retained scene index data producer prims into Hydra
+    ///Aggregation of the retained scene index data producer primitives into Hydra
     PXR_NS::HdRetainedSceneIndexRefPtr  _retainedSceneIndex  {nullptr};
 
     /// 3D grid of cubes primitives parameters
     CubeGridCreationParams              _currentCubeGridParams;
 
-    /// Is the root path to create unique sdfPath for each prim of the 3D grid of cube prims
+    /// Is the root path to create unique sdfPath for each prim of the 3D grid of cube primitives
     PXR_NS::SdfPath                     _cubeRootPath;
 
     /// Is the instancer path when using instancing

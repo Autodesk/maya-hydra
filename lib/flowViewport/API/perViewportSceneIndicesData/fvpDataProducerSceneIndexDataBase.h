@@ -84,7 +84,7 @@ protected:
     SdfPath                             _customDataProducerSceneIndexRootPathForInsertion;
     /// Are the Hydra renderer(s) to which this scene index should be applied (e.g : "GL, Arnold") or DataProducerSceneIndexInterface::allViewports to apply to all viewports
     std::string                         _rendererNames;
-    /// Is the DCC node so a MObject* for Maya or an INode* for 3ds Max
+    /// Is the DCC node so a MObject* for Maya
     void*                               _dccNode;
 
     //The following members are optional and only used when a dccNode was passed in the constructor

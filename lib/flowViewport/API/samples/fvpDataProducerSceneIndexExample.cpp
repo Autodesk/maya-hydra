@@ -119,19 +119,15 @@ namespace PrototypeInstancing
 
 namespace FVP_NS_DEF {
 
-DataProducerSceneIndexExample::DataProducerSceneIndexExample()
+DataProducerSceneIndexExample::DataProducerSceneIndexExample() :
+    _cubeRootPath(SdfPath(TfStringPrintf("/DataProducerSceneIndexExample/cube_%p", this))),//Is the root path for the cubes
+    _instancerPath(SdfPath(TfStringPrintf("/DataProducerSceneIndexExample/instancer_%p", this)))//Is the instancer path when using instancing
 {
-    //Is the root path for the cubes
-    _cubeRootPath       = SdfPath(TfStringPrintf("/DataProducerSceneIndexExample/cube_%p", this));
-    
-    //Is the instancer path when using instancing
-    _instancerPath      = SdfPath(TfStringPrintf("/DataProducerSceneIndexExample/instancer_%p", this));
-
     //Create the HdRetainedSceneIndex to be able to easily add primitives
     _retainedSceneIndex = HdRetainedSceneIndex::New();
     
     //set the container node inverse transform being identity
-    _containerNodeInvTransform = _containerNodeInvTransform.SetIdentity();
+    _containerNodeInvTransform.SetIdentity();
 
     //Add all primitives
     _AddAllPrims();
