@@ -6,12 +6,16 @@ target_sources(${TARGET_NAME}
     fvpSelectionClientExample.cpp
     fvpInformationClientExample.cpp
     fvpDataProducerSceneIndexExample.cpp
+    fvpFilteringSceneIndexExample.cpp
+    fvpFilteringSceneIndexClientExample.cpp
 )
 
 set(HEADERS
     fvpSelectionClientExample.h
     fvpInformationClientExample.h
     fvpDataProducerSceneIndexExample.h
+    fvpFilteringSceneIndexExample.h
+    fvpFilteringSceneIndexClientExample.h
 )
 
 # -----------------------------------------------------------------------------

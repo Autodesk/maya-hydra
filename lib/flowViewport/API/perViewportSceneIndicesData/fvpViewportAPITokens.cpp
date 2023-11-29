@@ -12,17 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#ifndef FVP_RENDER_INDEX_PROXY_FWD_H
-#define FVP_RENDER_INDEX_PROXY_FWD_H
 
-#include "flowViewport/api.h"
-#include <memory>
+#include "flowViewport/API/fvpViewportAPITokens.h"
 
-namespace FVP_NS_DEF {
+// *** TODO / FIXME ***  Figure out how to put tokens into non-Pixar namespace.
 
-class RenderIndexProxy;
-using RenderIndexProxyPtr = std::shared_ptr<RenderIndexProxy>;
+PXR_NAMESPACE_OPEN_SCOPE
 
-}//End of namespace FVP_NS_DEF
+TF_DEFINE_PUBLIC_TOKENS(FvpViewportAPITokens, FVP_VIEWPORT_API_TOKENS);
 
-#endif //FVP_RENDER_INDEX_PROXY_FWD_H
+PXR_NAMESPACE_CLOSE_SCOPE

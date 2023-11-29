@@ -1,3 +1,4 @@
+//
 // Copyright 2023 Autodesk
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,17 +13,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#ifndef FVP_RENDER_INDEX_PROXY_FWD_H
-#define FVP_RENDER_INDEX_PROXY_FWD_H
 
-#include "flowViewport/api.h"
-#include <memory>
+//Local headers
+#include "mayaHydraMayaFilteringSceneIndexDataConcreteFactory.h"
+#include "mayaHydraMayaFilteringSceneIndexData.h"
 
-namespace FVP_NS_DEF {
+PXR_NAMESPACE_USING_DIRECTIVE
 
-class RenderIndexProxy;
-using RenderIndexProxyPtr = std::shared_ptr<RenderIndexProxy>;
+namespace MAYAHYDRA_NS_DEF {
 
-}//End of namespace FVP_NS_DEF
+PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr 
+MayaFilteringSceneIndexDataConcreteFactory::createFilteringSceneIndexDataBase(::FVP_NS_DEF::FilteringSceneIndexClient& client)
+{
+    return MayaFilteringSceneIndexData::New(client);
+}
 
-#endif //FVP_RENDER_INDEX_PROXY_FWD_H
+}//end of namespace MAYAHYDRA_NS_DEF 

@@ -5,6 +5,10 @@ set(HEADERS
     fvpInformationInterface.h
     fvpInformationClient.h
     fvpDataProducerSceneIndexInterface.h
+    fvpFilteringSceneIndexClient.h
+    fvpFilteringSceneIndexClientFwd.h
+    fvpFilteringSceneIndexInterface.h
+    fvpViewportAPITokens.h
 )
 
 # -----------------------------------------------------------------------------

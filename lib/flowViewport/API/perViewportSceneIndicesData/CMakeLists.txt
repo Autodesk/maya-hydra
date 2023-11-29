@@ -6,6 +6,9 @@ target_sources(${TARGET_NAME}
     fvpViewportInformationAndSceneIndicesPerViewportData.cpp
     fvpViewportInformationAndSceneIndicesPerViewportDataManager.cpp
     fvpDataProducerSceneIndexDataBase.cpp
+    fvpFilteringSceneIndexDataBase.cpp
+    fvpFilteringSceneIndicesChainManager.cpp
+    fvpViewportAPITokens.cpp
 )
 
 set(HEADERS
@@ -13,6 +16,9 @@ set(HEADERS
     fvpViewportInformationAndSceneIndicesPerViewportDataManager.h
     fvpDataProducerSceneIndexDataAbstractFactory.h
     fvpDataProducerSceneIndexDataBase.h
+    fvpFilteringSceneIndexDataAbstractFactory.h
+    fvpFilteringSceneIndexDataBase.h
+    fvpFilteringSceneIndicesChainManager.h
 )
 
 # -----------------------------------------------------------------------------

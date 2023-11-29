@@ -19,6 +19,7 @@
 #include "flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h"
 #include "flowViewport/API/interfacesImp/fvpInformationInterfaceImp.h"
 #include "flowViewport/sceneIndex/fvpRenderIndexProxy.h"
+#include "flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h"
 
 //Hydra headers
 #include <pxr/imaging/hd/renderIndex.h>
@@ -43,8 +44,13 @@ ViewportInformationAndSceneIndicesPerViewportDataManager& ViewportInformationAnd
 }
 
 //A new Hydra viewport was created
-void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, const Fvp::RenderIndexProxyPtr& renderIndexProxy)
+void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, const Fvp::RenderIndexProxyPtr& renderIndexProxy, 
+                                                                    const HdSceneIndexBaseRefPtr& lastFilteringSceneIndexOfTheChainBeforeCustomFiltering)
 {
+    TF_AXIOM(renderIndexProxy && lastFilteringSceneIndexOfTheChainBeforeCustomFiltering);
+
+    ViewportInformationAndSceneIndicesPerViewportDataSet::iterator it = _viewportsInformationAndSceneIndicesPerViewportData.end();
+
     //Add it in our array if it is not already inside
     {
         std::lock_guard<std::mutex> lock(viewportInformationAndSceneIndicesPerViewportDataSet_mutex);
@@ -56,7 +62,9 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInform
             return;//It is already inside our array
         }
 
-        _viewportsInformationAndSceneIndicesPerViewportData.insert(ViewportInformationAndSceneIndicesPerViewportData(viewportInfo, renderIndexProxy));
+        ViewportInformationAndSceneIndicesPerViewportData temp(viewportInfo, renderIndexProxy);
+        auto theResultingPair = _viewportsInformationAndSceneIndicesPerViewportData.emplace(temp);
+        it = theResultingPair.first;
     }
 
     //Call this to let the data producer scene indices that apply to all viewports to be added to this new viewport as well
@@ -64,6 +72,16 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInform
 
     //Let the registered clients know a new viewport has been added
     InformationInterfaceImp::Get().SceneIndexAdded(viewportInfo);
+
+    //Add the custom filtering scene indices to the merging scene index
+    ViewportInformationAndSceneIndicesPerViewportData& viewportsInformationAndSceneIndicesPerViewportData = const_cast<ViewportInformationAndSceneIndicesPerViewportData&>(*it);
+    const HdSceneIndexBaseRefPtr lastFilteringSceneIndex  = FilteringSceneIndicesChainManager::get().createFilteringSceneIndicesChain(viewportsInformationAndSceneIndicesPerViewportData, 
+                                                                                                                                lastFilteringSceneIndexOfTheChainBeforeCustomFiltering);
+
+    //Insert the last filtering scene index into the render index
+    auto renderIndex = renderIndexProxy->GetRenderIndex();
+    TF_AXIOM(renderIndex);
+    renderIndex->InsertSceneIndex(lastFilteringSceneIndex, SdfPath::AbsoluteRootPath());
 }
 
 void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveViewportInformation(const std::string& modelPanel)

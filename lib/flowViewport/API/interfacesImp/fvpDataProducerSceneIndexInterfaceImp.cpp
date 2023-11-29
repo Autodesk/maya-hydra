@@ -41,9 +41,6 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
-const std::string DataProducerSceneIndexInterface::allViewports  = "allViewports";
-const std::string DataProducerSceneIndexInterface::allRenderers  = "allRenderers";
-
 DataProducerSceneIndexInterface& DataProducerSceneIndexInterface::get()
 {
     return DataProducerSceneIndexInterfaceImp::get();
@@ -67,7 +64,7 @@ bool DataProducerSceneIndexInterfaceImp::addDataProducerSceneIndex(const PXR_NS:
     if (nullptr == dataProducerSceneIndexData){
         return false;
     }
-    if (DataProducerSceneIndexInterface::allViewports == hydraViewportId){
+    if (PXR_NS::FvpViewportAPITokens->allViewports == hydraViewportId){
         //Apply this data producer scene index to all viewports
         return _AddDataProducerSceneIndexToAllViewports(dataProducerSceneIndexData);
     } 
@@ -110,7 +107,7 @@ void DataProducerSceneIndexInterfaceImp::removeAllViewportDataProducerSceneIndic
 void DataProducerSceneIndexInterfaceImp::removeViewportDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
                                                                               const std::string& hydraViewportId /*= allViewports*/)
 {
-    if (DataProducerSceneIndexInterface::allViewports == hydraViewportId){
+    if (PXR_NS::FvpViewportAPITokens->allViewports == hydraViewportId){
         //It was applied to all viewports
         
         ViewportInformationAndSceneIndicesPerViewportDataSet& allViewportsInfoAndSceneIndices = 
@@ -194,7 +191,7 @@ void DataProducerSceneIndexInterfaceImp::_AddDataProducerSceneIndexToThisViewpor
     //Check if there is some filtering per Hydra renderer
     const std::string& viewportRendererName                         = viewportInformation._rendererName;
     const std::string& dataProducerSceneIndexApplyToRendererNames   = dataProducerSceneIndexData->GetRendererNames();
-    if ( (! viewportRendererName.empty() )&& (dataProducerSceneIndexApplyToRendererNames != DataProducerSceneIndexInterface::allRenderers) ){
+    if ( (! viewportRendererName.empty() )&& (dataProducerSceneIndexApplyToRendererNames != PXR_NS::FvpViewportAPITokens->allRenderers) ){
         //Filtering per renderer is applied
         if (std::string::npos == dataProducerSceneIndexApplyToRendererNames.find(viewportRendererName)){
             return; //Ignore the current hydra viewport renderer name is not part of the supported renderers for this data producer scene index

@@ -15,11 +15,13 @@
 //
 
 //Flow viewport headers
+#include <flowViewport/API/fvpFilteringSceneIndexInterface.h>
 #include <flowViewport/API/fvpDataProducerSceneIndexInterface.h>
 #include <flowViewport/API/fvpInformationInterface.h>
 #include <flowViewport/API/fvpVersionInterface.h>
 #include <flowViewport/API/samples/fvpInformationClientExample.h>
 #include <flowViewport/API/samples/fvpDataProducerSceneIndexExample.h>
+#include <flowViewport/API/samples/fvpFilteringSceneIndexClientExample.h>
 
 //Maya hydra headers
 #include <mayaHydraLib/mayaUtils.h>
@@ -89,6 +91,8 @@ public:
     Fvp::DataProducerSceneIndexExample                          _hydraViewportDataProducerSceneIndexExample;
 
 protected:
+    /// _hydraViewportFilteringSceneIndexClientExample is the filtering scene index example for a Hydra viewport scene index.
+    Fvp::FilteringSceneIndexClientExample                   _hydraViewportFilteringSceneIndexClientExample;
     /// _hydraViewportInformationClient is the viewport information example for a Hydra viewport.
     std::shared_ptr<Fvp::InformationClientExample>          _hydraViewportInformationClient;
     ///To be used in hydra viewport API to pass the Maya node's MObject for setting callbacks for filtering and data producer scene indices
@@ -315,7 +319,11 @@ CHECK_MSTATUS ( attr.setReadable(true) ); \
 CHECK_MSTATUS ( attr.setWritable(false) );
 
 
-FlowViewportAPIMayaLocator::FlowViewportAPIMayaLocator()
+FlowViewportAPIMayaLocator::FlowViewportAPIMayaLocator() :
+    _hydraViewportFilteringSceneIndexClientExample("FilteringSceneIndexClientExample", 
+                                            Fvp::FilteringSceneIndexClient::Bucket::kSceneFiltering, 
+                                            FvpViewportAPITokens->allRenderers, //We could set only Storm by using "GL" or only Arnold by using "Arnold" or both with "GL, Arnold"
+                                            nullptr)
 {
     //Get the flow viewport API hydra interfaces
     int majorVersion = 0;
@@ -364,6 +372,10 @@ FlowViewportAPIMayaLocator::~FlowViewportAPIMayaLocator()
 
     //The DataProducerSceneIndexExample in its destructor removes itself by calling DataProducerSceneIndexExample::RemoveDataProducerSceneIndex()
      
+    //Unregister filtering scene index client
+    Fvp::FilteringSceneIndexInterface& filteringSceneIndexInterface = Fvp::FilteringSceneIndexInterface::get();
+    filteringSceneIndexInterface.unregisterFilteringSceneIndexClient(_hydraViewportFilteringSceneIndexClientExample);
+
     //Unregister viewport information client
     Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
     informationInterface.UnregisterInformationClient(_hydraViewportInformationClient);
@@ -418,13 +430,24 @@ void FlowViewportAPIMayaLocator::SetupFlowViewportInterfaces()
         }
     }
 
-    //Store the MObject* of the maya node in various classes
     //Set the maya node as a parent for this data producer scene index so that when the node is hidden/deleted/moved it gets applied to the prims produced
     GfMatrix4d nodeInvTransform;
     GetNodeInverseTransform(_thisMObject, nodeInvTransform);
     _hydraViewportDataProducerSceneIndexExample.setContainerNode(&_thisMObject);
     _hydraViewportDataProducerSceneIndexExample.setContainerNodeInverseTransform(nodeInvTransform);
     _hydraViewportDataProducerSceneIndexExample.addDataProducerSceneIndex();
+
+    //Register a filtering scene index client
+    Fvp::FilteringSceneIndexInterface& filteringSceneIndexInterface = Fvp::FilteringSceneIndexInterface::get();
+
+    //Store the MObject* of the maya node in various classes
+    _hydraViewportFilteringSceneIndexClientExample.setDccNode(&_thisMObject);
+
+    //Register this filtering scene index client, so it can append custom filtering scene indices to Hydra viewport scene indices
+    const bool bResult = filteringSceneIndexInterface.registerFilteringSceneIndexClient(_hydraViewportFilteringSceneIndexClientExample);
+    if(! bResult){
+        perror("ERROR : filteringSceneIndexInterface.registerFilteringSceneIndexClient returned false");
+    }
 }
 
 MStatus FlowViewportAPIMayaLocator::compute( const MPlug& plug, MDataBlock& dataBlock)

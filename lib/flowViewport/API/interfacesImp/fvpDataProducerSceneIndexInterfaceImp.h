@@ -24,6 +24,7 @@
 #include "flowViewport/API/fvpDataProducerSceneIndexInterface.h"
 #include "flowViewport/API/fvpInformationInterface.h"
 #include "flowViewport/API/perViewportSceneIndicesData/fvpDataProducerSceneIndexDataAbstractFactory.h"
+#include "flowViewport/API/fvpViewportAPITokens.h"
 
 //STL Headers
 #include <set>
@@ -45,12 +46,12 @@ public:
     ///From FVP_NS_DEF::DataProducerSceneIndexInterface
     bool addDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
                                     void* dccNode = nullptr,
-                                    const std::string& hydraViewportId = allViewports,
-                                    const std::string& rendererNames = allRenderers,
+                                    const std::string& hydraViewportId = PXR_NS::FvpViewportAPITokens->allViewports,
+                                    const std::string& rendererNames = PXR_NS::FvpViewportAPITokens->allRenderers,
                                     const PXR_NS::SdfPath& customDataProducerSceneIndexRootPathForInsertion = PXR_NS::SdfPath::AbsoluteRootPath()
                                     )override;
     void removeViewportDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
-                                              const std::string& hydraViewportId = allViewports)override;
+                                              const std::string& hydraViewportId = PXR_NS::FvpViewportAPITokens->allViewports)override;
 
     //Called by flow viewport
     ///hydraViewportSceneIndexAdded is called when a new hydra viewport is created by the ViewportInformationAndSceneIndicesPerViewportDataManager, it's not a callback.

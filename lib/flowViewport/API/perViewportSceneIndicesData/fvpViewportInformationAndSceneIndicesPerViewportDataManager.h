@@ -40,7 +40,8 @@ public:
     static ViewportInformationAndSceneIndicesPerViewportDataManager& Get();
  
     ///A new Hydra viewport was created
-    void AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, const Fvp::RenderIndexProxyPtr& renderIndexProxy);
+    void AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, const Fvp::RenderIndexProxyPtr& renderIndexProxy, 
+                                const PXR_NS::HdSceneIndexBaseRefPtr& lastFilteringSceneIndexOfTheChainBeforeCustomFiltering);
     
     ///A Hydra viewport was deleted
     void RemoveViewportInformation(const std::string& modelPanel);
