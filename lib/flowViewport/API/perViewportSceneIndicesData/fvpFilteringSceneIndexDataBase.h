@@ -54,9 +54,6 @@ protected:
 
     ///_isVisible is true when the filteringSceneIndices should be visible and false when they are not such as when the hosting node has been hidden/deleted.
     bool    _isVisible = true;
-
-private:
-    FilteringSceneIndexDataBase() = default;
 };
 
 }//End of namespace FVP_NS_DEF {
