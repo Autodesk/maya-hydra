@@ -42,7 +42,12 @@ public:
     }
     
     ~MayaFilteringSceneIndexData() override;
+
+    const MObjectHandle& getObjHandle()const {return _mObjHandle;}  
     
+private:
+    MayaFilteringSceneIndexData(const std::shared_ptr<::FVP_NS_DEF::FilteringSceneIndexClient>& client);
+
     ///The following members are optional and used only when a dccNode was passed in the FilteringSceneIndexClient
     
     /// Is the MObjectHandle of the maya node shape, it may be invalid if no maya node MObject pointer was passed in the FilteringSceneIndexClient.
@@ -53,9 +58,6 @@ public:
 
     /// Are the callbacks Ids set in maya to handle delete and deletion undo/redo
     MCallbackIdArray                    _dGMessageCallbackIds;
-
-private:
-    MayaFilteringSceneIndexData(const std::shared_ptr<::FVP_NS_DEF::FilteringSceneIndexClient>& client);
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

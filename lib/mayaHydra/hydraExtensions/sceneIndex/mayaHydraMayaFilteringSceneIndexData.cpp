@@ -53,7 +53,7 @@ namespace
         //this is how we identify which object we need to deal with.
         PXR_NS::MayaFilteringSceneIndexData* mayaFilteringSceneIndexData    = (PXR_NS::MayaFilteringSceneIndexData*)data;
         const MObjectHandle objHandle(obj);
-        if(mayaFilteringSceneIndexData&& mayaFilteringSceneIndexData->_mObjHandle.isValid() && objHandle.hashCode() == mayaFilteringSceneIndexData->_mObjHandle.hashCode()){
+        if(mayaFilteringSceneIndexData&& mayaFilteringSceneIndexData->getObjHandle().isValid() && objHandle.hashCode() == mayaFilteringSceneIndexData->getObjHandle().hashCode()){
             mayaFilteringSceneIndexData->updateVisibilityFromDCCNode(true);
         }
     }
@@ -65,7 +65,7 @@ namespace
         //this is how we identify which object we need to deal with.
         PXR_NS::MayaFilteringSceneIndexData* mayaFilteringSceneIndexData    = (PXR_NS::MayaFilteringSceneIndexData*)data;
         const MObjectHandle objHandle(obj);
-        if(mayaFilteringSceneIndexData&& mayaFilteringSceneIndexData->_mObjHandle.isValid() && objHandle.hashCode() == mayaFilteringSceneIndexData->_mObjHandle.hashCode()){
+        if(mayaFilteringSceneIndexData&& mayaFilteringSceneIndexData->getObjHandle().isValid() && objHandle.hashCode() == mayaFilteringSceneIndexData->getObjHandle().hashCode()){
             mayaFilteringSceneIndexData->updateVisibilityFromDCCNode(false);
         }
     }
