@@ -29,7 +29,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class MayaFilteringSceneIndexData;
-TF_DECLARE_REF_PTRS(MayaFilteringSceneIndexData);//Be able to use Ref counting pointers on MayaFilteringSceneIndexData
+TF_DECLARE_WEAK_AND_REF_PTRS(MayaFilteringSceneIndexData);//Be able to use Ref counting pointers on MayaFilteringSceneIndexData
 
 /**This class is a Maya implementation of FilteringSceneIndexDataBase with specific variables and callbacks for Maya since FilteringSceneIndexDataBase is
 * part of Flow viewport which is DCC agnostic.
