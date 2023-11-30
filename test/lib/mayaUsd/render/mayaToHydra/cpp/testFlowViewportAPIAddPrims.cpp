@@ -92,26 +92,14 @@ TEST(FlowViewportAPI, addPrimitives)
 
     //Setup inspector for the first viewport scene index
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
-    ASSERT_GT(sceneIndices.size(), static_cast<size_t>(0));
+    ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
     // Retrieve the first cube primitive from its Sdfpath and check its visibility
-    FindPrimPredicate findFirstCubePrimPredicate
-        = [&firstCubePath](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
-        const std::string primPathString    = primPath.GetAsString();
-        HdSceneIndexPrim prim               = sceneIndex->GetPrim(primPath);
-        if (primPathString.find(firstCubePath) != std::string::npos) {
-            //Check if it is visible or not
-            auto visibilityHandle = HdVisibilitySchema::GetFromParent(prim.dataSource).GetVisibility();
-            if (visibilityHandle){
-                return visibilityHandle->GetTypedValue(0.0f); //return true if it is visible, false otherwise
-            }
-        }
-        return false;
-    };
-
+    const PrimNameVisibilityPredicate findFirstCubePrimPredicate(firstCubePath);
+    
     PrimEntriesVector foundPrims = inspector.FindPrims(findFirstCubePrimPredicate, 1);
-    ASSERT_EQ(foundPrims.size(), static_cast<size_t>(1)); //The cube should be found
+    ASSERT_EQ(foundPrims.size(), 1u); //The cube should be found
 
     //Hide the shape node
     MFnDependencyNode depNode(parentSphereShapeMOject, &stat);
@@ -121,13 +109,13 @@ TEST(FlowViewportAPI, addPrimitives)
     visibilityPlug.setBool(false);
     
     foundPrims = inspector.FindPrims(findFirstCubePrimPredicate, 1);
-    ASSERT_EQ(foundPrims.size(), static_cast<size_t>(0));//The cube should not be found
+    ASSERT_EQ(foundPrims.size(), 0u);//The cube should not be found
 
     //Unhide the shape node
     visibilityPlug.setBool(true);
     
     foundPrims = inspector.FindPrims(findFirstCubePrimPredicate, 1);
-    ASSERT_EQ(foundPrims.size(), static_cast<size_t>(1));//The cube should be found
+    ASSERT_EQ(foundPrims.size(), 1u);//The cube should be found
 
     hydraViewportDataProducerSceneIndexExample.removeDataProducerSceneIndex();
 }

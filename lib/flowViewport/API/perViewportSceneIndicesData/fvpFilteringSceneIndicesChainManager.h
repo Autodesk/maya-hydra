@@ -24,7 +24,7 @@
 //Hydra headers
 #include <pxr/imaging/hd/sceneIndex.h>
 
-//STL headers
+//Std headers
 #include <string>
 
 namespace FVP_NS_DEF {
@@ -32,7 +32,7 @@ namespace FVP_NS_DEF {
 class RenderIndexProxy; //Predeclaration
 class ViewportInformationAndSceneIndicesPerViewportData;//Predeclaration
 
-/**Is a singletion to manage the custom filtering scene indices chain which is appended after the merging scene index
+/**Is a singleton to manage the custom filtering scene indices chain which is appended after the merging scene index
 * To access this class, use Fvp::FilteringSceneIndicesChainManager& filteringSceneIndicesChainManager = Fvp::FilteringSceneIndicesChainManager::get();
 */
 class FVP_API FilteringSceneIndicesChainManager

@@ -19,6 +19,7 @@
 
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/imaging/hd/sceneIndex.h>
+#include <pxr/imaging/hd/visibilitySchema.h>
 
 #include <maya/MMatrix.h>
 #include <maya/MStatus.h>
@@ -160,6 +161,43 @@ public:
      */
     bool operator()(const HdSceneIndexBasePtr& _, const SdfPath& primPath) {
         return primPath.GetName() == _primName;
+    }
+
+private:
+    const std::string _primName;
+};
+
+/**
+* @brief PrimNameVisibilityPredicate is a Predicate to find a name in a primitive SdfPath and check its visibility attribute. This class is to be used as a FindPrimPredicate.
+* It returns True if both conditions : 
+* 1) The predicate's prim name is found in one of the prims from the scene index (it only needs to be inside a path, not matching it exactly), 
+* 2) If 1) is filled, we check if the visibility attribute is set to true.
+* This Predicate returns true only if both conditions are validated. Or false if one these conditions is not filled.
+*/
+class PrimNameVisibilityPredicate 
+{
+public:
+    PrimNameVisibilityPredicate(const std::string primName) : _primName(primName) {}
+
+    /**
+    * @brief Predicate to find a name in a primitive SdfPath and check its visibility attribute. This class is to be used as a FindPrimPredicate.
+    *
+    * @param[in] sceneIndex :  scene index to use for checking the prims .
+    * @param[in] primPath : The prim path to test.
+    *
+    * @return True if the argument prim path's name has the predicate's prim name inside, and if the visibility attribute is set to true, false otherwise.
+    */
+    bool operator()(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) {
+        const std::string primPathString    = primPath.GetAsString();
+        HdSceneIndexPrim prim               = sceneIndex->GetPrim(primPath);
+        if (primPathString.find(_primName) != std::string::npos) {
+            //Check if it is visible or not
+            auto visibilityHandle = HdVisibilitySchema::GetFromParent(prim.dataSource).GetVisibility();
+            if (visibilityHandle){
+                return visibilityHandle->GetTypedValue(0.0f); //return true if it is visible, false otherwise
+            }
+        }
+        return false;
     }
 
 private:

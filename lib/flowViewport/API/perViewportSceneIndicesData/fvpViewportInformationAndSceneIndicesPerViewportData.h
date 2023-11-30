@@ -37,8 +37,8 @@ public:
     ~ViewportInformationAndSceneIndicesPerViewportData();
     
     const InformationInterface::ViewportInformation& GetViewportInformation()const { return _viewportInformation;}
-    PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndexOfTheChain() {return _lastFilteringSceneIndexOfTheChain;}
-    const PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndexOfTheChain() const {return _lastFilteringSceneIndexOfTheChain;}
+    PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndex() {return _lastFilteringSceneIndex;}
+    const PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndex() const {return _lastFilteringSceneIndex;}
     const Fvp::RenderIndexProxyPtr GetRenderIndexProxy() const {return _renderIndexProxy;}
     void SetInputSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) {_inputSceneIndex = inputSceneIndex;}
     const PXR_NS::HdSceneIndexBaseRefPtr&   GetInputSceneIndex() const {return _inputSceneIndex;}
@@ -62,7 +62,7 @@ private:
     PXR_NS::HdSceneIndexBaseRefPtr                                          _inputSceneIndex {nullptr};
 
     /// The last scene index of the custom filtering scene indices chain for this viewport
-    PXR_NS::HdSceneIndexBaseRefPtr                                          _lastFilteringSceneIndexOfTheChain {nullptr};
+    PXR_NS::HdSceneIndexBaseRefPtr                                          _lastFilteringSceneIndex {nullptr};
     
     ///Is a render index proxy per viewport to avoid accessing directly the render index
     Fvp::RenderIndexProxyPtr                                                _renderIndexProxy {nullptr};

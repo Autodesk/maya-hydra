@@ -94,7 +94,7 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndex)
     // The Flow Viewport wireframe selection highlight scene index is in the
     // scene index tree.
     const auto& si = GetTerminalSceneIndices();
-    ASSERT_GT(si.size(), static_cast<size_t>(0));
+    ASSERT_GT(si.size(), 0u);
 
     auto isFvpWireframeSelectionHighlightSceneIndex = SceneIndexDisplayNamePred(
         "Flow Viewport Wireframe Selection Highlight Scene Index");

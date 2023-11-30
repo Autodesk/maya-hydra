@@ -23,7 +23,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace MAYAHYDRA_NS_DEF {
 
 PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr 
-MayaFilteringSceneIndexDataConcreteFactory::createFilteringSceneIndexDataBase(::FVP_NS_DEF::FilteringSceneIndexClient& client)
+MayaFilteringSceneIndexDataConcreteFactory::createFilteringSceneIndexDataBase(const std::shared_ptr<::FVP_NS_DEF::FilteringSceneIndexClient>& client)
 {
     return MayaFilteringSceneIndexData::New(client);
 }

@@ -28,7 +28,7 @@ class FilteringSceneIndexDataAbstractFactory
 {
 public:
     /// The DCC will create a subclass of FilteringSceneIndexDataBaseRefPtr with specific DCC variables that Flow viewport cannot manage since it's DCC agnostic
-    virtual PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr createFilteringSceneIndexDataBase(::Fvp::FilteringSceneIndexClient& client) = 0;
+    virtual PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr createFilteringSceneIndexDataBase(const std::shared_ptr<::Fvp::FilteringSceneIndexClient>& client) = 0;
 };
 
 }//End of namespace FVP_NS_DEF {

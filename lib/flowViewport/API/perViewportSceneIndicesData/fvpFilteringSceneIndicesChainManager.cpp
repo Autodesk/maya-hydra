@@ -54,8 +54,8 @@ HdSceneIndexBaseRefPtr FilteringSceneIndicesChainManager::createFilteringSceneIn
         return inputSceneIndex;
     }
      
-    if (viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndexOfTheChain() != nullptr){
-        TF_CODING_ERROR("viewportInformationAndSceneIndicesPerViewportData->GetLastFilteringSceneIndexOfTheChain() != nullptr should not happen, \
+    if (viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndex() != nullptr){
+        TF_CODING_ERROR("viewportInformationAndSceneIndicesPerViewportData->GetLastFilteringSceneIndex() != nullptr should not happen, \
             you should call DestroyFilteringSceneIndicesChain before calling the current  function");
         return nullptr;//Not an empty filtering scene indices chain
     }
@@ -63,19 +63,19 @@ HdSceneIndexBaseRefPtr FilteringSceneIndicesChainManager::createFilteringSceneIn
     //Append the filtering scene indices chain tp the merging scene index from renderIndexProxy
     _AppendFilteringSceneIndicesChain(viewportInformationAndSceneIndicesPerViewportData, inputSceneIndex);
     
-    if (viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndexOfTheChain() == nullptr){
-        TF_CODING_ERROR("viewportInformationAndSceneIndicesPerViewportData->GetLastFilteringSceneIndexOfTheChain() == nullptr is invalid here");
+    if (viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndex() == nullptr){
+        TF_CODING_ERROR("viewportInformationAndSceneIndicesPerViewportData->GetLastFilteringSceneIndex() == nullptr is invalid here");
         return nullptr;
     }
 
     //Add the last element of the filtering scene indices chain to the render index
-    return viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndexOfTheChain();
+    return viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndex();
 }
 
 void FilteringSceneIndicesChainManager::destroyFilteringSceneIndicesChain(ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData)
 {
-    HdSceneIndexBaseRefPtr& lastSceneIndexOfTheChain = viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndexOfTheChain();
-    if (nullptr == lastSceneIndexOfTheChain){
+    HdSceneIndexBaseRefPtr& lastSceneIndex = viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndex();
+    if (nullptr == lastSceneIndex){
         return;
     }
 
@@ -83,10 +83,10 @@ void FilteringSceneIndicesChainManager::destroyFilteringSceneIndicesChain(Viewpo
     TF_AXIOM(renderIndexProxy);
     auto renderIndex = renderIndexProxy->GetRenderIndex();
     TF_AXIOM(renderIndex);
-    renderIndex->RemoveSceneIndex(lastSceneIndexOfTheChain);//Remove the whole chain from the render index
+    renderIndex->RemoveSceneIndex(lastSceneIndex);//Remove the whole chain from the render index
 
     //Remove a ref on it which should cascade the same on its references
-    lastSceneIndexOfTheChain.Reset();
+    lastSceneIndex.Reset();
 }
 
 void FilteringSceneIndicesChainManager::updateFilteringSceneIndicesChain(const std::string& rendererDisplayNames)
@@ -114,7 +114,7 @@ void FilteringSceneIndicesChainManager::updateFilteringSceneIndicesChain(const s
         auto& renderIndexProxy = viewportInformationAndSceneIndicesPerViewportData.GetRenderIndexProxy();
         destroyFilteringSceneIndicesChain(nonConstViewportInformationAndSceneIndicesPerViewportData);
         createFilteringSceneIndicesChain(nonConstViewportInformationAndSceneIndicesPerViewportData);
-        auto& lastSceneIndex = viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndexOfTheChain();
+        auto& lastSceneIndex = viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndex();
         TF_AXIOM(lastSceneIndex && renderIndexProxy && renderIndexProxy->GetRenderIndex());
         renderIndexProxy->GetRenderIndex()->InsertSceneIndex(lastSceneIndex, SdfPath::AbsoluteRootPath());
     }
@@ -129,15 +129,15 @@ void FilteringSceneIndicesChainManager::_AppendFilteringSceneIndicesChain(  View
         
     const std::string& rendererDisplayName = viewportInformationAndSceneIndicesPerViewportData.GetViewportInformation()._rendererName;
     
-    HdSceneIndexBaseRefPtr& lastSceneIndexOfTheChain    = viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndexOfTheChain();
+    HdSceneIndexBaseRefPtr& lastSceneIndex    = viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndex();
     //Set the merging scene index as the last element to use this scene index as the input scene index of filtering scene indices
-    lastSceneIndexOfTheChain                            = inputScene;
+    lastSceneIndex                            = inputScene;
 
     //Call our Hydra viewport API mechanism for custom filtering scene index clients
     auto& viewportFilteringSceneIndicesData = FilteringSceneIndexInterfaceImp::get().getSceneFilteringSceneIndicesData(); //Not const as we may modify its content later
     for (auto& filteringSceneIndexData : viewportFilteringSceneIndicesData) {
-        auto& client = filteringSceneIndexData->getClient();
-        const std::string& rendererNames = client.getRendererNames();
+        auto client = filteringSceneIndexData->getClient();
+        const std::string& rendererNames = client->getRendererNames();
         //Filter by render delegate name
         if ( (FvpViewportAPITokens->allRenderers != rendererNames) && rendererNames.find(rendererDisplayName) == std::string::npos){
             //Ignore that client info, it is not targeted for this renderer
@@ -146,13 +146,13 @@ void FilteringSceneIndicesChainManager::_AppendFilteringSceneIndicesChain(  View
 
         const bool isVisible = filteringSceneIndexData->getVisible();
         if (! isVisible){
-            continue; //We should not happened the filtering scene indices from not visible ViewportFilteringSceneIndexData
+            continue; //We should not append not visible filtering scene indices
         }
 
-        auto tempAppendedSceneIndex = client.appendSceneIndex(lastSceneIndexOfTheChain, _inputArgs);
-        if ((lastSceneIndexOfTheChain != tempAppendedSceneIndex)){
+        auto tempAppendedSceneIndex = client->appendSceneIndex(lastSceneIndex, _inputArgs);
+        if ((lastSceneIndex != tempAppendedSceneIndex)){
             //A new scene index was appended, it can also be a chain of scene indices but we need only the last element
-            lastSceneIndexOfTheChain = tempAppendedSceneIndex;
+            lastSceneIndex = tempAppendedSceneIndex;
         }
     }
 }

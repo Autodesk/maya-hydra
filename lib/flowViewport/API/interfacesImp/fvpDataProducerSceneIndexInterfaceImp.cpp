@@ -23,7 +23,7 @@
 //Hydra headers
 #include <pxr/imaging/hd/renderIndex.h>
  
-//STL Headers
+//Std Headers
 #include <mutex>
 
 namespace

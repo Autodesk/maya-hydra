@@ -22,7 +22,7 @@
 #include "flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h"
 #include "flowViewport/API/fvpFilteringSceneIndexClientFwd.h"
 
-//STL headers
+//Std headers
 #include <string>
 
 namespace FVP_NS_DEF
@@ -48,7 +48,7 @@ namespace FVP_NS_DEF
         * 
         *  @return     true if it succeded, false otherwise like the client if already registered.
         */
-        virtual bool registerFilteringSceneIndexClient(FilteringSceneIndexClient& client) = 0;
+        virtual bool registerFilteringSceneIndexClient(const std::shared_ptr<FilteringSceneIndexClient>& client) = 0;
         
         /**
         *  @brief      Unregister an SceneIndexClient instance
@@ -57,7 +57,7 @@ namespace FVP_NS_DEF
         * 
         *  @param[in]  client is the FilteringSceneIndexClient to remove.
         */
-        virtual void unregisterFilteringSceneIndexClient(FilteringSceneIndexClient& client)= 0;
+        virtual void unregisterFilteringSceneIndexClient(const std::shared_ptr<FilteringSceneIndexClient>& client)= 0;
     };
 
 }//end of namespace

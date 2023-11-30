@@ -24,7 +24,7 @@
 //Hydra headers
 #include <pxr/imaging/hd/renderIndex.h>
 
-//STL Headers
+//Std Headers
 #include <mutex>
 
 namespace 
@@ -45,9 +45,9 @@ ViewportInformationAndSceneIndicesPerViewportDataManager& ViewportInformationAnd
 
 //A new Hydra viewport was created
 void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, const Fvp::RenderIndexProxyPtr& renderIndexProxy, 
-                                                                    const HdSceneIndexBaseRefPtr& lastFilteringSceneIndexOfTheChainBeforeCustomFiltering)
+                                                                    const HdSceneIndexBaseRefPtr& inputSceneIndexForCustomFiltering)
 {
-    TF_AXIOM(renderIndexProxy && lastFilteringSceneIndexOfTheChainBeforeCustomFiltering);
+    TF_AXIOM(renderIndexProxy && inputSceneIndexForCustomFiltering);
 
     ViewportInformationAndSceneIndicesPerViewportDataSet::iterator it = _viewportsInformationAndSceneIndicesPerViewportData.end();
 
@@ -76,7 +76,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInform
     //Add the custom filtering scene indices to the merging scene index
     ViewportInformationAndSceneIndicesPerViewportData& viewportsInformationAndSceneIndicesPerViewportData = const_cast<ViewportInformationAndSceneIndicesPerViewportData&>(*it);
     const HdSceneIndexBaseRefPtr lastFilteringSceneIndex  = FilteringSceneIndicesChainManager::get().createFilteringSceneIndicesChain(viewportsInformationAndSceneIndicesPerViewportData, 
-                                                                                                                                lastFilteringSceneIndexOfTheChainBeforeCustomFiltering);
+                                                                                                                                inputSceneIndexForCustomFiltering);
 
     //Insert the last filtering scene index into the render index
     auto renderIndex = renderIndexProxy->GetRenderIndex();
@@ -99,7 +99,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveViewportInf
         if(renderIndexProxy){
             //Destroy the custom filtering scene indices chain
             auto renderIndex = renderIndexProxy->GetRenderIndex();
-            const auto& filteringSceneIndex = findResult->GetLastFilteringSceneIndexOfTheChain();
+            const auto& filteringSceneIndex = findResult->GetLastFilteringSceneIndex();
             if (renderIndex && filteringSceneIndex){
                 renderIndex->RemoveSceneIndex(filteringSceneIndex);//Remove the whole chain from the render index
             }
@@ -176,7 +176,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveAllViewport
         if(renderIndexProxy){
             //Destroy the custom filtering scene indices chain
             auto renderIndex = renderIndexProxy->GetRenderIndex();
-            const auto& filteringSceneIndex = viewportInfoAndData.GetLastFilteringSceneIndexOfTheChain();
+            const auto& filteringSceneIndex = viewportInfoAndData.GetLastFilteringSceneIndex();
             if (renderIndex && filteringSceneIndex){
                 renderIndex->RemoveSceneIndex(filteringSceneIndex);//Remove the whole chain from the render index
             }

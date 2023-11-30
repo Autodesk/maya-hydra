@@ -33,7 +33,6 @@
 
 //Hydra headers
 #include <pxr/imaging/hd/tokens.h>
-#include <pxr/imaging/hd/visibilitySchema.h>
 
 //Google tests
 #include <gtest/gtest.h>
@@ -72,8 +71,9 @@ TEST(FlowViewportAPI, filterPrimitives)
     
     //FilteringSceneIndexClientExample is an helper class to apply a filtering scene index into the viewport which hides objects with more than 10 000 vertices
     //This is the case for the object named "bigSphere", it has more than 10 000 vertices.
-    Fvp::FilteringSceneIndexClientExample hydraViewportFilteringSceneIndexExample ("TestFilteringSceneIndex", 
-                                                        Fvp::FilteringSceneIndexClient::Bucket::kSceneFiltering,
+    const std::shared_ptr<Fvp::FilteringSceneIndexClientExample> hydraViewportFilteringSceneIndexExample  = std::make_shared<Fvp::FilteringSceneIndexClientExample>
+                                                        ("TestFilteringSceneIndex", 
+                                                        Fvp::FilteringSceneIndexClient::Category::kSceneFiltering,
                                                         FvpViewportAPITokens->allRenderers,
                                                         &parentShapeMOject //Set the cube as the parent of this filtering scene index
                                                         );
@@ -86,44 +86,18 @@ TEST(FlowViewportAPI, filterPrimitives)
 
     //Check that there are primitives in the viewport terminal scene index
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
-    ASSERT_GT(sceneIndices.size(), static_cast<size_t>(0));
+    ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
-    // Retrieve the small sphere prim in the list of primitives and return its visibility
-    FindPrimPredicate findSmallSpherePrimPredicate
-        = [](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
-        const std::string primPathString    = primPath.GetAsString();
-        HdSceneIndexPrim prim               = sceneIndex->GetPrim(primPath);
-        if (primPathString.find(smallSphereShapeName.asChar()) != std::string::npos) {
-            //Check if it is visible or not
-            auto visibilityHandle = HdVisibilitySchema::GetFromParent(prim.dataSource).GetVisibility();
-            if (visibilityHandle){
-                return visibilityHandle->GetTypedValue(0.0f); //return true if it is visible, false otherwise
-            }
-        }
-        return false;
-    };
+    // Define both predicates for the small sphere prim and bug sphere in the list of primitives and return their visibility
+    const PrimNameVisibilityPredicate smallSpherePredicate(smallSphereShapeName.asChar());
+    const PrimNameVisibilityPredicate bigSpherePredicate(bigSphereShapeName.asChar());
+    
+    PrimEntriesVector foundPrims = inspector.FindPrims(smallSpherePredicate, 1);
+    ASSERT_EQ(foundPrims.size(), 1u); //The small sphere should be found and visible
 
-    // Retrieve the big sphere prim in the list of primitives and return its visibility
-    FindPrimPredicate findBigSpherePrimPredicate
-        = [](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
-        const std::string primPathString    = primPath.GetAsString();
-        HdSceneIndexPrim prim               = sceneIndex->GetPrim(primPath);
-        if (primPathString.find(bigSphereShapeName.asChar()) != std::string::npos) {
-            //Check if it is visible or not
-            auto visibilityHandle = HdVisibilitySchema::GetFromParent(prim.dataSource).GetVisibility();
-            if (visibilityHandle){
-                return visibilityHandle->GetTypedValue(0.0f); //return true if it is visible, false otherwise
-            }
-        }
-        return false;
-    };
-
-    PrimEntriesVector foundPrims = inspector.FindPrims(findSmallSpherePrimPredicate, 1);
-    ASSERT_EQ(foundPrims.size(), static_cast<size_t>(1)); //The small sphere should be found and visible
-
-    foundPrims = inspector.FindPrims(findBigSpherePrimPredicate, 1);
-    ASSERT_EQ(foundPrims.size(), static_cast<size_t>(0)); //The big sphere should be filtered (not visible)
+    foundPrims = inspector.FindPrims(bigSpherePredicate, 1);
+    ASSERT_EQ(foundPrims.size(), 0u); //The big sphere should be filtered (not visible)
 
     //Hide the cube shape node which is the parent node of the filtering scene index, this should disable the filtering and make the big sphere visible.
     MFnDependencyNode depNode(parentShapeMOject, &stat);
@@ -132,14 +106,14 @@ TEST(FlowViewportAPI, filterPrimitives)
     ASSERT_FALSE(visibilityPlug.isNull());
     visibilityPlug.setBool(false);
     
-    foundPrims = inspector.FindPrims(findBigSpherePrimPredicate, 1);
-    ASSERT_EQ(foundPrims.size(), static_cast<size_t>(1));//The big sphere should be visible, as the filtering is disabled since the cube which is its parent node is hidden.
+    foundPrims = inspector.FindPrims(bigSpherePredicate, 1);
+    ASSERT_EQ(foundPrims.size(), 1u);//The big sphere should be visible, as the filtering is disabled since the cube which is its parent node is hidden.
 
     //Unhide the cube shape node
     visibilityPlug.setBool(true);
     
-    foundPrims = inspector.FindPrims(findBigSpherePrimPredicate, 1);
-    ASSERT_EQ(foundPrims.size(), static_cast<size_t>(0));//The big sphere should not be visible, as filtering is applied again
+    foundPrims = inspector.FindPrims(bigSpherePredicate, 1);
+    ASSERT_EQ(foundPrims.size(), 0u);//The big sphere should not be visible, as filtering is applied again
 
     filteringSceneIndexInterface.unregisterFilteringSceneIndexClient(hydraViewportFilteringSceneIndexExample);
 }

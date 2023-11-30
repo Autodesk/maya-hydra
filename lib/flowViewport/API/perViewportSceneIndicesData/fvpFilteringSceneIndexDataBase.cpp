@@ -24,7 +24,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace FVP_NS_DEF {
 
-FilteringSceneIndexDataBase::FilteringSceneIndexDataBase(::Fvp::FilteringSceneIndexClient& filteringSIClient) 
+FilteringSceneIndexDataBase::FilteringSceneIndexDataBase(const std::shared_ptr<::Fvp::FilteringSceneIndexClient>& filteringSIClient) 
     : _client {filteringSIClient}
 {
 }
@@ -32,7 +32,7 @@ FilteringSceneIndexDataBase::FilteringSceneIndexDataBase(::Fvp::FilteringSceneIn
 void FilteringSceneIndexDataBase::updateVisibilityFromDCCNode(bool isVisible) 
 {
     _isVisible = isVisible;
-    const std::string& rendererNames = _client.getRendererNames();
+    const std::string& rendererNames = _client->getRendererNames();
     ::Fvp::FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(rendererNames);
 }
 

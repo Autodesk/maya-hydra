@@ -37,7 +37,7 @@ TF_DECLARE_REF_PTRS(MayaFilteringSceneIndexData);//Be able to use Ref counting p
  class MayaFilteringSceneIndexData : public FVP_NS_DEF::FilteringSceneIndexDataBase
 {
 public:
-    static TfRefPtr<MayaFilteringSceneIndexData> New(::FVP_NS_DEF::FilteringSceneIndexClient& client) {
+    static TfRefPtr<MayaFilteringSceneIndexData> New(const std::shared_ptr<::FVP_NS_DEF::FilteringSceneIndexClient>& client) {
         return TfCreateRefPtr(new MayaFilteringSceneIndexData(client));
     }
     
@@ -55,7 +55,7 @@ public:
     MCallbackIdArray                    _dGMessageCallbackIds;
 
 private:
-    MayaFilteringSceneIndexData(::FVP_NS_DEF::FilteringSceneIndexClient& client);
+    MayaFilteringSceneIndexData(const std::shared_ptr<::FVP_NS_DEF::FilteringSceneIndexClient>& client);
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

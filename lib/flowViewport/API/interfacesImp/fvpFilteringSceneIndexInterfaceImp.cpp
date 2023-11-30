@@ -18,7 +18,7 @@
 #include "fvpFilteringSceneIndexInterfaceImp.h"
 #include "flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h"
 
-//STL headers
+//Std headers
 #include <mutex>
 
 namespace
@@ -26,10 +26,10 @@ namespace
     std::mutex selectionHighlightFilteringClient_mutex;
     std::mutex sceneFilteringClient_mutex;
 
-    //Set of scene Filtering scene index data, they belong to the Fpv::FilteringSceneIndexInterface::Bucket::SceneFiltering bucket
+    //Set of scene Filtering scene index data, they belong to the Fpv::FilteringSceneIndexClient::Category::kSceneFiltering
     std::set<PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr> sceneFilteringSceneIndicesData;
 
-    //Set of selection highlighting Filtering scene index data, they belong to the Fpv::FilteringSceneIndexInterface::Bucket::SelectionHighlighting bucket
+    //Set of selection highlighting Filtering scene index data, they belong to the Fpv::FilteringSceneIndexClient::Category::kSelectionHighlighting
     std::set<PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr> selectionHighlightFilteringSceneIndicesData;
 
     // Abstract factory to create the scene index data, an implementation is provided by the DCC
@@ -55,14 +55,14 @@ FilteringSceneIndexInterfaceImp::~FilteringSceneIndexInterfaceImp()
 {
 }
 
-bool FilteringSceneIndexInterfaceImp::registerFilteringSceneIndexClient(FilteringSceneIndexClient& client)
+bool FilteringSceneIndexInterfaceImp::registerFilteringSceneIndexClient(const std::shared_ptr<FilteringSceneIndexClient>& client)
 {
-    switch(client.getBucket()){
-        case Fvp::FilteringSceneIndexClient::Bucket::kSceneFiltering:{
+    switch(client->getCategory()){
+        case Fvp::FilteringSceneIndexClient::Category::kSceneFiltering:{
             return _CreateSceneFilteringSceneIndicesData(client);
         }
         break;
-        case Fvp::FilteringSceneIndexClient::Bucket::kSelectionHighlighting:{
+        case Fvp::FilteringSceneIndexClient::Category::kSelectionHighlighting:{
             return _CreateSelectionHighlightFilteringSceneIndicesData(client);
         }
         break;
@@ -73,7 +73,7 @@ bool FilteringSceneIndexInterfaceImp::registerFilteringSceneIndexClient(Filterin
     return false;
 }
 
-bool FilteringSceneIndexInterfaceImp::_CreateSceneFilteringSceneIndicesData(FilteringSceneIndexClient& client) 
+bool FilteringSceneIndexInterfaceImp::_CreateSceneFilteringSceneIndicesData(const std::shared_ptr<FilteringSceneIndexClient>& client) 
 { 
     TF_AXIOM(sceneIndexDataFactory);
 
@@ -96,13 +96,13 @@ bool FilteringSceneIndexInterfaceImp::_CreateSceneFilteringSceneIndicesData(Filt
     }
 
     if (bNeedToUpdateViewportsFilteringSceneIndicesChain){
-        FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(client.getRendererNames());
+        FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(client->getRendererNames());
     }
 
     return true;
 }
 
-bool FilteringSceneIndexInterfaceImp::_CreateSelectionHighlightFilteringSceneIndicesData(FilteringSceneIndexClient& client)
+bool FilteringSceneIndexInterfaceImp::_CreateSelectionHighlightFilteringSceneIndicesData(const std::shared_ptr<FilteringSceneIndexClient>& client)
 { 
     TF_AXIOM(sceneIndexDataFactory);
 
@@ -126,7 +126,7 @@ bool FilteringSceneIndexInterfaceImp::_CreateSelectionHighlightFilteringSceneInd
     return true;
 }
 
-void FilteringSceneIndexInterfaceImp::_DestroySceneFilteringSceneIndicesData(FilteringSceneIndexClient& client)
+void FilteringSceneIndexInterfaceImp::_DestroySceneFilteringSceneIndicesData(const std::shared_ptr<::FVP_NS_DEF::FilteringSceneIndexClient>& client)
 {
     
     bool bNeedToUpdateViewportsFilteringSceneIndicesChain = false;
@@ -141,7 +141,7 @@ void FilteringSceneIndexInterfaceImp::_DestroySceneFilteringSceneIndicesData(Fil
         if (findResult != sceneFilteringSceneIndicesData.cend()){
             auto& filteringSIData = (*findResult);
             rendererNames = (filteringSIData)
-                ? filteringSIData->getClient().getRendererNames()
+                ? filteringSIData->getClient()->getRendererNames()
                 : FvpViewportAPITokens->allRenderers;
 
             sceneFilteringSceneIndicesData.erase(findResult);//This also decreases ref count
@@ -156,7 +156,7 @@ void FilteringSceneIndexInterfaceImp::_DestroySceneFilteringSceneIndicesData(Fil
     }
 }
 
-void FilteringSceneIndexInterfaceImp::_DestroySelectionHighlightFilteringSceneIndicesData(FilteringSceneIndexClient& client)
+void FilteringSceneIndexInterfaceImp::_DestroySelectionHighlightFilteringSceneIndicesData(const std::shared_ptr<FilteringSceneIndexClient>& client)
 {
     //Block for the lock lifetime
     {
@@ -170,14 +170,14 @@ void FilteringSceneIndexInterfaceImp::_DestroySelectionHighlightFilteringSceneIn
     }
 }
 
-void FilteringSceneIndexInterfaceImp::unregisterFilteringSceneIndexClient(FilteringSceneIndexClient& client)
+void FilteringSceneIndexInterfaceImp::unregisterFilteringSceneIndexClient(const std::shared_ptr<FilteringSceneIndexClient>& client)
 {
-    switch(client.getBucket()){
-        case Fvp::FilteringSceneIndexClient::Bucket::kSceneFiltering:{
+    switch(client->getCategory()){
+        case Fvp::FilteringSceneIndexClient::Category::kSceneFiltering:{
             _DestroySceneFilteringSceneIndicesData(client);
         }
         break;
-        case Fvp::FilteringSceneIndexClient::Bucket::kSelectionHighlighting:{
+        case Fvp::FilteringSceneIndexClient::Category::kSelectionHighlighting:{
             _DestroySelectionHighlightFilteringSceneIndicesData(client);
         }
         break;

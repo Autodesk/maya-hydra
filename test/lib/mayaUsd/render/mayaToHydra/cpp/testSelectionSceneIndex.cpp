@@ -37,7 +37,7 @@ TEST(FlowViewport, selectionSceneIndex)
 {
     // The Flow Viewport selection scene index is in the scene index tree.
     const auto& sceneIndices = GetTerminalSceneIndices();
-    ASSERT_GT(sceneIndices.size(), static_cast<size_t>(0));
+    ASSERT_GT(sceneIndices.size(), 0u);
 
     auto isFvpSelectionSceneIndex = SceneIndexDisplayNamePred(
         "Flow Viewport Selection Scene Index");

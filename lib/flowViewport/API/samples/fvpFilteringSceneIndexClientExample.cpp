@@ -21,8 +21,8 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
-FilteringSceneIndexClientExample::FilteringSceneIndexClientExample(const std::string& displayName, const Bucket bucket, const std::string& rendererNames, void* dccNode):
-    FilteringSceneIndexClient(displayName, bucket, rendererNames, dccNode)
+FilteringSceneIndexClientExample::FilteringSceneIndexClientExample(const std::string& displayName, const Category category, const std::string& rendererNames, void* dccNode):
+    FilteringSceneIndexClient(displayName, category, rendererNames, dccNode)
 {
 }
 

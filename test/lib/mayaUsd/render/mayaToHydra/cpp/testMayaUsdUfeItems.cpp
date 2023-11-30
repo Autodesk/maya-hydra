@@ -38,10 +38,10 @@ TEST(MayaUsdUfeItems, skipUsdUfeLights)
 {
     // Setup inspector for the first scene index
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
-    ASSERT_GT(sceneIndices.size(), static_cast<size_t>(0));
+    ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
     // Find UFE lights
     PrimEntriesVector ufeLights = inspector.FindPrims(&IsUfeLight, 1);
-    EXPECT_EQ(ufeLights.size(), static_cast<size_t>(0));
+    EXPECT_EQ(ufeLights.size(), 0u);
 }

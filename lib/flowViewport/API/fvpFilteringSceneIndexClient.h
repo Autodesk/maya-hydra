@@ -31,10 +31,10 @@ namespace FVP_NS_DEF
     {
     public:
         /**
-         * A Bucket is a container in which you want your filtering scene index or scene index chain to go to.
-         * The filtering scene indices inside a bucket don't have any specific priority when they are called.
+         * A Category is a container in which you want your filtering scene index or scene index chain to go to.
+         * The filtering scene indices inside a Category don't have any specific priority when they are called.
          */
-        enum class Bucket
+        enum class Category
         {
             /// kSelectionHighlighting is to register a filtering scene index to do custom selection highlighting (still a WIP)
             kSelectionHighlighting,
@@ -54,7 +54,7 @@ namespace FVP_NS_DEF
         *               or just return the input scene index passed if you don't want to append any scene index.
         * 
         *  @param[in]      displayName is a display name to be associated with your plugin.
-        *  @param[in]      bucket is the container in which you want your filtering scene index (or filtering scene index chain) to go into.
+        *  @param[in]      category is the container in which you want your filtering scene index (or filtering scene index chain) to go into.
         *  @param[in]      rendererNames is the names of the renderers you want this client to be associated to.
         *                  If there are several, separate them with for example a coma, like "GL, Arnold", we actually look for the renderer name in this string.
         *                  If you want your client to work on any renderer please use FvpViewportAPITokens->allRenderers.
@@ -66,8 +66,8 @@ namespace FVP_NS_DEF
         *  @param[in]      inputArgs is a container data source handle to deal with the possibility to send custom data from our Hydra viewport plugin for the creation of your scene index.
         *                  This parameter is currently not used by the Hydra viewport plugin but is left for possible future use.
         */
-        FilteringSceneIndexClient(const std::string& displayName, const Bucket bucket, const std::string& rendererNames, void* dccNode):
-            _displayName{displayName}, _bucket{bucket}, _rendererNames{rendererNames}, _dccNode{dccNode}
+        FilteringSceneIndexClient(const std::string& displayName, const Category category, const std::string& rendererNames, void* dccNode):
+            _displayName{displayName}, _category{category}, _rendererNames{rendererNames}, _dccNode{dccNode}
         {}
 
         /**
@@ -100,10 +100,10 @@ namespace FVP_NS_DEF
         const std::string& getDisplayName() const {return _displayName;}
         
         /**
-        *  @brief  Get the bucket.
-        *  @return the bucket. 
+        *  @brief  Get the Category.
+        *  @return the Category. 
         */
-        const Bucket getBucket() const {return _bucket;}
+        const Category getCategory() const {return _category;}
 
         /**
         *  @brief  Get the renderer names.
@@ -125,7 +125,7 @@ namespace FVP_NS_DEF
         bool operator == (const FilteringSceneIndexClient& other)const 
         {
             return _displayName == other._displayName &&
-                _bucket == other._bucket &&
+                _category == other._category &&
                 _rendererNames == other._rendererNames &&
                 _dccNode == other._dccNode;
         }
@@ -135,9 +135,9 @@ namespace FVP_NS_DEF
         */
         const std::string _displayName         {"Unnamed"};
 
-        /**_bucket is the container in which you want your filtering scene index (or filtering scene index chain) to go into.
+        /**_category is the container in which you want your filtering scene index (or filtering scene index chain) to go into.
         */
-        const Bucket _bucket   {Bucket::kSceneFiltering};
+        const Category _category   {Category::kSceneFiltering};
 
         /**_rendererNames is the names of the renderers you want this client to be associated to.
         *  If there are several, separate them with comas, like "GL, Arnold"

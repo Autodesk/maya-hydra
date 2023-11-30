@@ -73,11 +73,11 @@ namespace
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-MayaFilteringSceneIndexData::MayaFilteringSceneIndexData(Fvp::FilteringSceneIndexClient& client)
+MayaFilteringSceneIndexData::MayaFilteringSceneIndexData(const std::shared_ptr<::FVP_NS_DEF::FilteringSceneIndexClient>& client)
 : PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBase(client)
 {
     //If a maya node is present in client.getDccNode(), add callbacks to handle node deleted/undo/redo and hide/unhide
-    void* dccNode = client.getDccNode();
+    void* dccNode = client->getDccNode();
     if (dccNode){
         MObject* mObj = reinterpret_cast<MObject*>(dccNode);
         _mObjHandle   = MObjectHandle(*mObj);

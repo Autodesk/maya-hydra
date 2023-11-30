@@ -30,8 +30,9 @@ namespace FVP_NS_DEF {
 *   Usage of this class is :
 * 
 *   Call FilteringSceneIndexInterface::registerFilteringSceneIndexClient with this instance with for example :
-*   FilteringSceneIndexClientExample hydraViewportFilteringSceneIndexClient ("FilteringSceneIndexClientExample", 
-*                                            Fvp::FilteringSceneIndexClient::Bucket::kSceneFiltering, 
+* 
+*   const std::shared_ptr<FilteringSceneIndexClientExample> hydraViewportFilteringSceneIndexClient = std::make_shared_ptr<FilteringSceneIndexClientExample>("FilteringSceneIndexClientExample", 
+*                                            Fvp::FilteringSceneIndexClient::Category::kSceneFiltering, 
 *                                            FvpViewportAPITokens->allRenderers, //We could set only Storm by using "GL" or only Arnold by using "Arnold" or both with "GL, Arnold"
 *                                            nullptr);//No node associated, you could still do it later though.
 *   //Register a filtering scene index client
@@ -50,7 +51,7 @@ class FVP_API FilteringSceneIndexClientExample : public FilteringSceneIndexClien
 {
 public:
     /// Constructor, please see below for the meaning of the parameters
-    FilteringSceneIndexClientExample(const std::string& displayName, const Bucket bucket, const std::string& rendererNames, void* dccNode);
+    FilteringSceneIndexClientExample(const std::string& displayName, const Category category, const std::string& rendererNames, void* dccNode);
     /// Destructor
     ~FilteringSceneIndexClientExample() override = default;
 

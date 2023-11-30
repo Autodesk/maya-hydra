@@ -92,7 +92,7 @@ public:
 
 protected:
     /// _hydraViewportFilteringSceneIndexClientExample is the filtering scene index example for a Hydra viewport scene index.
-    Fvp::FilteringSceneIndexClientExample                   _hydraViewportFilteringSceneIndexClientExample;
+    std::shared_ptr<Fvp::FilteringSceneIndexClientExample>  _hydraViewportFilteringSceneIndexClientExample;
     /// _hydraViewportInformationClient is the viewport information example for a Hydra viewport.
     std::shared_ptr<Fvp::InformationClientExample>          _hydraViewportInformationClient;
     ///To be used in hydra viewport API to pass the Maya node's MObject for setting callbacks for filtering and data producer scene indices
@@ -319,11 +319,7 @@ CHECK_MSTATUS ( attr.setReadable(true) ); \
 CHECK_MSTATUS ( attr.setWritable(false) );
 
 
-FlowViewportAPIMayaLocator::FlowViewportAPIMayaLocator() :
-    _hydraViewportFilteringSceneIndexClientExample("FilteringSceneIndexClientExample", 
-                                            Fvp::FilteringSceneIndexClient::Bucket::kSceneFiltering, 
-                                            FvpViewportAPITokens->allRenderers, //We could set only Storm by using "GL" or only Arnold by using "Arnold" or both with "GL, Arnold"
-                                            nullptr)
+FlowViewportAPIMayaLocator::FlowViewportAPIMayaLocator()
 {
     //Get the flow viewport API hydra interfaces
     int majorVersion = 0;
@@ -349,6 +345,14 @@ FlowViewportAPIMayaLocator::FlowViewportAPIMayaLocator() :
 
     //Add a callback after a load scene
     _cbAfterOpenId = MSceneMessage::addCallback(MSceneMessage::kAfterOpen, afterOpenCallback, ((void*)this)) ;
+
+    //Create a Filtering scene index client
+    _hydraViewportFilteringSceneIndexClientExample = std::make_shared<Fvp::FilteringSceneIndexClientExample>(
+                                            "FilteringSceneIndexClientExample", 
+                                            Fvp::FilteringSceneIndexClient::Category::kSceneFiltering, 
+                                            FvpViewportAPITokens->allRenderers, //We could set only Storm by using "GL" or only Arnold by using "Arnold" or both with "GL, Arnold"
+                                            nullptr);//DCC node will be filled later
+    
 }
 
 //This is called only when our node is destroyed and the undo queue flushed.
@@ -440,8 +444,9 @@ void FlowViewportAPIMayaLocator::SetupFlowViewportInterfaces()
     //Register a filtering scene index client
     Fvp::FilteringSceneIndexInterface& filteringSceneIndexInterface = Fvp::FilteringSceneIndexInterface::get();
 
+    
     //Store the MObject* of the maya node in various classes
-    _hydraViewportFilteringSceneIndexClientExample.setDccNode(&_thisMObject);
+    _hydraViewportFilteringSceneIndexClientExample->setDccNode(&_thisMObject);
 
     //Register this filtering scene index client, so it can append custom filtering scene indices to Hydra viewport scene indices
     const bool bResult = filteringSceneIndexInterface.registerFilteringSceneIndexClient(_hydraViewportFilteringSceneIndexClientExample);

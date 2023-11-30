@@ -32,7 +32,7 @@ class MayaFilteringSceneIndexDataConcreteFactory : public Fvp::FilteringSceneInd
 public:
     /// The DCC will create a subclass of FilteringSceneIndexDataBaseRefPtr with specific DCC variables that Flow viewport cannot manage since it's DCC agnostic
     PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr   
-        createFilteringSceneIndexDataBase(::FVP_NS_DEF::FilteringSceneIndexClient& client) override;
+        createFilteringSceneIndexDataBase(const std::shared_ptr<Fvp::FilteringSceneIndexClient>& client) override;
 };
 
 }//end of MAYAHYDRA_NS_DEF

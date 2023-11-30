@@ -23,7 +23,7 @@
 #include "flowViewport/API/fvpFilteringSceneIndexClient.h"
 #include "flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndexDataAbstractFactory.h"
 
-//STL headers
+//Std headers
 #include <set>
 
 namespace FVP_NS_DEF {
@@ -39,8 +39,8 @@ public:
     static FVP_API FilteringSceneIndexInterfaceImp& get();
 
     //From FVP_NS_DEF::FilteringSceneIndexInterface
-    bool registerFilteringSceneIndexClient(FilteringSceneIndexClient& client) override;
-    void unregisterFilteringSceneIndexClient(FilteringSceneIndexClient& client) override;
+    bool registerFilteringSceneIndexClient(const std::shared_ptr<FilteringSceneIndexClient>& client) override;
+    void unregisterFilteringSceneIndexClient(const std::shared_ptr<FilteringSceneIndexClient>& client) override;
 
     //Called by the DCC
     FVP_API
@@ -51,10 +51,10 @@ public:
     const std::set<PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr>&           getSelectionHighlightFilteringSceneIndicesData() const;
 
 private :
-    bool _CreateSceneFilteringSceneIndicesData(FilteringSceneIndexClient& client);
-    bool _CreateSelectionHighlightFilteringSceneIndicesData(FilteringSceneIndexClient& client);
-    void _DestroySceneFilteringSceneIndicesData(FilteringSceneIndexClient& client);
-    void _DestroySelectionHighlightFilteringSceneIndicesData(FilteringSceneIndexClient& client);
+    bool _CreateSceneFilteringSceneIndicesData(const std::shared_ptr<FilteringSceneIndexClient>& client);
+    bool _CreateSelectionHighlightFilteringSceneIndicesData(const std::shared_ptr<FilteringSceneIndexClient>& client);
+    void _DestroySceneFilteringSceneIndicesData(const std::shared_ptr<FilteringSceneIndexClient>& client);
+    void _DestroySelectionHighlightFilteringSceneIndicesData(const std::shared_ptr<FilteringSceneIndexClient>& client);
     
 };
 
