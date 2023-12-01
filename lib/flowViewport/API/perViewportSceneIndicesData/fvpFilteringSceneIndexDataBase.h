@@ -24,7 +24,7 @@
 #include <pxr/base/tf/declarePtrs.h>
 #include <pxr/imaging/hd/sceneIndex.h>
 
-//The Pixar's namespace needs to be at the highest namespace level for TF_DECLARE_REF_PTRS to work.
+//The Pixar's namespace needs to be at the highest namespace level for TF_DECLARE_WEAK_AND_REF_PTRS to work.
 PXR_NAMESPACE_OPEN_SCOPE
 
 namespace FVP_NS_DEF {

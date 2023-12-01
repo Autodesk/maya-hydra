@@ -89,7 +89,7 @@ void DataProducerSceneIndexInterfaceImp::removeAllViewportDataProducerSceneIndic
 
     auto& dataProducerSceneIndicesDataForthisViewport = viewportInformationAndSceneIndicesPerViewportData.GetDataProducerSceneIndicesData();
 
-    for (auto& dataProducerSceneIndicesData : dataProducerSceneIndicesDataForthisViewport){
+    for (const auto& dataProducerSceneIndicesData : dataProducerSceneIndicesDataForthisViewport){
         //Remove it from the render index
         if (dataProducerSceneIndicesData){
             const auto& sceneIndex = dataProducerSceneIndicesData->GetDataProducerLastSceneIndexChain();
@@ -110,13 +110,12 @@ void DataProducerSceneIndexInterfaceImp::removeViewportDataProducerSceneIndex(co
     if (PXR_NS::FvpViewportAPITokens->allViewports == hydraViewportId){
         //It was applied to all viewports
         
-        ViewportInformationAndSceneIndicesPerViewportDataSet& allViewportsInfoAndSceneIndices = 
+        ViewportInformationAndSceneIndicesPerViewportDataVector& allViewportsInfoAndSceneIndices = 
             ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetAllViewportInfoAndData();
 
         //We need to remove it from all viewports where it was applied.
         for (auto& viewportInfoAndData : allViewportsInfoAndSceneIndices){
-            ViewportInformationAndSceneIndicesPerViewportData& nonConstViewportInfoAndData = const_cast<ViewportInformationAndSceneIndicesPerViewportData&>(viewportInfoAndData);
-            nonConstViewportInfoAndData.RemoveViewportDataProducerSceneIndex(customDataProducerSceneIndex);
+            viewportInfoAndData.RemoveViewportDataProducerSceneIndex(customDataProducerSceneIndex);
         }
 
         //Also remove it from the dataProducerSceneIndicesThatApplyToAllViewports array

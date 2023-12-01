@@ -74,7 +74,7 @@ void ViewportInformationAndSceneIndicesPerViewportData::_AddAllDataProducerScene
     }
 
     //Add all data producer scene index to the merging scene index through the render index proxy
-    for (auto& dataProducerSceneIndexData : _dataProducerSceneIndicesData){
+    for (const auto& dataProducerSceneIndexData : _dataProducerSceneIndicesData){
         // Add the data producer scene index to the merging scene index
         if (dataProducerSceneIndexData && dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain()) {
             _renderIndexProxy->InsertSceneIndex(dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain(), 

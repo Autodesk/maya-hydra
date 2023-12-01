@@ -46,9 +46,14 @@ public:
     std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr>& GetDataProducerSceneIndicesData() {return _dataProducerSceneIndicesData;}
     void RemoveViewportDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex);
 
-    //Needed by std::set
-    bool operator < (const ViewportInformationAndSceneIndicesPerViewportData& other)const{
-        return _viewportInformation < other._viewportInformation; //Is for std::set.
+    //Needed by std::vector
+    ViewportInformationAndSceneIndicesPerViewportData& operator = (const ViewportInformationAndSceneIndicesPerViewportData& other){
+        _viewportInformation = other._viewportInformation;
+        _dataProducerSceneIndicesData = other._dataProducerSceneIndicesData;
+        _inputSceneIndex = other._inputSceneIndex;
+        _lastFilteringSceneIndex = other._lastFilteringSceneIndex;
+        _renderIndexProxy = other._renderIndexProxy;
+        return *this;
     }
 
 private:
@@ -71,7 +76,7 @@ private:
     void _AddAllDataProducerSceneIndexToMergingSCeneIndex();
 };
 
-using ViewportInformationAndSceneIndicesPerViewportDataSet = std::set<ViewportInformationAndSceneIndicesPerViewportData>;
+using ViewportInformationAndSceneIndicesPerViewportDataVector = std::vector<ViewportInformationAndSceneIndicesPerViewportData>;
 
 } //End of namespace FVP_NS_DEF
 

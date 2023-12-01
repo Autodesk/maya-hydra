@@ -96,10 +96,10 @@ void FilteringSceneIndicesChainManager::updateFilteringSceneIndicesChain(const s
     *   only the viewports filtering scene indices chain which are using this renderer.
     */
 
-    ViewportInformationAndSceneIndicesPerViewportDataSet& viewportInformationAndSceneIndicesPerViewportDataSet=
+    ViewportInformationAndSceneIndicesPerViewportDataVector& allViewportInformationAndSceneIndicesPerViewport =
             ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetAllViewportInfoAndData();
 
-    for (auto& viewportInformationAndSceneIndicesPerViewportData : viewportInformationAndSceneIndicesPerViewportDataSet){
+    for (auto& viewportInformationAndSceneIndicesPerViewportData : allViewportInformationAndSceneIndicesPerViewport){
         
         //Check the renderer name
         const std::string& rendererDisplayName = viewportInformationAndSceneIndicesPerViewportData.GetViewportInformation()._rendererName;
@@ -110,11 +110,10 @@ void FilteringSceneIndicesChainManager::updateFilteringSceneIndicesChain(const s
             }
         }
 
-        ViewportInformationAndSceneIndicesPerViewportData& nonConstViewportInformationAndSceneIndicesPerViewportData = const_cast<ViewportInformationAndSceneIndicesPerViewportData&>(viewportInformationAndSceneIndicesPerViewportData);
-        auto& renderIndexProxy = viewportInformationAndSceneIndicesPerViewportData.GetRenderIndexProxy();
-        destroyFilteringSceneIndicesChain(nonConstViewportInformationAndSceneIndicesPerViewportData);
-        createFilteringSceneIndicesChain(nonConstViewportInformationAndSceneIndicesPerViewportData);
-        auto& lastSceneIndex = viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndex();
+        const auto& renderIndexProxy = viewportInformationAndSceneIndicesPerViewportData.GetRenderIndexProxy();
+        destroyFilteringSceneIndicesChain(viewportInformationAndSceneIndicesPerViewportData);
+        createFilteringSceneIndicesChain(viewportInformationAndSceneIndicesPerViewportData);
+        const auto& lastSceneIndex = viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndex();
         TF_AXIOM(lastSceneIndex && renderIndexProxy && renderIndexProxy->GetRenderIndex());
         renderIndexProxy->GetRenderIndex()->InsertSceneIndex(lastSceneIndex, SdfPath::AbsoluteRootPath());
     }
@@ -134,8 +133,8 @@ void FilteringSceneIndicesChainManager::_AppendFilteringSceneIndicesChain(  View
     lastSceneIndex                            = inputScene;
 
     //Call our Hydra viewport API mechanism for custom filtering scene index clients
-    auto& viewportFilteringSceneIndicesData = FilteringSceneIndexInterfaceImp::get().getSceneFilteringSceneIndicesData(); //Not const as we may modify its content later
-    for (auto& filteringSceneIndexData : viewportFilteringSceneIndicesData) {
+    const auto& viewportFilteringSceneIndicesData = FilteringSceneIndexInterfaceImp::get().getSceneFilteringSceneIndicesData();
+    for (const auto& filteringSceneIndexData : viewportFilteringSceneIndicesData) {
         auto client = filteringSceneIndexData->getClient();
         const std::string& rendererNames = client->getRendererNames();
         //Filter by render delegate name

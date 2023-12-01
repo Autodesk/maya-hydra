@@ -139,7 +139,7 @@ void FilteringSceneIndexInterfaceImp::_DestroySceneFilteringSceneIndicesData(con
         auto findResult = std::find_if(sceneFilteringSceneIndicesData.cbegin(), sceneFilteringSceneIndicesData.cend(),
                     [&client](const PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr& filteringSIData) { return filteringSIData->getClient() == client;});
         if (findResult != sceneFilteringSceneIndicesData.cend()){
-            auto& filteringSIData = (*findResult);
+            const auto& filteringSIData = (*findResult);
             rendererNames = (filteringSIData)
                 ? filteringSIData->getClient()->getRendererNames()
                 : FvpViewportAPITokens->allRenderers;

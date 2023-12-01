@@ -46,8 +46,8 @@ public:
     //A Hydra viewport was deleted
     void RemoveViewportInformation(const std::string& modelPanel);
 
-    const ViewportInformationAndSceneIndicesPerViewportDataSet&  GetAllViewportInfoAndData() const {return _viewportsInformationAndSceneIndicesPerViewportData;}
-    ViewportInformationAndSceneIndicesPerViewportDataSet&  GetAllViewportInfoAndData() {return _viewportsInformationAndSceneIndicesPerViewportData;}
+    const ViewportInformationAndSceneIndicesPerViewportDataVector&  GetAllViewportInfoAndData() const {return _viewportsInformationAndSceneIndicesPerViewportData;}
+    ViewportInformationAndSceneIndicesPerViewportDataVector&  GetAllViewportInfoAndData() {return _viewportsInformationAndSceneIndicesPerViewportData;}
 
     const ViewportInformationAndSceneIndicesPerViewportData* GetViewportInfoAndDataFromViewportId(const std::string& viewportId)const;
     ViewportInformationAndSceneIndicesPerViewportData* GetViewportInfoAndDataFromViewportId(const std::string& viewportId);
@@ -59,7 +59,7 @@ public:
 
 private:
     ///Hydra viewport information
-    ViewportInformationAndSceneIndicesPerViewportDataSet     _viewportsInformationAndSceneIndicesPerViewportData;
+    ViewportInformationAndSceneIndicesPerViewportDataVector     _viewportsInformationAndSceneIndicesPerViewportData;
     
     ViewportInformationAndSceneIndicesPerViewportDataManager() = default;
 };
