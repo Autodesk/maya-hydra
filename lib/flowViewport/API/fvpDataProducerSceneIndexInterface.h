@@ -19,6 +19,7 @@
 
 //Local headers
 #include "flowViewport/api.h"
+#include "flowViewport/API/fvpViewportAPITokens.h"
 
 //Hydra headers
 #include <pxr/imaging/hd/sceneIndex.h>
@@ -37,12 +38,6 @@ namespace FVP_NS_DEF
     
         /// Interface accessor
         static FVP_API DataProducerSceneIndexInterface& get();
-
-        /// Use this string in the viewport identifier parameters, named "hydraViewportId" in this class, to apply the data producer scene index to all viewports.
-        static FVP_API const std::string allViewports;
-
-        /// Use this string in the AddDataProducerSceneIndex method for the "rendererNames" parameter to apply to all renderers.
-        static FVP_API const std::string allRenderers;
 
         /**
         *  @brief       Adds a custom data producer scene index.
@@ -77,8 +72,8 @@ namespace FVP_NS_DEF
         */
         virtual bool addDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
                                                void* dccNode = nullptr,
-                                               const std::string& hydraViewportId = allViewports,
-                                               const std::string& rendererNames = allRenderers,
+                                               const std::string& hydraViewportId = PXR_NS::FvpViewportAPITokens->allViewports,
+                                               const std::string& rendererNames = PXR_NS::FvpViewportAPITokens->allRenderers,
                                                const PXR_NS::SdfPath& customDataProducerSceneIndexRootPathForInsertion = PXR_NS::SdfPath::AbsoluteRootPath()
                                               ) = 0;
 
@@ -94,7 +89,7 @@ namespace FVP_NS_DEF
         
         */
         virtual void removeViewportDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
-                                                          const std::string& hydraViewportId = allViewports
+                                                          const std::string& hydraViewportId = PXR_NS::FvpViewportAPITokens->allViewports
                                                          ) = 0;
     };
     

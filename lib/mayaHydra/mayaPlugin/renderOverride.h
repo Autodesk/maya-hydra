@@ -221,6 +221,7 @@ private:
     HdxTaskController*                        _taskController = nullptr;
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
     Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
+    HdSceneIndexBaseRefPtr                    _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
     HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;

@@ -25,13 +25,13 @@ InformationClientExample::~InformationClientExample()
 { 
 }
 
-//Callback to be able to act when a Hydra viewport scene index was added, typical use case is an hydra viewport was created.
+//Callback to be able to act when a Hydra viewport scene index was added, typical use case is a hydra viewport was created.
 void InformationClientExample::SceneIndexAdded(const InformationInterface::ViewportInformation& viewportInformation)
 {
     
 }
 
-//Callback to be able to act when a Hydra viewport scene index was removed, typical use case is an hydra viewport was removed.
+//Callback to be able to act when a Hydra viewport scene index was removed, typical use case is a hydra viewport was removed.
 void InformationClientExample::SceneIndexRemoved(const InformationInterface::ViewportInformation& viewportInformation)
 {
 }

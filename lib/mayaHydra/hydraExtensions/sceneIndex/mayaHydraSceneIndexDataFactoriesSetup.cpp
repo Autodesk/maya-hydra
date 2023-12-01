@@ -22,14 +22,19 @@
 //Local headers
 #include "mayaHydraSceneIndexDataFactoriesSetup.h"
 #include "mayaHydraMayaDataProducerSceneIndexDataConcreteFactory.h"
+#include "mayaHydraMayaFilteringSceneIndexDataConcreteFactory.h"
 
 //Flow viewport headers
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
+#include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
 
 namespace MAYAHYDRA_NS_DEF{
 
 SceneIndexDataFactoriesSetup::SceneIndexDataFactoriesSetup()
 {
+    static MayaFilteringSceneIndexDataConcreteFactory  filteringFactory;
+    Fvp::FilteringSceneIndexInterfaceImp::get().setSceneIndexDataFactory(filteringFactory);
+
     static MayaDataProducerSceneIndexDataConcreteFactory  dataProducerFactory;
     Fvp::DataProducerSceneIndexInterfaceImp::get().setSceneIndexDataFactory(dataProducerFactory);
 }

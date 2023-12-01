@@ -32,7 +32,7 @@ TEST(MayaSceneFlattening, childHasFlattenedTransform)
 {
     // Setup inspector for the first scene index
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
-    ASSERT_GT(sceneIndices.size(), static_cast<size_t>(0));
+    ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
     // Retrieve the child cube prim
@@ -47,7 +47,7 @@ TEST(MayaSceneFlattening, childHasFlattenedTransform)
         return parentIsCube;
     };
     PrimEntriesVector foundPrims = inspector.FindPrims(findCubePrimPredicate, 1);
-    ASSERT_EQ(foundPrims.size(), static_cast<size_t>(1));
+    ASSERT_EQ(foundPrims.size(), 1u);
     HdSceneIndexPrim cubePrim = foundPrims.front().prim;
 
     // Extract the Hydra xform matrix from the cube prim

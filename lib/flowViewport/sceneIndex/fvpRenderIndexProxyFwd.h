@@ -16,7 +16,7 @@
 #define FVP_RENDER_INDEX_PROXY_FWD_H
 
 #include "flowViewport/api.h"
-
+#include <memory>
 
 namespace FVP_NS_DEF {
 

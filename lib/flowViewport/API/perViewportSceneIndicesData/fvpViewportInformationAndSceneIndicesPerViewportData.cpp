@@ -19,6 +19,7 @@
 #include "flowViewport/API/interfacesImp/fvpInformationInterfaceImp.h"
 #include "flowViewport/sceneIndex/fvpRenderIndexProxy.h"
 #include "flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h"
+#include "flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h"
 
 //Hydra headers
 #include <pxr/imaging/hd/renderIndex.h>
@@ -39,6 +40,8 @@ ViewportInformationAndSceneIndicesPerViewportData::ViewportInformationAndSceneIn
 ViewportInformationAndSceneIndicesPerViewportData::~ViewportInformationAndSceneIndicesPerViewportData()
 {
     DataProducerSceneIndexInterfaceImp::get().removeAllViewportDataProducerSceneIndices(*this);
+    //Remove custom filtering scene indices chain
+    FilteringSceneIndicesChainManager::get().destroyFilteringSceneIndicesChain(*this);
 }
 
 void ViewportInformationAndSceneIndicesPerViewportData::RemoveViewportDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex)
@@ -71,7 +74,7 @@ void ViewportInformationAndSceneIndicesPerViewportData::_AddAllDataProducerScene
     }
 
     //Add all data producer scene index to the merging scene index through the render index proxy
-    for (auto& dataProducerSceneIndexData : _dataProducerSceneIndicesData){
+    for (const auto& dataProducerSceneIndexData : _dataProducerSceneIndicesData){
         // Add the data producer scene index to the merging scene index
         if (dataProducerSceneIndexData && dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain()) {
             _renderIndexProxy->InsertSceneIndex(dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain(), 
