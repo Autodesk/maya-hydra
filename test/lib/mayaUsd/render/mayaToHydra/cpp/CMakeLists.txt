@@ -25,6 +25,7 @@ target_sources(${TARGET_NAME}
         testFlowViewportAPIAddPrims.cpp
         testUsdStageLayerMuting.cpp
         testMeshAdapterTransform.cpp
+        testFlowViewportAPIFilterPrims.cpp
 )
 
 # -----------------------------------------------------------------------------

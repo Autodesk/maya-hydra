@@ -24,6 +24,7 @@ set(TEST_SCRIPT_FILES
     cpp/testFlowViewportAPIViewportInformation.py
     cpp/testFlowViewportAPIAddPrims.py
     cpp/testUsdStageLayerMuting.py
+    cpp/testFlowViewportAPIFilterPrims.py
 )
 
 # Test use of mesh adapter code for mesh support, using environment variable.

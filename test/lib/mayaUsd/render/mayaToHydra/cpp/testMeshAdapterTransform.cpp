@@ -32,7 +32,7 @@ TEST(MeshAdapterTransform, testDirtying)
 {
     // Setup notifications accumulator for the first terminal scene index
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
-    ASSERT_GT(sceneIndices.size(), static_cast<size_t>(0));
+    ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexNotificationsAccumulator notifsAccumulator(sceneIndices.front());
 
     // The test cube should still be selected from the Python driver

@@ -14,6 +14,8 @@ target_sources(${TARGET_NAME}
     mayaHydraMayaDataProducerSceneIndexData.cpp
     mayaHydraMayaDataProducerSceneIndexDataConcreteFactory.cpp
     mayaHydraSceneIndexDataFactoriesSetup.cpp
+    mayaHydraMayaFilteringSceneIndexData.cpp
+    mayaHydraMayaFilteringSceneIndexDataConcreteFactory.cpp
 )
 
 set(HEADERS
@@ -28,6 +30,8 @@ set(HEADERS
     mayaHydraMayaDataProducerSceneIndexData.h
     mayaHydraMayaDataProducerSceneIndexDataConcreteFactory.h
     mayaHydraSceneIndexDataFactoriesSetup.h
+    mayaHydraMayaFilteringSceneIndexData.h
+    mayaHydraMayaFilteringSceneIndexDataConcreteFactory.h
 )
 
 # -----------------------------------------------------------------------------

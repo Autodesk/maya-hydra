@@ -76,22 +76,19 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             cmds.showHidden(transformNode)
             self.assertSnapshotClose("add_NodeUnhidden.png", None, None)
 
-            #Delete the shape node
+            #Delete the shape node, this should hide the added prims as well
             cmds.delete(flowViewportNodeName)
-            
             self.assertSnapshotClose("add_NodeDeleted.png", None, None)
-            #Enable undo again
-            cmds.undoInfo(stateWithoutFlush=True)
-
-            #Undo the delete, the node should be visible again
+            
+            #Undo the delete, the node should be visible again so do the added prims
             cmds.undo()
             self.assertSnapshotClose("add_NodeDeletedUndo.png", None, None)
 
-            #Redo the delete
+            #Redo the delete, the added prims should be hidden
             cmds.redo()
             self.assertSnapshotClose("add_NodeDeletedRedo.png", None, None)
 
-            #Undo the delete again, the node should be visible again
+            #Undo the delete again, the added prims should be visible
             cmds.undo()
             self.assertSnapshotClose("add_NodeDeletedUndoAgain.png", None, None)
 
@@ -111,6 +108,84 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             #Finish by a File New command
             cmds.file(new=True, force=True)
 
+    #Test filtering primitives
+    def test_FilteringPrimitives(self):
+        self.setupScene()
+        with PluginLoaded('flowViewportAPIMayaLocator'):
+
+            #Create a maya sphere
+            sphereNode, sphereShape = cmds.polySphere()
+            cmds.refresh()
+
+            #Create a FlowViewportAPIMayaLocator node which adds a dataProducerSceneIndex and a Filtering scene index
+            flowViewportNodeName = cmds.createNode("FlowViewportAPIMayaLocator")
+            self.assertFalse(flowViewportNodeName == None)
+            #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
+            cmds.setAttr(flowViewportNodeName + '.dummyInput', 3)#setting this will set dirty the dummyOutput attribute
+            cmds.getAttr(flowViewportNodeName + '.dummyOutput')#getting this value will trigger a call to compute
+            cmds.refresh()
+            #Original images are located for example in maya-hydra\test\lib\mayaUsd\render\mayaToHydra\FlowViewportAPITest
+            self.assertSnapshotClose("filter_NodeCreated.png", None, None)
+
+            #Move the transform node, the added prims (cube grid) should move as well
+            # Get the transform node of the FlowViewportAPIMayaLocator
+            transformNode = cmds.listRelatives(flowViewportNodeName, parent=True)[0]
+            self.assertFalse(transformNode == None)
+            #Select the transform node
+            cmds.select(transformNode)
+            # Move the selected node
+            cmds.move(15, 0, 0)
+            cmds.refresh()
+            self.assertSnapshotClose("filter_NodeMoved.png", None, None)
+
+            #Change sphere attributes to add more vertices/polygons, our filtering hides a prim when its number of vertices is greater than 10 000.
+            cmds.setAttr(sphereShape + '.subdivisionsAxis', 200)
+            cmds.setAttr(sphereShape + '.subdivisionsHeight', 200)
+            cmds.refresh()
+            self.assertSnapshotClose("filter_SphereFiltered.png", None, None)
+
+            #Decreasing the number of vertices of this sphere under 10 000 should make it visible again (not filtered)
+            cmds.setAttr(sphereShape + '.subdivisionsAxis', 30)
+            cmds.refresh()
+            self.assertSnapshotClose("filter_SphereUnFiltered.png", None, None)
+
+            #Increasing again the number of vertices above 10 000 should make it filtered again (invisible)
+            cmds.setAttr(sphereShape + '.subdivisionsAxis', 200)
+            cmds.refresh()
+            self.assertSnapshotClose("filter_SphereFilteredAgain.png", None, None)
+
+            #Hide the transform node, this should hide the FlowViewportAPIMayaLocator shape node and disable the filtering as well.
+            cmds.hide(transformNode)
+            self.assertSnapshotClose("filter_NodeHidden.png", None, None)
+
+            #Unhide the transform node, this should unhide the FlowViewportAPIMayaLocator node and enable the filtering as well.
+            cmds.showHidden(transformNode)
+            self.assertSnapshotClose("filter_NodeUnhidden.png", None, None)
+
+            #Delete the shape node, this should disable filtering
+            cmds.delete(flowViewportNodeName)
+            self.assertSnapshotClose("filter_NodeDeleted.png", None, None)
+            
+            #Undo the delete, the node should be visible again and filtering be enabled
+            cmds.undo()
+            self.assertSnapshotClose("filter_NodeDeletedUndo.png", None, None)
+
+            #Redo the delete, filtering should be disabled
+            cmds.redo()
+            self.assertSnapshotClose("filter_NodeDeletedRedo.png", None, None)
+            
+            #Undo the delete so filtering is enabled again
+            cmds.undo()
+
+            #Switch to VP2
+            self.setViewport2Renderer()
+            #Switch back to Storm
+            self.setHdStormRenderer()
+            self.assertSnapshotClose("filter_VP2AndThenBackToStorm.png", None, None)
+
+            #Finish by a File New command
+            cmds.file(new=True, force=True)
+    
     #Test Cube grids parameters
     def test_CubeGrid(self):
         self.setupScene()
@@ -324,6 +399,23 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             cmds.setFocus ('modelPanel2')
             self.assertSnapshotClose("multipleViewports_viewPanel2.png", None, None)
 
+            #Change sphere attributes to add more vertices/polygons, our filtering removes a prim when its number of vertices is greater than 10 000.
+            cmds.setAttr(sphereShape + '.subdivisionsAxis', 200)
+            cmds.setAttr(sphereShape + '.subdivisionsHeight', 200)
+            cmds.refresh()
+            cmds.setFocus ('modelPanel4')
+            self.assertSnapshotClose("multipleViewports_sphereFiltered_viewPanel4.png", None, None)
+            cmds.setFocus ('modelPanel2')
+            self.assertSnapshotClose("multipleViewports_sphereFiltered_viewPanel2.png", None, None)
+            
+            #Remove filtering by decreasing the number of vertices
+            cmds.setAttr(sphereShape + '.subdivisionsAxis', 30)
+            cmds.refresh()
+            cmds.setFocus ('modelPanel4')
+            self.assertSnapshotClose("multipleViewports_sphereUnfiltered_viewPanel4.png", None, None)
+            cmds.setFocus ('modelPanel2')
+            self.assertSnapshotClose("multipleViewports_sphereUnfiltered_viewPanel2.png", None, None)
+            
             #Switch to VP2
             cmds.setFocus ('modelPanel4')
             self.setViewport2Renderer()

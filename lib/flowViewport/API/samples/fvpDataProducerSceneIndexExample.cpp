@@ -534,7 +534,7 @@ HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubeP
 void DataProducerSceneIndexExample::addDataProducerSceneIndex()
 {
     if (!_dataProducerSceneIndexAdded && _hydraInterface){
-        const bool res = _hydraInterface->addDataProducerSceneIndex(_retainedSceneIndex, _containerNode, DataProducerSceneIndexInterface::allViewports, DataProducerSceneIndexInterface::allRenderers, SdfPath::AbsoluteRootPath());
+        const bool res = _hydraInterface->addDataProducerSceneIndex(_retainedSceneIndex, _containerNode, PXR_NS::FvpViewportAPITokens->allViewports, PXR_NS::FvpViewportAPITokens->allRenderers, SdfPath::AbsoluteRootPath());
         if (false == res){
             TF_CODING_ERROR("_hydraInterface->addDataProducerSceneIndex returned false !");
         }
@@ -545,7 +545,7 @@ void DataProducerSceneIndexExample::addDataProducerSceneIndex()
 void DataProducerSceneIndexExample::removeDataProducerSceneIndex() 
 { 
     if (_dataProducerSceneIndexAdded && _hydraInterface){
-        _hydraInterface->removeViewportDataProducerSceneIndex(_retainedSceneIndex, DataProducerSceneIndexInterface::allViewports);
+        _hydraInterface->removeViewportDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allViewports);
         _dataProducerSceneIndexAdded = false;
     }
 }

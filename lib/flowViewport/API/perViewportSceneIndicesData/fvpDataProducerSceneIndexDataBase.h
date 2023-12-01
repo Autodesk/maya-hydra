@@ -88,7 +88,7 @@ protected:
     void*                               _dccNode;
 
     //The following members are optional and only used when a dccNode was passed in the constructor
-    /** Is a filtering scene index that modifies the parent prim from the retained scene index to update the transfor/visibility when it is updated in the DCC. 
+    /** Is a filtering scene index that modifies the parent prim from the retained scene index to update the transform/visibility when it is updated in the DCC. 
     It is used only when a dccNode was passed.*/
     ParentDataModifierSceneIndexRefPtr  _parentDataModifierSceneIndex = nullptr;
     /// ParentPath prim used to be the parent of all prims from _dataProducerSceneIndex, used only when a dccNode was passed

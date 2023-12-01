@@ -47,14 +47,21 @@ namespace FVP_NS_DEF
                 : _viewportId(viewportId), _cameraName(cameraName) {}
             
             ///_viewportId is a Hydra viewport string identifier which is unique for all hydra viewports during a session
-            const std::string _viewportId;
+            std::string _viewportId;
 
             ///_cameraName is the name of the camera/viewport when the viewport was created, it is not updated if the camera's name has changed.
-            const std::string _cameraName;
+            std::string _cameraName;
 
             ///_rendererName is the Hydra viewport renderer name (example : "GL" for Storm or "Arnold" for the Arnold render delegate)
             std::string _rendererName;
 
+            ViewportInformation& operator = (const ViewportInformation& other){
+                _viewportId = other._viewportId;
+                _cameraName = other._cameraName;
+                _rendererName = other._rendererName;
+                return *this;
+            }
+            
             bool operator ==(const ViewportInformation& other)const{
                 return  _viewportId == other._viewportId &&
                         _cameraName == other._cameraName &&

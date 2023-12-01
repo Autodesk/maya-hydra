@@ -37,8 +37,8 @@ public:
     ~ViewportInformationAndSceneIndicesPerViewportData();
     
     const InformationInterface::ViewportInformation& GetViewportInformation()const { return _viewportInformation;}
-    const PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndexOfTheChain() const {return _lastFilteringSceneIndexOfTheChain;}
-    void SetRenderIndexProxy(const Fvp::RenderIndexProxyPtr& renderIndexProxy);
+    PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndex() {return _lastFilteringSceneIndex;}
+    const PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndex() const {return _lastFilteringSceneIndex;}
     const Fvp::RenderIndexProxyPtr GetRenderIndexProxy() const {return _renderIndexProxy;}
     void SetInputSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) {_inputSceneIndex = inputSceneIndex;}
     const PXR_NS::HdSceneIndexBaseRefPtr&   GetInputSceneIndex() const {return _inputSceneIndex;}
@@ -46,9 +46,14 @@ public:
     std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr>& GetDataProducerSceneIndicesData() {return _dataProducerSceneIndicesData;}
     void RemoveViewportDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex);
 
-    //Needed by std::set
-    bool operator < (const ViewportInformationAndSceneIndicesPerViewportData& other)const{
-        return _viewportInformation < other._viewportInformation; //Is for std::set.
+    //Needed by std::vector
+    ViewportInformationAndSceneIndicesPerViewportData& operator = (const ViewportInformationAndSceneIndicesPerViewportData& other){
+        _viewportInformation = other._viewportInformation;
+        _dataProducerSceneIndicesData = other._dataProducerSceneIndicesData;
+        _inputSceneIndex = other._inputSceneIndex;
+        _lastFilteringSceneIndex = other._lastFilteringSceneIndex;
+        _renderIndexProxy = other._renderIndexProxy;
+        return *this;
     }
 
 private:
@@ -62,7 +67,7 @@ private:
     PXR_NS::HdSceneIndexBaseRefPtr                                          _inputSceneIndex {nullptr};
 
     /// The last scene index of the custom filtering scene indices chain for this viewport
-    PXR_NS::HdSceneIndexBaseRefPtr                                          _lastFilteringSceneIndexOfTheChain {nullptr};
+    PXR_NS::HdSceneIndexBaseRefPtr                                          _lastFilteringSceneIndex {nullptr};
     
     ///Is a render index proxy per viewport to avoid accessing directly the render index
     Fvp::RenderIndexProxyPtr                                                _renderIndexProxy {nullptr};
@@ -71,7 +76,7 @@ private:
     void _AddAllDataProducerSceneIndexToMergingSCeneIndex();
 };
 
-using ViewportInformationAndSceneIndicesPerViewportDataSet = std::set<ViewportInformationAndSceneIndicesPerViewportData>;
+using ViewportInformationAndSceneIndicesPerViewportDataVector = std::vector<ViewportInformationAndSceneIndicesPerViewportData>;
 
 } //End of namespace FVP_NS_DEF
 

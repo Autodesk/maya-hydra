@@ -45,6 +45,18 @@ public:
     ///Destructor
     ~MayaDataProducerSceneIndexData() override;
     
+    /// Get the MObject handle
+    const MObjectHandle& getObjHandle()const {return _mObjHandle;}  
+
+    /// Provide the node name from maya
+    std::string GetDCCNodeName() const override;
+
+    ///Update transform from maya node
+    void UpdateTransformFromMayaNode();
+   
+private:
+    MayaDataProducerSceneIndexData(const FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params);
+
     //The following members are optional and used only when a dccNode was passed in the constructor of DataProducerSceneIndexDataBase
     
     /// Is the MObjectHandle of the maya node shape, it may be invalid if no maya node MObject pointer was passed.
@@ -55,15 +67,6 @@ public:
     MCallbackIdArray                    _nodeMessageCallbackIds;
     /// Are the callbacks Ids set in maya to handle delete and deletion undo/redo
     MCallbackIdArray                    _dGMessageCallbackIds;
-
-    /// Provide the node name from maya
-    std::string GetDCCNodeName() const override;
-
-    ///Update transform from maya node
-    void UpdateTransformFromMayaNode();
-   
-private:
-    MayaDataProducerSceneIndexData(const FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params);
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -21,13 +21,13 @@
 
 namespace FVP_NS_DEF {
 
-/** Since Flow viewport is DCC agnostic, the DCC will implement a concrete factory subclassing that class to provide specific 
-*   DCC implementation of the classes mentioned.
+/** Since Flow viewport is DCC agnostic, the DCC will implement a concrete factory subclassing that class to provide a specific 
+*   DCC implementation of DataProducerSceneIndexDataBaseRefPtr.
 */
 class DataProducerSceneIndexDataAbstractFactory
 {
 public:
-    /// The DCC will create a subclass of DataProducerSceneIndexDataBaseRefPtr with specific DCC variables that flow viewport cannot manage since it's DCC agnostic
+    /// The DCC will create a subclass of DataProducerSceneIndexDataBaseRefPtr with specific DCC variables that Flow viewport cannot manage since it's DCC agnostic
     virtual PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr   createDataProducerSceneIndexDataBase(
         const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params) = 0;
 };
