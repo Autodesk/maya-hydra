@@ -40,11 +40,10 @@ class ParentDataModifierSceneIndex : public HdSingleInputFilteringSceneIndexBase
 public:
     using ParentClass = HdSingleInputFilteringSceneIndexBase;
 
-    static ParentDataModifierSceneIndexRefPtr New(const HdSceneIndexBaseRefPtr& _inputSceneIndex){
-        return TfCreateRefPtr(new ParentDataModifierSceneIndex(_inputSceneIndex));
+    static ParentDataModifierSceneIndexRefPtr New(const HdSceneIndexBaseRefPtr& inputSceneIndex, const SdfPath& parentPath, const GfMatrix4d& transformMatrix, bool visible){
+        return TfCreateRefPtr(new ParentDataModifierSceneIndex(inputSceneIndex, parentPath, transformMatrix, visible));
     }
 
-    void SetParentPath              (const SdfPath& parentPath)         {_parentPath        = parentPath;}
     void SetParentTransformMatrix   (const GfMatrix4d& transformMatrix) {_transformMatrix   = transformMatrix;}
     void SetParentVisibility        (bool visible)                      {_visible           = visible;}
 
@@ -86,7 +85,8 @@ protected:
     GfMatrix4d  _transformMatrix;
     bool        _visible = true;
 private:
-    ParentDataModifierSceneIndex(const HdSceneIndexBaseRefPtr& _inputSceneIndex) : ParentClass(_inputSceneIndex){}
+    ParentDataModifierSceneIndex(const HdSceneIndexBaseRefPtr& _inputSceneIndex, const SdfPath& parentPath, const GfMatrix4d& transformMatrix, bool visible) : 
+        ParentClass(_inputSceneIndex), _parentPath(parentPath), _transformMatrix(transformMatrix), _visible(visible) {}
 };
 
 } //End of namespace FVP_NS_DEF

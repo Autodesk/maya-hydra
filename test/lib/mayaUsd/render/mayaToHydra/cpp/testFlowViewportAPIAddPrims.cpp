@@ -60,7 +60,7 @@ TEST(FlowViewportAPI, addPrimitives)
     //hydraViewportDataProducerSceneIndexExample is what will inject the 3D grid of Hydra cube mesh primitives into the viewport
     Fvp::DataProducerSceneIndexExample  hydraViewportDataProducerSceneIndexExample;
 
-    const std::string firstCubePath (TfStringPrintf("/DataProducerSceneIndexExample/cube_%p0_0_0", &hydraViewportDataProducerSceneIndexExample));
+    const std::string firstCubePath (TfStringPrintf("/cube_%p0_0_0", &hydraViewportDataProducerSceneIndexExample));
     
     //Setup cube grid parameters
     hydraViewportDataProducerSceneIndexExample.setCubeGridParams(cubeGridParams);
