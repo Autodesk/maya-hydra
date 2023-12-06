@@ -120,8 +120,8 @@ namespace PrototypeInstancing
 namespace FVP_NS_DEF {
 
 DataProducerSceneIndexExample::DataProducerSceneIndexExample() :
-    _cubeRootPath(SdfPath(TfStringPrintf("/cube_%p", this, this))),//Is the root path for the cubes
-    _instancerPath(SdfPath(TfStringPrintf("/instancer_%p", this, this)))//Is the instancer path when using instancing
+    _cubeRootPath(SdfPath(TfStringPrintf("/cube_%p", this))),//Is the root path for the cubes
+    _instancerPath(SdfPath(TfStringPrintf("/instancer_%p", this)))//Is the instancer path when using instancing
 {
     //Create the HdRetainedSceneIndex to be able to easily add primitives
     _retainedSceneIndex = HdRetainedSceneIndex::New();
