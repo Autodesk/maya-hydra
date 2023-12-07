@@ -1,5 +1,52 @@
 # Changelog
 
+## [v0.5.0] - 2023-12-07
+
+**Build:**
+* Report build and version information from the mayaHydra plugin [#10](https://github.com/Autodesk/maya-hydra/pull/10)
+* Hydra for Maya has now a new home under https://github.com/Autodesk.com/maya-hdyra
+
+**Documentation:**
+* Rename docs mentioning Flow Viewport Library to Flow Viewport Toolkit [#11](https://github.com/Autodesk/maya-hydra/pull/11)
+* Update test README to clarify how to use MayaUSD in tests [#8](https://github.com/Autodesk/maya-hydra/pull/8)
+
+**Miscellaneous:**
+* Add filtering scene index interface to flow viewport toolkit [#21](https://github.com/Autodesk/maya-hydra/pull/21)
+* Fix mesh adapter transform update [#20](https://github.com/Autodesk/maya-hydra/pull/20)
+* Add data producer scene index interface in viewport API [#18](https://github.com/Autodesk/maya-hydra/pull/18)
+* Add test for USD stage layer muting [#17](https://github.com/Autodesk/maya-hydra/pull/17)
+* C++ 17, forward pointer declarations, and method naming [#16](https://github.com/Autodesk/maya-hydra/pull/16)
+* Fix Hydra Scene Browser test [#15](https://github.com/Autodesk/maya-hydra/pull/15)
+* Fix test for UFE lights from MayaUSD [#14](https://github.com/Autodesk/maya-hydra/pull/14)
+* Flow selection GitHub [#9](https://github.com/Autodesk/maya-hydra/pull/9)
+* Support USD v23.11 [#7](https://github.com/Autodesk/maya-hydra/pull/7)
+* Merge viewport information interface [#4](https://github.com/Autodesk/maya-hydra/pull/4)
+* Support multithreading in MayaHydraSceneIndex::RecreateAdapterOnIdle [#3](https://github.com/Autodesk/maya-hydra/pull/3)
+* Fix directional and default lights not working [#2](https://github.com/Autodesk/maya-hydra/pull/2)
+
+**Carry over from maya-usd repository:**
+* [HYDRA-107] - mayaHydra: Maya crashes when loading an USD stage from file, then doing File->New
+* [HYDRA-131] - mayaHydra: Arnold render delegate doesn't render IBL texture
+* [HYDRA-181] - DomeLight attributes don't show an effect on lighting
+* [HYDRA-185] - Selection Highlight for USD prims
+* [HYDRA-399] - USD Proxy Node Transforms not captured by MayaHydra
+* [HYDRA-414] - aiSkyDomeLight is shaded blue instead showing texture with Storm
+* [HYDRA-449] - Prims with purpose set to default are not rendered
+* [HYDRA-451] - Animation cache doesn't playback with mayaHydra
+* [HYDRA-452] - Crash when deleting a prim from a USD stage in mayaHydra
+* [HYDRA-465] - SceneIndex as default for Maya native scene data
+* [HYDRA-469] - aiSkymeDomeLight : don't switch temporary textures when updating the color
+* [HYDRA-485] - Hydra selection interface: Describe selection independent of SdfPaths
+* [HYDRA-496] - Crash on exit or on New Scene when the viewport is active and there a USD stage
+* [HYDRA-502] - Implement Custom MergingSceneIndex
+* [HYDRA-511] - Hydra Scene Browser builds on Linux and Mac
+* [HYDRA-529] - Failed to build MayaHydra with SceneBrowser plugin ON under Debug config
+* [HYDRA-551] - USD Stage needs to be moved to be visible when using the viewport API
+* [HYDRA-568] - Objects are not shown in the viewport when switching to MayaHydra from an empty scene
+* [HYDRA-586] - Crash when switching to mayaHydra if the scene contains Maya data and mayaHydra had previously been used
+* [HYDRA-613] - Crash when doing a file new with a callback using a dangling scene index
+* [HYDRA-687] - MayaUsdUfeItems.skipUsdUfeLights test failing
+  
 ## [v0.4.0] - 2023-08-30
 
 **Build:**
