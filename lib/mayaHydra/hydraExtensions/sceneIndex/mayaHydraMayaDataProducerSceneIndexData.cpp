@@ -89,6 +89,10 @@ MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(const FVP_NS_DEF:
         MObject* mObj = reinterpret_cast<MObject*>(_dccNode);
         _mObjHandle   = MObjectHandle(*mObj);
 
+        _mayaNodeDagPath  = MDagPath::getAPathTo(*mObj);
+
+        _CopyMayaNodeTransform();//Copy it so that the classes created in _CreateSceneIndexChainForDataProducerSceneIndex have the up to date matrix
+
         //The user provided a DCC node, it's a maya MObject in maya hydra
         _CreateSceneIndexChainForDataProducerSceneIndex();
 
@@ -97,8 +101,6 @@ MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(const FVP_NS_DEF:
             _nodeMessageCallbackIds.append(cbId);
         }
 
-        _mayaNodeDagPath  = MDagPath::getAPathTo(*mObj);
-                
         //Also monitor parent DAG node to be able to update the scene index if the parent transform is modified or the visibility changed
         MDagPath parentDagPath  = _mayaNodeDagPath;
         parentDagPath.pop();
@@ -137,6 +139,12 @@ MayaDataProducerSceneIndexData::~MayaDataProducerSceneIndexData()
 
 void MayaDataProducerSceneIndexData::UpdateTransformFromMayaNode() 
 { 
+    _CopyMayaNodeTransform(); 
+    UpdateHydraTransformFromParentPath();
+}
+
+void MayaDataProducerSceneIndexData::_CopyMayaNodeTransform() 
+{ 
     if (_mayaNodeDagPath.isValid()){
         //Get Maya transform value
         //Convert from Maya matrix to GfMatrix4d
@@ -144,9 +152,6 @@ void MayaDataProducerSceneIndexData::UpdateTransformFromMayaNode()
         
         //Copy Maya matrix into _parentMatrix member of this struct
         memcpy(_parentMatrix.GetArray(), mayaMat[0], sizeof(double) * 16);
-
-        //Update transform in Hydra
-        UpdateHydraTransformFromParentPath();
     }
 }
 

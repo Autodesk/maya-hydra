@@ -164,10 +164,8 @@ void DataProducerSceneIndexDataBase::_CreateSceneIndexChainForDataProducerSceneI
     AddParentPrimToSceneIndex();
 
     //Create a filtering scene index to update the information (transform, visibility,...) from the parent prim.
-    _parentDataModifierSceneIndex = ParentDataModifierSceneIndex::New(_retainedSceneIndex);
-    _parentDataModifierSceneIndex->SetParentPath(_parentPath);//Set the parent path inside
-    _parentDataModifierSceneIndex->SetParentTransformMatrix(_parentMatrix);
-
+    _parentDataModifierSceneIndex = ParentDataModifierSceneIndex::New(_retainedSceneIndex, _parentPath, _parentMatrix, true);
+    
     //Add a prefixing scene index to _dataProducerSceneIndex to set the parent which we added to the retainedsceneindex
     HdPrefixingSceneIndexRefPtr prefixingSceneIndex = HdPrefixingSceneIndex::New(_dataProducerSceneIndex, _parentPath);
     

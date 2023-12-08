@@ -58,12 +58,12 @@ bool DataProducerSceneIndexInterfaceImp::addDataProducerSceneIndex(const PXR_NS:
                                                                    const std::string& rendererNames /*= allRenderers*/,
                                                                    const PXR_NS::SdfPath& customDataProducerSceneIndexRootPathForInsertion /*= PXR_NS::SdfPath::AbsoluteRootPath()*/)
 {   
-    //hydraViewportId can DataProducerSceneIndexInterface::allViewports, meaning the user wants customDataProducerSceneIndex to be applied in all viewports.
     PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr dataProducerSceneIndexData  = 
         _CreateDataProducerSceneIndexData(customDataProducerSceneIndex, rendererNames, customDataProducerSceneIndexRootPathForInsertion, dccNode);
     if (nullptr == dataProducerSceneIndexData){
         return false;
     }
+    //PXR_NS::FvpViewportAPITokens->allViewports == hydraViewportId means the user wants customDataProducerSceneIndex to be applied in all viewports.
     if (PXR_NS::FvpViewportAPITokens->allViewports == hydraViewportId){
         //Apply this data producer scene index to all viewports
         return _AddDataProducerSceneIndexToAllViewports(dataProducerSceneIndexData);
