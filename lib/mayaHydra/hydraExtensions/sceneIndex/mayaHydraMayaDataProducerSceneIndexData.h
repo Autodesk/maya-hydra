@@ -57,6 +57,8 @@ public:
 private:
     MayaDataProducerSceneIndexData(const FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params);
 
+    void _CopyMayaNodeTransform();
+
     //The following members are optional and used only when a dccNode was passed in the constructor of DataProducerSceneIndexDataBase
     
     /// Is the MObjectHandle of the maya node shape, it may be invalid if no maya node MObject pointer was passed.
