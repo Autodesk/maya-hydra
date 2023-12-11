@@ -26,7 +26,7 @@ namespace FVP_NS_DEF
 {
     /**
     * SelectionClient is the definition of selection callbacks for a Hydra viewport.
-    * Subclass this class to register an instance of SelectionClient with Fvp::FlowSelectionInterface::RegisterSelectionClient
+    * Subclass this class to register an instance of SelectionClient with Fvp::SelectionInterface::RegisterSelectionClient
     */
     class FVP_API SelectionClient
     {

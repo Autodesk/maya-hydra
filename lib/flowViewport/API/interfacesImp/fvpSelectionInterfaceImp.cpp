@@ -30,7 +30,7 @@ namespace FVP_NS_DEF {
 
 SelectionClientSet _viewportSelectionClients;
 
-FlowSelectionInterface& FlowSelectionInterface::Get() 
+SelectionInterface& SelectionInterface::Get() 
 { 
     return SelectionInterfaceImp::Get();
 }

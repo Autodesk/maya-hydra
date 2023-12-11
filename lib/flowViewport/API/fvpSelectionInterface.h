@@ -24,20 +24,20 @@ namespace FVP_NS_DEF
     class SelectionClient;//Predeclaration
     
     /** 
-    * FlowSelectionInterface is used to register/unregister selection callbacks SelectionClient for a Hydra viewport.
-    * To get an instance of the FlowSelectionInterface class, please use :
-    * Fvp::FlowSelectionInterface& flowSelectionInterface = Fvp::FlowSelectionInterface::Get();
+    * SelectionInterface is used to register/unregister selection callbacks SelectionClient for a Hydra viewport.
+    * To get an instance of the SelectionInterface class, please use :
+    * Fvp::SelectionInterface& flowSelectionInterface = Fvp::SelectionInterface::Get();
     */
-    class FlowSelectionInterface
+    class SelectionInterface
     {
      public:
         
          /**
         *  @brief      Access to this interface
         *
-        *  @return     A reference on the FlowSelectionInterface
+        *  @return     A reference on the SelectionInterface
         */
-         static FVP_API FlowSelectionInterface& Get();
+         static FVP_API SelectionInterface& Get();
         
         /**
         *  @brief      Register a callbacks SelectionClient instance

@@ -19,13 +19,13 @@
 
 //Local headers
 #include <flowViewport/api.h>
-#include <flowViewport/API/fvpFlowSelectionInterface.h>
+#include <flowViewport/API/fvpSelectionInterface.h>
 #include <flowViewport/API/fvpSelectionClient.h>
 
 namespace FVP_NS_DEF {
 
 ///Is a singleton, use SelectionInterfaceImp& selInterfaceImp = SelectionInterfaceImp::Get() to get an instance of that interface
-class SelectionInterfaceImp :  public FVP_NS_DEF::FlowSelectionInterface
+class SelectionInterfaceImp :  public FVP_NS_DEF::SelectionInterface
 {
 public:
     virtual ~SelectionInterfaceImp()    = default;
