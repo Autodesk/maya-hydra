@@ -941,23 +941,24 @@ void MtohRenderOverride::SelectionChanged(
     //    reading the Maya selection must be done from the Maya selection
     //    changed callback, not the UFE selection changed callback.
     using SnOp = Ufe::SelectionCompositeNotification::Op;
-    static auto appendSn = [this](const SnOp& op) {
-        _selectionSceneIndex->AddSelection(op.item->path());
+    using SnSiPtr = Fvp::SelectionSceneIndexRefPtr;
+    static auto appendSn = [](const SnOp& op, const SnSiPtr& si) {
+        si->AddSelection(op.item->path());
     };
-    static auto removeSn = [this](const SnOp& op) {
-        _selectionSceneIndex->RemoveSelection(op.item->path());
+    static auto removeSn = [](const SnOp& op, const SnSiPtr& si) {
+        si->RemoveSelection(op.item->path());
     };
     // FLOW_VIEWPORT_TODO  Support selection insert.  PPT, 19-Oct-2023
-    static auto insertSn = [](const SnOp&) {
+    static auto insertSn = [](const SnOp&, const SnSiPtr& si) {
         TF_WARN("Insert into selection not supported.");
     };
-    static auto clearSn = [this](const SnOp&) {
-        _selectionSceneIndex->ClearSelection();
+    static auto clearSn = [](const SnOp&, const SnSiPtr& si) {
+        si->ClearSelection();
     };
-    static auto replaceWithSn = [this](const SnOp& op) {
-        _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+    static auto replaceWithSn = [](const SnOp& op, const SnSiPtr& si) {
+        si->ReplaceSelection(*Ufe::GlobalSelection::get());
     };
-    static std::function<void(const SnOp&)> changeSn[] = {appendSn, removeSn, insertSn, clearSn, replaceWithSn};
+    static std::function<void(const SnOp&, const SnSiPtr&)> changeSn[] = {appendSn, removeSn, insertSn, clearSn, replaceWithSn};
 
     if (notification.opType() == 
         Ufe::SelectionChanged::SelectionCompositeNotification) {
@@ -965,13 +966,13 @@ void MtohRenderOverride::SelectionChanged(
         const auto& compositeNotification = notification.staticCast<Ufe::SelectionCompositeNotification>();
 
         for (const auto& op : compositeNotification) {
-            changeSn[op.opType](op);
+            changeSn[op.opType](op, _selectionSceneIndex);
         }
     }
     else {
         SnOp op(notification);
 
-        changeSn[op.opType](op);
+        changeSn[op.opType](op, _selectionSceneIndex);
     }
 
 
