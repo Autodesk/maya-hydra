@@ -20,7 +20,7 @@
 //Local headers
 #include "flowViewport/api.h"
 #include "flowViewport/API/fvpSelectionClient.h"
-#include "flowViewport/API/fvpFlowSelectionInterface.h"
+#include "flowViewport/API/fvpSelectionInterface.h"
 
 namespace FVP_NS_DEF {
 
@@ -32,7 +32,7 @@ public:
     ~SelectionClientExample() override;
 
     ///Set the hydra interface
-    void SetHydraInterface(FlowSelectionInterface* si)   {_hydraViewportSelectionInterface   = si;}
+    void SetHydraInterface(SelectionInterface* si)   {_hydraViewportSelectionInterface   = si;}
 
     ///From FlowViewport::SelectionClient
     ///This is a dummy callback function to be replaced
@@ -40,7 +40,7 @@ public:
 
 protected:
     ///Store the Hydra interface pointer
-    FlowSelectionInterface*  _hydraViewportSelectionInterface    = nullptr;
+    SelectionInterface*  _hydraViewportSelectionInterface    = nullptr;
 };
 
 } //end of namespace FVP_NS_DEF

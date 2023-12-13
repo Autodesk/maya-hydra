@@ -1,6 +1,6 @@
 set(HEADERS
     fvpSelectionClient.h
-    fvpFlowSelectionInterface.h
+    fvpSelectionInterface.h
     fvpVersionInterface.h
     fvpInformationInterface.h
     fvpInformationClient.h
