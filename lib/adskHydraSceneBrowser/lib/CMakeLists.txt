@@ -73,6 +73,18 @@ foreach(SOURCE IN ITEMS ${SOURCES})
     # "QVariant(someVariable.str().data())" -> "QVariant(QLatin1StringView(someVariable.str().data()))"
     string(REGEX REPLACE "QVariant\\(\(${IDENTIFIER_REGEX}\)\.str\\(\\)\.\(c_str|data\)\\(\\)\\)" "QVariant(QLatin1StringView(\\1.str().\\2()))" FILE_CONTENTS "${FILE_CONTENTS}")
     
+    # Some setExpanded() calls are wrapped inside a QTimer::singleShot() call in order to defer their execution.
+    # This was done by Pixar in order to work around a crash in what appears to be some of their proprietary code
+    # (a method named PhdRequest::ExtractOptionalValue). However, this workaround now causes a crash on our end.
+    # Since the original intent was to directly call setExpanded(), we replace the QTimer::singleShot() workaround 
+    # with a direct call to setExpanded(). This string regex does the following replacement :
+    # QTimer::singleShot(0, [this]() {
+    #     this->setExpanded(true);          ->      setExpanded(true);
+    # });
+    set(SET_EXPANDED_REGEX "QTimer::singleShot\\(0, \\[this\\]\\(\\) {[\r\n\t ]+this->setExpanded\\(true\\);[\r\n\t ]+}\\);")
+    set(SET_EXPANDED_REPLACEMENT "setExpanded\(true\);")
+    string(REGEX REPLACE "${SET_EXPANDED_REGEX}" "${SET_EXPANDED_REPLACEMENT}" FILE_CONTENTS "${FILE_CONTENTS}")
+
     # Patch in '#include <QString>' to make sure we can use QLatin1StringView
     prepend_include(FILE_CONTENTS "#include <QString>")
 
