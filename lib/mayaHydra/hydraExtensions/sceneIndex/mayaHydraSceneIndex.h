@@ -201,7 +201,7 @@ private:
     bool _CreateMaterial(const SdfPath& id, const MObject& obj);
     
     using LightDagPathMap = std::unordered_map<std::string, MDagPath>;
-    LightDagPathMap _GetActiveLightPaths() const;
+    LightDagPathMap _GetGlobalLightPaths() const;
     static VtValue CreateMayaDefaultMaterial();
 
     using DirtyBitsToLocatorsFunc = std::function<void(TfToken const&, const HdDirtyBits, HdDataSourceLocatorSet*)>;
