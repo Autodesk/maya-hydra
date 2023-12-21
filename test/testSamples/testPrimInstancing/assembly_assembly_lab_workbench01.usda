@@ -13,7 +13,7 @@ def Xform "root" (
     {
         def Xform "furniture_workbench01_0001" (
             instanceable = true
-            prepend references = @geo_modelling_furniture_workbench01_render_high_mesh.usdc@
+            prepend references = @geo_modelling_furniture_workbench01_render_high_mesh.usda@
         )
         {
             float3 xformOp:rotateXYZ = (0, -0, -0)
