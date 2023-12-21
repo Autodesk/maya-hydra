@@ -16,7 +16,6 @@ import maya.cmds as cmds
 
 import fixturesUtils
 import mtohUtils
-import usdUtils
 import unittest
 
 import testUtils
@@ -27,6 +26,7 @@ class TestPrimInstancing(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def loadUsdScene(self):
+        import usdUtils
         usdScenePath = testUtils.getTestScene('testPrimInstancing', 'scene.usda')
         usdUtils.createStageFromFile(usdScenePath)
         self.setHdStormRenderer()
