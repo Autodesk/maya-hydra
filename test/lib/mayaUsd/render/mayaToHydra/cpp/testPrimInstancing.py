@@ -17,6 +17,7 @@ import maya.mel as mel
 
 import fixturesUtils
 import mtohUtils
+import usdUtils
 import unittest
 
 import testUtils
@@ -29,10 +30,7 @@ class TestPrimInstancing(mtohUtils.MayaHydraBaseTestCase):
     def setupUsdStage(self):
         # Load the USD scene
         usdScenePath = testUtils.getTestScene('testPrimInstancing', 'scene.usda')
-        mel.eval('source \"mayaUsd_createStageFromFile.mel\"')
-        loadStageCmd = f'mayaUsd_createStageFromFilePath("{usdScenePath}")'
-        loadStageCmd = loadStageCmd.replace('\\', '/')
-        mel.eval(loadStageCmd)
+        usdUtils.createStageFromFile(usdScenePath)
         self.setHdStormRenderer()
         cmds.refresh()
 
