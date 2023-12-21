@@ -22,7 +22,7 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
-FindPrimPredicate findRootPredicate = PrimNamePredicate("root");
+FindPrimPredicate findInstanceableCubePredicate = PrimNamePredicate("instanceableCube");
 HdDataSourceLocator instancerLocator = HdDataSourceLocator(TfToken("instance"), TfToken("instancer"));
 } // namespace
 
@@ -33,14 +33,14 @@ TEST(PrimInstancing, testUsdPrimInstancing)
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
-    // Find the root prim
-    PrimEntriesVector rootPrims = inspector.FindPrims(findRootPredicate);
-    ASSERT_EQ(rootPrims.size(), 1u);
-    HdSceneIndexPrim rootPrim = rootPrims.front().prim;
+    // Find the instanceable cube prim
+    PrimEntriesVector instanceableCubePrims = inspector.FindPrims(findInstanceableCubePredicate);
+    ASSERT_EQ(instanceableCubePrims.size(), 1u);
+    HdSceneIndexPrim instanceableCubePrim = instanceableCubePrims.front().prim;
 
     // Retrieve the instancer data source
     auto instancerDataSource = HdTypedSampledDataSource<SdfPath>::Cast(
-        HdContainerDataSource::Get(rootPrim.dataSource, instancerLocator));
+        HdContainerDataSource::Get(instanceableCubePrim.dataSource, instancerLocator));
     ASSERT_TRUE(instancerDataSource);
 
     // Ensure the instancer prim exists and is populated
@@ -55,7 +55,7 @@ TEST(PrimInstancing, testUsdPrimInstancing)
     ASSERT_EQ(instancerPrim.primType, HdPrimTypeTokens->instancer);
     ASSERT_NE(instancerPrim.dataSource, nullptr);
 
-    // Ensure the cube prim exists and is populated
+    // Ensure the reference cube prim exists and is populated
     auto findCubePredicate
         = [instancerPath](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
         return primPath.HasPrefix(instancerPath) && primPath.GetName() == "cubeMesh";
