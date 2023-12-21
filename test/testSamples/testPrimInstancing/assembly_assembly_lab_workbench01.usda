@@ -13,13 +13,9 @@ def Xform "root" (
     {
         def Xform "furniture_workbench01_0001" (
             instanceable = true
-            prepend references = @geo_modelling_furniture_workbench01_render_high_mesh.usda@
+            prepend references = @cube.usda@
         )
         {
-            float3 xformOp:rotateXYZ = (0, -0, -0)
-            float3 xformOp:scale = (1, 1, 1)
-            double3 xformOp:translate = (0, 3.088914144757659, 0)
-            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
         }
     }
 }
