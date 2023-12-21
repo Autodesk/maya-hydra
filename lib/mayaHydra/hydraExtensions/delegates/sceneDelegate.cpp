@@ -79,11 +79,11 @@ namespace {
 // Pixar macros require Pixar namespace.
 PXR_NAMESPACE_USING_DIRECTIVE
 
-TF_DEFINE_ENV_SETTING(MAYA_HYDRA_USE_MESH_ADAPTER, false,
+TF_DEFINE_ENV_SETTING(MAYA_HYDRA_USE_MESH_ADAPTER_WITH_SCENE_DELEGATE, false,
                       "Use mesh adapter instead of MRenderItem for Maya meshes.");
 
 bool useMeshAdapter() {
-    static bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
+    static bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER_WITH_SCENE_DELEGATE);
     return uma;
 }
 
