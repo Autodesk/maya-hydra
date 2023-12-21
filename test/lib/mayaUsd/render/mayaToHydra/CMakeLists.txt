@@ -19,6 +19,7 @@ set(TEST_SCRIPT_FILES
     cpp/testMayaSceneFlattening.py
     cpp/testMayaUsdUfeItems.py
     cpp/testMergingSceneIndex.py
+    cpp/testPathInterface.py
     cpp/testSelectionSceneIndex.py
     cpp/testWireframeSelectionHighlightSceneIndex.py
     cpp/testFlowViewportAPIViewportInformation.py

@@ -17,6 +17,8 @@
 #ifndef MAYAHYDRA_TEST_UTILS_H
 #define MAYAHYDRA_TEST_UTILS_H
 
+#include <mayaHydraLib/mayaHydra.h>
+
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
@@ -287,5 +289,28 @@ private:
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+namespace MAYAHYDRA_NS_DEF {
+
+/**
+ * @brief Set global command-line arguments for use in tests.
+ *
+ * Provide argc, argv access for GoogleTest unit tests.
+ *
+ * @param[in] argc The count of arguments in argv.
+ * @param[in] argv Argument character strings.
+ */
+void setTestingArgs(int argc, char** argv);
+
+/**
+ * @brief Get global command-line arguments for use in tests.
+ *
+ * Provide argc, argv access for GoogleTest unit tests.
+ *
+ * @return argc, argv.
+ */
+std::pair<int, char**> getTestingArgs();
+
+}
 
 #endif // MAYAHYDRA_TEST_UTILS_H
