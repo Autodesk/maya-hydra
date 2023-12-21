@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 import maya.cmds as cmds
-import maya.mel as mel
 
 import fixturesUtils
 import mtohUtils
@@ -27,8 +26,7 @@ class TestPrimInstancing(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    def setupUsdStage(self):
-        # Load the USD scene
+    def loadUsdScene(self):
         usdScenePath = testUtils.getTestScene('testPrimInstancing', 'scene.usda')
         usdUtils.createStageFromFile(usdScenePath)
         self.setHdStormRenderer()
@@ -36,7 +34,7 @@ class TestPrimInstancing(mtohUtils.MayaHydraBaseTestCase):
 
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_UsdPrimInstancing(self):
-        self.setupUsdStage()
+        self.loadUsdScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="PrimInstancing.testUsdPrimInstancing")
 

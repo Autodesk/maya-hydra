@@ -15,7 +15,6 @@
 
 #include "testUtils.h"
 
-#include <pxr/base/gf/vec3d.h>
 #include <pxr/imaging/hd/tokens.h>
 
 #include <gtest/gtest.h>
