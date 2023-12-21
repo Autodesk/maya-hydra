@@ -16,6 +16,7 @@
 #include "testUtils.h"
 
 #include <pxr/base/gf/vec3d.h>
+#include <pxr/imaging/hd/tokens.h>
 
 #include <gtest/gtest.h>
 
@@ -43,11 +44,26 @@ TEST(PrimInstancing, testUsdPrimInstancing)
         HdContainerDataSource::Get(rootPrim.dataSource, instancerLocator));
     ASSERT_TRUE(instancerDataSource);
 
-    // Check if the instancer prim exists
+    // Ensure the instancer prim exists and is populated
     SdfPath instancerPath = instancerDataSource->GetTypedValue(0);
     auto findInstancerPredicate
         = [instancerPath](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
         return primPath == instancerPath;
     };
-    EXPECT_EQ(inspector.FindPrims(findInstancerPredicate).size(), 1u);
+    PrimEntriesVector instancerPrims = inspector.FindPrims(findInstancerPredicate);
+    ASSERT_EQ(instancerPrims.size(), 1u);
+    HdSceneIndexPrim instancerPrim = instancerPrims.front().prim;
+    ASSERT_EQ(instancerPrim.primType, HdPrimTypeTokens->instancer);
+    ASSERT_NE(instancerPrim.dataSource, nullptr);
+
+    // Ensure the cube prim exists and is populated
+    auto findCubePredicate
+        = [instancerPath](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
+        return primPath.HasPrefix(instancerPath) && primPath.GetName() == "cubeMesh";
+    };
+    PrimEntriesVector cubePrims = inspector.FindPrims(findCubePredicate);
+    ASSERT_EQ(cubePrims.size(), 1u);
+    HdSceneIndexPrim cubePrim = cubePrims.front().prim;
+    ASSERT_EQ(cubePrim.primType, HdPrimTypeTokens->mesh);
+    ASSERT_NE(cubePrim.dataSource, nullptr);
 }
