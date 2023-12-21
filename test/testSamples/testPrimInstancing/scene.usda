@@ -3,6 +3,9 @@
     defaultPrim = "root"
 )
 
+# We need to have an instanceable prim reference a separate USD file
+# to confirm the fix for HYDRA-764, as referencing a prim in the same
+# file did not cause issues.
 def Xform "root" (
     instanceable = true
     prepend references = @cube.usda@
