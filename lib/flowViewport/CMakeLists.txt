@@ -39,10 +39,6 @@ target_include_directories(${TARGET_NAME}
 # Hydra USD headers impose this requirement.  PPT, 26-Sep-2023.
 
 target_compile_definitions(${TARGET_NAME} 
-    PUBLIC
-        $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:TBB_USE_DEBUG>
-        $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_DEBUG_PYTHON>
-        $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_LINKING_PYTHON>        
     PRIVATE
         FVP_EXPORT
         $<$<BOOL:${IS_MACOSX}>:OSMac_>
