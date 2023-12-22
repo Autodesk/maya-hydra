@@ -131,9 +131,11 @@ function(mayaHydra_compile_config TARGET)
         )
     endif()
 
-    # Remove annoying TBB warnings.
+    # Common definitions
     target_compile_definitions(${TARGET}
         PRIVATE
-            TBB_SUPPRESS_DEPRECATED_MESSAGES
+            TBB_SUPPRESS_DEPRECATED_MESSAGES # Remove TBB deprecation warnings
+            BOOST_ALL_NO_LIB # Avoid Boost autolinking libraries
+            $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_DEBUG_PYTHON> # Auto-select Boost python version
     )
 endfunction()
