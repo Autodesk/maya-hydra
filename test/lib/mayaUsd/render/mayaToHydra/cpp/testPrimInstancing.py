@@ -27,7 +27,7 @@ class TestPrimInstancing(mtohUtils.MayaHydraBaseTestCase):
 
     def loadUsdScene(self):
         import usdUtils
-        usdScenePath = testUtils.getTestScene('testPrimInstancing', 'scene.usda')
+        usdScenePath = testUtils.getTestScene('testPrimInstancing', 'instanceableCube.usda')
         usdUtils.createStageFromFile(usdScenePath)
         self.setHdStormRenderer()
         cmds.refresh()
