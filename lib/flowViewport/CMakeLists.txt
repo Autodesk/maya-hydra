@@ -32,12 +32,6 @@ target_include_directories(${TARGET_NAME}
 # -----------------------------------------------------------------------------
 # compiler configuration
 # -----------------------------------------------------------------------------
-
-# Without the TBB_USE_DEBUG, BOOST_DEBUG_PYTHON and BOOST_LINKING_PYTHON
-# the Debug variant link fails, even though there is no Python or Boost
-# at time of writing in the Flow Viewport Toolkit.  The assumption is that
-# Hydra USD headers impose this requirement.  PPT, 26-Sep-2023.
-
 target_compile_definitions(${TARGET_NAME} 
     PRIVATE
         FVP_EXPORT
