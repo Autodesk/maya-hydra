@@ -21,9 +21,6 @@
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/tokens.h>
-#include <pxr/imaging/hd/xformSchema.h>
-
-#include <iostream>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -71,6 +68,7 @@ bool FilteringSceneIndexExample::IsFiltered(const SdfPath& primPath) const
 {
     return _filteredPrims.find(primPath) != _filteredPrims.end();
 }
+
 void FilteringSceneIndexExample::UpdateFilteringStatus(const SdfPath& primPath)
 {
     if (_GetInputSceneIndex() && ShouldBeFiltered(_GetInputSceneIndex()->GetPrim(primPath))) {
@@ -80,35 +78,38 @@ void FilteringSceneIndexExample::UpdateFilteringStatus(const SdfPath& primPath)
     }
 }
 
-//This is the function where we filter prims
 HdSceneIndexPrim FilteringSceneIndexExample::GetPrim(const SdfPath& primPath) const
 {
-    HdSceneIndexPrim result;
-
-    std::cout << "DBP : GetPrim " << primPath.GetAsString() << std::endl;
-    if (_GetInputSceneIndex()) {
-        HdSceneIndexPrim prim = _GetInputSceneIndex()->GetPrim(primPath);
-        if (!ShouldBeFiltered(prim)) {
-            result = prim; // return only non filtered prims
-        }
+    if (!_GetInputSceneIndex()) {
+        return HdSceneIndexPrim();
     }
 
-    return result;
+    HdSceneIndexPrim prim = _GetInputSceneIndex()->GetPrim(primPath);
+    return ShouldBeFiltered(prim) ? HdSceneIndexPrim() : prim;
+}
+
+SdfPathVector FilteringSceneIndexExample::GetChildPrimPaths(const SdfPath& primPath) const {
+    if (!_GetInputSceneIndex()) {
+        return SdfPathVector();
+    }
+
+    HdSceneIndexPrim prim = _GetInputSceneIndex()->GetPrim(primPath);
+    return ShouldBeFiltered(prim) ? SdfPathVector() : _GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
 void FilteringSceneIndexExample::_PrimsAdded(
     const HdSceneIndexBase&                         sender,
     const HdSceneIndexObserver::AddedPrimEntries& entries)
 {
-    HdSceneIndexObserver::AddedPrimEntries filteredEntries;
+    HdSceneIndexObserver::AddedPrimEntries unfilteredEntries;
     for (const auto& entry : entries) {
-        std::cout << "DBP : _PrimsAdded " << entry.primPath.GetAsString() << std::endl;
+        // We only want to forward the notifications for prims that don't get filtered out
         UpdateFilteringStatus(entry.primPath);
         if (!IsFiltered(entry.primPath)) {
-            filteredEntries.push_back(entry);
+            unfilteredEntries.push_back(entry);
         }
     }
-    _SendPrimsAdded(filteredEntries);
+    _SendPrimsAdded(unfilteredEntries);
 }
 
 void FilteringSceneIndexExample::_PrimsRemoved(
@@ -116,7 +117,7 @@ void FilteringSceneIndexExample::_PrimsRemoved(
     const HdSceneIndexObserver::RemovedPrimEntries& entries)
 {
     for (const auto& entry : entries) {
-        std::cout << "DBP : _PrimsRemoved " << entry.primPath.GetAsString() << std::endl;
+        // We don't need to update or check the filtering status, since the prim is getting removed either way
         _filteredPrims.erase(entry.primPath);
     }
     _SendPrimsRemoved(entries);
@@ -126,34 +127,33 @@ void FilteringSceneIndexExample::_PrimsDirtied(
     const HdSceneIndexBase&                         sender,
     const HdSceneIndexObserver::DirtiedPrimEntries& entries)
 {
-    HdSceneIndexObserver::AddedPrimEntries   unfilteredPrims;
-    HdSceneIndexObserver::RemovedPrimEntries filteredPrims;
+    // There are three potential scenarios here for a given prim :
+    // 1. Its filtering status did NOT change -> forward the PrimsDirtied notification as-is
+    // 2. Its filtering status DID change :
+    //    2a. If the prim was previously filtered -> it is now unfiltered, so send a PrimsAdded notification
+    //    2b. If the prim was previously unfiltered -> it is now filtered, so send a PrimsRemoved notification
+    HdSceneIndexObserver::AddedPrimEntries   newlyUnfilteredEntries;
+    HdSceneIndexObserver::RemovedPrimEntries newlyFilteredEntries;
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
     for (const auto& entry : entries) {
-        std::cout << "DBP : _PrimsDirtied " << entry.primPath.GetAsString() << std::endl;
-        bool wasFiltered = IsFiltered(entry.primPath);
+        bool wasPreviouslyFiltered = IsFiltered(entry.primPath);
         UpdateFilteringStatus(entry.primPath);
-        if (wasFiltered == IsFiltered(entry.primPath)) {
+        if (wasPreviouslyFiltered == IsFiltered(entry.primPath)) {
             // Filtering status did not change, forward notification as-is
             dirtiedEntries.push_back(entry);
         }
         else {
-            // Filtering status changed, dirty everything
-            std::cout << "DBP : Filtering status changed from " << wasFiltered << " to "
-                      << IsFiltered(entry.primPath) << " for " << entry.primPath.GetAsString() << std::endl;
-            //HdDataSourceLocatorSet newSet = entry.dirtyLocators;
-            //newSet.insert(HdXformSchema::GetDefaultLocator());
-            //filteredEntries.push_back({ entry.primPath, HdDataSourceLocatorSet::UniversalSet() });
-            if (wasFiltered) {
-                    unfilteredPrims.emplace_back(
+            // Filtering status changed, send a different notification instead
+            if (wasPreviouslyFiltered) {
+                    newlyUnfilteredEntries.emplace_back(
                         entry.primPath, _GetInputSceneIndex()->GetPrim(entry.primPath).primType);
             } else {
-                    filteredPrims.emplace_back(entry.primPath);
+                    newlyFilteredEntries.emplace_back(entry.primPath);
             }
         }
     }
-    _SendPrimsAdded(unfilteredPrims);
-    _SendPrimsRemoved(filteredPrims);
+    _SendPrimsAdded(newlyUnfilteredEntries);
+    _SendPrimsRemoved(newlyFilteredEntries);
     _SendPrimsDirtied(dirtiedEntries);
 }
 
