@@ -63,24 +63,20 @@ protected:
 
     void _PrimsAdded(
         const HdSceneIndexBase&                       sender,
-        const HdSceneIndexObserver::AddedPrimEntries& entries) override final
-    {
-        _SendPrimsAdded(entries);
-    }
+        const HdSceneIndexObserver::AddedPrimEntries& entries) override;
 
     void _PrimsRemoved(
         const HdSceneIndexBase&                         sender,
-        const HdSceneIndexObserver::RemovedPrimEntries& entries) override 
-    {
-        _SendPrimsRemoved(entries);
-    }
+        const HdSceneIndexObserver::RemovedPrimEntries& entries) override;
 
     void _PrimsDirtied(
         const HdSceneIndexBase&                         sender,
-        const HdSceneIndexObserver::DirtiedPrimEntries& entries) override 
-        {
-            _SendPrimsDirtied(entries);
-        }
+        const HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
+
+    bool IsFiltered(const SdfPath& primPath) const;
+    void UpdateFilteringStatus(const SdfPath& primPath);
+
+    SdfPathSet _filteredPrims;
 };
 
 }//end of namespace FVP_NS_DEF
