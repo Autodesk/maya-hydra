@@ -53,7 +53,7 @@ public:
     ~FilteringSceneIndexExample() override = default;
 
 protected:
-    FilteringSceneIndexExample(const HdSceneIndexBaseRefPtr& inputSceneIndex) : ParentClass(inputSceneIndex) {}
+    FilteringSceneIndexExample(const HdSceneIndexBaseRefPtr& inputSceneIndex);
 
     void _PrimsAdded(
         const HdSceneIndexBase&                       sender,
@@ -68,6 +68,7 @@ protected:
         const HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
 
     bool IsFiltered(const SdfPath& primPath) const;
+
     void UpdateFilteringStatus(const SdfPath& primPath);
 
     SdfPathSet _filteredPrims;

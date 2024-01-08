@@ -22,6 +22,8 @@
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 
+#include <stack>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 namespace 
@@ -78,14 +80,27 @@ void FilteringSceneIndexExample::UpdateFilteringStatus(const SdfPath& primPath)
     }
 }
 
+FilteringSceneIndexExample::FilteringSceneIndexExample(const HdSceneIndexBaseRefPtr& inputSceneIndex)
+    : ParentClass(inputSceneIndex)
+{
+    std::stack<SdfPath> primPathsToTraverse({ SdfPath::AbsoluteRootPath() });
+    while (!primPathsToTraverse.empty()) {
+        SdfPath currPrimPath = primPathsToTraverse.top();
+        primPathsToTraverse.pop();
+        UpdateFilteringStatus(currPrimPath);
+        for (const auto& childPath : inputSceneIndex->GetChildPrimPaths(currPrimPath)) {
+            primPathsToTraverse.push(childPath);
+        }
+    }
+}
+
 HdSceneIndexPrim FilteringSceneIndexExample::GetPrim(const SdfPath& primPath) const
 {
     if (!_GetInputSceneIndex()) {
         return HdSceneIndexPrim();
     }
 
-    HdSceneIndexPrim prim = _GetInputSceneIndex()->GetPrim(primPath);
-    return ShouldBeFiltered(prim) ? HdSceneIndexPrim() : prim;
+    return IsFiltered(primPath) ? HdSceneIndexPrim() : _GetInputSceneIndex()->GetPrim(primPath);
 }
 
 SdfPathVector FilteringSceneIndexExample::GetChildPrimPaths(const SdfPath& primPath) const {
@@ -93,8 +108,7 @@ SdfPathVector FilteringSceneIndexExample::GetChildPrimPaths(const SdfPath& primP
         return SdfPathVector();
     }
 
-    HdSceneIndexPrim prim = _GetInputSceneIndex()->GetPrim(primPath);
-    return ShouldBeFiltered(prim) ? SdfPathVector() : _GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    return IsFiltered(primPath) ? SdfPathVector() : _GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
 void FilteringSceneIndexExample::_PrimsAdded(
