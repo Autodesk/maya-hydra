@@ -108,7 +108,14 @@ SdfPathVector FilteringSceneIndexExample::GetChildPrimPaths(const SdfPath& primP
         return SdfPathVector();
     }
 
-    return IsFiltered(primPath) ? SdfPathVector() : _GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    SdfPathVector childPaths = _GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    childPaths.erase(
+        std::remove_if(
+            childPaths.begin(),
+            childPaths.end(),
+            [this](const SdfPath& childPath) -> bool { return IsFiltered(childPath); }),
+        childPaths.end());
+    return IsFiltered(primPath) ? SdfPathVector() : childPaths;
 }
 
 void FilteringSceneIndexExample::_PrimsAdded(
