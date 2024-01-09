@@ -73,7 +73,7 @@ bool FilteringSceneIndexExample::IsFiltered(const SdfPath& primPath) const
 
 void FilteringSceneIndexExample::UpdateFilteringStatus(const SdfPath& primPath)
 {
-    if (_GetInputSceneIndex() && ShouldBeFiltered(_GetInputSceneIndex()->GetPrim(primPath))) {
+    if (ShouldBeFiltered(_GetInputSceneIndex()->GetPrim(primPath))) {
         _filteredPrims.insert(primPath);
     } else {
         _filteredPrims.erase(primPath);
@@ -96,15 +96,11 @@ FilteringSceneIndexExample::FilteringSceneIndexExample(const HdSceneIndexBaseRef
 
 HdSceneIndexPrim FilteringSceneIndexExample::GetPrim(const SdfPath& primPath) const
 {
-    if (!_GetInputSceneIndex()) {
-        return HdSceneIndexPrim();
-    }
-
     return IsFiltered(primPath) ? HdSceneIndexPrim() : _GetInputSceneIndex()->GetPrim(primPath);
 }
 
 SdfPathVector FilteringSceneIndexExample::GetChildPrimPaths(const SdfPath& primPath) const {
-    if (!_GetInputSceneIndex()) {
+    if (IsFiltered(primPath)) {
         return SdfPathVector();
     }
 
@@ -115,7 +111,7 @@ SdfPathVector FilteringSceneIndexExample::GetChildPrimPaths(const SdfPath& primP
             childPaths.end(),
             [this](const SdfPath& childPath) -> bool { return IsFiltered(childPath); }),
         childPaths.end());
-    return IsFiltered(primPath) ? SdfPathVector() : childPaths;
+    return childPaths;
 }
 
 void FilteringSceneIndexExample::_PrimsAdded(
