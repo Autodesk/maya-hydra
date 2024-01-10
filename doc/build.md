@@ -17,7 +17,7 @@ Before building the project, consult the following table to ensure you use the r
 |    Python Packages    | PyYAML, PySide, PyOpenGL        | PyYAML, PySide2, PyOpenGL              | PyYAML, PySide, PyOpenGL |
 |    Build generator    | Visual Studio, Ninja (Recommended)    |  XCode, Ninja (Recommended)                      |    Ninja (Recommended)      |
 |    Command processor  | Visual Studio x64 2022 command prompt  |                     bash                |             bash            |
-| Supported Maya Version|  2024   |                   2024                    |   2024    |
+| Supported Maya Version|  2024, PR   |                   2024, PR                    |   2024, PR    |
 
 |        Optional       | ![](images/windows.png)   |                            ![](images/mac.png)               |   ![](images/linux.png)     |
 
