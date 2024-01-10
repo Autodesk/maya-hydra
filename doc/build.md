@@ -13,7 +13,7 @@ Before building the project, consult the following table to ensure you use the r
 |    Operating System   |         Windows 10 <br> Windows 11 | High Sierra (10.13)<br>Mojave (10.14)<br>Catalina (10.15)<br>Big Sur (11.2.x)    |      Rocky Linux 8.6 / Linux® Red Hat® Enterprise 8.6 WS             |
 |   Compiler Requirement| Maya 2024 (VS 2022) | Maya 2024 (Xcode 13.4 or higher) | Maya 2024 (gcc 11.2.1) |
 | CMake Version (min/max) |        3.13...3.20      |                              3.13...3.20                     |           3.13...3.20       |
-|         Python        | 3.10.8  |                       3.10.8               |  3.10.8   |
+|         Python        | 3.10.8, 3.11.4  |                       3.10.8, 3.11.4               |  3.10.8, 3.11.4   |
 |    Python Packages    | PyYAML, PySide, PyOpenGL        | PyYAML, PySide2, PyOpenGL              | PyYAML, PySide, PyOpenGL |
 |    Build generator    | Visual Studio, Ninja (Recommended)    |  XCode, Ninja (Recommended)                      |    Ninja (Recommended)      |
 |    Command processor  | Visual Studio x64 2022 command prompt  |                     bash                |             bash            |
@@ -27,14 +27,11 @@ Before building the project, consult the following table to ensure you use the r
 
 See Pixar's official github page for instructions on how to build USD: https://github.com/PixarAnimationStudios/USD. Pixar has removed support for building Maya USD libraries/plug-ins in their github repository and ```build_usd.py```.
 
-|               |      ![](images/pxr.png)          |        
-|:------------: |:---------------:                  |
-|  CommitID/Tags | Recommended : [v23.08](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.08) |
-|  CommitID/Tags | For older maya-hydra plugin: [v22.11](https://github.com/PixarAnimationStudios/USD/releases/tag/v22.11) |
+|               |      ![](images/pxr.png)          |USD version used in Maya        
+|:------------: |:---------------:                  |:---------------:
+|  CommitID/Tags | [v22.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v22.11) or [v23.08](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.08) or [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11) |Maya 2024 = v22.11<br>Maya PR = v23.11
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
-
-***NOTE:*** Recommended version of USD for building the latest version of MayaHydra plugin is USD23.08  [v23.08](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.08). If older version of USD needs to be used then maya-hydra v0.1.x is to be used for build and feature compatibility.
 
 ***NOTE:*** Make sure that you don't have an older USD locations in your ```PATH``` and ```PYTHONPATH``` environment settings. ```PATH``` and ```PYTHONPATH``` are automatically adjusted inside the project to point to the correct USD location. See ```cmake/usd.cmake```.
 
