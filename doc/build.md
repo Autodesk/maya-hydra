@@ -12,11 +12,11 @@ Before building the project, consult the following table to ensure you use the r
 |:---------------------:|:-------------------------:|:------------------------------------------------------------:|:---------------------------:|
 |    Operating System   |         Windows 10 <br> Windows 11 | High Sierra (10.13)<br>Mojave (10.14)<br>Catalina (10.15)<br>Big Sur (11.2.x)    |      Rocky Linux 8.6 / Linux® Red Hat® Enterprise 8.6 WS             |
 |   Compiler Requirement| Maya 2024 (VS 2022) | Maya 2024 (Xcode 13.4 or higher) | Maya 2024 (gcc 11.2.1) |
-| CMake Version (min/max) |        3.13...3.17      |                              3.13...3.17                     |           3.13...3.17       |
+| CMake Version (min/max) |        3.13...3.20      |                              3.13...3.20                     |           3.13...3.20       |
 |         Python        | 3.10.8  |                       3.10.8               |  3.10.8   |
 |    Python Packages    | PyYAML, PySide, PyOpenGL        | PyYAML, PySide2, PyOpenGL              | PyYAML, PySide, PyOpenGL |
 |    Build generator    | Visual Studio, Ninja (Recommended)    |  XCode, Ninja (Recommended)                      |    Ninja (Recommended)      |
-|    Command processor  | Visual Studio X64 2019 command prompt  |                     bash                |             bash            |
+|    Command processor  | Visual Studio x64 2022 command prompt  |                     bash                |             bash            |
 | Supported Maya Version|  2024   |                   2024                    |   2024    |
 
 |        Optional       | ![](images/windows.png)   |                            ![](images/mac.png)               |   ![](images/linux.png)     |
@@ -135,9 +135,9 @@ Examples:
 
 It is up to the user to select the CMake Generator of choice, but we encourage the use of the Ninja generator. To use the Ninja Generator, you need to first install the Ninja binary from https://ninja-build.org/
 
-You then need to set the generator to ```Ninja``` and the ```CMAKE_MAKE_PROGRAM``` variable to the Ninja binary you downloaded.
+You then need to set the generator to ```Ninja```.
 ```
-python build.py --generator Ninja --build-args=-DCMAKE_MAKE_PROGRAM='path to ninja binary'
+python build.py --generator Ninja
 ```
 ##### Build and Install locations
 
@@ -205,10 +205,11 @@ There is a related ADDITIONAL_PXR_PLUGINPATH_NAME cmake var which can be used if
 
 # How to Load Plug-ins in Maya 
 
-The provided module files (*.mod) facilitates setting various environment variables for plugins and libraries. After the project is successfully built, ```mayaHydra.mod``` are installed inside the install directory. In order for Maya to discover these mod files, ```MAYA_MODULE_PATH``` environment variable needs to be set to point to the location where the mod files are installed.
+The provided module files (*.mod) facilitates setting various environment variables for plugins and libraries. After the project is successfully built, ```mayaHydra.mod``` is installed inside the install directory. In order for Maya to discover this mod file, the ```MAYA_MODULE_PATH``` environment variable needs to be set to point to the location where the mod file is installed.
 Examples:
 ```
 set MAYA_MODULE_PATH=C:\workspace\install\RelWithDebInfo
 export MAYA_MODULE_PATH=/usr/local/workspace/install/RelWithDebInfo
 ```
+The MAYA_MODULE_PATH environment variable can also be set through the Maya.env file.
 Once MAYA_MODULE_PATH is set, run maya and go to ```Windows -> Setting/Preferences -> Plug-in Manager``` to load the plugins.
