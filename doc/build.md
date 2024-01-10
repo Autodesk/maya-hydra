@@ -87,6 +87,28 @@ Windows:
 C:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya2024" --pxrusd-location C:\USD-Release --devkit-location C:\devkitBase C:\workspace
 ```
 
+**Notes:** 
+- For OSX builds, you might need to toggle on the `BUILD_UB2` CMake option to build Universal Binary 2 binaries (see below).
+- If you get an error saying that the correct Python version could not be found, or an error such as "Imported target <xyz> includes non-existent path" pointing to a Python path, you might need to specify the `Python_EXECUTABLE`, `PYTHON_INCLUDE_DIR` and `PYTHON_LIBRARIES` CMake variables to point to directories of the bundled Maya Python. Here is what to set them to for each platform :
+```
+Linux:
+Python_EXECUTABLE=<maya-location>/bin/mayapy
+PYTHON_INCLUDE_DIR=<maya-location>/include/Python<python-version>/Python (e.g. <maya-location>/include/Python311/Python)
+PYTHON_LIBRARIES=<maya-location>/lib/libpython<python-version>.so (e.g. : <maya-location>/lib/libpython3.11.so)
+
+OSX:
+Python_EXECUTABLE=<maya-location>/Maya.app/Contents/bin/mayapy
+PYTHON_INCLUDE_DIR=<maya-location>/Maya.app/Contents/Frameworks/Python.framework/Versions/<python-version>/include/python<python-version>
+(e.g. <maya-location>/Maya.app/Contents/Frameworks/Python.framework/Versions/3.11/include/python3.11)
+PYTHON_LIBRARIES=<maya-location>/Maya.app/Contents/Frameworks/Python.framework/Versions/<python-version>/lib/libpython<python-version>.dylib
+(e.g. : <maya-location>/Maya.app/Contents/Frameworks/Python.framework/Versions/3.11/lib/libpython3.11.dylib)
+
+Windows:
+Python_EXECUTABLE=<maya-location>\bin\mayapy.exe
+PYTHON_INCLUDE_DIR=<maya-location>\include\Python<python-version>\Python (e.g. <maya-location>\include\Python311\Python)
+PYTHON_LIBRARIES=<maya-location>\lib\python<python-version>.lib (e.g. : <maya-location>\lib\python311.lib)
+```
+
 ##### Build Arguments
 
 | Flag                  | Description                                                                           |
