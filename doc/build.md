@@ -183,7 +183,6 @@ e.g
 ➜ pip list
 Package    Version
 ---------- --------
-MarkupSafe 2.1.1
 pip        22.2.1
 PyOpenGL   3.1.6
 PySide2    5.15.2.1
