@@ -25,7 +25,7 @@ Before building the project, consult the following table to ensure you use the r
 
 #### 2. Download and Build Pixar USD 
 
-See Pixar's official github page for instructions on how to build USD: https://github.com/PixarAnimationStudios/USD. Pixar has recently removed support for building Maya USD libraries/plug-ins in their github repository and ```build_usd.py```.
+See Pixar's official github page for instructions on how to build USD: https://github.com/PixarAnimationStudios/USD. Pixar has removed support for building Maya USD libraries/plug-ins in their github repository and ```build_usd.py```.
 
 |               |      ![](images/pxr.png)          |        
 |:------------: |:---------------:                  |
@@ -44,8 +44,7 @@ The Universal Front End (UFE) is a DCC-agnostic component that allows Maya to br
 
 | Ufe Version                | Maya Version                                           | Ufe Docs (external) |
 |----------------------------|--------------------------------------------------------|:-------------------:|
-| v4.0.0                      | Maya 2024                                                | https://help.autodesk.com/view/MAYAUL/2024/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
-| v4.0.1                      | Maya 2024.1                                               | |
+| v4.0.0<br>v4.1.0<br>v4.2.0            | Maya 2024<br>Maya 2024.1<br>Maya 2024.2                                                | https://help.autodesk.com/view/MAYAUL/2024/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
 
 To build the project with UFE support, you will need to use the headers and libraries included in the ***Maya Devkit***:
 
