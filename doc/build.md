@@ -71,7 +71,7 @@ cd maya-hydra
 
 ##### Arguments
 
-There are four arguments that must be passed to the script: 
+There are at least four arguments that must be passed to the script: 
 
 | Flags                 | Description                                                                           |
 |--------------------   |-------------------------------------------------------------------------------------- |
@@ -88,7 +88,7 @@ MacOSX:
 ➜ maya-hydra python build.py --maya-location /Applications/Autodesk/maya2024 --pxrusd-location /opt/local/USD-Release --devkit-location /opt/local/devkitBase /opt/local/workspace
 
 Windows:
-c:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya2024" --pxrusd-location C:\USD-Release --devkit-location C:\devkitBase C:\workspace
+C:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya2024" --pxrusd-location C:\USD-Release --devkit-location C:\devkitBase C:\workspace
 ```
 
 ##### Build Arguments
@@ -101,7 +101,7 @@ c:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya20
 --build-args="-DBUILD_TESTS=OFF"
 ```
 
-##### CMake Options
+##### CMake Options and Variables
 
 Name                        | Description                                                | Default
 ---                         | ---                                                        | ---
@@ -113,6 +113,7 @@ BUILD_WITH_PYTHON_3_VERSION | specify which Python 3 version to build with      
 Python_EXECUTABLE           | path to the Python executable to build with                | Determined automatically by CMake
 PYTHON_INCLUDE_DIR          | directory containing the Python header files               | Determined using the DPython_EXECUTABLE
 PYTHON_LIBRARIES            | path to the Python library to link with                    | Determined using the DPython_EXECUTABLE
+CMAKE_WANT_MATERIALX_BUILD  | enable building with MaterialX (experimental)              | OFF
 
 ##### Stages
 
