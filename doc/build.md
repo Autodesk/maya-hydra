@@ -14,7 +14,7 @@ Before building the project, consult the following table to ensure you use the r
 |   Compiler Requirement| Maya 2024 (VS 2022) | Maya 2024 (Xcode 13.4 or higher) | Maya 2024 (gcc 11.2.1) |
 | CMake Version (min/max) |        3.13...3.17      |                              3.13...3.17                     |           3.13...3.17       |
 |         Python        | 3.10.8  |                       3.10.8               |  3.10.8   |
-|    Python Packages    | PyYAML, PySide, PyOpenGL, Jinja2        | PyYAML, PySide2, PyOpenGL, Jinja2              | PyYAML, PySide, PyOpenGL, Jinja2 |
+|    Python Packages    | PyYAML, PySide, PyOpenGL        | PyYAML, PySide2, PyOpenGL              | PyYAML, PySide, PyOpenGL |
 |    Build generator    | Visual Studio, Ninja (Recommended)    |  XCode, Ninja (Recommended)                      |    Ninja (Recommended)      |
 |    Command processor  | Visual Studio X64 2019 command prompt  |                     bash                |             bash            |
 | Supported Maya Version|  2024   |                   2024                    |   2024    |
@@ -183,7 +183,6 @@ e.g
 ➜ pip list
 Package    Version
 ---------- --------
-Jinja2     3.1.2
 MarkupSafe 2.1.1
 pip        22.2.1
 PyOpenGL   3.1.6
