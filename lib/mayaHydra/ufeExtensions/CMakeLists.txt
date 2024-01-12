@@ -26,18 +26,18 @@ target_compile_definitions(${TARGET_NAME}
 
 mayaHydra_compile_config(${TARGET_NAME})
 
-if(NOT BUILD_MAYAUSD_LIBRARY)
-    # -----------------------------------------------------------------------------
-    # include directories
-    # -----------------------------------------------------------------------------
-    target_include_directories(${TARGET_NAME} 
+
+# -----------------------------------------------------------------------------
+# include directories
+# -----------------------------------------------------------------------------
+target_include_directories(${TARGET_NAME} 
         PUBLIC
             ${MAYA_INCLUDE_DIRS}
             ${CMAKE_BINARY_DIR}/include
             $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
-    )
+)
 
-    target_compile_definitions(${TARGET_NAME}
+target_compile_definitions(${TARGET_NAME}
         PUBLIC
             PXR_PLUGINPATH_NAME=${PXR_OVERRIDE_PLUGINPATH_NAME}
             $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:TBB_USE_DEBUG>
@@ -53,8 +53,7 @@ if(NOT BUILD_MAYAUSD_LIBRARY)
 
             # this flag is needed when building maya-usd in Maya
             $<$<BOOL:${IS_WINDOWS}>:WIN32>
-    )
-endif()
+)
 
 if(DEFINED MAYAHYDRA_VERSION)
     target_compile_definitions(${TARGET_NAME}

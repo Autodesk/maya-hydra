@@ -534,7 +534,8 @@ HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubeP
 void DataProducerSceneIndexExample::addDataProducerSceneIndex()
 {
     if (!_dataProducerSceneIndexAdded && _hydraInterface){
-        const bool res = _hydraInterface->addDataProducerSceneIndex(_retainedSceneIndex, _containerNode, PXR_NS::FvpViewportAPITokens->allViewports, PXR_NS::FvpViewportAPITokens->allRenderers, SdfPath::AbsoluteRootPath());
+        SdfPath inoutPrefix = PXR_NS::SdfPath::AbsoluteRootPath();
+        const bool res = _hydraInterface->addDataProducerSceneIndex(_retainedSceneIndex, inoutPrefix, _containerNode, PXR_NS::FvpViewportAPITokens->allViewports, PXR_NS::FvpViewportAPITokens->allRenderers);
         if (false == res){
             TF_CODING_ERROR("_hydraInterface->addDataProducerSceneIndex returned false !");
         }

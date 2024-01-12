@@ -80,6 +80,14 @@ There are four arguments that must be passed to the script:
 |  --devkit-location    | directory where Maya devkit is installed.                                             |
 | workspace_location    | directory where the project use as a workspace to build and install plugin/libraries  |
 
+Optional arguments are :
+| Flags                 | Description                                                                                         |
+|--------------------   |---------------------------------------------------------------------------------------------------- |
+|   --mayausd-location  | directory where the mayaUSD.mod file is. By providing this, you will enable more features for       |
+|                       | usd stages when using an hydra render delegate, such as : hide/delete the stage when the proxy shape|
+|                       | node is hidden/deleted, or applying a transform on the proxy shape node will apply it on the stage. |
+
+
 ```
 Linux:
 ➜ maya-hydra python build.py --maya-location /usr/autodesk/maya2024 --pxrusd-location /usr/local/USD-Release --devkit-location /usr/local/devkitBase /usr/local/workspace

@@ -16,10 +16,8 @@
 // Copyright 2023 Autodesk, Inc. All rights reserved.
 //
 
-#if !defined(MAYAUSD_VERSION)
 // GL loading library needs to be included before any other OpenGL headers.
 #include <pxr/imaging/garch/glApi.h>
-#endif
 
 #include "renderOverride.h"
 
@@ -43,6 +41,7 @@
 #include <flowViewport/selection/fvpSelection.h>
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
+#include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -60,10 +59,6 @@
 
 #include <ufeExtensions/Global.h>
 
-#if defined(MAYAUSD_VERSION)
-#include <mayaUsd/render/px_vp20/utils.h>
-#include <mayaUsd/utils/hash.h>
-#else
 namespace MayaUsd {
 // hash combiner taken from:
 // http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0814r0.pdf
@@ -77,7 +72,7 @@ template <typename T> inline void hash_combine(std::size_t& seed, const T& value
     seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
 } // namespace MayaUsd
-#endif
+
 
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/tf/instantiateSingleton.h>
@@ -839,6 +834,9 @@ void MtohRenderOverride::ClearHydraResources()
 
     //We don't have any viewport using Hydra any more
     Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveAllViewportsInformation();
+    
+    //Remove the data producer scene indices that apply to all viewports
+    Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViewports();
 
     _mayaHydraSceneProducer.reset();
     _selectionSceneIndex.Reset();
@@ -1099,12 +1097,24 @@ void MtohRenderOverride::_PopulateSelectionList(
                     = _sceneIndexRegistry->GetSceneIndexRegistrationForRprim(pickedPath))
                 // Scene index is incompatible with UFE. Skip
                 {
-                    // Remove scene index plugin path prefix to obtain local picked path with
+                    // Keep the path after the scene index plugin path prefix to obtain local picked path with
                     // respect to current scene index. This is because the scene index was inserted
                     // into the render index using a custom prefix. As a result the scene index
                     // prefix will be prepended to rprims tied to that scene index automatically.
-                    SdfPath localPath(
-                        pickedPath.ReplacePrefix(registration->sceneIndexPathPrefix, SdfPath("/")));
+                    const std::string& sceneIndexPathPrefixAsString = registration->sceneIndexPathPrefix.GetString();
+                    const std::string& pickedPathAsString = pickedPath.GetString();
+                    std::string localPathAsString;
+                    const size_t foundPlace = pickedPathAsString.find(sceneIndexPathPrefixAsString);
+                    if (foundPlace == std::string::npos) {
+                        TF_CODING_ERROR("pickedPathAsString.find(sceneIndexPathPrefixAsString) returned std::string::npos !");
+                        return;
+                    }
+
+                    //Keep only the right part of the string after the prefix
+                    const size_t placeToKeep = foundPlace + sceneIndexPathPrefixAsString.length();
+                    localPathAsString = pickedPathAsString.substr(placeToKeep, pickedPathAsString.length() - placeToKeep);
+
+                    const SdfPath localPath(localPathAsString);
                     Ufe::Path interpretedPath(registration->interpretRprimPathFn(
                         registration->pluginSceneIndex, localPath));
 

@@ -556,7 +556,7 @@ parser.add_argument("--maya-location", type=str,
                     help="Directory where Maya is installed.")
 
 parser.add_argument("--mayausd-location", type=str,
-                    help="Directory where MayaUsd is installed.")
+                    help="Directory where mayaUSD.mod file is.")
                     
 parser.add_argument("--pxrusd-location", type=str,
                     help="Directory where Pixar USD is installed.")

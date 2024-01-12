@@ -33,6 +33,12 @@ public:
     /// CreateDataProducerSceneIndexDataBase creates a subclass of DataProducerSceneIndexDataBaseRefPtr with specific DCC variables that flow viewport cannot manage since it's DCC agnostic
     PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr   
         createDataProducerSceneIndexDataBase(const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params) override;
+
+    /** The DCC will create a subclass of DataProducerSceneIndexDataBaseRefPtr with specific DCC variables that Flow viewport cannot manage since it's DCC agnostic
+    * This function is specific for Usd Stages
+    */
+    PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr   createDataProducerSceneIndexDataBaseForUsdStage(
+        PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParametersForUsdStage& params)override;
 };
 
 }//end of namespace MAYAHYDRA_NS_DEF 

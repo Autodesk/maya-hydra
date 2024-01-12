@@ -52,17 +52,44 @@ DataProducerSceneIndexInterfaceImp& DataProducerSceneIndexInterfaceImp::get()
     return theInterface;
 }
 
+//Specific internal function for Usd Stages
+PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr DataProducerSceneIndexInterfaceImp::addUsdStageSceneIndex(UsdImagingCreateSceneIndicesInfo& createInfo, 
+                                                                                HdSceneIndexBaseRefPtr& finalSceneIndex,
+                                                                                UsdImagingStageSceneIndexRefPtr& stageSceneIndex,
+                                                                                SdfPath& inoutPrefix, 
+                                                                                void* dccNode)
+{
+    PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr dataProducerSceneIndexData  = 
+        _CreateDataProducerSceneIndexDataForUsdStage(createInfo, finalSceneIndex, stageSceneIndex, inoutPrefix, dccNode);
+    if (nullptr == dataProducerSceneIndexData){
+        return nullptr;
+    }
+
+    inoutPrefix = dataProducerSceneIndexData->GetPrefix();
+
+    return dataProducerSceneIndexData; 
+}
+
+bool DataProducerSceneIndexInterfaceImp::addUsdStageDataProducerSceneIndexDataBaseToAllViewports(PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr&  dataProducerSceneIndexData){
+    //Apply this maya usd scene index to all viewports
+    return _AddDataProducerSceneIndexToAllViewports(dataProducerSceneIndexData);
+}
+
 bool DataProducerSceneIndexInterfaceImp::addDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
+                                                                   PXR_NS::SdfPath& inoutPrefix,
                                                                    void* dccNode /*= nullptr*/,
                                                                    const std::string& hydraViewportId /*= allViewports*/,
-                                                                   const std::string& rendererNames /*= allRenderers*/,
-                                                                   const PXR_NS::SdfPath& customDataProducerSceneIndexRootPathForInsertion /*= PXR_NS::SdfPath::AbsoluteRootPath()*/)
+                                                                   const std::string& rendererNames /*= allRenderers*/
+                                                                    )
 {   
     PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr dataProducerSceneIndexData  = 
-        _CreateDataProducerSceneIndexData(customDataProducerSceneIndex, rendererNames, customDataProducerSceneIndexRootPathForInsertion, dccNode);
+        _CreateDataProducerSceneIndexData(customDataProducerSceneIndex, rendererNames, inoutPrefix, dccNode);
     if (nullptr == dataProducerSceneIndexData){
         return false;
     }
+
+    inoutPrefix = dataProducerSceneIndexData->GetPrefix();
+
     //PXR_NS::FvpViewportAPITokens->allViewports == hydraViewportId means the user wants customDataProducerSceneIndex to be applied in all viewports.
     if (PXR_NS::FvpViewportAPITokens->allViewports == hydraViewportId){
         //Apply this data producer scene index to all viewports
@@ -163,9 +190,24 @@ bool DataProducerSceneIndexInterfaceImp::_AddDataProducerSceneIndexToAllViewport
     return true;
 }
 
+PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr DataProducerSceneIndexInterfaceImp::_CreateDataProducerSceneIndexDataForUsdStage(
+    PXR_NS::UsdImagingCreateSceneIndicesInfo& createInfo, HdSceneIndexBaseRefPtr& finalSceneIndex, UsdImagingStageSceneIndexRefPtr& stageSceneIndex, const SdfPath& prefix, void* dccNode)
+{ 
+    TF_AXIOM(sceneIndexDataFactory);
+
+    if (! sceneIndexDataFactory){
+        TF_CODING_ERROR("sceneIndexDataFactory is a nullptr, it should have been provided by a call to GetDataProducerSceneIndexInterfaceImp()->SetSceneIndexDataFactory");
+        return nullptr;
+    }
+
+    PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParametersForUsdStage  params(createInfo, finalSceneIndex, stageSceneIndex, prefix, dccNode);
+    return sceneIndexDataFactory->createDataProducerSceneIndexDataBaseForUsdStage(params);
+}
+
+
 PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr DataProducerSceneIndexInterfaceImp::_CreateDataProducerSceneIndexData(const HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
                                                                                              const std::string& rendererNames,
-                                                                                             const SdfPath& customDataProducerSceneIndexRootPathForInsertion, 
+                                                                                             const SdfPath& prefix, 
                                                                                              void* dccNode)
 { 
     TF_AXIOM(sceneIndexDataFactory);
@@ -175,7 +217,7 @@ PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr DataProducerSceneIndexI
         return nullptr;
     }
 
-    const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters  params(customDataProducerSceneIndex, rendererNames, customDataProducerSceneIndexRootPathForInsertion, dccNode);
+    const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters  params(customDataProducerSceneIndex, rendererNames, prefix, dccNode);
     return sceneIndexDataFactory->createDataProducerSceneIndexDataBase(params);
 }
 
@@ -212,7 +254,7 @@ void DataProducerSceneIndexInterfaceImp::_AddDataProducerSceneIndexToThisViewpor
     //Add it to the merging scene index if the render inex proxy is present, it may happen that it will be set later
     auto renderIndexProxy = viewportInformationAndSceneIndicesPerViewportData->GetRenderIndexProxy();
     if (renderIndexProxy && dataProducerSceneIndexData && dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain()){
-        renderIndexProxy->InsertSceneIndex(dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain(), dataProducerSceneIndexData->GetCustomDataProducerSceneIndexRootPathForInsertion());
+        renderIndexProxy->InsertSceneIndex(dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain(), SdfPath::AbsoluteRootPath());
     }
 }
 
@@ -228,6 +270,12 @@ void DataProducerSceneIndexInterfaceImp::hydraViewportSceneIndexAdded(const Info
 void DataProducerSceneIndexInterfaceImp::setSceneIndexDataFactory(DataProducerSceneIndexDataAbstractFactory& factory) 
 {
     sceneIndexDataFactory = &factory;
+}
+
+void DataProducerSceneIndexInterfaceImp::ClearDataProducerSceneIndicesThatApplyToAllViewports() 
+{ 
+    std::lock_guard<std::mutex> lockDataProducerSceneIndicesDataPerViewport(dataProducerSceneIndicesThatApplyToAllViewports_mutex);
+    dataProducerSceneIndicesThatApplyToAllViewports.clear();
 }
 
 } //End of namespace FVP_NS_DEF
