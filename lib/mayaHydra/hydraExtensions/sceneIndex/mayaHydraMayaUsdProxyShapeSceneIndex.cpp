@@ -68,7 +68,7 @@ void MayaUsdProxyShapeSceneIndex::onTimeChanged(void* data)
 
 void MayaUsdProxyShapeSceneIndex::UpdateTime()
 {
-    if (_usdImagingStageSceneIndex && _proxyStage.isValid() && _dagNodeHandle.isValid()) {
+    if (_usdImagingStageSceneIndex && _dagNodeHandle.isValid()) {
         _usdImagingStageSceneIndex->SetTime(_proxyStage.getTime());//We have the possibility to scale and offset the time in _proxyShapeBase
     }
 }
@@ -92,7 +92,7 @@ void MayaUsdProxyShapeSceneIndex::_PopulateAndApplyPendingChanges()
 
 void MayaUsdProxyShapeSceneIndex::Populate()
 {
-    if (!_populated && _proxyStage.isValid()) {
+    if (!_populated) {
         auto stage = _proxyStage.getUsdStage();
         // Check whether the pseudo-root has children
         if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {

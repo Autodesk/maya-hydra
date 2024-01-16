@@ -127,6 +127,13 @@ else()
     message(STATUS "UFE not found.")
 endif()
 
+find_package(MayaUsd OPTIONAL_COMPONENTS)
+if(MAYAUSD_FOUND)
+    message(STATUS "Building with MayaUsd.")
+else()
+    message(STATUS "MayaUsd not used to build.")
+endif()
+
 if(CMAKE_WANT_MATERIALX_BUILD AND MAYA_LIGHTAPI_VERSION LESS 2)
     set(CMAKE_WANT_MATERIALX_BUILD OFF)
     message(WARNING "Disabling MaterialX VP2 rendering: it is not supported by this version of Maya.")

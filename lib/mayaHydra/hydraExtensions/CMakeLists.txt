@@ -30,29 +30,19 @@ set(HEADERS
 # -----------------------------------------------------------------------------
 # compiler configuration
 # -----------------------------------------------------------------------------
-if(DEFINED MAYAUSD_LOCATION)
-    target_compile_definitions(${TARGET_NAME} 
-        PRIVATE 
-            MAYAHYDRALIB_EXPORT
-            MAYAHYDRALIB_MAYAUSD_IS_USED_TO_BUILD
-            $<$<BOOL:${IS_MACOSX}>:OSMac_>
-            # Copy-pasted from lib/mayaUsd/CMakeLists.txt
-    )
-else()
-    target_compile_definitions(${TARGET_NAME} 
-        PRIVATE 
-            MAYAHYDRALIB_EXPORT
-            $<$<BOOL:${IS_MACOSX}>:OSMac_>
-            # Copy-pasted from lib/mayaUsd/CMakeLists.txt
-    )
-endif()
+target_compile_definitions(${TARGET_NAME} 
+    PRIVATE 
+        MAYAHYDRALIB_EXPORT
+        $<$<BOOL:${MAYAUSD_FOUND}>:MAYAHYDRALIB_MAYAUSD_IS_USED_TO_BUILD>
+        $<$<BOOL:${IS_MACOSX}>:OSMac_>
+        # Copy-pasted from lib/mayaUsd/CMakeLists.txt
+)
         
 mayaHydra_compile_config(${TARGET_NAME})
 
 # -----------------------------------------------------------------------------
 # include directories
 # -----------------------------------------------------------------------------
-if(DEFINED MAYAUSD_LOCATION)
 target_include_directories(${TARGET_NAME} 
             PUBLIC
                 ${MAYA_INCLUDE_DIRS}
@@ -60,22 +50,10 @@ target_include_directories(${TARGET_NAME}
                 ${PXR_INCLUDE_DIRS}
                 ${BOOST_INCLUDE_DIR}
                 ${CMAKE_BINARY_DIR}/include
-        ${MAYAUSD_LOCATION}/include
             PRIVATE
                 $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
+                $<$<BOOL:${MAYAUSD_FOUND}>:${MAYAUSD_INCLUDE_DIR}>
 )
-     else()
-        target_include_directories(${TARGET_NAME} 
-            PUBLIC
-                ${MAYA_INCLUDE_DIRS}
-                ${PYTHON_INCLUDE_DIR}
-                ${PXR_INCLUDE_DIRS}
-                ${BOOST_INCLUDE_DIR}
-                ${CMAKE_BINARY_DIR}/include
-            PRIVATE
-                $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
-        )
-     endif()
 
 target_compile_definitions(${TARGET_NAME}
         PUBLIC
@@ -113,77 +91,40 @@ if(DEFINED MAYAHYDRA_VERSION)
     )
 endif()
 
-    # -----------------------------------------------------------------------------
-    # link libraries
-    # -----------------------------------------------------------------------------
-if(DEFINED MAYAUSD_LOCATION)
-    find_library(MAYAUSD_API_LIBRARY NAMES mayaUsdAPI PATHS ${MAYAUSD_LOCATION}/lib NO_DEFAULT_PATH)
-    if(NOT MAYAUSD_API_LIBRARY)
-        message(WARNING "Could not find mayaUsdAPI library.")
-    endif()
-    target_link_libraries(${TARGET_NAME} 
-        PUBLIC
-            ar
-            gf
-            hd
-            hdx
-            js
-            kind
-            plug
-            sdf
-            tf
-            trace
-            usd
-            usdGeom
-            usdImaging
-            usdImagingGL
-            usdLux
-            usdRender
-            usdRi
-            usdShade
-            usdSkel
-            usdUtils
-            ufeExtensions
-            flowViewport
-            ${MAYAUSD_API_LIBRARY}
-            ${MAYA_LIBRARIES}
-        PRIVATE
-            $<$<BOOL:${USD_001905_BUILD}>:hio>
-            ${PYTHON_LIBRARIES} 
-            $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
-    )
-else()
-    target_link_libraries(${TARGET_NAME} 
-        PUBLIC
-            ar
-            gf
-            hd
-            hdx
-            js
-            kind
-            plug
-            sdf
-            tf
-            trace
-            usd
-            usdGeom
-            usdImaging
-            usdImagingGL
-            usdLux
-            usdRender
-            usdRi
-            usdShade
-            usdSkel
-            usdUtils
-            ufeExtensions
-            flowViewport
-            ${MAYA_LIBRARIES}
-        PRIVATE
-            $<$<BOOL:${USD_001905_BUILD}>:hio>
-            ${PYTHON_LIBRARIES} 
-            $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
-    )
-endif()
+# -----------------------------------------------------------------------------
+# link libraries
+# -----------------------------------------------------------------------------
+target_link_libraries(${TARGET_NAME} 
+    PUBLIC
+        ar
+        gf
+        hd
+        hdx
+        js
+        kind
+        plug
+        sdf
+        tf
+        trace
+        usd
+        usdGeom
+        usdImaging
+        usdImagingGL
+        usdLux
+        usdRender
+        usdRi
+        usdShade
+        usdSkel
+        usdUtils
+        ufeExtensions
+        flowViewport
+        ${MAYA_LIBRARIES}
+    PRIVATE
+        $<$<BOOL:${USD_001905_BUILD}>:hio>
+        ${PYTHON_LIBRARIES} 
+        $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
+        $<$<BOOL:${MAYAUSD_FOUND}>:${MAYAUSDAPI_LIBRARY}>
+)
 
 # -----------------------------------------------------------------------------
 # promoted headers

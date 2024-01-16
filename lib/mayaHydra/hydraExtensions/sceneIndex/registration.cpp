@@ -207,82 +207,80 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
 {
     //We receive only dag nodes of type MayaUsdProxyShapeNode
     MAYAUSDAPI_NS::ProxyStage proxyStage(dagNode);
-    if (TF_VERIFY(proxyStage.isValid(), "Error getting MayaUsdAPIProxyStage")) {
-        MayaHydraSceneIndexRegistrationPtr registration(new MayaHydraSceneIndexRegistration());
+    MayaHydraSceneIndexRegistrationPtr registration(new MayaHydraSceneIndexRegistration());
 
-        //Add the usdimaging stage scene index chain as a data producer scene index in flow viewport
+    //Add the usdimaging stage scene index chain as a data producer scene index in flow viewport
 
-        //Since we want to insert a parent primitive for the stage scene index to be transformed or set visible/invisible, we need to set this scene indices chain 
-        //before some of the instancing scene indices for UsdImaginsStageSceneIndex, and there is a slot for that purpose which is createInfo.overridesSceneIndexCallback
-        //With this callback you can insert some scene indices which will be applied before the prototype scene indices.
-        //This will be done inside Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageSceneIndex later
-        UsdImagingCreateSceneIndicesInfo createInfo;
+    //Since we want to insert a parent primitive for the stage scene index to be transformed or set visible/invisible, we need to set this scene indices chain 
+    //before some of the instancing scene indices for UsdImaginsStageSceneIndex, and there is a slot for that purpose which is createInfo.overridesSceneIndexCallback
+    //With this callback you can insert some scene indices which will be applied before the prototype scene indices.
+    //This will be done inside Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageSceneIndex later
+    UsdImagingCreateSceneIndicesInfo createInfo;
         
-        auto stage = proxyStage.getUsdStage();
-        // Check whether the pseudo-root has children
-        if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
-            createInfo.stage = stage;//Add the stage to the creation parameters
-        }
+    auto stage = proxyStage.getUsdStage();
+    // Check whether the pseudo-root has children
+    if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
+        createInfo.stage = stage;//Add the stage to the creation parameters
+    }
             
-        MStatus  status;
-        MDagPath dagPath(MDagPath::getAPathTo(dagNode, &status));
-        if (TF_VERIFY(status == MS::kSuccess, "Incapable of finding dag path to given node")) {
-            registration->dagNode = MObjectHandle(dagNode);
-            // Construct the scene index path prefix appended to each rprim created by it.
-            // It is composed of the "scene index plugin's name" + "dag node name" +
-            // "disambiguator" The dag node name disambiguator is necessary in situation
-            // where node name isn't unique and may clash with other node defined by the
-            // same plugin.
-            MFnDependencyNode dependNodeFn(dagNode);
-            std::string dependNodeNameString (dependNodeFn.name().asChar());
-            SanitizeNameForSdfPath(dependNodeNameString);
+    MStatus  status;
+    MDagPath dagPath(MDagPath::getAPathTo(dagNode, &status));
+    if (TF_VERIFY(status == MS::kSuccess, "Incapable of finding dag path to given node")) {
+        registration->dagNode = MObjectHandle(dagNode);
+        // Construct the scene index path prefix appended to each rprim created by it.
+        // It is composed of the "scene index plugin's name" + "dag node name" +
+        // "disambiguator" The dag node name disambiguator is necessary in situation
+        // where node name isn't unique and may clash with other node defined by the
+        // same plugin.
+        MFnDependencyNode dependNodeFn(dagNode);
+        std::string dependNodeNameString (dependNodeFn.name().asChar());
+        SanitizeNameForSdfPath(dependNodeNameString);
                 
-            registration->sceneIndexPathPrefix = 
-                        SdfPath::AbsoluteRootPath()
-                        .AppendPath(SdfPath(dependNodeNameString
-                            + (dependNodeFn.hasUniqueName()
-                                    ? ""
-                                    : "__" + std::to_string(_incrementedCounterDisambiguator++))));
+        registration->sceneIndexPathPrefix = 
+                    SdfPath::AbsoluteRootPath()
+                    .AppendPath(SdfPath(dependNodeNameString
+                        + (dependNodeFn.hasUniqueName()
+                                ? ""
+                                : "__" + std::to_string(_incrementedCounterDisambiguator++))));
 
 
-            //We will get the following scene indices from Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageSceneIndex
-            HdSceneIndexBaseRefPtr finalSceneIndex = nullptr;
-            UsdImagingStageSceneIndexRefPtr stageSceneIndex = nullptr;
+        //We will get the following scene indices from Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageSceneIndex
+        HdSceneIndexBaseRefPtr finalSceneIndex = nullptr;
+        UsdImagingStageSceneIndexRefPtr stageSceneIndex = nullptr;
 
-            PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr dataProducerSceneIndexData  = 
-                Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageSceneIndex(createInfo, finalSceneIndex, stageSceneIndex, 
-                                                                                                    registration->sceneIndexPathPrefix, (void*)&dagNode);
-            if (nullptr == dataProducerSceneIndexData || nullptr == finalSceneIndex || nullptr == stageSceneIndex){
-                TF_CODING_ERROR("Error (nullptr == dataProducerSceneIndexData || nullptr == finalSceneIndex || nullptr == stageSceneIndex) !");
-            }
-        
-            //Create maya usd proxy shape scene index, since this scene index contains maya data, it cannot be added by the flow viewport API
-            auto mayaUsdProxyShapeSceneIndex = MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode));
-            registration->pluginSceneIndex = mayaUsdProxyShapeSceneIndex;
-            registration->interpretRprimPathFn = &(MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::InterpretRprimPath);
-            mayaUsdProxyShapeSceneIndex->Populate();
-
-            registration->rootSceneIndex = registration->pluginSceneIndex;
-
-            //Add the PathInterfaceSceneIndex which must be the last scene index, it is used for selection highlighting
-            registration->rootSceneIndex = PathInterfaceSceneIndex::New(
-                    registration->rootSceneIndex,
-                    registration->sceneIndexPathPrefix);
-
-            //Set the chain back into the dataProducerSceneIndexData in both members
-            dataProducerSceneIndexData->SetDataProducerSceneIndex(registration->rootSceneIndex);
-            dataProducerSceneIndexData->SetDataProducerLastSceneIndexChain(registration->rootSceneIndex);
-
-            //Add this chain scene index to the render index proxy from all viewports
-            const bool bRes = Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageDataProducerSceneIndexDataBaseToAllViewports(dataProducerSceneIndexData);
-            if (false == bRes){
-                TF_CODING_ERROR("Fvp::DataProducerSceneIndexInterfaceImp::get().addDataProducerSceneIndex returned false !");
-            }
-
-            // Add registration record if everything succeeded
-            _registrations.insert({ registration->sceneIndexPathPrefix, registration });
-            _registrationsByObjectHandle.insert({ registration->dagNode, registration });
+        PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr dataProducerSceneIndexData  = 
+            Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageSceneIndex(createInfo, finalSceneIndex, stageSceneIndex, 
+                                                                                                registration->sceneIndexPathPrefix, (void*)&dagNode);
+        if (nullptr == dataProducerSceneIndexData || nullptr == finalSceneIndex || nullptr == stageSceneIndex){
+            TF_CODING_ERROR("Error (nullptr == dataProducerSceneIndexData || nullptr == finalSceneIndex || nullptr == stageSceneIndex) !");
         }
+        
+        //Create maya usd proxy shape scene index, since this scene index contains maya data, it cannot be added by the flow viewport API
+        auto mayaUsdProxyShapeSceneIndex = MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode));
+        registration->pluginSceneIndex = mayaUsdProxyShapeSceneIndex;
+        registration->interpretRprimPathFn = &(MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::InterpretRprimPath);
+        mayaUsdProxyShapeSceneIndex->Populate();
+
+        registration->rootSceneIndex = registration->pluginSceneIndex;
+
+        //Add the PathInterfaceSceneIndex which must be the last scene index, it is used for selection highlighting
+        registration->rootSceneIndex = PathInterfaceSceneIndex::New(
+                registration->rootSceneIndex,
+                registration->sceneIndexPathPrefix);
+
+        //Set the chain back into the dataProducerSceneIndexData in both members
+        dataProducerSceneIndexData->SetDataProducerSceneIndex(registration->rootSceneIndex);
+        dataProducerSceneIndexData->SetDataProducerLastSceneIndexChain(registration->rootSceneIndex);
+
+        //Add this chain scene index to the render index proxy from all viewports
+        const bool bRes = Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageDataProducerSceneIndexDataBaseToAllViewports(dataProducerSceneIndexData);
+        if (false == bRes){
+            TF_CODING_ERROR("Fvp::DataProducerSceneIndexInterfaceImp::get().addDataProducerSceneIndex returned false !");
+        }
+
+        // Add registration record if everything succeeded
+        _registrations.insert({ registration->sceneIndexPathPrefix, registration });
+        _registrationsByObjectHandle.insert({ registration->dagNode, registration });
     }
 }
 #else
