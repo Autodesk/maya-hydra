@@ -42,8 +42,7 @@ namespace FVP_NS_DEF {
 *       Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get()
 *   2. Optionally, set the DCC container node (for example : a MObject* for maya) by calling the setContainerNode function.
 *   3. Optionally, if you want to change the grid of cubes primitives, call setCubeGridParams
-*   4. Optionally, if you are using instancing on the cube primitives, call setContainerNodeInverseTransform with the suitable transform from your DCC node.
-*   5. Call addDataProducerSceneIndex() which will add the data producer scene index to all viewports
+*   4. Call addDataProducerSceneIndex() which will add the data producer scene index to all viewports
 * 
 *   The call to removeDataProducerSceneIndex() which will remove the primitives from the viewport is done in the destructor of this class.
 */
@@ -60,7 +59,6 @@ public:
     * Is also our triggering function to add the data producer scene index as we want to wait to have the DCC node pointer value initialized before dataProducer the scene index.
     */
     void setContainerNode(void* node){_containerNode = node;}
-    void setContainerNodeInverseTransform(const PXR_NS::GfMatrix4d& InvTransform);
 
     /// Compute the resulting axis aligned bounding box of the 3D grid of cube primitives, is used by the DCC node to give its bounding box
     void getPrimsBoundingBox(float& corner1X, float& corner1Y, float& corner1Z, float& corner2X, float& corner2Y, float& corner2Z)const;
@@ -151,9 +149,6 @@ protected:
 
     /// Container node from a DCC (maya for example)
     void*  _containerNode {nullptr};//Is a MObject* for Maya
-
-    ///Is the container node inverse transform matrix to remove transform matrix being applied twice for instances
-    PXR_NS::GfMatrix4d  _containerNodeInvTransform;
 
     /// Did we already add this data producer scene index to some render index ?
     bool   _dataProducerSceneIndexAdded {false};
