@@ -43,10 +43,10 @@ class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
                 "UsdStageWithSphereMatXStdSurf.ma")
         cmds.refresh()
         self.assertSnapshotClose("directionalLight.png", None, None)
-        #Do a view fit
-        cmds.viewFit('persp')
-        cmds.refresh()
-        self.assertSnapshotClose("directionalLightFit.png", None, None)
+        #Do a view fit --Test removed as on Linux the fit doesn't produce the same result as on Windows and OSX.
+        #cmds.viewFit('persp')
+        #cmds.refresh()
+        #self.assertSnapshotClose("directionalLightFit.png", None, None)
 
         #delete the directional Light
         cmds.delete('directionalLight1')
@@ -56,7 +56,7 @@ class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
         panel = self.activeModelPanel()
         cmds.modelEditor(panel, edit=True, displayLights="default")
         cmds.refresh()
-        self.assertSnapshotClose("defaultLightFit.png", None, None)
+        self.assertSnapshotClose("defaultLight.png", None, None)
         
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
