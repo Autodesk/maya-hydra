@@ -886,7 +886,7 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         }
     }
 
-    // Turn on active lights, turn off non-active lights, and add non-created active lights.
+    // Turn on active lights, turn off non-active lights
     _MapAdapter<MayaHydraLightAdapter>(
         [&](MayaHydraLightAdapter* a) {
             auto lgtAdapter = activeLightPaths.find(a->GetDagPath().fullPathName().asChar());
@@ -894,7 +894,10 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
                 a->SetLightingOn(true);
                 activeLightPaths.erase(lgtAdapter);
             } else {
-                a->SetLightingOn(false);
+                // Skip dome light as maya numberOfActiveLights API doesn't count active dome light
+                if (a->LightType() != HdPrimTypeTokens->domeLight) {
+                    a->SetLightingOn(false);
+                }
             }
         },
         _lightAdapters);
