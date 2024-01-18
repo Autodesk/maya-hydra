@@ -141,10 +141,6 @@ target_include_directories(${TARGET_NAME}
 set_target_properties(Qt6::Core PROPERTIES INTERFACE_COMPILE_DEFINITIONS QT_NO_KEYWORDS)
 
 target_compile_definitions(${TARGET_NAME} 
-    PUBLIC
-        $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:TBB_USE_DEBUG>
-        $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_DEBUG_PYTHON>
-        $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_LINKING_PYTHON>
     PRIVATE 
         HDUI_EXPORT
 )

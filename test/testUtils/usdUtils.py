@@ -20,6 +20,8 @@
     Helper functions regarding USD that will be used throughout the test.
 """
 
+import maya.mel as mel
+
 import mayaUsd.ufe
 import mayaUsd.lib
 import mayaUsd_createStageWithNewLayer
@@ -31,6 +33,20 @@ from pxr import Usd, UsdGeom, Gf, Sdf
 
 usdSeparator = '/'
 
+def createStageFromFile(filePath: str):
+    """
+        Creates a USD stage from a given path to a USD file.
+        Args:
+            filePath (str): The file path to the USD file to load.
+        Returns :
+            A string representing the UFE path to the stage's proxy shape node
+    """
+    # Source the corresponding mel file, otherwise the procedure isn't available
+    mel.eval('source \"mayaUsd_createStageFromFile.mel\"')
+    loadStageCmd = f'mayaUsd_createStageFromFilePath(\"{filePath}\")'
+    # Replace backslashes with forward slashes to avoid them being interpreted
+    loadStageCmd = loadStageCmd.replace('\\', '/')
+    return mel.eval(loadStageCmd)
 
 def createUfePathSegment(usdPath):
     """
