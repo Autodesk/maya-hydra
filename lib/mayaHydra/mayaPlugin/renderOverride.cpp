@@ -59,21 +59,6 @@
 
 #include <ufeExtensions/Global.h>
 
-namespace MayaUsd {
-// hash combiner taken from:
-// http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0814r0.pdf
-
-// boost::hash implementation also relies on the same algorithm:
-// https://www.boost.org/doc/libs/1_64_0/boost/functional/hash/hash.hpp
-
-template <typename T> inline void hash_combine(std::size_t& seed, const T& value)
-{
-    ::std::hash<T> hasher;
-    seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-}
-} // namespace MayaUsd
-
-
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/tf/instantiateSingleton.h>
 #include <pxr/base/vt/value.h>
@@ -1101,22 +1086,15 @@ void MtohRenderOverride::_PopulateSelectionList(
                     // respect to current scene index. This is because the scene index was inserted
                     // into the render index using a custom prefix. As a result the scene index
                     // prefix will be prepended to rprims tied to that scene index automatically.
-                    const std::string& sceneIndexPathPrefixAsString = registration->sceneIndexPathPrefix.GetString();
-                    const std::string& pickedPathAsString = pickedPath.GetString();
-                    std::string localPathAsString;
-                    const size_t foundPlace = pickedPathAsString.find(sceneIndexPathPrefixAsString);
-                    if (foundPlace == std::string::npos) {
+                    const SdfPath& sceneIndexPathPrefix = registration->sceneIndexPathPrefix;
+                    if ( ! pickedPath.HasPrefix(sceneIndexPathPrefix)){
                         TF_CODING_ERROR("pickedPathAsString.find(sceneIndexPathPrefixAsString) returned std::string::npos !");
                         return;
                     }
-
-                    //Keep only the right part of the string after the prefix
-                    const size_t placeToKeep = foundPlace + sceneIndexPathPrefixAsString.length();
-                    localPathAsString = pickedPathAsString.substr(placeToKeep, pickedPathAsString.length() - placeToKeep);
-
-                    const SdfPath localPath(localPathAsString);
+                    const SdfPath relativePath = pickedPath.MakeRelativePath(sceneIndexPathPrefix);
+                    
                     Ufe::Path interpretedPath(registration->interpretRprimPathFn(
-                        registration->pluginSceneIndex, localPath));
+                        registration->pluginSceneIndex, relativePath));
 
                     // If this is a maya UFE path, then select using MSelectionList
                     // This is because the NamedSelection ignores Ufe items made from maya ufe path

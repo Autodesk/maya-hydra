@@ -16,7 +16,7 @@
 
 #include "mayaHydraLib/hydraUtils.h"
 #include "mayaHydraLib/sceneIndex/registration.h"
-#include "mayaHydraLib/sceneIndex/mayaHydraMayaUsdProxyShapeSceneIndex.h"
+#include "mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndex.h"
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpPathInterfaceSceneIndex.h>
@@ -30,7 +30,7 @@
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/usd/sdf/path.h>
 
-#if defined(MAYAHYDRALIB_MAYAUSD_IS_USED_TO_BUILD)
+#if defined(MAYAHYDRALIB_MAYAUSD_ENABLED)
     #include <mayaUsdAPI/proxyStage.h>
 #endif
 
@@ -202,7 +202,7 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
     return false;
 }
 
-#ifdef MAYAHYDRALIB_MAYAUSD_IS_USED_TO_BUILD
+#ifdef MAYAHYDRALIB_MAYAUSD_ENABLED
 void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
 {
     //We receive only dag nodes of type MayaUsdProxyShapeNode
@@ -380,7 +380,7 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
         }
     }
 }
-#endif //MAYAHYDRALIB_MAYAUSD_IS_USED_TO_BUILD
+#endif //MAYAHYDRALIB_MAYAUSD_ENABLED
 
 void MayaHydraSceneIndexRegistry::_SceneIndexNodeAddedCallback(MObject& dagNode, void* clientData)
 {

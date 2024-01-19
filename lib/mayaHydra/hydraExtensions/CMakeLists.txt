@@ -33,7 +33,7 @@ set(HEADERS
 target_compile_definitions(${TARGET_NAME} 
     PRIVATE 
         MAYAHYDRALIB_EXPORT
-        $<$<BOOL:${MAYAUSD_FOUND}>:MAYAHYDRALIB_MAYAUSD_IS_USED_TO_BUILD>
+        $<$<BOOL:${MAYAUSD_FOUND}>:MAYAHYDRALIB_MAYAUSD_ENABLED>
         $<$<BOOL:${IS_MACOSX}>:OSMac_>
         # Copy-pasted from lib/mayaUsd/CMakeLists.txt
 )

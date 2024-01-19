@@ -16,7 +16,7 @@
 #ifndef MAYA_HYDRA_MAYAUSD_PROXY_SHAPE_SCENE_INDEX_PLUGIN_H
 #define MAYA_HYDRA_MAYAUSD_PROXY_SHAPE_SCENE_INDEX_PLUGIN_H
 
-#if defined(MAYAHYDRALIB_MAYAUSD_IS_USED_TO_BUILD)
+#if defined(MAYAHYDRALIB_MAYAUSD_ENABLED)
 //MayaHydra headers
 #include "mayaHydraLib/api.h"
 #include "mayaHydraLib/mayaHydra.h"
@@ -33,7 +33,7 @@
 
 //Maya headers
 #include <maya/MObjectHandle.h>
-#include <maya/MMEssage.h>
+#include <maya/MMessage.h>
 
 //Ufe headers
 #include <ufe/path.h>
@@ -106,6 +106,6 @@ private:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif //MAYAHYDRALIB_MAYAUSD_IS_USED_TO_BUILD
+#endif //MAYAHYDRALIB_MAYAUSD_ENABLED
 
 #endif //MAYA_HYDRA_MAYAUSD_PROXY_SHAPE_SCENE_INDEX_PLUGIN_H

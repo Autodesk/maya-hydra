@@ -14,9 +14,9 @@
 // limitations under the License.
 //
 
-#include "mayaHydraMayaUsdProxyShapeSceneIndex.h"
+#include "mhMayaUsdProxyShapeSceneIndex.h"
 
-#if defined(MAYAHYDRALIB_MAYAUSD_IS_USED_TO_BUILD)
+#if defined(MAYAHYDRALIB_MAYAUSD_ENABLED)
 
 //Maya headers
 #include <maya/MEventMessage.h>//For timeChanged callback
@@ -108,7 +108,7 @@ Ufe::Path MayaUsdProxyShapeSceneIndex::InterpretRprimPath(
     const HdSceneIndexBaseRefPtr& sceneIndex,
     const SdfPath&                path)
 {
-    if (MayaUsdProxyShapeSceneIndexRefPtr proxyShapeSceneIndex = TfStatic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(sceneIndex)) {
+    if (MayaUsdProxyShapeSceneIndexRefPtr proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(sceneIndex)) {
         MDagPath dagPath(MDagPath::getAPathTo(proxyShapeSceneIndex->_dagNodeHandle.object()));
         return Ufe::Path(
             { UfeExtensions::dagPathToUfePathSegment(dagPath), UfeExtensions::sdfPathToUfePathSegment(path,  UfeExtensions::getUsdRunTimeId()) });
@@ -131,4 +131,4 @@ SdfPathVector MayaUsdProxyShapeSceneIndex::GetChildPrimPaths(const SdfPath& prim
 } // namespace MAYAUSD_NS_DEF
 
 PXR_NAMESPACE_CLOSE_SCOPE
-#endif //MAYAHYDRALIB_MAYAUSD_IS_USED_TO_BUILD
+#endif //MAYAHYDRALIB_MAYAUSD_ENABLED

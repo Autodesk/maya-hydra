@@ -14,6 +14,7 @@ set(TEST_SCRIPT_FILES
     testNewSceneWithStage.py
     testDirectionalLights.py
     testFlowViewportAPI.py
+    testMayaUsdAPIUsage.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py
