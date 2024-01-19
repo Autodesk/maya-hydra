@@ -4,7 +4,7 @@
 
 **Build:**
 * Report build and version information from the mayaHydra plugin [#10](https://github.com/Autodesk/maya-hydra/pull/10)
-* Hydra for Maya has now a new home under https://github.com/Autodesk.com/maya-hdyra
+* Hydra for Maya has now a new home under https://github.com/Autodesk/maya-hydra
 
 **Documentation:**
 * Rename docs mentioning Flow Viewport Library to Flow Viewport Toolkit [#11](https://github.com/Autodesk/maya-hydra/pull/11)
