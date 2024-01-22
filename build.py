@@ -645,7 +645,7 @@ class InstallContext:
                                 if args.maya_location else None)
 
         # MayaUsd Location
-        self.mayaUsdLocation = (os.path.abspath(args.mayausd_location)
+        self.mayaUsdLocation = (os.path.abspath(args.mayausd_location).replace("\\","/")
                                 if args.mayausd_location else None)
         
         # PXR USD Location
