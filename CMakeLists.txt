@@ -128,7 +128,7 @@ else()
 endif()
 
 find_package(MayaUsd OPTIONAL_COMPONENTS)
-if(MAYAUSD_FOUND)
+if(MayaUsd_FOUND)
     message(STATUS "Building with MayaUsd.")
 else()
     message(STATUS "MayaUsd not used to build.")
