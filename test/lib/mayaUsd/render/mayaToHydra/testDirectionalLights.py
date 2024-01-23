@@ -18,6 +18,7 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 import mayaUtils
+import platform
 import unittest
 
 class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
@@ -42,13 +43,15 @@ class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
                 "testDirectionalLights",
                 "UsdStageWithSphereMatXStdSurf.ma")
         cmds.refresh()
-        self.assertSnapshotClose("directionalLight.png", None, None)
-        #Do a view fit --Test removed as on Linux the fit doesn't produce the same result as on Windows and OSX.
-        #cmds.viewFit('persp')
-        #cmds.refresh()
-        #self.assertSnapshotClose("directionalLightFit.png", None, None)
+        self.assertSnapshotClose("directionalLight.png", 1, 1)
 
-        #delete the directional Light
+        # Do a view fit -- Skip this test on Linux, as the fit doesn't produce the same result than on Windows and OSX.
+        if platform.system() != "Linux":
+            cmds.viewFit('persp')
+            cmds.refresh()
+            self.assertSnapshotClose("directionalLightFit.png", 1, 1)
+
+        # Delete the directional Light
         cmds.delete('directionalLight1')
         cmds.refresh()
 
@@ -56,7 +59,7 @@ class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
         panel = self.activeModelPanel()
         cmds.modelEditor(panel, edit=True, displayLights="default")
         cmds.refresh()
-        self.assertSnapshotClose("defaultLight.png", None, None)
+        self.assertSnapshotClose("defaultLight.png", 1, 1)
         
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
