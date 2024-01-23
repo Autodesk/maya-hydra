@@ -46,8 +46,8 @@ class TestSceneBrowser(mtohUtils.MayaHydraBaseTestCase):
 
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin() and mtohUtils.checkForPlugin(SCENE_BROWSER_TEST_PLUGIN_NAME)
                          and platform.system() != "Darwin", 
-                         f'Requires mayaUSD and {SCENE_BROWSER_TEST_PLUGIN_NAME} plugins. 
-                         Currently also disabled on OSX.')
+                         f'Requires mayaUSD and {SCENE_BROWSER_TEST_PLUGIN_NAME} plugins. '
+                         'Currently also disabled on OSX.')
     def test_SceneBrowser(self):
         self.setupScene()
         with PluginLoaded(self.SCENE_BROWSER_TEST_PLUGIN_NAME):
