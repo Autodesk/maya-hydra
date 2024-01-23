@@ -66,6 +66,7 @@ find_package_handle_standard_args(MAYAUSD
 )
 
 if(MAYAUSD_FOUND)
+    message(STATUS "MayaUsd found : ${MAYAUSD_LOCATION}")
     message(STATUS "MayaUsd include dir: ${MAYAUSD_INCLUDE_DIR}")
     message(STATUS "MayaUsd libraries dir: ${MAYAUSD_LIBRARY_DIR}")
     message(STATUS "MayaUsdAPI.lib fullpath : ${MAYAUSDAPI_LIBRARY}")
@@ -83,7 +84,7 @@ if(MAYAUSD_FOUND)
     set(ENV{MAYA_MODULE_PATH} ${MAYA_MODULE_PATH})
 else()
     if(DEFINED MAYAUSD_LOCATION)
-        message(FATAL_ERROR "Could not find MayaUsd library and include directories in the folder provided : ${MAYAUSD_LOCATION}")
+        message(WARNING "Could not find MayaUsd library and include directories in the folder provided : ${MAYAUSD_LOCATION}")
     endif()
 endif()
 

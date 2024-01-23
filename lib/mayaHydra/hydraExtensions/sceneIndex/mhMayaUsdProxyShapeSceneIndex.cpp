@@ -16,7 +16,7 @@
 
 #include "mhMayaUsdProxyShapeSceneIndex.h"
 
-#if defined(MAYAHYDRALIB_MAYAUSD_ENABLED)
+#if defined(MAYAHYDRALIB_MAYAUSDAPI_ENABLED)
 
 //Maya headers
 #include <maya/MEventMessage.h>//For timeChanged callback
@@ -131,4 +131,4 @@ SdfPathVector MayaUsdProxyShapeSceneIndex::GetChildPrimPaths(const SdfPath& prim
 } // namespace MAYAUSD_NS_DEF
 
 PXR_NAMESPACE_CLOSE_SCOPE
-#endif //MAYAHYDRALIB_MAYAUSD_ENABLED
+#endif //MAYAHYDRALIB_MAYAUSDAPI_ENABLED

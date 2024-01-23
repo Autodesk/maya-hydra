@@ -30,7 +30,7 @@
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/usd/sdf/path.h>
 
-#if defined(MAYAHYDRALIB_MAYAUSD_ENABLED)
+#if defined(MAYAHYDRALIB_MAYAUSDAPI_ENABLED)
     #include <mayaUsdAPI/proxyStage.h>
 #endif
 
@@ -202,7 +202,7 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
     return false;
 }
 
-#ifdef MAYAHYDRALIB_MAYAUSD_ENABLED
+#ifdef MAYAHYDRALIB_MAYAUSDAPI_ENABLED
 void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
 {
     //We receive only dag nodes of type MayaUsdProxyShapeNode
@@ -380,7 +380,7 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
         }
     }
 }
-#endif //MAYAHYDRALIB_MAYAUSD_ENABLED
+#endif //MAYAHYDRALIB_MAYAUSDAPI_ENABLED
 
 void MayaHydraSceneIndexRegistry::_SceneIndexNodeAddedCallback(MObject& dagNode, void* clientData)
 {
