@@ -33,7 +33,7 @@ set(HEADERS
 target_compile_definitions(${TARGET_NAME} 
     PRIVATE 
         MAYAHYDRALIB_EXPORT
-        $<$<BOOL:${MayaUsd_FOUND}>:MAYAHYDRALIB_MAYAUSD_ENABLED>
+        $<$<BOOL:${MAYAUSD_FOUND}>:MAYAHYDRALIB_MAYAUSD_ENABLED>
         $<$<BOOL:${IS_MACOSX}>:OSMac_>
         # Copy-pasted from lib/mayaUsd/CMakeLists.txt
 )
@@ -52,7 +52,7 @@ target_include_directories(${TARGET_NAME}
                 ${CMAKE_BINARY_DIR}/include
             PRIVATE
                 $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
-                $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSD_INCLUDE_DIR}>
+                $<$<BOOL:${MAYAUSD_FOUND}>:${MAYAUSD_INCLUDE_DIR}>
 )
 
 target_compile_definitions(${TARGET_NAME}
@@ -123,7 +123,7 @@ target_link_libraries(${TARGET_NAME}
         $<$<BOOL:${USD_001905_BUILD}>:hio>
         ${PYTHON_LIBRARIES} 
         $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
-        $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSDAPI_LIBRARY}>
+        $<$<BOOL:${MAYAUSD_FOUND}>:${MAYAUSDAPI_LIBRARY}>
 )
 
 # -----------------------------------------------------------------------------
