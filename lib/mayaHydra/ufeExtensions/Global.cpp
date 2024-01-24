@@ -36,7 +36,6 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 constexpr char kMayaRunTimeName[] = "Maya-DG";
 constexpr char kUSDRunTimeName[] = "USD";
-constexpr char kSdfPathSeparator = '/';
 
 Ufe::Rtid getMayaRunTimeId()
 {
