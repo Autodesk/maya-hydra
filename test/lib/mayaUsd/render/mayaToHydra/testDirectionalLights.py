@@ -18,7 +18,6 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 import mayaUtils
-import platform
 import unittest
 
 class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
