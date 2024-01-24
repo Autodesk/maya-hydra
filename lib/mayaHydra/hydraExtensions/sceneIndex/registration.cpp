@@ -20,7 +20,7 @@
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpPathInterfaceSceneIndex.h>
-#include <flowViewport/API/InterfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
+#include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
 #include <pxr/imaging/hd/retainedDataSource.h>

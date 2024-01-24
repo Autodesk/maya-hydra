@@ -52,7 +52,7 @@ target_include_directories(${TARGET_NAME}
                 ${CMAKE_BINARY_DIR}/include
             PRIVATE
                 $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
-                $<$<BOOL:${MAYAUSD_FOUND}>:${MAYAUSD_INCLUDE_DIR}>
+                $<$<BOOL:${MAYAUSDAPI_LIBRARY}>:${MAYAUSD_INCLUDE_DIR}>
 )
 
 target_compile_definitions(${TARGET_NAME}
@@ -123,7 +123,7 @@ target_link_libraries(${TARGET_NAME}
         $<$<BOOL:${USD_001905_BUILD}>:hio>
         ${PYTHON_LIBRARIES} 
         $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
-        $<$<BOOL:${MAYAUSD_FOUND}>:${MAYAUSDAPI_LIBRARY}>
+        $<$<BOOL:${MAYAUSDAPI_LIBRARY}>:${MAYAUSDAPI_LIBRARY}>
 )
 
 # -----------------------------------------------------------------------------
