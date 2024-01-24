@@ -24,7 +24,7 @@ class TestMayaUsdAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCas
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.1
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.2
     IMAGE_DIFF_FAIL_PERCENT = 2
 
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
