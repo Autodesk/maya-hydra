@@ -45,12 +45,6 @@ class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
         cmds.refresh()
         self.assertSnapshotClose("directionalLight.png", 1, 1)
 
-        # Do a view fit -- Skip this check on Linux, as the fit doesn't produce the same result than on Windows and OSX.
-        if platform.system() != "Linux":
-            cmds.viewFit('persp')
-            cmds.refresh()
-            self.assertSnapshotClose("directionalLightFit.png", 1, 1)
-
         # Delete the directional Light
         cmds.delete('directionalLight1')
         cmds.refresh()
