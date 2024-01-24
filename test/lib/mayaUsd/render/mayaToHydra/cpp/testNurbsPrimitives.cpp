@@ -21,12 +21,19 @@
 #include <pxr/imaging/hd/tokens.h>
 
 #include <maya/MViewport2Renderer.h>
+#include <maya/MFnMesh.h>
+#include <maya/MFnNurbsSurface.h>
 
 #include <gtest/gtest.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace MayaHydra;
+
+namespace {
+
+template<typename AttrType>
+}
 
 TEST(NurbsPrimitives, nurbsSphere)
 {
@@ -51,4 +58,11 @@ TEST(NurbsPrimitives, nurbsSphere)
     HdSceneIndexPrim spherePrim = foundPrims.front().prim;
     EXPECT_TRUE(spherePrim.primType != TfToken());
     EXPECT_TRUE(spherePrim.dataSource != nullptr);
+
+    MDagPath sphereDagPath;
+    ASSERT_TRUE(GetDagPathFromNodeName("nurbsSphere1", sphereDagPath));
+    sphereDagPath.extendToShape();
+
+    MStatus nurbsResult;
+    MFnNurbsSurface nurbsSphere(sphereDagPath.node(), &nurbsResult);
 }

@@ -23,6 +23,7 @@ class TestNurbsPrimitives(mtohUtils.MayaHydraBaseTestCase):
 
     def setupScene(self):
         self.setHdStormRenderer()
+        cmds.sphere()
         cmds.refresh()
 
     def test_NurbsSphere(self):
