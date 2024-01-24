@@ -24,6 +24,9 @@ class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.5
+    IMAGE_DIFF_FAIL_PERCENT = 1
+
     def activeModelPanel(self):
         """Return the model panel that will be used for playblasting etc..."""
         for panel in cmds.getPanel(type="modelPanel"):
@@ -42,7 +45,7 @@ class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
                 "testDirectionalLights",
                 "UsdStageWithSphereMatXStdSurf.ma")
         cmds.refresh()
-        self.assertSnapshotClose("directionalLight.png", 1, 1)
+        self.assertSnapshotClose("directionalLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         # Delete the directional Light
         cmds.delete('directionalLight1')
@@ -52,7 +55,7 @@ class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
         panel = self.activeModelPanel()
         cmds.modelEditor(panel, edit=True, displayLights="default")
         cmds.refresh()
-        self.assertSnapshotClose("defaultLight.png", 1, 1)
+        self.assertSnapshotClose("defaultLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
