@@ -272,4 +272,10 @@ void DataProducerSceneIndexInterfaceImp::setSceneIndexDataFactory(DataProducerSc
     sceneIndexDataFactory = &factory;
 }
 
+void DataProducerSceneIndexInterfaceImp::ClearDataProducerSceneIndicesThatApplyToAllViewports() 
+{ 
+    std::lock_guard<std::mutex> lockDataProducerSceneIndicesDataPerViewport(dataProducerSceneIndicesThatApplyToAllViewports_mutex);
+    dataProducerSceneIndicesThatApplyToAllViewports.clear();
+}
+
 } //End of namespace FVP_NS_DEF

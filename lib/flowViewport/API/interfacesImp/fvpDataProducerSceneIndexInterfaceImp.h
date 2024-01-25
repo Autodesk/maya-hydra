@@ -68,6 +68,8 @@ public:
                                               const std::string& hydraViewportId = PXR_NS::FvpViewportAPITokens->allViewports)override;
 
 
+    FVP_API void ClearDataProducerSceneIndicesThatApplyToAllViewports();
+
     //Called by flow viewport
     ///hydraViewportSceneIndexAdded is called when a new hydra viewport is created by the ViewportInformationAndSceneIndicesPerViewportDataManager, it's not a callback.
     void hydraViewportSceneIndexAdded(const InformationInterface::ViewportInformation& viewportInfo);

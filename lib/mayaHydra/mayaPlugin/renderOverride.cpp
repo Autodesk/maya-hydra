@@ -820,6 +820,9 @@ void MtohRenderOverride::ClearHydraResources()
     //We don't have any viewport using Hydra any more
     Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveAllViewportsInformation();
     
+    //Remove the data producer scene indices that apply to all viewports
+    Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViewports();
+
     _mayaHydraSceneProducer.reset();
     _selectionSceneIndex.Reset();
     _selection.reset();
