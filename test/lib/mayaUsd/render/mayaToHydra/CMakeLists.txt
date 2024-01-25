@@ -14,7 +14,7 @@ set(TEST_SCRIPT_FILES
     testNewSceneWithStage.py
     testDirectionalLights.py
     testFlowViewportAPI.py
-    testMayaUsdAPIUsage.py
+    $<$<BOOL:${MAYAUSDAPI_LIBRARY}>:testMayaUsdAPIUsage.py> #add this test only if the MAYAUSDAPI_LIBRARY has been found during compile time.
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py
