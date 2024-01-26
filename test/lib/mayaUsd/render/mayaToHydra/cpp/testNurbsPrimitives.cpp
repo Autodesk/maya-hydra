@@ -29,6 +29,7 @@
 #include <maya/MPlug.h>
 #include <maya/MPxNode.h>
 #include <maya/MViewport2Renderer.h>
+#include <maya/M3dView.h>
 
 #include <gtest/gtest.h>
 
@@ -142,11 +143,17 @@ TEST(NurbsPrimitives, nurbsSphere)
     MStatus         nurbsResult;
     MFnNurbsSurface nurbsSphere(sphereDagPath.node(), &nurbsResult);*/
 
-    /*MDagPath makeNurbSpherePath;
-    ASSERT_TRUE(GetDagPathFromNodeName("makeNurbSphere1", makeNurbSpherePath));
-    MStatus           makeNurbNodeStatus;
-    MFnDependencyNode makeNurbNode = makeNurbSpherePath.node(&makeNurbNodeStatus);
-    ASSERT_TRUE(makeNurbNodeStatus);
-    NurbMaker         nurbMaker(makeNurbNode);*/
-    //nurbMaker.setAttribute("potato", 10);
+    MObject makeNurbNode;
+    ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbSphere1", makeNurbNode));
+    MStatus makeNurbNodeFnStatus;
+    MFnDependencyNode makeNurbNodeFn(makeNurbNode, &makeNurbNodeFnStatus);
+    ASSERT_TRUE(makeNurbNodeFnStatus);
+    NurbMaker nurbMaker(makeNurbNodeFn);
+    
+    EXPECT_TRUE(nurbMaker.setAttribute("radius", 10));
+
+    M3dView::active3dView().refresh();
+
+    //CompareDataSource(topologyDataSource, topologyPath);
+    //CompareDataSource(pointsDataSource, pointsPath);
 }
