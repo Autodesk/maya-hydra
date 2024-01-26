@@ -127,7 +127,7 @@ else()
     message(STATUS "UFE not found.")
 endif()
 
-find_package(MayaUsd OPTIONAL_COMPONENTS)
+find_package(MayaUsd)
 if(MayaUsd_FOUND)
     message(STATUS "Building with MayaUsd.")
 else()

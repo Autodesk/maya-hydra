@@ -1,5 +1,15 @@
 set(MAYA_USD_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
+if(MAYAUSD_FOUND)
+    #Add MAYAUSD_MOD_PATH (the path where maya USD .mod file is) to the MAYA_MODULE_PATH
+    # Get the current value of the environment variable
+    set(CURRENT_MAYA_MODULE_PATH $ENV{MAYA_MODULE_PATH})
+    # Append the new path to the current value
+    set(MAYA_MODULE_PATH "${CURRENT_MAYA_MODULE_PATH}:${MAYAUSD_MOD_PATH}")
+    # Export the new value to the environment
+    set(ENV{MAYA_MODULE_PATH} ${MAYA_MODULE_PATH})
+endif()
+
 function(mayaUsd_get_unittest_target unittest_target unittest_basename)
     get_filename_component(unittest_name ${unittest_basename} NAME_WE)
     set(${unittest_target} "${unittest_name}" PARENT_SCOPE)

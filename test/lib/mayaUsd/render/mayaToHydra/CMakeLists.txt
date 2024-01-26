@@ -27,10 +27,10 @@ set(TEST_SCRIPT_FILES
     cpp/testFlowViewportAPIFilterPrims.py
 )
 
-#Add this test only if the MAYAUSDAPI_LIBRARY has been found during compile time.
-if(MAYAUSDAPI_LIBRARY)
+#Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.
+if(MayaUsd_FOUND)
     list(APPEND TEST_SCRIPT_FILES testMayaUsdAPIUsage.py)
-endif(MAYAUSDAPI_LIBRARY)
+endif(MayaUsd_FOUND)
 
 # Test use of mesh adapter code for mesh support, using environment variable.
 # As of 13-Jun-2023, if a test in this list is identical to a test in
