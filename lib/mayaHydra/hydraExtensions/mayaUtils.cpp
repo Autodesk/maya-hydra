@@ -71,6 +71,16 @@ MStatus GetDagPathFromNodeName(const MString& nodeName, MDagPath& outDagPath)
     return status;
 }
 
+MStatus GetDependNodeFromNodeName(const MString& nodeName, MObject& outDependNode)
+{
+    MSelectionList selectionList;
+    MStatus        status = selectionList.add(nodeName);
+    if (status) {
+        status = selectionList.getDependNode(0, outDependNode);
+    }
+    return status;
+}
+
 MStatus GetMayaMatrixFromDagPath(const MDagPath& dagPath, MMatrix& outMatrix)
 {
     MStatus status;

@@ -60,6 +60,17 @@ MAYAHYDRALIB_API
 MStatus GetDagPathFromNodeName(const MString& nodeName, MDagPath& outDagPath);
 
 /**
+ * @brief Get a node from the Maya dependency graph using its name
+ *
+ * @param[in] nodeName is the name of the node to get.
+ * @param[out] outDependNode is the node in the Maya dependency graph.
+ *
+ * @return The resulting status of the operation.
+ */
+MAYAHYDRALIB_API
+MStatus GetDependNodeFromNodeName(const MString& nodeName, MObject& outDependNode);
+
+/**
  * @brief Get the Maya transform matrix of a node from its DAG path
  *
  * The output transform matrix is the resultant ("flattened") matrix from it and 
