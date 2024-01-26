@@ -46,14 +46,13 @@ find_path(MAYAUSD_MOD_PATH
 # all listed variables are TRUE.
 include(FindPackageHandleStandardArgs)
 
-find_package_handle_standard_args(MAYAUSD
+find_package_handle_standard_args(MayaUsd
     REQUIRED_VARS
         MAYAUSD_INCLUDE_DIR
         MAYAUSDAPI_LIBRARY
 )
 
 if(MayaUsd_FOUND)
-    message(STATUS "MayaUsd found : ${MAYAUSD_LOCATION}")
     message(STATUS "MayaUsd include dir: ${MAYAUSD_INCLUDE_DIR}")
     message(STATUS "MayaUsdAPI library fullpath : ${MAYAUSDAPI_LIBRARY}")
     message(STATUS "MAYAUSD_MOD_PATH : ${MAYAUSD_MOD_PATH}")
