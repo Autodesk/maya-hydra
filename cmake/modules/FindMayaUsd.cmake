@@ -42,7 +42,7 @@ find_path(MAYAUSD_MOD_PATH
 )
 
 
-# Handle the QUIETLY and REQUIRED arguments and set MAYAUSD_FOUND to TRUE if
+# Handle the QUIETLY and REQUIRED arguments and set MayaUsd_FOUND to TRUE if
 # all listed variables are TRUE.
 include(FindPackageHandleStandardArgs)
 
@@ -52,7 +52,7 @@ find_package_handle_standard_args(MAYAUSD
         MAYAUSDAPI_LIBRARY
 )
 
-if(MAYAUSD_FOUND)
+if(MayaUsd_FOUND)
     message(STATUS "MayaUsd found : ${MAYAUSD_LOCATION}")
     message(STATUS "MayaUsd include dir: ${MAYAUSD_INCLUDE_DIR}")
     message(STATUS "MayaUsdAPI library fullpath : ${MAYAUSDAPI_LIBRARY}")

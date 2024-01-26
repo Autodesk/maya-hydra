@@ -1,6 +1,6 @@
 set(MAYA_USD_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
-if(MAYAUSD_FOUND)
+if(MayaUsd_FOUND)
     #Add MAYAUSD_MOD_PATH (the path where maya USD .mod file is) to the MAYA_MODULE_PATH
     # Get the current value of the environment variable
     set(CURRENT_MAYA_MODULE_PATH $ENV{MAYA_MODULE_PATH})
