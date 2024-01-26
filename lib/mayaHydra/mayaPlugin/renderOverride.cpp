@@ -277,7 +277,8 @@ MtohRenderOverride::~MtohRenderOverride()
     if (_timerCallback)
         MMessage::removeCallback(_timerCallback);
 
-    ClearHydraResources();
+    static const bool fullReset = true;
+    ClearHydraResources(fullReset);
 
     for (auto operation : _operations) {
         delete operation;
@@ -549,7 +550,8 @@ MStatus MtohRenderOverride::Render(
 
     _DetectMayaDefaultLighting(drawContext);
     if (_needsClear.exchange(false)) {
-        ClearHydraResources();
+        static const bool fullReset = false;
+        ClearHydraResources(fullReset);
     }
 
     if (!_initializationAttempted) {
@@ -808,7 +810,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     _initializationSucceeded = true;
 }
 
-void MtohRenderOverride::ClearHydraResources()
+void MtohRenderOverride::ClearHydraResources(bool fullReset)
 {
     if (!_initializationAttempted) {
         return;
@@ -820,8 +822,12 @@ void MtohRenderOverride::ClearHydraResources()
     //We don't have any viewport using Hydra any more
     Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveAllViewportsInformation();
     
-    //Remove the data producer scene indices that apply to all viewports
-    Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViewports();
+    if (fullReset){
+        //Remove the data producer scene indices that apply to all viewports
+        Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViewports();
+        //Remove the scene index registry
+        _sceneIndexRegistry.reset();
+    }
 
     _mayaHydraSceneProducer.reset();
     _selectionSceneIndex.Reset();
@@ -847,8 +853,6 @@ void MtohRenderOverride::ClearHydraResources()
         HdRendererPluginRegistry::GetInstance().ReleasePlugin(_rendererPlugin);
         _rendererPlugin = nullptr;
     }
-
-    _sceneIndexRegistry.reset();
 
     //Decrease ref count on the render index proxy which owns the merging scene index at the end of this function as some previous calls may likely use it to remove some scene indices
     _renderIndexProxy.reset();
@@ -897,7 +901,8 @@ void MtohRenderOverride::_RemovePanel(MString panelName)
     }
 
     if (_renderPanelCallbacks.empty()) {
-        ClearHydraResources();
+        static const bool fullReset = false;
+        ClearHydraResources(fullReset);
     }
 }
 
@@ -1268,7 +1273,8 @@ void MtohRenderOverride::_ClearHydraCallback(void* data)
     if (!TF_VERIFY(instance)) {
         return;
     }
-    instance->ClearHydraResources();
+    static const bool fullReset = true;
+    instance->ClearHydraResources(fullReset);
 }
 
 void MtohRenderOverride::_PlayblastingChanged(bool playBlasting, void* userData)

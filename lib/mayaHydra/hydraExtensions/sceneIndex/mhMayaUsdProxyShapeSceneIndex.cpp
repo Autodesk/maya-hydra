@@ -38,8 +38,8 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(const MAYAUSDAPI_NS::Pr
     , _dagNodeHandle(dagNodeHandle)
 {
     TfWeakPtr<MayaUsdProxyShapeSceneIndex> ptr(this);
-    TfNotice::Register(ptr, &MayaUsdProxyShapeSceneIndex::_StageSet);
-    TfNotice::Register(ptr, &MayaUsdProxyShapeSceneIndex::_ObjectsChanged);
+    _stageSetNoticeKey = TfNotice::Register(ptr, &MayaUsdProxyShapeSceneIndex::_StageSet);
+    _objectsChangedNoticeKey = TfNotice::Register(ptr, &MayaUsdProxyShapeSceneIndex::_ObjectsChanged);
     
     _timeChangeCallbackId = MEventMessage::addEventCallback("timeChanged", onTimeChanged, this);
 }
@@ -47,6 +47,8 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(const MAYAUSDAPI_NS::Pr
 MayaUsdProxyShapeSceneIndex::~MayaUsdProxyShapeSceneIndex()
 {
     MMessage::removeCallback(_timeChangeCallbackId);
+    TfNotice::Revoke(_stageSetNoticeKey);
+    TfNotice::Revoke(_objectsChangedNoticeKey);
 }
 
 MayaUsdProxyShapeSceneIndexRefPtr MayaUsdProxyShapeSceneIndex::New(const MAYAUSDAPI_NS::ProxyStage& proxyStage, 

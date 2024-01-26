@@ -100,6 +100,8 @@ private:
     std::atomic<bool>               _populated { false };
     MCallbackId                     _timeChangeCallbackId = 0;
     MObjectHandle                   _dagNodeHandle;
+    TfNotice::Key                   _stageSetNoticeKey;
+    TfNotice::Key                   _objectsChangedNoticeKey;
 };
 
 } // namespace MAYAHYDRA_NS_DEF

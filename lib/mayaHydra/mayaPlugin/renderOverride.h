@@ -112,7 +112,7 @@ public:
         const MHWRender::MDrawContext&                         drawContext,
         const MHWRender::MDataServerOperation::MViewportScene& scene);
 
-    void ClearHydraResources();
+    void ClearHydraResources(bool fullReset);
     void SelectionChanged(const Ufe::SelectionChanged& notification);
     void SetRenderPurposeTags(const MayaHydraParams& delegateParams) { _SetRenderPurposeTags(delegateParams); };
     MString uiName() const override { return MString(_rendererDesc.displayName.GetText()); }
