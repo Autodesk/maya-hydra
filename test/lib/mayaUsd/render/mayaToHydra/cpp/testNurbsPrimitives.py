@@ -23,6 +23,7 @@ class TestNurbsPrimitives(mtohUtils.MayaHydraBaseTestCase):
 
     def setupScene(self):
         self.setHdStormRenderer()
+        cmds.loadPlugin('ArubaTessellator')
         cmds.sphere()
         cmds.refresh()
 

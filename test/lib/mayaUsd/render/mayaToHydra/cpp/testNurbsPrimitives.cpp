@@ -19,12 +19,24 @@
 #include <mayaHydraLib/mayaUtils.h>
 
 #include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/meshSchema.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
 
-#include <maya/MViewport2Renderer.h>
+#include <maya/MFnDependencyNode.h>
 #include <maya/MFnMesh.h>
 #include <maya/MFnNurbsSurface.h>
+#include <maya/MObject.h>
+#include <maya/MPlug.h>
+#include <maya/MPxNode.h>
+#include <maya/MViewport2Renderer.h>
 
 #include <gtest/gtest.h>
+
+#include <sstream>
+#include <string>
+#include <filesystem>
+#include <algorithm>
+#include <iterator>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -32,37 +44,109 @@ using namespace MayaHydra;
 
 namespace {
 
-template<typename AttrType>
+HdDataSourceLocator topologyLocator = HdMeshSchema::GetTopologyLocator();
+HdDataSourceLocator pointsLocator = HdPrimvarsSchema::GetPointsLocator();
+
+class NurbMaker
+{
+public:
+    NurbMaker(MFnDependencyNode& makeNurbNode)
+        : _makeNurbNode(makeNurbNode)
+    {
+    }
+
+    template <typename AttrType> bool setAttribute(std::string attrName, AttrType newValue)
+    {
+        MStatus findPlugStatus;
+        MPlug   plug = _makeNurbNode.findPlug(MString(attrName.c_str()), true, &findPlugStatus);
+        if (!findPlugStatus) {
+            return false;
+        }
+        return plug.setValue(newValue);
+    }
+
+private:
+    MFnDependencyNode& _makeNurbNode;
+};
+
+FindPrimPredicate getNurbPrimPredicate(const std::string& nurbShapeName, const TfToken& primType)
+{
+    return [nurbShapeName,
+            primType](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
+        if (primPath.GetParentPath().GetElementString() != nurbShapeName) {
+            return false;
+        }
+        HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
+        return prim.primType == primType;
+    };
 }
+
+void CompareDataSource(HdDataSourceBaseHandle dataSource, std::filesystem::path referencePath)
+{
+    std::stringstream dataSourceDump;
+    HdDebugPrintDataSource(dataSourceDump, dataSource);
+
+    /*std::ofstream outFile(referencePath.filename());
+    HdDebugPrintDataSource(outFile, dataSource);*/
+
+    std::stringstream referenceDump;
+    std::ifstream referenceFile(referencePath);
+    referenceDump << referenceFile.rdbuf();
+    
+    EXPECT_EQ(dataSourceDump.str(), referenceDump.str())
+        << "Data source dump does not match reference.";
+}
+
+void DumpDataSourceToFile(HdDataSourceBaseHandle dataSource, std::filesystem::path dumpPath)
+{
+    std::ofstream dumpFile(dumpPath);
+    HdDebugPrintDataSource(dumpFile, dataSource);
+}
+} // namespace
 
 TEST(NurbsPrimitives, nurbsSphere)
 {
-    // Setup inspector for the first scene index
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
-    // Retrieve the sphere prim
-    FindPrimPredicate findSpherePredicate
-        = [](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
-        HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
-        if (prim.primType != HdPrimTypeTokens->mesh) {
-            return false;
-        }
-        bool parentIsNurbsSphereShape
-            = MakeRelativeToParentPath(primPath.GetParentPath()).GetAsString().find("nurbsSphereShape") != std::string::npos;
-        return parentIsNurbsSphereShape;
-    };
-    PrimEntriesVector foundPrims = inspector.FindPrims(findSpherePredicate, 1);
+    PrimEntriesVector foundPrims = inspector.FindPrims(getNurbPrimPredicate("nurbsSphereShape1", HdPrimTypeTokens->mesh));
     ASSERT_EQ(foundPrims.size(), 1u);
-    HdSceneIndexPrim spherePrim = foundPrims.front().prim;
-    EXPECT_TRUE(spherePrim.primType != TfToken());
-    EXPECT_TRUE(spherePrim.dataSource != nullptr);
+    HdSceneIndexPrim meshPrim = foundPrims.front().prim;
+    EXPECT_TRUE(meshPrim.primType != TfToken());
+    EXPECT_TRUE(meshPrim.dataSource != nullptr);
 
-    MDagPath sphereDagPath;
+
+    HdDataSourceBaseHandle topologyDataSource
+        = HdContainerDataSource::Get(meshPrim.dataSource, topologyLocator);
+    HdDataSourceBaseHandle pointsDataSource
+        = HdContainerDataSource::Get(meshPrim.dataSource, pointsLocator);
+
+    std::filesystem::path topologyPath = "D:/dev/maya-hydra-oss/maya-hydra/test/testSamples/"
+                                         "testNurbsPrimitives/topologyDataSource.txt";
+    std::filesystem::path pointsPath = "D:/dev/maya-hydra-oss/maya-hydra/test/testSamples/"
+                                       "testNurbsPrimitives/pointsDataSource.txt";
+
+    CompareDataSource(topologyDataSource, topologyPath);
+    CompareDataSource(pointsDataSource, pointsPath);
+
+    /*CompareDataSource(
+        meshPrim.dataSource,
+        "D:/dev/maya-hydra-oss/maya-hydra/test/testSamples/testNurbsPrimitives/"
+        "sphere_topology_new.txt");*/
+
+    /*MDagPath sphereDagPath;
     ASSERT_TRUE(GetDagPathFromNodeName("nurbsSphere1", sphereDagPath));
     sphereDagPath.extendToShape();
 
-    MStatus nurbsResult;
-    MFnNurbsSurface nurbsSphere(sphereDagPath.node(), &nurbsResult);
+    MStatus         nurbsResult;
+    MFnNurbsSurface nurbsSphere(sphereDagPath.node(), &nurbsResult);*/
+
+    /*MDagPath makeNurbSpherePath;
+    ASSERT_TRUE(GetDagPathFromNodeName("makeNurbSphere1", makeNurbSpherePath));
+    MStatus           makeNurbNodeStatus;
+    MFnDependencyNode makeNurbNode = makeNurbSpherePath.node(&makeNurbNodeStatus);
+    ASSERT_TRUE(makeNurbNodeStatus);
+    NurbMaker         nurbMaker(makeNurbNode);*/
+    //nurbMaker.setAttribute("potato", 10);
 }
