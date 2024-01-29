@@ -31,7 +31,6 @@
 #include <iostream>
 
 namespace {
-std::pair<int, char**> testingArgs { 0, nullptr };
 std::filesystem::path  testInputDir;
 std::filesystem::path  testOutputDir;
 }
