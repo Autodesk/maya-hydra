@@ -251,10 +251,6 @@ PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
 
-void setTestingArgs(int argc, char** argv) { testingArgs = { argc, argv }; }
-
-std::pair<int, char**> getTestingArgs() { return testingArgs; }
-
 void setInputDir(std::filesystem::path inputDir) { testInputDir = inputDir; }
 
 std::filesystem::path getInputDir() {

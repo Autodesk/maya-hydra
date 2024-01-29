@@ -35,46 +35,26 @@ constexpr auto _inputDirLong = "-inputDir";
 constexpr auto _outputDir = "-od";
 constexpr auto _outputDirLong = "-outputDir";
 
-MStringArray constructGoogleTestArgs(const MArgDatabase& database)
+std::vector<std::string> constructGoogleTestArgs(const MArgDatabase& database)
 {
+    std::vector<std::string> args;
+    args.emplace_back("mayahydra_tests");
+
     MString filter = "*";
     if (database.isFlagSet(_filter)) {
-        if (database.getFlagArgument(_filter, 0, filter)) { }
+        database.getFlagArgument(_filter, 0, filter);
     }
+    ::testing::GTEST_FLAG(filter) = filter.asChar();
 
     MString inputDir;
-    if (database.isFlagSet(_inputDir)) {
-        if (database.getFlagArgument(_inputDir, 0, inputDir)) {
-            MayaHydra::setInputDir(inputDir.asChar());
-        }
+    if (database.isFlagSet(_inputDir) && database.getFlagArgument(_inputDir, 0, inputDir)) {
+        MayaHydra::setInputDir(inputDir.asChar());
     }
 
     MString outputDir;
-    if (database.isFlagSet(_outputDir)) {
-        if (database.getFlagArgument(_outputDir, 0, outputDir)) {
-            MayaHydra::setOutputDir(outputDir.asChar());
-        }
+    if (database.isFlagSet(_outputDir) && database.getFlagArgument(_outputDir, 0, outputDir)) {
+        MayaHydra::setOutputDir(outputDir.asChar());
     }
-
-    MStringArray args;
-    MStatus      status = database.getObjects(args);
-    CHECK_MSTATUS_AND_RETURN(status, MStringArray());
-
-    // As per https://github.com/google/googletest/issues/3395
-    // the InitGoogleTest() check verifies that the argv passed to it has at
-    // least one argument, otherwise it emits the following warning:
-    //
-    // IMPORTANT NOTICE - DO NOT IGNORE:
-    // This test program did NOT call testing::InitGoogleTest() before calling RUN_ALL_TESTS(). This
-    // is INVALID. Soon Google Test will start to enforce the valid usage. Please fix it ASAP, or IT
-    // WILL START TO FAIL.
-    //
-    // Therefore, add a dummy argument if required.
-    if (args.length() == 0) {
-        args.append("dummy");
-    }
-
-    ::testing::GTEST_FLAG(filter) = filter.asChar();
 
     return args;
 }
@@ -101,15 +81,14 @@ MStatus mayaHydraCppTestCmd::doIt(const MArgList& args)
 
     auto arguments = constructGoogleTestArgs(db);
 
-    char**  argv = new char*[arguments.length()];
-    int32_t argc(arguments.length());
+    char**  argv = new char*[arguments.size()];
+    int32_t argc(arguments.size());
     for (int32_t i = 0; i < argc; ++i) {
-        argv[i] = (char*)arguments[i].asChar();
+        argv[i] = (char*)arguments[i].c_str();
     }
 
     // By default, if no filter flag is given, all tests will run
     ::testing::InitGoogleTest(&argc, argv);
-    MayaHydra::setTestingArgs(argc, argv);
     if (RUN_ALL_TESTS() == 0 && ::testing::UnitTest::GetInstance()->test_to_run_count() > 0) {
         MGlobal::displayInfo("This test passed.");
         return MS::kSuccess;
