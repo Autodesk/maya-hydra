@@ -24,8 +24,6 @@
 
 #include <gtest/gtest.h>
 
-#include <filesystem>
-
 namespace 
 {
 constexpr auto _filter = "-f";

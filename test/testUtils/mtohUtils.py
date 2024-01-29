@@ -25,7 +25,6 @@ import testUtils
 from imageUtils import ImageDiffingTestCase
 from testUtils import PluginLoaded
 
-
 import sys
 
 HD_STORM = "HdStormRendererPlugin"
