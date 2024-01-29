@@ -250,8 +250,6 @@ PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
 
-void setInputDir(std::filesystem::path inputDir) { testInputDir = inputDir; }
-
 std::filesystem::path getInputDir() {
     if (testInputDir.empty()) {
         throw std::invalid_argument("Attempted to access test input directory but it was not specified.");
@@ -259,7 +257,7 @@ std::filesystem::path getInputDir() {
     return testInputDir;
 }
 
-void setOutputDir(std::filesystem::path outputDir) { testOutputDir = outputDir; }
+void setInputDir(std::filesystem::path inputDir) { testInputDir = inputDir; }
 
 std::filesystem::path getOutputDir() {
     if (testOutputDir.empty()) {
@@ -267,6 +265,8 @@ std::filesystem::path getOutputDir() {
     }
     return testOutputDir;
 }
+
+void setOutputDir(std::filesystem::path outputDir) { testOutputDir = outputDir; }
 
 std::filesystem::path getPathToSample(std::string filename) { return getInputDir() / filename; }
 
