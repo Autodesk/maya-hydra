@@ -10,7 +10,7 @@ if(MayaUsd_FOUND)
         set(MAYA_MODULE_PATH "${CURRENT_MAYA_MODULE_PATH}:${MAYAUSD_MOD_PATH}")
     else()
         #Windows
-        set(MAYA_MODULE_PATH "${CURRENT_MAYA_MODULE_PATH};${MAYAUSD_MOD_PATH}")
+        set(MAYA_MODULE_PATH "${CURRENT_MAYA_MODULE_PATH}\;${MAYAUSD_MOD_PATH}")
     endif()
     # Export the new value to the environment
     set(ENV{MAYA_MODULE_PATH} ${MAYA_MODULE_PATH})
