@@ -23,6 +23,8 @@ import maya.mel
 import fixturesUtils
 import testUtils
 from imageUtils import ImageDiffingTestCase
+from testUtils import PluginLoaded
+
 
 import sys
 
@@ -125,8 +127,12 @@ class MayaHydraBaseTestCase(unittest.TestCase):
     def traceIndex(self, msg):
         self.trace(msg.format(str(self.getIndex())))
 
+    def runCppTest(self, testFilter: str):
+        with PluginLoaded("mayaHydraCppTests"):
+            cmds.mayaHydraCppTest(f=testFilter)
+
 class MtohTestCase(MayaHydraBaseTestCase, ImageDiffingTestCase):
-    '''Base class for mayaHydra unit tests with image comparison.'''
+    '''Base class for mayaHydra unit tests with file comparison.'''
 
     _inputDir = None
 
@@ -179,3 +185,7 @@ class MtohTestCase(MayaHydraBaseTestCase, ImageDiffingTestCase):
         '''Use of this method is discouraged, as renders can vary slightly between renderer architectures.'''
         refImage = self.resolveRefImage(refImage, imageVersion)
         super(MtohTestCase, self).assertSnapshotEqual(refImage)
+
+    def runCppTest(self, testFilter: str):
+        with PluginLoaded("mayaHydraCppTests"):
+            cmds.mayaHydraCppTest(f=testFilter, inputDir=self._inputDir, outputDir=self._testDir)

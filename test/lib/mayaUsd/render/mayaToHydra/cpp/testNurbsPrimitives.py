@@ -17,7 +17,7 @@ import fixturesUtils
 import mtohUtils
 from testUtils import PluginLoaded
 
-class TestNurbsPrimitives(mtohUtils.MayaHydraBaseTestCase):
+class TestNurbsPrimitives(mtohUtils.MtohTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -29,8 +29,7 @@ class TestNurbsPrimitives(mtohUtils.MayaHydraBaseTestCase):
 
     def test_NurbsTorus(self):
         self.setupScene()
-        with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(f="NurbsPrimitives.nurbsTorus")
+        self.runCppTest("NurbsPrimitives.nurbsTorus")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
