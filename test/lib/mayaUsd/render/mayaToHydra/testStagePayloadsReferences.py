@@ -153,9 +153,9 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MtohTestCase): #Subclassing mt
         shapeNode = "FlowerPotShape"
         shapeStage = mayaUsdLib.GetPrim(shapeNode).GetStage()
         rootPrim = shapeStage.GetPrimAtPath('/FlowerPot')
-        self.assertFalse(rootPrim== None)
+        self.assertIsNotNone(rootPrim)
         modVariant = rootPrim.GetVariantSet('modelingVariant')
-        self.assertFalse(modVariant== None)
+        self.assertIsNotNone(modVariant)
         self.assertEqual(modVariant.GetVariantSelection(), 'FlowerPotA')
         
         modVariant.SetVariantSelection('FlowerPotB')
