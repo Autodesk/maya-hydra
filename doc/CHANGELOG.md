@@ -1,5 +1,30 @@
 # Changelog
 
+## [v0.6.0] - 2024-01-29
+
+**Build:**
+* Avoid Boost autolinking libraries [#34](https://github.com/Autodesk/maya-hydra/pull/34)
+* Update mayahydra_version.info [#25](https://github.com/Autodesk/maya-hydra/pull/25)
+
+**Documentation:**
+* Update build doc & script [#37](https://github.com/Autodesk/maya-hydra/pull/37)
+
+**Miscellaneous:**
+* Fix Broken Link [#44](https://github.com/Autodesk/maya-hydra/pull/44)
+* Make sure skydome light is not turned off unexpectedly [#41](https://github.com/Autodesk/maya-hydra/pull/41)
+* Remove the usage of the "fit" on a node in a directional … [#40](https://github.com/Autodesk/maya-hydra/pull/40)
+* Fix the double transform issue on instanced prims [#39](https://github.com/Autodesk/maya-hydra/pull/39)
+* Add prim instancing unit test [#33](https://github.com/Autodesk/maya-hydra/pull/33)
+* Rename the env var to avoid duplication [#32](https://github.com/Autodesk/maya-hydra/pull/32)
+* Fix testFlowViewportAPI image diff thresholds [#31](https://github.com/Autodesk/maya-hydra/pull/31)
+* Fix for Maya Lighting mode not working [#30](https://github.com/Autodesk/maya-hydra/pull/30)
+* Remove idiff workaround [#29](https://github.com/Autodesk/maya-hydra/pull/29)
+* Fix scene browser crash when adding same prim multiple times [#28](https://github.com/Autodesk/maya-hydra/pull/28)
+* Add missing rpaths to mayaHydraSceneBrowser [#27](https://github.com/Autodesk/maya-hydra/pull/27)
+* Selection change functors now take scene index as argument [#26](https://github.com/Autodesk/maya-hydra/pull/26)
+* Tremblp/hydra 651/rename selection interface [#24](https://github.com/Autodesk/maya-hydra/pull/24)
+* Fix added prims being at the wrong place when saving/loading a scene [#23](https://github.com/Autodesk/maya-hydra/pull/23)
+
 ## [v0.5.0] - 2023-12-07
 
 **Build:**
