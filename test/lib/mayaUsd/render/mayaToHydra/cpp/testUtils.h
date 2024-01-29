@@ -330,7 +330,6 @@ void setOutputDir(std::filesystem::path outputDir);
  */
 std::filesystem::path getPathToSample(std::string filename);
 
-
 /**
  * @brief Compares a data source text dump to a reference dump. The text dump will be also be written 
  * to a file in the output directory for debugging purposes.

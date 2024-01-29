@@ -49,21 +49,6 @@ namespace {
 HdDataSourceLocator topologyLocator = HdMeshSchema::GetTopologyLocator();
 HdDataSourceLocator pointsLocator = HdPrimvarsSchema::GetPointsLocator();
 
-template <typename AttrType> bool setAttribute(MObject node, std::string attrName, AttrType newValue)
-{
-    MStatus           dependencyNodeStatus;
-    MFnDependencyNode dependencyNode(node, &dependencyNodeStatus);
-    if (!dependencyNodeStatus) {
-        return false;
-    }
-    MStatus plugStatus;
-    MPlug   plug = dependencyNode.findPlug(attrName.c_str(), true, &plugStatus);
-    if (!plugStatus) {
-        return false;
-    }
-    return plug.setValue(newValue);
-}
-
 FindPrimPredicate getNurbPrimPredicate(const std::string& nurbShapeName, const TfToken& primType)
 {
     return [nurbShapeName,
@@ -102,14 +87,14 @@ TEST(NurbsPrimitives, nurbsTorus)
 
     MObject makeNurbNode;
     ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbTorus1", makeNurbNode));
-    EXPECT_TRUE(setAttribute(makeNurbNode, "startSweep", 50));
-    EXPECT_TRUE(setAttribute(makeNurbNode, "endSweep", 300));
-    EXPECT_TRUE(setAttribute(makeNurbNode, "radius", 2));
-    EXPECT_TRUE(setAttribute(makeNurbNode, "degree", 1));
-    EXPECT_TRUE(setAttribute(makeNurbNode, "sections", 12));
-    EXPECT_TRUE(setAttribute(makeNurbNode, "spans", 6));
-    EXPECT_TRUE(setAttribute(makeNurbNode, "heightRatio", 0.8f));
-    EXPECT_TRUE(setAttribute(makeNurbNode, "minorSweep", 250));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "startSweep", 50));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "endSweep", 300));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "radius", 2));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "degree", 1));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "sections", 12));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "spans", 6));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "heightRatio", 0.8f));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "minorSweep", 250));
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
@@ -117,8 +102,8 @@ TEST(NurbsPrimitives, nurbsTorus)
     EXPECT_TRUE(dataSourceMatchesReference(
         pointsDataSource, getPathToSample("torus_pointsDataSource_modified.txt")));
 
-    EXPECT_TRUE(setAttribute(makeNurbNode, "useTolerance", true));
-    EXPECT_TRUE(setAttribute(makeNurbNode, "tolerance", 0.05f));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "useTolerance", true));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "tolerance", 0.05f));
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
