@@ -67,7 +67,6 @@ MSyntax mayaHydraCppTestCmd::createSyntax()
     syntax.addFlag(_filter, _filterLong, MSyntax::kString);
     syntax.addFlag(_inputDir, _inputDirLong, MSyntax::kString);
     syntax.addFlag(_outputDir, _outputDirLong, MSyntax::kString);
-    syntax.setObjectType(MSyntax::kStringObjects);
     return syntax;
 }
 
