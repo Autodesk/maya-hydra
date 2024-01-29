@@ -38,6 +38,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <iterator>
+#include <optional>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -48,27 +49,20 @@ namespace {
 HdDataSourceLocator topologyLocator = HdMeshSchema::GetTopologyLocator();
 HdDataSourceLocator pointsLocator = HdPrimvarsSchema::GetPointsLocator();
 
-class NurbMaker
+template <typename AttrType> bool setAttribute(MObject node, std::string attrName, AttrType newValue)
 {
-public:
-    NurbMaker(MFnDependencyNode& makeNurbNode)
-        : _makeNurbNode(makeNurbNode)
-    {
+    MStatus           dependencyNodeStatus;
+    MFnDependencyNode dependencyNode(node, &dependencyNodeStatus);
+    if (!dependencyNodeStatus) {
+        return false;
     }
-
-    template <typename AttrType> bool setAttribute(std::string attrName, AttrType newValue)
-    {
-        MStatus findPlugStatus;
-        MPlug   plug = _makeNurbNode.findPlug(MString(attrName.c_str()), true, &findPlugStatus);
-        if (!findPlugStatus) {
-            return false;
-        }
-        return plug.setValue(newValue);
+    MStatus plugStatus;
+    MPlug   plug = dependencyNode.findPlug(attrName.c_str(), true, &plugStatus);
+    if (!plugStatus) {
+        return false;
     }
-
-private:
-    MFnDependencyNode& _makeNurbNode;
-};
+    return plug.setValue(newValue);
+}
 
 FindPrimPredicate getNurbPrimPredicate(const std::string& nurbShapeName, const TfToken& primType)
 {
@@ -82,20 +76,33 @@ FindPrimPredicate getNurbPrimPredicate(const std::string& nurbShapeName, const T
     };
 }
 
+std::filesystem::path kSamplesPath = "D:/dev/maya-hydra-oss/maya-hydra/test/testSamples/testNurbsPrimitives";
+
+std::filesystem::path GetPathToSample(std::string sampleFilename)
+{
+    return kSamplesPath / sampleFilename;
+}
+
 void CompareDataSource(HdDataSourceBaseHandle dataSource, std::filesystem::path referencePath)
 {
-    std::stringstream dataSourceDump;
-    HdDebugPrintDataSource(dataSourceDump, dataSource);
+    // We'll dump the data source to a file and then read it. We could just dump the data source
+    // to a stringstream directly, but if the tests start failing, inspecting the console logs
+    // is much more tedious than having a separate file to look at. We could also dump to a file
+    // and a stringstream separately, but this would make the file dump and the dump used for
+    // testing independent from each other, so they could have unrelated issues. Dumping to a 
+    // file and reading from it ensures that the file both exists and is in line with what is 
+    // being used for the test.
+    std::fstream testFile(referencePath.filename());
+    HdDebugPrintDataSource(testFile, dataSource);
+    testFile.seekg(0, testFile.beg);
+    std::stringstream testDump;
+    testDump << testFile.rdbuf();
 
-    /*std::ofstream outFile(referencePath.filename());
-    HdDebugPrintDataSource(outFile, dataSource);*/
-
-    std::stringstream referenceDump;
     std::ifstream referenceFile(referencePath);
+    std::stringstream referenceDump;
     referenceDump << referenceFile.rdbuf();
-    
-    EXPECT_EQ(dataSourceDump.str(), referenceDump.str())
-        << "Data source dump does not match reference.";
+
+    EXPECT_EQ(testDump.str(), referenceDump.str()) << "Data source dump does not match reference.";
 }
 
 void DumpDataSourceToFile(HdDataSourceBaseHandle dataSource, std::filesystem::path dumpPath)
@@ -105,55 +112,45 @@ void DumpDataSourceToFile(HdDataSourceBaseHandle dataSource, std::filesystem::pa
 }
 } // namespace
 
-TEST(NurbsPrimitives, nurbsSphere)
+TEST(NurbsPrimitives, nurbsTorus)
 {
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
-    PrimEntriesVector foundPrims = inspector.FindPrims(getNurbPrimPredicate("nurbsSphereShape1", HdPrimTypeTokens->mesh));
+    PrimEntriesVector foundPrims = inspector.FindPrims(getNurbPrimPredicate("nurbsTorusShape1", HdPrimTypeTokens->mesh));
     ASSERT_EQ(foundPrims.size(), 1u);
     HdSceneIndexPrim meshPrim = foundPrims.front().prim;
     EXPECT_TRUE(meshPrim.primType != TfToken());
-    EXPECT_TRUE(meshPrim.dataSource != nullptr);
-
+    ASSERT_TRUE(meshPrim.dataSource != nullptr);
 
     HdDataSourceBaseHandle topologyDataSource
         = HdContainerDataSource::Get(meshPrim.dataSource, topologyLocator);
     HdDataSourceBaseHandle pointsDataSource
         = HdContainerDataSource::Get(meshPrim.dataSource, pointsLocator);
 
-    std::filesystem::path topologyPath = "D:/dev/maya-hydra-oss/maya-hydra/test/testSamples/"
-                                         "testNurbsPrimitives/topologyDataSource.txt";
-    std::filesystem::path pointsPath = "D:/dev/maya-hydra-oss/maya-hydra/test/testSamples/"
-                                       "testNurbsPrimitives/pointsDataSource.txt";
-
-    CompareDataSource(topologyDataSource, topologyPath);
-    CompareDataSource(pointsDataSource, pointsPath);
-
-    /*CompareDataSource(
-        meshPrim.dataSource,
-        "D:/dev/maya-hydra-oss/maya-hydra/test/testSamples/testNurbsPrimitives/"
-        "sphere_topology_new.txt");*/
-
-    /*MDagPath sphereDagPath;
-    ASSERT_TRUE(GetDagPathFromNodeName("nurbsSphere1", sphereDagPath));
-    sphereDagPath.extendToShape();
-
-    MStatus         nurbsResult;
-    MFnNurbsSurface nurbsSphere(sphereDagPath.node(), &nurbsResult);*/
+    CompareDataSource(topologyDataSource, GetPathToSample("torus_topologyDataSource_fresh.txt"));
+    CompareDataSource(pointsDataSource, GetPathToSample("torus_pointsDataSource_fresh.txt"));
 
     MObject makeNurbNode;
-    ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbSphere1", makeNurbNode));
-    MStatus makeNurbNodeFnStatus;
-    MFnDependencyNode makeNurbNodeFn(makeNurbNode, &makeNurbNodeFnStatus);
-    ASSERT_TRUE(makeNurbNodeFnStatus);
-    NurbMaker nurbMaker(makeNurbNodeFn);
-    
-    EXPECT_TRUE(nurbMaker.setAttribute("radius", 10));
+    ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbTorus1", makeNurbNode));
+    EXPECT_TRUE(setAttribute(makeNurbNode, "startSweep", 50));
+    EXPECT_TRUE(setAttribute(makeNurbNode, "endSweep", 300));
+    EXPECT_TRUE(setAttribute(makeNurbNode, "radius", 2));
+    EXPECT_TRUE(setAttribute(makeNurbNode, "degree", 1));
+    EXPECT_TRUE(setAttribute(makeNurbNode, "sections", 12));
+    EXPECT_TRUE(setAttribute(makeNurbNode, "spans", 6));
+    EXPECT_TRUE(setAttribute(makeNurbNode, "heightRatio", 0.8f));
+    EXPECT_TRUE(setAttribute(makeNurbNode, "minorSweep", 250));
+    EXPECT_TRUE(M3dView::active3dView().refresh());
 
-    M3dView::active3dView().refresh();
+    CompareDataSource(topologyDataSource, GetPathToSample("torus_topologyDataSource_modified.txt"));
+    CompareDataSource(pointsDataSource, GetPathToSample("torus_pointsDataSource_modified.txt"));
 
-    //CompareDataSource(topologyDataSource, topologyPath);
-    //CompareDataSource(pointsDataSource, pointsPath);
+    EXPECT_TRUE(setAttribute(makeNurbNode, "useTolerance", true));
+    EXPECT_TRUE(setAttribute(makeNurbNode, "tolerance", 0.05f));
+    EXPECT_TRUE(M3dView::active3dView().refresh());
+
+    CompareDataSource(topologyDataSource, GetPathToSample("torus_topologyDataSource_tolerance.txt"));
+    CompareDataSource(pointsDataSource, GetPathToSample("torus_pointsDataSource_tolerance.txt"));
 }

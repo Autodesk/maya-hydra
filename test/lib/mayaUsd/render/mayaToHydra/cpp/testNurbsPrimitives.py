@@ -24,13 +24,13 @@ class TestNurbsPrimitives(mtohUtils.MayaHydraBaseTestCase):
     def setupScene(self):
         self.setHdStormRenderer()
         cmds.loadPlugin('ArubaTessellator')
-        cmds.sphere()
+        cmds.torus()
         cmds.refresh()
 
-    def test_NurbsSphere(self):
+    def test_NurbsTorus(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(f="NurbsPrimitives.nurbsSphere")
+            cmds.mayaHydraCppTest(f="NurbsPrimitives.nurbsTorus")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
