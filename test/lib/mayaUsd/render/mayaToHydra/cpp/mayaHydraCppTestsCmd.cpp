@@ -79,7 +79,7 @@ MStatus mayaHydraCppTestCmd::doIt(const MArgList& args)
         return status;
     }
 
-    auto arguments = constructGoogleTestArgs(db);
+    std::vector<std::string> arguments = constructGoogleTestArgs(db);
 
     char**  argv = new char*[arguments.size()];
     int32_t argc(arguments.size());
