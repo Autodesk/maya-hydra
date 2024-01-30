@@ -75,8 +75,8 @@ TEST(NurbsPrimitives, nurbsTorus)
         = inspector.FindPrims(getNurbPrimPredicate("nurbsTorus1", HdPrimTypeTokens->mesh));
     ASSERT_EQ(foundPrims.size(), 1u);
     HdSceneIndexPrim torusPrim = foundPrims.front().prim;
-    EXPECT_TRUE(torusPrim.primType != TfToken());
-    ASSERT_TRUE(torusPrim.dataSource != nullptr);
+    EXPECT_EQ(torusPrim.primType, HdPrimTypeTokens->mesh);
+    ASSERT_NE(torusPrim.dataSource, nullptr);
 
     EXPECT_TRUE(dataSourceMatchesReference(
         HdContainerDataSource::Get(torusPrim.dataSource, meshTopologyLocator),
@@ -128,8 +128,8 @@ TEST(NurbsPrimitives, nurbsCube)
 
     auto testPlanePrims = [planePrims](std::string testSuffix) -> void {
         for (PrimEntry planePrim : planePrims) {
-            EXPECT_TRUE(planePrim.prim.primType != TfToken());
-            ASSERT_TRUE(planePrim.prim.dataSource != nullptr);
+            EXPECT_EQ(planePrim.prim.primType, HdPrimTypeTokens->mesh);
+            ASSERT_NE(planePrim.prim.dataSource, nullptr);
             EXPECT_TRUE(dataSourceMatchesReference(
                 HdContainerDataSource::Get(planePrim.prim.dataSource, meshTopologyLocator),
                 getPathToSample(
@@ -168,8 +168,8 @@ TEST(NurbsPrimitives, nurbsCircle)
         = inspector.FindPrims(getNurbPrimPredicate("nurbsCircle1", HdPrimTypeTokens->basisCurves));
     ASSERT_EQ(foundPrims.size(), 1u);
     HdSceneIndexPrim circlePrim = foundPrims.front().prim;
-    EXPECT_TRUE(circlePrim.primType != TfToken());
-    ASSERT_TRUE(circlePrim.dataSource != nullptr);
+    EXPECT_EQ(circlePrim.primType, HdPrimTypeTokens->basisCurves);
+    ASSERT_NE(circlePrim.dataSource, nullptr);
 
     EXPECT_TRUE(dataSourceMatchesReference(
         HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator),
@@ -236,8 +236,8 @@ TEST(NurbsPrimitives, nurbsSquare)
 
     auto testLinePrims = [linePrims](std::string testSuffix) -> void {
         for (PrimEntry linePrim : linePrims) {
-            EXPECT_TRUE(linePrim.prim.primType != TfToken());
-            ASSERT_TRUE(linePrim.prim.dataSource != nullptr);
+            EXPECT_EQ(linePrim.prim.primType, HdPrimTypeTokens->basisCurves);
+            ASSERT_NE(linePrim.prim.dataSource, nullptr);
             EXPECT_TRUE(dataSourceMatchesReference(
                 HdContainerDataSource::Get(linePrim.prim.dataSource, curvesTopologyLocator),
                 getPathToSample(
