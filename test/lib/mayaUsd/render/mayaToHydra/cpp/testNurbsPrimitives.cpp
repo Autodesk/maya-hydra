@@ -24,22 +24,8 @@
 #include <pxr/imaging/hd/tokens.h>
 
 #include <maya/M3dView.h>
-#include <maya/MFnDependencyNode.h>
-#include <maya/MFnMesh.h>
-#include <maya/MFnNurbsSurface.h>
-#include <maya/MObject.h>
-#include <maya/MPlug.h>
-#include <maya/MPxNode.h>
-#include <maya/MViewport2Renderer.h>
 
 #include <gtest/gtest.h>
-
-#include <algorithm>
-#include <filesystem>
-#include <iterator>
-#include <optional>
-#include <sstream>
-#include <string>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
