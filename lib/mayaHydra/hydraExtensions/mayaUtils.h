@@ -21,6 +21,8 @@
 #include <mayaHydraLib/mayaHydra.h>
 
 #include <maya/MApiNamespace.h>
+#include <maya/MFnDependencyNode.h>
+#include <maya/MPlug.h>
 
 #include <string>
 
