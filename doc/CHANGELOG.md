@@ -11,7 +11,7 @@
 **Miscellaneous:**
 * Fix Broken Link [#44](https://github.com/Autodesk/maya-hydra/pull/44)
 * Make sure skydome light is not turned off unexpectedly [#41](https://github.com/Autodesk/maya-hydra/pull/41)
-* Remove the usage of the "fit" mode for directional lights [#40](https://github.com/Autodesk/maya-hydra/pull/40)
+* Remove the usage of the "fit" mode for directional light unit test [#40](https://github.com/Autodesk/maya-hydra/pull/40)
 * Fix the double transform issue on instanced prims [#39](https://github.com/Autodesk/maya-hydra/pull/39)
 * Add prim instancing unit test [#33](https://github.com/Autodesk/maya-hydra/pull/33)
 * Rename the env var to avoid duplication [#32](https://github.com/Autodesk/maya-hydra/pull/32)
