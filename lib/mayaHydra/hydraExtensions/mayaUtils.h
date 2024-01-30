@@ -143,14 +143,14 @@ bool IsAMayaTransformAttributeName(const MString& attrName);
 bool IsAMayaVisibilityAttribute(const MPlug& plug, bool& outVal);
 
 /**
-* @brief Set the value of a DG node attribute.
-* 
-* @param[in] node The Maya node for which to modify the attribute
-* @param[in] attrName The attribute name to modify
-* @param[in] newValue The value to set the attribute to
-* 
-* @return True if the attribute was successfully modified, false otherwise.
-*/
+ * @brief Set the value of a DG node attribute.
+ *
+ * @param[in] node The Maya node for which to modify the attribute
+ * @param[in] attrName The attribute name to modify
+ * @param[in] newValue The value to set the attribute to
+ *
+ * @return True if the attribute was successfully modified, false otherwise.
+ */
 template <typename AttrType>
 bool SetNodeAttribute(MObject node, std::string attrName, AttrType newValue)
 {

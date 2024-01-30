@@ -325,24 +325,24 @@ void setOutputDir(std::filesystem::path outputDir);
  * @brief Get the full path to a test sample file.
  *
  * @param[in] filename Name of the sample file (including its extension, if any).
- * 
+ *
  * @return Full path to the sample file.
  */
 std::filesystem::path getPathToSample(std::string filename);
 
 /**
- * @brief Compares a data source text dump to a reference dump. The text dump will be also be written 
- * to a file in the output directory for debugging purposes.
+ * @brief Compares a data source text dump to a reference dump. The text dump will be also be
+ * written to a file in the output directory.
  *
  * @param[in] dataSource The data source to dump and compare to a reference.
  * @param[in] referencePath The path to the reference dump file.
- * 
+ *
  * @return Whether the data source dump matches the reference dump.
  */
 bool dataSourceMatchesReference(
     PXR_NS::HdDataSourceBaseHandle dataSource,
     std::filesystem::path          referencePath);
 
-}
+} // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRA_TEST_UTILS_H

@@ -16,11 +16,11 @@
 
 #include "testUtils.h"
 
-#include <maya/MString.h>
-#include <maya/MFnPlugin.h>
 #include <maya/MArgDatabase.h>
-#include <maya/MSyntax.h>
+#include <maya/MFnPlugin.h>
 #include <maya/MGlobal.h>
+#include <maya/MString.h>
+#include <maya/MSyntax.h>
 
 #include <gtest/gtest.h>
 
