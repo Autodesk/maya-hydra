@@ -21,15 +21,19 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    def setupScene(self):
+    def setupScene(self, nurbsCreationCallable):
         self.setHdStormRenderer()
         cmds.loadPlugin('ArubaTessellator')
-        cmds.torus()
+        nurbsCreationCallable()
         cmds.refresh()
 
     def test_NurbsTorus(self):
-        self.setupScene()
+        self.setupScene(cmds.torus)
         self.runCppTest("NurbsPrimitives.nurbsTorus")
+
+    def test_NurbsCube(self):
+        self.setupScene(cmds.nurbsCube)
+        self.runCppTest("NurbsPrimitives.nurbsCube")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

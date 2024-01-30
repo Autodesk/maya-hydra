@@ -18,10 +18,11 @@
 #include <mayaHydraLib/hydraUtils.h>
 #include <mayaHydraLib/mayaUtils.h>
 
-#include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/tokens.h>
 
+#include <maya/M3dView.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MFnMesh.h>
 #include <maya/MFnNurbsSurface.h>
@@ -29,16 +30,15 @@
 #include <maya/MPlug.h>
 #include <maya/MPxNode.h>
 #include <maya/MViewport2Renderer.h>
-#include <maya/M3dView.h>
 
 #include <gtest/gtest.h>
 
-#include <sstream>
-#include <string>
-#include <filesystem>
 #include <algorithm>
+#include <filesystem>
 #include <iterator>
 #include <optional>
+#include <sstream>
+#include <string>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -49,11 +49,11 @@ namespace {
 HdDataSourceLocator topologyLocator = HdMeshSchema::GetTopologyLocator();
 HdDataSourceLocator pointsLocator = HdPrimvarsSchema::GetPointsLocator();
 
-FindPrimPredicate getNurbPrimPredicate(const std::string& nurbShapeName, const TfToken& primType)
+FindPrimPredicate getNurbPrimPredicate(const std::string& nurbsName, const TfToken& primType)
 {
-    return [nurbShapeName,
+    return [nurbsName,
             primType](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
-        if (primPath.GetParentPath().GetElementString() != nurbShapeName) {
+        if (primPath.GetAsString().find(nurbsName) == std::string::npos) {
             return false;
         }
         HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
@@ -69,7 +69,8 @@ TEST(NurbsPrimitives, nurbsTorus)
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
-    PrimEntriesVector foundPrims = inspector.FindPrims(getNurbPrimPredicate("nurbsTorusShape1", HdPrimTypeTokens->mesh));
+    PrimEntriesVector foundPrims
+        = inspector.FindPrims(getNurbPrimPredicate("nurbsTorus1", HdPrimTypeTokens->mesh));
     ASSERT_EQ(foundPrims.size(), 1u);
     HdSceneIndexPrim meshPrim = foundPrims.front().prim;
     EXPECT_TRUE(meshPrim.primType != TfToken());
@@ -81,9 +82,9 @@ TEST(NurbsPrimitives, nurbsTorus)
         = HdContainerDataSource::Get(meshPrim.dataSource, pointsLocator);
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        topologyDataSource, getPathToSample("torus_topologyDataSource_fresh.txt")));
-    EXPECT_TRUE(dataSourceMatchesReference(
-        pointsDataSource, getPathToSample("torus_pointsDataSource_fresh.txt")));
+        topologyDataSource, getPathToSample("torus_topology_fresh.txt")));
+    EXPECT_TRUE(
+        dataSourceMatchesReference(pointsDataSource, getPathToSample("torus_points_fresh.txt")));
 
     MObject makeNurbNode;
     ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbTorus1", makeNurbNode));
@@ -98,16 +99,62 @@ TEST(NurbsPrimitives, nurbsTorus)
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        topologyDataSource, getPathToSample("torus_topologyDataSource_modified.txt")));
-    EXPECT_TRUE(dataSourceMatchesReference(
-        pointsDataSource, getPathToSample("torus_pointsDataSource_modified.txt")));
+        topologyDataSource, getPathToSample("torus_topology_modified.txt")));
+    EXPECT_TRUE(
+        dataSourceMatchesReference(pointsDataSource, getPathToSample("torus_points_modified.txt")));
 
     EXPECT_TRUE(SetAttribute(makeNurbNode, "useTolerance", true));
     EXPECT_TRUE(SetAttribute(makeNurbNode, "tolerance", 0.05f));
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        topologyDataSource, getPathToSample("torus_topologyDataSource_tolerance.txt")));
+        topologyDataSource, getPathToSample("torus_topology_tolerance.txt")));
     EXPECT_TRUE(dataSourceMatchesReference(
-        pointsDataSource, getPathToSample("torus_pointsDataSource_tolerance.txt")));
+        pointsDataSource, getPathToSample("torus_points_tolerance.txt")));
+}
+
+TEST(NurbsPrimitives, nurbsCube)
+{
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+    SceneIndexInspector inspector(sceneIndices.front());
+
+    PrimEntriesVector planePrims
+        = inspector.FindPrims(getNurbPrimPredicate("nurbsCube1", HdPrimTypeTokens->mesh));
+    ASSERT_EQ(planePrims.size(), 6u);
+
+    auto testPlanePrims = [planePrims](std::string testSuffix) -> void {
+        for (PrimEntry planePrim : planePrims) {
+            EXPECT_TRUE(planePrim.prim.primType != TfToken());
+            ASSERT_TRUE(planePrim.prim.dataSource != nullptr);
+            HdDataSourceBaseHandle topologyDataSource
+                = HdContainerDataSource::Get(planePrim.prim.dataSource, topologyLocator);
+            HdDataSourceBaseHandle pointsDataSource
+                = HdContainerDataSource::Get(planePrim.prim.dataSource, pointsLocator);
+            EXPECT_TRUE(dataSourceMatchesReference(
+                topologyDataSource,
+                getPathToSample(
+                    "cube_" + planePrim.primPath.GetParentPath().GetElementString() + "_topology_"
+                    + testSuffix + ".txt")));
+            EXPECT_TRUE(dataSourceMatchesReference(
+                pointsDataSource,
+                getPathToSample(
+                    "cube_" + planePrim.primPath.GetParentPath().GetElementString() + "_points_"
+                    + testSuffix + ".txt")));
+        }
+    };
+
+    testPlanePrims("fresh");
+
+    MObject makeNurbNode;
+    ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbCube1", makeNurbNode));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "degree", 1));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "patchesU", 2));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "patchesV", 3));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "width", 4));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "lengthRatio", 5));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "heightRatio", 6));
+    EXPECT_TRUE(M3dView::active3dView().refresh());
+
+    testPlanePrims("modified");
 }
