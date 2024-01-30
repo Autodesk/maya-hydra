@@ -18,6 +18,7 @@
 #include <mayaHydraLib/hydraUtils.h>
 #include <mayaHydraLib/mayaUtils.h>
 
+#include <pxr/imaging/hd/basisCurvesSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
@@ -46,7 +47,8 @@ using namespace MayaHydra;
 
 namespace {
 
-HdDataSourceLocator topologyLocator = HdMeshSchema::GetTopologyLocator();
+HdDataSourceLocator curvesTopologyLocator = HdBasisCurvesSchema::GetTopologyLocator();
+HdDataSourceLocator meshTopologyLocator = HdMeshSchema::GetTopologyLocator();
 HdDataSourceLocator pointsLocator = HdPrimvarsSchema::GetPointsLocator();
 
 FindPrimPredicate getNurbPrimPredicate(const std::string& nurbsName, const TfToken& primType)
@@ -72,19 +74,16 @@ TEST(NurbsPrimitives, nurbsTorus)
     PrimEntriesVector foundPrims
         = inspector.FindPrims(getNurbPrimPredicate("nurbsTorus1", HdPrimTypeTokens->mesh));
     ASSERT_EQ(foundPrims.size(), 1u);
-    HdSceneIndexPrim meshPrim = foundPrims.front().prim;
-    EXPECT_TRUE(meshPrim.primType != TfToken());
-    ASSERT_TRUE(meshPrim.dataSource != nullptr);
-
-    HdDataSourceBaseHandle topologyDataSource
-        = HdContainerDataSource::Get(meshPrim.dataSource, topologyLocator);
-    HdDataSourceBaseHandle pointsDataSource
-        = HdContainerDataSource::Get(meshPrim.dataSource, pointsLocator);
+    HdSceneIndexPrim torusPrim = foundPrims.front().prim;
+    EXPECT_TRUE(torusPrim.primType != TfToken());
+    ASSERT_TRUE(torusPrim.dataSource != nullptr);
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        topologyDataSource, getPathToSample("torus_topology_fresh.txt")));
-    EXPECT_TRUE(
-        dataSourceMatchesReference(pointsDataSource, getPathToSample("torus_points_fresh.txt")));
+        HdContainerDataSource::Get(torusPrim.dataSource, meshTopologyLocator),
+        getPathToSample("torus_topology_fresh.txt")));
+    EXPECT_TRUE(dataSourceMatchesReference(
+        HdContainerDataSource::Get(torusPrim.dataSource, pointsLocator),
+        getPathToSample("torus_points_fresh.txt")));
 
     MObject makeNurbNode;
     ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbTorus1", makeNurbNode));
@@ -99,18 +98,22 @@ TEST(NurbsPrimitives, nurbsTorus)
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        topologyDataSource, getPathToSample("torus_topology_modified.txt")));
-    EXPECT_TRUE(
-        dataSourceMatchesReference(pointsDataSource, getPathToSample("torus_points_modified.txt")));
+        HdContainerDataSource::Get(torusPrim.dataSource, meshTopologyLocator),
+        getPathToSample("torus_topology_modified.txt")));
+    EXPECT_TRUE(dataSourceMatchesReference(
+        HdContainerDataSource::Get(torusPrim.dataSource, pointsLocator),
+        getPathToSample("torus_points_modified.txt")));
 
     EXPECT_TRUE(SetAttribute(makeNurbNode, "useTolerance", true));
     EXPECT_TRUE(SetAttribute(makeNurbNode, "tolerance", 0.05f));
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
-        topologyDataSource, getPathToSample("torus_topology_tolerance.txt")));
+        HdContainerDataSource::Get(torusPrim.dataSource, meshTopologyLocator),
+        getPathToSample("torus_topology_tolerance.txt")));
     EXPECT_TRUE(dataSourceMatchesReference(
-        pointsDataSource, getPathToSample("torus_points_tolerance.txt")));
+        HdContainerDataSource::Get(torusPrim.dataSource, pointsLocator),
+        getPathToSample("torus_points_tolerance.txt")));
 }
 
 TEST(NurbsPrimitives, nurbsCube)
@@ -127,17 +130,13 @@ TEST(NurbsPrimitives, nurbsCube)
         for (PrimEntry planePrim : planePrims) {
             EXPECT_TRUE(planePrim.prim.primType != TfToken());
             ASSERT_TRUE(planePrim.prim.dataSource != nullptr);
-            HdDataSourceBaseHandle topologyDataSource
-                = HdContainerDataSource::Get(planePrim.prim.dataSource, topologyLocator);
-            HdDataSourceBaseHandle pointsDataSource
-                = HdContainerDataSource::Get(planePrim.prim.dataSource, pointsLocator);
             EXPECT_TRUE(dataSourceMatchesReference(
-                topologyDataSource,
+                HdContainerDataSource::Get(planePrim.prim.dataSource, meshTopologyLocator),
                 getPathToSample(
                     "cube_" + planePrim.primPath.GetParentPath().GetElementString() + "_topology_"
                     + testSuffix + ".txt")));
             EXPECT_TRUE(dataSourceMatchesReference(
-                pointsDataSource,
+                HdContainerDataSource::Get(planePrim.prim.dataSource, pointsLocator),
                 getPathToSample(
                     "cube_" + planePrim.primPath.GetParentPath().GetElementString() + "_points_"
                     + testSuffix + ".txt")));
@@ -157,4 +156,70 @@ TEST(NurbsPrimitives, nurbsCube)
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     testPlanePrims("modified");
+}
+
+TEST(NurbsPrimitives, nurbsCircle)
+{
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+    SceneIndexInspector inspector(sceneIndices.front());
+
+    PrimEntriesVector foundPrims
+        = inspector.FindPrims(getNurbPrimPredicate("nurbsCircle1", HdPrimTypeTokens->basisCurves));
+    ASSERT_EQ(foundPrims.size(), 1u);
+    HdSceneIndexPrim circlePrim = foundPrims.front().prim;
+    EXPECT_TRUE(circlePrim.primType != TfToken());
+    ASSERT_TRUE(circlePrim.dataSource != nullptr);
+
+    EXPECT_TRUE(dataSourceMatchesReference(
+        HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator),
+        getPathToSample("circle_topology_fresh.txt")));
+    EXPECT_TRUE(dataSourceMatchesReference(
+        HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
+        getPathToSample("circle_points_fresh.txt")));
+
+    MObject makeNurbNode;
+    ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbCircle1", makeNurbNode));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "sweep", 180));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "radius", 2));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "degree", 1));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "sections", 12));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "normalX", 1));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "normalY", 2));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "normalZ", 3));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "centerX", 4));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "centerY", 5));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "centerZ", 6));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "firstPointX", 7));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "firstPointY", 8));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "firstPointZ", 9));
+    EXPECT_TRUE(M3dView::active3dView().refresh());
+
+    EXPECT_TRUE(dataSourceMatchesReference(
+        HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator),
+        getPathToSample("circle_topology_modified.txt")));
+    EXPECT_TRUE(dataSourceMatchesReference(
+        HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
+        getPathToSample("circle_points_modified.txt")));
+
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "useTolerance", true));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "tolerance", 0.05f));
+    EXPECT_TRUE(M3dView::active3dView().refresh());
+
+    EXPECT_TRUE(dataSourceMatchesReference(
+        HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator),
+        getPathToSample("circle_topology_tolerance.txt")));
+    EXPECT_TRUE(dataSourceMatchesReference(
+        HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
+        getPathToSample("circle_points_tolerance.txt")));
+
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "fixCenter", false));
+    EXPECT_TRUE(M3dView::active3dView().refresh());
+
+    EXPECT_TRUE(dataSourceMatchesReference(
+        HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator),
+        getPathToSample("circle_topology_unfixedCenter.txt")));
+    EXPECT_TRUE(dataSourceMatchesReference(
+        HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
+        getPathToSample("circle_points_unfixedCenter.txt")));
 }
