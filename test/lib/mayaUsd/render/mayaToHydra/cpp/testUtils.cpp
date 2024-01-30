@@ -291,7 +291,7 @@ bool dataSourceMatchesReference(
 
     // We return a boolean instead of using something like EXPECT_EQ, as that would print the
     // entire dumps to stdout and pollute the logs in case of a test failure. Using EXPECT_TRUE
-    // at the callsites still logs exactly which comparison failed, but keeps logs legible.
+    // at the callsites still logs exactly which comparison failed, but keeps logs readable.
     return outputDump.str() == referenceDump.str();
 }
 
