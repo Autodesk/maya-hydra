@@ -223,3 +223,49 @@ TEST(NurbsPrimitives, nurbsCircle)
         HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
         getPathToSample("circle_points_unfixedCenter.txt")));
 }
+
+TEST(NurbsPrimitives, nurbsSquare)
+{
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+    SceneIndexInspector inspector(sceneIndices.front());
+
+    PrimEntriesVector linePrims
+        = inspector.FindPrims(getNurbPrimPredicate("nurbsSquare1", HdPrimTypeTokens->basisCurves));
+    ASSERT_EQ(linePrims.size(), 4u);
+
+    auto testLinePrims = [linePrims](std::string testSuffix) -> void {
+        for (PrimEntry linePrim : linePrims) {
+            EXPECT_TRUE(linePrim.prim.primType != TfToken());
+            ASSERT_TRUE(linePrim.prim.dataSource != nullptr);
+            EXPECT_TRUE(dataSourceMatchesReference(
+                HdContainerDataSource::Get(linePrim.prim.dataSource, curvesTopologyLocator),
+                getPathToSample(
+                    "square_" + linePrim.primPath.GetParentPath().GetElementString() + "_topology_"
+                    + testSuffix + ".txt")));
+            EXPECT_TRUE(dataSourceMatchesReference(
+                HdContainerDataSource::Get(linePrim.prim.dataSource, pointsLocator),
+                getPathToSample(
+                    "square_" + linePrim.primPath.GetParentPath().GetElementString() + "_points_"
+                    + testSuffix + ".txt")));
+        }
+    };
+
+    testLinePrims("fresh");
+
+    MObject makeNurbNode;
+    ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbsSquare1", makeNurbNode));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "sideLength1", 2));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "sideLength2", 3));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "spansPerSide", 4));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "degree", 1));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "normalX", 1));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "normalY", 2));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "normalZ", 3));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "centerX", 4));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "centerY", 5));
+    EXPECT_TRUE(SetAttribute(makeNurbNode, "centerZ", 6));
+    EXPECT_TRUE(M3dView::active3dView().refresh());
+
+    testLinePrims("modified");
+}

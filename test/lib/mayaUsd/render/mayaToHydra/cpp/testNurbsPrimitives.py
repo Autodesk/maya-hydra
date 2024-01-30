@@ -39,5 +39,9 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         self.setupScene(cmds.circle)
         self.runCppTest("NurbsPrimitives.nurbsCircle")
 
+    def test_NurbsSquare(self):
+        self.setupScene(cmds.nurbsSquare)
+        self.runCppTest("NurbsPrimitives.nurbsSquare")
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
