@@ -73,14 +73,14 @@ TEST(NurbsPrimitives, nurbsTorus)
 
     MObject makeNurbNode;
     ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbTorus1", makeNurbNode));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "startSweep", 50));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "endSweep", 300));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "radius", 2));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "degree", 1));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "sections", 12));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "spans", 6));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "heightRatio", 0.8f));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "minorSweep", 250));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "startSweep", 50));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "endSweep", 300));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "radius", 2));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "degree", 1));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "sections", 12));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "spans", 6));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "heightRatio", 0.8f));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "minorSweep", 250));
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
@@ -90,8 +90,8 @@ TEST(NurbsPrimitives, nurbsTorus)
         HdContainerDataSource::Get(torusPrim.dataSource, pointsLocator),
         getPathToSample("torus_points_modified.txt")));
 
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "useTolerance", true));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "tolerance", 0.05f));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "useTolerance", true));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "tolerance", 0.05f));
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
@@ -133,12 +133,12 @@ TEST(NurbsPrimitives, nurbsCube)
 
     MObject makeNurbNode;
     ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbCube1", makeNurbNode));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "degree", 1));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "patchesU", 2));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "patchesV", 3));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "width", 4));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "lengthRatio", 5));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "heightRatio", 6));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "degree", 1));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "patchesU", 2));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "patchesV", 3));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "width", 4));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "lengthRatio", 5));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "heightRatio", 6));
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     testPlanePrims("modified");
@@ -166,19 +166,19 @@ TEST(NurbsPrimitives, nurbsCircle)
 
     MObject makeNurbNode;
     ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbCircle1", makeNurbNode));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "sweep", 180));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "radius", 2));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "degree", 1));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "sections", 12));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "normalX", 1));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "normalY", 2));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "normalZ", 3));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "centerX", 4));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "centerY", 5));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "centerZ", 6));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "firstPointX", 7));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "firstPointY", 8));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "firstPointZ", 9));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "sweep", 180));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "radius", 2));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "degree", 1));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "sections", 12));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "normalX", 1));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "normalY", 2));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "normalZ", 3));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "centerX", 4));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "centerY", 5));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "centerZ", 6));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "firstPointX", 7));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "firstPointY", 8));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "firstPointZ", 9));
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
@@ -188,8 +188,8 @@ TEST(NurbsPrimitives, nurbsCircle)
         HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
         getPathToSample("circle_points_modified.txt")));
 
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "useTolerance", true));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "tolerance", 0.05f));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "useTolerance", true));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "tolerance", 0.05f));
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
@@ -199,7 +199,7 @@ TEST(NurbsPrimitives, nurbsCircle)
         HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
         getPathToSample("circle_points_tolerance.txt")));
 
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "fixCenter", false));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "fixCenter", false));
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     EXPECT_TRUE(dataSourceMatchesReference(
@@ -241,16 +241,16 @@ TEST(NurbsPrimitives, nurbsSquare)
 
     MObject makeNurbNode;
     ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbsSquare1", makeNurbNode));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "sideLength1", 2));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "sideLength2", 3));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "spansPerSide", 4));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "degree", 1));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "normalX", 1));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "normalY", 2));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "normalZ", 3));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "centerX", 4));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "centerY", 5));
-    EXPECT_TRUE(SetAttribute(makeNurbNode, "centerZ", 6));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "sideLength1", 2));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "sideLength2", 3));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "spansPerSide", 4));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "degree", 1));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "normalX", 1));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "normalY", 2));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "normalZ", 3));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "centerX", 4));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "centerY", 5));
+    EXPECT_TRUE(SetNodeAttribute(makeNurbNode, "centerZ", 6));
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     testLinePrims("modified");

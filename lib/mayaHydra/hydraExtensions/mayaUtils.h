@@ -152,7 +152,7 @@ bool IsAMayaVisibilityAttribute(const MPlug& plug, bool& outVal);
 * @return True if the attribute was successfully modified, false otherwise.
 */
 template <typename AttrType>
-bool SetAttribute(MObject node, std::string attrName, AttrType newValue)
+bool SetNodeAttribute(MObject node, std::string attrName, AttrType newValue)
 {
     MStatus           dependencyNodeStatus;
     MFnDependencyNode dependencyNode(node, &dependencyNodeStatus);
