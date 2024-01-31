@@ -103,41 +103,41 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
 endforeach()
 
 # Use Maya.exe with UI, interactive tests.
-    foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
-        mayaUsd_get_unittest_target(target ${script})
-        mayaUsd_add_test(${target}
-            INTERACTIVE
-            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-            PYTHON_SCRIPT ${script}
-            ENV
-                "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
-                "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
-                "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
+    mayaUsd_get_unittest_target(target ${script})
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        PYTHON_SCRIPT ${script}
+        ENV
+            "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
+            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
+            "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
 
-                # LD_LIBRARY_PATH needs to be set for the idiff executable because its 
-                # RPATH is absolute rather than relative to ORIGIN, meaning the RPATH 
-                # points to the absolute path on the machine where idiff was built.
-                # This absence of relative paths for RPATH comes from OpenImageIO.
-                # We introduce a second workaround to avoid Maya using usd's libpng, 
-                # because both use incompatible versions of libpng. This is done by 
-                # setting LD_LIBRARY_PATH to IDIFF_LD_LIBRARY_PATH only when we run 
-                # idiff using Python's subprocess module.
-                "IDIFF_LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}:${PXR_USD_LOCATION}/lib64:${PXR_USD_LOCATION}/lib"
+            # LD_LIBRARY_PATH needs to be set for the idiff executable because its 
+            # RPATH is absolute rather than relative to ORIGIN, meaning the RPATH 
+            # points to the absolute path on the machine where idiff was built.
+            # This absence of relative paths for RPATH comes from OpenImageIO.
+            # We introduce a second workaround to avoid Maya using usd's libpng, 
+            # because both use incompatible versions of libpng. This is done by 
+            # setting LD_LIBRARY_PATH to IDIFF_LD_LIBRARY_PATH only when we run 
+            # idiff using Python's subprocess module.
+            "IDIFF_LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}:${PXR_USD_LOCATION}/lib64:${PXR_USD_LOCATION}/lib"
 
-                # Maya uses a very old version of GLEW, so we need support for
-                # pre-loading a newer version from elsewhere.
-                "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
+            # Maya uses a very old version of GLEW, so we need support for
+            # pre-loading a newer version from elsewhere.
+            "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
 
-                # Fallback to old color management. We will have to investigate
-                # and introduce OCIOv2 compatible version of these tests.
-                "MAYA_COLOR_MANAGEMENT_SYNCOLOR=1"
+            # Fallback to old color management. We will have to investigate
+            # and introduce OCIOv2 compatible version of these tests.
+            "MAYA_COLOR_MANAGEMENT_SYNCOLOR=1"
 
-                "MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX=1"
-        )
+            "MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX=1"
+    )
 
-        # Add a ctest label to these tests for easy filtering.
-        set_property(TEST ${target} APPEND PROPERTY LABELS MayaHydraInteractive)
-    endforeach()
+    # Add a ctest label to these tests for easy filtering.
+    set_property(TEST ${target} APPEND PROPERTY LABELS MayaHydraInteractive)
+endforeach()
 
 # C++ unit tests
 add_subdirectory(cpp)
