@@ -1,5 +1,4 @@
-# Copyright 2020 Luma Pictures
-# Copyright 2023 Autodesk
+# Copyright 2024 Autodesk
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,17 +25,11 @@ class TestTransforms(mtohUtils.MtohTestCase):
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
     IMAGEDIFF_FAIL_PERCENT = 0.1
 
-    def setUp(self):
-        self.imageVersion = None
-        if maya.mel.eval("defaultShaderName") != "standardSurface1":
-            self.imageVersion = 'lambertDefaultMaterial'
-
     def verifySnapshot(self, imageName):
         cmds.refresh()
         self.assertSnapshotClose(imageName, 
                                  self.IMAGEDIFF_FAIL_THRESHOLD,
-                                 self.IMAGEDIFF_FAIL_PERCENT, 
-                                 imageVersion=self.imageVersion)
+                                 self.IMAGEDIFF_FAIL_PERCENT)
 
     def test_nativePrim(self):
         self.makeCubeScene(camDist=6)
