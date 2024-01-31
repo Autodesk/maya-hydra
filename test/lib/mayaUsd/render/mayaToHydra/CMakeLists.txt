@@ -12,7 +12,7 @@ set(TEST_SCRIPT_FILES
     testSceneBrowser.py
     testStageAddPrim.py
     testNewSceneWithStage.py
-    testDirectionalLights.py
+    testMayaLights.py
     testFlowViewportAPI.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
