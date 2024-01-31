@@ -25,17 +25,13 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
     IMAGE_DIFF_FAIL_PERCENT = 0.0
 
     def compareSnapshot(self, referenceFilename, fitView=True):
-        try:
-            if fitView:
-                cmds.viewFit()
-            cmds.refresh(force=True)
-            self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        except:
-            pass
+        if fitView:
+            cmds.viewFit()
+        cmds.refresh(force=True)
+        self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def setupScene(self, nurbsCreationCallable):
         self.setHdStormRenderer()
-        #cmds.loadPlugin('ArubaTessellator')
         nurbsCreationCallable()
         cmds.refresh(force=True)
 
