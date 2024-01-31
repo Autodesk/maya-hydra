@@ -20,7 +20,7 @@ import mtohUtils
 import mayaUtils
 import unittest
 
-class TesUSDtLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
+class TestUSDLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
