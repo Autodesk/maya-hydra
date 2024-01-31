@@ -31,89 +31,87 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def setupScene(self, nurbsCreationCallable):
+        cmds.file(new=True, force=True)
+        cmds.loadPlugin('ArubaTessellator')
         self.setHdStormRenderer()
         nurbsCreationCallable()
         cmds.refresh(force=True)
 
     def test_NurbsTorus(self):
-        with PluginLoaded('ArubaTessellator'):
-            self.setupScene(cmds.torus)
-            self.compareSnapshot("torus_fresh.png")
+        self.setupScene(cmds.torus)
+        self.compareSnapshot("torus_fresh.png")
         
-            makeNurbNodeName = "makeNurbTorus1"
-            cmds.setAttr(makeNurbNodeName + ".startSweep", 50)
-            cmds.setAttr(makeNurbNodeName + ".endSweep", 300)
-            cmds.setAttr(makeNurbNodeName + ".radius", 2)
-            cmds.setAttr(makeNurbNodeName + ".degree", 1)
-            cmds.setAttr(makeNurbNodeName + ".sections", 12)
-            cmds.setAttr(makeNurbNodeName + ".spans", 6)
-            cmds.setAttr(makeNurbNodeName + ".heightRatio", 0.8)
-            cmds.setAttr(makeNurbNodeName + ".minorSweep", 250)
-            self.compareSnapshot("torus_modified.png")
+        makeNurbNodeName = "makeNurbTorus1"
+        cmds.setAttr(makeNurbNodeName + ".startSweep", 50)
+        cmds.setAttr(makeNurbNodeName + ".endSweep", 300)
+        cmds.setAttr(makeNurbNodeName + ".radius", 2)
+        cmds.setAttr(makeNurbNodeName + ".degree", 1)
+        cmds.setAttr(makeNurbNodeName + ".sections", 12)
+        cmds.setAttr(makeNurbNodeName + ".spans", 6)
+        cmds.setAttr(makeNurbNodeName + ".heightRatio", 0.8)
+        cmds.setAttr(makeNurbNodeName + ".minorSweep", 250)
+        self.compareSnapshot("torus_modified.png")
 
-            cmds.setAttr(makeNurbNodeName + ".useTolerance", True)
-            cmds.setAttr(makeNurbNodeName + ".tolerance", 0.05)
-            self.compareSnapshot("torus_tolerance.png")
+        cmds.setAttr(makeNurbNodeName + ".useTolerance", True)
+        cmds.setAttr(makeNurbNodeName + ".tolerance", 0.05)
+        self.compareSnapshot("torus_tolerance.png")
 
     def test_NurbsCube(self):
-        with PluginLoaded('ArubaTessellator'):
-            self.setupScene(cmds.nurbsCube)
-            self.compareSnapshot("cube_fresh.png")
+        self.setupScene(cmds.nurbsCube)
+        self.compareSnapshot("cube_fresh.png")
 
-            makeNurbNodeName = "makeNurbCube1"
-            cmds.setAttr(makeNurbNodeName + ".degree", 1)
-            cmds.setAttr(makeNurbNodeName + ".patchesU", 2)
-            cmds.setAttr(makeNurbNodeName + ".patchesV", 3)
-            cmds.setAttr(makeNurbNodeName + ".width", 4)
-            cmds.setAttr(makeNurbNodeName + ".lengthRatio", 5)
-            cmds.setAttr(makeNurbNodeName + ".heightRatio", 6)
-            self.compareSnapshot("cube_modified.png")
+        makeNurbNodeName = "makeNurbCube1"
+        cmds.setAttr(makeNurbNodeName + ".degree", 1)
+        cmds.setAttr(makeNurbNodeName + ".patchesU", 2)
+        cmds.setAttr(makeNurbNodeName + ".patchesV", 3)
+        cmds.setAttr(makeNurbNodeName + ".width", 4)
+        cmds.setAttr(makeNurbNodeName + ".lengthRatio", 5)
+        cmds.setAttr(makeNurbNodeName + ".heightRatio", 6)
+        self.compareSnapshot("cube_modified.png")
 
     def test_NurbsCircle(self):
-        with PluginLoaded('ArubaTessellator'):
-            self.setupScene(cmds.circle)
-            self.compareSnapshot("circle_fresh.png")
+        self.setupScene(cmds.circle)
+        self.compareSnapshot("circle_fresh.png")
 
-            makeNurbNodeName = "makeNurbCircle1"
-            cmds.setAttr(makeNurbNodeName + ".sweep", 180)
-            cmds.setAttr(makeNurbNodeName + ".radius", 2)
-            cmds.setAttr(makeNurbNodeName + ".degree", 1)
-            cmds.setAttr(makeNurbNodeName + ".sections", 12)
-            cmds.setAttr(makeNurbNodeName + ".normalX", 1)
-            cmds.setAttr(makeNurbNodeName + ".normalY", 2)
-            cmds.setAttr(makeNurbNodeName + ".normalZ", 3)
-            cmds.setAttr(makeNurbNodeName + ".centerX", 4)
-            cmds.setAttr(makeNurbNodeName + ".centerY", 5)
-            cmds.setAttr(makeNurbNodeName + ".centerZ", 6)
-            cmds.setAttr(makeNurbNodeName + ".firstPointX", 7)
-            cmds.setAttr(makeNurbNodeName + ".firstPointY", 8)
-            cmds.setAttr(makeNurbNodeName + ".firstPointZ", 9)
-            self.compareSnapshot("circle_modified.png")
+        makeNurbNodeName = "makeNurbCircle1"
+        cmds.setAttr(makeNurbNodeName + ".sweep", 180)
+        cmds.setAttr(makeNurbNodeName + ".radius", 2)
+        cmds.setAttr(makeNurbNodeName + ".degree", 1)
+        cmds.setAttr(makeNurbNodeName + ".sections", 12)
+        cmds.setAttr(makeNurbNodeName + ".normalX", 1)
+        cmds.setAttr(makeNurbNodeName + ".normalY", 2)
+        cmds.setAttr(makeNurbNodeName + ".normalZ", 3)
+        cmds.setAttr(makeNurbNodeName + ".centerX", 4)
+        cmds.setAttr(makeNurbNodeName + ".centerY", 5)
+        cmds.setAttr(makeNurbNodeName + ".centerZ", 6)
+        cmds.setAttr(makeNurbNodeName + ".firstPointX", 7)
+        cmds.setAttr(makeNurbNodeName + ".firstPointY", 8)
+        cmds.setAttr(makeNurbNodeName + ".firstPointZ", 9)
+        self.compareSnapshot("circle_modified.png")
 
-            cmds.setAttr(makeNurbNodeName + ".useTolerance", True)
-            cmds.setAttr(makeNurbNodeName + ".tolerance", 0.05)
-            self.compareSnapshot("circle_tolerance.png")
+        cmds.setAttr(makeNurbNodeName + ".useTolerance", True)
+        cmds.setAttr(makeNurbNodeName + ".tolerance", 0.05)
+        self.compareSnapshot("circle_tolerance.png")
 
-            cmds.setAttr(makeNurbNodeName + ".fixCenter", False)
-            self.compareSnapshot("circle_unfixedCenter.png", False)
+        cmds.setAttr(makeNurbNodeName + ".fixCenter", False)
+        self.compareSnapshot("circle_unfixedCenter.png", False)
 
     def test_NurbsSquare(self):
-        with PluginLoaded('ArubaTessellator'):
-            self.setupScene(cmds.nurbsSquare)
-            self.compareSnapshot("square_fresh.png")
+        self.setupScene(cmds.nurbsSquare)
+        self.compareSnapshot("square_fresh.png")
 
-            makeNurbNodeName = "makeNurbsSquare1"
-            cmds.setAttr(makeNurbNodeName + ".sideLength1", 2)
-            cmds.setAttr(makeNurbNodeName + ".sideLength2", 3)
-            cmds.setAttr(makeNurbNodeName + ".spansPerSide", 4)
-            cmds.setAttr(makeNurbNodeName + ".degree", 1)
-            cmds.setAttr(makeNurbNodeName + ".normalX", 1)
-            cmds.setAttr(makeNurbNodeName + ".normalY", 2)
-            cmds.setAttr(makeNurbNodeName + ".normalZ", 3)
-            cmds.setAttr(makeNurbNodeName + ".centerX", 4)
-            cmds.setAttr(makeNurbNodeName + ".centerY", 5)
-            cmds.setAttr(makeNurbNodeName + ".centerZ", 6)
-            self.compareSnapshot("square_modified.png")
+        makeNurbNodeName = "makeNurbsSquare1"
+        cmds.setAttr(makeNurbNodeName + ".sideLength1", 2)
+        cmds.setAttr(makeNurbNodeName + ".sideLength2", 3)
+        cmds.setAttr(makeNurbNodeName + ".spansPerSide", 4)
+        cmds.setAttr(makeNurbNodeName + ".degree", 1)
+        cmds.setAttr(makeNurbNodeName + ".normalX", 1)
+        cmds.setAttr(makeNurbNodeName + ".normalY", 2)
+        cmds.setAttr(makeNurbNodeName + ".normalZ", 3)
+        cmds.setAttr(makeNurbNodeName + ".centerX", 4)
+        cmds.setAttr(makeNurbNodeName + ".centerY", 5)
+        cmds.setAttr(makeNurbNodeName + ".centerZ", 6)
+        self.compareSnapshot("square_modified.png")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
