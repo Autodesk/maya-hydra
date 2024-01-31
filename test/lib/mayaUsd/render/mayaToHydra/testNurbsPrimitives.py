@@ -24,8 +24,11 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.0
     IMAGE_DIFF_FAIL_PERCENT = 0.0
 
-    def testSnapshot(self, referenceFilename):
+    def compareSnapshot(self, referenceFilename, fitView=True):
         try:
+            if fitView:
+                cmds.viewFit()
+            cmds.refresh(force=True)
             self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         except:
             pass
@@ -34,13 +37,12 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         self.setHdStormRenderer()
         #cmds.loadPlugin('ArubaTessellator')
         nurbsCreationCallable()
-        #cmds.viewFit()
         cmds.refresh(force=True)
 
     def test_NurbsTorus(self):
         with PluginLoaded('ArubaTessellator'):
             self.setupScene(cmds.torus)
-            self.testSnapshot("torus_fresh.png")
+            self.compareSnapshot("torus_fresh.png")
         
             makeNurbNodeName = "makeNurbTorus1"
             cmds.setAttr(makeNurbNodeName + ".startSweep", 50)
@@ -51,18 +53,16 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
             cmds.setAttr(makeNurbNodeName + ".spans", 6)
             cmds.setAttr(makeNurbNodeName + ".heightRatio", 0.8)
             cmds.setAttr(makeNurbNodeName + ".minorSweep", 250)
-            cmds.refresh(force=True)
-            self.testSnapshot("torus_modified.png")
+            self.compareSnapshot("torus_modified.png")
 
             cmds.setAttr(makeNurbNodeName + ".useTolerance", True)
             cmds.setAttr(makeNurbNodeName + ".tolerance", 0.05)
-            cmds.refresh(force=True)
-            self.testSnapshot("torus_tolerance.png")
+            self.compareSnapshot("torus_tolerance.png")
 
     def test_NurbsCube(self):
         with PluginLoaded('ArubaTessellator'):
             self.setupScene(cmds.nurbsCube)
-            self.testSnapshot("cube_fresh.png")
+            self.compareSnapshot("cube_fresh.png")
 
             makeNurbNodeName = "makeNurbCube1"
             cmds.setAttr(makeNurbNodeName + ".degree", 1)
@@ -71,13 +71,12 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
             cmds.setAttr(makeNurbNodeName + ".width", 4)
             cmds.setAttr(makeNurbNodeName + ".lengthRatio", 5)
             cmds.setAttr(makeNurbNodeName + ".heightRatio", 6)
-            cmds.refresh(force=True)
-            self.testSnapshot("cube_modified.png")
+            self.compareSnapshot("cube_modified.png")
 
     def test_NurbsCircle(self):
         with PluginLoaded('ArubaTessellator'):
             self.setupScene(cmds.circle)
-            self.testSnapshot("circle_fresh.png")
+            self.compareSnapshot("circle_fresh.png")
 
             makeNurbNodeName = "makeNurbCircle1"
             cmds.setAttr(makeNurbNodeName + ".sweep", 180)
@@ -93,22 +92,19 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
             cmds.setAttr(makeNurbNodeName + ".firstPointX", 7)
             cmds.setAttr(makeNurbNodeName + ".firstPointY", 8)
             cmds.setAttr(makeNurbNodeName + ".firstPointZ", 9)
-            cmds.refresh(force=True)
-            self.testSnapshot("circle_modified.png")
+            self.compareSnapshot("circle_modified.png")
 
             cmds.setAttr(makeNurbNodeName + ".useTolerance", True)
             cmds.setAttr(makeNurbNodeName + ".tolerance", 0.05)
-            cmds.refresh(force=True)
-            self.testSnapshot("circle_tolerance.png")
+            self.compareSnapshot("circle_tolerance.png")
 
             cmds.setAttr(makeNurbNodeName + ".fixCenter", False)
-            cmds.refresh(force=True)
-            self.testSnapshot("circle_unfixedCenter.png")
+            self.compareSnapshot("circle_unfixedCenter.png", False)
 
     def test_NurbsSquare(self):
         with PluginLoaded('ArubaTessellator'):
             self.setupScene(cmds.nurbsSquare)
-            self.testSnapshot("square_fresh.png")
+            self.compareSnapshot("square_fresh.png")
 
             makeNurbNodeName = "makeNurbsSquare1"
             cmds.setAttr(makeNurbNodeName + ".sideLength1", 2)
@@ -121,8 +117,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
             cmds.setAttr(makeNurbNodeName + ".centerX", 4)
             cmds.setAttr(makeNurbNodeName + ".centerY", 5)
             cmds.setAttr(makeNurbNodeName + ".centerZ", 6)
-            cmds.refresh(force=True)
-            self.testSnapshot("square_modified.png")
+            self.compareSnapshot("square_modified.png")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
