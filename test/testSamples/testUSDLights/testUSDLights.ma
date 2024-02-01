@@ -3,7 +3,6 @@
 //Last modified: Mon, Jan 29, 2024 03:08:57 PM
 //Codeset: 1252
 requires maya "2025ff02";
-requires -nodeType "aiOptions" "mtoa" "5.4.0";
 requires -nodeType "mayaUsdLayerManager" -nodeType "mayaUsdProxyShape" -dataType "pxrUsdStageData"
 		 "mayaUsdPlugin" "0.27.0";
 currentUnit -l centimeter -a degree -t film;
@@ -45,7 +44,6 @@ createNode camera -s -n "topShape" -p "top";
 	setAttr ".man" -type "string" "top_mask";
 	setAttr ".hc" -type "string" "viewSet -t %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -s -n "front";
 	rename -uid "DD8CA7E2-453A-C778-B5FD-F7BB508CE68A";
 	setAttr ".v" no;
@@ -61,7 +59,6 @@ createNode camera -s -n "frontShape" -p "front";
 	setAttr ".man" -type "string" "front_mask";
 	setAttr ".hc" -type "string" "viewSet -f %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -s -n "side";
 	rename -uid "2B78A136-4727-43E2-D43D-BE9A9B437308";
 	setAttr ".v" no;
@@ -78,7 +75,6 @@ createNode camera -s -n "sideShape" -p "side";
 	setAttr ".man" -type "string" "side_mask";
 	setAttr ".hc" -type "string" "viewSet -s %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -n "testUSDLights:stage1";
 	rename -uid "35670C48-4886-D972-E9AA-57BECF0B6D37";
 createNode mayaUsdProxyShape -n "testUSDLights:stageShape1" -p "testUSDLights:stage1";
@@ -189,9 +185,6 @@ createNode script -n "testUSDLights:sceneConfigurationScriptNode";
 	rename -uid "A1B55885-4CFC-3F1F-6C51-78B9E4F5D89F";
 	setAttr ".b" -type "string" "playbackOptions -min 0 -max 24 -ast 0 -aet 48 ";
 	setAttr ".st" 6;
-createNode aiOptions -s -n "defaultArnoldRenderOptions";
-	rename -uid "A3C23385-4F86-EE6C-52C6-4CB701939657";
-	setAttr ".version" -type "string" "5.4.0";
 createNode polySphere -n "testUSDLights:polySphere1";
 	rename -uid "732C7968-49F7-5C7A-573E-2F962274AA7F";
 createNode polyPlane -n "testUSDLights:polyPlane1";
@@ -259,7 +252,6 @@ select -ne :defaultRenderGlobals;
 	addAttr -ci true -sn "HdStormRendererPlugin__maxLights" -ln "HdStormRendererPlugin__maxLights" 
 		-dv 16 -at "long";
 	addAttr -ci true -h true -sn "dss" -ln "defaultSurfaceShader" -dt "string";
-	setAttr ".ren" -type "string" "arnold";
 	setAttr ".mtohMaximumShadowMapResolution" 32;
 	setAttr ".dss" -type "string" "standardSurface1";
 select -ne :defaultResolution;
