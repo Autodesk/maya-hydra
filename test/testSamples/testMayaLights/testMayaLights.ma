@@ -3,7 +3,6 @@
 //Last modified: Thu, Jan 25, 2024 11:12:38 PM
 //Codeset: 1252
 requires maya "2025ff02";
-requires -nodeType "aiOptions" -nodeType "aiAOVDriver" -nodeType "aiAOVFilter" "mtoa" "5.4.0";
 requires -nodeType "mayaUsdLayerManager" -nodeType "mayaUsdProxyShape" -dataType "pxrUsdStageData"
 		 "mayaUsdPlugin" "0.27.0";
 currentUnit -l centimeter -a degree -t film;
@@ -205,17 +204,6 @@ createNode script -n "sceneConfigurationScriptNode";
 	rename -uid "DBFF5364-414C-E231-713C-438185D55279";
 	setAttr ".b" -type "string" "playbackOptions -min 1 -max 120 -ast 1 -aet 200 ";
 	setAttr ".st" 6;
-createNode aiOptions -s -n "defaultArnoldRenderOptions";
-	rename -uid "13A02CCF-4A8E-DF78-AAC5-4FB3D57071C0";
-	setAttr ".version" -type "string" "5.4.0";
-createNode aiAOVFilter -s -n "defaultArnoldFilter";
-	rename -uid "9ABFB092-451E-E2A8-1CA6-038275CD9093";
-createNode aiAOVDriver -s -n "defaultArnoldDriver";
-	rename -uid "DF159763-4677-012D-70E5-E6B30D3EBC58";
-createNode aiAOVDriver -s -n "defaultArnoldDisplayDriver";
-	rename -uid "7ED73D39-4453-ACBE-CB35-FA95F9CC92EB";
-	setAttr ".ai_translator" -type "string" "maya";
-	setAttr ".output_mode" 0;
 createNode polySphere -n "polySphere1";
 	rename -uid "700E8179-4D6C-A7C0-895A-D4B487501BE6";
 createNode polyPlane -n "polyPlane1";
@@ -302,10 +290,6 @@ relationship "shadowLink" ":lightLinker1" ":initialShadingGroup.message" ":defau
 relationship "shadowLink" ":lightLinker1" ":initialParticleSE.message" ":defaultLightSet.message";
 connectAttr "layerManager.dli[0]" "defaultLayer.id";
 connectAttr "renderLayerManager.rlmi[0]" "defaultRenderLayer.rlid";
-connectAttr ":defaultArnoldDisplayDriver.msg" ":defaultArnoldRenderOptions.drivers"
-		 -na;
-connectAttr ":defaultArnoldFilter.msg" ":defaultArnoldRenderOptions.filt";
-connectAttr ":defaultArnoldDriver.msg" ":defaultArnoldRenderOptions.drvr";
 connectAttr "defaultRenderLayer.msg" ":defaultRenderingList1.r" -na;
 connectAttr "directionalLightShape1.ltd" ":lightList1.l" -na;
 connectAttr "pointLightShape1.ltd" ":lightList1.l" -na;
