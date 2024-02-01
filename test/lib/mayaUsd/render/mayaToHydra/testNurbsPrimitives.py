@@ -25,22 +25,22 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
     IMAGE_DIFF_FAIL_PERCENT = 1.0
 
     def compareSnapshot(self, referenceFilename):
-        cmds.refresh(force=True)
+        cmds.refresh()
         self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def setupScene(self, nurbsCreationCallable):
         cmds.loadPlugin('ArubaTessellator')
         self.setHdStormRenderer()
-        nurbsCreationCallable()
         self.setBasicCam(10)
-        cmds.refresh(force=True)
+        nurbsResult = nurbsCreationCallable()
+        cmds.refresh()
+        return nurbsResult
 
     # Torus attributes is a superset of sphere, cone, and cylinder attributes
     def test_NurbsTorus(self):
-        self.setupScene(cmds.torus)
+        makeNurbNodeName = self.setupScene(cmds.torus)[1]
         self.compareSnapshot("torus_fresh.png")
         
-        makeNurbNodeName = "makeNurbTorus1"
         cmds.setAttr(makeNurbNodeName + ".startSweep", 50)
         cmds.setAttr(makeNurbNodeName + ".endSweep", 300)
         cmds.setAttr(makeNurbNodeName + ".radius", 2)
@@ -57,10 +57,9 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
 
     # Cube attributes is a superset of plane attributes
     def test_NurbsCube(self):
-        self.setupScene(cmds.nurbsCube)
+        makeNurbNodeName = self.setupScene(cmds.nurbsCube)[1]
         self.compareSnapshot("cube_fresh.png")
 
-        makeNurbNodeName = "makeNurbCube1"
         cmds.setAttr(makeNurbNodeName + ".degree", 1)
         cmds.setAttr(makeNurbNodeName + ".patchesU", 2)
         cmds.setAttr(makeNurbNodeName + ".patchesV", 3)
@@ -70,10 +69,9 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("cube_modified.png")
 
     def test_NurbsCircle(self):
-        self.setupScene(cmds.circle)
+        makeNurbNodeName = self.setupScene(cmds.circle)[1]
         self.compareSnapshot("circle_fresh.png")
 
-        makeNurbNodeName = "makeNurbCircle1"
         cmds.setAttr(makeNurbNodeName + ".sweep", 180)
         cmds.setAttr(makeNurbNodeName + ".radius", 2)
         cmds.setAttr(makeNurbNodeName + ".degree", 1)
@@ -97,10 +95,9 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("circle_unfixedCenter.png")
 
     def test_NurbsSquare(self):
-        self.setupScene(cmds.nurbsSquare)
+        makeNurbNodeName = self.setupScene(cmds.nurbsSquare)[1]
         self.compareSnapshot("square_fresh.png")
 
-        makeNurbNodeName = "makeNurbsSquare1"
         cmds.setAttr(makeNurbNodeName + ".sideLength1", 2)
         cmds.setAttr(makeNurbNodeName + ".sideLength2", 3)
         cmds.setAttr(makeNurbNodeName + ".spansPerSide", 4)
