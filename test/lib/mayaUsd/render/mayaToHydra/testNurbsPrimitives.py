@@ -24,9 +24,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.0
     IMAGE_DIFF_FAIL_PERCENT = 0.0
 
-    def compareSnapshot(self, referenceFilename, fitView=True):
-        if fitView:
-            cmds.viewFit()
+    def compareSnapshot(self, referenceFilename):
         cmds.refresh(force=True)
         self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
@@ -34,6 +32,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         cmds.loadPlugin('ArubaTessellator')
         self.setHdStormRenderer()
         nurbsCreationCallable()
+        self.setBasicCam(10)
         cmds.refresh(force=True)
 
     # Torus attributes is a superset of sphere, cone, and cylinder attributes
@@ -66,8 +65,8 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         cmds.setAttr(makeNurbNodeName + ".patchesU", 2)
         cmds.setAttr(makeNurbNodeName + ".patchesV", 3)
         cmds.setAttr(makeNurbNodeName + ".width", 4)
-        cmds.setAttr(makeNurbNodeName + ".lengthRatio", 5)
-        cmds.setAttr(makeNurbNodeName + ".heightRatio", 6)
+        cmds.setAttr(makeNurbNodeName + ".lengthRatio", 2)
+        cmds.setAttr(makeNurbNodeName + ".heightRatio", 3)
         self.compareSnapshot("cube_modified.png")
 
     def test_NurbsCircle(self):
@@ -95,7 +94,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("circle_tolerance.png")
 
         cmds.setAttr(makeNurbNodeName + ".fixCenter", False)
-        self.compareSnapshot("circle_unfixedCenter.png", False)
+        self.compareSnapshot("circle_unfixedCenter.png")
 
     def test_NurbsSquare(self):
         self.setupScene(cmds.nurbsSquare)
