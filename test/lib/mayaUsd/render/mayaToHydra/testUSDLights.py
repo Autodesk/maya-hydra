@@ -24,12 +24,15 @@ class TestUSDLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.1
-    IMAGE_DIFF_FAIL_PERCENT = 0.3
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
+    IMAGE_DIFF_FAIL_PERCENT = 0.2
 
     def verifyLightingModes(self, shadowOn):
         imageSuffix = "_shadowOn" if shadowOn else ""
         panel = mayaUtils.activeModelPanel()
+
+        #Turn on/off shadows
+        cmds.modelEditor(panel, edit=True, shadows=shadowOn)
 
         #All Lights mode
         cmds.modelEditor(panel, edit=True, displayLights="all")
@@ -72,7 +75,6 @@ class TestUSDLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_USDLights(self):
         cmds.file(new=True, force=True)
-        cmds.refresh()
 
         # Load a maya scene with a maya native sphere, usd sphere and some lights, with HdStorm already being the viewport renderer.
         # The sphere is not at the origin on purpose
@@ -80,10 +82,6 @@ class TestUSDLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase
                 "testUSDLights",
                 "testUSDLights.ma")
         cmds.refresh()
-        #Do a view fit --Test removed as on Linux the fit doesn't produce the same result as on Windows and OSX.
-        #cmds.viewFit('persp')
-        #cmds.refresh()
-        #self.assertSnapshotClose("allLightsFit.png", None, None)
 
         #Test Lighting Modes
         #Shadow OFF
