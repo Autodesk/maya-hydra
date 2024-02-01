@@ -37,6 +37,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         nurbsCreationCallable()
         cmds.refresh(force=True)
 
+    # Torus attributes is a superset of sphere, cone, and cylinder attributes
     def test_NurbsTorus(self):
         self.setupScene(cmds.torus)
         self.compareSnapshot("torus_fresh.png")
@@ -56,6 +57,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         cmds.setAttr(makeNurbNodeName + ".tolerance", 0.05)
         self.compareSnapshot("torus_tolerance.png")
 
+    # Cube attributes is a superset of plane attributes
     def test_NurbsCube(self):
         self.setupScene(cmds.nurbsCube)
         self.compareSnapshot("cube_fresh.png")
