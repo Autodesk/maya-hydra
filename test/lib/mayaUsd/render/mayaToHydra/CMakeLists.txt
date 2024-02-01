@@ -11,6 +11,7 @@ set(TEST_SCRIPT_FILES
     testRendererSwitching.py
     testSceneBrowser.py
     testStageAddPrim.py
+    testTransforms.py
     testNewSceneWithStage.py
     testDirectionalLights.py
     testFlowViewportAPI.py
