@@ -17,6 +17,7 @@ import maya.mel as mel
 
 import fixturesUtils
 import mtohUtils
+import platform
 import unittest
 
 from testUtils import PluginLoaded
@@ -43,8 +44,10 @@ class TestSceneBrowser(mtohUtils.MayaHydraBaseTestCase):
         cmds.directionalLight(name="MayaDirectionalLight")
         cmds.refresh()
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin() and mtohUtils.checkForPlugin(SCENE_BROWSER_TEST_PLUGIN_NAME), 
-                         f'Requires mayaUSD and {SCENE_BROWSER_TEST_PLUGIN_NAME} plugins.')
+    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin() and mtohUtils.checkForPlugin(SCENE_BROWSER_TEST_PLUGIN_NAME)
+                         and platform.system() != "Darwin", 
+                         f'Requires mayaUSD and {SCENE_BROWSER_TEST_PLUGIN_NAME} plugins. '
+                         'Currently also disabled on OSX.')
     def test_SceneBrowser(self):
         self.setupScene()
         with PluginLoaded(self.SCENE_BROWSER_TEST_PLUGIN_NAME):

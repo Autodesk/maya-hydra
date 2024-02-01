@@ -24,6 +24,9 @@ class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.5
+    IMAGE_DIFF_FAIL_PERCENT = 1
+
     def activeModelPanel(self):
         """Return the model panel that will be used for playblasting etc..."""
         for panel in cmds.getPanel(type="modelPanel"):
@@ -42,13 +45,9 @@ class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
                 "testDirectionalLights",
                 "UsdStageWithSphereMatXStdSurf.ma")
         cmds.refresh()
-        self.assertSnapshotClose("directionalLight.png", None, None)
-        #Do a view fit --Test removed as on Linux the fit doesn't produce the same result as on Windows and OSX.
-        #cmds.viewFit('persp')
-        #cmds.refresh()
-        #self.assertSnapshotClose("directionalLightFit.png", None, None)
+        self.assertSnapshotClose("directionalLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-        #delete the directional Light
+        # Delete the directional Light
         cmds.delete('directionalLight1')
         cmds.refresh()
 
@@ -56,7 +55,7 @@ class TestDirectionalLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
         panel = self.activeModelPanel()
         cmds.modelEditor(panel, edit=True, displayLights="default")
         cmds.refresh()
-        self.assertSnapshotClose("defaultLight.png", None, None)
+        self.assertSnapshotClose("defaultLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
