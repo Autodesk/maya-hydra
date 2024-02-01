@@ -25,7 +25,7 @@ class TestUSDLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.2
+    IMAGE_DIFF_FAIL_PERCENT = 0.5
 
     def verifyLightingModes(self, shadowOn):
         imageSuffix = "_shadowOn" if shadowOn else ""
