@@ -21,8 +21,8 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.0
-    IMAGE_DIFF_FAIL_PERCENT = 1.0
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.1
+    IMAGE_DIFF_FAIL_PERCENT = 0.5
 
     def compareSnapshot(self, referenceFilename):
         cmds.refresh()
