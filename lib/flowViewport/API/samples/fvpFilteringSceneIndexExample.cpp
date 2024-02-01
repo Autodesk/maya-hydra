@@ -100,10 +100,18 @@ HdSceneIndexPrim FilteringSceneIndexExample::GetPrim(const SdfPath& primPath) co
 }
 
 SdfPathVector FilteringSceneIndexExample::GetChildPrimPaths(const SdfPath& primPath) const {
+    // A filtered prim should not exist from the point of view of downstream scene indices,
+    // so return an empty vector if the current prim is filtered. This case should normally
+    // not be reached during scene index hierarchy traversal, as its parent should not even
+    // return it when GetChildPrimPaths is called on it (see other comment in this method.)
     if (IsFiltered(primPath)) {
         return SdfPathVector();
     }
 
+    // If the current prim is not filtered, we still do not want to return a path
+    // to a filtered child prim, as a filtered prim should not exist at all (and
+    // we might have sent a PrimsRemoved notification prior). Thus, remove all
+    // child paths to filtered prims before returning.
     SdfPathVector childPaths = _GetInputSceneIndex()->GetChildPrimPaths(primPath);
     childPaths.erase(
         std::remove_if(
