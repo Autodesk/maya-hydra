@@ -31,7 +31,6 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def setupScene(self, nurbsCreationCallable):
-        cmds.file(new=True, force=True)
         cmds.loadPlugin('ArubaTessellator')
         self.setHdStormRenderer()
         nurbsCreationCallable()
