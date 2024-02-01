@@ -15,6 +15,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNewSceneWithStage.py
     testDirectionalLights.py
     testFlowViewportAPI.py
+    testStageVariants.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py
