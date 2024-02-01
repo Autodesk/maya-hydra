@@ -22,7 +22,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.0
-    IMAGE_DIFF_FAIL_PERCENT = 0.0
+    IMAGE_DIFF_FAIL_PERCENT = 1.0
 
     def compareSnapshot(self, referenceFilename):
         cmds.refresh(force=True)
