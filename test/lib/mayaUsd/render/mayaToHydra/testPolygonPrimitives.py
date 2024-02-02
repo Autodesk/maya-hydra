@@ -43,6 +43,15 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
             horizontalDivisions=1,
             verticalDivisions=1,
             mergeVertices=True)
+
+    def setupSuperShapeHelix(self, polyCreatorNodeName):
+        cmds.setAttr(polyCreatorNodeName + ".mergeVertices", False)
+        cmds.setAttr(polyCreatorNodeName + ".horizontalRevolutions", 1)
+        cmds.setAttr(polyCreatorNodeName + ".verticalRevolutions", 1)
+        cmds.setAttr(polyCreatorNodeName + ".verticalOffset", 2)
+        cmds.setAttr(polyCreatorNodeName + ".internalRadius", 2)
+        cmds.setAttr(polyCreatorNodeName + ".xOffset", 0.25)
+        cmds.setAttr(polyCreatorNodeName + ".zOffset", 0.75)
     
     # Cube attributes is a superset of plane attributes
     def test_PolygonCube(self):
@@ -276,9 +285,15 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         cmds.setAttr(polyCreatorNodeName + ".heightBaseline", 0.5)
         cmds.setAttr(polyCreatorNodeName + ".horizontalDivisions", 4)
         cmds.setAttr(polyCreatorNodeName + ".verticalDivisions", 4)
-        cmds.setAttr(polyCreatorNodeName + ".ellipse0", 1.25)
+        cmds.setAttr(polyCreatorNodeName + ".ellipse0", 0.75)
         cmds.setAttr(polyCreatorNodeName + ".ellipse1", 1.25)
         self.compareSnapshot("superEllipse_modified.png")
+
+        cmds.setAttr(polyCreatorNodeName + ".ellipseMirror", True)
+        self.compareSnapshot("superEllipse_mirror.png")
+
+        self.setupSuperShapeHelix(polyCreatorNodeName)
+        self.compareSnapshot("superEllipse_helix.png")
 
     def test_PolygonSphericalHarmonics(self):
         polyCreatorNodeName = self.setupScene(self.getSuperShapeCreationCallable("SphericalHarmonics"))[1]
@@ -297,6 +312,9 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         cmds.setAttr(polyCreatorNodeName + ".harmonics6", 0.1)
         cmds.setAttr(polyCreatorNodeName + ".harmonics7", 2)
         self.compareSnapshot("sphericalHarmonics_modified.png")
+
+        self.setupSuperShapeHelix(polyCreatorNodeName)
+        self.compareSnapshot("sphericalHarmonics_helix.png")
 
     def test_PolygonUltra(self):
         polyCreatorNodeName = self.setupScene(self.getSuperShapeCreationCallable("UltraShape"))[1]
@@ -325,6 +343,9 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         cmds.setAttr(polyCreatorNodeName + ".ultra14", 2) # Vertical Exponent 4
         cmds.setAttr(polyCreatorNodeName + ".ultra15", 1.5) # Vertical Exponent 5
         self.compareSnapshot("ultra_modified.png")
+
+        self.setupSuperShapeHelix(polyCreatorNodeName)
+        self.compareSnapshot("ultra_helix.png")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
