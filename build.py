@@ -486,7 +486,7 @@ def BuildAndInstall(context, buildArgs, stages):
         
         if context.mayaUsdLocation:
             extraArgs.append('-DMAYAUSD_LOCATION="{mayaUsdLocation}"'
-                             .format(mayaUsdLocation=context.mayaUsdLocation))
+                             .format(mayaUsdLocation=context.mayaUsdLocation.replace("\\","/")))
 
         if context.pxrUsdLocation:
             extraArgs.append('-DPXR_USD_LOCATION="{pxrUsdLocation}"'
@@ -645,7 +645,7 @@ class InstallContext:
                                 if args.maya_location else None)
 
         # MayaUsd Location
-        self.mayaUsdLocation = (os.path.abspath(args.mayausd_location)
+        self.mayaUsdLocation = (os.path.abspath(args.mayausd_location).replace("\\","/")
                                 if args.mayausd_location else None)
         
         # PXR USD Location

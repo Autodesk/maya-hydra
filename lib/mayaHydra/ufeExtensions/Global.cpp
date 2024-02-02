@@ -36,7 +36,6 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 constexpr char kMayaRunTimeName[] = "Maya-DG";
 constexpr char kUSDRunTimeName[] = "USD";
-constexpr char kSdfPathSeparator = '/';
 
 Ufe::Rtid getMayaRunTimeId()
 {
@@ -83,27 +82,28 @@ MDagPath ufeToDagPath(const Ufe::Path& ufePath)
 /// desired runtime id as a parameter.
 ///
 //! \return Ufe PathSegment
-Ufe::PathSegment sdfPathToUfePathSegment(const SdfPath& usdPath, Ufe::Rtid rtid)
+Ufe::PathSegment sdfPathToUfePathSegment(const SdfPath& usdPath, Ufe::Rtid rtid, int instanceIndex/*= ALL_INSTANCES*/)
 {
+    static const char separator = SdfPathTokens->childDelimiter.GetText()[0u];
+
     if (!TF_VERIFY(!usdPath.IsEmpty())) {
         // Return an empty segment.
-        return Ufe::PathSegment(Ufe::PathSegment::Components(), rtid, kSdfPathSeparator);
+        return Ufe::PathSegment(Ufe::PathSegment::Components(), rtid, separator);
     }
 
     std::string pathString = usdPath.GetString();
 
-    // MAYA-128021: instances are not currently supported
-    // if (instanceIndex >= 0) {
-    //    // Note here that we're taking advantage of the fact that identifiers
-    //    // in SdfPaths must be C/Python identifiers; that is, they must *not*
-    //    // begin with a digit. This means that when we see a path component at
-    //    // the end of a USD path segment that does begin with a digit, we can
-    //    // be sure that it represents an instance index and not a prim or other
-    //    // USD entity.
-    //    pathString += TfStringPrintf("%c%d", separator, instanceIndex);
-    //}
+    if (instanceIndex >= 0) {
+        // Note here that we're taking advantage of the fact that identifiers
+        // in SdfPaths must be C/Python identifiers; that is, they must *not*
+        // begin with a digit. This means that when we see a path component at
+        // the end of a USD path segment that does begin with a digit, we can
+        // be sure that it represents an instance index and not a prim or other
+        // USD entity.
+        pathString += TfStringPrintf("%c%d", separator, instanceIndex);
+    }
 
-    return Ufe::PathSegment(pathString, rtid, kSdfPathSeparator);
+    return Ufe::PathSegment(pathString, rtid, separator);
 }
 
 Ufe::PathSegment dagPathToUfePathSegment(const MDagPath& dagPath)
