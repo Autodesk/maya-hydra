@@ -54,9 +54,6 @@ class MayaHydraBaseTestCase(unittest.TestCase):
         fixturesUtils.readOnlySetUpClass(cls._file, 'mayaHydra', 
                                          initializeStandalone=False)
 
-    def setUp(self):
-        cmds.file(new=True, force=True)
-
     def setHdStormRenderer(self):
         self.activeEditor = cmds.playblast(activeEditor=1)
         cmds.modelEditor(
