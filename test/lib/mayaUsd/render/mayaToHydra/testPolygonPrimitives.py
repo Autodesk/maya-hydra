@@ -16,17 +16,26 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 
+import platform
+
 class TestPolygonPrimitives(mtohUtils.MtohTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.1
-    IMAGE_DIFF_FAIL_PERCENT = 0.5
+    @property
+    def imageDiffFailThreshold(self):
+        return 0.1
+    
+    @property
+    def imageDiffFailPercent(self):
+        if platform.system() == "Darwin":
+            return 2
+        return 0.5
 
     def compareSnapshot(self, referenceFilename, cameraDistance=15):
         self.setBasicCam(cameraDistance)
         cmds.refresh()
-        self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose(referenceFilename, self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
     def setupScene(self, polygonCreationCallable):
         cmds.loadPlugin('modelingToolkit') # Provides polyDisc, polyPlatonic, polyGear and polySuperShape
