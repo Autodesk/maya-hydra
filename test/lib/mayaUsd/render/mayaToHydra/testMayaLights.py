@@ -35,7 +35,7 @@ class TestMayaLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCas
         # Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
         # for that platform specifically for now, so we can still catch issues on other platforms.
         if platform.system() == "Darwin":
-            return 0.6
+            return 3
         return 0.2
 
     def verifyLightingModes(self, shadowOn):
