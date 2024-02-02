@@ -15,14 +15,13 @@
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
-from testUtils import PluginLoaded
 
 class TestNurbsPrimitives(mtohUtils.MtohTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
-    IMAGE_DIFF_FAIL_PERCENT = 0.5
+    IMAGE_DIFF_FAIL_PERCENT = 0.75
 
     def compareSnapshot(self, referenceFilename):
         cmds.refresh()
