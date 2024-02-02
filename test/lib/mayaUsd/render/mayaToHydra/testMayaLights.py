@@ -20,12 +20,23 @@ import mtohUtils
 import mayaUtils
 import unittest
 
+import platform
+
 class TestMayaLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.2
+    @property
+    def imageDiffFailThreshold(self):
+        return 0.01
+    
+    @property
+    def imageDiffFailPercent(self):
+        # Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
+        # for that platform specifically for now, so we can still catch issues on other platforms.
+        if platform.system() == "Darwin":
+            return 3
+        return 0.2
 
     def verifyLightingModes(self, shadowOn):
         imageSuffix = "_shadowOn" if shadowOn else ""
@@ -37,12 +48,12 @@ class TestMayaLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCas
         #All Lights mode
         cmds.modelEditor(panel, edit=True, displayLights="all")
         cmds.refresh()
-        self.assertSnapshotClose("allLights" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("allLights" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Default Light mode
         cmds.modelEditor(panel, edit=True, displayLights="default")
         cmds.refresh()
-        self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Selected Light mode
         cmds.modelEditor(panel, edit=True, displayLights="selected")
@@ -50,31 +61,31 @@ class TestMayaLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCas
         #Use Directional Light
         cmds.select( 'directionalLight1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("directionalLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("directionalLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Use Point Light
         #TODO: Enable shadowOn test on point light when it works
         if not shadowOn:
             cmds.select( 'pointLight1', r=True )
             cmds.refresh()
-            self.assertSnapshotClose("pointLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("pointLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Use Spot Light
         cmds.select( 'spotLight1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("spotLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("spotLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Flat Light mode
         #TODO: Enable test on flat lighting mode when it works
         #cmds.modelEditor(panel, edit=True, displayLights="flat")
         #cmds.refresh()
-        #self.assertSnapshotClose("flatLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        #self.assertSnapshotClose("flatLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #No Light mode
         if not shadowOn:
             cmds.modelEditor(panel, edit=True, displayLights="none")
             cmds.refresh()
-            self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
     #Test maya lights (e.g., default,directional,point,spot,etc.) with a maya native sphere and usd sphere.
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
