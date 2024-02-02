@@ -29,7 +29,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def setupScene(self, nurbsCreationCallable):
-        cmds.loadPlugin('ArubaTessellator')
+        cmds.loadPlugin('ArubaTessellator') # Loaded by default in Maya, changes NURBS vertices calculations
         self.setHdStormRenderer()
         nurbsResult = nurbsCreationCallable()
         cmds.refresh()
