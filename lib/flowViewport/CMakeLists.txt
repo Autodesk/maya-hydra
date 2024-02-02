@@ -49,6 +49,7 @@ target_link_libraries(${TARGET_NAME}
         hd
         hdx
         sdf
+        usdImaging
         ${UFE_LIBRARY}
     PRIVATE
         ar

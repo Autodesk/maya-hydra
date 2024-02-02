@@ -29,6 +29,10 @@
 //Std Headers
 #include <set>
 
+//Hydra headers
+#include <pxr/usdImaging/usdImaging/sceneIndices.h>
+
+
 namespace FVP_NS_DEF {
 
 class ViewportInformationAndSceneIndicesPerViewportData;
@@ -43,15 +47,28 @@ public:
     ///Interface accessor
     static FVP_API DataProducerSceneIndexInterfaceImp& get();
 
+    ///Specific internal function for Usd Stages
+    FVP_API PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr addUsdStageSceneIndex( PXR_NS::UsdImagingCreateSceneIndicesInfo& createInfo,
+                                        PXR_NS::HdSceneIndexBaseRefPtr& finalSceneIndex,
+                                        PXR_NS::UsdImagingStageSceneIndexRefPtr& stageSceneIndex,
+                                        PXR_NS::SdfPath& inoutPreFix,
+                                        void* dccNode);
+
+    ///Specific internal function for Usd Stages
+    FVP_API bool addUsdStageDataProducerSceneIndexDataBaseToAllViewports(PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr&  dataProducerSceneIndexData);
+
     ///From FVP_NS_DEF::DataProducerSceneIndexInterface
     bool addDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
+                                    PXR_NS::SdfPath& inoutPreFix,
                                     void* dccNode = nullptr,
                                     const std::string& hydraViewportId = PXR_NS::FvpViewportAPITokens->allViewports,
-                                    const std::string& rendererNames = PXR_NS::FvpViewportAPITokens->allRenderers,
-                                    const PXR_NS::SdfPath& customDataProducerSceneIndexRootPathForInsertion = PXR_NS::SdfPath::AbsoluteRootPath()
+                                    const std::string& rendererNames = PXR_NS::FvpViewportAPITokens->allRenderers
                                     )override;
     void removeViewportDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
                                               const std::string& hydraViewportId = PXR_NS::FvpViewportAPITokens->allViewports)override;
+
+
+    FVP_API void ClearDataProducerSceneIndicesThatApplyToAllViewports();
 
     //Called by flow viewport
     ///hydraViewportSceneIndexAdded is called when a new hydra viewport is created by the ViewportInformationAndSceneIndicesPerViewportDataManager, it's not a callback.
@@ -68,8 +85,13 @@ protected:
     
     PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr _CreateDataProducerSceneIndexData( const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
                                                                 const std::string& rendererNames,
-                                                                const PXR_NS::SdfPath& customDataProducerSceneIndexRootPathForInsertion, 
+                                                                const PXR_NS::SdfPath& prefix, 
                                                                 void* dccNode);
+    PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr _CreateDataProducerSceneIndexDataForUsdStage(PXR_NS::UsdImagingCreateSceneIndicesInfo& createInfo, 
+                                                                                                          PXR_NS::HdSceneIndexBaseRefPtr& finalSceneIndex, 
+                                                                                                          PXR_NS::UsdImagingStageSceneIndexRefPtr& stageSceneIndex,
+                                                                                                              const PXR_NS::SdfPath& inoutPreFix, 
+                                                                                                              void* dccNode);
 };
 
 } //End of namespace FVP_NS_DEF

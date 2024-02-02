@@ -33,6 +33,9 @@ namespace UfeExtensions {
 
 using SdfPath = PXR_NS::SdfPath;
 
+//Copied from usdImaging/usdImaging/delegate.h
+static constexpr int ALL_INSTANCES = -1;
+
 UFEEXTENSIONS_API
 Ufe::Rtid getMayaRunTimeId();
 
@@ -46,7 +49,7 @@ UFEEXTENSIONS_API
 MDagPath ufeToDagPath(const Ufe::Path& ufePath);
 
 UFEEXTENSIONS_API
-Ufe::PathSegment sdfPathToUfePathSegment(const SdfPath& usdPath, Ufe::Rtid rtid);
+Ufe::PathSegment sdfPathToUfePathSegment(const SdfPath& usdPath, Ufe::Rtid rtid, int instanceIndex = ALL_INSTANCES);
 
 UFEEXTENSIONS_API
 Ufe::PathSegment dagPathToUfePathSegment(const MDagPath& dagPath);

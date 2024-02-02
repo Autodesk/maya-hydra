@@ -16,6 +16,7 @@ target_sources(${TARGET_NAME}
     mayaHydraSceneIndexDataFactoriesSetup.cpp
     mayaHydraMayaFilteringSceneIndexData.cpp
     mayaHydraMayaFilteringSceneIndexDataConcreteFactory.cpp
+    mhMayaUsdProxyShapeSceneIndex.cpp
 )
 
 set(HEADERS
@@ -32,6 +33,7 @@ set(HEADERS
     mayaHydraSceneIndexDataFactoriesSetup.h
     mayaHydraMayaFilteringSceneIndexData.h
     mayaHydraMayaFilteringSceneIndexDataConcreteFactory.h
+    mhMayaUsdProxyShapeSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------

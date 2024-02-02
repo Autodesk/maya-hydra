@@ -58,7 +58,7 @@ namespace FVP_NS_DEF
         *  @param[in]      rendererNames is the names of the renderers you want this client to be associated to.
         *                  If there are several, separate them with for example a coma, like "GL, Arnold", we actually look for the renderer name in this string.
         *                  If you want your client to work on any renderer please use FvpViewportAPITokens->allRenderers.
-        *  @param[in]      dccNode is a MObject* for Maya, if you provide the pointer value, then we automatically track some events such as visibility changed, 
+        *  @param[in]      dccNode is a MObject* DAG node for Maya, if you provide the pointer value, then we automatically track some events such as visibility changed, 
         *                  node deleted/undeleted and we remove/add automatically your filtering scene indices from the viewport. Meaning if the maya node is visible your filtering
         *                  scene indices are applied to the scene, if the node is not visible (or deleted) your filtering scene indices are removed from the scene.
         *                  If it is a nullptr, your filtering scene indices will stay applied to the viewport(s) until you remove them.
@@ -145,7 +145,7 @@ namespace FVP_NS_DEF
         */
         const std::string _rendererNames   = PXR_NS::FvpViewportAPITokens->allRenderers;
 
-        /**_dccNode is a MObject* for Maya, if you provide the pointer value, then we automatically track some events such as visibility changed, 
+        /**_dccNode is a MObject* DAG node for Maya, if you provide the pointer value, then we automatically track some events such as visibility changed, 
         *  node deleted/undeleted and we remove/add automatically your filtering scene indices from the viewport. Meaning if the maya node is visible your filtering
         *  scene indices are applied to the scene, if the node is not visible (or deleted) your filtering scene indices are removed from the scene.
         *  If it is a nullptr, your filtering scene indices will stay applied to the viewport(s) until you remove them.

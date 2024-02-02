@@ -71,8 +71,6 @@ struct MayaHydraSceneIndexRegistration
  * type checking the node for the one defined and also instantiate the corresponding scene index
  * inside _AppendSceneIndex. The scene index returned by _AppendSceneIndex is then added to the
  * render index by Maya.
- *
- * See registration.cpp file for a code snippet.
  */
 class MayaHydraSceneIndexRegistry
 {

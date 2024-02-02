@@ -30,6 +30,13 @@ public:
     /// The DCC will create a subclass of DataProducerSceneIndexDataBaseRefPtr with specific DCC variables that Flow viewport cannot manage since it's DCC agnostic
     virtual PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr   createDataProducerSceneIndexDataBase(
         const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params) = 0;
+
+    /** The DCC will create a subclass of DataProducerSceneIndexDataBaseRefPtr with specific DCC variables that Flow viewport cannot manage since it's DCC agnostic
+    * This function is specific for Usd Stages
+    */
+    virtual PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr   createDataProducerSceneIndexDataBaseForUsdStage(
+        PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParametersForUsdStage& params) = 0;
+    
 };
 
 }//End of namespace FVP_NS_DEF {

@@ -16,10 +16,8 @@
 // Copyright 2023 Autodesk, Inc. All rights reserved.
 //
 
-#if !defined(MAYAUSD_VERSION)
 // GL loading library needs to be included before any other OpenGL headers.
 #include <pxr/imaging/garch/glApi.h>
-#endif
 
 #include "renderOverride.h"
 
@@ -43,6 +41,7 @@
 #include <flowViewport/selection/fvpSelection.h>
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
+#include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -59,25 +58,6 @@
 #include <ufe/observer.h>
 
 #include <ufeExtensions/Global.h>
-
-#if defined(MAYAUSD_VERSION)
-#include <mayaUsd/render/px_vp20/utils.h>
-#include <mayaUsd/utils/hash.h>
-#else
-namespace MayaUsd {
-// hash combiner taken from:
-// http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0814r0.pdf
-
-// boost::hash implementation also relies on the same algorithm:
-// https://www.boost.org/doc/libs/1_64_0/boost/functional/hash/hash.hpp
-
-template <typename T> inline void hash_combine(std::size_t& seed, const T& value)
-{
-    ::std::hash<T> hasher;
-    seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-}
-} // namespace MayaUsd
-#endif
 
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/tf/instantiateSingleton.h>
@@ -297,7 +277,8 @@ MtohRenderOverride::~MtohRenderOverride()
     if (_timerCallback)
         MMessage::removeCallback(_timerCallback);
 
-    ClearHydraResources();
+    constexpr bool fullReset = true;
+    ClearHydraResources(fullReset);
 
     for (auto operation : _operations) {
         delete operation;
@@ -569,7 +550,8 @@ MStatus MtohRenderOverride::Render(
 
     _DetectMayaDefaultLighting(drawContext);
     if (_needsClear.exchange(false)) {
-        ClearHydraResources();
+        constexpr bool fullReset = false;
+        ClearHydraResources(fullReset);
     }
 
     if (!_initializationAttempted) {
@@ -828,7 +810,10 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     _initializationSucceeded = true;
 }
 
-void MtohRenderOverride::ClearHydraResources()
+//When fullReset is true, we remove the data producer scene indices that apply to all viewports and the scene index registry where the usd stages have been loaded.
+//It means you are doing a full reset of hydra such as when doing "File New".
+//Use fullReset = false when you still want to see the previously registered data producer scene indices when using an hydra viewport.
+void MtohRenderOverride::ClearHydraResources(bool fullReset)
 {
     if (!_initializationAttempted) {
         return;
@@ -839,6 +824,13 @@ void MtohRenderOverride::ClearHydraResources()
 
     //We don't have any viewport using Hydra any more
     Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveAllViewportsInformation();
+    
+    if (fullReset){
+        //Remove the data producer scene indices that apply to all viewports
+        Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViewports();
+        //Remove the scene index registry
+        _sceneIndexRegistry.reset();
+    }
 
     _mayaHydraSceneProducer.reset();
     _selectionSceneIndex.Reset();
@@ -864,8 +856,6 @@ void MtohRenderOverride::ClearHydraResources()
         HdRendererPluginRegistry::GetInstance().ReleasePlugin(_rendererPlugin);
         _rendererPlugin = nullptr;
     }
-
-    _sceneIndexRegistry.reset();
 
     //Decrease ref count on the render index proxy which owns the merging scene index at the end of this function as some previous calls may likely use it to remove some scene indices
     _renderIndexProxy.reset();
@@ -914,7 +904,8 @@ void MtohRenderOverride::_RemovePanel(MString panelName)
     }
 
     if (_renderPanelCallbacks.empty()) {
-        ClearHydraResources();
+        constexpr bool fullReset = false;
+        ClearHydraResources(fullReset);
     }
 }
 
@@ -1099,14 +1090,19 @@ void MtohRenderOverride::_PopulateSelectionList(
                     = _sceneIndexRegistry->GetSceneIndexRegistrationForRprim(pickedPath))
                 // Scene index is incompatible with UFE. Skip
                 {
-                    // Remove scene index plugin path prefix to obtain local picked path with
+                    // Keep the path after the scene index plugin path prefix to obtain local picked path with
                     // respect to current scene index. This is because the scene index was inserted
                     // into the render index using a custom prefix. As a result the scene index
                     // prefix will be prepended to rprims tied to that scene index automatically.
-                    SdfPath localPath(
-                        pickedPath.ReplacePrefix(registration->sceneIndexPathPrefix, SdfPath("/")));
+                    const SdfPath& sceneIndexPathPrefix = registration->sceneIndexPathPrefix;
+                    if ( ! pickedPath.HasPrefix(sceneIndexPathPrefix)){
+                        TF_CODING_ERROR("pickedPathAsString.find(sceneIndexPathPrefixAsString) returned std::string::npos !");
+                        return;
+                    }
+                    const SdfPath relativePath = pickedPath.MakeRelativePath(sceneIndexPathPrefix);
+                    
                     Ufe::Path interpretedPath(registration->interpretRprimPathFn(
-                        registration->pluginSceneIndex, localPath));
+                        registration->pluginSceneIndex, relativePath));
 
                     // If this is a maya UFE path, then select using MSelectionList
                     // This is because the NamedSelection ignores Ufe items made from maya ufe path
@@ -1280,7 +1276,8 @@ void MtohRenderOverride::_ClearHydraCallback(void* data)
     if (!TF_VERIFY(instance)) {
         return;
     }
-    instance->ClearHydraResources();
+    constexpr bool fullReset = true;
+    instance->ClearHydraResources(fullReset);
 }
 
 void MtohRenderOverride::_PlayblastingChanged(bool playBlasting, void* userData)

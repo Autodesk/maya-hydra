@@ -23,6 +23,7 @@
 //Hydra headers
 #include <pxr/base/tf/declarePtrs.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
+#include <pxr/usdImaging/usdImaging/sceneIndices.h>
 
 //The Pixar's namespace needs to be at the highest namespace level for TF_DECLARE_WEAK_AND_REF_PTRS to work.
 PXR_NAMESPACE_OPEN_SCOPE
@@ -44,17 +45,32 @@ public:
     {
         CreationParameters( const HdSceneIndexBaseRefPtr&   customDataProducerSceneIndex,
                             const std::string&              rendererNames,
-                            const SdfPath&                  customDataProducerSceneIndexRootPathForInsertion,
+                            const SdfPath&                  prefix,
                             void*                           dccNode) :
             _customDataProducerSceneIndex(customDataProducerSceneIndex), _rendererNames(rendererNames),
-            _customDataProducerSceneIndexRootPathForInsertion(customDataProducerSceneIndexRootPathForInsertion),_dccNode(dccNode)
+            _prefix(prefix),_dccNode(dccNode)
         {}
 
         //See below for an explanation of these parameters
         const HdSceneIndexBaseRefPtr&   _customDataProducerSceneIndex;
         const std::string&              _rendererNames;
-        const SdfPath&                  _customDataProducerSceneIndexRootPathForInsertion;
+        const SdfPath&                  _prefix;
         void*                           _dccNode;
+    };
+
+    struct CreationParametersForUsdStage
+    {
+        CreationParametersForUsdStage(UsdImagingCreateSceneIndicesInfo& createInfo, HdSceneIndexBaseRefPtr& finalSceneIndex, 
+                                      UsdImagingStageSceneIndexRefPtr& stageSceneIndex, const SdfPath& prefix, void* dccNode)
+            : _createInfo(createInfo), _finalSceneIndex(finalSceneIndex), _stageSceneIndex(stageSceneIndex), _prefix(prefix),_dccNode(dccNode)
+        {}
+
+        //See below for an explanation of these parameters
+        UsdImagingCreateSceneIndicesInfo& _createInfo;
+        HdSceneIndexBaseRefPtr& _finalSceneIndex;
+        UsdImagingStageSceneIndexRefPtr& _stageSceneIndex;
+        const SdfPath& _prefix;
+        void* _dccNode;
     };
 
     ~DataProducerSceneIndexDataBase() override = default;
@@ -62,9 +78,13 @@ public:
     virtual void AddParentPrimToSceneIndex();
     virtual void RemoveParentPrimFromSceneIndex();
 
+    //Used to set the usd stage scene indices
+    void SetDataProducerSceneIndex(const HdSceneIndexBaseRefPtr& sceneIndex) {_dataProducerSceneIndex = sceneIndex;}
+    void SetDataProducerLastSceneIndexChain(const HdSceneIndexBaseRefPtr& sceneIndex) {_lastSceneIndexChain = sceneIndex;}
+
     const HdSceneIndexBaseRefPtr&   GetDataProducerSceneIndex() const {return _dataProducerSceneIndex;}
     const HdSceneIndexBaseRefPtr&   GetDataProducerLastSceneIndexChain() const {return _lastSceneIndexChain;}
-    const SdfPath&                  GetCustomDataProducerSceneIndexRootPathForInsertion()const{return _customDataProducerSceneIndexRootPathForInsertion;}
+    const SdfPath&                  GetPrefix()const{return _prefix;}
     const std::string&              GetRendererNames() const {return _rendererNames;}
 
     /// Provide the node name from the DCC to be overriden in a DCC specific subclass
@@ -76,23 +96,30 @@ public:
 protected:
 
     void _CreateSceneIndexChainForDataProducerSceneIndex();
+    void _CreateSceneIndexChainForDataProducerSceneIndexWithDCCNode(HdSceneIndexBaseRefPtr const & inputSceneIndex);
+    void _CreateSceneIndexChainForDataProducerSceneIndexWithoutDCCNode(HdSceneIndexBaseRefPtr const & inputSceneIndex);
+    void _CreateSceneIndexChainForUsdStageSceneIndex(CreationParametersForUsdStage& params);
+
+    //Callback for UsdImagingCreateSceneIndicesInfo.OverridesSceneIndexCallback
+    //Set the overridesSceneIndexCallback to insert our scene indices chain after the stage scene index and before the flatten scene index
+    //If we don't do so, we cannot add a parent which will apply its matrix to the children because of the flatten scene index in the usd stage chain.
+    PXR_NS::HdSceneIndexBaseRefPtr _CreateUsdStageSceneIndexChain(PXR_NS::HdSceneIndexBaseRefPtr const & inputStageSceneIndex);
     DataProducerSceneIndexDataBase(const CreationParameters& params);
+    DataProducerSceneIndexDataBase(const CreationParametersForUsdStage& params);
 
     /// data producer scene index
     HdSceneIndexBaseRefPtr              _dataProducerSceneIndex = nullptr;
     /// data producer scene index rootPath for insertion (used in HdRenderIndex::InsertSceneIndex)
-    SdfPath                             _customDataProducerSceneIndexRootPathForInsertion;
+    SdfPath                             _prefix;
     /// Are the Hydra renderer(s) to which this scene index should be applied (e.g : "GL, Arnold") or DataProducerSceneIndexInterface::allViewports to apply to all viewports
     std::string                         _rendererNames;
-    /// Is the DCC node so a MObject* for Maya
+    /// Is the DCC node so a MObject* DAG node for Maya
     void*                               _dccNode;
 
     //The following members are optional and only used when a dccNode was passed in the constructor
     /** Is a filtering scene index that modifies the parent prim from the retained scene index to update the transform/visibility when it is updated in the DCC. 
     It is used only when a dccNode was passed.*/
     ParentDataModifierSceneIndexRefPtr  _parentDataModifierSceneIndex = nullptr;
-    /// ParentPath prim used to be the parent of all prims from _dataProducerSceneIndex, used only when a dccNode was passed
-    SdfPath                             _parentPath;
     /// Is the last scene index of the scene index chain when a dccNode was passed.
     HdSceneIndexBaseRefPtr              _lastSceneIndexChain = nullptr;
     /// Is the retained scene index holding the parent prim for _dataProducerSceneIndex. It is used only when a dccNode was passed.
