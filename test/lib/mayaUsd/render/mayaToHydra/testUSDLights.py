@@ -19,13 +19,23 @@ import fixturesUtils
 import mtohUtils
 import mayaUtils
 import unittest
+import platform
 
 class TestUSDLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 1
+    @property
+    def imageDiffFailThreshold(self):
+        return 0.01
+
+    @property
+    def imageDiffFailPercent(self):
+        # Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
+        # for that platform specifically for now, so we can still catch issues on other platforms.
+        if platform.system() == "Darwin":
+            return 5
+        return 0.2
 
     def verifyLightingModes(self, shadowOn):
         imageSuffix = "_shadowOn" if shadowOn else ""
@@ -37,13 +47,13 @@ class TestUSDLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase
         #All Lights mode
         cmds.modelEditor(panel, edit=True, displayLights="all")
         cmds.refresh()
-        self.assertSnapshotClose("allLights" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("allLights" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #TODO: Enable code below when those lighting modes are supported by usd lights
         #Default Light mode
         #cmds.modelEditor(panel, edit=True, displayLights="default")
         #cmds.refresh()
-        #self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        #self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Selected Light mode
         #cmds.modelEditor(panel, edit=True, displayLights="selected")
@@ -51,25 +61,25 @@ class TestUSDLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase
 
         #cmds.select( 'distantLight1', r=True )
         #cmds.refresh()
-        #self.assertSnapshotClose("directionalLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        #self.assertSnapshotClose("directionalLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #cmds.select( 'diskLight1', r=True )
         #cmds.refresh()
-        #self.assertSnapshotClose("pointLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        #self.assertSnapshotClose("pointLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #cmds.select( 'domeLight1', r=True )
         #cmds.refresh()
-        #self.assertSnapshotClose("spotLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        #self.assertSnapshotClose("spotLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Flat Light mode
         #cmds.modelEditor(panel, edit=True, displayLights="flat")
         #cmds.refresh()
-        #self.assertSnapshotClose("flatLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        #self.assertSnapshotClose("flatLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #No Light mode
         #cmds.modelEditor(panel, edit=True, displayLights="none")
         #cmds.refresh()
-        #self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        #self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
     #Test usd lights (e.g., disk,distant,dome,etc.) with a maya native sphere and usd sphere.
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
