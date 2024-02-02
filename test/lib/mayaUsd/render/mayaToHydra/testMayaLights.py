@@ -32,6 +32,8 @@ class TestMayaLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCas
     
     @property
     def imageDiffFailPercent():
+        # Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
+        # for that platform specifically for now, so we can still catch issues on other platforms.
         if platform.system() == "Darwin":
             return 0.6
         return 0.2
