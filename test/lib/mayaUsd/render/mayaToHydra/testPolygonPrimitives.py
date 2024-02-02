@@ -35,6 +35,15 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         cmds.refresh()
         return polygonResult
     
+    def getSuperShapeCreationCallable(self, shapeType):
+        # Base parameters to have an actually visible mesh
+        return lambda: cmds.polySuperShape(
+            shape=shapeType,
+            radius=1,
+            horizontalDivisions=1,
+            verticalDivisions=1,
+            mergeVertices=True)
+    
     # Cube attributes is a superset of plane attributes
     def test_PolygonCube(self):
         polyCreatorNodeName = self.setupScene(cmds.polyCube)[1]
@@ -258,6 +267,64 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         cmds.setAttr(polyCreatorNodeName + ".axisY", 2)
         cmds.setAttr(polyCreatorNodeName + ".axisZ", -1)
         self.compareSnapshot("soccerball_modified.png")
+
+    def test_PolygonSuperEllipse(self):
+        polyCreatorNodeName = self.setupScene(self.getSuperShapeCreationCallable("SuperEllipse"))[1]
+        self.compareSnapshot("superEllipse_fresh.png")
+        
+        cmds.setAttr(polyCreatorNodeName + ".radius", 5)
+        cmds.setAttr(polyCreatorNodeName + ".heightBaseline", 0.5)
+        cmds.setAttr(polyCreatorNodeName + ".horizontalDivisions", 4)
+        cmds.setAttr(polyCreatorNodeName + ".verticalDivisions", 4)
+        cmds.setAttr(polyCreatorNodeName + ".ellipse0", 1.25)
+        cmds.setAttr(polyCreatorNodeName + ".ellipse1", 1.25)
+        self.compareSnapshot("superEllipse_modified.png")
+
+    def test_PolygonSphericalHarmonics(self):
+        polyCreatorNodeName = self.setupScene(self.getSuperShapeCreationCallable("SphericalHarmonics"))[1]
+        self.compareSnapshot("sphericalHarmonics_fresh.png")
+        
+        cmds.setAttr(polyCreatorNodeName + ".radius", 5)
+        cmds.setAttr(polyCreatorNodeName + ".heightBaseline", 0.5)
+        cmds.setAttr(polyCreatorNodeName + ".horizontalDivisions", 4)
+        cmds.setAttr(polyCreatorNodeName + ".verticalDivisions", 4)
+        cmds.setAttr(polyCreatorNodeName + ".harmonics0", 1)
+        cmds.setAttr(polyCreatorNodeName + ".harmonics1", 2)
+        cmds.setAttr(polyCreatorNodeName + ".harmonics2", 1)
+        cmds.setAttr(polyCreatorNodeName + ".harmonics3", 2)
+        cmds.setAttr(polyCreatorNodeName + ".harmonics4", 0.1)
+        cmds.setAttr(polyCreatorNodeName + ".harmonics5", 2)
+        cmds.setAttr(polyCreatorNodeName + ".harmonics6", 0.1)
+        cmds.setAttr(polyCreatorNodeName + ".harmonics7", 2)
+        self.compareSnapshot("sphericalHarmonics_modified.png")
+
+    def test_PolygonUltra(self):
+        polyCreatorNodeName = self.setupScene(self.getSuperShapeCreationCallable("UltraShape"))[1]
+        self.compareSnapshot("ultra_fresh.png")
+        
+        cmds.setAttr(polyCreatorNodeName + ".radius", 5)
+        cmds.setAttr(polyCreatorNodeName + ".heightBaseline", 0.5)
+        cmds.setAttr(polyCreatorNodeName + ".horizontalDivisions", 4)
+        cmds.setAttr(polyCreatorNodeName + ".verticalDivisions", 4)
+        # Horizontal attributes
+        cmds.setAttr(polyCreatorNodeName + ".ultra0", 2) # Horizontal Multiplier 1
+        cmds.setAttr(polyCreatorNodeName + ".ultra1", 2) # Horizontal Exponent 1
+        cmds.setAttr(polyCreatorNodeName + ".ultra2", 2) # Horizontal Exponent 2
+        cmds.setAttr(polyCreatorNodeName + ".ultra3", 0.25) # Horizontal Mixer
+        cmds.setAttr(polyCreatorNodeName + ".ultra4", 3) # Horizontal Multiplier 2
+        cmds.setAttr(polyCreatorNodeName + ".ultra5", 3) # Horizontal Exponent 3
+        cmds.setAttr(polyCreatorNodeName + ".ultra6", 3) # Horizontal Exponent 4
+        cmds.setAttr(polyCreatorNodeName + ".ultra7", 1.5) # Horizontal Exponent 5
+        # Vertical attributes
+        cmds.setAttr(polyCreatorNodeName + ".ultra8", 3) # Vertical Multiplier 1
+        cmds.setAttr(polyCreatorNodeName + ".ultra9", 3) # Vertical Exponent 1
+        cmds.setAttr(polyCreatorNodeName + ".ultra10", 3) # Vertical Exponent 2
+        cmds.setAttr(polyCreatorNodeName + ".ultra11", 0.75) # Vertical Mixer
+        cmds.setAttr(polyCreatorNodeName + ".ultra12", 2) # Vertical Multiplier 2
+        cmds.setAttr(polyCreatorNodeName + ".ultra13", 2) # Vertical Exponent 3
+        cmds.setAttr(polyCreatorNodeName + ".ultra14", 2) # Vertical Exponent 4
+        cmds.setAttr(polyCreatorNodeName + ".ultra15", 1.5) # Vertical Exponent 5
+        self.compareSnapshot("ultra_modified.png")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
