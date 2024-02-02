@@ -112,6 +112,9 @@ public:
         const MHWRender::MDrawContext&                         drawContext,
         const MHWRender::MDataServerOperation::MViewportScene& scene);
 
+    ///When fullReset is true, we remove the data producer scene indices that apply to all viewports and the scene index registry where the usd stages have been loaded.
+    ///It means you are doing a full reset of hydra such as when doing "File New".
+    ///Use fullReset = false when you still want to see the previously registered data producer scene indices when using an hydra viewport.
     void ClearHydraResources(bool fullReset);
     void SelectionChanged(const Ufe::SelectionChanged& notification);
     void SetRenderPurposeTags(const MayaHydraParams& delegateParams) { _SetRenderPurposeTags(delegateParams); };

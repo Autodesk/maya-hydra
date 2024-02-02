@@ -277,7 +277,7 @@ MtohRenderOverride::~MtohRenderOverride()
     if (_timerCallback)
         MMessage::removeCallback(_timerCallback);
 
-    static const bool fullReset = true;
+    constexpr bool fullReset = true;
     ClearHydraResources(fullReset);
 
     for (auto operation : _operations) {
@@ -550,7 +550,7 @@ MStatus MtohRenderOverride::Render(
 
     _DetectMayaDefaultLighting(drawContext);
     if (_needsClear.exchange(false)) {
-        static const bool fullReset = false;
+        constexpr bool fullReset = false;
         ClearHydraResources(fullReset);
     }
 
@@ -810,6 +810,9 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     _initializationSucceeded = true;
 }
 
+//When fullReset is true, we remove the data producer scene indices that apply to all viewports and the scene index registry where the usd stages have been loaded.
+//It means you are doing a full reset of hydra such as when doing "File New".
+//Use fullReset = false when you still want to see the previously registered data producer scene indices when using an hydra viewport.
 void MtohRenderOverride::ClearHydraResources(bool fullReset)
 {
     if (!_initializationAttempted) {
@@ -901,7 +904,7 @@ void MtohRenderOverride::_RemovePanel(MString panelName)
     }
 
     if (_renderPanelCallbacks.empty()) {
-        static const bool fullReset = false;
+        constexpr bool fullReset = false;
         ClearHydraResources(fullReset);
     }
 }
@@ -1273,7 +1276,7 @@ void MtohRenderOverride::_ClearHydraCallback(void* data)
     if (!TF_VERIFY(instance)) {
         return;
     }
-    static const bool fullReset = true;
+    constexpr bool fullReset = true;
     instance->ClearHydraResources(fullReset);
 }
 
