@@ -23,14 +23,14 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 0.75
 
-    def compareSnapshot(self, referenceFilename):
+    def compareSnapshot(self, referenceFilename, cameraDistance=10):
+        self.setBasicCam(cameraDistance)
         cmds.refresh()
         self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def setupScene(self, nurbsCreationCallable):
         cmds.loadPlugin('ArubaTessellator')
         self.setHdStormRenderer()
-        self.setBasicCam(10)
         nurbsResult = nurbsCreationCallable()
         cmds.refresh()
         return nurbsResult
@@ -38,7 +38,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
     # Torus attributes is a superset of sphere, cone, and cylinder attributes
     def test_NurbsTorus(self):
         makeNurbNodeName = self.setupScene(cmds.torus)[1]
-        self.compareSnapshot("torus_fresh.png")
+        self.compareSnapshot("torus_fresh.png", 5)
         
         cmds.setAttr(makeNurbNodeName + ".startSweep", 50)
         cmds.setAttr(makeNurbNodeName + ".endSweep", 300)
@@ -57,7 +57,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
     # Cube attributes is a superset of plane attributes
     def test_NurbsCube(self):
         makeNurbNodeName = self.setupScene(cmds.nurbsCube)[1]
-        self.compareSnapshot("cube_fresh.png")
+        self.compareSnapshot("cube_fresh.png", 5)
 
         cmds.setAttr(makeNurbNodeName + ".degree", 1)
         cmds.setAttr(makeNurbNodeName + ".patchesU", 2)
@@ -69,7 +69,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
 
     def test_NurbsCircle(self):
         makeNurbNodeName = self.setupScene(cmds.circle)[1]
-        self.compareSnapshot("circle_fresh.png")
+        self.compareSnapshot("circle_fresh.png", 5)
 
         cmds.setAttr(makeNurbNodeName + ".sweep", 180)
         cmds.setAttr(makeNurbNodeName + ".radius", 2)
@@ -95,7 +95,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
 
     def test_NurbsSquare(self):
         makeNurbNodeName = self.setupScene(cmds.nurbsSquare)[1]
-        self.compareSnapshot("square_fresh.png")
+        self.compareSnapshot("square_fresh.png", 5)
 
         cmds.setAttr(makeNurbNodeName + ".sideLength1", 2)
         cmds.setAttr(makeNurbNodeName + ".sideLength2", 3)
