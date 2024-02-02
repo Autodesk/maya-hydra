@@ -186,6 +186,14 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             self.setHdStormRenderer()
             self.assertSnapshotClose("filter_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
+            #Test unfiltering the sphere after switching renderers (HYDRA-747)
+            self.setViewport2Renderer()
+            cmds.xform(sphereNode, translation=[0,5,0], scale=[4,4,4])
+            self.setHdStormRenderer()
+            cmds.setAttr(sphereShape + '.subdivisionsAxis', 30) #Unfilter the prim
+            cmds.refresh()
+            self.assertSnapshotClose("filter_VP2AndThenBackToStorm_MovedSphereUnFiltered.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
             #Finish by a File New command
             cmds.file(new=True, force=True)
     
