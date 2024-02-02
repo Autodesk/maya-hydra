@@ -13,7 +13,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStageAddPrim.py
     testTransforms.py
     testNewSceneWithStage.py
-    testDirectionalLights.py
+    testMayaLights.py
     testFlowViewportAPI.py
     testStageVariants.py
     cpp/testColorPreferences.py
