@@ -1,3 +1,2 @@
-if(BUILD_MAYAHYDRALIB)
-    add_subdirectory(mayaToHydra)
-endif()
+add_subdirectory(mayaToHydra)
+

@@ -40,9 +40,6 @@ target_include_directories(${TARGET_NAME}
 target_compile_definitions(${TARGET_NAME}
         PUBLIC
             PXR_PLUGINPATH_NAME=${PXR_OVERRIDE_PLUGINPATH_NAME}
-            $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:TBB_USE_DEBUG>
-            $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_DEBUG_PYTHON>
-            $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_LINKING_PYTHON>
         PRIVATE
             MFB_PACKAGE_NAME="${PROJECT_NAME}"
             MFB_ALT_PACKAGE_NAME="${PROJECT_NAME}"

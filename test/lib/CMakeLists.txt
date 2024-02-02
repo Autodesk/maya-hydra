@@ -14,6 +14,5 @@ set_property(TEST ${target} APPEND PROPERTY DISABLED True)
 set_property(TEST ${target} APPEND PROPERTY LABELS Debugging)
 set_property(TEST ${target} APPEND PROPERTY ENVIRONMENT "MAYA_MODULE_PATH=${CMAKE_INSTALL_PREFIX}")
 
-if(BUILD_MAYAHYDRALIB)
-    add_subdirectory(mayaUsd/render)
-endif()    
+add_subdirectory(mayaUsd)
+
