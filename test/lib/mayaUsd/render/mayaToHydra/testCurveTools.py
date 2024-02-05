@@ -22,6 +22,9 @@ class TestCurveTools(mtohUtils.MtohTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
+    POINTS = [(0,-5,10), (-10, 0, 0), (0, 5, -10), (10, 0, 0), (0, -5, 5), (-5,0,0), (0,5,-5), (5, 0, 0), (0,0,0)]
+    CUSTOM_KNOTS = [0,1,2,3,4,5,6,7,8,9,10]
+
     @property
     def imageDiffFailThreshold(self):
         return 0.05
@@ -34,10 +37,7 @@ class TestCurveTools(mtohUtils.MtohTestCase):
             return 2
         return 0.5
 
-    POINTS = [(0,-5,10), (-10, 0, 0), (0, 5, -10), (10, 0, 0), (0, -5, 5), (-5,0,0), (0,5,-5), (5, 0, 0), (0,0,0)]
-    CUSTOM_KNOTS = [0,1,2,3,4,5,6,7,8,9,10]
-
-    def compareSnapshot(self, referenceFilename, cameraDistance=10):
+    def compareSnapshot(self, referenceFilename, cameraDistance=15):
         self.setBasicCam(cameraDistance)
         cmds.refresh()
         self.assertSnapshotClose(referenceFilename, self.imageDiffFailThreshold, self.imageDiffFailPercent)
@@ -53,29 +53,47 @@ class TestCurveTools(mtohUtils.MtohTestCase):
         cmds.connectAttr(arcNode + ".oc", curveNode + ".cr")
         return arcNode
 
-    def test_CurveBasic(self):
-        cmds.curve(point=self.POINTS)
-        self.compareSnapshot("curveBasic.png")
+    def test_CurveControlVertices(self):
+        curve = cmds.curve(point=self.POINTS)
+        self.compareSnapshot("curveControlVertices_basic.png")
+        cmds.delete(curve)
 
-    def test_CurveCustomKnots(self):
-        cmds.curve(point=self.POINTS, knot=self.CUSTOM_KNOTS)
-        self.compareSnapshot("curveCustomKnots.png")
+        curve = cmds.curve(point=self.POINTS, knot=self.CUSTOM_KNOTS)
+        self.compareSnapshot("curveControlVertices_customKnots.png")
+        cmds.delete(curve)
 
-    def test_CurveDegree1(self):
-        cmds.curve(point=self.POINTS, degree=1)
-        self.compareSnapshot("curveDegree1.png")
+        curve = cmds.curve(point=self.POINTS, degree=1)
+        self.compareSnapshot("curveControlVertices_degree1.png")
+        cmds.delete(curve)
 
-    def test_CurveDegree2(self):
-        cmds.curve(point=self.POINTS, degree=2)
-        self.compareSnapshot("curveDegree2.png")
+        curve = cmds.curve(point=self.POINTS, degree=2)
+        self.compareSnapshot("curveControlVertices_degree2.png")
+        cmds.delete(curve)
 
-    def test_CurveBezier(self):
-        cmds.curve(point=self.POINTS, bezier=True)
-        self.compareSnapshot("curveBezier.png")
+        curve = cmds.curve(point=self.POINTS, bezier=True)
+        self.compareSnapshot("curveControlVertices_bezier.png")
+        cmds.delete(curve)
+
+    def test_CurveEditPoints(self):
+        curve = cmds.curve(editPoint=self.POINTS)
+        self.compareSnapshot("curveEditPoints_basic.png")
+        cmds.delete(curve)
+
+        curve = cmds.curve(editPoint=self.POINTS, degree=1)
+        self.compareSnapshot("curveEditPoints_degree1.png")
+        cmds.delete(curve)
+
+        curve = cmds.curve(editPoint=self.POINTS, degree=2)
+        self.compareSnapshot("curveEditPoints_degree2.png")
+        cmds.delete(curve)
+
+        curve = cmds.curve(editPoint=self.POINTS, bezier=True)
+        self.compareSnapshot("curveEditPoints_bezier.png")
+        cmds.delete(curve)
 
     def test_TwoPointCircularArc(self):
         arcNode = self.createCircularArc("makeTwoPointCircularArc")
-        self.compareSnapshot("twoPointCircularArc_fresh.png")
+        self.compareSnapshot("twoPointCircularArc_fresh.png", 5)
 
         cmds.setAttr(arcNode + ".point1X", 0)
         cmds.setAttr(arcNode + ".point1Y", 0)
@@ -100,7 +118,7 @@ class TestCurveTools(mtohUtils.MtohTestCase):
 
     def test_ThreePointCircularArc(self):
         arcNode = self.createCircularArc("makeThreePointCircularArc")
-        self.compareSnapshot("threePointCircularArc_fresh.png")
+        self.compareSnapshot("threePointCircularArc_fresh.png", 5)
 
         cmds.setAttr(arcNode + ".point1X", -1)
         cmds.setAttr(arcNode + ".point1Y", -1)
