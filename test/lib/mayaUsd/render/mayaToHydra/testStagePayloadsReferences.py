@@ -20,9 +20,7 @@ import mtohUtils
 import unittest
 import testUtils
 import mayaUtils
-import usdUtils
 import ufe
-import usdUfe
 from pxr import Usd, Sdf
 
 class TestUsdStagePayloadsAndReferences(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
@@ -72,6 +70,7 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MtohTestCase): #Subclassing mt
         cmds.file(new=True, force=True)
         import mayaUsd_createStageWithNewLayer
         from mayaUsd import lib as mayaUsdLib
+        import usdUtils
 
         self.setHdStormRenderer()
 
@@ -99,7 +98,8 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MtohTestCase): #Subclassing mt
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_UsdStagePayloadsOnTheFly(self):
         import mayaUsd.ufe
-
+        import usdUfe
+    
         self.setUpPayloadScene()
        
         primUfePath = "|stage1|stageShape1,/A"
