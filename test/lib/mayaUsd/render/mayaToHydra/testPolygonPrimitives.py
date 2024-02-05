@@ -40,7 +40,6 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         self.assertSnapshotClose(referenceFilename, self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
     def setupScene(self, polygonCreationCallable):
-        cmds.loadPlugin('modelingToolkit') # Provides polyDisc, polyPlatonic, polyGear and polySuperShape
         self.setHdStormRenderer()
         polyCreatorNodeName = polygonCreationCallable()[1]
         cmds.refresh()
