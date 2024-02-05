@@ -31,13 +31,13 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
     def setupScene(self, nurbsCreationCallable):
         cmds.loadPlugin('ArubaTessellator') # Loaded by default in Maya, changes NURBS vertices calculations
         self.setHdStormRenderer()
-        nurbsResult = nurbsCreationCallable()
+        makeNurbNodeName = nurbsCreationCallable()[1]
         cmds.refresh()
-        return nurbsResult
+        return makeNurbNodeName
 
     # Torus attributes is a superset of sphere, cone, and cylinder attributes
     def test_NurbsTorus(self):
-        makeNurbNodeName = self.setupScene(cmds.torus)[1]
+        makeNurbNodeName = self.setupScene(cmds.torus)
         self.compareSnapshot("torus_fresh.png", 5)
         
         cmds.setAttr(makeNurbNodeName + ".startSweep", 50)
@@ -56,7 +56,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
 
     # Cube attributes is a superset of plane attributes
     def test_NurbsCube(self):
-        makeNurbNodeName = self.setupScene(cmds.nurbsCube)[1]
+        makeNurbNodeName = self.setupScene(cmds.nurbsCube)
         self.compareSnapshot("cube_fresh.png", 5)
 
         cmds.setAttr(makeNurbNodeName + ".degree", 1)
@@ -68,7 +68,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("cube_modified.png")
 
     def test_NurbsCircle(self):
-        makeNurbNodeName = self.setupScene(cmds.circle)[1]
+        makeNurbNodeName = self.setupScene(cmds.circle)
         self.compareSnapshot("circle_fresh.png", 5)
 
         cmds.setAttr(makeNurbNodeName + ".sweep", 180)
@@ -94,7 +94,7 @@ class TestNurbsPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("circle_unfixedCenter.png")
 
     def test_NurbsSquare(self):
-        makeNurbNodeName = self.setupScene(cmds.nurbsSquare)[1]
+        makeNurbNodeName = self.setupScene(cmds.nurbsSquare)
         self.compareSnapshot("square_fresh.png", 5)
 
         cmds.setAttr(makeNurbNodeName + ".sideLength1", 2)
