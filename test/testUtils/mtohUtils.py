@@ -39,6 +39,9 @@ def checkForPlugin(pluginName: str):
 def checkForMayaUsdPlugin():
     return checkForPlugin('mayaUsdPlugin')
 
+def checkForMtoAPlugin():
+    return checkForPlugin('mtoa')
+
 class MayaHydraBaseTestCase(unittest.TestCase):
     '''Base class for mayaHydra unit tests without image comparison.'''
 
