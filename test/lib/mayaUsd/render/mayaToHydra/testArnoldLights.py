@@ -74,7 +74,7 @@ class TestArnoldLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestC
         #self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
     #Test arnold lights (e.g., aiSkyDomeLight,etc.) with a maya native sphere and usd sphere.
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
+    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin() and mtohUtils.checkForMtoAPlugin(), "Requires Maya USD and MtoA Plugins.")
     def test_ArnoldLights(self):
         cmds.file(new=True, force=True)
 

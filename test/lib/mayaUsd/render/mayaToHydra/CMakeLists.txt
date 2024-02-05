@@ -16,8 +16,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaLights.py
     testFlowViewportAPI.py
     testStageVariants.py
-# Skip until MtoA plugin can be loaded.
-#   testArnoldLights.py
+    testArnoldLights.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py
