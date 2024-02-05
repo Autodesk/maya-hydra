@@ -18,7 +18,6 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 import mayaUtils
-import unittest
 
 class TestStandardSurface(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
