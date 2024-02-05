@@ -22,9 +22,6 @@
 #include "viewCommand.h"
 
 #include <mayaHydraLib/adapters/adapter.h>
-#if defined(MAYAUSD_VERSION)
-#include <mayaUsd/utils/plugRegistryHelper.h>
-#endif
 
 #include <flowViewport/global.h>
 
@@ -93,10 +90,6 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
     MStatus ret = MS::kSuccess;
 
-#if defined(MAYAUSD_VERSION)
-    // Call one time registration of plugins compiled for same USD version as MayaUSD plugin.
-    MayaUsd::registerVersionedPlugins();
-#endif
     ret = PXR_NS::MayaHydraAdapter::Initialize();
     if (!ret) {
         return ret;

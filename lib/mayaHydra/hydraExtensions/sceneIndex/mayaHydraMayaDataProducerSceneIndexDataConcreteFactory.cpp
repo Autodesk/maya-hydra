@@ -26,4 +26,10 @@ MayaDataProducerSceneIndexDataConcreteFactory::createDataProducerSceneIndexDataB
     return PXR_NS::MayaDataProducerSceneIndexData::New(params);
 }
 
+PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr   
+MayaDataProducerSceneIndexDataConcreteFactory::createDataProducerSceneIndexDataBaseForUsdStage(PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParametersForUsdStage& params)
+{
+    return PXR_NS::MayaDataProducerSceneIndexData::New(params);
+}
+
 }//end of namespace MAYAHYDRA_NS_DEF 

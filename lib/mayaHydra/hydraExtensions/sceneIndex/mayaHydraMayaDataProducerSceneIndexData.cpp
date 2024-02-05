@@ -84,6 +84,19 @@ PXR_NAMESPACE_USING_DIRECTIVE
 MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(const FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params) 
     : FVP_NS_DEF::DataProducerSceneIndexDataBase(params)
 {
+    CreateNodeCallbacks();
+    _CreateSceneIndexChainForDataProducerSceneIndex();
+}
+
+MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParametersForUsdStage& params) 
+    : FVP_NS_DEF::DataProducerSceneIndexDataBase(params)
+{
+    CreateNodeCallbacks();
+    _CreateSceneIndexChainForUsdStageSceneIndex(params);
+}
+
+void MayaDataProducerSceneIndexData::CreateNodeCallbacks() 
+{ 
     //When the user has passed a maya node we are adding callbacks on various changes to be able to act on the data producer scene index prims automatically
     if (_dccNode){
         MObject* mObj = reinterpret_cast<MObject*>(_dccNode);
@@ -92,9 +105,6 @@ MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(const FVP_NS_DEF:
         _mayaNodeDagPath  = MDagPath::getAPathTo(*mObj);
 
         _CopyMayaNodeTransform();//Copy it so that the classes created in _CreateSceneIndexChainForDataProducerSceneIndex have the up to date matrix
-
-        //The user provided a DCC node, it's a maya MObject in maya hydra
-        _CreateSceneIndexChainForDataProducerSceneIndex();
 
         MCallbackId cbId = MNodeMessage::addAttributeChangedCallback(*mObj, attributeChangedCallback, this);
         if (cbId){

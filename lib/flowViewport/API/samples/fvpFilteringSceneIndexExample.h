@@ -46,41 +46,32 @@ public:
     }
 
     // From HdSceneIndexBase
-    HdSceneIndexPrim GetPrim(const SdfPath& primPath) const override;//Is the useful function where we do filtering
+    HdSceneIndexPrim GetPrim(const SdfPath& primPath) const override;
     
-    SdfPathVector GetChildPrimPaths(const SdfPath& primPath) const override{//We leave this function with no filtering for simplicity
-        if (_GetInputSceneIndex()){
-            return _GetInputSceneIndex()->GetChildPrimPaths(primPath);
-        }
-
-        return {};
-    }
+    SdfPathVector GetChildPrimPaths(const SdfPath& primPath) const override;
     
     ~FilteringSceneIndexExample() override = default;
 
 protected:
-    FilteringSceneIndexExample(const HdSceneIndexBaseRefPtr& inputSceneIndex) : ParentClass(inputSceneIndex) {}
+    FilteringSceneIndexExample(const HdSceneIndexBaseRefPtr& inputSceneIndex);
 
     void _PrimsAdded(
         const HdSceneIndexBase&                       sender,
-        const HdSceneIndexObserver::AddedPrimEntries& entries) override final
-    {
-        _SendPrimsAdded(entries);
-    }
+        const HdSceneIndexObserver::AddedPrimEntries& entries) override;
 
     void _PrimsRemoved(
         const HdSceneIndexBase&                         sender,
-        const HdSceneIndexObserver::RemovedPrimEntries& entries) override 
-    {
-        _SendPrimsRemoved(entries);
-    }
+        const HdSceneIndexObserver::RemovedPrimEntries& entries) override;
 
     void _PrimsDirtied(
         const HdSceneIndexBase&                         sender,
-        const HdSceneIndexObserver::DirtiedPrimEntries& entries) override 
-        {
-            _SendPrimsDirtied(entries);
-        }
+        const HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
+
+    bool IsFiltered(const SdfPath& primPath) const;
+
+    void UpdateFilteringStatus(const SdfPath& primPath);
+
+    SdfPathSet _filteredPrims;
 };
 
 }//end of namespace FVP_NS_DEF
