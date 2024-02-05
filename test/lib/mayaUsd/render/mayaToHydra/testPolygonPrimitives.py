@@ -42,9 +42,9 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
     def setupScene(self, polygonCreationCallable):
         cmds.loadPlugin('modelingToolkit') # Provides polyDisc, polyPlatonic, polyGear and polySuperShape
         self.setHdStormRenderer()
-        polygonResult = polygonCreationCallable()
+        polyCreatorNodeName = polygonCreationCallable()[1]
         cmds.refresh()
-        return polygonResult
+        return polyCreatorNodeName
     
     def getSuperShapeCreationCallable(self, shapeType):
         # Base parameters to have an actually visible mesh
@@ -66,7 +66,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
     
     # Cube attributes is a superset of plane attributes
     def test_PolygonCube(self):
-        polyCreatorNodeName = self.setupScene(cmds.polyCube)[1]
+        polyCreatorNodeName = self.setupScene(cmds.polyCube)
         self.compareSnapshot("cube_fresh.png", 5)
 
         cmds.setAttr(polyCreatorNodeName + ".width", 6)
@@ -83,7 +83,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
 
     # Cylinder attributes is a superset of sphere and cone
     def test_PolygonCylinder(self):
-        polyCreatorNodeName = self.setupScene(cmds.polyCylinder)[1]
+        polyCreatorNodeName = self.setupScene(cmds.polyCylinder)
         self.compareSnapshot("cylinder_fresh.png", 5)
         
         cmds.setAttr(polyCreatorNodeName + ".radius", 3)
@@ -104,7 +104,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("cylinder_roundCapHeightCompensation.png")
         
     def test_PolygonTorus(self):
-        polyCreatorNodeName = self.setupScene(cmds.polyTorus)[1]
+        polyCreatorNodeName = self.setupScene(cmds.polyTorus)
         self.compareSnapshot("torus_fresh.png", 5)
         
         cmds.setAttr(polyCreatorNodeName + ".radius", 4)
@@ -119,7 +119,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("torus_modified.png")
 
     def test_PolygonDisc(self):
-        polyCreatorNodeName = self.setupScene(cmds.polyDisc)[1]
+        polyCreatorNodeName = self.setupScene(cmds.polyDisc)
         self.compareSnapshot("disc_fresh.png", 5)
 
         cmds.setAttr(polyCreatorNodeName + ".sides", 10)
@@ -143,7 +143,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("disc_subdivision_circle.png")
 
     def test_PolygonPlatonicSolid(self):
-        polyCreatorNodeName = self.setupScene(cmds.polyPlatonic)[1]
+        polyCreatorNodeName = self.setupScene(cmds.polyPlatonic)
         self.compareSnapshot("platonic_fresh.png", 5)
 
         cmds.setAttr(polyCreatorNodeName + ".subdivisions", 2)
@@ -172,7 +172,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("platonic_icosahedron_triangles.png")
 
     def test_PolygonPyramid(self):
-        polyCreatorNodeName = self.setupScene(cmds.polyPyramid)[1]
+        polyCreatorNodeName = self.setupScene(cmds.polyPyramid)
         self.compareSnapshot("pyramid_fresh.png", 5)
 
         cmds.setAttr(polyCreatorNodeName + ".sideLength", 5)
@@ -193,7 +193,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("pyramid_5sides.png")
 
     def test_PolygonPrism(self):
-        polyCreatorNodeName = self.setupScene(cmds.polyPrism)[1]
+        polyCreatorNodeName = self.setupScene(cmds.polyPrism)
         self.compareSnapshot("prism_fresh.png", 5)
 
         cmds.setAttr(polyCreatorNodeName + ".length", 4)
@@ -212,7 +212,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("prism_8sides.png")
 
     def test_PolygonPipe(self):
-        polyCreatorNodeName = self.setupScene(cmds.polyPipe)[1]
+        polyCreatorNodeName = self.setupScene(cmds.polyPipe)
         self.compareSnapshot("pipe_fresh.png", 5)
         
         cmds.setAttr(polyCreatorNodeName + ".radius", 3)
@@ -234,7 +234,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("pipe_roundCapHeightCompensation.png")
 
     def test_PolygonHelix(self):
-        polyCreatorNodeName = self.setupScene(cmds.polyHelix)[1]
+        polyCreatorNodeName = self.setupScene(cmds.polyHelix)
         self.compareSnapshot("helix_fresh.png", 5)
         
         cmds.setAttr(polyCreatorNodeName + ".coils", 2)
@@ -257,7 +257,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("helix_clockwise.png")
 
     def test_PolygonGear(self):
-        polyCreatorNodeName = self.setupScene(cmds.polyGear)[1]
+        polyCreatorNodeName = self.setupScene(cmds.polyGear)
         self.compareSnapshot("gear_fresh.png", 5)
         
         cmds.setAttr(polyCreatorNodeName + ".sides", 10)
@@ -275,7 +275,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("gear_modified.png")
 
     def test_PolygonSoccerBall(self):
-        polyCreatorNodeName = self.setupScene(cmds.polyPrimitive)[1]
+        polyCreatorNodeName = self.setupScene(cmds.polyPrimitive)
         self.compareSnapshot("soccerball_fresh.png", 5)
         
         cmds.setAttr(polyCreatorNodeName + ".radius", 4)
@@ -289,7 +289,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("soccerball_modified.png")
 
     def test_PolygonSuperEllipse(self):
-        polyCreatorNodeName = self.setupScene(self.getSuperShapeCreationCallable("SuperEllipse"))[1]
+        polyCreatorNodeName = self.setupScene(self.getSuperShapeCreationCallable("SuperEllipse"))
         self.compareSnapshot("superEllipse_fresh.png", 5)
         
         cmds.setAttr(polyCreatorNodeName + ".radius", 5)
@@ -307,7 +307,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("superEllipse_helix.png")
 
     def test_PolygonSphericalHarmonics(self):
-        polyCreatorNodeName = self.setupScene(self.getSuperShapeCreationCallable("SphericalHarmonics"))[1]
+        polyCreatorNodeName = self.setupScene(self.getSuperShapeCreationCallable("SphericalHarmonics"))
         self.compareSnapshot("sphericalHarmonics_fresh.png", 5)
         
         cmds.setAttr(polyCreatorNodeName + ".radius", 5)
@@ -328,7 +328,7 @@ class TestPolygonPrimitives(mtohUtils.MtohTestCase):
         self.compareSnapshot("sphericalHarmonics_helix.png")
 
     def test_PolygonUltra(self):
-        polyCreatorNodeName = self.setupScene(self.getSuperShapeCreationCallable("UltraShape"))[1]
+        polyCreatorNodeName = self.setupScene(self.getSuperShapeCreationCallable("UltraShape"))
         self.compareSnapshot("ultra_fresh.png", 5)
         
         cmds.setAttr(polyCreatorNodeName + ".radius", 5)
