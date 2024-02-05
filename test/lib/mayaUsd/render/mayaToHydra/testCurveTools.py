@@ -16,12 +16,23 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 
+import platform
+
 class TestCurveTools(mtohUtils.MtohTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.1
-    IMAGE_DIFF_FAIL_PERCENT = 0.75
+    @property
+    def imageDiffFailThreshold(self):
+        return 0.05
+    
+    @property
+    def imageDiffFailPercent(self):
+        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
+        # for that platform specifically for now, so we can still catch issues on other platforms.
+        if platform.system() == "Darwin":
+            return 2
+        return 0.5
 
     POINTS = [(0,-5,10), (-10, 0, 0), (0, 5, -10), (10, 0, 0), (0, -5, 5), (-5,0,0), (0,5,-5), (5, 0, 0), (0,0,0)]
     CUSTOM_KNOTS = [0,1,2,3,4,5,6,7,8,9,10]
@@ -29,7 +40,7 @@ class TestCurveTools(mtohUtils.MtohTestCase):
     def compareSnapshot(self, referenceFilename, cameraDistance=10):
         self.setBasicCam(cameraDistance)
         cmds.refresh()
-        self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose(referenceFilename, self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
     def setUp(self):
         super(TestCurveTools, self).setUp()
