@@ -14,6 +14,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testTransforms.py
     testNewSceneWithStage.py
     testMayaLights.py
+    testUSDLights.py
     testFlowViewportAPI.py
     testStageVariants.py
     cpp/testColorPreferences.py
