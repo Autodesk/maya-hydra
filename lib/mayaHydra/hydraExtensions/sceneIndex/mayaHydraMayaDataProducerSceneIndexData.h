@@ -42,6 +42,11 @@ public:
         return TfCreateRefPtr(new MayaDataProducerSceneIndexData(params));
     }
     
+    ///Is the way to get access to a new instance of MayaDataProducerSceneIndexData using ref counting for Usd Stages
+    static TfRefPtr<MayaDataProducerSceneIndexData> New(FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParametersForUsdStage& params) {
+        return TfCreateRefPtr(new MayaDataProducerSceneIndexData(params));
+    }
+
     ///Destructor
     ~MayaDataProducerSceneIndexData() override;
     
@@ -56,7 +61,9 @@ public:
    
 private:
     MayaDataProducerSceneIndexData(const FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params);
-
+    MayaDataProducerSceneIndexData(FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParametersForUsdStage& params);
+    
+    void CreateNodeCallbacks();
     void _CopyMayaNodeTransform();
 
     //The following members are optional and used only when a dccNode was passed in the constructor of DataProducerSceneIndexDataBase

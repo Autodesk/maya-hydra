@@ -13,9 +13,12 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStageAddPrim.py
     testTransforms.py
     testNewSceneWithStage.py
-    testDirectionalLights.py
+    testMayaLights.py
+    testUSDLights.py
     testFlowViewportAPI.py
     testStageVariants.py
+    testArnoldLights.py
+    testNurbsPrimitives.py
     testPolygonPrimitives.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
@@ -31,10 +34,15 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testPrimInstancing.py
 )
 
+#Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.
+if(MayaUsd_FOUND)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testMayaUsdAPIUsage.py)
+endif(MayaUsd_FOUND)
+
 # Interactive Unit test scripts for mesh adapter (launched with maya.exe instead of mayapy.exe)
 # Test use of mesh adapter code for mesh support, using environment variable.
 # As of 13-Jun-2023, if a test in this list is identical to a test in
-# TEST_SCRIPT_FILES, it cannot write to an output directory, because running
+# INTERACTIVE_TEST_SCRIPT_FILES, it cannot write to an output directory, because running
 # both versions of the test in parallel will conflict.
 set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshes.py
