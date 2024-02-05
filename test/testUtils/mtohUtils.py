@@ -56,6 +56,12 @@ class MayaHydraBaseTestCase(unittest.TestCase):
                              "define `_file = __file__`")
         fixturesUtils.readOnlySetUpClass(cls._file, 'mayaHydra', 
                                          initializeStandalone=False)
+        
+    def setUp(self):
+        # Maya is not closed/reset between each test of a test suite,
+        # so open a new file before each test to minimize leftovers
+        # from previous tests.
+        cmds.file(new=True, force=True)
 
     def setHdStormRenderer(self):
         self.activeEditor = cmds.playblast(activeEditor=1)
