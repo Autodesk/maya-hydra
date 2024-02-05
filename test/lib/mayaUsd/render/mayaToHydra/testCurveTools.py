@@ -23,8 +23,8 @@ class TestCurveTools(mtohUtils.MtohTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 0.75
 
-    POINTS = [(0,-3,10), (10,0,0), (-10,3,0), (0,6,-10)]
-    CUSTOM_KNOTS = [0,1,2,3,4,5]
+    POINTS = [(0,-5,10), (-10, 0, 0), (0, 5, -10), (10, 0, 0), (0, -5, 5), (-5,0,0), (0,5,-5), (5, 0, 0), (0,0,0)]
+    CUSTOM_KNOTS = [0,1,2,3,4,5,6,7,8,9,10]
 
     def compareSnapshot(self, referenceFilename, cameraDistance=10):
         self.setBasicCam(cameraDistance)
