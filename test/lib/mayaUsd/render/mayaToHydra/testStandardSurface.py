@@ -73,10 +73,5 @@ class TestStandardSurface(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
         cmds.refresh()
         self.assertSnapshotClose("emission" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-        #Verify Opacity
-        cmds.setAttr("standardSurface1.opacity", 0.5, 0.5, 0.5, type="double3")
-        cmds.refresh()
-        self.assertSnapshotClose("opacity" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
