@@ -19,6 +19,9 @@ import shutil
 import sys
 import unittest
 
+# Plugins that are bundled and loaded by default in a Maya installation
+DEFAULT_PLUGINS = ['ArubaTessellator']
+
 def _setUpClass(modulePathName, pluginName, initializeStandalone):
     '''
     Common code for setUpClass() and readOnlySetUpClass()
@@ -30,6 +33,9 @@ def _setUpClass(modulePathName, pluginName, initializeStandalone):
     if pluginName:
         import maya.cmds as cmds
         cmds.loadPlugin(pluginName, quiet=True)
+
+    for defaultPlugin in DEFAULT_PLUGINS:
+        cmds.loadPlugin(defaultPlugin, quiet=True)
 
     realPath = os.path.realpath(modulePathName)
     return os.path.split(realPath)
