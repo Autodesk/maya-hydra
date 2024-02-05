@@ -16,6 +16,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaLights.py
     testFlowViewportAPI.py
     testStageVariants.py
+    testStagePayloadsReferences.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py
