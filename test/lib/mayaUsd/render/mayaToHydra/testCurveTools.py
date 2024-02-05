@@ -70,6 +70,10 @@ class TestCurveTools(mtohUtils.MtohTestCase):
         self.compareSnapshot("curveControlVertices_degree2.png")
         cmds.delete(curve)
 
+        curve = cmds.curve(point=self.POINTS, degree=5)
+        self.compareSnapshot("curveControlVertices_degree5.png")
+        cmds.delete(curve)
+
         curve = cmds.curve(point=self.POINTS, bezier=True)
         self.compareSnapshot("curveControlVertices_bezier.png")
         cmds.delete(curve)
@@ -85,6 +89,10 @@ class TestCurveTools(mtohUtils.MtohTestCase):
 
         curve = cmds.curve(editPoint=self.POINTS, degree=2)
         self.compareSnapshot("curveEditPoints_degree2.png")
+        cmds.delete(curve)
+
+        curve = cmds.curve(editPoint=self.POINTS, degree=5)
+        self.compareSnapshot("curveEditPoints_degree5.png")
         cmds.delete(curve)
 
         curve = cmds.curve(editPoint=self.POINTS, bezier=True)
