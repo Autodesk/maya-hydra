@@ -19,6 +19,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStageVariants.py
     testArnoldLights.py
     testNurbsPrimitives.py
+    testCurveTools.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py
