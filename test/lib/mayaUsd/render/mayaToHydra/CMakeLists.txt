@@ -15,6 +15,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNewSceneWithStage.py
     testMayaLights.py
     testUSDLights.py
+    testArnoldLights.py
+    testStandardSurface.py
     testFlowViewportAPI.py
     testStageVariants.py
     testStagePayloadsReferences.py
