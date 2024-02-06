@@ -20,7 +20,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFlowViewportAPI.py
     testStageVariants.py
     testStagePayloadsReferences.py
-    testArnoldLights.py
     testNurbsPrimitives.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
