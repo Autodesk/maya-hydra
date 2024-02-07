@@ -17,6 +17,7 @@
 
 #include "flowViewport/api.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
+#include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -40,8 +41,10 @@ typedef PXR_NS::TfRefPtr<const WireframeSelectionHighlightSceneIndex> WireframeS
 ///
 class WireframeSelectionHighlightSceneIndex 
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
+    , public Fvp::InputSceneIndexUtils<WireframeSelectionHighlightSceneIndex>
 {
 public:
+    using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
     FVP_API
     static PXR_NS::HdSceneIndexBaseRefPtr New(

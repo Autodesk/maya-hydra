@@ -41,6 +41,7 @@
 #include "flowViewport/api.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
+#include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
@@ -72,8 +73,11 @@ typedef PXR_NS::TfRefPtr<const SelectionSceneIndex> SelectionSceneIndexConstRefP
 class SelectionSceneIndex final
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
     , public PathInterface
+    , public Fvp::InputSceneIndexUtils<SelectionSceneIndex>
 {
 public:
+    using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
+
     FVP_API
     static SelectionSceneIndexRefPtr New(
         PXR_NS::HdSceneIndexBaseRefPtr const &inputSceneIndex,

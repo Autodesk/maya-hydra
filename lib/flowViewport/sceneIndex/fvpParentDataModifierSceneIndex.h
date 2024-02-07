@@ -18,6 +18,7 @@
 
 //Local headers
 #include "flowViewport/api.h"
+#include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 
 //Hydra headers
 #include <pxr/base/tf/declarePtrs.h>
@@ -36,8 +37,10 @@ class ParentDataModifierSceneIndex;
 TF_DECLARE_WEAK_AND_REF_PTRS(ParentDataModifierSceneIndex);
 
 class ParentDataModifierSceneIndex : public HdSingleInputFilteringSceneIndexBase
+    , public Fvp::InputSceneIndexUtils<ParentDataModifierSceneIndex>
 {
 public:
+    using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
     using ParentClass = HdSingleInputFilteringSceneIndexBase;
 
     static ParentDataModifierSceneIndexRefPtr New(const HdSceneIndexBaseRefPtr& inputSceneIndex, const SdfPath& parentPath, const GfMatrix4d& transformMatrix, bool visible){
@@ -50,8 +53,8 @@ public:
     // From HdSceneIndexBase
     HdSceneIndexPrim GetPrim(const SdfPath& primPath) const override;
     SdfPathVector GetChildPrimPaths(const SdfPath& primPath) const override { //defined in this header file as we do no modification to it
-        if (_GetInputSceneIndex()){
-            return _GetInputSceneIndex()->GetChildPrimPaths(primPath);
+        if (GetInputSceneIndex()){
+            return GetInputSceneIndex()->GetChildPrimPaths(primPath);
         }
 
         return {};
@@ -84,9 +87,13 @@ protected:
     SdfPath     _parentPath;
     GfMatrix4d  _transformMatrix;
     bool        _visible = true;
+
 private:
-    ParentDataModifierSceneIndex(const HdSceneIndexBaseRefPtr& _inputSceneIndex, const SdfPath& parentPath, const GfMatrix4d& transformMatrix, bool visible) : 
-        ParentClass(_inputSceneIndex), _parentPath(parentPath), _transformMatrix(transformMatrix), _visible(visible) {}
+    ParentDataModifierSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const SdfPath& parentPath, const GfMatrix4d& transformMatrix, bool visible) : 
+        ParentClass(inputSceneIndex), InputSceneIndexUtils(inputSceneIndex)
+        , _parentPath(parentPath), _transformMatrix(transformMatrix)
+        , _visible(visible)
+        {}
 };
 
 } //End of namespace FVP_NS_DEF

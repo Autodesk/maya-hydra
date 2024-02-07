@@ -104,6 +104,16 @@ MayaHydraSceneProducer::~MayaHydraSceneProducer()
     _delegates.clear();
 }
 
+#ifdef CODE_COVERAGE_WORKAROUND
+void MayaHydraSceneProducer::Cleanup()
+{
+    if (enableMayaNativeSceneIndex())
+    {
+        _sceneIndex->RemoveCallbacksAndDeleteAdapters();
+    }
+}
+#endif
+
 void MayaHydraSceneProducer::HandleCompleteViewportScene(const MDataServerOperation::MViewportScene& scene, MFrameContext::DisplayStyle ds)
 {
     if (enableMayaNativeSceneIndex())

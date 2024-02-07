@@ -202,6 +202,8 @@ def BuildVariant(context):
         return "Debug"
     elif context.buildRelease:
         return "Release"
+    elif context.buildCoverage:
+        return "Coverage"
     elif context.buildRelWithDebug:
         return "RelWithDebInfo"
     return "RelWithDebInfo"
@@ -258,7 +260,6 @@ def CurrentWorkingDirectory(dir):
 def RunCMake(context, extraArgs=None, stages=None):
     """Invoke CMake to configure, build, and install a library whose 
     source code is located in the current working directory."""
-
     srcDir = os.getcwd()
     instDir = context.instDir
     buildDir = context.buildDir
@@ -293,27 +294,40 @@ def RunCMake(context, extraArgs=None, stages=None):
     if generator and 'Visual Studio' in generator and IsVisualStudio2019OrGreater():
         generator = generator + " -A x64"
 
+    add_coverage_flags = False
+
+    if (context.buildCoverage):
+        # Use RelWithDebInfo as underlying variant to build
+        context.buildCoverage = False
+        add_coverage_flags = True
+    
+
     # get build variant 
     variant= BuildVariant(context)
-
+        
     with CurrentWorkingDirectory(buildDir):
         # recreate build_log.txt everytime the script runs
         if os.path.isfile(context.logFileLocation):
             os.remove(context.logFileLocation)
-
         if 'configure' in stages:
             Run(context,
                 'cmake '
                 '-DCMAKE_INSTALL_PREFIX="{instDir}" '
                 '-DCMAKE_BUILD_TYPE={variant} '
                 '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON '
+                '{codeCoverageCompilerCpp} '
+                '{codeCoverageCompilerC} '
                 '{generator} '
+                '{codeCoverageOption} '
                 '{extraArgs} '
                 '"{srcDir}"'
                 .format(instDir=instDir,
                         variant=variant,
                         srcDir=srcDir,
+                        codeCoverageCompilerCpp=("-DCMAKE_CXX_COMPILER=clang++" if add_coverage_flags else ""),
+                        codeCoverageCompilerC=("-DCMAKE_C_COMPILER=clang" if add_coverage_flags else ""),
                         generator=(generator or ""),
+                        codeCoverageOption=("-DCODE_COVERAGE=ON" if add_coverage_flags else ""),
                         extraArgs=(" ".join(extraArgs) if extraArgs else "")))
  
         installArg = ""
@@ -571,6 +585,9 @@ varGroup.add_argument("--build-debug", dest="build_debug", action="store_true",
 varGroup.add_argument("--build-release", dest="build_release", action="store_true",
                     help="Build in Release mode (default: %(default)s)")
 
+varGroup.add_argument("--build-coverage", dest="build_coverage", action="store_true",
+                    help="Build in Coverage mode (default: %(default)s)")
+
 varGroup.add_argument("--build-relwithdebug", dest="build_relwithdebug", action="store_true", default=True,
                     help="Build in RelWithDebInfo mode (default: %(default)s)")
 
@@ -605,7 +622,6 @@ verbosity = args.verbosity
 # InstallContext
 class InstallContext:
     def __init__(self, args):
-
         # Assume the project's top level cmake is in the current source directory
         self.mayaHydraSrcDir = os.path.normpath(
             os.path.join(os.path.abspath(os.path.dirname(__file__))))
@@ -615,6 +631,7 @@ class InstallContext:
         self.buildDebug = args.build_debug
         self.buildRelease = args.build_release
         self.buildRelWithDebug = args.build_relwithdebug
+        self.buildCoverage = args.build_coverage
 
         self.debugPython = args.debug_python
 
@@ -684,6 +701,7 @@ class InstallContext:
 
         # Redirect output stream to file
         self.redirectOutstreamFile = args.redirect_outstream_file
+
 try:
     context = InstallContext(args)
 except Exception as e:

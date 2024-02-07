@@ -60,8 +60,13 @@ macro(maya_set_plugin_properties target)
                               PREFIX "")
     elseif(WIN32)
         set(_MAYA_DEFINES "${_MAYA_DEFINES}" _AFXDLL _MBCS NT_PLUGIN)
-        set_target_properties( ${target} PROPERTIES
-                               LINK_FLAGS "/export:initializePlugin /export:uninitializePlugin")
+        if(IS_CLANG)
+            set_target_properties( ${target} PROPERTIES
+                                   LINK_FLAGS "-Wl,-export:initializePlugin -Wl,-export:uninitializePlugin")
+        else()
+            set_target_properties( ${target} PROPERTIES
+                                   LINK_FLAGS "/export:initializePlugin /export:uninitializePlugin")
+        endif()
     else()
         set(_MAYA_DEFINES "${_MAYA_DEFINES}" LINUX LINUX_64)
         set_target_properties( ${target} PROPERTIES

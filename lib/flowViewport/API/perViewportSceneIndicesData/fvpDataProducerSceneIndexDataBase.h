@@ -73,7 +73,7 @@ public:
         void* _dccNode;
     };
 
-    ~DataProducerSceneIndexDataBase() override = default;
+    ~DataProducerSceneIndexDataBase() override;
     
     virtual void AddParentPrimToSceneIndex();
     virtual void RemoveParentPrimFromSceneIndex();

@@ -34,11 +34,11 @@ namespace FVP_NS_DEF {
 //This is the function where we filter prims
 HdSceneIndexPrim ParentDataModifierSceneIndex::GetPrim(const SdfPath& primPath) const
 {
-    if (!_GetInputSceneIndex()){
+    if (!GetInputSceneIndex()){
         return HdSceneIndexPrim();
     }
 
-    HdSceneIndexPrim prim   = _GetInputSceneIndex()->GetPrim(primPath);
+    HdSceneIndexPrim prim   = GetInputSceneIndex()->GetPrim(primPath);
 
     if (prim.dataSource && (primPath == _parentPath)){
         //Use an HdContainerDataSourceEditor to overwrite the values for the transform and visibility attributes
