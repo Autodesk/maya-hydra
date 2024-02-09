@@ -40,6 +40,7 @@ namespace FVP_NS_DEF {
 */
 DataProducerSceneIndexDataBase::DataProducerSceneIndexDataBase(const CreationParameters& params)
 {
+    _parentMatrix.SetIdentity();
     _dataProducerSceneIndex     = params._customDataProducerSceneIndex;
     _prefix                     = params._prefix;
     _lastSceneIndexChain        = params._customDataProducerSceneIndex;
@@ -50,6 +51,7 @@ DataProducerSceneIndexDataBase::DataProducerSceneIndexDataBase(const CreationPar
 //For Usd stages
 DataProducerSceneIndexDataBase::DataProducerSceneIndexDataBase(const CreationParametersForUsdStage& params)
 {
+    _parentMatrix.SetIdentity();
     _dataProducerSceneIndex     = nullptr;//Will be set later
     _prefix                     = params._prefix;
     _lastSceneIndexChain        = nullptr;//Will be set later
