@@ -56,16 +56,14 @@ DataProducerSceneIndexInterfaceImp& DataProducerSceneIndexInterfaceImp::get()
 PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr DataProducerSceneIndexInterfaceImp::addUsdStageSceneIndex(UsdImagingCreateSceneIndicesInfo& createInfo, 
                                                                                 HdSceneIndexBaseRefPtr& finalSceneIndex,
                                                                                 UsdImagingStageSceneIndexRefPtr& stageSceneIndex,
-                                                                                SdfPath& inoutPrefix, 
+                                                                                const SdfPath& preFix, 
                                                                                 void* dccNode)
 {
     PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr dataProducerSceneIndexData  = 
-        _CreateDataProducerSceneIndexDataForUsdStage(createInfo, finalSceneIndex, stageSceneIndex, inoutPrefix, dccNode);
+        _CreateDataProducerSceneIndexDataForUsdStage(createInfo, finalSceneIndex, stageSceneIndex, preFix, dccNode);
     if (nullptr == dataProducerSceneIndexData){
         return nullptr;
     }
-
-    inoutPrefix = dataProducerSceneIndexData->GetPrefix();
 
     return dataProducerSceneIndexData; 
 }
@@ -76,19 +74,17 @@ bool DataProducerSceneIndexInterfaceImp::addUsdStageDataProducerSceneIndexDataBa
 }
 
 bool DataProducerSceneIndexInterfaceImp::addDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
-                                                                   PXR_NS::SdfPath& inoutPrefix,
+                                                                   const PXR_NS::SdfPath& preFix,
                                                                    void* dccNode /*= nullptr*/,
                                                                    const std::string& hydraViewportId /*= allViewports*/,
                                                                    const std::string& rendererNames /*= allRenderers*/
                                                                     )
 {   
     PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr dataProducerSceneIndexData  = 
-        _CreateDataProducerSceneIndexData(customDataProducerSceneIndex, rendererNames, inoutPrefix, dccNode);
+        _CreateDataProducerSceneIndexData(customDataProducerSceneIndex, rendererNames, preFix, dccNode);
     if (nullptr == dataProducerSceneIndexData){
         return false;
     }
-
-    inoutPrefix = dataProducerSceneIndexData->GetPrefix();
 
     //PXR_NS::FvpViewportAPITokens->allViewports == hydraViewportId means the user wants customDataProducerSceneIndex to be applied in all viewports.
     if (PXR_NS::FvpViewportAPITokens->allViewports == hydraViewportId){

@@ -18,12 +18,13 @@
 
 //Local headers
 #include "flowViewport/api.h"
-#include "flowViewport/sceneIndex/fvpParentDataModifierSceneIndex.h"
 
 //Hydra headers
 #include <pxr/base/tf/declarePtrs.h>
+#include <pxr/base/gf/matrix4d.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
 #include <pxr/usdImaging/usdImaging/sceneIndices.h>
+#include <pxr/usdImaging/usdImaging/rootOverridesSceneIndex.h>
 
 //The Pixar's namespace needs to be at the highest namespace level for TF_DECLARE_WEAK_AND_REF_PTRS to work.
 PXR_NAMESPACE_OPEN_SCOPE
@@ -75,9 +76,6 @@ public:
 
     ~DataProducerSceneIndexDataBase() override = default;
     
-    virtual void AddParentPrimToSceneIndex();
-    virtual void RemoveParentPrimFromSceneIndex();
-
     //Used to set the usd stage scene indices
     void SetDataProducerSceneIndex(const HdSceneIndexBaseRefPtr& sceneIndex) {_dataProducerSceneIndex = sceneIndex;}
     void SetDataProducerLastSceneIndexChain(const HdSceneIndexBaseRefPtr& sceneIndex) {_lastSceneIndexChain = sceneIndex;}
@@ -117,18 +115,16 @@ protected:
     void*                               _dccNode;
 
     //The following members are optional and only used when a dccNode was passed in the constructor
-    /** Is a filtering scene index that modifies the parent prim from the retained scene index to update the transform/visibility when it is updated in the DCC. 
-    It is used only when a dccNode was passed.*/
-    ParentDataModifierSceneIndexRefPtr  _parentDataModifierSceneIndex = nullptr;
+    
     /// Is the last scene index of the scene index chain when a dccNode was passed.
     HdSceneIndexBaseRefPtr              _lastSceneIndexChain = nullptr;
-    /// Is the retained scene index holding the parent prim for _dataProducerSceneIndex. It is used only when a dccNode was passed.
-    HdRetainedSceneIndexRefPtr          _retainedSceneIndex = nullptr;
     
-    /// Is the world matrix of the parent prim in the retained scene index. It is used only when a dccNode was passed.
+    /// Is the world matrix of the scene index. It is used only when a dccNode was passed to override the transform of the root of the scene index.
     GfMatrix4d                          _parentMatrix;
-    /// Is the visibility state of the parent prim in the retained scene index. It is used only when a dccNode was passed.
-    bool                                _visible = false;
+    
+    /// _rootOverridesSceneIndex is used to set a transform and visibility at the root of the Usd stage/data producer scene index. It is used only when a dccNode was passed.
+    /// With this scene index when you select the proxyshape node and move it or hide it, we apply the same operation on the stage, same for a data producer scene index with a hosting node.
+    UsdImagingRootOverridesSceneIndexRefPtr _rootOverridesSceneIndex = nullptr;
 };
 
 }//End of namespace FVP_NS_DEF
