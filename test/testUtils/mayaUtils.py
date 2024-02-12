@@ -35,12 +35,9 @@ import ufe
 import ufeUtils, testUtils
 
 import os
-import re
 import sys
 
 mayaSeparator = "|"
-
-prRe = re.compile('Preview Release ([0-9]+)')
 
 def loadPlugin(pluginName):
     """ 
@@ -259,35 +256,6 @@ def createSingleSphereMayaScene(directory=None):
     cmds.file(rename=tempMayaFile)
     cmds.file(save=True, force=True, type='mayaAscii')
     return tempMayaFile
-
-def previewReleaseVersion():
-    '''Return the Maya Preview Release version.
-
-    If the version of Maya is 2019, returns 98.
-
-    If the version of Maya is 2020, returns 110.
-
-    If the version of Maya is 2022, returns 122.
-
-    If the version of Maya is current and is not a Preview Release, returns
-    sys.maxsize (a very large number).  If the environment variable
-    MAYA_PREVIEW_RELEASE_VERSION_OVERRIDE is defined, return its value instead.
-    '''
-
-    if 'MAYA_PREVIEW_RELEASE_VERSION_OVERRIDE' in os.environ:
-        return int(os.environ['MAYA_PREVIEW_RELEASE_VERSION_OVERRIDE'])
-
-    majorVersion = int(cmds.about(majorVersion=True))
-    if majorVersion == 2019:
-        return 98
-    elif majorVersion == 2020:
-        return 110
-    elif majorVersion == 2022:
-        return 122
-
-    match = prRe.match(cmds.about(v=True))
-
-    return int(match.group(1)) if match else sys.maxsize
 
 def mayaMajorVersion():
     return int(cmds.about(majorVersion=True))
