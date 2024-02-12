@@ -12,12 +12,12 @@ Before building the project, consult the following table to ensure you use the r
 |:---------------------:|:-------------------------:|:------------------------------------------------------------:|:---------------------------:|
 |    Operating System   |         Windows 10 <br> Windows 11 | High Sierra (10.13)<br>Mojave (10.14)<br>Catalina (10.15)<br>Big Sur (11.2.x)    |      Rocky Linux 8.6 / Linux® Red Hat® Enterprise 8.6 WS             |
 |   Compiler Requirement| Maya 2024 (VS 2022) | Maya 2024 (Xcode 13.4 or higher) | Maya 2024 (gcc 11.2.1) |
-| CMake Version (min/max) |        3.13...3.17      |                              3.13...3.17                     |           3.13...3.17       |
-|         Python        | 3.10.8  |                       3.10.8               |  3.10.8   |
-|    Python Packages    | PyYAML, PySide, PyOpenGL, Jinja2        | PyYAML, PySide2, PyOpenGL, Jinja2              | PyYAML, PySide, PyOpenGL, Jinja2 |
+| CMake Version (min/max) |        3.13...3.20      |                              3.13...3.20                     |           3.13...3.20       |
+|         Python        | 3.10.8, 3.11.4  |                       3.10.8, 3.11.4               |  3.10.8, 3.11.4   |
+|    Python Packages    | PyYAML, PySide, PyOpenGL        | PyYAML, PySide2, PyOpenGL              | PyYAML, PySide, PyOpenGL |
 |    Build generator    | Visual Studio, Ninja (Recommended)    |  XCode, Ninja (Recommended)                      |    Ninja (Recommended)      |
-|    Command processor  | Visual Studio X64 2019 command prompt  |                     bash                |             bash            |
-| Supported Maya Version|  2024   |                   2024                    |   2024    |
+|    Command processor  | Visual Studio x64 2022 command prompt  |                     bash                |             bash            |
+| Supported Maya Version|  2024, PR   |                   2024, PR                    |   2024, PR    |
 
 |        Optional       | ![](images/windows.png)   |                            ![](images/mac.png)               |   ![](images/linux.png)     |
 
@@ -25,16 +25,13 @@ Before building the project, consult the following table to ensure you use the r
 
 #### 2. Download and Build Pixar USD 
 
-See Pixar's official github page for instructions on how to build USD: https://github.com/PixarAnimationStudios/USD. Pixar has recently removed support for building Maya USD libraries/plug-ins in their github repository and ```build_usd.py```.
+See Pixar's official github page for instructions on how to build USD: https://github.com/PixarAnimationStudios/USD. Pixar has removed support for building Maya USD libraries/plug-ins in their github repository and ```build_usd.py```.
 
-|               |      ![](images/pxr.png)          |        
-|:------------: |:---------------:                  |
-|  CommitID/Tags | Recommended : [v23.08](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.08) |
-|  CommitID/Tags | For older maya-hydra plugin: [v22.11](https://github.com/PixarAnimationStudios/USD/releases/tag/v22.11) |
+|               |      ![](images/pxr.png)          |USD version used in Maya        
+|:------------: |:---------------:                  |:---------------:
+|  CommitID/Tags | [v22.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v22.11) or [v23.08](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.08) or [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11) |Maya 2024 = v22.11<br>Maya PR = v23.11
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
-
-***NOTE:*** Recommended version of USD for building the latest version of MayaHydra plugin is USD23.08  [v23.08](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.08). If older version of USD needs to be used then maya-hydra v0.1.x is to be used for build and feature compatibility.
 
 ***NOTE:*** Make sure that you don't have an older USD locations in your ```PATH``` and ```PYTHONPATH``` environment settings. ```PATH``` and ```PYTHONPATH``` are automatically adjusted inside the project to point to the correct USD location. See ```cmake/usd.cmake```.
 
@@ -44,8 +41,7 @@ The Universal Front End (UFE) is a DCC-agnostic component that allows Maya to br
 
 | Ufe Version                | Maya Version                                           | Ufe Docs (external) |
 |----------------------------|--------------------------------------------------------|:-------------------:|
-| v4.0.0                      | Maya 2024                                                | https://help.autodesk.com/view/MAYAUL/2024/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
-| v4.0.1                      | Maya 2024.1                                               | |
+| v4.0.0<br>v4.1.0<br>v4.2.0            | Maya 2024<br>Maya 2024.1<br>Maya 2024.2                                                | https://help.autodesk.com/view/MAYAUL/2024/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
 
 To build the project with UFE support, you will need to use the headers and libraries included in the ***Maya Devkit***:
 
@@ -71,7 +67,7 @@ cd maya-hydra
 
 ##### Arguments
 
-There are four arguments that must be passed to the script: 
+There are at least four arguments that must be passed to the script: 
 
 | Flags                 | Description                                                                           |
 |--------------------   |-------------------------------------------------------------------------------------- |
@@ -79,6 +75,14 @@ There are four arguments that must be passed to the script:
 |  --pxrusd-location    | directory where Pixar USD Core is installed.                                          |
 |  --devkit-location    | directory where Maya devkit is installed.                                             |
 | workspace_location    | directory where the project use as a workspace to build and install plugin/libraries  |
+
+Optional arguments are :
+| Flags                 | Description                                                                                         |
+|--------------------   |---------------------------------------------------------------------------------------------------- |
+|   --mayausd-location  | directory where MayaUSD is installed. By providing this, you will enable more features for          |
+|                       | usd stages when using an hydra render delegate, such as : hide/delete the stage when the proxy shape|
+|                       | node is hidden/deleted, or applying a transform on the proxy shape node will apply it on the stage. |
+
 
 ```
 Linux:
@@ -88,7 +92,29 @@ MacOSX:
 ➜ maya-hydra python build.py --maya-location /Applications/Autodesk/maya2024 --pxrusd-location /opt/local/USD-Release --devkit-location /opt/local/devkitBase /opt/local/workspace
 
 Windows:
-c:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya2024" --pxrusd-location C:\USD-Release --devkit-location C:\devkitBase C:\workspace
+C:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya2024" --pxrusd-location C:\USD-Release --devkit-location C:\devkitBase C:\workspace
+```
+
+**Notes:** 
+- For OSX builds, you might need to toggle on the `BUILD_UB2` CMake option to build Universal Binary 2 binaries (see below).
+- If you get an error saying that the correct Python version could not be found, or an error such as "Imported target <xyz> includes non-existent path" pointing to a Python path, you might need to specify the `Python_EXECUTABLE`, `PYTHON_INCLUDE_DIR` and `PYTHON_LIBRARIES` CMake variables to point to directories of the bundled Maya Python. Here is what to set them to for each platform :
+```
+Linux:
+Python_EXECUTABLE=<maya-location>/bin/mayapy
+PYTHON_INCLUDE_DIR=<maya-location>/include/Python<python-version>/Python (e.g. <maya-location>/include/Python311/Python)
+PYTHON_LIBRARIES=<maya-location>/lib/libpython<python-version>.so (e.g. : <maya-location>/lib/libpython3.11.so)
+
+OSX:
+Python_EXECUTABLE=<maya-location>/Maya.app/Contents/bin/mayapy
+PYTHON_INCLUDE_DIR=<maya-location>/Maya.app/Contents/Frameworks/Python.framework/Versions/<python-version>/include/python<python-version>
+(e.g. <maya-location>/Maya.app/Contents/Frameworks/Python.framework/Versions/3.11/include/python3.11)
+PYTHON_LIBRARIES=<maya-location>/Maya.app/Contents/Frameworks/Python.framework/Versions/<python-version>/lib/libpython<python-version>.dylib
+(e.g. : <maya-location>/Maya.app/Contents/Frameworks/Python.framework/Versions/3.11/lib/libpython3.11.dylib)
+
+Windows:
+Python_EXECUTABLE=<maya-location>\bin\mayapy.exe
+PYTHON_INCLUDE_DIR=<maya-location>\include\Python<python-version>\Python (e.g. <maya-location>\include\Python311\Python)
+PYTHON_LIBRARIES=<maya-location>\lib\python<python-version>.lib (e.g. : <maya-location>\lib\python311.lib)
 ```
 
 ##### Build Arguments
@@ -101,13 +127,19 @@ c:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya20
 --build-args="-DBUILD_TESTS=OFF"
 ```
 
-##### CMake Options
+##### CMake Options and Variables
 
 Name                        | Description                                                | Default
 ---                         | ---                                                        | ---
 BUILD_TESTS                 | builds all unit tests.                                     | ON
 BUILD_STRICT_MODE           | enforces all warnings as errors.                           | ON
 BUILD_SHARED_LIBS			| build libraries as shared or static.						 | ON
+BUILD_UB2			        | build as Universal Binary 2 (OSX)                          | OFF
+BUILD_WITH_PYTHON_3_VERSION | specify which Python 3 version to build with               | Determined based on Maya version
+Python_EXECUTABLE           | path to the Python executable to build with                | Determined automatically by CMake
+PYTHON_INCLUDE_DIR          | directory containing the Python header files               | Determined using the DPython_EXECUTABLE
+PYTHON_LIBRARIES            | path to the Python library to link with                    | Determined using the DPython_EXECUTABLE
+CMAKE_WANT_MATERIALX_BUILD  | enable building with MaterialX (experimental)              | OFF
 
 ##### Stages
 
@@ -135,9 +167,9 @@ Examples:
 
 It is up to the user to select the CMake Generator of choice, but we encourage the use of the Ninja generator. To use the Ninja Generator, you need to first install the Ninja binary from https://ninja-build.org/
 
-You then need to set the generator to ```Ninja``` and the ```CMAKE_MAKE_PROGRAM``` variable to the Ninja binary you downloaded.
+You then need to set the generator to ```Ninja```.
 ```
-python build.py --generator Ninja --build-args=-DCMAKE_MAKE_PROGRAM='path to ninja binary'
+python build.py --generator Ninja
 ```
 ##### Build and Install locations
 
@@ -183,8 +215,6 @@ e.g
 ➜ pip list
 Package    Version
 ---------- --------
-Jinja2     3.1.2
-MarkupSafe 2.1.1
 pip        22.2.1
 PyOpenGL   3.1.6
 PySide2    5.15.2.1
@@ -207,10 +237,11 @@ There is a related ADDITIONAL_PXR_PLUGINPATH_NAME cmake var which can be used if
 
 # How to Load Plug-ins in Maya 
 
-The provided module files (*.mod) facilitates setting various environment variables for plugins and libraries. After the project is successfully built, ```mayaHydra.mod``` are installed inside the install directory. In order for Maya to discover these mod files, ```MAYA_MODULE_PATH``` environment variable needs to be set to point to the location where the mod files are installed.
+The provided module files (*.mod) facilitates setting various environment variables for plugins and libraries. After the project is successfully built, ```mayaHydra.mod``` is installed inside the install directory. In order for Maya to discover this mod file, the ```MAYA_MODULE_PATH``` environment variable needs to be set to point to the location where the mod file is installed.
 Examples:
 ```
 set MAYA_MODULE_PATH=C:\workspace\install\RelWithDebInfo
 export MAYA_MODULE_PATH=/usr/local/workspace/install/RelWithDebInfo
 ```
+The MAYA_MODULE_PATH environment variable can also be set through the Maya.env file.
 Once MAYA_MODULE_PATH is set, run maya and go to ```Windows -> Setting/Preferences -> Plug-in Manager``` to load the plugins.

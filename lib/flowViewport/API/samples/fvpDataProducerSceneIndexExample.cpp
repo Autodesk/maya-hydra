@@ -126,9 +126,6 @@ DataProducerSceneIndexExample::DataProducerSceneIndexExample() :
     //Create the HdRetainedSceneIndex to be able to easily add primitives
     _retainedSceneIndex = HdRetainedSceneIndex::New();
     
-    //set the container node inverse transform being identity
-    _containerNodeInvTransform.SetIdentity();
-
     //Add all primitives
     _AddAllPrims();
 }
@@ -218,13 +215,10 @@ void DataProducerSceneIndexExample::_AddAllPrimsWithInstancing()
 {
     static const bool instancing = true;
 
-    //We need to apply the inverse of the container node transform for instances so that it is not applied twice, once on the original cube and once on the instancer node.
-    GfMatrix4d transform = _currentCubeGridParams._initalTransform * _containerNodeInvTransform;
-
     //Copy the main cube primitive in the array, we will update only the SdfPath and the transform, all others attributes are identical
     HdRetainedSceneIndex::AddedPrimEntry cubePrimEntry = _CreateCubePrim(_cubeRootPath, _currentCubeGridParams._halfSize, 
                                                                         _currentCubeGridParams._color, _currentCubeGridParams._opacity, 
-                                                                        transform, instancing);
+                                                                        _currentCubeGridParams._initalTransform, instancing);
 
     //Add the cube to the retained scene index
     _retainedSceneIndex->AddPrims({cubePrimEntry});
@@ -499,7 +493,9 @@ HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubeP
                         HdXformSchemaTokens->xform,
                         HdXformSchema::Builder()
                                 .SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(
-                                transform)).Build(),
+                                transform))
+                                .SetResetXformStack(HdRetainedTypedSampledDataSource<bool>::New(true)) //Mark the transform of prototype not inherit from parent
+                                .Build(),
 
                         //create a mesh
                         HdMeshSchemaTokens->mesh,
@@ -534,7 +530,8 @@ HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubeP
 void DataProducerSceneIndexExample::addDataProducerSceneIndex()
 {
     if (!_dataProducerSceneIndexAdded && _hydraInterface){
-        const bool res = _hydraInterface->addDataProducerSceneIndex(_retainedSceneIndex, _containerNode, PXR_NS::FvpViewportAPITokens->allViewports, PXR_NS::FvpViewportAPITokens->allRenderers, SdfPath::AbsoluteRootPath());
+        SdfPath inoutPrefix = PXR_NS::SdfPath::AbsoluteRootPath();
+        const bool res = _hydraInterface->addDataProducerSceneIndex(_retainedSceneIndex, inoutPrefix, _containerNode, PXR_NS::FvpViewportAPITokens->allViewports, PXR_NS::FvpViewportAPITokens->allRenderers);
         if (false == res){
             TF_CODING_ERROR("_hydraInterface->addDataProducerSceneIndex returned false !");
         }
@@ -547,16 +544,6 @@ void DataProducerSceneIndexExample::removeDataProducerSceneIndex()
     if (_dataProducerSceneIndexAdded && _hydraInterface){
         _hydraInterface->removeViewportDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allViewports);
         _dataProducerSceneIndexAdded = false;
-    }
-}
-
-void DataProducerSceneIndexExample::setContainerNodeInverseTransform(const PXR_NS::GfMatrix4d& InvTransform)
-{ 
-    _containerNodeInvTransform = InvTransform;
-    if (_currentCubeGridParams._useInstancing){
-        //Update with the current transform
-        _RemoveAllPrims();
-        _AddAllPrims();
     }
 }
 

@@ -32,17 +32,7 @@ target_include_directories(${TARGET_NAME}
 # -----------------------------------------------------------------------------
 # compiler configuration
 # -----------------------------------------------------------------------------
-
-# Without the TBB_USE_DEBUG, BOOST_DEBUG_PYTHON and BOOST_LINKING_PYTHON
-# the Debug variant link fails, even though there is no Python or Boost
-# at time of writing in the Flow Viewport Toolkit.  The assumption is that
-# Hydra USD headers impose this requirement.  PPT, 26-Sep-2023.
-
 target_compile_definitions(${TARGET_NAME} 
-    PUBLIC
-        $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:TBB_USE_DEBUG>
-        $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_DEBUG_PYTHON>
-        $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_LINKING_PYTHON>        
     PRIVATE
         FVP_EXPORT
         $<$<BOOL:${IS_MACOSX}>:OSMac_>
@@ -59,6 +49,7 @@ target_link_libraries(${TARGET_NAME}
         hd
         hdx
         sdf
+        usdImaging
         ${UFE_LIBRARY}
     PRIVATE
         ar

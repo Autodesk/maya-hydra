@@ -690,17 +690,17 @@ SdfPath MayaHydraSceneIndex::GetDelegateID(TfToken name)
 }
 
 MayaHydraSceneIndex::
-LightDagPathMap MayaHydraSceneIndex::_GetActiveLightPaths() const 
+LightDagPathMap MayaHydraSceneIndex::_GetGlobalLightPaths() const 
 {
-    LightDagPathMap activeLightPaths;
-    activeLightPaths.reserve(_lightAdapters.size());
+    LightDagPathMap allLightPaths;
+    allLightPaths.reserve(_lightAdapters.size());
     // By the time this function is called _lightAdapters should already have been populated
     // with both Maya and Arnold light adapters. The adapters contain the DagPath information
     // we store it here in unordered_map for fast retrieval
     for(const auto& entry : _lightAdapters)
-        activeLightPaths.emplace(entry.second->GetDagPath().fullPathName().asChar(), 
+        allLightPaths.emplace(entry.second->GetDagPath().fullPathName().asChar(), 
                                  entry.second->GetDagPath());
-    return activeLightPaths;
+    return allLightPaths;
 }
 
 void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
@@ -835,12 +835,13 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         return;
     }
    
-    LightDagPathMap activeLightPaths = _GetActiveLightPaths();
+    LightDagPathMap globalLightPaths = _GetGlobalLightPaths();
+    LightDagPathMap activeLightPaths;
     constexpr auto considerAllSceneLights = MHWRender::MDrawContext::kFilteredIgnoreLightLimit;
     MStatus        status;
     const auto     numLights = context.numberOfActiveLights(considerAllSceneLights, &status);
 
-    if ((!status || numLights == 0) && (0 == activeLightPaths.size())) {
+    if ((!status || numLights == 0) && (0 == globalLightPaths.size())) {
         _MapAdapter<MayaHydraLightAdapter>(
             [](MayaHydraLightAdapter* a) { a->SetLightingOn(false); },
             _lightAdapters); // Turn off all lights
@@ -864,8 +865,8 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         }
 
         // we do a fast look up here for any new lights that may have been added
-        auto found = activeLightPaths.find(lightPath.fullPathName().asChar());
-        if (found == activeLightPaths.end())
+        auto found = globalLightPaths.find(lightPath.fullPathName().asChar());
+        if (found != globalLightPaths.end())
             activeLightPaths.emplace(lightPath.fullPathName().asChar(), 
                                      lightPath);
 
@@ -885,7 +886,7 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         }
     }
 
-    // Turn on active lights, turn off non-active lights, and add non-created active lights.
+    // Turn on active lights, turn off non-active lights
     _MapAdapter<MayaHydraLightAdapter>(
         [&](MayaHydraLightAdapter* a) {
             auto lgtAdapter = activeLightPaths.find(a->GetDagPath().fullPathName().asChar());
@@ -893,13 +894,13 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
                 a->SetLightingOn(true);
                 activeLightPaths.erase(lgtAdapter);
             } else {
-                a->SetLightingOn(false);
+                // Skip dome light as maya numberOfActiveLights API doesn't count active dome light
+                if (a->LightType() != HdPrimTypeTokens->domeLight) {
+                    a->SetLightingOn(false);
+                }
             }
         },
         _lightAdapters);
-    for(const auto& entry : activeLightPaths) {
-        CreateLightAdapter(entry.second);
-    }
 }
 
 void MayaHydraSceneIndex::PostFrame()

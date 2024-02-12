@@ -27,6 +27,7 @@ target_sources(${TARGET_NAME}
         testUsdStageLayerMuting.cpp
         testMeshAdapterTransform.cpp
         testFlowViewportAPIFilterPrims.cpp
+        testPrimInstancing.cpp
 )
 
 # -----------------------------------------------------------------------------
@@ -38,7 +39,6 @@ target_compile_definitions(${TARGET_NAME}
     PRIVATE
         $<$<BOOL:${IS_MACOSX}>:OSMac_>
         $<$<BOOL:${IS_LINUX}>:LINUX>
-        $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:TBB_USE_DEBUG>
         $<$<BOOL:${IS_WINDOWS}>:GTEST_LINKED_AS_SHARED_LIBRARY>
 )
 

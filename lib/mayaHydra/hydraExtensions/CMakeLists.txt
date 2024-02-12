@@ -33,33 +33,31 @@ set(HEADERS
 target_compile_definitions(${TARGET_NAME} 
     PRIVATE 
         MAYAHYDRALIB_EXPORT
+        $<$<BOOL:${MayaUsd_FOUND}>:MAYAHYDRALIB_MAYAUSDAPI_ENABLED>
         $<$<BOOL:${IS_MACOSX}>:OSMac_>
         # Copy-pasted from lib/mayaUsd/CMakeLists.txt
 )
-
+        
 mayaHydra_compile_config(${TARGET_NAME})
 
-if(NOT BUILD_MAYAUSD_LIBRARY)
-    # -----------------------------------------------------------------------------
-    # include directories
-    # -----------------------------------------------------------------------------
-    target_include_directories(${TARGET_NAME} 
-        PUBLIC
-            ${MAYA_INCLUDE_DIRS}
-            ${PYTHON_INCLUDE_DIR}
-            ${PXR_INCLUDE_DIRS}
-            ${BOOST_INCLUDE_DIR}
-            ${CMAKE_BINARY_DIR}/include
-        PRIVATE
-            $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
-    )
+# -----------------------------------------------------------------------------
+# include directories
+# -----------------------------------------------------------------------------
+target_include_directories(${TARGET_NAME} 
+            PUBLIC
+                ${MAYA_INCLUDE_DIRS}
+                ${PYTHON_INCLUDE_DIR}
+                ${PXR_INCLUDE_DIRS}
+                ${BOOST_INCLUDE_DIR}
+                ${CMAKE_BINARY_DIR}/include
+            PRIVATE
+                $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
+                $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSD_INCLUDE_DIR}>
+)
 
-    target_compile_definitions(${TARGET_NAME}
+target_compile_definitions(${TARGET_NAME}
         PUBLIC
             PXR_PLUGINPATH_NAME=${PXR_OVERRIDE_PLUGINPATH_NAME}
-            $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:TBB_USE_DEBUG>
-            $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_DEBUG_PYTHON>
-            $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_LINKING_PYTHON>
         PRIVATE
             MAYAUSD_MACROS_EXPORT
             MAYAUSD_CORE_EXPORT
@@ -75,8 +73,7 @@ if(NOT BUILD_MAYAUSD_LIBRARY)
 
             # this flag is needed when building maya-usd in Maya
             $<$<BOOL:${IS_WINDOWS}>:WIN32>
-    )
-endif()
+)
 
 if(DEFINED MAYAUSD_VERSION)
     target_compile_definitions(${TARGET_NAME}
@@ -91,48 +88,40 @@ if(DEFINED MAYAHYDRA_VERSION)
     )
 endif()
 
-    # -----------------------------------------------------------------------------
-    # link libraries
-    # -----------------------------------------------------------------------------
-if(BUILD_MAYAUSD_LIBRARY)
-    target_link_libraries(${TARGET_NAME} 
-        PUBLIC 
-            mayaUsd
-        PRIVATE
-            $<$<BOOL:${USD_001905_BUILD}>:hio>
-    )
-else()    
-    target_link_libraries(${TARGET_NAME} 
-        PUBLIC
-            ar
-            gf
-            hd
-            hdx
-            js
-            kind
-            plug
-            sdf
-            tf
-            trace
-            usd
-            usdGeom
-            usdImaging
-            usdImagingGL
-            usdLux
-            usdRender
-            usdRi
-            usdShade
-            usdSkel
-            usdUtils
-            ufeExtensions
-            flowViewport
-            ${MAYA_LIBRARIES}
-        PRIVATE
-            $<$<BOOL:${USD_001905_BUILD}>:hio>
-            ${PYTHON_LIBRARIES} 
-            $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
-    )
-endif()
+# -----------------------------------------------------------------------------
+# link libraries
+# -----------------------------------------------------------------------------
+target_link_libraries(${TARGET_NAME} 
+    PUBLIC
+        ar
+        gf
+        hd
+        hdx
+        js
+        kind
+        plug
+        sdf
+        tf
+        trace
+        usd
+        usdGeom
+        usdImaging
+        usdImagingGL
+        usdLux
+        usdRender
+        usdRi
+        usdShade
+        usdSkel
+        usdUtils
+        ufeExtensions
+        flowViewport
+        ${MAYA_LIBRARIES}
+    PRIVATE
+        $<$<BOOL:${USD_001905_BUILD}>:hio>
+        ${PYTHON_LIBRARIES} 
+        $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
+        $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSDAPI_LIBRARY}>
+)
 
 # -----------------------------------------------------------------------------
 # promoted headers

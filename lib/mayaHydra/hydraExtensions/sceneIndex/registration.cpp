@@ -14,11 +14,13 @@
 // limitations under the License.
 //
 
-#include <mayaHydraLib/hydraUtils.h>
-#include <mayaHydraLib/sceneIndex/registration.h>
+#include "mayaHydraLib/hydraUtils.h"
+#include "mayaHydraLib/sceneIndex/registration.h"
+#include "mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndex.h"
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpPathInterfaceSceneIndex.h>
+#include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -27,6 +29,10 @@
 #include <pxr/imaging/hd/renderDelegate.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/usd/sdf/path.h>
+
+#if defined(MAYAHYDRALIB_MAYAUSDAPI_ENABLED)
+    #include <mayaUsdAPI/proxyStage.h>
+#endif
 
 #include <maya/MDGMessage.h>
 #include <maya/MFnDependencyNode.h>
@@ -181,6 +187,7 @@ private:
     Ufe::Path           _sceneIndexAppPath;
 };
 
+constexpr char kMayaUsdProxyShapeNode[] = { "mayaUsdProxyShape" };
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -191,91 +198,35 @@ PXR_NAMESPACE_OPEN_SCOPE
 // Remove this once the code has been moved to the MayaHydra namespace.
 using namespace MayaHydra;
 
-/* To add a custom scene index, a customer plugin must:
- 1. Define a Maya dag node via the MPxNode interface, and register it MFnPlugin::registerNode. This
-is typically done inside a Maya plug-in initialize function.
- 2. Define a HdSceneIndexPlugin which contains an _AppendSceneIndex method. The _AppendSceneIndex
-method will be called for every Maya node added into the scene. A customer is responsible for type
-checking the node for the one defined and also instantiate the corresponding scene index inside
-_AppendSceneIndex. The scene index returned by _AppendSceneIndex is then added to the render index
-by Maya.
-
-For example here is how we do that process in the Maya USD plug-in :
-// Some context :
-// MayaUsdProxyShapeMayaNodeSceneIndexPlugin is a subclass of HdSceneIndexPlugin.
-// MayaUsdProxyShapeBase is the base class for our Maya USD node.
-// MayaUsd::MayaUsdProxyShapeSceneIndex is the scene index class for Maya USD where we load the
-// stages.
-
-HdSceneIndexBaseRefPtr MayaUsdProxyShapeMayaNodeSceneIndexPlugin::_AppendSceneIndex(
-    const HdSceneIndexBaseRefPtr&      inputScene,
-    const HdContainerDataSourceHandle& inputArgs)
-{
-    using HdMObjectDataSource = HdRetainedTypedSampledDataSource<MObject>;
-    using HdMObjectDataSourceHandle = HdRetainedTypedSampledDataSource<MObject>::Handle;
-    static TfToken         dataSourceNodePathEntry("object");
-    HdDataSourceBaseHandle dataSourceEntryPathHandle = inputArgs->Get(dataSourceNodePathEntry);
-    if (HdMObjectDataSourceHandle dataSourceEntryPath
-        = HdMObjectDataSource::Cast(dataSourceEntryPathHandle)) {
-        MObject           dagNode = dataSourceEntryPath->GetTypedValue(0.0f);
-        MStatus           status;
-        MFnDependencyNode dependNodeFn(dagNode, &status);
-        if (!TF_VERIFY(status, "Error getting MFnDependencyNode")) {
-            return nullptr;
-        }
-
-        // Check that this node is a MayaUsdProxyShapeBase which is the base class for our Maya USD
-        // node
-        auto proxyShape = dynamic_cast<MayaUsdProxyShapeBase*>(dependNodeFn.userNode());
-        if (TF_VERIFY(proxyShape, "Error getting MayaUsdProxyShapeBase")) {
-            auto psSceneIndex = MayaUsd::MayaUsdProxyShapeSceneIndex::New(proxyShape);
-            // Flatten transforms, visibility, purpose, model, and material
-            // bindings over hierarchies.
-            return HdFlatteningSceneIndex::New(psSceneIndex);
-        }
-    }
-
-    return nullptr;
-}
-
-You may want to see the full source code in the Maya USD open source repository :
-https://github.com/Autodesk/maya-usd/tree/dev/lib/mayaUsd/sceneIndex
-*/
-
-namespace {
-constexpr char kDagNodeMessageName[] = { "dagNode" };
-}
 // MayaHydraSceneIndexRegistration is used to register a scene index for a given dag node type.
 MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy)
     : _renderIndexProxy(renderIndexProxy)
 {
-    // Begin registering of custom scene indices for given node types
-    HdSceneIndexPluginRegistry& sceneIndexPluginRegistry
-        = HdSceneIndexPluginRegistry::GetInstance();
-    // Ensure scene index plugin registration
-    std::vector<HfPluginDesc> customSceneIndexDescs;
-    sceneIndexPluginRegistry.GetPluginDescs(&customSceneIndexDescs);
-    if (customSceneIndexDescs.size() != 0) {
-        MCallbackId id;
-        MStatus     status;
-        id = MDGMessage::addNodeAddedCallback(
-            _SceneIndexNodeAddedCallback, kDagNodeMessageName, this, &status);
-        if (TF_VERIFY(status == MS::kSuccess, "NodeAdded callback registration failed."))
-            _sceneIndexDagNodeMessageCallbacks.append(id);
-        id = MDGMessage::addNodeRemovedCallback(
-            _SceneIndexNodeRemovedCallback, kDagNodeMessageName, this, &status);
-        if (TF_VERIFY(status == MS::kSuccess, "NodeRemoved callback registration failed."))
-            _sceneIndexDagNodeMessageCallbacks.append(id);
+    MCallbackId id;
+    MStatus     status;
+    id = MDGMessage::addNodeAddedCallback(
+        _SceneIndexNodeAddedCallback, kMayaUsdProxyShapeNode, this, &status);//We need only to monitor the MayaUsdProxyShapeNode
+    if (TF_VERIFY(status == MS::kSuccess, "NodeAdded callback registration failed."))
+        _sceneIndexDagNodeMessageCallbacks.append(id);
+    id = MDGMessage::addNodeRemovedCallback(
+        _SceneIndexNodeRemovedCallback, kMayaUsdProxyShapeNode, this, &status);//We need only to monitor the MayaUsdProxyShapeNode
+    if (TF_VERIFY(status == MS::kSuccess, "NodeRemoved callback registration failed."))
+        _sceneIndexDagNodeMessageCallbacks.append(id);
 
-        // Iterate over scene to find out existing node which will miss eventual dagNode added
-        // callbacks
-        MItDag nodesDagIt(MItDag::kDepthFirst, MFn::kInvalid);
-        for (; !nodesDagIt.isDone(); nodesDagIt.next()) {
-            MStatus status;
-            MObject dagNode(nodesDagIt.item(&status));
-            if (TF_VERIFY(status == MS::kSuccess)) {
-                _AddSceneIndexForNode(dagNode);
-            }
+    static const MTypeId MAYAUSD_PROXYSHAPE_ID(0x58000095); //Hardcoded
+        
+    // Iterate over scene to find out existing node which will miss eventual dagNode added callbacks
+    MItDag nodesDagIt(MItDag::kDepthFirst, MFn::kInvalid);
+    for (; !nodesDagIt.isDone(); nodesDagIt.next()) {
+        MObject dagNode(nodesDagIt.item(&status));
+        //Act only on MayaUsdProxyShapeBase nodes
+        MFnDependencyNode  dep(dagNode);
+        if (MAYAUSD_PROXYSHAPE_ID != dep.typeId()) {
+            continue; 
+        }
+        
+        if (TF_VERIFY(status == MS::kSuccess)) {
+            _AddSceneIndexForNode(dagNode);
         }
     }
 }
@@ -285,17 +236,15 @@ MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(const std::shared_ptr<F
 MayaHydraSceneIndexRegistrationPtr
 MayaHydraSceneIndexRegistry::GetSceneIndexRegistrationForRprim(const SdfPath& rprimPath) const
 {
-    // Retrieve the rprimPath prefix. Composed of the scene index plugin path, and a name used as a
-    // disambiguator. MAYA-128179: Revisit this operation. SdfPath operation is slow. No way to get
-    // first component only
-    SdfPath sceneIndexPluginPath = rprimPath.GetParentPath();
-    while (sceneIndexPluginPath.GetPathElementCount() > 2)
-        sceneIndexPluginPath = sceneIndexPluginPath.GetParentPath();
-    auto it = _registrations.find(sceneIndexPluginPath);
-    if (it != _registrations.end()) {
-        return it->second;
+    const std::string& rprimPathAsString = rprimPath.GetString();
+    for (auto& reg : _registrations){
+        auto& key = reg.first.GetString();
+        const size_t found = rprimPathAsString.find(key);
+        if (found != std::string::npos){
+            return reg.second;
+        }
     }
-
+    
     return nullptr;
 }
 
@@ -316,10 +265,11 @@ MayaHydraSceneIndexRegistry::~MayaHydraSceneIndexRegistry()
 bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNode)
 {
     MObjectHandle dagNodeHandle(dagNode);
-    auto          it = _registrationsByObjectHandle.find(dagNodeHandle);
+    auto it = _registrationsByObjectHandle.find(dagNodeHandle);
     if (it != _registrationsByObjectHandle.end()) {
         MayaHydraSceneIndexRegistrationPtr registration(it->second);
-        _renderIndexProxy->RemoveSceneIndex(registration->rootSceneIndex);
+        Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
+        dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(registration->rootSceneIndex);
         _registrationsByObjectHandle.erase(dagNodeHandle);
         _registrations.erase(registration->sceneIndexPathPrefix);
         return true;
@@ -327,10 +277,92 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
     return false;
 }
 
-constexpr char kSceneIndexPluginSuffix[] = {
-    "MayaNodeSceneIndexPlugin"
-}; // every scene index plugin compatible with the hydra viewport requires this suffix
+#ifdef MAYAHYDRALIB_MAYAUSDAPI_ENABLED
+void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
+{
+    //We receive only dag nodes of type MayaUsdProxyShapeNode
+    MAYAUSDAPI_NS::ProxyStage proxyStage(dagNode);
+    MayaHydraSceneIndexRegistrationPtr registration(new MayaHydraSceneIndexRegistration());
 
+    //Add the usdimaging stage scene index chain as a data producer scene index in flow viewport
+
+    //Since we want to insert a parent primitive for the stage scene index to be transformed or set visible/invisible, we need to set this scene indices chain 
+    //before some of the instancing scene indices for UsdImaginsStageSceneIndex, and there is a slot for that purpose which is createInfo.overridesSceneIndexCallback
+    //With this callback you can insert some scene indices which will be applied before the prototype scene indices.
+    //This will be done inside Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageSceneIndex later
+    UsdImagingCreateSceneIndicesInfo createInfo;
+        
+    auto stage = proxyStage.getUsdStage();
+    // Check whether the pseudo-root has children
+    if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
+        createInfo.stage = stage;//Add the stage to the creation parameters
+    }
+            
+    MStatus  status;
+    MDagPath dagPath(MDagPath::getAPathTo(dagNode, &status));
+    if (TF_VERIFY(status == MS::kSuccess, "Incapable of finding dag path to given node")) {
+        registration->dagNode = MObjectHandle(dagNode);
+        // Construct the scene index path prefix appended to each rprim created by it.
+        // It is composed of the "scene index plugin's name" + "dag node name" +
+        // "disambiguator" The dag node name disambiguator is necessary in situation
+        // where node name isn't unique and may clash with other node defined by the
+        // same plugin.
+        MFnDependencyNode dependNodeFn(dagNode);
+        std::string dependNodeNameString (dependNodeFn.name().asChar());
+        SanitizeNameForSdfPath(dependNodeNameString);
+                
+        registration->sceneIndexPathPrefix = 
+                    SdfPath::AbsoluteRootPath()
+                    .AppendPath(SdfPath(dependNodeNameString
+                        + (dependNodeFn.hasUniqueName()
+                                ? ""
+                                : "__" + std::to_string(_incrementedCounterDisambiguator++))));
+
+
+        //We will get the following scene indices from Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageSceneIndex
+        HdSceneIndexBaseRefPtr finalSceneIndex = nullptr;
+        UsdImagingStageSceneIndexRefPtr stageSceneIndex = nullptr;
+
+        PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr dataProducerSceneIndexData  = 
+            Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageSceneIndex(createInfo, finalSceneIndex, stageSceneIndex, 
+                                                                                                registration->sceneIndexPathPrefix, (void*)&dagNode);
+        if (nullptr == dataProducerSceneIndexData || nullptr == finalSceneIndex || nullptr == stageSceneIndex){
+            TF_CODING_ERROR("Error (nullptr == dataProducerSceneIndexData || nullptr == finalSceneIndex || nullptr == stageSceneIndex) !");
+        }
+        
+        //Create maya usd proxy shape scene index, since this scene index contains maya data, it cannot be added by the flow viewport API
+        auto mayaUsdProxyShapeSceneIndex = MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode));
+        registration->pluginSceneIndex = mayaUsdProxyShapeSceneIndex;
+        registration->interpretRprimPathFn = &(MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::InterpretRprimPath);
+        mayaUsdProxyShapeSceneIndex->Populate();
+
+        registration->rootSceneIndex = registration->pluginSceneIndex;
+
+        //Add the PathInterfaceSceneIndex which must be the last scene index, it is used for selection highlighting
+        registration->rootSceneIndex = PathInterfaceSceneIndex::New(
+                registration->rootSceneIndex,
+                registration->sceneIndexPathPrefix);
+
+        //Set the chain back into the dataProducerSceneIndexData in both members
+        dataProducerSceneIndexData->SetDataProducerSceneIndex(registration->rootSceneIndex);
+        dataProducerSceneIndexData->SetDataProducerLastSceneIndexChain(registration->rootSceneIndex);
+
+        //Add this chain scene index to the render index proxy from all viewports
+        const bool bRes = Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageDataProducerSceneIndexDataBaseToAllViewports(dataProducerSceneIndexData);
+        if (false == bRes){
+            TF_CODING_ERROR("Fvp::DataProducerSceneIndexInterfaceImp::get().addDataProducerSceneIndex returned false !");
+        }
+
+        // Add registration record if everything succeeded
+        _registrations.insert({ registration->sceneIndexPathPrefix, registration });
+        _registrationsByObjectHandle.insert({ registration->dagNode, registration });
+    }
+}
+#else
+namespace
+{
+    constexpr char kSceneIndexPluginSuffix[] = {"MayaNodeSceneIndexPlugin"};
+}
 void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
 {
     MFnDependencyNode dependNodeFn(dagNode);
@@ -375,7 +407,7 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
         HdRetainedContainerDataSource::New(kDataSourceNumEntries, sDataSourceEntryNames, values));
     if (TF_VERIFY(
             registration->pluginSceneIndex,
-            "HdSceneIndexBase::AppendSceneIndex failed to create %s scene index from given "
+            "MayaHydraSceneIndexRegistry::_AddSceneIndexForNode failed to create %s scene index from given "
             "node type.",
             sceneIndexPluginName.c_str())) {
 
@@ -423,6 +455,7 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
         }
     }
 }
+#endif //MAYAHYDRALIB_MAYAUSDAPI_ENABLED
 
 void MayaHydraSceneIndexRegistry::_SceneIndexNodeAddedCallback(MObject& dagNode, void* clientData)
 {

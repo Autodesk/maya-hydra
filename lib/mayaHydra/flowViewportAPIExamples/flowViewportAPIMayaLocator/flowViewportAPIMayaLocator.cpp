@@ -156,23 +156,6 @@ namespace
     //Callback when an attribute of this Maya node changes
     void transformAttributeChangedCallback(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug & otherPlug, void* dataProducerSceneIndexData)
     {
-        //Dealing with the transform only
-        MFnAttribute attr (plug.attribute());
-        if (MayaHydra::IsAMayaTransformAttributeName(attr.name())){
-            
-            if (! dataProducerSceneIndexData){
-                return;
-            }
-            FlowViewportAPIMayaLocator* flowViewportAPIMayaLocator = reinterpret_cast<FlowViewportAPIMayaLocator*>(dataProducerSceneIndexData);
-
-            GfMatrix4d nodeInvTransform;
-            MObject mObj = flowViewportAPIMayaLocator->thisMObject();
-            MStatus stat = GetNodeInverseTransform(mObj, nodeInvTransform);
-            CHECK_MSTATUS(stat);
-            if (MStatus::kSuccess == stat){
-                flowViewportAPIMayaLocator->_hydraViewportDataProducerSceneIndexExample.setContainerNodeInverseTransform(nodeInvTransform);
-            }
-        }
     }
 
     //Callback when an attribute of this Maya node changes
@@ -438,7 +421,6 @@ void FlowViewportAPIMayaLocator::SetupFlowViewportInterfaces()
     GfMatrix4d nodeInvTransform;
     GetNodeInverseTransform(_thisMObject, nodeInvTransform);
     _hydraViewportDataProducerSceneIndexExample.setContainerNode(&_thisMObject);
-    _hydraViewportDataProducerSceneIndexExample.setContainerNodeInverseTransform(nodeInvTransform);
     _hydraViewportDataProducerSceneIndexExample.addDataProducerSceneIndex();
 
     //Register a filtering scene index client
