@@ -66,7 +66,7 @@ DataProducerSceneIndexDataBase::DataProducerSceneIndexDataBase(const CreationPar
 DataProducerSceneIndexDataBase::~DataProducerSceneIndexDataBase()
 {
 #ifdef CODE_COVERAGE_WORKAROUND
-    Fvp::leakSceneIndex(_parentDataModifierSceneIndex);
+    Fvp::leakSceneIndex(_rootOverridesSceneIndex);
 #endif
 }
 
