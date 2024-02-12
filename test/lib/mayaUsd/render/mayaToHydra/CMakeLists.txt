@@ -20,6 +20,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFlowViewportAPI.py
     testStageVariants.py
     testNurbsPrimitives.py
+    testPolygonPrimitives.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py

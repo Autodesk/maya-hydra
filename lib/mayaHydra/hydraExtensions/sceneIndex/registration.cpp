@@ -269,6 +269,10 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
 
         registration->rootSceneIndex = registration->pluginSceneIndex;
 
+        registration->rootSceneIndex = HdPrefixingSceneIndex::New(
+                    registration->rootSceneIndex,
+                    registration->sceneIndexPathPrefix);
+
         //Add the PathInterfaceSceneIndex which must be the last scene index, it is used for selection highlighting
         registration->rootSceneIndex = PathInterfaceSceneIndex::New(
                 registration->rootSceneIndex,

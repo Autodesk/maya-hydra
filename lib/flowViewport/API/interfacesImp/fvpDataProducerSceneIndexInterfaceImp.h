@@ -51,7 +51,7 @@ public:
     FVP_API PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr addUsdStageSceneIndex( PXR_NS::UsdImagingCreateSceneIndicesInfo& createInfo,
                                         PXR_NS::HdSceneIndexBaseRefPtr& finalSceneIndex,
                                         PXR_NS::UsdImagingStageSceneIndexRefPtr& stageSceneIndex,
-                                        PXR_NS::SdfPath& inoutPreFix,
+                                        const PXR_NS::SdfPath& preFix,
                                         void* dccNode);
 
     ///Specific internal function for Usd Stages
@@ -59,7 +59,7 @@ public:
 
     ///From FVP_NS_DEF::DataProducerSceneIndexInterface
     bool addDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
-                                    PXR_NS::SdfPath& inoutPreFix,
+                                    const PXR_NS::SdfPath& preFix,
                                     void* dccNode = nullptr,
                                     const std::string& hydraViewportId = PXR_NS::FvpViewportAPITokens->allViewports,
                                     const std::string& rendererNames = PXR_NS::FvpViewportAPITokens->allRenderers

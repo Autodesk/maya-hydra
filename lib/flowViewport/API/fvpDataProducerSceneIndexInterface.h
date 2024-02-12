@@ -49,8 +49,8 @@ namespace FVP_NS_DEF
         * 
         *  @param[in]   customDataProducerSceneIndex is the custom scene index to add.
         * 
-        *  @param[in, out] inoutPreFix is the prefix you want to add to your data producer scene index primitives, it may be modified by this function if you provide a dccnode.
-        *                  If you don't want any prefix, pass SdfPath::AbsoluteRootPath() to this parameter.
+        *  @param[in]   preFix is the prefix you want to add to your data producer scene index primitives.
+        *               If you don't want any prefix, pass SdfPath::AbsoluteRootPath() to this parameter.
         * 
         *  @param[in]   dccNode is a MObject* from a DAG node for Maya, if you provide the pointer value, then we automatically track some events such as transform 
         *               or visibility updated and we hide automatically the primitives from the data producer scene index. 
@@ -73,7 +73,7 @@ namespace FVP_NS_DEF
         *  @return     true if the operation succeeded, false otherwise.
         */
         virtual bool addDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
-                                               PXR_NS::SdfPath& inoutPreFix,
+                                               const PXR_NS::SdfPath& preFix,
                                                void* dccNode = nullptr,
                                                const std::string& hydraViewportId = PXR_NS::FvpViewportAPITokens->allViewports,
                                                const std::string& rendererNames = PXR_NS::FvpViewportAPITokens->allRenderers
