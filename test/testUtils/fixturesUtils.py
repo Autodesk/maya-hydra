@@ -20,7 +20,7 @@ import sys
 import unittest
 
 # Plugins that are bundled and loaded by default in a Maya installation
-DEFAULT_PLUGINS = ['ArubaTessellator']
+DEFAULT_PLUGINS = ['ArubaTessellator', 'modelingToolkit']
 
 def _setUpClass(modulePathName, pluginName, initializeStandalone):
     '''
