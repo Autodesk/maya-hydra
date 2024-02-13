@@ -33,6 +33,7 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(const MAYAUSDAPI_NS::Pr
                                                         const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
                                                         const MObjectHandle& dagNodeHandle)
     : ParentClass(sceneIndexChainLastElement)
+    , InputSceneIndexUtils(sceneIndexChainLastElement)
     , _usdImagingStageSceneIndex(usdImagingStageSceneIndex)
     , _proxyStage(proxyStage)
     , _dagNodeHandle(dagNodeHandle)
@@ -122,12 +123,12 @@ Ufe::Path MayaUsdProxyShapeSceneIndex::InterpretRprimPath(
 // satisfying HdSceneIndexBase
 HdSceneIndexPrim MayaUsdProxyShapeSceneIndex::GetPrim(const SdfPath& primPath) const
 {
-    return _GetInputSceneIndex()->GetPrim(primPath);
+    return GetInputSceneIndex()->GetPrim(primPath);
 }
 
 SdfPathVector MayaUsdProxyShapeSceneIndex::GetChildPrimPaths(const SdfPath& primPath) const
 {
-    return _GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
 } // namespace MAYAUSD_NS_DEF

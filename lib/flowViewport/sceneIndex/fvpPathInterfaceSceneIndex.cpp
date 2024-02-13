@@ -23,18 +23,19 @@ namespace FVP_NS_DEF {
 PathInterfaceSceneIndexBase::
 PathInterfaceSceneIndexBase(HdSceneIndexBaseRefPtr const &inputSceneIndex)
   : HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
+  , InputSceneIndexUtils(inputSceneIndex)
 {}
 
 HdSceneIndexPrim
 PathInterfaceSceneIndexBase::GetPrim(const SdfPath &primPath) const
 {
-    return _GetInputSceneIndex()->GetPrim(primPath);
+    return GetInputSceneIndex()->GetPrim(primPath);
 }
 
 SdfPathVector
 PathInterfaceSceneIndexBase::GetChildPrimPaths(const SdfPath &primPath) const
 {
-    return _GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
 void

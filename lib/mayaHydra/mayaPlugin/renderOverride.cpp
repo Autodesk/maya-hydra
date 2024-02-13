@@ -32,6 +32,9 @@
 #include <mayaHydraLib/sceneIndex/registration.h>
 #include <mayaHydraLib/hydraUtils.h>
 
+#ifdef CODE_COVERAGE_WORKAROUND
+#include <flowViewport/fvpUtils.h>
+#endif
 #include <flowViewport/tokens.h>
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
@@ -832,7 +835,14 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
         _sceneIndexRegistry.reset();
     }
 
+#ifdef CODE_COVERAGE_WORKAROUND
+    // Leak the Maya scene index, as its base class HdRetainedSceneIndex
+    // destructor crashes under Windows clang code coverage build.
+    _mayaHydraSceneProducer->Cleanup();
+    _mayaHydraSceneProducer.release();
+#else
     _mayaHydraSceneProducer.reset();
+#endif
     _selectionSceneIndex.Reset();
     _selection.reset();
 
@@ -847,7 +857,11 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 
     if (_renderIndex != nullptr) {
         GetMayaHydraLibInterface().UnregisterTerminalSceneIndex(_renderIndex->GetTerminalSceneIndex());
+#ifndef CODE_COVERAGE_WORKAROUND
+        // Leak the render index, as its destructor crashes under Windows clang
+        // code coverage build.
         delete _renderIndex;
+#endif
         _renderIndex = nullptr;
     }
 
@@ -889,6 +903,10 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex()
     // selection highlighting.
     wfSi->addExcludedSceneRoot(_ID);
     _lastFilteringSceneIndexBeforeCustomFiltering  = wfSi;
+
+#ifdef CODE_COVERAGE_WORKAROUND
+    Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);
+#endif
   
     // Set the initial selection onto the selection scene index.
     _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());

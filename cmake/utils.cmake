@@ -27,7 +27,7 @@ endif()
 # compiler type
 if (CMAKE_COMPILER_IS_GNUCXX)
     set(IS_GNU TRUE)
-elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     set(IS_CLANG TRUE)
 elseif(MSVC)
     set(IS_MSVC TRUE)

@@ -112,8 +112,9 @@ SelectionSceneIndex(
     const SelectionPtr&           selection
 )
   : HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
+  , InputSceneIndexUtils(inputSceneIndex)
   , _selection(selection)
-  , _inputSceneIndexPathInterface(dynamic_cast<const PathInterface*>(&*_GetInputSceneIndex()))
+  , _inputSceneIndexPathInterface(dynamic_cast<const PathInterface*>(&*inputSceneIndex))
 {
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::SelectionSceneIndex() called.\n");
@@ -127,7 +128,7 @@ SelectionSceneIndex::GetPrim(const SdfPath &primPath) const
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::GetPrim() called.\n");
 
-    HdSceneIndexPrim result = _GetInputSceneIndex()->GetPrim(primPath);
+    HdSceneIndexPrim result = GetInputSceneIndex()->GetPrim(primPath);
     if (!result.dataSource) {
         return result;
     }
@@ -144,7 +145,7 @@ SelectionSceneIndex::GetChildPrimPaths(const SdfPath &primPath) const
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::GetChildPrimPaths() called.\n");
 
-    return _GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
 void

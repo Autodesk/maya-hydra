@@ -73,7 +73,7 @@ bool FilteringSceneIndexExample::IsFiltered(const SdfPath& primPath) const
 
 void FilteringSceneIndexExample::UpdateFilteringStatus(const SdfPath& primPath)
 {
-    if (ShouldBeFiltered(_GetInputSceneIndex()->GetPrim(primPath))) {
+    if (ShouldBeFiltered(GetInputSceneIndex()->GetPrim(primPath))) {
         _filteredPrims.insert(primPath);
     } else {
         _filteredPrims.erase(primPath);
@@ -81,7 +81,7 @@ void FilteringSceneIndexExample::UpdateFilteringStatus(const SdfPath& primPath)
 }
 
 FilteringSceneIndexExample::FilteringSceneIndexExample(const HdSceneIndexBaseRefPtr& inputSceneIndex)
-    : ParentClass(inputSceneIndex)
+    : ParentClass(inputSceneIndex), InputSceneIndexUtils(inputSceneIndex)
 {
     std::stack<SdfPath> primPathsToTraverse({ SdfPath::AbsoluteRootPath() });
     while (!primPathsToTraverse.empty()) {
@@ -96,7 +96,7 @@ FilteringSceneIndexExample::FilteringSceneIndexExample(const HdSceneIndexBaseRef
 
 HdSceneIndexPrim FilteringSceneIndexExample::GetPrim(const SdfPath& primPath) const
 {
-    return IsFiltered(primPath) ? HdSceneIndexPrim() : _GetInputSceneIndex()->GetPrim(primPath);
+    return IsFiltered(primPath) ? HdSceneIndexPrim() : GetInputSceneIndex()->GetPrim(primPath);
 }
 
 SdfPathVector FilteringSceneIndexExample::GetChildPrimPaths(const SdfPath& primPath) const {
@@ -112,7 +112,7 @@ SdfPathVector FilteringSceneIndexExample::GetChildPrimPaths(const SdfPath& primP
     // to a filtered child prim, as a filtered prim should not exist at all (and
     // we might have sent a PrimsRemoved notification prior). Thus, remove all
     // child paths to filtered prims before returning.
-    SdfPathVector childPaths = _GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    SdfPathVector childPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
     childPaths.erase(
         std::remove_if(
             childPaths.begin(),
@@ -171,7 +171,7 @@ void FilteringSceneIndexExample::_PrimsDirtied(
             // Filtering status changed, send a different notification instead
             if (wasPreviouslyFiltered) {
                     newlyUnfilteredEntries.emplace_back(
-                        entry.primPath, _GetInputSceneIndex()->GetPrim(entry.primPath).primType);
+                        entry.primPath, GetInputSceneIndex()->GetPrim(entry.primPath).primType);
             } else {
                     newlyFilteredEntries.emplace_back(entry.primPath);
             }

@@ -8,6 +8,7 @@ add_library(${TARGET_NAME} SHARED)
 target_sources(${TARGET_NAME} 
     PRIVATE
         debugCodes.cpp
+        fvpUtils.cpp
         global.cpp
         tokens.cpp
 )
@@ -15,6 +16,7 @@ target_sources(${TARGET_NAME}
 set(HEADERS
     api.h
     debugCodes.h
+    fvpUtils.h
     global.h
     tokens.h
 )
@@ -92,8 +94,10 @@ install(FILES ${CMAKE_BINARY_DIR}/include/flowViewport/flowViewport.h
 )
 
 if(IS_WINDOWS)
-    install(FILES $<TARGET_PDB_FILE:${TARGET_NAME}> 
-            DESTINATION ${CMAKE_INSTALL_PREFIX}/lib OPTIONAL)
+    if (NOT CODE_COVERAGE)
+        install(FILES $<TARGET_PDB_FILE:${TARGET_NAME}> 
+                DESTINATION ${CMAKE_INSTALL_PREFIX}/lib OPTIONAL)
+    endif()
 endif()
 
 # -----------------------------------------------------------------------------

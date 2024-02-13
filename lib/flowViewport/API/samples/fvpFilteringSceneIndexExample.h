@@ -19,6 +19,8 @@
 //Local headers
 #include "flowViewport/api.h"
 
+#include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+
 //Hydra headers
 #include <pxr/base/tf/declarePtrs.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
@@ -37,9 +39,11 @@ class FilteringSceneIndexExample;
 TF_DECLARE_WEAK_AND_REF_PTRS(FilteringSceneIndexExample);
 
 class FilteringSceneIndexExample : public HdSingleInputFilteringSceneIndexBase
+    , public Fvp::InputSceneIndexUtils<FilteringSceneIndexExample>
 {
 public:
     using ParentClass = HdSingleInputFilteringSceneIndexBase;
+    using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
     static FilteringSceneIndexExampleRefPtr New(const HdSceneIndexBaseRefPtr& inputSceneIndex){
         return TfCreateRefPtr(new FilteringSceneIndexExample(inputSceneIndex));
@@ -79,4 +83,3 @@ protected:
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif //FLOW_VIEWPORT_EXAMPLES_FILTERING_SCENE_INDEX_EXAMPLE_H
-

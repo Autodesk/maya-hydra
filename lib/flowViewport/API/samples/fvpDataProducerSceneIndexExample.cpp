@@ -22,6 +22,10 @@
 //Local headers
 #include "fvpDataProducerSceneIndexExample.h"
 
+#ifdef CODE_COVERAGE_WORKAROUND
+#include <flowViewport/fvpUtils.h>
+#endif
+
 //USD headers
 #include <pxr/base/gf/range3d.h>
 #include <pxr/base/gf/bbox3d.h>
@@ -132,6 +136,10 @@ DataProducerSceneIndexExample::DataProducerSceneIndexExample() :
 
 DataProducerSceneIndexExample::~DataProducerSceneIndexExample() 
 { 
+#ifdef CODE_COVERAGE_WORKAROUND
+    Fvp::leakSceneIndex(_retainedSceneIndex);
+#endif
+
     removeDataProducerSceneIndex();
     _hydraInterface = nullptr;
 }
