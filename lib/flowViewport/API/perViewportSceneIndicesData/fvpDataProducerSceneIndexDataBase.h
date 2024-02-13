@@ -74,7 +74,7 @@ public:
         void* _dccNode;
     };
 
-    ~DataProducerSceneIndexDataBase() override = default;
+    ~DataProducerSceneIndexDataBase() override;
     
     //Used to set the usd stage scene indices
     void SetDataProducerSceneIndex(const HdSceneIndexBaseRefPtr& sceneIndex) {_dataProducerSceneIndex = sceneIndex;}

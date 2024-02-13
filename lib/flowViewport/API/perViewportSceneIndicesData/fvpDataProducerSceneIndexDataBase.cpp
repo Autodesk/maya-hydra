@@ -22,6 +22,10 @@
 #include "fvpDataProducerSceneIndexDataBase.h"
 #include "flowViewport/API/fvpViewportAPITokens.h"
 
+#ifdef CODE_COVERAGE_WORKAROUND
+#include <flowViewport/fvpUtils.h>
+#endif
+
 //Hydra headers
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/flatteningSceneIndex.h>
@@ -57,6 +61,13 @@ DataProducerSceneIndexDataBase::DataProducerSceneIndexDataBase(const CreationPar
     _lastSceneIndexChain        = nullptr;//Will be set later
     _rendererNames              = FvpViewportAPITokens->allRenderers;
     _dccNode                    = params._dccNode;
+}
+
+DataProducerSceneIndexDataBase::~DataProducerSceneIndexDataBase()
+{
+#ifdef CODE_COVERAGE_WORKAROUND
+    Fvp::leakSceneIndex(_rootOverridesSceneIndex);
+#endif
 }
 
 void DataProducerSceneIndexDataBase::UpdateHydraTransformFromParentPath() 

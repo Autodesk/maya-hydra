@@ -16,6 +16,9 @@
 
 //Local headers
 #include "fvpFilteringSceneIndicesChainManager.h"
+#ifdef CODE_COVERAGE_WORKAROUND
+#include <flowViewport/fvpUtils.h>
+#endif
 #include "flowViewport/sceneIndex/fvpRenderIndexProxy.h"
 #include "flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h"
 #include "flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h"
@@ -86,6 +89,9 @@ void FilteringSceneIndicesChainManager::destroyFilteringSceneIndicesChain(Viewpo
     renderIndex->RemoveSceneIndex(lastSceneIndex);//Remove the whole chain from the render index
 
     //Remove a ref on it which should cascade the same on its references
+#ifdef CODE_COVERAGE_WORKAROUND
+    Fvp::leakSceneIndex(lastSceneIndex);
+#endif
     lastSceneIndex.Reset();
 }
 

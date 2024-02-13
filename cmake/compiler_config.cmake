@@ -20,6 +20,18 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         )
 endif()
 
+set(CLANG_FLAGS
+    -MP
+    -frtti
+)
+
+if (CODE_COVERAGE)
+    list(APPEND CLANG_FLAGS
+        -fprofile-instr-generate
+        -fcoverage-mapping
+    )
+endif()
+
 set(MSVC_FLAGS
     # we want to be as strict as possible
     /W3
@@ -58,6 +70,22 @@ set(MSVC_FLAGS
     /we4101
     /we4189
 )
+
+set(CLANG_DEFINITIONS
+    # Make sure WinDef.h does not define min and max macros which
+    # will conflict with std::min() and std::max().
+    NOMINMAX
+
+    _CRT_SECURE_NO_WARNINGS
+    _SCL_SECURE_NO_WARNINGS
+) 
+
+if (CODE_COVERAGE)
+    list(APPEND CLANG_DEFINITIONS
+        CODE_COVERAGE
+        CODE_COVERAGE_WORKAROUND
+    )
+endif()
 
 set(MSVC_DEFINITIONS
     # Make sure WinDef.h does not define min and max macros which
@@ -99,7 +127,7 @@ function(mayaHydra_compile_config TARGET)
                 cxx_std_11
         )
     endif()
-    if(IS_GNU OR IS_CLANG)
+    if(IS_GNU)
         target_compile_options(${TARGET} 
             PRIVATE
                 ${GNU_CLANG_FLAGS}
@@ -120,6 +148,15 @@ function(mayaHydra_compile_config TARGET)
                     BOOST_NO_CXX98_FUNCTION_BASE
             )
         endif()
+    elseif(IS_CLANG)
+        target_compile_options(${TARGET} 
+            PRIVATE
+                ${CLANG_FLAGS}
+        )
+        target_compile_definitions(${TARGET} 
+            PRIVATE
+                ${CLANG_DEFINITIONS}
+        )
     elseif(IS_MSVC)
         target_compile_options(${TARGET} 
             PRIVATE

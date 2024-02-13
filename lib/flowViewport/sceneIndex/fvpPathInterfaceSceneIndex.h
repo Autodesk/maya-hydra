@@ -17,6 +17,7 @@
 
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
+#include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
@@ -29,9 +30,12 @@ namespace FVP_NS_DEF {
 /// PathInterface::SceneIndexPath() virtual.
 ///
 class PathInterfaceSceneIndexBase 
-    : public PXR_NS::HdSingleInputFilteringSceneIndexBase, public PathInterface
+    : public PXR_NS::HdSingleInputFilteringSceneIndexBase
+    , public PathInterface
+    , public Fvp::InputSceneIndexUtils<PathInterfaceSceneIndexBase>
 {
 public:
+    using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
     FVP_API
     PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath &primPath) const override;
