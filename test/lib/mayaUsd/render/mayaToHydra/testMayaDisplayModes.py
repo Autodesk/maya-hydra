@@ -86,8 +86,7 @@ class TestMayaDisplayModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
     def test_MayaDisplayModes(self):
         cmds.file(new=True, force=True)
 
-        # Load a maya scene with a maya native sphere, usd sphere and some lights, with HdStorm already being the viewport renderer.
-        # The sphere is not at the origin on purpose
+        # open simple Maya scene wita light/sphere/plane
         testFile = mayaUtils.openTestScene(
                 "testMayaDisplayModes",
                 "testMayaDisplayModes.ma")
