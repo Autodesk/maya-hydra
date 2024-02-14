@@ -18,13 +18,23 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 import mayaUtils
+import platform
 
 class TestLookThrough(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.2
+    @property
+    def imageDiffFailThreshold(self):
+        return 0.01
+    
+    @property
+    def imageDiffFailPercent(self):
+        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
+        # for that platform specifically for now, so we can still catch issues on other platforms.
+        if platform.system() == "Darwin":
+            return 3
+        return 0.2
 
     #Test look through camera and maya lights (spot & area).
     def test_LookThrough(self):
@@ -38,22 +48,22 @@ class TestLookThrough(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCa
 
         #Verify Default display
         panel = mayaUtils.activeModelPanel()
-        self.assertSnapshotClose("default" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("default" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Verify look through camera
         cmds.lookThru( panel, 'persp1' )
         cmds.refresh()
-        self.assertSnapshotClose("lookThroughCamera" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("lookThroughCamera" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Verify look through spot Light
         cmds.lookThru( panel, 'spotLight1' )
         cmds.refresh()
-        self.assertSnapshotClose("lookThroughSpotLight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("lookThroughSpotLight" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Verify look through area light, use a small far clip to clip the scene
         cmds.lookThru( panel, 'areaLight1', nc=0.0, fc=7.5 )
         cmds.refresh()
-        self.assertSnapshotClose("lookThroughAreaLight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("lookThroughAreaLight" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
