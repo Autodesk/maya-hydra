@@ -13,9 +13,11 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStageAddPrim.py
     testTransforms.py
     testNewSceneWithStage.py
+    testMayaDisplayModes.py
     testMayaLights.py
     testUSDLights.py
     testArnoldLights.py
+    testMayaDisplayModes.py
     testStandardSurface.py
     testFlowViewportAPI.py
     testStageVariants.py
