@@ -86,7 +86,7 @@ class TestMayaDisplayModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
     def test_MayaDisplayModes(self):
         cmds.file(new=True, force=True)
 
-        # open simple Maya scene wita light/sphere/plane
+        # open simple Maya scene
         testFile = mayaUtils.openTestScene(
                 "testMayaDisplayModes",
                 "testMayaDisplayModes.ma")
