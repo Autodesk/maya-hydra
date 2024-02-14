@@ -29,15 +29,30 @@
 #include <pxr/imaging/hd/material.h>
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/types.h>
+#include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usd/stage.h>
+#include <pxr/usd/usdMtlx/reader.h>
+#include <pxr/usd/usdShade/material.h>
+#include <pxr/usdImaging/usdImaging/materialParamUtils.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
 #include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
 #include <maya/MPlugArray.h>
 
+#include <MaterialXCore/Document.h>
+#include <MaterialXFormat/XmlIo.h>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
+
+TF_DEFINE_PRIVATE_TOKENS(
+    _tokens,
+    (mtlx)
+    ((mtlxSurface, "mtlx:surface"))
+    (surface)
+);
 
 const VtValue       _emptyValue;
 const TfToken       _emptyToken;
@@ -231,10 +246,81 @@ private:
         }
     }
 
+    bool PopulateMaterialXNetworkMap(HdMaterialNetworkMap& networkMap)
+    {
+        // Get the dependency node
+        MStatus status;
+        MFnDependencyNode node(_surfaceShader, &status);
+        if (!status) {
+            return false;
+        }
+
+        // Fetch the "renderDocument" attribute from the node
+        static const MString renderDocumentStr("renderDocument");  
+        auto mtlxDocPlug = node.findPlug(renderDocumentStr, true, &status);
+        if (!status) {
+            return false;
+        }
+
+        // Construct a MaterialX document
+        auto mtlxDocStr = mtlxDocPlug.asString();
+        auto mtlxDoc = MaterialX::createDocument();
+        MaterialX::readFromXmlString(mtlxDoc, mtlxDocStr.asChar());
+
+        // Create a Usd Stage from the MaterialX document
+        auto stage = UsdStage::CreateInMemory("tmp.usda", TfNullPtr);
+        UsdMtlxRead(mtlxDoc, stage);
+        
+        // Search for material group in the Usd Stage
+        static const SdfPath basePath("/MaterialX/Materials");
+        auto mtlxRange = stage->GetPrimAtPath(basePath).GetChildren();
+        if (mtlxRange.empty()) {
+            return false;
+        }
+
+        // There should be only one material. Fetch it.
+        UsdShadeMaterial mtlxMaterial(*mtlxRange.begin());
+        if (!mtlxMaterial) {
+            return false;
+        }
+
+        // Get MaterialX output
+        UsdShadeOutput mtlxOutput = mtlxMaterial.GetOutput(_tokens->mtlxSurface);
+        if (!mtlxOutput) {
+            return false;
+        }
+
+        // Get MaterialX shader outputs
+        UsdShadeAttributeVector mtlxShaderOutputs = 
+            UsdShadeUtils::GetValueProducingAttributes(mtlxOutput, /*shaderOutputsOnly*/true);
+        if (mtlxShaderOutputs.empty()) {
+            return false;
+        }
+        
+        // Finally get MaterialX shader
+        UsdShadeShader mtlxShader(mtlxShaderOutputs[0].GetPrim());
+        if (!mtlxShader) {
+            return false;
+        }
+
+        // Convert the MaterialX shader to HdMaterialNetwork
+        UsdImagingBuildHdMaterialNetworkFromTerminal(
+            mtlxShader.GetPrim(), _tokens->surface, {_tokens->mtlx},
+            {_tokens->mtlx}, &networkMap, UsdTimeCode());
+            
+        return true;
+    }
+
     VtValue GetMaterialResource() override
     {
         TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
             .Msg("MayaHydraShadingEngineAdapter::GetMaterialResource(): %s\n", GetID().GetText());
+        
+        HdMaterialNetworkMap materialXNetworkMap;
+        if (PopulateMaterialXNetworkMap(materialXNetworkMap)) {
+            return VtValue(materialXNetworkMap);
+        }
+        
         MayaHydraMaterialNetworkConverter::MayaHydraMaterialNetworkConverterInit initStruct(
             GetID(), _enableXRayShadingMode, &_materialPathToMobj);
 
