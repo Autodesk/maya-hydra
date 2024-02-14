@@ -500,7 +500,7 @@ def BuildAndInstall(context, buildArgs, stages):
         
         if context.mayaUsdLocation:
             extraArgs.append('-DMAYAUSD_LOCATION="{mayaUsdLocation}"'
-                             .format(mayaUsdLocation=context.mayaUsdLocation.replace("\\","/")))     
+                             .format(mayaUsdLocation=context.mayaUsdLocation))     
         
         if context.mtoaLocation:
             extraArgs.append('-DMTOAUSD_LOCATION="{mtoaLocation}"'
