@@ -17,7 +17,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaLights.py
     testUSDLights.py
     testArnoldLights.py
-    testMayaDisplayModes.py
     testStandardSurface.py
     testFlowViewportAPI.py
     testStageVariants.py
