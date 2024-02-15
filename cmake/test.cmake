@@ -281,6 +281,22 @@ finally:
         list(APPEND MAYAUSD_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
              "${MAYAUSD_LOCATION}/libraries")
     endif()
+    
+    # mtoa
+    if(DEFINED MTOA_LOCATION)
+        list(APPEND MAYAUSD_VARNAME_PATH
+             "${MTOA_LOCATION}/bin")
+        list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
+             "${MTOA_LOCATION}/scripts/mtoa/mel")   
+        list(APPEND MAYAUSD_VARNAME_MAYA_PXR_PLUGINPATH_NAME
+             "${MTOA_LOCATION}/usd")
+        list(APPEND MAYAUSD_VARNAME_MAYA_RENDER_DESC_PATH
+             "${MTOA_LOCATION}/")
+        list(APPEND MAYAUSD_MATERIALX_SEARCH_PATH
+             "${MTOA_LOCATION}/materialx/arnold")
+             list(APPEND MAYAUSD_MATERIALX_SEARCH_PATH
+                  "${MTOA_LOCATION}/materialx/targets")
+    endif()
 
 
     if(IS_WINDOWS AND DEFINED ENV{PYTHONHOME})
