@@ -39,6 +39,7 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
     IMAGE_DIFF_FAIL_PERCENT = 2
 
     def setupScene(self):
+        cmds.file(new=True, force=True)
         self.setHdStormRenderer()
 
     #Test adding primitives
