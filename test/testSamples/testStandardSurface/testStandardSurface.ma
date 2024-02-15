@@ -3,7 +3,6 @@
 //Last modified: Mon, Feb 05, 2024 09:30:35 AM
 //Codeset: 1252
 requires maya "2025ff02";
-requires -nodeType "mayaUsdLayerManager" -dataType "pxrUsdStageData" "mayaUsdPlugin" "0.27.0";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";
 fileInfo "product" "Maya 2025";
@@ -112,9 +111,6 @@ createNode file -n "file1";
 	setAttr ".cs" -type "string" "sRGB";
 createNode place2dTexture -n "place2dTexture1";
 	rename -uid "6616C90D-4B36-08C7-8666-33BB13D15663";
-createNode mayaUsdLayerManager -n "mayaUsdLayerManager1";
-	rename -uid "61CE7C31-4E04-09B7-BFEA-F291A58D7E4C";
-	setAttr ".sst" -type "string" "";
 createNode script -n "uiConfigurationScriptNode";
 	rename -uid "8E0C2C18-4263-5451-E98E-C6B108D65C44";
 	setAttr ".b" -type "string" (
