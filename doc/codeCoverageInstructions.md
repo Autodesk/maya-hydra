@@ -15,12 +15,12 @@ To install Clang and the LLVM toolset, you can install an optional module with V
 
 ## Building the Coverage Variant
 
-The maya-hydra build has a Coverage variant that can be used with the following stages: clean,build,install,test (note that the test stage depends on the install stage).  Clang is used with code coverage instrumentation flags enabled (-fprofile-instr-generate -fcoverage-mapping) so that when tests are run after a successful install stage, code coverage data files will be generated.
+The maya-hydra build has a Coverage variant that can be used with the following stages: clean,build,install,test (note that the test stage depends on the install stage).  Clang is used with code coverage instrumentation flags enabled (-fprofile-instr-generate -fcoverage-mapping) so that when tests are run after a successful install stage, code coverage data files will be generated.  Refer to the [build documentation](./build.md) for more details.
 
 To build the coverage variant you can run:
 
 ```
-python build.py --generator=Ninja --stages clean,configure,build,install --maya-location <maya_location> --build-coverage --pxrusd-location <pxrusd_location> --devkit-location <devkit_location> --build-args="-DPYTHON_INCLUDE_DIR=<python_include_dir>,-DPython_EXECUTABLE=<python_executable>,-DPYTHON_LIBRARIES=<python_libraries>,-DBUILD_WITH_PYTHON_3=ON,-DBUILD_WITH_PYTHON_3_VERSION=<version_of_python>,-DQT_VERSION=6.5.0,-DCMAKE_WANT_MATERIALX_BUILD=ON,-DCMAKE_PREFIX_PATH=<cmake_prefix_path>" <installation_location>
+python build.py --generator=Ninja --stages clean,configure,build,install --maya-location <maya_location> --build-coverage --pxrusd-location <pxrusd_location> --devkit-location <devkit_location> --build-args="-DPYTHON_INCLUDE_DIR=<python_include_dir>,-DPython_EXECUTABLE=<python_executable>,-DPYTHON_LIBRARIES=<python_libraries>,-DCMAKE_WANT_MATERIALX_BUILD=ON,-DCMAKE_PREFIX_PATH=<cmake_prefix_path>" <installation_location>
 ```
 
 The --build-coverage flag indicates that the variant to be built is the Coverage variant. 
@@ -30,7 +30,7 @@ The --build-coverage flag indicates that the variant to be built is the Coverage
 To run tests and generate code coverage information using the Coverage build, run:
 
 ```
-python build.py --generator=Ninja --stages test --maya-location <maya_location> --build-coverage --pxrusd-location <pxrusd_location> --devkit-location <devkit_location> --build-args="-DPYTHON_INCLUDE_DIR=<python_include_dir>,-DPython_EXECUTABLE=<python_executable>,-DPYTHON_LIBRARIES=<python_libraries>,-DBUILD_WITH_PYTHON_3=ON,-DBUILD_WITH_PYTHON_3_VERSION=<version_of_python>,-DQT_VERSION=6.5.0,-DCMAKE_WANT_MATERIALX_BUILD=ON,-DCMAKE_PREFIX_PATH=<cmake_prefix_path>" <installation_location>
+python build.py --generator=Ninja --stages test --maya-location <maya_location> --build-coverage --pxrusd-location <pxrusd_location> --devkit-location <devkit_location> --build-args="-DPYTHON_INCLUDE_DIR=<python_include_dir>,-DPython_EXECUTABLE=<python_executable>,-DPYTHON_LIBRARIES=<python_libraries>,-DCMAKE_WANT_MATERIALX_BUILD=ON,-DCMAKE_PREFIX_PATH=<cmake_prefix_path>" <installation_location>
 ```
 
 After running tests, there will be raw coverage information files generated that are have a file extension of .profraw. 
