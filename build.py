@@ -496,11 +496,15 @@ def BuildAndInstall(context, buildArgs, stages):
         stagesArgs = []
         if context.mayaLocation:
             extraArgs.append('-DMAYA_LOCATION="{mayaLocation}"'
-                             .format(mayaLocation=context.mayaLocation))        
+                             .format(mayaLocation=context.mayaLocation))
         
         if context.mayaUsdLocation:
             extraArgs.append('-DMAYAUSD_LOCATION="{mayaUsdLocation}"'
-                             .format(mayaUsdLocation=context.mayaUsdLocation.replace("\\","/")))
+                             .format(mayaUsdLocation=context.mayaUsdLocation))     
+        
+        if context.mtoaLocation:
+            extraArgs.append('-DMTOAUSD_LOCATION="{mtoaLocation}"'
+                             .format(mtoaLocation=context.mtoaLocation))        
 
         if context.pxrUsdLocation:
             extraArgs.append('-DPXR_USD_LOCATION="{pxrUsdLocation}"'
@@ -571,6 +575,9 @@ parser.add_argument("--maya-location", type=str,
 
 parser.add_argument("--mayausd-location", type=str,
                     help="Directory where MayaUsd is installed.")
+
+parser.add_argument("--mtoa-location", type=str,
+                    help="Directory where MtoA is installed.")
                     
 parser.add_argument("--pxrusd-location", type=str,
                     help="Directory where Pixar USD is installed.")
@@ -664,6 +671,10 @@ class InstallContext:
         # MayaUsd Location
         self.mayaUsdLocation = (os.path.abspath(args.mayausd_location).replace("\\","/")
                                 if args.mayausd_location else None)
+
+        # MtoA Location
+        self.mtoaLocation = (os.path.abspath(args.mtoa_location).replace("\\","/")
+                                if args.mtoa_location else None)
         
         # PXR USD Location
         self.pxrUsdLocation = (os.path.abspath(args.pxrusd_location)
