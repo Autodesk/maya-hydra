@@ -3,7 +3,6 @@
 //Last modified: Thu, Feb 15, 2024 11:20:16 AM
 //Codeset: 1252
 requires maya "2026ff01";
-requires -nodeType "aiOptions" -nodeType "aiAOVDriver" -nodeType "aiAOVFilter" "mtoa" "5.4.0";
 requires -nodeType "mayaUsdLayerManager" -dataType "pxrUsdStageData" "mayaUsdPlugin" "0.28.0";
 requires -nodeType "MhFootPrint" "mayaHydraFootPrintNode" "2025.0";
 currentUnit -l centimeter -a degree -t film;

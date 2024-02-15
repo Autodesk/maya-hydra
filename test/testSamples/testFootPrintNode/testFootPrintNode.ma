@@ -3,7 +3,6 @@
 //Last modified: Wed, Feb 14, 2024 05:36:52 PM
 //Codeset: 1252
 requires maya "2026ff01";
-requires "mtoa" "5.4.0";
 requires -nodeType "mayaUsdLayerManager" -dataType "pxrUsdStageData" "mayaUsdPlugin" "0.28.0";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";
