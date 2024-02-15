@@ -12,14 +12,17 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testSceneBrowser.py
     testStageAddPrim.py
     testTransforms.py
+    testMaterialXOnNative.py
     testNewSceneWithStage.py
     testMayaLights.py
     testUSDLights.py
+    testArnoldLights.py
+    testStandardSurface.py
     testFlowViewportAPI.py
     testStageVariants.py
-    testArnoldLights.py
     testNurbsPrimitives.py
     testCurveTools.py
+    testPolygonPrimitives.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py

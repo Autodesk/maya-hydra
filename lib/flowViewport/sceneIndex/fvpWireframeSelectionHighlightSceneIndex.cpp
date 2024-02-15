@@ -69,8 +69,9 @@ WireframeSelectionHighlightSceneIndex(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
     const SelectionConstPtr&      selection
 )
-  : HdSingleInputFilteringSceneIndexBase(inputSceneIndex),
-    _selection(selection)
+  : HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
+  , InputSceneIndexUtils(inputSceneIndex)
+  , _selection(selection)
 {}
 
 HdSceneIndexPrim
@@ -79,7 +80,7 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
     TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
         .Msg("WireframeSelectionHighlightSceneIndex::GetPrim(%s) called.\n", primPath.GetText());
 
-    auto prim = _GetInputSceneIndex()->GetPrim(primPath);
+    auto prim = GetInputSceneIndex()->GetPrim(primPath);
 
     // If prim is in excluded hierarchy, don't provide selection highlighting
     // for it.  Selection highlighting is done only on meshes.  HYDRA-569: this
@@ -98,7 +99,7 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
 SdfPathVector
 WireframeSelectionHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath) const
 {
-    return _GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
 void
