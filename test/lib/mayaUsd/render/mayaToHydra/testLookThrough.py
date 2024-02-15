@@ -38,8 +38,6 @@ class TestLookThrough(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCa
 
     #Test look through camera and maya lights (spot & area).
     def test_LookThrough(self):
-        cmds.file(new=True, force=True)
-
         # Load a maya scene with a maya native cubic
         testFile = mayaUtils.openTestScene(
                 "testLookThrough",
