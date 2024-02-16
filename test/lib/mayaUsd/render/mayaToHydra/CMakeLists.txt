@@ -18,6 +18,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testUSDLights.py
     testArnoldLights.py
     testLookThrough.py
+    testTemplateAndReference.py
     testStandardSurface.py
     testFlowViewportAPI.py
     testStageVariants.py
