@@ -34,11 +34,11 @@ class TestMayaDisplayModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
         # for that platform specifically for now, so we can still catch issues on other platforms.
         if platform.system() == "Darwin":
-            return 5
+            return 6
         return 0.2
 
     def switchDisplayModes(self):
-        panel = mayaUtils.activeModelPanel()        
+        panel = mayaUtils.activeModelPanel()
         
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=False)
 
@@ -51,12 +51,12 @@ class TestMayaDisplayModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
         cmds.refresh()
         self.assertSnapshotClose("wireframeOnShaded" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-        cmds.modelEditor(panel, edit=True, wireframeOnShaded=False)      
+        cmds.modelEditor(panel, edit=True, wireframeOnShaded=False)
 
         #Shadows mode
         cmds.modelEditor(panel, edit=True, shadows=True)
         cmds.refresh()
-        self.assertSnapshotClose("shadows" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)      
+        self.assertSnapshotClose("shadows" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
         cmds.modelEditor(panel, edit=True, shadows=False)
 
         #All Lights mode
