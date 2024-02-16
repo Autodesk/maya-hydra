@@ -56,7 +56,7 @@ Fvp::SelectionSceneIndexRefPtr getSelectionSceneIndex()
 TEST(TestPathInterface, testSceneIndices)
 {
     const auto& sceneIndices = GetTerminalSceneIndices();
-    auto childPrims = sceneIndices.front()->GetChildPrimPaths(SdfPath("/MayaUsdProxyShapeMayaNodeSceneIndexPlugin"));
+    auto childPrims = sceneIndices.front()->GetChildPrimPaths(SdfPath("/MayaUsdProxyShape_PluginNode"));
     ASSERT_EQ(childPrims.size(), 3u);
 }
 

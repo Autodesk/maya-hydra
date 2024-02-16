@@ -285,7 +285,7 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
 
 void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
 {
-    constexpr char kSceneIndexPluginSuffix[] = {"_MayaPlugin"};
+    constexpr char kSceneIndexPluginSuffix[] = {"_PluginNode"};
     const MayaHydraSceneIndexRegistrationPtr registration(new MayaHydraSceneIndexRegistration());
     MFnDependencyNode dependNodeFn(dagNode);
     // To match plugin TfType registration, name must begin with upper case.
