@@ -31,6 +31,20 @@ namespace
 {
     std::mutex viewportInformationAndSceneIndicesPerViewportData_mutex;
     std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr> dummyEmptyArray;
+
+#ifdef CODE_COVERAGE_WORKAROUND
+void leakViewportData(const Fvp::ViewportInformationAndSceneIndicesPerViewportDataVector& vpDataVec) {
+    // Must place the leaked data vector on the heap, as a by-value
+    // vector will have its destructor called at process exit, which calls
+    // the vector element destructors and triggers the crash. 
+    static std::vector<Fvp::ViewportInformationAndSceneIndicesPerViewportDataVector>* leakedVpData{nullptr};
+    if (!leakedVpData) {
+        leakedVpData = new std::vector<Fvp::ViewportInformationAndSceneIndicesPerViewportDataVector>;
+    }
+    leakedVpData->push_back(vpDataVec);
+}
+#endif
+
 }
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -181,6 +195,10 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveAllViewport
             }
         }
     }
+
+#ifdef CODE_COVERAGE_WORKAROUND
+    leakViewportData(_viewportsInformationAndSceneIndicesPerViewportData);
+#endif
 
     _viewportsInformationAndSceneIndicesPerViewportData.clear();//Delete all of them
 }

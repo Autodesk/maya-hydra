@@ -25,6 +25,9 @@
 #include <mayaUsdAPI/proxyStage.h>
 #include <mayaUsdAPI/proxyShapeNotice.h>
 
+// Flow Viewport Toolkit headers.
+#include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+
 //Usd/Hydra headers
 #include <pxr/base/tf/declarePtrs.h>
 #include <pxr/usdImaging/usdImaging/stageSceneIndex.h>
@@ -51,8 +54,10 @@ TF_DECLARE_WEAK_AND_REF_PTRS(MayaUsdProxyShapeSceneIndex);
 /// Simply wraps single stage scene index for initial stage assignment and population
 /// </summary>
 class MayaUsdProxyShapeSceneIndex : public HdSingleInputFilteringSceneIndexBase
+    , public Fvp::InputSceneIndexUtils<MayaUsdProxyShapeSceneIndex>
 {
 public:
+    using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
     using ParentClass = HdSingleInputFilteringSceneIndexBase;
 
     static MayaUsdProxyShapeSceneIndexRefPtr

@@ -21,6 +21,7 @@ import mayaUtils
 from testUtils import PluginLoaded
 
 import unittest
+import os
 
 class TestMeshes(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -28,6 +29,27 @@ class TestMeshes(mtohUtils.MayaHydraBaseTestCase):
 
     def matchingRprims(self, rprims, matching):
         return len([rprim for rprim in rprims if matching in rprim])
+
+    # Override the base class method to provide a suffix to setUpClass().
+    # 
+    # This test is run twice, with different values for the
+    # MAYA_HYDRA_USE_MESH_ADAPTER environment variable.  This requires creating
+    # two different output directories, otherwise the two test runs will clash
+    # when run in parallel, typically when trying to clear out the output
+    # directory before the test runs:
+    #   File "[...]\maya\builds\master\maya\build\RelWithDebInfo\runTime\Python\Lib\shutil.py", line 624, in _rmtree_unsafe
+    # os.rmdir(path)
+    # PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: '[...]\\maya-hydra-4\\build\\Coverage\\test\\lib\\mayaUsd\\render\\mayaToHydra\\testMeshesOutput'
+    @classmethod
+    def setUpClass(cls):
+        if cls._file is None:
+            raise ValueError("Subclasses of MayaHydraBaseTestCase must "
+                             "define `_file = __file__`")
+
+        meshAdapter = os.getenv('MAYA_HYDRA_USE_MESH_ADAPTER', 0)
+        fixturesUtils.setUpClass(cls._file, 'mayaHydra',
+                                 initializeStandalone=False,
+                                 suffix='_meshAdapter' if meshAdapter else '')
 
     @unittest.skipUnless(mayaUtils.hydraFixLevel() > 0, "Requires Data Server render item lifescope fix.")
     def test_sweepMesh(self):

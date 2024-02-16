@@ -54,7 +54,8 @@ class MayaHydraBaseTestCase(unittest.TestCase):
         if cls._file is None:
             raise ValueError("Subclasses of MayaHydraBaseTestCase must "
                              "define `_file = __file__`")
-        fixturesUtils.readOnlySetUpClass(cls._file, 'mayaHydra', 
+        # Set up all tests with their own test directory to write out test-specific coverage information
+        fixturesUtils.setUpClass(cls._file, 'mayaHydra',
                                          initializeStandalone=False)
         
     def setUp(self):

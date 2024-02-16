@@ -104,6 +104,8 @@ install(FILES ${HEADERS}
 )
 
 if(IS_WINDOWS)
-    install(FILES $<TARGET_PDB_FILE:${TARGET_NAME}> 
-            DESTINATION ${CMAKE_INSTALL_PREFIX}/lib OPTIONAL)
+    if (NOT CODE_COVERAGE)
+        install(FILES $<TARGET_PDB_FILE:${TARGET_NAME}> 
+                DESTINATION ${CMAKE_INSTALL_PREFIX}/lib OPTIONAL)
+    endif()
 endif()
