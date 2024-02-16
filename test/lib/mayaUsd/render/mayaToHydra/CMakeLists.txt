@@ -14,6 +14,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testTransforms.py
     testMaterialXOnNative.py
     testNewSceneWithStage.py
+    testMayaDisplayModes.py
     testMayaLights.py
     testUSDLights.py
     testArnoldLights.py
