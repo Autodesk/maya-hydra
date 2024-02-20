@@ -39,7 +39,6 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
         return 0.2
 
     def setupScene(self):
-        cmds.file(new=True, force=True)
         testFile = mayaUtils.openTestScene( #Is an empty scene that is used to zoom in more on the foot print nodes, it also has Storm already set as the renderer
                 "testFootPrintNode",
                 "testFootPrintNode.ma")
@@ -53,7 +52,6 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
         
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex
             footPrintNodeName = cmds.createNode("MhFootPrint")
-            self.assertFalse(footPrintNodeName == None)
             
             #Increase its size
             cmds.setAttr(footPrintNodeName + '.size', 5)
@@ -63,17 +61,13 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             cmds.setAttr(footPrintNodeName + '.dummyInput', 2)#setting this will set dirty the dummyOutput attribute
             cmds.getAttr(footPrintNodeName + '.dummyOutput')#getting this value will trigger a call to compute
             cmds.refresh()
-            #Original images are located for example in maya-hydra\test\lib\mayaUsd\render\mayaToHydra\FlowViewportAPITest
             self.assertSnapshotClose("add_NodeCreated.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
             #Move the transform node, the added prims should move as well
             # Get the transform node of the mayaHydraFootPrintNode
             transformNode = cmds.listRelatives(footPrintNodeName, parent=True)[0]
-            self.assertFalse(transformNode == None)
-            #Select the transform node
-            cmds.select(transformNode)
-            # Move the selected node
-            cmds.move(2, 0.5, -2)
+            self.assertIsNotNone(transformNode)
+            cmds.move(2, 0.5, -2, transformNode)
             cmds.refresh()
             self.assertSnapshotClose("add_NodeMoved.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
         
@@ -101,10 +95,7 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             cmds.undo()
             self.assertSnapshotClose("add_NodeDeletedUndoAgain.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
-            #Move transform node again to see if it still updates the added prims transform
-            cmds.select(transformNode)
-            # Move the selected node
-            cmds.move(-0.2, -0.5, 0)
+            cmds.move(-0.2, -0.5, 0, transformNode)
             cmds.refresh()
             self.assertSnapshotClose("add_NodeMovedAfterDeletionAndUndo.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
@@ -124,7 +115,6 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
         
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex and a Filtering scene index
             footPrintNodeName = cmds.createNode("MhFootPrint")
-            self.assertFalse(footPrintNodeName == None)
 
             #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
             cmds.setAttr(footPrintNodeName + '.dummyInput', 2)#setting this will set dirty the dummyOutput attribute
@@ -153,7 +143,6 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
         
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex and a Filtering scene index
             footPrintNodeName1 = cmds.createNode("MhFootPrint", n="nodeShape1")
-            self.assertFalse(footPrintNodeName1 == None)
 
             #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
             cmds.setAttr(footPrintNodeName1 + '.dummyInput', 3)#setting this will set dirty the dummyOutput attribute
@@ -167,16 +156,12 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             #Move the transform node, the added prims should move as well
             # Get the transform node of the mayaHydraFootPrintNode
             transformNode1 = cmds.listRelatives(footPrintNodeName1, parent=True)[0]
-            self.assertFalse(transformNode1 == None)
-            #Select the transform node
-            cmds.select(transformNode1)
-            # Move the selected node
-            cmds.move(-2, 0, 0)
+            self.assertIsNotNone(transformNode1)
+            cmds.move(-2, 0, 0, transformNode1)
             cmds.refresh()
             
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex and a Filtering scene index
             footPrintNodeName2 = cmds.createNode("MhFootPrint", n="nodeShape2")
-            self.assertFalse(footPrintNodeName2 == None)
 
             #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
             cmds.setAttr(footPrintNodeName2 + '.dummyInput', 3)#setting this will set dirty the dummyOutput attribute
@@ -189,11 +174,8 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             #Move the transform node, the added prims should move as well
             # Get the transform node of the mayaHydraFootPrintNode
             transformNode2 = cmds.listRelatives(footPrintNodeName2, parent=True)[0]
-            self.assertFalse(transformNode2 == None)
-            #Select the transform node
-            cmds.select(transformNode2)
-            # Move the selected node
-            cmds.move(2, 0, -2)
+            self.assertIsNotNone(transformNode2)
+            cmds.move(2, 0, -2, transformNode2)
             cmds.refresh()
             
             self.assertSnapshotClose("multipleNodes_BeforeModifs.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
@@ -248,7 +230,6 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex and a Filtering scene index
             footPrintNodeName1 = cmds.createNode("MhFootPrint", n="nodeShape1")
-            self.assertFalse(footPrintNodeName1 == None)
 
             #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
             cmds.setAttr(footPrintNodeName1 + '.dummyInput', 2)#setting this will set dirty the dummyOutput attribute

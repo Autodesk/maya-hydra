@@ -23,8 +23,6 @@ target_compile_definitions(${TARGET_NAME}
         # private atm because M3dView is only used in .cpp right now
         # gcc will NOT set this automatically
         $<$<BOOL:${IS_LINUX}>:LINUX>
-        # Not sure if msvcc sets this automatically, but won't hurt to redefine
-        $<$<BOOL:${IS_WINDOWS}>:_WIN32>
 		MFB_ALT_PACKAGE_NAME="${TARGET_NAME}" # This is used by Pixar HdSceneIndexPluginRegistry::Define to create a unique name
 )
 
@@ -38,18 +36,14 @@ if(DEFINED MAYAUSD_VERSION)
     )
 endif()
 
-if(DEFINED MAYAHYDRA_VERSION)
-    target_compile_definitions(${TARGET_NAME}
-        PRIVATE
-            MAYAHYDRA_VERSION=${MAYAHYDRA_VERSION}
-    )
+if(NOT DEFINED MAYAHYDRA_VERSION)
+    message(FATAL_ERROR "No MAYAHYDRA_VERSION defined, aborting configuration." )
 endif()
-if(DEFINED MAYAHYDRA_CUT_ID)
-    target_compile_definitions(${TARGET_NAME}
-        PRIVATE
-            MAYAHYDRA_CUT_ID=${MAYAHYDRA_CUT_ID}
-    )
-endif()
+
+target_compile_definitions(${TARGET_NAME}
+    PRIVATE
+        MAYAHYDRA_VERSION=${MAYAHYDRA_VERSION}
+)
 
 mayaHydra_compile_config(${TARGET_NAME})
 

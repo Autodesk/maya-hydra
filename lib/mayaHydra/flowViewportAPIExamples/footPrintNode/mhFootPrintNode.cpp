@@ -37,6 +37,7 @@
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MSceneMessage.h>
 #include <maya/MNodeMessage.h>
+#include <maya/MObjectHandle.h>
 
 //Flow viewport headers
 #include <flowViewport/API/fvpVersionInterface.h>
@@ -100,7 +101,7 @@ private:
     void _UpdateThisMObject();
 
     ///Counter to make the hydra primitives unique
-    static int _counter;
+    std::atomic_int _counter { 0 };
 
     /// Sole path to be used in the retained hydra scene index for the sole primitive
     SdfPath                     _solePath;
@@ -111,7 +112,7 @@ private:
     HdRetainedSceneIndexRefPtr  _retainedSceneIndex  {nullptr};
 
     ///To be used in hydra viewport API to pass the Maya node's MObject for setting callbacks for data producer scene indices
-    MObject                     _thisMObject; 
+    MObjectHandle                _thisMObject; 
     ///To check if the MObject of this node has changed
     MObject                     _oldMObject; 
     ///To hold the afterOpenCallback Id to be able to react when a File Open has happened.
@@ -126,9 +127,6 @@ private:
 namespace 
 {
     // Foot print data
-    constexpr int soleVertsCount = 21;
-    constexpr int heelVertsCount = 17;
-
     static const VtArray<GfVec3f> solePoints = { 
                                {  0.00f, 0.0f, -0.70f },
                                {  0.04f, 0.0f, -0.69f },
@@ -352,10 +350,9 @@ namespace
 }//end of anonymous namespace
 
 //Static variables init
-int     MhFootPrint::_counter = 0;
 MObject MhFootPrint::mSize;
 MObject MhFootPrint::mColor;
-MTypeId MhFootPrint::id( 0x90573 );
+MTypeId MhFootPrint::id( 0x00080101 );
 MString	MhFootPrint::nodeClassification("hydraAPIExample/geometry/footPrint");
 MObject MhFootPrint::mWorldS;
 MObject MhFootPrint::mDummyInput;
@@ -408,9 +405,6 @@ MhFootPrint::~MhFootPrint()
 //Create the Hydra foot print primitives in the retained scene index
 void MhFootPrint::_CreateAndAddFootPrintPrimitives() 
 { 
-    using _PointArrayDs = HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>;
-    using _IntArrayDs   = HdRetainedTypedSampledDataSource<VtIntArray>;
-
     //Get the value of the size and color attributes
     const float fSize           = _GetSizeInCentimeters();
     const GfVec3f displayColor  = _GetColor();
@@ -456,15 +450,11 @@ void MhFootPrint::TriggerACallToCompute()
 
 void MhFootPrint::_UpdateThisMObject()
 {
-    if (! _thisMObject.isNull()){
+    if (_thisMObject.isValid()){
         return;
     }
 
-    MObject currentMObj = thisMObject();
-    if (_oldMObject.isNull() || _oldMObject != currentMObj){
-        _thisMObject = currentMObj;     
-        _oldMObject  = _thisMObject;
-    }
+    _thisMObject = thisMObject();
 }
 
 void MhFootPrint::setupFlowViewportInterface()
@@ -479,14 +469,15 @@ void MhFootPrint::setupFlowViewportInterface()
         _cbAttributeChangedId = 0;
     }
     //Add the callback when an attribute of this node changes
-    _cbAttributeChangedId = MNodeMessage::addAttributeChangedCallback(_thisMObject, attributeChangedCallback, ((void*)this));
+    MObject obj = _thisMObject.object();
+    _cbAttributeChangedId = MNodeMessage::addAttributeChangedCallback(obj, attributeChangedCallback, ((void*)this));
 
     //Remove the previous data producer scene index in case it was registered, if that occurs it's because _thisMObject has changed and we want to update the maya callbacks on the node
     Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
     dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, pxr::FvpViewportAPITokens->allViewports);
 
     //Data producer scene index interface is used to add the retained scene index to all viewports with all render delegates
-    dataProducerSceneIndexInterface.addDataProducerSceneIndex(_retainedSceneIndex, noPrefix, (void*)&_thisMObject, FvpViewportAPITokens->allViewports,FvpViewportAPITokens->allRenderers);
+    dataProducerSceneIndexInterface.addDataProducerSceneIndex(_retainedSceneIndex, noPrefix, (void*)&obj, FvpViewportAPITokens->allViewports,FvpViewportAPITokens->allRenderers);
 }
 
 // Retrieve value of the size attribute from the node
@@ -530,12 +521,7 @@ MStatus MhFootPrint::compute( const MPlug& plug, MDataBlock& dataBlock)
     }
 
     //The MObject can change if the node gets deleted and deletion being undone, so always update it in our records
-    MObject currentMObj = thisMObject();
-    if (_oldMObject.isNull() || _oldMObject != currentMObj){
-        
-        _thisMObject = currentMObj;     
-        _oldMObject  = _thisMObject;
-
+    if (! _thisMObject.isValid()){
         setupFlowViewportInterface();
     }
 

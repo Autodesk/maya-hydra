@@ -23,8 +23,6 @@ target_compile_definitions(${TARGET_NAME}
         # private atm because M3dView is only used in .cpp right now
         # gcc will NOT set this automatically
         $<$<BOOL:${IS_LINUX}>:LINUX>
-        # Not sure if msvcc sets this automatically, but won't hurt to redefine
-        $<$<BOOL:${IS_WINDOWS}>:_WIN32>
 		MFB_ALT_PACKAGE_NAME="${TARGET_NAME}" # This is used by Pixar HdSceneIndexPluginRegistry::Define to create a unique name
 )
 
@@ -38,18 +36,14 @@ if(DEFINED MAYAUSD_VERSION)
     )
 endif()
 
-if(DEFINED MAYAHYDRA_VERSION)
-    target_compile_definitions(${TARGET_NAME}
-        PRIVATE
-            MAYAHYDRA_VERSION=${MAYAHYDRA_VERSION}
-    )
+if(NOT DEFINED MAYAHYDRA_VERSION)
+    message(FATAL_ERROR "No MAYAHYDRA_VERSION defined, aborting configuration." )
 endif()
-if(DEFINED MAYAHYDRA_CUT_ID)
-    target_compile_definitions(${TARGET_NAME}
-        PRIVATE
-            MAYAHYDRA_CUT_ID=${MAYAHYDRA_CUT_ID}
-    )
-endif()
+
+target_compile_definitions(${TARGET_NAME}
+    PRIVATE
+        MAYAHYDRA_VERSION=${MAYAHYDRA_VERSION}
+)
 
 mayaHydra_compile_config(${TARGET_NAME})
 
@@ -73,15 +67,16 @@ if(IS_MACOSX OR IS_LINUX)
     mayaUsd_init_rpath(rpath "lib/maya")
     if(DEFINED MAYAUSD_TO_USD_RELATIVE_PATH)
         mayaUsd_add_rpath(rpath "../../${MAYAUSD_TO_USD_RELATIVE_PATH}/lib")
+        if (IS_LINUX)
+            mayaUsd_add_rpath(rpath "../../${MAYAUSD_TO_USD_RELATIVE_PATH}/lib64")
+        endif()
+        if(IS_MACOSX)
+            mayaUsd_add_rpath(rpath "../../../../Maya.app/Contents/MacOS")
+        endif()
     elseif(DEFINED PXR_USD_LOCATION)
         mayaUsd_add_rpath(rpath "${PXR_USD_LOCATION}/lib")
     endif()
-    if (IS_LINUX AND DEFINED MAYAUSD_TO_USD_RELATIVE_PATH)
-        mayaUsd_add_rpath(rpath "../../${MAYAUSD_TO_USD_RELATIVE_PATH}/lib64")
-    endif()
-    if(IS_MACOSX AND DEFINED MAYAUSD_TO_USD_RELATIVE_PATH)
-        mayaUsd_add_rpath(rpath "../../../../Maya.app/Contents/MacOS")
-    endif()
+    
     mayaUsd_add_rpath(rpath "../")
     mayaUsd_install_rpath(rpath ${TARGET_NAME})
 endif()
