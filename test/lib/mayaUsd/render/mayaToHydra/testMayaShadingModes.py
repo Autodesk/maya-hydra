@@ -27,6 +27,10 @@ class TestMayaShadingModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
 
     @property
     def imageDiffFailThreshold(self):
+        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
+        # for that platform specifically for now, so we can still catch issues on other platforms.
+        if platform.system() == "Darwin":
+            return 0.05
         return 0.01
     
     @property
@@ -34,7 +38,7 @@ class TestMayaShadingModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
         # for that platform specifically for now, so we can still catch issues on other platforms.
         if platform.system() == "Darwin":
-            return 3
+            return 5
         return 0.2
 
     def test_MayaShadingModes(self):
@@ -69,7 +73,7 @@ class TestMayaShadingModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         cmds.modelEditor(panel, edit=True, displayAppearance="wireframe")
         cmds.modelEditor(panel, edit=True, smoothWireframe=True)
         cmds.refresh()
-        self.assertSnapshotClose("smoothwireframe" + ".png", 0.1, self.imageDiffFailPercent)
+        self.assertSnapshotClose("smoothwireframe" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
         cmds.modelEditor(panel, edit=True, smoothWireframe=False)
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
 
