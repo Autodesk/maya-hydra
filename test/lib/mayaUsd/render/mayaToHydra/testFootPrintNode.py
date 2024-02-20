@@ -36,7 +36,7 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
 
     @property
     def imageDiffFailPercent(self):
-        return 0.2
+        return 0.1
 
     def setupScene(self):
         testFile = mayaUtils.openTestScene( #Is an empty scene that is used to zoom in more on the foot print nodes, it also has Storm already set as the renderer

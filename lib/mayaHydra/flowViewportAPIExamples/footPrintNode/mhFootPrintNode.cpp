@@ -101,7 +101,7 @@ private:
     void _UpdateThisMObject();
 
     ///Counter to make the hydra primitives unique
-    std::atomic_int _counter { 0 };
+    static std::atomic_int _counter;
 
     /// Sole path to be used in the retained hydra scene index for the sole primitive
     SdfPath                     _solePath;
@@ -350,6 +350,7 @@ namespace
 }//end of anonymous namespace
 
 //Static variables init
+std::atomic_int MhFootPrint::_counter {0};
 MObject MhFootPrint::mSize;
 MObject MhFootPrint::mColor;
 MTypeId MhFootPrint::id( 0x00080101 );
