@@ -38,6 +38,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testUsdStageLayerMuting.py
     cpp/testFlowViewportAPIFilterPrims.py
     cpp/testPrimInstancing.py
+    cpp/testNurbsSurfaces.py
 )
 
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.

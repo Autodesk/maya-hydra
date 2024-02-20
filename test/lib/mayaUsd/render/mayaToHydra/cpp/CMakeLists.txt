@@ -27,6 +27,7 @@ target_sources(${TARGET_NAME}
         testMeshAdapterTransform.cpp
         testFlowViewportAPIFilterPrims.cpp
         testPrimInstancing.cpp
+        testNurbsSurfaces.cpp
 )
 
 # -----------------------------------------------------------------------------
