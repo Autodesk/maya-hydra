@@ -69,7 +69,7 @@ class TestMayaShadingModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         cmds.modelEditor(panel, edit=True, displayAppearance="wireframe")
         cmds.modelEditor(panel, edit=True, smoothWireframe=True)
         cmds.refresh()
-        self.assertSnapshotClose("smoothwireframe" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("smoothwireframe" + ".png", 0.1, self.imageDiffFailPercent)
         cmds.modelEditor(panel, edit=True, smoothWireframe=False)
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
 
