@@ -27,6 +27,10 @@
 //
 ////////////////////////////////////////////////////////////////////////
 
+//Local headers
+#include "mhFootPrintNodeStrings.h"
+
+//maya headers
 #include <maya/MPxLocatorNode.h>
 #include <maya/MString.h>
 #include <maya/MTypeId.h>
@@ -38,6 +42,7 @@
 #include <maya/MSceneMessage.h>
 #include <maya/MNodeMessage.h>
 #include <maya/MObjectHandle.h>
+#include <maya/MGlobal.h>
 
 //Flow viewport headers
 #include <flowViewport/API/fvpVersionInterface.h>
@@ -347,6 +352,14 @@ namespace
         MFnNumericData fnData(oDouble3);
         fnData.getData( outVal[0], outVal[1], outVal[2] );
     }
+
+    // Register all strings used by the plugin C++ code
+    static MStatus registerMStringResources()
+    {
+	    MStringResource::registerString(rMayaHydraNotLoadedStringError);
+	    return MS::kSuccess;
+    }
+
 }//end of anonymous namespace
 
 //Static variables init
@@ -554,6 +567,20 @@ MBoundingBox MhFootPrint::boundingBox() const
 
 void* MhFootPrint::creator()
 {
+    int	isMayaHydraLoaded = false;
+    // Validate that the gpuCache plugin is loaded.
+    MGlobal::executeCommand( "pluginInfo -query -loaded mayaHydra", isMayaHydraLoaded );
+	if( ! isMayaHydraLoaded){
+        MStatus status;
+	    MString errorString = MStringResource::getString(rMayaHydraNotLoadedStringError, status);	     
+        if (! status){
+            status.perror("Cannot retrieve the rMayaHydraNotLoadedStringError string, but you need to load mayaHydra before creating this node");
+        }else{
+	        MGlobal::displayError(errorString);	    
+        }
+        return nullptr;
+    }
+
     return new MhFootPrint();
 }
 
@@ -621,11 +648,19 @@ MStatus MhFootPrint::initialize()
 
 MStatus initializePlugin( MObject obj )
 {
-    MStatus   status;
     MFnPlugin plugin( obj, PLUGIN_COMPANY, "2025.0", "Any");
-
+    
+    MStatus   status;
+    // This is done first, so the strings are available. 
+	status = plugin.registerUIStrings(registerMStringResources, "mayaHydraFootPrintNodeInitStrings");
+	if (status != MS::kSuccess)
+	{
+		status.perror("registerUIStrings");
+		return status;
+	}
+    
     status = plugin.registerNode(
-                "MhFootPrint",
+                kMhFootPrintNodePluginId,
                 MhFootPrint::id,
                 &MhFootPrint::creator,
                 &MhFootPrint::initialize,

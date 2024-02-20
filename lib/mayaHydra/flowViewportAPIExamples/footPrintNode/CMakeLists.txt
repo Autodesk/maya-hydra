@@ -12,6 +12,7 @@ target_sources(${TARGET_NAME}
 
 set(HEADERS
 	PRIVATE
+    mhFootPrintNodeStrings.h
 )
 
 # -----------------------------------------------------------------------------
