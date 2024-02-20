@@ -17,6 +17,8 @@
 #ifndef MAYAHYDRA_TEST_UTILS_H
 #define MAYAHYDRA_TEST_UTILS_H
 
+#include <mayaHydraLib/mayaHydra.h>
+
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
@@ -24,6 +26,7 @@
 #include <maya/MMatrix.h>
 #include <maya/MStatus.h>
 
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <limits>
@@ -287,5 +290,59 @@ private:
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+namespace MAYAHYDRA_NS_DEF {
+
+/**
+ * @brief Get the input directory used for test samples.
+ *
+ * @return Path to the directory containing test samples.
+ */
+std::filesystem::path getInputDir();
+
+/**
+ * @brief Set the input directory used for test samples.
+ *
+ * @param[in] inputDir Path to the directory containing test samples.
+ */
+void setInputDir(std::filesystem::path inputDir);
+
+/**
+ * @brief Get the output directory used for test output files.
+ *
+ * @return Path to the test output files directory.
+ */
+std::filesystem::path getOutputDir();
+
+/**
+ * @brief Set the output directory used for test output files.
+ *
+ * @param[in] outputDir Path to the test output files directory.
+ */
+void setOutputDir(std::filesystem::path outputDir);
+
+/**
+ * @brief Get the full path to a test sample file.
+ *
+ * @param[in] filename Name of the sample file (including its extension, if any).
+ *
+ * @return Full path to the sample file.
+ */
+std::filesystem::path getPathToSample(std::string filename);
+
+/**
+ * @brief Compares a data source text dump to a reference dump. The text dump will be also be
+ * written to a file in the output directory.
+ *
+ * @param[in] dataSource The data source to dump and compare to a reference.
+ * @param[in] referencePath The path to the reference dump file.
+ *
+ * @return Whether the data source dump matches the reference dump.
+ */
+bool dataSourceMatchesReference(
+    PXR_NS::HdDataSourceBaseHandle dataSource,
+    std::filesystem::path          referencePath);
+
+} // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRA_TEST_UTILS_H

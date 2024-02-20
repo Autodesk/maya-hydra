@@ -27,7 +27,13 @@
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
 
+#include <exception>
 #include <iostream>
+
+namespace {
+std::filesystem::path  testInputDir;
+std::filesystem::path  testOutputDir;
+}
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
@@ -241,3 +247,56 @@ HdSceneIndexBaseRefPtr findSceneIndexInTree(
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+namespace MAYAHYDRA_NS_DEF {
+
+std::filesystem::path getInputDir()
+{
+    if (testInputDir.empty()) {
+        throw std::invalid_argument(
+            "Attempted to access test input directory but it was not specified.");
+    }
+    return testInputDir;
+}
+
+void setInputDir(std::filesystem::path inputDir) { testInputDir = inputDir; }
+
+std::filesystem::path getOutputDir()
+{
+    if (testOutputDir.empty()) {
+        throw std::invalid_argument(
+            "Attempted to access test output directory but it was not specified.");
+    }
+    return testOutputDir;
+}
+
+void setOutputDir(std::filesystem::path outputDir) { testOutputDir = outputDir; }
+
+std::filesystem::path getPathToSample(std::string filename) { return getInputDir() / filename; }
+
+bool dataSourceMatchesReference(
+    PXR_NS::HdDataSourceBaseHandle dataSource,
+    std::filesystem::path          referencePath)
+{
+    // We'll dump the data source to a file and then read from it. That way we have a trace
+    // of what value was used for comparison, and can inspect it in case of failures.
+    std::filesystem::path outputPath = getOutputDir() / referencePath.filename();
+    std::fstream          outputFile(outputPath, std::ios::out);
+    HdDebugPrintDataSource(outputFile, dataSource);
+    outputFile.close();
+
+    outputFile.open(outputPath, std::ios::in);
+    std::stringstream outputDump;
+    outputDump << outputFile.rdbuf();
+
+    std::ifstream     referenceFile(referencePath);
+    std::stringstream referenceDump;
+    referenceDump << referenceFile.rdbuf();
+
+    // We return a boolean instead of using something like EXPECT_EQ, as that would print the
+    // entire dumps to stdout and pollute the logs in case of a test failure. Using EXPECT_TRUE
+    // at the callsites still logs exactly which comparison failed, but keeps logs readable.
+    return outputDump.str() == referenceDump.str();
+}
+
+} // namespace MAYAHYDRA_NS_DEF
