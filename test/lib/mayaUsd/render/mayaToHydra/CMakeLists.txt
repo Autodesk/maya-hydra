@@ -16,6 +16,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNewSceneWithStage.py
     testMayaDisplayModes.py
     testMayaShadingModes.py
+    testMayaIsolateSelect.py
     testMayaLights.py
     testUSDLights.py
     testArnoldLights.py
@@ -24,6 +25,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFlowViewportAPI.py
     testStageVariants.py
     testNurbsPrimitives.py
+    testCurveTools.py
     testPolygonPrimitives.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
