@@ -65,11 +65,21 @@ class TestMayaShadingModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         self.assertSnapshotClose("boundingBox" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
 
-        #Wirefame
+        #SmoothWirefame
+        cmds.modelEditor(panel, edit=True, displayAppearance="wireframe")
         cmds.modelEditor(panel, edit=True, smoothWireframe=True)
         cmds.refresh()
-        self.assertSnapshotClose("wireframe" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("smoothwireframe" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
         cmds.modelEditor(panel, edit=True, smoothWireframe=False)
+        cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
+
+        #SmoothWirefameOnShaded
+        cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
+        cmds.modelEditor(panel, edit=True, smoothWireframe=True)
+        cmds.refresh()
+        self.assertSnapshotClose("smoothwireframeonshaded" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        cmds.modelEditor(panel, edit=True, smoothWireframe=False)
+        cmds.modelEditor(panel, edit=True, wireframeOnShaded=False)
 
         #X-ray
         cmds.modelEditor(panel, edit=True, xray=True)
