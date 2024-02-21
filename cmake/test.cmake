@@ -1,6 +1,16 @@
 set(MAYA_USD_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(MayaUsd_FOUND)
+    if(IS_MACOSX OR IS_LINUX) 
+        #When MayaUsd_FOUND is true, MAYAUSDAPI_LIBRARY exists as it is required. 
+        #So add MAYAUSDAPI_LIBRARY (the path where maya USD library files are) to the ADDITIONAL_LD_LIBRARY_PATH which is used to run the tests
+        set(CURRENT_ADDITIONAL_LD_LIBRARY_PATH $ENV{ADDITIONAL_LD_LIBRARY_PATH})
+        set(ADDITIONAL_LD_LIBRARY_PATH "${CURRENT_ADDITIONAL_LD_LIBRARY_PATH}:${MAYAUSDAPI_LIBRARY}")
+        # Export the new value to the environment
+        set(ENV{ADDITIONAL_LD_LIBRARY_PATH} ${ADDITIONAL_LD_LIBRARY_PATH})
+        message(STATUS "ADDITIONAL_LD_LIBRARY_PATH is now : ${ADDITIONAL_LD_LIBRARY_PATH}")
+    endif()
+
     if (MAYAUSD_MOD_PATH)
         #Add MAYAUSD_MOD_PATH (the path where maya USD .mod file is) to the MAYA_MODULE_PATH
         # Get the current value of the environment variable
