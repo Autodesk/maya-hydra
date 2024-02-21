@@ -105,7 +105,7 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             self.setHdStormRenderer()
             self.assertSnapshotClose("add_VP2AndThenBackToStorm.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
-            #Finish by a File New command
+            #Finish by a File New command to check that it's not crashing when cleaning up everything'
             cmds.file(new=True, force=True)
 
     #Test FootPrint grids parameters
@@ -133,7 +133,7 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             self.setHdStormRenderer()
             self.assertSnapshotClose("footPrint_VP2AndThenBackToStorm.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
-            #Finish by a File New command
+            #Finish by a File New command to check that it's not crashing when cleaning up everything
             cmds.file(new=True, force=True)
 
     #Test multiple nodes
@@ -204,7 +204,7 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             self.setHdStormRenderer()
             self.assertSnapshotClose("multipleNodes_VP2AndThenBackToStorm.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
-            #Finish by a File New command
+            #Finish by a File New command to check that it's not crashing when cleaning up everything
             cmds.file(new=True, force=True)
 
     #Test multiple viewports
@@ -260,7 +260,7 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             self.setHdStormRenderer()
             self.assertSnapshotClose("multipleViewports_VP2AndThenBackToStorm_modPan3.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
-            #Finish by a File New command
+            #Finish by a File New command to check that it's not crashing when cleaning up everything
             cmds.file(new=True, force=True)
 
     #Test loading a scene

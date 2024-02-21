@@ -366,7 +366,7 @@ namespace
 std::atomic_int MhFootPrint::_counter {0};
 MObject MhFootPrint::mSize;
 MObject MhFootPrint::mColor;
-MTypeId MhFootPrint::id( 0x00080101 );
+MTypeId MhFootPrint::id( 0x00080102 );
 MString	MhFootPrint::nodeClassification("hydraAPIExample/geometry/footPrint");
 MObject MhFootPrint::mWorldS;
 MObject MhFootPrint::mDummyInput;
@@ -568,9 +568,9 @@ MBoundingBox MhFootPrint::boundingBox() const
 void* MhFootPrint::creator()
 {
     int	isMayaHydraLoaded = false;
-    // Validate that the gpuCache plugin is loaded.
+    // Validate that the mayaHydra plugin is loaded.
     MGlobal::executeCommand( "pluginInfo -query -loaded mayaHydra", isMayaHydraLoaded );
-	if( ! isMayaHydraLoaded){
+    if( ! isMayaHydraLoaded){
         MStatus status;
 	    MString errorString = MStringResource::getString(rMayaHydraNotLoadedStringError, status);	     
         if (! status){

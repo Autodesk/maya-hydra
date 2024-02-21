@@ -271,7 +271,7 @@ namespace
 }//end of anonymous namespace
 
 //Initialization of static members
-MTypeId FlowViewportAPIMayaLocator::id( 0x00080100 );
+MTypeId FlowViewportAPIMayaLocator::id( 0x00080101 );
 MString	FlowViewportAPIMayaLocator::nodeClassification("hydraAPIExample/geometry/FlowViewportAPIMayaLocator");
 
 MObject FlowViewportAPIMayaLocator::mNumCubeLevelsX;
