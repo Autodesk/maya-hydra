@@ -20,7 +20,7 @@ import mtohUtils
 import mayaUtils
 import platform
 
-class TestTemplateAndReference(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
+class TestObjectTemplate(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -36,42 +36,30 @@ class TestTemplateAndReference(mtohUtils.MtohTestCase): #Subclassing mtohUtils.M
             return 3
         return 0.2
 
-    #Test object display & selection under Template & Reference modes.
-    def test_TemplateAndReference(self):
+    #Test object display & selection when template attribute is on.
+    def test_ObjectTemplate(self):
         cmds.file(new=True, force=True)
 
-        # Load a maya scene with a maya native cubic and sphere
+        # Load a maya scene with a maya native sphere
         testFile = mayaUtils.openTestScene(
-                "testTemplateAndReference",
-                "testTemplateAndReference.ma")
+                "testObjectTemplate",
+                "testObjectTemplate.ma")
         cmds.refresh()
 
         #Verify Default display
         panel = mayaUtils.activeModelPanel()
         self.assertSnapshotClose("default" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
-        #Verify template mode
+        #Verify template attribute
         #Display
-        cmds.setAttr('layer_sphere.displayType', 1)
+        cmds.setAttr('pSphere1.template', 1)
         cmds.refresh()
-        self.assertSnapshotClose("templateMode" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("templateOn" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
         #Selection
         cmds.select( clear=True )
         cmds.select( 'pSphere1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("templateModeSelection" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-
-        #Verify reference mode
-        #Display
-        cmds.setAttr('layer_cubic.displayType', 2)
-        cmds.refresh()
-        self.assertSnapshotClose("referenceMode" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-        #Selection
-        cmds.select( clear=True )
-        cmds.select( 'pCube1', r=True )
-        cmds.refresh()
-        self.assertSnapshotClose("referenceModeSelection" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-        
+        self.assertSnapshotClose("templateOnSelection" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
