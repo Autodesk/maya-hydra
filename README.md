@@ -44,32 +44,30 @@ USD proxies in Viewport 2.0? Some potential reasons include:
 
 ## Known Limitations
 
-- Only direct texture inputs are supported for Maya materials
-- Limited support for Maya shader networks
-- Drawing issues with selection and highlighting
+- Limited Maya material support:
+  - Maya Standard Surface materials are translated into the USD Preview Surface which has limitations in available parameters and does not match one to one (e.g. transparency and opacity)
+  - Only direct texture inputs are supported for Maya materials. No other Hypershade nodes are supported (e.g. ramp or procedural textures)
 - Hydra shading differs from Maya's Viewport 2.0
 - Animation Ghosting has the wrong shading
-- Current limitations with USD prims:
-  - Maya layers don't show effect
-  - Isolate Select only functions with Maya nodes
-  - Viewport display modes like Xray, wireframe or default shading do not function
-  - Selection highlighting not showing
-  - Gprims currently don't cast shadows in Storm
-- No material bindings on GeomSubsets (Hydra v2 limitation)
-
-## Currently not supported
-
-- Backface culling
-- Screen space effects like depth of field and motion blur
-- Arnold lights except the aiSkyDomeLight
-- Following Maya node types:
+- Backface Culling
+- Isolate Select only functions with Maya nodes
+- Following Maya node types are not rendered:
   - Bifrost
   - nParticles
   - Fluid
-- Blue Pencil
-- Maya's volume and ambient light
-- Hardware Fog
-- Maya's procedural textures (e.g. noise or pattern)
+  - Blue Pencil
+  - Maya's volume and ambient light
+- Current limitations with USD:
+  - Maya layers don't show effect
+  - Viewport display modes like Xray, wireframe or default shading are not supported yet
+  - Gprims currently don't cast shadows in Storm
+  - No material bindings on GeomSubsets (Hydra v2 limitation)
+
+## Limitations with Storm
+- Screen space effects like depth of field and motion blur or Hardware Fog are not supported
+- Limited shadow quality of lights
+- Long loading times and low viewport performance with MaterialX materials with Storm
+
 
 ## Detailed Documentation
 
