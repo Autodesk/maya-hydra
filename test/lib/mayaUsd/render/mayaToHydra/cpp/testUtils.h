@@ -20,6 +20,7 @@
 #include <mayaHydraLib/mayaHydra.h>
 
 #include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/tf/stringUtils.h>
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 
@@ -342,6 +343,29 @@ std::filesystem::path getPathToSample(std::string filename);
 bool dataSourceMatchesReference(
     PXR_NS::HdDataSourceBaseHandle dataSource,
     std::filesystem::path          referencePath);
+
+/**
+* @class A RAII-style class to temporarily override the string conversion settings used when
+* streaming out VtValues containing floats or doubles.
+*/
+class DecimalStreamingOverride {
+public:
+    DecimalStreamingOverride(pxr::TfDecimalToStringConfig overrideConfig)
+    {
+        _prevFloatConfig = pxr::TfStreamFloat::toStringConfig.load();
+        _prevDoubleConfig = pxr::TfStreamDouble::toStringConfig.load();
+        pxr::TfStreamFloat::toStringConfig.store(overrideConfig);
+        pxr::TfStreamDouble::toStringConfig.store(overrideConfig);
+    }
+    ~DecimalStreamingOverride()
+    {
+        pxr::TfStreamFloat::toStringConfig.store(_prevFloatConfig);
+        pxr::TfStreamDouble::toStringConfig.store(_prevDoubleConfig);
+    }
+private:
+    pxr::TfDecimalToStringConfig _prevFloatConfig;
+    pxr::TfDecimalToStringConfig _prevDoubleConfig;
+};
 
 } // namespace MAYAHYDRA_NS_DEF
 

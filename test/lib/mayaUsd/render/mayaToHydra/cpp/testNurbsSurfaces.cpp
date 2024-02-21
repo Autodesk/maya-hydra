@@ -57,6 +57,8 @@ TEST(NurbsSurfaces, nurbsTorus)
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
+    DecimalStreamingOverride decimalStreamingOverride({ pxr::TfDecimalToStringMode::FIXED, 5, false });
+
     PrimEntriesVector foundPrims
         = inspector.FindPrims(getNurbPrimPredicate("nurbsTorus1", HdPrimTypeTokens->mesh));
     ASSERT_EQ(foundPrims.size(), 1u);
@@ -108,6 +110,8 @@ TEST(NurbsSurfaces, nurbsCube)
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
+    DecimalStreamingOverride decimalStreamingOverride({ pxr::TfDecimalToStringMode::FIXED, 5, false });
+
     PrimEntriesVector planePrims
         = inspector.FindPrims(getNurbPrimPredicate("nurbsCube1", HdPrimTypeTokens->mesh));
     ASSERT_EQ(planePrims.size(), 6u);
@@ -149,6 +153,8 @@ TEST(NurbsSurfaces, nurbsCircle)
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
+
+    DecimalStreamingOverride decimalStreamingOverride({ pxr::TfDecimalToStringMode::FIXED, 5, false });
 
     PrimEntriesVector foundPrims
         = inspector.FindPrims(getNurbPrimPredicate("nurbsCircle1", HdPrimTypeTokens->basisCurves));
@@ -215,6 +221,8 @@ TEST(NurbsSurfaces, nurbsSquare)
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
+
+    DecimalStreamingOverride decimalStreamingOverride({ pxr::TfDecimalToStringMode::FIXED, 5, false });
 
     PrimEntriesVector linePrims
         = inspector.FindPrims(getNurbPrimPredicate("nurbsSquare1", HdPrimTypeTokens->basisCurves));
