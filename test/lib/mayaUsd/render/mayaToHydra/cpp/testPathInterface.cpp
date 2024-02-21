@@ -1,4 +1,4 @@
-// Copyright 2023 Autodesk
+// Copyright 2024 Autodesk
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -78,10 +78,10 @@ TEST(TestPathInterface, testUnselected)
     // Get the Flow Viewport selection scene index.
     auto snSi = getSelectionSceneIndex();
     
-    // Selected object path string is in command line arguments.
+    // Unselected object path string is in command line arguments.
     // Get it and translate it into a scene index path.
     const auto sceneIndexPath = getArgSceneIndexPath(snSi);
 
-    // Confirm the object is selected in scene index scene.
+    // Confirm the object is not selected in scene index scene.
     ASSERT_FALSE(snSi->IsFullySelected(sceneIndexPath));
 }

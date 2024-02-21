@@ -353,15 +353,13 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     registration->interpretRprimPathFn = &(MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::InterpretRprimPath);
     mayaUsdProxyShapeSceneIndex->Populate();
 
-    registration->rootSceneIndex = registration->pluginSceneIndex;
-
-    registration->rootSceneIndex = HdPrefixingSceneIndex::New(
-        registration->rootSceneIndex,
+    auto pfsi = HdPrefixingSceneIndex::New(
+        registration->pluginSceneIndex,
         registration->sceneIndexPathPrefix);
 
     //Add the PathInterfaceSceneIndex which must be the last scene index, it is used for selection highlighting
     registration->rootSceneIndex = PathInterfaceSceneIndex::New(
-        registration->rootSceneIndex,
+        pfsi,
         registration->sceneIndexPathPrefix,
         Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath)));
 
