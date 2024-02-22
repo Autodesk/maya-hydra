@@ -71,6 +71,9 @@ public:
     MhFootPrint();
     ~MhFootPrint() override;
 
+    //Is called when the MObject has been constructed and is valid
+    void    postConstructor() override;
+
     MStatus   		compute( const MPlug& plug, MDataBlock& data ) override;
 
     bool            isBounded() const override;
@@ -124,9 +127,6 @@ private:
     MCallbackId                 _cbAfterOpenId = 0;
     ///To hold the attributeChangedCallback Id to be able to react when the 3D grid creation parameters attributes from this node change.
     MCallbackId                 _cbAttributeChangedId = 0;
-
-    /// Init flag to do things only once for this node
-    bool _init = false;
 };
 
 namespace 
@@ -366,7 +366,7 @@ namespace
 std::atomic_int MhFootPrint::_counter {0};
 MObject MhFootPrint::mSize;
 MObject MhFootPrint::mColor;
-MTypeId MhFootPrint::id( 0x00080102 );
+MTypeId MhFootPrint::id( 0x58000087 );
 MString	MhFootPrint::nodeClassification("hydraAPIExample/geometry/footPrint");
 MObject MhFootPrint::mWorldS;
 MObject MhFootPrint::mDummyInput;
@@ -388,6 +388,11 @@ namespace {
 
 MhFootPrint::MhFootPrint()
 {
+}
+
+void MhFootPrint::postConstructor()
+{
+    //We have a valid MObject in this function
     _solePath = SdfPath(std::string("/sole_") + std::to_string(_counter));
     _heelPath = SdfPath(std::string("/heel_") + std::to_string(_counter));
     _counter++;
@@ -396,6 +401,8 @@ MhFootPrint::MhFootPrint()
     _cbAfterOpenId = MSceneMessage::addCallback(MSceneMessage::kAfterOpen, afterOpenCallback, ((void*)this)) ;
 
     _retainedSceneIndex = HdRetainedSceneIndex::New();
+
+    _CreateAndAddFootPrintPrimitives();
 }
 
 MhFootPrint::~MhFootPrint()
@@ -529,12 +536,7 @@ GfVec3f MhFootPrint::_GetColor() const
 
 MStatus MhFootPrint::compute( const MPlug& plug, MDataBlock& dataBlock)
 {
-    if( ! _init){
-        _CreateAndAddFootPrintPrimitives();
-        _init = true;
-    }
-
-    //The MObject can change if the node gets deleted and deletion being undone, so always update it in our records
+    //The MObject can change if the node gets deleted and deletion being undone
     if (! _thisMObject.isValid()){
         setupFlowViewportInterface();
     }
