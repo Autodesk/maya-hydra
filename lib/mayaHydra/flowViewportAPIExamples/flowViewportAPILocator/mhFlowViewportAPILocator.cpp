@@ -14,9 +14,6 @@
 // limitations under the License.
 //
 
-//Local headers
-#include "MhFlowViewportAPILocatorStrings.h"
-
 //Flow viewport headers
 #include <flowViewport/API/fvpFilteringSceneIndexInterface.h>
 #include <flowViewport/API/fvpDataProducerSceneIndexInterface.h>
@@ -59,7 +56,6 @@ class MhFlowViewportAPILocator : public MPxLocatorNode
 public:
     ~MhFlowViewportAPILocator() override;
 
-    //Is called when the MObject has been constructed and is valid
     void    postConstructor() override;
 
     MStatus   		compute( const MPlug& plug, MDataBlock& data ) override;
@@ -228,14 +224,6 @@ namespace
         flowViewportAPIMayaLocator->setCubeGridParametersFromAttributes();
         flowViewportAPIMayaLocator->setupFlowViewportInterfaces();
     }
-
-    // Register all strings used by the plugin C++ code
-    static MStatus registerMStringResources()
-    {
-	    MStringResource::registerString(rMayaHydraNotLoadedStringError);
-	    return MS::kSuccess;
-    }
-
 }//end of anonymous namespace
 
 //Initialization of static members
@@ -256,12 +244,6 @@ MObject MhFlowViewportAPILocator::mDummyOutput;
 
 void MhFlowViewportAPILocator::postConstructor() 
 { 
-    //The MObject has been constructed and is valid
-    MObject currentMObj = thisMObject();
-
-    //Add the callback when an attribute of this node changes
-    _cbAttributeChangedId = MNodeMessage::addAttributeChangedCallback(currentMObj, attributeChangedCallback, ((void*)this));
-
     //Get the flow viewport API hydra interfaces
     int majorVersion = 0;
     int minorVersion = 0;
@@ -324,13 +306,9 @@ MhFlowViewportAPILocator::~MhFlowViewportAPILocator()
 
 void MhFlowViewportAPILocator::setCubeGridParametersFromAttributes()
 {
-    MObject mObj = _thisMObject.object();
+    MObject mObj = thisMObject();
     if (mObj.isNull()){
-        _UpdateThisMObject();
-        mObj = _thisMObject.object();
-        if(mObj.isNull()){
-            return;
-        }
+        return;
     }
 
     GetAttributeValue(_cubeGridParams._numLevelsX, mObj, MhFlowViewportAPILocator::mNumCubeLevelsX);
@@ -373,12 +351,22 @@ void MhFlowViewportAPILocator::_UpdateThisMObject()
 void MhFlowViewportAPILocator::setupFlowViewportInterfaces()
 {
     _UpdateThisMObject();
-    
+
     //Set the maya node as a parent for this data producer scene index so that when the node is hidden/deleted/moved it gets applied to the prims produced
     MObject obj = _thisMObject.object();
     if (obj.isNull()){
         perror("ERROR : _thisMObject.object() is null, using the maya node to move/hide the prims won't be supported");
+        return;
     }
+
+    //Remove any existing callback
+    if (_cbAttributeChangedId){
+        CHECK_MSTATUS(MMessage::removeCallback(_cbAttributeChangedId));
+        _cbAttributeChangedId = 0;
+    }
+
+    //Add the callback when an attribute of this node changes
+    _cbAttributeChangedId = MNodeMessage::addAttributeChangedCallback(obj, attributeChangedCallback, ((void*)this));
 
     _hydraViewportDataProducerSceneIndexExample.setContainerNode(&obj);
     _hydraViewportDataProducerSceneIndexExample.addDataProducerSceneIndex();
@@ -387,7 +375,7 @@ void MhFlowViewportAPILocator::setupFlowViewportInterfaces()
     Fvp::FilteringSceneIndexInterface& filteringSceneIndexInterface = Fvp::FilteringSceneIndexInterface::get();
     
     //Store the MObject* of the maya node in various classes
-    _hydraViewportFilteringSceneIndexClientExample->setDccNode(&_thisMObject);
+    _hydraViewportFilteringSceneIndexClientExample->setDccNode(&obj);
 
     //Register this filtering scene index client, so it can append custom filtering scene indices to Hydra viewport scene indices
     const bool bResult = filteringSceneIndexInterface.registerFilteringSceneIndexClient(_hydraViewportFilteringSceneIndexClientExample);
@@ -436,17 +424,13 @@ void MhFlowViewportAPILocator::getCacheSetup(const MEvaluationNode& evalNode, MN
 
 void* MhFlowViewportAPILocator::creator()
 {
+    static const MString errorMsg ("You need to load the mayaHydra plugin before creating this node");
+
     int	isMayaHydraLoaded = false;
     // Validate that the mayaHydra plugin is loaded.
     MGlobal::executeCommand( "pluginInfo -query -loaded mayaHydra", isMayaHydraLoaded );
     if( ! isMayaHydraLoaded){
-        MStatus status;
-	    MString errorString = MStringResource::getString(rMayaHydraNotLoadedStringError, status);	     
-        if (! status){
-            status.perror("Cannot retrieve the rMayaHydraNotLoadedStringError string, but you need to load mayaHydra before creating this node");
-        }else{
-	        MGlobal::displayError(errorString);	    
-        }
+        MGlobal::displayError(errorMsg);
         return nullptr;
     }
 
@@ -549,16 +533,8 @@ MStatus initializePlugin( MObject obj )
     static const char * pluginVersion = "1.0";
     MFnPlugin plugin( obj, PLUGIN_COMPANY, pluginVersion, "Any");
 
-    // This is done first, so the strings are available. 
-	status = plugin.registerUIStrings(registerMStringResources, "mayaHydraFootPrintNodeInitStrings");
-	if (status != MS::kSuccess)
-	{
-		status.perror("registerUIStrings");
-		return status;
-	}
-
     status = plugin.registerNode(
-                kMhFlowViewportAPILocatorNodePluginId,
+                "MhFlowViewportAPILocator",
                 MhFlowViewportAPILocator::id,
                 &MhFlowViewportAPILocator::creator,
                 &MhFlowViewportAPILocator::initialize,

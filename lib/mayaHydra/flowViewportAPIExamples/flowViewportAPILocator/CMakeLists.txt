@@ -12,7 +12,6 @@ target_sources(${TARGET_NAME}
 
 set(HEADERS
 	PRIVATE
-    mhFlowViewportAPILocatorStrings.h
 )
 
 # -----------------------------------------------------------------------------
