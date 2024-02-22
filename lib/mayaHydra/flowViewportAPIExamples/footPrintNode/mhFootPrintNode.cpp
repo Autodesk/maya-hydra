@@ -80,8 +80,7 @@ public:
     MBoundingBox    boundingBox() const override;
 
     void setupFlowViewportInterface();
-    void UpdateFootPrintPrims();
-    void TriggerACallToCompute();
+    void updateFootPrintPrims();
     
     static  void *      creator();
     static  MStatus     initialize();
@@ -334,7 +333,7 @@ namespace
             (parentPlug == MhFootPrint::mColor) ||
             (plug       == MhFootPrint::mColor)
            ){
-                footPrint->UpdateFootPrintPrims();
+                footPrint->updateFootPrintPrims();
         }
     }
 
@@ -382,7 +381,8 @@ namespace {
 
         //Trigger a call to compute so that everything is initialized
         MhFootPrint* footPrintInstance = reinterpret_cast<MhFootPrint*>(clientData);
-        footPrintInstance->TriggerACallToCompute();
+        footPrintInstance->updateFootPrintPrims();
+        footPrintInstance->setupFlowViewportInterface();
     }
 }
 
@@ -399,6 +399,10 @@ void MhFootPrint::postConstructor()
 
     //Add a callback after a load scene
     _cbAfterOpenId = MSceneMessage::addCallback(MSceneMessage::kAfterOpen, afterOpenCallback, ((void*)this)) ;
+
+    //Add the callback when an attribute of this node changes
+    MObject obj = _thisMObject.object();
+    _cbAttributeChangedId = MNodeMessage::addAttributeChangedCallback(obj, attributeChangedCallback, ((void*)this));
 
     _retainedSceneIndex = HdRetainedSceneIndex::New();
 
@@ -442,31 +446,10 @@ void MhFootPrint::_RemoveFootPrintPrimitives()
 }
 
 //To update we need to remove the previous primitives and create new ones
-void MhFootPrint::UpdateFootPrintPrims() 
+void MhFootPrint::updateFootPrintPrims() 
 { 
     _RemoveFootPrintPrimitives();
     _CreateAndAddFootPrintPrimitives();
-}
-
-void MhFootPrint::TriggerACallToCompute() 
-{ 
-    {
-        MPlug plug(thisMObject(), mDummyInput);
-        if (!plug.isNull())
-        {
-            int dummyInputVal;
-            if (plug.getValue(dummyInputVal))
-            {
-                plug.setValue(dummyInputVal + 1);//Dirty one parameter that affects the mDummyOutput attribute
-                MPlug plugOutput(thisMObject(), mDummyOutput);
-                if (!plugOutput.isNull())
-                {
-                    int dummyOutputVal;
-                    plugOutput.getValue(dummyOutputVal);//This will trigger a call to compute
-                }
-            }
-        }
-    }
 }
 
 void MhFootPrint::_UpdateThisMObject()
