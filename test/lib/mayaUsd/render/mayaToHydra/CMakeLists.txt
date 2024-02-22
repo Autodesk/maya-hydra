@@ -61,7 +61,8 @@ foreach(script ${TEST_SCRIPT_FILES})
         PYTHON_MODULE ${target}
         ENV
             "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
-            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
+            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}" #Linux
+            "DYLD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}" #OSX
             "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
 
             # LD_LIBRARY_PATH needs to be set for the idiff executable because its 
@@ -99,7 +100,8 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
         PYTHON_SCRIPT ${script}
         ENV
             "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
-            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
+            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}" #Linux
+            "DYLD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}" #OSX
 
             "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
 
@@ -123,7 +125,8 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
         PYTHON_SCRIPT ${script}
         ENV
             "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
-            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
+            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}" #Linux
+            "DYLD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}" #OSX
             "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
 
             # LD_LIBRARY_PATH needs to be set for the idiff executable because its 
