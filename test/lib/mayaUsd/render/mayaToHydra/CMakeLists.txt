@@ -16,6 +16,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNewSceneWithStage.py
     testMayaDisplayModes.py
     testMayaShadingModes.py
+    testMayaDisplayLayers.py
     testMayaIsolateSelect.py
     testMayaLights.py
     testUSDLights.py
