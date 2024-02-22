@@ -1,1 +1,1 @@
-add_subdirectory(flowViewportAPIMayaLocator)
+add_subdirectory(flowViewportAPILocator)

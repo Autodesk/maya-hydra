@@ -19,7 +19,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-// MhFlowViewportAPIMayaLocator Node hydra plugin localization strings
+// MhFlowViewportAPILocator Node hydra plugin localization strings
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -28,11 +28,11 @@
 // MStringResourceIds contain plug-in id, unique resource id for
 // each string and the default value for the string.
 
-#define kMhFlowViewportAPIMayaLocatorNodePluginId				"MhFlowViewportAPIMayaLocator"
+#define kMhFlowViewportAPILocatorNodePluginId				"MhFlowViewportAPILocator"
 
 // If a MStringResourceId is added to this list, please register in registerMStringRes() 
-// in mhFlowViewportAPIMayaLocator.cpp
+// in MhFlowViewportAPILocator.cpp
 
-#define rMayaHydraNotLoadedStringError  MStringResourceId( kMhFlowViewportAPIMayaLocatorNodePluginId, "rMayaHydraNotLoadedStringError", "You need to load the mayaHydra plugin before creating this node.")
+#define rMayaHydraNotLoadedStringError  MStringResourceId( kMhFlowViewportAPILocatorNodePluginId, "rMayaHydraNotLoadedStringError", "You need to load the mayaHydra plugin before creating this node.")
 
 #endif //_MAYAHYDRA_FLOW_VIEWPORT_API_MAYA_LOCATOR_STRINGS_

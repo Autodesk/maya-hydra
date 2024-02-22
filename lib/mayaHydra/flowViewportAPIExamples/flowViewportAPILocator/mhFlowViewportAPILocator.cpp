@@ -15,7 +15,7 @@
 //
 
 //Local headers
-#include "mhFlowViewportAPIMayaLocatorStrings.h"
+#include "MhFlowViewportAPILocatorStrings.h"
 
 //Flow viewport headers
 #include <flowViewport/API/fvpFilteringSceneIndexInterface.h>
@@ -48,16 +48,16 @@
 //But you could use another kind of maya plugin.
 
 /*To create an instance of this node in maya, please use the following MEL command :
-createNode("MhFlowViewportAPIMayaLocator")
+createNode("MhFlowViewportAPILocator")
 */
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 ///Maya Locator node subclass to create filtering and data producer scene indices example, to be used with the flow viewport API.
-class MhFlowViewportAPIMayaLocator : public MPxLocatorNode
+class MhFlowViewportAPILocator : public MPxLocatorNode
 {
 public:
-    ~MhFlowViewportAPIMayaLocator() override;
+    ~MhFlowViewportAPILocator() override;
 
     //Is called when the MObject has been constructed and is valid
     void    postConstructor() override;
@@ -111,7 +111,7 @@ protected:
     
 private:
     /// Private Constructor
-    MhFlowViewportAPIMayaLocator() {}
+    MhFlowViewportAPILocator() {}
     
     ///Update the MObject of this node
     void _UpdateThisMObject();
@@ -126,7 +126,7 @@ namespace
             return;
         }
 
-        MhFlowViewportAPIMayaLocator* flowViewportAPIMayaLocator = reinterpret_cast<MhFlowViewportAPIMayaLocator*>(dataProducerSceneIndexData);
+        MhFlowViewportAPILocator* flowViewportAPIMayaLocator = reinterpret_cast<MhFlowViewportAPILocator*>(dataProducerSceneIndexData);
 
         MPlug parentPlug = plug.parent();
         if (plug == flowViewportAPIMayaLocator->mDummyInput || plug == flowViewportAPIMayaLocator->mDummyOutput){
@@ -224,7 +224,7 @@ namespace
             return;
         }
 
-        MhFlowViewportAPIMayaLocator* flowViewportAPIMayaLocator = reinterpret_cast<MhFlowViewportAPIMayaLocator*>(clientData);
+        MhFlowViewportAPILocator* flowViewportAPIMayaLocator = reinterpret_cast<MhFlowViewportAPILocator*>(clientData);
         flowViewportAPIMayaLocator->setCubeGridParametersFromAttributes();
         flowViewportAPIMayaLocator->setupFlowViewportInterfaces();
     }
@@ -239,22 +239,22 @@ namespace
 }//end of anonymous namespace
 
 //Initialization of static members
-MTypeId MhFlowViewportAPIMayaLocator::id( 0x58000086 );
-MString	MhFlowViewportAPIMayaLocator::nodeClassification("hydraAPIExample/geometry/MhFlowViewportAPIMayaLocator");
+MTypeId MhFlowViewportAPILocator::id( 0x58000086 );
+MString	MhFlowViewportAPILocator::nodeClassification("hydraAPIExample/geometry/MhFlowViewportAPILocator");
 
-MObject MhFlowViewportAPIMayaLocator::mNumCubeLevelsX;
-MObject MhFlowViewportAPIMayaLocator::mNumCubeLevelsY;
-MObject MhFlowViewportAPIMayaLocator::mNumCubeLevelsZ;
-MObject MhFlowViewportAPIMayaLocator::mCubeHalfSize;
-MObject MhFlowViewportAPIMayaLocator::mCubeInitalTransform;
-MObject MhFlowViewportAPIMayaLocator::mCubeColor;
-MObject MhFlowViewportAPIMayaLocator::mCubeOpacity;
-MObject MhFlowViewportAPIMayaLocator::mCubesUseInstancing;
-MObject MhFlowViewportAPIMayaLocator::mCubesDeltaTrans;
-MObject MhFlowViewportAPIMayaLocator::mDummyInput;
-MObject MhFlowViewportAPIMayaLocator::mDummyOutput;
+MObject MhFlowViewportAPILocator::mNumCubeLevelsX;
+MObject MhFlowViewportAPILocator::mNumCubeLevelsY;
+MObject MhFlowViewportAPILocator::mNumCubeLevelsZ;
+MObject MhFlowViewportAPILocator::mCubeHalfSize;
+MObject MhFlowViewportAPILocator::mCubeInitalTransform;
+MObject MhFlowViewportAPILocator::mCubeColor;
+MObject MhFlowViewportAPILocator::mCubeOpacity;
+MObject MhFlowViewportAPILocator::mCubesUseInstancing;
+MObject MhFlowViewportAPILocator::mCubesDeltaTrans;
+MObject MhFlowViewportAPILocator::mDummyInput;
+MObject MhFlowViewportAPILocator::mDummyOutput;
 
-void MhFlowViewportAPIMayaLocator::postConstructor() 
+void MhFlowViewportAPILocator::postConstructor() 
 { 
     //The MObject has been constructed and is valid
     MObject currentMObj = thisMObject();
@@ -298,7 +298,7 @@ void MhFlowViewportAPIMayaLocator::postConstructor()
 }
 
 //This is called only when our node is destroyed and the undo queue flushed.
-MhFlowViewportAPIMayaLocator::~MhFlowViewportAPIMayaLocator() 
+MhFlowViewportAPILocator::~MhFlowViewportAPILocator() 
 { 
     //Remove the callbacks
     if (_cbAttributeChangedId){
@@ -322,7 +322,7 @@ MhFlowViewportAPIMayaLocator::~MhFlowViewportAPIMayaLocator()
     informationInterface.UnregisterInformationClient(_hydraViewportInformationClient);
 }
 
-void MhFlowViewportAPIMayaLocator::setCubeGridParametersFromAttributes()
+void MhFlowViewportAPILocator::setCubeGridParametersFromAttributes()
 {
     MObject mObj = _thisMObject.object();
     if (mObj.isNull()){
@@ -333,27 +333,27 @@ void MhFlowViewportAPIMayaLocator::setCubeGridParametersFromAttributes()
         }
     }
 
-    GetAttributeValue(_cubeGridParams._numLevelsX, mObj, MhFlowViewportAPIMayaLocator::mNumCubeLevelsX);
-    GetAttributeValue(_cubeGridParams._numLevelsY, mObj, MhFlowViewportAPIMayaLocator::mNumCubeLevelsY);
-    GetAttributeValue(_cubeGridParams._numLevelsZ, mObj, MhFlowViewportAPIMayaLocator::mNumCubeLevelsZ);
+    GetAttributeValue(_cubeGridParams._numLevelsX, mObj, MhFlowViewportAPILocator::mNumCubeLevelsX);
+    GetAttributeValue(_cubeGridParams._numLevelsY, mObj, MhFlowViewportAPILocator::mNumCubeLevelsY);
+    GetAttributeValue(_cubeGridParams._numLevelsZ, mObj, MhFlowViewportAPILocator::mNumCubeLevelsZ);
 
-    GetAttributeValue(_cubeGridParams._halfSize, mObj, MhFlowViewportAPIMayaLocator::mCubeHalfSize);
+    GetAttributeValue(_cubeGridParams._halfSize, mObj, MhFlowViewportAPILocator::mCubeHalfSize);
     
     MMatrix mat;
-    GetMatrixAttributeValue(mat, mObj, MhFlowViewportAPIMayaLocator::mCubeInitalTransform);
+    GetMatrixAttributeValue(mat, mObj, MhFlowViewportAPILocator::mCubeInitalTransform);
     memcpy(_cubeGridParams._initalTransform.GetArray(), mat[0], sizeof(double) * 16);//convert from MMatrix to GfMatrix4d
 
     double3 color;
-    GetDouble3AttributeValue(color, mObj, MhFlowViewportAPIMayaLocator::mCubeColor);
+    GetDouble3AttributeValue(color, mObj, MhFlowViewportAPILocator::mCubeColor);
     _cubeGridParams._color.data()[0]        = color[0];//Implicit conversion from double to float
     _cubeGridParams._color.data()[1]        = color[1];
     _cubeGridParams._color.data()[2]        = color[2];
 
-    GetAttributeValue(_cubeGridParams._opacity, mObj, MhFlowViewportAPIMayaLocator::mCubeOpacity);
-    GetAttributeValue(_cubeGridParams._useInstancing, mObj, MhFlowViewportAPIMayaLocator::mCubesUseInstancing);
+    GetAttributeValue(_cubeGridParams._opacity, mObj, MhFlowViewportAPILocator::mCubeOpacity);
+    GetAttributeValue(_cubeGridParams._useInstancing, mObj, MhFlowViewportAPILocator::mCubesUseInstancing);
 
     double3 deltaTrans;
-    GetDouble3AttributeValue(deltaTrans, mObj, MhFlowViewportAPIMayaLocator::mCubesDeltaTrans);
+    GetDouble3AttributeValue(deltaTrans, mObj, MhFlowViewportAPILocator::mCubesDeltaTrans);
     _cubeGridParams._deltaTrans.data()[0]   = deltaTrans[0];//Implicit conversion from double to float
     _cubeGridParams._deltaTrans.data()[1]   = deltaTrans[1];
     _cubeGridParams._deltaTrans.data()[2]   = deltaTrans[2];
@@ -361,7 +361,7 @@ void MhFlowViewportAPIMayaLocator::setCubeGridParametersFromAttributes()
     _hydraViewportDataProducerSceneIndexExample.setCubeGridParams(_cubeGridParams);
 }
 
-void MhFlowViewportAPIMayaLocator::_UpdateThisMObject()
+void MhFlowViewportAPILocator::_UpdateThisMObject()
 {
     if (_thisMObject.isValid()){
         return;
@@ -370,7 +370,7 @@ void MhFlowViewportAPIMayaLocator::_UpdateThisMObject()
     _thisMObject = thisMObject();
 }
 
-void MhFlowViewportAPIMayaLocator::setupFlowViewportInterfaces()
+void MhFlowViewportAPILocator::setupFlowViewportInterfaces()
 {
     _UpdateThisMObject();
     
@@ -396,7 +396,7 @@ void MhFlowViewportAPIMayaLocator::setupFlowViewportInterfaces()
     }
 }
 
-MStatus MhFlowViewportAPIMayaLocator::compute( const MPlug& plug, MDataBlock& dataBlock)
+MStatus MhFlowViewportAPILocator::compute( const MPlug& plug, MDataBlock& dataBlock)
 {
     //The MObject can change if the node gets deleted and deletion being undone
     if (! _thisMObject.isValid()){
@@ -406,13 +406,13 @@ MStatus MhFlowViewportAPIMayaLocator::compute( const MPlug& plug, MDataBlock& da
     return MS::kSuccess;
 }
 
-bool MhFlowViewportAPIMayaLocator::isBounded() const
+bool MhFlowViewportAPILocator::isBounded() const
 {
     return true;
 }
 
 //We return as a bounding box the bounding box of the data producer hydra data
-MBoundingBox MhFlowViewportAPIMayaLocator::boundingBox() const
+MBoundingBox MhFlowViewportAPILocator::boundingBox() const
 {
     float corner1X, corner1Y, corner1Z, corner2X, corner2Y, corner2Z;
     _hydraViewportDataProducerSceneIndexExample.getPrimsBoundingBox(corner1X, corner1Y, corner1Z, corner2X, corner2Y, corner2Z);
@@ -420,21 +420,21 @@ MBoundingBox MhFlowViewportAPIMayaLocator::boundingBox() const
 }
 
 // Called before this node is evaluated by Evaluation Manager
-MStatus MhFlowViewportAPIMayaLocator::preEvaluation(
+MStatus MhFlowViewportAPILocator::preEvaluation(
     const MDGContext& context,
     const MEvaluationNode& evaluationNode)
 {
     return MStatus::kSuccess;
 }
 
-void MhFlowViewportAPIMayaLocator::getCacheSetup(const MEvaluationNode& evalNode, MNodeCacheDisablingInfo& disablingInfo, MNodeCacheSetupInfo& cacheSetupInfo, MObjectArray& monitoredAttributes) const
+void MhFlowViewportAPILocator::getCacheSetup(const MEvaluationNode& evalNode, MNodeCacheDisablingInfo& disablingInfo, MNodeCacheSetupInfo& cacheSetupInfo, MObjectArray& monitoredAttributes) const
 {
     MPxLocatorNode::getCacheSetup(evalNode, disablingInfo, cacheSetupInfo, monitoredAttributes);
     assert(!disablingInfo.getCacheDisabled());
     cacheSetupInfo.setPreference(MNodeCacheSetupInfo::kWantToCacheByDefault, true);
 }
 
-void* MhFlowViewportAPIMayaLocator::creator()
+void* MhFlowViewportAPILocator::creator()
 {
     int	isMayaHydraLoaded = false;
     // Validate that the mayaHydra plugin is loaded.
@@ -450,7 +450,7 @@ void* MhFlowViewportAPIMayaLocator::creator()
         return nullptr;
     }
 
-    return new MhFlowViewportAPIMayaLocator;
+    return new MhFlowViewportAPILocator;
 }
 
 //---------------------------------------------------------------------------
@@ -473,7 +473,7 @@ void* MhFlowViewportAPIMayaLocator::creator()
     CHECK_MSTATUS ( attr.setReadable(true) ); \
     CHECK_MSTATUS ( attr.setWritable(false) );
 
-MStatus MhFlowViewportAPIMayaLocator::initialize()
+MStatus MhFlowViewportAPILocator::initialize()
 {
     MStatus status;
 
@@ -558,12 +558,12 @@ MStatus initializePlugin( MObject obj )
 	}
 
     status = plugin.registerNode(
-                kMhFlowViewportAPIMayaLocatorNodePluginId,
-                MhFlowViewportAPIMayaLocator::id,
-                &MhFlowViewportAPIMayaLocator::creator,
-                &MhFlowViewportAPIMayaLocator::initialize,
+                kMhFlowViewportAPILocatorNodePluginId,
+                MhFlowViewportAPILocator::id,
+                &MhFlowViewportAPILocator::creator,
+                &MhFlowViewportAPILocator::initialize,
                 MPxNode::kLocatorNode,
-                &MhFlowViewportAPIMayaLocator::nodeClassification);
+                &MhFlowViewportAPILocator::nodeClassification);
     if (!status) {
         status.perror("registerNode");
         return status;
@@ -577,7 +577,7 @@ MStatus uninitializePlugin( MObject obj)
     MStatus   status;
     MFnPlugin plugin( obj );
 
-    status = plugin.deregisterNode( MhFlowViewportAPIMayaLocator::id );
+    status = plugin.deregisterNode( MhFlowViewportAPILocator::id );
     if (!status) {
         status.perror("deregisterNode");
         return status;
