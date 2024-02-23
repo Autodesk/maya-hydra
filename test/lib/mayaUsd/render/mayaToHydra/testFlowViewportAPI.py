@@ -38,6 +38,11 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 2
 
+    @classmethod
+    def tearDownClass(cls):
+        #Finish by a File New command to check that it's not crashing when cleaning up everything'
+        cmds.file(new=True, force=True)
+
     def setupScene(self):
         self.setHdStormRenderer()
 
@@ -101,9 +106,6 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             #Switch back to Storm
             self.setHdStormRenderer()
             self.assertSnapshotClose("add_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
-            #Finish by a File New command to check that it's not crashing when cleaning up everything
-            cmds.file(new=True, force=True)
 
     #Test filtering primitives
     def test_FilteringPrimitives(self):
@@ -184,9 +186,6 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             cmds.setAttr(sphereShape + '.subdivisionsAxis', 30) #Unfilter the prim
             cmds.refresh()
             self.assertSnapshotClose("filter_VP2AndThenBackToStorm_MovedSphereUnFiltered.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
-            #Finish by a File New command to check that it's not crashing when cleaning up everything
-            cmds.file(new=True, force=True)
     
     #Test Cube grids parameters
     def test_CubeGrid(self):
@@ -240,9 +239,6 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             #Switch back to Storm
             self.setHdStormRenderer()
             self.assertSnapshotClose("cubeGrid_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
-            #Finish by a File New command to check that it's not crashing when cleaning up everything
-            cmds.file(new=True, force=True)
 
     #Test multiple nodes
     def test_MultipleNodes(self):
@@ -345,9 +341,6 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             self.setHdStormRenderer()
             self.assertSnapshotClose("multipleNodes_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-            #Finish by a File New command to check that it's not crashing when cleaning up everything
-            cmds.file(new=True, force=True)
-
     #Test multiple viewports
     def test_MultipleViewports(self):
         with PluginLoaded('flowViewportAPIMayaLocator'):
@@ -425,7 +418,5 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             self.setHdStormRenderer()
             self.assertSnapshotClose("multipleViewports_VP2AndThenBackToStorm_modPan2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-            #Finish by a File New command to check that it's not crashing when cleaning up everything
-            cmds.file(new=True, force=True)
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

@@ -38,12 +38,15 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
     def imageDiffFailPercent(self):
         return 0.1
 
+    @classmethod
+    def tearDownClass(cls):
+        #Finish by a File New command to check that it's not crashing when cleaning up everything'
+        cmds.file(new=True, force=True)
+
     def setupScene(self):
-        testFile = mayaUtils.openTestScene( #Is an empty scene that is used to zoom in more on the foot print nodes, it also has Storm already set as the renderer
-                "testFootPrintNode",
-                "testFootPrintNode.ma")
+        self.setHdStormRenderer()
+        cmds.move(7.714, 5.786, 7.714, 'persp')
         cmds.refresh()
-        self.setHdStormRenderer()#set Storm as the renderer (even if the scene is supposed to have it already)
 
     #Test adding primitives
     def test_AddingPrimitives(self):
@@ -105,9 +108,6 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             self.setHdStormRenderer()
             self.assertSnapshotClose("add_VP2AndThenBackToStorm.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
-            #Finish by a File New command to check that it's not crashing when cleaning up everything'
-            cmds.file(new=True, force=True)
-
     #Test FootPrint grids parameters
     def test_FootPrintAttributes(self):
         with PluginLoaded('mayaHydraFootPrintNode'):
@@ -132,9 +132,6 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             #Switch back to Storm
             self.setHdStormRenderer()
             self.assertSnapshotClose("footPrint_VP2AndThenBackToStorm.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-
-            #Finish by a File New command to check that it's not crashing when cleaning up everything
-            cmds.file(new=True, force=True)
 
     #Test multiple nodes
     def test_MultipleNodes(self):
@@ -204,9 +201,6 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             self.setHdStormRenderer()
             self.assertSnapshotClose("multipleNodes_VP2AndThenBackToStorm.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
-            #Finish by a File New command to check that it's not crashing when cleaning up everything
-            cmds.file(new=True, force=True)
-
     #Test multiple viewports
     def test_MultipleViewports(self):
         with PluginLoaded('mayaHydraFootPrintNode'):
@@ -259,9 +253,6 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             cmds.setFocus ('modelPanel1')
             self.setHdStormRenderer()
             self.assertSnapshotClose("multipleViewports_VP2AndThenBackToStorm_modPan3.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-
-            #Finish by a File New command to check that it's not crashing when cleaning up everything
-            cmds.file(new=True, force=True)
 
     #Test loading a scene
     def test_Load(self):
