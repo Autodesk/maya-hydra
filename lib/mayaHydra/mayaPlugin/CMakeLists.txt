@@ -84,7 +84,7 @@ maya_set_plugin_properties(${TARGET_NAME})
 # run-time search paths
 # -----------------------------------------------------------------------------
 if(IS_MACOSX OR IS_LINUX) 
-    mayaUsd_init_rpath(rpath "lib/maya")
+    mayaUsd_init_rpath2(rpath "lib/maya")
     if(DEFINED MAYAHYDRA_TO_USD_RELATIVE_PATH)
         mayaUsd_add_rpath(rpath "../../${MAYAHYDRA_TO_USD_RELATIVE_PATH}/lib")
     elseif(DEFINED PXR_USD_LOCATION)
