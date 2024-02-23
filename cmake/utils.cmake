@@ -115,13 +115,39 @@ function(mayaUsd_add_rpath rpathRef target)
         file(RELATIVE_PATH
             target
             "${origin}"
-            "${target}/"
+            "${target}"
         )
         if("x${target}" STREQUAL "x")
             set(target ".")
         endif()
     endif()
     file(TO_CMAKE_PATH "${target}" target)
+    set(NEW_RPATH "${${rpathRef}}")
+    list(APPEND NEW_RPATH "$ORIGIN/${target}")
+    set(${rpathRef} "${NEW_RPATH}" PARENT_SCOPE)
+endfunction()
+
+# Add a relative target path to the rpath.  If target is absolute compute
+# and add a relative path from the origin to the target.
+function(mayaUsd_add_rpath2 rpathRef target)
+    if(IS_ABSOLUTE "${target}")
+        # init_rpath calls get_filename_component([...] REALPATH), which does
+        # symlink resolution, so we must do the same, otherwise relative path
+        # determination below will fail.
+        get_filename_component(target "${target}" REALPATH)
+        # Make target relative to $ORIGIN (which is the first element in
+        # rpath when initialized with mayaUsd_init_rpath()).
+        list(GET ${rpathRef} 0 origin)
+        file(RELATIVE_PATH
+            target
+            "${origin}"
+            "${target}"
+        )
+        if("x${target}" STREQUAL "x")
+            set(target ".")
+        endif()
+    endif()
+    file(TO_CMAKE_PATH "../${target}" target)
     set(NEW_RPATH "${${rpathRef}}")
     list(APPEND NEW_RPATH "$ORIGIN/${target}")
     set(${rpathRef} "${NEW_RPATH}" PARENT_SCOPE)
