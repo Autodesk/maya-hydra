@@ -15,11 +15,14 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMaterialXOnNative.py
     testNewSceneWithStage.py
     testMayaDisplayModes.py
+    testMayaShadingModes.py
+    testMayaDisplayLayers.py
     testMayaIsolateSelect.py
     testMayaLights.py
     testUSDLights.py
     testArnoldLights.py
     testLookThrough.py
+    testObjectTemplate.py
     testStandardSurface.py
     testFlowViewportAPI.py
     testStageVariants.py

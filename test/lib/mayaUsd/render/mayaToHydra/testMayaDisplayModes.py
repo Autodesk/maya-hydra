@@ -41,7 +41,14 @@ class TestMayaDisplayModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
             return 4
         return 0.2
 
-    def switchDisplayModes(self):
+    def test_MayaDisplayModes(self):
+
+        # open simple Maya scene
+        testFile = mayaUtils.openTestScene(
+                "testMayaDisplayModes",
+                "testMayaDisplayModes.ma")
+        cmds.refresh()
+
         panel = mayaUtils.activeModelPanel()
         
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=False)
@@ -85,18 +92,6 @@ class TestMayaDisplayModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
         cmds.refresh()
         self.assertSnapshotClose("smoothShaded" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-        
-
-    def test_MayaDisplayModes(self):
-        cmds.file(new=True, force=True)
-
-        # open simple Maya scene
-        testFile = mayaUtils.openTestScene(
-                "testMayaDisplayModes",
-                "testMayaDisplayModes.ma")
-        cmds.refresh()
-
-        self.switchDisplayModes()
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
