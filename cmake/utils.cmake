@@ -160,6 +160,69 @@ function(mayaUsd_install_rpath rpathRef NAME)
     )
 endfunction()
 
+# Add a relative target path to the rpath.  If target is absolute compute
+# and add a relative path from the origin to the target.
+function(mayaUsd_add_rpath2 rpathRef target)
+    if(IS_ABSOLUTE "${target}")
+        # init_rpath calls get_filename_component([...] REALPATH), which does
+        # symlink resolution, so we must do the same, otherwise relative path
+        # determination below will fail.
+        message(STATUS "mayaUsd_add_rpath2: path 1 : ${target}")
+        get_filename_component(target "${target}" REALPATH)
+        message(STATUS "mayaUsd_add_rpath2: path 2 : ${target}")
+        # Make target relative to $ORIGIN (which is the first element in
+        # rpath when initialized with mayaUsd_init_rpath()).
+        list(GET ${rpathRef} 0 origin)
+        message(STATUS "mayaUsd_add_rpath2: path 3 : ${origin}")
+        file(RELATIVE_PATH
+            target
+            "${origin}"
+            "${target}"
+        )
+        message(STATUS "mayaUsd_add_rpath2: path 4: ${target}")
+        if("x${target}" STREQUAL "x")
+            set(target ".")
+        endif()
+    endif()
+    file(TO_CMAKE_PATH "${target}" target)
+    message(STATUS "mayaUsd_add_rpath2: path 5: ${target}")
+    set(NEW_RPATH "${${rpathRef}}")
+    list(APPEND NEW_RPATH "$ORIGIN/${target}")
+    message(STATUS "mayaUsd_add_rpath2: path 6: $ORIGIN/${target}")
+    set(${rpathRef} "${NEW_RPATH}" PARENT_SCOPE)
+endfunction()
+
+function(mayaUsd_install_rpath2 rpathRef NAME)
+    # Get and remove the origin.
+    list(GET ${rpathRef} 0 origin)
+    set(RPATH ${${rpathRef}})
+    list(REMOVE_AT RPATH 0)
+    # Canonicalize and uniquify paths.
+    set(FINAL "")
+    foreach(path ${RPATH})
+        # Replace $ORIGIN with @loader_path
+        if(IS_MACOSX)
+            if("${path}/" MATCHES "^[$]ORIGIN/")
+                # Replace with origin path.
+                message(STATUS "mayaUsd_install_rpath2: before replace: ${path}")
+                string(REPLACE "$ORIGIN/" "@loader_path/" path "${path}/")
+                message(STATUS "mayaUsd_install_rpath2: after replace: ${path}")
+            endif()
+        endif()
+        # Strip trailing slashes.
+        string(REGEX REPLACE "/+$" "" path "${path}")
+        # Ignore paths we already have.
+        if (NOT ";${FINAL};" MATCHES ";${path};")
+            list(APPEND FINAL "${path}")
+        endif()
+    endforeach()
+    set_target_properties(${NAME}
+        PROPERTIES
+            INSTALL_RPATH_USE_LINK_PATH TRUE
+            INSTALL_RPATH "${FINAL}"
+    )
+endfunction()
+
 #
 # mayaUsd_promoteHeaderList(
 #                        [SUBDIR  <sub-directory name>]
