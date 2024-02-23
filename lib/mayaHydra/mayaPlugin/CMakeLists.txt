@@ -84,13 +84,7 @@ maya_set_plugin_properties(${TARGET_NAME})
 # run-time search paths
 # -----------------------------------------------------------------------------
 if(IS_MACOSX OR IS_LINUX) 
-    mayaUsd_init_rpath2(rpath "lib/maya")
-    if(MayaUsd_FOUND)
-        #When MayaUsd_FOUND is true, MAYAUSDAPI_LIBRARY exists as it is required. 
-        #MAYAUSDAPI_LIBRARY is the full path name of the maya USD API shared library, so get only its directory into MAYAUSDAPI_LIBRARY_PATH
-        get_filename_component(MAYAUSDAPI_LIBRARY_PATH "${MAYAUSDAPI_LIBRARY}" DIRECTORY)
-        mayaUsd_add_rpath2(rpath "${MAYAUSDAPI_LIBRARY_PATH}")
-    endif()
+    mayaUsd_init_rpath(rpath "lib/maya")
     if(DEFINED MAYAHYDRA_TO_USD_RELATIVE_PATH)
         mayaUsd_add_rpath(rpath "../../${MAYAHYDRA_TO_USD_RELATIVE_PATH}/lib")
     elseif(DEFINED PXR_USD_LOCATION)
@@ -102,8 +96,14 @@ if(IS_MACOSX OR IS_LINUX)
     if(IS_MACOSX AND DEFINED MAYAHYDRA_TO_USD_RELATIVE_PATH)
         mayaUsd_add_rpath(rpath "../../../../Maya.app/Contents/MacOS")
     endif()
+    if(MayaUsd_FOUND)
+        #When MayaUsd_FOUND is true, MAYAUSDAPI_LIBRARY exists as it is required. 
+        #MAYAUSDAPI_LIBRARY is the full path name of the maya USD API shared library, so get only its directory into MAYAUSDAPI_LIBRARY_PATH
+        get_filename_component(MAYAUSDAPI_LIBRARY_PATH "${MAYAUSDAPI_LIBRARY}" DIRECTORY)
+        mayaUsd_add_rpath(rpath "${MAYAUSDAPI_LIBRARY_PATH}")
+    endif()
     mayaUsd_add_rpath(rpath "../")
-    mayaUsd_install_rpath2(rpath ${TARGET_NAME})
+    mayaUsd_install_rpath(rpath ${TARGET_NAME})
 endif()
 
 # -----------------------------------------------------------------------------
