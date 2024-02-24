@@ -34,7 +34,7 @@ class TestMayaUsdAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCas
         # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
         # for that platform specifically for now, so we can still catch issues on other platforms.
         if platform.system() == "Darwin":
-            return 6
+            return 10
         return 0.2
 
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
