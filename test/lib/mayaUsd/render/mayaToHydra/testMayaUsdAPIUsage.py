@@ -24,8 +24,17 @@ class TestMayaUsdAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCas
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.2
-    IMAGE_DIFF_FAIL_PERCENT = 2
+    @property
+    def imageDiffFailThreshold(self):
+        return 0.01
+    
+    @property
+    def imageDiffFailPercent(self):
+        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
+        # for that platform specifically for now, so we can still catch issues on other platforms.
+        if platform.system() == "Darwin":
+            return 3
+        return 0.2
 
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_MovingUsdStage(self):
@@ -44,44 +53,44 @@ class TestMayaUsdAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCas
         # Move the selected node
         cmds.move(0, 0, -2)
         cmds.refresh()
-        self.assertSnapshotClose("mayaUsdAPI_TransformMoved.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("mayaUsdAPI_TransformMoved.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
         
         #Hide the transform node, this should hide the usd stage
         cmds.hide(transformNode)
-        self.assertSnapshotClose("mayaUsdAPI__NodeHidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("mayaUsdAPI__NodeHidden.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Unhide the transform node, this should unhide the usd stage
         cmds.showHidden(transformNode)
-        self.assertSnapshotClose("mayaUsdAPI__NodeUnhidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("mayaUsdAPI__NodeUnhidden.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Delete the shape node, this should hide the usd stage
         cmds.delete(transformNode)
-        self.assertSnapshotClose("mayaUsdAPI__NodeDeleted.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("mayaUsdAPI__NodeDeleted.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
             
         #Undo the delete, the usd stage should be visible again
         cmds.undo()
-        self.assertSnapshotClose("mayaUsdAPI__NodeDeletedUndo.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("mayaUsdAPI__NodeDeletedUndo.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Redo the delete, the usd stage should be hidden
         cmds.redo()
-        self.assertSnapshotClose("mayaUsdAPI__NodeDeletedRedo.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("mayaUsdAPI__NodeDeletedRedo.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Undo the delete again, the stage prims should be visible
         cmds.undo()
-        self.assertSnapshotClose("mayaUsdAPI__NodeDeletedUndoAgain.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("mayaUsdAPI__NodeDeletedUndoAgain.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Move transform node again to see if it still updates the usd stage prims
         cmds.select(transformNode)
         # Move the selected node
         cmds.move(0, 0, 4)
         cmds.refresh()
-        self.assertSnapshotClose("mayaUsdAPI__NodeMovedAfterDeletionAndUndo.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("mayaUsdAPI__NodeMovedAfterDeletionAndUndo.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Switch to VP2
         self.setViewport2Renderer()
         #Switch back to Storm
         self.setHdStormRenderer()
-        self.assertSnapshotClose("mayaUsdAPI__VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("mayaUsdAPI__VP2AndThenBackToStorm.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Finish by a File New command
         cmds.file(new=True, force=True)

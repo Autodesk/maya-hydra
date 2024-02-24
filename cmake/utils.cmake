@@ -90,14 +90,20 @@ endfunction()
 function(mayaUsd_init_rpath rpathRef origin)
     if(NOT IS_ABSOLUTE ${origin})
         if(DEFINED INSTALL_DIR_SUFFIX)
-            set(origin "${CMAKE_INSTALL_PREFIX}/${INSTALL_DIR_SUFFIX}/${origin}")
+            set(prefix "${CMAKE_INSTALL_PREFIX}/${INSTALL_DIR_SUFFIX}")
         else()
-            set(origin "${CMAKE_INSTALL_PREFIX}/${origin}")
+            set(prefix "${CMAKE_INSTALL_PREFIX}")
         endif()
+        # mayaUsd_add_rpath uses REALPATH, so we must make sure we always
+        # do so here too, to get the right relative path
+        # we get REALPATH against prefix directory first as it already existed
+        get_filename_component(prefix "${prefix}" REALPATH)
+        set(origin "${prefix}/${origin}")
+    else()
+        # mayaUsd_add_rpath uses REALPATH, so we must make sure we always
+        # do so here too, to get the right relative path
+        get_filename_component(origin "${origin}" REALPATH)
     endif()
-    # mayaUsd_add_rpath uses REALPATH, so we must make sure we always
-    # do so here too, to get the right relative path
-    get_filename_component(origin "${origin}" REALPATH)
     set(${rpathRef} "${origin}" PARENT_SCOPE)
 endfunction()
 
@@ -122,32 +128,6 @@ function(mayaUsd_add_rpath rpathRef target)
         endif()
     endif()
     file(TO_CMAKE_PATH "${target}" target)
-    set(NEW_RPATH "${${rpathRef}}")
-    list(APPEND NEW_RPATH "$ORIGIN/${target}")
-    set(${rpathRef} "${NEW_RPATH}" PARENT_SCOPE)
-endfunction()
-
-# Add a relative target path to the rpath.  If target is absolute compute
-# and add a relative path from the origin to the target.
-function(mayaUsd_add_rpath2 rpathRef target)
-    if(IS_ABSOLUTE "${target}")
-        # init_rpath calls get_filename_component([...] REALPATH), which does
-        # symlink resolution, so we must do the same, otherwise relative path
-        # determination below will fail.
-        get_filename_component(target "${target}" REALPATH)
-        # Make target relative to $ORIGIN (which is the first element in
-        # rpath when initialized with mayaUsd_init_rpath()).
-        list(GET ${rpathRef} 0 origin)
-        file(RELATIVE_PATH
-            target
-            "${origin}"
-            "${target}"
-        )
-        if("x${target}" STREQUAL "x")
-            set(target ".")
-        endif()
-    endif()
-    file(TO_CMAKE_PATH "../../${target}" target)
     set(NEW_RPATH "${${rpathRef}}")
     list(APPEND NEW_RPATH "$ORIGIN/${target}")
     set(${rpathRef} "${NEW_RPATH}" PARENT_SCOPE)
