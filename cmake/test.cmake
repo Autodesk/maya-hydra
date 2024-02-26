@@ -297,7 +297,20 @@ finally:
              list(APPEND MAYAUSD_MATERIALX_SEARCH_PATH
                   "${MTOA_LOCATION}/materialx/targets")
     endif()
-
+    
+    # lookdevx
+    if(DEFINED LOOKDEVX_LOCATION)
+        list(APPEND MAYAUSD_VARNAME_PATH
+             "${LOOKDEVX_LOCATION}/bin")
+        list(APPEND MAYAUSD_VARNAME_PATH
+             "${LOOKDEVX_LOCATION}/plug-ins")
+        list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
+             "${LOOKDEVX_LOCATION}/AEtemplate")
+        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
+             "${LOOKDEVX_LOCATION}/scripts")
+        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
+             "${LOOKDEVX_LOCATION}/python")
+    endif()
 
     if(IS_WINDOWS AND DEFINED ENV{PYTHONHOME})
         # If the environment contains a PYTHONHOME, also set the path to
