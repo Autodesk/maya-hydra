@@ -62,6 +62,7 @@ foreach(script ${TEST_SCRIPT_FILES})
         ENV
             "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
             "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
+            "LD_DEBUG=libs"
             "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
 
             # LD_LIBRARY_PATH needs to be set for the idiff executable because its 
@@ -100,7 +101,7 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
         ENV
             "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
             "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
-
+            "LD_DEBUG=libs"
             "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
 
             "MAYA_COLOR_MANAGEMENT_SYNCOLOR=1"
@@ -124,6 +125,7 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
         ENV
             "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
             "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
+            "LD_DEBUG=libs"
             "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
 
             # LD_LIBRARY_PATH needs to be set for the idiff executable because its 
