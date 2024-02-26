@@ -25,6 +25,8 @@ python build.py --generator=Ninja --stages clean,configure,build,install --maya-
 
 The --build-coverage flag indicates that the variant to be built is the Coverage variant. 
 
+At time of writing (February 26th, 2024), only the Ninja code generator is supported.  In particular, the Visual Studio generator is known not to output code coverage data.
+
 ## Running Tests and Getting Raw Coverage Information
 
 To run tests and generate code coverage information using the Coverage build, run:
@@ -33,7 +35,7 @@ To run tests and generate code coverage information using the Coverage build, ru
 python build.py --generator=Ninja --stages test --maya-location <maya_location> --build-coverage --pxrusd-location <pxrusd_location> --devkit-location <devkit_location> --build-args="-DPYTHON_INCLUDE_DIR=<python_include_dir>,-DPython_EXECUTABLE=<python_executable>,-DPYTHON_LIBRARIES=<python_libraries>,-DCMAKE_WANT_MATERIALX_BUILD=ON,-DCMAKE_PREFIX_PATH=<cmake_prefix_path>" <installation_location>
 ```
 
-After running tests, there will be raw coverage information files generated that are have a file extension of .profraw. 
+After running tests, there will be raw coverage information files generated that have a .profraw file extension.
 
 ## Parsing Coverage Information and Report
 
