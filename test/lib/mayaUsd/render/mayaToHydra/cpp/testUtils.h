@@ -344,28 +344,30 @@ bool dataSourceMatchesReference(
     PXR_NS::HdDataSourceBaseHandle dataSource,
     std::filesystem::path          referencePath);
 
+#ifdef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
 /**
 * @class A RAII-style class to temporarily override the string conversion settings used when
 * streaming out VtValues containing floats or doubles.
 */
 class DecimalStreamingOverride {
 public:
-    DecimalStreamingOverride(pxr::TfDecimalToStringConfig overrideConfig)
+    DecimalStreamingOverride(const pxr::TfDecimalToStringConfig& overrideConfig)
     {
-        _prevFloatConfig = pxr::TfStreamFloat::toStringConfig.load();
-        _prevDoubleConfig = pxr::TfStreamDouble::toStringConfig.load();
-        pxr::TfStreamFloat::toStringConfig.store(overrideConfig);
-        pxr::TfStreamDouble::toStringConfig.store(overrideConfig);
+        _prevFloatConfig = pxr::TfStreamFloat::ToStringConfig();
+        _prevDoubleConfig = pxr::TfStreamDouble::ToStringConfig();
+        pxr::TfStreamFloat::ToStringConfig() = overrideConfig;
+        pxr::TfStreamDouble::ToStringConfig() = overrideConfig;
     }
     ~DecimalStreamingOverride()
     {
-        pxr::TfStreamFloat::toStringConfig.store(_prevFloatConfig);
-        pxr::TfStreamDouble::toStringConfig.store(_prevDoubleConfig);
+        pxr::TfStreamFloat::ToStringConfig() = _prevFloatConfig;
+        pxr::TfStreamDouble::ToStringConfig() = _prevDoubleConfig;
     }
 private:
     pxr::TfDecimalToStringConfig _prevFloatConfig;
     pxr::TfDecimalToStringConfig _prevDoubleConfig;
 };
+#endif
 
 } // namespace MAYAHYDRA_NS_DEF
 

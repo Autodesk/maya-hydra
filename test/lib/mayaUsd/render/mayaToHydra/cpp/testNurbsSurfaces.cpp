@@ -53,6 +53,9 @@ FindPrimPredicate getNurbPrimPredicate(const std::string& nurbsName, const TfTok
 
 TEST(NurbsSurfaces, nurbsTorus)
 {
+#ifndef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
+    GTEST_SKIP() << "Skipping test, configurable decimal streaming is unavailable.";
+#else
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
@@ -102,10 +105,14 @@ TEST(NurbsSurfaces, nurbsTorus)
     EXPECT_TRUE(dataSourceMatchesReference(
         HdContainerDataSource::Get(torusPrim.dataSource, pointsLocator),
         getPathToSample("torus_points_tolerance.txt")));
+#endif
 }
 
 TEST(NurbsSurfaces, nurbsCube)
 {
+#ifndef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
+    GTEST_SKIP() << "Skipping test, configurable decimal streaming is unavailable.";
+#else
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
@@ -146,10 +153,14 @@ TEST(NurbsSurfaces, nurbsCube)
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     testPlanePrims("modified");
+#endif
 }
 
 TEST(NurbsSurfaces, nurbsCircle)
 {
+#ifndef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
+    GTEST_SKIP() << "Skipping test, configurable decimal streaming is unavailable.";
+#else
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
@@ -214,10 +225,14 @@ TEST(NurbsSurfaces, nurbsCircle)
     EXPECT_TRUE(dataSourceMatchesReference(
         HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
         getPathToSample("circle_points_unfixedCenter.txt")));
+#endif
 }
 
 TEST(NurbsSurfaces, nurbsSquare)
 {
+#ifndef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
+    GTEST_SKIP() << "Skipping test, configurable decimal streaming is unavailable.";
+#else
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
@@ -262,4 +277,5 @@ TEST(NurbsSurfaces, nurbsSquare)
     EXPECT_TRUE(M3dView::active3dView().refresh());
 
     testLinePrims("modified");
+#endif
 }
