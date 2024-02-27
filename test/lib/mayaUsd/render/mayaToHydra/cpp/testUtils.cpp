@@ -29,6 +29,10 @@
 
 #include <iostream>
 
+namespace {
+std::pair<int, char**> testingArgs{0, nullptr};
+}
+
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
 // The following code currently lives inside the pxr namespace, but it would make more sense to 
@@ -241,3 +245,17 @@ HdSceneIndexBaseRefPtr findSceneIndexInTree(
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+namespace MAYAHYDRA_NS_DEF {
+
+void setTestingArgs(int argc, char** argv)
+{
+    testingArgs = {argc, argv};
+}
+
+std::pair<int, char**> getTestingArgs()
+{
+    return testingArgs;
+}
+
+}
