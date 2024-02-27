@@ -188,6 +188,10 @@ public:
         return nSamples;
     }
 
+#ifdef CODE_COVERAGE_WORKAROUND
+    void Cleanup();
+#endif
+
 private:
 
     //

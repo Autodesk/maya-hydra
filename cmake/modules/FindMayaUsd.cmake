@@ -50,7 +50,8 @@ find_package_handle_standard_args(MayaUsd
     REQUIRED_VARS
         MAYAUSD_INCLUDE_DIR
         MAYAUSDAPI_LIBRARY
-        MAYAUSD_MOD_PATH
+        #MAYAUSD_MOD_PATH is not part of MayaUsd cuts downloaded so remove it from the requirements
+        # as we want to be able to build with MayaUsd cuts.
 )
 
 if(MayaUsd_FOUND)

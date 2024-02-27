@@ -21,6 +21,9 @@
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpPathInterfaceSceneIndex.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
+#ifdef CODE_COVERAGE_WORKAROUND
+#include <flowViewport/fvpUtils.h>
+#endif
 
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -197,6 +200,9 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
         dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(registration->rootSceneIndex);
         _registrationsByObjectHandle.erase(dagNodeHandle);
         _registrations.erase(registration->sceneIndexPathPrefix);
+#ifdef CODE_COVERAGE_WORKAROUND
+        Fvp::leakSceneIndex(registration->rootSceneIndex);
+#endif
         return true;
     }
     return false;
@@ -262,6 +268,10 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
         mayaUsdProxyShapeSceneIndex->Populate();
 
         registration->rootSceneIndex = registration->pluginSceneIndex;
+
+        registration->rootSceneIndex = HdPrefixingSceneIndex::New(
+                    registration->rootSceneIndex,
+                    registration->sceneIndexPathPrefix);
 
         //Add the PathInterfaceSceneIndex which must be the last scene index, it is used for selection highlighting
         registration->rootSceneIndex = PathInterfaceSceneIndex::New(
