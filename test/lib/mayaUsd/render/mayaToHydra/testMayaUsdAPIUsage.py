@@ -34,7 +34,7 @@ class TestMayaUsdAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCas
         # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
         # for that platform specifically for now, so we can still catch issues on other platforms.
         if platform.system() == "Darwin":
-            return 30
+            return 3
         return 0.2
 
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
@@ -44,7 +44,7 @@ class TestMayaUsdAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCas
                 "testMayaUsdAPIUsage",
                 "UsdStageWithSphereMatXStdSurf.ma")
         cmds.refresh()
-        self.assertSnapshotClose("mayaUsdAPI_DirectionalLight.png", None, None)
+        self.assertSnapshotClose("mayaUsdAPI_DirectionalLight.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
         #Move the transform node, the usd stage prim should move as well
         # Get the transform node of the MayaUsdProxyShape node hosting the stage, it is named "stage1"
