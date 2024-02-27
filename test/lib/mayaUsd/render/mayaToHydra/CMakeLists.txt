@@ -14,14 +14,20 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testTransforms.py
     testMaterialXOnNative.py
     testNewSceneWithStage.py
+    testMayaDisplayModes.py
+    testMayaShadingModes.py
+    testMayaDisplayLayers.py
+    testMayaIsolateSelect.py
     testMayaLights.py
     testUSDLights.py
     testArnoldLights.py
     testLookThrough.py
+    testObjectTemplate.py
     testStandardSurface.py
     testFlowViewportAPI.py
     testStageVariants.py
     testNurbsPrimitives.py
+    testCurveTools.py
     testPolygonPrimitives.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
@@ -127,6 +133,7 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
         ENV
             "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
             "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
+
             "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
 
             # LD_LIBRARY_PATH needs to be set for the idiff executable because its 

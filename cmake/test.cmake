@@ -1,20 +1,35 @@
 set(MAYA_USD_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(MayaUsd_FOUND)
-    #Add MAYAUSD_MOD_PATH (the path where maya USD .mod file is) to the MAYA_MODULE_PATH
-    # Get the current value of the environment variable
-    set(CURRENT_MAYA_MODULE_PATH $ENV{MAYA_MODULE_PATH})
-    # Append the new path to the current value
     if(IS_MACOSX OR IS_LINUX) 
-        #Linux and OSX
-        set(MAYA_MODULE_PATH "${CURRENT_MAYA_MODULE_PATH}:${MAYAUSD_MOD_PATH}")
-    else()
-        #Windows
-        set(MAYA_MODULE_PATH "${CURRENT_MAYA_MODULE_PATH}\;${MAYAUSD_MOD_PATH}")
+        #When MayaUsd_FOUND is true, MAYAUSDAPI_LIBRARY exists as it is required. 
+        #MAYAUSDAPI_LIBRARY is the full path name of the maya USD API shared library, so get only its directory into MAYAUSDAPI_LIBRARY_PATH
+        get_filename_component(MAYAUSDAPI_LIBRARY_PATH "${MAYAUSDAPI_LIBRARY}" DIRECTORY)
+
+        #So add MAYAUSDAPI_LIBRARY_PATH to the ADDITIONAL_LD_LIBRARY_PATH which is used to run the tests
+        set(CURRENT_ADDITIONAL_LD_LIBRARY_PATH $ENV{ADDITIONAL_LD_LIBRARY_PATH})
+        set(ADDITIONAL_LD_LIBRARY_PATH "${CURRENT_ADDITIONAL_LD_LIBRARY_PATH}:${MAYAUSDAPI_LIBRARY_PATH}")
+        # Export the new value to the environment
+        set(ENV{ADDITIONAL_LD_LIBRARY_PATH} ${ADDITIONAL_LD_LIBRARY_PATH})
+        message(STATUS "ADDITIONAL_LD_LIBRARY_PATH is now : ${ADDITIONAL_LD_LIBRARY_PATH}")
     endif()
-    # Export the new value to the environment
-    set(ENV{MAYA_MODULE_PATH} ${MAYA_MODULE_PATH})
-    message(STATUS "MAYA_MODULE_PATH is now : ${MAYA_MODULE_PATH}")
+
+    if (MAYAUSD_MOD_PATH)
+        #Add MAYAUSD_MOD_PATH (the path where maya USD .mod file is) to the MAYA_MODULE_PATH
+        # Get the current value of the environment variable
+        set(CURRENT_MAYA_MODULE_PATH $ENV{MAYA_MODULE_PATH})
+        # Append the new path to the current value
+        if(IS_MACOSX OR IS_LINUX) 
+            #Linux and OSX
+            set(MAYA_MODULE_PATH "${CURRENT_MAYA_MODULE_PATH}:${MAYAUSD_MOD_PATH}")
+        else()
+            #Windows
+            set(MAYA_MODULE_PATH "${CURRENT_MAYA_MODULE_PATH}\;${MAYAUSD_MOD_PATH}")
+        endif()
+        # Export the new value to the environment
+        set(ENV{MAYA_MODULE_PATH} ${MAYA_MODULE_PATH})
+        message(STATUS "MAYA_MODULE_PATH is now : ${MAYA_MODULE_PATH}")
+    endif()
 endif()
 
 function(mayaUsd_get_unittest_target unittest_target unittest_basename)
@@ -297,7 +312,20 @@ finally:
              list(APPEND MAYAUSD_MATERIALX_SEARCH_PATH
                   "${MTOA_LOCATION}/materialx/targets")
     endif()
-
+    
+    # lookdevx
+    if(DEFINED LOOKDEVX_LOCATION)
+        list(APPEND MAYAUSD_VARNAME_PATH
+             "${LOOKDEVX_LOCATION}/bin")
+        list(APPEND MAYAUSD_VARNAME_PATH
+             "${LOOKDEVX_LOCATION}/plug-ins")
+        list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
+             "${LOOKDEVX_LOCATION}/AEtemplate")
+        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
+             "${LOOKDEVX_LOCATION}/scripts")
+        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
+             "${LOOKDEVX_LOCATION}/python")
+    endif()
 
     if(IS_WINDOWS AND DEFINED ENV{PYTHONHOME})
         # If the environment contains a PYTHONHOME, also set the path to

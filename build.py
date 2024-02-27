@@ -500,11 +500,15 @@ def BuildAndInstall(context, buildArgs, stages):
         
         if context.mayaUsdLocation:
             extraArgs.append('-DMAYAUSD_LOCATION="{mayaUsdLocation}"'
-                             .format(mayaUsdLocation=context.mayaUsdLocation))     
+                             .format(mayaUsdLocation=context.mayaUsdLocation))
         
         if context.mtoaLocation:
-            extraArgs.append('-DMTOAUSD_LOCATION="{mtoaLocation}"'
-                             .format(mtoaLocation=context.mtoaLocation))        
+            extraArgs.append('-DMTOAUSD_LOCATION="{mtoaLocation}"' 
+                             .format(mtoaLocation=context.mtoaLocation))
+        
+        if context.lookdevxLocation:
+            extraArgs.append('-DLOOKDEVX_LOCATION="{lookdevxLocation}"' 
+                             .format(lookdevxLocation=context.lookdevxLocation))
 
         if context.pxrUsdLocation:
             extraArgs.append('-DPXR_USD_LOCATION="{pxrUsdLocation}"'
@@ -578,6 +582,9 @@ parser.add_argument("--mayausd-location", type=str,
 
 parser.add_argument("--mtoa-location", type=str,
                     help="Directory where MtoA is installed.")
+
+parser.add_argument("--lookdevx-location", type=str,
+                    help="Directory where LookdevX is installed.")
                     
 parser.add_argument("--pxrusd-location", type=str,
                     help="Directory where Pixar USD is installed.")
@@ -675,6 +682,10 @@ class InstallContext:
         # MtoA Location
         self.mtoaLocation = (os.path.abspath(args.mtoa_location).replace("\\","/")
                                 if args.mtoa_location else None)
+
+        # LookdevX Location
+        self.lookdevxLocation = (os.path.abspath(args.lookdevx_location).replace("\\","/")
+                                if args.lookdevx_location else None)
         
         # PXR USD Location
         self.pxrUsdLocation = (os.path.abspath(args.pxrusd_location)
