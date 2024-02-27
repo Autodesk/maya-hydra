@@ -1,0 +1,43 @@
+#usda 1.0
+(
+    defaultPrim = "root"
+)
+
+def "root"()
+{
+  def "cube"
+  (
+    references = @./cube1.usda@
+  )
+  {
+    double3 xformOp:translate = (-1, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+  }
+  
+  def "sphere"
+  (
+    references = @./sphere.usda@
+  )
+  {
+    double3 xformOp:translate = (1, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+  }
+  
+  def "cone"
+  (
+    references = @./cone.usda@
+  )
+  {
+    double3 xformOp:translate = (4, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+  }
+  
+  def "cylinder"
+  (
+    references = @./cylinder.usda@
+  )
+  {
+    double3 xformOp:translate = (-4, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+  }
+}

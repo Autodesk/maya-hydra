@@ -26,6 +26,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStandardSurface.py
     testFlowViewportAPI.py
     testStageVariants.py
+    testStagePayloadsReferences.py
     testNurbsPrimitives.py
     testCurveTools.py
     testPolygonPrimitives.py
