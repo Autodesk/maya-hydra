@@ -24,6 +24,8 @@
 #include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/usd/sdf/assetPath.h>
 
+#include <regex>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 // This is the delimiter that Maya uses to identify levels of hierarchy in the
@@ -225,6 +227,16 @@ void SanitizeNameForSdfPath(std::string& inoutPathString, bool doStripNamespaces
     std::replace(inoutPathString.begin(), inoutPathString.end(), ';', '_');
 }
 
+std::string SanitizeNameForSdfPath(
+    const std::string& pathString, 
+    bool doStripNamespaces /* = false */
+)
+{
+    auto rhs = pathString;
+    SanitizeNameForSdfPath(rhs, doStripNamespaces);
+    return rhs;
+}
+
 SdfPath MakeRelativeToParentPath(const SdfPath& path)
 {
     return path.MakeRelativePath(path.GetParentPath());
@@ -253,5 +265,63 @@ void GetDirectionalLightPositionFromDirectionVector(GfVec3f& outPosition, const 
     outPosition = {-farfarAway*direction.data()[0], -farfarAway*direction.data()[1], -farfarAway*direction.data()[2]};
 }
 
+bool splitNumericalSuffix(const std::string& srcName, std::string& base, std::string& suffix)
+{
+    // Compiled regular expression to find a numerical suffix to a path component.
+    // It searches for any number of characters followed by a single non-numeric,
+    // then one or more digits at end of string.
+    const static std::regex re("(.*)([^0-9])([0-9]+)$");
+    base = srcName;
+    std::smatch match;
+    if (std::regex_match(srcName, match, re)) {
+        base = match[1].str() + match[2].str();
+        suffix = match[3].str();
+        return true;
+    }
+    return false;
+}
+
+std::string uniqueName(const TfToken::HashSet& existingNames, std::string srcName)
+{
+    if (existingNames.empty() || (existingNames.count(TfToken(srcName)) == 0u)) {
+        return srcName;
+    }
+
+    std::string base, suffixStr;
+    int         suffix { 1 };
+    size_t      lenSuffix { 1 };
+    if (splitNumericalSuffix(srcName, base, suffixStr)) {
+        lenSuffix = suffixStr.length();
+        suffix = std::stoi(suffixStr) + 1;
+    }
+
+    // Create a suffix string from the number keeping the same number of digits
+    // as numerical suffix from input srcName (padding with 0's if needed).
+    suffixStr = std::to_string(suffix);
+    suffixStr = std::string(lenSuffix - std::min(lenSuffix, suffixStr.length()), '0') + suffixStr;
+    std::string dstName = base + suffixStr;
+    while (existingNames.count(TfToken(dstName)) > 0) {
+        suffixStr = std::to_string(++suffix);
+        suffixStr
+            = std::string(lenSuffix - std::min(lenSuffix, suffixStr.length()), '0') + suffixStr;
+        dstName = base + suffixStr;
+    }
+    return dstName;
+}
+
+PXR_NS::TfToken uniqueChildName(
+    const PXR_NS::HdSceneIndexBaseRefPtr& sceneIndex,
+    const PXR_NS::SdfPath&                parent,
+    const std::string&                    childName
+)
+{
+    auto childPrims = sceneIndex->GetChildPrimPaths(parent);
+    TfToken::HashSet existingNames;
+    for (const auto& child : childPrims) {
+        existingNames.insert(child.GetNameToken());
+    }
+
+    return TfToken(uniqueName(existingNames, childName));
+}
 
 } // namespace MAYAHYDRA_NS_DEF

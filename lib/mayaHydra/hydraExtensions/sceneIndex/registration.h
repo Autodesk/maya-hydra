@@ -111,8 +111,6 @@ private:
     };
     std::unordered_map<MObjectHandle, MayaHydraSceneIndexRegistrationPtr, _HashObjectHandle>
         _registrationsByObjectHandle;
-
-    std::atomic_int _incrementedCounterDisambiguator { 0 };
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

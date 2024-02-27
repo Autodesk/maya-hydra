@@ -65,6 +65,17 @@ MAYAHYDRALIB_API
 void SanitizeNameForSdfPath(std::string& inOutPathString, bool doStripNamespaces = false);
 
 /**
+ * @brief Replaces the invalid characters for SdfPath in \p pathString.
+ *
+ * @param[in] pathString is the path string to sanitize.
+ * @param[in] doStripNamespaces determines whether to strip namespaces or not.
+ *
+ * @return The sanitized version of \p pathString.
+ */
+MAYAHYDRALIB_API
+std::string SanitizeNameForSdfPath(const std::string& pathString, bool doStripNamespaces = false);
+
+/**
  * @brief Get the given SdfPath without its parent path.
  *
  * The result is the last element of the original SdfPath.
@@ -102,6 +113,30 @@ bool GetXformMatrixFromPrim(const PXR_NS::HdSceneIndexPrim& prim, PXR_NS::GfMatr
 
 MAYAHYDRALIB_API
 void GetDirectionalLightPositionFromDirectionVector(PXR_NS::GfVec3f& outPosition, const PXR_NS::GfVec3f& direction);
+
+//! Split the input source name <p srcName> into a base name <p base> and a
+//! numerical suffix (if present) <p suffix>.
+//! Returns true when numerical suffix was found, otherwise false.
+MAYAHYDRALIB_API
+bool splitNumericalSuffix(const std::string& srcName, std::string& base, std::string& suffix);
+
+//! Return a name based on <p srcName> that is not in the set of <p
+//! existingNames>.  If srcName is not in existingNames, it is returned
+//! unchanged.  If it is in existingNames, try to extract a numerical suffix
+//! from srcName (set to 1 if none).  The resulting name is checked against
+//! existingNames, with the suffix incremented until the resulting name is
+//! unique.
+MAYAHYDRALIB_API
+std::string uniqueName(const PXR_NS::TfToken::HashSet& existingNames, std::string srcName);
+
+//! Use uniqueName() to return a name based on <p childName> that is not in the
+//! existing children of <p parent>.
+MAYAHYDRALIB_API
+PXR_NS::TfToken uniqueChildName(
+    const PXR_NS::HdSceneIndexBaseRefPtr& sceneIndex,
+    const PXR_NS::SdfPath&                parent,
+    const std::string&                    childName
+);
 
 } // namespace MAYAHYDRA_NS_DEF
 

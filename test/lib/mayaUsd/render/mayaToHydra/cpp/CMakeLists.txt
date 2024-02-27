@@ -17,6 +17,7 @@ target_sources(${TARGET_NAME}
         testMayaSceneFlattening.cpp
         testMayaUsdUfeItems.cpp
         testMergingSceneIndex.cpp
+        testPathInterface.cpp
         testSelectionSceneIndex.cpp
         testUtils.cpp
         testWireframeSelectionHighlightSceneIndex.cpp
