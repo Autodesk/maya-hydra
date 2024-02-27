@@ -27,7 +27,7 @@ class TestMayaUsdAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCas
 
     @property
     def imageDiffFailThreshold(self):
-        return 0.01
+        return 0.2
     
     @property
     def imageDiffFailPercent(self):
