@@ -132,6 +132,7 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
         ENV
             "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
             "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
+
             "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
 
             # LD_LIBRARY_PATH needs to be set for the idiff executable because its 

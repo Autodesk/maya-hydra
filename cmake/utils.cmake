@@ -90,14 +90,20 @@ endfunction()
 function(mayaUsd_init_rpath rpathRef origin)
     if(NOT IS_ABSOLUTE ${origin})
         if(DEFINED INSTALL_DIR_SUFFIX)
-            set(origin "${CMAKE_INSTALL_PREFIX}/${INSTALL_DIR_SUFFIX}/${origin}")
+            set(prefix "${CMAKE_INSTALL_PREFIX}/${INSTALL_DIR_SUFFIX}")
         else()
-            set(origin "${CMAKE_INSTALL_PREFIX}/${origin}")
+            set(prefix "${CMAKE_INSTALL_PREFIX}")
         endif()
+        # mayaUsd_add_rpath uses REALPATH, so we must make sure we always
+        # do so here too, to get the right relative path
+        # we get REALPATH against prefix directory first as it already existed
+        get_filename_component(prefix "${prefix}" REALPATH)
+        set(origin "${prefix}/${origin}")
+    else()
+        # mayaUsd_add_rpath uses REALPATH, so we must make sure we always
+        # do so here too, to get the right relative path
+        get_filename_component(origin "${origin}" REALPATH)
     endif()
-    # mayaUsd_add_rpath uses REALPATH, so we must make sure we always
-    # do so here too, to get the right relative path
-    get_filename_component(origin "${origin}" REALPATH)
     set(${rpathRef} "${origin}" PARENT_SCOPE)
 endfunction()
 
