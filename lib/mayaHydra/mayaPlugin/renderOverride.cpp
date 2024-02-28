@@ -625,6 +625,28 @@ MStatus MtohRenderOverride::Render(
     // Set Purpose tags
     SetRenderPurposeTags(delegateParams);
 
+    // Maya's default MSAA toggle is set to off and that of Hydra's is on
+    // This code will change the default rendered look and might cause 
+    // some of our unit test to fail.
+    #if 0
+    // Set MSAA as per Maya AntiAliasing settings
+    if (_isUsingHdSt)
+    {  
+        // Maya's MSAA toggle settings
+        bool isMultiSampled = framecontext->getPostEffectEnabled(MHWRender::MFrameContext::kAntiAliasing);
+        
+        // Set MSAA on Color Buffer
+        HdAovDescriptor colorAovDesc = _taskController->GetRenderOutputSettings(HdAovTokens->color);
+        colorAovDesc.multiSampled = isMultiSampled;
+        _taskController->SetRenderOutputSettings(HdAovTokens->color, colorAovDesc);
+        
+        // Set MSAA of Depth buffer
+        HdAovDescriptor depthAovDesc = _taskController->GetRenderOutputSettings(HdAovTokens->depth);
+        depthAovDesc.multiSampled = isMultiSampled;        
+        _taskController->SetRenderOutputSettings(HdAovTokens->depth, depthAovDesc);
+    }
+    #endif
+
     _taskController->SetFreeCameraMatrices(
         GetGfMatrixFromMaya(
             drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx)),
