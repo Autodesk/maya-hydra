@@ -42,21 +42,22 @@ def checkForMayaUsdPlugin():
 def checkForMtoAPlugin():
     return checkForPlugin('mtoa')
 
-class MayaHydraBaseTestCase(unittest.TestCase):
-    '''Base class for mayaHydra unit tests without image comparison.'''
+    class MayaHydraBaseTestCase(unittest.TestCase):
+        '''Base class for mayaHydra unit tests without image comparison.'''
 
-    _file = None
+        _file = None
 
-    DEFAULT_CAM_DIST = 24
+        DEFAULT_CAM_DIST = 24
 
-    @classmethod
-    def setUpClass(cls):
-        if cls._file is None:
-            raise ValueError("Subclasses of MayaHydraBaseTestCase must "
-                             "define `_file = __file__`")
-        # Set up all tests with their own test directory to write out test-specific coverage information
-        fixturesUtils.setUpClass(cls._file, 'mayaHydra',
-                                         initializeStandalone=False)
+        @classmethod
+        def setUpClass(cls):
+            self.set
+            if cls._file is None:
+                raise ValueError("Subclasses of MayaHydraBaseTestCase must "
+                                "define `_file = __file__`")
+            # Set up all tests with their own test directory to write out test-specific coverage information
+            fixturesUtils.setUpClass(cls._file, 'mayaHydra',
+                                            initializeStandalone=False)
         
     def setUp(self):
         # Maya is not closed/reset between each test of a test suite,
@@ -69,7 +70,7 @@ class MayaHydraBaseTestCase(unittest.TestCase):
         cmds.modelEditor(
             self.activeEditor, e=1,
             rendererOverrideName=HD_STORM_OVERRIDE)        
-        #cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", True)
+        cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", True)
         cmds.refresh(f=1)
         self.delegateId = cmds.mayaHydra(renderer=HD_STORM,
                                     sceneDelegateId="MayaHydraSceneDelegate")
@@ -158,6 +159,10 @@ class MtohTestCase(MayaHydraBaseTestCase, ImageDiffingTestCase):
                 inputDirName += 'Test'
             cls._inputDir = os.path.join(inputPath, inputDirName)
 
+        # set HdStorm as default renderer
+        inst = cls()
+        inst.setHdStormRenderer()
+        
         cls._testDir = os.path.abspath('.')
 
     def resolveRefImage(self, refImage, imageVersion):
