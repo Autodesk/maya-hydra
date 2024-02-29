@@ -629,21 +629,21 @@ MStatus MtohRenderOverride::Render(
     // This code will change the default rendered look and might cause 
     // some of our unit test to fail.
     // Set MSAA as per Maya AntiAliasing settings
-    if (_isUsingHdSt)
-    {  
-        // Maya's MSAA toggle settings
-        bool isMultiSampled = framecontext->getPostEffectEnabled(MHWRender::MFrameContext::kAntiAliasing);
+    // if (_isUsingHdSt)
+    // {  
+    //     // Maya's MSAA toggle settings
+    //     bool isMultiSampled = framecontext->getPostEffectEnabled(MHWRender::MFrameContext::kAntiAliasing);
         
-        // Set MSAA on Color Buffer
-        HdAovDescriptor colorAovDesc = _taskController->GetRenderOutputSettings(HdAovTokens->color);
-        colorAovDesc.multiSampled = isMultiSampled;
-        _taskController->SetRenderOutputSettings(HdAovTokens->color, colorAovDesc);
+    //     // Set MSAA on Color Buffer
+    //     HdAovDescriptor colorAovDesc = _taskController->GetRenderOutputSettings(HdAovTokens->color);
+    //     colorAovDesc.multiSampled = isMultiSampled;
+    //     _taskController->SetRenderOutputSettings(HdAovTokens->color, colorAovDesc);
         
-        // Set MSAA of Depth buffer
-        HdAovDescriptor depthAovDesc = _taskController->GetRenderOutputSettings(HdAovTokens->depth);
-        depthAovDesc.multiSampled = isMultiSampled;        
-        _taskController->SetRenderOutputSettings(HdAovTokens->depth, depthAovDesc);
-    }
+    //     // Set MSAA of Depth buffer
+    //     HdAovDescriptor depthAovDesc = _taskController->GetRenderOutputSettings(HdAovTokens->depth);
+    //     depthAovDesc.multiSampled = isMultiSampled;        
+    //     _taskController->SetRenderOutputSettings(HdAovTokens->depth, depthAovDesc);
+    // }
 
     _taskController->SetFreeCameraMatrices(
         GetGfMatrixFromMaya(
