@@ -21,6 +21,7 @@
 
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/imaging/hd/sceneIndex.h>
+#include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 
 #include <maya/MMatrix.h>
@@ -204,6 +205,33 @@ public:
 
 private:
     const std::string _primName;
+};
+
+class RenderItemMeshPrimPredicate
+{
+public:
+    RenderItemMeshPrimPredicate(const std::string& shapeName)
+        : _shapeName(shapeName)
+    {
+    }
+
+    /**
+     * @brief Predicate to match a mesh prim from a render item. This class is to be used as a FindPrimPredicate.
+     *
+     * @param[in] sceneIndex The scene index to test.
+     * @param[in] primPath The prim path to test.
+     *
+     * @return True if the argument prim path's has a parent whose name matches the given shape name, and its primType
+     * is mesh.
+     */
+    bool operator()(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
+    {
+        return primPath.GetParentPath().GetName() == _shapeName
+            && sceneIndex->GetPrim(primPath).primType == HdPrimTypeTokens->mesh;
+    }
+
+private:
+    const std::string _shapeName;
 };
 
 class SceneIndexDisplayNamePred {

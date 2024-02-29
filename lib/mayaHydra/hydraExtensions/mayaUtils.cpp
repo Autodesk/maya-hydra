@@ -24,6 +24,7 @@
 #include <maya/MSelectionList.h>
 #include <maya/MObjectArray.h>
 #include <maya/MFnAttribute.h>
+#include <maya/MFnTransform.h>
 
 namespace
 {
@@ -69,6 +70,26 @@ MStatus GetDagPathFromNodeName(const MString& nodeName, MDagPath& outDagPath)
         status = selectionList.getDagPath(0, outDagPath);
     }
     return status;
+}
+
+MStatus GetWorldPositionFromNodeName(const MString& nodeName, MPoint& worldPosition)
+{
+    MDagPath dagPath;
+    MStatus  status = GetDagPathFromNodeName(nodeName, dagPath);
+    if (!status) {
+        return status;
+    }
+    MFnTransform fnTransform(dagPath, &status);
+    if (!status) {
+        return status;
+    }
+    MVector worldTranslation = fnTransform.getTranslation(MSpace::kWorld, &status);
+    if (!status) {
+        return status;
+    }
+
+    worldPosition = MPoint(worldTranslation);
+    return MS::kSuccess;
 }
 
 MStatus GetMayaMatrixFromDagPath(const MDagPath& dagPath, MMatrix& outMatrix)
