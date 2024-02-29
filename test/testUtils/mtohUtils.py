@@ -51,7 +51,6 @@ class MayaHydraBaseTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        self.set
         if cls._file is None:
             raise ValueError("Subclasses of MayaHydraBaseTestCase must "
                             "define `_file = __file__`")
