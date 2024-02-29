@@ -42,22 +42,22 @@ def checkForMayaUsdPlugin():
 def checkForMtoAPlugin():
     return checkForPlugin('mtoa')
 
-    class MayaHydraBaseTestCase(unittest.TestCase):
-        '''Base class for mayaHydra unit tests without image comparison.'''
+class MayaHydraBaseTestCase(unittest.TestCase):
+    '''Base class for mayaHydra unit tests without image comparison.'''
 
-        _file = None
+    _file = None
 
-        DEFAULT_CAM_DIST = 24
+    DEFAULT_CAM_DIST = 24
 
-        @classmethod
-        def setUpClass(cls):
-            self.set
-            if cls._file is None:
-                raise ValueError("Subclasses of MayaHydraBaseTestCase must "
-                                "define `_file = __file__`")
-            # Set up all tests with their own test directory to write out test-specific coverage information
-            fixturesUtils.setUpClass(cls._file, 'mayaHydra',
-                                            initializeStandalone=False)
+    @classmethod
+    def setUpClass(cls):
+        self.set
+        if cls._file is None:
+            raise ValueError("Subclasses of MayaHydraBaseTestCase must "
+                            "define `_file = __file__`")
+        # Set up all tests with their own test directory to write out test-specific coverage information
+        fixturesUtils.setUpClass(cls._file, 'mayaHydra',
+                                        initializeStandalone=False)
         
     def setUp(self):
         # Maya is not closed/reset between each test of a test suite,
