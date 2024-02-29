@@ -29,6 +29,8 @@
 #include <maya/MSelectionList.h>
 #include <maya/MFnTransform.h>
 #include <maya/MDagPath.h>
+#include <maya/MSelectionList.h>
+#include <maya/MItSelectionList.h>
 
 #include <QApplication>
 #include <QGraphicsView>
@@ -45,10 +47,11 @@ using namespace MayaHydra;
 
 namespace {
 
-void getMouseCoords(std::string nodeName, M3dView& view, QPoint& outMouseCoords)
+void getMouseCoords(std::string nodeName, M3dView& view, QPoint& outMouseCoords, MPoint& outPoint)
 {
     MPoint worldPosition;
     ASSERT_TRUE(GetWorldPositionFromNodeName(MString(nodeName.c_str()), worldPosition));
+    outPoint = worldPosition;
     short mouseX = 0, mouseY = 0;
     MStatus worldToViewStatus;
     // The first assert checks that the point was not clipped, the second checks the general MStatus
@@ -58,7 +61,7 @@ void getMouseCoords(std::string nodeName, M3dView& view, QPoint& outMouseCoords)
     outMouseCoords = QPoint(mouseX, view.portHeight() - mouseY);
 }
 
-void getMouseCoords2(const SceneIndexInspector& sceneIndexInspector, const FindPrimPredicate& primPredicate, M3dView& view, QPoint& outMouseCoords)
+void getMouseCoords2(const SceneIndexInspector& sceneIndexInspector, const FindPrimPredicate& primPredicate, M3dView& view, QPoint& outMouseCoords, MPoint& outPoint)
 {
     PrimEntriesVector prims = sceneIndexInspector.FindPrims(primPredicate);
     ASSERT_EQ(prims.size(), 1u);
@@ -72,7 +75,8 @@ void getMouseCoords2(const SceneIndexInspector& sceneIndexInspector, const FindP
     GfMatrix4d xformMatrix = xformSchema.GetMatrix()->GetTypedValue(0);
     GfVec3d translation = xformMatrix.ExtractTranslation();
 
-    MPoint worldPosition(translation.data());
+    MPoint worldPosition(translation[0], translation[1], translation[2], 1.0);
+    outPoint = worldPosition;
     short   mouseX = 0, mouseY = 0;
     MStatus worldToViewStatus;
     // The first assert checks that the point was not clipped, the second checks the general MStatus
@@ -130,6 +134,20 @@ void mouseMoveTo(QWidget* widget, QPoint localMousePos)
     QApplication::sendEvent(widget, &mouseMoveEvent);
 }
 
+void mouseEnter(QWidget* widget, QPoint localMousePos)
+{
+    QMouseEvent mouseEnterEvent(
+        QEvent::Type::Enter,
+        localMousePos,
+        widget->mapToGlobal(localMousePos),
+        Qt::MouseButton::NoButton,
+        mouseButtons,
+        keyboardModifiers);
+    //QEnterEvent enterEvent()
+    QCursor::setPos(widget->mapToGlobal(localMousePos));
+    QApplication::sendEvent(widget, &mouseEnterEvent);
+}
+
 } // namespace
 
 TEST(TestPicking, clickAndRelease)
@@ -184,17 +202,34 @@ TEST(TestPicking, clickAndReleaseMarquee)
     M3dView active3dView = M3dView::active3dView();
 
     QPoint cubeMouseCoords;
-    //getMouseCoords2(inspector, RenderItemMeshPrimPredicate("pCubeShape1"), active3dView, cubeMouseCoords);
-    getMouseCoords("pCube1", active3dView, cubeMouseCoords);
+    MPoint hydraPoint;
+    MPoint mayaPoint;
+    getMouseCoords2(inspector, RenderItemMeshPrimPredicate("pCubeShape1"), active3dView, cubeMouseCoords, hydraPoint);
+    getMouseCoords("pCube1", active3dView, cubeMouseCoords, mayaPoint);
+    ASSERT_EQ(hydraPoint, mayaPoint);
 
     QPoint torusMouseCoords;
-    //getMouseCoords2(inspector, RenderItemMeshPrimPredicate("pTorusShape1"), active3dView, torusMouseCoords);
-    getMouseCoords("pTorus1", active3dView, torusMouseCoords);
+    getMouseCoords2(inspector, RenderItemMeshPrimPredicate("pTorusShape1"), active3dView, torusMouseCoords, hydraPoint);
+    getMouseCoords("pTorus1", active3dView, torusMouseCoords, mayaPoint);
+    ASSERT_EQ(hydraPoint, mayaPoint);
 
+    //mouseEnter(active3dView.widget(), cubeMouseCoords);
+    //mouseMoveTo(active3dView.widget(), cubeMouseCoords);
     mousePress(Qt::MouseButton::LeftButton, active3dView.widget(), cubeMouseCoords);
     mouseMoveTo(active3dView.widget(), torusMouseCoords);
     mouseRelease(Qt::MouseButton::LeftButton, active3dView.widget(), torusMouseCoords);
 
+    MSelectionList selected;
+    MGlobal::getActiveSelectionList(selected);
+    MItSelectionList iter(selected);
+
+    for (; !iter.isDone(); iter.next()) {
+        MObject object;
+        iter.getDependNode(object);
+        MFnDagNode node(object);
+        MString    name = node.name();
+        std::cout << name.asChar() << std::endl;
+    }
     //mousePress(Qt::MouseButton::LeftButton, active3dView.widget(), cubeMouseCoords);
     //mouseRelease(Qt::MouseButton::LeftButton, active3dView.widget(), torusMouseCoords);
 
