@@ -43,6 +43,11 @@ bool RunFullSceneIndexComparisonTest(pxr::HdSceneIndexBasePtr referenceSceneInde
     AdskHydraSceneBrowserTestFixture::SetReferenceSceneIndex(referenceSceneIndex);
     return RunTestsWithFilter("AdskHydraSceneBrowserTestFixture.FullSceneIndexComparison");
 }
+bool RunSceneCorrectnessTest(pxr::HdSceneIndexBasePtr referenceSceneIndex)
+{
+    AdskHydraSceneBrowserTestFixture::SetReferenceSceneIndex(referenceSceneIndex);
+    return RunTestsWithFilter("AdskHydraSceneBrowserTestFixture.VerifySceneCorrectness");
+}
 } // namespace AdskHydraSceneBrowserTesting
 
 TEST_F(AdskHydraSceneBrowserTestFixture, FullSceneIndexComparison)
@@ -51,4 +56,9 @@ TEST_F(AdskHydraSceneBrowserTestFixture, FullSceneIndexComparison)
     bool compareDataSourceHierarchy = true;
     bool compareDataSourceValues = true;
     ComparePrimHierarchy(compareDataSourceHierarchy, compareDataSourceValues);
+}
+
+TEST_F(AdskHydraSceneBrowserTestFixture, VerifySceneCorrectness)
+{
+    VerifySceneCorrectness();
 }

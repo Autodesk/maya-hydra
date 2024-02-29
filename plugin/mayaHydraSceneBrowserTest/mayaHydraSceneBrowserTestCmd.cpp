@@ -31,6 +31,14 @@ using namespace MAYAHYDRA_NS;
 
 const MString mayaHydraSceneBrowserTestCmd::name("mayaHydraSceneBrowserTest");
 
+namespace {
+void DisplayResult(bool didTestSucceed, const char* testDisplayName)
+{
+    MString testResultString = didTestSucceed ? MString(" test result : PASS") : MString(" test result : FAIL");
+    MGlobal::displayInfo(testDisplayName + testResultString);    
+}
+} // namespace
+
 MStatus mayaHydraSceneBrowserTestCmd::doIt(const MArgList& args)
 {
     // Retrieve the scene index
@@ -44,13 +52,17 @@ MStatus mayaHydraSceneBrowserTestCmd::doIt(const MArgList& args)
     // Run comparison test
     bool didTestSucceed
         = AdskHydraSceneBrowserTesting::RunFullSceneIndexComparisonTest(sceneIndices.front());
+    bool didAllTestsSucceed = didTestSucceed;
+    DisplayResult(didTestSucceed, "Hydra Scene Browser comparison");
 
-    // Display result
-    MString testResultString = didTestSucceed ? MString("PASS") : MString("FAIL");
-    MGlobal::displayInfo("Hydra Scene Browser comparison test result : " + testResultString);
+    // Run correctness test
+    didTestSucceed
+        = AdskHydraSceneBrowserTesting::RunSceneCorrectnessTest(sceneIndices.front());
+    didAllTestsSucceed |= didTestSucceed;
+    DisplayResult(didTestSucceed, "Hydra Scene correctness");
 
     // Return result
-    return didTestSucceed ? MS::kSuccess : MS::kFailure;
+    return didAllTestsSucceed ? MS::kSuccess : MS::kFailure;
 }
 
 MStatus initializePlugin(MObject obj)
