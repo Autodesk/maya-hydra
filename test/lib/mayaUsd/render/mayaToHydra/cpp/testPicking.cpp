@@ -177,6 +177,7 @@ TEST(TestPicking, pickMesh)
     SceneIndexInspector inspector(sceneIndices.front());
 
     auto [argc, argv] = getTestingArgs();
+    ASSERT_EQ(argc, 1);
     const std::string primName(argv[0]);
 
     ensureUnselected(inspector, PrimNamePredicate(primName));

@@ -15,6 +15,7 @@
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
+import unittest
 
 from testUtils import PluginLoaded
 
@@ -27,15 +28,41 @@ class TestPicking(mtohUtils.MtohTestCase):
         self.setHdStormRenderer()
         cmds.refresh()
 
-    def test_Picking(self):
-        cubeName = cmds.polyCube()
+    def test_PickMayaMesh(self):
+        cubeObjectName, _ = cmds.polyCube()
+        cmds.move(1, 2, 3)
         cmds.select(clear=True)
         cmds.refresh()
-        #self.assertSnapshotClose("cube_unselected.png", 0, 0)
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(cubeName, f="TestPicking.pickMesh")
-            #cmds.refresh()
-            #self.assertSnapshotClose("cube_selected.png", 0, 0)
+            cmds.mayaHydraCppTest(cubeObjectName, f="TestPicking.pickMesh")
+
+    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
+    def test_PickUsdMesh(self):
+        import mayaUsd_createStageWithNewLayer
+        import mayaUsd.lib
+        cubeObjectAndNodeNames = cmds.polyCube()
+        cmds.move(1, 2, 3)
+        psPathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        cmds.mayaUsdDuplicate(cmds.ls(cubeObjectAndNodeNames, long=True)[0], psPathStr)
+        cmds.delete(cubeObjectAndNodeNames)
+        cmds.select(clear=True)
+        cmds.refresh()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(cubeObjectAndNodeNames[0], f="TestPicking.pickMesh")
+
+    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
+    def test_PickUsdImplicitSurface(self):
+        import mayaUsd_createStageWithNewLayer
+        import mayaUsd.lib
+        from pxr import UsdGeom, Sdf
+        cubeObjectName = "USDCube"
+        psPathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        stage = mayaUsd.lib.GetPrim(psPathStr).GetStage()
+        UsdGeom.Cube.Define(stage, "/" + cubeObjectName)
+        cmds.select(clear=True)
+        cmds.refresh()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(cubeObjectName, f="TestPicking.pickMesh")
 
     def test_MarqueeSelection(self):
         cmds.polyPlane()
