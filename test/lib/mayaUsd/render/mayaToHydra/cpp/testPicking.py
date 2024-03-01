@@ -14,6 +14,7 @@
 #
 import maya.cmds as cmds
 import fixturesUtils
+import mayaUtils
 import mtohUtils
 import unittest
 
@@ -63,6 +64,15 @@ class TestPicking(mtohUtils.MtohTestCase):
         cmds.refresh()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(cubeObjectName, "mesh", f="TestPicking.pickObject")
+    
+    def test_PickMayaLight(self):
+        lightShapeName = cmds.directionalLight()
+        lightObjectName = cmds.listRelatives(lightShapeName, parent=True)
+        cmds.select(clear=True)
+        cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, displayLights='all')
+        cmds.refresh()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(lightObjectName, "simpleLight", f="TestPicking.pickObject")
 
     def test_MarqueeSelection(self):
         cmds.polyPlane()
