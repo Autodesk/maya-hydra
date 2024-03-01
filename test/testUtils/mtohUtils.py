@@ -63,6 +63,7 @@ class MayaHydraBaseTestCase(unittest.TestCase):
         # so open a new file before each test to minimize leftovers
         # from previous tests.
         cmds.file(new=True, force=True)
+        self.setHdStormRenderer()
 
     def setHdStormRenderer(self):
         self.activeEditor = cmds.playblast(activeEditor=1)
@@ -157,11 +158,7 @@ class MtohTestCase(MayaHydraBaseTestCase, ImageDiffingTestCase):
             if not inputDirName.endswith('Test'):
                 inputDirName += 'Test'
             cls._inputDir = os.path.join(inputPath, inputDirName)
-
-        # set HdStorm as default renderer
-        inst = cls()
-        inst.setHdStormRenderer()
-        
+      
         cls._testDir = os.path.abspath('.')
 
     def resolveRefImage(self, refImage, imageVersion):
