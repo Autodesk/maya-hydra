@@ -207,32 +207,6 @@ private:
     const std::string _primName;
 };
 
-class MeshPrimPredicate
-{
-public:
-    MeshPrimPredicate(const std::string& objectName)
-        : _objectName(objectName)
-    {
-    }
-
-    /**
-     * @brief Predicate to match a mesh prim from the original object's name. This class is to be used as a FindPrimPredicate.
-     *
-     * @param[in] sceneIndex The scene index to test.
-     * @param[in] primPath The prim path to test.
-     *
-     * @return True if the argument prim path's contains the object name, and its prim type is mesh.
-     */
-    bool operator()(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
-    {
-        return primPath.GetAsString().find(_objectName) != std::string::npos
-            && sceneIndex->GetPrim(primPath).primType == HdPrimTypeTokens->mesh;
-    }
-
-private:
-    const std::string _objectName;
-};
-
 class SceneIndexDisplayNamePred {
     const std::string _name;
 public:

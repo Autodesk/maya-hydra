@@ -34,7 +34,7 @@ class TestPicking(mtohUtils.MtohTestCase):
         cmds.select(clear=True)
         cmds.refresh()
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(cubeObjectName, f="TestPicking.pickMesh")
+            cmds.mayaHydraCppTest(cubeObjectName, "mesh", f="TestPicking.pickObject")
 
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_PickUsdMesh(self):
@@ -48,7 +48,7 @@ class TestPicking(mtohUtils.MtohTestCase):
         cmds.select(clear=True)
         cmds.refresh()
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(cubeObjectAndNodeNames[0], f="TestPicking.pickMesh")
+            cmds.mayaHydraCppTest(cubeObjectAndNodeNames[0], "mesh", f="TestPicking.pickObject")
 
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_PickUsdImplicitSurface(self):
@@ -62,7 +62,7 @@ class TestPicking(mtohUtils.MtohTestCase):
         cmds.select(clear=True)
         cmds.refresh()
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(cubeObjectName, f="TestPicking.pickMesh")
+            cmds.mayaHydraCppTest(cubeObjectName, "mesh", f="TestPicking.pickObject")
 
     def test_MarqueeSelection(self):
         cmds.polyPlane()

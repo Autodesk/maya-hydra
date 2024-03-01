@@ -168,21 +168,30 @@ void ensureUnselected(const SceneIndexInspector& inspector, const FindPrimPredic
     }
 }
 
+FindPrimPredicate findPickPrimPredicate(const std::string& objectName, const TfToken& primType)
+{
+    return [objectName, primType](const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath) -> bool {
+        return primPath.GetAsString().find(objectName) != std::string::npos
+            && sceneIndex->GetPrim(primPath).primType == primType;
+    };
+}
+
 } // namespace
 
-TEST(TestPicking, pickMesh)
+TEST(TestPicking, pickObject)
 {
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
     auto [argc, argv] = getTestingArgs();
-    ASSERT_EQ(argc, 1);
-    const std::string primName(argv[0]);
+    ASSERT_EQ(argc, 2);
+    const std::string objectName(argv[0]);
+    const TfToken primType(argv[1]);
 
-    ensureUnselected(inspector, PrimNamePredicate(primName));
+    ensureUnselected(inspector, PrimNamePredicate(objectName));
 
-    PrimEntriesVector prims = inspector.FindPrims(MeshPrimPredicate(primName));
+    PrimEntriesVector prims = inspector.FindPrims(findPickPrimPredicate(objectName, primType));
     ASSERT_EQ(prims.size(), 1u);
 
     M3dView active3dView = M3dView::active3dView();
@@ -195,7 +204,7 @@ TEST(TestPicking, pickMesh)
 
     active3dView.refresh();
 
-    ensureSelected(inspector, PrimNamePredicate(primName));
+    ensureSelected(inspector, PrimNamePredicate(objectName));
 }
 
 TEST(TestPicking, marqueeSelection)
@@ -209,12 +218,12 @@ TEST(TestPicking, marqueeSelection)
 
     M3dView active3dView = M3dView::active3dView();
 
-    PrimEntriesVector cubeMeshPrims = inspector.FindPrims(MeshPrimPredicate(cubePrimName));
+    PrimEntriesVector cubeMeshPrims = inspector.FindPrims(findPickPrimPredicate(cubePrimName, HdPrimTypeTokens->mesh));
     ASSERT_EQ(cubeMeshPrims.size(), 1u);
     QPoint cubeMouseCoords;
     getPrimMouseCoords(cubeMeshPrims.front().prim, active3dView, cubeMouseCoords);
 
-    PrimEntriesVector torusMeshPrims = inspector.FindPrims(MeshPrimPredicate(torusPrimName));
+    PrimEntriesVector torusMeshPrims = inspector.FindPrims(findPickPrimPredicate(torusPrimName, HdPrimTypeTokens->mesh));
     ASSERT_EQ(torusMeshPrims.size(), 1u);
     QPoint torusMouseCoords;
     getPrimMouseCoords(torusMeshPrims.front().prim, active3dView, torusMouseCoords);
