@@ -207,31 +207,30 @@ private:
     const std::string _primName;
 };
 
-class RenderItemMeshPrimPredicate
+class MeshPrimPredicate
 {
 public:
-    RenderItemMeshPrimPredicate(const std::string& primName)
-        : _primName(primName)
+    MeshPrimPredicate(const std::string& objectName)
+        : _objectName(objectName)
     {
     }
 
     /**
-     * @brief Predicate to match a mesh prim from a render item. This class is to be used as a FindPrimPredicate.
+     * @brief Predicate to match a mesh prim from the original object's name. This class is to be used as a FindPrimPredicate.
      *
      * @param[in] sceneIndex The scene index to test.
      * @param[in] primPath The prim path to test.
      *
-     * @return True if the argument prim path's has a parent whose name matches the given shape name, and its primType
-     * is mesh.
+     * @return True if the argument prim path's contains the object name, and its prim type is mesh.
      */
     bool operator()(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
     {
-        return primPath.GetParentPath().GetParentPath().GetName() == _primName
+        return primPath.GetAsString().find(_objectName) != std::string::npos
             && sceneIndex->GetPrim(primPath).primType == HdPrimTypeTokens->mesh;
     }
 
 private:
-    const std::string _primName;
+    const std::string _objectName;
 };
 
 class SceneIndexDisplayNamePred {

@@ -28,14 +28,14 @@ class TestPicking(mtohUtils.MtohTestCase):
         cmds.refresh()
 
     def test_Picking(self):
-        cmds.polyCube()
+        cubeName = cmds.polyCube()
         cmds.select(clear=True)
         cmds.refresh()
-        self.assertSnapshotClose("cube_unselected.png", 0, 0)
+        #self.assertSnapshotClose("cube_unselected.png", 0, 0)
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(f="TestPicking.clickAndRelease")
-            cmds.refresh()
-            self.assertSnapshotClose("cube_selected.png", 0, 0)
+            cmds.mayaHydraCppTest(cubeName, f="TestPicking.pickMesh")
+            #cmds.refresh()
+            #self.assertSnapshotClose("cube_selected.png", 0, 0)
 
     def test_MarqueeSelection(self):
         cmds.polyPlane()

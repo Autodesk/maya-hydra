@@ -170,47 +170,31 @@ void ensureUnselected(const SceneIndexInspector& inspector, const FindPrimPredic
 
 } // namespace
 
-TEST(TestPicking, clickAndRelease)
+TEST(TestPicking, pickMesh)
 {
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
-    auto active3dView = M3dView::active3dView();
-    auto active3dViewWidget = active3dView.widget();
-    std::cout << "DBP-DBG (active3dViewWidget) : "
-              << active3dViewWidget->objectName().toStdString()
-              << std::endl;
-    active3dViewWidget->dumpObjectInfo();
-    active3dViewWidget->dumpObjectTree();
-    std::cout << "QWidget dims : " << active3dViewWidget->width() << " x " << active3dViewWidget->height();
-    std::cout << "M3dView port dims : " << active3dView.portWidth() << " x " << active3dView.portHeight();
-    std::cout << "M3dView playblast dims : " << active3dView.playblastPortWidth() << " x " << active3dView.playblastPortHeight();
-    
-    QPoint mousePos = QPoint(active3dViewWidget->width() / 2, active3dViewWidget->height() / 2);
-    QCursor::setPos(active3dViewWidget->mapToGlobal(mousePos));
-    QMouseEvent mousePressEvent(
-        QEvent::MouseButtonPress,
-        mousePos,
-        active3dViewWidget->mapToGlobal(mousePos),
-        Qt::MouseButton::LeftButton,
-        Qt::MouseButton::NoButton,
-        Qt::KeyboardModifier::NoModifier);
-    QApplication::sendEvent(active3dViewWidget, &mousePressEvent);
-    QMouseEvent mouseReleaseEvent(
-        QEvent::MouseButtonRelease,
-        mousePos,
-        active3dViewWidget->mapToGlobal(mousePos),
-        Qt::MouseButton::LeftButton,
-        Qt::MouseButton::NoButton,
-        Qt::KeyboardModifier::NoModifier);
-    QApplication::sendEvent(active3dViewWidget, &mouseReleaseEvent);
+    auto [argc, argv] = getTestingArgs();
+    const std::string primName(argv[0]);
 
+    ensureUnselected(inspector, PrimNamePredicate(primName));
 
-    /*QApplication::postEvent(active3dViewWidget, &mouseReleaseEvent);
-    QApplication::processEvents(QEventLoop::ProcessEventsFlag::EventLoopExec);
-    QCoreApplication* app = QApplication::instance();
-    app->notify(active3dViewWidget, &mouseReleaseEvent);*/
+    PrimEntriesVector prims = inspector.FindPrims(MeshPrimPredicate(primName));
+    ASSERT_EQ(prims.size(), 1u);
+
+    M3dView active3dView = M3dView::active3dView();
+
+    QPoint primMouseCoords;
+    getPrimMouseCoords(prims.front().prim, active3dView, primMouseCoords);
+
+    mousePress(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
+    mouseRelease(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
+
+    active3dView.refresh();
+
+    ensureSelected(inspector, PrimNamePredicate(primName));
 }
 
 TEST(TestPicking, marqueeSelection)
@@ -224,12 +208,12 @@ TEST(TestPicking, marqueeSelection)
 
     M3dView active3dView = M3dView::active3dView();
 
-    PrimEntriesVector cubeMeshPrims = inspector.FindPrims(RenderItemMeshPrimPredicate(cubePrimName));
+    PrimEntriesVector cubeMeshPrims = inspector.FindPrims(MeshPrimPredicate(cubePrimName));
     ASSERT_EQ(cubeMeshPrims.size(), 1u);
     QPoint cubeMouseCoords;
     getPrimMouseCoords(cubeMeshPrims.front().prim, active3dView, cubeMouseCoords);
 
-    PrimEntriesVector torusMeshPrims = inspector.FindPrims(RenderItemMeshPrimPredicate(torusPrimName));
+    PrimEntriesVector torusMeshPrims = inspector.FindPrims(MeshPrimPredicate(torusPrimName));
     ASSERT_EQ(torusMeshPrims.size(), 1u);
     QPoint torusMouseCoords;
     getPrimMouseCoords(torusMeshPrims.front().prim, active3dView, torusMouseCoords);
