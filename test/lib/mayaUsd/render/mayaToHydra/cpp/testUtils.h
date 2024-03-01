@@ -210,8 +210,8 @@ private:
 class RenderItemMeshPrimPredicate
 {
 public:
-    RenderItemMeshPrimPredicate(const std::string& shapeName)
-        : _shapeName(shapeName)
+    RenderItemMeshPrimPredicate(const std::string& primName)
+        : _primName(primName)
     {
     }
 
@@ -226,12 +226,12 @@ public:
      */
     bool operator()(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
     {
-        return primPath.GetParentPath().GetName() == _shapeName
+        return primPath.GetParentPath().GetParentPath().GetName() == _primName
             && sceneIndex->GetPrim(primPath).primType == HdPrimTypeTokens->mesh;
     }
 
 private:
-    const std::string _shapeName;
+    const std::string _primName;
 };
 
 class SceneIndexDisplayNamePred {

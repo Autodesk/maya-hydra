@@ -18,11 +18,15 @@
 #include <mayaHydraLib/hydraUtils.h>
 #include <mayaHydraLib/mayaUtils.h>
 
+#include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
+
 #include <pxr/imaging/hd/basisCurvesSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/xformSchema.h>
+#include <pxr/imaging/hd/selectionSchema.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
 
 #include <maya/M3dView.h>
 #include <maya/MGlobal.h>
@@ -47,26 +51,9 @@ using namespace MayaHydra;
 
 namespace {
 
-void getMouseCoords(std::string nodeName, M3dView& view, QPoint& outMouseCoords, MPoint& outPoint)
+void getPrimMouseCoords(const HdSceneIndexPrim& prim, M3dView& view, QPoint& outMouseCoords)
 {
-    MPoint worldPosition;
-    ASSERT_TRUE(GetWorldPositionFromNodeName(MString(nodeName.c_str()), worldPosition));
-    outPoint = worldPosition;
-    short mouseX = 0, mouseY = 0;
-    MStatus worldToViewStatus;
-    // The first assert checks that the point was not clipped, the second checks the general MStatus
-    ASSERT_TRUE(view.worldToView(worldPosition, mouseX, mouseY, &worldToViewStatus));
-    ASSERT_TRUE(worldToViewStatus);
-    // Qt and M3dView use opposite Y-coordinates
-    outMouseCoords = QPoint(mouseX, view.portHeight() - mouseY);
-}
-
-void getMouseCoords2(const SceneIndexInspector& sceneIndexInspector, const FindPrimPredicate& primPredicate, M3dView& view, QPoint& outMouseCoords, MPoint& outPoint)
-{
-    PrimEntriesVector prims = sceneIndexInspector.FindPrims(primPredicate);
-    ASSERT_EQ(prims.size(), 1u);
-
-    HdDataSourceBaseHandle xformDataSource = HdContainerDataSource::Get(prims.front().prim.dataSource, HdXformSchema::GetDefaultLocator());
+    HdDataSourceBaseHandle xformDataSource = HdContainerDataSource::Get(prim.dataSource, HdXformSchema::GetDefaultLocator());
     ASSERT_NE(xformDataSource, nullptr);
     HdContainerDataSourceHandle xformContainerDataSource = HdContainerDataSource::Cast(xformDataSource);
     ASSERT_NE(xformContainerDataSource, nullptr);
@@ -76,15 +63,14 @@ void getMouseCoords2(const SceneIndexInspector& sceneIndexInspector, const FindP
     GfVec3d translation = xformMatrix.ExtractTranslation();
 
     MPoint worldPosition(translation[0], translation[1], translation[2], 1.0);
-    outPoint = worldPosition;
-    short   mouseX = 0, mouseY = 0;
+    short   viewportX = 0, viewportY = 0;
     MStatus worldToViewStatus;
-    // The first assert checks that the point was not clipped, the second checks the general MStatus
-    ASSERT_TRUE(view.worldToView(worldPosition, mouseX, mouseY, &worldToViewStatus));
+    // First assert checks that the point was not clipped, second assert checks the general MStatus
+    ASSERT_TRUE(view.worldToView(worldPosition, viewportX, viewportY, &worldToViewStatus));
     ASSERT_TRUE(worldToViewStatus);
 
     // Qt and M3dView use opposite Y-coordinates
-    outMouseCoords = QPoint(mouseX, view.portHeight() - mouseY);
+    outMouseCoords = QPoint(viewportX, view.portHeight() - viewportY);
 }
 
 Qt::MouseButtons mouseButtons;
@@ -134,18 +120,52 @@ void mouseMoveTo(QWidget* widget, QPoint localMousePos)
     QApplication::sendEvent(widget, &mouseMoveEvent);
 }
 
-void mouseEnter(QWidget* widget, QPoint localMousePos)
+//void mouseEnter(QWidget* widget, QPoint localMousePos)
+//{
+//    QMouseEvent mouseEnterEvent(
+//        QEvent::Type::Enter,
+//        localMousePos,
+//        widget->mapToGlobal(localMousePos),
+//        Qt::MouseButton::NoButton,
+//        mouseButtons,
+//        keyboardModifiers);
+//    //QEnterEvent enterEvent()
+//    QCursor::setPos(widget->mapToGlobal(localMousePos));
+//    QApplication::sendEvent(widget, &mouseEnterEvent);
+//}
+
+void ensureSelected(const SceneIndexInspector& inspector, const FindPrimPredicate& primPredicate)
 {
-    QMouseEvent mouseEnterEvent(
-        QEvent::Type::Enter,
-        localMousePos,
-        widget->mapToGlobal(localMousePos),
-        Qt::MouseButton::NoButton,
-        mouseButtons,
-        keyboardModifiers);
-    //QEnterEvent enterEvent()
-    QCursor::setPos(widget->mapToGlobal(localMousePos));
-    QApplication::sendEvent(widget, &mouseEnterEvent);
+    // 2024-03-01 : Due to the extra "Lighted" hierarchy, it is possible for two different prims to
+    // have the same name, only one of which being selected. We will tolerate this in the test, but 
+    // we'll make sure there are at most two prims with the same name. We'll also allow a prim not 
+    // to have any selections, but there must be at least one prim selected.
+    PrimEntriesVector primEntries = inspector.FindPrims(primPredicate);
+    ASSERT_GE(primEntries.size(), 1u);
+    ASSERT_LE(primEntries.size(), 2u);
+
+    size_t nbSelectedPrims = 0;
+    for (const auto& primEntry : primEntries) {
+        HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(primEntry.prim.dataSource);
+        if (selectionsSchema.GetNumElements() > 0u) {
+            ASSERT_EQ(selectionsSchema.GetNumElements(), 1u);
+            HdSelectionSchema selectionSchema = selectionsSchema.GetElement(0);
+            EXPECT_TRUE(selectionSchema.GetFullySelected());
+            nbSelectedPrims++;
+        }
+    }
+
+    ASSERT_GT(nbSelectedPrims, 0u);
+}
+
+void ensureUnselected(const SceneIndexInspector& inspector, const FindPrimPredicate& primPredicate)
+{
+    PrimEntriesVector primEntries = inspector.FindPrims(primPredicate);
+    for (const auto& primEntry : primEntries) {
+        HdSelectionsSchema selectionsSchema
+            = HdSelectionsSchema::GetFromParent(primEntry.prim.dataSource);
+        ASSERT_EQ(selectionsSchema.IsDefined(), false);
+    }
 }
 
 } // namespace
@@ -193,105 +213,36 @@ TEST(TestPicking, clickAndRelease)
     app->notify(active3dViewWidget, &mouseReleaseEvent);*/
 }
 
-TEST(TestPicking, clickAndReleaseMarquee)
+TEST(TestPicking, marqueeSelection)
 {
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
+    const std::string cubePrimName("pCube1");
+    const std::string torusPrimName("pTorus1");
+
     M3dView active3dView = M3dView::active3dView();
 
+    PrimEntriesVector cubeMeshPrims = inspector.FindPrims(RenderItemMeshPrimPredicate(cubePrimName));
+    ASSERT_EQ(cubeMeshPrims.size(), 1u);
     QPoint cubeMouseCoords;
-    MPoint hydraPoint;
-    MPoint mayaPoint;
-    getMouseCoords2(inspector, RenderItemMeshPrimPredicate("pCubeShape1"), active3dView, cubeMouseCoords, hydraPoint);
-    getMouseCoords("pCube1", active3dView, cubeMouseCoords, mayaPoint);
-    ASSERT_EQ(hydraPoint, mayaPoint);
+    getPrimMouseCoords(cubeMeshPrims.front().prim, active3dView, cubeMouseCoords);
 
+    PrimEntriesVector torusMeshPrims = inspector.FindPrims(RenderItemMeshPrimPredicate(torusPrimName));
+    ASSERT_EQ(torusMeshPrims.size(), 1u);
     QPoint torusMouseCoords;
-    getMouseCoords2(inspector, RenderItemMeshPrimPredicate("pTorusShape1"), active3dView, torusMouseCoords, hydraPoint);
-    getMouseCoords("pTorus1", active3dView, torusMouseCoords, mayaPoint);
-    ASSERT_EQ(hydraPoint, mayaPoint);
+    getPrimMouseCoords(torusMeshPrims.front().prim, active3dView, torusMouseCoords);
 
-    //mouseEnter(active3dView.widget(), cubeMouseCoords);
-    //mouseMoveTo(active3dView.widget(), cubeMouseCoords);
+    ensureUnselected(inspector, PrimNamePredicate(cubePrimName));
+    ensureUnselected(inspector, PrimNamePredicate(torusPrimName));
+
     mousePress(Qt::MouseButton::LeftButton, active3dView.widget(), cubeMouseCoords);
     mouseMoveTo(active3dView.widget(), torusMouseCoords);
     mouseRelease(Qt::MouseButton::LeftButton, active3dView.widget(), torusMouseCoords);
 
-    MSelectionList selected;
-    MGlobal::getActiveSelectionList(selected);
-    MItSelectionList iter(selected);
+    active3dView.refresh();
 
-    for (; !iter.isDone(); iter.next()) {
-        MObject object;
-        iter.getDependNode(object);
-        MFnDagNode node(object);
-        MString    name = node.name();
-        std::cout << name.asChar() << std::endl;
-    }
-    //mousePress(Qt::MouseButton::LeftButton, active3dView.widget(), cubeMouseCoords);
-    //mouseRelease(Qt::MouseButton::LeftButton, active3dView.widget(), torusMouseCoords);
-
-        
-    /*MPoint worldPos;
-    ASSERT_TRUE(getPosition(MString("pCube1"), worldPos));
-    short                                   x, y;
-    active3dView.worldToView(worldPos, x, y);
-    auto active3dViewWidget = active3dView.widget();*/
-    //active3dViewWidget->parentWidget()->parentWidget()->parentWidget()->resize(1000, 500);
-    /*std::cout << "DBP-DBG (active3dViewWidget) : " << active3dViewWidget->objectName().toStdString()
-              << std::endl;
-    active3dViewWidget->dumpObjectInfo();
-    active3dViewWidget->dumpObjectTree();
-    std::cout << "QWidget dims : " << active3dViewWidget->width() << " x "
-              << active3dViewWidget->height();
-    std::cout << "M3dView port dims : " << active3dView.portWidth() << " x "
-              << active3dView.portHeight();
-    std::cout << "M3dView playblast dims : " << active3dView.playblastPortWidth() << " x "
-              << active3dView.playblastPortHeight();*/
-
-    /*QWidget* parent = active3dViewWidget->parentWidget();
-    while (parent) {
-        std::cout << "DBP-DBG (parent) : " << parent->objectName().toStdString()
-                  << std::endl;
-        parent->dumpObjectInfo();
-        parent->dumpObjectTree();
-        std::cout << "QWidget dims : " << parent->width() << " x " << parent->height();
-        parent = parent->parentWidget();
-    }*/
-
-    //QPoint mousePos = QPoint(active3dViewWidget->width() / 2 - 250, active3dViewWidget->height() / 2);
-    //QPoint mousePos = QPoint(x, active3dView.portHeight() - y);
-    //click(active3dViewWidget, mousePos);
-    /*QCursor::setPos(active3dViewWidget->mapToGlobal(mousePos));
-    QMouseEvent mousePressEvent(
-        QEvent::MouseButtonPress,
-        mousePos,
-        active3dViewWidget->mapToGlobal(mousePos),
-        Qt::MouseButton::LeftButton,
-        Qt::MouseButton::NoButton,
-        Qt::KeyboardModifier::NoModifier);
-    QApplication::sendEvent(active3dViewWidget, &mousePressEvent);
-    QMouseEvent mouseMoveEvent(
-        QEvent::MouseMove,
-        mousePos,
-        active3dViewWidget->mapToGlobal(mousePos),
-        Qt::MouseButton::LeftButton,
-        Qt::MouseButton::NoButton,
-        Qt::KeyboardModifier::NoModifier
-    )
-    QMouseEvent mouseReleaseEvent(
-        QEvent::MouseButtonRelease,
-        mousePos,
-        active3dViewWidget->mapToGlobal(mousePos),
-        Qt::MouseButton::LeftButton,
-        Qt::MouseButton::NoButton,
-        Qt::KeyboardModifier::NoModifier);
-    QApplication::sendEvent(active3dViewWidget, &mouseReleaseEvent);*/
-
-    /*QApplication::postEvent(active3dViewWidget, &mouseReleaseEvent);
-    QApplication::processEvents(QEventLoop::ProcessEventsFlag::EventLoopExec);
-    QCoreApplication* app = QApplication::instance();
-    app->notify(active3dViewWidget, &mouseReleaseEvent);*/
+    ensureSelected(inspector, PrimNamePredicate(cubePrimName));
+    ensureSelected(inspector, PrimNamePredicate(torusPrimName));
 }

@@ -37,7 +37,7 @@ class TestPicking(mtohUtils.MtohTestCase):
             cmds.refresh()
             self.assertSnapshotClose("cube_selected.png", 0, 0)
 
-    def test_MarqueeSelect(self):
+    def test_MarqueeSelection(self):
         cmds.polyPlane()
         cmds.move(-5, 0, 5)
         cmds.rotate(45, -25, -60)
@@ -52,11 +52,11 @@ class TestPicking(mtohUtils.MtohTestCase):
         self.setBasicCam(10)
         cmds.select(clear=True)
         cmds.refresh()
-        self.assertSnapshotClose("marquee_before.png", 0, 0)
+        #self.assertSnapshotClose("marquee_before.png", 0, 0)
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(f="TestPicking.clickAndReleaseMarquee")
+            cmds.mayaHydraCppTest(f="TestPicking.marqueeSelection")
             cmds.refresh()
-            self.assertSnapshotClose("marquee_after.png", 0, 0)
+            #self.assertSnapshotClose("marquee_after.png", 0, 0)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
