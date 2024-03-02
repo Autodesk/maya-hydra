@@ -49,6 +49,10 @@ class TestMayaDisplayLayers(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
 
     def test_MayaDisplayLayers(self):
 
+        # set HdStorm as renderer
+        self.setHdStormRenderer()
+
+        #set up the scene
         sphere = cmds.sphere( n='sphere1' )
         cone = cmds.cone( n='cone1' )
         cmds.move( 1, 5, 1 )
