@@ -224,6 +224,7 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
     , _mayaSelectionObserver(std::make_shared<SelectionObserver>(*this))
     , _isUsingHdSt(desc.rendererName == MtohTokens->HdStormRendererPlugin)
 {
+    std::cout <<"\n\nMtohRenderOverride::MtohRenderOverride &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n\n";
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg(
             "MtohRenderOverride created (%s - %s - %s)\n",
