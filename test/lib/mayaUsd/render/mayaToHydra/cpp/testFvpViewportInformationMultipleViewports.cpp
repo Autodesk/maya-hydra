@@ -64,15 +64,15 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports2Viewports)
     //Get all Hydra viewports information
     Fvp::InformationInterface::ViewportInformationSet allViewportsInformation;
     informationInterface.GetViewportsInformation(allViewportsInformation);
-    //ASSERT_EQ(allViewportsInformation.size(), (size_t)3); //we should have 2 Hydra viewports
+    ASSERT_EQ(allViewportsInformation.size(), (size_t)3); //we should have 2 Hydra viewports
 
     //Check renderers name, they all should be Storm
     for (auto info : allViewportsInformation){
         ASSERT_EQ(info._rendererName, _stormRendererName);
     }
 
-//     ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 2);//Has been called twice
-//     ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 0);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 2);//Has been called twice
+    ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 0);
 }
 
 //Step 3 : the python script removed hydra from 1 of the 2 viewports
