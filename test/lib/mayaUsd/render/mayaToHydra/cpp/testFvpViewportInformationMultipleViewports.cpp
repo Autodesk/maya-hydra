@@ -73,7 +73,7 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports2Viewports)
 
 //     ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 2);//Has been called twice
 //     ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 0);
-// }
+}
 
 //Step 3 : the python script removed hydra from 1 of the 2 viewports
 //and _infoClientTest is registered in Fvp::InformationInterface so InfoClientTest::SceneIndexRemoved should be have been called once
