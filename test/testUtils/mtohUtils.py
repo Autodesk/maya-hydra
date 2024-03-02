@@ -70,7 +70,7 @@ class MayaHydraBaseTestCase(unittest.TestCase):
         cmds.modelEditor(
             self.activeEditor, e=1,
             rendererOverrideName=HD_STORM_OVERRIDE)        
-        #cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", True)
+        cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", True)
         cmds.refresh(f=1)
         self.delegateId = cmds.mayaHydra(renderer=HD_STORM,
                                     sceneDelegateId="MayaHydraSceneDelegate")
