@@ -273,7 +273,6 @@ void mouseMoveTo(QWidget* widget, QPoint localMousePos)
         mouseButtons,
         keyboardModifiers);
 
-    QCursor::setPos(widget->mapToGlobal(localMousePos));
     QApplication::sendEvent(widget, &mouseMoveEvent);
 }
 
@@ -288,7 +287,6 @@ void mousePress(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMouseP
         keyboardModifiers);
     mouseButtons |= mouseButton;
 
-    QCursor::setPos(widget->mapToGlobal(localMousePos));
     QApplication::sendEvent(widget, &mousePressEvent);
 }
 
@@ -303,7 +301,6 @@ void mouseRelease(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMous
         mouseButtons,
         keyboardModifiers);
 
-    QCursor::setPos(widget->mapToGlobal(localMousePos));
     QApplication::sendEvent(widget, &mouseReleaseEvent);
 }
 
