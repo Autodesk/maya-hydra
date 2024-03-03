@@ -59,17 +59,21 @@ class TestPicking(mtohUtils.MtohTestCase):
         from pxr import UsdGeom
         objectName = "USDCube"
         stage = mayaUsd.lib.GetPrim(stagePath).GetStage()
-        UsdGeom.Cube.Define(stage, "/" + objectName)
+        xform = UsdGeom.Xform.Define(stage, "/" + objectName + "Xform")
+        xform.AddTranslateOp().Set(value=(0.0, 1.0, 2.0))
+        UsdGeom.Cube.Define(stage, str(xform.GetPath()) + "/" + objectName)
         cmds.select(clear=True)
         cmds.refresh()
         return objectName
     
     def createUsdRectLight(self, stagePath):
         import mayaUsd.lib
-        from pxr import UsdLux
+        from pxr import UsdGeom, UsdLux
         objectName = "USDRectLight"
         stage = mayaUsd.lib.GetPrim(stagePath).GetStage()
-        UsdLux.RectLight.Define(stage, "/" + objectName)
+        xform = UsdGeom.Xform.Define(stage, "/" + objectName + "Xform")
+        xform.AddTranslateOp().Set(value=(-3.0, -0.5, 1.0))
+        UsdLux.RectLight.Define(stage, str(xform.GetPath()) + "/" + objectName)
         cmds.select(clear=True)
         cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, displayLights='all')
         cmds.refresh()
