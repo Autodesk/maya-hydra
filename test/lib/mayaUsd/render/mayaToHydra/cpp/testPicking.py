@@ -30,11 +30,11 @@ class TestPicking(mtohUtils.MtohTestCase):
         cmds.refresh()
 
     def createMayaCube(self):
-        objectAndNodeNames = cmds.polyCube()
+        objectName = cmds.polyCube()[0]
         cmds.move(1, 2, 3)
         cmds.select(clear=True)
         cmds.refresh()
-        return objectAndNodeNames[0]
+        return objectName
     
     def createMayaDirectionalLight(self):
         shapeName = cmds.directionalLight()
@@ -46,13 +46,13 @@ class TestPicking(mtohUtils.MtohTestCase):
         return objectName
 
     def createUsdCubeFromMaya(self, stagePath):
-        objectAndNodeNames = cmds.polyCube()
+        objectName = cmds.polyCube()[0]
         cmds.move(-4, 3, -2)
-        cmds.mayaUsdDuplicate(cmds.ls(objectAndNodeNames, long=True)[0], stagePath)
-        cmds.delete(objectAndNodeNames)
+        cmds.mayaUsdDuplicate(cmds.ls(objectName, long=True)[0], stagePath)
+        cmds.delete(objectName)
         cmds.select(clear=True)
         cmds.refresh()
-        return objectAndNodeNames[0]
+        return objectName
     
     def createUsdCube(self, stagePath):
         import mayaUsd.lib
