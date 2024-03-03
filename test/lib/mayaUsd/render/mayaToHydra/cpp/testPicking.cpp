@@ -207,36 +207,63 @@ TEST(TestPicking, pickObject)
     ensureSelected(inspector, PrimNamePredicate(objectName));
 }
 
-TEST(TestPicking, marqueeSelection)
+TEST(TestPicking, marqueeSelect)
 {
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
-    const std::string cubePrimName("pCube1");
-    const std::string torusPrimName("pTorus1");
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_TRUE(argc % 2 == 0); // Each object is identified by both its name and a type
+    ASSERT_TRUE(argc >= 4); // We need at least two objects to do the marquee selection
+    std::vector<std::pair<std::string, TfToken>> objectsToSelect;
+    for (size_t iArg = 0; iArg < argc; iArg += 2) {
+        objectsToSelect.push_back(std::make_pair(std::string(argv[iArg]), TfToken(argv[iArg + 1])));
+    }
+
+    for (const auto& object : objectsToSelect) {
+        ensureUnselected(inspector, PrimNamePredicate(object.first));
+    }
 
     M3dView active3dView = M3dView::active3dView();
 
-    PrimEntriesVector cubeMeshPrims = inspector.FindPrims(findPickPrimPredicate(cubePrimName, HdPrimTypeTokens->mesh));
-    ASSERT_EQ(cubeMeshPrims.size(), 1u);
-    QPoint cubeMouseCoords;
-    getPrimMouseCoords(cubeMeshPrims.front().prim, active3dView, cubeMouseCoords);
+    PrimEntriesVector initialPrimEntries = inspector.FindPrims(
+        findPickPrimPredicate(objectsToSelect.front().first, objectsToSelect.front().second));
+    ASSERT_EQ(initialPrimEntries.size(), 1u);
+    QPoint initialMouseCoords;
+    getPrimMouseCoords(initialPrimEntries.front().prim, active3dView, initialMouseCoords);
 
-    PrimEntriesVector torusMeshPrims = inspector.FindPrims(findPickPrimPredicate(torusPrimName, HdPrimTypeTokens->mesh));
-    ASSERT_EQ(torusMeshPrims.size(), 1u);
-    QPoint torusMouseCoords;
-    getPrimMouseCoords(torusMeshPrims.front().prim, active3dView, torusMouseCoords);
+    QPoint topLeftMouseCoords = initialMouseCoords;
+    QPoint bottomRightMouseCoords = initialMouseCoords;
 
-    ensureUnselected(inspector, PrimNamePredicate(cubePrimName));
-    ensureUnselected(inspector, PrimNamePredicate(torusPrimName));
+    for (size_t iObject = 1; iObject < objectsToSelect.size(); iObject++) {
+        PrimEntriesVector objectPrims = inspector.FindPrims(
+            findPickPrimPredicate(objectsToSelect[iObject].first, objectsToSelect[iObject].second));
+        ASSERT_EQ(objectPrims.size(), 1u);
+        QPoint objectMouseCoords;
+        getPrimMouseCoords(objectPrims.front().prim, active3dView, objectMouseCoords);
 
-    mousePress(Qt::MouseButton::LeftButton, active3dView.widget(), cubeMouseCoords);
-    mouseMoveTo(active3dView.widget(), torusMouseCoords);
-    mouseRelease(Qt::MouseButton::LeftButton, active3dView.widget(), torusMouseCoords);
+        if (objectMouseCoords.x() > bottomRightMouseCoords.x()) {
+            bottomRightMouseCoords.setX(objectMouseCoords.x());
+        }
+        if (objectMouseCoords.x() < topLeftMouseCoords.x()) {
+            topLeftMouseCoords.setX(objectMouseCoords.x());
+        }
+        if (objectMouseCoords.y() > topLeftMouseCoords.y()) {
+            topLeftMouseCoords.setY(objectMouseCoords.y());
+        }
+        if (objectMouseCoords.y() < bottomRightMouseCoords.y()) {
+            bottomRightMouseCoords.setY(objectMouseCoords.y());
+        }
+    }
+
+    mousePress(Qt::MouseButton::LeftButton, active3dView.widget(), topLeftMouseCoords);
+    mouseMoveTo(active3dView.widget(), bottomRightMouseCoords);
+    mouseRelease(Qt::MouseButton::LeftButton, active3dView.widget(), bottomRightMouseCoords);
 
     active3dView.refresh();
 
-    ensureSelected(inspector, PrimNamePredicate(cubePrimName));
-    ensureSelected(inspector, PrimNamePredicate(torusPrimName));
+    for (const auto& object : objectsToSelect) {
+        ensureSelected(inspector, PrimNamePredicate(object.first));
+    }
 }
