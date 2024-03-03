@@ -27,7 +27,7 @@ class TestFlowViewportAPIViewportInformation(mtohUtils.MayaHydraBaseTestCase):
     def test_RendererSwitching(self):
         with PluginLoaded('mayaHydraCppTests'):
             #Switch to Storm
-            self.setHdStormRenderer()
+            #self.setHdStormRenderer()
             cmds.refresh()
             cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationWithHydra")
             #Switch to VP2

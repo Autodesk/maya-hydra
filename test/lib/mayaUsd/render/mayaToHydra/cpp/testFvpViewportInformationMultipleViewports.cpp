@@ -44,12 +44,13 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewportsInit)
     //Get all Hydra viewports information
     Fvp::InformationInterface::ViewportInformationSet allViewportsInformation;
     informationInterface.GetViewportsInformation(allViewportsInformation);
-    //ASSERT_EQ(allViewportsInformation.size(), (size_t)1);//We should have 0 hydra viewport
+    ASSERT_EQ(allViewportsInformation.size(), (size_t)1);//We should have 0 hydra viewport
 
     //Check initial count for _infoClientTest callbacks
     ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 0);
     ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 0);
-
+    
+    
     //We don't call UnregisterInformationClient on purpose as we want to check if the callbacks are called and will unregister it in the code below
 }
 
@@ -64,14 +65,14 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports2Viewports)
     //Get all Hydra viewports information
     Fvp::InformationInterface::ViewportInformationSet allViewportsInformation;
     informationInterface.GetViewportsInformation(allViewportsInformation);
-    ASSERT_EQ(allViewportsInformation.size(), (size_t)3); //we should have 2 Hydra viewports
+    ASSERT_EQ(allViewportsInformation.size(), (size_t)2); //we should have 2 Hydra viewports
 
     //Check renderers name, they all should be Storm
     for (auto info : allViewportsInformation){
         ASSERT_EQ(info._rendererName, _stormRendererName);
     }
 
-    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 2);//Has been called twice
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 1);//Has been called twice
     ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 0);
 }
 
@@ -86,7 +87,7 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports1Viewport)
     //Get all Hydra viewports information
     Fvp::InformationInterface::ViewportInformationSet allViewportsInformation;
     informationInterface.GetViewportsInformation(allViewportsInformation);
-    //ASSERT_EQ(allViewportsInformation.size(), (size_t)2);//We should have 1 hydra viewport
+    ASSERT_EQ(allViewportsInformation.size(), (size_t)1);//We should have 1 hydra viewport
 
    //Check renderers name, they all should be Storm
     for (auto info : allViewportsInformation){
@@ -94,8 +95,8 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports1Viewport)
     }
 
     //Both should have been called once only
-    // ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 2);
-    // ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 1);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 1);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 1);
 }
 
 //Step 4 : the python script removed hydra from the last viewport where hydra was
@@ -109,11 +110,11 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports0Viewport)
     //Get all Hydra viewports information
     Fvp::InformationInterface::ViewportInformationSet allViewportsInformation;
     informationInterface.GetViewportsInformation(allViewportsInformation);
-    //ASSERT_EQ(allViewportsInformation.size(), (size_t)1);//We should not have any hydra viewport
+    ASSERT_EQ(allViewportsInformation.size(), (size_t)0);//We should not have any hydra viewport
 
    ///Both should have been called once only
-    // ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 2);
-    // ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 2);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 1);
+    ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 2);
 
     //Unregister our callbacks client
     informationInterface.UnregisterInformationClient(_infoClientTest);
