@@ -85,9 +85,9 @@ class TestPicking(mtohUtils.MtohTestCase):
             cmds.mayaHydraCppTest(cubeObjectName, "mesh", f="TestPicking.pickObject")
 
     def test_PickMayaLight(self):
-        lightObjectName = self.createMayaDirectionalLight()
+        directionalLightObjectName = self.createMayaDirectionalLight()
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(lightObjectName, "simpleLight", f="TestPicking.pickObject")
+            cmds.mayaHydraCppTest(directionalLightObjectName, "simpleLight", f="TestPicking.pickObject")
 
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_PickUsdMesh(self):
@@ -109,9 +109,9 @@ class TestPicking(mtohUtils.MtohTestCase):
     def test_PickUsdLight(self):
         import mayaUsd_createStageWithNewLayer
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
-        lightObjectName = self.createUsdRectLight(stagePath)
+        rectLightObjectName = self.createUsdRectLight(stagePath)
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(lightObjectName, "rectLight", f="TestPicking.pickObject")
+            cmds.mayaHydraCppTest(rectLightObjectName, "rectLight", f="TestPicking.pickObject")
 
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_MarqueeSelection(self):
