@@ -55,7 +55,7 @@ class TestPicking(mtohUtils.MtohTestCase):
     def test_PickUsdImplicitSurface(self):
         import mayaUsd_createStageWithNewLayer
         import mayaUsd.lib
-        from pxr import UsdGeom, Sdf
+        from pxr import UsdGeom
         cubeObjectName = "USDCube"
         psPathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         stage = mayaUsd.lib.GetPrim(psPathStr).GetStage()
@@ -73,6 +73,21 @@ class TestPicking(mtohUtils.MtohTestCase):
         cmds.refresh()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(lightObjectName, "simpleLight", f="TestPicking.pickObject")
+    
+    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
+    def test_PickUsdLight(self):
+        import mayaUsd_createStageWithNewLayer
+        import mayaUsd.lib
+        from pxr import UsdLux
+        lightObjectName = "USDRectLight"
+        psPathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        stage = mayaUsd.lib.GetPrim(psPathStr).GetStage()
+        UsdLux.RectLight.Define(stage, "/" + lightObjectName)
+        cmds.select(clear=True)
+        cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, displayLights='all')
+        cmds.refresh()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(lightObjectName, "rectLight", f="TestPicking.pickObject")
 
     def test_MarqueeSelection(self):
         cmds.polyPlane()
