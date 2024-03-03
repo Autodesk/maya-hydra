@@ -39,7 +39,7 @@ class TestPicking(mtohUtils.MtohTestCase):
     def createMayaDirectionalLight(self):
         shapeName = cmds.directionalLight()
         objectName = cmds.listRelatives(shapeName, parent=True)
-        cmds.move(0.5, -1, 2)
+        cmds.move(3, -2, 1)
         cmds.select(clear=True)
         cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, displayLights='all')
         cmds.refresh()
@@ -47,7 +47,7 @@ class TestPicking(mtohUtils.MtohTestCase):
 
     def createUsdCubeFromMaya(self, stagePath):
         objectAndNodeNames = cmds.polyCube()
-        cmds.move(-1, 2, -3)
+        cmds.move(-4, 3, -2)
         cmds.mayaUsdDuplicate(cmds.ls(objectAndNodeNames, long=True)[0], stagePath)
         cmds.delete(objectAndNodeNames)
         cmds.select(clear=True)
@@ -60,7 +60,7 @@ class TestPicking(mtohUtils.MtohTestCase):
         objectName = "USDCube"
         stage = mayaUsd.lib.GetPrim(stagePath).GetStage()
         xform = UsdGeom.Xform.Define(stage, "/" + objectName + "Xform")
-        xform.AddTranslateOp().Set(value=(0.0, 1.0, 2.0))
+        xform.AddTranslateOp().Set(value=(6, 5, 4))
         UsdGeom.Cube.Define(stage, str(xform.GetPath()) + "/" + objectName)
         cmds.select(clear=True)
         cmds.refresh()
@@ -72,7 +72,7 @@ class TestPicking(mtohUtils.MtohTestCase):
         objectName = "USDRectLight"
         stage = mayaUsd.lib.GetPrim(stagePath).GetStage()
         xform = UsdGeom.Xform.Define(stage, "/" + objectName + "Xform")
-        xform.AddTranslateOp().Set(value=(-3.0, -0.5, 1.0))
+        xform.AddTranslateOp().Set(value=(-6, -3.5, -1))
         UsdLux.RectLight.Define(stage, str(xform.GetPath()) + "/" + objectName)
         cmds.select(clear=True)
         cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, displayLights='all')
@@ -113,41 +113,23 @@ class TestPicking(mtohUtils.MtohTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(lightObjectName, "rectLight", f="TestPicking.pickObject")
 
-    # @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
-    # def test_MarqueeSelection(self):
-    #     import mayaUsd_createStageWithNewLayer
-    #     import mayaUsd.lib
-    #     from pxr import UsdGeom, UsdLux
-    #     psPathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
-    #     stage = mayaUsd.lib.GetPrim(psPathStr).GetStage()
-
-    #     usdCubeName = "USDCube"
-    #     usdCubeXform = UsdGeom.Xform.Define(stage, "/" + usdCubeName + "Xform")
-    #     UsdGeom.Cube.Define(stage, usdCubeXform.GetPath() + "/" + usdCubeName)
-    #     usdCubeXform.AddTranslateOp().Set(value=(1.0, 2.0, 3.0))
-
-    #     usdLightName = "USDRectLight"
-    #     usdLightXform = UsdGeom.Xform.Define(stage, "/" + usdLightName + "Xform")
-    #     UsdLux.RectLight.Define(stage, usdLightXform.GetPath() + "/" + usdLightName)
-    #     usdLightXform.AddTranslateOp().Set(value=(-1.0, -2.0, -3.0))
-
-    #     mayaCubeObjectAndNodeNames = cmds.polyCube()
-    #     cmds.move(2, 4, 6)
-    #     cmds.mayaUsdDuplicate(cmds.ls(mayaCubeObjectAndNodeNames, long=True)[0], psPathStr)
-
-
-    #     cmds.polyCube()
-    #     cmds.move(-2, 1.5, 3)
-    #     cmds.rotate(-40, 50, -60)
-    #     cmds.polyTorus()
-    #     cmds.move(0.5, -2, -2)
-    #     cmds.rotate(30, -5, -20)
-    #     cmds.refresh()
-    #     self.setBasicCam(10)
-    #     cmds.select(clear=True)
-    #     cmds.refresh()
-    #     with PluginLoaded('mayaHydraCppTests'):
-    #         cmds.mayaHydraCppTest(f="TestPicking.marqueeSelect")
+    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
+    def test_MarqueeSelection(self):
+        import mayaUsd_createStageWithNewLayer
+        stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        mayaCubeName = self.createMayaCube()
+        mayaDirectionalLightName = self.createMayaDirectionalLight()
+        usdMayaCubeName = self.createUsdCubeFromMaya(stagePath)
+        usdCubeName = self.createUsdCube(stagePath)
+        usdRectLightName = self.createUsdRectLight(stagePath)
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(
+                mayaCubeName, "mesh",
+                mayaDirectionalLightName, "simpleLight",
+                usdMayaCubeName, "mesh",
+                usdCubeName, "mesh",
+                usdRectLightName, "rectLight",
+                f="TestPicking.marqueeSelect")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
