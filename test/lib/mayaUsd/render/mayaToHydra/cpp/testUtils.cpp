@@ -27,10 +27,15 @@
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
 
+#include <QApplication>
+
 #include <iostream>
 
 namespace {
 std::pair<int, char**> testingArgs{0, nullptr};
+
+Qt::MouseButtons      mouseButtons;
+Qt::KeyboardModifiers keyboardModifiers;
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -256,6 +261,50 @@ void setTestingArgs(int argc, char** argv)
 std::pair<int, char**> getTestingArgs()
 {
     return testingArgs;
+}
+
+void mouseMoveTo(QWidget* widget, QPoint localMousePos)
+{
+    QMouseEvent mouseMoveEvent(
+        QEvent::Type::MouseMove,
+        localMousePos,
+        widget->mapToGlobal(localMousePos),
+        Qt::MouseButton::NoButton,
+        mouseButtons,
+        keyboardModifiers);
+
+    QCursor::setPos(widget->mapToGlobal(localMousePos));
+    QApplication::sendEvent(widget, &mouseMoveEvent);
+}
+
+void mousePress(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos)
+{
+    QMouseEvent mousePressEvent(
+        QEvent::Type::MouseButtonPress,
+        localMousePos,
+        widget->mapToGlobal(localMousePos),
+        mouseButton,
+        mouseButtons,
+        keyboardModifiers);
+    mouseButtons |= mouseButton;
+
+    QCursor::setPos(widget->mapToGlobal(localMousePos));
+    QApplication::sendEvent(widget, &mousePressEvent);
+}
+
+void mouseRelease(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos)
+{
+    mouseButtons &= ~mouseButton;
+    QMouseEvent mouseReleaseEvent(
+        QEvent::Type::MouseButtonRelease,
+        localMousePos,
+        widget->mapToGlobal(localMousePos),
+        mouseButton,
+        mouseButtons,
+        keyboardModifiers);
+
+    QCursor::setPos(widget->mapToGlobal(localMousePos));
+    QApplication::sendEvent(widget, &mouseReleaseEvent);
 }
 
 }

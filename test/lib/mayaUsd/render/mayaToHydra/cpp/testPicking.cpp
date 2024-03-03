@@ -51,6 +51,15 @@ using namespace MayaHydra;
 
 namespace {
 
+FindPrimPredicate findPickPrimPredicate(const std::string& objectName, const TfToken& primType)
+{
+    return [objectName,
+            primType](const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath) -> bool {
+        return primPath.GetAsString().find(objectName) != std::string::npos
+            && sceneIndex->GetPrim(primPath).primType == primType;
+    };
+}
+
 void getPrimMouseCoords(const HdSceneIndexPrim& prim, M3dView& view, QPoint& outMouseCoords)
 {
     HdDataSourceBaseHandle xformDataSource = HdContainerDataSource::Get(prim.dataSource, HdXformSchema::GetDefaultLocator());
@@ -72,67 +81,6 @@ void getPrimMouseCoords(const HdSceneIndexPrim& prim, M3dView& view, QPoint& out
     // Qt and M3dView use opposite Y-coordinates
     outMouseCoords = QPoint(viewportX, view.portHeight() - viewportY);
 }
-
-Qt::MouseButtons mouseButtons;
-Qt::KeyboardModifiers keyboardModifiers;
-
-void mousePress(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos)
-{
-    QMouseEvent mousePressEvent(
-        QEvent::Type::MouseButtonPress,
-        localMousePos,
-        widget->mapToGlobal(localMousePos),
-        mouseButton,
-        mouseButtons,
-        keyboardModifiers);
-    mouseButtons |= mouseButton;
-
-    QCursor::setPos(widget->mapToGlobal(localMousePos));
-    QApplication::sendEvent(widget, &mousePressEvent);
-}
-
-void mouseRelease(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos)
-{
-    mouseButtons &= ~mouseButton;
-    QMouseEvent mouseReleaseEvent(
-        QEvent::Type::MouseButtonRelease,
-        localMousePos,
-        widget->mapToGlobal(localMousePos),
-        mouseButton,
-        mouseButtons,
-        keyboardModifiers);
-
-    QCursor::setPos(widget->mapToGlobal(localMousePos));
-    QApplication::sendEvent(widget, &mouseReleaseEvent);
-}
-
-void mouseMoveTo(QWidget* widget, QPoint localMousePos)
-{
-    QMouseEvent mouseMoveEvent(
-        QEvent::Type::MouseMove,
-        localMousePos,
-        widget->mapToGlobal(localMousePos),
-        Qt::MouseButton::NoButton,
-        mouseButtons,
-        keyboardModifiers);
-
-    QCursor::setPos(widget->mapToGlobal(localMousePos));
-    QApplication::sendEvent(widget, &mouseMoveEvent);
-}
-
-//void mouseEnter(QWidget* widget, QPoint localMousePos)
-//{
-//    QMouseEvent mouseEnterEvent(
-//        QEvent::Type::Enter,
-//        localMousePos,
-//        widget->mapToGlobal(localMousePos),
-//        Qt::MouseButton::NoButton,
-//        mouseButtons,
-//        keyboardModifiers);
-//    //QEnterEvent enterEvent()
-//    QCursor::setPos(widget->mapToGlobal(localMousePos));
-//    QApplication::sendEvent(widget, &mouseEnterEvent);
-//}
 
 void ensureSelected(const SceneIndexInspector& inspector, const FindPrimPredicate& primPredicate)
 {
@@ -166,14 +114,6 @@ void ensureUnselected(const SceneIndexInspector& inspector, const FindPrimPredic
             = HdSelectionsSchema::GetFromParent(primEntry.prim.dataSource);
         ASSERT_EQ(selectionsSchema.IsDefined(), false);
     }
-}
-
-FindPrimPredicate findPickPrimPredicate(const std::string& objectName, const TfToken& primType)
-{
-    return [objectName, primType](const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath) -> bool {
-        return primPath.GetAsString().find(objectName) != std::string::npos
-            && sceneIndex->GetPrim(primPath).primType == primType;
-    };
 }
 
 } // namespace

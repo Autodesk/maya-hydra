@@ -27,6 +27,9 @@
 #include <maya/MMatrix.h>
 #include <maya/MStatus.h>
 
+#include <QMouseEvent>
+#include <QWidget>
+
 #include <fstream>
 #include <functional>
 #include <limits>
@@ -311,6 +314,35 @@ void setTestingArgs(int argc, char** argv);
  * @return argc, argv.
  */
 std::pair<int, char**> getTestingArgs();
+
+/**
+ * @brief Send a mouse move event to a widget to move the mouse at a given position.
+ *
+ * @param[in] widget The widget to send the event to.
+ * @param[in] localMousePos The position to move the mouse to, relative to the widget.
+ *
+ */
+void mouseMoveTo(QWidget* widget, QPoint localMousePos);
+
+/**
+ * @brief Send a mouse press event to a widget to press a mouse button at a given position.
+ *
+ * @param[in] mouseButton The mouse button to press.
+ * @param[in] widget The widget to send the event to.
+ * @param[in] localMousePos The position of the mouse, relative to the widget.
+ *
+ */
+void mousePress(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos);
+
+/**
+ * @brief Send a mouse release event to a widget to release a mouse button at a given position.
+ *
+ * @param[in] mouseButton The mouse button to release.
+ * @param[in] widget The widget to send the event to.
+ * @param[in] localMousePos The position of the mouse, relative to the widget.
+ *
+ */
+void mouseRelease(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos);
 
 }
 
