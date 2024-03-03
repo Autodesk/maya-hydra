@@ -227,15 +227,22 @@ TEST(TestPicking, marqueeSelect)
 
     M3dView active3dView = M3dView::active3dView();
 
+    // We get the first prim's mouse coordinates and initialize the selection rectangle
+    // with them; we then iterate on the other prims and expand the selection rectangle
+    // to fit them all.
+
+    // Get the first prim's mouse coords
     PrimEntriesVector initialPrimEntries = inspector.FindPrims(
         findPickPrimPredicate(objectsToSelect.front().first, objectsToSelect.front().second));
     ASSERT_EQ(initialPrimEntries.size(), 1u);
     QPoint initialMouseCoords;
     getPrimMouseCoords(initialPrimEntries.front().prim, active3dView, initialMouseCoords);
 
+    // Initialize the selection rectangle
     QPoint topLeftMouseCoords = initialMouseCoords;
     QPoint bottomRightMouseCoords = initialMouseCoords;
 
+    // Expand the selection rectangle to fit all prims
     for (size_t iObject = 1; iObject < objectsToSelect.size(); iObject++) {
         PrimEntriesVector objectPrims = inspector.FindPrims(
             findPickPrimPredicate(objectsToSelect[iObject].first, objectsToSelect[iObject].second));
@@ -257,6 +264,7 @@ TEST(TestPicking, marqueeSelect)
         }
     }
 
+    // Perform the marquee selection
     mousePress(Qt::MouseButton::LeftButton, active3dView.widget(), topLeftMouseCoords);
     mouseMoveTo(active3dView.widget(), bottomRightMouseCoords);
     mouseRelease(Qt::MouseButton::LeftButton, active3dView.widget(), bottomRightMouseCoords);
