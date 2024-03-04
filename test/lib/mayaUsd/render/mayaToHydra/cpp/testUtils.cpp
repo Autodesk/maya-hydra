@@ -34,6 +34,10 @@
 namespace {
 std::pair<int, char**> testingArgs{0, nullptr};
 
+// Store the ongoing state of the pressed moused & keyboard buttons.
+// These are normally kept track of internally by Qt and can be retrieved using 
+// methods of the same name. But since we are sending artificial events, Qt does 
+// not get the opportunity to set these, so we keep track of them manually here.
 Qt::MouseButtons      mouseButtons;
 Qt::KeyboardModifiers keyboardModifiers;
 }
@@ -285,6 +289,8 @@ void mousePress(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMouseP
         mouseButton,
         mouseButtons,
         keyboardModifiers);
+
+    // Update mouse state
     mouseButtons |= mouseButton;
 
     QApplication::sendEvent(widget, &mousePressEvent);
@@ -292,7 +298,9 @@ void mousePress(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMouseP
 
 void mouseRelease(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos)
 {
+    // Update mouse state
     mouseButtons &= ~mouseButton;
+
     QMouseEvent mouseReleaseEvent(
         QEvent::Type::MouseButtonRelease,
         localMousePos,
