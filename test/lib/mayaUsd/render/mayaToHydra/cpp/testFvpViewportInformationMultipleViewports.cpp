@@ -44,7 +44,7 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewportsInit)
     //Get all Hydra viewports information
     Fvp::InformationInterface::ViewportInformationSet allViewportsInformation;
     informationInterface.GetViewportsInformation(allViewportsInformation);
-    ASSERT_EQ(allViewportsInformation.size(), (size_t)1);//We should have 0 hydra viewport
+    ASSERT_EQ(allViewportsInformation.size(), (size_t)1);//We should have 1 hydra viewport init by the tests script
 
     //Check initial count for _infoClientTest callbacks
     ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 0);
@@ -72,7 +72,7 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports2Viewports)
         ASSERT_EQ(info._rendererName, _stormRendererName);
     }
 
-    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 1);//Has been called twice
+    ASSERT_EQ(_infoClientTest->GetSceneIndexAdded(), 1);//Has been called once
     ASSERT_EQ(_infoClientTest->GetSceneIndexRemoved(), 0);
 }
 
