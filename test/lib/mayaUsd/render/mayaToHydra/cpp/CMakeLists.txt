@@ -39,8 +39,6 @@ target_sources(${TARGET_NAME}
 # -----------------------------------------------------------------------------
 # compiler configuration
 # -----------------------------------------------------------------------------
-set_target_properties(Qt6::Core PROPERTIES INTERFACE_COMPILE_DEFINITIONS QT_NO_KEYWORDS)
-
 mayaHydra_compile_config(${TARGET_NAME})
 
 target_compile_definitions(${TARGET_NAME}
@@ -69,8 +67,6 @@ target_link_libraries(${TARGET_NAME}
         Qt6::Core
         Qt6::Widgets
 )
-
-set_property(TARGET mayaHydraCppTests PROPERTY AUTOMOC ON)
 
 # -----------------------------------------------------------------------------
 # properties
