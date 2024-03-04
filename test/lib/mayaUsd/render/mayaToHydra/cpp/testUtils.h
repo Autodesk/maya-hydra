@@ -17,6 +17,8 @@
 #ifndef MAYAHYDRA_TEST_UTILS_H
 #define MAYAHYDRA_TEST_UTILS_H
 
+#define _USE_MATH_DEFINES
+
 #include <mayaHydraLib/mayaHydra.h>
 
 #include <pxr/base/gf/matrix4d.h>
