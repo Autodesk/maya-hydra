@@ -136,7 +136,7 @@ TEST(TestPicking, marqueeSelect)
     ASSERT_TRUE(argc % 2 == 0); // Each object is identified by both its name and a type
     ASSERT_TRUE(argc >= 4); // We need at least two objects to do the marquee selection
     std::vector<std::pair<std::string, TfToken>> objectsToSelect;
-    for (size_t iArg = 0; iArg < argc; iArg += 2) {
+    for (int iArg = 0; iArg < argc; iArg += 2) {
         objectsToSelect.push_back(std::make_pair(std::string(argv[iArg]), TfToken(argv[iArg + 1])));
     }
 
