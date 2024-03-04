@@ -27,6 +27,7 @@
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
 
+#include <algorithm>
 #include <exception>
 #include <iostream>
 
@@ -309,15 +310,23 @@ bool dataSourceMatchesReference(
     outputFile.open(outputPath, std::ios::in);
     std::stringstream outputDump;
     outputDump << outputFile.rdbuf();
+    std::string outputString = outputDump.str();
 
     std::ifstream     referenceFile(referencePath);
     std::stringstream referenceDump;
     referenceDump << referenceFile.rdbuf();
+    std::string referenceString = referenceDump.str();
+
+    // Remove carriage returns from the reference string, as these can sometimes be 
+    // inadvertently/automatically added to the reference files stored in git.
+    // The test outputs always use line feeds only, so no need to do it for those.
+    referenceString.erase(
+        std::remove(referenceString.begin(), referenceString.end(), '\r'), referenceString.end());
 
     // We return a boolean instead of using something like EXPECT_EQ, as that would print the
     // entire dumps to stdout and pollute the logs in case of a test failure. Using EXPECT_TRUE
     // at the callsites still logs exactly which comparison failed, but keeps logs readable.
-    return outputDump.str() == referenceDump.str();
+    return outputString == referenceString;
 }
 
 } // namespace MAYAHYDRA_NS_DEF
