@@ -271,7 +271,10 @@ std::filesystem::path getInputDir()
     return testInputDir;
 }
 
-void setInputDir(std::filesystem::path inputDir) { testInputDir = inputDir; }
+void setInputDir(std::filesystem::path inputDir)
+{ 
+    testInputDir = inputDir;
+}
 
 std::filesystem::path getOutputDir()
 {
@@ -282,9 +285,15 @@ std::filesystem::path getOutputDir()
     return testOutputDir;
 }
 
-void setOutputDir(std::filesystem::path outputDir) { testOutputDir = outputDir; }
+void setOutputDir(std::filesystem::path outputDir)
+{ 
+    testOutputDir = outputDir;
+}
 
-std::filesystem::path getPathToSample(std::string filename) { return getInputDir() / filename; }
+std::filesystem::path getPathToSample(std::string filename)
+{ 
+    return getInputDir() / filename;
+}
 
 bool dataSourceMatchesReference(
     PXR_NS::HdDataSourceBaseHandle dataSource,
