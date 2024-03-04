@@ -15,33 +15,12 @@
 
 #include "testUtils.h"
 
-#include <mayaHydraLib/hydraUtils.h>
-#include <mayaHydraLib/mayaUtils.h>
-
-#include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
-
-#include <pxr/imaging/hd/basisCurvesSchema.h>
-#include <pxr/imaging/hd/meshSchema.h>
-#include <pxr/imaging/hd/primvarsSchema.h>
-#include <pxr/imaging/hd/tokens.h>
-#include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
+#include <pxr/imaging/hd/xformSchema.h>
 
 #include <maya/M3dView.h>
-#include <maya/MGlobal.h>
-#include <maya/MSelectionList.h>
-#include <maya/MFnTransform.h>
-#include <maya/MDagPath.h>
-#include <maya/MSelectionList.h>
-#include <maya/MItSelectionList.h>
-
-#include <QApplication>
-#include <QGraphicsView>
-#include <QWindow>
-#include <QWidget>
-#include <QOpenGLContext>
-#include <QMouseEvent>
+#include <maya/MPoint.h>
 
 #include <gtest/gtest.h>
 
