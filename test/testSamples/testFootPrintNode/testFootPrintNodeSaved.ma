@@ -80,7 +80,6 @@ createNode MhFootPrint -n "MhFootPrint1" -p "transform1";
 	setAttr -k off ".v";
 	setAttr ".sz" 5;
 	setAttr ".col" -type "double3" 0 1 1 ;
-	setAttr ".dI" 2;
 createNode lightLinker -s -n "lightLinker1";
 	rename -uid "F05525A4-421C-610A-0237-D4A8D7720235";
 	setAttr -s 2 ".lnk";

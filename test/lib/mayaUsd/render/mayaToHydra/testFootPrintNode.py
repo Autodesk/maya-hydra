@@ -58,11 +58,6 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             #Increase its size
             cmds.setAttr(footPrintNodeName + '.size', 5)
             cmds.refresh()
-            
-            #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
-            cmds.setAttr(footPrintNodeName + '.dummyInput', 2)#setting this will set dirty the dummyOutput attribute
-            cmds.getAttr(footPrintNodeName + '.dummyOutput')#getting this value will trigger a call to compute
-            cmds.refresh()
             self.assertSnapshotClose("add_NodeCreated.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
             #Move the transform node, the added prims should move as well
@@ -114,10 +109,7 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
         
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex and a Filtering scene index
             footPrintNodeName = cmds.createNode("MhFootPrint")
-
-            #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
-            cmds.setAttr(footPrintNodeName + '.dummyInput', 2)#setting this will set dirty the dummyOutput attribute
-            cmds.getAttr(footPrintNodeName + '.dummyOutput')#getting this value will trigger a call to compute
+            cmds.refresh()
             self.assertSnapshotClose("footPrint_BeforeModifs.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
             #Modify the attributes
@@ -140,10 +132,6 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex and a Filtering scene index
             footPrintNodeName1 = cmds.createNode("MhFootPrint", n="nodeShape1")
 
-            #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
-            cmds.setAttr(footPrintNodeName1 + '.dummyInput', 3)#setting this will set dirty the dummyOutput attribute
-            cmds.getAttr(footPrintNodeName1 + '.dummyOutput')#getting this value will trigger a call to compute
-            
             #Modify the attributes
             cmds.setAttr(footPrintNodeName1 + '.size', 3)
             cmds.setAttr(footPrintNodeName1 + '.color', 1.0, 1.0, 1.0, type="double3")
@@ -159,10 +147,6 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex and a Filtering scene index
             footPrintNodeName2 = cmds.createNode("MhFootPrint", n="nodeShape2")
 
-            #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
-            cmds.setAttr(footPrintNodeName2 + '.dummyInput', 3)#setting this will set dirty the dummyOutput attribute
-            cmds.getAttr(footPrintNodeName2 + '.dummyOutput')#getting this value will trigger a call to compute
-            
             cmds.setAttr(footPrintNodeName2 + '.size', 1.5)
             cmds.setAttr(footPrintNodeName2 + '.color', 0.0, 1.0, 0.0, type="double3")
             cmds.refresh()
@@ -224,10 +208,6 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex and a Filtering scene index
             footPrintNodeName1 = cmds.createNode("MhFootPrint", n="nodeShape1")
 
-            #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
-            cmds.setAttr(footPrintNodeName1 + '.dummyInput', 2)#setting this will set dirty the dummyOutput attribute
-            cmds.getAttr(footPrintNodeName1 + '.dummyOutput')#getting this value will trigger a call to compute
-            
             cmds.setAttr(footPrintNodeName1 + '.size', 6)
             cmds.setAttr(footPrintNodeName1 + '.color', 0.0, 1.0, 0.0, type="double3")
             cmds.refresh()

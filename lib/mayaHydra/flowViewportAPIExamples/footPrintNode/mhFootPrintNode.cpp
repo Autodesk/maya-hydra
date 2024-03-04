@@ -83,7 +83,6 @@ public:
     bool            isBounded() const override;
     MBoundingBox    boundingBox() const override;
 
-    void setupFlowViewportInterface();
     void updateFootPrintPrims();
     
     static  void *      creator();
@@ -542,8 +541,6 @@ void* MhFootPrint::creator()
 
 void MhFootPrint::addedToModelCb()
 {
-    std::cout << "PPT: footprint node added to model." << std::endl;
-
     static const SdfPath noPrefix = SdfPath::AbsoluteRootPath();
 
     //Add the callback when an attribute of this node changes
@@ -557,8 +554,6 @@ void MhFootPrint::addedToModelCb()
 
 void MhFootPrint::removedFromModelCb()
 {
-    std::cout << "PPT: footprint node removed from model." << std::endl;
-
     //Remove the callback
     if (_cbAttributeChangedId){
         CHECK_MSTATUS(MMessage::removeCallback(_cbAttributeChangedId));
