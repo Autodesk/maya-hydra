@@ -40,6 +40,8 @@
 #include <maya/MNodeMessage.h>
 #include <maya/MObjectHandle.h>
 #include <maya/MGlobal.h>
+#include <maya/MFnDagNode.h>
+#include <maya/MModelMessage.h>
 
 //Flow viewport headers
 #include <flowViewport/API/fvpVersionInterface.h>
@@ -57,6 +59,11 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
+namespace {
+void nodeAddedToModel(MObject& node, void* clientData);
+void nodeRemovedFromModel(MObject& node, void* clientData);
+}
+
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
 // Node implementation with Hydra scene index
@@ -65,7 +72,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 class MhFootPrint : public MPxLocatorNode
 {
 public:
-    MhFootPrint();
+    MhFootPrint() = default;
     ~MhFootPrint() override;
 
     //Is called when the MObject has been constructed and is valid
@@ -82,12 +89,16 @@ public:
     static  void *      creator();
     static  MStatus     initialize();
 
+    // Callback when the footprint node is added to the model (create /
+    // undo-delete)
+    void addedToModelCb();
+    // Callback when the footprint node is removed from model (delete)
+    void removedFromModelCb();
+
     //Attributes
     static MObject     mSize;
     static MObject     mWorldS;
     static MObject     mColor;
-    static MObject     mDummyInput; //Dummy input to trigger a call to compute
-    static MObject     mDummyOutput;//Dummy output to trigger a call to compute
 
     static	MTypeId		id;
     static	MString		nodeClassification;
@@ -101,8 +112,6 @@ private:
     void _CreateAndAddFootPrintPrimitives();
     ///Remove the Hydra foot print primitives
     void _RemoveFootPrintPrimitives();
-    ///Update the MObject of this node
-    void _UpdateThisMObject();
 
     ///Counter to make the hydra primitives unique
     static std::atomic_int _counter;
@@ -115,14 +124,13 @@ private:
     ///Hydra retained scene index to add the 2 foot print primitives
     HdRetainedSceneIndexRefPtr  _retainedSceneIndex  {nullptr};
 
-    ///To be used in hydra viewport API to pass the Maya node's MObject for setting callbacks for data producer scene indices
-    MObjectHandle                _thisMObject; 
-    ///To check if the MObject of this node has changed
-    MObject                     _oldMObject; 
     ///To hold the afterOpenCallback Id to be able to react when a File Open has happened.
     MCallbackId                 _cbAfterOpenId = 0;
     ///To hold the attributeChangedCallback Id to be able to react when the 3D grid creation parameters attributes from this node change.
     MCallbackId                 _cbAttributeChangedId = 0;
+
+    MCallbackId _nodeAddedToModelCbId{0};
+    MCallbackId _nodeRemovedFromModelCbId{0};
 };
 
 namespace 
@@ -348,6 +356,27 @@ namespace
         MFnNumericData fnData(oDouble3);
         fnData.getData( outVal[0], outVal[1], outVal[2] );
     }
+
+void nodeAddedToModel(MObject& node, void* /* clientData */)
+{
+    auto fpNode = reinterpret_cast<MhFootPrint*>(MFnDagNode(node).userNode());
+    if (!TF_VERIFY(fpNode)) {
+        return;
+    }
+
+    fpNode->addedToModelCb();
+}
+
+void nodeRemovedFromModel(MObject& node, void* /* clientData */)
+{
+    auto fpNode = reinterpret_cast<MhFootPrint*>(MFnDagNode(node).userNode());
+    if (!TF_VERIFY(fpNode)) {
+        return;
+    }
+
+    fpNode->removedFromModelCb();
+}
+
 }
 //end of anonymous namespace
 
@@ -358,8 +387,6 @@ MObject MhFootPrint::mColor;
 MTypeId MhFootPrint::id( 0x58000087 );
 MString	MhFootPrint::nodeClassification("hydraAPIExample/geometry/footPrint");
 MObject MhFootPrint::mWorldS;
-MObject MhFootPrint::mDummyInput;
-MObject MhFootPrint::mDummyOutput;
 
 namespace {
     //Callback after a File Open
@@ -372,12 +399,8 @@ namespace {
         //Trigger a call to compute so that everything is initialized
         MhFootPrint* footPrintInstance = reinterpret_cast<MhFootPrint*>(clientData);
         footPrintInstance->updateFootPrintPrims();
-        footPrintInstance->setupFlowViewportInterface();
+        footPrintInstance->addedToModelCb();
     }
-}
-
-MhFootPrint::MhFootPrint()
-{
 }
 
 void MhFootPrint::postConstructor()
@@ -391,27 +414,26 @@ void MhFootPrint::postConstructor()
     _cbAfterOpenId = MSceneMessage::addCallback(MSceneMessage::kAfterOpen, afterOpenCallback, ((void*)this)) ;
 
     //Add the callback when an attribute of this node changes
-    MObject obj = _thisMObject.object();
+    MObject obj = thisMObject();
     _cbAttributeChangedId = MNodeMessage::addAttributeChangedCallback(obj, attributeChangedCallback, ((void*)this));
 
     _retainedSceneIndex = HdRetainedSceneIndex::New();
 
     _CreateAndAddFootPrintPrimitives();
+
+    _nodeAddedToModelCbId = MModelMessage::addNodeAddedToModelCallback(obj, nodeAddedToModel);
+    _nodeRemovedFromModelCbId = MModelMessage::addNodeRemovedFromModelCallback(obj, nodeRemovedFromModel);
 }
 
 MhFootPrint::~MhFootPrint()
 {
     //Remove the callbacks
-    if (_cbAfterOpenId){
-        CHECK_MSTATUS(MSceneMessage::removeCallback(_cbAfterOpenId));
-        _cbAfterOpenId = 0;
+    for(auto cbId : {_cbAfterOpenId, _cbAttributeChangedId, _nodeAddedToModelCbId, _nodeRemovedFromModelCbId}) {
+        if (cbId) {
+            CHECK_MSTATUS(MMessage::removeCallback(cbId));
+        }
     }
     
-    if (_cbAttributeChangedId){
-        CHECK_MSTATUS(MMessage::removeCallback(_cbAttributeChangedId));
-        _cbAttributeChangedId = 0;
-    }
-
     //Remove our retained scene index from hydra
     Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
     dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, pxr::FvpViewportAPITokens->allViewports);
@@ -440,38 +462,6 @@ void MhFootPrint::updateFootPrintPrims()
 { 
     _RemoveFootPrintPrimitives();
     _CreateAndAddFootPrintPrimitives();
-}
-
-void MhFootPrint::_UpdateThisMObject()
-{
-    if (_thisMObject.isValid()){
-        return;
-    }
-
-    _thisMObject = thisMObject();
-}
-
-void MhFootPrint::setupFlowViewportInterface()
-{
-    static const SdfPath noPrefix = SdfPath::AbsoluteRootPath();
-
-    _UpdateThisMObject();
-
-    //Remove the callback
-    if (_cbAttributeChangedId){
-        CHECK_MSTATUS(MMessage::removeCallback(_cbAttributeChangedId));
-        _cbAttributeChangedId = 0;
-    }
-    //Add the callback when an attribute of this node changes
-    MObject obj = _thisMObject.object();
-    _cbAttributeChangedId = MNodeMessage::addAttributeChangedCallback(obj, attributeChangedCallback, ((void*)this));
-
-    //Remove the previous data producer scene index in case it was registered, if that occurs it's because _thisMObject has changed and we want to update the maya callbacks on the node
-    Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, pxr::FvpViewportAPITokens->allViewports);
-
-    //Data producer scene index interface is used to add the retained scene index to all viewports with all render delegates
-    dataProducerSceneIndexInterface.addDataProducerSceneIndex(_retainedSceneIndex, noPrefix, (void*)&obj, FvpViewportAPITokens->allViewports,FvpViewportAPITokens->allRenderers);
 }
 
 // Retrieve value of the size attribute from the node
@@ -509,11 +499,6 @@ GfVec3f MhFootPrint::_GetColor() const
 
 MStatus MhFootPrint::compute( const MPlug& plug, MDataBlock& dataBlock)
 {
-    //The MObject can change if the node gets deleted and deletion being undone
-    if (! _thisMObject.isValid()){
-        setupFlowViewportInterface();
-    }
-
     if (plug == mWorldS) 
     {
         if (plug.isElement())
@@ -553,6 +538,36 @@ void* MhFootPrint::creator()
     }
 
     return new MhFootPrint();
+}
+
+void MhFootPrint::addedToModelCb()
+{
+    std::cout << "PPT: footprint node added to model." << std::endl;
+
+    static const SdfPath noPrefix = SdfPath::AbsoluteRootPath();
+
+    //Add the callback when an attribute of this node changes
+    MObject obj = thisMObject();
+    _cbAttributeChangedId = MNodeMessage::addAttributeChangedCallback(obj, attributeChangedCallback, ((void*)this));
+
+    //Data producer scene index interface is used to add the retained scene index to all viewports with all render delegates
+    auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
+    dataProducerSceneIndexInterface.addDataProducerSceneIndex(_retainedSceneIndex, noPrefix, (void*)&obj, FvpViewportAPITokens->allViewports,FvpViewportAPITokens->allRenderers);
+}
+
+void MhFootPrint::removedFromModelCb()
+{
+    std::cout << "PPT: footprint node removed from model." << std::endl;
+
+    //Remove the callback
+    if (_cbAttributeChangedId){
+        CHECK_MSTATUS(MMessage::removeCallback(_cbAttributeChangedId));
+        _cbAttributeChangedId = 0;
+    }
+
+    //Remove the data producer scene index.
+    auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
+    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, pxr::FvpViewportAPITokens->allViewports);
 }
 
 //---------------------------------------------------------------------------
@@ -596,24 +611,11 @@ MStatus MhFootPrint::initialize()
     MAKE_INPUT(nAttr);
     CHECK_MSTATUS ( nAttr.setDefault(0.0, 0.0, 1.0) );
 
-    //Create dummy input attribute to trigger a call to the compute function on demand. as it's in the compute fonction that we add our scene indices
-    mDummyInput = nAttr.create("dummyInput", "dI", MFnNumericData::kInt, 1.0);
-    MAKE_INPUT(nAttr);
-    CHECK_MSTATUS ( nAttr.setDefault(1) );
-
-    //Create dummy output attribute to trigger a call to the compute function on demand. as it's in the compute fonction that we add our scene indices
-    mDummyOutput = nAttr.create("dummyOutput", "dO", MFnNumericData::kInt, 1.0);
-    MAKE_OUTPUT(nAttr);
-    CHECK_MSTATUS ( nAttr.setDefault(1) );
-
     CHECK_MSTATUS ( addAttribute(mSize) );
     CHECK_MSTATUS ( addAttribute(mColor));
-    CHECK_MSTATUS ( addAttribute(mDummyInput));
-    CHECK_MSTATUS ( addAttribute(mDummyOutput));
     CHECK_MSTATUS ( addAttribute(mWorldS));
     
     CHECK_MSTATUS ( attributeAffects(mSize, mWorldS));
-    CHECK_MSTATUS ( attributeAffects(mDummyInput, mDummyOutput));
     return MS::kSuccess;
 }
 

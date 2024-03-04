@@ -38,9 +38,8 @@ class TestFootPrintNode(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
     def imageDiffFailPercent(self):
         return 0.1
 
-    @classmethod
-    def tearDownClass(cls):
-        #Finish by a File New command to check that it's not crashing when cleaning up everything'
+    def tearDown(self):
+        #is called after each test : finish by a File New command to check that it's not crashing when cleaning up everything'
         cmds.file(new=True, force=True)
 
     def setupScene(self):
