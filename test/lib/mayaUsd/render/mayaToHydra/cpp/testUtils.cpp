@@ -31,6 +31,8 @@
 #include <iostream>
 
 namespace {
+std::pair<int, char**> testingArgs{0, nullptr};
+
 std::filesystem::path  testInputDir;
 std::filesystem::path  testOutputDir;
 }
@@ -249,6 +251,16 @@ HdSceneIndexBaseRefPtr findSceneIndexInTree(
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
+
+void setTestingArgs(int argc, char** argv)
+{
+    testingArgs = {argc, argv};
+}
+
+std::pair<int, char**> getTestingArgs()
+{
+    return testingArgs;
+}
 
 std::filesystem::path getInputDir()
 {

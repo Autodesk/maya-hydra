@@ -295,6 +295,25 @@ PXR_NAMESPACE_CLOSE_SCOPE
 namespace MAYAHYDRA_NS_DEF {
 
 /**
+ * @brief Set global command-line arguments for use in tests.
+ *
+ * Provide argc, argv access for GoogleTest unit tests.
+ *
+ * @param[in] argc The count of arguments in argv.
+ * @param[in] argv Argument character strings.
+ */
+void setTestingArgs(int argc, char** argv);
+
+/**
+ * @brief Get global command-line arguments for use in tests.
+ *
+ * Provide argc, argv access for GoogleTest unit tests.
+ *
+ * @return argc, argv.
+ */
+std::pair<int, char**> getTestingArgs();
+
+/**
  * @brief Get the input directory used for test samples.
  *
  * @return Path to the directory containing test samples.
