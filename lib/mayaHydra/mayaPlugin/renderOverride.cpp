@@ -625,9 +625,6 @@ MStatus MtohRenderOverride::Render(
     // Set Purpose tags
     SetRenderPurposeTags(delegateParams);
 
-    // Maya's default MSAA toggle is set to off and that of Hydra's is on
-    // This code will change the default rendered look and might cause 
-    // some of our unit test to fail.
     // Set MSAA as per Maya AntiAliasing settings
     if (_isUsingHdSt)
     {  
