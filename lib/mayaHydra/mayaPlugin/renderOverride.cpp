@@ -1283,9 +1283,7 @@ bool MtohRenderOverride::select(
             outHits.clear();
         }
     }
-    for (const auto& myHit : outHits) {
-        std::cout << "DBP-DBG (hit) : " << myHit.objectId << std::endl;
-    }
+
     _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts);
     return true;
 }

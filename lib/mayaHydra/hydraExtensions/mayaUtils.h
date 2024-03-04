@@ -60,17 +60,6 @@ MAYAHYDRALIB_API
 MStatus GetDagPathFromNodeName(const MString& nodeName, MDagPath& outDagPath);
 
 /**
- * @brief Get the world position of a node from the Maya scene graph using its name
- *
- * @param[in] nodeName is the name of the node to get the world position of.
- * @param[out] outWorldPosition is the world position of the node in the Maya scene graph.
- *
- * @return The resulting status of the operation.
- */
-MAYAHYDRALIB_API
-MStatus GetWorldPositionFromNodeName(const MString& nodeName, MPoint& outWorldPosition);
-
-/**
  * @brief Get the Maya transform matrix of a node from its DAG path
  *
  * The output transform matrix is the resultant ("flattened") matrix from it and 

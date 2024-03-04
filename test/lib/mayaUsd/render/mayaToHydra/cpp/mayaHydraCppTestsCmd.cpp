@@ -19,18 +19,12 @@
 #include <maya/MArgDatabase.h>
 #include <maya/MSyntax.h>
 #include <maya/MGlobal.h>
-#include <maya/M3dView.h>
 #include <gtest/gtest.h>
-
-#include <QApplication>
-#include <QWidget>
 
 namespace 
 {
 constexpr auto _filter = "-f";
 constexpr auto _filterLong = "-filter";
-constexpr auto _resize = "-r";
-constexpr auto _resizeLong = "-resize";
 
 MStringArray constructGoogleTestArgs(const MArgDatabase& database)
 {
@@ -67,7 +61,6 @@ MSyntax mayaHydraCppTestCmd::createSyntax()
 {
     MSyntax syntax;
     syntax.addFlag(_filter, _filterLong, MSyntax::kString);
-    syntax.addFlag(_resize, _resizeLong, MSyntax::kNoArg);
     syntax.setObjectType(MSyntax::kStringObjects);
     return syntax;
 }
@@ -78,11 +71,6 @@ MStatus mayaHydraCppTestCmd::doIt( const MArgList& args )
     MArgDatabase db(syntax(), args, &status);
     if (!status) {
         return status;
-    }
-
-    if (db.isFlagSet("-r")) {
-        M3dView::active3dView().widget()->resize(1163, 677);
-        return MS::kSuccess;
     }
 
     auto arguments = constructGoogleTestArgs(db);
