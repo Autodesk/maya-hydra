@@ -25,6 +25,10 @@ class TestFlowViewportAPIViewportInformation(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def test_RendererSwitching(self):
+
+        # reset all deafult viewports for VP2 as the test framework sets it to Storm in base class    
+        self.setViewport2Renderer()
+
         with PluginLoaded('mayaHydraCppTests'):
             #Switch to Storm
             self.setHdStormRenderer()
@@ -40,6 +44,10 @@ class TestFlowViewportAPIViewportInformation(mtohUtils.MayaHydraBaseTestCase):
             cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationWithHydraAgain")
             
     def test_MultipleViewports(self):
+
+        # reset all deafult viewports for VP2 as the test framework sets it to Storm in base class    
+        self.setViewport2Renderer()
+        
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="FlowViewportAPI.viewportInformationMultipleViewportsInit")
             #switch to 4 views
