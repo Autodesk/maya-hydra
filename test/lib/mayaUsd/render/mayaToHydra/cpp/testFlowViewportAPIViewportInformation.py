@@ -26,7 +26,7 @@ class TestFlowViewportAPIViewportInformation(mtohUtils.MayaHydraBaseTestCase):
 
     def test_RendererSwitching(self):
 
-        # reset all deafult viewports for VP2 as the test framework sets it to Storm in base class    
+        # reset all default viewports for VP2 as the test framework sets it to Storm in base class    
         self.setViewport2Renderer()
 
         with PluginLoaded('mayaHydraCppTests'):
@@ -45,7 +45,7 @@ class TestFlowViewportAPIViewportInformation(mtohUtils.MayaHydraBaseTestCase):
             
     def test_MultipleViewports(self):
 
-        # reset all deafult viewports for VP2 as the test framework sets it to Storm in base class    
+        # reset all default viewports for VP2 as the test framework sets it to Storm in base class    
         self.setViewport2Renderer()
         
         with PluginLoaded('mayaHydraCppTests'):
