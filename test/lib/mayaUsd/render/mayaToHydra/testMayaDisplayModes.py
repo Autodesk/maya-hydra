@@ -76,11 +76,11 @@ class TestMayaDisplayModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         self.assertSnapshotClose("wireframeOnShaded" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=False)
         
-        # #Shadows mode
-        # cmds.modelEditor(panel, edit=True, shadows=True)
-        # cmds.refresh()
-        # self.assertSnapshotClose("shadows" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-        # cmds.modelEditor(panel, edit=True, shadows=False)
+        #Shadows mode
+        cmds.modelEditor(panel, edit=True, shadows=True)
+        cmds.refresh()
+        self.assertSnapshotClose("shadows" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        cmds.modelEditor(panel, edit=True, shadows=False)
                 
         #All Lights mode
         cmds.modelEditor(panel, edit=True, displayLights="all")
