@@ -32,7 +32,7 @@ from maya import cmds
 from maya.api import OpenMaya as om
 
 import ufe
-import ufeUtils, testUtils, mtohUtils
+import ufeUtils, testUtils
 
 import os
 import sys
