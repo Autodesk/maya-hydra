@@ -63,10 +63,10 @@ void getPrimMouseCoords(const HdSceneIndexPrim& prim, M3dView& view, QPoint& out
 
 void ensureSelected(const SceneIndexInspector& inspector, const FindPrimPredicate& primPredicate)
 {
-    // 2024-03-01 : Due to the extra "Lighted" hierarchy, it is possible for two different prims to
-    // have the same name, only one of which being selected. We will tolerate this in the test, but 
-    // we'll make sure there are at most two prims with the same name. We'll also allow a prim not 
-    // to have any selections, but there must be at least one prim selected.
+    // 2024-03-01 : Due to the extra "Lighted" hierarchy, it is possible for an object to be split
+    // into two prims, only one of which will be selected. We will tolerate this in the test, but 
+    // we'll make sure there are at most two prims for that object. We'll also allow a prim not 
+    // to have any selections, but at least one prim must be selected.
     PrimEntriesVector primEntries = inspector.FindPrims(primPredicate);
     ASSERT_GE(primEntries.size(), 1u);
     ASSERT_LE(primEntries.size(), 2u);
