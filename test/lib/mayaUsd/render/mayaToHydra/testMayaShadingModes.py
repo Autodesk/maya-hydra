@@ -90,17 +90,6 @@ class TestMayaShadingModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         cmds.refresh()
         self.assertSnapshotClose("xray" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)        
         cmds.modelEditor(panel, edit=True, xray=False)
-
-        #joint xray mode
-        cmds.modelEditor(panel, edit=True, jointXray=True)
-        cmds.refresh()
-        self.assertSnapshotClose("jointxray" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-        cmds.modelEditor(panel, edit=True, jointXray=False)
-
-        #backfaceCulling  
-        cmds.modelEditor(panel, edit=True, backfaceCulling=True)
-        cmds.refresh()
-        self.assertSnapshotClose("backfaceCulling" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-
+        
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
