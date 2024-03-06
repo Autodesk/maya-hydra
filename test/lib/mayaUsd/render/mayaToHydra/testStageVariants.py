@@ -20,7 +20,6 @@ import mtohUtils
 import unittest
 import testUtils
 import mayaUtils
-import usdUtils
 import ufe
 
 class TestStageVariants(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
@@ -32,6 +31,7 @@ class TestStageVariants(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
 
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_UsdStageVariants(self):
+        import usdUtils
         from mayaUsd import lib as mayaUsdLib
         cmds.file(new=True, force=True)
 
