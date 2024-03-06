@@ -43,6 +43,9 @@ mayaHydra_compile_config(${TARGET_NAME})
 
 target_compile_definitions(${TARGET_NAME}
     PRIVATE
+        # We had issues with macro redefinitions between qmath.h and corecrt_math_defines.h on certain Windows machines.
+        # Defining _USE_MATH_DEFINES seems to fix the error, though it is not entirely clear why.
+        $<$<CXX_COMPILER_ID:MSVC>:_USE_MATH_DEFINES>>
         $<$<BOOL:${IS_MACOSX}>:OSMac_>
         $<$<BOOL:${IS_LINUX}>:LINUX>
         $<$<BOOL:${IS_WINDOWS}>:GTEST_LINKED_AS_SHARED_LIBRARY>
