@@ -42,6 +42,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testFlowViewportAPIAddPrims.py
     cpp/testUsdStageLayerMuting.py
     cpp/testFlowViewportAPIFilterPrims.py
+    cpp/testSceneCorrectness.py
     cpp/testPrimInstancing.py
 )
 
