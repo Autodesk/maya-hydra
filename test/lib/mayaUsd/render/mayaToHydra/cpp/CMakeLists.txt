@@ -39,10 +39,6 @@ target_sources(${TARGET_NAME}
 # -----------------------------------------------------------------------------
 # compiler configuration
 # -----------------------------------------------------------------------------
-# QT_NO_KEYWORDS prevents Qt from defining the foreach, signals, slots and emit macros.
-# this avoids overlap between Qt macros and boost, and enforces using Q_ macros.
-set_target_properties(Qt6::Core PROPERTIES INTERFACE_COMPILE_DEFINITIONS QT_NO_KEYWORDS)
-
 mayaHydra_compile_config(${TARGET_NAME})
 
 target_compile_definitions(${TARGET_NAME}

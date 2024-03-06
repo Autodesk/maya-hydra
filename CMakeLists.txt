@@ -160,6 +160,9 @@ if(MAYA_APP_VERSION VERSION_GREATER 2024)
     set(WANT_QT_VERSION 6.5)
     find_package(Qt6 ${WANT_QT_VERSION} COMPONENTS Core Widgets QUIET)
     if (Qt6_FOUND)
+        # QT_NO_KEYWORDS prevents Qt from defining the foreach, signals, slots and emit macros.
+        # This avoids overlap between Qt macros and boost, and enforces using Q_ macros.
+        set_target_properties(Qt6::Core PROPERTIES INTERFACE_COMPILE_DEFINITIONS QT_NO_KEYWORDS)
         if (CODE_COVERAGE)
             set(BUILD_HDSB_PLUGIN FALSE)
             message(STATUS "Code coverage enabled, Hydra Scene Browser will not be built.")
