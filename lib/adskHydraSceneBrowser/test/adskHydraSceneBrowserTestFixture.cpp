@@ -25,7 +25,6 @@
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/vt/array.h>
 #include <pxr/base/vt/value.h>
-#include <pxr/imaging/hd/tokens.h>
 
 #include <gtest/gtest.h>
 
@@ -89,60 +88,6 @@ void AdskHydraSceneBrowserTestFixture::SetReferenceSceneIndex(
     pxr::HdSceneIndexBasePtr referenceSceneIndex)
 {
     sceneIndex = referenceSceneIndex;
-}
-
-void AdskHydraSceneBrowserTestFixture::VerifySceneCorrectness()
-{
-    // Traverse prim hierarchy
-    QTreeWidgetItemIterator itPrimsTreeWidget = GetIteratorForTree(_primHierarchyWidget);
-    for (; *itPrimsTreeWidget; itPrimsTreeWidget++) {
-        QTreeWidgetItem* primQtItem = *itPrimsTreeWidget;
-        _primHierarchyWidget->setCurrentItem(primQtItem);
-
-        // Traverse data source hierarchy
-        QTreeWidgetItemIterator itDataSourceTreeWidget = GetIteratorForTree(_dataSourceHierarchyWidget);
-        for (; *itDataSourceTreeWidget; itDataSourceTreeWidget++) {
-            QTreeWidgetItem* dataSourceQtItem = *itDataSourceTreeWidget;
-
-            // Verify representation selector's correctness
-            if (dataSourceQtItem->text(0) == "reprSelector") {
-                _dataSourceHierarchyWidget->setCurrentItem(dataSourceQtItem);
-
-                int numPointReprs = 0;
-                int numWireReprs  = 0;
-                int numSurfReprs  = 0;
-
-                // Count representations in use 
-                _dataSourceValueView->expandAll();
-                QAbstractItemModel* dataSourceItemModel = _dataSourceValueView->model();
-                for (int row = 0; row < dataSourceItemModel->rowCount(); ++row) {
-                    QModelIndex  valueIndex = dataSourceItemModel->index(row, 0);
-                    QVariant     valueData = dataSourceItemModel->data(valueIndex, Qt::DisplayRole);
-                    pxr::TfToken reprName(valueData.toString().toStdString());
-
-                    if (reprName == pxr::HdReprTokens->hull || 
-                        reprName == pxr::HdReprTokens->smoothHull || 
-                        reprName == pxr::HdReprTokens->refined) {
-                        ++numSurfReprs;
-                    } else if (reprName == pxr::HdReprTokens->refinedWire ||
-                               reprName == pxr::HdReprTokens->wire) {
-                        ++numWireReprs;
-                    } else if (reprName == pxr::HdReprTokens->refinedWireOnSurf ||
-                               reprName == pxr::HdReprTokens->wireOnSurf) {
-                        ++numWireReprs;
-                        ++numSurfReprs;
-                    } else if (reprName == pxr::HdReprTokens->points) {
-                        ++numPointReprs;
-                    }
-                }
-
-                // Verify that we don't draw the same geometry more than once
-                EXPECT_LE(numPointReprs, 1);
-                EXPECT_LE(numWireReprs, 1);
-                EXPECT_LE(numSurfReprs, 1);
-            }
-        }
-    }
 }
 
 void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(

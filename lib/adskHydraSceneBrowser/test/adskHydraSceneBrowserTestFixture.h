@@ -53,8 +53,6 @@ protected:
         bool compareDataSourceHierarchy = false,
         bool compareDataSourceValues = false);
 
-    void VerifySceneCorrectness();
-
     void
     CompareDataSourceHierarchy(DataSourceEntry rootDataSourceEntry, bool compareValues = false);
 
