@@ -271,7 +271,7 @@ namespace
 }//end of anonymous namespace
 
 //Initialization of static members
-MTypeId FlowViewportAPIMayaLocator::id( 0x90517 );
+MTypeId FlowViewportAPIMayaLocator::id( 0x00080101 );
 MString	FlowViewportAPIMayaLocator::nodeClassification("hydraAPIExample/geometry/FlowViewportAPIMayaLocator");
 
 MObject FlowViewportAPIMayaLocator::mNumCubeLevelsX;
@@ -554,7 +554,7 @@ MStatus FlowViewportAPIMayaLocator::initialize()
     MAKE_INPUT(nAttr);
     CHECK_MSTATUS ( nAttr.setDefault(5.0, 5.0, 5.0) );
 
-    //Create dummy output attribute to trigger a call to the compute function on demand. as it's in the compute fonction that we add our scene indices
+    //Create dummy input attribute to trigger a call to the compute function on demand. as it's in the compute fonction that we add our scene indices
     mDummyInput = nAttr.create("dummyInput", "dI", MFnNumericData::kInt, 1.0, &status);
     MAKE_INPUT(nAttr);
     CHECK_MSTATUS ( nAttr.setDefault(1) );

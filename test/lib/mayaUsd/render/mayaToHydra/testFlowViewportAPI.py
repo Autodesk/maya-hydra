@@ -38,6 +38,11 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 2
 
+    @classmethod
+    def tearDownClass(cls):
+        #Finish by a File New command to check that it's not crashing when cleaning up everything'
+        cmds.file(new=True, force=True)
+
     def setupScene(self):
         self.setHdStormRenderer()
 
@@ -52,7 +57,7 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
 
             #Create a FlowViewportAPIMayaLocator node which adds a dataProducerSceneIndex and a Filtering scene index
             flowViewportNodeName = cmds.createNode("FlowViewportAPIMayaLocator")
-            self.assertFalse(flowViewportNodeName == None)
+            self.assertIsNotNone(flowViewportNodeName)
             #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
             cmds.setAttr(flowViewportNodeName + '.dummyInput', 2)#setting this will set dirty the dummyOutput attribute
             cmds.getAttr(flowViewportNodeName + '.dummyOutput')#getting this value will trigger a call to compute
@@ -63,11 +68,8 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             #Move the transform node, the added prims (cube grid) should move as well
             # Get the transform node of the FlowViewportAPIMayaLocator
             transformNode = cmds.listRelatives(flowViewportNodeName, parent=True)[0]
-            self.assertFalse(transformNode == None)
-            #Select the transform node
-            cmds.select(transformNode)
-            # Move the selected node
-            cmds.move(10, 5, -5)
+            self.assertIsNotNone(transformNode)
+            cmds.move(10, 5, -5, transformNode)
             cmds.refresh()
             self.assertSnapshotClose("add_NodeMoved.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
@@ -95,10 +97,7 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             cmds.undo()
             self.assertSnapshotClose("add_NodeDeletedUndoAgain.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-            #Move transform node again to see if it still updates the added prims transform
-            cmds.select(transformNode)
-            # Move the selected node
-            cmds.move(-20, -5, 0)
+            cmds.move(-20, -5, 0, transformNode)
             cmds.refresh()
             self.assertSnapshotClose("add_NodeMovedAfterDeletionAndUndo.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
@@ -107,9 +106,6 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             #Switch back to Storm
             self.setHdStormRenderer()
             self.assertSnapshotClose("add_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
-            #Finish by a File New command
-            cmds.file(new=True, force=True)
 
     #Test filtering primitives
     def test_FilteringPrimitives(self):
@@ -122,7 +118,7 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
 
             #Create a FlowViewportAPIMayaLocator node which adds a dataProducerSceneIndex and a Filtering scene index
             flowViewportNodeName = cmds.createNode("FlowViewportAPIMayaLocator")
-            self.assertFalse(flowViewportNodeName == None)
+            self.assertIsNotNone(flowViewportNodeName)
             #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
             cmds.setAttr(flowViewportNodeName + '.dummyInput', 3)#setting this will set dirty the dummyOutput attribute
             cmds.getAttr(flowViewportNodeName + '.dummyOutput')#getting this value will trigger a call to compute
@@ -133,11 +129,8 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             #Move the transform node, the added prims (cube grid) should move as well
             # Get the transform node of the FlowViewportAPIMayaLocator
             transformNode = cmds.listRelatives(flowViewportNodeName, parent=True)[0]
-            self.assertFalse(transformNode == None)
-            #Select the transform node
-            cmds.select(transformNode)
-            # Move the selected node
-            cmds.move(15, 0, 0)
+            self.assertIsNotNone(transformNode)
+            cmds.move(15, 0, 0, transformNode)
             cmds.refresh()
             self.assertSnapshotClose("filter_NodeMoved.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
@@ -193,9 +186,6 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             cmds.setAttr(sphereShape + '.subdivisionsAxis', 30) #Unfilter the prim
             cmds.refresh()
             self.assertSnapshotClose("filter_VP2AndThenBackToStorm_MovedSphereUnFiltered.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
-            #Finish by a File New command
-            cmds.file(new=True, force=True)
     
     #Test Cube grids parameters
     def test_CubeGrid(self):
@@ -204,7 +194,7 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             
             #Create a FlowViewportAPIMayaLocator node which adds a dataProducerSceneIndex and a Filtering scene index
             flowViewportNodeName = cmds.createNode("FlowViewportAPIMayaLocator")
-            self.assertFalse(flowViewportNodeName == None)
+            self.assertIsNotNone(flowViewportNodeName)
 
             #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
             cmds.setAttr(flowViewportNodeName + '.dummyInput', 2)#setting this will set dirty the dummyOutput attribute
@@ -250,9 +240,6 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             self.setHdStormRenderer()
             self.assertSnapshotClose("cubeGrid_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-            #Finish by a File New command
-            cmds.file(new=True, force=True)
-
     #Test multiple nodes
     def test_MultipleNodes(self):
         self.setupScene()
@@ -260,7 +247,7 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             
             #Create a FlowViewportAPIMayaLocator node which adds a dataProducerSceneIndex and a Filtering scene index
             flowViewportNodeName1 = cmds.createNode("FlowViewportAPIMayaLocator", n="nodeShape1")
-            self.assertFalse(flowViewportNodeName1 == None)
+            self.assertIsNotNone(flowViewportNodeName1)
 
             #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
             cmds.setAttr(flowViewportNodeName1 + '.dummyInput', 2)#setting this will set dirty the dummyOutput attribute
@@ -286,16 +273,13 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             #Move the transform node, the added prims (cube grid) should move as well
             # Get the transform node of the FlowViewportAPIMayaLocator
             transformNode1 = cmds.listRelatives(flowViewportNodeName1, parent=True)[0]
-            self.assertFalse(transformNode1 == None)
-            #Select the transform node
-            cmds.select(transformNode1)
-            # Move the selected node
-            cmds.move(-10, 0, 0)
+            self.assertIsNotNone(transformNode1)
+            cmds.move(-10, 0, 0, transformNode1)
             cmds.refresh()
             
             #Create a FlowViewportAPIMayaLocator node which adds a dataProducerSceneIndex and a Filtering scene index
             flowViewportNodeName2 = cmds.createNode("FlowViewportAPIMayaLocator", n="nodeShape2")
-            self.assertFalse(flowViewportNodeName2 == None)
+            self.assertIsNotNone(flowViewportNodeName2)
 
             #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
             cmds.setAttr(flowViewportNodeName2 + '.dummyInput', 3)#setting this will set dirty the dummyOutput attribute
@@ -321,11 +305,8 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             #Move the transform node, the added prims (cube grid) should move as well
             # Get the transform node of the FlowViewportAPIMayaLocator
             transformNode2 = cmds.listRelatives(flowViewportNodeName2, parent=True)[0]
-            self.assertFalse(transformNode2 == None)
-            #Select the transform node
-            cmds.select(transformNode2)
-            # Move the selected node
-            cmds.move(-30, 0, -30)
+            self.assertIsNotNone(transformNode2)
+            cmds.move(-30, 0, -30, transformNode2)
             cmds.refresh()
             
             self.assertSnapshotClose("multipleNodes_BeforeModifs.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
@@ -360,9 +341,6 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             self.setHdStormRenderer()
             self.assertSnapshotClose("multipleNodes_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-            #Finish by a File New command
-            cmds.file(new=True, force=True)
-
     #Test multiple viewports
     def test_MultipleViewports(self):
         with PluginLoaded('flowViewportAPIMayaLocator'):
@@ -380,15 +358,12 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             
             #Create a maya sphere
             sphereNode, sphereShape = cmds.polySphere()
-            #Select the transform node
-            cmds.select(sphereNode)
-            # Move the selected node
-            cmds.move(15, 0, 0)
+            cmds.move(15, 0, 0, sphereNode)
             cmds.refresh()
 
             #Create a FlowViewportAPIMayaLocator node which adds a dataProducerSceneIndex and a Filtering scene index
             flowViewportNodeName1 = cmds.createNode("FlowViewportAPIMayaLocator", n="nodeShape1")
-            self.assertFalse(flowViewportNodeName1 == None)
+            self.assertIsNotNone(flowViewportNodeName1)
 
             #When the node above is created, its compute method is not called automatically, so work around to trigger a call to compute
             cmds.setAttr(flowViewportNodeName1 + '.dummyInput', 2)#setting this will set dirty the dummyOutput attribute
@@ -443,7 +418,5 @@ class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
             self.setHdStormRenderer()
             self.assertSnapshotClose("multipleViewports_VP2AndThenBackToStorm_modPan2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-            #Finish by a File New command
-            cmds.file(new=True, force=True)
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

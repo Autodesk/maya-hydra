@@ -112,7 +112,6 @@ void DataProducerSceneIndexDataBase::_CreateSceneIndexChainForDataProducerSceneI
 HdSceneIndexBaseRefPtr DataProducerSceneIndexDataBase::_CreateUsdStageSceneIndexChain(HdSceneIndexBaseRefPtr const & inputStageSceneIndex)
 {
     _CreateSceneIndexChainForDataProducerSceneIndexWithDCCNode(inputStageSceneIndex);
-    UpdateHydraTransformFromParentPath();//Update the transform, this is useful when deleting the node and undoing it
     return _lastSceneIndexChain;
 }
 
@@ -136,6 +135,7 @@ void DataProducerSceneIndexDataBase::_CreateSceneIndexChainForDataProducerSceneI
 {
     _rootOverridesSceneIndex    = UsdImagingRootOverridesSceneIndex::New(inputSceneIndex);
     _lastSceneIndexChain        = _rootOverridesSceneIndex;
+    UpdateHydraTransformFromParentPath();//Update the transform, this is useful when deleting the node and undoing it
 }
 
 void DataProducerSceneIndexDataBase::_CreateSceneIndexChainForDataProducerSceneIndexWithoutDCCNode(HdSceneIndexBaseRefPtr const & inputSceneIndex)
