@@ -30,6 +30,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNurbsPrimitives.py
     testCurveTools.py
     testPolygonPrimitives.py
+    testFootPrintNode.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py
@@ -42,6 +43,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testFlowViewportAPIAddPrims.py
     cpp/testUsdStageLayerMuting.py
     cpp/testFlowViewportAPIFilterPrims.py
+    cpp/testSceneCorrectness.py
     cpp/testPrimInstancing.py
     cpp/testPicking.py
 )

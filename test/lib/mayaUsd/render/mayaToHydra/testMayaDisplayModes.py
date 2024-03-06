@@ -48,50 +48,55 @@ class TestMayaDisplayModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
                 "testMayaDisplayModes",
                 "testMayaDisplayModes.ma")
         cmds.refresh()
-
         panel = mayaUtils.activeModelPanel()
+        
+        #start with default lights        
+        cmds.modelEditor(panel, edit=True, displayLights="default")
         
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=False)
 
         #Use Default Material
         cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
         cmds.refresh()
-        self.assertSnapshotClose("defaultMaterial" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("defaultMaterial" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)        
+        cmds.modelEditor(panel, edit=True, useDefaultMaterial=False)
 
+        #xray mode
+        cmds.modelEditor(panel, edit=True, xray=True)
+        cmds.refresh()
+        self.assertSnapshotClose("xray" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)        
+        cmds.modelEditor(panel, edit=True, xray=False)
+        
         #WireframeOnShaded mode
+        cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
         cmds.refresh()
         self.assertSnapshotClose("wireframeOnShaded" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=False)
-
-        #Shadows mode
-        cmds.modelEditor(panel, edit=True, shadows=True)
-        cmds.refresh()
-        self.assertSnapshotClose("shadows" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-        cmds.modelEditor(panel, edit=True, shadows=False)
+        cmds.modelEditor(panel, edit=True, useDefaultMaterial=False)
 
         #All Lights mode
         cmds.modelEditor(panel, edit=True, displayLights="all")
         cmds.refresh()
         self.assertSnapshotClose("allLights" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-
-        #xray mode
-        cmds.modelEditor(panel, edit=True, xray=True)
+        
+        #Shadows mode
+        cmds.modelEditor(panel, edit=True, shadows=True)
         cmds.refresh()
-        self.assertSnapshotClose("xray" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-        cmds.modelEditor(panel, edit=True, xray=False)
-
-        #Display texures mode        
-        cmds.modelEditor(panel, edit=True, useDefaultMaterial=False)
-        cmds.modelEditor(panel, edit=True, displayTextures=True)
-        cmds.refresh()
-        self.assertSnapshotClose("displayTextures" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)     
-        cmds.modelEditor(panel, edit=True, displayTextures=False)
-
+        self.assertSnapshotClose("shadows" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        cmds.modelEditor(panel, edit=True, shadows=False)
+        
         #Smoothshaded Material
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
         cmds.refresh()
-        self.assertSnapshotClose("smoothShaded" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("smoothShaded" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)        
+        cmds.modelEditor(panel, edit=True, displayLights="default")   #revert to default lighting 
+
+        #Display texures mode         
+        cmds.modelEditor(panel, edit=True, displayTextures=True)  
+        cmds.refresh()
+        self.assertSnapshotClose("displayTextures" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)     
+        cmds.modelEditor(panel, edit=True, displayTextures=False)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

@@ -39,6 +39,9 @@ import sys
 
 mayaSeparator = "|"
 
+HD_STORM = "HdStormRendererPlugin"
+HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
+
 def loadPlugin(pluginName):
     """ 
         Load all given plugins created or needed by maya-ufe-plugin 
@@ -124,9 +127,17 @@ def getMayaSelectionList():
     else:
         return [x for x in cmds.ls(sl=True)]
 
+def isHydraRenderer():
+    activeEditor = cmds.playblast(activeEditor=1)
+    activeRenderer = cmds.modelEditor(activeEditor, q=True,rendererOverrideName=True)
+    return activeRenderer == HD_STORM_OVERRIDE
+
 def openTestScene(*args):
     filePath = testUtils.getTestScene(*args)
     cmds.file(filePath, force=True, open=True)
+    if isHydraRenderer():        
+        cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", True)
+
 
 def openTopLayerScene():
     '''
