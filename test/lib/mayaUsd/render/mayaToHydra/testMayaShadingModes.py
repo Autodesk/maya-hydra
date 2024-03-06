@@ -38,7 +38,7 @@ class TestMayaShadingModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
         # for that platform specifically for now, so we can still catch issues on other platforms.
         if platform.system() == "Darwin":
-            return 5
+            return 6.5
         return 0.2
 
     def test_MayaShadingModes(self):
