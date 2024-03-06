@@ -53,13 +53,14 @@ class TestMayaDisplayModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=False)
 
-        # #Use Default Material
-        # cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
-        # cmds.refresh()
-        # self.assertSnapshotClose("defaultMaterial" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-        # cmds.refresh()
+        #Use Default Material
+        cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
+        cmds.refresh()
+        self.assertSnapshotClose("defaultMaterial" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        cmds.refresh()
 
         #xray mode
+        cmds.modelEditor(panel, edit=True, useDefaultMaterial=False)
         cmds.modelEditor(panel, edit=True, xray=True)
         cmds.refresh()
         self.assertSnapshotClose("xray" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)        
