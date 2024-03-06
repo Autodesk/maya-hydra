@@ -36,6 +36,7 @@ target_sources(${TARGET_NAME}
         testPrimInstancing.cpp
         testPicking.cpp
         testPointInstancePicking.cpp
+        testUsdNativeInstancePicking.cpp
 )
 
 # -----------------------------------------------------------------------------
