@@ -1,2 +1,2 @@
-add_subdirectory(flowViewportAPIMayaLocator)
+add_subdirectory(flowViewportAPILocator)
 add_subdirectory(footPrintNode)
