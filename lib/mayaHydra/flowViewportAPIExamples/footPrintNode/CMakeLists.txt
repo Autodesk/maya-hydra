@@ -1,4 +1,4 @@
-set(TARGET_NAME flowViewportAPIMayaLocator)
+set(TARGET_NAME mayaHydraFootPrintNode)
 
 add_library(${TARGET_NAME} SHARED)
 
@@ -7,7 +7,7 @@ add_library(${TARGET_NAME} SHARED)
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME} 
     PRIVATE
-        flowViewportAPIMayaLocator.cpp
+        mhFootPrintNode.cpp
 )
 
 set(HEADERS
@@ -67,15 +67,16 @@ if(IS_MACOSX OR IS_LINUX)
     mayaUsd_init_rpath(rpath "lib/maya")
     if(DEFINED MAYAUSD_TO_USD_RELATIVE_PATH)
         mayaUsd_add_rpath(rpath "../../${MAYAUSD_TO_USD_RELATIVE_PATH}/lib")
+        if (IS_LINUX)
+            mayaUsd_add_rpath(rpath "../../${MAYAUSD_TO_USD_RELATIVE_PATH}/lib64")
+        endif()
+        if(IS_MACOSX)
+            mayaUsd_add_rpath(rpath "../../../../Maya.app/Contents/MacOS")
+        endif()
     elseif(DEFINED PXR_USD_LOCATION)
         mayaUsd_add_rpath(rpath "${PXR_USD_LOCATION}/lib")
     endif()
-    if (IS_LINUX AND DEFINED MAYAUSD_TO_USD_RELATIVE_PATH)
-        mayaUsd_add_rpath(rpath "../../${MAYAUSD_TO_USD_RELATIVE_PATH}/lib64")
-    endif()
-    if(IS_MACOSX AND DEFINED MAYAUSD_TO_USD_RELATIVE_PATH)
-        mayaUsd_add_rpath(rpath "../../../../Maya.app/Contents/MacOS")
-    endif()
+    
     mayaUsd_add_rpath(rpath "../")
     mayaUsd_install_rpath(rpath ${TARGET_NAME})
 endif()
@@ -87,10 +88,8 @@ install(TARGETS ${TARGET_NAME}
         DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/maya)
 
 if(IS_WINDOWS)
-    if (NOT CODE_COVERAGE)
-        install(FILES $<TARGET_PDB_FILE:${TARGET_NAME}> 
+    install(FILES $<TARGET_PDB_FILE:${TARGET_NAME}> 
             DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/maya OPTIONAL)
-    endif()
 endif()
 
 set(LIBFILENAME ${CMAKE_SHARED_LIBRARY_PREFIX}${TARGET_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX})

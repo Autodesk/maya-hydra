@@ -30,6 +30,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNurbsPrimitives.py
     testCurveTools.py
     testPolygonPrimitives.py
+    testFootPrintNode.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py
