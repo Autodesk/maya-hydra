@@ -33,15 +33,7 @@ const HdRetainedContainerDataSourceHandle sSelectedDisplayStyleDataSource
         HdRetainedContainerDataSource::New(
             HdLegacyDisplayStyleSchemaTokens->reprSelector,
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
-                { HdReprTokens->refinedWireOnSurf, HdReprTokens->wireOnSurf, TfToken() })));
-
-const HdRetainedContainerDataSourceHandle sUnselectedDisplayStyleDataSource
-    = HdRetainedContainerDataSource::New(
-        HdLegacyDisplayStyleSchemaTokens->displayStyle,
-        HdRetainedContainerDataSource::New(
-            HdLegacyDisplayStyleSchemaTokens->reprSelector,
-            HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
-                { HdReprTokens->refined, HdReprTokens->refined, TfToken() })));
+                { HdReprTokens->refinedWireOnSurf, TfToken(), TfToken() })));
 
 const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
@@ -88,10 +80,10 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
     // index to convert implicit surfaces (e.g. USD cube / cone / sphere /
     // capsule primitive types) to meshes.
     if (!isExcluded(primPath) && prim.primType == HdPrimTypeTokens->mesh) {
-        prim.dataSource = HdOverlayContainerDataSource::New(
-            { prim.dataSource, _selection->HasFullySelectedAncestorInclusive(primPath) ? 
-                sSelectedDisplayStyleDataSource : 
-                sUnselectedDisplayStyleDataSource });
+        if (_selection->HasFullySelectedAncestorInclusive(primPath)) {
+            prim.dataSource = HdOverlayContainerDataSource::New(
+                { prim.dataSource, sSelectedDisplayStyleDataSource });
+        }
     }
     return prim;
 }
