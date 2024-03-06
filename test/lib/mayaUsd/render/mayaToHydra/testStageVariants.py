@@ -31,6 +31,7 @@ class TestStageVariants(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTest
 
     @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_UsdStageVariants(self):
+        import usdUtils
         from mayaUsd import lib as mayaUsdLib
         # usdUtils imports mayaUsd.ufe
         import usdUtils

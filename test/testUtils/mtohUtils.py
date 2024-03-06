@@ -63,12 +63,14 @@ class MayaHydraBaseTestCase(unittest.TestCase):
         # so open a new file before each test to minimize leftovers
         # from previous tests.
         cmds.file(new=True, force=True)
+        self.setHdStormRenderer()
 
     def setHdStormRenderer(self):
         self.activeEditor = cmds.playblast(activeEditor=1)
         cmds.modelEditor(
             self.activeEditor, e=1,
             rendererOverrideName=HD_STORM_OVERRIDE)
+        cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", True)
         cmds.refresh(f=1)
         self.delegateId = cmds.mayaHydra(renderer=HD_STORM,
                                     sceneDelegateId="MayaHydraSceneDelegate")

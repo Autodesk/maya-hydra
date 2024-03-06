@@ -82,7 +82,7 @@ bool hasSelectionHighlight(const HdSceneIndexPrim& prim)
         return false;
     }
     
-    static VtArray<TfToken> expected({HdReprTokens->refinedWireOnSurf, HdReprTokens->wireOnSurf, TfToken()});
+    static VtArray<TfToken> expected({HdReprTokens->refinedWireOnSurf, TfToken(), TfToken()});
 
     return taDs->GetValue(0) == expected;
 }
