@@ -103,6 +103,14 @@ set(MSVC_DEFINITIONS
     # since it was added in Visual Studio 2015.
     HAVE_SNPRINTF
 
+    # In debug builds, Boost's wrap_python.hpp will #undef _DEBUG when BOOST_DEBUG_PYTHON is not defined,
+    # and will then include pyconfig.h :
+    # https://github.com/boostorg/python/blob/boost-1.81.0/include/boost/python/detail/wrap_python.hpp#L23-L57
+    # pyconfig.h will then autolink the Python lib; however, since _DEBUG was #undef'd, it will try to
+    # link against the release version of the Python lib, causing a linker error :
+    # https://github.com/python/cpython/blob/v3.11.4/PC/pyconfig.h#L269-L286
+    $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_DEBUG_PYTHON>
+
     # When using the qmath.h Qt header, we can run into macro redefinition issues.
     # Specifically, qmath.h wants to define the math macros listed here :
     # https://learn.microsoft.com/en-us/cpp/c-runtime-library/math-constants?view=msvc-170
@@ -202,13 +210,6 @@ function(mayaHydra_compile_config TARGET)
         target_compile_definitions(${TARGET} 
             PRIVATE
                 ${MSVC_DEFINITIONS}
-                # In debug builds, Boost's wrap_python.hpp will #undef _DEBUG when BOOST_DEBUG_PYTHON is not defined,
-                # and will then include pyconfig.h :
-                # https://github.com/boostorg/python/blob/boost-1.81.0/include/boost/python/detail/wrap_python.hpp#L23-L57
-                # pyconfig.h will then autolink the Python lib; however, since _DEBUG was #undef'd, it will try to
-                # link against the release version of the Python lib, causing a linker error :
-                # https://github.com/python/cpython/blob/v3.11.4/PC/pyconfig.h#L269-L286
-                $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:BOOST_DEBUG_PYTHON>
         )
     endif()
 
