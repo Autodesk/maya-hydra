@@ -121,7 +121,7 @@ set(MSVC_DEFINITIONS
     # This can lead to the following scenario : 
     # 1. _USE_MATH_DEFINES is not defined.
     # 2. We hit an #include <cmath> or <cstdlib>.
-    # 3. The cmath or cstdlib header guards activate.
+    # 3. The cmath or cstdlib header guards get defined.
     # 4. math.h gets included, but since _USE_MATH_DEFINES is not defined, corecrt_math_defines.h
     #    is not included, and the math macros do not get defined.
     # 5. We hit an #include <qmath.h>.
