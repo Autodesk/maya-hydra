@@ -102,6 +102,43 @@ set(MSVC_DEFINITIONS
     # Needed to prevent Python from adding a define for snprintf
     # since it was added in Visual Studio 2015.
     HAVE_SNPRINTF
+
+    # When using the qmath.h Qt header, we can run into macro redefinition issues.
+    # Specifically, qmath.h wants to define the math macros listed here :
+    # https://learn.microsoft.com/en-us/cpp/c-runtime-library/math-constants?view=msvc-170
+    # To do so, it will first try to include cmath. cmath includes cstdlib, which includes math.h,
+    # which includes corecrt_math_defines.h, which defines the math macros.
+    # However, corecrt_math_defines.h is only included by math.h if _USE_MATH_DEFINES is defined.
+    # If _USE_MATH_DEFINES is not defined, Qt will temporarily define it itself, include cmath 
+    # so that corecrt_math_defines.h ends up defining the math macros, and undefine it afterwards. See here :
+    # https://github.com/qt/qtbase/blob/85c69f023fe281b7f16e1a93e61be4432f7fef9b/src/corelib/kernel/qmath.h#L18-L28
+    # If the math macros are still not defined after that, Qt will resort to defining the macros itself : 
+    # https://github.com/qt/qtbase/blob/85c69f023fe281b7f16e1a93e61be4432f7fef9b/src/corelib/kernel/qmath.h#L188-L238
+    # As such, it is guaranteed that the math macros are defined after including qmath.h.
+    # So what's the issue? Well, 2 things combined. First, it turns out that while cmath, cstdlib and 
+    # corecrt_math_defines.h have header guards, math.h does not. Second, corecrt_math_defines.h does
+    # not check that the math macros are not defined before defining them itself.
+    # This can lead to the following scenario : 
+    # 1. _USE_MATH_DEFINES is not defined.
+    # 2. We hit an #include <cmath> or <cstdlib>.
+    # 3. The cmath or cstdlib header guards activate.
+    # 4. math.h gets included, but since _USE_MATH_DEFINES is not defined, corecrt_math_defines.h
+    #    is not included, and the math macros do not get defined.
+    # 5. We hit an #include <qmath.h>.
+    # 6. Qt temporarily defines _USE_MATH_DEFINES and includes cmath.
+    # 7. We hit the cmath or cstdlib header guard and stop the inclusion, not reaching math.h 
+    #    and corecrt_math_defines.h. The math macros are still not defined.
+    # 8. Qt sees that the math macros are still not defined, and defines them itself.
+    # 9. _USE_MATH_DEFINES gets defined.
+    # 10. We hit an #include <math.h>.
+    # 11. Since there is no header guard for math.h, it is re-included.
+    # 12. As _USE_MATH_DEFINES is now defined, corecrt_math_defines.h does get included this time.
+    # 13. corecrt_math_defines.h defines the macros without checking if they have already been defined :
+    #     macro redefinition -> warning -> warning treated-as-error -> error -> compilation fails.
+    # By defining _USE_MATH_DEFINES from the get-go, we ensure that the math macros get defined by
+    # corecrt_math_defines.h the first time around. Afterwards, even if math.h does not have a
+    # header guard, the one in corecrt_math_defines.h avoids redefining the macros.
+    _USE_MATH_DEFINES
 )
 
 #------------------------------------------------------------------------------
