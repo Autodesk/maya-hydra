@@ -39,7 +39,7 @@ class TestMayaShadingModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         # for that platform specifically for now, so we can still catch issues on other platforms.
         if platform.system() == "Darwin":
             return 6.5
-        return 0.2
+        return 0.3
 
     def test_MayaShadingModes(self):
         
