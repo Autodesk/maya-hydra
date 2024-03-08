@@ -143,6 +143,8 @@ set(MSVC_DEFINITIONS
     # 12. As _USE_MATH_DEFINES is now defined, corecrt_math_defines.h does get included this time.
     # 13. corecrt_math_defines.h defines the macros without checking if they have already been defined :
     #     macro redefinition -> warning -> warning treated-as-error -> error -> compilation fails.
+    # In our case, step 9 (_USE_MATH_DEFINES getting defined late) happens in MTypes.h, and step 10 
+    # (math.h re-inclusion) in some other Maya headers, for example MFloatVector.h.
     # By defining _USE_MATH_DEFINES from the get-go, we ensure that the math macros get defined by
     # corecrt_math_defines.h the first time around. Afterwards, even if math.h does not have a
     # header guard, the one in corecrt_math_defines.h avoids redefining the macros.
