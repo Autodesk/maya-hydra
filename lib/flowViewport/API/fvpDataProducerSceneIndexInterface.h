@@ -43,7 +43,7 @@ namespace FVP_NS_DEF
         *  @brief       Adds a custom data producer scene index.
         *
         *               Adds a custom data producer scene index and associate it to be used in the same rendering as the hydra viewport whose identifier is hydraViewportId 
-        *               (or all hydra viewports if hydraViewportId is DataProducerSceneIndexInterface::allViewports). 
+        *               (or all hydra viewports if hydraViewportId is PXR_NS::FvpViewportAPITokens->allViewports). 
         *               Basically, we merge this scene index with the others scene indices from the viewport which are the usd stages, the DCC native 
         *               data and any others custom data producer scene indices like this one.
         * 
@@ -58,17 +58,14 @@ namespace FVP_NS_DEF
         *               Basically, this is a way for you to set the DCC node as a parent node for all your primitives from the scene index.
         * 
         *  @param[in]   hydraViewportId is a Hydra viewport string identifier to which customDataProducerSceneIndex needs to be associated to. 
-        *               Set it to DataProducerSceneIndexInterface::allViewports to add this data producer scene index to all viewports. 
+        *               Set it to PXR_NS::FvpViewportAPITokens->allViewports to add this data producer scene index to all viewports. 
         *               To retrieve a specific hydra viewport identifier, please use the InformationInterface class.
         * 
         *  @param[in]  rendererNames : are the Hydra renderer names to which this scene index should be added.
-        *              This is only used when hydraViewportId is set to DataProducerSceneIndexInterface::allViewports, meaning you want to add this scene index to all viewports 
+        *              This is only used when hydraViewportId is set to PXR_NS::FvpViewportAPITokens->allViewports, meaning you want to add this scene index to all viewports 
         *              that are using these renderers.
         *              To apply to multiple renderers, use a separator such as ",". E.g : "GL, Arnold". We are actually looking for the render delegate's name in this string.
-        *              Set this parameter to FvpViewportAPITokens->allRenderers to add your scene index to all viewports whatever their renderer is.
-        * 
-        *  @param[in]  customDataProducerSceneIndexRootPathForInsertion is the root path for insertion used as a second parameter of HdRenderIndex::InsertSceneIndex method.
-        *              e.g : renderIndex.InsertSceneIndex(customDataProducerSceneIndex, customDataProducerSceneIndexRootPathForInsertion);
+        *              Set this parameter to PXR_NS::FvpViewportAPITokens->allRenderers to add your scene index to all viewports whatever their renderer is.
         * 
         *  @return     true if the operation succeeded, false otherwise.
         */
@@ -86,8 +83,7 @@ namespace FVP_NS_DEF
         * 
         *  @param[in]  customDataProducerSceneIndex is the custom scene index to remove.
         * 
-        *  @param[in]  hydraViewportId is the hydra viewport string identifier to which customDataProducerSceneIndex was associated to or DataProducerSceneIndexInterface::allViewports
-        *               if it was applied to all viewports.
+        *  @param[in]  hydraViewportId is the hydra viewport string identifier to which customDataProducerSceneIndex was associated to.
         */
         virtual void removeViewportDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
                                                           const std::string& hydraViewportId = PXR_NS::FvpViewportAPITokens->allViewports
