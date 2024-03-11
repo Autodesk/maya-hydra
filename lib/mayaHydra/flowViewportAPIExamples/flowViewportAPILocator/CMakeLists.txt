@@ -1,4 +1,4 @@
-set(TARGET_NAME flowViewportAPIMayaLocator)
+set(TARGET_NAME mayaHydraFlowViewportAPILocator)
 
 add_library(${TARGET_NAME} SHARED)
 
@@ -7,7 +7,7 @@ add_library(${TARGET_NAME} SHARED)
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME} 
     PRIVATE
-        flowViewportAPIMayaLocator.cpp
+        mhFlowViewportAPILocator.cpp
 )
 
 set(HEADERS
