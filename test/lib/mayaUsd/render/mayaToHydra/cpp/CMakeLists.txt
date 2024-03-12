@@ -29,6 +29,7 @@ target_sources(${TARGET_NAME}
         testFlowViewportAPIFilterPrims.cpp
         testSceneCorrectness.cpp
         testPrimInstancing.cpp
+        testNurbsSurfaces.cpp
 )
 
 # -----------------------------------------------------------------------------

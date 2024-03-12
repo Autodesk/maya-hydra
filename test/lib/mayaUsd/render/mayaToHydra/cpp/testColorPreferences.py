@@ -40,10 +40,6 @@ class TestColorPreferences(mtohUtils.MayaHydraBaseTestCase):
     def tearDown(self):
         self.resetColorPrefs()
 
-    def runCppTest(self, testFilter: str):
-        with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(f=testFilter)
-
     # Individual tests
     def test_rgbaColorNotification(self):
         self.runCppTest("ColorPreferences.rgbaColorNotification")
