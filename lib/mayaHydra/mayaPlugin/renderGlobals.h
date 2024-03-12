@@ -19,7 +19,7 @@
 #include "pluginUtils.h"
 #include "tokens.h"
 
-#include <mayaHydraLib/delegates/params.h>
+#include <mayaHydraLib/mayaHydraParams.h>
 
 #include <pxr/base/gf/vec4f.h>
 #include <pxr/base/tf/token.h>

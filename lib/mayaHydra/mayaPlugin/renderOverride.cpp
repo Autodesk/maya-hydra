@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Luma Pictures
+// Copyright 2024 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,8 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Copyright 2023 Autodesk, Inc. All rights reserved.
-//
+
 
 // GL loading library needs to be included before any other OpenGL headers.
 #include <pxr/imaging/garch/glApi.h>
@@ -26,8 +25,6 @@
 #include "renderOverrideUtils.h"
 #include "tokens.h"
 
-#include <mayaHydraLib/delegates/delegateRegistry.h>
-#include <mayaHydraLib/delegates/sceneDelegate.h>
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
 #include <mayaHydraLib/hydraUtils.h>
@@ -230,7 +227,6 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
             _rendererDesc.rendererName.GetText(),
             _rendererDesc.overrideName.GetText(),
             _rendererDesc.displayName.GetText());
-    MayaHydraDelegateRegistry::InstallDelegatesChangedSignal([this]() { _needsClear.store(true); });
     _ID = SdfPath("/MayaHydraViewportRenderer")
               .AppendChild(
                   TfToken(TfStringPrintf("_MayaHydra_%s_%p", desc.rendererName.GetText(), this)));
@@ -781,7 +777,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
         _taskController->SetRenderOutputs({ HdAovTokens->color });
     }
 
-    MayaHydraDelegate::InitData delegateInitData(
+    MayaHydraInitData mhInitData(
         TfToken(),
         _engine,
         _renderIndex,
@@ -800,7 +796,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 
     _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(_renderIndex);
 
-    _mayaHydraSceneProducer.reset(new MayaHydraSceneProducer(_renderIndexProxy, _ID, delegateInitData, !_hasDefaultLighting));
+    _mayaHydraSceneProducer.reset(new MayaHydraSceneProducer(_renderIndexProxy, _ID, mhInitData, !_hasDefaultLighting));
 
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
     _engine.SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);

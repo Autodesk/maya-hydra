@@ -26,8 +26,7 @@
 #include <maya/MViewport2Renderer.h>
 
 #include <mayaHydraLib/api.h>
-#include <mayaHydraLib/delegates/params.h>
-#include <mayaHydraLib/delegates/delegate.h>
+#include <mayaHydraLib/mayaHydraParams.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/usd/sdf/path.h>
@@ -45,16 +44,10 @@ class RenderIndexProxy;
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-class MayaHydraSceneDelegate;
 class MayaHydraAdapter;
-class MtohDefaultLightDelegate;
 
 /**
  * \brief MayaHydraSceneProducer is used to produce the hydra scene from Maya native scene.
- * Under the hood, the work is delegated to MayaHydraSceneIndex or MayaHydraSceneDelegate, depends on
- * if MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX is enabled or not. 
- * Note that MayaHydraSceneDelegate could be deprecated in the future.
  */
 class MAYAHYDRALIB_API MayaHydraSceneProducer
 {
@@ -62,7 +55,7 @@ public:
     MayaHydraSceneProducer(
         const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy,
         const SdfPath&               id,
-        MayaHydraDelegate::InitData& initData,
+        MayaHydraInitData& initData,
         bool                         lightEnabled);
     ~MayaHydraSceneProducer();
 
@@ -193,14 +186,6 @@ public:
 #endif
 
 private:
-
-    //
-    // Delegates, depends on if MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX is enabled or not.
-    // 
-    // SceneDelegate
-    std::shared_ptr<MayaHydraSceneDelegate> _sceneDelegate;
-    std::vector<MayaHydraDelegatePtr> _delegates;
-    std::unique_ptr<MtohDefaultLightDelegate> _defaultLightDelegate;
 
     // SceneIndex
     MayaHydraSceneIndexRefPtr _sceneIndex;

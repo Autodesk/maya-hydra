@@ -33,8 +33,7 @@
 #include "renderGlobals.h"
 #include "pluginUtils.h"
 
-#include <mayaHydraLib/delegates/delegate.h>
-#include <mayaHydraLib/delegates/params.h>
+#include <mayaHydraLib/mayaHydraParams.h>
 #include <mayaHydraLib/mayaHydraSceneProducer.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexDataFactoriesSetup.h>
 

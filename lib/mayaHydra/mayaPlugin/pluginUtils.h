@@ -28,7 +28,6 @@
 
 #include <string>
 #include <vector>
-
 namespace MAYAHYDRA_NS_DEF {
 
 constexpr auto MTOH_RENDER_OVERRIDE_PREFIX = "mayaHydraRenderOverride_";

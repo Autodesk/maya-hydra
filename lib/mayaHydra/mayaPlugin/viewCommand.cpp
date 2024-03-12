@@ -20,7 +20,6 @@
 #include "renderGlobals.h"
 #include "renderOverride.h"
 
-#include <mayaHydraLib/delegates/delegateRegistry.h>
 #include <mayaHydraLib/mhBuildInfo.h>
 #include <mayaHydraLib/mayaHydra.h>
 
@@ -142,8 +141,6 @@ MSyntax MtohViewCmd::createSyntax()
 
     syntax.addFlag(_getRendererDisplayName, _getRendererDisplayNameLong);
 
-    syntax.addFlag(_listDelegates, _listDelegatesLong);
-
     syntax.addFlag(_createRenderGlobals, _createRenderGlobalsLong);
 
     syntax.addFlag(_userDefaultsId, _userDefaultsIdLong);
@@ -222,14 +219,6 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
 
         const auto dn = MtohGetRendererPluginDisplayName(renderDelegateName);
         setResult(MString(dn.c_str()));
-    } else if (db.isFlagSet(_listDelegates)) {
-        for (const auto& delegate : MayaHydraDelegateRegistry::GetDelegateNames()) {
-            appendToResult(delegate.GetText());
-        }
-        // Want to return an empty list, not None
-        if (!isCurrentResultArray()) {
-            setResult(MStringArray());
-        }
     } else if (db.isFlagSet(_help)) {
         MString helpText = _helpText;
         if (db.isFlagSet(_verbose)) {

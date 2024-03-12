@@ -93,8 +93,6 @@ foreach(script ${TEST_SCRIPT_FILES})
             # Fallback to old color management. We will have to investigate
             # and introduce OCIOv2 compatible version of these tests.
             "MAYA_COLOR_MANAGEMENT_SYNCOLOR=1"
-
-            "MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX=1"
     )
 
     # Assign a CTest label to these tests for easy filtering.
@@ -118,8 +116,6 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
             "MAYA_COLOR_MANAGEMENT_SYNCOLOR=1"
 
             "MAYA_HYDRA_USE_MESH_ADAPTER=1"
-
-            "MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX=1"
     )
 
     # Assign a CTest label to these tests for easy filtering.
@@ -156,8 +152,6 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
             # Fallback to old color management. We will have to investigate
             # and introduce OCIOv2 compatible version of these tests.
             "MAYA_COLOR_MANAGEMENT_SYNCOLOR=1"
-
-            "MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX=1"
     )
 
     # Add a ctest label to these tests for easy filtering.
