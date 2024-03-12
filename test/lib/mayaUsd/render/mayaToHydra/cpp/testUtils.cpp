@@ -27,10 +27,19 @@
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
 
+#include <QApplication>
+
 #include <iostream>
 
 namespace {
 std::pair<int, char**> testingArgs{0, nullptr};
+
+// Store the ongoing state of the pressed moused & keyboard buttons.
+// These are normally kept track of internally by Qt and can be retrieved using 
+// methods of the same name. But since we are sending artificial events, Qt does 
+// not get the opportunity to set these, so we keep track of them manually here.
+Qt::MouseButtons      mouseButtons;
+Qt::KeyboardModifiers keyboardModifiers;
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -256,6 +265,51 @@ void setTestingArgs(int argc, char** argv)
 std::pair<int, char**> getTestingArgs()
 {
     return testingArgs;
+}
+
+void mouseMoveTo(QWidget* widget, QPoint localMousePos)
+{
+    QMouseEvent mouseMoveEvent(
+        QEvent::Type::MouseMove,
+        localMousePos,
+        widget->mapToGlobal(localMousePos),
+        Qt::MouseButton::NoButton,
+        mouseButtons,
+        keyboardModifiers);
+
+    QApplication::sendEvent(widget, &mouseMoveEvent);
+}
+
+void mousePress(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos)
+{
+    QMouseEvent mousePressEvent(
+        QEvent::Type::MouseButtonPress,
+        localMousePos,
+        widget->mapToGlobal(localMousePos),
+        mouseButton,
+        mouseButtons,
+        keyboardModifiers);
+
+    // Update mouse state
+    mouseButtons |= mouseButton;
+
+    QApplication::sendEvent(widget, &mousePressEvent);
+}
+
+void mouseRelease(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos)
+{
+    // Update mouse state
+    mouseButtons &= ~mouseButton;
+
+    QMouseEvent mouseReleaseEvent(
+        QEvent::Type::MouseButtonRelease,
+        localMousePos,
+        widget->mapToGlobal(localMousePos),
+        mouseButton,
+        mouseButtons,
+        keyboardModifiers);
+
+    QApplication::sendEvent(widget, &mouseReleaseEvent);
 }
 
 }
