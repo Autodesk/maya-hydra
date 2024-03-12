@@ -20,6 +20,7 @@ set(HEADERS
     api.h
     debugCodes.h
     hydraUtils.h
+    mayaHydraParams.h
     mayaHydraLibInterface.h
     mayaHydraLibInterfaceImp.h
     mayaUtils.h
@@ -200,5 +201,4 @@ endif()
 # subdirectories
 # -----------------------------------------------------------------------------
 add_subdirectory(adapters)
-add_subdirectory(delegates)
 add_subdirectory(sceneIndex)

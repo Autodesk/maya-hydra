@@ -20,7 +20,6 @@
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
-#include <mayaHydraLib/delegates/sceneDelegate.h>
 #include <mayaHydraLib/mayaHydraSceneProducer.h>
 
 #include <pxr/base/plug/plugin.h>

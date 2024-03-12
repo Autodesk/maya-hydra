@@ -1,5 +1,5 @@
 //
-// Copyright 2023 Autodesk, Inc. All rights reserved.
+// Copyright 2024 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -373,7 +373,7 @@ VtValue MayaHydraSceneIndex::_mayaDefaultMaterial;
 SdfPath MayaHydraSceneIndex::_mayaDefaultLightPath; // Common to all scene indexes
 
 MayaHydraSceneIndex::MayaHydraSceneIndex(
-    MayaHydraDelegate::InitData& initData,
+    MayaHydraInitData& initData,
     bool lightEnabled)
     : _ID(initData.delegateID)
     , _producer(initData.producer)

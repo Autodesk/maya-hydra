@@ -3,22 +3,6 @@
         {
             "Info": {
                 "Types": {
-                    # Delegates
-                    "MayaHydraDelegate": {
-                        "displayName": "Base type for all scene delegates in Hydra for Maya."
-                    },
-                    "MayaHydraSceneDelegate": {
-                        "bases": [
-                            "MayaHydraDelegate"
-                        ],
-                        "displayName": "Maya Shapes in Hydra for Maya."
-                    },
-                    "MayaHydraProxyDelegate": {
-                        "bases": [
-                            "MayaHydraDelegate"
-                        ],
-                        "displayName": "Proxy Shapes in Hydra for Maya"
-                    },
                     # Adapters
                     "MayaHydraAdapter": {
                         "displayName": "Base type for all node adapters in Hydra for Maya."

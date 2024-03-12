@@ -21,7 +21,6 @@
 #include <mayaHydraLib/adapters/materialAdapter.h>
 #include <mayaHydraLib/adapters/renderItemAdapter.h>
 #include <mayaHydraLib/adapters/shapeAdapter.h>
-#include <mayaHydraLib/delegates/delegateCtx.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/pxr.h>

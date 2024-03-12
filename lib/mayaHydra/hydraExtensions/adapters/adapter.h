@@ -19,12 +19,26 @@
 #define MAYAHYDRALIB_ADAPTER_H
 
 #include <mayaHydraLib/api.h>
-#include <mayaHydraLib/delegates/delegateCtx.h>
 
+#include <pxr/imaging/hd/sceneDelegate.h>
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
+#include <pxr/base/arch/hints.h>
+#include <pxr/base/gf/interval.h>
+#include <pxr/imaging/hd/engine.h>
+#include <pxr/imaging/hd/renderIndex.h>
+#include <pxr/imaging/hd/rendererPlugin.h>
+#include <pxr/imaging/hd/selection.h>
+#include <pxr/imaging/hdx/pickTask.h>
+#include <pxr/imaging/hdx/taskController.h>
 
 #include <maya/MMessage.h>
+#include <maya/MAnimControl.h>
+#include <maya/MDGContextGuard.h>
+#include <maya/MDrawContext.h>
+#include <maya/MPointArray.h>
+#include <maya/MSelectionContext.h>
+#include <maya/MSelectionList.h>
 
 #include <vector>
 

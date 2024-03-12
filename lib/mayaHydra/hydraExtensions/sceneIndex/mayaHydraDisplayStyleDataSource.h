@@ -31,7 +31,7 @@ class MayaHydraSceneIndex;
 /**
  * \brief A container data source representing data unique to display style
  */
- class MayaHydraDisplayStyleDataSource : public HdContainerDataSource
+class MayaHydraDisplayStyleDataSource : public HdContainerDataSource
 {
 public:
     HD_DECLARE_DATASOURCE(MayaHydraDisplayStyleDataSource);

@@ -25,8 +25,7 @@
 #include <maya/MDrawContext.h>
 
 #include <mayaHydraLib/api.h>
-#include <mayaHydraLib/delegates/params.h>
-#include <mayaHydraLib/delegates/delegate.h>
+#include <mayaHydraLib/mayaHydraParams.h>
 #include <mayaHydraLib/adapters/shapeAdapter.h>
 #include <mayaHydraLib/adapters/renderItemAdapter.h>
 #include <mayaHydraLib/adapters/materialAdapter.h>
@@ -57,6 +56,38 @@ class RenderIndexProxy;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+struct MayaHydraInitData
+{
+    MayaHydraInitData(
+        TfToken            nameIn,
+        HdEngine&          engineIn,
+        HdRenderIndex*     renderIndexIn,
+        HdRendererPlugin*  rendererPluginIn,
+        HdxTaskController* taskControllerIn,
+        const SdfPath&     delegateIDIn,
+        bool               isHdStIn,
+        MayaHydraSceneProducer* producerIn = nullptr)
+        : name(nameIn)
+        , engine(engineIn)
+        , renderIndex(renderIndexIn)
+        , rendererPlugin(rendererPluginIn)
+        , taskController(taskControllerIn)
+        , delegateID(delegateIDIn)
+        , isHdSt(isHdStIn)
+        , producer(producerIn)
+    {
+    }
+
+    TfToken            name;
+    HdEngine&          engine;
+    HdRenderIndex*     renderIndex;
+    HdRendererPlugin*  rendererPlugin;
+    HdxTaskController* taskController;
+    SdfPath            delegateID;
+    bool               isHdSt;
+    MayaHydraSceneProducer* producer;
+};
+
 class MayaHydraSceneIndex;
 TF_DECLARE_WEAK_AND_REF_PTRS(MayaHydraSceneIndex);
 /**
@@ -73,7 +104,7 @@ public:
     template <typename T> using AdapterMap = std::unordered_map<SdfPath, T, SdfPath::Hash>;
 
     static MayaHydraSceneIndexRefPtr New(
-        MayaHydraDelegate::InitData& initData,
+        MayaHydraInitData& initData,
         bool lightEnabled) {
         return TfCreateRefPtr(new MayaHydraSceneIndex(initData, lightEnabled));
     }
@@ -177,7 +208,7 @@ public:
    
 private:
     MayaHydraSceneIndex(
-        MayaHydraDelegate::InitData& initData,
+        MayaHydraInitData& initData,
         bool lightEnabled);
 
     template <typename AdapterPtr, typename Map>

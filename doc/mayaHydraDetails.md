@@ -71,9 +71,6 @@ The maya-usd plugin provides access to USD data files inside Maya by injecting t
 
 Experimentally, we have separated the two plugins so that they no longer link together.  We use USD's HdSceneIndexPluginRegistry interface to query for a registered HdSceneIndex provider for a Maya node, using a naming convention based on the node type name.  Our hope is that this can also be the entry point for third-party plugins to control the viewport rendering of custom node types (MPxLocatorNode or MPxSurfaceShape) purely through the Hydra API instead of through Maya's various viewport APIs.  This could potentially replace the Maya APIs MPxSubsceneOverride, MPxDrawOverride, and MPxGeometryOverride.  
 
-### Scene Delegate vs Scene Index
-MayaHydra's long term plan is to migrate to using Scene Index completely and remove dependency on SceneDelegates. This aligns with the Pixar's recommendation as Hydra will eventually deprecate Scene Delegate support. During this transition phase, we are supporting both Scene Delegate and Scene Indices. By default, Scene Index is used but it can be overridden to use Scene Delegate using the environment variable ```MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX``` to 0. Please note that Scene Delegate mode will not be actively supported and the Scene Index mode is the recommended one.
-
 ### Plugin initialization, render loop and data flow through the plugin.
 As described in the section above, the plugin hooks into Maya Viewport through the MRenderOverride API. 
 
