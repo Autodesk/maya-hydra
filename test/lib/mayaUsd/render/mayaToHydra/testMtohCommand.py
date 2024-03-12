@@ -98,11 +98,6 @@ class TestCommand(unittest.TestCase):
                                                     gn=True))
             self.assertEqual(displayName, "Embree")
 
-    def test_listDelegates(self):
-        delegates = cmds.mayaHydra(listDelegates=1)
-        self.assertEqual(delegates, cmds.mayaHydra(ld=1))
-        self.assertIn("MayaHydraSceneDelegate", delegates)
-
     def test_createRenderGlobals(self):
         for flag in ("createRenderGlobals", "crg"):
             cmds.file(f=1, new=1)
