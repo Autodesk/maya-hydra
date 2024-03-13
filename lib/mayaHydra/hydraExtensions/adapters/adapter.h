@@ -44,7 +44,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class MayaHydraSceneProducer;
+class MayaHydraSceneIndex;
 
 /**
  * \brief MayaHydraAdapter is the base class for all adapters. An adapter is used to translate from
@@ -55,12 +55,12 @@ class MayaHydraAdapter
 {
 public:
     MAYAHYDRALIB_API
-    MayaHydraAdapter(const MObject& node, const SdfPath& id, MayaHydraSceneProducer* producer);
+    MayaHydraAdapter(const MObject& node, const SdfPath& id, MayaHydraSceneIndex* mayaHydraSceneIndex);
     MAYAHYDRALIB_API
     virtual ~MayaHydraAdapter();
 
-    const SdfPath&        GetID() const { return _id; }
-    MayaHydraSceneProducer* GetSceneProducer() const { return _sceneProducer; }
+    const SdfPath&       GetID() const { return _id; }
+    MayaHydraSceneIndex* GetMayaHydraSceneIndex() const { return _mayaHydraSceneIndex; }
     MAYAHYDRALIB_API
     void AddCallback(MCallbackId callbackId);
     MAYAHYDRALIB_API
@@ -109,7 +109,7 @@ public:
 protected:
     SdfPath                  _id;
     std::vector<MCallbackId> _callbacks;
-    MayaHydraSceneProducer*  _sceneProducer;
+    MayaHydraSceneIndex*     _mayaHydraSceneIndex;
     MObject                  _node;
 
     bool _isPopulated = false;

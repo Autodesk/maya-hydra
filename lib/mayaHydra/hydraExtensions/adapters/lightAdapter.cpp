@@ -18,7 +18,7 @@
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/constantShadowMatrix.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
-#include <mayaHydraLib/mayaHydraSceneProducer.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/type.h>
@@ -95,8 +95,8 @@ const MString defaultLightSet("defaultLightSet");
 // MayaHydraLightAdapter is the base class for any light adapter used to handle the translation from
 // a light to hydra.
 
-MayaHydraLightAdapter::MayaHydraLightAdapter(MayaHydraSceneProducer* producer, const MDagPath& dag)
-    : MayaHydraDagAdapter(producer->GetPrimPath(dag, true), producer, dag)
+MayaHydraLightAdapter::MayaHydraLightAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag)
+    : MayaHydraDagAdapter(mayaHydraSceneIndex->GetPrimPath(dag, true), mayaHydraSceneIndex, dag)
 {
     // This should be avoided, not a good idea to call virtual functions
     // directly or indirectly in a constructor.
@@ -110,7 +110,7 @@ MayaHydraLightAdapter::~MayaHydraLightAdapter()
 
 bool MayaHydraLightAdapter::IsSupported() const
 {
-    return GetSceneProducer()->GetRenderIndex().IsSprimTypeSupported(LightType());
+    return GetMayaHydraSceneIndex()->GetRenderIndex().IsSprimTypeSupported(LightType());
 }
 
 void MayaHydraLightAdapter::Populate()
@@ -119,7 +119,7 @@ void MayaHydraLightAdapter::Populate()
         return;
     }
     if (IsVisible() && _isLightingOn) {
-        GetSceneProducer()->InsertSprim(this, LightType(), GetID(), HdLight::AllDirty);
+        GetMayaHydraSceneIndex()->InsertPrim(this, LightType(), GetID());
         _isPopulated = true;
     }
 }
@@ -127,7 +127,7 @@ void MayaHydraLightAdapter::Populate()
 void MayaHydraLightAdapter::MarkDirty(HdDirtyBits dirtyBits)
 {
     if (_isPopulated && dirtyBits != 0) {
-        GetSceneProducer()->MarkSprimDirty(GetID(), dirtyBits);
+        GetMayaHydraSceneIndex()->MarkSprimDirty(GetID(), dirtyBits);
     }
 }
 
@@ -136,7 +136,7 @@ void MayaHydraLightAdapter::RemovePrim()
     if (!_isPopulated) {
         return;
     }
-    GetSceneProducer()->RemoveSprim(LightType(), GetID());
+    GetMayaHydraSceneIndex()->RemovePrim(GetID());
     _isPopulated = false;
 }
 
@@ -198,8 +198,8 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
         return VtValue(MayaHydraDagAdapter::GetTransform());
     } else if (key == HdLightTokens->shadowCollection) {
         // Exclude prims that should not be lighted by only
-        // taking the primitives whose root path is GetSceneProducer()->GetLightedPrimsRootPath()
-        const SdfPath     lightedPrimsRootPath = GetSceneProducer()->GetLightedPrimsRootPath();
+        // taking the primitives whose root path is GetMayaHydraSceneIndex()->GetLightedPrimsRootPath()
+        const SdfPath     lightedPrimsRootPath = GetMayaHydraSceneIndex()->GetLightedPrimsRootPath();
         HdRprimCollection coll(
             HdTokens->geometry,
             HdReprSelector(HdReprTokens->refined),
@@ -302,9 +302,9 @@ void MayaHydraLightAdapter::_CalculateShadowParams(MFnLight& light, HdxShadowPar
 
     params.enabled = true;
     params.resolution = dmapResolutionPlug.isNull()
-        ? GetSceneProducer()->GetParams().maximumShadowMapResolution
+        ? GetMayaHydraSceneIndex()->GetParams().maximumShadowMapResolution
         : std::min(
-            GetSceneProducer()->GetParams().maximumShadowMapResolution, dmapResolutionPlug.asInt());
+            GetMayaHydraSceneIndex()->GetParams().maximumShadowMapResolution, dmapResolutionPlug.asInt());
 
     params.shadowMatrix
         = std::make_shared<MayaHydraConstantShadowMatrix>(GetTransform() * _shadowProjectionMatrix);

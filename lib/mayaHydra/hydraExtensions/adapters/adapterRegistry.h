@@ -44,7 +44,7 @@ class MayaHydraAdapterRegistry : public TfSingleton<MayaHydraAdapterRegistry>
 
 public:
     using ShapeAdapterCreator
-        = std::function<MayaHydraShapeAdapterPtr(MayaHydraSceneProducer*, const MDagPath&)>;
+        = std::function<MayaHydraShapeAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>;
     MAYAHYDRALIB_API
     static void RegisterShapeAdapter(const TfToken& type, ShapeAdapterCreator creator);
 
@@ -52,7 +52,7 @@ public:
     static ShapeAdapterCreator GetShapeAdapterCreator(const MDagPath& dag);
 
     using LightAdapterCreator
-        = std::function<MayaHydraLightAdapterPtr(MayaHydraSceneProducer*, const MDagPath&)>;
+        = std::function<MayaHydraLightAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>;
     MAYAHYDRALIB_API
     static void RegisterLightAdapter(const TfToken& type, LightAdapterCreator creator);
 
@@ -63,7 +63,7 @@ public:
     static LightAdapterCreator GetLightAdapterCreator(const MObject& dag);
 
     using MaterialAdapterCreator = std::function<
-        MayaHydraMaterialAdapterPtr(const SdfPath&, MayaHydraSceneProducer*, const MObject&)>;
+        MayaHydraMaterialAdapterPtr(const SdfPath&, MayaHydraSceneIndex*, const MObject&)>;
     MAYAHYDRALIB_API
     static void RegisterMaterialAdapter(const TfToken& type, MaterialAdapterCreator creator);
 
@@ -71,7 +71,7 @@ public:
     static MaterialAdapterCreator GetMaterialAdapterCreator(const MObject& node);
 
     using CameraAdapterCreator
-        = std::function<MayaHydraCameraAdapterPtr(MayaHydraSceneProducer*, const MDagPath&)>;
+        = std::function<MayaHydraCameraAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>;
     MAYAHYDRALIB_API
     static void RegisterCameraAdapter(const TfToken& type, CameraAdapterCreator creator);
 

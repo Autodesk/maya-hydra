@@ -34,8 +34,9 @@
 #include "pluginUtils.h"
 
 #include <mayaHydraLib/mayaHydraParams.h>
-#include <mayaHydraLib/mayaHydraSceneProducer.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexDataFactoriesSetup.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h>
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
@@ -144,7 +145,8 @@ private:
     void              _InitHydraResources(const MHWRender::MDrawContext& drawContext);
     void              _RemovePanel(MString panelName);
     void              _DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext);
-    HdRenderDelegate* _GetRenderDelegate();
+    HdRenderDelegate* _GetRenderDelegate();   
+    void              _ClearMayaHydraSceneIndex();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void              _CreateSceneIndicesChainAfterMergingSceneIndex();
 
@@ -185,7 +187,7 @@ private:
     // Callbacks
     static void _ClearHydraCallback(void* data);
     static void _TimerCallback(float, float, void* data);
-    static void _PlayblastingChanged(bool state, void*);
+    static void _PlayblastingChanged(bool state, void*); 
     static void _PanelDeletedCallback(const MString& panelName, void* data);
     static void _RendererChangedCallback(
         const MString& panelName,
@@ -243,7 +245,7 @@ private:
 
     GlfSimpleLight _defaultLight;
 
-    std::unique_ptr<MayaHydraSceneProducer> _mayaHydraSceneProducer;
+    MayaHydraSceneIndexRefPtr _mayaHydraSceneIndex;
 
     /** This class creates the scene index data factories and set them up into the flow viewport library to be able to create DCC 
     *   specific scene index data classes without knowing their content in Flow viewport.

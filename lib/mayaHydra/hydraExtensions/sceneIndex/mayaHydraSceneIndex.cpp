@@ -39,7 +39,6 @@
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
-#include <mayaHydraLib/mayaHydraSceneProducer.h>
 
 #include <ufeExtensions/Global.h>
 
@@ -375,8 +374,8 @@ SdfPath MayaHydraSceneIndex::_mayaDefaultLightPath; // Common to all scene index
 MayaHydraSceneIndex::MayaHydraSceneIndex(
     MayaHydraInitData& initData,
     bool lightEnabled)
-    : _ID(initData.delegateID)
-    , _producer(initData.producer)
+    : _ID(initData.delegateID.AppendChild(
+        TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this))))
     , _renderIndex(initData.renderIndex)
     , _isHdSt(initData.isHdSt)
     , _rprimPath(initData.delegateID.AppendPath(SdfPath(std::string("rprims"))))
@@ -476,7 +475,7 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
             }
             // MAYA-128021: We do not currently support maya instances.
             MDagPath dagPath(ri.sourceDagPath());
-            ria = std::make_shared<MayaHydraRenderItemAdapter>(dagPath, slowId, fastId, _producer, ri);
+            ria = std::make_shared<MayaHydraRenderItemAdapter>(dagPath, slowId, fastId, GetMayaHydraSceneIndex(), ri);
 
             //Update the render item adapter if this render item is an aiSkydomeLight shape
             ria->SetIsRenderITemAnaiSkydomeLightTriangleShape(isRenderItem_aiSkyDomeLightTriangleShape(ri));
@@ -903,6 +902,11 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         _lightAdapters);
 }
 
+bool MayaHydraSceneIndex::GetPlaybackRunning() const
+{
+    return _isPlaybackRunning;
+}
+
 void MayaHydraSceneIndex::PostFrame()
 {
 }
@@ -1287,7 +1291,7 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
 template <typename AdapterPtr, typename Map>
 AdapterPtr MayaHydraSceneIndex::_CreateAdapter(
     const MDagPath& dag,
-    const std::function<AdapterPtr(MayaHydraSceneProducer*, const MDagPath&)>& adapterCreator,
+    const std::function<AdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>& adapterCreator,
     Map& adapterMap,
     bool                                                                     isSprim)
 {
@@ -1308,7 +1312,7 @@ AdapterPtr MayaHydraSceneIndex::_CreateAdapter(
     if (TfMapLookupPtr(adapterMap, id) != nullptr) {
         return {};
     }
-    auto adapter = adapterCreator(GetProducer(), dag);
+    auto adapter = adapterCreator(GetMayaHydraSceneIndex(), dag);
     if (adapter == nullptr || !adapter->IsSupported()) {
         return {};
     }
@@ -1447,7 +1451,7 @@ bool MayaHydraSceneIndex::_CreateMaterial(const SdfPath& id, const MObject& obj)
     if (materialCreator == nullptr) {
         return false;
     }
-    auto materialAdapter = materialCreator(id, GetProducer(), obj);
+    auto materialAdapter = materialCreator(id, GetMayaHydraSceneIndex(), obj);
     if (materialAdapter == nullptr || !materialAdapter->IsSupported()) {
         return false;
     }
@@ -1511,12 +1515,12 @@ VtValue MayaHydraSceneIndex::GetShadingStyle(SdfPath const& id)
     return VtValue();
 }
 
-const std::shared_ptr<Fvp::RenderIndexProxy> MayaHydraSceneIndex::GetRenderIndexProxy()
-{
-    if (! _producer){
-        TF_CODING_ERROR("The MayaHydraSceneProducer pointer should not be a nullptr !");
-    }
-    return _producer->GetRenderIndexProxy();
-}
+// const std::shared_ptr<Fvp::RenderIndexProxy> MayaHydraSceneIndex::GetRenderIndexProxy()
+// {
+//     if (! _producer){
+//         TF_CODING_ERROR("The MayaHydraSceneIndex pointer should not be a nullptr !");
+//     }
+//     return _producer->GetRenderIndexProxy();
+// }
 
 PXR_NAMESPACE_CLOSE_SCOPE
