@@ -17,7 +17,7 @@
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/lightAdapter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
-#include <mayaHydraLib/mayaHydraSceneProducer.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/glf/simpleLight.h>
@@ -70,14 +70,14 @@ float GetSpotFalloff(MFnSpotLight& mayaLight) { return static_cast<float>(mayaLi
 class MayaHydraSpotLightAdapter : public MayaHydraLightAdapter
 {
 public:
-    MayaHydraSpotLightAdapter(MayaHydraSceneProducer* producer, const MDagPath& dag)
-        : MayaHydraLightAdapter(producer, dag)
+    MayaHydraSpotLightAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag)
+        : MayaHydraLightAdapter(mayaHydraSceneIndex, dag)
     {
     }
 
     const TfToken& LightType() const override
     {
-        if (GetSceneProducer()->IsHdSt()) {
+        if (GetMayaHydraSceneIndex()->IsHdSt()) {
             return HdPrimTypeTokens->simpleLight;
         } else {
             return HdPrimTypeTokens->sphereLight;
@@ -159,8 +159,8 @@ TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, pointLight)
 {
     MayaHydraAdapterRegistry::RegisterLightAdapter(
         TfToken("spotLight"),
-        [](MayaHydraSceneProducer* producer, const MDagPath& dag) -> MayaHydraLightAdapterPtr {
-            return MayaHydraLightAdapterPtr(new MayaHydraSpotLightAdapter(producer, dag));
+        [](MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag) -> MayaHydraLightAdapterPtr {
+            return MayaHydraLightAdapterPtr(new MayaHydraSpotLightAdapter(mayaHydraSceneIndex, dag));
         });
 }
 
