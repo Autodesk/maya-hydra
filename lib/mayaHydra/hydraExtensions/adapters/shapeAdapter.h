@@ -22,7 +22,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class MayaHydraSceneProducer;
+class MayaHydraSceneIndex;
 
 /**
  * \brief MayaHydraShapeAdapter is an adapter to translate from Maya shapes to hydra
@@ -35,7 +35,7 @@ protected:
     MAYAHYDRALIB_API
     MayaHydraShapeAdapter(
         const SdfPath&        id,
-        MayaHydraSceneProducer* producer,
+        MayaHydraSceneIndex*  mayaHydraSceneIndex,
         const MDagPath&       dagPath);
 
 public:

@@ -16,7 +16,7 @@
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/lightAdapter.h>
-#include <mayaHydraLib/mayaHydraSceneProducer.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
@@ -31,8 +31,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 class MayaHydraAreaLightAdapter : public MayaHydraLightAdapter
 {
 public:
-    MayaHydraAreaLightAdapter(MayaHydraSceneProducer* producer, const MDagPath& dag)
-        : MayaHydraLightAdapter(producer, dag)
+    MayaHydraAreaLightAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag)
+        : MayaHydraLightAdapter(mayaHydraSceneIndex, dag)
     {
     }
 
@@ -40,7 +40,7 @@ public:
 
     const TfToken& LightType() const override
     {
-        if (GetSceneProducer()->IsHdSt()) {
+        if (GetMayaHydraSceneIndex()->IsHdSt()) {
             return HdPrimTypeTokens->simpleLight;
         } else {
             return HdPrimTypeTokens->rectLight;
@@ -73,8 +73,8 @@ TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, pointLight)
 {
     MayaHydraAdapterRegistry::RegisterLightAdapter(
         TfToken("areaLight"),
-        [](MayaHydraSceneProducer* producer, const MDagPath& dag) -> MayaHydraLightAdapterPtr {
-            return MayaHydraLightAdapterPtr(new MayaHydraAreaLightAdapter(producer, dag));
+        [](MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag) -> MayaHydraLightAdapterPtr {
+            return MayaHydraLightAdapterPtr(new MayaHydraAreaLightAdapter(mayaHydraSceneIndex, dag));
         });
 }
 

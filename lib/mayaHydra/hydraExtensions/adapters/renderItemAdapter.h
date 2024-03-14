@@ -37,7 +37,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class MayaHydraSceneProducer;
+class MayaHydraSceneIndex;
 
 namespace {
 std::string kRenderItemTypeName = "renderItem";
@@ -61,7 +61,7 @@ public:
         const MDagPath&       dagPath,
         const SdfPath&        slowId,
         int                   fastId,
-        MayaHydraSceneProducer* producer,
+        MayaHydraSceneIndex*  mayaHydraSceneIndex,
         const MRenderItem&    ri);
 
     MAYAHYDRALIB_API

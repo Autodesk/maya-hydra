@@ -284,7 +284,7 @@ For source files (.cpp) with an associated header file (.h) that resides in the 
 All included public header files from outside and inside the project should be `#include`’d using angle brackets. For example:
 ```cpp
 #include <pxr/base/tf/stringUtils.h>
-#include <mayaHydraLib/mayaHydraSceneProducer.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 ```
 
 Private project’s header files should be `#include`'d using double quotes, and a relative path. Private headers may live in the same directory or sub-directories, but they should never be included using "._" or ".._" as part of a relative path. For example:

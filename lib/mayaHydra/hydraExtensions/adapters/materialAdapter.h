@@ -22,7 +22,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class MayaHydraSceneProducer;
+class MayaHydraSceneIndex;
 
 /**
  * \brief MayaHydraMaterialAdapter is used to handle the translation from a Maya material to hydra.
@@ -35,7 +35,7 @@ public:
     MAYAHYDRALIB_API
     MayaHydraMaterialAdapter(
         const SdfPath&        id,
-        MayaHydraSceneProducer* producer,
+        MayaHydraSceneIndex*  mayaHydraSceneIndex,
         const MObject&        node);
     MAYAHYDRALIB_API
     virtual ~MayaHydraMaterialAdapter() = default;

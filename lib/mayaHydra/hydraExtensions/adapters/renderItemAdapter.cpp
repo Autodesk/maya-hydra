@@ -20,7 +20,7 @@
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
-#include <mayaHydraLib/mayaHydraSceneProducer.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -61,9 +61,9 @@ MayaHydraRenderItemAdapter::MayaHydraRenderItemAdapter(
     const MDagPath&       dagPath,
     const SdfPath&        slowId,
     int                   fastId,
-    MayaHydraSceneProducer* producer,
+    MayaHydraSceneIndex*  mayaHydraSceneIndex,
     const MRenderItem&    ri)
-    : MayaHydraAdapter(MObject(), slowId, producer)
+    : MayaHydraAdapter(MObject(), slowId, mayaHydraSceneIndex)
     , _dagPath(dagPath)
     , _primitive(ri.primitive())
     , _name(ri.name())
@@ -81,7 +81,7 @@ void MayaHydraRenderItemAdapter::UpdateTransform(const MRenderItem& ri)
     MMatrix matrix;
     if (ri.getMatrix(matrix) == MStatus::kSuccess) {
         _transform[0] = GetGfMatrixFromMaya(matrix);
-        if (GetSceneProducer()->GetParams().motionSamplesEnabled()) {
+        if (GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled()) {
             MDGContextGuard guard(MAnimControl::currentTime() + 1.0);
             _transform[1] = GetGfMatrixFromMaya(matrix);
         } else {
@@ -94,12 +94,12 @@ bool MayaHydraRenderItemAdapter::IsSupported() const
 {
     switch (_primitive) {
     case MHWRender::MGeometry::Primitive::kTriangles:
-        return GetSceneProducer()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->mesh);
+        return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->mesh);
     case MHWRender::MGeometry::Primitive::kLines:
     case MHWRender::MGeometry::Primitive::kLineStrip:
-        return GetSceneProducer()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->basisCurves);
+        return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->basisCurves);
     case MHWRender::MGeometry::Primitive::kPoints:
-        return GetSceneProducer()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->points);
+        return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->points);
     default: return false;
     }
 }
@@ -108,14 +108,14 @@ void MayaHydraRenderItemAdapter::_InsertRprim(MayaHydraAdapter* adapter)
 {
     switch (GetPrimitive()) {
     case MHWRender::MGeometry::Primitive::kTriangles:
-        GetSceneProducer()->InsertRprim(adapter, HdPrimTypeTokens->mesh, GetID(), {});
+        GetMayaHydraSceneIndex()->InsertPrim(adapter, HdPrimTypeTokens->mesh, GetID());
         break;
     case MHWRender::MGeometry::Primitive::kLines:
     case MHWRender::MGeometry::Primitive::kLineStrip:
-        GetSceneProducer()->InsertRprim(adapter, HdPrimTypeTokens->basisCurves, GetID(), {});
+        GetMayaHydraSceneIndex()->InsertPrim(adapter, HdPrimTypeTokens->basisCurves, GetID());
         break;
     case MHWRender::MGeometry::Primitive::kPoints:
-        GetSceneProducer()->InsertRprim(adapter, HdPrimTypeTokens->points, GetID(), {});
+        GetMayaHydraSceneIndex()->InsertPrim(adapter, HdPrimTypeTokens->points, GetID());
         break;
     default:
         assert(false); // unexpected/unsupported primitive type
@@ -123,7 +123,7 @@ void MayaHydraRenderItemAdapter::_InsertRprim(MayaHydraAdapter* adapter)
     }
 }
 
-void MayaHydraRenderItemAdapter::_RemoveRprim() { GetSceneProducer()->RemoveRprim(GetID());} 
+void MayaHydraRenderItemAdapter::_RemoveRprim() { GetMayaHydraSceneIndex()->RemovePrim(GetID());} 
 
 // We receive in that function the changes made in the Maya viewport between the last frame rendered
 // and the current frame
@@ -310,7 +310,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         switch (GetPrimitive()) {
         case MGeometry::Primitive::kTriangles:
             _topology.reset(new HdMeshTopology(
-                (GetSceneProducer()->GetParams().displaySmoothMeshes
+                (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes
                  || GetDisplayStyle().refineLevel > 0)
                     ? PxOsdOpenSubdivTokens->catmullClark
                     : PxOsdOpenSubdivTokens->none,
@@ -377,7 +377,7 @@ VtValue MayaHydraRenderItemAdapter::Get(const TfToken& key)
 void MayaHydraRenderItemAdapter::MarkDirty(HdDirtyBits dirtyBits)
 {
     if (dirtyBits != 0) {
-        GetSceneProducer()->MarkRprimDirty(GetID(), dirtyBits);
+        GetMayaHydraSceneIndex()->MarkRprimDirty(GetID(), dirtyBits);
     }
 }
 
@@ -431,8 +431,8 @@ bool MayaHydraRenderItemAdapter::GetVisible()
     if (_isHideOnPlayback) {
         // MAYA-127216: Remove dependency on parent class MayaHydraAdapter. This will let us use
         // MayaHydraSceneDelegate directly
-        auto sceneProducer = static_cast<MayaHydraSceneProducer*>(GetSceneProducer());
-        return !sceneProducer->GetPlaybackRunning();
+        auto mayaHydraSceneIndex = static_cast<MayaHydraSceneIndex*>(GetMayaHydraSceneIndex());
+        return !mayaHydraSceneIndex->GetPlaybackRunning();
     }
 
     return _visible;

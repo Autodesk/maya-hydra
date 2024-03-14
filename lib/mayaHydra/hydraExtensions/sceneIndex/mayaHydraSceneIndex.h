@@ -65,8 +65,7 @@ struct MayaHydraInitData
         HdRendererPlugin*  rendererPluginIn,
         HdxTaskController* taskControllerIn,
         const SdfPath&     delegateIDIn,
-        bool               isHdStIn,
-        MayaHydraSceneProducer* producerIn = nullptr)
+        bool               isHdStIn)
         : name(nameIn)
         , engine(engineIn)
         , renderIndex(renderIndexIn)
@@ -74,7 +73,6 @@ struct MayaHydraInitData
         , taskController(taskControllerIn)
         , delegateID(delegateIDIn)
         , isHdSt(isHdStIn)
-        , producer(producerIn)
     {
     }
 
@@ -85,7 +83,6 @@ struct MayaHydraInitData
     HdxTaskController* taskController;
     SdfPath            delegateID;
     bool               isHdSt;
-    MayaHydraSceneProducer* producer;
 };
 
 class MayaHydraSceneIndex;
@@ -200,11 +197,51 @@ public:
 
     bool IsHdSt() const { return _isHdSt; }
 
-    MayaHydraSceneProducer* GetProducer() { return _producer; };
-
-    const std::shared_ptr<Fvp::RenderIndexProxy> GetRenderIndexProxy();
+    bool GetPlaybackRunning() const;
 
     SdfPath SceneIndexPath(const Ufe::Path& appPath) const override;
+
+    // Common function to return templated sample types
+    template <typename T, typename Getter>
+    size_t SampleValues(size_t maxSampleCount, float* times, T* samples, Getter getValue)
+    {
+        if (ARCH_UNLIKELY(maxSampleCount == 0)) {
+            return 0;
+        }
+        // Fast path 1 sample at current-frame
+        if (maxSampleCount == 1
+            || (!GetParams().motionSamplesEnabled() && GetParams().motionSampleStart == 0)) {
+            times[0] = 0.0f;
+            samples[0] = getValue();
+            return 1;
+        }
+
+        const GfInterval shutter = GetCurrentTimeSamplingInterval();
+        // Shutter for [-1, 1] (size 2) should have a step of 2 for 2 samples, and 1 for 3 samples
+        // For sample size of 1 tStep is unused and we match USD and to provide t=shutterOpen
+        // sample.
+        const double tStep = maxSampleCount > 1 ? (shutter.GetSize() / (maxSampleCount - 1)) : 0;
+        const MTime  mayaTime = MAnimControl::currentTime();
+        size_t       nSamples = 0;
+        double       relTime = shutter.GetMin();
+
+        for (size_t i = 0; i < maxSampleCount; ++i) {
+            T sample;
+            {
+                MDGContextGuard guard(mayaTime + relTime);
+                sample = getValue();
+            }
+            // We compare the sample to the previous in order to reduce sample count on output.
+            // Goal is to reduce the amount of samples/keyframes the Hydra delegate has to absorb.
+            if (!nSamples || sample != samples[nSamples - 1]) {
+                samples[nSamples] = std::move(sample);
+                times[nSamples] = relTime;
+                ++nSamples;
+            }
+            relTime += tStep;
+        }
+        return nSamples;
+    }
    
 private:
     MayaHydraSceneIndex(
@@ -214,9 +251,9 @@ private:
     template <typename AdapterPtr, typename Map>
     AdapterPtr _CreateAdapter(
         const MDagPath& dag,
-        const std::function<AdapterPtr(MayaHydraSceneProducer*, const MDagPath&)>& adapterCreator,
+        const std::function<AdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>& adapterCreator,
         Map& adapterMap,
-        bool                                                                     isSprim = false);
+        bool isSprim = false);
     MayaHydraLightAdapterPtr CreateLightAdapter(const MDagPath& dagPath);
     MayaHydraCameraAdapterPtr CreateCameraAdapter(const MDagPath& dagPath);
     MayaHydraShapeAdapterPtr CreateShapeAdapter(const MDagPath& dagPath);
@@ -254,8 +291,6 @@ private:
     SdfPath _ID;
     MayaHydraParams _params;
 
-    // Weak refs
-    MayaHydraSceneProducer* _producer = nullptr;
     HdRenderIndex* _renderIndex = nullptr;
 
     // Adapters
@@ -271,7 +306,7 @@ private:
 
     std::vector<MObject> _addedNodes;
     using LightAdapterCreator
-        = std::function<MayaHydraLightAdapterPtr(MayaHydraSceneProducer*, const MDagPath&)>;
+        = std::function<MayaHydraLightAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>;
     std::vector<std::pair<MObject, LightAdapterCreator>> _lightsToAdd;
     std::vector<SdfPath> _materialTagsChanged;
 

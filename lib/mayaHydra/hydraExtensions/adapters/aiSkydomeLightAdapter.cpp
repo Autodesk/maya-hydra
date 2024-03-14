@@ -20,7 +20,7 @@
 #include <mayaHydraLib/adapters/lightAdapter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
-#include <mayaHydraLib/mayaHydraSceneProducer.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
@@ -33,7 +33,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class MayaHydraSceneProducer;
+class MayaHydraSceneIndex;
 
 /**
  * \brief MayaHydraAiSkyDomeLightAdapter is used to handle the translation from an Arnold skydome
@@ -59,8 +59,8 @@ class MayaHydraAiSkyDomeLightAdapter : public MayaHydraLightAdapter
     bool _colorIsConnected  = false;
 
 public:
-    MayaHydraAiSkyDomeLightAdapter(MayaHydraSceneProducer* producer, const MDagPath& dag)
-        : MayaHydraLightAdapter(producer, dag)
+    MayaHydraAiSkyDomeLightAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag)
+        : MayaHydraLightAdapter(mayaHydraSceneIndex, dag)
     {
         //Init static variables if needed
         if (! _pTextureManager){
@@ -185,7 +185,7 @@ public:
             if (!_colorIsConnected){
                 if (!_dummyTextureFullPathFilename.empty()){
                     // Update Hydra texture resource everytime Domelight color is tweaked.
-                    auto resourceReg = GetSceneProducer()->GetRenderIndex().GetResourceRegistry();
+                    auto resourceReg = GetMayaHydraSceneIndex()->GetRenderIndex().GetResourceRegistry();
                     if (TF_VERIFY(resourceReg, "Unable to update AikSkyDomelights constant color"))
                         resourceReg->ReloadResource(TfToken("texture"), _dummyTextureFullPathFilename);
                     // SdfAssetPath requires both "path" and "resolvedPath"
@@ -240,8 +240,8 @@ TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, domeLight)
 {
     MayaHydraAdapterRegistry::RegisterLightAdapter(
         TfToken("aiSkyDomeLight"),
-        [](MayaHydraSceneProducer* producer, const MDagPath& dag) -> MayaHydraLightAdapterPtr {
-            return MayaHydraLightAdapterPtr(new MayaHydraAiSkyDomeLightAdapter(producer, dag));
+        [](MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag) -> MayaHydraLightAdapterPtr {
+            return MayaHydraLightAdapterPtr(new MayaHydraAiSkyDomeLightAdapter(mayaHydraSceneIndex, dag));
         });
 }
 
