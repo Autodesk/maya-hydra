@@ -199,10 +199,6 @@ public:
 
     bool GetPlaybackRunning() const;
 
-    MayaHydraSceneIndex* GetMayaHydraSceneIndex() { return this; };
-
-    //const std::shared_ptr<Fvp::RenderIndexProxy> GetRenderIndexProxy();
-
     SdfPath SceneIndexPath(const Ufe::Path& appPath) const override;
 
     // Common function to return templated sample types
@@ -257,7 +253,7 @@ private:
         const MDagPath& dag,
         const std::function<AdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>& adapterCreator,
         Map& adapterMap,
-        bool                                                                     isSprim = false);
+        bool isSprim = false);
     MayaHydraLightAdapterPtr CreateLightAdapter(const MDagPath& dagPath);
     MayaHydraCameraAdapterPtr CreateCameraAdapter(const MDagPath& dagPath);
     MayaHydraShapeAdapterPtr CreateShapeAdapter(const MDagPath& dagPath);

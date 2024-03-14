@@ -475,7 +475,7 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
             }
             // MAYA-128021: We do not currently support maya instances.
             MDagPath dagPath(ri.sourceDagPath());
-            ria = std::make_shared<MayaHydraRenderItemAdapter>(dagPath, slowId, fastId, GetMayaHydraSceneIndex(), ri);
+            ria = std::make_shared<MayaHydraRenderItemAdapter>(dagPath, slowId, fastId, this, ri);
 
             //Update the render item adapter if this render item is an aiSkydomeLight shape
             ria->SetIsRenderITemAnaiSkydomeLightTriangleShape(isRenderItem_aiSkyDomeLightTriangleShape(ri));
@@ -1312,7 +1312,7 @@ AdapterPtr MayaHydraSceneIndex::_CreateAdapter(
     if (TfMapLookupPtr(adapterMap, id) != nullptr) {
         return {};
     }
-    auto adapter = adapterCreator(GetMayaHydraSceneIndex(), dag);
+    auto adapter = adapterCreator(this, dag);
     if (adapter == nullptr || !adapter->IsSupported()) {
         return {};
     }
@@ -1451,7 +1451,7 @@ bool MayaHydraSceneIndex::_CreateMaterial(const SdfPath& id, const MObject& obj)
     if (materialCreator == nullptr) {
         return false;
     }
-    auto materialAdapter = materialCreator(id, GetMayaHydraSceneIndex(), obj);
+    auto materialAdapter = materialCreator(id, this, obj);
     if (materialAdapter == nullptr || !materialAdapter->IsSupported()) {
         return false;
     }
