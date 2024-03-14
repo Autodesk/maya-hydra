@@ -1515,12 +1515,4 @@ VtValue MayaHydraSceneIndex::GetShadingStyle(SdfPath const& id)
     return VtValue();
 }
 
-// const std::shared_ptr<Fvp::RenderIndexProxy> MayaHydraSceneIndex::GetRenderIndexProxy()
-// {
-//     if (! _producer){
-//         TF_CODING_ERROR("The MayaHydraSceneIndex pointer should not be a nullptr !");
-//     }
-//     return _producer->GetRenderIndexProxy();
-// }
-
 PXR_NAMESPACE_CLOSE_SCOPE

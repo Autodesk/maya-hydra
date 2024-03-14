@@ -80,7 +80,7 @@ class MayaHydraMeshAdapter : public MayaHydraShapeAdapter
 {
 public:
     MayaHydraMeshAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag)
-        : MayaHydraShapeAdapter(GetMayaHydraSceneIndex()->GetPrimPath(dag, false), mayaHydraSceneIndex, dag)
+        : MayaHydraShapeAdapter(mayaHydraSceneIndex->GetPrimPath(dag, false), mayaHydraSceneIndex, dag)
     {
     }
 

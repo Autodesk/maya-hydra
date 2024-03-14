@@ -18,7 +18,6 @@
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/materialNetworkConverter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
-//#include <mayaHydraLib/mayaHydraSceneProducer.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/tf/type.h>
