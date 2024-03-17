@@ -22,6 +22,7 @@
 
 #include <mayaHydraLib/mhBuildInfo.h>
 #include <mayaHydraLib/mayaHydra.h>
+#include <mayaHydraLib/mixedUtils.h>
 
 #include <maya/MArgDatabase.h>
 #include <maya/MGlobal.h>
@@ -40,6 +41,12 @@ constexpr auto _listRenderersLong = "-listRenderers";
 
 constexpr auto _listActiveRenderers = "-lar";
 constexpr auto _listActiveRenderersLong = "-listActiveRenderers";
+
+constexpr auto _currentProcessMemory = "-cpm";
+constexpr auto _currentProcessMemoryLong = "-currentProcessMemory";
+
+constexpr auto _hdStGPUMem = "-hdm";
+constexpr auto _hdStGPUMemLong = "-hdStGPUMem";
 
 constexpr auto _getRendererDisplayName = "-gn";
 constexpr auto _getRendererDisplayNameLong = "-getRendererDisplayName";
@@ -139,6 +146,10 @@ MSyntax MtohViewCmd::createSyntax()
 
     syntax.addFlag(_rendererId, _rendererIdLong, MSyntax::kString);
 
+    syntax.addFlag(_currentProcessMemory, _currentProcessMemoryLong);
+
+    syntax.addFlag(_hdStGPUMem, _hdStGPUMemLong);
+
     syntax.addFlag(_getRendererDisplayName, _getRendererDisplayNameLong);
 
     syntax.addFlag(_createRenderGlobals, _createRenderGlobalsLong);
@@ -193,7 +204,11 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
         }
     }
 
-    if (db.isFlagSet(_listRenderers)) {
+    if (db.isFlagSet(_hdStGPUMem)) {
+        appendToResult(MtohRenderOverride::GetHdStGPUMemory());
+    } if (db.isFlagSet(_currentProcessMemory)) {
+        appendToResult(getProcessMemory());
+    } else if (db.isFlagSet(_listRenderers)) {
         for (auto& plugin : MtohGetRendererDescriptions())
             appendToResult(plugin.rendererName.GetText());
 

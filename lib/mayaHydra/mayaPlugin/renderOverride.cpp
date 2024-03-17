@@ -340,6 +340,26 @@ void MtohRenderOverride::UpdateRenderGlobals(
     MGlobal::executeCommandOnIdle("refresh -f");
 }
 
+VtValue MtohRenderOverride::_GetHdStGPUMemory() const
+{
+    if (_isUsingHdSt && _renderDelegate)
+    {
+        VtDictionary hdStRenderStat = _renderDelegate->GetRenderStats();
+        return hdStRenderStat[HdPerfTokens->gpuMemoryUsed.GetString()];
+    }
+    return VtValue();
+}
+
+int MtohRenderOverride::GetHdStGPUMemory()
+{   
+    int totalGPUMemory = 0;
+    std::lock_guard<std::mutex> lock(_allInstancesMutex);
+    for (auto* instance : _allInstances) {
+        totalGPUMemory += instance->_GetHdStGPUMemory().UncheckedGet<int>();
+    }
+    return totalGPUMemory; 
+}
+
 std::vector<MString> MtohRenderOverride::AllActiveRendererNames()
 {
     std::vector<MString> renderers;
@@ -720,7 +740,7 @@ MStatus MtohRenderOverride::Render(
     if (_mayaHydraSceneIndex) {
         _mayaHydraSceneIndex->PostFrame();
     }
-
+    
     return MStatus::kSuccess;
 }
 
