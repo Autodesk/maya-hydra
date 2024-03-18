@@ -30,7 +30,61 @@
 #include <maya/MMatrix.h>
 #include <maya/MObject.h>
 
+#if defined(_WIN32)
+#include <windows.h>
+#include "psapi.h"
+#elif defined(__linux__)
+#include <fstream>
+#include <sstream>
+#elif defined(__APPLE__)
+#include <mach/task.h>
+#include <mach/mach.h>
+#endif
+
 namespace MAYAHYDRA_NS_DEF {
+
+constexpr int MB = 1024 * 1024;
+
+// Function to get memory usage of the current process
+MAYAHYDRALIB_API
+inline int getProcessMemory()
+{
+#if defined(_WIN32)
+    // see https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+    return static_cast<int>(pmc.PrivateUsage / MB); // Working Set Size in MB
+
+#elif defined(__linux__)
+    // https://man7.org/linux/man-pages/man5/proc.5.html
+    // When a process accesses this magic symbolic link, it
+    // resolves to the process's own /proc/pid directory.
+    std::ifstream processFile("/proc/self/status");
+    std::string line;
+    unsigned long long memoryUsage = 0;
+
+    while (std::getline(processFile, line)) {
+        if (line.compare(0, 6, "VmSize:") == 0) {
+            std::istringstream iss(line.substr(7));
+            iss >> memoryUsage;
+            break;
+        }
+    }
+    return  static_cast<int>(memoryUsage / MB);
+    
+#elif defined(__APPLE__)
+    // https://developer.apple.com/documentation/kernel/1537934-task_info
+    task_vm_info_data_t vmInfo;
+    mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+    kern_return_t kernResult = task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&vmInfo, &count);
+
+    if (kernResult == KERN_SUCCESS) {
+        return static_cast<int>(vmInfo.virtual_size / MB); // Physical footprint in MB
+    } else {
+        return 0; // Unable to retrieve memory usage
+    }
+#endif
+}
 
 /**
  * @brief Converts a Maya matrix to a double precision GfMatrix.

@@ -340,6 +340,28 @@ void MtohRenderOverride::UpdateRenderGlobals(
     MGlobal::executeCommandOnIdle("refresh -f");
 }
 
+VtValue MtohRenderOverride::_GetUsedGPUMemory() const
+{
+    // Currently, only Storm is the known/tested renderer that provides GPU stats
+    // via the Render Delegate.
+    if (_isUsingHdSt && _renderDelegate)
+    {
+        VtDictionary hdStRenderStat = _renderDelegate->GetRenderStats();
+        return hdStRenderStat[HdPerfTokens->gpuMemoryUsed.GetString()];
+    }
+    return VtValue();
+}
+
+int MtohRenderOverride::GetUsedGPUMemory()
+{   
+    int totalGPUMemory = 0;
+    std::lock_guard<std::mutex> lock(_allInstancesMutex);
+    for (auto* instance : _allInstances) {
+        totalGPUMemory += instance->_GetUsedGPUMemory().UncheckedGet<int>();
+    }
+    return totalGPUMemory / (1024*1024); 
+}
+
 std::vector<MString> MtohRenderOverride::AllActiveRendererNames()
 {
     std::vector<MString> renderers;
@@ -720,7 +742,7 @@ MStatus MtohRenderOverride::Render(
     if (_mayaHydraSceneIndex) {
         _mayaHydraSceneIndex->PostFrame();
     }
-
+    
     return MStatus::kSuccess;
 }
 
