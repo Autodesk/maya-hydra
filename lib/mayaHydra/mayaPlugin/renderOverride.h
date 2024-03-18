@@ -125,7 +125,7 @@ public:
     MStatus setup(const MString& destination) override;
     MStatus cleanup() override;
 
-    // Utility function to get HdStorm GPU memory usage stats
+    // Utility function to get GPU memory usage stats
     static int GetUsedGPUMemory();
 
     bool                         startOperationIterator() override;
