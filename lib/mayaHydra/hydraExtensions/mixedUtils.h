@@ -53,7 +53,7 @@ inline int getProcessMemory()
     // see https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo
     PROCESS_MEMORY_COUNTERS_EX pmc;
     GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
-    return static_cast<int>(pmc.WorkingSetSize / MB); // Working Set Size in MB
+    return static_cast<int>(pmc.PrivateUsage / MB); // Working Set Size in MB
 
 #elif defined(__linux__)
     // https://man7.org/linux/man-pages/man5/proc.5.html
@@ -64,7 +64,7 @@ inline int getProcessMemory()
     unsigned long long memoryUsage = 0;
 
     while (std::getline(processFile, line)) {
-        if (line.compare(0, 6, "VmRSS:") == 0) {
+        if (line.compare(0, 6, "VmSize:") == 0) {
             std::istringstream iss(line.substr(7));
             iss >> memoryUsage;
             break;
@@ -79,7 +79,7 @@ inline int getProcessMemory()
     kern_return_t kernResult = task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&vmInfo, &count);
 
     if (kernResult == KERN_SUCCESS) {
-        return static_cast<int>(vmInfo.phys_footprint / MB); // Physical footprint in MB
+        return static_cast<int>(vmInfo.virtual_size / MB); // Physical footprint in MB
     } else {
         return 0; // Unable to retrieve memory usage
     }

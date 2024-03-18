@@ -340,7 +340,7 @@ void MtohRenderOverride::UpdateRenderGlobals(
     MGlobal::executeCommandOnIdle("refresh -f");
 }
 
-VtValue MtohRenderOverride::_GetHdStGPUMemory() const
+VtValue MtohRenderOverride::_GetUsedGPUMemory() const
 {
     if (_isUsingHdSt && _renderDelegate)
     {
@@ -350,14 +350,14 @@ VtValue MtohRenderOverride::_GetHdStGPUMemory() const
     return VtValue();
 }
 
-int MtohRenderOverride::GetHdStGPUMemory()
+int MtohRenderOverride::GetUsedGPUMemory()
 {   
     int totalGPUMemory = 0;
     std::lock_guard<std::mutex> lock(_allInstancesMutex);
     for (auto* instance : _allInstances) {
-        totalGPUMemory += instance->_GetHdStGPUMemory().UncheckedGet<int>();
+        totalGPUMemory += instance->_GetUsedGPUMemory().UncheckedGet<int>();
     }
-    return totalGPUMemory; 
+    return totalGPUMemory / (1024*1024); 
 }
 
 std::vector<MString> MtohRenderOverride::AllActiveRendererNames()

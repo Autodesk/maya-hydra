@@ -45,8 +45,8 @@ constexpr auto _listActiveRenderersLong = "-listActiveRenderers";
 constexpr auto _currentProcessMemory = "-cpm";
 constexpr auto _currentProcessMemoryLong = "-currentProcessMemory";
 
-constexpr auto _hdStGPUMem = "-hdm";
-constexpr auto _hdStGPUMemLong = "-hdStGPUMem";
+constexpr auto _hdGPUMem = "-hdm";
+constexpr auto _hdGPUMemLong = "-hdGPUMem";
 
 constexpr auto _getRendererDisplayName = "-gn";
 constexpr auto _getRendererDisplayNameLong = "-getRendererDisplayName";
@@ -148,7 +148,7 @@ MSyntax MtohViewCmd::createSyntax()
 
     syntax.addFlag(_currentProcessMemory, _currentProcessMemoryLong);
 
-    syntax.addFlag(_hdStGPUMem, _hdStGPUMemLong);
+    syntax.addFlag(_hdGPUMem, _hdGPUMemLong);
 
     syntax.addFlag(_getRendererDisplayName, _getRendererDisplayNameLong);
 
@@ -204,8 +204,8 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
         }
     }
 
-    if (db.isFlagSet(_hdStGPUMem)) {
-        appendToResult(MtohRenderOverride::GetHdStGPUMemory());
+    if (db.isFlagSet(_hdGPUMem)) {
+        appendToResult(MtohRenderOverride::GetUsedGPUMemory());
     } if (db.isFlagSet(_currentProcessMemory)) {
         appendToResult(getProcessMemory());
     } else if (db.isFlagSet(_listRenderers)) {
