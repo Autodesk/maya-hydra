@@ -125,6 +125,9 @@ public:
     MStatus setup(const MString& destination) override;
     MStatus cleanup() override;
 
+    // Utility function to get GPU memory usage stats
+    static int GetUsedGPUMemory();
+
     bool                         startOperationIterator() override;
     MHWRender::MRenderOperation* renderOperation() override;
     bool                         nextRenderOperation() override;
@@ -149,6 +152,7 @@ private:
     void              _ClearMayaHydraSceneIndex();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void              _CreateSceneIndicesChainAfterMergingSceneIndex();
+    VtValue           _GetUsedGPUMemory() const;
 
     void _PickByRegion(
         HdxPickHitVector& outHits,
