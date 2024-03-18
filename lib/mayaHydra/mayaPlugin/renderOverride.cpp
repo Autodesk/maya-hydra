@@ -342,6 +342,8 @@ void MtohRenderOverride::UpdateRenderGlobals(
 
 VtValue MtohRenderOverride::_GetUsedGPUMemory() const
 {
+    // Currently, only Storm is the known/tested renderer that provides GPU stats
+    // via the Render Delegate.
     if (_isUsingHdSt && _renderDelegate)
     {
         VtDictionary hdStRenderStat = _renderDelegate->GetRenderStats();
