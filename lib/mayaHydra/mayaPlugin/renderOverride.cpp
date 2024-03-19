@@ -888,7 +888,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
         // Leak the Maya scene index, as its base class HdRetainedSceneIndex
         // destructor crashes under Windows clang code coverage build.
         _mayaHydraSceneIndex->RemoveCallbacksAndDeleteAdapters();
-        _mayaHydraSceneIndex.Reset();
+        _mayaHydraSceneIndex.release();
     #else
        _ClearMayaHydraSceneIndex();
     #endif
