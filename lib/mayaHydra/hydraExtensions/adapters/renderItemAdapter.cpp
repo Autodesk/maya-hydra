@@ -179,15 +179,19 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         dirtyBits |= HdChangeTracker::DirtyTransform;
     }
     if (geomChanged) {
-        dirtyBits |= HdChangeTracker::DirtyPoints;
+        dirtyBits |= (HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent);
     }
     if (topoChanged) {
-        dirtyBits |= (HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar);
+        dirtyBits |= (HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyExtent);
     }
 
     MGeometry* geom = nullptr;
     if (geomChanged || topoChanged) {
         geom = data._ri.geometry();
+        auto bbox = data._ri.boundingBox();
+        const MPoint& min = bbox.min();
+        const MPoint& max = bbox.max();
+        _bounds.SetRange(GfRange3d({min.x, min.y, min.z}, GfVec3d({max.x, max.y, max.z})));
     }
     VtIntArray vertexIndices;
     VtIntArray vertexCounts;

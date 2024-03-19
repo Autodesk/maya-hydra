@@ -105,6 +105,10 @@ public:
     virtual HdCullStyle GetCullStyle() const { return HdCullStyleNothing; }
     MAYAHYDRALIB_API
     virtual HdDisplayStyle GetDisplayStyle() { return { 0, false, false }; }
+    MAYAHYDRALIB_API
+    virtual GfBBox3d GetBoundingBox() const { return GfBBox3d(); }
+    MAYAHYDRALIB_API
+    virtual GfVec4f GetDisplayColor() const { return {1.f,1.f,1.f,1.f}; }
 
 protected:
     SdfPath                  _id;
