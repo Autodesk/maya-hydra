@@ -179,6 +179,7 @@ private:
             [&panelName](const PanelCallbacks& item) { return item.first == panelName; });
     }
 
+    MAYAHYDRALIB_API
     void _PopulateSelectionList(
         const HdxPickHitVector&          hits,
         const MHWRender::MSelectionInfo& selectInfo,
