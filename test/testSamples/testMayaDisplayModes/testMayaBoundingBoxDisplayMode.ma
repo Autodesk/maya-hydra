@@ -4,7 +4,6 @@
 //Codeset: 1252
 requires maya "2026ff01";
 requires -nodeType "MhFlowViewportAPILocator" "mayaHydraFlowViewportAPILocator" "1.0";
-requires "mtoa" "5.4.0";
 requires -nodeType "mayaUsdLayerManager" -nodeType "mayaUsdProxyShape" -dataType "pxrUsdStageData"
 		 "mayaUsdPlugin" "0.28.0";
 currentUnit -l centimeter -a degree -t film;
@@ -44,7 +43,6 @@ createNode camera -s -n "topShape" -p "top";
 	setAttr ".man" -type "string" "top_mask";
 	setAttr ".hc" -type "string" "viewSet -t %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -s -n "front";
 	rename -uid "B1091544-4663-35B0-19C8-19B001B67F59";
 	setAttr ".v" no;
@@ -60,7 +58,6 @@ createNode camera -s -n "frontShape" -p "front";
 	setAttr ".man" -type "string" "front_mask";
 	setAttr ".hc" -type "string" "viewSet -f %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -s -n "side";
 	rename -uid "B8465080-43E9-3CA4-0C25-5B9A0F32CCBD";
 	setAttr ".v" no;
@@ -77,7 +74,6 @@ createNode camera -s -n "sideShape" -p "side";
 	setAttr ".man" -type "string" "side_mask";
 	setAttr ".hc" -type "string" "viewSet -s %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -n "pSphere1";
 	rename -uid "C17CAB5B-436C-4851-0943-DF9457FFAC34";
 	setAttr ".t" -type "double3" -11.877593371584959 0 0 ;
