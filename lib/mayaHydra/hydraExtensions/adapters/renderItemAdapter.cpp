@@ -191,7 +191,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         auto bbox = data._ri.boundingBox();
         const MPoint& min = bbox.min();
         const MPoint& max = bbox.max();
-        _bounds.SetRange(GfRange3d({min.x, min.y, min.z}, GfVec3d({max.x, max.y, max.z})));
+        _bounds.SetRange(GfRange3d({min.x, min.y, min.z}, {max.x, max.y, max.z}));
     }
     VtIntArray vertexIndices;
     VtIntArray vertexCounts;

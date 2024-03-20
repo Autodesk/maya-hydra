@@ -15,7 +15,7 @@
 //
 
 //Local headers
-#include "fvpBboxSceneIndex.h"
+#include "fvpBBoxSceneIndex.h"
 
 //USD/Hydra headers
 #include <pxr/base/gf/bbox3d.h>

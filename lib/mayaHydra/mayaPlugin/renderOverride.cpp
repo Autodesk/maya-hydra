@@ -46,7 +46,7 @@
 #include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
-#include <flowViewport/sceneIndex/fvpBboxSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
