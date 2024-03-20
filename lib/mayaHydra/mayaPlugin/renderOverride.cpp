@@ -598,6 +598,10 @@ MStatus MtohRenderOverride::Render(
         _mayaHydraSceneProducer->PreFrame(drawContext);
     }
 
+    if (_displayStyleSceneIndex) {
+       _displayStyleSceneIndex->SetRefineLevel({true, delegateParams.refineLevel});
+    }
+
     HdxRenderTaskParams params;
     params.enableLighting = true;
     params.enableSceneMaterials = true;
@@ -858,6 +862,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 #else
     _mayaHydraSceneProducer.reset();
 #endif
+    _displayStyleSceneIndex = nullptr;
     _selectionSceneIndex.Reset();
     _selection.reset();
 
@@ -909,6 +914,10 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex()
     if (!_sceneIndexRegistry) {
         _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy));
     }
+
+    // Add display style scene index
+    _lastFilteringSceneIndexBeforeCustomFiltering = _displayStyleSceneIndex =
+            HdsiLegacyDisplayStyleOverrideSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
 
     auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection));
     wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");

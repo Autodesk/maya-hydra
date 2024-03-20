@@ -730,6 +730,15 @@ void MtohRenderGlobals::BuildOptionsMenu(
            << ", $fromAE);\n";
     }
 
+    {
+        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
+           << ',' << quote("Refine level") << ',' // Description
+           << quote(_MangleName(MtohTokens->mtohRefinementLevel).GetString())
+           << ','                                                         // Attribute name
+           << quote(MtohTokens->mtohRefinementLevel.GetText()) // Label
+           << ", $fromAE);\n";
+    }
+
     // Temp solution to store global settings for USD Purpose tags
     {
         ss << "\tframeLayout -label \"Display Purpose\" -collapsable true;";
@@ -911,6 +920,20 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
             [](MFnNumericAttribute& nAttr) {
                 nAttr.setMin(32);
                 nAttr.setMax(8192);
+            });
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
+    if (filter(MtohTokens->mtohRefinementLevel)) {
+        _CreateIntAttribute(
+            node,
+            filter.mayaString(),
+            defGlobals.delegateParams.refineLevel,
+            userDefaults,
+            [](MFnNumericAttribute& nAttr) {
+                nAttr.setMin(0);
+                nAttr.setMax(8);
             });
         if (filter.attributeFilter()) {
             return mayaObject;
@@ -1098,6 +1121,16 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
             node,
             filter.mayaString(),
             globals.delegateParams.maximumShadowMapResolution,
+            storeUserSetting);
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    if (filter(MtohTokens->mtohRefinementLevel)) {
+        _GetAttribute(
+            node,
+            filter.mayaString(),
+            globals.delegateParams.refineLevel,
             storeUserSetting);
         if (filter.attributeFilter()) {
             return globals;

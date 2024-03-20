@@ -49,6 +49,7 @@
 #include <pxr/imaging/hd/rendererPlugin.h>
 #include <pxr/imaging/hd/rprimCollection.h>
 #include <pxr/imaging/hd/pluginRenderDelegateUniqueHandle.h>
+#include <pxr/imaging/hdsi/legacyDisplayStyleOverrideSceneIndex.h>
 #include <pxr/imaging/hdSt/renderDelegate.h>
 #include <pxr/imaging/hdx/taskController.h>
 #include <pxr/pxr.h>
@@ -234,6 +235,8 @@ private:
     HdRprimCollection                         _renderCollection { HdTokens->geometry,
                                           HdReprSelector(HdReprTokens->refined),
                                           SdfPath::AbsoluteRootPath() };
+
+    HdsiLegacyDisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
 
     HdRprimCollection _pointSnappingCollection {
         HdTokens->geometry,
