@@ -224,6 +224,7 @@ finally:
 
     set(ALL_PATH_VARS
         PYTHONPATH
+        MAYA_MODULE_PATH
         MAYA_PLUG_IN_PATH
         MAYA_SCRIPT_PATH
         XBMLANGPATH
@@ -299,18 +300,8 @@ finally:
     
     # mtoa
     if(DEFINED MTOA_LOCATION)
-        list(APPEND MAYAUSD_VARNAME_PATH
-             "${MTOA_LOCATION}/bin")
-        list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
-             "${MTOA_LOCATION}/scripts/mtoa/mel")   
-        list(APPEND MAYAUSD_VARNAME_MAYA_PXR_PLUGINPATH_NAME
-             "${MTOA_LOCATION}/usd")
-        list(APPEND MAYAUSD_VARNAME_MAYA_RENDER_DESC_PATH
-             "${MTOA_LOCATION}/")
-        list(APPEND MAYAUSD_MATERIALX_SEARCH_PATH
-             "${MTOA_LOCATION}/materialx/arnold")
-             list(APPEND MAYAUSD_MATERIALX_SEARCH_PATH
-                  "${MTOA_LOCATION}/materialx/targets")
+        list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH
+             "${MTOA_LOCATION}")
     endif()
     
     # lookdevx
@@ -394,10 +385,6 @@ finally:
             list(APPEND ALL_PATH_VARS "${env_name}")
         endif()
     endforeach()
-
-    # Unset any MAYA_MODULE_PATH as we set all the individual variables
-    # so we don't want to conflict with a MayaUsd module.
-    set_property(TEST ${test_name} APPEND PROPERTY ENVIRONMENT "MAYA_MODULE_PATH=")
 
     # set all env vars
     foreach(pathvar ${ALL_PATH_VARS})
