@@ -18,7 +18,7 @@
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
-#include <mayaHydraLib/mayaHydraSceneProducer.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/gf/interval.h>
 #include <pxr/imaging/hd/camera.h>
@@ -40,16 +40,16 @@ TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, camera)
 {
     MayaHydraAdapterRegistry::RegisterCameraAdapter(
         HdPrimTypeTokens->camera,
-        [](MayaHydraSceneProducer* producer, const MDagPath& dag) -> MayaHydraCameraAdapterPtr {
-            return MayaHydraCameraAdapterPtr(new MayaHydraCameraAdapter(producer, dag));
+        [](MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag) -> MayaHydraCameraAdapterPtr {
+            return MayaHydraCameraAdapterPtr(new MayaHydraCameraAdapter(mayaHydraSceneIndex, dag));
         });
 }
 
 } // namespace
 
 // MayaHydraCameraAdapter is used to handle the translation from a Maya camera to hydra.
-MayaHydraCameraAdapter::MayaHydraCameraAdapter(MayaHydraSceneProducer* producer, const MDagPath& dag)
-    : MayaHydraShapeAdapter(producer->GetPrimPath(dag, true), producer, dag)
+MayaHydraCameraAdapter::MayaHydraCameraAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag)
+    : MayaHydraShapeAdapter(mayaHydraSceneIndex->GetPrimPath(dag, true), mayaHydraSceneIndex, dag)
 {
 }
 
@@ -59,7 +59,7 @@ TfToken MayaHydraCameraAdapter::CameraType() { return HdPrimTypeTokens->camera; 
 
 bool MayaHydraCameraAdapter::IsSupported() const
 {
-    return GetSceneProducer()->GetRenderIndex().IsSprimTypeSupported(CameraType());
+    return GetMayaHydraSceneIndex()->GetRenderIndex().IsSprimTypeSupported(CameraType());
 }
 
 void MayaHydraCameraAdapter::Populate()
@@ -67,7 +67,7 @@ void MayaHydraCameraAdapter::Populate()
     if (_isPopulated) {
         return;
     }
-    GetSceneProducer()->InsertSprim(this, CameraType(), GetID(), HdCamera::AllDirty);
+    GetMayaHydraSceneIndex()->InsertPrim(this, CameraType(), GetID());
     _isPopulated = true;
 }
 
@@ -75,7 +75,7 @@ void MayaHydraCameraAdapter::MarkDirty(HdDirtyBits dirtyBits)
 {
     if (_isPopulated && dirtyBits != 0) {
         dirtyBits = dirtyBits & HdCamera::AllDirty;
-        GetSceneProducer()->MarkSprimDirty(GetID(), dirtyBits);
+        GetMayaHydraSceneIndex()->MarkSprimDirty(GetID(), dirtyBits);
     }
 }
 
@@ -120,7 +120,7 @@ void MayaHydraCameraAdapter::RemovePrim()
     if (!_isPopulated) {
         return;
     }
-    GetSceneProducer()->RemoveSprim(CameraType(), GetID());
+    GetMayaHydraSceneIndex()->RemovePrim(GetID());
     _isPopulated = false;
 }
 
@@ -195,20 +195,20 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
 
     if (paramName == HdCameraTokens->shutterOpen) {
         // No motion samples, instantaneous shutter
-        if (!GetSceneProducer()->GetParams().motionSamplesEnabled())
+        if (!GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled())
             return VtValue(double(0));
-        return VtValue(double(GetSceneProducer()->GetCurrentTimeSamplingInterval().GetMin()));
+        return VtValue(double(GetMayaHydraSceneIndex()->GetCurrentTimeSamplingInterval().GetMin()));
     }
     if (paramName == HdCameraTokens->shutterClose) {
         // No motion samples, instantaneous shutter
-        if (!GetSceneProducer()->GetParams().motionSamplesEnabled())
+        if (!GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled())
             return VtValue(double(0));
         const auto shutterAngle = camera.shutterAngle(&status);
         if (hadError(status))
             return {};
         auto constexpr maxRadians = M_PI * 2.0;
         auto shutterClose = std::min(std::max(0.0, shutterAngle), maxRadians) / maxRadians;
-        auto interval = GetSceneProducer()->GetCurrentTimeSamplingInterval();
+        auto interval = GetMayaHydraSceneIndex()->GetCurrentTimeSamplingInterval();
         return VtValue(double(interval.GetMin() + interval.GetSize() * shutterClose));
     }
 

@@ -23,7 +23,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class MayaHydraSceneProducer;
+class MayaHydraSceneIndex;
 
 /**
  * \brief MayaHydraCameraAdapter is used to handle the translation from a Maya camera to hydra.
@@ -32,7 +32,7 @@ class MayaHydraCameraAdapter : public MayaHydraShapeAdapter
 {
 public:
     MAYAHYDRALIB_API
-    MayaHydraCameraAdapter(MayaHydraSceneProducer* producer, const MDagPath& dag);
+    MayaHydraCameraAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag);
 
     MAYAHYDRALIB_API
     virtual ~MayaHydraCameraAdapter();

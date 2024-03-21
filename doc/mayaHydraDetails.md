@@ -91,7 +91,7 @@ classDiagram
     -_renderIndex: HdRenderIndex*
     -_fvpSelectionTracker: Fvp::SelectionTrackerSharedPtr
     -_selectionSceneIndex: Fvp::SelectionSceneIndexRefPtr
-    -_mayaHydraSceneProducer: std::unique_ptr<MayaHydraSceneProducer>
+    -_mayaHydraSceneIndex: std::unique_ptr<MayaHydraSceneIndex>
     +Render(const MHWRender::MDrawContext& drawContext, const MHWRender::MDataServerOperation::MViewportScene& scene)
   }
 ```
@@ -129,8 +129,8 @@ stateDiagram
 
   state InitHydraResources() {
       [*] --> HydraResources
-      HydraResources --> MayaHydraSceneProducer() :  RenderDelegate/RenderIndex
-      MayaHydraSceneProducer() --> Populate() : Creates MayaHydra specific Scene Indices internally       
+      HydraResources --> MayaHydraSceneIndex() :  RenderDelegate/RenderIndex
+      MayaHydraSceneIndex() --> Populate() : Creates MayaHydra specific Scene Indices internally       
       Populate() --> MayaHydraAdapter : Loop over Maya native nodes
       MayaHydraAdapter --> SceneIndexRegistration : Flow Viewport API (WIP) to inject various Scene Indices including USD data and SelectionHighlighting
       SceneIndexRegistration --> [*]

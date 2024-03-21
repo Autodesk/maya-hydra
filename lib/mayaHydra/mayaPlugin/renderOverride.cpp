@@ -27,6 +27,7 @@
 #include "renderOverrideUtils.h"
 #include "tokens.h"
 
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
 #include <mayaHydraLib/hydraUtils.h>
@@ -44,6 +45,7 @@
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
+#include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -338,6 +340,28 @@ void MtohRenderOverride::UpdateRenderGlobals(
     MGlobal::executeCommandOnIdle("refresh -f");
 }
 
+VtValue MtohRenderOverride::_GetUsedGPUMemory() const
+{
+    // Currently, only Storm is the known/tested renderer that provides GPU stats
+    // via the Render Delegate.
+    if (_isUsingHdSt && _renderDelegate)
+    {
+        VtDictionary hdStRenderStat = _renderDelegate->GetRenderStats();
+        return hdStRenderStat[HdPerfTokens->gpuMemoryUsed.GetString()];
+    }
+    return VtValue();
+}
+
+int MtohRenderOverride::GetUsedGPUMemory()
+{   
+    int totalGPUMemory = 0;
+    std::lock_guard<std::mutex> lock(_allInstancesMutex);
+    for (auto* instance : _allInstances) {
+        totalGPUMemory += instance->_GetUsedGPUMemory().UncheckedGet<int>();
+    }
+    return totalGPUMemory / (1024*1024); 
+}
+
 std::vector<MString> MtohRenderOverride::AllActiveRendererNames()
 {
     std::vector<MString> renderers;
@@ -386,8 +410,8 @@ SdfPath MtohRenderOverride::RendererSceneDelegateId(TfToken rendererName, TfToke
         return SdfPath();
     }
 
-    if (instance->_mayaHydraSceneProducer) {
-        return instance->_mayaHydraSceneProducer->GetDelegateID(sceneDelegateName);
+    if (instance->_mayaHydraSceneIndex) {
+        return instance->_mayaHydraSceneIndex->GetDelegateID(sceneDelegateName);
     }
     return SdfPath();
 }
@@ -527,8 +551,8 @@ MStatus MtohRenderOverride::Render(
         replaceSelectionTask(&tasks);
 
         if (scene.changed()) {
-            if (_mayaHydraSceneProducer) {
-                _mayaHydraSceneProducer->HandleCompleteViewportScene(
+            if (_mayaHydraSceneIndex) {
+                _mayaHydraSceneIndex->HandleCompleteViewportScene(
                     scene, static_cast<MFrameContext::DisplayStyle>(drawContext.getDisplayStyle()));
             }
         }
@@ -591,11 +615,11 @@ MStatus MtohRenderOverride::Render(
     MayaHydraParams delegateParams = _globals.delegateParams;
     delegateParams.displaySmoothMeshes = !(displayStyle & MHWRender::MFrameContext::kFlatShaded);
 
-    if (_mayaHydraSceneProducer) {
-        _mayaHydraSceneProducer->SetDefaultLightEnabled(_hasDefaultLighting);
-        _mayaHydraSceneProducer->SetDefaultLight(_defaultLight);
-        _mayaHydraSceneProducer->SetParams(delegateParams);
-        _mayaHydraSceneProducer->PreFrame(drawContext);
+    if (_mayaHydraSceneIndex) {
+        _mayaHydraSceneIndex->SetDefaultLightEnabled(_hasDefaultLighting);
+        _mayaHydraSceneIndex->SetDefaultLight(_defaultLight);
+        _mayaHydraSceneIndex->SetParams(delegateParams);
+        _mayaHydraSceneIndex->PreFrame(drawContext);
     }
 
     if (_displayStyleSceneIndex) {
@@ -658,10 +682,10 @@ MStatus MtohRenderOverride::Render(
             Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
             bool isMayaCamera = ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId();
             if (isMayaCamera) {
-                if (_mayaHydraSceneProducer) {
-                    params.camera = _mayaHydraSceneProducer->SetCameraViewport(camPath, _viewport);
+                if (_mayaHydraSceneIndex) {
+                    params.camera = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
                     if (vpDirty)
-                        _mayaHydraSceneProducer->MarkSprimDirty(params.camera, HdCamera::DirtyParams);
+                        _mayaHydraSceneIndex->MarkSprimDirty(params.camera, HdCamera::DirtyParams);
                 }
             }
         } else {
@@ -719,8 +743,8 @@ MStatus MtohRenderOverride::Render(
     } else {
         renderFrame(true);
     }
-    if (_mayaHydraSceneProducer) {
-        _mayaHydraSceneProducer->PostFrame();
+    if (_mayaHydraSceneIndex) {
+        _mayaHydraSceneIndex->PostFrame();
     }
 
     return MStatus::kSuccess;
@@ -747,6 +771,13 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
     if (delegateParams.guidePurpose)
         mhRenderTags.push_back(HdRenderTagTokens->guide);
     _taskController->SetRenderTags(mhRenderTags);
+}
+
+void MtohRenderOverride::_ClearMayaHydraSceneIndex()
+{
+    _renderIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
+    _mayaHydraSceneIndex->RemoveCallbacksAndDeleteAdapters(); //This should be called before calling _sceneIndex.Reset(); which will call the destructor if the ref count reaches 0
+    _mayaHydraSceneIndex.Reset();
 }
 
 void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& drawContext)
@@ -784,12 +815,12 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     }
 
     MayaHydraInitData mhInitData(
-        TfToken(),
+        TfToken("MayaHydraSceneIndex"),
         _engine,
         _renderIndex,
         _rendererPlugin,
         _taskController,
-        SdfPath(),
+        SdfPath("/MayaHydraViewportRenderer"),
         _isUsingHdSt
     );
 
@@ -802,12 +833,15 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 
     _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(_renderIndex);
 
-    _mayaHydraSceneProducer.reset(new MayaHydraSceneProducer(_renderIndexProxy, _ID, mhInitData, !_hasDefaultLighting));
+    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, !_hasDefaultLighting);
+    TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
 
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
     _engine.SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
 
-    _mayaHydraSceneProducer->Populate();
+    _mayaHydraSceneIndex->Populate();
+    //Add the scene index as an input scene index of the merging scene index
+    _renderIndexProxy->InsertSceneIndex(_mayaHydraSceneIndex, SdfPath::AbsoluteRootPath());
     
     _CreateSceneIndicesChainAfterMergingSceneIndex();
 
@@ -857,10 +891,10 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 #ifdef CODE_COVERAGE_WORKAROUND
     // Leak the Maya scene index, as its base class HdRetainedSceneIndex
     // destructor crashes under Windows clang code coverage build.
-    _mayaHydraSceneProducer->Cleanup();
-    _mayaHydraSceneProducer.release();
+        _mayaHydraSceneIndex->RemoveCallbacksAndDeleteAdapters();
+        _mayaHydraSceneIndex.Reset();
 #else
-    _mayaHydraSceneProducer.reset();
+       _ClearMayaHydraSceneIndex();
 #endif
     _displayStyleSceneIndex = nullptr;
     _selectionSceneIndex.Reset();
@@ -1118,12 +1152,12 @@ void MtohRenderOverride::_PopulateSelectionList(
     if (hits.empty())
         return;
 
-    if (_mayaHydraSceneProducer) {
+    if (_mayaHydraSceneIndex) {
 
         MStatus status;
         if (auto ufeSel = Ufe::NamedSelection::get(kNamedSelection)) {
             for (const HdxPickHit& hit : hits) {
-                if (_mayaHydraSceneProducer->AddPickHitToSelectionList(
+                if (_mayaHydraSceneIndex->AddPickHitToSelectionList(
                         hit, selectInfo, selectionList, worldSpaceHitPts)) {
                     continue;
                 }
