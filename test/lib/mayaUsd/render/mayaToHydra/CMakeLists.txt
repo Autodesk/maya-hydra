@@ -12,6 +12,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testSceneBrowser.py
     testStageAddPrim.py
     testTransforms.py
+    testRefinement.py
     testMaterialXOnNative.py
     testNewSceneWithStage.py
     testMayaDisplayModes.py
