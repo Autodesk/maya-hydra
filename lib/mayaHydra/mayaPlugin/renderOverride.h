@@ -64,10 +64,12 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <vector>
 
 #include <ufe/ufe.h>
 UFE_NS_DEF {
 class SelectionChanged;
+class Selection;
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -85,6 +87,10 @@ using HdxPickHitVector = std::vector<struct HdxPickHit>;
 class MtohRenderOverride : public MHWRender::MRenderOverride
 {
 public:
+    // Picking support.
+    class PickHandlerBase;
+    friend PickHandlerBase;
+
     MtohRenderOverride(const MtohRendererDescription& desc);
     ~MtohRenderOverride() override;
 
@@ -187,6 +193,10 @@ private:
 
     void _AddPluginSelectionHighlighting();
 
+    // Determine the pick handler which should handle a pick hit, to transform
+    // the pick hit into a selection.
+    const PickHandlerBase* _PickHandler(const HdxPickHit& hit) const;
+
     // Callbacks
     static void _ClearHydraCallback(void* data);
     static void _TimerCallback(float, float, void* data);
@@ -233,6 +243,11 @@ private:
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
     Fvp::SelectionPtr                         _selection;
+    // Naming this identifier _ufeSelection clashes with UFE's selection.h
+    // include guard and produces
+    // "error C2351: obsolete C++ constructor initialization syntax"
+    // with Visual Studio 2022, in MtohRenderOverride::MtohRenderOverride().
+    std::shared_ptr<Ufe::Selection>           _ufeSn;
     class SelectionObserver;
     using SelectionObserverPtr = std::shared_ptr<SelectionObserver>;
     SelectionObserverPtr                      _mayaSelectionObserver;
@@ -266,6 +281,9 @@ private:
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
     bool       _hasDefaultLighting = false;
+
+    // Picking support.
+    const std::vector<std::unique_ptr<PickHandlerBase>> _pickHandlers;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
