@@ -28,6 +28,7 @@ import sys
 
 HD_STORM = "HdStormRendererPlugin"
 HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
+MAYAUSD_PLUGIN_NAME = 'mayaUsdPlugin'
 
 def checkForPlugin(pluginName: str):
     try:
@@ -42,21 +43,44 @@ def checkForMayaUsdPlugin():
 def checkForMtoAPlugin():
     return checkForPlugin('mtoa')
 
-class MayaHydraBaseTestCase(unittest.TestCase):
-    '''Base class for mayaHydra unit tests without image comparison.'''
-
-    _file = None
+class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
+    '''Base class for mayaHydra unit tests.'''
 
     DEFAULT_CAM_DIST = 24
+
+    _inputDir = None
+
+    # Variables to be set in subclasses
+    _file = None
+    _extraPluginsToLoad = []
 
     @classmethod
     def setUpClass(cls):
         if cls._file is None:
-            raise ValueError("Subclasses of MayaHydraBaseTestCase must "
-                             "define `_file = __file__`")
-        # Set up all tests with their own test directory to write out test-specific coverage information
-        fixturesUtils.setUpClass(cls._file, 'mayaHydra',
-                                         initializeStandalone=False)
+            raise ValueError("Subclasses of MayaHydraBaseTestCase must define "
+                             "`_file = __file__`")
+
+        inputPath = fixturesUtils.setUpClass(
+            cls._file, 'mayaHydra', initializeStandalone=False, 
+            suffix=('_' + cls.__name__))
+
+        if cls._inputDir is None:
+            inputDirName = os.path.splitext(os.path.basename(cls._file))[0]
+            inputDirName = testUtils.stripPrefix(inputDirName, 'test')
+            if not inputDirName.endswith('Test'):
+                inputDirName += 'Test'
+            cls._inputDir = os.path.join(inputPath, inputDirName)
+
+        cls._testDir = os.path.abspath('.')
+
+        if MAYAUSD_PLUGIN_NAME not in cls._extraPluginsToLoad:
+            cls._extraPluginsToLoad.append(MAYAUSD_PLUGIN_NAME)
+
+        for pluginToLoad in cls._extraPluginsToLoad:
+            # If a plugin fails to load, the entire test suite will be immediately aborted.
+            # Note that in the case of mtoa, the plugin might load successfully but not
+            # initialize properly, which means issues will only be caught in the actual tests.
+            cmds.loadPlugin(pluginToLoad)
         
     def setUp(self):
         # Maya is not closed/reset between each test of a test suite,
@@ -137,30 +161,6 @@ class MayaHydraBaseTestCase(unittest.TestCase):
     def traceIndex(self, msg):
         self.trace(msg.format(str(self.getIndex())))
 
-class MtohTestCase(MayaHydraBaseTestCase, ImageDiffingTestCase):
-    '''Base class for mayaHydra unit tests with image comparison.'''
-
-    _inputDir = None
-
-    @classmethod
-    def setUpClass(cls):
-        if cls._file is None:
-            raise ValueError("Subclasses of MtohTestCase, must define "
-                             "`_file = __file__`")
-
-        inputPath = fixturesUtils.setUpClass(
-            cls._file, 'mayaHydra', initializeStandalone=False, 
-            suffix=('_' + cls.__name__))
-
-        if cls._inputDir is None:
-            inputDirName = os.path.splitext(os.path.basename(cls._file))[0]
-            inputDirName = testUtils.stripPrefix(inputDirName, 'test')
-            if not inputDirName.endswith('Test'):
-                inputDirName += 'Test'
-            cls._inputDir = os.path.join(inputPath, inputDirName)
-
-        cls._testDir = os.path.abspath('.')
-
     def resolveRefImage(self, refImage, imageVersion):
         if not os.path.isabs(refImage):
             if imageVersion:
@@ -173,21 +173,21 @@ class MtohTestCase(MayaHydraBaseTestCase, ImageDiffingTestCase):
                 hardfail=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         imagePath1 = self.resolveRefImage(image1, image1Version)
         imagePath2 = self.resolveRefImage(image2, image2Version)
-        super(MtohTestCase, self).assertImagesClose(imagePath1, imagePath2, fail, failpercent, hardfail, 
+        super(MayaHydraBaseTestCase, self).assertImagesClose(imagePath1, imagePath2, fail, failpercent, hardfail, 
                             warn, warnpercent, hardwarn, perceptual)
         
     def assertImagesEqual(self, image1, image2, image1Version=None, image2Version=None):
         imagePath1 = self.resolveRefImage(image1, image1Version)
         imagePath2 = self.resolveRefImage(image2, image2Version)
-        super(MtohTestCase, self).assertImagesEqual(imagePath1, imagePath2)
+        super(MayaHydraBaseTestCase, self).assertImagesEqual(imagePath1, imagePath2)
 
     def assertSnapshotClose(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
                 warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         refImage = self.resolveRefImage(refImage, imageVersion)
-        super(MtohTestCase, self).assertSnapshotClose(refImage, fail, failpercent, hardfail,
+        super(MayaHydraBaseTestCase, self).assertSnapshotClose(refImage, fail, failpercent, hardfail,
                             warn, warnpercent, hardwarn, perceptual)
 
     def assertSnapshotEqual(self, refImage, imageVersion=None):
         '''Use of this method is discouraged, as renders can vary slightly between renderer architectures.'''
         refImage = self.resolveRefImage(refImage, imageVersion)
-        super(MtohTestCase, self).assertSnapshotEqual(refImage)
+        super(MayaHydraBaseTestCase, self).assertSnapshotEqual(refImage)

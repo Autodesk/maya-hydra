@@ -31,7 +31,6 @@ class TestSceneCorrectness(mtohUtils.MayaHydraBaseTestCase):
         usdUtils.createStageFromFile(usdScenePath)
         self.setHdStormRenderer()
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_HydraFromUsdSceneCorrectness(self):
         self.loadUsdScene()
         cmds.select(all=True)

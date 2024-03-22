@@ -23,7 +23,7 @@ from testUtils import PluginLoaded
 
 import platform
 
-class TestMayaDisplayModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
+class TestMayaDisplayModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 

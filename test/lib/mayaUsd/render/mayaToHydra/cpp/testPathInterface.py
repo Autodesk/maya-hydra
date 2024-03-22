@@ -66,7 +66,6 @@ class TestPathInterface(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.refresh()
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_PathInterface(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):

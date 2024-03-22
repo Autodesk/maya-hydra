@@ -22,7 +22,7 @@ import maya.mel
 import fixturesUtils
 import mtohUtils
 
-class TestImageDiffing(mtohUtils.MtohTestCase):
+class TestImageDiffing(mtohUtils.MayaHydraBaseTestCase):
     """Test the image diffing setup to make sure it works and returns the expected results."""
 
     _file = __file__

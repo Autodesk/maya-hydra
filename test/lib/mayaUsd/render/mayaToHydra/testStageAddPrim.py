@@ -26,7 +26,6 @@ class TestStage(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
           
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_addPrim(self):
         import mayaUsd_createStageWithNewLayer
         import mayaUsd.lib

@@ -23,7 +23,7 @@ import mayaUtils
 import ufe
 from pxr import Usd, Sdf
 
-class TestUsdStagePayloadsAndReferences(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
+class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -95,7 +95,6 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MtohTestCase): #Subclassing mt
  
         cmds.select(clear=True)
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_UsdStagePayloadsOnTheFly(self):
         import mayaUsd.ufe
         import usdUfe
@@ -143,7 +142,6 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MtohTestCase): #Subclassing mt
         self.assertTrue(prim.IsLoaded())
         self.assertSnapshotClose("cubeLoadWithDescendants.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_UsdStagePayloadsFromScene(self):
         from mayaUsd import lib as mayaUsdLib
         self.loadUsdPayloadScene()
@@ -162,7 +160,6 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MtohTestCase): #Subclassing mt
         self.assertEqual(modVariant.GetVariantSelection(), 'FlowerPotB')
         self.assertSnapshotClose("payloadSceneLoadedPotB.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_UsdStageReferences(self):
         self.setUpReferenceScene()
         self.assertSnapshotClose("referencesSceneCreated.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)

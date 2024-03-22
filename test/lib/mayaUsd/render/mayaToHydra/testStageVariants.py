@@ -22,14 +22,13 @@ import testUtils
 import mayaUtils
 import ufe
 
-class TestStageVariants(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
+class TestStageVariants(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 0.3
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_UsdStageVariants(self):
         import usdUtils
         from mayaUsd import lib as mayaUsdLib

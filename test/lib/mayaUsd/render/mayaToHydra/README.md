@@ -26,7 +26,7 @@ For example, to run testVisibility on RelWithDebInfo :
 
 ### Running tests with MayaUSD
 
-Some tests require the MayaUSD plugin to be loaded in order to be run. If MayaUSD cannot be loaded, those tests will be skipped. In order for the test framework to find and load MayaUSD, the `-DMAYAUSD_LOCATION` CMake flag must be set to your MayaUSD installation directory when building MayaHydra. For convenience, you can use the `--mayausd-location` parameter when using the [build.py](../../../../../build.py) script, which will set the CMake flag for you with the given argument. The specified path should point to the directory where your MayaUSD `.mod` file resides. Note that the test framework will not find MayaUSD using the MAYA_MODULE_PATH environment variable.
+The tests require MayaUSD in order to be run. In order for the test framework to find and load MayaUSD, the `-DMAYAUSD_LOCATION` CMake flag must be set to your MayaUSD installation directory when building MayaHydra. For convenience, you can use the `--mayausd-location` parameter when using the [build.py](../../../../../build.py) script, which will set the CMake flag for you with the given argument. The specified path should point to the directory where your MayaUSD `.mod` file resides. Note that the test framework will not find MayaUSD using the MAYA_MODULE_PATH environment variable.
 
 For example, if your MayaUSD `.mod` file resides in `<some-path>/install/RelWithDebInfo`, you could call build.py as such :
 
@@ -54,29 +54,26 @@ Looking to add a C++ test suite? See the corresponding [README.md](./cpp/README.
 To add a new Python-only test suite : 
 
 1. Create a new test[...].py file in the current folder.
-2. Create a test class that derives from unittest.TestCase (doesn't need to directly inherit from it).
-3. Add `test_[...]` methods for each test case in your test suite.
-4. Add the following snippet at the bottom of your file :
+2. Create a test class that derives from `mtohUtils.MayaHydraBaseTestCase`.
+3. Add the line `_file = __file__` in your class definition.
+4. If needed, set `_extraPluginsToLoad` to list any plugins that need to be loaded for your test. MayaUSD does not need to be specified, it will be loaded automatically.
+5. Add `test_[...]` methods for each test case in your test suite.
+6. Add the following snippet at the bottom of your file :
     ```python
     if __name__ == '__main__':
         fixturesUtils.runTests(globals())
     ```
-5. Add the name of your test[...].py file to the list of `TEST_SCRIPT_FILES` in the [current folder's CMakeLists.txt](./CMakeLists.txt)
-
-Some important notes :
-- By default, the mayaHydra plugin will not be loaded. An easy way to load it is to have your test class derive from `MayaHydraBaseTestCase`, which will automatically load mayaHydra when running tests. Don't forget to add the line `_file = __file__` in your class.
-- After loading mayaHydra, the renderer will still be on Viewport 2.0. If you want to use another renderer, your test will have to switch to it. If you want to use HdStorm, an easy way to do it is to have your test class derive from `MayaHydraBaseTestCase` and call `self.setHdStormRenderer()`
+7. Add the name of your test[...].py file to the list of `TEST_SCRIPT_FILES` in the [current folder's CMakeLists.txt](./CMakeLists.txt)
 
 # Image comparison
 
 Image comparison is done using [idiff from OpenImageIO](https://openimageio.readthedocs.io/en/latest/idiff.html).
 
 Some utilities exist to facilitate image comparison tests. Here is the simplest way to get going : 
-1. Make your test class derive from `MtohTestCase`.
-2. Don't forget to add the line `_file = __file__` in your class.
-3. Create a folder called [TestName]Test (e.g. for testVisibility, create a folder VisibilityTest)
-4. Put the images you want to use for comparison in that folder
-5. Call `self.assertImagesClose`, `self.assertImagesEqual` and/or `self.assertSnapshotClose` with the file names of the images to compare with.
+1. Make sure your test class derives from `mtohUtils.MayaHydraBaseTestCase` (and has the line `_file = __file__`).
+2. Create a folder called [TestName]Test (e.g. for testVisibility, create a folder VisibilityTest)
+3. Put the images you want to use for comparison in that folder
+4. Call `self.assertImagesClose`, `self.assertImagesEqual` and/or `self.assertSnapshotClose` with the file names of the images to compare with.
 
 For the `assert[...]Close` methods, you will need to pass in a fail threshold for individual pixels and a fail percentage for the whole image. Other parameters are also available for you to specify. You can find more information on these parameters on the [idiff documentation page](https://openimageio.readthedocs.io/en/latest/idiff.html).
 
@@ -88,10 +85,4 @@ To create a reference snapshot, an easy way is to first write your test, and the
 
 # Utilities
 
-Utility files are located under [/test/testUtils](../../../../testUtils/). Note that at the time of writing this (2023/08/16), many of the utils files and their contents were inherited from the USD plugin, and are not all used. Here are some of the main utilities you might find useful :
-
-- mtohutils.py :
-    - `checkForMayaUsdPlugin()` will try to load the MayaUsd plugin and return a boolean indicating if the plugin was loaded successfully. By decorating a test case with the following line, you can run the test only if the MayaUsd plugin is found and loaded : 
-    ```@unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")```
-    - `MayaHydraBaseTestCase` is a base class you can use for your test classes that will provide you with some useful functionality, such as automatically loading the mayaHydra plugin. It also provides a method to use the HdStorm renderer (`setHdStormRenderer`), and another to create a simple scene with a cube (`makeCubeScene`).
-    - `MtohTestCase` is a class you can use as a base for your test classes that will provide you with image comparison functionality (see [Image comparison](#Image-comparison) section). Note that this class already derives from MayaHydraBaseTestCase, so it will also automatically load the mayaHydra plugin.
+Utility files are located under [/test/testUtils](../../../../testUtils/). Note that at the time of writing this (2023/08/16), many of the utils files and their contents were inherited from the USD plugin, and are not all used.

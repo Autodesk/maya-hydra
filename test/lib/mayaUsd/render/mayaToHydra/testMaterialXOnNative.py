@@ -18,8 +18,9 @@ import fixturesUtils
 import mtohUtils
 import unittest
 
-class TestMaterialXOnNative(mtohUtils.MtohTestCase):
+class TestMaterialXOnNative(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
+    _extraPluginsToLoad = ['LookdevXMaya']
 
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
     IMAGEDIFF_FAIL_PERCENT = 0.1
@@ -30,7 +31,6 @@ class TestMaterialXOnNative(mtohUtils.MtohTestCase):
                                  self.IMAGEDIFF_FAIL_THRESHOLD,
                                  self.IMAGEDIFF_FAIL_PERCENT)
 
-    @unittest.skipUnless(mtohUtils.checkForPlugin('LookdevXMaya'), "Requires LookDevX Plugin.")
     def test_MaterialX(self):
         mayaUtils.openTestScene("testMaterialX", "RedMtlxSphere.ma")
         self.setBasicCam(2)

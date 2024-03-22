@@ -57,7 +57,6 @@ class TestUsdStageLayerMuting(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.refresh()
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_UsdStageLayerMuting(self):
         self.setupUsdStage()
         with PluginLoaded('mayaHydraCppTests'):

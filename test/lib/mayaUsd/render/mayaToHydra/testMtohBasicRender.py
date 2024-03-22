@@ -25,7 +25,7 @@ import maya.mel
 import fixturesUtils
 import mtohUtils
 
-class TestSnapshot(mtohUtils.MtohTestCase):
+class TestSnapshot(mtohUtils.MayaHydraBaseTestCase):
     """Tests whether our snapshot rendering works with basic Viewport 2.0"""
 
     _file = __file__
@@ -60,7 +60,7 @@ class TestSnapshot(mtohUtils.MtohTestCase):
         self.assertRaises(AssertionError,
                           self.assertSnapshotEqual, "flat_orange_bad.png")        
 
-class TestMayaHydraRender(mtohUtils.MtohTestCase):
+class TestMayaHydraRender(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def test_cube(self):

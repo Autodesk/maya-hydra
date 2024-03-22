@@ -19,7 +19,7 @@ import fixturesUtils
 import mtohUtils
 import unittest
 
-class TestTransforms(mtohUtils.MtohTestCase):
+class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
@@ -56,7 +56,6 @@ class TestTransforms(mtohUtils.MtohTestCase):
         cmds.scale(2, 2, 2, cubeParent, absolute=True)
         self.verifySnapshot("cube_parent_moved_rotated_scaled.png")
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_usdPrim(self):
         import mayaUsd
         import mayaUsd_createStageWithNewLayer

@@ -22,7 +22,7 @@ import maya.mel
 import fixturesUtils
 import mtohUtils
 
-class TestDagChanges(mtohUtils.MtohTestCase):
+class TestDagChanges(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def setUp(self):
@@ -262,7 +262,7 @@ class TestDagChanges(mtohUtils.MtohTestCase):
         self.assertSnapshotEqual("instances_12.png", self.imageVersion)
 
 
-class TestUndo(mtohUtils.MtohTestCase):
+class TestUndo(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def test_node_creation_undo(self):
