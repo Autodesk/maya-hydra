@@ -157,7 +157,7 @@ private:
     HdRenderDelegate* _GetRenderDelegate();   
     void              _ClearMayaHydraSceneIndex();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
-    void              _CreateSceneIndicesChainAfterMergingSceneIndex();
+    void              _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
     VtValue           _GetUsedGPUMemory() const;
 
     void _PickByRegion(
@@ -281,6 +281,7 @@ private:
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
     bool       _hasDefaultLighting = false;
+    unsigned int _oldDisplayStyle {0};
 
     // Picking support.
     const std::vector<std::unique_ptr<PickHandlerBase>> _pickHandlers;
