@@ -316,6 +316,8 @@ finally:
              "${LOOKDEVX_LOCATION}/scripts")
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH
              "${LOOKDEVX_LOCATION}/python")
+        list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
+             "${LOOKDEVX_LOCATION}/plug-ins")
     endif()
 
     if(IS_WINDOWS AND DEFINED ENV{PYTHONHOME})
