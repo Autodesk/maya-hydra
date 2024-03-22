@@ -46,6 +46,7 @@
 #include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
+#include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -132,6 +133,19 @@ void replaceSelectionTask(PXR_NS::HdTaskSharedPtrVector* tasks)
     }
 
     *found = HdTaskSharedPtr(new Fvp::SelectionTask);
+}
+
+// We compare the current and previous viewport display style and 
+// return true if we need to recreate the filtering scene indices chain because of a change, false otherwise.
+bool NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, unsigned int previousDisplayStyle)
+{
+    const bool currentlyUsingBBoxDisplayStyle = currentDisplayStyle & MHWRender::MFrameContext::kBoundingBox;
+    const bool previouslyUsingBBoxDisplayStyle = previousDisplayStyle & MHWRender::MFrameContext::kBoundingBox;
+    if (currentlyUsingBBoxDisplayStyle != previouslyUsingBBoxDisplayStyle){
+        return true;
+    }
+
+    return false;
 }
 
 }
@@ -611,15 +625,34 @@ MStatus MtohRenderOverride::Render(
         }
     }
 
-    const auto      displayStyle = drawContext.getDisplayStyle();
+    const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
     MayaHydraParams delegateParams = _globals.delegateParams;
-    delegateParams.displaySmoothMeshes = !(displayStyle & MHWRender::MFrameContext::kFlatShaded);
+    delegateParams.displaySmoothMeshes = !(currentDisplayStyle & MHWRender::MFrameContext::kFlatShaded);
 
     if (_mayaHydraSceneIndex) {
         _mayaHydraSceneIndex->SetDefaultLightEnabled(_hasDefaultLighting);
         _mayaHydraSceneIndex->SetDefaultLight(_defaultLight);
         _mayaHydraSceneIndex->SetParams(delegateParams);
         _mayaHydraSceneIndex->PreFrame(drawContext);
+
+        if (NeedToRecreateTheSceneIndicesChain(currentDisplayStyle, _oldDisplayStyle)){
+            //We need to recreate the filtering scene index chain after the merging scene index as there was a change such as in the BBox display style which has been turned on or off.
+            _lastFilteringSceneIndexBeforeCustomFiltering = nullptr;//Release
+            _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
+            auto& manager = Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get();
+            manager.RemoveViewportInformation(std::string(panelName.asChar()));
+            //Get information from viewport
+            std::string cameraName;
+            M3dView view;
+            if (M3dView::getM3dViewFromModelPanel(panelName, view)){
+                MDagPath dpath;
+                view.getCamera(dpath);
+                MFnCamera viewCamera(dpath);
+                cameraName = viewCamera.name().asChar();
+            }
+            const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(panelName.asChar()), cameraName);
+            manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
+        }
     }
 
     HdxRenderTaskParams params;
@@ -743,6 +776,9 @@ MStatus MtohRenderOverride::Render(
         _mayaHydraSceneIndex->PostFrame();
     }
     
+    //Store as old display style
+    _oldDisplayStyle = currentDisplayStyle;
+
     return MStatus::kSuccess;
 }
 
@@ -839,7 +875,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     //Add the scene index as an input scene index of the merging scene index
     _renderIndexProxy->InsertSceneIndex(_mayaHydraSceneIndex, SdfPath::AbsoluteRootPath());
     
-    _CreateSceneIndicesChainAfterMergingSceneIndex();
+    _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
 
     if (auto* renderDelegate = _GetRenderDelegate()) {
         // Pull in any options that may have changed due file-open.
@@ -929,7 +965,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _initializationAttempted = false;
 }
 
-void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex()
+void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext)
 {
     //This function is where happens the ordering of filtering scene indices that are after the merging scene index
     TF_AXIOM(_renderIndexProxy);
@@ -953,6 +989,14 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex()
     // selection highlighting.
     wfSi->addExcludedSceneRoot(_ID);
     _lastFilteringSceneIndexBeforeCustomFiltering  = wfSi;
+    
+    const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
+    
+    //Are we using Bounding Box display style ?
+    if (currentDisplayStyle & MHWRender::MFrameContext::kBoundingBox){
+        //Insert the bounding box filtering scene index which converts geometries into a bounding box using the extent attribute
+        _lastFilteringSceneIndexBeforeCustomFiltering = Fvp::BboxSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+    }
 
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);

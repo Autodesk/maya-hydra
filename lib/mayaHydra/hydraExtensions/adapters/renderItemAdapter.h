@@ -22,6 +22,7 @@
 #include <mayaHydraLib/adapters/materialNetworkConverter.h>
 
 #include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/gf/bbox3d.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/meshTopology.h>
 #include <pxr/imaging/hd/renderIndex.h>
@@ -81,6 +82,12 @@ public:
 
     MAYAHYDRALIB_API
     bool GetDoubleSided() const override { return false; };
+
+    MAYAHYDRALIB_API
+    GfBBox3d GetBoundingBox()const override { return _bounds; }
+
+    MAYAHYDRALIB_API
+    GfVec4f GetDisplayColor() const override { return {_wireframeColor.r, _wireframeColor.g, _wireframeColor.b, _wireframeColor.a}; }
 
     MAYAHYDRALIB_API
     HdCullStyle GetCullStyle() const override;
@@ -209,6 +216,7 @@ private:
     bool                        _isHideOnPlayback = false;
     MHWRender::DisplayStatus    _displayStatus = MHWRender::DisplayStatus::kNoStatus;
     bool                        _isArnoldSkyDomeLightTriangleShape = false;
+    GfBBox3d                    _bounds;//Bounding box
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
