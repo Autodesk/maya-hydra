@@ -52,6 +52,7 @@ private:
     TfToken _InterpolationAsToken(HdInterpolation interpolation);
     HdDataSourceBaseHandle _GetMaterialBindingDataSource();
     HdDataSourceBaseHandle _GetMaterialDataSource();
+    HdDataSourceBaseHandle _GetDisplayColorDataSource();
 private:
     SdfPath _id;
     TfToken _type;

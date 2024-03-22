@@ -18,6 +18,8 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 import mayaUtils
+import unittest
+from testUtils import PluginLoaded
 
 import platform
 
@@ -98,5 +100,18 @@ class TestMayaDisplayModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         self.assertSnapshotClose("displayTextures" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)     
         cmds.modelEditor(panel, edit=True, displayTextures=False)
 
+    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
+    def test_MayaBoundingBoxDisplayMode(self):
+        with PluginLoaded('mayaHydraFlowViewportAPILocator'):
+            # open a Maya scene that contains USD prims, custom flow viewport data producer prims and maya native prims
+            testFile = mayaUtils.openTestScene(
+                    "testMayaDisplayModes",
+                    "testMayaBoundingBoxDisplayMode.ma")
+            cmds.refresh()
+            self.assertSnapshotClose("BBox_sceneLoaded" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+            panel = mayaUtils.activeModelPanel()
+            cmds.modelEditor(panel, edit=True, displayAppearance="boundingBox")
+            self.assertSnapshotClose("BBox_DisplayModeOn" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+    
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

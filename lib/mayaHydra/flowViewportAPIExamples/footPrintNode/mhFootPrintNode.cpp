@@ -56,6 +56,7 @@
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/extentSchema.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -299,6 +300,8 @@ namespace
         GfMatrix4d transform;
         transform.SetIdentity();
         transform.SetScale(scale);
+        
+        const float scaleArray[3] = {scale.data()[0], scale.data()[1], scale.data()[2]};
 
         //Create the primitive
         HdRetainedSceneIndex::AddedPrimEntry addedPrim;
@@ -310,6 +313,14 @@ namespace
             HdXformSchema::Builder()
                     .SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(
                     transform)).Build(),
+
+            //Create an extent attribute to support the viewport bounding box display style, 
+            //if no extent attribute is added, it will not be displayed at all in bounding box display style
+            HdExtentSchemaTokens->extent,
+            HdExtentSchema::Builder()
+                .SetMin(HdRetainedTypedSampledDataSource<GfVec3d>::New(GfVec3d(corner1.x*scaleArray[0], corner1.y*scaleArray[1], corner1.z*scaleArray[2])))
+                .SetMax(HdRetainedTypedSampledDataSource<GfVec3d>::New(GfVec3d(corner2.x*scaleArray[0], corner2.y*scaleArray[1], corner2.z*scaleArray[2])))
+                .Build(),
 
             //create a mesh
             HdMeshSchemaTokens->mesh,

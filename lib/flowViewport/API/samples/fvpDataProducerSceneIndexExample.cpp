@@ -41,6 +41,7 @@
 #include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
+#include <pxr/imaging/hd/extentSchema.h>
 
 //TBB headers to use multithreading
 #include <tbb/parallel_for.h>
@@ -484,6 +485,9 @@ HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubeP
                 .Build()
         );
 
+    const GfRange3d cubeRange ({-halfSize, -halfSize, -halfSize},     
+                               { halfSize,  halfSize,  halfSize});
+
     //Add the cube primitive
     HdRetainedSceneIndex::AddedPrimEntry addedPrim;
     addedPrim.primPath      = cubePath;
@@ -505,6 +509,14 @@ HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubeP
                                 .SetResetXformStack(HdRetainedTypedSampledDataSource<bool>::New(true)) //Mark the transform of prototype not inherit from parent
                                 .Build(),
 
+                        //Create an extent attribute to support the viewport bounding box display style, 
+                        //if no extent attribute is added, it will not be displayed at all in bounding box display style
+                        HdExtentSchemaTokens->extent,
+                        HdExtentSchema::Builder()
+                            .SetMin(HdRetainedTypedSampledDataSource<GfVec3d>::New(cubeRange.GetMin()))
+                            .SetMax(HdRetainedTypedSampledDataSource<GfVec3d>::New(cubeRange.GetMax()))
+                            .Build(),
+
                         //create a mesh
                         HdMeshSchemaTokens->mesh,
                         meshDs,
@@ -523,6 +535,13 @@ HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubeP
                         HdXformSchema::Builder()
                                 .SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(
                                 transform)).Build(),
+
+                        //create an extent attribute to easily compute the bounding box from it
+                        HdExtentSchemaTokens->extent,
+                        HdExtentSchema::Builder()
+                            .SetMin(HdRetainedTypedSampledDataSource<GfVec3d>::New(cubeRange.GetMin()))
+                            .SetMax(HdRetainedTypedSampledDataSource<GfVec3d>::New(cubeRange.GetMax()))
+                            .Build(),
 
                         //create a mesh
                         HdMeshSchemaTokens->mesh,

@@ -42,6 +42,7 @@
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/volumeFieldSchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
+#include <pxr/imaging/hd/extentSchema.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -65,6 +66,7 @@ MayaHydraDataSource::GetNames()
 
     if (_type == HdPrimTypeTokens->mesh) {
         result.push_back(HdMeshSchemaTokens->mesh);
+        result.push_back(HdExtentSchemaTokens->extent); //Add an extent attribute to support the bounding box display style
     }
 
     if (_type == HdPrimTypeTokens->basisCurves) {
@@ -179,6 +181,16 @@ MayaHydraDataSource::Get(const TfToken& name)
     else if (name == HdLightSchemaTokens->light) {
         return MayaHydraLightDataSource::New(_id, _type, _adapter);
     }
+    else if (name == HdExtentSchemaTokens->extent) {//Extent attribute to support the bounding box display style
+        GfBBox3d bbox = _adapter->GetBoundingBox();
+        return HdExtentSchema::Builder()
+            .SetMin(HdRetainedTypedSampledDataSource<GfVec3d>::New(bbox.GetRange().GetMin()))
+            .SetMax(HdRetainedTypedSampledDataSource<GfVec3d>::New(bbox.GetRange().GetMax()))
+            .Build();
+    }
+    else if (name == HdTokens->displayColor) {//Is not part of a schema so using HdTokens->displayColor
+        return _GetDisplayColorDataSource();
+    }
 
     return nullptr;
 }
@@ -198,6 +210,11 @@ HdDataSourceBaseHandle MayaHydraDataSource::_GetVisibilityDataSource()
                 HdRetainedTypedSampledDataSource<bool>::New(false));
         return visOff;
     }
+}
+
+HdDataSourceBaseHandle MayaHydraDataSource::_GetDisplayColorDataSource()
+{
+    return HdRetainedTypedSampledDataSource<GfVec4f>::New(_adapter->GetDisplayColor());
 }
 
 HdDataSourceBaseHandle MayaHydraDataSource::_GetPrimvarsDataSource()
