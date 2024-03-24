@@ -24,6 +24,8 @@ import fixturesUtils
 import testUtils
 from imageUtils import ImageDiffingTestCase
 
+import platform
+import subprocess
 import sys
 
 HD_STORM = "HdStormRendererPlugin"
@@ -88,6 +90,11 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         # from previous tests.
         cmds.file(new=True, force=True)
         self.setHdStormRenderer()
+
+    @classmethod
+    def tearDownClass(cls):
+        if platform.system() == "Windows":
+            subprocess.run(['taskkill', '/f', '/im', 'ADPClientService.exe'])
 
     def setHdStormRenderer(self):
         self.activeEditor = cmds.playblast(activeEditor=1)
