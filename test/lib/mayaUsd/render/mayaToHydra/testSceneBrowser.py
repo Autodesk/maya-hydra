@@ -42,6 +42,7 @@ class TestSceneBrowser(mtohUtils.MayaHydraBaseTestCase):
         cmds.directionalLight(name="MayaDirectionalLight")
         cmds.refresh()
 
+    @unittest.skipUnless(platform.system() != "Darwin", 'This test is disabled on OSX.')
     def test_SceneBrowser(self):
         self.setupScene()
         cmds.mayaHydraSceneBrowserTest()
