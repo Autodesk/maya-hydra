@@ -93,6 +93,8 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             # settings, etc. This prevents us from deleting the temporary test directory, and 
             # thus from cleaning the build. To avoid this, kill the process immediately.
             # So far (2024-03-25), this has only been observed when using LookdevX.
+            # Note that the force (/f) flag seems necessary, omitting it did not end up killing
+            # the process.
             subprocess.run(['taskkill', '/f', '/im', 'ADPClientService.exe'])
 
     def setHdStormRenderer(self):
