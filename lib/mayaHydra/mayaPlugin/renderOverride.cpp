@@ -407,7 +407,7 @@ public:
             // Implicit prototype instancing (i.e. USD native instancing).
             auto schema = HdPrimOriginSchema(instancerContext.instancePrimOrigin);
             if (!TF_VERIFY(schema, "Cannot build prim origin schema for USD native instance.")) {
-                return {{}, -1};
+                return {SdfPath(), -1};
             }
             return {schema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath), -1};
         }
