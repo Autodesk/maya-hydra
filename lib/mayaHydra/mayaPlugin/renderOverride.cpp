@@ -973,6 +973,10 @@ MStatus MtohRenderOverride::Render(
         }
     }
 
+    if (_displayStyleSceneIndex) {
+       _displayStyleSceneIndex->SetRefineLevel({true, delegateParams.refineLevel});
+    }
+
     HdxRenderTaskParams params;
     params.enableLighting = true;
     params.enableSceneMaterials = true;
@@ -1247,6 +1251,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
        _ClearMayaHydraSceneIndex();
     #endif
 
+    _displayStyleSceneIndex = nullptr;
     _selectionSceneIndex.Reset();
     _selection.reset();
 
@@ -1299,13 +1304,20 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy));
     }
 
+    const SdfPath mayaNativeRoot("/MayaHydraViewportRenderer");
+
+    // Add display style scene index
+    _lastFilteringSceneIndexBeforeCustomFiltering = _displayStyleSceneIndex =
+            Fvp::DisplayStyleOverrideSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+    _displayStyleSceneIndex->addExcludedSceneRoot(mayaNativeRoot); // Maya native prims don't use global refinement
+
     auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection));
     wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
     
     // At time of writing, wireframe selection highlighting of Maya native data
     // is done by Maya at render item creation time, so avoid double wireframe
     // selection highlighting.
-    wfSi->addExcludedSceneRoot(_ID);
+    wfSi->addExcludedSceneRoot(mayaNativeRoot);
     _lastFilteringSceneIndexBeforeCustomFiltering  = wfSi;
     
     const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
