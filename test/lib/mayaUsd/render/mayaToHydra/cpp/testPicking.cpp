@@ -39,28 +39,6 @@ FindPrimPredicate findPickPrimPredicate(const std::string& objectName, const TfT
     };
 }
 
-void getPrimMouseCoords(const HdSceneIndexPrim& prim, M3dView& view, QPoint& outMouseCoords)
-{
-    HdDataSourceBaseHandle xformDataSource = HdContainerDataSource::Get(prim.dataSource, HdXformSchema::GetDefaultLocator());
-    ASSERT_NE(xformDataSource, nullptr);
-    HdContainerDataSourceHandle xformContainerDataSource = HdContainerDataSource::Cast(xformDataSource);
-    ASSERT_NE(xformContainerDataSource, nullptr);
-    HdXformSchema xformSchema(xformContainerDataSource);
-    ASSERT_NE(xformSchema.GetMatrix(), nullptr);
-    GfMatrix4d xformMatrix = xformSchema.GetMatrix()->GetTypedValue(0);
-    GfVec3d translation = xformMatrix.ExtractTranslation();
-
-    MPoint worldPosition(translation[0], translation[1], translation[2], 1.0);
-    short   viewportX = 0, viewportY = 0;
-    MStatus worldToViewStatus;
-    // First assert checks that the point was not clipped, second assert checks the general MStatus
-    ASSERT_TRUE(view.worldToView(worldPosition, viewportX, viewportY, &worldToViewStatus));
-    ASSERT_TRUE(worldToViewStatus);
-
-    // Qt and M3dView use opposite Y-coordinates
-    outMouseCoords = QPoint(viewportX, view.portHeight() - viewportY);
-}
-
 void ensureSelected(const SceneIndexInspector& inspector, const FindPrimPredicate& primPredicate)
 {
     // 2024-03-01 : Due to the extra "Lighted" hierarchy, it is possible for an object to be split
@@ -115,11 +93,9 @@ TEST(TestPicking, pickObject)
 
     M3dView active3dView = M3dView::active3dView();
 
-    QPoint primMouseCoords;
-    getPrimMouseCoords(prims.front().prim, active3dView, primMouseCoords);
+    auto primMouseCoords = getPrimMouseCoords(prims.front().prim, active3dView);
 
-    mousePress(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
-    mouseRelease(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
+    mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
 
     active3dView.refresh();
 
@@ -154,8 +130,7 @@ TEST(TestPicking, marqueeSelect)
     PrimEntriesVector initialPrimEntries = inspector.FindPrims(
         findPickPrimPredicate(objectsToSelect.front().first, objectsToSelect.front().second));
     ASSERT_EQ(initialPrimEntries.size(), 1u);
-    QPoint initialMouseCoords;
-    getPrimMouseCoords(initialPrimEntries.front().prim, active3dView, initialMouseCoords);
+    auto initialMouseCoords = getPrimMouseCoords(initialPrimEntries.front().prim, active3dView);
 
     // Initialize the selection rectangle
     QPoint topLeftMouseCoords = initialMouseCoords;
@@ -166,8 +141,7 @@ TEST(TestPicking, marqueeSelect)
         PrimEntriesVector objectPrims = inspector.FindPrims(
             findPickPrimPredicate(objectsToSelect[iObject].first, objectsToSelect[iObject].second));
         ASSERT_EQ(objectPrims.size(), 1u);
-        QPoint objectMouseCoords;
-        getPrimMouseCoords(objectPrims.front().prim, active3dView, objectMouseCoords);
+        auto objectMouseCoords = getPrimMouseCoords(objectPrims.front().prim, active3dView);
 
         if (objectMouseCoords.x() > bottomRightMouseCoords.x()) {
             bottomRightMouseCoords.setX(objectMouseCoords.x());

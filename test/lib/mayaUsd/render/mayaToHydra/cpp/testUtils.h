@@ -19,12 +19,14 @@
 
 #include <mayaHydraLib/mayaHydra.h>
 
+#include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
+
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 
-#include <maya/MMatrix.h>
 #include <maya/MStatus.h>
+#include <maya/MApiNamespace.h>
 
 #include <QMouseEvent>
 #include <QWidget>
@@ -240,6 +242,20 @@ HdSceneIndexBaseRefPtr findSceneIndexInTree(
 );
 
 /**
+ * @brief Find the selection scene index in the scene index tree.
+ *
+ * This is a convenience function that calls findSceneIndexInTree() with
+ * the appropriate predicate.
+ *
+ * @param[in] sceneIndex The root of the scene index tree to search.
+ *
+ * @return Selection scene index pointer if found, otherwise nullptr.
+ */
+Fvp::SelectionSceneIndexRefPtr findSelectionSceneIndexInTree(
+    const HdSceneIndexBaseRefPtr& sceneIndex
+);
+
+/**
 * @class A utility class to accumulate and read SceneIndex notifications sent by a SceneIndex.
 */
 class SceneIndexNotificationsAccumulator : public HdSceneIndexObserver
@@ -342,6 +358,30 @@ void mousePress(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMouseP
  *
  */
 void mouseRelease(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos);
+
+/**
+ * @brief Convenience function to send a mouse press / release event pair to a widget at a given position.
+ *
+ * @param[in] mouseButton The mouse button to press and release.
+ * @param[in] widget The widget to send the event to.
+ * @param[in] localMousePos The position of the mouse, relative to the widget.
+ *
+ */
+void mouseClick(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos);
+
+/**
+ * @brief Get the mouse coordinates for a scene index prim.
+ *
+ * This function will return the mouse coordinates for the scene index prim's
+ * local coordinate origin.  Note that the view argument is not changed and is
+ * passed in by non const reference only because its interface is not
+ * const-correct.
+ *
+ * @param[in] prim The scene index prim for which mouse coordinates must be computed. 
+ * @param[in] view The view for which mouse coordinates are returned.
+ * @return Mouse coordinates.
+ */
+QPoint getPrimMouseCoords(const PXR_NS::HdSceneIndexPrim& prim, M3dView& view);
 
 }
 

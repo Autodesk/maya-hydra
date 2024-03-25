@@ -1,0 +1,186 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+    metersPerUnit = 0.01
+    upAxis = "Z"
+)
+
+def Xform "Root"
+{
+    def PointInstancer "ParentPointInstancer"
+    {
+        float3[] extent = [(-10, -10, -10), (10, 10, 10)]
+        point3f[] positions = [(0, 0, 0), (0, 0, 2), (0, 0, 4), (0, 0, 6)]
+        int[] protoIndices = [0, 1, 0, 1]
+        rel prototypes = [
+            </Root/ParentPointInstancer/prototypes/CubePointInstancerXform>,
+            </Root/ParentPointInstancer/prototypes/PyramidPointInstancerXform>,
+        ]
+
+        def "prototypes"
+        {
+            def Xform "CubePointInstancerXform"
+            {
+                def PointInstancer "CubePointInstancer" (
+                    kind = "subcomponent"
+                )
+                {
+                    float3[] extent = [(-5, -0.5, -0.5), (5, 2, 0.5)]
+                    point3f[] positions = [(-4.5, 0, 0), (-3, 0, 0), (-1.5, 0, 0), (0, 0, 0), (1.5, 0, 0), (3, 0, 0), (4.5, 0, 0), (-4.5, 1.5, 0), (-3, 1.5, 0), (-1.5, 1.5, 0), (0, 1.5, 0), (1.5, 1.5, 0), (3, 1.5, 0), (4.5, 1.5, 0)]
+                    int[] protoIndices = [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6]
+                    rel prototypes = [
+                        </Root/ParentPointInstancer/prototypes/CubePointInstancerXform/CubePointInstancer/prototypes/RedCube>,
+                        </Root/ParentPointInstancer/prototypes/CubePointInstancerXform/CubePointInstancer/prototypes/OrangeCube>,
+                        </Root/ParentPointInstancer/prototypes/CubePointInstancerXform/CubePointInstancer/prototypes/YellowCube>,
+                        </Root/ParentPointInstancer/prototypes/CubePointInstancerXform/CubePointInstancer/prototypes/GreenCube>,
+                        </Root/ParentPointInstancer/prototypes/CubePointInstancerXform/CubePointInstancer/prototypes/BlueCube>,
+                        </Root/ParentPointInstancer/prototypes/CubePointInstancerXform/CubePointInstancer/prototypes/IndigoCube>,
+                        </Root/ParentPointInstancer/prototypes/CubePointInstancerXform/CubePointInstancer/prototypes/VioletCube>,
+                    ]
+
+                    def "prototypes" (
+                        kind = "subcomponent"
+                    )
+                    {
+                        def "BlueCube" (
+                            prepend references = @./CubeModel.usda@
+                            variants = {
+                                string shadingVariant = "Blue"
+                            }
+                        )
+                        {
+                        }
+
+                        def "GreenCube" (
+                            prepend references = @./CubeModel.usda@
+                            variants = {
+                                string shadingVariant = "Green"
+                            }
+                        )
+                        {
+                        }
+
+                        def "IndigoCube" (
+                            prepend references = @./CubeModel.usda@
+                            variants = {
+                                string shadingVariant = "Indigo"
+                            }
+                        )
+                        {
+                        }
+
+                        def "OrangeCube" (
+                            prepend references = @./CubeModel.usda@
+                            variants = {
+                                string shadingVariant = "Orange"
+                            }
+                        )
+                        {
+                        }
+
+                        def "RedCube" (
+                            prepend references = @./CubeModel.usda@
+                            variants = {
+                                string shadingVariant = "Red"
+                            }
+                        )
+                        {
+                        }
+
+                        def "VioletCube" (
+                            prepend references = @./CubeModel.usda@
+                            variants = {
+                                string shadingVariant = "Violet"
+                            }
+                        )
+                        {
+                        }
+
+                        def "YellowCube" (
+                            prepend references = @./CubeModel.usda@
+                            variants = {
+                                string shadingVariant = "Yellow"
+                            }
+                        )
+                        {
+                        }
+                    }
+                }
+            }
+
+            def Xform "PyramidPointInstancerXform"
+            {
+                def PointInstancer "PyramidPointInstancer" (
+                    kind = "subcomponent"
+                )
+                {
+                    float3[] extent = [(-2, -0.36, -2), (2, 0.36, 2)]
+                    point3f[] positions = [(-1, 0, 0.5), (-1, 0, -1), (0.5, 0, 0.5), (0.5, 0, -1)]
+                    int[] protoIndices = [0, 1, 2, 0]
+                    rel prototypes = [
+                        </Root/ParentPointInstancer/prototypes/PyramidPointInstancerXform/PyramidPointInstancer/prototypes/RedPyramid>,
+                        </Root/ParentPointInstancer/prototypes/PyramidPointInstancerXform/PyramidPointInstancer/prototypes/GreenPyramid>,
+                        </Root/ParentPointInstancer/prototypes/PyramidPointInstancerXform/PyramidPointInstancer/prototypes/BluePyramid>,
+                    ]
+
+                    def "prototypes" (
+                        kind = "subcomponent"
+                    )
+                    {
+                        def "BluePyramid" (
+                            prepend references = @./PyramidModel.usda@
+                            variants = {
+                                string shadingVariant = "Blue"
+                            }
+                        )
+                        {
+                        }
+
+                        def "GreenPyramid" (
+                            prepend references = @./PyramidModel.usda@
+                            variants = {
+                                string shadingVariant = "Green"
+                            }
+                        )
+                        {
+                        }
+
+                        def "RedPyramid" (
+                            prepend references = @./PyramidModel.usda@
+                            variants = {
+                                string shadingVariant = "Red"
+                            }
+                        )
+                        {
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    def Xform "MarkerRedPyramidInstance3"
+    {
+        double3 xformOp:translate = (0.5, 0, 5)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "MarkerGreenPyramidInstance1"
+    {
+        double3 xformOp:translate = (-1, 0, 1)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "MarkerBlueCubeInstance0"
+    {
+        double3 xformOp:translate = (1.5, 1.5, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "MarkerYellowCubeInstance2"
+    {
+        double3 xformOp:translate = (-1.5, 1.5, 4)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+

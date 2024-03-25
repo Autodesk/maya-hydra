@@ -648,7 +648,7 @@ SdfPath MayaHydraSceneIndex::SetCameraViewport(const MDagPath& camPath, const Gf
 
 bool MayaHydraSceneIndex::AddPickHitToSelectionList(
     const HdxPickHit& hit,
-    const MHWRender::MSelectionInfo& selectInfo,
+    const MHWRender::MSelectionInfo& /* selectInfo */,
     MSelectionList& selectionList,
     MPointArray& worldSpaceHitPts)
 {
