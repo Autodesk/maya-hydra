@@ -100,7 +100,6 @@ class TestMayaDisplayModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
         self.assertSnapshotClose("displayTextures" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)     
         cmds.modelEditor(panel, edit=True, displayTextures=False)
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_MayaBoundingBoxDisplayMode(self):
         with PluginLoaded('mayaHydraFlowViewportAPILocator'):
             # open a Maya scene that contains USD prims, custom flow viewport data producer prims and maya native prims
