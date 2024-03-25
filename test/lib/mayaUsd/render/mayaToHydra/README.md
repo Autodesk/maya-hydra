@@ -70,6 +70,8 @@ Some important notes :
 
 # Best practices
 - Don't skip tests unless necessary. If a test requires a certain plugin to be loaded, don't skip the test if the plugin fails to load, as this will falsely be reported as a pass. For such cases, prefer setting the `_extraPluginsToLoad` variable in your test class.
+- Use relative paths in test data to make sure the tests will work anywhere.
+- Prefer storing USD data in text-form .usda instead of binary, for readability and ease of modification should a test need to be tweaked.
 
 # Image comparison
 
