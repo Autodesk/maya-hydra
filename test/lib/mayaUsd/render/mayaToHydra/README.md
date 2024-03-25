@@ -65,6 +65,9 @@ To add a new Python-only test suite :
     ```
 7. Add the name of your test[...].py file to the list of `TEST_SCRIPT_FILES` in the [current folder's CMakeLists.txt](./CMakeLists.txt)
 
+# Best practices
+- Don't skip tests unless necessary. If a test requires a certain plugin to be loaded, don't skip the test if the plugin fails to load, as this will falsely be reported as a pass. For such cases, prefer setting the `_extraPluginsToLoad` variable in your test class.
+
 # Image comparison
 
 Image comparison is done using [idiff from OpenImageIO](https://openimageio.readthedocs.io/en/latest/idiff.html).
