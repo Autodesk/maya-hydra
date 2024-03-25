@@ -300,6 +300,12 @@ finally:
     
     # mtoa
     if(DEFINED MTOA_LOCATION)
+        # It seems like we need to use MAYA_MODULE_PATH for MtoA to work properly.
+        # Even if we emulate the .mod file by manually setting the same env vars
+        # to the same values, MtoA itself will appear to load successfully when 
+        # calling loadPlugin, but some of its extensions will fail to initialize,
+        # leading to incorrect behavior and test failures. In those cases, it seems
+        # like having a locally installed MtoA fixed it, but we can't rely on that.
         list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH
              "${MTOA_LOCATION}")
     endif()
