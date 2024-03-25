@@ -25,7 +25,11 @@
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
 #include <maya/MGlobal.h>
-#include <maya/MSelectionList.h>
+#include <maya/MMatrix.h>
+#include <maya/M3dView.h>
+#include <maya/MPoint.h>
+
+#include <gtest/gtest.h>
 
 #include <QApplication>
 
@@ -253,7 +257,20 @@ HdSceneIndexBaseRefPtr findSceneIndexInTree(
     return {};
 }
 
+Fvp::SelectionSceneIndexRefPtr findSelectionSceneIndexInTree(
+    const HdSceneIndexBaseRefPtr& sceneIndex
+)
+{
+    auto isFvpSelectionSceneIndex = SceneIndexDisplayNamePred(
+        "Flow Viewport Selection Scene Index");
+    auto selectionSiBase = findSceneIndexInTree(
+        sceneIndex, isFvpSelectionSceneIndex);
+    return TfDynamic_cast<Fvp::SelectionSceneIndexRefPtr>(selectionSiBase);
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
+
+PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
 
@@ -310,6 +327,43 @@ void mouseRelease(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMous
         keyboardModifiers);
 
     QApplication::sendEvent(widget, &mouseReleaseEvent);
+}
+
+void mouseClick(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos)
+{
+    mousePress(mouseButton, widget, localMousePos);
+    mouseRelease(mouseButton, widget, localMousePos);
+}
+
+QPoint getPrimMouseCoords(const HdSceneIndexPrim& prim, M3dView& view)
+{
+    HdDataSourceBaseHandle xformDataSource = HdContainerDataSource::Get(prim.dataSource, HdXformSchema::GetDefaultLocator());
+    if (!xformDataSource) {
+        ADD_FAILURE() << "Scene index prim has no default locator data source, cannot get mouse coordinates for it.";
+        return {};
+    }
+    HdContainerDataSourceHandle xformContainerDataSource = HdContainerDataSource::Cast(xformDataSource);
+    TF_AXIOM(xformContainerDataSource);
+    HdXformSchema xformSchema(xformContainerDataSource);
+    TF_AXIOM(xformSchema.GetMatrix());
+    GfMatrix4d xformMatrix = xformSchema.GetMatrix()->GetTypedValue(0);
+    GfVec3d translation = xformMatrix.ExtractTranslation();
+
+    MPoint worldPosition(translation[0], translation[1], translation[2], 1.0);
+    short   viewportX = 0, viewportY = 0;
+    MStatus worldToViewStatus;
+    // First assert checks that the point was not clipped, second assert checks the general MStatus
+    if (!view.worldToView(worldPosition, viewportX, viewportY, &worldToViewStatus)) {
+        ADD_FAILURE() << "point was clipped by world to view projection, cannot get mouse coordinates for scene index prim.";
+        return {};
+    }
+    if (worldToViewStatus != MS::kSuccess) {
+        ADD_FAILURE() << "M3dView::worldToView() failed, cannot get mouse coordinates for scene index prim.";
+        return {};
+    }
+
+    // Qt and M3dView use opposite Y-coordinates
+    return QPoint(viewportX, view.portHeight() - viewportY);
 }
 
 }

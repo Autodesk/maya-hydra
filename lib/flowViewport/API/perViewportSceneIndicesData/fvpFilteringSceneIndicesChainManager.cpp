@@ -63,7 +63,7 @@ HdSceneIndexBaseRefPtr FilteringSceneIndicesChainManager::createFilteringSceneIn
         return nullptr;//Not an empty filtering scene indices chain
     }
 
-    //Append the filtering scene indices chain tp the merging scene index from renderIndexProxy
+    //Append the filtering scene indices chain to the merging scene index from renderIndexProxy
     _AppendFilteringSceneIndicesChain(viewportInformationAndSceneIndicesPerViewportData, inputSceneIndex);
     
     if (viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndex() == nullptr){

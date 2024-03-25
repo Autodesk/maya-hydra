@@ -35,6 +35,7 @@ target_sources(${TARGET_NAME}
         testSceneCorrectness.cpp
         testPrimInstancing.cpp
         testPicking.cpp
+        testPointInstancePicking.cpp
 )
 
 # -----------------------------------------------------------------------------

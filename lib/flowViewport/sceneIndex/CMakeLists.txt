@@ -10,6 +10,7 @@ target_sources(${TARGET_NAME}
     fvpSceneIndexUtils.cpp
     fvpSelectionSceneIndex.cpp
     fvpWireframeSelectionHighlightSceneIndex.cpp
+    fvpBBoxSceneIndex.cpp
 )
 
 set(HEADERS
@@ -21,6 +22,7 @@ set(HEADERS
     fvpSceneIndexUtils.h
     fvpSelectionSceneIndex.h
     fvpWireframeSelectionHighlightSceneIndex.h
+    fvpBBoxSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------
