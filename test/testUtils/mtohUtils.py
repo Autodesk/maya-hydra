@@ -94,6 +94,11 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     @classmethod
     def tearDownClass(cls):
         if platform.system() == "Windows":
+            # On Windows, ADPClientService can linger around after a test ends and Maya closes,
+            # keeping a handle open into the temporary test directory that holds preferences,
+            # settings, etc. This prevents us from deleting the temporary test directory, and 
+            # thus from cleaning the build. To avoid this, kill the process immediately.
+            # So far (2024-03-25), this has only been observed when using LookdevX.
             subprocess.run(['taskkill', '/f', '/im', 'ADPClientService.exe'])
 
     def setHdStormRenderer(self):
