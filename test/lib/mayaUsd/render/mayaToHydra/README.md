@@ -56,7 +56,7 @@ To add a new Python-only test suite :
 1. Create a new test[...].py file in the current folder.
 2. Create a test class that derives from `mtohUtils.MayaHydraBaseTestCase`.
 3. Add the line `_file = __file__` in your class definition.
-4. If needed, set `_extraPluginsToLoad` to list any plugins that need to be loaded for your test. MayaUSD does not need to be specified, it will be loaded automatically.
+4. If needed, set `_requiredPlugins` to list any plugins that need to be loaded for your test. MayaUSD does not need to be specified, it will be loaded automatically.
 5. Add `test_[...]` methods for each test case in your test suite.
 6. Add the following snippet at the bottom of your file :
     ```python
@@ -69,7 +69,7 @@ Some important notes :
 - Before each test, a new file will be opened and the renderer will be switched to Hydra. If you need to switch between renderers, you can use the `self.setHdStormRenderer()` and `self.setViewport2Renderer()` methods.
 
 # Best practices
-- Don't skip tests unless necessary. If a test requires a certain plugin to be loaded, don't skip the test if the plugin fails to load, as this will falsely be reported as a pass. For such cases, prefer setting the `_extraPluginsToLoad` variable in your test class.
+- Don't skip tests unless necessary. If a test requires a certain plugin to be loaded, don't skip the test if the plugin fails to load, as this will falsely be reported as a pass. For such cases, prefer setting the `_requiredPlugins` variable in your test class.
 - Use relative paths in test data to make sure the tests will work anywhere.
 - Prefer storing USD data in text-form .usda instead of binary, for readability and ease of modification should a test need to be tweaked.
 

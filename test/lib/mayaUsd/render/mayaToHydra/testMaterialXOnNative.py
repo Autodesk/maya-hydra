@@ -20,7 +20,7 @@ import unittest
 
 class TestMaterialXOnNative(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
-    _extraPluginsToLoad = ['LookdevXMaya']
+    _requiredPlugins = ['LookdevXMaya']
 
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
     IMAGEDIFF_FAIL_PERCENT = 0.1

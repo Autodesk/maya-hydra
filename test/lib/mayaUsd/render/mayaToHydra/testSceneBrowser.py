@@ -25,7 +25,7 @@ from testUtils import PluginLoaded
 class TestSceneBrowser(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
-    _extraPluginsToLoad = ['mayaHydraSceneBrowserTest']
+    _requiredPlugins = ['mayaHydraSceneBrowserTest']
 
     def setupScene(self):
         import mayaUsd

@@ -48,7 +48,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
 
     # Variables to be set in subclasses
     _file = None
-    _extraPluginsToLoad = []
+    _requiredPlugins = []
 
     @classmethod
     def setUpClass(cls):
@@ -69,10 +69,10 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
 
         cls._testDir = os.path.abspath('.')
 
-        if MAYAUSD_PLUGIN_NAME not in cls._extraPluginsToLoad:
-            cls._extraPluginsToLoad.append(MAYAUSD_PLUGIN_NAME)
+        if MAYAUSD_PLUGIN_NAME not in cls._requiredPlugins:
+            cls._requiredPlugins.append(MAYAUSD_PLUGIN_NAME)
 
-        for pluginToLoad in cls._extraPluginsToLoad:
+        for pluginToLoad in cls._requiredPlugins:
             # If a plugin fails to load, the entire test suite will be immediately aborted.
             # Note that in the case of mtoa, the plugin might load successfully but not
             # initialize properly, which means issues will only be caught in the actual tests.

@@ -24,7 +24,7 @@ import platform
 class TestArnoldLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
-    _extraPluginsToLoad = ['mtoa']
+    _requiredPlugins = ['mtoa']
 
     @property
     def imageDiffFailThreshold(self):
