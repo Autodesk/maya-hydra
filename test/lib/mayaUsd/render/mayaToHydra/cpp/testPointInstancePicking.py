@@ -15,13 +15,12 @@
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
-import unittest
 import usdUtils
 
 import testUtils
 from testUtils import PluginLoaded
 
-class TestPointInstancePicking(mtohUtils.MtohTestCase):
+class TestPointInstancePicking(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -45,7 +44,6 @@ class TestPointInstancePicking(mtohUtils.MtohTestCase):
         cmds.setAttr('persp.rotate', -33.4, 63.0, 0, type='float3')
         cmds.refresh()
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_PickPointInstancer(self):
         with PluginLoaded('mayaHydraCppTests'):
 
@@ -63,7 +61,6 @@ class TestPointInstancePicking(mtohUtils.MtohTestCase):
                     self.PICK_PATH + marker,
                     f="TestPointInstancePicking.pickPointInstance")
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_PickInstances(self):
         with PluginLoaded('mayaHydraCppTests'):
 
@@ -87,7 +84,6 @@ class TestPointInstancePicking(mtohUtils.MtohTestCase):
                     self.PICK_PATH + marker,
                     f="TestPointInstancePicking.pickPointInstance")
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_PickPrototypes(self):
         with PluginLoaded('mayaHydraCppTests'):
 

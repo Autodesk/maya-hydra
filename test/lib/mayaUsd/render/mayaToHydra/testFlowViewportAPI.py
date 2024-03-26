@@ -31,7 +31,7 @@ def setRotateY(matrixAsAList, angle):
     matrixAsAList[2+4*0] = sin(angle)
     return matrixAsAList
 
-class TestFlowViewportAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
+class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 

@@ -89,7 +89,7 @@ createNode mayaUsdProxyShape -n "FlowerPotShape" -p "FlowerPot";
 	setAttr ".epp" -type "string" "";
 	setAttr ".forceCompute" yes;
 	setAttr ".usdStageLoadRules" -type "string" "/=all";
-	setAttr ".usdStageTargetLayer" -type "string" "x:/GIT/maya-hydra-opensource/test/testSamples/testStagePayloadsReferences/FlowerPot.usda";
+	setAttr ".usdStageTargetLayer" -type "string" "./FlowerPot.usda";
 createNode lightLinker -s -n "lightLinker1";
 	rename -uid "C6C6B39A-4A43-E8E4-FF7F-43B1BCC75A33";
 	setAttr -s 2 ".lnk";

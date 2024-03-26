@@ -14,18 +14,13 @@
 # limitations under the License.
 #
 # Test to make sure that our snapshot-comparison tools work
-
-import os.path
-import sys
-import unittest
-
 import maya.cmds as cmds
 import maya.mel
 
 import fixturesUtils
 import mtohUtils
 
-class TestSnapshot(mtohUtils.MtohTestCase):
+class TestSnapshot(mtohUtils.MayaHydraBaseTestCase):
     """Tests whether our snapshot rendering works with basic Viewport 2.0"""
 
     _file = __file__
@@ -60,7 +55,7 @@ class TestSnapshot(mtohUtils.MtohTestCase):
         self.assertRaises(AssertionError,
                           self.assertSnapshotEqual, "flat_orange_bad.png")        
 
-class TestMayaHydraRender(mtohUtils.MtohTestCase):
+class TestMayaHydraRender(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def test_cube(self):

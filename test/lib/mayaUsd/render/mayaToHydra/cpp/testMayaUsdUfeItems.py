@@ -16,7 +16,6 @@ import maya.cmds as cmds
 
 import fixturesUtils
 import mtohUtils
-import unittest
 
 from testUtils import PluginLoaded
 
@@ -37,7 +36,6 @@ class TestMayaUsdUfeItems(mtohUtils.MayaHydraBaseTestCase):
         UsdLux.RectLight.Define(usdStage, "/USDRectLight")
         cmds.refresh()
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_SkipMayaUsdUfeLights(self):
         self.setupUsdStage()
         with PluginLoaded('mayaHydraCppTests'):

@@ -18,7 +18,7 @@ import mtohUtils
 
 import platform
 
-class TestPolygonPrimitives(mtohUtils.MtohTestCase):
+class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 

@@ -224,6 +224,7 @@ finally:
 
     set(ALL_PATH_VARS
         PYTHONPATH
+        MAYA_MODULE_PATH
         MAYA_PLUG_IN_PATH
         MAYA_SCRIPT_PATH
         XBMLANGPATH
@@ -299,18 +300,14 @@ finally:
     
     # mtoa
     if(DEFINED MTOA_LOCATION)
-        list(APPEND MAYAUSD_VARNAME_PATH
-             "${MTOA_LOCATION}/bin")
-        list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
-             "${MTOA_LOCATION}/scripts/mtoa/mel")   
-        list(APPEND MAYAUSD_VARNAME_MAYA_PXR_PLUGINPATH_NAME
-             "${MTOA_LOCATION}/usd")
-        list(APPEND MAYAUSD_VARNAME_MAYA_RENDER_DESC_PATH
-             "${MTOA_LOCATION}/")
-        list(APPEND MAYAUSD_MATERIALX_SEARCH_PATH
-             "${MTOA_LOCATION}/materialx/arnold")
-             list(APPEND MAYAUSD_MATERIALX_SEARCH_PATH
-                  "${MTOA_LOCATION}/materialx/targets")
+        # It seems like we need to use MAYA_MODULE_PATH for MtoA to work properly.
+        # Even if we emulate the .mod file by manually setting the same env vars
+        # to the same values, MtoA itself will appear to load successfully when 
+        # calling loadPlugin, but some of its extensions will fail to initialize,
+        # leading to incorrect behavior and test failures. In those cases, it seems
+        # like having a locally installed MtoA fixed it, but we can't rely on that.
+        list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH
+             "${MTOA_LOCATION}")
     endif()
     
     # lookdevx
@@ -325,6 +322,8 @@ finally:
              "${LOOKDEVX_LOCATION}/scripts")
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH
              "${LOOKDEVX_LOCATION}/python")
+        list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
+             "${LOOKDEVX_LOCATION}/plug-ins")
     endif()
 
     if(IS_WINDOWS AND DEFINED ENV{PYTHONHOME})

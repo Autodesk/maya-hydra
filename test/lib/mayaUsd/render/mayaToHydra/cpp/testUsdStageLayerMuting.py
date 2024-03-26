@@ -16,7 +16,6 @@ import maya.cmds as cmds
 
 import fixturesUtils
 import mtohUtils
-import unittest
 
 from testUtils import PluginLoaded
 
@@ -57,7 +56,6 @@ class TestUsdStageLayerMuting(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.refresh()
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_UsdStageLayerMuting(self):
         self.setupUsdStage()
         with PluginLoaded('mayaHydraCppTests'):

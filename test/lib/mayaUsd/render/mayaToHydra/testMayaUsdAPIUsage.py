@@ -17,11 +17,10 @@
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
-import unittest
 import mayaUtils
 import platform
 
-class TestMayaUsdAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
+class TestMayaUsdAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -37,7 +36,6 @@ class TestMayaUsdAPI(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCas
             return 3
         return 0.2
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_MovingUsdStage(self):
         # Load a maya scene with a sphere prim in a UsdStage and a directional light, with HdStorm already being the viewport renderer.
         testFile = mayaUtils.openTestScene(

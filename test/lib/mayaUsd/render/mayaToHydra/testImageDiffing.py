@@ -12,17 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import os.path
-import sys
-import unittest
-
-import maya.cmds as cmds
-import maya.mel
-
 import fixturesUtils
 import mtohUtils
 
-class TestImageDiffing(mtohUtils.MtohTestCase):
+class TestImageDiffing(mtohUtils.MayaHydraBaseTestCase):
     """Test the image diffing setup to make sure it works and returns the expected results."""
 
     _file = __file__

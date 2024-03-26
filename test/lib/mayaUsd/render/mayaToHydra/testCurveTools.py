@@ -18,7 +18,7 @@ import mtohUtils
 
 import platform
 
-class TestCurveTools(mtohUtils.MtohTestCase):
+class TestCurveTools(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 

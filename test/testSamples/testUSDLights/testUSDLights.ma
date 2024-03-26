@@ -86,12 +86,12 @@ createNode mayaUsdProxyShape -n "testUSDLights:stageShape1" -p "testUSDLights:st
 	setAttr -k off ".v";
 	setAttr ".covm[0]"  0 1 1;
 	setAttr ".cdvm[0]"  0 1 1;
-	setAttr ".fp" -type "string" "E:/MayaHydra/ecg-maya-hydra/maya-hydra/test/testSamples/testUSDLights/UsdStageWithSphereMatXStdSurf.usd";
+	setAttr ".fp" -type "string" "./UsdStageWithSphereMatXStdSurf.usda";
 	setAttr ".epp" -type "string" "";
 	setAttr ".oslid" -type "string" "anon:0000018889420F50:UsdStageWithSphereMatXStdSurf-session.usda";
-	setAttr ".orlid" -type "string" "e:/MayaHydra/ecg-maya-hydra/maya-hydra/test/testSamples/testUSDLights/UsdStageWithSphereMatXStdSurf.usd";
+	setAttr ".orlid" -type "string" "./UsdStageWithSphereMatXStdSurf.usda";
 	setAttr ".usdStageLoadRules" -type "string" "/=all";
-	setAttr ".usdStageTargetLayer" -type "string" "e:/MayaHydra/ecg-maya-hydra/maya-hydra/test/testSamples/testUSDLights/UsdStageWithSphereMatXStdSurf.usd";
+	setAttr ".usdStageTargetLayer" -type "string" "./UsdStageWithSphereMatXStdSurf.usda";
 createNode transform -n "testUSDLights:pSphere1";
 	rename -uid "34F75DDF-48D8-4C4F-A85A-3CB7A16E2341";
 	setAttr ".t" -type "double3" 0 0 2.324 ;
@@ -198,7 +198,7 @@ createNode mayaUsdLayerManager -n "mayaUsdLayerManager1";
 	setAttr ".lyr[0].fid" -type "string" "usda";
 	setAttr ".lyr[0].szd" -type "string" "";
 	setAttr ".lyr[0].ann" yes;
-	setAttr ".lyr[1].id" -type "string" "e:/MayaHydra/ecg-maya-hydra/maya-hydra/test/testSamples/testUSDLights/UsdStageWithSphereMatXStdSurf.usd";
+	setAttr ".lyr[1].id" -type "string" "./UsdStageWithSphereMatXStdSurf.usda";
 	setAttr ".lyr[1].fid" -type "string" "usd";
 	setAttr ".lyr[1].szd" -type "string" (
 		"#usda 1.0\n\ndef Sphere \"Sphere1\" (\n    prepend apiSchemas = [\"MaterialBindingAPI\"]\n)\n{\n    rel material:binding = </mtl/standard_surface1>\n    double3 xformOp:translate = (0, 0, -2.3244301402269603)\n    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n}\n\ndef Scope \"mtl\"\n{\n    def Material \"standard_surface1\"\n    {\n        token outputs:mtlx:surface.connect = </mtl/standard_surface1/standard_surface1.outputs:out>\n\n        def Shader \"standard_surface1\"\n        {\n            uniform token info:id = \"ND_standard_surface_surfaceshader\"\n            token outputs:out\n        }\n    }\n}\n\ndef DistantLight \"DistantLight1\"\n{\n    float inputs:angle = 0.53\n    color3f inputs:shadow:color\n    bool inputs:shadow:enable = 1\n    token visibility = \"inherited\"\n    float3 xformOp:rotateXYZ = (-90, 0, 0)\n    double3 xformOp:translate = (0, 2, 0)\n    uniform token[] xformOpOrder = [\"xformOp:translate\", \"xformOp:rotateXYZ\"]\n}\n\ndef DiskLight \"DiskLight1\"\n{\n    float inputs:radius = 2.4875622\n    token visibility = \"inherited\"\n    float3 xformOp:rotateXYZ = (-90, 0, 0)\n"

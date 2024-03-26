@@ -16,7 +16,6 @@ import maya.cmds as cmds
 
 import fixturesUtils
 import mtohUtils
-import unittest
 
 import testUtils
 from testUtils import PluginLoaded
@@ -32,7 +31,6 @@ class TestPrimInstancing(mtohUtils.MayaHydraBaseTestCase):
         self.setHdStormRenderer()
         cmds.refresh()
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_UsdPrimInstancing(self):
         self.loadUsdScene()
         with PluginLoaded('mayaHydraCppTests'):
