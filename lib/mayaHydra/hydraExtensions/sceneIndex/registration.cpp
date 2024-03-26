@@ -42,6 +42,8 @@
 #include <maya/MItDag.h>
 #include <maya/MMessage.h>
 #include <maya/MNodeMessage.h>
+#include <maya/MFnPlugin.h>
+#include <maya/MGlobal.h>
 
 #include <ufeExtensions/Global.h>
 
@@ -201,10 +203,16 @@ PXR_NAMESPACE_OPEN_SCOPE
 // Remove this once the code has been moved to the MayaHydra namespace.
 using namespace MayaHydra;
 
-// MayaHydraSceneIndexRegistration is used to register a scene index for a given dag node type.
+// MayaHydraSceneIndexRegistration is used to register a scene index for
+// mayaUsdPlugin proxy shape nodes.
 MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy)
     : _renderIndexProxy(renderIndexProxy)
 {
+    if (!MFnPlugin::isNodeRegistered(kMayaUsdProxyShapeNode)) {
+        MGlobal::displayWarning("mayaUsdPlugin not loaded, cannot be registered to Maya Hydra.  Please load mayaUsdPlugin, then switch back to a Maya Hydra viewport renderer.");
+        return;
+    }
+
     MCallbackId id;
     MStatus     status;
     id = MDGMessage::addNodeAddedCallback(
