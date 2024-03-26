@@ -26,21 +26,8 @@ class TestMayaDisplayModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    @property
-    def imageDiffFailThreshold(self):
-        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
-        # for that platform specifically for now, so we can still catch issues on other platforms.
-        if platform.system() == "Darwin":
-            return 0.1
-        return 0.01
-    
-    @property
-    def imageDiffFailPercent(self):
-        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
-        # for that platform specifically for now, so we can still catch issues on other platforms.
-        if platform.system() == "Darwin":
-            return 4
-        return 0.2
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
+    IMAGE_DIFF_FAIL_PERCENT = 0.2
 
     def test_MayaDisplayModes(self):
 
@@ -59,44 +46,44 @@ class TestMayaDisplayModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
         #Use Default Material
         cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
         cmds.refresh()
-        self.assertSnapshotClose("defaultMaterial" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)        
+        self.assertSnapshotClose("defaultMaterial" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
         cmds.modelEditor(panel, edit=True, useDefaultMaterial=False)
 
         #xray mode
         cmds.modelEditor(panel, edit=True, xray=True)
         cmds.refresh()
-        self.assertSnapshotClose("xray" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)        
+        self.assertSnapshotClose("xray" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
         cmds.modelEditor(panel, edit=True, xray=False)
         
         #WireframeOnShaded mode
         cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
         cmds.refresh()
-        self.assertSnapshotClose("wireframeOnShaded" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("wireframeOnShaded" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=False)
         cmds.modelEditor(panel, edit=True, useDefaultMaterial=False)
 
         #All Lights mode
         cmds.modelEditor(panel, edit=True, displayLights="all")
         cmds.refresh()
-        self.assertSnapshotClose("allLights" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("allLights" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
         #Shadows mode
         cmds.modelEditor(panel, edit=True, shadows=True)
         cmds.refresh()
-        self.assertSnapshotClose("shadows" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("shadows" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.modelEditor(panel, edit=True, shadows=False)
         
         #Smoothshaded Material
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
         cmds.refresh()
-        self.assertSnapshotClose("smoothShaded" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)        
+        self.assertSnapshotClose("smoothShaded" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
         cmds.modelEditor(panel, edit=True, displayLights="default")   #revert to default lighting 
 
         #Display texures mode         
         cmds.modelEditor(panel, edit=True, displayTextures=True)  
         cmds.refresh()
-        self.assertSnapshotClose("displayTextures" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)     
+        self.assertSnapshotClose("displayTextures" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)     
         cmds.modelEditor(panel, edit=True, displayTextures=False)
 
     def test_MayaBoundingBoxDisplayMode(self):
@@ -106,10 +93,10 @@ class TestMayaDisplayModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
                     "testMayaDisplayModes",
                     "testMayaBoundingBoxDisplayMode.ma")
             cmds.refresh()
-            self.assertSnapshotClose("BBox_sceneLoaded" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+            self.assertSnapshotClose("BBox_sceneLoaded" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
             panel = mayaUtils.activeModelPanel()
             cmds.modelEditor(panel, edit=True, displayAppearance="boundingBox")
-            self.assertSnapshotClose("BBox_DisplayModeOn" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+            self.assertSnapshotClose("BBox_DisplayModeOn" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

@@ -24,17 +24,8 @@ class TestMayaUsdAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    @property
-    def imageDiffFailThreshold(self):
-        return 0.01
-    
-    @property
-    def imageDiffFailPercent(self):
-        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
-        # for that platform specifically for now, so we can still catch issues on other platforms.
-        if platform.system() == "Darwin":
-            return 3
-        return 0.2
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
+    IMAGE_DIFF_FAIL_PERCENT = 0.2
 
     def test_MovingUsdStage(self):
         # Load a maya scene with a sphere prim in a UsdStage and a directional light, with HdStorm already being the viewport renderer.
@@ -42,7 +33,7 @@ class TestMayaUsdAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
                 "testMayaUsdAPIUsage",
                 "UsdStageWithSphereMatXStdSurf.ma")
         cmds.refresh()
-        self.assertSnapshotClose("mayaUsdAPI_DirectionalLight.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("mayaUsdAPI_DirectionalLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Move the transform node, the usd stage prim should move as well
         # Get the transform node of the MayaUsdProxyShape node hosting the stage, it is named "stage1"
@@ -52,44 +43,44 @@ class TestMayaUsdAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
         # Move the selected node
         cmds.move(0, 0, -2)
         cmds.refresh()
-        self.assertSnapshotClose("mayaUsdAPI_TransformMoved.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("mayaUsdAPI_TransformMoved.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
         #Hide the transform node, this should hide the usd stage
         cmds.hide(transformNode)
-        self.assertSnapshotClose("mayaUsdAPI__NodeHidden.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("mayaUsdAPI__NodeHidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Unhide the transform node, this should unhide the usd stage
         cmds.showHidden(transformNode)
-        self.assertSnapshotClose("mayaUsdAPI__NodeUnhidden.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("mayaUsdAPI__NodeUnhidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Delete the shape node, this should hide the usd stage
         cmds.delete(transformNode)
-        self.assertSnapshotClose("mayaUsdAPI__NodeDeleted.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("mayaUsdAPI__NodeDeleted.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
             
         #Undo the delete, the usd stage should be visible again
         cmds.undo()
-        self.assertSnapshotClose("mayaUsdAPI__NodeDeletedUndo.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("mayaUsdAPI__NodeDeletedUndo.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Redo the delete, the usd stage should be hidden
         cmds.redo()
-        self.assertSnapshotClose("mayaUsdAPI__NodeDeletedRedo.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("mayaUsdAPI__NodeDeletedRedo.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Undo the delete again, the stage prims should be visible
         cmds.undo()
-        self.assertSnapshotClose("mayaUsdAPI__NodeDeletedUndoAgain.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("mayaUsdAPI__NodeDeletedUndoAgain.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Move transform node again to see if it still updates the usd stage prims
         cmds.select(transformNode)
         # Move the selected node
         cmds.move(0, 0, 4)
         cmds.refresh()
-        self.assertSnapshotClose("mayaUsdAPI__NodeMovedAfterDeletionAndUndo.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("mayaUsdAPI__NodeMovedAfterDeletionAndUndo.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Switch to VP2
         self.setViewport2Renderer()
         #Switch back to Storm
         self.setHdStormRenderer()
-        self.assertSnapshotClose("mayaUsdAPI__VP2AndThenBackToStorm.png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("mayaUsdAPI__VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Finish by a File New command
         cmds.file(new=True, force=True)
