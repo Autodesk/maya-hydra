@@ -73,6 +73,7 @@ Some important notes :
 - Use relative paths in test data to make sure the tests will work anywhere.
 - Prefer storing USD data in text-form .usda instead of binary, for readability and ease of modification should a test need to be tweaked.
 - By default, tests will disable color management. However, it tends to be automatically re-enabled in certain conditions; while we have mitigated this by re-disabling it every time we've seen this occur, it is safer to make sure it is explicitly disabled if possible, such as by saving tests scenes with color management off (as opposed to saving them with an undefined color management status).
+- If you add tests for color management, do **NOT** use the legacy SynColor system, as it is no longer supported on OSX.
 
 # Image comparison
 
