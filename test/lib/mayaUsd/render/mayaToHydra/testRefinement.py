@@ -41,21 +41,21 @@ class TestRefinement(mtohUtils.MtohTestCase):
         self.setHdStormRenderer()
         cmds.mayaHydra(createRenderGlobals=1)
         
-        cmds.setAttr("defaultRenderGlobals.mtohRefinementLevel", 0)
-        cmds.mayaHydra(updateRenderGlobals="mtohRefinementLevel")
+        cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 0)
+        cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
         self.verifySnapshot("usd_cube_refined_0.png")
 
-        cmds.setAttr("defaultRenderGlobals.mtohRefinementLevel", 2)
-        cmds.mayaHydra(updateRenderGlobals="mtohRefinementLevel")
+        cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 2)
+        cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
         self.verifySnapshot("usd_cube_refined_2.png")
 
-        cmds.setAttr("defaultRenderGlobals.mtohRefinementLevel", 4)
-        cmds.mayaHydra(updateRenderGlobals="mtohRefinementLevel")
+        cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 4)
+        cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
         self.verifySnapshot("usd_cube_refined_4.png")
 
         #restore the default
-        cmds.setAttr("defaultRenderGlobals.mtohRefinementLevel", 0)
-        cmds.mayaHydra(updateRenderGlobals="mtohRefinementLevel")
+        cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 0)
+        cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

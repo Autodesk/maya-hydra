@@ -733,9 +733,9 @@ void MtohRenderGlobals::BuildOptionsMenu(
     {
         ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
            << ',' << quote("Refine level") << ',' // Description
-           << quote(_MangleName(MtohTokens->mtohRefinementLevel).GetString())
+           << quote(_MangleName(MtohTokens->mayaHydraRefinementLevel).GetString())
            << ','                                                         // Attribute name
-           << quote(MtohTokens->mtohRefinementLevel.GetText()) // Label
+           << quote(MtohTokens->mayaHydraRefinementLevel.GetText()) // Label
            << ", $fromAE);\n";
     }
 
@@ -925,7 +925,7 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
             return mayaObject;
         }
     }
-    if (filter(MtohTokens->mtohRefinementLevel)) {
+    if (filter(MtohTokens->mayaHydraRefinementLevel)) {
         _CreateIntAttribute(
             node,
             filter.mayaString(),
@@ -1126,7 +1126,7 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
             return globals;
         }
     }
-    if (filter(MtohTokens->mtohRefinementLevel)) {
+    if (filter(MtohTokens->mayaHydraRefinementLevel)) {
         _GetAttribute(
             node,
             filter.mayaString(),
