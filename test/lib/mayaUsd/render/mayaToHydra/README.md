@@ -72,6 +72,7 @@ Some important notes :
 - Don't skip tests unless necessary. If a test requires a certain plugin to be loaded, don't skip the test if the plugin fails to load, as this will falsely be reported as a pass. For such cases, prefer setting the `_requiredPlugins` variable in your test class.
 - Use relative paths in test data to make sure the tests will work anywhere.
 - Prefer storing USD data in text-form .usda instead of binary, for readability and ease of modification should a test need to be tweaked.
+- By default, tests will disable color management. However, it tends to be re-enabled in certain conditions; while we have mitigated this by re-disabling it every time we've seen this occur, it is safer to make sure it is explicitly disabled if possible, such as by saving tests scenes with color management off (as opposed to saving them with an undefined color management status).
 
 # Image comparison
 
