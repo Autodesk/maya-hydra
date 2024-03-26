@@ -162,6 +162,8 @@ namespace {
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
+static const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaHydraViewportRenderer");
+
 //! Pick resolution behavior to use when the picked object is a point instance.
 enum UsdPointInstancesPickMode
 {
@@ -583,8 +585,7 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
             _rendererDesc.rendererName.GetText(),
             _rendererDesc.overrideName.GetText(),
             _rendererDesc.displayName.GetText());
-    _ID = SdfPath("/MayaHydraViewportRenderer")
-              .AppendChild(
+    _ID = MAYA_NATIVE_ROOT.AppendChild(
                   TfToken(TfStringPrintf("_MayaHydra_%s_%p", desc.rendererName.GetText(), this)));
 
     MStatus status;
@@ -993,6 +994,10 @@ MStatus MtohRenderOverride::Render(
         }
     }
 
+    if (_displayStyleSceneIndex) {
+       _displayStyleSceneIndex->SetRefineLevel({true, delegateParams.refineLevel});
+    }
+
     HdxRenderTaskParams params;
     params.enableLighting = true;
     params.enableSceneMaterials = true;
@@ -1190,7 +1195,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
         _renderIndex,
         _rendererPlugin,
         _taskController,
-        SdfPath("/MayaHydraViewportRenderer"),
+        MAYA_NATIVE_ROOT,
         _isUsingHdSt
     );
 
@@ -1267,6 +1272,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
        _ClearMayaHydraSceneIndex();
     #endif
 
+    _displayStyleSceneIndex = nullptr;
     _selectionSceneIndex.Reset();
     _selection.reset();
 
@@ -1319,13 +1325,18 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy));
     }
 
+    // Add display style scene index
+    _lastFilteringSceneIndexBeforeCustomFiltering = _displayStyleSceneIndex =
+            Fvp::DisplayStyleOverrideSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+    _displayStyleSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims don't use global refinement
+
     auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection));
     wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
     
     // At time of writing, wireframe selection highlighting of Maya native data
     // is done by Maya at render item creation time, so avoid double wireframe
     // selection highlighting.
-    wfSi->addExcludedSceneRoot(_ID);
+    wfSi->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
     _lastFilteringSceneIndexBeforeCustomFiltering  = wfSi;
     
     const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();

@@ -39,6 +39,7 @@ struct MayaHydraParams
     float motionSampleStart = 0;
     float motionSampleEnd = 0;
     bool  displaySmoothMeshes = true;
+    int   refineLevel = 0;
 
     bool motionSamplesEnabled() const { return motionSampleStart != 0 || motionSampleEnd != 0; }
 };
