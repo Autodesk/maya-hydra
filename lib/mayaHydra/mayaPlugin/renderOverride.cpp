@@ -393,6 +393,26 @@ public:
             return {primOrigin.GetFullPath(), -1};
         }
 
+        // If there is a Hydra instancer, distinguish between native instancing
+        // (implicit USD prototype created by USD itself) and point instancing
+        // (explicitly authored USD prototypes).  As per HdxInstancerContext
+        // documentation:
+        // 
+        // [...] "exactly one of instancePrimOrigin or instancerPrimOrigin will
+        // contain data depending on whether the instancing at the current
+        // level was implicit or not, respectively."
+        const auto& instancerContext = primOrigin.instancerContexts.front();
+
+        if (instancerContext.instancePrimOrigin) {
+            // Implicit prototype instancing (i.e. USD native instancing).
+            auto schema = HdPrimOriginSchema(instancerContext.instancePrimOrigin);
+            if (!TF_VERIFY(schema, "Cannot build prim origin schema for USD native instance.")) {
+                return {SdfPath(), -1};
+            }
+            return {schema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath), -1};
+        }
+
+        // Explicit prototype instancing (i.e. USD point instancing).
         std::function<HitPath(const HdxPrimOriginInfo& primOrigin, const HdxPickHit& hit)> pickFn[] = {pickInstancer, pickInstance, pickPrototype};
                             
         // Retrieve pick mode from mayaUsd optionVar, to see if we're picking

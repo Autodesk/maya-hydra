@@ -47,6 +47,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testPrimInstancing.py
     cpp/testPicking.py
     cpp/testPointInstancePicking.py
+    cpp/testUsdNativeInstancePicking.py
 )
 
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.
