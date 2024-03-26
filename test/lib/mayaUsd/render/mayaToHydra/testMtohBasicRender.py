@@ -14,11 +14,6 @@
 # limitations under the License.
 #
 # Test to make sure that our snapshot-comparison tools work
-
-import os.path
-import sys
-import unittest
-
 import maya.cmds as cmds
 import maya.mel
 

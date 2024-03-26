@@ -12,13 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import os.path
-import sys
-import unittest
-
-import maya.cmds as cmds
-import maya.mel
-
 import fixturesUtils
 import mtohUtils
 

@@ -16,11 +16,6 @@ import maya.cmds as cmds
 
 import fixturesUtils
 import mtohUtils
-import mayaUtils
-from testUtils import PluginLoaded
-
-import unittest
-import sys
 
 class TestStage(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.

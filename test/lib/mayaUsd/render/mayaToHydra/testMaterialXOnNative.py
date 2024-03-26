@@ -16,7 +16,6 @@ import maya.cmds as cmds
 import mayaUtils
 import fixturesUtils
 import mtohUtils
-import unittest
 
 class TestMaterialXOnNative(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__

@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 import maya.cmds as cmds
-import maya.mel as mel
 
 import fixturesUtils
 import mtohUtils

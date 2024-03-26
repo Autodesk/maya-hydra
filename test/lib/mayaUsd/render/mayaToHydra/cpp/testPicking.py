@@ -16,7 +16,6 @@ import maya.cmds as cmds
 import fixturesUtils
 import mayaUtils
 import mtohUtils
-import unittest
 
 from testUtils import PluginLoaded
 

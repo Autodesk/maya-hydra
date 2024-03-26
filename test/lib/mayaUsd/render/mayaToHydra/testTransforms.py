@@ -13,11 +13,9 @@
 # limitations under the License.
 #
 import maya.cmds as cmds
-import maya.mel
 
 import fixturesUtils
 import mtohUtils
-import unittest
 
 class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__

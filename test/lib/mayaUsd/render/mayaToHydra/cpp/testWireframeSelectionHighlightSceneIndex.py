@@ -4,8 +4,6 @@ import mtohUtils
 import mayaUtils
 from testUtils import PluginLoaded
 
-import unittest
-
 class TestWireframeSelectionHighlightSceneIndex(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__

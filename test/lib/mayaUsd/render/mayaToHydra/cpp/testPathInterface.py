@@ -23,8 +23,6 @@ import ufe
 
 from testUtils import PluginLoaded
 
-import unittest
-
 class TestPathInterface(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__

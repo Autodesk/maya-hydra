@@ -16,10 +16,9 @@ import maya.cmds as cmds
 
 import fixturesUtils
 import mtohUtils
-import unittest
 import testUtils
 
-class TestRefinement(mtohUtils.MtohTestCase):
+class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
@@ -31,7 +30,6 @@ class TestRefinement(mtohUtils.MtohTestCase):
                                  self.IMAGEDIFF_FAIL_THRESHOLD,
                                  self.IMAGEDIFF_FAIL_PERCENT)
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_usdPrim(self):
         import usdUtils
         usdScenePath = testUtils.getTestScene('testStagePayloadsReferences', 'cube.usda')
