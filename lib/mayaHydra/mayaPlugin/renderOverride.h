@@ -273,7 +273,7 @@ private:
     */
     MAYAHYDRA_NS_DEF::SceneIndexDataFactoriesSetup  _sceneIndexDataFactoriesSetup;
 
-    SdfPath _ID;
+    SdfPath _ID; // Root path to runtime data (like task controller) 
 
     GfVec4d _viewport;
 
