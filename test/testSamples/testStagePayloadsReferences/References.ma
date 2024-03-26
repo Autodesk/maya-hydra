@@ -89,7 +89,7 @@ createNode mayaUsdProxyShape -n "referencesExampleShape" -p "referencesExample";
 	setAttr ".epp" -type "string" "";
 	setAttr ".forceCompute" yes;
 	setAttr ".usdStageLoadRules" -type "string" "/=all";
-	setAttr ".usdStageTargetLayer" -type "string" "x:/GIT/maya-hydra-opensource/test/testSamples/testStagePayloadsReferences/referencesExample.usda";
+	setAttr ".usdStageTargetLayer" -type "string" "./referencesExample.usda";
 createNode lightLinker -s -n "lightLinker1";
 	rename -uid "8D01FE9F-4A1A-8749-28C0-D2A9E4833F67";
 	setAttr -s 2 ".lnk";

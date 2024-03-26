@@ -18,11 +18,10 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 import mayaUtils
-import unittest
 
 import platform
 
-class TestMayaLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
+class TestMayaLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -88,7 +87,6 @@ class TestMayaLights(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCas
             self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
 
     #Test maya lights (e.g., default,directional,point,spot,etc.) with a maya native sphere and usd sphere.
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_MayaLights(self):
         cmds.file(new=True, force=True)
 

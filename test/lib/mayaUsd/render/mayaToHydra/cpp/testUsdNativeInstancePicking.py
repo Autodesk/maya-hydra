@@ -15,13 +15,12 @@
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
-import unittest
 import usdUtils
 
 import testUtils
 from testUtils import PluginLoaded
 
-class TestUsdNativeInstancePicking(mtohUtils.MtohTestCase):
+class TestUsdNativeInstancePicking(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -36,7 +35,6 @@ class TestUsdNativeInstancePicking(mtohUtils.MtohTestCase):
         self.loadUsdScene()
         cmds.refresh()
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_NativeInstances(self):
         with PluginLoaded('mayaHydraCppTests'):
             instances = ["/cubes_1", "/cubes_2"]

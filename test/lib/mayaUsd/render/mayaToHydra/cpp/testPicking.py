@@ -16,11 +16,10 @@ import maya.cmds as cmds
 import fixturesUtils
 import mayaUtils
 import mtohUtils
-import unittest
 
 from testUtils import PluginLoaded
 
-class TestPicking(mtohUtils.MtohTestCase):
+class TestPicking(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -89,7 +88,6 @@ class TestPicking(mtohUtils.MtohTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(directionalLightObjectName, "simpleLight", f="TestPicking.pickObject")
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_PickUsdMesh(self):
         import mayaUsd_createStageWithNewLayer
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
@@ -97,7 +95,6 @@ class TestPicking(mtohUtils.MtohTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(cubeObjectName, "mesh", f="TestPicking.pickObject")
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_PickUsdImplicitSurface(self):
         import mayaUsd_createStageWithNewLayer
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
@@ -105,7 +102,6 @@ class TestPicking(mtohUtils.MtohTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(cubeObjectName, "mesh", f="TestPicking.pickObject")
     
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_PickUsdLight(self):
         import mayaUsd_createStageWithNewLayer
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
@@ -113,7 +109,6 @@ class TestPicking(mtohUtils.MtohTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(rectLightObjectName, "rectLight", f="TestPicking.pickObject")
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_MarqueeSelection(self):
         import mayaUsd_createStageWithNewLayer
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
