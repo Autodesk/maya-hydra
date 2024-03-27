@@ -67,7 +67,6 @@ To add a new Python-only test suite :
 
 Some important notes :
 - Before each test, a new file will be opened and the renderer will be switched to Hydra. If you need to switch between renderers, you can use the `self.setHdStormRenderer()` and `self.setViewport2Renderer()` methods.
-- When opening a Maya test scene (using `mayaUtils.openTestScene()`), color management will be disabled immediately afterwards, even if the scene had it enabled. If your test is explicitly testing for color management, you will need to re-enable it manually (for example using `maya.cmds.colorManagementPrefs(edit=True, cmEnabled=True)`).
 
 # Best practices
 - Don't skip tests unless necessary. If a test requires a certain plugin to be loaded, don't skip the test if the plugin fails to load, as this will falsely be reported as a pass. For such cases, prefer setting the `_requiredPlugins` variable in your test class.
