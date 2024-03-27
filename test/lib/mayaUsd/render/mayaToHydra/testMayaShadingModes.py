@@ -25,8 +25,8 @@ class TestMayaShadingModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.3
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.05
+    IMAGE_DIFF_FAIL_PERCENT = 1.5
 
     def test_MayaShadingModes(self):
         

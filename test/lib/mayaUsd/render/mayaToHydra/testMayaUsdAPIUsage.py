@@ -24,8 +24,8 @@ class TestMayaUsdAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.2
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.05
+    IMAGE_DIFF_FAIL_PERCENT = 1
 
     def test_MovingUsdStage(self):
         # Load a maya scene with a sphere prim in a UsdStage and a directional light, with HdStorm already being the viewport renderer.

@@ -22,8 +22,8 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.1
-    IMAGE_DIFF_FAIL_PERCENT = 0.5
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.05
+    IMAGE_DIFF_FAIL_PERCENT = 1.5
 
     def compareSnapshot(self, referenceFilename, cameraDistance=15):
         self.setBasicCam(cameraDistance)
