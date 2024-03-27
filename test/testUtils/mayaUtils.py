@@ -135,6 +135,9 @@ def isHydraRenderer():
 def openTestScene(*args):
     filePath = testUtils.getTestScene(*args)
     cmds.file(filePath, force=True, open=True)
+    # To err on the safe side, disable color management in case the scene had color management on.
+    # If/when we add color management tests, they will need to re-enable it manually.
+    cmds.colorManagementPrefs(edit=True, cmEnabled=False)
     if isHydraRenderer():        
         cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", True)
 

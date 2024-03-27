@@ -69,6 +69,12 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
 
         cls._testDir = os.path.abspath('.')
 
+        # This optionVar sets the color management status used when creating a new scene.
+        # We set it to off to have color management turned off by default before each test
+        # (as setUp creates a new file), and to avoid inadvertently turning it on mid-test
+        # if a new file is manually created.
+        cmds.optionVar(intValue=('colorManagementEnabledByDefault', 0))
+
         if MAYAUSD_PLUGIN_NAME not in cls._requiredPlugins:
             cls._requiredPlugins.append(MAYAUSD_PLUGIN_NAME)
 
