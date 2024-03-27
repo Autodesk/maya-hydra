@@ -196,10 +196,12 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         super(MayaHydraBaseTestCase, self).assertImagesEqual(imagePath1, imagePath2)
 
     def assertSnapshotClose(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                warn=None, warnpercent=None, hardwarn=None, perceptual=False,
+                hud=False, grid=False, colorManagementEnabled=False, camera=None, backgroundColor=(0.36, 0.36, 0.36)):
         refImage = self.resolveRefImage(refImage, imageVersion)
         super(MayaHydraBaseTestCase, self).assertSnapshotClose(refImage, fail, failpercent, hardfail,
-                            warn, warnpercent, hardwarn, perceptual)
+                            warn, warnpercent, hardwarn, perceptual,
+                            hud=hud, grid=grid, colorManagementEnabled=colorManagementEnabled, camera=camera, backgroundColor=backgroundColor)
 
     def assertSnapshotEqual(self, refImage, imageVersion=None):
         '''Use of this method is discouraged, as renders can vary slightly between renderer architectures.'''

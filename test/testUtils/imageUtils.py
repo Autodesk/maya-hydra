@@ -40,9 +40,8 @@ def resetDefaultLightIntensity():
         cmds.setAttr('hardwareRenderingGlobals.defaultLightIntensity', 1.0)
 resetDefaultLightIntensity()
 
-def snapshot(outputPath, width=400, height=None, hud=False, grid=False, colorManagementEnabled=False, camera=None):
+def snapshot(outputPath, width=400, height=None, hud=False, grid=False, colorManagementEnabled=False, camera=None, backgroundColor=(0.36, 0.36, 0.36)):
     resetDefaultLightIntensity()
-    cmds.displayRGBColor('background', 0.36, 0.36, 0.36)
     
     if height is None:
         height = width
@@ -66,6 +65,8 @@ def snapshot(outputPath, width=400, height=None, hud=False, grid=False, colorMan
     oldGrid = cmds.grid(q=1, toggle=1)
     # save the old color management status
     oldColorManagementEnabled = cmds.colorManagementPrefs(q=1, cmEnabled=1)
+    # save the old background color
+    oldBackgroundColor = cmds.displayRGBColor('background', q=1)
 
     # Find the current model panel for playblasting
     # to make sure the desired camera is set, if any
@@ -78,6 +79,7 @@ def snapshot(outputPath, width=400, height=None, hud=False, grid=False, colorMan
     cmds.headsUpDisplay(layoutVisibility=hud)
     cmds.grid(toggle=grid)
     cmds.colorManagementPrefs(edit=True, cmEnabled=colorManagementEnabled)
+    cmds.displayRGBColor('background', backgroundColor[0], backgroundColor[1], backgroundColor[2])
     try:
         cmds.refresh()
         cmds.playblast(cf=outputPath, viewer=False, format="image",
@@ -88,6 +90,7 @@ def snapshot(outputPath, width=400, height=None, hud=False, grid=False, colorMan
         cmds.headsUpDisplay(layoutVisibility=oldHud)
         cmds.grid(toggle=oldGrid)
         cmds.colorManagementPrefs(edit=True, cmEnabled=oldColorManagementEnabled)
+        cmds.displayRGBColor('background', oldBackgroundColor[0], oldBackgroundColor[1], oldBackgroundColor[2])
         
         if camera:
             cmds.lookThru(panel, oldCamera)
@@ -182,14 +185,15 @@ class ImageDiffingTestCase:
         self.assertImagesClose(imagePath1, imagePath2, fail=None, failpercent=None)
     
     def assertSnapshotClose(self, refImage, fail, failpercent, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                warn=None, warnpercent=None, hardwarn=None, perceptual=False,
+                hud=False, grid=False, colorManagementEnabled=False, camera=None, backgroundColor=(0.36, 0.36, 0.36)):
         #Disable undo so that when we call undo it doesn't undo any operation from self.assertSnapshotClose
         cmds.undoInfo(stateWithoutFlush=False)
         snapDir = os.path.join(os.path.abspath('.'), self._testMethodName)
         if not os.path.isdir(snapDir):
             os.makedirs(snapDir)
         snapImage = os.path.join(snapDir, os.path.basename(refImage))
-        snapshot(snapImage)
+        snapshot(snapImage, hud=hud, grid=grid, colorManagementEnabled=colorManagementEnabled, camera=camera, backgroundColor=backgroundColor)
         #Enable undo again
         cmds.undoInfo(stateWithoutFlush=True)
         
