@@ -146,7 +146,6 @@ def applyTestSettings():
     cmds.headsUpDisplay(layoutVisibility=False)
     cmds.grid(toggle=False)
     cmds.colorManagementPrefs(edit=True, cmEnabled=False)
-    cmds.displayRGBColor('background', 0.36, 0.36, 0.36)
     cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", True) # TODO : Turn anti-aliasing off by default.
 
 def openNewScene(useTestSettings=True):
