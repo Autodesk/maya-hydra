@@ -22,22 +22,13 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    @property
-    def imageDiffFailThreshold(self):
-        return 0.1
-    
-    @property
-    def imageDiffFailPercent(self):
-        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
-        # for that platform specifically for now, so we can still catch issues on other platforms.
-        if platform.system() == "Darwin":
-            return 2
-        return 0.5
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.05
+    IMAGE_DIFF_FAIL_PERCENT = 1.5
 
     def compareSnapshot(self, referenceFilename, cameraDistance=15):
         self.setBasicCam(cameraDistance)
         cmds.refresh()
-        self.assertSnapshotClose(referenceFilename, self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def setupScene(self, polygonCreationCallable):
         self.setHdStormRenderer()

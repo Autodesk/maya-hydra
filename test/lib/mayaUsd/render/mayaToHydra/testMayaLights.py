@@ -25,14 +25,12 @@ class TestMayaLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
+
     @property
-    def imageDiffFailThreshold(self):
-        return 0.01
-    
-    @property
-    def imageDiffFailPercent(self):
-        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
-        # for that platform specifically for now, so we can still catch issues on other platforms.
+    def IMAGE_DIFF_FAIL_PERCENT(self):
+        # HYDRA-943 : Shadows don't seem to work properly on OSX, possibly only with point lights.
+        # Only the "all lights with shadows" check fails, and shadows with point light only is skipped.
         if platform.system() == "Darwin":
             return 3
         return 0.2
@@ -47,12 +45,12 @@ class TestMayaLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
         #All Lights mode
         cmds.modelEditor(panel, edit=True, displayLights="all")
         cmds.refresh()
-        self.assertSnapshotClose("allLights" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("allLights" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Default Light mode
         cmds.modelEditor(panel, edit=True, displayLights="default")
         cmds.refresh()
-        self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Selected Light mode
         cmds.modelEditor(panel, edit=True, displayLights="selected")
@@ -60,31 +58,31 @@ class TestMayaLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
         #Use Directional Light
         cmds.select( 'directionalLight1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("directionalLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("directionalLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Use Point Light
         #TODO: Enable shadowOn test on point light when it works
         if not shadowOn:
             cmds.select( 'pointLight1', r=True )
             cmds.refresh()
-            self.assertSnapshotClose("pointLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+            self.assertSnapshotClose("pointLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Use Spot Light
         cmds.select( 'spotLight1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("spotLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("spotLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Flat Light mode
         #TODO: Enable test on flat lighting mode when it works
         #cmds.modelEditor(panel, edit=True, displayLights="flat")
         #cmds.refresh()
-        #self.assertSnapshotClose("flatLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        #self.assertSnapshotClose("flatLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #No Light mode
         if not shadowOn:
             cmds.modelEditor(panel, edit=True, displayLights="none")
             cmds.refresh()
-            self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+            self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     #Test maya lights (e.g., default,directional,point,spot,etc.) with a maya native sphere and usd sphere.
     def test_MayaLights(self):
