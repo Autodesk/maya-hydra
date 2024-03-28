@@ -15,6 +15,7 @@
 import maya.cmds as cmds
 
 import fixturesUtils
+import mayaUtils
 import mtohUtils
 
 class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
@@ -59,7 +60,7 @@ class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
         import mayaUsd_createStageWithNewLayer
         from pxr import UsdGeom, Gf
 
-        cmds.file(new=True, force=True)
+        mayaUtils.openNewScene()
         self.setBasicCam(10)
         self.setHdStormRenderer()
 

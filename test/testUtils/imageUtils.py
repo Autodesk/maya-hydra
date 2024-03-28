@@ -15,8 +15,6 @@
 #
 import os
 import maya.cmds as cmds
-import maya.mel
-import mayaUtils
 import subprocess
 
 KNOWN_FORMATS = {
@@ -31,18 +29,8 @@ KNOWN_FORMATS = {
     'bmp': 20,
     'png': 32,
 }
-def resetDefaultLightIntensity():
-    """If the current Maya version supports setting the default light intensity,
-        then restore it to 1 so snapshots look equal across versions."""
-    if maya.mel.eval("optionVar -exists defaultLightIntensity"):
-        maya.mel.eval("optionVar -fv defaultLightIntensity 1")
-    if cmds.attributeQuery('defaultLightIntensity', node='hardwareRenderingGlobals', exists=True):
-        cmds.setAttr('hardwareRenderingGlobals.defaultLightIntensity', 1.0)
-resetDefaultLightIntensity()
 
-def snapshot(outputPath, width=400, height=None, hud=False, grid=False, colorManagementEnabled=False, camera=None, backgroundColor=(0.36, 0.36, 0.36)):
-    resetDefaultLightIntensity()
-    
+def snapshot(outputPath, width=400, height=None):
     if height is None:
         height = width
 
@@ -59,27 +47,8 @@ def snapshot(outputPath, width=400, height=None, hud=False, grid=False, colorMan
 
     # save the old output image format
     oldFormat = cmds.getAttr("defaultRenderGlobals.imageFormat")
-    # save the hud setting
-    oldHud = cmds.headsUpDisplay(q=1, layoutVisibility=1)
-    # save the grid setting
-    oldGrid = cmds.grid(q=1, toggle=1)
-    # save the old color management status
-    oldColorManagementEnabled = cmds.colorManagementPrefs(q=1, cmEnabled=1)
-    # save the old background color
-    oldBackgroundColor = cmds.displayRGBColor('background', q=1)
-
-    # Find the current model panel for playblasting
-    # to make sure the desired camera is set, if any
-    panel = mayaUtils.activeModelPanel()
-    oldCamera = cmds.modelPanel(panel, q=True, cam=True)
-    if camera:
-        cmds.modelEditor(panel, edit=True, camera=camera)
 
     cmds.setAttr("defaultRenderGlobals.imageFormat", formatNum)
-    cmds.headsUpDisplay(layoutVisibility=hud)
-    cmds.grid(toggle=grid)
-    cmds.colorManagementPrefs(edit=True, cmEnabled=colorManagementEnabled)
-    cmds.displayRGBColor('background', backgroundColor[0], backgroundColor[1], backgroundColor[2])
     try:
         cmds.refresh()
         cmds.playblast(cf=outputPath, viewer=False, format="image",
@@ -87,13 +56,6 @@ def snapshot(outputPath, width=400, height=None, hud=False, grid=False, colorMan
                        widthHeight=(width, height), percent=100)
     finally:
         cmds.setAttr("defaultRenderGlobals.imageFormat", oldFormat)
-        cmds.headsUpDisplay(layoutVisibility=oldHud)
-        cmds.grid(toggle=oldGrid)
-        cmds.colorManagementPrefs(edit=True, cmEnabled=oldColorManagementEnabled)
-        cmds.displayRGBColor('background', oldBackgroundColor[0], oldBackgroundColor[1], oldBackgroundColor[2])
-        
-        if camera:
-            cmds.lookThru(panel, oldCamera)
 
 def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail, 
                 warn, warnpercent, hardwarn, perceptual):    
@@ -185,15 +147,14 @@ class ImageDiffingTestCase:
         self.assertImagesClose(imagePath1, imagePath2, fail=None, failpercent=None)
     
     def assertSnapshotClose(self, refImage, fail, failpercent, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False,
-                hud=False, grid=False, colorManagementEnabled=False, camera=None, backgroundColor=(0.36, 0.36, 0.36)):
+                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         #Disable undo so that when we call undo it doesn't undo any operation from self.assertSnapshotClose
         cmds.undoInfo(stateWithoutFlush=False)
         snapDir = os.path.join(os.path.abspath('.'), self._testMethodName)
         if not os.path.isdir(snapDir):
             os.makedirs(snapDir)
         snapImage = os.path.join(snapDir, os.path.basename(refImage))
-        snapshot(snapImage, hud=hud, grid=grid, colorManagementEnabled=colorManagementEnabled, camera=camera, backgroundColor=backgroundColor)
+        snapshot(snapImage)
         #Enable undo again
         cmds.undoInfo(stateWithoutFlush=True)
         

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import maya.cmds as cmds
+
 import fixturesUtils
 import mtohUtils
 
@@ -23,8 +25,10 @@ class TestGrid(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_PERCENT = 1
 
     def test_Grid(self):
-        self.assertSnapshotClose("grid_enabled.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, grid=True)
-        self.assertSnapshotClose("grid_disabled.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, grid=False)
+        cmds.grid(toggle=True)
+        self.assertSnapshotClose("grid_enabled.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        cmds.grid(toggle=False)
+        self.assertSnapshotClose("grid_disabled.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

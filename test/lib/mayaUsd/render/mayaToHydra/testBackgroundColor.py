@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import maya.cmds as cmds
+
 import fixturesUtils
 import mtohUtils
 
@@ -22,14 +24,26 @@ class TestBackgroundColor(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1
 
+    def compareBackgroundColor(self, imageName):
+        self.setViewport2Renderer()
+        self.assertSnapshotClose(imageName, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.setHdStormRenderer()
+        self.assertSnapshotClose(imageName, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
     def test_BackgroundColor(self):
-        self.assertSnapshotClose("background_red.jpg", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, backgroundColor=(0.5, 0, 0))
-        self.assertSnapshotClose("background_green.jpg", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, backgroundColor=(0, 0.5, 0))
-        self.assertSnapshotClose("background_blue.jpg", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, backgroundColor=(0, 0, 0.5))
+        cmds.displayRGBColor('background', 0.5, 0, 0)
+        self.compareBackgroundColor("background_red.jpg")
+        cmds.displayRGBColor('background', 0, 0.5, 0)
+        self.compareBackgroundColor("background_green.jpg")
+        cmds.displayRGBColor('background', 0, 0, 0.5)
+        self.compareBackgroundColor("background_blue.jpg")
         
-        self.assertSnapshotClose("background_black.jpg", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, backgroundColor=(0, 0, 0))
-        self.assertSnapshotClose("background_gray.jpg", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, backgroundColor=(0.5, 0.5, 0.5))
-        self.assertSnapshotClose("background_white.jpg", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, backgroundColor=(1, 1, 1))
+        cmds.displayRGBColor('background', 0, 0, 0)
+        self.compareBackgroundColor("background_black.jpg")
+        cmds.displayRGBColor('background', 0.5, 0.5, 0.5)
+        self.compareBackgroundColor("background_gray.jpg")
+        cmds.displayRGBColor('background', 1, 1, 1)
+        self.compareBackgroundColor("background_white.jpg")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

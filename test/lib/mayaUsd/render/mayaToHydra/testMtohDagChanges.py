@@ -17,6 +17,7 @@ import maya.cmds as cmds
 import maya.mel
 
 import fixturesUtils
+import mayaUtils
 import mtohUtils
 
 class TestDagChanges(mtohUtils.MayaHydraBaseTestCase):
@@ -271,7 +272,7 @@ class TestUndo(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.undoInfo(state=0)
         try:
-            cmds.file(new=1, f=1)
+            mayaUtils.openNewScene()
             self.setBasicCam()
 
             self.setHdStormRenderer()
