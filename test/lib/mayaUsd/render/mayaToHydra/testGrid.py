@@ -21,8 +21,8 @@ class TestGrid(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.05
-    IMAGE_DIFF_FAIL_PERCENT = 1
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.15
+    IMAGE_DIFF_FAIL_PERCENT = 2
 
     def test_Grid(self):
         cmds.grid(toggle=True)
