@@ -1218,6 +1218,10 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     //Add the scene index as an input scene index of the merging scene index
     _renderIndexProxy->InsertSceneIndex(_mayaHydraSceneIndex, SdfPath::AbsoluteRootPath());
     
+    if (!_sceneIndexRegistry) {
+        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy));
+    }
+    
     _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
 
     if (auto* renderDelegate = _GetRenderDelegate()) {
@@ -1321,10 +1325,6 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
     _lastFilteringSceneIndexBeforeCustomFiltering  = _selectionSceneIndex;
   
-    if (!_sceneIndexRegistry) {
-        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy));
-    }
-
     // Add display style scene index
     _lastFilteringSceneIndexBeforeCustomFiltering = _displayStyleSceneIndex =
             Fvp::DisplayStyleOverrideSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
