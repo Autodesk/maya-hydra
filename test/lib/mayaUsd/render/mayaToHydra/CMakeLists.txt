@@ -21,6 +21,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaIsolateSelect.py
     testMayaLights.py
     testUSDLights.py
+    testUVandUDIM.py
     testArnoldLights.py
     testLookThrough.py
     testObjectTemplate.py
