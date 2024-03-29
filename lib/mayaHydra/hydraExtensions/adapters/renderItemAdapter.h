@@ -206,7 +206,9 @@ private:
     MDagPath                    _dagPath;
     std::unique_ptr<HdTopology> _topology = nullptr;
     VtVec3fArray                _positions = {};
+    VtVec3fArray                _normals = {};
     VtVec2fArray                _uvs = {};
+    VtVec2fArray                _tangents = {};
     MGeometry::Primitive        _primitive;
     MString                     _name;
     GfMatrix4d                  _transform[2];

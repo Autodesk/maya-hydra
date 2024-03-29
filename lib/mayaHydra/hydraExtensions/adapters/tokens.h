@@ -81,7 +81,14 @@ PXR_NAMESPACE_OPEN_SCOPE
     (MayaHydraPhongShader)                    \
     (MayaHydraBlinnShader)                    \
 	(MayaHydraStippleShader)                  \
-    (MayaHydraSolidColorShader)
+    (MayaHydraSolidColorShader)               \
+    (tangents)                                \
+    (normalCamera)                            \
+    (bump2d)                                  \
+    (raw)                                     \
+    (sourceColorSpace)                        \
+    (bias)                                    \
+    (scale)
 
 // clang-format on
 

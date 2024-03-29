@@ -53,11 +53,11 @@ namespace {
 const std::pair<MObject&, HdDirtyBits> _dirtyBits[] {
     { MayaAttrs::mesh::pnts,
       // This is useful when the user edits the mesh.
-      HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent
+      HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent | HdChangeTracker::DirtyNormals
           | HdChangeTracker::DirtySubdivTags },
     { MayaAttrs::mesh::inMesh,
       // We are tracking topology changes and uv changes separately
-      HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent
+      HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent | HdChangeTracker::DirtyNormals
           | HdChangeTracker::DirtySubdivTags },
     { MayaAttrs::mesh::worldMatrix, HdChangeTracker::DirtyTransform },
     { MayaAttrs::mesh::doubleSided, HdChangeTracker::DirtyDoubleSided },
@@ -161,14 +161,21 @@ public:
             return {};
         }
         VtArray<GfVec2f> uvs;
-        uvs.reserve(static_cast<size_t>(mesh.numFaceVertices()));
+        const size_t numFacesVertices = mesh.numFaceVertices();
+        uvs.resize(numFacesVertices);
+        float2* uvsPointer = (float2*)uvs.cdata();
+        size_t numUVsFloat2 = 0;
         for (MItMeshPolygon pit(GetDagPath()); !pit.isDone(); pit.next()) {
             const auto vertexCount = pit.polygonVertexCount();
             for (auto i = decltype(vertexCount) { 0 }; i < vertexCount; ++i) {
-                float2 uv = { 0.0f, 0.0f };
-                pit.getUV(i, uv);
-                uvs.push_back(GfVec2f(uv[0], uv[1]));
+                pit.getUV(i, *uvsPointer);
+                ++uvsPointer;
+                ++numUVsFloat2;
             }
+        }
+
+        if (numUVsFloat2 != numFacesVertices){
+            TF_CODING_ERROR("Number of UVs does not match number of face vertices" );
         }
 
         return VtValue(uvs);
@@ -183,6 +190,18 @@ public:
         }
         VtVec3fArray ret;
         ret.assign(rawPoints, rawPoints + mesh.numVertices());
+        return VtValue(ret);
+    }
+
+    VtValue GetNormals(const MFnMesh& mesh)
+    {
+        MStatus     status;
+        const auto* rawNormals = reinterpret_cast<const GfVec3f*>(mesh.getRawNormals(&status));
+        if (ARCH_UNLIKELY(!status)) {
+            return {};
+        }
+        VtVec3fArray ret;
+        ret.assign(rawNormals, rawNormals + mesh.numVertices());
         return VtValue(ret);
     }
 
@@ -201,9 +220,21 @@ public:
                 return {};
             }
             return GetPoints(mesh);
-        } else if (key == MayaHydraAdapterTokens->st) {
+        } 
+
+        if (key == HdTokens->normals) {
+            MStatus status;
+            MFnMesh mesh(GetDagPath(), &status);
+            if (ARCH_UNLIKELY(!status)) {
+                return {};
+            }
+            return GetNormals(mesh);
+        } 
+        
+        if (key == MayaHydraAdapterTokens->st) {
             return GetUVs();
         }
+
         return {};
     }
 
@@ -222,11 +253,24 @@ public:
             }
             return GetMayaHydraSceneIndex()->SampleValues(
                 maxSampleCount, times, samples, [&]() -> VtValue { return GetPoints(mesh); });
-        } else if (key == MayaHydraAdapterTokens->st) {
+        } 
+
+        if (key == HdTokens->normals) {
+            MStatus status;
+            MFnMesh mesh(GetDagPath(), &status);
+            if (ARCH_UNLIKELY(!status)) {
+                return 0;
+            }
+            return GetMayaHydraSceneIndex()->SampleValues(
+                maxSampleCount, times, samples, [&]() -> VtValue { return GetNormals(mesh); });
+        } 
+        
+        if (key == MayaHydraAdapterTokens->st) {
             times[0] = 0.0f;
             samples[0] = GetUVs();
             return 1;
         }
+
         return 0;
     }
 
@@ -246,11 +290,19 @@ public:
             }
         }
 
+        static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
+        if (passNormalsToHydra){
+                return HdMeshTopology(
+                        PxOsdOpenSubdivTokens->none,//For the OGS normals vertex buffer to be used, we need to use PxOsdOpenSubdivTokens->none
+                        UsdGeomTokens->rightHanded,
+                        faceVertexCounts,
+                        faceVertexIndices);
+        }
+        
         return HdMeshTopology(
             (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes || GetDisplayStyle().refineLevel > 0)
                 ? PxOsdOpenSubdivTokens->catmullClark
                 : PxOsdOpenSubdivTokens->none,
-
             UsdGeomTokens->rightHanded,
             faceVertexCounts,
             faceVertexIndices);
@@ -339,11 +391,15 @@ public:
     HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation) override
     {
         if (interpolation == HdInterpolationVertex) {
-            HdPrimvarDescriptor desc;
-            desc.name = UsdGeomTokens->points;
-            desc.interpolation = interpolation;
-            desc.role = HdPrimvarRoleTokens->point;
-            return { desc };
+            static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
+            return  passNormalsToHydra ? 
+            HdPrimvarDescriptorVector{
+                {UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point},//Vertices
+                {UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal}//Normals
+            } : 
+            HdPrimvarDescriptorVector{
+                {UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point}//Vertices only
+            };
         } else if (interpolation == HdInterpolationFaceVarying) {
             // UVs are face varying in maya.
             MFnMesh mesh(GetDagPath());
@@ -422,7 +478,7 @@ private:
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
         adapter->MarkDirty(
             HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar
-            | HdChangeTracker::DirtyPoints);
+            | HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyNormals);
     }
 
     static void ComponentIdChanged(MUintArray componentIds[], unsigned int count, void* clientData)

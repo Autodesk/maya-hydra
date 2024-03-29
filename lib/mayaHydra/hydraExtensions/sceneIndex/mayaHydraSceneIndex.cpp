@@ -71,9 +71,12 @@ TF_DEFINE_ENV_SETTING(MAYA_HYDRA_USE_MESH_ADAPTER, false,
     "Use mesh adapter instead of MRenderItem for Maya meshes.");
 
 bool useMeshAdapter() {
-    static bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
+    static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
     return uma;
 }
+
+TF_DEFINE_ENV_SETTING(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA, true,
+    "Pass the normals to Hydra (works for both render item and mesh adapters).");
 
 namespace {
     bool filterMesh(const MRenderItem& ri) {
@@ -1513,6 +1516,12 @@ VtValue MayaHydraSceneIndex::GetShadingStyle(SdfPath const& id)
         }
     }
     return VtValue();
+}
+
+bool MayaHydraSceneIndex::passNormalsToHydra() 
+{
+    static const bool val = TfGetEnvSetting(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA);
+    return val;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

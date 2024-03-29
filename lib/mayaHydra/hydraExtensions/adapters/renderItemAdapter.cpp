@@ -21,6 +21,7 @@
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+#include <mayaHydraLib/mayaUtils.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -179,7 +180,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         dirtyBits |= HdChangeTracker::DirtyTransform;
     }
     if (geomChanged) {
-        dirtyBits |= (HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent);
+        dirtyBits |= (HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent | HdChangeTracker::DirtyNormals);
     }
     if (topoChanged) {
         dirtyBits |= (HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyExtent);
@@ -196,6 +197,8 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     VtIntArray vertexIndices;
     VtIntArray vertexCounts;
 
+    static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
+        
     // Vertices
     MVertexBuffer* verts = nullptr;
     if (geomChanged && geom && geom->vertexBufferCount() > 0) {
@@ -223,15 +226,40 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
             // is slow.  Disabling processing of non-triangle render made that disappear.  Maybe
             // something like joint render items point to hardware only buffers?
             const auto* vertexPositions = reinterpret_cast<const GfVec3f*>(verts->map());
-            // NOTE: Looking at MayaHydraMeshAdapter::GetPoints notice assign(vertexPositions,
-            // vertexPositions + vertCount) Why are we not multiplying with sizeof(GfVec3f) to
-            // calculate the offset ? The following happens when I try to do it : Invalid Hydra prim
-            // - Vertex primvar points has 288 elements, while its topology references only upto
-            // element index 24.
             if (TF_VERIFY(vertexPositions)) {
                 _positions.assign(vertexPositions, vertexPositions + vertCount);
             }
             verts->unmap();
+        }
+
+        //Normals
+        if (passNormalsToHydra){
+            //Get index for normals vertex buffer
+            const int normalsVertexBufferIndex = GetNormalsVertexBufferIndex(*geom);//In mayaUtils.cpp
+            if (normalsVertexBufferIndex >= 0) {
+                MVertexBuffer* normals = geom->vertexBuffer(normalsVertexBufferIndex);
+                if (normals) {
+                    int normalsCount = 0;
+                    // Keep the previously-determined normals count in case it was truncated.
+                    const unsigned int originalNormalsCount = normals->vertexCount();
+                    const size_t normalSize = _normals.size();
+                    if (normalSize > 0 && normalSize <= originalNormalsCount) {
+                        normalsCount = normalSize;
+                    } else {
+                        normalsCount = originalNormalsCount;
+                    }
+                    _normals.clear();
+                    const auto* vertexNormals = reinterpret_cast<const GfVec3f*>(normals->map());
+                    if (TF_VERIFY(vertexNormals)) {
+                    /*for (int i=0;i<normalsCount;i++) {
+                        _normals.push_back(GfVec3f(1, 0, 0));
+                    }
+                    */
+                        _normals.assign(vertexNormals, vertexNormals + normalsCount);
+                    }
+                    normals->unmap();
+                }
+            }
         }
     }
 
@@ -265,13 +293,17 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
             if (maxIndex < (int64_t)_positions.size() - 1) {
                 _positions.resize(maxIndex + 1);
             }
+            const size_t numNormals = _normals.size();
+            if (numNormals > 0 && (maxIndex < (int64_t)numNormals - 1)) {
+                _normals.resize(maxIndex + 1);
+            }
 
             switch (GetPrimitive()) {
             case MHWRender::MGeometry::Primitive::kTriangles:
                 vertexCounts.resize(indexCount / 3);
                 vertexCounts.assign(indexCount / 3, 3);
 
-                // UVs
+                // UVs and Tangents
                 if (indexCount > 0) {
                     MVertexBuffer* mvb = nullptr;
                     for (int vbIdx = 0; vbIdx < geom->vertexBufferCount(); vbIdx++) {
@@ -281,19 +313,25 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
 
                         const MVertexBufferDescriptor& desc = mvb->descriptor();
 
-                        if (desc.semantic() != MGeometry::Semantic::kTexture)
-                            continue;
-
-                        // Hydra expects a uv coordinate for each face-index, not 1 per vertex. 
-                        // e.g. a cube expects 36 uvs not 24.
-                        _uvs.clear();
-                        _uvs.resize(indices->size());
-                        float* uvs = (float*)mvb->map();
-                        for (int i = 0; i < indexCount; ++i) {
-                            _uvs[i].Set(&uvs[indicesData[i] * 2]);
+                        if (desc.semantic() == MGeometry::Semantic::kTexture){
+                            // Hydra expects a uv coordinate for each face-index (face varying), though we could use its own set of indices which should be smaller.
+                            _uvs.clear();
+                            _uvs.resize(indices->size());
+                            float* uvs = (float*)mvb->map();
+                            for (int i = 0; i < indexCount; ++i){
+                                _uvs[i].Set(&uvs[indicesData[i] * 2]);
+                            }
+                            mvb->unmap();
+                        }else if (passNormalsToHydra && (desc.semantic() == MHWRender::MGeometry::kTangent) ){
+                            // Hydra expects a tangent for each face-index (face varying), though we could use its own set of indices which should be smaller.
+                            _tangents.clear();
+                            _tangents.resize(indices->size());
+                            float* tangents = (float*)mvb->map();
+                            for (int i = 0; i < indexCount; ++i){
+                                _tangents[i].Set(&tangents[indicesData[i] * 2]);
+                            }
+                            mvb->unmap();
                         }
-                        mvb->unmap();
-                        break;
                     }
                 }
                 break;
@@ -312,15 +350,25 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
 
     if (topoChanged) {
         switch (GetPrimitive()) {
-        case MGeometry::Primitive::kTriangles:
-            _topology.reset(new HdMeshTopology(
-                (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes
-                 || GetDisplayStyle().refineLevel > 0)
-                    ? PxOsdOpenSubdivTokens->catmullClark
-                    : PxOsdOpenSubdivTokens->none,
-                UsdGeomTokens->rightHanded,
-                vertexCounts,
-                vertexIndices));
+        case MGeometry::Primitive::kTriangles:{
+            static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
+            if (passNormalsToHydra){
+                _topology.reset(new HdMeshTopology(
+                    PxOsdOpenSubdivTokens->none,//For the OGS normals vertex buffer to be used, we need to use PxOsdOpenSubdivTokens->none
+                    UsdGeomTokens->rightHanded,
+                    vertexCounts,
+                    vertexIndices));
+            } else{
+                _topology.reset(new HdMeshTopology(
+                    (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes
+                     || GetDisplayStyle().refineLevel > 0)
+                        ? PxOsdOpenSubdivTokens->catmullClark
+                        : PxOsdOpenSubdivTokens->none,
+                    UsdGeomTokens->rightHanded,
+                    vertexCounts,
+                    vertexIndices));
+            }
+            }
             break;
         case MGeometry::Primitive::kLines:
         case MGeometry::Primitive::kLineStrip: {
@@ -367,8 +415,14 @@ VtValue MayaHydraRenderItemAdapter::Get(const TfToken& key)
     if (key == HdTokens->points) {
         return VtValue(_positions);
     }
+    if (key == HdTokens->normals) {
+        return VtValue(_normals);
+    }
     if (key == MayaHydraAdapterTokens->st) {
         return VtValue(_uvs);
+    }
+    if (key == MayaHydraAdapterTokens->tangents){
+        return VtValue(_tangents);
     }
     if (key == HdTokens->displayColor) {
         return VtValue(GfVec4f(
@@ -392,17 +446,28 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
 
     // Vertices
     if (interpolation == HdInterpolationVertex) {
-        desc.name           = UsdGeomTokens->points;
-        desc.interpolation  = interpolation;
-        desc.role           = HdPrimvarRoleTokens->point;
-        return { desc };
-    } else if (interpolation == HdInterpolationFaceVarying) {
-        // UVs are face varying in maya.
+        static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
+        return  passNormalsToHydra ? 
+        HdPrimvarDescriptorVector{
+            {UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point},//Vertices
+            {UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal}//Normals
+        } : 
+        HdPrimvarDescriptorVector{
+            {UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point}//Vertices only
+        };
+    } 
+    else if (interpolation == HdInterpolationFaceVarying) {
+        // UVs and tangents are face varying in maya.
         if (_primitive == MGeometry::Primitive::kTriangles) {
-            desc.name           = MayaHydraAdapterTokens->st;
-            desc.interpolation  = interpolation;
-            desc.role           = HdPrimvarRoleTokens->textureCoordinate;
-            return { desc };
+            static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
+            return  passNormalsToHydra ? 
+            HdPrimvarDescriptorVector{
+                {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate},//uvs
+                {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate},//tangents
+            } : 
+            HdPrimvarDescriptorVector{
+                {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate},//uvs
+            };
         }
     } else if (interpolation == HdInterpolationConstant) {
         switch(_primitive){

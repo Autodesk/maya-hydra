@@ -23,7 +23,9 @@
 #include <maya/MPlug.h>
 #include <maya/MSelectionList.h>
 #include <maya/MObjectArray.h>
+#include <maya/MPlugArray.h>
 #include <maya/MFnAttribute.h>
+#include <maya/MHWGeometry.h>
 
 namespace
 {
@@ -146,6 +148,41 @@ bool IsAMayaVisibilityAttribute(const MPlug& plug, bool& outVal)
         plug.getValue(outVal);
     }
     return isVisibility;
+}
+
+int GetNormalsVertexBufferIndex(const MGeometry& geom)
+{
+    const int numVertexBuffers = geom.vertexBufferCount();
+    for (int i=0; i<numVertexBuffers; ++i){
+        const MVertexBuffer* vertexBuffer = geom.vertexBuffer(i);
+        if (vertexBuffer && (vertexBuffer->descriptor().semantic() == MGeometry::Semantic::kNormal)){
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+bool GetTypedNodeFromDestinationConnections(MFnDependencyNode& node, MObject& outNode, MFn::Type nodeType)
+{
+    MPlugArray connections;
+    MStatus status = node.getConnections(connections);
+    if (status){
+        for (size_t i = 0, len = connections.length(); i < len; ++i) {
+            MPlugArray destinations;
+            connections[i].destinations(destinations);
+            for (size_t d = 0, destLen = destinations.length(); d < destLen; ++d) {
+                if (destinations[d].isNull())
+                    continue;
+                if (destinations[d].node().hasFn(nodeType)) {
+                    outNode = destinations[d].node();
+                    return true;//found
+                }
+            }
+        }
+    }
+    //not found
+    return false;
 }
 
 } // namespace MAYAHYDRA_NS_DEF

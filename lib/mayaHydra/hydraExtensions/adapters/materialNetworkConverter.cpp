@@ -22,6 +22,7 @@
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
 #include <mayaHydraLib/hydraUtils.h>
+#include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 
 #include <pxr/usd/sdr/registry.h>
@@ -349,6 +350,82 @@ private:
     const VtValue _value;
 };
 
+
+
+//This class is used to return a VtValue which is a TfToken, it is used from a texture maya node
+//The TfToken should be either MayaHydraAdapterTokens->raw if there is a bump2d node connected to the texture node
+//Or TfToken("auto") if there is no bump2d node connected (the texture is not used as a normal map)
+class MayaHydraMaterialColorSpaceConverter : public MayaHydraComputedMaterialAttrConverter
+{
+public:
+    MayaHydraMaterialColorSpaceConverter()
+    {
+    }
+
+    SdfValueTypeName GetType() override { return SdfGetValueTypeNameForValue(_uvvalue); }
+
+    VtValue GetValue(
+        MFnDependencyNode&      textureNode,
+        const TfToken&          paramName,
+        const SdfValueTypeName& type,
+        const VtValue*          fallback = nullptr,
+        MPlugArray*             outPlug = nullptr) override
+    {
+        //If the texture node is connected to a bump2d node in its upstream connections then we should return MayaHydraAdapterTokens->raw
+        MObject bump2dNodeUnused;
+        const bool bBump2dNodeFound = GetTypedNodeFromDestinationConnections(textureNode, bump2dNodeUnused, MFn::kBump);//From MayaUtils
+        if (bBump2dNodeFound && ! bump2dNodeUnused.isNull()){
+            return VtValue(MayaHydraAdapterTokens->raw);
+        }
+
+        return _uvvalue;
+    }
+
+    VtValue _uvvalue { TfToken("auto") };
+};
+
+//This class is used to return a VtValue which is a TfToken, it is used from a place2d maya node
+//The TfToken should be either MayaHydraAdapterTokens->tangents if there is a bump2d node connected to the texture node which is connected to this place2d node
+//Or MayaHydraAdapterTokens->st if there is no bump2d node connected
+class MayaHydraUvOrTangentMaterialAttrConverter : public MayaHydraComputedMaterialAttrConverter
+{
+public:
+    MayaHydraUvOrTangentMaterialAttrConverter()
+    {
+    }
+
+    SdfValueTypeName GetType() override { return SdfGetValueTypeNameForValue(_uvvalue); }
+
+    VtValue GetValue(
+        MFnDependencyNode&      node,
+        const TfToken&          paramName,
+        const SdfValueTypeName& type,
+        const VtValue*          fallback = nullptr,
+        MPlugArray*             outPlug = nullptr) override
+    {
+        //If the place2d texture node is connected to a bump2d node in its upstream connections then we should return MayaHydraAdapterTokens->tangents
+        // If not then use the usual uvs set : MayaHydraAdapterTokens->st
+        //First Look for the texture node in its connections
+        MObject textureNode;
+        const bool bTextureNodeFound = GetTypedNodeFromDestinationConnections(node, textureNode, MFn::kFileTexture);//From MayaUtils
+        if (! bTextureNodeFound || textureNode.isNull()){
+            return _uvvalue;
+        }
+
+        //We found a texture node, if the texture node is connected to a bump2d node in its upstream connections then we should return MayaHydraAdapterTokens->tangents
+        MFnDependencyNode textureNodeDep(textureNode);
+        MObject bump2dNodeUnused;
+        const bool bBump2dNodeFound = GetTypedNodeFromDestinationConnections(textureNodeDep, bump2dNodeUnused, MFn::kBump);//From MayaUtils
+        if (bBump2dNodeFound && ! bump2dNodeUnused.isNull()){
+            return VtValue(MayaHydraAdapterTokens->tangents);
+        }
+
+        return _uvvalue;
+    }
+
+    VtValue _uvvalue { MayaHydraAdapterTokens->st};
+};
+
 class MayaHydraUvAttrConverter : public MayaHydraMaterialAttrConverter
 {
 public:
@@ -584,17 +661,21 @@ void MayaHydraMaterialNetworkConverter::initialize()
     auto coatRoughnessConverter = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
         MayaHydraAdapterTokens->coatRoughness, SdfValueTypeNames->Float);
     auto transmissionToOpacity = std::make_shared<MayaHydraTransmissionMaterialAttrConverter>();
+    auto normapMapConverter = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
+        MayaHydraAdapterTokens->normalCamera, //Is actually called "Bump mapping" in the Geometry section in the UI of the Standard surface
+        SdfValueTypeNames->Vector3f);
 
     auto fixedZeroFloat = std::make_shared<MayaHydraFixedMaterialAttrConverter>(0.0f);
     auto fixedOneFloat = std::make_shared<MayaHydraFixedMaterialAttrConverter>(1.0f);
     auto fixedZeroInt = std::make_shared<MayaHydraFixedMaterialAttrConverter>(0);
     auto fixedOneInt = std::make_shared<MayaHydraFixedMaterialAttrConverter>(1);
-    auto fixedStToken
-        = std::make_shared<MayaHydraFixedMaterialAttrConverter>(MayaHydraAdapterTokens->st);
-
+    auto uvOrTangentNameConverter = std::make_shared<MayaHydraUvOrTangentMaterialAttrConverter>();
     auto cosinePowerToRoughness = std::make_shared<MayaHydraCosinePowerMaterialAttrConverter>();
     auto filenameConverter = std::make_shared<MayaHydraFilenameMaterialAttrConverter>();
-
+    
+    auto sourceColorSpaceConverter = std::make_shared<MayaHydraMaterialColorSpaceConverter>();
+    auto biasConverter = std::make_shared<MayaHydraFixedMaterialAttrConverter>(GfVec4f(-1.0, -1.0, -1.0, 0.0));//This should be for normal maps
+    auto scaleConverter = std::make_shared<MayaHydraFixedMaterialAttrConverter>(GfVec4f(2.0, 2.0, 2.0, 0.0));//This should be for normal maps
     auto wrapUConverter = std::make_shared<MayaHydraWrapMaterialAttrConverter>(
         MayaAttrs::file::wrapU, MayaAttrs::file::mirrorU);
     auto wrapVConverter = std::make_shared<MayaHydraWrapMaterialAttrConverter>(
@@ -656,6 +737,7 @@ void MayaHydraMaterialNetworkConverter::initialize()
                 { MayaHydraAdapterTokens->clearcoatRoughness, coatRoughnessConverter },
                 { MayaHydraAdapterTokens->opacity, transmissionToOpacity },
                 { MayaHydraAdapterTokens->metallic, metallicConverter },
+                { MayaHydraAdapterTokens->normal, normapMapConverter },//Normal mapping
             } } },
         { MayaHydraAdapterTokens->file,
           { UsdImagingTokens->UsdUVTexture, // Maya file translated to a UsdUVTexture with the
@@ -666,13 +748,17 @@ void MayaHydraMaterialNetworkConverter::initialize()
                 { UsdHydraTokens->wrapS, wrapUConverter },
                 { UsdHydraTokens->wrapT, wrapVConverter },
                 { UsdHydraTokens->textureMemory, textureMemoryConverter },
+                { MayaHydraAdapterTokens->sourceColorSpace, sourceColorSpaceConverter }, //Is not TfToken("auto") when the texture is a normal map, it should be TfToken("raw")
+                //{ MayaHydraAdapterTokens->bias, biasConverter},
+                //{ MayaHydraAdapterTokens->scale, scaleConverter},
             } } },
         { MayaHydraAdapterTokens
               ->place2dTexture, // Maya place2dTexture translated to a UsdPrimvarReader_float2 with
                                 // the following UsdPrimvarReader_float2 parameters mapped
           { UsdImagingTokens->UsdPrimvarReader_float2,
             {
-                { MayaHydraAdapterTokens->varname, fixedStToken },
+                //Should be TfToken("st") when the associated texture is not a normal map or TfToken("tangents") when the texture is a normal map
+                { MayaHydraAdapterTokens->varname, uvOrTangentNameConverter },
             } } },
     };
 }
@@ -749,9 +835,28 @@ HdMaterialNode* MayaHydraMaterialNetworkConverter::GetMaterial(const MObject& ma
         return &(*findResult);
     }
 
+    const TfToken nodeType(node.typeName().asChar());
+
     auto* nodeConverter
-        = MayaHydraMaterialNodeConverter::GetNodeConverter(TfToken(node.typeName().asChar()));
+        = MayaHydraMaterialNodeConverter::GetNodeConverter(nodeType);
     if (!nodeConverter) {
+        if (nodeType == MayaHydraAdapterTokens->bump2d) {
+            //Skip that node and get the texture node to translate
+            MStatus    status;
+            MPlugArray connections;
+            status = node.getConnections(connections);
+            if (status) {
+                for (size_t i = 0, len = connections.length(); i < len; ++i) {
+                    MPlug source = connections[i].source();
+                    if (source.isNull()) {
+                        continue;
+                    }
+                    if (source.node().hasFn(MFn::kFileTexture)) {
+                       return GetMaterial(source.node());
+                    }
+                }
+            }
+        }
         return nullptr;
     }
     HdMaterialNode material {};

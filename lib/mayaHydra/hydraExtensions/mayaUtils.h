@@ -21,7 +21,7 @@
 #include <mayaHydraLib/mayaHydra.h>
 
 #include <maya/MApiNamespace.h>
-
+#include <maya/MFn.h>
 #include <string>
 
 namespace MAYAHYDRA_NS_DEF {
@@ -125,9 +125,31 @@ bool IsAMayaTransformAttributeName(const MString& attrName);
  *
  * @return true if this is a maya visibility attribute name, false otherwise.
  */
-
-//Is it a maya node visibility attribute ? 
+MAYAHYDRALIB_API 
 bool IsAMayaVisibilityAttribute(const MPlug& plug, bool& outVal);
+
+/**
+ * @brief Get the index of the normals vertex buffer in the geometry
+ *
+ * @param[in] geom is the geometry to get the normals vertex buffer index from.
+ *
+ * @return The index of the normals vertex buffer in the geometry or -1 if not found
+ */
+MAYAHYDRALIB_API 
+int GetNormalsVertexBufferIndex(const MGeometry& geom);
+
+/**
+ * @brief Get a connected node from its type. The node is searched from a Dependency node connections (in their destination MPlug, not source)
+ *
+ * @param[in] node is the MFnDependencyNode to look for in its destination connection
+ * 
+ * @param[out] outNode is the MObjectof the node we were looking for
+ * 
+ * @param[in] nodeType is the type of the node we were looking for
+ * 
+ * @return true if the node was found, false otherwise
+ */
+bool GetTypedNodeFromDestinationConnections(MFnDependencyNode& node, MObject& outNode, MFn::Type nodeType);
 
 } // namespace MAYAHYDRA_NS_DEF
 
