@@ -9,7 +9,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNamespaces.py
     testVisibility.py
     testRendererSwitching.py
-    testSceneBrowser.py
     testStageAddPrim.py
     testTransforms.py
     testRefinement.py
@@ -56,6 +55,11 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 if(MayaUsd_FOUND)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testMayaUsdAPIUsage.py)
 endif(MayaUsd_FOUND)
+
+# Code coverage is not computed for the Hydra scene browser.
+if (NOT CODE_COVERAGE)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py)
+endif()
 
 # Interactive Unit test scripts for mesh adapter (launched with maya.exe instead of mayapy.exe)
 # Test use of mesh adapter code for mesh support, using environment variable.

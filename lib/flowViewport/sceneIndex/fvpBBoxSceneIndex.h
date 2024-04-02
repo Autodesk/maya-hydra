@@ -18,6 +18,7 @@
 
 //Local headers
 #include "flowViewport/api.h"
+#include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 
 //Hydra headers
 #include <pxr/base/tf/declarePtrs.h>
@@ -35,10 +36,10 @@ typedef PXR_NS::TfRefPtr<const BboxSceneIndex> BboxSceneIndexConstRefPtr;
 /// If the extent attribute is not present, it does not draw anything for that prim.
 ///
 class BboxSceneIndex : public PXR_NS::HdSingleInputFilteringSceneIndexBase
+    , public Fvp::InputSceneIndexUtils<BboxSceneIndex>
 {
 public:
     using ParentClass = PXR_NS::HdSingleInputFilteringSceneIndexBase;
-    using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
     FVP_API
     static BboxSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex){
@@ -51,14 +52,14 @@ public:
     
     FVP_API
     PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath& primPath) const override{
-        return _GetInputSceneIndex()->GetChildPrimPaths(primPath);
+        return GetInputSceneIndex()->GetChildPrimPaths(primPath);
     }
     
     FVP_API
     ~BboxSceneIndex() override = default;
 
 protected:
-    BboxSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) : ParentClass(inputSceneIndex) {};
+    BboxSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) : ParentClass(inputSceneIndex), InputSceneIndexUtils(inputSceneIndex) {};
 
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override;
