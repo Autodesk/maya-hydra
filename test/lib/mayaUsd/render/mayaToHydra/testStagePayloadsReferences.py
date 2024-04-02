@@ -30,7 +30,6 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
     IMAGE_DIFF_FAIL_PERCENT = 2
 
     def loadUsdPayloadScene(self):
-        cmds.file(new=True, force=True)
         mayaUtils.openTestScene(
                 "testStagePayloadsReferences",
                 "FlowerPot.ma")
@@ -38,7 +37,6 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         cmds.refresh()
 
     def loadUsdReferencesScene(self):
-        cmds.file(new=True, force=True)
         mayaUtils.openTestScene(
                 "testStagePayloadsReferences",
                 "References.ma")
@@ -49,7 +47,7 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         from mayaUsd import lib as mayaUsdLib
         import mayaUsd_createStageWithNewLayer
 
-        cmds.file(new=True, force=True)
+        mayaUtils.openNewScene()
 
         # Create a simple scene with a Def prim with a USD reference.
         psPathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
@@ -66,7 +64,7 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         self.setHdStormRenderer()
 
     def setUpPayloadScene(self):
-        cmds.file(new=True, force=True)
+        mayaUtils.openNewScene()
         import mayaUsd_createStageWithNewLayer
         from mayaUsd import lib as mayaUsdLib
         import usdUtils

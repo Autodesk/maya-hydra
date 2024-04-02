@@ -26,8 +26,6 @@ class TestSnapshot(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def test_flat_orange(self):
-        cmds.file(new=1, f=1)
-
         activeEditor = cmds.playblast(activeEditor=1)
 
         # Note that we use the default viewport2 renderer, because we're not testing

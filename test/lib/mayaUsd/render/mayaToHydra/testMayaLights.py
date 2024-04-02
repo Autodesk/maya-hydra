@@ -86,8 +86,6 @@ class TestMayaLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
 
     #Test maya lights (e.g., default,directional,point,spot,etc.) with a maya native sphere and usd sphere.
     def test_MayaLights(self):
-        cmds.file(new=True, force=True)
-
         # Load a maya scene with a maya native sphere, usd sphere and some lights, with HdStorm already being the viewport renderer.
         # The sphere is not at the origin on purpose
         testFile = mayaUtils.openTestScene(

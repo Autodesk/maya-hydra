@@ -73,8 +73,6 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
 
     #Test usd lights (e.g., disk,distant,dome,etc.) with a maya native sphere and usd sphere.
     def test_USDLights(self):
-        cmds.file(new=True, force=True)
-
         # Load a maya scene with a maya native sphere, usd sphere and some lights, with HdStorm already being the viewport renderer.
         # The sphere is not at the origin on purpose
         testFile = mayaUtils.openTestScene(

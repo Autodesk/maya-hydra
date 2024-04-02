@@ -32,7 +32,6 @@ class TestStageVariants(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         from mayaUsd import lib as mayaUsdLib
         # usdUtils imports mayaUsd.ufe
         import usdUtils
-        cmds.file(new=True, force=True)
 
         testFile = mayaUtils.openTestScene(
                 "testStageVariants",
