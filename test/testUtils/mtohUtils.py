@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import inspect
 import os
 import unittest
 
@@ -21,6 +20,7 @@ import maya.cmds as cmds
 import maya.mel
 
 import fixturesUtils
+import mayaUtils
 import testUtils
 from imageUtils import ImageDiffingTestCase
 
@@ -88,7 +88,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         # Maya is not closed/reset between each test of a test suite,
         # so open a new file before each test to minimize leftovers
         # from previous tests.
-        cmds.file(new=True, force=True)
+        mayaUtils.openNewScene()
         self.setHdStormRenderer()
 
     @classmethod
@@ -108,7 +108,6 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         cmds.modelEditor(
             self.activeEditor, e=1,
             rendererOverrideName=HD_STORM_OVERRIDE)
-        cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", True)
         cmds.refresh(f=1)
         self.delegateId = cmds.mayaHydra(renderer=HD_STORM,
                                     sceneDelegateId="MayaHydraSceneDelegate")
@@ -125,7 +124,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         cmds.setAttr('persp.translate', dist, .75 * dist, dist, type='float3')
 
     def makeCubeScene(self, camDist=DEFAULT_CAM_DIST):
-        cmds.file(f=1, new=1)
+        mayaUtils.openNewScene()
         self.cubeTrans = cmds.polyCube()[0]
         self.cubeShape = cmds.listRelatives(self.cubeTrans)[0]
         self.setHdStormRenderer()

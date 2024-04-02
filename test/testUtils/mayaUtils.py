@@ -29,6 +29,7 @@ except:
     pass
 
 from maya import cmds
+from maya import mel
 from maya.api import OpenMaya as om
 
 import ufe
@@ -132,75 +133,31 @@ def isHydraRenderer():
     activeRenderer = cmds.modelEditor(activeEditor, q=True,rendererOverrideName=True)
     return activeRenderer == HD_STORM_OVERRIDE
 
-def openTestScene(*args):
+def resetDefaultLightIntensity():
+    """If the current Maya version supports setting the default light intensity,
+        then restore it to 1 so snapshots look equal across versions."""
+    if mel.eval("optionVar -exists defaultLightIntensity"):
+        mel.eval("optionVar -fv defaultLightIntensity 1")
+    if cmds.attributeQuery('defaultLightIntensity', node='hardwareRenderingGlobals', exists=True):
+        cmds.setAttr('hardwareRenderingGlobals.defaultLightIntensity', 1.0)
+
+def applyTestSettings():
+    resetDefaultLightIntensity()
+    cmds.headsUpDisplay(layoutVisibility=False)
+    cmds.grid(toggle=False)
+    cmds.colorManagementPrefs(edit=True, cmEnabled=False)
+    cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", True) # TODO : Turn anti-aliasing off by default.
+
+def openNewScene(useTestSettings=True):
+    cmds.file(new=True, force=True)
+    if useTestSettings:
+        applyTestSettings()
+
+def openTestScene(*args, useTestSettings=True):
     filePath = testUtils.getTestScene(*args)
     cmds.file(filePath, force=True, open=True)
-    # To err on the safe side, disable color management in case the scene had color management on.
-    # If/when we add color management tests, they will need to re-enable it manually.
-    cmds.colorManagementPrefs(edit=True, cmEnabled=False)
-    if isHydraRenderer():        
-        cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", True)
-
-
-def openTopLayerScene():
-    '''
-        The test scene hierarchy is represented as :
-                |world
-                    |pSphere1
-                        |pSphereShape1
-                    |transform1
-                        |proxyShape1
-                            /Room_set
-                                /Props
-                                    /Ball_1
-                                    /Ball_2
-                                    ...
-                                    /Ball_35
-    '''
-    # Open top_layer file which contains the USD scene
-    return openTestScene("ballset", "StandaloneScene", "top_layer.ma" )
-
-def openCylinderScene():
-    return openTestScene("cylinder", "usdCylinder.ma" )
-
-def openTwoSpheresScene():
-    return openTestScene("twoSpheres", "twoSpheres.ma" )
-
-def openSphereAnimatedRadiusScene():
-    return openTestScene("sphereAnimatedRadius", "sphereAnimatedRadiusProxyShape.ma" )
-
-def openTreeScene():
-    return openTestScene("tree", "tree.ma" )
-
-def openTreeRefScene():
-    return openTestScene("tree", "treeRef.ma" )
-
-def openAppleBiteScene():
-    return openTestScene("appleBite", "appleBite.ma" )
-
-def openGroupBallsScene():
-    return openTestScene("groupBalls", "ballset.ma" )
-
-def openPrimitivesScene():
-    return openTestScene("reorderCmd", "primitives.ma" )
-
-def openPointInstancesGrid14Scene():
-    return openTestScene("pointInstances", "PointInstancer_Grid_14.ma" )
-
-def openPointInstancesGrid7kScene():
-    return openTestScene("pointInstances", "PointInstancer_Grid_7k.ma" )
-
-def openPointInstancesGrid70kScene():
-    return openTestScene("pointInstances", "PointInstancer_Grid_70k.ma" )
-
-def openVariantSetScene():
-    return openTestScene("variantSet", "Variant.ma" )
-
-def openCompositionArcsScene():
-    return openTestScene("compositionArcs", "compositionArcs.ma" )
-
-def openPrimPathScene():
-    return openTestScene("primPath", "primPath.ma" )
+    if useTestSettings:
+        applyTestSettings()
 
 def setMayaTranslation(aMayaItem, t):
     '''Set the translation on the argument Maya scene item.'''
@@ -253,23 +210,6 @@ def createProxyFromFile(filePath):
     cmds.connectAttr('time1.outTime','{}.time'.format(shapeNode))
 
     return shapeNode,shapeStage
-
-def createSingleSphereMayaScene(directory=None):
-    '''Create a Maya scene with a single polygonal sphere.
-    Returns the file path.
-    '''
-
-    cmds.file(new=True, force=True)
-    cmds.CreatePolygonSphere()
-    tempMayaFile = 'simpleSphere.ma'
-    if directory is not None:
-        tempMayaFile = os.path.join(directory, tempMayaFile)
-    # Prevent Windows single backslash from being interpreted as a control
-    # character.
-    tempMayaFile = tempMayaFile.replace(os.sep, '/')
-    cmds.file(rename=tempMayaFile)
-    cmds.file(save=True, force=True, type='mayaAscii')
-    return tempMayaFile
 
 def mayaMajorVersion():
     return int(cmds.about(majorVersion=True))

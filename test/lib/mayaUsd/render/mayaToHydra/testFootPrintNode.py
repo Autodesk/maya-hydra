@@ -231,7 +231,6 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
     #Test loading a scene
     def test_Load(self):
         with PluginLoaded('mayaHydraFootPrintNode'):
-            cmds.file(new=True, force=True)
             testFile = mayaUtils.openTestScene( 
                 "testFootPrintNode",
                 "testFootPrintNodeSaved.ma")

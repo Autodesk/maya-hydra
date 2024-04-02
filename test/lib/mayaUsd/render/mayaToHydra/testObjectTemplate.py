@@ -29,8 +29,6 @@ class TestObjectTemplate(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtil
 
     #Test object display & selection when template attribute is on.
     def test_ObjectTemplate(self):
-        cmds.file(new=True, force=True)
-
         # Load a maya scene with a maya native sphere
         testFile = mayaUtils.openTestScene(
                 "testObjectTemplate",
