@@ -508,7 +508,10 @@ public:
             (pickedMayaPath + std::to_string(instanceNdx)) :
 
             // Not an instance: adjust picked path for selection kind.
-            [&]() {
+            // As per https://stackoverflow.com/questions/46114214
+            // structured bindings cannot be captured by a lambda in C++ 17,
+            // so pass in pickedUsdPath as a lambda argument.
+            [&pickedMayaPath, &registration](const SdfPath& pickedUsdPath) {
             auto snKind = GetSelectionKind();
             if (snKind.IsEmpty()) {
                 return pickedMayaPath;
@@ -528,7 +531,7 @@ public:
             const auto usdPath = prim ? prim.GetPath() : pickedUsdPath;
 
             return usdPathToUfePath(registration, usdPath);
-        }();
+        }(pickedUsdPath);
 
         auto si = Ufe::Hierarchy::createItem(snMayaPath);
         if (!si) {
