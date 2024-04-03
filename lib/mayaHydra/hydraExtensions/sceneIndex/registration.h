@@ -30,6 +30,8 @@
 #include <maya/MNodeMessage.h>
 #include <maya/MObject.h>
 #include <maya/MObjectHandle.h>
+#include <maya/MObjectArray.h>
+
 #include <ufe/rtid.h>
 #include <ufe/ufe.h>
 
@@ -98,9 +100,20 @@ private:
     bool        _RemoveSceneIndexForNode(const MObject& dagNode);
     static void _SceneIndexNodeAddedCallback(MObject& obj, void* clientData);
     static void _SceneIndexNodeRemovedCallback(MObject& obj, void* clientData);
+    static void _AfterOpenCallback (void *clientData);
+
+    // Append a node to the list of nodes that need to be processed after the scene is opened.
+    void _AppendNodeToProcessAfterOpenScene(const MObject& node) {_nodesToProcessAfterOpenScene.append(node);}
+    //We need to check if some nodes that need to be processed were added to our array during a file load
+    void _ProcessNodesAfterOpen();
+
     const std::shared_ptr<Fvp::RenderIndexProxy> _renderIndexProxy;
 
-    MCallbackIdArray _sceneIndexDagNodeMessageCallbacks;
+    MCallbackIdArray _DGCallbackIds;
+    MCallbackId _AfterOpenCBId {0};
+
+    // Maintain a list of nodes that need to be processed after the scene is opened. We cannot process them during file load.
+    MObjectArray    _nodesToProcessAfterOpenScene;
 
     Registrations _registrations;
     // Maintain alternative way to retrieve registration based on MObjectHandle. This is faster to
