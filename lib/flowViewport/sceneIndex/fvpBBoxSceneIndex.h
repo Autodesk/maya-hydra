@@ -40,6 +40,7 @@ class BboxSceneIndex : public PXR_NS::HdSingleInputFilteringSceneIndexBase
 {
 public:
     using ParentClass = PXR_NS::HdSingleInputFilteringSceneIndexBase;
+    using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
     FVP_API
     static BboxSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex){

@@ -45,6 +45,8 @@ class DisplayStyleOverrideSceneIndex :
     , public Fvp::InputSceneIndexUtils<DisplayStyleOverrideSceneIndex>
 {
 public:
+    using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
+
     FVP_API
     static DisplayStyleOverrideSceneIndexRefPtr
     New(const PXR_NS::HdSceneIndexBaseRefPtr &inputSceneIndex);
