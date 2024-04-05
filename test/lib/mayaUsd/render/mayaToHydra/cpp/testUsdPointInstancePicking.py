@@ -20,7 +20,7 @@ import usdUtils
 import testUtils
 from testUtils import PluginLoaded
 
-class TestPointInstancePicking(mtohUtils.MayaHydraBaseTestCase):
+class TestUsdPointInstancePicking(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -34,11 +34,11 @@ class TestPointInstancePicking(mtohUtils.MayaHydraBaseTestCase):
     # we want to pick, and use the marker objects to determine the projected
     # mouse coordinates.
     def loadUsdScene(self):
-        usdScenePath = testUtils.getTestScene('testPointInstances', 'nestedPointInstancers.usda')
+        usdScenePath = testUtils.getTestScene('testUsdPointInstances', 'nestedPointInstancers.usda')
         usdUtils.createStageFromFile(usdScenePath)
 
     def setUp(self):
-        super(TestPointInstancePicking, self).setUp()
+        super(TestUsdPointInstancePicking, self).setUp()
         self.loadUsdScene()
         cmds.setAttr('persp.translate', 19.3, 13.7, 11.4, type='float3')
         cmds.setAttr('persp.rotate', -33.4, 63.0, 0, type='float3')
@@ -59,7 +59,7 @@ class TestPointInstancePicking(mtohUtils.MayaHydraBaseTestCase):
                 cmds.mayaHydraCppTest(
                     self.PICK_PATH + "/ParentPointInstancer",
                     self.PICK_PATH + marker,
-                    f="TestPointInstancePicking.pickPointInstance")
+                    f="TestUsdPointInstancePicking.pickPointInstance")
 
     def test_PickInstances(self):
         with PluginLoaded('mayaHydraCppTests'):
@@ -82,7 +82,7 @@ class TestPointInstancePicking(mtohUtils.MayaHydraBaseTestCase):
                 cmds.mayaHydraCppTest(
                     self.PICK_PATH + instance,
                     self.PICK_PATH + marker,
-                    f="TestPointInstancePicking.pickPointInstance")
+                    f="TestUsdPointInstancePicking.pickPointInstance")
 
     def test_PickPrototypes(self):
         with PluginLoaded('mayaHydraCppTests'):
@@ -106,7 +106,7 @@ class TestPointInstancePicking(mtohUtils.MayaHydraBaseTestCase):
                 cmds.mayaHydraCppTest(
                     self.PICK_PATH + prototype,
                     self.PICK_PATH + marker,
-                    f="TestPointInstancePicking.pickPointInstance")
+                    f="TestUsdPointInstancePicking.pickPointInstance")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
