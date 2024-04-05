@@ -32,7 +32,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace MayaHydra;
 
-TEST(TestUsdNativeInstancePicking, pickInstance)
+TEST(TestUsdPicking, pick)
 {
     const auto& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);

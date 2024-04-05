@@ -38,6 +38,7 @@ target_compile_definitions(${TARGET_NAME}
         $<$<BOOL:${IS_LINUX}>:LINUX>
         # Not sure if msvcc sets this automatically, but won't hurt to redefine
         $<$<BOOL:${IS_WINDOWS}>:_WIN32>
+        $<$<BOOL:${MayaUsd_FOUND}>:MAYAHYDRALIB_MAYAUSDAPI_ENABLED>
 )
 
 # -----------------------------------------------------------------------------
@@ -46,6 +47,7 @@ target_compile_definitions(${TARGET_NAME}
 target_include_directories(${TARGET_NAME} 
     PRIVATE
         $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
+        $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSD_INCLUDE_DIR}>
 )
 
 if(DEFINED MAYAUSD_VERSION)
@@ -73,6 +75,7 @@ target_link_libraries(${TARGET_NAME}
         ufeExtensions
         flowViewport
         $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
+        $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSDAPI_LIBRARY}>
 )
 
 # -----------------------------------------------------------------------------

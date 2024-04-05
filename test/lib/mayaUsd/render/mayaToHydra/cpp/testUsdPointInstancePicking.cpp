@@ -29,7 +29,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace MayaHydra;
 
-TEST(TestPointInstancePicking, pickPointInstance)
+TEST(TestUsdPointInstancePicking, pickPointInstance)
 {
     const auto& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);

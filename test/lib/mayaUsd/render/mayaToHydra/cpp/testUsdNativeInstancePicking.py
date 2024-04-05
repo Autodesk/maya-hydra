@@ -41,7 +41,7 @@ class TestUsdNativeInstancePicking(mtohUtils.MayaHydraBaseTestCase):
             for instance in instances:
                 cmds.mayaHydraCppTest(
                     self.PICK_PATH + instance,
-                    f="TestUsdNativeInstancePicking.pickInstance")
+                    f="TestUsdPicking.pick")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

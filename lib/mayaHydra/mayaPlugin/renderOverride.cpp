@@ -82,7 +82,12 @@
 #include <pxr/imaging/hdx/tokens.h>
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
+#include <pxr/usd/kind/registry.h>
+#include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usd/modelAPI.h>
 #include <pxr/pxr.h>
+
+#include <mayaUsdAPI/proxyStage.h>
 
 #include <maya/M3dView.h>
 #include <maya/MConditionMessage.h>
@@ -163,6 +168,45 @@ namespace {
 PXR_NAMESPACE_USING_DIRECTIVE
 
 static const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaHydraViewportRenderer");
+
+// Copy pasted from
+// https://github.com/Autodesk/maya-usd/blob/dev/lib/mayaUsd/render/vp2RenderDelegate/proxyRenderDelegate.cpp
+
+//! \brief  Query the Kind to be selected from viewport.
+//! \return A Kind token (https://graphics.pixar.com/usd/docs/api/kind_page_front.html). If the
+//!         token is empty or non-existing in the hierarchy, the exact prim that gets picked
+//!         in the viewport will be selected.
+TfToken GetSelectionKind()
+{
+    static const MString kOptionVarName(MayaUsdPickOptionVars->SelectionKind.GetText());
+
+    if (MGlobal::optionVarExists(kOptionVarName)) {
+        MString optionVarValue = MGlobal::optionVarStringValue(kOptionVarName);
+        return TfToken(optionVarValue.asChar());
+    }
+    return TfToken();
+}
+
+//! \brief  Returns the prim or an ancestor of it that is of the given kind.
+//
+// If neither the prim itself nor any of its ancestors above it in the
+// namespace hierarchy have an authored kind that matches, an invalid null
+// prim is returned.
+UsdPrim GetPrimOrAncestorWithKind(const UsdPrim& prim, const TfToken& kind)
+{
+    UsdPrim iterPrim = prim;
+    TfToken primKind;
+
+    while (iterPrim) {
+        if (UsdModelAPI(iterPrim).GetKind(&primKind) && KindRegistry::IsA(primKind, kind)) {
+            break;
+        }
+
+        iterPrim = iterPrim.GetParent();
+    }
+
+    return iterPrim;
+}
 
 //! Pick resolution behavior to use when the picked object is a point instance.
 enum UsdPointInstancesPickMode
@@ -285,6 +329,15 @@ HitPath pickInstancer(
     // prim origin.  To return the innermost instancer, we would use the last
     // instancer context prim origin.
     return {instancerPrimOrigin(primOrigin.instancerContexts.front()), -1};
+}
+
+Ufe::Path usdPathToUfePath(
+    const MayaHydraSceneIndexRegistrationPtr& registration,
+    const SdfPath&                            usdPath
+)
+{
+    return registration ? registration->interpretRprimPathFn(
+        registration->pluginSceneIndex, usdPath) : Ufe::Path();
 }
 
 }
@@ -445,19 +498,48 @@ public:
 
         // For the USD pick handler pick results are directly returned with USD
         // scene paths, so no need to remove scene index plugin path prefix.
-        const auto& [pickedPath, instanceNdx] = hitPath(pickInput.pickHit);
-        Ufe::Path interpretedPath(registration->interpretRprimPathFn(
-            registration->pluginSceneIndex, pickedPath));
+        const auto& [pickedUsdPath, instanceNdx] = hitPath(pickInput.pickHit);
 
-        // Appending a numeric component to the path to identify a point
-        // instance cannot be done on the picked SdfPath, as numeric path
-        // components are not allowed by SdfPath.  Do so here with Ufe::Path,
-        // which has no such restriction.
-        if (instanceNdx >= 0) {
-            interpretedPath = interpretedPath + std::to_string(instanceNdx);
-        }
+        const auto pickedMayaPath = usdPathToUfePath(registration, pickedUsdPath);
+        const auto snMayaPath =
+            // As per https://stackoverflow.com/questions/46114214
+            // structured bindings cannot be captured by a lambda in C++ 17,
+            // so pass in pickedUsdPath and instanceNdx as lambda arguments.
+            [&pickedMayaPath, &registration](
+                const SdfPath& pickedUsdPath, int instanceNdx) {
 
-        auto si = Ufe::Hierarchy::createItem(interpretedPath);
+            if (instanceNdx >= 0) {
+                // Point instance: add the instance index to the path.
+                // Appending a numeric component to the path to identify a
+                // point instance cannot be done on the picked SdfPath, as
+                // numeric path components are not allowed by SdfPath.  Do so
+                // here with Ufe::Path, which has no such restriction.
+                return pickedMayaPath + std::to_string(instanceNdx);
+            }
+
+            // Not an instance: adjust picked path for selection kind.
+            auto snKind = GetSelectionKind();
+            if (snKind.IsEmpty()) {
+                return pickedMayaPath;
+            }
+
+            // Get the prim from the stage and path, to access the
+            // UsdModelAPI for the prim.
+            auto proxyShapeObj = registration->dagNode.object();
+            if (proxyShapeObj.isNull()) {
+                TF_FATAL_ERROR("No mayaUsd proxy shape object corresponds to USD pick");
+                return pickedMayaPath;
+            }
+
+            MayaUsdAPI::ProxyStage proxyStage{proxyShapeObj};
+            auto prim = proxyStage.getUsdStage()->GetPrimAtPath(pickedUsdPath);
+            prim = GetPrimOrAncestorWithKind(prim, snKind);
+            const auto usdPath = prim ? prim.GetPath() : pickedUsdPath;
+
+            return usdPathToUfePath(registration, usdPath);
+        }(pickedUsdPath, instanceNdx);
+
+        auto si = Ufe::Hierarchy::createItem(snMayaPath);
         if (!si) {
             return false;
         }
