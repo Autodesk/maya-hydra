@@ -104,7 +104,14 @@ public:
     MAYAHYDRALIB_API
     virtual HdCullStyle GetCullStyle() const { return HdCullStyleNothing; }
     MAYAHYDRALIB_API
-    virtual HdDisplayStyle GetDisplayStyle() { return { 0, false, false }; }
+    virtual HdDisplayStyle GetDisplayStyle() { 
+        constexpr int refineLevel = 0;
+        constexpr bool flatShading = false;
+        constexpr bool displacement = false;
+        constexpr bool occludedSelectionShowsThrough = false;
+        constexpr bool pointsShadingEnabled = false;
+        constexpr bool materialIsFinal = false;
+        return HdDisplayStyle(refineLevel, flatShading, displacement, occludedSelectionShowsThrough, pointsShadingEnabled, materialIsFinal); }
     MAYAHYDRALIB_API
     virtual GfBBox3d GetBoundingBox() const { return GfBBox3d(); }
     MAYAHYDRALIB_API
