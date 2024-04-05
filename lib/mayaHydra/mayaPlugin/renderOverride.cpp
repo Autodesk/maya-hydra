@@ -169,6 +169,9 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 static const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaHydraViewportRenderer");
 
+// Copy pasted from
+// https://github.com/Autodesk/maya-usd/blob/dev/lib/mayaUsd/render/vp2RenderDelegate/proxyRenderDelegate.cpp
+
 //! \brief  Query the Kind to be selected from viewport.
 //! \return A Kind token (https://graphics.pixar.com/usd/docs/api/kind_page_front.html). If the
 //!         token is empty or non-existing in the hierarchy, the exact prim that gets picked
@@ -498,20 +501,23 @@ public:
         const auto& [pickedUsdPath, instanceNdx] = hitPath(pickInput.pickHit);
 
         const auto pickedMayaPath = usdPathToUfePath(registration, pickedUsdPath);
-        const auto snMayaPath = (instanceNdx >= 0) ?
-
-            // Point instance: add the instance index to the path.  Appending a
-            // numeric component to the path to identify a point instance
-            // cannot be done on the picked SdfPath, as numeric path components
-            // are not allowed by SdfPath.  Do so here with Ufe::Path, which
-            // has no such restriction.
-            (pickedMayaPath + std::to_string(instanceNdx)) :
-
-            // Not an instance: adjust picked path for selection kind.
+        const auto snMayaPath =
             // As per https://stackoverflow.com/questions/46114214
             // structured bindings cannot be captured by a lambda in C++ 17,
             // so pass in pickedUsdPath as a lambda argument.
-            [&pickedMayaPath, &registration](const SdfPath& pickedUsdPath) {
+            [&pickedMayaPath, &registration, instanceNdx](
+                const SdfPath& pickedUsdPath) {
+
+            if (instanceNdx >= 0) {
+                // Point instance: add the instance index to the path.
+                // Appending a numeric component to the path to identify a
+                // point instance cannot be done on the picked SdfPath, as
+                // numeric path components are not allowed by SdfPath.  Do so
+                // here with Ufe::Path, which has no such restriction.
+                return pickedMayaPath + std::to_string(instanceNdx);
+            }
+
+            // Not an instance: adjust picked path for selection kind.
             auto snKind = GetSelectionKind();
             if (snKind.IsEmpty()) {
                 return pickedMayaPath;
