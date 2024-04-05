@@ -504,9 +504,9 @@ public:
         const auto snMayaPath =
             // As per https://stackoverflow.com/questions/46114214
             // structured bindings cannot be captured by a lambda in C++ 17,
-            // so pass in pickedUsdPath as a lambda argument.
-            [&pickedMayaPath, &registration, instanceNdx](
-                const SdfPath& pickedUsdPath) {
+            // so pass in pickedUsdPath and instanceNdx as lambda arguments.
+            [&pickedMayaPath, &registration](
+                const SdfPath& pickedUsdPath, int instanceNdx) {
 
             if (instanceNdx >= 0) {
                 // Point instance: add the instance index to the path.
@@ -537,7 +537,7 @@ public:
             const auto usdPath = prim ? prim.GetPath() : pickedUsdPath;
 
             return usdPathToUfePath(registration, usdPath);
-        }(pickedUsdPath);
+        }(pickedUsdPath, instanceNdx);
 
         auto si = Ufe::Hierarchy::createItem(snMayaPath);
         if (!si) {
