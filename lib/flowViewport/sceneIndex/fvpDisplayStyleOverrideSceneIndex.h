@@ -16,6 +16,7 @@
 #define FVP_DISPLAY_STYLE_OVERRIDE_SCENE_INDEX_H
 
 #include "flowViewport/api.h"
+#include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 
 #include "pxr/imaging/hdsi/api.h"
 #include "pxr/imaging/hd/filteringSceneIndex.h"
@@ -41,8 +42,11 @@ typedef PXR_NS::TfRefPtr<const DisplayStyleOverrideSceneIndex> DisplayStyleOverr
 ///
 class DisplayStyleOverrideSceneIndex :
     public PXR_NS::HdSingleInputFilteringSceneIndexBase
+    , public Fvp::InputSceneIndexUtils<DisplayStyleOverrideSceneIndex>
 {
 public:
+    using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
+
     FVP_API
     static DisplayStyleOverrideSceneIndexRefPtr
     New(const PXR_NS::HdSceneIndexBaseRefPtr &inputSceneIndex);

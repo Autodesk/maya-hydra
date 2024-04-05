@@ -406,7 +406,7 @@ namespace
 
 HdSceneIndexPrim BboxSceneIndex::GetPrim(const SdfPath& primPath) const
 {
-    HdSceneIndexPrim prim = _GetInputSceneIndex()->GetPrim(primPath);
+    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     if (prim.dataSource && ((prim.primType == HdPrimTypeTokens->mesh) || (prim.primType == HdPrimTypeTokens->basisCurves)) ){
         prim.primType   = HdPrimTypeTokens->basisCurves;//Convert to basisCurve for displaying a bounding box
         prim.dataSource = _BoundsPrimDataSource::New(prim.dataSource);
@@ -420,7 +420,7 @@ void BboxSceneIndex::_PrimsAdded(const HdSceneIndexBase& sender, const HdSceneIn
     HdSceneIndexObserver::AddedPrimEntries newEntries;
     for (const HdSceneIndexObserver::AddedPrimEntry &entry : entries) {
         const SdfPath &path = entry.primPath;
-        HdSceneIndexPrim prim = _GetInputSceneIndex()->GetPrim(path);
+        HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(path);
         if (prim.primType == HdPrimTypeTokens->mesh){
             newEntries.push_back({path, HdPrimTypeTokens->basisCurves});//Convert meshes to basisCurve to display a bounding box
         }else{

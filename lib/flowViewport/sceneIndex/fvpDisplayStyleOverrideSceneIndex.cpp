@@ -87,6 +87,7 @@ DisplayStyleOverrideSceneIndex::
 DisplayStyleOverrideSceneIndex(
     const HdSceneIndexBaseRefPtr &inputSceneIndex)
   : HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
+  , InputSceneIndexUtils(inputSceneIndex)
   , _styleInfo(std::make_shared<_StyleInfo>())
   , _overlayDs(
       HdRetainedContainerDataSource::New(
@@ -99,7 +100,7 @@ HdSceneIndexPrim
 DisplayStyleOverrideSceneIndex::GetPrim(
     const SdfPath &primPath) const
 {
-    HdSceneIndexPrim prim = _GetInputSceneIndex()->GetPrim(primPath);
+    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     if (prim.dataSource) {
         if (!isExcluded(primPath) && prim.primType == HdPrimTypeTokens->mesh) {
             prim.dataSource =
@@ -114,7 +115,7 @@ SdfPathVector
 DisplayStyleOverrideSceneIndex::GetChildPrimPaths(
     const SdfPath &primPath) const
 {
-    return _GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
 void
@@ -147,7 +148,7 @@ DisplayStyleOverrideSceneIndex::_DirtyAllPrims(
     }
 
     HdSceneIndexObserver::DirtiedPrimEntries entries;
-    for (const SdfPath &path : HdSceneIndexPrimView(_GetInputSceneIndex())) {
+    for (const SdfPath &path : HdSceneIndexPrimView(GetInputSceneIndex())) {
         entries.push_back({path, locators});
     }
 
