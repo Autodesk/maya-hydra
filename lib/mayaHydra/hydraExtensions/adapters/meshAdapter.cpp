@@ -321,15 +321,13 @@ public:
         }
 
         static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
-        if (passNormalsToHydra){
-                return HdMeshTopology(
+        return  (passNormalsToHydra) ?
+            HdMeshTopology(
                         PxOsdOpenSubdivTokens->none,//For the OGS normals vertex buffer to be used, we need to use PxOsdOpenSubdivTokens->none
                         UsdGeomTokens->rightHanded,
                         faceVertexCounts,
-                        faceVertexIndices);
-        }
-        
-        return HdMeshTopology(
+                        faceVertexIndices) :
+            HdMeshTopology(
             (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes || GetDisplayStyle().refineLevel > 0)
                 ? PxOsdOpenSubdivTokens->catmullClark
                 : PxOsdOpenSubdivTokens->none,

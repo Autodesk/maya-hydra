@@ -21,7 +21,6 @@
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
-#include <mayaHydraLib/mayaUtils.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -203,7 +202,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // Vertices
     if (geomChanged && vertexBuffercount) {
         //vertexBuffercount > 0 means geom is non null
-        for (int vbIdx = 0; vbIdx < geom->vertexBufferCount(); vbIdx++) {
+        for (int vbIdx = 0; vbIdx < vertexBuffercount; vbIdx++) {
             MVertexBuffer* mvb = geom->vertexBuffer(vbIdx);
             if ( ! mvb) {
                 continue;
@@ -306,7 +305,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                     
                     MVertexBuffer* mvb = nullptr;
 
-                    for (int vbIdx = 0; vbIdx < geom->vertexBufferCount(); vbIdx++) {
+                    for (int vbIdx = 0; vbIdx < vertexBuffercount; vbIdx++) {
                         mvb = geom->vertexBuffer(vbIdx);
                         if (!mvb)
                             continue;
@@ -314,7 +313,6 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                         const MVertexBufferDescriptor& desc = mvb->descriptor();
                         const auto semantic = desc.semantic();
                         switch(semantic){
-
                             case MGeometry::Semantic::kTexture: {
                                 // Hydra supports a uv coordinate for each face-index (face varying), though we could use its own set of indices which should be smaller.
                                 _uvs.clear();
