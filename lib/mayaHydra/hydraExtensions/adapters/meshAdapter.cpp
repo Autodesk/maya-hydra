@@ -210,9 +210,14 @@ public:
         return VtValue(ret);
     }
 
-    VtValue GetPoints(const MFnMesh& mesh)
+    VtValue GetPoints()
     {
-        MStatus     status;
+        MStatus status;
+        MFnMesh mesh(GetDagPath(), &status);
+        if (ARCH_UNLIKELY(!status)) {
+            return {};
+        }
+
         const auto* rawPoints = reinterpret_cast<const GfVec3f*>(mesh.getRawPoints(&status));
         if (ARCH_UNLIKELY(!status)) {
             return {};
@@ -222,10 +227,15 @@ public:
         return VtValue(ret);
     }
 
-    VtValue GetNormals(const MFnMesh& mesh)
+    VtValue GetNormals()
     {
+        MStatus status;
+        MFnMesh mesh(GetDagPath(), &status);
+        if (ARCH_UNLIKELY(!status)) {
+            return {};
+        }
+
         //Normals are per vertex
-        MStatus     status;
         MFloatVectorArray normals;
         constexpr bool angleWeighted = false;
         mesh.getVertexNormals(angleWeighted, normals);
@@ -244,21 +254,11 @@ public:
                 GetDagPath().partialPathName().asChar());
 
         if (key == HdTokens->points) {
-            MStatus status;
-            MFnMesh mesh(GetDagPath(), &status);
-            if (ARCH_UNLIKELY(!status)) {
-                return {};
-            }
-            return GetPoints(mesh);
+            return GetPoints();
         } 
 
         if (key == HdTokens->normals) {
-            MStatus status;
-            MFnMesh mesh(GetDagPath(), &status);
-            if (ARCH_UNLIKELY(!status)) {
-                return {};
-            }
-            return GetNormals(mesh);
+            return GetNormals();
         } 
         
         if (key == MayaHydraAdapterTokens->tangents) {
@@ -280,23 +280,13 @@ public:
         }
 
         if (key == HdTokens->points) {
-            MStatus status;
-            MFnMesh mesh(GetDagPath(), &status);
-            if (ARCH_UNLIKELY(!status)) {
-                return 0;
-            }
             return GetMayaHydraSceneIndex()->SampleValues(
-                maxSampleCount, times, samples, [&]() -> VtValue { return GetPoints(mesh); });
+                maxSampleCount, times, samples, [&]() -> VtValue { return GetPoints(); });
         } 
 
         if (key == HdTokens->normals) {
-            MStatus status;
-            MFnMesh mesh(GetDagPath(), &status);
-            if (ARCH_UNLIKELY(!status)) {
-                return 0;
-            }
             return GetMayaHydraSceneIndex()->SampleValues(
-                maxSampleCount, times, samples, [&]() -> VtValue { return GetNormals(mesh); });
+                maxSampleCount, times, samples, [&]() -> VtValue { return GetNormals(); });
         } 
         
         if (key == MayaHydraAdapterTokens->tangents) {
