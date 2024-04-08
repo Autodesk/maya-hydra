@@ -111,9 +111,13 @@ class TestPassingNormalsPerformanceWo(mtohUtils.MayaHydraBaseTestCase):
 
         testFile = mayaUtils.openTestScene(
                 "testPassingNormals",
-                "Synthetic_Mesh_8M_Triangles_Deformed.mb")
+                "CrocWarrior_StdSurface.ma")
+                #"Synthetic_Mesh_8M_Triangles_Deformed.mb")
         self.setHdStormRenderer()
         cmds.refresh(f=True)
+        
+        #This is to generate the cache
+        self.anim_perf('persp', 100, 1)
         
         StormFps = self.anim_perf()
         self.setViewport2Renderer()
