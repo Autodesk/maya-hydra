@@ -1,5 +1,79 @@
 # Changelog
 
+[v0.6.1] - 2024-04-05
+
+**Build:**
+* Create a unit test for translate, rotate, scale [#51](https://github.com/Autodesk/maya-hydra/pull/51)
+* Clean test files and separate interactive and non interactive tests [#50](https://github.com/Autodesk/maya-hydra/pull/50)
+* Add a test for Usd stages variants [#46](https://github.com/Autodesk/maya-hydra/pull/46)
+* Fix image diff test and skip failing test on OSX [#45](https://github.com/Autodesk/maya-hydra/pull/45)
+* Add unit test for maya lights [#52](https://github.com/Autodesk/maya-hydra/pull/52)
+* Adjust image diff threshold for testMayaLights [#55](https://github.com/Autodesk/maya-hydra/pull/55)
+* Add test for usd lights [#53](https://github.com/Autodesk/maya-hydra/pull/53)
+* Add test to cover arnold lights [#56](https://github.com/Autodesk/maya-hydra/pull/56)
+* Image-based NURBS unit test [#54](https://github.com/Autodesk/maya-hydra/pull/54)
+* Add test for standard surface [#59](https://github.com/Autodesk/maya-hydra/pull/59)
+* Maya is no longer using a Preview Release number [#63](https://github.com/Autodesk/maya-hydra/pull/63)
+* Image-based polygon primitives tests [#57](https://github.com/Autodesk/maya-hydra/pull/57)
+* Add test for look through camera&lights [#73](https://github.com/Autodesk/maya-hydra/pull/73)
+* Add Unit Test for Maya Display Modes [#74](https://github.com/Autodesk/maya-hydra/pull/74)
+* Curve tools unit tests [#60](https://github.com/Autodesk/maya-hydra/pull/60)
+* Add Unit Test for Isolate Select for Maya data [#78](https://github.com/Autodesk/maya-hydra/pull/78)
+* Add Unit Test for Maya Shading Modes [#77](https://github.com/Autodesk/maya-hydra/pull/77)
+* Add test for template and reference [#76](https://github.com/Autodesk/maya-hydra/pull/76)
+* Add Unit Test for Maya Display Layers [#83](https://github.com/Autodesk/maya-hydra/pull/83)
+* Add test for cover display & seleciton for object template [#81](https://github.com/Autodesk/maya-hydra/pull/81)
+* Add LookdevX support for test framework [#87](https://github.com/Autodesk/maya-hydra/pull/87)
+* Add test for payload & reference [#89](https://github.com/Autodesk/maya-hydra/pull/89)
+* Expose option to enable/disable MSAA for Storm renderer [#95](https://github.com/Autodesk/maya-hydra/pull/95)
+* Investigate why the tumbling performance of USD scene is slower than corresponding Maya Scene under Hydra Storm [#91](https://github.com/Autodesk/maya-hydra/pull/91)
+* Adjust image diff fail percent for shading modes test [#99](https://github.com/Autodesk/maya-hydra/pull/99)
+* Add picking test + Link C++ tests with Qt for UI/viewport interaction [#94](https://github.com/Autodesk/maya-hydra/pull/94)
+* Fix MtoA & LookdevX loading in tests + Related test improvements [#108](https://github.com/Autodesk/maya-hydra/pull/108)
+* Fix color management handling in tests [#110](https://github.com/Autodesk/maya-hydra/pull/110)
+* Create unit test to verify UVs/UDIMs are rendered accordingly with Maya data [#111](https://github.com/Autodesk/maya-hydra/pull/111)
+* Background color and grid tests [#112](https://github.com/Autodesk/maya-hydra/pull/112)
+* Fix coverage crashes in newly-added filtering scene indices [#114](https://github.com/Autodesk/maya-hydra/pull/114)
+
+**Features:**
+* Add mayaHydra plugin commands to query CPU/GPU memory usage [#102](https://github.com/Autodesk/maya-hydra/pull/102)
+* Implement basics of bounding box display style [#103](https://github.com/Autodesk/maya-hydra/pull/103)
+* Point instance picking support (no selection highlighting) [#105](https://github.com/Autodesk/maya-hydra/pull/105)
+* Native instance picking [#107](https://github.com/Autodesk/maya-hydra/pull/107)
+* Expose complexity settings in globalRenderSettings [#106](https://github.com/Autodesk/maya-hydra/pull/106)
+* USD pick with kind support, with test [#115](https://github.com/Autodesk/maya-hydra/pull/115)
+
+**Flow Viewport Toolkit:**
+* Use RootOverridesSceneIndex to simplify data producer scene indices [#64](https://github.com/Autodesk/maya-hydra/pull/64)
+* Fix Mayausd.mod file not being present in downloaded build [#68](https://github.com/Autodesk/maya-hydra/pull/68)
+* Add the FootPrint node as an Hydra example [#75](https://github.com/Autodesk/maya-hydra/pull/75)
+* Fix the crash when mayaHydra is not loaded and rename classes [#98](https://github.com/Autodesk/maya-hydra/pull/98)
+* Add a flow viewport toolkit API .md file [#97](https://github.com/Autodesk/maya-hydra/pull/97)
+
+**Miscellaneous:**
+* Move mayaUsd code for managing stages inside mayaHydra [#38](https://github.com/Autodesk/maya-hydra/pull/38)
+* Add code coverage build support [#65](https://github.com/Autodesk/maya-hydra/pull/65)
+* Add mtoa download support in maya hydra [#71](https://github.com/Autodesk/maya-hydra/pull/71)
+* Maya MaterialX material bindings on Maya geometry [#72](https://github.com/Autodesk/maya-hydra/pull/72)
+* Updating changelog for v0.6.0 (#49) [#80](https://github.com/Autodesk/maya-hydra/pull/80)
+* Made proxy shape scene index prefixes unique, and support rename / reparent [#84](https://github.com/Autodesk/maya-hydra/pull/84)
+* Update maya-hydra-preflight-launcher.yml [#67](https://github.com/Autodesk/maya-hydra/pull/67)
+* Update maya-hydra-new-issues.yml [#66](https://github.com/Autodesk/maya-hydra/pull/66)
+* Try to fix rpath issue [#96](https://github.com/Autodesk/maya-hydra/pull/96)
+* Remove SceneDelegate code path [#100](https://github.com/Autodesk/maya-hydra/pull/100)
+* Remove Maya Hydra Scene Producer wrapper [#101](https://github.com/Autodesk/maya-hydra/pull/101)
+
+**Bugfix:**
+* Filtering scene index example can have prims get unfiltered at the wrong location [#42](https://github.com/Autodesk/maya-hydra/pull/42)
+* Fix code coverage build issue [#104](https://github.com/Autodesk/maya-hydra/pull/104)
+* Avoid Maya Hydra registration for mayaUsdPlugin if not loaded [#109](https://github.com/Autodesk/maya-hydra/pull/109)
+* Fix reload of a scene with a Usd stage [#113](https://github.com/Autodesk/maya-hydra/pull/113)
+
+**Documentation:**
+* Added code coverage documentation [#70](https://github.com/Autodesk/maya-hydra/pull/70)
+* Readme.md update [#82](https://github.com/Autodesk/maya-hydra/pull/82)
+* Minor code coverage documentation fixes [#86](https://github.com/Autodesk/maya-hydra/pull/86)
+
 ## [v0.6.0] - 2024-01-29
 
 **Build:**
