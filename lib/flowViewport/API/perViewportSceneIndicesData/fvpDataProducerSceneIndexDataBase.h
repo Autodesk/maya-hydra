@@ -88,8 +88,8 @@ public:
     /// Provide the node name from the DCC to be overriden in a DCC specific subclass
     virtual std::string GetDCCNodeName() const {return "";}
 
-    void UpdateVisibilityFromDCCNode(bool isVisible);
-    void UpdateHydraTransformFromParentPath();
+    void SetVisibility(bool isVisible);
+    void SetTransform(const GfMatrix4d& transformMatrix);
 
 protected:
 
@@ -118,9 +118,6 @@ protected:
     
     /// Is the last scene index of the scene index chain when a dccNode was passed.
     HdSceneIndexBaseRefPtr              _lastSceneIndexChain = nullptr;
-    
-    /// Is the world matrix of the scene index. It is used only when a dccNode was passed to override the transform of the root of the scene index.
-    GfMatrix4d                          _parentMatrix;
     
     /// _rootOverridesSceneIndex is used to set a transform and visibility at the root of the Usd stage/data producer scene index. It is used only when a dccNode was passed.
     /// With this scene index when you select the proxyshape node and move it or hide it, we apply the same operation on the stage, same for a data producer scene index with a hosting node.

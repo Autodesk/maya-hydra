@@ -18,11 +18,13 @@
 
 //Flow viewport headers
 #include <flowViewport/API/perViewportSceneIndicesData/fvpDataProducerSceneIndexDataBase.h>
+#include "ufeExtensions/Global.h"
 
 //Maya headers
 #include <maya/MDagPath.h>
 #include <maya/MObjectHandle.h>
 #include <maya/MNodeMessage.h>
+#include <maya/MDagMessage.h>
 #include <maya/MCallbackIdArray.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -50,32 +52,26 @@ public:
     ///Destructor
     ~MayaDataProducerSceneIndexData() override;
     
-    /// Get the MObject handle
-    const MObjectHandle& getObjHandle()const {return _mObjHandle;}  
-
     /// Provide the node name from maya
     std::string GetDCCNodeName() const override;
 
-    ///Update transform from maya node
-    void UpdateTransformFromMayaNode();
-   
 private:
     MayaDataProducerSceneIndexData(const FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params);
     MayaDataProducerSceneIndexData(FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParametersForUsdStage& params);
     
-    void CreateNodeCallbacks();
-    void _CopyMayaNodeTransform();
+    void SetupUfeObservation();
 
-    //The following members are optional and used only when a dccNode was passed in the constructor of DataProducerSceneIndexDataBase
-    
-    /// Is the MObjectHandle of the maya node shape, it may be invalid if no maya node MObject pointer was passed.
-    MObjectHandle                       _mObjHandle;
-    /// Is the dag path of the Maya node passed in AppendSceneIndex. It is used only when a dccNode was passed.
-    MDagPath                            _mayaNodeDagPath;
-    /// Are the callbacks Ids set in maya to forward the changes done in maya on the data producer scene index.
-    MCallbackIdArray                    _nodeMessageCallbackIds;
-    /// Are the callbacks Ids set in maya to handle delete and deletion undo/redo
-    MCallbackIdArray                    _dGMessageCallbackIds;
+    void UpdateTransform();
+    void UpdateVisibility();
+
+    // Path to the data producer, if it was added through a scene item
+    std::optional<Ufe::Path> _path;
+
+    // To observe changes to the data producer scene item, if it exists
+    Ufe::PathSubject::Ptr    _pathSubject;
+    Ufe::Observer::Ptr       _notificationsHandler;
+
+    class UfeNotificationsHandler;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

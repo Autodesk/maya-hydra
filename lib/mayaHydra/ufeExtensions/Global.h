@@ -25,6 +25,15 @@
 #include <maya/MDagPath.h>
 #include <ufe/path.h>
 #include <ufe/pathSegment.h>
+#include <ufe/sceneNotification.h>
+#include <ufe/transform3dPathSubject.h>
+#include <ufe/hierarchy.h>
+#include <ufe/attributes.h>
+#include <ufe/scene.h>
+#include <ufe/object3d.h>
+#include <ufe/transform3d.h>
+#include <ufe/transform3dNotification.h>
+#include <ufe/object3dNotification.h>
 #include <ufe/rtid.h>
 
 #include <ufeExtensions/api.h>
