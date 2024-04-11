@@ -195,7 +195,7 @@ public:
         const size_t numFacesVertices = mesh.numFaceVertices();
         MFloatVectorArray mayaTangents;
         mesh.getTangents(mayaTangents);
-        const int tangentsCount = mayaTangents.length();
+        const size_t tangentsCount = mayaTangents.length();
         if (0 == tangentsCount){
             return {};
         }
