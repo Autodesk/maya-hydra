@@ -29,7 +29,7 @@ FilteringSceneIndexDataBase::FilteringSceneIndexDataBase(const std::shared_ptr<:
 {
 }
 
-void FilteringSceneIndexDataBase::updateVisibilityFromDCCNode(bool isVisible) 
+void FilteringSceneIndexDataBase::SetVisibility(bool isVisible)
 {
     _isVisible = isVisible;
     const std::string& rendererNames = _client->getRendererNames();

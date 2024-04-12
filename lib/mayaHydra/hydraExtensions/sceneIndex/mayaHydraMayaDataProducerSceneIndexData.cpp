@@ -54,19 +54,19 @@ private:
 MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(const FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params) 
     : FVP_NS_DEF::DataProducerSceneIndexDataBase(params)
 {
-    SetupUfeObservation();
+    if (_dccNode) {
+        SetupUfeObservation(_dccNode);
+    }
     _CreateSceneIndexChainForDataProducerSceneIndex();
 }
 
 MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParametersForUsdStage& params) 
     : FVP_NS_DEF::DataProducerSceneIndexDataBase(params)
 {
-    SetupUfeObservation();
+    if (_dccNode) {
+        SetupUfeObservation(_dccNode);
+    }
     _CreateSceneIndexChainForUsdStageSceneIndex(params);
-}
-
-MayaDataProducerSceneIndexData::~MayaDataProducerSceneIndexData()
-{
 }
 
 std::string MayaDataProducerSceneIndexData::GetDCCNodeName() const
@@ -79,11 +79,11 @@ std::string MayaDataProducerSceneIndexData::GetDCCNodeName() const
     return nodeName;
 }
 
-void MayaDataProducerSceneIndexData::SetupUfeObservation() 
+void MayaDataProducerSceneIndexData::SetupUfeObservation(void* dccNode)
 { 
-    // If the data producer is based on a Maya node, monitor changes to the node to reflect them on the data producer scene index.
-    if (_dccNode) {
-        MObject* mObject = reinterpret_cast<MObject*>(_dccNode);
+    // If the data producer is based on a scene item, monitor changes to it to reflect them on the data producer scene index.
+    if (dccNode) {
+        MObject* mObject = reinterpret_cast<MObject*>(dccNode);
         MDagPath dagPath;
         MDagPath::getAPathTo(*mObject, dagPath);
         dagPath.extendToShape();

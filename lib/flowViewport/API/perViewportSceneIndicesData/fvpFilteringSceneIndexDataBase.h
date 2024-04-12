@@ -41,10 +41,10 @@ public:
 
     ~FilteringSceneIndexDataBase() override = default;
     
-    void updateVisibilityFromDCCNode(bool isVisible);
-    std::shared_ptr<::Fvp::FilteringSceneIndexClient> getClient() {return _client;}
-    bool getVisible() const{return _isVisible;}
-    void setVisible(bool visible) {_isVisible = visible;}
+    std::shared_ptr<::Fvp::FilteringSceneIndexClient> GetClient() {return _client;}
+
+    bool GetVisibility() { return _isVisible; }
+    void SetVisibility(bool isVisible);
 
 protected:
     FilteringSceneIndexDataBase(const std::shared_ptr<::Fvp::FilteringSceneIndexClient>& filteringSIClient);

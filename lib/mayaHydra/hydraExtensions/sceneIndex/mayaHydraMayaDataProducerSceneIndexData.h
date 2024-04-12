@@ -50,7 +50,7 @@ public:
     }
 
     ///Destructor
-    ~MayaDataProducerSceneIndexData() override;
+    ~MayaDataProducerSceneIndexData() override = default;
     
     /// Provide the node name from maya
     std::string GetDCCNodeName() const override;
@@ -59,12 +59,12 @@ private:
     MayaDataProducerSceneIndexData(const FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params);
     MayaDataProducerSceneIndexData(FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParametersForUsdStage& params);
     
-    void SetupUfeObservation();
+    void SetupUfeObservation(void* dccNode);
 
     void UpdateTransform();
     void UpdateVisibility();
 
-    // Path to the data producer, if it was added through a scene item
+    // Path to the scene item, if it was added as one
     std::optional<Ufe::Path> _path;
 
     // To observe changes to the data producer scene item, if it exists
