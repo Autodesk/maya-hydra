@@ -80,8 +80,9 @@ std::string MayaDataProducerSceneIndexData::GetDCCNodeName() const
 }
 
 void MayaDataProducerSceneIndexData::SetupUfeObservation(void* dccNode)
-{ 
-    // If the data producer is based on a scene item, monitor changes to it to reflect them on the data producer scene index.
+{
+    // If the data producer is based on a scene item, monitor changes to it to reflect them on the
+    // data producer scene index.
     if (dccNode) {
         MObject* mObject = reinterpret_cast<MObject*>(dccNode);
         MDagPath dagPath;
@@ -93,17 +94,17 @@ void MayaDataProducerSceneIndexData::SetupUfeObservation(void* dccNode)
         _pathSubject = std::make_shared<Ufe::Transform3dPathSubject>(_path.value());
         _notificationsHandler = std::make_shared<UfeNotificationsHandler>(*this);
 
-        Ufe::Scene::instance().addObserver(_notificationsHandler); // For hierarchy changes (reparent/add/delete)
-        Ufe::Object3d::addObserver(_notificationsHandler); // For visibility changes
-        _pathSubject->addObserver(_notificationsHandler); // For transform changes
+        Ufe::Scene::instance().addObserver(_notificationsHandler); // For hierarchy changes
+        Ufe::Object3d::addObserver(_notificationsHandler);         // For visibility changes
+        _pathSubject->addObserver(_notificationsHandler);          // For transform changes
 
         UpdateTransform();
         UpdateVisibility();
     }
 }
 
-void MayaDataProducerSceneIndexData::UpdateTransform() 
-{ 
+void MayaDataProducerSceneIndexData::UpdateTransform()
+{
     if (!_path.has_value()) {
         return;
     }
@@ -112,7 +113,10 @@ void MayaDataProducerSceneIndexData::UpdateTransform()
         return;
     }
     GfMatrix4d transformMatrix;
-    std::memcpy(transformMatrix.GetArray(), transform->inclusiveMatrix().matrix.data(), sizeof(double) * 4 * 4);
+    std::memcpy(
+        transformMatrix.GetArray(),
+        transform->inclusiveMatrix().matrix.data(),
+        sizeof(double) * 4 * 4);
     SetTransform(transformMatrix);
 }
 
@@ -138,20 +142,26 @@ void MayaDataProducerSceneIndexData::UfeNotificationsHandler::operator()(const U
     // We're processing UFE notifications, which implies that a path must be in use.
     TF_AXIOM(_dataProducer._path.has_value());
 
-    const Ufe::Transform3dChanged* transformChangedNotif = dynamic_cast<const Ufe::Transform3dChanged*>(&notification);
-    if (transformChangedNotif != nullptr && _dataProducer._path.value().startsWith(transformChangedNotif->item()->path())) {
+    const Ufe::Transform3dChanged* transformChangedNotif
+        = dynamic_cast<const Ufe::Transform3dChanged*>(&notification);
+    if (transformChangedNotif != nullptr
+        && _dataProducer._path.value().startsWith(transformChangedNotif->item()->path())) {
         _dataProducer.UpdateTransform();
         return;
     }
 
-    const Ufe::VisibilityChanged* visibilityChangedNotif = dynamic_cast<const Ufe::VisibilityChanged*>(&notification);
-    if (visibilityChangedNotif != nullptr && _dataProducer._path.value().startsWith(visibilityChangedNotif->path())) {
+    const Ufe::VisibilityChanged* visibilityChangedNotif
+        = dynamic_cast<const Ufe::VisibilityChanged*>(&notification);
+    if (visibilityChangedNotif != nullptr
+        && _dataProducer._path.value().startsWith(visibilityChangedNotif->path())) {
         _dataProducer.UpdateVisibility();
         return;
     }
 
-    const Ufe::SceneChanged* sceneChangedNotif = dynamic_cast<const Ufe::SceneChanged*>(&notification);
-    if (sceneChangedNotif != nullptr && _dataProducer._path.value().startsWith(sceneChangedNotif->changedPath())) {
+    const Ufe::SceneChanged* sceneChangedNotif
+        = dynamic_cast<const Ufe::SceneChanged*>(&notification);
+    if (sceneChangedNotif != nullptr
+        && _dataProducer._path.value().startsWith(sceneChangedNotif->changedPath())) {
         handleSceneChanged(*sceneChangedNotif);
         return;
     }
@@ -166,48 +176,42 @@ void MayaDataProducerSceneIndexData::UfeNotificationsHandler::handleSceneChanged
     auto handleSingleOperation = [&](const Ufe::SceneCompositeNotification::Op& sceneOperation) -> void {
         // We're processing UFE notifications, which implies that a path must be in use.
         TF_AXIOM(_dataProducer._path.has_value());
-        
+
         if (!_dataProducer._path.value().startsWith(sceneOperation.path)) {
             // This notification does not relate to our parent hierarchy, so we have nothing to do.
             return;
         }
 
         switch (sceneOperation.opType) {
-            case Ufe::SceneChanged::ObjectAdd:
+        case Ufe::SceneChanged::ObjectAdd:
+            _dataProducer.UpdateTransform();
+            _dataProducer.UpdateVisibility();
+            break;
+        case Ufe::SceneChanged::ObjectDelete: _dataProducer.SetVisibility(false); break;
+        case Ufe::SceneChanged::ObjectPathChange:
+            switch (sceneOperation.subOpType) {
+            case Ufe::ObjectPathChange::None: break;
+            case Ufe::ObjectPathChange::ObjectRename:
+                _dataProducer._path = _dataProducer._path.value().replaceComponent(
+                    sceneOperation.item->path().size() - 1, sceneOperation.item->path().back());
+                break;
+            case Ufe::ObjectPathChange::ObjectReparent:
+                _dataProducer._path = _dataProducer._path.value().reparent(sceneOperation.path, sceneOperation.item->path());
                 _dataProducer.UpdateTransform();
                 _dataProducer.UpdateVisibility();
                 break;
-            case Ufe::SceneChanged::ObjectDelete:
-                _dataProducer.SetVisibility(false);
+            case Ufe::ObjectPathChange::ObjectPathAdd:
+                TF_WARN("Instancing is not supported for this item.");
                 break;
-            case Ufe::SceneChanged::ObjectPathChange:
-                switch (sceneOperation.subOpType) {
-                    case Ufe::ObjectPathChange::None:
-                        break;
-                    case Ufe::ObjectPathChange::ObjectRename:
-                        _dataProducer._path = _dataProducer._path.value().replaceComponent(
-                            sceneOperation.item->path().size() - 1,
-                            sceneOperation.item->path().back());
-                        break;
-                    case Ufe::ObjectPathChange::ObjectReparent:
-                        _dataProducer._path = _dataProducer._path.value().reparent(sceneOperation.path, sceneOperation.item->path());
-                        _dataProducer.UpdateTransform();
-                        _dataProducer.UpdateVisibility();
-                        break;
-                    case Ufe::ObjectPathChange::ObjectPathAdd:
-                        TF_WARN("Instancing is not supported for this item.");
-                        break;
-                    case Ufe::ObjectPathChange::ObjectPathRemove:
-                        TF_WARN("Instancing is not supported for this item.");
-                        break;
-                }
+            case Ufe::ObjectPathChange::ObjectPathRemove:
+                TF_WARN("Instancing is not supported for this item.");
                 break;
-            case Ufe::SceneChanged::SubtreeInvalidate:
-                _dataProducer.SetVisibility(false);
-                break;
-            case Ufe::SceneChanged::SceneCompositeNotification:
-                TF_CODING_ERROR("SceneCompositeNotification cannot be turned into an Op.");
-                break;
+            }
+            break;
+        case Ufe::SceneChanged::SubtreeInvalidate: _dataProducer.SetVisibility(false); break;
+        case Ufe::SceneChanged::SceneCompositeNotification:
+            TF_CODING_ERROR("SceneCompositeNotification cannot be turned into an Op.");
+            break;
         }
     };
     if (sceneChanged.opType() == Ufe::SceneChanged::SceneCompositeNotification) {

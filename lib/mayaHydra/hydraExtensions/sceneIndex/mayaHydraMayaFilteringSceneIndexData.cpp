@@ -51,9 +51,9 @@ private:
 MayaFilteringSceneIndexData::MayaFilteringSceneIndexData(const std::shared_ptr<::FVP_NS_DEF::FilteringSceneIndexClient>& client)
 : PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBase(client)
 {
-    //If a maya node is present in client.getDccNode(), add callbacks to handle node deleted/undo/redo and hide/unhide
+    // If a Maya node is present in client->getDccNode(), add callbacks to handle node added/deleted/reparented/renamed and hide/unhide
     void* dccNode = client->getDccNode();
-    if (dccNode){
+    if (dccNode) {
         SetupUfeObservation(dccNode);
     }
 }
@@ -72,8 +72,8 @@ void MayaFilteringSceneIndexData::SetupUfeObservation(void* dccNode)
 
         _notificationsHandler = std::make_shared<UfeNotificationsHandler>(*this);
 
-        Ufe::Scene::instance().addObserver(_notificationsHandler); // For hierarchy changes (reparent/add/delete)
-        Ufe::Object3d::addObserver(_notificationsHandler); // For visibility changes
+        Ufe::Scene::instance().addObserver(_notificationsHandler); // For hierarchy changes
+        Ufe::Object3d::addObserver(_notificationsHandler);         // For visibility changes
 
         UpdateVisibility();
     }
@@ -138,9 +138,7 @@ void MayaFilteringSceneIndexData::UfeNotificationsHandler::handleSceneChanged(
         }
 
         switch (sceneOperation.opType) {
-        case Ufe::SceneChanged::ObjectAdd:
-            _filteringData.UpdateVisibility();
-            break;
+        case Ufe::SceneChanged::ObjectAdd: _filteringData.UpdateVisibility(); break;
         case Ufe::SceneChanged::ObjectDelete: _filteringData.SetVisibility(false); break;
         case Ufe::SceneChanged::ObjectPathChange:
             switch (sceneOperation.subOpType) {
@@ -178,4 +176,3 @@ void MayaFilteringSceneIndexData::UfeNotificationsHandler::handleSceneChanged(
         handleSingleOperation(sceneChanged);
     }
 }
-
