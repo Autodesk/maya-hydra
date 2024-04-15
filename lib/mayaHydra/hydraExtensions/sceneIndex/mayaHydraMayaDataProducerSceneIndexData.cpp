@@ -116,7 +116,7 @@ void MayaDataProducerSceneIndexData::UpdateTransform()
     std::memcpy(
         transformMatrix.GetArray(),
         transform->inclusiveMatrix().matrix.data(),
-        sizeof(double) * 4 * 4);
+        sizeof(decltype(transformMatrix)::ScalarType) * transformMatrix.numRows * transformMatrix.numColumns);
     SetTransform(transformMatrix);
 }
 
