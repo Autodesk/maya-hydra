@@ -1096,7 +1096,7 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
             || MHWRender::MGeometry::Primitive::kLineStrip == renderItemAdapter->GetPrimitive()) {
             return _fallbackMaterial;
         }
-        else if (_useDefaultMaterial) {            
+        else if (_useDefaultMaterial) {
             return _mayaDefaultMaterialPath;
         }
         auto& material = renderItemAdapter->GetMaterial();
@@ -1111,6 +1111,9 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
     }
 
     if (useMeshAdapter()) {
+        if (_useDefaultMaterial) {
+            return _mayaDefaultMaterialPath;
+        }
         auto shapeAdapter = TfMapLookupPtr(_shapeAdapters, id);
         if (shapeAdapter == nullptr) {
             return _fallbackMaterial;
