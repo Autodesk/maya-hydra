@@ -200,7 +200,7 @@ public:
 
     bool GetPlaybackRunning() const;
 
-    void AddDefaultMaterial(bool useDefMaterial);
+    void SetDefaultMaterial(bool useDefMaterial);
 
     SdfPath SceneIndexPath(const Ufe::Path& appPath) const override;
 

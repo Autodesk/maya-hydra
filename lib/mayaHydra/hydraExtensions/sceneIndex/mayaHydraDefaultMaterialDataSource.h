@@ -1,5 +1,5 @@
 //
-// Copyright 2023 Autodesk, Inc. All rights reserved.
+// Copyright 2024 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 class MayaHydraSceneIndex;
 
 /**
- * \brief A container data source representing data unique to light
+ * \brief A container data source representing a default material with USDPreviewSurface
  */
  class MayaHydraDefaultMaterialDataSource : public HdContainerDataSource
 {

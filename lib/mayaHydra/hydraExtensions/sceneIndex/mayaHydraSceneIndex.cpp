@@ -39,7 +39,6 @@
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
-#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexUtils.h>
 
 #include <ufeExtensions/Global.h>
 
@@ -732,7 +731,7 @@ LightDagPathMap MayaHydraSceneIndex::_GetGlobalLightPaths() const
 }
 
 
-void MayaHydraSceneIndex::AddDefaultMaterial(bool useDefMaterial)
+void MayaHydraSceneIndex::SetDefaultMaterial(bool useDefMaterial)
 {
     if (useDefMaterial) {
         auto mayaDefaultMaterialDataSource = MayaHydraDefaultMaterialDataSource::New(_mayaDefaultMaterialPath, HdPrimTypeTokens->material, this);
@@ -748,7 +747,7 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         = (context.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
     if (useDefaultMaterial != _useDefaultMaterial) {
         _useDefaultMaterial = useDefaultMaterial;
-        AddDefaultMaterial(_useDefaultMaterial);
+        SetDefaultMaterial(_useDefaultMaterial);
         if (useMeshAdapter()) {
             for (const auto& shape : _shapeAdapters)
                 shape.second->MarkDirty(HdChangeTracker::DirtyMaterialId);
@@ -761,8 +760,6 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         for (auto& matAdapter : _materialAdapters)
             matAdapter.second->EnableXRayShadingMode(_xRayEnabled);
     }
-    
-    std::cout <<"\n_xRayEnabled is: " << _xRayEnabled;
     if (!_materialTagsChanged.empty()) {
         if (IsHdSt()) {
             for (const auto& id : _materialTagsChanged) {
@@ -973,7 +970,6 @@ void MayaHydraSceneIndex::InsertPrim(
     // Therefore, insert missing ancestors ourselves, with a non-null data
     // source and empty type.
     _AddPrimAncestors(id);
-
     AddPrims({ { id, typeId, dataSource } });
 }
 
@@ -1095,10 +1091,6 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
 
 SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
 {
-    if (_useDefaultMaterial) {
-        return _mayaDefaultMaterialPath;
-    }
-
     auto result = TfMapLookupPtr(_renderItemsAdapters, id);
     if (result != nullptr) {
         auto& renderItemAdapter = *result;
@@ -1108,7 +1100,9 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
             || MHWRender::MGeometry::Primitive::kLineStrip == renderItemAdapter->GetPrimitive()) {
             return _fallbackMaterial;
         }
-
+        else if (_useDefaultMaterial) {            
+            return _mayaDefaultMaterialPath;
+        }
         auto& material = renderItemAdapter->GetMaterial();
 
         if (material == kInvalidMaterial) {
