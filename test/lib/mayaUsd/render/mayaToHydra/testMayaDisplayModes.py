@@ -34,7 +34,7 @@ class TestMayaDisplayModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
         # open simple Maya scene
         testFile = mayaUtils.openTestScene(
                 "testMayaDisplayModes",
-                "testMayaDisplayModes.ma")
+                "testMayaDisplayModes.ma", useTestSettings=False)
         cmds.refresh()
         panel = mayaUtils.activeModelPanel()
         
