@@ -360,6 +360,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((MayaDefaultMaterial, "__maya_default_material__"))
     (diffuseColor)
     (emissiveColor)
+    (opacity)
     (roughness)
     (MayaHydraMeshPoints)
     (constantLighting)
@@ -585,7 +586,7 @@ void MayaHydraSceneIndex::SetDefaultLight(const GlfSimpleLight& light)
 
 VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
 {
-    if (id == _mayaDefaultMaterialPath) {
+    if (id == _mayaDefaultMaterialPath) {    
         return _mayaDefaultMaterial;
     }
 
@@ -612,6 +613,9 @@ VtValue MayaHydraSceneIndex::CreateMayaDefaultMaterial()
     node.parameters.insert(
         { _tokens->diffuseColor,
           VtValue(GfVec3f(kDefaultGrayColor[0], kDefaultGrayColor[1], kDefaultGrayColor[2])) });
+    node.parameters.insert(
+        { _tokens->opacity,
+          VtValue(float(1.0f))});
     network.nodes.push_back(std::move(node));
     networkMap.map.insert({ HdMaterialTerminalTokens->surface, std::move(network) });
     networkMap.terminals.push_back(_mayaDefaultMaterialPath);
@@ -702,12 +706,24 @@ LightDagPathMap MayaHydraSceneIndex::_GetGlobalLightPaths() const
     return allLightPaths;
 }
 
+
+void MayaHydraSceneIndex::AddDefaultMaterial(bool useDefMaterial)
+{
+    if (useDefMaterial) {
+        auto mayaDefaultMaterialDataSource = MayaHydraDefaultMaterialDataSource::New(_mayaDefaultMaterialPath, HdPrimTypeTokens->material, this);
+        AddPrims({ { _mayaDefaultMaterialPath, HdPrimTypeTokens->material, mayaDefaultMaterialDataSource } });
+    }
+    else
+        RemovePrim(_mayaDefaultMaterialPath);
+}
+
 void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
 {
     bool useDefaultMaterial
         = (context.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
     if (useDefaultMaterial != _useDefaultMaterial) {
         _useDefaultMaterial = useDefaultMaterial;
+        AddDefaultMaterial(_useDefaultMaterial);
         if (useMeshAdapter()) {
             for (const auto& shape : _shapeAdapters)
                 shape.second->MarkDirty(HdChangeTracker::DirtyMaterialId);

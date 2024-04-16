@@ -32,6 +32,7 @@
 #include <mayaHydraLib/adapters/lightAdapter.h>
 #include <mayaHydraLib/adapters/cameraAdapter.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDefaultLightDataSource.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraDefaultMaterialDataSource.h>
 
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
 
@@ -198,6 +199,8 @@ public:
     bool IsHdSt() const { return _isHdSt; }
 
     bool GetPlaybackRunning() const;
+
+    void AddDefaultMaterial(bool useDefMaterial);
 
     SdfPath SceneIndexPath(const Ufe::Path& appPath) const override;
 

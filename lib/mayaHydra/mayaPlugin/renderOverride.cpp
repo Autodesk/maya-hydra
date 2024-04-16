@@ -1049,6 +1049,8 @@ MStatus MtohRenderOverride::Render(
     const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
     MayaHydraParams delegateParams = _globals.delegateParams;
     delegateParams.displaySmoothMeshes = !(currentDisplayStyle & MHWRender::MFrameContext::kFlatShaded);
+    
+    bool currentUseDefaultMaterial = (drawContext.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
 
     if (_mayaHydraSceneIndex) {
         _mayaHydraSceneIndex->SetDefaultLightEnabled(_hasDefaultLighting);
@@ -1056,7 +1058,8 @@ MStatus MtohRenderOverride::Render(
         _mayaHydraSceneIndex->SetParams(delegateParams);
         _mayaHydraSceneIndex->PreFrame(drawContext);
 
-        if (NeedToRecreateTheSceneIndicesChain(currentDisplayStyle, _oldDisplayStyle)){
+
+        if (NeedToRecreateTheSceneIndicesChain(currentDisplayStyle, _oldDisplayStyle) || _useDefaultMaterial != currentUseDefaultMaterial){
             //We need to recreate the filtering scene index chain after the merging scene index as there was a change such as in the BBox display style which has been turned on or off.
             _lastFilteringSceneIndexBeforeCustomFiltering = nullptr;//Release
             _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
@@ -1073,6 +1076,8 @@ MStatus MtohRenderOverride::Render(
             }
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(panelName.asChar()), cameraName);
             manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
+            
+            _useDefaultMaterial = currentUseDefaultMaterial;
         }
     }
 

@@ -11,6 +11,7 @@ target_sources(${TARGET_NAME}
     mayaHydraCameraDataSource.cpp
     mayaHydraLightDataSource.cpp
     mayaHydraDefaultLightDataSource.cpp
+    mayaHydraDefaultMaterialDataSource.cpp
     mayaHydraMayaDataProducerSceneIndexData.cpp
     mayaHydraMayaDataProducerSceneIndexDataConcreteFactory.cpp
     mayaHydraSceneIndexDataFactoriesSetup.cpp
@@ -27,7 +28,9 @@ set(HEADERS
     mayaHydraDisplayStyleDataSource.h
     mayaHydraCameraDataSource.h
     mayaHydraLightDataSource.h
+    mayaHydraSceneIndexUtils.h
     mayaHydraDefaultLightDataSource.h
+    mayaHydraDefaultMaterialDataSource.h
     mayaHydraMayaDataProducerSceneIndexData.h
     mayaHydraMayaDataProducerSceneIndexDataConcreteFactory.h
     mayaHydraSceneIndexDataFactoriesSetup.h
