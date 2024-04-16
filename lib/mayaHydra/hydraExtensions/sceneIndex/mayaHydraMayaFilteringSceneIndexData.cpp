@@ -23,14 +23,6 @@
 //flow viewport headers
 #include <flowViewport/API/fvpFilteringSceneIndexClient.h>
 
-//Maya headers
-#include <maya/MDGMessage.h>
-#include <maya/MFnDependencyNode.h>
-#include <maya/MFnAttribute.h>
-#include <maya/MStringArray.h>
-#include <maya/MPlug.h>
-#include <maya/MDagPath.h>
-
 PXR_NAMESPACE_USING_DIRECTIVE
 
 class MayaFilteringSceneIndexData::UfeNotificationsHandler : public Ufe::Observer

@@ -18,14 +18,9 @@
 
 //Flow viewport headers
 #include <flowViewport/API/perViewportSceneIndicesData/fvpDataProducerSceneIndexDataBase.h>
-#include "ufeExtensions/Global.h"
 
-//Maya headers
-#include <maya/MDagPath.h>
-#include <maya/MObjectHandle.h>
-#include <maya/MNodeMessage.h>
-#include <maya/MDagMessage.h>
-#include <maya/MCallbackIdArray.h>
+// UFE headers
+#include "ufeExtensions/Global.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 

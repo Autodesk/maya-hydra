@@ -20,12 +20,9 @@
 #include <flowViewport/API/fvpFilteringSceneIndexClientFwd.h>
 #include <flowViewport/API/fvpFilteringSceneIndexInterface.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndexDataBase.h>
-#include "ufeExtensions/Global.h"
 
-//Maya headers
-#include <maya/MObjectHandle.h>
-#include <maya/MNodeMessage.h>
-#include <maya/MCallbackIdArray.h>
+// UFE headers
+#include "ufeExtensions/Global.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 

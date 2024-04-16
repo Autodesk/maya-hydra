@@ -23,17 +23,6 @@
 #include "mayaHydraLib/hydraUtils.h"
 #include "mayaHydraLib/mayaUtils.h"
 
-//Maya headers
-#include <maya/MMatrix.h>
-#include <maya/MDGMessage.h>
-#include <maya/MDagMessage.h>
-#include <maya/MDagPath.h>
-#include <maya/MDagPathArray.h>
-#include <maya/MFnDependencyNode.h>
-#include <maya/MStringArray.h>
-#include <maya/MFnAttribute.h>
-#include <maya/MPlug.h>
-
 PXR_NAMESPACE_USING_DIRECTIVE
 
 class MayaDataProducerSceneIndexData::UfeNotificationsHandler : public Ufe::Observer
