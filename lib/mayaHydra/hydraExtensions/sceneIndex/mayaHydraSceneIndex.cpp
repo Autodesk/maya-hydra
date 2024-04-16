@@ -39,6 +39,7 @@
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexUtils.h>
 
 #include <ufeExtensions/Global.h>
 
@@ -584,9 +585,33 @@ void MayaHydraSceneIndex::SetDefaultLight(const GlfSimpleLight& light)
     }
 }
 
+void modifyDefaultMaterialOpacity(HdMaterialNetworkMap& materialNetworkMap, bool xrayEnabled) {
+    
+    // Hardcoded value taken from OGSMayaRenderItem::UpdateExtraOpacityParam
+    constexpr float xRayOpacityValue = 0.3f;
+    const TfToken _opacityToken("opacity");
+    for (auto &iter: materialNetworkMap.map) {
+        HdMaterialNetwork &hdNetwork = iter.second;
+        if (hdNetwork.nodes.empty())      
+            continue;
+        for (HdMaterialNode &node : hdNetwork.nodes) {
+            const auto it = node.parameters.find(_opacityToken);
+            if (it != node.parameters.cend()) {
+                if (xrayEnabled)
+                    node.parameters[_opacityToken] = xRayOpacityValue;
+                else
+                    node.parameters[_opacityToken] = 1.f;;
+            }
+        }
+    }
+}
+
 VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
 {
-    if (id == _mayaDefaultMaterialPath) {    
+    if (id == _mayaDefaultMaterialPath) {
+        modifyDefaultMaterialOpacity(
+            const_cast<HdMaterialNetworkMap&>(_mayaDefaultMaterial.UncheckedGet<HdMaterialNetworkMap>()),
+            _xRayEnabled);
         return _mayaDefaultMaterial;
     }
 
@@ -736,7 +761,8 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         for (auto& matAdapter : _materialAdapters)
             matAdapter.second->EnableXRayShadingMode(_xRayEnabled);
     }
-
+    
+    std::cout <<"\n_xRayEnabled is: " << _xRayEnabled;
     if (!_materialTagsChanged.empty()) {
         if (IsHdSt()) {
             for (const auto& id : _materialTagsChanged) {
