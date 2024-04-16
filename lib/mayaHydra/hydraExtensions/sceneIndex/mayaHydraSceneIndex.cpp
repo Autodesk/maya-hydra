@@ -595,12 +595,8 @@ void modifyDefaultMaterialOpacity(HdMaterialNetworkMap& materialNetworkMap, bool
             continue;
         for (HdMaterialNode &node : hdNetwork.nodes) {
             const auto it = node.parameters.find(_opacityToken);
-            if (it != node.parameters.cend()) {
-                if (xrayEnabled)
-                    node.parameters[_opacityToken] = xRayOpacityValue;
-                else
-                    node.parameters[_opacityToken] = 1.f;;
-            }
+            if (it != node.parameters.cend()) 
+                node.parameters[_opacityToken] = xrayEnabled ? xRayOpacityValue : 1.f;
         }
     }
 }
