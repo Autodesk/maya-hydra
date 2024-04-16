@@ -233,7 +233,7 @@ createNode materialInfo -n "materialInfo1";
 	rename -uid "7A353D3A-4CE0-1AA9-B650-97B907DB1314";
 createNode file -n "file2";
 	rename -uid "024402E0-4F08-CE4B-8A38-2194E8643C1A";
-	setAttr ".ftn" -type "string" "D:/repos/mayaHydra/ecg-maya-hydra/maya-hydra/test/testSamples/testMayaDisplayModes/diffuse.png";
+	setAttr ".ftn" -type "string" "./diffuse.png";
 	setAttr ".cs" -type "string" "sRGB";
 createNode place2dTexture -n "place2dTexture2";
 	rename -uid "8C4D244C-4C70-F0D0-007B-139D0D202499";
