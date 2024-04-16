@@ -75,7 +75,11 @@ void MayaFilteringSceneIndexData::SetupUfeObservation(void* dccNode)
         Ufe::Scene::instance().addObserver(_notificationsHandler); // For hierarchy changes
         Ufe::Object3d::addObserver(_notificationsHandler);         // For visibility changes
 
-        UpdateVisibility();
+        // Note : do not manually call UpdateVisibility/SetVisibility to initialize the visibility, 
+        // as it will try to recreate the filtering scene index chain while the node is still being
+        // added to the scene, which leads to a crash when using MayaHydra. Anyways, it is not 
+        // necessary : once the node is actually added to the scene, a corresponding Ufe::ObjectAdd 
+        // notification will be sent by Maya, so the observer will receive it and call UpdateVisibility.
     }
 }
 

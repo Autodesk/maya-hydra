@@ -97,9 +97,6 @@ void MayaDataProducerSceneIndexData::SetupUfeObservation(void* dccNode)
         Ufe::Scene::instance().addObserver(_notificationsHandler); // For hierarchy changes
         Ufe::Object3d::addObserver(_notificationsHandler);         // For visibility changes
         _pathSubject->addObserver(_notificationsHandler);          // For transform changes
-
-        UpdateTransform();
-        UpdateVisibility();
     }
 }
 
