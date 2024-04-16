@@ -360,6 +360,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((MayaDefaultMaterial, "__maya_default_material__"))
     (diffuseColor)
     (emissiveColor)
+    (opacity)
     (roughness)
     (MayaHydraMeshPoints)
     (constantLighting)
@@ -583,9 +584,29 @@ void MayaHydraSceneIndex::SetDefaultLight(const GlfSimpleLight& light)
     }
 }
 
+void modifyDefaultMaterialOpacity(HdMaterialNetworkMap& materialNetworkMap, bool xrayEnabled) {
+    
+    // Hardcoded value taken from OGSMayaRenderItem::UpdateExtraOpacityParam
+    constexpr float xRayOpacityValue = 0.3f;
+    const TfToken _opacityToken("opacity");
+    for (auto &iter: materialNetworkMap.map) {
+        HdMaterialNetwork &hdNetwork = iter.second;
+        if (hdNetwork.nodes.empty())      
+            continue;
+        for (HdMaterialNode &node : hdNetwork.nodes) {
+            const auto it = node.parameters.find(_opacityToken);
+            if (it != node.parameters.cend()) 
+                node.parameters[_opacityToken] = xrayEnabled ? xRayOpacityValue : 1.f;
+        }
+    }
+}
+
 VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
 {
     if (id == _mayaDefaultMaterialPath) {
+        modifyDefaultMaterialOpacity(
+            const_cast<HdMaterialNetworkMap&>(_mayaDefaultMaterial.UncheckedGet<HdMaterialNetworkMap>()),
+            _xRayEnabled);
         return _mayaDefaultMaterial;
     }
 
@@ -612,6 +633,9 @@ VtValue MayaHydraSceneIndex::CreateMayaDefaultMaterial()
     node.parameters.insert(
         { _tokens->diffuseColor,
           VtValue(GfVec3f(kDefaultGrayColor[0], kDefaultGrayColor[1], kDefaultGrayColor[2])) });
+    node.parameters.insert(
+        { _tokens->opacity,
+          VtValue(float(1.0f))});
     network.nodes.push_back(std::move(node));
     networkMap.map.insert({ HdMaterialTerminalTokens->surface, std::move(network) });
     networkMap.terminals.push_back(_mayaDefaultMaterialPath);
@@ -702,12 +726,24 @@ LightDagPathMap MayaHydraSceneIndex::_GetGlobalLightPaths() const
     return allLightPaths;
 }
 
+
+void MayaHydraSceneIndex::SetDefaultMaterial(bool useDefMaterial)
+{
+    if (useDefMaterial) {
+        auto mayaDefaultMaterialDataSource = MayaHydraDefaultMaterialDataSource::New(_mayaDefaultMaterialPath, HdPrimTypeTokens->material, this);
+        AddPrims({ { _mayaDefaultMaterialPath, HdPrimTypeTokens->material, mayaDefaultMaterialDataSource } });
+    }
+    else
+        RemovePrim(_mayaDefaultMaterialPath);
+}
+
 void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
 {
     bool useDefaultMaterial
         = (context.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
     if (useDefaultMaterial != _useDefaultMaterial) {
         _useDefaultMaterial = useDefaultMaterial;
+        SetDefaultMaterial(_useDefaultMaterial);
         if (useMeshAdapter()) {
             for (const auto& shape : _shapeAdapters)
                 shape.second->MarkDirty(HdChangeTracker::DirtyMaterialId);
@@ -720,7 +756,6 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         for (auto& matAdapter : _materialAdapters)
             matAdapter.second->EnableXRayShadingMode(_xRayEnabled);
     }
-
     if (!_materialTagsChanged.empty()) {
         if (IsHdSt()) {
             for (const auto& id : _materialTagsChanged) {
@@ -931,7 +966,6 @@ void MayaHydraSceneIndex::InsertPrim(
     // Therefore, insert missing ancestors ourselves, with a non-null data
     // source and empty type.
     _AddPrimAncestors(id);
-
     AddPrims({ { id, typeId, dataSource } });
 }
 
@@ -1053,10 +1087,6 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
 
 SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
 {
-    if (_useDefaultMaterial) {
-        return _mayaDefaultMaterialPath;
-    }
-
     auto result = TfMapLookupPtr(_renderItemsAdapters, id);
     if (result != nullptr) {
         auto& renderItemAdapter = *result;
@@ -1066,7 +1096,9 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
             || MHWRender::MGeometry::Primitive::kLineStrip == renderItemAdapter->GetPrimitive()) {
             return _fallbackMaterial;
         }
-
+        else if (_useDefaultMaterial) {
+            return _mayaDefaultMaterialPath;
+        }
         auto& material = renderItemAdapter->GetMaterial();
 
         if (material == kInvalidMaterial) {
@@ -1079,6 +1111,9 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
     }
 
     if (useMeshAdapter()) {
+        if (_useDefaultMaterial) {
+            return _mayaDefaultMaterialPath;
+        }
         auto shapeAdapter = TfMapLookupPtr(_shapeAdapters, id);
         if (shapeAdapter == nullptr) {
             return _fallbackMaterial;

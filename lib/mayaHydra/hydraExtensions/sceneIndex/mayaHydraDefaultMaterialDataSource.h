@@ -1,5 +1,5 @@
 //
-// Copyright 2023 Autodesk, Inc. All rights reserved.
+// Copyright 2024 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef MAYAHYDRADATASOURCE_H
-#define MAYAHYDRADATASOURCE_H
+#ifndef MAYAHYDRADEFAULTMATERIALDATASOURCE_H
+#define MAYAHYDRADEFAULTMATERIALDATASOURCE_H
 
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
@@ -24,16 +24,15 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class MayaHydraAdapter;
 class MayaHydraSceneIndex;
 
 /**
- * \brief A container data source representing data unique to render item
+ * \brief A container data source representing a default material with USDPreviewSurface
  */
- class MayaHydraDataSource : public HdContainerDataSource
+ class MayaHydraDefaultMaterialDataSource : public HdContainerDataSource
 {
 public:
-    HD_DECLARE_DATASOURCE(MayaHydraDataSource);
+    HD_DECLARE_DATASOURCE(MayaHydraDefaultMaterialDataSource);
 
     // ------------------------------------------------------------------------
     // HdContainerDataSource implementations
@@ -41,30 +40,21 @@ public:
     HdDataSourceBaseHandle Get(const TfToken& name) override;
 
 private:
-    MayaHydraDataSource(
+    MayaHydraDefaultMaterialDataSource(
         const SdfPath& id,
         TfToken type,
-        MayaHydraSceneIndex* sceneIndex,
-        MayaHydraAdapter* adapter);
+        MayaHydraSceneIndex* sceneIndex);
 
-    HdDataSourceBaseHandle _GetVisibilityDataSource();
-    HdDataSourceBaseHandle _GetPrimvarsDataSource();
-    TfToken _InterpolationAsToken(HdInterpolation interpolation);
+    HdDataSourceBaseHandle _GetMaterialDataSource();    
     HdDataSourceBaseHandle _GetMaterialBindingDataSource();
-    HdDataSourceBaseHandle _GetMaterialDataSource();
-    HdDataSourceBaseHandle _GetDisplayColorDataSource();
-private:
+
     SdfPath _id;
     TfToken _type;
     MayaHydraSceneIndex* _sceneIndex = nullptr;
-    MayaHydraAdapter* _adapter = nullptr;
-
-    std::atomic_bool _primvarsBuilt{false};
-    HdContainerDataSourceAtomicHandle _primvars;
 };
 
-HD_DECLARE_DATASOURCE_HANDLES(MayaHydraDataSource);
+HD_DECLARE_DATASOURCE_HANDLES(MayaHydraDefaultMaterialDataSource);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // MAYAHYDRADATASOURCE_H
+#endif // MAYAHYDRADEFAULTMATERIALDATASOURCE_H
