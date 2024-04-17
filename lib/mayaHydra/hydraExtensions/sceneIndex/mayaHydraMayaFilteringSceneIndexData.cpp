@@ -114,7 +114,7 @@ void MayaFilteringSceneIndexData::UfeNotificationsHandler::operator()(
         return;
     }
 
-    // 2024-04-11 : The two main types of notifications being handled here (VisibilityChanged and SceneChanged)
+    // The two main types of notifications being handled here (VisibilityChanged and SceneChanged)
     // are all sent from two different subjects. We share the same observer for all subjects for simplicity, 
     // but if we ever want to avoid cascading dynamic casts, we could instead use a dedicated observer for each 
     // subject, and use static casts instead.

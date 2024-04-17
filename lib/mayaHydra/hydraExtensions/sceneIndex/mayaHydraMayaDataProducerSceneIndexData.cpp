@@ -152,7 +152,7 @@ void MayaDataProducerSceneIndexData::UfeNotificationsHandler::operator()(const U
         return;
     }
 
-    // 2024-04-11 : The three main types of notifications being handled here (Transform3dChanged, VisibilityChanged and SceneChanged)
+    // The three main types of notifications being handled here (Transform3dChanged, VisibilityChanged and SceneChanged)
     // are all sent from three different subjects. We share the same observer for all subjects for simplicity, but if we ever want to 
     // avoid cascading dynamic casts, we could instead use a dedicated observer for each subject, and use static casts instead.
 }
