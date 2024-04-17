@@ -400,7 +400,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
             # Sphere that should be filtered by the locator filtering scene index (>10k vertices)
             sphereShape, sphereNode = cmds.polySphere()
-            cmds.move(0, 0, 10)
+            cmds.move(0, 0, 5)
             cmds.setAttr(sphereNode + ".subdivisionsAxis", 200)
             cmds.setAttr(sphereNode + ".subdivisionsHeight", 200)
             cmds.select(clear=True)
