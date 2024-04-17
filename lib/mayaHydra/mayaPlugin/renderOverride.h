@@ -284,6 +284,8 @@ private:
     bool       _initializationSucceeded = false;
     bool       _hasDefaultLighting = false;
     unsigned int _oldDisplayStyle {0};
+    bool       _useDefaultMaterial;
+    bool       _xRayEnabled;
 
     // Picking support.
     const std::vector<std::unique_ptr<PickHandlerBase>> _pickHandlers;
