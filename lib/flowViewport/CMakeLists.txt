@@ -8,6 +8,7 @@ add_library(${TARGET_NAME} SHARED)
 target_sources(${TARGET_NAME} 
     PRIVATE
         debugCodes.cpp
+        fvpInstruments.cpp
         fvpUtils.cpp
         global.cpp
         tokens.cpp
@@ -16,7 +17,7 @@ target_sources(${TARGET_NAME}
 set(HEADERS
     api.h
     debugCodes.h
-    fvpUtils.h
+    fvpInstruments.h
     global.h
     tokens.h
 )

@@ -16,15 +16,14 @@
 
 #include "mhMayaUsdProxyShapeSceneIndex.h"
 
-#if defined(MAYAHYDRALIB_MAYAUSDAPI_ENABLED)
+#include <flowViewport/fvpInstruments.h>
 
-//Maya headers
-#include <maya/MEventMessage.h>//For timeChanged callback
+#if defined(MAYAHYDRALIB_MAYAUSDAPI_ENABLED)
 
 //mayaHydra headers
 #include "ufeExtensions/Global.h"
 
-PXR_NAMESPACE_OPEN_SCOPE
+PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
 
@@ -40,15 +39,16 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(const MAYAUSDAPI_NS::Pr
 {
     TfWeakPtr<MayaUsdProxyShapeSceneIndex> ptr(this);
     _stageSetNoticeKey = TfNotice::Register(ptr, &MayaUsdProxyShapeSceneIndex::_StageSet);
+    _stageInvalidateNoticeKey = TfNotice::Register(ptr, &MayaUsdProxyShapeSceneIndex::_StageInvalidate);
     _objectsChangedNoticeKey = TfNotice::Register(ptr, &MayaUsdProxyShapeSceneIndex::_ObjectsChanged);
-    
-    _timeChangeCallbackId = MEventMessage::addEventCallback("timeChanged", onTimeChanged, this);
+
+    Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
 }
 
 MayaUsdProxyShapeSceneIndex::~MayaUsdProxyShapeSceneIndex()
 {
-    MMessage::removeCallback(_timeChangeCallbackId);
     TfNotice::Revoke(_stageSetNoticeKey);
+    TfNotice::Revoke(_stageInvalidateNoticeKey);
     TfNotice::Revoke(_objectsChangedNoticeKey);
 }
 
@@ -60,24 +60,35 @@ MayaUsdProxyShapeSceneIndexRefPtr MayaUsdProxyShapeSceneIndex::New(const MAYAUSD
     return TfCreateRefPtr(new MayaUsdProxyShapeSceneIndex(proxyStage, sceneIndexChainLastElement, usdImagingStageSceneIndex, dagNodeHandle));
 }
 
-void MayaUsdProxyShapeSceneIndex::onTimeChanged(void* data)
-{
-    auto* instance = reinterpret_cast<MayaUsdProxyShapeSceneIndex*>(data);
-    if (!TF_VERIFY(instance)) {
-        return;
-    }
-    instance->UpdateTime();
-}
-
 void MayaUsdProxyShapeSceneIndex::UpdateTime()
 {
     if (_usdImagingStageSceneIndex && _dagNodeHandle.isValid()) {
-        _usdImagingStageSceneIndex->SetTime(_proxyStage.getTime());//We have the possibility to scale and offset the time in _proxyShapeBase
+        // _usdImagingStageSceneIndex->SetTime(_proxyStage.getTime());//We have the possibility to scale and offset the time in _proxyShapeBase
+        auto time = _proxyStage.getTime();
+        _usdImagingStageSceneIndex->SetTime(time);
     }
 }
 
 void MayaUsdProxyShapeSceneIndex::_StageSet(const MAYAUSDAPI_NS::ProxyStageSetNotice& notice) 
 { 
+    _populated = false;
+    Populate(); 
+}
+
+// Stage invalidated.  See
+// https://github.com/Autodesk/maya-usd/blob/dev/lib/mayaUsd/nodes/proxyShapeBase.cpp    
+// for all inputs that can invalidate the stage, among which:
+// - the USD file path
+// - the USD prim at the root of the stage
+// - the input stage cache ID, e.g. for a Bifrost-generated stage.  Note that
+//   in this case, the mayaUsd stage pointer DOES NOT CHANGE: the 
+//   Bifrost-generated stage is added as a sub-layer of the mayaUsd stage.
+// - etc.
+// In these cases we set the stage to null and start over.
+void MayaUsdProxyShapeSceneIndex::_StageInvalidate(const MAYAUSDAPI_NS::ProxyStageInvalidateNotice& notice) 
+{ 
+    _usdImagingStageSceneIndex->SetStage(nullptr);
+    _populated = false;
     Populate(); 
 }
 
@@ -99,6 +110,8 @@ void MayaUsdProxyShapeSceneIndex::Populate()
         auto stage = _proxyStage.getUsdStage();
         // Check whether the pseudo-root has children
         if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
+            ++_nbPopulateCalls;
+            Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
             _usdImagingStageSceneIndex->SetStage(stage);
             // Set the initial time
             UpdateTime();
@@ -133,5 +146,4 @@ SdfPathVector MayaUsdProxyShapeSceneIndex::GetChildPrimPaths(const SdfPath& prim
 
 } // namespace MAYAUSD_NS_DEF
 
-PXR_NAMESPACE_CLOSE_SCOPE
 #endif //MAYAHYDRALIB_MAYAUSDAPI_ENABLED

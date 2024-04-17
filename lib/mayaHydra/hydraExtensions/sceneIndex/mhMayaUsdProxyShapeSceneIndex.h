@@ -36,19 +36,23 @@
 
 //Maya headers
 #include <maya/MObjectHandle.h>
-#include <maya/MMessage.h>
 
-//Ufe headers
-#include <ufe/path.h>
+UFE_NS_DEF {
+class Path;
+}
 
 #include <memory>
 
-PXR_NAMESPACE_OPEN_SCOPE
+PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
 
 class MayaUsdProxyShapeSceneIndex;
-TF_DECLARE_WEAK_AND_REF_PTRS(MayaUsdProxyShapeSceneIndex);
+
+// Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
+// type in PXR_NS.
+typedef PXR_NS::TfRefPtr<MayaUsdProxyShapeSceneIndex> MayaUsdProxyShapeSceneIndexRefPtr;
+typedef PXR_NS::TfRefPtr<const MayaUsdProxyShapeSceneIndex> MayaUsdProxyShapeSceneIndexConstRefPtr;
 
 /// <summary>
 /// Simply wraps single stage scene index for initial stage assignment and population
@@ -59,6 +63,8 @@ class MayaUsdProxyShapeSceneIndex : public HdSingleInputFilteringSceneIndexBase
 public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
     using ParentClass = HdSingleInputFilteringSceneIndexBase;
+
+    static constexpr char kNbPopulateCalls[] = "MayaUsdProxyShapeSceneIndex:NbPopulateCalls";
 
     static MayaUsdProxyShapeSceneIndexRefPtr
     New(const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
@@ -95,23 +101,22 @@ public:
 private:
     void _ObjectsChanged(const MAYAUSDAPI_NS::ProxyStageObjectsChangedNotice& notice);
     void _StageSet(const MAYAUSDAPI_NS::ProxyStageSetNotice& notice);
+    void _StageInvalidate(const MAYAUSDAPI_NS::ProxyStageInvalidateNotice& notice);
     void _PopulateAndApplyPendingChanges();
 
 private:
-    static void onTimeChanged(void* data);
 
     UsdImagingStageSceneIndexRefPtr _usdImagingStageSceneIndex {nullptr};
     MAYAUSDAPI_NS::ProxyStage       _proxyStage;
     std::atomic<bool>               _populated { false };
-    MCallbackId                     _timeChangeCallbackId = 0;
     MObjectHandle                   _dagNodeHandle;
     TfNotice::Key                   _stageSetNoticeKey;
+    TfNotice::Key                   _stageInvalidateNoticeKey;
     TfNotice::Key                   _objectsChangedNoticeKey;
+    long int                        _nbPopulateCalls{0};
 };
 
 } // namespace MAYAHYDRA_NS_DEF
-
-PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif //MAYAHYDRALIB_MAYAUSDAPI_ENABLED
 
