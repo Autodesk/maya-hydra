@@ -101,6 +101,7 @@ private:
     bool isExcluded(const PXR_NS::SdfPath& sceneRoot) const;
 
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
+    PXR_NS::HdContainerDataSourceHandle _highlightSelectedPrim(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::SdfPath& primPath)const;
 
     const SelectionConstPtr   _selection;
 };

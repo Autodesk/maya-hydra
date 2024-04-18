@@ -37,9 +37,11 @@
 //
 
 #include "flowViewport/selection/fvpSelection.h"
+#include "flowViewport/colorPreferences/fvpColorPreferences.h"
+#include "flowViewport/colorPreferences/fvpColorPreferencesTokens.h"
 
-#include "pxr/imaging/hd/selectionSchema.h"
-#include "pxr/imaging/hd/selectionsSchema.h"
+#include <pxr/imaging/hd/selectionSchema.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -74,31 +76,58 @@ Selection::_PrimSelectionState::GetVectorDataSource() const
     );
 };
 
-bool
-Selection::Add(const PXR_NS::SdfPath& primPath)
+Selection::Selection()
 {
+    Fvp::ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->wireframeSelection, _leadWireframeColor);
+    Fvp::ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->wireframeSelectionSecondary, _activeWireframeColor);
+    Fvp::ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->polymeshDormant, _dormantWireframeColor);
+}
+
+bool
+Selection::Add(const SdfPath& primPath)
+{
+    if (_ignoreChanges) return false;
+
     if (primPath.IsEmpty()) {
         return false;
     }
 
     _pathToState[primPath].selectionSources.push_back(selectionBuilder.Build());
+    if (_selectedPaths.end() == std::find(_selectedPaths.begin(), _selectedPaths.end(), primPath)){
+        _selectedPaths.push_back(primPath);
+    }
 
     return true;
 }
 
-bool Selection::Remove(const PXR_NS::SdfPath& primPath)
+bool Selection::Remove(const SdfPath& primPath)
 {
-    return (!primPath.IsEmpty() && (_pathToState.erase(primPath) == 1));
+    if (_ignoreChanges) return false;
+
+    const bool res = (!primPath.IsEmpty() && (_pathToState.erase(primPath) == 1));
+    if( res){
+        auto it = std::find(_selectedPaths.begin(), _selectedPaths.end(), primPath);
+        if (it != _selectedPaths.end()){
+            _selectedPaths.erase(it);
+        }
+    }
+
+    return res;
 }
 
 void
 Selection::Clear()
 {
+    if (_ignoreChanges) return;
+
     _pathToState.clear();
+    _selectedPaths.clear();
 }
 
-void Selection::Replace(const PXR_NS::SdfPathVector& selection)
+void Selection::Replace(const SdfPathVector& selection)
 {
+    if (_ignoreChanges) return;
+
     Clear();
 
     for (const auto& primPath : selection) {
@@ -108,12 +137,23 @@ void Selection::Replace(const PXR_NS::SdfPathVector& selection)
         _pathToState[primPath].selectionSources.push_back(
             selectionBuilder.Build());
     }
+
+    //Copy selection to selectedPaths 
+    _selectedPaths.assign(selection.begin(), selection.end());
 }
 
-void Selection::RemoveHierarchy(const PXR_NS::SdfPath& primPath)
+void Selection::RemoveHierarchy(const SdfPath& primPath)
 {
+    if (_ignoreChanges) return;
+
     auto it = _pathToState.lower_bound(primPath);
     while (it != _pathToState.end() && it->first.HasPrefix(primPath)) {
+        //Remove it from _selectedPaths
+        auto itSelectedPaths = std::find(_selectedPaths.begin(), _selectedPaths.end(), it->first);
+        if (itSelectedPaths != _selectedPaths.end()){
+            _selectedPaths.erase(itSelectedPaths);
+        }
+
         it = _pathToState.erase(it);
     }
 }
@@ -152,7 +192,7 @@ SdfPathVector Selection::GetFullySelectedPaths() const
 }
 
 HdDataSourceBaseHandle Selection::GetVectorDataSource(
-    const PXR_NS::SdfPath& primPath
+    const SdfPath& primPath
 ) const
 {
     auto it = _pathToState.find(primPath);
@@ -160,4 +200,33 @@ HdDataSourceBaseHandle Selection::GetVectorDataSource(
         it->second.GetVectorDataSource() : nullptr;
 }
 
+GfVec4f Selection::GetWireframeColor(const SdfPath& primPath)const
+{
+    if (HasFullySelectedAncestorInclusive(primPath)){
+        return (_IsLastSelected(primPath)) ? _leadWireframeColor : _activeWireframeColor;
+    }
+
+    return _dormantWireframeColor;
 }
+
+SdfPath Selection::GetLastPathSelected()const 
+{     
+    if (_selectedPaths.empty()){
+        return SdfPath();
+    }
+
+    return _selectedPaths.back();
+}
+
+bool Selection::_IsLastSelected(const SdfPath& primPath)const
+{
+    auto lastSelPath = GetLastPathSelected();
+    if (lastSelPath.IsEmpty()){
+        return false;
+    }
+
+    return (lastSelPath == primPath);
+}
+
+
+} // end of namespace FVP_NS_DEF

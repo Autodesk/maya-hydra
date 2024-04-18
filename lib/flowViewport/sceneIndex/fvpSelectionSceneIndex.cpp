@@ -39,12 +39,14 @@
 #include "flowViewport/sceneIndex/fvpSelectionSceneIndex.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
 #include "flowViewport/selection/fvpSelection.h"
+#include "flowViewport/fvpUtils.h"
 
 #include "flowViewport/debugCodes.h"
 
-#include "pxr/imaging/hd/retainedDataSource.h"
-#include "pxr/imaging/hd/selectionSchema.h"
-#include "pxr/imaging/hd/selectionsSchema.h"
+#include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/tokens.h>
 
 #include <ufe/pathString.h>
 #include <ufe/selection.h>
@@ -52,7 +54,14 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
-const HdDataSourceLocatorSet selectionsSchemaDefaultLocator{HdSelectionsSchema::GetDefaultLocator()};
+    const HdDataSourceLocatorSet selectionsAndPrimvarsColorsLocatorSet{HdSelectionsSchema::GetDefaultLocator(), 
+                                                                HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),//Also dirty override wireframe color
+                                                                HdPrimvarsSchema::GetDefaultLocator().Append(HdTokens->displayColor)//and display color
+                                                                };
+
+    const HdDataSourceLocatorSet primvarsColorsLocatorSet{  HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),
+                                                            HdPrimvarsSchema::GetDefaultLocator().Append(HdTokens->displayColor)
+                                                         };
 }
 
 namespace FVP_NS_DEF {
@@ -161,8 +170,17 @@ SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("    Adding %s to the Hydra selection.\n", sceneIndexPath.GetText());
 
+    //Deal with the lead and active colors for wireframe highlighting
+    //Get last selected path before removing
+    const SdfPath lastSelPathBefore = _selection->GetLastPathSelected();//This is the lead object if non empty
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
     if (_selection->Add(sceneIndexPath)) {
-        _SendPrimsDirtied({{sceneIndexPath, selectionsSchemaDefaultLocator}});
+        if ( ! lastSelPathBefore.IsEmpty()){
+            //The wireframe color of this prim should be updated as it's no longer the lead object
+            dirtiedPrims.push_back({lastSelPathBefore, primvarsColorsLocatorSet});
+        }
+        dirtiedPrims.push_back({sceneIndexPath, selectionsAndPrimvarsColorsLocatorSet});
+        _SendPrimsDirtied(dirtiedPrims);
     }
 }
 
@@ -175,8 +193,26 @@ void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
     // index path.
     auto sceneIndexPath = SceneIndexPath(appPath);
 
+    //Deal with the lead and active colors for wireframe highlighting
+    //Get last selected path before removing
+    const SdfPath lastSelPathBefore = _selection->GetLastPathSelected();//This is the lead object if non empty before the removal
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
     if (_selection->Remove(sceneIndexPath)) {
-        _SendPrimsDirtied({{sceneIndexPath, selectionsSchemaDefaultLocator}});
+        dirtiedPrims.push_back({sceneIndexPath, selectionsAndPrimvarsColorsLocatorSet});
+
+        //Get last selected path after removing
+        const SdfPath lastSelPathAfter = _selection->GetLastPathSelected();//lead object after removal
+        if (lastSelPathBefore != lastSelPathAfter){
+            //The wireframe color of these prim should be updated
+            if(! lastSelPathBefore.IsEmpty()){
+                dirtiedPrims.push_back({lastSelPathBefore, primvarsColorsLocatorSet});
+            }
+            if(! lastSelPathAfter.IsEmpty()){
+                dirtiedPrims.push_back({lastSelPathAfter, primvarsColorsLocatorSet});
+            }
+        }
+        
+       _SendPrimsDirtied(dirtiedPrims);
     }
 }
 
@@ -194,7 +230,7 @@ SelectionSceneIndex::ClearSelection()
     auto paths = _selection->GetFullySelectedPaths();
     entries.reserve(paths.size());
     for (const auto& path : paths) {
-        entries.emplace_back(path, selectionsSchemaDefaultLocator);
+        entries.emplace_back(path, selectionsAndPrimvarsColorsLocatorSet);
     }
 
     _selection->Clear();
@@ -214,7 +250,7 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
     auto paths = _selection->GetFullySelectedPaths();
     entries.reserve(paths.size() + selection.size());
     for (const auto& path : paths) {
-        entries.emplace_back(path, selectionsSchemaDefaultLocator);
+        entries.emplace_back(path, selectionsAndPrimvarsColorsLocatorSet);
     }
 
     _selection->Clear();
@@ -233,7 +269,7 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
         sceneIndexSn.emplace_back(sceneIndexPath);
         TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
             .Msg("    Adding %s to the Hydra selection.\n", sceneIndexPath.GetText());
-        entries.emplace_back(sceneIndexPath, selectionsSchemaDefaultLocator);
+        entries.emplace_back(sceneIndexPath, selectionsAndPrimvarsColorsLocatorSet);
     }
 
     _selection->Replace(sceneIndexSn);

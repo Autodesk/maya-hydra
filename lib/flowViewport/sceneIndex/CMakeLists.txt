@@ -12,6 +12,7 @@ target_sources(${TARGET_NAME}
     fvpWireframeSelectionHighlightSceneIndex.cpp
     fvpDisplayStyleOverrideSceneIndex.cpp
     fvpBBoxSceneIndex.cpp
+    fvpReprSelectorSceneIndex.cpp
 )
 
 set(HEADERS
@@ -25,6 +26,7 @@ set(HEADERS
     fvpWireframeSelectionHighlightSceneIndex.h
     fvpDisplayStyleOverrideSceneIndex.h
     fvpBBoxSceneIndex.h
+    fvpReprSelectorSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------

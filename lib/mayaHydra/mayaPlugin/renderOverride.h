@@ -194,6 +194,8 @@ private:
 
     void _AddPluginSelectionHighlighting();
 
+    bool _NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool currentUseDefaultMaterial, bool xRayEnabled);
+
     // Determine the pick handler which should handle a pick hit, to transform
     // the pick hit into a selection.
     const PickHandlerBase* _PickHandler(const HdxPickHit& hit) const;
@@ -240,6 +242,7 @@ private:
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
     Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
     HdSceneIndexBaseRefPtr                    _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
+    HdSceneIndexBaseRefPtr                    _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
     Fvp::DisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
     HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;

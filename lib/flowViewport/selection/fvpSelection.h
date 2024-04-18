@@ -21,6 +21,7 @@
 
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/usd/sdf/path.h>
+#include <pxr/base/gf/vec4f.h>
 
 #include <map>
 
@@ -41,6 +42,9 @@ namespace FVP_NS_DEF {
 class Selection
 {
 public:
+
+    FVP_API
+    Selection();
 
     // Add primPath to selection and return true if the argument is not empty.
     FVP_API
@@ -83,6 +87,20 @@ public:
     PXR_NS::HdDataSourceBaseHandle
     GetVectorDataSource(const PXR_NS::SdfPath& primPath) const;
 
+    //Get the wireframe color of a primitive for selection highlighting, 
+    // this checks if the prim is selected or not and if it is selected, 
+    // it returns the lead or active color depending on the lead of the selection
+    FVP_API
+    PXR_NS::GfVec4f GetWireframeColor(const PXR_NS::SdfPath& primPath)const;
+
+    //Ignore changes, this is used to keep the selection when we want to switch between display modes
+    FVP_API
+    void IgnoreChanges(bool val){_ignoreChanges = val;}
+
+    //Get last path selected is used to get the mlast selected path, to check if a prim is the lead object of the selection
+    FVP_API
+    PXR_NS::SdfPath GetLastPathSelected()const;
+
 private:
 
     struct _PrimSelectionState {
@@ -95,6 +113,18 @@ private:
     // Maps prim path to data sources to be returned by the vector data
     // source at locator selections.
     std::map<PXR_NS::SdfPath, _PrimSelectionState> _pathToState;
+
+    //We need to keep an order of selected paths to deal with the lead of the selection, the lead is the last of the selected items
+    PXR_NS::SdfPathVector _selectedPaths;
+
+    bool _IsLastSelected(const PXR_NS::SdfPath& primPath)const;
+
+    //Colors used by wireframe selection highlighting
+    PXR_NS::GfVec4f _activeWireframeColor;
+    PXR_NS::GfVec4f _leadWireframeColor;
+    PXR_NS::GfVec4f _dormantWireframeColor;
+    //Used to ignore changes in _pathToState as we want to keep the selection (typical example is a switch between display modes like from shaded to wireframe)
+    bool _ignoreChanges = false;
 };
 
 }
