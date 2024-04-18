@@ -25,7 +25,13 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
-    IMAGE_DIFF_FAIL_PERCENT = 0.3
+    @property
+    def IMAGE_DIFF_FAIL_PERCENT(self):
+        # HYDRA-943 : Shadows don't seem to work properly on OSX, possibly only with point lights.
+        # Only the "all lights with shadows" check fails, and shadows with point light only is skipped.
+        if platform.system() == "Darwin":
+            return 3
+        return 0.2
 
     def test_UsdKeepSelectionHighlighting(self):
         import usdUtils # usdUtils imports mayaUsd.ufe

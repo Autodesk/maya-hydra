@@ -25,15 +25,6 @@
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 
-//Define tokens common to different classes to handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
-PXR_NAMESPACE_OPEN_SCOPE
-TF_DEFINE_PRIVATE_TOKENS(
-     _primVarsTokens,
- 
-     (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
- );
-PXR_NAMESPACE_CLOSE_SCOPE
-
 namespace FVP_NS_DEF {
 
 // At time of writing, the last reference removal causing destruction of a 

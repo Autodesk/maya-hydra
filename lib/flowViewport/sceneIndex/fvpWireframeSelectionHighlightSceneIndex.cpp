@@ -29,6 +29,13 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
+//Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
+TF_DEFINE_PRIVATE_TOKENS(
+     _primVarsTokens,
+ 
+     (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
+ );
+
 const HdRetainedContainerDataSourceHandle sRefinedWireOnSurfaceDisplayStyleDataSource
     = HdRetainedContainerDataSource::New(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,

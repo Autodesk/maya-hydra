@@ -35,6 +35,13 @@ namespace FVP_NS_DEF {
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
+//Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
+TF_DEFINE_PRIVATE_TOKENS(
+     _primVarsTokens,
+ 
+     (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
+ );
+
 //Wireframe on surface refined
 const HdRetainedContainerDataSourceHandle sRefinedWireframeOnShadedDisplayStyleDataSource
     = HdRetainedContainerDataSource::New(
