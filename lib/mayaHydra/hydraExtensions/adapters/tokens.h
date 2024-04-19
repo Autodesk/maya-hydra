@@ -81,7 +81,8 @@ PXR_NAMESPACE_OPEN_SCOPE
     (MayaHydraPhongShader)                    \
     (MayaHydraBlinnShader)                    \
 	(MayaHydraStippleShader)                  \
-    (MayaHydraSolidColorShader)
+    (MayaHydraSolidColorShader)               \
+    (tangents)
 
 // clang-format on
 

@@ -246,6 +246,9 @@ public:
         return nSamples;
     }
    
+    /// Is using an environment variable to tell if we should pass normals to Hydra when using the render item and mesh adapters
+    static bool passNormalsToHydra();
+
 private:
     MayaHydraSceneIndex(
         MayaHydraInitData& initData,
