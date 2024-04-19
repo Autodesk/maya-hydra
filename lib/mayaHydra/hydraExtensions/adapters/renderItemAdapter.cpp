@@ -242,14 +242,19 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                     if (passNormalsToHydra){
                         MVertexBuffer* normals = mvb;
                         int normalsCount = 0;
-                        // Keep the previously-determined normals count in case it was truncated.
                         const unsigned int originalNormalsCount = normals->vertexCount();
-                        const size_t normalSize = _normals.size();
-                        if (normalSize > 0 && normalSize <= originalNormalsCount) {
-                            normalsCount = normalSize;
-                        } else {
+                        if (topoChanged) {
                             normalsCount = originalNormalsCount;
+                        } else {
+                            // Keep the previously-determined normals count in case it was truncated.
+                            const size_t normalSize = _normals.size();
+                            if (normalSize > 0 && normalSize <= originalNormalsCount) {
+                                normalsCount = normalSize;
+                            } else {
+                                normalsCount = originalNormalsCount;
+                            }
                         }
+
                         _normals.clear();
                         const auto* vertexNormals = reinterpret_cast<const GfVec3f*>(normals->map());
                         if (TF_VERIFY(vertexNormals)) {
