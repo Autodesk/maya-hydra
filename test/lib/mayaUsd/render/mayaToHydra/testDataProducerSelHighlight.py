@@ -32,12 +32,6 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
             return 3
         return 0.2
 
-    @property
-    def IMAGE_DIFF_FAIL_BIG_PERCENT(self):
-        if platform.system() == "Darwin":
-            return 7
-        return 0.2
-
     def test_UsdKeepSelectionHighlighting(self):
         import usdUtils # usdUtils imports mayaUsd.ufe
         from mayaUsd import lib as mayaUsdLib
@@ -48,6 +42,8 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         
         #We are in VP2
         self.setViewport2Renderer()
+        #Remove anti-aliasing
+        cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", False)
         cmds.refresh()
 
         shapeNode = "sample_usdShape"
@@ -165,26 +161,26 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         ufeGlobalSel =  ufe.GlobalSelection.get()
         ufeGlobalSel.clear()
         ufeGlobalSel.append(pSphere1UfeItem)
-        self.assertSnapshotClose("Storm_S1Selected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_BIG_PERCENT)
+        self.assertSnapshotClose("Storm_S1Selected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         ufeGlobalSel.append(pSphere2UfeItem)
-        self.assertSnapshotClose("Storm_S1And2Selected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_BIG_PERCENT)
+        self.assertSnapshotClose("Storm_S1And2Selected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         ufeGlobalSel.append(pTorusUfeItem)
-        self.assertSnapshotClose("Storm_S1And2AndTSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_BIG_PERCENT)
+        self.assertSnapshotClose("Storm_S1And2AndTSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         ufeGlobalSel.append(pPlaneUfeItem)
-        self.assertSnapshotClose("Storm_S1And2AndTAndPSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_BIG_PERCENT)
+        self.assertSnapshotClose("Storm_S1And2AndTAndPSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Switch to wireframe display mode, we should keep the selected items and their color
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, displayAppearance="wireframe")
-        self.assertSnapshotClose("Storm_Wire_AllSelInStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_BIG_PERCENT)
+        self.assertSnapshotClose("Storm_Wire_AllSelInStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Remove the lead object
         ufeGlobalSel.remove(pPlaneUfeItem)
-        self.assertSnapshotClose("Storm_S1And2AndTSelectedPRemoved.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_BIG_PERCENT)
+        self.assertSnapshotClose("Storm_S1And2AndTSelectedPRemoved.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Remove a non lead object
         ufeGlobalSel.remove(pSphere1UfeItem)
-        self.assertSnapshotClose("Storm_S2AndTSelPAndS1Removed.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_BIG_PERCENT)
+        self.assertSnapshotClose("Storm_S2AndTSelPAndS1Removed.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
