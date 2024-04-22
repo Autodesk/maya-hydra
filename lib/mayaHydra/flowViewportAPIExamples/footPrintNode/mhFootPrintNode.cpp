@@ -395,7 +395,7 @@ std::atomic_int MhFootPrint::_counter {0};
 MObject MhFootPrint::mSize;
 MObject MhFootPrint::mColor;
 MTypeId MhFootPrint::id( 0x58000087 );
-MString	MhFootPrint::nodeClassification("hydraAPIExample/geometry/footPrint");
+MString	MhFootPrint::nodeClassification("drawdb/geometry/locator/footPrint");
 MObject MhFootPrint::mWorldS;
 
 namespace {
