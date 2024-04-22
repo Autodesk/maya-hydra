@@ -27,7 +27,7 @@
 #include <mayaHydraLib/mayaUtils.h>
 
 //Maya headers
-#include <maya/MPxSurfaceShape.h>
+#include <maya/MPxLocatorNode.h>
 #include <maya/MFnPlugin.h>
 #include <maya/MFnTransform.h>
 #include <maya/MMatrix.h>
@@ -43,7 +43,7 @@
 #include <maya/MFnDagNode.h>
 #include <maya/MModelMessage.h>
 
-//We use a surface shape node to deal with creating and filtering hydra primitives as an example.
+//We use a locator node to deal with creating and filtering hydra primitives as an example.
 //But you could use another kind of maya plugin.
 
 /*To create an instance of this node in maya, please use the following MEL command :
@@ -57,8 +57,8 @@ void nodeRemovedFromModel(MObject& node, void* clientData);
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-///Maya SurfaceShape node subclass to create filtering and data producer scene indices example, to be used with the flow viewport API.
-class MhFlowViewportAPILocator : public MPxSurfaceShape
+///Maya Locator node subclass to create filtering and data producer scene indices example, to be used with the flow viewport API.
+class MhFlowViewportAPILocator : public MPxLocatorNode
 {
 public:
     ~MhFlowViewportAPILocator() override;
@@ -256,7 +256,7 @@ namespace
 
 //Initialization of static members
 MTypeId MhFlowViewportAPILocator::id( 0x58000086 );
-MString	MhFlowViewportAPILocator::nodeClassification("drawdb/subscene/MhFlowViewportAPILocator");
+MString	MhFlowViewportAPILocator::nodeClassification("drawdb/geometry/locator/MhFlowViewportAPILocator");
 MObject MhFlowViewportAPILocator::mNumCubeLevelsX;
 MObject MhFlowViewportAPILocator::mNumCubeLevelsY;
 MObject MhFlowViewportAPILocator::mNumCubeLevelsZ;
@@ -392,7 +392,7 @@ MStatus MhFlowViewportAPILocator::preEvaluation(
 
 void MhFlowViewportAPILocator::getCacheSetup(const MEvaluationNode& evalNode, MNodeCacheDisablingInfo& disablingInfo, MNodeCacheSetupInfo& cacheSetupInfo, MObjectArray& monitoredAttributes) const
 {
-    MPxSurfaceShape::getCacheSetup(evalNode, disablingInfo, cacheSetupInfo, monitoredAttributes);
+    MPxLocatorNode::getCacheSetup(evalNode, disablingInfo, cacheSetupInfo, monitoredAttributes);
     assert(!disablingInfo.getCacheDisabled());
     cacheSetupInfo.setPreference(MNodeCacheSetupInfo::kWantToCacheByDefault, true);
 }
@@ -531,11 +531,12 @@ MStatus initializePlugin( MObject obj )
     static const char * pluginVersion = "1.0";
     MFnPlugin plugin( obj, PLUGIN_COMPANY, pluginVersion, "Any");
 
-    status = plugin.registerShape(
+    status = plugin.registerNode(
                 "MhFlowViewportAPILocator",
                 MhFlowViewportAPILocator::id,
                 &MhFlowViewportAPILocator::creator,
                 &MhFlowViewportAPILocator::initialize,
+                MPxNode::kLocatorNode,
                 &MhFlowViewportAPILocator::nodeClassification);
     if (!status) {
         status.perror("registerNode");
