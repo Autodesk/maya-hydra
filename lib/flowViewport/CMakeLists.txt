@@ -18,6 +18,7 @@ set(HEADERS
     api.h
     debugCodes.h
     fvpInstruments.h
+    fvpUtils.h
     global.h
     tokens.h
 )

@@ -63,9 +63,7 @@ MayaUsdProxyShapeSceneIndexRefPtr MayaUsdProxyShapeSceneIndex::New(const MAYAUSD
 void MayaUsdProxyShapeSceneIndex::UpdateTime()
 {
     if (_usdImagingStageSceneIndex && _dagNodeHandle.isValid()) {
-        // _usdImagingStageSceneIndex->SetTime(_proxyStage.getTime());//We have the possibility to scale and offset the time in _proxyShapeBase
-        auto time = _proxyStage.getTime();
-        _usdImagingStageSceneIndex->SetTime(time);
+        _usdImagingStageSceneIndex->SetTime(_proxyStage.getTime());//We have the possibility to scale and offset the time in _proxyShapeBase
     }
 }
 
