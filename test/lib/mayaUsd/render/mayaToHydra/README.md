@@ -24,6 +24,8 @@ For example, to run testVisibility on RelWithDebInfo :
 
 ```ctest -C RelWithDebInfo -VV --output-on-failure -R testVisibility```
 
+Note that when running Python tests the Python source is read directly from the source directory.  Therefore, when changing Python test code source, no build needs to be done to update the test, which can be run immediately using ctest.  This is a convenient time saver, as the test development cycle is not edit, build, run, but simply edit and run.  Only if C++ test code is changed is a build then necessary.
+
 ### Running tests with MayaUSD
 
 The tests require MayaUSD in order to be run. In order for the test framework to find and load MayaUSD, the `-DMAYAUSD_LOCATION` CMake flag must be set to your MayaUSD installation directory when building MayaHydra. For convenience, you can use the `--mayausd-location` parameter when using the [build.py](../../../../../build.py) script, which will set the CMake flag for you with the given argument. The specified path should point to the directory where your MayaUSD `.mod` file resides. Note that the test framework will not find MayaUSD using the MAYA_MODULE_PATH environment variable.
