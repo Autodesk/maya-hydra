@@ -1,0 +1,29 @@
+#usda 1.0
+(
+    defaultPrim = "Cube"
+    endTimeCode = 10
+    framesPerSecond = 30
+    metersPerUnit = 0.01
+    startTimeCode = 0
+    timeCodesPerSecond = 30
+    upAxis = "Y"
+)
+
+def Cube "Cube" ()
+{
+    double3 xformOp:translate.timeSamples = {
+        0: (0, 0, 0),
+        1: (0, 0, 1),
+        2: (0, 0, 2),
+        3: (0, 0, 3),
+        4: (0, 0, 4),
+        5: (0, 0, 5),
+        6: (0, 0, 6),
+        7: (0, 0, 7),
+        8: (0, 0, 8),
+        9: (0, 0, 9),
+        10: (0, 0, 10),
+    }
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+

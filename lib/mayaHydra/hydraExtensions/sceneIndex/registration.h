@@ -59,6 +59,8 @@ struct MayaHydraSceneIndexRegistration
     SdfPath                     sceneIndexPathPrefix;
     MObjectHandle               dagNode;
     MayaHydraInterpretRprimPath interpretRprimPathFn = nullptr;
+
+    virtual void Update() = 0;
 };
 
 /**

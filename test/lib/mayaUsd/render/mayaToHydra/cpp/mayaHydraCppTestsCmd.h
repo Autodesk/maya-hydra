@@ -23,7 +23,14 @@ public:
     static void*   creator() { return new mayaHydraCppTestCmd(); }
     static MSyntax createSyntax();
 
-    static const MString name;
+    MStatus doIt(const MArgList& args) override;
+};
+
+class mayaHydraInstruments : public MPxCommand
+{
+public:
+    static void*   creator() { return new mayaHydraInstruments(); }
+    static MSyntax createSyntax();
 
     MStatus doIt(const MArgList& args) override;
 };
