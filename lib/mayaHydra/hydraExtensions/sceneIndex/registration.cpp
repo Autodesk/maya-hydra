@@ -204,6 +204,14 @@ PXR_NAMESPACE_OPEN_SCOPE
 // Remove this once the code has been moved to the MayaHydra namespace.
 using namespace MayaHydra;
 
+struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
+{
+    void Update() override {
+        auto proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(pluginSceneIndex);
+        proxyShapeSceneIndex->UpdateTime();
+    }
+};
+
 // MayaHydraSceneIndexRegistration is used to register a scene index for
 // mayaUsdPlugin proxy shape nodes.
 MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy)
@@ -304,7 +312,7 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
 void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
 {
     constexpr char kSceneIndexPluginSuffix[] = {"_PluginNode"};
-    const MayaHydraSceneIndexRegistrationPtr registration(new MayaHydraSceneIndexRegistration());
+    const MayaHydraSceneIndexRegistrationPtr registration(new MayaUsdSceneIndexRegistration());
     MFnDependencyNode dependNodeFn(dagNode);
     // To match plugin TfType registration, name must begin with upper case.
     const std::string sceneIndexPluginName([&](){

@@ -1173,6 +1173,12 @@ MStatus MtohRenderOverride::Render(
         _taskController->SetSelectionEnableOutline(false);
 
     _taskController->SetCollection(_renderCollection);
+
+    // Update all registered plugin before render.
+    for (auto& entry : _sceneIndexRegistry->GetRegistrations()) {
+        entry.second->Update();
+    }
+
     if (_isUsingHdSt) {
         auto  enableShadows = true;
         auto* lightParam = drawContext.getLightParameterInformation(

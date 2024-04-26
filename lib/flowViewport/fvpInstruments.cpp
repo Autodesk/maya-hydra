@@ -1,4 +1,4 @@
-// Copyright 2023 Autodesk
+// Copyright 2024 Autodesk
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,27 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#ifndef MH_CPPTESTS_CMD
-#define MH_CPPTESTS_CMD
 
-#include <maya/MPxCommand.h>
+#include "fvpInstruments.h"
 
-class mayaHydraCppTestCmd : public MPxCommand
+#include <pxr/base/vt/dictionary.h>
+
+namespace {
+PXR_NS::VtDictionary instruments;
+}
+
+namespace FVP_NS_DEF {
+
+/* static */
+Instruments& Instruments::instance()
 {
-public:
-    static void*   creator() { return new mayaHydraCppTestCmd(); }
-    static MSyntax createSyntax();
+    static Instruments i;
+    return i;
+}
 
-    MStatus doIt(const MArgList& args) override;
-};
-
-class mayaHydraInstruments : public MPxCommand
+PXR_NS::VtValue Instruments::get(const std::string& key) const
 {
-public:
-    static void*   creator() { return new mayaHydraInstruments(); }
-    static MSyntax createSyntax();
+    auto found = instruments.find(key);
+    return (found != instruments.end()) ? found->second : PXR_NS::VtValue();
+}
 
-    MStatus doIt(const MArgList& args) override;
-};
+void Instruments::set(const std::string& key, const PXR_NS::VtValue& v)
+{
+    instruments[key] = v;
+}
 
-#endif // MH_CPPTESTS_CMD
+} // namespace FVP_NS_DEF
