@@ -72,7 +72,7 @@ const HdRetainedContainerDataSourceHandle sWireframeDisplayStyleDataSource
 
 }//End of namespace
 
-ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const std::shared_ptr<const Selection>& selection) 
+ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const SelectionConstPtr& selection) 
     : ParentClass(inputSceneIndex), 
     InputSceneIndexUtils(inputSceneIndex),
     _selection(selection)

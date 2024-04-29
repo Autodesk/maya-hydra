@@ -254,13 +254,17 @@ void DataProducerSceneIndexInterfaceImp::_AddDataProducerSceneIndexToThisViewpor
     }
 }
 
-void DataProducerSceneIndexInterfaceImp::hydraViewportSceneIndexAdded(const InformationInterface::ViewportInformation& viewportInfo)
+bool DataProducerSceneIndexInterfaceImp::hydraViewportSceneIndexAdded(const InformationInterface::ViewportInformation& viewportInfo)
 {
+    bool dataProducerSceneIndicesAdded = false;
     //Add the data producer scene indices that apply to all viewports to this newly created hydra viewport
     std::lock_guard<std::mutex> lockDataProducerSceneIndicesDataPerViewport(dataProducerSceneIndicesThatApplyToAllViewports_mutex);
     for (const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData : dataProducerSceneIndicesThatApplyToAllViewports){
         _AddDataProducerSceneIndexToThisViewport(viewportInfo, dataProducerSceneIndexData);
+        dataProducerSceneIndicesAdded = true;
     }
+
+    return dataProducerSceneIndicesAdded;
 }
 
 void DataProducerSceneIndexInterfaceImp::setSceneIndexDataFactory(DataProducerSceneIndexDataAbstractFactory& factory) 

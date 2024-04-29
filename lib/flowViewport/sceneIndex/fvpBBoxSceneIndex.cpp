@@ -349,7 +349,7 @@ namespace
     };
 }
 
-BboxSceneIndex::BboxSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<const Selection>& selection) : 
+BboxSceneIndex::BboxSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const SelectionConstPtr& selection) : 
     ParentClass(inputSceneIndex), 
     InputSceneIndexUtils(inputSceneIndex),
     _selection(selection)

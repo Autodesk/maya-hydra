@@ -91,9 +91,9 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
     // means that HdsiImplicitSurfaceSceneIndex must be used before this scene
     // index to convert implicit surfaces (e.g. USD cube / cone / sphere /
     // capsule primitive types) to meshes.
-    if (!isExcluded(primPath) && prim.primType == HdPrimTypeTokens->mesh) {
+    if (! _IsExcluded(primPath) && prim.primType == HdPrimTypeTokens->mesh) {
         if (_selection->HasFullySelectedAncestorInclusive(primPath)) {
-            prim.dataSource = _highlightSelectedPrim(prim.dataSource, primPath);
+            prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath);
         }
     }
     return prim;
@@ -105,8 +105,8 @@ WireframeSelectionHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath
     return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
-//We want to set the displayStyle of the selected prim to refinedWireOnSurf only if the displayStyle of the prim is refined
-HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_highlightSelectedPrim(const HdContainerDataSourceHandle& dataSource, const SdfPath& primPath)const
+//We want to set the displayStyle of the selected prim to refinedWireOnSurf only if the displayStyle of the prim is refined (meaning shaded)
+HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSelectedPrim(const HdContainerDataSourceHandle& dataSource, const SdfPath& primPath)const
 {
     //Always edit its override wireframe color
     auto edited = HdContainerDataSourceEditor(dataSource);
@@ -116,7 +116,7 @@ HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_highlightSel
                             HdPrimvarSchemaTokens->constant,
                             HdPrimvarSchemaTokens->color));
     
-    //Is the prim in refined displayStyle?
+    //Is the prim in refined displayStyle (meaning shaded) ?
     if (HdLegacyDisplayStyleSchema styleSchema =
             HdLegacyDisplayStyleSchema::GetFromParent(dataSource)) {
 
@@ -162,14 +162,14 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
     for (const auto& entry : entries) {
         // If the dirtied prim is excluded, don't provide selection
         // highlighting for it.
-        if (!isExcluded(entry.primPath) && 
+        if (! _IsExcluded(entry.primPath) && 
             entry.dirtyLocators.Contains(
                 HdSelectionsSchema::GetDefaultLocator())) {
             TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
                 .Msg("    %s selections locator dirty.\n", entry.primPath.GetText());
             // All mesh prims recursively under the selection dirty prim have a
             // dirty wireframe selection highlight.
-            dirtySelectionHighlightRecursive(entry.primPath, &highlightEntries);
+            _DirtySelectionHighlightRecursive(entry.primPath, &highlightEntries);
         }
     }
 
@@ -196,7 +196,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsRemoved(
     _SendPrimsRemoved(entries);
 }
 
-void WireframeSelectionHighlightSceneIndex::dirtySelectionHighlightRecursive(
+void WireframeSelectionHighlightSceneIndex::_DirtySelectionHighlightRecursive(
     const SdfPath&                            primPath, 
     HdSceneIndexObserver::DirtiedPrimEntries* highlightEntries
 )
@@ -206,7 +206,7 @@ void WireframeSelectionHighlightSceneIndex::dirtySelectionHighlightRecursive(
 
     highlightEntries->emplace_back(primPath, HdDataSourceLocatorSet {reprSelectorLocator, primvarsOverrideWireframeColorLocator});
     for (const auto& childPath : GetChildPrimPaths(primPath)) {
-        dirtySelectionHighlightRecursive(childPath, highlightEntries);
+        _DirtySelectionHighlightRecursive(childPath, highlightEntries);
     }
 }
 
@@ -217,7 +217,7 @@ void WireframeSelectionHighlightSceneIndex::addExcludedSceneRoot(
     _excludedSceneRoots.emplace(sceneRoot);
 }
 
-bool WireframeSelectionHighlightSceneIndex::isExcluded(
+bool WireframeSelectionHighlightSceneIndex::_IsExcluded(
     const PXR_NS::SdfPath& sceneRoot
 ) const
 {

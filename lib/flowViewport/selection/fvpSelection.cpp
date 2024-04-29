@@ -93,9 +93,7 @@ Selection::Add(const SdfPath& primPath)
     }
 
     _pathToState[primPath].selectionSources.push_back(selectionBuilder.Build());
-    if (_selectedPaths.end() == std::find(_selectedPaths.begin(), _selectedPaths.end(), primPath)){
-        _selectedPaths.push_back(primPath);
-    }
+    _selectedPaths.push_back(primPath);//Ufe prevents duplicates from being added so no need to check for duplicates
 
     return true;
 }

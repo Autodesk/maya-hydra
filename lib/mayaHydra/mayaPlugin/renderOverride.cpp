@@ -343,11 +343,7 @@ Ufe::Path usdPathToUfePath(
 
 inline bool areDifferentForOneOfTheseBits(unsigned int val1, unsigned int val2, unsigned int bitsToTest)
 {
-    if ((val1 & bitsToTest) != (val2 & bitsToTest)) {
-        return true;
-    }
-
-    return false;
+    return ((val1 & bitsToTest) != (val2 & bitsToTest));
 }
 
 }
@@ -1039,9 +1035,9 @@ MStatus MtohRenderOverride::Render(
     
             //Create a HydraViewportInformation 
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(panelName.asChar()), cameraName);
-            manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
-            //Update the selection since we may have added scene indices through manager.AddViewportInformation to the merging scene index
-            if (_selectionSceneIndex){
+            const bool dataProducerSceneIndicesAdded = manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
+            //Update the selection since we have added data producer scene indices through manager.AddViewportInformation to the merging scene index
+            if (dataProducerSceneIndicesAdded && _selectionSceneIndex){
                 _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
             }
         }

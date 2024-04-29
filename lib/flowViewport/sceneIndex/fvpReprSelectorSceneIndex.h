@@ -50,7 +50,7 @@ public:
     };
 
     FVP_API
-    static ReprSelectorSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const std::shared_ptr<const Selection>& selection){
+    static ReprSelectorSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const SelectionConstPtr& selection){
         return PXR_NS::TfCreateRefPtr(new ReprSelectorSceneIndex(inputSceneIndex, type, selection));
     }
 
@@ -73,7 +73,7 @@ public:
 
 protected:
     
-ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const std::shared_ptr<const Selection>& selection);
+ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const SelectionConstPtr& selection);
 
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override{
