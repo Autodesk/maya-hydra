@@ -1,10 +1,9 @@
-//Maya ASCII 2026ff01 scene
+//Maya ASCII 2025 scene
 //Name: test_ImportedAssetsNormals.ma
 //Last modified: Wed, Apr 10, 2024 10:06:11 AM
 //Codeset: 1252
-requires maya "2026ff01";
+requires maya "2025";
 requires "stereoCamera" "10.0";
-requires -nodeType "aiOptions" -nodeType "aiAOVDriver" -nodeType "aiAOVFilter" "mtoa" "5.4.0";
 requires -nodeType "mayaUsdLayerManager" -dataType "pxrUsdStageData" "mayaUsdPlugin" "0.28.0";
 requires "stereoCamera" "10.0";
 currentUnit -l centimeter -a degree -t film;
@@ -45,7 +44,6 @@ createNode camera -s -n "topShape" -p "top";
 	setAttr ".man" -type "string" "top_mask";
 	setAttr ".hc" -type "string" "viewSet -t %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -s -n "front";
 	rename -uid "4E99FEB8-47CC-3A0C-BAAB-E7B5AAE5E347";
 	setAttr ".v" no;
@@ -61,7 +59,6 @@ createNode camera -s -n "frontShape" -p "front";
 	setAttr ".man" -type "string" "front_mask";
 	setAttr ".hc" -type "string" "viewSet -f %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -s -n "side";
 	rename -uid "B3321176-4474-7E4D-8FBE-6EA5DA74E26C";
 	setAttr ".v" no;
@@ -78,7 +75,6 @@ createNode camera -s -n "sideShape" -p "side";
 	setAttr ".man" -type "string" "side_mask";
 	setAttr ".hc" -type "string" "viewSet -s %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -n "testGeo_normals:original";
 	rename -uid "6FDE1BDE-42CD-FF5F-6964-D2869AFAE833";
 	setAttr ".s" -type "double3" 0.57325892802804179 0.57325892802804179 0.57325892802804179 ;
@@ -1336,19 +1332,6 @@ createNode shapeEditorManager -n "shapeEditorManager";
 	rename -uid "88FDEBA4-48FC-8121-0F77-7B80F72BF1F5";
 createNode poseInterpolatorManager -n "poseInterpolatorManager";
 	rename -uid "823144B8-4ACA-7C9A-21B1-6EB88559CDB7";
-createNode aiOptions -s -n "defaultArnoldRenderOptions";
-	rename -uid "F70913AA-4FC8-0122-13C3-299EE1ED2BC3";
-	setAttr ".version" -type "string" "5.2.3";
-createNode aiAOVFilter -s -n "defaultArnoldFilter";
-	rename -uid "1A48D8B4-4401-7986-6BAA-279A9601B8EC";
-	setAttr ".ai_translator" -type "string" "gaussian";
-createNode aiAOVDriver -s -n "defaultArnoldDriver";
-	rename -uid "FFF37E91-43E5-5032-1783-828E3FF7B4B8";
-	setAttr ".ai_translator" -type "string" "exr";
-createNode aiAOVDriver -s -n "defaultArnoldDisplayDriver";
-	rename -uid "77FB48E7-4804-3642-DA7A-9BA1179F34DD";
-	setAttr ".ai_translator" -type "string" "maya";
-	setAttr ".output_mode" 0;
 createNode materialInfo -n "testGeo_normals:materialInfo104";
 	rename -uid "845031F7-4269-4A67-8736-E59D0E547CD8";
 createNode shadingEngine -n "testGeo_normals:standardSurface5SG";
@@ -1356,8 +1339,6 @@ createNode shadingEngine -n "testGeo_normals:standardSurface5SG";
 	addAttr -ci true -h true -sn "aal" -ln "attributeAliasList" -dt "attributeAlias";
 	setAttr ".ihi" 0;
 	setAttr ".ro" yes;
-	setAttr ".aovs[0].aov_name" -type "string" "N";
-	setAttr ".aal" -type "attributeAlias" 2 "ai_aov_N" "aiCustomAOVs[0]" ;
 createNode standardSurface -n "testGeo_normals:testShader";
 	rename -uid "84589A09-4917-8B5D-813A-59916F502ED3";
 	setAttr ".bc" -type "float3" 1 1 1 ;
