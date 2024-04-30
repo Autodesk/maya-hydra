@@ -42,6 +42,8 @@ TF_DEFINE_PRIVATE_TOKENS(
      (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
  );
 
+//refined means that it supports a "refineLevel" attribute in the displayStyle to get a more refined drawing, valid range is from 0 to 8
+
 //Wireframe on surface refined
 const HdRetainedContainerDataSourceHandle sRefinedWireframeOnShadedDisplayStyleDataSource
     = HdRetainedContainerDataSource::New(
