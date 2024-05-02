@@ -35,7 +35,13 @@ For additional information on building Pixar USD, see the ***Additional Build In
 
 ***NOTE:*** Make sure that you don't have an older USD locations in your ```PATH``` and ```PYTHONPATH``` environment settings. ```PATH``` and ```PYTHONPATH``` are automatically adjusted inside the project to point to the correct USD location. See ```cmake/usd.cmake```.
 
-#### 3. Universal Front End (UFE)
+#### 3. Download and Build MayaUSD 
+
+Starting from Maya 2025, the project requires MayaUSD to build, this will enable more features for usd stages when using an hydra render delegate, such as : hide/delete the stage when the proxy shape node is hidden/deleted, or applying a transform on the proxy shape node will apply it on the stage. 
+
+To build MayaUSD, see the github page https://github.com/Autodesk/maya-usd/blob/dev/doc/build.md
+
+#### 4. Universal Front End (UFE)
 
 The Universal Front End (UFE) is a DCC-agnostic component that allows Maya to browse and edit data in multiple data models. This allows Maya to edit pipeline data such as USD. UFE comes installed as a built-in component with Maya 2019 and later. UFE is developed as a separate binary component, and therefore versioned separately from Maya.
 
@@ -47,7 +53,7 @@ To build the project with UFE support, you will need to use the headers and libr
 
 https://www.autodesk.com/developer-network/platform-technologies/maya
 
-#### 4. Download the source code
+#### 5. Download the source code
 
 Start by cloning the repository:
 ```
@@ -63,36 +69,29 @@ cd maya-hydra
 | lib/mayaHydra/hydraExtensions | Contains extensions to and mechanism needed to interface with hydra classes |
 | lib/mayaHydra/ufeExtensions | Contains extensions to translate paths between UFE, USD SdfPath and Maya DAGPath |
 
-#### 5. How To Use build.py Script
+#### 6. How To Use build.py Script
 
 ##### Arguments
 
-There are at least four arguments that must be passed to the script: 
+There are at least five arguments that must be passed to the script: 
 
 | Flags                 | Description                                                                           |
 |--------------------   |-------------------------------------------------------------------------------------- |
 |   --maya-location     | directory where Maya is installed.                                                    |
 |  --pxrusd-location    | directory where Pixar USD Core is installed.                                          |
+|  --mayausd-location   | directory where MayaUSD is installed.                                                 |
 |  --devkit-location    | directory where Maya devkit is installed.                                             |
 | workspace_location    | directory where the project use as a workspace to build and install plugin/libraries  |
 
-Optional arguments are :
-| Flags                 | Description                                                                                         |
-|--------------------   |---------------------------------------------------------------------------------------------------- |
-|   --mayausd-location  | directory where MayaUSD is installed. By providing this, you will enable more features for          |
-|                       | usd stages when using an hydra render delegate, such as : hide/delete the stage when the proxy shape|
-|                       | node is hidden/deleted, or applying a transform on the proxy shape node will apply it on the stage. |
-
-
 ```
 Linux:
-➜ maya-hydra python build.py --maya-location /usr/autodesk/maya2025 --pxrusd-location /usr/local/USD-Release --devkit-location /usr/local/devkitBase /usr/local/workspace
+➜ maya-hydra python build.py --maya-location /usr/autodesk/maya2025 --mayausd-location /usr/local/mayaUSD-Release --pxrusd-location /usr/local/USD-Release --devkit-location /usr/local/devkitBase /usr/local/workspace
 
 MacOSX:
-➜ maya-hydra python build.py --maya-location /Applications/Autodesk/maya2025 --pxrusd-location /opt/local/USD-Release --devkit-location /opt/local/devkitBase /opt/local/workspace
+➜ maya-hydra python build.py --maya-location /Applications/Autodesk/maya2025 --mayausd-location /opt/local/mayaUSD-Release --pxrusd-location /opt/local/USD-Release --devkit-location /opt/local/devkitBase /opt/local/workspace
 
 Windows:
-C:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya2025" --pxrusd-location C:\USD-Release --devkit-location C:\devkitBase C:\workspace
+➜ C:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya2025" --mayausd-location C:\mayaUSD-Release --pxrusd-location C:\USD-Release --devkit-location C:\devkitBase C:\workspace
 ```
 
 **Notes:** 
