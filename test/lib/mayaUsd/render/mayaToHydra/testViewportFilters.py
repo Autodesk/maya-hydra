@@ -68,6 +68,11 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
 
     CURVE_POINTS = [(0,-5,10), (-10, 0, 0), (0, 5, -10), (10, 0, 0), (0, -5, 5), (-5,0,0), (0,5,-5), (5, 0, 0), (0,0,0)]
 
+    def setUp(self):
+        super(TestViewportFilters, self).setUp()
+        # Include everything
+        cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, excludeObjectMask=0)
+
     # This is a somewhat hacky workaround around the limitation that line width is currently (2024-05-02)
     # not supported by mayaHydra : we stack multiple instances of the same item very close together.
     # If we just used a single wireframe, its line width would be 1-pixel wide, which is much too thin
@@ -86,67 +91,66 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
     def checkFilter(self, name, exclusionMask, cameraDistance=15):
         activeViewport = mayaUtils.activeModelPanel()
         oldMask = cmds.modelEditor(activeViewport, query=True, excludeObjectMask=True)
-        # Should start by being excluded
-        self.assertNotEqual(oldMask & exclusionMask, 0)
 
-        # Reuse the same image for all checks when an item is excluded. Since we start by excluding everything,
-        # exclusion checks should all result in an empty image.
-        self.compareSnapshot("excluded.png", cameraDistance)
+        # Should start by being included
+        self.assertEqual(oldMask & exclusionMask, 0)
+        self.compareSnapshot(name + "_included.png", cameraDistance)
 
-        # Enable the given items and check that they are displayed
-        newMask = oldMask & (~exclusionMask)
+        # Exclude and ensure the items are no longer displayed
+        newMask = oldMask | exclusionMask
         cmds.modelEditor(activeViewport, edit=True, excludeObjectMask=newMask)
-        self.compareSnapshot(name + ".png", cameraDistance)
+        self.compareSnapshot(name + "_excluded.png", cameraDistance)
 
         # Restore old mask
         cmds.modelEditor(activeViewport, edit=True, excludeObjectMask=oldMask)
 
-    def test_ViewportFilters(self):
-        # Start by excluding everything
-        cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, excludeObjectMask=0xffffffff)
-        
-        # Increase line width so they take up a larger portion of the images
-        cmds.displayPref(lineWidth=9)
-        mel.eval('displayPref -lineWidth 9')
-
-        cmds.polySphere()
-        cmds.select(clear=True)
-        self.checkFilter("polygons", kExcludeMeshes, 3)
-
-        self.stackInstances(cmds.circle, 50, [0, 0, 0.005])
-        cmds.select(clear=True)
-        self.checkFilter("nurbs_curves", kExcludeNurbsCurves, 2)
-
-        self.stackInstances(cmds.directionalLight, 50, [0, 0.005, 0])
-        cmds.select(clear=True)
-        self.checkFilter("lights", kExcludeLights, 3)
-
-        cmds.sphere()
-        cmds.select(clear=True)
-        self.checkFilter("nurbs_surfaces", kExcludeNurbsSurfaces, 3)
-
+    def test_Dimensions(self):
         cmds.distanceDimension(startPoint=[-1, -2, 3], endPoint=[3, 2, -1])
         cmds.select(clear=True)
         self.checkFilter("dimensions", kExcludeDimensions, 6)
 
-        curve = cmds.curve(point=self.CURVE_POINTS)
-        cmds.setAttr(curve + ".dispHull", True)
+    def test_NurbsCurves(self):
+        self.stackInstances(cmds.circle, 50, [0, 0, 0.005])
         cmds.select(clear=True)
-        # Hulls are dependent on curves being visible in the first place
-        self.checkFilter("nurbs_hull", kExcludeHulls | kExcludeNurbsCurves, 3)
+        self.checkFilter("nurbs_curves", kExcludeNurbsCurves, 2)
 
+    def test_NurbsSurfaces(self):
+        cmds.sphere()
+        cmds.select(clear=True)
+        self.checkFilter("nurbs_surfaces", kExcludeNurbsSurfaces, 3)
+
+    def test_NurbsHulls(self):
+        def curveCreator():
+            curve = cmds.curve(point=self.CURVE_POINTS)
+            cmds.setAttr(curve + ".dispHull", True)
+        self.stackInstances(curveCreator, 50, [0, 0.005, 0.005])
+        cmds.select(clear=True)
+        self.checkFilter("nurbs_hull", kExcludeHulls, 10)
+
+    def test_Polygons(self):
+        cmds.polySphere()
+        cmds.select(clear=True)
+        self.checkFilter("polygons", kExcludeMeshes, 3)
+
+    def test_SubdivisionSurfaces(self):
         cylinderNode = cmds.polyCylinder()[0]
         cmds.polyToSubdiv(cylinderNode)
         cmds.select(clear=True)
+        cmds.delete(cylinderNode)
         self.checkFilter("subdivision_surfaces", kExcludeSubdivSurfaces, 3)
 
-        # TODO
-        # Here are some of the object types mayaHydra does not support currently (2024-05-02) :
-        # - Construction Planes
-        # - NURBS CVs
-        # - 
-        # And some that are supported by secondary graphics, and not through Hydra itself :
-        # - 
+    def test_Lights(self):
+        self.stackInstances(cmds.directionalLight, 50, [0, 0.005, 0])
+        cmds.select(clear=True)
+        self.checkFilter("lights", kExcludeLights, 3)
+
+    # TODO
+    # Here are some of the object types mayaHydra does not support currently (2024-05-02) :
+    # - Construction Planes
+    # - NURBS CVs
+    # - 
+    # And some that are supported by secondary graphics, and not through Hydra itself :
+    # - 
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
