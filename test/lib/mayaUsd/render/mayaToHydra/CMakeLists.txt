@@ -35,6 +35,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testBackgroundColor.py
     testGrid.py
     testPassingNormalsOnMayaNative.py
+    testViewportFilters.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py
