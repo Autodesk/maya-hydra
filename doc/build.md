@@ -23,11 +23,9 @@ Before building the project, consult the following table to ensure you use the r
 
 ***NOTE:*** Visit the online Maya developer help document under ***Setting up your build environment*** for additional compiler requirements on different platforms.
 
-#### 2. Download and Build MayaUSD 
+#### 2. Download and Build Pixar USD 
 
-Started from Maya 2025, by default, the project needs to be built with MayaUSD, to build MayaUSD, see the github page https://github.com/Autodesk/maya-usd/blob/dev/doc/build.md
-
-***NOTE:*** If you want to build the project with Pixar USD instead of MayaUSD or you're building the project with Maya 2024, see Pixar's official github page for instructions on how to build USD: https://github.com/PixarAnimationStudios/USD. Pixar has removed support for building Maya USD libraries/plug-ins in their github repository and ```build_usd.py```.
+See Pixar's official github page for instructions on how to build USD: https://github.com/PixarAnimationStudios/USD. Pixar has removed support for building Maya USD libraries/plug-ins in their github repository and ```build_usd.py```.
 
 |               |      ![](images/pxr.png)          |USD version used in Maya        
 |:------------: |:---------------:                  |:---------------:
@@ -74,28 +72,27 @@ There are at least four arguments that must be passed to the script:
 | Flags                 | Description                                                                           |
 |--------------------   |-------------------------------------------------------------------------------------- |
 |   --maya-location     | directory where Maya is installed.                                                    |
-|  --mayausd-location   | directory where MayaUSD is installed.                                                 |
+|  --pxrusd-location    | directory where Pixar USD Core is installed.                                          |
 |  --devkit-location    | directory where Maya devkit is installed.                                             |
 | workspace_location    | directory where the project use as a workspace to build and install plugin/libraries  |
 
 Optional arguments are :
 | Flags                 | Description                                                                                         |
 |--------------------   |---------------------------------------------------------------------------------------------------- |
-|   --pxrausd-location  | directory where Pixar USD Core is installed.                                                        |
-|                       | Note if this argument instead of mayausd-location is provided, some features won't be available for |
+|   --mayausd-location  | directory where MayaUSD is installed. By providing this, you will enable more features for          |
 |                       | usd stages when using an hydra render delegate, such as : hide/delete the stage when the proxy shape|
 |                       | node is hidden/deleted, or applying a transform on the proxy shape node will apply it on the stage. |
 
 
 ```
 Linux:
-➜ maya-hydra python build.py --maya-location /usr/autodesk/maya2025 --mayausd-location /usr/local/mayausd --devkit-location /usr/local/devkitBase /usr/local/workspace
+➜ maya-hydra python build.py --maya-location /usr/autodesk/maya2025 --pxrusd-location /usr/local/USD-Release --devkit-location /usr/local/devkitBase /usr/local/workspace
 
 MacOSX:
-➜ maya-hydra python build.py --maya-location /Applications/Autodesk/maya2025 --mayausd-location /opt/local/mayausd --devkit-location /opt/local/devkitBase /opt/local/workspace
+➜ maya-hydra python build.py --maya-location /Applications/Autodesk/maya2025 --pxrusd-location /opt/local/USD-Release --devkit-location /opt/local/devkitBase /opt/local/workspace
 
 Windows:
-C:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya2025" --mayausd-location C:\mayausd --devkit-location C:\devkitBase C:\workspace
+C:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya2025" --pxrusd-location C:\USD-Release --devkit-location C:\devkitBase C:\workspace
 ```
 
 **Notes:** 
@@ -195,11 +192,11 @@ Unit tests can be run by setting ```--stages=test``` or by simply calling `ctest
 
 ##### Python:
 
-***NOTE:*** If you want to build the project with Pixar USD instead of MayaUSD or you're building the project with Maya 2024, it is important to use the Python version shipped with Maya and not the system version when building USD on MacOS. Note that this is primarily an issue on MacOS, where Maya's version of Python is likely to conflict with the version provided by the system. 
+It is important to use the Python version shipped with Maya and not the system version when building USD on MacOS. Note that this is primarily an issue on MacOS, where Maya's version of Python is likely to conflict with the version provided by the system. 
 
-To build USD and the Maya plug-ins on MacOS for Maya (2024), run:
+To build USD and the Maya plug-ins on MacOS for Maya (2025), run:
 ```
-/Applications/Autodesk/maya2024/Maya.app/Contents/bin/mayapy build_usd.py ~/Desktop/BUILD
+/Applications/Autodesk/maya2025/Maya.app/Contents/bin/mayapy build_usd.py ~/Desktop/BUILD
 ```
 By default, ``usdview`` is built which has a dependency on PyOpenGL. Since the Python version of Maya doesn't ship with PyOpenGL you will be prompted with the following error message:
 ```
