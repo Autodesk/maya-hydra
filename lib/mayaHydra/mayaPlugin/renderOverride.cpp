@@ -1057,7 +1057,7 @@ MStatus MtohRenderOverride::Render(
         _mayaHydraSceneIndex->PreFrame(drawContext);
         
         if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle, currentUseDefaultMaterial, xRayEnabled)){
-            _selection->IgnoreChanges(true);//Prevent selection from being updated, we want to keep it.
+            _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(true);//Prevent prim removal propagation to keep the current selection.
             //We need to recreate the filtering scene index chain after the merging scene index as there was a change such as in the BBox display style which has been turned on or off.
             _lastFilteringSceneIndexBeforeCustomFiltering = nullptr;//Release
             _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
@@ -1077,7 +1077,7 @@ MStatus MtohRenderOverride::Render(
             
             _xRayEnabled = xRayEnabled;
             _useDefaultMaterial = currentUseDefaultMaterial;
-            _selection->IgnoreChanges(false);//Allow selection to be updated again.
+            _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(false);//Allow prim removal propagation again.
         }
     }
 
@@ -1312,8 +1312,10 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     //Create internal scene indices chain
     _inputSceneIndexOfFilteringSceneIndicesChain = _renderIndexProxy->GetMergingSceneIndex();
 
+    //Put BlockPrimRemovalPropagationSceneIndex first as it can block/unblock the prim removal propagation on the whole scene indices chain
+    _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
     _selection = std::make_shared<Fvp::Selection>();
-    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain , _selection);
+    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_blockPrimRemovalPropagationSceneIndex, _selection);
     _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
     _inputSceneIndexOfFilteringSceneIndicesChain = _selectionSceneIndex;
 

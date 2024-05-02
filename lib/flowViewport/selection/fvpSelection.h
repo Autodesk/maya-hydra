@@ -93,10 +93,6 @@ public:
     FVP_API
     PXR_NS::GfVec4f GetWireframeColor(const PXR_NS::SdfPath& primPath)const;
 
-    //Ignore changes, this is used to keep the selection when we want to switch between display modes
-    FVP_API
-    void IgnoreChanges(bool val){_ignoreChanges = val;}
-
     //Get last path selected is used to get the mlast selected path, to check if a prim is the lead object of the selection
     FVP_API
     PXR_NS::SdfPath GetLastPathSelected()const;
@@ -123,8 +119,6 @@ private:
     PXR_NS::GfVec4f _activeWireframeColor;
     PXR_NS::GfVec4f _leadWireframeColor;
     PXR_NS::GfVec4f _dormantWireframeColor;
-    //Used to ignore changes in _pathToState as we want to keep the selection (typical example is a switch between display modes like from shaded to wireframe)
-    bool _ignoreChanges = false;
 };
 
 }

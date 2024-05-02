@@ -43,6 +43,7 @@
 #include <flowViewport/selection/fvpSelectionTracker.h>
 #include <flowViewport/selection/fvpSelectionFwd.h>
 #include <flowViewport/sceneIndex/fvpDisplayStyleOverrideSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
@@ -248,6 +249,7 @@ private:
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
     Fvp::SelectionPtr                         _selection;
+    Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     // Naming this identifier _ufeSelection clashes with UFE's selection.h
     // include guard and produces
     // "error C2351: obsolete C++ constructor initialization syntax"

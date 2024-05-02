@@ -86,8 +86,6 @@ Selection::Selection()
 bool
 Selection::Add(const SdfPath& primPath)
 {
-    if (_ignoreChanges) return false;
-
     if (primPath.IsEmpty()) {
         return false;
     }
@@ -100,8 +98,6 @@ Selection::Add(const SdfPath& primPath)
 
 bool Selection::Remove(const SdfPath& primPath)
 {
-    if (_ignoreChanges) return false;
-
     const bool res = (!primPath.IsEmpty() && (_pathToState.erase(primPath) == 1));
     if( res){
         auto it = std::find(_selectedPaths.begin(), _selectedPaths.end(), primPath);
@@ -116,16 +112,12 @@ bool Selection::Remove(const SdfPath& primPath)
 void
 Selection::Clear()
 {
-    if (_ignoreChanges) return;
-
     _pathToState.clear();
     _selectedPaths.clear();
 }
 
 void Selection::Replace(const SdfPathVector& selection)
 {
-    if (_ignoreChanges) return;
-
     Clear();
 
     for (const auto& primPath : selection) {
@@ -142,8 +134,6 @@ void Selection::Replace(const SdfPathVector& selection)
 
 void Selection::RemoveHierarchy(const SdfPath& primPath)
 {
-    if (_ignoreChanges) return;
-
     auto it = _pathToState.lower_bound(primPath);
     while (it != _pathToState.end() && it->first.HasPrefix(primPath)) {
         //Remove it from _selectedPaths
