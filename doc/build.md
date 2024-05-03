@@ -37,7 +37,7 @@ For additional information on building Pixar USD, see the ***Additional Build In
 
 #### 3. Download and Build MayaUSD 
 
-Starting from Maya 2025, the project requires MayaUSD to build, this will enable more features for usd stages when using an hydra render delegate, such as : hide/delete the stage when the proxy shape node is hidden/deleted, or applying a transform on the proxy shape node will apply it on the stage. 
+Starting from Maya 2025, the project requires MayaUSD to build.  This enables more features for USD stages when using a Hydra render delegate, such as: hide/delete the stage when the proxy shape node is hidden/deleted, or applying a transform on the proxy shape node will apply it on the stage. 
 
 To build MayaUSD, see the github page https://github.com/Autodesk/maya-usd/blob/dev/doc/build.md
 
