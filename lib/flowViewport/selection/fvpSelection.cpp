@@ -37,8 +37,6 @@
 //
 
 #include "flowViewport/selection/fvpSelection.h"
-#include "flowViewport/colorPreferences/fvpColorPreferences.h"
-#include "flowViewport/colorPreferences/fvpColorPreferencesTokens.h"
 
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
@@ -78,9 +76,6 @@ Selection::_PrimSelectionState::GetVectorDataSource() const
 
 Selection::Selection()
 {
-    Fvp::ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->wireframeSelection, _leadWireframeColor);
-    Fvp::ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->wireframeSelectionSecondary, _activeWireframeColor);
-    Fvp::ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->polymeshDormant, _dormantWireframeColor);
 }
 
 bool
@@ -91,29 +86,19 @@ Selection::Add(const SdfPath& primPath)
     }
 
     _pathToState[primPath].selectionSources.push_back(selectionBuilder.Build());
-    _selectedPaths.push_back(primPath);//Ufe prevents duplicates from being added so no need to check for duplicates
-
+    
     return true;
 }
 
 bool Selection::Remove(const SdfPath& primPath)
 {
-    const bool res = (!primPath.IsEmpty() && (_pathToState.erase(primPath) == 1));
-    if( res){
-        auto it = std::find(_selectedPaths.begin(), _selectedPaths.end(), primPath);
-        if (it != _selectedPaths.end()){
-            _selectedPaths.erase(it);
-        }
-    }
-
-    return res;
+    return (!primPath.IsEmpty() && (_pathToState.erase(primPath) == 1));
 }
 
 void
 Selection::Clear()
 {
     _pathToState.clear();
-    _selectedPaths.clear();
 }
 
 void Selection::Replace(const SdfPathVector& selection)
@@ -127,21 +112,12 @@ void Selection::Replace(const SdfPathVector& selection)
         _pathToState[primPath].selectionSources.push_back(
             selectionBuilder.Build());
     }
-
-    //Copy selection to selectedPaths 
-    _selectedPaths.assign(selection.begin(), selection.end());
 }
 
 void Selection::RemoveHierarchy(const SdfPath& primPath)
 {
     auto it = _pathToState.lower_bound(primPath);
     while (it != _pathToState.end() && it->first.HasPrefix(primPath)) {
-        //Remove it from _selectedPaths
-        auto itSelectedPaths = std::find(_selectedPaths.begin(), _selectedPaths.end(), it->first);
-        if (itSelectedPaths != _selectedPaths.end()){
-            _selectedPaths.erase(itSelectedPaths);
-        }
-
         it = _pathToState.erase(it);
     }
 }
@@ -187,34 +163,5 @@ HdDataSourceBaseHandle Selection::GetVectorDataSource(
     return (it != _pathToState.end()) ? 
         it->second.GetVectorDataSource() : nullptr;
 }
-
-GfVec4f Selection::GetWireframeColor(const SdfPath& primPath)const
-{
-    if (HasFullySelectedAncestorInclusive(primPath)){
-        return (_IsLastSelected(primPath)) ? _leadWireframeColor : _activeWireframeColor;
-    }
-
-    return _dormantWireframeColor;
-}
-
-SdfPath Selection::GetLastPathSelected()const 
-{     
-    if (_selectedPaths.empty()){
-        return SdfPath();
-    }
-
-    return _selectedPaths.back();
-}
-
-bool Selection::_IsLastSelected(const SdfPath& primPath)const
-{
-    auto lastSelPath = GetLastPathSelected();
-    if (lastSelPath.IsEmpty()){
-        return false;
-    }
-
-    return (lastSelPath == primPath);
-}
-
 
 } // end of namespace FVP_NS_DEF

@@ -65,10 +65,6 @@ namespace {
                                                                 HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),//Also dirty override wireframe color
                                                                 HdPrimvarsSchema::GetDefaultLocator().Append(HdTokens->displayColor)//and display color
                                                                 };
-
-    const HdDataSourceLocatorSet primvarsColorsLocatorSet{  HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),
-                                                            HdPrimvarsSchema::GetDefaultLocator().Append(HdTokens->displayColor)
-                                                         };
 }
 
 namespace FVP_NS_DEF {
@@ -177,17 +173,9 @@ SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("    Adding %s to the Hydra selection.\n", sceneIndexPath.GetText());
 
-    //Deal with the lead and active colors for wireframe highlighting
-    //Get last selected path before removing
-    const SdfPath lastSelPathBefore = _selection->GetLastPathSelected();//This is the lead object if non empty
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
     if (_selection->Add(sceneIndexPath)) {
-        if ( ! lastSelPathBefore.IsEmpty()){
-            //The wireframe color of this prim should be updated as it's no longer the lead object
-            dirtiedPrims.push_back({lastSelPathBefore, primvarsColorsLocatorSet});
-        }
-        dirtiedPrims.push_back({sceneIndexPath, selectionsAndPrimvarsColorsLocatorSet});
-        _SendPrimsDirtied(dirtiedPrims);
+        _SendPrimsDirtied({{sceneIndexPath, selectionsAndPrimvarsColorsLocatorSet}});
     }
 }
 
@@ -200,26 +188,9 @@ void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
     // index path.
     auto sceneIndexPath = SceneIndexPath(appPath);
 
-    //Deal with the lead and active colors for wireframe highlighting
-    //Get last selected path before removing
-    const SdfPath lastSelPathBefore = _selection->GetLastPathSelected();//This is the lead object if non empty before the removal
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
     if (_selection->Remove(sceneIndexPath)) {
-        dirtiedPrims.push_back({sceneIndexPath, selectionsAndPrimvarsColorsLocatorSet});
-
-        //Get last selected path after removing
-        const SdfPath lastSelPathAfter = _selection->GetLastPathSelected();//lead object after removal
-        if (lastSelPathBefore != lastSelPathAfter){
-            //The wireframe color of these prim should be updated
-            if(! lastSelPathBefore.IsEmpty()){
-                dirtiedPrims.push_back({lastSelPathBefore, primvarsColorsLocatorSet});
-            }
-            if(! lastSelPathAfter.IsEmpty()){
-                dirtiedPrims.push_back({lastSelPathAfter, primvarsColorsLocatorSet});
-            }
-        }
-        
-       _SendPrimsDirtied(dirtiedPrims);
+       _SendPrimsDirtied({{sceneIndexPath, selectionsAndPrimvarsColorsLocatorSet}});
     }
 }
 

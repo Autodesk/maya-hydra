@@ -27,7 +27,6 @@
 #include "renderOverrideUtils.h"
 #include "tokens.h"
 
-#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
 #include <mayaHydraLib/hydraUtils.h>
@@ -1040,6 +1039,10 @@ MStatus MtohRenderOverride::Render(
             if (dataProducerSceneIndicesAdded && _selectionSceneIndex){
                 _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
             }
+            //Update the leadObjectTacker in case it could not find the current lead object which could be in a custom data producer scene index or a maya usd proxy shape scene index
+            if (_leadObjectPathTracker){
+                _leadObjectPathTracker->updateAfterDataProducerSceneIndicesLoaded();
+            }
         }
     }
 
@@ -1319,6 +1322,9 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
     _inputSceneIndexOfFilteringSceneIndicesChain = _selectionSceneIndex;
 
+    _dirtyLeadObjectSceneIndex = MAYAHYDRA_NS_DEF::MhDirtyLeadObjectSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
+    _inputSceneIndexOfFilteringSceneIndicesChain = _dirtyLeadObjectSceneIndex;
+
     // Set the initial selection onto the selection scene index.
     _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
 
@@ -1379,6 +1385,8 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _displayStyleSceneIndex = nullptr;
     _selectionSceneIndex.Reset();
     _selection.reset();
+    _wireframeColorInterfaceImp.reset();
+    _leadObjectPathTracker.reset();
 
     // Cleanup internal context data that keep references to data that is now
     // invalid.
@@ -1425,10 +1433,19 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
     const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
 
+    auto mergingSceneIndex = _renderIndexProxy->GetMergingSceneIndex();
+    if(! _leadObjectPathTracker){
+        _leadObjectPathTracker = std::make_shared<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker>(mergingSceneIndex, _dirtyLeadObjectSceneIndex);
+    }
+
+    if (! _wireframeColorInterfaceImp){
+        _wireframeColorInterfaceImp = std::make_unique<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp>(_selection, _leadObjectPathTracker);
+    }
+    
     //Are we using Bounding Box display style ?
     if (currentDisplayStyle & MHWRender::MFrameContext::kBoundingBox){
         //Insert the bounding box filtering scene index which converts geometries into a bounding box using the extent attribute
-        auto bboxSceneIndex  = Fvp::BboxSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection);
+        auto bboxSceneIndex  = Fvp::BboxSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, *_wireframeColorInterfaceImp);
         bboxSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
         _lastFilteringSceneIndexBeforeCustomFiltering = bboxSceneIndex;
     }
@@ -1440,14 +1457,14 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
             if (MFrameContext::WireOnShadedMode::kWireFrameOnShadedReduced == wireOnShadedMode ){
                 //Insert the reprselector filtering scene index which updates the repr selector on geometries
                 auto reprSelectorSceneIndex = Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
-                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface, _selection);
+                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface, *_wireframeColorInterfaceImp);
                 reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
                 _lastFilteringSceneIndexBeforeCustomFiltering = reprSelectorSceneIndex;
             } else {//Full quality
                 //Should we support kWireFrameOnShadedNone and do not display any wireframe ?
                 //Insert the reprselector filtering scene index which updates the repr selector on geometries
                 auto reprSelectorSceneIndex = Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
-                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined, _selection);
+                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined, *_wireframeColorInterfaceImp);
                 reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
                 _lastFilteringSceneIndexBeforeCustomFiltering = reprSelectorSceneIndex;
             }
@@ -1457,13 +1474,13 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
                 
                 //Insert the reprselector filtering scene index which updates the repr selector on geometries
                 auto reprSelectorSceneIndex = Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
-                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined, _selection);
+                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined, *_wireframeColorInterfaceImp);
                 reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
                 _lastFilteringSceneIndexBeforeCustomFiltering = reprSelectorSceneIndex;
             }
     }
 
-    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection));
+    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection, *_wireframeColorInterfaceImp));
     wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
     
     // At time of writing, wireframe selection highlighting of Maya native data

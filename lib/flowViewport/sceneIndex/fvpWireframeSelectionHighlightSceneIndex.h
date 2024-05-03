@@ -18,6 +18,7 @@
 #include "flowViewport/api.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+#include "flowViewport/fvpWireframeColorInterface.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -49,7 +50,8 @@ public:
     FVP_API
     static PXR_NS::HdSceneIndexBaseRefPtr New(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
-        const SelectionConstPtr& selection
+        const SelectionConstPtr& selection,
+        const WireframeColorInterface& wireframeColorInterface
     );
 
     FVP_API
@@ -73,7 +75,8 @@ protected:
     FVP_API
     WireframeSelectionHighlightSceneIndex(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
-        const SelectionConstPtr& selection
+        const SelectionConstPtr& selection,
+        const WireframeColorInterface& wireframeColorInterface
     );
 
     FVP_API
@@ -104,6 +107,7 @@ private:
     PXR_NS::HdContainerDataSourceHandle _HighlightSelectedPrim(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::SdfPath& primPath)const;
 
     const SelectionConstPtr   _selection;
+    const WireframeColorInterface& _wireframeColorInterface;
 };
 
 }

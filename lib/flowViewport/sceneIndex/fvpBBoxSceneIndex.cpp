@@ -16,7 +16,6 @@
 
 //Local headers
 #include "fvpBBoxSceneIndex.h"
-#include "flowViewport/selection/fvpSelection.h"
 #include "flowViewport/fvpUtils.h"
 
 //USD/Hydra headers
@@ -349,10 +348,10 @@ namespace
     };
 }
 
-BboxSceneIndex::BboxSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const SelectionConstPtr& selection) : 
+BboxSceneIndex::BboxSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const WireframeColorInterface& wireframeColorInterface) : 
     ParentClass(inputSceneIndex), 
     InputSceneIndexUtils(inputSceneIndex),
-    _selection(selection)
+    _wireframeColorInterface(wireframeColorInterface)
 {
 }
 
@@ -361,7 +360,7 @@ HdSceneIndexPrim BboxSceneIndex::GetPrim(const SdfPath& primPath) const
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     if (prim.dataSource && ! _isExcluded(primPath) && ((prim.primType == HdPrimTypeTokens->mesh) || (prim.primType == HdPrimTypeTokens->basisCurves)) ){
         prim.primType   = HdPrimTypeTokens->basisCurves;//Convert to basisCurve for displaying a bounding box
-        const GfVec4f wireframeColor = _selection->GetWireframeColor(primPath);
+        const GfVec4f wireframeColor = _wireframeColorInterface.getWireframeColor(primPath);
         prim.dataSource = _BoundsPrimDataSource::New(prim.dataSource, wireframeColor);
     }
 

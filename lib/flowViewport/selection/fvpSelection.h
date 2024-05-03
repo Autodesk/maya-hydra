@@ -87,16 +87,6 @@ public:
     PXR_NS::HdDataSourceBaseHandle
     GetVectorDataSource(const PXR_NS::SdfPath& primPath) const;
 
-    //Get the wireframe color of a primitive for selection highlighting, 
-    // this checks if the prim is selected or not and if it is selected, 
-    // it returns the lead or active color depending on the lead of the selection
-    FVP_API
-    PXR_NS::GfVec4f GetWireframeColor(const PXR_NS::SdfPath& primPath)const;
-
-    //Get last path selected is used to get the mlast selected path, to check if a prim is the lead object of the selection
-    FVP_API
-    PXR_NS::SdfPath GetLastPathSelected()const;
-
 private:
 
     struct _PrimSelectionState {
@@ -109,16 +99,6 @@ private:
     // Maps prim path to data sources to be returned by the vector data
     // source at locator selections.
     std::map<PXR_NS::SdfPath, _PrimSelectionState> _pathToState;
-
-    //We need to keep an order of selected paths to deal with the lead of the selection, the lead is the last of the selected items
-    PXR_NS::SdfPathVector _selectedPaths;
-
-    bool _IsLastSelected(const PXR_NS::SdfPath& primPath)const;
-
-    //Colors used by wireframe selection highlighting
-    PXR_NS::GfVec4f _activeWireframeColor;
-    PXR_NS::GfVec4f _leadWireframeColor;
-    PXR_NS::GfVec4f _dormantWireframeColor;
 };
 
 }

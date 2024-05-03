@@ -16,7 +16,6 @@
 
 //Local headers
 #include "fvpReprSelectorSceneIndex.h"
-#include "flowViewport/selection/fvpSelection.h"
 #include "flowViewport/fvpUtils.h"
 
 //USD/Hydra headers
@@ -74,10 +73,10 @@ const HdRetainedContainerDataSourceHandle sWireframeDisplayStyleDataSource
 
 }//End of namespace
 
-ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const SelectionConstPtr& selection) 
+ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const WireframeColorInterface& wireframeColorInterface) 
     : ParentClass(inputSceneIndex), 
     InputSceneIndexUtils(inputSceneIndex),
-    _selection(selection)
+    _wireframeColorInterface(wireframeColorInterface)
 {
     switch (type){
         case RepSelectorType::WireframeRefined:
@@ -105,7 +104,7 @@ HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
         edited.Set(HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),
                         Fvp::PrimvarDataSource::New(
                             HdRetainedTypedSampledDataSource<VtVec4fArray>::New(
-                                                VtVec4fArray{_selection->GetWireframeColor(primPath)}),
+                                                VtVec4fArray{_wireframeColorInterface.getWireframeColor(primPath)}),
                                                 HdPrimvarSchemaTokens->constant,
                                                 HdPrimvarSchemaTokens->color));
         //Edit the cull style

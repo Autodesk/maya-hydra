@@ -19,7 +19,7 @@
 //Local headers
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
-#include "flowViewport/selection/fvpSelectionFwd.h"
+#include "flowViewport/fvpWireframeColorInterface.h"
 
 //Hydra headers
 #include <pxr/base/tf/declarePtrs.h>
@@ -50,8 +50,8 @@ public:
     };
 
     FVP_API
-    static ReprSelectorSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const SelectionConstPtr& selection){
-        return PXR_NS::TfCreateRefPtr(new ReprSelectorSceneIndex(inputSceneIndex, type, selection));
+    static ReprSelectorSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const WireframeColorInterface& wireframeColorInterface){
+        return PXR_NS::TfCreateRefPtr(new ReprSelectorSceneIndex(inputSceneIndex, type, wireframeColorInterface));
     }
 
     // From HdSceneIndexBase
@@ -73,7 +73,7 @@ public:
 
 protected:
     
-ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const SelectionConstPtr& selection);
+ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const WireframeColorInterface& wireframeColorInterface);
 
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override{
@@ -101,7 +101,7 @@ ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, Re
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
 
     PXR_NS::HdRetainedContainerDataSourceHandle _wireframeTypeDataSource = nullptr;
-    const SelectionConstPtr   _selection;
+    const WireframeColorInterface& _wireframeColorInterface;
 };
 
 }//end of namespace FVP_NS_DEF

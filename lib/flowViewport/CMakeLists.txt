@@ -19,6 +19,7 @@ set(HEADERS
     fvpUtils.h
     global.h
     tokens.h
+    fvpWireframeColorInterface.h
 )
 
 # -----------------------------------------------------------------------------

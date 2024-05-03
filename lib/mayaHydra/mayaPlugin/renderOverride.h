@@ -36,7 +36,9 @@
 #include <mayaHydraLib/mayaHydraParams.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexDataFactoriesSetup.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
-
+#include <mayaHydraLib/mhWireframeColorInterfaceImp.h>
+#include <mayaHydraLib/mhLeadObjectPathTracker.h>
+#include <mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h>
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h>
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
@@ -271,6 +273,11 @@ private:
     GlfSimpleLight _defaultLight;
 
     MayaHydraSceneIndexRefPtr _mayaHydraSceneIndex;
+
+    //Lead object selection and wireframe color for selection highlight
+    std::unique_ptr<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp> _wireframeColorInterfaceImp {nullptr};
+    std::shared_ptr<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker> _leadObjectPathTracker {nullptr};
+    MAYAHYDRA_NS_DEF::MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex{nullptr};
 
     /** This class creates the scene index data factories and set them up into the flow viewport library to be able to create DCC 
     *   specific scene index data classes without knowing their content in Flow viewport.
