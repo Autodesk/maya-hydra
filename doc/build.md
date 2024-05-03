@@ -11,13 +11,13 @@ Before building the project, consult the following table to ensure you use the r
 |        Required       | ![](images/windows.png)   |                            ![](images/mac.png)               |   ![](images/linux.png)     |
 |:---------------------:|:-------------------------:|:------------------------------------------------------------:|:---------------------------:|
 |    Operating System   |         Windows 10 <br> Windows 11 | High Sierra (10.13)<br>Mojave (10.14)<br>Catalina (10.15)<br>Big Sur (11.2.x)    |      Rocky Linux 8.6 / Linux® Red Hat® Enterprise 8.6 WS             |
-|   Compiler Requirement| Maya 2024 (VS 2022) | Maya 2024 (Xcode 13.4 or higher) | Maya 2024 (gcc 11.2.1) |
+|   Compiler Requirement| Maya 2024 (VS 2022)<br>Maya 2025 (VS 2022) | Maya 2024 (Xcode 13.4 or higher)<br>Maya 2025 (Xcode 13.4 or higher) | Maya 2024 (gcc 11.2.1)<br>Maya 2025 (gcc 11.2.1) |
 | CMake Version (min/max) |        3.13...3.20      |                              3.13...3.20                     |           3.13...3.20       |
 |         Python        | 3.10.8, 3.11.4  |                       3.10.8, 3.11.4               |  3.10.8, 3.11.4   |
 |    Python Packages    | PyYAML, PySide, PyOpenGL        | PyYAML, PySide2, PyOpenGL              | PyYAML, PySide, PyOpenGL |
 |    Build generator    | Visual Studio, Ninja (Recommended)    |  XCode, Ninja (Recommended)                      |    Ninja (Recommended)      |
 |    Command processor  | Visual Studio x64 2022 command prompt  |                     bash                |             bash            |
-| Supported Maya Version|  2024, PR   |                   2024, PR                    |   2024, PR    |
+| Supported Maya Version|  2024, 2025, PR   |                   2024, 2025, PR                    |   2024, 2025, PR    |
 
 |        Optional       | ![](images/windows.png)   |                            ![](images/mac.png)               |   ![](images/linux.png)     |
 
@@ -29,25 +29,31 @@ See Pixar's official github page for instructions on how to build USD: https://g
 
 |               |      ![](images/pxr.png)          |USD version used in Maya        
 |:------------: |:---------------:                  |:---------------:
-|  CommitID/Tags | [v22.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v22.11) or [v23.08](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.08) or [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11) |Maya 2024 = v22.11<br>Maya PR = v23.11
+|  CommitID/Tags | [v22.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v22.11) or [v23.08](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.08) or [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11) |Maya 2024 = v22.11<br>Maya 2025 = v23.11<br>Maya PR = v23.11
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
 
 ***NOTE:*** Make sure that you don't have an older USD locations in your ```PATH``` and ```PYTHONPATH``` environment settings. ```PATH``` and ```PYTHONPATH``` are automatically adjusted inside the project to point to the correct USD location. See ```cmake/usd.cmake```.
 
-#### 3. Universal Front End (UFE)
+#### 3. Download and Build MayaUSD 
+
+Starting from Maya 2025, the project requires MayaUSD to build.  This enables more features for USD stages when using a Hydra render delegate, such as: hide/delete the stage when the proxy shape node is hidden/deleted, or applying a transform on the proxy shape node will apply it on the stage. 
+
+To build MayaUSD, see the github page https://github.com/Autodesk/maya-usd/blob/dev/doc/build.md
+
+#### 4. Universal Front End (UFE)
 
 The Universal Front End (UFE) is a DCC-agnostic component that allows Maya to browse and edit data in multiple data models. This allows Maya to edit pipeline data such as USD. UFE comes installed as a built-in component with Maya 2019 and later. UFE is developed as a separate binary component, and therefore versioned separately from Maya.
 
 | Ufe Version                | Maya Version                                           | Ufe Docs (external) |
 |----------------------------|--------------------------------------------------------|:-------------------:|
-| v4.0.0<br>v4.1.0<br>v4.2.0            | Maya 2024<br>Maya 2024.1<br>Maya 2024.2                                                | https://help.autodesk.com/view/MAYAUL/2024/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
+| v4.0.0<br>v4.1.0<br>v4.2.0<br>v4.2.0            | Maya 2024<br>Maya 2024.1<br>Maya 2024.2<br>Maya 2025                                                | https://help.autodesk.com/view/MAYADEV/2025/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
 
 To build the project with UFE support, you will need to use the headers and libraries included in the ***Maya Devkit***:
 
 https://www.autodesk.com/developer-network/platform-technologies/maya
 
-#### 4. Download the source code
+#### 5. Download the source code
 
 Start by cloning the repository:
 ```
@@ -63,36 +69,29 @@ cd maya-hydra
 | lib/mayaHydra/hydraExtensions | Contains extensions to and mechanism needed to interface with hydra classes |
 | lib/mayaHydra/ufeExtensions | Contains extensions to translate paths between UFE, USD SdfPath and Maya DAGPath |
 
-#### 5. How To Use build.py Script
+#### 6. How To Use build.py Script
 
 ##### Arguments
 
-There are at least four arguments that must be passed to the script: 
+There are at least five arguments that must be passed to the script: 
 
 | Flags                 | Description                                                                           |
 |--------------------   |-------------------------------------------------------------------------------------- |
 |   --maya-location     | directory where Maya is installed.                                                    |
 |  --pxrusd-location    | directory where Pixar USD Core is installed.                                          |
+|  --mayausd-location   | directory where MayaUSD is installed.                                                 |
 |  --devkit-location    | directory where Maya devkit is installed.                                             |
 | workspace_location    | directory where the project use as a workspace to build and install plugin/libraries  |
 
-Optional arguments are :
-| Flags                 | Description                                                                                         |
-|--------------------   |---------------------------------------------------------------------------------------------------- |
-|   --mayausd-location  | directory where MayaUSD is installed. By providing this, you will enable more features for          |
-|                       | usd stages when using an hydra render delegate, such as : hide/delete the stage when the proxy shape|
-|                       | node is hidden/deleted, or applying a transform on the proxy shape node will apply it on the stage. |
-
-
 ```
 Linux:
-➜ maya-hydra python build.py --maya-location /usr/autodesk/maya2024 --pxrusd-location /usr/local/USD-Release --devkit-location /usr/local/devkitBase /usr/local/workspace
+➜ maya-hydra python build.py --maya-location /usr/autodesk/maya2025 --mayausd-location /usr/local/mayaUSD-Release --pxrusd-location /usr/local/USD-Release --devkit-location /usr/local/devkitBase /usr/local/workspace
 
 MacOSX:
-➜ maya-hydra python build.py --maya-location /Applications/Autodesk/maya2024 --pxrusd-location /opt/local/USD-Release --devkit-location /opt/local/devkitBase /opt/local/workspace
+➜ maya-hydra python build.py --maya-location /Applications/Autodesk/maya2025 --mayausd-location /opt/local/mayaUSD-Release --pxrusd-location /opt/local/USD-Release --devkit-location /opt/local/devkitBase /opt/local/workspace
 
 Windows:
-C:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya2024" --pxrusd-location C:\USD-Release --devkit-location C:\devkitBase C:\workspace
+➜ C:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya2025" --mayausd-location C:\mayaUSD-Release --pxrusd-location C:\USD-Release --devkit-location C:\devkitBase C:\workspace
 ```
 
 **Notes:** 
@@ -194,9 +193,9 @@ Unit tests can be run by setting ```--stages=test``` or by simply calling `ctest
 
 It is important to use the Python version shipped with Maya and not the system version when building USD on MacOS. Note that this is primarily an issue on MacOS, where Maya's version of Python is likely to conflict with the version provided by the system. 
 
-To build USD and the Maya plug-ins on MacOS for Maya (2024), run:
+To build USD and the Maya plug-ins on MacOS for Maya (2025), run:
 ```
-/Applications/Autodesk/maya2024/Maya.app/Contents/bin/mayapy build_usd.py ~/Desktop/BUILD
+/Applications/Autodesk/maya2025/Maya.app/Contents/bin/mayapy build_usd.py ~/Desktop/BUILD
 ```
 By default, ``usdview`` is built which has a dependency on PyOpenGL. Since the Python version of Maya doesn't ship with PyOpenGL you will be prompted with the following error message:
 ```
