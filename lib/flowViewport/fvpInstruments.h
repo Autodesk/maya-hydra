@@ -1,4 +1,4 @@
-// Copyright 2023 Autodesk
+// Copyright 2024 Autodesk
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,27 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#ifndef MH_CPPTESTS_CMD
-#define MH_CPPTESTS_CMD
+#ifndef FVP_INSTRUMENTS
+#define FVP_INSTRUMENTS
 
-#include <maya/MPxCommand.h>
+#include <flowViewport/api.h>
 
-class mayaHydraCppTestCmd : public MPxCommand
+#include <pxr/base/vt/value.h>
+
+#include <string>
+
+namespace FVP_NS_DEF {
+
+/// \class Instruments
+///
+/// A registry to measure Flow Viewport processing.
+///
+class Instruments
 {
 public:
-    static void*   creator() { return new mayaHydraCppTestCmd(); }
-    static MSyntax createSyntax();
 
-    MStatus doIt(const MArgList& args) override;
+    FVP_API
+    static Instruments& instance();
+
+    FVP_API
+    PXR_NS::VtValue get(const std::string& key) const;
+    FVP_API
+    void set(const std::string& key, const PXR_NS::VtValue& v);
+
+private:
+
+    Instruments() = default;
 };
 
-class mayaHydraInstruments : public MPxCommand
-{
-public:
-    static void*   creator() { return new mayaHydraInstruments(); }
-    static MSyntax createSyntax();
+} // namespace FVP_NS_DEF
 
-    MStatus doIt(const MArgList& args) override;
-};
-
-#endif // MH_CPPTESTS_CMD
+#endif // FVP_INSTRUMENTS
