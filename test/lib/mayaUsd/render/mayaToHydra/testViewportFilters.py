@@ -81,7 +81,8 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
     def stackInstances(self, itemCreationCallable, nbInstances, offset):
         for i in range(nbInstances):
             itemCreationCallable()
-            cmds.move(*[i * o for o in offset])
+            cmds.move(*[i * o for o in offset], relative=True)
+            cmds.select(clear=True)
 
     def compareSnapshot(self, referenceFilename, cameraDistance):
         self.setBasicCam(cameraDistance)
@@ -138,6 +139,53 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(clear=True)
         cmds.delete(cylinderNode)
         self.checkFilter("subdivision_surfaces", kExcludeSubdivSurfaces, 3)
+
+    def test_Controllers(self):
+        def controllerCreator():
+            circle = cmds.circle()[0]
+            cmds.select(circle)
+            cmds.controller()
+        self.stackInstances(controllerCreator, 50, [0, 0, 0.005])
+        cmds.select(clear=True)
+        self.checkFilter("controllers", kExcludeControllers, 2)
+
+    def test_Deformers(self):
+        self.stackInstances(cmds.lattice, 50, [0, 0.005, 0])
+        cmds.select(clear=True)
+        self.checkFilter("deformers", kExcludeDeformers, 2)
+
+    def test_IkHandles(self):
+        def ikHandleCreator():
+            joint1 = cmds.joint(position=[0,-2,0])
+            joint2 = cmds.joint(position=[0,2,0])
+            cmds.joint(joint1, edit=True, zeroScaleOrient=True, orientJoint="xyz", secondaryAxisOrient="yup")
+            cmds.joint(joint2, edit=True, zeroScaleOrient=True, orientJoint="none")
+            ikHandle = cmds.ikHandle(startJoint=joint1, endEffector=joint2, solver="ikRPsolver")[0]
+            cmds.select([joint1, ikHandle], replace=True)
+        self.stackInstances(ikHandleCreator, 50, [0, 0, 0.005])
+        cmds.select(all=True)
+        self.checkFilter("ikHandles", kExcludeIkHandles, 5)
+
+    def test_Joints(self):
+        def jointCreator():
+            joint1 = cmds.joint(position=[0,-2,0])
+            joint2 = cmds.joint(position=[0,2,0])
+            cmds.joint(joint1, edit=True, zeroScaleOrient=True, orientJoint="xyz", secondaryAxisOrient="yup")
+            cmds.joint(joint2, edit=True, zeroScaleOrient=True, orientJoint="none")
+            cmds.select([joint1], replace=True)
+        self.stackInstances(jointCreator, 50, [0, 0, 0.005])
+        cmds.select(clear=True)
+        self.checkFilter("joints", kExcludeJoints, 5)
+
+    def test_Locators(self):
+        self.stackInstances(cmds.spaceLocator, 50, [0, 0.005, 0])
+        cmds.select(clear=True)
+        self.checkFilter("locators", kExcludeLocators, 2)
+    
+    def test_MotionTrails(self):
+        mayaUtils.openTestScene("testViewportFilters", "motionTrails.ma")
+        self.setHdStormRenderer()
+        self.checkFilter("motion_trails", kExcludeMotionTrails, 2)
 
     def test_Lights(self):
         self.stackInstances(cmds.directionalLight, 50, [0, 0.005, 0])
