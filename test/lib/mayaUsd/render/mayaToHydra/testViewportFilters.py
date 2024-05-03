@@ -213,6 +213,11 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(clear=True)
         self.checkFilter("lights", kExcludeLights, 3)
 
+    def test_Strokes(self):
+        mayaUtils.openTestScene("testViewportFilters", "strokes.ma")
+        self.setHdStormRenderer()
+        self.checkFilter("strokes", kExcludeStrokes, 4)
+
     # TODO : Texture Placements (not working in Hydra as of 2024-05-03)
 
     # TODO
