@@ -105,6 +105,8 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         # Restore old mask
         cmds.modelEditor(activeViewport, edit=True, excludeObjectMask=oldMask)
 
+    # TODO : Construction planes (not working in Hydra as of 2024-05-03)
+
     def test_Dimensions(self):
         cmds.distanceDimension(startPoint=[-1, -2, 3], endPoint=[3, 2, -1])
         cmds.select(clear=True)
@@ -114,6 +116,8 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         self.stackInstances(cmds.circle, 50, [0, 0, 0.005])
         cmds.select(clear=True)
         self.checkFilter("nurbs_curves", kExcludeNurbsCurves, 2)
+
+    # TODO : Nurbs CVs (not working in Hydra as of 2024-05-03)
 
     def test_NurbsSurfaces(self):
         cmds.sphere()
@@ -140,6 +144,8 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         cmds.delete(cylinderNode)
         self.checkFilter("subdivision_surfaces", kExcludeSubdivSurfaces, 3)
 
+    # TODO : Clip ghosts (filtering option not working as of 2024-05-03?)
+
     def test_Controllers(self):
         def controllerCreator():
             circle = cmds.circle()[0]
@@ -153,6 +159,8 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         self.stackInstances(cmds.lattice, 50, [0, 0.005, 0])
         cmds.select(clear=True)
         self.checkFilter("deformers", kExcludeDeformers, 2)
+    
+    # TODO : Handles (what are they?)
 
     def test_IkHandles(self):
         def ikHandleCreator():
@@ -187,10 +195,25 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         self.setHdStormRenderer()
         self.checkFilter("motion_trails", kExcludeMotionTrails, 2)
 
+    # TODO : Pivots (what are they?)
+
+    def test_Cameras(self):
+        self.stackInstances(cmds.camera, 50, [0, 0.005, 0])
+        cmds.select(clear=True)
+        self.checkFilter("cameras", kExcludeCameras, 2)
+
+    def test_ImagePlanes(self):
+        # Note : the images themselves are not working in Hydra as of 2024-05-03, but the selection highlight does.
+        self.stackInstances(cmds.imagePlane, 50, [0, 0, 0.005])
+        cmds.select(all=True)
+        self.checkFilter("image_planes", kExcludeImagePlane, 8)
+
     def test_Lights(self):
         self.stackInstances(cmds.directionalLight, 50, [0, 0.005, 0])
         cmds.select(clear=True)
         self.checkFilter("lights", kExcludeLights, 3)
+
+    # TODO : Texture Placements (not working in Hydra as of 2024-05-03)
 
     # TODO
     # Here are some of the object types mayaHydra does not support currently (2024-05-02) :
