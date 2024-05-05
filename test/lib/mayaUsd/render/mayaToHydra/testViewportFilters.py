@@ -220,13 +220,5 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
 
     # TODO : Texture Placements (not working in Hydra as of 2024-05-03)
 
-    # TODO
-    # Here are some of the object types mayaHydra does not support currently (2024-05-02) :
-    # - Construction Planes
-    # - NURBS CVs
-    # - 
-    # And some that are supported by secondary graphics, and not through Hydra itself :
-    # - 
-
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
