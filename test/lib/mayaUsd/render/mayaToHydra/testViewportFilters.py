@@ -195,7 +195,7 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         self.setHdStormRenderer()
         self.checkFilter("motion_trails", kExcludeMotionTrails, 2)
 
-    # TODO : Pivots (what are they?)
+    # TODO : Pivots (not working in Hydra as of 2024-05-03)
 
     def test_Cameras(self):
         self.stackInstances(cmds.camera, 50, [0, 0.005, 0])
