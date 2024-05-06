@@ -34,6 +34,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFootPrintNode.py
     testBackgroundColor.py
     testGrid.py
+    testDataProducerSelHighlight.py
     testPassingNormalsOnMayaNative.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py

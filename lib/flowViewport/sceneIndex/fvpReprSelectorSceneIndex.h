@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#ifndef FLOW_VIEWPORT_SCENEINDEX_FVP_BBOX_SCENE_INDEX_H
-#define FLOW_VIEWPORT_SCENEINDEX_FVP_BBOX_SCENE_INDEX_H
+#ifndef FLOW_VIEWPORT_SCENEINDEX_FVP_REPRSELECTOR_SCENE_INDEX_H
+#define FLOW_VIEWPORT_SCENEINDEX_FVP_REPRSELECTOR_SCENE_INDEX_H
 
 //Local headers
 #include "flowViewport/api.h"
@@ -23,30 +23,35 @@
 
 //Hydra headers
 #include <pxr/base/tf/declarePtrs.h>
-#include <pxr/base/gf/vec4f.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
 
 namespace FVP_NS_DEF {
 
-class BboxSceneIndex;
-typedef PXR_NS::TfRefPtr<BboxSceneIndex> BboxSceneIndexRefPtr;
-typedef PXR_NS::TfRefPtr<const BboxSceneIndex> BboxSceneIndexConstRefPtr;
+class ReprSelectorSceneIndex;
+typedef PXR_NS::TfRefPtr<ReprSelectorSceneIndex> ReprSelectorSceneIndexRefPtr;
+typedef PXR_NS::TfRefPtr<const ReprSelectorSceneIndex> ReprSelectorSceneIndexConstRefPtr;
 
-/// \class BboxSceneIndex
+/// \class ReprSelectorSceneIndex
 ///
-/// A filtering scene index that converts geometries into a bounding box using the extent attribute. 
-/// If the extent attribute is not present, it does not draw anything for that prim.
+/// A filtering scene index that applies a different RepSelector on geometries (such as wireframe or wireframe on shaded). 
 ///
-class BboxSceneIndex : public PXR_NS::HdSingleInputFilteringSceneIndexBase
-    , public Fvp::InputSceneIndexUtils<BboxSceneIndex>
+class ReprSelectorSceneIndex : public PXR_NS::HdSingleInputFilteringSceneIndexBase
+    , public Fvp::InputSceneIndexUtils<ReprSelectorSceneIndex>
 {
 public:
     using ParentClass = PXR_NS::HdSingleInputFilteringSceneIndexBase;
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
+    enum class RepSelectorType{
+        WireframeRefined, //Refined wireframe (refined means that it supports a "refineLevel" attribute in the displayStyle to get a more refined drawing, valid range is from 0 to 8)
+        WireframeOnSurface, //Wireframe on surface not refined
+        WireframeOnSurfaceRefined,//Wireframe on surface refined
+    };
+
     FVP_API
-    static BboxSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface){
-        return PXR_NS::TfCreateRefPtr(new BboxSceneIndex(inputSceneIndex, wireframeColorInterface));
+    static ReprSelectorSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface){
+        return PXR_NS::TfCreateRefPtr(new ReprSelectorSceneIndex(inputSceneIndex, type, wireframeColorInterface));
     }
 
     // From HdSceneIndexBase
@@ -59,7 +64,7 @@ public:
     }
     
     FVP_API
-    ~BboxSceneIndex() override = default;
+    ~ReprSelectorSceneIndex() override = default;
 
     FVP_API
     void addExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot) { 
@@ -67,10 +72,14 @@ public:
     }
 
 protected:
-    BboxSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>&  wireframeColorInterface);
+    
+ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface);
 
     //From HdSingleInputFilteringSceneIndexBase
-    void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override;
+    void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override{
+        if (!_IsObserved())return;
+        _SendPrimsAdded(entries);
+    }
     void _PrimsRemoved(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& entries)override{
         if (!_IsObserved())return;
         _SendPrimsRemoved(entries);
@@ -90,9 +99,11 @@ protected:
     }
 
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
+
+    PXR_NS::HdRetainedContainerDataSourceHandle _wireframeTypeDataSource = nullptr;
     std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 };
 
 }//end of namespace FVP_NS_DEF
 
-#endif //FLOW_VIEWPORT_SCENEINDEX_FVP_BBOX_SCENE_INDEX_H
+#endif //FLOW_VIEWPORT_SCENEINDEX_FVP_REPRSELECTOR_SCENE_INDEX_H

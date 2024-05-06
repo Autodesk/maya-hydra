@@ -16,6 +16,7 @@
 
 //Local headers
 #include "fvpBBoxSceneIndex.h"
+#include "flowViewport/fvpUtils.h"
 
 //USD/Hydra headers
 #include <pxr/base/gf/bbox3d.h>
@@ -34,6 +35,7 @@
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/basisCurvesTopologySchema.h>
 #include <pxr/imaging/hd/basisCurvesSchema.h>
+#include <pxr/imaging/hd/primOriginSchema.h>
 
 
 // This class is a filtering scene index that converts the geometries into a bounding box using the extent attribute. 
@@ -55,56 +57,6 @@ namespace
         return result;
     }
 
-    /// A convenience data source implementing the primvar schema from
-    /// a triple of primvar value, interpolation and role. The latter two
-    /// are given as tokens. The value can be given either as data source
-    /// or as thunk returning a data source which is evaluated on each
-    /// Get.
-    class _PrimvarDataSource final : public HdContainerDataSource
-    {
-    public:
-        HD_DECLARE_DATASOURCE(_PrimvarDataSource);
-
-        TfTokenVector GetNames() override {
-            return {HdPrimvarSchemaTokens->primvarValue,
-                    HdPrimvarSchemaTokens->interpolation,
-                    HdPrimvarSchemaTokens->role};
-        }
-
-        HdDataSourceBaseHandle Get(const TfToken &name) override {
-            if (name == HdPrimvarSchemaTokens->primvarValue) {
-                return _primvarValueSrc;
-            }
-            if (name == HdPrimvarSchemaTokens->interpolation) {
-                return
-                    HdPrimvarSchema::BuildInterpolationDataSource(
-                        _interpolation);
-            }
-            if (name == HdPrimvarSchemaTokens->role) {
-                return
-                    HdPrimvarSchema::BuildRoleDataSource(
-                        _role);
-            }
-
-            return nullptr;
-        }
-
-    private:
-        _PrimvarDataSource(
-            const HdDataSourceBaseHandle &primvarValueSrc,
-            const TfToken &interpolation,
-            const TfToken &role)
-          : _primvarValueSrc(primvarValueSrc)
-          , _interpolation(interpolation)
-          , _role(role)
-        {
-        }
-
-        HdDataSourceBaseHandle _primvarValueSrc;
-        TfToken _interpolation;
-        TfToken _role;
-    };
-
     /// Base class for container data sources providing primvars.
     ///
     /// Provides primvars common to bounding boxes display:
@@ -120,40 +72,27 @@ namespace
 
         HdDataSourceBaseHandle Get(const TfToken &name) override {
             if (name == HdTokens->displayColor) {
-                //Get the color from the displayColor attribute of the prim
-                //Works only for maya native data at this time...
-                GfVec4f color(0,1,0,1);
-                HdSampledDataSourceHandle valueDs = HdSampledDataSource::Cast(_primSource->Get(name)); 
-                if (valueDs) {
-                    const VtValue value = valueDs->GetValue(0);
-                    if (value.IsHolding<GfVec4f>()){
-                        color = value.UncheckedGet<GfVec4f>();
-                    }else
-                    if (value.IsHolding<GfVec3f>()){
-                        auto color3 = value.UncheckedGet<GfVec3f>();
-                        color = GfVec4f(color3[0], color3[1], color3[2], 1.0f);
-                    }
-                    
-                    HdDataSourceBaseHandle const src =
-                        _PrimvarDataSource::New(
-                                HdRetainedTypedSampledDataSource<VtVec3fArray>::New(
-                                                    VtVec3fArray{{color[0], color[1], color[2]}}),
-                                                    HdPrimvarSchemaTokens->constant,
-                                                    HdPrimvarSchemaTokens->color);
-                    return src;
-                }
+                HdDataSourceBaseHandle const src =
+                    Fvp::PrimvarDataSource::New(
+                            HdRetainedTypedSampledDataSource<VtVec3fArray>::New(
+                                                VtVec3fArray{{_wireframeColor[0], _wireframeColor[1], _wireframeColor[2]}}),
+                                                HdPrimvarSchemaTokens->constant,
+                                                HdPrimvarSchemaTokens->color);
+                return src;
             }
             return nullptr;
         }
 
     protected:
         _PrimvarsDataSource(
-            const HdContainerDataSourceHandle &primSource)
-          : _primSource(primSource)
+            const HdContainerDataSourceHandle &primSource, const GfVec4f& wireframeColor)
+          : _primSource(primSource),
+            _wireframeColor(wireframeColor)
         {
         }
 
         HdContainerDataSourceHandle _primSource;
+        GfVec4f _wireframeColor;
     };
 
     /// Base class for prim data sources.
@@ -164,6 +103,7 @@ namespace
     /// - visibility (from the given prim data source)
     /// - displayStyle (constant)
     /// - instancedBy
+    /// - primOrigin (for selection picking to work on usd prims in bounding box display mode)
     ///
     class _PrimDataSource : public HdContainerDataSource
     {
@@ -175,14 +115,16 @@ namespace
                 HdPurposeSchemaTokens->purpose,
                 HdVisibilitySchemaTokens->visibility,
                 HdInstancedBySchemaTokens->instancedBy,
-                HdLegacyDisplayStyleSchemaTokens->displayStyle };
+                HdLegacyDisplayStyleSchemaTokens->displayStyle,
+                HdPrimOriginSchemaTokens->primOrigin};
         }
 
         HdDataSourceBaseHandle Get(const TfToken &name) override {
             if (name == HdXformSchemaTokens->xform ||
                 name == HdPurposeSchemaTokens->purpose ||
                 name == HdVisibilitySchemaTokens->visibility ||
-                name == HdInstancedBySchemaTokens->instancedBy) {
+                name == HdInstancedBySchemaTokens->instancedBy ||
+                name == HdPrimOriginSchemaTokens->primOrigin) {
                 if (_primSource) {
                     return _primSource->Get(name);
                 }
@@ -193,7 +135,7 @@ namespace
                     HdLegacyDisplayStyleSchema::Builder()
                         .SetCullStyle(
                             HdRetainedTypedSampledDataSource<TfToken>::New(
-                                HdCullStyleTokens->back))
+                                HdCullStyleTokens->nothing))//No culling
                         .Build();
                 return src;
             }
@@ -294,7 +236,7 @@ namespace
     class _BoundsPrimvarsDataSource final : public _PrimvarsDataSource
     {
     public:
-        HD_DECLARE_DATASOURCE(_BoundsPrimvarsDataSource);
+        HD_DECLARE_DATASOURCE(_BoundsPrimvarsDataSource)
 
         TfTokenVector GetNames() override {
             static const TfTokenVector result = _Concat(
@@ -305,7 +247,7 @@ namespace
 
         HdDataSourceBaseHandle Get(const TfToken &name) override {
             if (name == HdPrimvarsSchemaTokens->points) {
-                return _PrimvarDataSource::New(
+                return Fvp::PrimvarDataSource::New(
                     _BoundsPointsPrimvarValueDataSource::New(_primSource),
                     HdPrimvarSchemaTokens->vertex,
                     HdPrimvarSchemaTokens->point);
@@ -314,9 +256,8 @@ namespace
         }
 
     private:
-        _BoundsPrimvarsDataSource(
-            const HdContainerDataSourceHandle &primSource)
-          : _PrimvarsDataSource(primSource)
+        _BoundsPrimvarsDataSource(const HdContainerDataSourceHandle &primSource, const GfVec4f& wireframeColor)
+          : _PrimvarsDataSource(primSource, wireframeColor)
         {
         }
     };
@@ -364,7 +305,7 @@ namespace
     class _BoundsPrimDataSource : public _PrimDataSource
     {
     public:
-        HD_DECLARE_DATASOURCE(_BoundsPrimDataSource);
+        HD_DECLARE_DATASOURCE(_BoundsPrimDataSource)
 
         TfTokenVector GetNames() override {
             static const TfTokenVector result = _Concat(
@@ -384,7 +325,7 @@ namespace
                 return basisCurvesSrc;
             }
             if (name == HdPrimvarsSchemaTokens->primvars) {
-                return _BoundsPrimvarsDataSource::New(_primSource);
+                return _BoundsPrimvarsDataSource::New(_primSource, _wireframeColor);
             }
             if (name == HdExtentSchemaTokens->extent) {
                 if (_primSource) {
@@ -397,19 +338,31 @@ namespace
 
     private:
         _BoundsPrimDataSource(
-            const HdContainerDataSourceHandle &primSource)
-          : _PrimDataSource(primSource)
+            const HdContainerDataSourceHandle &primSource, const GfVec4f& wireframeColor)
+          : _PrimDataSource(primSource),
+            _wireframeColor(wireframeColor)
         {
         }
+
+        GfVec4f _wireframeColor;
     };
+}
+
+BboxSceneIndex::BboxSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface) : 
+    ParentClass(inputSceneIndex), 
+    InputSceneIndexUtils(inputSceneIndex),
+    _wireframeColorInterface(wireframeColorInterface)
+{
+    TF_AXIOM(_wireframeColorInterface);
 }
 
 HdSceneIndexPrim BboxSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-    if (prim.dataSource && ((prim.primType == HdPrimTypeTokens->mesh) || (prim.primType == HdPrimTypeTokens->basisCurves)) ){
+    if (prim.dataSource && ! _isExcluded(primPath) && ((prim.primType == HdPrimTypeTokens->mesh) || (prim.primType == HdPrimTypeTokens->basisCurves)) ){
         prim.primType   = HdPrimTypeTokens->basisCurves;//Convert to basisCurve for displaying a bounding box
-        prim.dataSource = _BoundsPrimDataSource::New(prim.dataSource);
+        const GfVec4f wireframeColor = _wireframeColorInterface->getWireframeColor(primPath);
+        prim.dataSource = _BoundsPrimDataSource::New(prim.dataSource, wireframeColor);
     }
 
     return prim;
@@ -417,6 +370,8 @@ HdSceneIndexPrim BboxSceneIndex::GetPrim(const SdfPath& primPath) const
 
 void BboxSceneIndex::_PrimsAdded(const HdSceneIndexBase& sender, const HdSceneIndexObserver::AddedPrimEntries& entries)
 {
+    if (!_IsObserved())return;
+
     HdSceneIndexObserver::AddedPrimEntries newEntries;
     for (const HdSceneIndexObserver::AddedPrimEntry &entry : entries) {
         const SdfPath &path = entry.primPath;
