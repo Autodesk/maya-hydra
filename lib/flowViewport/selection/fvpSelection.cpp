@@ -38,8 +38,8 @@
 
 #include "flowViewport/selection/fvpSelection.h"
 
-#include <pxr/imaging/hd/selectionSchema.h>
-#include <pxr/imaging/hd/selectionsSchema.h>
+#include "pxr/imaging/hd/selectionSchema.h"
+#include "pxr/imaging/hd/selectionsSchema.h"
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -74,23 +74,19 @@ Selection::_PrimSelectionState::GetVectorDataSource() const
     );
 };
 
-Selection::Selection()
-{
-}
-
 bool
-Selection::Add(const SdfPath& primPath)
+Selection::Add(const PXR_NS::SdfPath& primPath)
 {
     if (primPath.IsEmpty()) {
         return false;
     }
 
     _pathToState[primPath].selectionSources.push_back(selectionBuilder.Build());
-    
+
     return true;
 }
 
-bool Selection::Remove(const SdfPath& primPath)
+bool Selection::Remove(const PXR_NS::SdfPath& primPath)
 {
     return (!primPath.IsEmpty() && (_pathToState.erase(primPath) == 1));
 }
@@ -101,7 +97,7 @@ Selection::Clear()
     _pathToState.clear();
 }
 
-void Selection::Replace(const SdfPathVector& selection)
+void Selection::Replace(const PXR_NS::SdfPathVector& selection)
 {
     Clear();
 
@@ -114,7 +110,7 @@ void Selection::Replace(const SdfPathVector& selection)
     }
 }
 
-void Selection::RemoveHierarchy(const SdfPath& primPath)
+void Selection::RemoveHierarchy(const PXR_NS::SdfPath& primPath)
 {
     auto it = _pathToState.lower_bound(primPath);
     while (it != _pathToState.end() && it->first.HasPrefix(primPath)) {
@@ -156,7 +152,7 @@ SdfPathVector Selection::GetFullySelectedPaths() const
 }
 
 HdDataSourceBaseHandle Selection::GetVectorDataSource(
-    const SdfPath& primPath
+    const PXR_NS::SdfPath& primPath
 ) const
 {
     auto it = _pathToState.find(primPath);
@@ -164,4 +160,4 @@ HdDataSourceBaseHandle Selection::GetVectorDataSource(
         it->second.GetVectorDataSource() : nullptr;
 }
 
-} // end of namespace FVP_NS_DEF
+}

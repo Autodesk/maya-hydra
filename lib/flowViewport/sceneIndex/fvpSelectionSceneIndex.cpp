@@ -39,14 +39,12 @@
 #include "flowViewport/sceneIndex/fvpSelectionSceneIndex.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
 #include "flowViewport/selection/fvpSelection.h"
-#include "flowViewport/fvpUtils.h"
 
 #include "flowViewport/debugCodes.h"
 
-#include <pxr/imaging/hd/retainedDataSource.h>
-#include <pxr/imaging/hd/selectionsSchema.h>
-#include <pxr/imaging/hd/primvarsSchema.h>
-#include <pxr/imaging/hd/tokens.h>
+#include "pxr/imaging/hd/retainedDataSource.h"
+#include "pxr/imaging/hd/selectionSchema.h"
+#include "pxr/imaging/hd/selectionsSchema.h"
 
 #include <ufe/pathString.h>
 #include <ufe/selection.h>
@@ -54,17 +52,7 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
-    //Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
-    TF_DEFINE_PRIVATE_TOKENS(
-         _primVarsTokens,
- 
-         (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
-     );
-
-    const HdDataSourceLocatorSet selectionsAndPrimvarsColorsLocatorSet{HdSelectionsSchema::GetDefaultLocator(), 
-                                                                HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),//Also dirty override wireframe color
-                                                                HdPrimvarsSchema::GetDefaultLocator().Append(HdTokens->displayColor)//and display color
-                                                                };
+const HdDataSourceLocatorSet selectionsSchemaDefaultLocator{HdSelectionsSchema::GetDefaultLocator()};
 }
 
 namespace FVP_NS_DEF {
@@ -173,9 +161,8 @@ SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("    Adding %s to the Hydra selection.\n", sceneIndexPath.GetText());
 
-    HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
     if (_selection->Add(sceneIndexPath)) {
-        _SendPrimsDirtied({{sceneIndexPath, selectionsAndPrimvarsColorsLocatorSet}});
+        _SendPrimsDirtied({{sceneIndexPath, selectionsSchemaDefaultLocator}});
     }
 }
 
@@ -188,9 +175,8 @@ void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
     // index path.
     auto sceneIndexPath = SceneIndexPath(appPath);
 
-    HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
     if (_selection->Remove(sceneIndexPath)) {
-       _SendPrimsDirtied({{sceneIndexPath, selectionsAndPrimvarsColorsLocatorSet}});
+        _SendPrimsDirtied({{sceneIndexPath, selectionsSchemaDefaultLocator}});
     }
 }
 
@@ -208,7 +194,7 @@ SelectionSceneIndex::ClearSelection()
     auto paths = _selection->GetFullySelectedPaths();
     entries.reserve(paths.size());
     for (const auto& path : paths) {
-        entries.emplace_back(path, selectionsAndPrimvarsColorsLocatorSet);
+        entries.emplace_back(path, selectionsSchemaDefaultLocator);
     }
 
     _selection->Clear();
@@ -228,7 +214,7 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
     auto paths = _selection->GetFullySelectedPaths();
     entries.reserve(paths.size() + selection.size());
     for (const auto& path : paths) {
-        entries.emplace_back(path, selectionsAndPrimvarsColorsLocatorSet);
+        entries.emplace_back(path, selectionsSchemaDefaultLocator);
     }
 
     _selection->Clear();
@@ -247,7 +233,7 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
         sceneIndexSn.emplace_back(sceneIndexPath);
         TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
             .Msg("    Adding %s to the Hydra selection.\n", sceneIndexPath.GetText());
-        entries.emplace_back(sceneIndexPath, selectionsAndPrimvarsColorsLocatorSet);
+        entries.emplace_back(sceneIndexPath, selectionsSchemaDefaultLocator);
     }
 
     _selection->Replace(sceneIndexSn);

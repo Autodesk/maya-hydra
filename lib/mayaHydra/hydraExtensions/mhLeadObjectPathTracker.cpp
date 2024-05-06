@@ -24,9 +24,9 @@
 
 //ufe
 #include <ufe/globalSelection.h>
-#include <ufe/selection.h>
 #include <ufe/observableSelection.h>
 #include <ufe/selectionNotification.h>
+#include <ufe/sceneItem.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -40,62 +40,29 @@ class GlobalSelectionChangedObs : public Ufe::Observer
     {
         public:
             GlobalSelectionChangedObs(MayaHydra::MhLeadObjectPathTracker& leadObjectPathInstance)
-            : _leadObjectPathInstance(leadObjectPathInstance)
+            : _leadObjectPathTracker(leadObjectPathInstance)
             {
             }
 
         private:
             void operator()(const Ufe::Notification& notification) override
             {
-                const Ufe::SelectionChanged& selectionChanged = notification.staticCast<Ufe::SelectionChanged>();
-
-                auto leadObjectUfePath = _leadObjectPathInstance.getLeadObjectUfePath();
-
-                switch (selectionChanged.opType()) {
-                    case Ufe::SelectionChanged::OpType::Append: {
-                        const Ufe::SelectionItemAppended& appended = notification.staticCast<Ufe::SelectionItemAppended>();
-                        auto newLeadObjectUfePath = appended.item()->path();
-                        _leadObjectPathInstance.setNewLeadObjectSceneItem(newLeadObjectUfePath);
-                        break;
-                    }
-                    case Ufe::SelectionChanged::OpType::Remove: {
-                        const Ufe::SelectionItemRemoved& removed = notification.staticCast<Ufe::SelectionItemRemoved>();
-                        auto removedItemUfePath = removed.item()->path();
-                        //Check if the lead object has been removed
-                        if (leadObjectUfePath == removedItemUfePath) {
-                            UpdateLeadObjectSceneItem(leadObjectUfePath);
-                        }
-                        break;
-                    }
-                    case Ufe::SelectionChanged::OpType::Clear: {
-                        _leadObjectPathInstance.ClearLeadObject();
-                        break;
-                    }
-                    
-                    case Ufe::SelectionChanged::OpType::Insert://Fall into
-                    case Ufe::SelectionChanged::OpType::SelectionCompositeNotification://Fall into
-                    case Ufe::SelectionChanged::OpType::ReplaceWith: {
-                        UpdateLeadObjectSceneItem(leadObjectUfePath);
-                        break;
-                    }
-                    default: break;
-                }
-            }
-
-            void UpdateLeadObjectSceneItem(const Ufe::Path& currentLeadObjectUfePath) { 
+                //selection has changed.
+                
                 //Update the lead object if it has changed
                 auto globalSelection = Ufe::GlobalSelection::get();
                 if (globalSelection->size() > 0) {
                     auto newLeadObjectUfePath = globalSelection->back()->path();
+                    auto currentLeadObjectUfePath = _leadObjectPathTracker.getLeadObjectUfePath();
                     if (newLeadObjectUfePath != currentLeadObjectUfePath){
-                        _leadObjectPathInstance.setNewLeadObjectSceneItem(newLeadObjectUfePath);
+                        _leadObjectPathTracker.setLeadObjectUfePath(newLeadObjectUfePath);
                     }
                 }else {
-                    _leadObjectPathInstance.ClearLeadObject();
+                    _leadObjectPathTracker.setLeadObjectUfePath({});
                 }
             }
 
-            MayaHydra::MhLeadObjectPathTracker& _leadObjectPathInstance;
+            MayaHydra::MhLeadObjectPathTracker& _leadObjectPathTracker;
     };
 
 }
@@ -104,6 +71,7 @@ namespace MAYAHYDRA_NS_DEF {
 MhLeadObjectPathTracker::MhLeadObjectPathTracker(const HdSceneIndexBaseRefPtr& sceneIndexWithPathInterface, 
                                             MhDirtyLeadObjectSceneIndexRefPtr& dirtyLeadObjectSceneIndex) 
     : _pathInterface(dynamic_cast<const Fvp::PathInterface*>(&*sceneIndexWithPathInterface))
+    , _ufeSelectionObserver (std::make_shared<GlobalSelectionChangedObs>(*this))
     , _dirtyLeadObjectSceneIndex(dirtyLeadObjectSceneIndex)
 {
     TF_AXIOM(_pathInterface);
@@ -114,12 +82,12 @@ MhLeadObjectPathTracker::MhLeadObjectPathTracker(const HdSceneIndexBaseRefPtr& s
         auto leadObjectSceneItem = selection.back();//get last selected
         _leadObjectUfePath = leadObjectSceneItem->path();
         //_leadObjectPrimPath can be empty with a valid _leadObjectUfePath when the lead object is in a data producer scene index not yet added to the merging scene index
-        //This is fixed at some point by calling updateAfterDataProducerSceneIndicesLoaded()
+        //This is fixed at some point by calling updatePrimPath()
         _leadObjectPrimPath = _pathInterface->SceneIndexPath(_leadObjectUfePath); 
     }
 
    // Add ourself as an observer to the selection
-   _ufeSelectionObserver = std::make_shared<GlobalSelectionChangedObs>(*this);
+   
    ufeSelection->addObserver(_ufeSelectionObserver);
 }
 
@@ -127,7 +95,6 @@ MhLeadObjectPathTracker::~MhLeadObjectPathTracker()
 {
     Ufe::GlobalSelection::get()->removeObserver(_ufeSelectionObserver);
     _ufeSelectionObserver = nullptr;
-    _dirtyLeadObjectSceneIndex = nullptr;
 }
 
 bool MhLeadObjectPathTracker::isLeadObject(const PXR_NS::SdfPath& primPath) const
@@ -137,8 +104,9 @@ bool MhLeadObjectPathTracker::isLeadObject(const PXR_NS::SdfPath& primPath) cons
     return primPath.HasPrefix(_leadObjectPrimPath);
 }
 
-void MhLeadObjectPathTracker::setNewLeadObjectSceneItem(const Ufe::Path& newLeadObjectUfePath)
+void MhLeadObjectPathTracker::setLeadObjectUfePath(const Ufe::Path& newLeadObjectUfePath)
 {
+    //newLeadObjectUfePath be an empty Ufe::Path
     if (_leadObjectUfePath == newLeadObjectUfePath) {
        return;
     }
@@ -154,13 +122,7 @@ void MhLeadObjectPathTracker::setNewLeadObjectSceneItem(const Ufe::Path& newLead
     }
 }
 
-void MhLeadObjectPathTracker::ClearLeadObject()
-{
-    _leadObjectPrimPath   = SdfPath::EmptyPath();
-    _leadObjectUfePath    = Ufe::Path();
-}
-
-void MhLeadObjectPathTracker::updateAfterDataProducerSceneIndicesLoaded() 
+void MhLeadObjectPathTracker::updatePrimPath() 
 { 
    // Update the lead object prim path in case it was not valid yet
     if ( (_leadObjectUfePath.size() > 0) && _leadObjectPrimPath.IsEmpty()) {

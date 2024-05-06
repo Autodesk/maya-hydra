@@ -26,7 +26,7 @@
 
 //ufe
 #include <ufe/observer.h>
-#include <ufe/sceneItem.h>
+#include <ufe/path.h>
 
 //Hydra headers
 #include <pxr/imaging/hd/sceneIndex.h>
@@ -53,21 +53,17 @@ public:
     Ufe::Path getLeadObjectUfePath() const {return _leadObjectUfePath;}
 
     MAYAHYDRALIB_API
-    void setNewLeadObjectSceneItem(const Ufe::Path& newLeadObjectUfePath);
+    void setLeadObjectUfePath(const Ufe::Path& newLeadObjectUfePath);
 
     MAYAHYDRALIB_API
-    void ClearLeadObject();
-
-    MAYAHYDRALIB_API
-    void updateAfterDataProducerSceneIndicesLoaded(); // This is called after the data producer
-                                                      // scene indices are loaded
+    void updatePrimPath(); // For example : this is called after the data producer scene indices are loaded
 
 private:
     const Fvp::PathInterface* const _pathInterface {nullptr};
     PXR_NS::SdfPath                 _leadObjectPrimPath;
     Ufe::Observer::Ptr              _ufeSelectionObserver {nullptr};
     Ufe::Path                       _leadObjectUfePath;
-    MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex;
+    const MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex;
 };
 
 }//end of namespace MAYAHYDRA_NS_DEF

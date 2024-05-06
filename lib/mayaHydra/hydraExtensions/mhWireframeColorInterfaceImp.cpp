@@ -30,39 +30,45 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 // An implementation for maya of the WireframeColorInterface to get the wireframe color from a prim for selection highlighting
-
+namespace {
+    PXR_NS::GfVec4f getPreferencesColor(const PXR_NS::TfToken& token) {
+        PXR_NS::GfVec4f color;
+        Fvp::ColorPreferences::getInstance().getColor(token, color);
+        return color;
+    }
+}
 namespace MAYAHYDRA_NS_DEF {
 
 MhWireframeColorInterfaceImp::MhWireframeColorInterfaceImp(const std::shared_ptr<Fvp::Selection>& selection
                                                          , const std::shared_ptr<MhLeadObjectPathTracker>& leadObjectPathTracker) 
-    : _selection(selection)
+    : _activeWireframeColor (getPreferencesColor(FvpColorPreferencesTokens->wireframeSelectionSecondary))
+    , _leadWireframeColor (getPreferencesColor(FvpColorPreferencesTokens->wireframeSelection))
+    , _dormantWireframeColor (getPreferencesColor(FvpColorPreferencesTokens->polymeshDormant))
+    , _selection(selection)
     , _leadObjectPathTracker(leadObjectPathTracker)
 { 
     TF_AXIOM(_selection);
-    Fvp::ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->wireframeSelection, _leadWireframeColor);
-    Fvp::ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->wireframeSelectionSecondary, _activeWireframeColor);
-    Fvp::ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->polymeshDormant, _dormantWireframeColor);
 }
 
-bool MhWireframeColorInterfaceImp::_isSelected(const SdfPath& primPath, bool& outIsTheLastSelected)const
+MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getSelectionState(const PXR_NS::SdfPath& primPath)const
 {
-    outIsTheLastSelected = false;
-
-    const bool selected = _selection->HasFullySelectedAncestorInclusive(primPath);
-    if (selected){
-        //Update outIsTheLastSelected
-        outIsTheLastSelected = _leadObjectPathTracker->isLeadObject(primPath);
-        return true;
+    if (_selection->HasFullySelectedAncestorInclusive(primPath)){
+        return (_leadObjectPathTracker->isLeadObject(primPath)) ? kLead : kActive;
     }
     
-    return selected;
+    return kDormant;
 }
 
 GfVec4f MhWireframeColorInterfaceImp::getWireframeColor(const SdfPath& primPath) const { 
-    bool isLastSelected = false;
-    if (_isSelected(primPath, isLastSelected)){
-        return isLastSelected ? _leadWireframeColor : _activeWireframeColor;
-    }   
+    SelectionState selState = _getSelectionState(primPath);
+    switch (selState) {
+        case kLead:
+            return _leadWireframeColor;
+        case kActive:
+            return _activeWireframeColor;
+        default:
+        break;
+    }
 
     return _dormantWireframeColor;
 }

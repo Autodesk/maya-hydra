@@ -46,9 +46,9 @@ public:
     PXR_NS::GfVec4f getWireframeColor(const PXR_NS::SdfPath& primPath) const override;
 
 private:
-    //returns true if the sdfpath is selected or false if it is not. 
-    // If the function returns true, the outIsTheLastSelected is true if the prim was the last selected prim
-    bool _isSelected(const PXR_NS::SdfPath& primPath, bool& outIsTheLastSelected)const;
+    enum SelectionState {kLead, kActive, kDormant};
+
+    SelectionState _getSelectionState(const PXR_NS::SdfPath& primPath)const;
 
     //Colors used by wireframe selection highlighting
     PXR_NS::GfVec4f _activeWireframeColor;

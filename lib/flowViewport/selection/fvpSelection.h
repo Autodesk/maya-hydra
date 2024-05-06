@@ -21,7 +21,6 @@
 
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/usd/sdf/path.h>
-#include <pxr/base/gf/vec4f.h>
 
 #include <map>
 
@@ -42,9 +41,6 @@ namespace FVP_NS_DEF {
 class Selection
 {
 public:
-
-    FVP_API
-    Selection();
 
     // Add primPath to selection and return true if the argument is not empty.
     FVP_API
