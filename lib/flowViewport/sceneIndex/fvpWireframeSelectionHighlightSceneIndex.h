@@ -51,7 +51,7 @@ public:
     static PXR_NS::HdSceneIndexBaseRefPtr New(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
         const SelectionConstPtr& selection,
-        const WireframeColorInterface& wireframeColorInterface
+        const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
 
     FVP_API
@@ -76,7 +76,7 @@ protected:
     WireframeSelectionHighlightSceneIndex(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
         const SelectionConstPtr& selection,
-        const WireframeColorInterface& wireframeColorInterface
+        const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
 
     FVP_API
@@ -107,7 +107,7 @@ private:
     PXR_NS::HdContainerDataSourceHandle _HighlightSelectedPrim(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::SdfPath& primPath)const;
 
     const SelectionConstPtr   _selection;
-    const WireframeColorInterface& _wireframeColorInterface;
+    const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 };
 
 }

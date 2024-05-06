@@ -48,7 +48,7 @@ bool MhWireframeColorInterfaceImp::_isSelected(const SdfPath& primPath, bool& ou
 {
     outIsTheLastSelected = false;
 
-    const bool selected = _selection->IsFullySelected(primPath);
+    const bool selected = _selection->HasFullySelectedAncestorInclusive(primPath);
     if (selected){
         //Update outIsTheLastSelected
         outIsTheLastSelected = _leadObjectPathTracker->isLeadObject(primPath);

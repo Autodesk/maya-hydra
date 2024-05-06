@@ -132,7 +132,9 @@ MhLeadObjectPathTracker::~MhLeadObjectPathTracker()
 
 bool MhLeadObjectPathTracker::isLeadObject(const PXR_NS::SdfPath& primPath) const
 {
-    return _leadObjectPrimPath == primPath;
+    //_leadObjectPrimPath can be a hierarchy path, so we need to check if the primPath is a prefix
+    //of the lead object prim path
+    return primPath.HasPrefix(_leadObjectPrimPath);
 }
 
 void MhLeadObjectPathTracker::setNewLeadObjectSceneItem(const Ufe::Path& newLeadObjectUfePath)
@@ -147,7 +149,7 @@ void MhLeadObjectPathTracker::setNewLeadObjectSceneItem(const Ufe::Path& newLead
     _leadObjectPrimPath = _pathInterface->SceneIndexPath(_leadObjectUfePath);
 
     // Dirty the previous lead object
-    if(_dirtyLeadObjectSceneIndex && ! oldLeadObjectPrimPath.IsEmpty()){
+    if(_dirtyLeadObjectSceneIndex){
         _dirtyLeadObjectSceneIndex->dirtyLeadObjectRelatedPrims(oldLeadObjectPrimPath, _leadObjectPrimPath);
     }
 }

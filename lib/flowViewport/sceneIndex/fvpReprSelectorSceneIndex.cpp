@@ -73,11 +73,12 @@ const HdRetainedContainerDataSourceHandle sWireframeDisplayStyleDataSource
 
 }//End of namespace
 
-ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const WireframeColorInterface& wireframeColorInterface) 
+ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface) 
     : ParentClass(inputSceneIndex), 
     InputSceneIndexUtils(inputSceneIndex),
     _wireframeColorInterface(wireframeColorInterface)
 {
+    TF_AXIOM(_wireframeColorInterface);
     switch (type){
         case RepSelectorType::WireframeRefined:
             _wireframeTypeDataSource = sWireframeDisplayStyleDataSource;
@@ -104,7 +105,7 @@ HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
         edited.Set(HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),
                         Fvp::PrimvarDataSource::New(
                             HdRetainedTypedSampledDataSource<VtVec4fArray>::New(
-                                                VtVec4fArray{_wireframeColorInterface.getWireframeColor(primPath)}),
+                                                VtVec4fArray{_wireframeColorInterface->getWireframeColor(primPath)}),
                                                 HdPrimvarSchemaTokens->constant,
                                                 HdPrimvarSchemaTokens->color));
         //Edit the cull style

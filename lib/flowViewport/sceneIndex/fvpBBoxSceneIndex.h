@@ -45,7 +45,7 @@ public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
     FVP_API
-    static BboxSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const WireframeColorInterface& wireframeColorInterface){
+    static BboxSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface){
         return PXR_NS::TfCreateRefPtr(new BboxSceneIndex(inputSceneIndex, wireframeColorInterface));
     }
 
@@ -67,7 +67,7 @@ public:
     }
 
 protected:
-    BboxSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const WireframeColorInterface& wireframeColorInterface);
+    BboxSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>&  wireframeColorInterface);
 
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override;
@@ -90,7 +90,7 @@ protected:
     }
 
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
-    const WireframeColorInterface& _wireframeColorInterface;
+    std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 };
 
 }//end of namespace FVP_NS_DEF

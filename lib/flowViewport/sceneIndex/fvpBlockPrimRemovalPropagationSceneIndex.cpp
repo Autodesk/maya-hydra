@@ -27,6 +27,13 @@ namespace FVP_NS_DEF {
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
+BlockPrimRemovalPropagationSceneIndex::BlockPrimRemovalPropagationSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) 
+    : ParentClass(inputSceneIndex), InputSceneIndexUtils(inputSceneIndex)
+{
+    _pathInterface = dynamic_cast<const PathInterface*>(&*GetInputSceneIndex());
+    TF_AXIOM(_pathInterface);
+}
+
 void BlockPrimRemovalPropagationSceneIndex::_PrimsRemoved(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& entries)
 {
     if (!_IsObserved() || _blockPrimRemoval)return;

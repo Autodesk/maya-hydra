@@ -50,7 +50,7 @@ public:
     };
 
     FVP_API
-    static ReprSelectorSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const WireframeColorInterface& wireframeColorInterface){
+    static ReprSelectorSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface){
         return PXR_NS::TfCreateRefPtr(new ReprSelectorSceneIndex(inputSceneIndex, type, wireframeColorInterface));
     }
 
@@ -73,7 +73,7 @@ public:
 
 protected:
     
-ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const WireframeColorInterface& wireframeColorInterface);
+ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface);
 
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override{
@@ -101,7 +101,7 @@ ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, Re
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
 
     PXR_NS::HdRetainedContainerDataSourceHandle _wireframeTypeDataSource = nullptr;
-    const WireframeColorInterface& _wireframeColorInterface;
+    std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 };
 
 }//end of namespace FVP_NS_DEF

@@ -23,9 +23,7 @@
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
 
 //Hydra headers
-#include <pxr/base/tf/declarePtrs.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
-#include <pxr/imaging/hd/retainedDataSource.h>
 
 namespace FVP_NS_DEF {
 
@@ -73,18 +71,12 @@ public:
     //from PathInterface
     FVP_API
     PXR_NS::SdfPath SceneIndexPath(const Ufe::Path& appPath) const override{
-        auto pathInterface = dynamic_cast<const PathInterface*>(&*GetInputSceneIndex());
-        if (!pathInterface){
-            return {};
-        }
-        
-        return pathInterface->SceneIndexPath(appPath);
+        return _pathInterface->SceneIndexPath(appPath);
     }
 
 protected:
-    
-BlockPrimRemovalPropagationSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) 
-    : ParentClass(inputSceneIndex), InputSceneIndexUtils(inputSceneIndex){}
+    FVP_API
+    BlockPrimRemovalPropagationSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex);
 
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override{
@@ -97,9 +89,11 @@ BlockPrimRemovalPropagationSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inpu
         _SendPrimsDirtied(entries);
     }
 
+    FVP_API
     void _PrimsRemoved(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& entries)override;
 
     bool _blockPrimRemoval {false};
+    const PathInterface* _pathInterface {nullptr};
 };
 
 }//end of namespace FVP_NS_DEF

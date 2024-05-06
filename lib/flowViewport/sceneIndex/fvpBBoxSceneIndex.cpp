@@ -348,11 +348,12 @@ namespace
     };
 }
 
-BboxSceneIndex::BboxSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const WireframeColorInterface& wireframeColorInterface) : 
+BboxSceneIndex::BboxSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface) : 
     ParentClass(inputSceneIndex), 
     InputSceneIndexUtils(inputSceneIndex),
     _wireframeColorInterface(wireframeColorInterface)
 {
+    TF_AXIOM(_wireframeColorInterface);
 }
 
 HdSceneIndexPrim BboxSceneIndex::GetPrim(const SdfPath& primPath) const
@@ -360,7 +361,7 @@ HdSceneIndexPrim BboxSceneIndex::GetPrim(const SdfPath& primPath) const
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     if (prim.dataSource && ! _isExcluded(primPath) && ((prim.primType == HdPrimTypeTokens->mesh) || (prim.primType == HdPrimTypeTokens->basisCurves)) ){
         prim.primType   = HdPrimTypeTokens->basisCurves;//Convert to basisCurve for displaying a bounding box
-        const GfVec4f wireframeColor = _wireframeColorInterface.getWireframeColor(primPath);
+        const GfVec4f wireframeColor = _wireframeColorInterface->getWireframeColor(primPath);
         prim.dataSource = _BoundsPrimDataSource::New(prim.dataSource, wireframeColor);
     }
 

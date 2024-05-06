@@ -275,7 +275,7 @@ private:
     MayaHydraSceneIndexRefPtr _mayaHydraSceneIndex;
 
     //Lead object selection and wireframe color for selection highlight
-    std::unique_ptr<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp> _wireframeColorInterfaceImp {nullptr};
+    std::shared_ptr<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp> _wireframeColorInterfaceImp {nullptr};
     std::shared_ptr<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker> _leadObjectPathTracker {nullptr};
     MAYAHYDRA_NS_DEF::MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex{nullptr};
 

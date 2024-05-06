@@ -59,11 +59,12 @@ public:
 
     ~MhDirtyLeadObjectSceneIndex() override = default;
 
+    MAYAHYDRALIB_API
     void dirtyLeadObjectRelatedPrims(const PXR_NS::SdfPath& previousLeadObjectPath, const PXR_NS::SdfPath& currentLeadObjectPath);
 
 protected:
     
-MhDirtyLeadObjectSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) 
+    MhDirtyLeadObjectSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) 
     : ParentClass(inputSceneIndex), InputSceneIndexUtils(inputSceneIndex){}
 
     //From HdSingleInputFilteringSceneIndexBase
@@ -81,6 +82,9 @@ MhDirtyLeadObjectSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneInde
         if (!_IsObserved())return;
         _SendPrimsRemoved(entries);
     }
+
+    MAYAHYDRALIB_API
+    void _AddDirtyPathRecursively(const PXR_NS::SdfPath& path, PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& inoutDirtiedPrimEntries)const;
 };
 
 } // namespace MAYAHYDRA_NS_DEF

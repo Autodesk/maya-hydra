@@ -40,17 +40,30 @@ namespace {
                                                          };
 }
 
-void MhDirtyLeadObjectSceneIndex::dirtyLeadObjectRelatedPrims(const PXR_NS::SdfPath& previousLeadObjectPath, const PXR_NS::SdfPath& currentLeadObjectPath)
+void MhDirtyLeadObjectSceneIndex::dirtyLeadObjectRelatedPrims(const SdfPath& previousLeadObjectPath, const SdfPath& currentLeadObjectPath)
 {
+    // Each SdfPath could be a hierarchy path, so we need to get the children prim paths
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrimEntries;
+    if (! previousLeadObjectPath.IsEmpty()) {
+        _AddDirtyPathRecursively(previousLeadObjectPath, dirtiedPrimEntries);
+    }
     if (!currentLeadObjectPath.IsEmpty()) {
-        dirtiedPrimEntries.push_back({currentLeadObjectPath, primvarsColorsLocatorSet});
+        _AddDirtyPathRecursively(currentLeadObjectPath, dirtiedPrimEntries);
     }
-    if (!previousLeadObjectPath.IsEmpty()) {
-        dirtiedPrimEntries.push_back({ previousLeadObjectPath, primvarsColorsLocatorSet });
-    }
-    if (dirtiedPrimEntries.size() > 0){
+
+    if (! dirtiedPrimEntries.empty()){
         _SendPrimsDirtied(dirtiedPrimEntries);
+    }
+}
+
+void MhDirtyLeadObjectSceneIndex::_AddDirtyPathRecursively(const SdfPath& path, HdSceneIndexObserver::DirtiedPrimEntries& inoutDirtiedPrimEntries)const
+{
+    //path can be a hierachy of prim paths so we need to get all children prim paths
+    inoutDirtiedPrimEntries.emplace_back(path, primvarsColorsLocatorSet);
+
+    auto childPrimPathsArray = GetChildPrimPaths(path);
+    for (const auto& childPath : childPrimPathsArray) {
+        _AddDirtyPathRecursively(childPath, inoutDirtiedPrimEntries);
     }
 }
 

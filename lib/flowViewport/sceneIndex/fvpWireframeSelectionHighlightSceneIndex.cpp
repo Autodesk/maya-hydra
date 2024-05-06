@@ -58,7 +58,7 @@ HdSceneIndexBaseRefPtr
 WireframeSelectionHighlightSceneIndex::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
     const SelectionConstPtr&      selection,
-    const WireframeColorInterface& wireframeColorInterface
+    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
 )
 {
     return TfCreateRefPtr(new WireframeSelectionHighlightSceneIndex(inputSceneIndex, selection, wireframeColorInterface));
@@ -73,13 +73,15 @@ WireframeSelectionHighlightSceneIndex::
 WireframeSelectionHighlightSceneIndex(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
     const SelectionConstPtr&      selection,
-    const WireframeColorInterface& wireframeColorInterface
+    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
 )
   : HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
     , InputSceneIndexUtils(inputSceneIndex)
     , _selection(selection)
     , _wireframeColorInterface(wireframeColorInterface)
-{}
+{
+    TF_AXIOM(_wireframeColorInterface);
+}
 
 HdSceneIndexPrim
 WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
@@ -115,7 +117,7 @@ HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSel
     auto edited = HdContainerDataSourceEditor(dataSource);
     edited.Set(HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),
                         Fvp::PrimvarDataSource::New(
-                            HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{_wireframeColorInterface.getWireframeColor(primPath)}),
+                            HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{_wireframeColorInterface->getWireframeColor(primPath)}),
                             HdPrimvarSchemaTokens->constant,
                             HdPrimvarSchemaTokens->color));
     
