@@ -62,6 +62,7 @@ MayaColorPreferencesTranslator::MayaColorPreferencesTranslator()
     trackRGBAColor(kLeadColorName, PXR_NS::FvpColorPreferencesTokens->wireframeSelection);
     trackRGBAColor(
         kPolymeshActiveColorName, PXR_NS::FvpColorPreferencesTokens->wireframeSelectionSecondary);
+    trackRGBAColor(kPolymeshDormantColorName, PXR_NS::FvpColorPreferencesTokens->polymeshDormant);
     trackIndexedColor(
         kPolyVertexColorName,
         kActiveColorTableName,

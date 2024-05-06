@@ -58,7 +58,7 @@ ViewportInformationAndSceneIndicesPerViewportDataManager& ViewportInformationAnd
 }
 
 //A new Hydra viewport was created
-void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, const Fvp::RenderIndexProxyPtr& renderIndexProxy, 
+bool ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, const Fvp::RenderIndexProxyPtr& renderIndexProxy, 
                                                                     const HdSceneIndexBaseRefPtr& inputSceneIndexForCustomFiltering)
 {
     TF_AXIOM(renderIndexProxy && inputSceneIndexForCustomFiltering);
@@ -73,7 +73,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInform
         auto findResult = std::find_if(_viewportsInformationAndSceneIndicesPerViewportData.begin(), _viewportsInformationAndSceneIndicesPerViewportData.end(),
                     [&viewportId](const ViewportInformationAndSceneIndicesPerViewportData& other) { return other.GetViewportInformation()._viewportId == viewportId;});
         if (findResult != _viewportsInformationAndSceneIndicesPerViewportData.end()){
-            return;//It is already inside our array
+            return false;//It is already inside our array
         }
 
         ViewportInformationAndSceneIndicesPerViewportData temp(viewportInfo, renderIndexProxy);
@@ -81,7 +81,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInform
     }
 
     //Call this to let the data producer scene indices that apply to all viewports to be added to this new viewport as well
-    DataProducerSceneIndexInterfaceImp::get().hydraViewportSceneIndexAdded(viewportInfo);
+    const bool dataProducerSceneIndicesAdded = DataProducerSceneIndexInterfaceImp::get().hydraViewportSceneIndexAdded(viewportInfo);
 
     //Let the registered clients know a new viewport has been added
     InformationInterfaceImp::Get().SceneIndexAdded(viewportInfo);
@@ -90,11 +90,12 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInform
     TF_AXIOM(newElement);
     const HdSceneIndexBaseRefPtr lastFilteringSceneIndex  = FilteringSceneIndicesChainManager::get().createFilteringSceneIndicesChain(*newElement, 
                                                                                                                                 inputSceneIndexForCustomFiltering);
-
     //Insert the last filtering scene index into the render index
     auto renderIndex = renderIndexProxy->GetRenderIndex();
     TF_AXIOM(renderIndex);
     renderIndex->InsertSceneIndex(lastFilteringSceneIndex, SdfPath::AbsoluteRootPath());
+
+    return dataProducerSceneIndicesAdded;
 }
 
 void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveViewportInformation(const std::string& modelPanel)

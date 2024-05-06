@@ -28,11 +28,9 @@ class TestStageVariants(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
     IMAGE_DIFF_FAIL_PERCENT = 0.3
 
     def test_UsdStageVariants(self):
-        import usdUtils
+        import usdUtils # usdUtils imports mayaUsd.ufe
         from mayaUsd import lib as mayaUsdLib
-        # usdUtils imports mayaUsd.ufe
-        import usdUtils
-
+        
         testFile = mayaUtils.openTestScene(
                 "testStageVariants",
                 "testStageVariants.ma")

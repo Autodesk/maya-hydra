@@ -19,9 +19,11 @@
 //Local headers
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+#include "flowViewport/fvpWireframeColorInterface.h"
 
 //Hydra headers
 #include <pxr/base/tf/declarePtrs.h>
+#include <pxr/base/gf/vec4f.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
 namespace FVP_NS_DEF {
@@ -43,8 +45,8 @@ public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
     FVP_API
-    static BboxSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex){
-        return PXR_NS::TfCreateRefPtr(new BboxSceneIndex(inputSceneIndex));
+    static BboxSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface){
+        return PXR_NS::TfCreateRefPtr(new BboxSceneIndex(inputSceneIndex, wireframeColorInterface));
     }
 
     // From HdSceneIndexBase
@@ -59,17 +61,36 @@ public:
     FVP_API
     ~BboxSceneIndex() override = default;
 
+    FVP_API
+    void addExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot) { 
+        _excludedSceneRoots.emplace(sceneRoot);
+    }
+
 protected:
-    BboxSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) : ParentClass(inputSceneIndex), InputSceneIndexUtils(inputSceneIndex) {};
+    BboxSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>&  wireframeColorInterface);
 
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override;
     void _PrimsRemoved(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& entries)override{
+        if (!_IsObserved())return;
         _SendPrimsRemoved(entries);
     }
     void _PrimsDirtied(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries)override{
+        if (!_IsObserved())return;
         _SendPrimsDirtied(entries);
     }
+
+    bool _isExcluded(const PXR_NS::SdfPath& sceneRoot) const { 
+        for (const auto& excluded : _excludedSceneRoots) {
+            if (sceneRoot.HasPrefix(excluded)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    std::set<PXR_NS::SdfPath> _excludedSceneRoots;
+    std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 };
 
 }//end of namespace FVP_NS_DEF

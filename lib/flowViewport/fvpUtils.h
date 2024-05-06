@@ -21,6 +21,10 @@
 #include <pxr/imaging/hd/sceneIndex.h>
 #endif
 
+#include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
+
 namespace FVP_NS_DEF {
 
 // At time of writing, the last reference removal causing destruction of a 
@@ -34,6 +38,56 @@ namespace FVP_NS_DEF {
 #ifdef CODE_COVERAGE_WORKAROUND
 void FVP_API leakSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& si);
 #endif
+
+/// A convenience data source implementing the primvar schema from
+/// a triple of primvar value, interpolation and role. The latter two
+/// are given as tokens. The value can be given either as data source
+/// or as thunk returning a data source which is evaluated on each
+/// Get.
+class PrimvarDataSource final : public PXR_NS::HdContainerDataSource
+{
+public:
+    HD_DECLARE_DATASOURCE(PrimvarDataSource);
+
+    PXR_NS::TfTokenVector GetNames() override {
+        return {PXR_NS::HdPrimvarSchemaTokens->primvarValue,
+                PXR_NS::HdPrimvarSchemaTokens->interpolation,
+                PXR_NS::HdPrimvarSchemaTokens->role};
+    }
+
+    PXR_NS::HdDataSourceBaseHandle Get(const PXR_NS::TfToken &name) override {
+        if (name == PXR_NS::HdPrimvarSchemaTokens->primvarValue) {
+            return _primvarValueSrc;
+        }
+        if (name == PXR_NS::HdPrimvarSchemaTokens->interpolation) {
+            return
+                PXR_NS::HdPrimvarSchema::BuildInterpolationDataSource(
+                    _interpolation);
+        }
+        if (name == PXR_NS::HdPrimvarSchemaTokens->role) {
+            return
+                PXR_NS::HdPrimvarSchema::BuildRoleDataSource(
+                    _role);
+        }
+
+        return nullptr;
+    }
+
+private:
+    PrimvarDataSource(
+        const PXR_NS::HdDataSourceBaseHandle &primvarValueSrc,
+        const PXR_NS::TfToken &interpolation,
+        const PXR_NS::TfToken &role)
+        : _primvarValueSrc(primvarValueSrc)
+        , _interpolation(interpolation)
+        , _role(role)
+    {
+    }
+
+    PXR_NS::HdDataSourceBaseHandle _primvarValueSrc;
+    PXR_NS::TfToken _interpolation;
+    PXR_NS::TfToken _role;
+};
 
 } // namespace FVP_NS_DEF
 

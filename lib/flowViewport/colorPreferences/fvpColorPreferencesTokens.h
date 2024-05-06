@@ -33,7 +33,8 @@ PXR_NAMESPACE_OPEN_SCOPE
     (wireframeSelectionSecondary) \
     (vertexSelection) \
     (edgeSelection) \
-    (faceSelection)
+    (faceSelection) \
+    (polymeshDormant)
 // clang-format on
 
 TF_DECLARE_PUBLIC_TOKENS(FvpColorPreferencesTokens, FVP_API, FVP_COLOR_PREFERENCES_TOKENS);
