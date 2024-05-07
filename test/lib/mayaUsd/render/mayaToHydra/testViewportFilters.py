@@ -160,7 +160,9 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(clear=True)
         self.checkFilter("deformers", kExcludeDeformers, 2)
     
-    # TODO : Handles (what are they?)
+    # TODO : Selection Handles (not working in Hydra as of 2024-05-03)
+    # To display them (currently only working in VP2), select an object for which to display 
+    # a selection handle, and toggle Display -> Transform Display -> Selection Handles.
 
     def test_IkHandles(self):
         # IK handles are currently only partially translated to Hydra (2023-05-06),
@@ -198,6 +200,8 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         self.checkFilter("motion_trails", kExcludeMotionTrails, 2)
 
     # TODO : Pivots (not working in Hydra as of 2024-05-03)
+    # To display them (currently only working in VP2), see the attributes under the 
+    # "Pivots" category on a transform.
 
     def test_Cameras(self):
         self.stackInstances(cmds.camera, 50, [0, 0.005, 0])
