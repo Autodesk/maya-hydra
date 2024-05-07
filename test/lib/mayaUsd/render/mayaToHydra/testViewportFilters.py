@@ -163,6 +163,8 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
     # TODO : Handles (what are they?)
 
     def test_IkHandles(self):
+        # IK handles are currently only partially translated to Hydra (2023-05-06),
+        # but the filter does work on what is translated.
         def ikHandleCreator():
             joint1 = cmds.joint(position=[0,-2,0])
             joint2 = cmds.joint(position=[0,2,0])
