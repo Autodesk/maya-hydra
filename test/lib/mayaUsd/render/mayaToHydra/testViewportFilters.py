@@ -13,13 +13,12 @@
 # limitations under the License.
 #
 import maya.cmds as cmds
-import maya.mel as mel
 import fixturesUtils
 import mayaUtils
 import mtohUtils
 
 # Note : the order of the bit flags does not correspond to the order 
-# of the options in the "Show" -> "Viewport" UI at all.
+# of the options in the "Show" -> "Viewport" UI.
 kExcludeNurbsCurves        = 1 << 0
 kExcludeNurbsSurfaces      = 1 << 1
 kExcludeMeshes             = 1 << 2
@@ -51,7 +50,7 @@ kExcludeDynamicConstraints = 1 << 27
 kExcludeManipulators       = 1 << 28
 kExcludeNParticles         = 1 << 29
 kExcludeMotionTrails       = 1 << 30
-kExcludeHoldOuts		   = 1 << 31
+kExcludeHoldOuts           = 1 << 31
 kExcludePluginShapes       = 1 << 32
 kExcludeHUD                = 1 << 33
 kExcludeClipGhosts         = 1 << 34
@@ -76,8 +75,8 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
     # This is a somewhat hacky workaround around the limitation that line width is currently (2024-05-02)
     # not supported by mayaHydra : we stack multiple instances of the same item very close together.
     # If we just used a single wireframe, its line width would be 1-pixel wide, which is much too thin
-    # to be reliable : by having multiple of them, it can take up more of the screen, and it reduces
-    # the impact of anti-aliasing on the image comparison.
+    # to be reliable : by having multiple of them, it can take up more of the screen and provide more
+    # robust image comparison.
     def stackInstances(self, itemCreationCallable, nbInstances, offset):
         for i in range(nbInstances):
             itemCreationCallable()
@@ -86,7 +85,6 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
 
     def compareSnapshot(self, referenceFilename, cameraDistance):
         self.setBasicCam(cameraDistance)
-        cmds.refresh(force=True)
         self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def checkFilter(self, name, exclusionMask, cameraDistance=15):
@@ -144,7 +142,7 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         cmds.delete(cylinderNode)
         self.checkFilter("subdivision_surfaces", kExcludeSubdivSurfaces, 3)
 
-    # TODO : Clip ghosts (filtering option not working as of 2024-05-03?)
+    # TODO : Clip ghosts (filtering option not working as of 2024-05-03)
 
     def test_Controllers(self):
         def controllerCreator():
@@ -165,8 +163,6 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
     # a selection handle, and toggle Display -> Transform Display -> Selection Handles.
 
     def test_IkHandles(self):
-        # IK handles are currently only partially translated to Hydra (2023-05-06),
-        # but the filter does work on what is translated.
         def ikHandleCreator():
             joint1 = cmds.joint(position=[0,-2,0])
             joint2 = cmds.joint(position=[0,2,0])
@@ -206,7 +202,7 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
     def test_Cameras(self):
         self.stackInstances(cmds.camera, 50, [0, 0.005, 0])
         cmds.select(clear=True)
-        self.checkFilter("cameras", kExcludeCameras, 2)
+        self.checkFilter("cameras", kExcludeCameras, 3)
 
     def test_ImagePlanes(self):
         # Note : the images themselves are not working in Hydra as of 2024-05-03, but the selection highlight does.
