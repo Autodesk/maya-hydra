@@ -1,8 +1,8 @@
-//Maya ASCII 2026ff01 scene
+//Maya ASCII 2025ff02 scene
 //Name: motionTrails.ma
 //Last modified: Fri, May 03, 2024 03:45:46 PM
 //Codeset: 1252
-requires maya "2026ff01";
+requires maya "2025ff02";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";
 fileInfo "product" "Maya 2025";
