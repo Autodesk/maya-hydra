@@ -28,11 +28,12 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-#if PXR_VERSION > 2311
-static bool
-_ConvertHdMaterialNetworkToHdDataSources(
-    const HdMaterialNetworkMap &hdNetworkMap,
-    HdContainerDataSourceHandle *result)
+#if PXR_VERSION >= 2405
+
+static
+HdContainerDataSourceHandle
+_ToMaterialNetworkSchema(
+    const HdMaterialNetworkMap& hdNetworkMap)
 {
     HD_TRACE_FUNCTION();
 
@@ -91,7 +92,8 @@ _ConvertHdMaterialNetworkToHdDataSources(
                         .SetValue(
                             HdRetainedTypedSampledDataSource<VtValue>::New(
                                 item.second.value))
-                        .SetColorSpace(item.second.colorSpace.IsEmpty() 
+                        .SetColorSpace(
+                            item.second.colorSpace.IsEmpty()
                             ? nullptr
                             : HdRetainedTypedSampledDataSource<TfToken>::New(
                                 item.second.colorSpace))
@@ -108,7 +110,7 @@ _ConvertHdMaterialNetworkToHdDataSources(
             TfSmallVector<HdDataSourceBaseHandle, 8> cValues;
 
             for (const HdMaterialRelationship &rel : hdNetwork.relationships) {
-                if (rel.outputId == node.path) {                    
+                if (rel.outputId == node.path) {
                     TfToken outputPath = rel.inputId.GetToken(); 
                     TfToken outputName = TfToken(rel.inputName.GetString());
 
@@ -171,22 +173,30 @@ _ConvertHdMaterialNetworkToHdDataSources(
 
     HdContainerDataSourceHandle nodesDefaultContext = 
         HdRetainedContainerDataSource::New(
-            nodeNames.size(), 
+            nodeNames.size(),
             nodeNames.data(),
             nodeValues.data());
 
     HdContainerDataSourceHandle terminalsDefaultContext = 
         HdRetainedContainerDataSource::New(
-            terminalsNames.size(), 
+            terminalsNames.size(),
             terminalsNames.data(),
             terminalsValues.data());
 
-    // Create the material network, potentially one per network selector
-    HdDataSourceBaseHandle network = HdMaterialNetworkSchema::Builder()
+    return HdMaterialNetworkSchema::Builder()
         .SetNodes(nodesDefaultContext)
         .SetTerminals(terminalsDefaultContext)
         .Build();
-        
+}
+
+static bool
+_ConvertHdMaterialNetworkToHdDataSources(
+    const HdMaterialNetworkMap &hdNetworkMap,
+    HdContainerDataSourceHandle *result)
+{
+    // Create the material network, potentially one per network selector
+    HdDataSourceBaseHandle network = _ToMaterialNetworkSchema(hdNetworkMap);
+
     TfToken defaultContext = HdMaterialSchemaTokens->universalRenderContext;
     *result = HdMaterialSchema::BuildRetained(
         1, 
@@ -195,7 +205,9 @@ _ConvertHdMaterialNetworkToHdDataSources(
     
     return true;
 }
+
 #else
+
 static bool
 _ConvertHdMaterialNetworkToHdDataSources(
     const HdMaterialNetworkMap &hdNetworkMap,
