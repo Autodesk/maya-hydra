@@ -59,18 +59,17 @@ inline int getProcessMemory()
     // https://man7.org/linux/man-pages/man5/proc.5.html
     // When a process accesses this magic symbolic link, it
     // resolves to the process's own /proc/pid directory.
-    std::ifstream processFile("/proc/self/status");
-    std::string line;
-    unsigned long long memoryUsage = 0;
-
-    while (std::getline(processFile, line)) {
-        if (line.compare(0, 6, "VmSize:") == 0) {
-            std::istringstream iss(line.substr(7));
-            iss >> memoryUsage;
-            break;
-        }
+    long rss = 0L;
+    FILE* fp = NULL;
+    if ( (fp = fopen( "/proc/self/statm", "r" )) == NULL )
+        return (size_t)0L;     
+    if ( fscanf( fp, "%*s%ld", &rss ) != 1 )
+    {
+        fclose( fp );
+        return (size_t)0L;
     }
-    return  static_cast<int>(memoryUsage / MB);
+    fclose( fp );
+    return ((size_t)rss * (size_t)sysconf( _SC_PAGESIZE)) / MB ;
     
 #elif defined(__APPLE__)
     // https://developer.apple.com/documentation/kernel/1537934-task_info
