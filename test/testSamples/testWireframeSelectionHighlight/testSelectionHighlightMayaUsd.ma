@@ -1,9 +1,8 @@
-//Maya ASCII 2026ff01 scene
+//Maya ASCII 2025 scene
 //Name: testSelectionHighlightMayaUsd.ma
 //Last modified: Wed, Apr 17, 2024 03:28:44 PM
 //Codeset: 1252
-requires maya "2026ff01";
-requires "mtoa" "5.4.0";
+requires maya "2025";
 requires -nodeType "mayaUsdLayerManager" -nodeType "mayaUsdProxyShape" -dataType "pxrUsdStageData"
 		 "mayaUsdPlugin" "0.28.0";
 currentUnit -l centimeter -a degree -t film;
@@ -43,7 +42,6 @@ createNode camera -s -n "topShape" -p "top";
 	setAttr ".man" -type "string" "top_mask";
 	setAttr ".hc" -type "string" "viewSet -t %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -s -n "front";
 	rename -uid "67DAD043-4E45-C7D7-AB7A-61A4E84D19A3";
 	setAttr ".v" no;
@@ -59,7 +57,6 @@ createNode camera -s -n "frontShape" -p "front";
 	setAttr ".man" -type "string" "front_mask";
 	setAttr ".hc" -type "string" "viewSet -f %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -s -n "side";
 	rename -uid "D2D62B2B-4D48-47D9-7A26-7EA65FE2D25E";
 	setAttr ".v" no;
@@ -76,7 +73,6 @@ createNode camera -s -n "sideShape" -p "side";
 	setAttr ".man" -type "string" "side_mask";
 	setAttr ".hc" -type "string" "viewSet -s %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -n "sample_usd";
 	rename -uid "F58040AF-4BDF-D338-8785-C1A4702B1E62";
 createNode mayaUsdProxyShape -n "sample_usdShape" -p "sample_usd";
