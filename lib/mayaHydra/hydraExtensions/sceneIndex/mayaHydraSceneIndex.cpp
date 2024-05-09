@@ -39,6 +39,8 @@
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
+#include <mayaHydraLib/pick/mhPickHandler.h>
+#include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
 
 #include <ufeExtensions/Global.h>
 
@@ -60,6 +62,38 @@ namespace
 {
     static std::mutex _adaptersToRecreateMutex;
     static std::mutex _adaptersToRebuildMutex;
+
+// Pick handler for the Maya scene index.  As the Maya pick handler and the
+// Maya scene index are circularly dependent (the Maya pick handler calls
+// MayaHydraSceneIndex::AddPickHitToSelectionList() in the Maya scene index
+// interface, and the Maya scene index builds the Maya pick handler), they are
+// both defined here in the same implementation file.
+
+class MayaPickHandler : public MayaHydra::PickHandler {
+    PXR_NS::MayaHydraSceneIndex& _mayaSceneIndex;
+
+public:
+
+    MayaPickHandler(PXR_NS::MayaHydraSceneIndex& mayaSceneIndex) : 
+        _mayaSceneIndex(mayaSceneIndex) {}
+
+    bool handlePickHit(
+        const Input& pickInput, Output& pickOutput
+    ) const override
+    {
+        // Maya does not create Hydra instances, so if the pick hit instancer
+        // ID isn't empty, it's not a Maya pick hit.
+        if (!pickInput.pickHit.instancerId.IsEmpty()) {
+            return false;
+        }
+
+        return _mayaSceneIndex.AddPickHitToSelectionList(
+            pickInput.pickHit, pickInput.pickInfo, 
+            pickOutput.mayaSelection, pickOutput.mayaWorldSpaceHitPts
+        );
+    }
+};
+
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -407,6 +441,10 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
         _mayaDefaultMaterial = MayaHydraSceneIndex::CreateMayaDefaultMaterial();
         _fallbackMaterial = SdfPath::EmptyPath(); // Empty path for hydra fallback material
     });
+
+    // Add our pick handler to the pick handler registry.
+    auto pickHandler = std::make_shared<MayaPickHandler>(*this);
+    TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Register(_rprimPath, pickHandler));
 }
 
 MayaHydraSceneIndex::~MayaHydraSceneIndex()
@@ -414,6 +452,9 @@ MayaHydraSceneIndex::~MayaHydraSceneIndex()
     //If you get a crash in a callback with a nullptr for _sceneIndex, 
     // it may be due to the fact that the _sceneIndex pointer has been nulled as its ref count reached 0 but the destructor is still being called.
     //You should call RemoveCallbacksAndDeleteAdapters(); before the destructor is called.
+
+    // Remove our pick handler from the pick handler registry.
+    TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Unregister(_rprimPath));
 }
 
 void MayaHydraSceneIndex::RemoveCallbacksAndDeleteAdapters()

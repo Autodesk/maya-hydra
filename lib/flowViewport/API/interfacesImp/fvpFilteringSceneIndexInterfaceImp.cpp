@@ -97,7 +97,8 @@ bool FilteringSceneIndexInterfaceImp::_CreateSceneFilteringSceneIndicesData(cons
 
         auto findResult = std::find_if(sceneFilteringSceneIndicesData().cbegin(), sceneFilteringSceneIndicesData().cend(),
                     [&client](const PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr& filteringSIData) { return filteringSIData->getClient() == client;});
-        if (findResult != sceneFilteringSceneIndicesData().cend()){
+        if (!TF_VERIFY(findResult == sceneFilteringSceneIndicesData().cend(),
+                       "Filtering scene index client already found in FilteringSceneIndexInterfaceImp::_CreateSceneFilteringSceneIndicesData()")){
             return false;
         }
 

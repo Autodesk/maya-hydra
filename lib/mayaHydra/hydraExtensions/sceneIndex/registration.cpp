@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-#include "mayaHydraLib/hydraUtils.h"
+#include "mayaHydraLib/mixedUtils.h"
 #include "mayaHydraLib/sceneIndex/registration.h"
 #include "mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndex.h"
 
@@ -386,16 +386,7 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
 
 void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
 {
-    constexpr char kSceneIndexPluginSuffix[] = {"_PluginNode"};
     const MayaHydraSceneIndexRegistrationPtr registration(new MayaUsdSceneIndexRegistration());
-    MFnDependencyNode dependNodeFn(dagNode);
-    // To match plugin TfType registration, name must begin with upper case.
-    const std::string sceneIndexPluginName([&](){
-            std::string name = dependNodeFn.typeName().asChar();
-            name[0] = toupper(name[0]);
-            name += kSceneIndexPluginSuffix;
-            return name;}());
-    const TfToken sceneIndexPluginId(sceneIndexPluginName);
 
     MStatus  status;
     MDagPath dagPath(MDagPath::getAPathTo(dagNode, &status));
@@ -404,20 +395,9 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     }
 
     registration->dagNode = MObjectHandle(dagNode);
-
-    // Create a unique scene index path prefix by starting with the
-    // Dag node name, and checking for uniqueness under the scene
-    // index plugin parent rprim.  If not unique, add an
-    // incrementing numerical suffix until it is.
-    const auto sceneIndexPluginPath = SdfPath::AbsoluteRootPath().AppendChild(sceneIndexPluginId);
-    const auto newName = uniqueChildName(
-        _renderIndexProxy->GetMergingSceneIndex(),
-        sceneIndexPluginPath,
-        SanitizeNameForSdfPath(dependNodeFn.name().asChar())
-    );
-
-    registration->sceneIndexPathPrefix = sceneIndexPluginPath.AppendChild(newName);
-
+    registration->sceneIndexPathPrefix = sceneIndexPathPrefix(
+        _renderIndexProxy->GetMergingSceneIndex(), dagNode);
+                                                                  
 #ifdef MAYAHYDRALIB_MAYAUSDAPI_ENABLED
 
     //We receive only dag nodes of type MayaUsdProxyShapeNode
@@ -441,24 +421,39 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     HdSceneIndexBaseRefPtr finalSceneIndex = nullptr;
     UsdImagingStageSceneIndexRefPtr stageSceneIndex = nullptr;
 
+    // We are explicitly adding a prefixing scene index just downstream (after)
+    // the MayaUsdProxyShapeSceneIndex.  We don't want to automatically add an
+    // additional prefixing scene index to the PathInterfaceSceneIndex (which
+    // is downstream of the prefixing stream index), which would double the
+    // prefix.  Therefore, set the scene index prefix here to be 'null' (the
+    // absolute root path).
     PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr dataProducerSceneIndexData  = 
         Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageSceneIndex(createInfo, finalSceneIndex, stageSceneIndex, 
-                                                                             registration->sceneIndexPathPrefix, (void*)&dagNode);
+                                                                             SdfPath::AbsoluteRootPath(), (void*)&dagNode);
     if (nullptr == dataProducerSceneIndexData || nullptr == finalSceneIndex || nullptr == stageSceneIndex){
         TF_CODING_ERROR("Error (nullptr == dataProducerSceneIndexData || nullptr == finalSceneIndex || nullptr == stageSceneIndex) !");
     }
         
-    //Create maya usd proxy shape scene index, since this scene index contains maya data, it cannot be added by the flow viewport API
-    auto mayaUsdProxyShapeSceneIndex = MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode));
+    // Create Maya USD proxy shape scene index.  Since this scene index
+    // contains Maya data, it cannot be added by the Flow Viewport API.
+    // Pass in the scene index prefix for the proxy shape scene index, so it
+    // can register a pick handler.
+    auto mayaUsdProxyShapeSceneIndex = MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode), registration->sceneIndexPathPrefix);
     registration->pluginSceneIndex = mayaUsdProxyShapeSceneIndex;
     registration->interpretRprimPathFn = &(MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::InterpretRprimPath);
     mayaUsdProxyShapeSceneIndex->Populate();
 
+    // This sets the required prefix just downstream (after) the
+    // MayaUsdProxyShapeSceneIndex, as required.
     auto pfsi = HdPrefixingSceneIndex::New(
         registration->pluginSceneIndex,
         registration->sceneIndexPathPrefix);
 
-    //Add the PathInterfaceSceneIndex which must be the last scene index, it is used for selection highlighting
+    // Add the PathInterfaceSceneIndex which must be the last scene index, it 
+    // is used by selection highlighting.  The scene index prefix is passed in
+    // not to add in a prefix, which is done explicitly by the prefixing scene
+    // index above.  Rather, it is so the path interface scene index can build
+    // the scene index path from an application path.
     registration->rootSceneIndex = PathInterfaceSceneIndex::New(
         pfsi,
         registration->sceneIndexPathPrefix,

@@ -34,7 +34,7 @@ namespace UfeExtensions {
 using SdfPath = PXR_NS::SdfPath;
 
 //Copied from usdImaging/usdImaging/delegate.h
-static constexpr int ALL_INSTANCES = -1;
+constexpr int ALL_INSTANCES = -1;
 
 UFEEXTENSIONS_API
 Ufe::Rtid getMayaRunTimeId();

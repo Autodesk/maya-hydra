@@ -125,11 +125,13 @@ namespace PrototypeInstancing
 namespace FVP_NS_DEF {
 
 DataProducerSceneIndexExample::DataProducerSceneIndexExample() :
-    _cubeRootPath(SdfPath(TfStringPrintf("/cube_%p", this))),//Is the root path for the cubes
-    _instancerPath(SdfPath(TfStringPrintf("/instancer_%p", this)))//Is the instancer path when using instancing
+    _cubeRootPath(SdfPath("/cube_")),//Is the root path for the cubes
+    _instancerPath(SdfPath("/instancer_"))//Is the instancer path when using instancing
 {
     //Create the HdRetainedSceneIndex to be able to easily add primitives
     _retainedSceneIndex = HdRetainedSceneIndex::New();
+
+    _retainedSceneIndex->SetDisplayName("Flow Viewport Data Producer Example Scene Index");
     
     //Add all primitives
     _AddAllPrims();
@@ -165,10 +167,10 @@ void DataProducerSceneIndexExample::getPrimsBoundingBox(float& corner1X, float& 
                                     {-_currentCubeGridParams._halfSize, -_currentCubeGridParams._halfSize, -_currentCubeGridParams._halfSize},     
                                     { _currentCubeGridParams._halfSize,  _currentCubeGridParams._halfSize,  _currentCubeGridParams._halfSize}
                                  );
-    const GfBBox3d  cubeInitialBBox (cubeRange, _currentCubeGridParams._initalTransform);
+    const GfBBox3d  cubeInitialBBox (cubeRange, _currentCubeGridParams._initialTransform);
     
     //Init some variables before looping
-    const GfVec3d initTrans   = _currentCubeGridParams._initalTransform.ExtractTranslation();
+    const GfVec3d initTrans   = _currentCubeGridParams._initialTransform.ExtractTranslation();
     const int numLevelsX      = _currentCubeGridParams._numLevelsX;
     const int numLevelsY      = _currentCubeGridParams._numLevelsY;
     const int numLevelsZ      = _currentCubeGridParams._numLevelsZ;
@@ -178,18 +180,18 @@ void DataProducerSceneIndexExample::getPrimsBoundingBox(float& corner1X, float& 
 
     //Combine the AABB of each cube prim of the 3D grid of Hydra cubes primitives
     for (int z = 0; z < numLevelsZ; ++z) {
-		for (int y = 0; y < numLevelsY; ++y) {
-			for (int x = 0; x < numLevelsX; ++x) {
+        for (int y = 0; y < numLevelsY; ++y) {
+            for (int x = 0; x < numLevelsX; ++x) {
                 //Update translation, by getting the initial transform
-                GfMatrix4d currentXForm = _currentCubeGridParams._initalTransform;
+                GfMatrix4d currentXForm = _currentCubeGridParams._initialTransform;
                 //And updating the translation only in the matrix, _currentCubeGridParams._deltaTrans holds the number of units to separate the cubes in the grid in X, Y, and Z.
                 currentXForm.SetTranslateOnly(initTrans + (GfCompMult(_currentCubeGridParams._deltaTrans, GfVec3f(x,y,z))));
 
                 const GfBBox3d currentCubeAABB (cubeRange, currentXForm);
                 combinedAABBox = GfBBox3d::Combine(currentCubeAABB, combinedAABBox);
-			}
-		}
-	}
+            }
+        }
+    }
 
     //Get resulting AABB 
     const GfRange3d resultedAABB    = combinedAABBox.ComputeAlignedRange();
@@ -227,14 +229,14 @@ void DataProducerSceneIndexExample::_AddAllPrimsWithInstancing()
     //Copy the main cube primitive in the array, we will update only the SdfPath and the transform, all others attributes are identical
     HdRetainedSceneIndex::AddedPrimEntry cubePrimEntry = _CreateCubePrim(_cubeRootPath, _currentCubeGridParams._halfSize, 
                                                                         _currentCubeGridParams._color, _currentCubeGridParams._opacity, 
-                                                                        _currentCubeGridParams._initalTransform, instancing);
+                                                                        _currentCubeGridParams._initialTransform, instancing);
 
     //Add the cube to the retained scene index
     _retainedSceneIndex->AddPrims({cubePrimEntry});
 
     const size_t totalSize = _currentCubeGridParams._numLevelsX * _currentCubeGridParams._numLevelsY * _currentCubeGridParams._numLevelsZ;
     
-    const GfVec3d initTrans{0,0,0};//             = _currentCubeGridParams._initalTransform.ExtractTranslation();
+    const GfVec3d initTrans{0,0,0};//             = _currentCubeGridParams._initialTransform.ExtractTranslation();
     const int numLevelsX                = _currentCubeGridParams._numLevelsX;
     const int numLevelsY                = _currentCubeGridParams._numLevelsY;
     const int numLevelsZ                = _currentCubeGridParams._numLevelsZ;
@@ -246,11 +248,11 @@ void DataProducerSceneIndexExample::_AddAllPrimsWithInstancing()
         
     //Create matrices array
     tbb::parallel_for(tbb::blocked_range3d<int, int, int>(0, numLevelsZ, 0, numLevelsY, 0, numLevelsX),
-		[&](const tbb::blocked_range3d<int, int, int>& r)
-		{
-			for (int z = r.pages().begin(), z_end = r.pages().end(); z < z_end; ++z) {
-				for (int y = r.rows().begin(), y_end = r.rows().end(); y < y_end; ++y) {
-					for (int x = r.cols().begin(), x_end = r.cols().end(); x < x_end; ++x) {
+        [&](const tbb::blocked_range3d<int, int, int>& r)
+        {
+            for (int z = r.pages().begin(), z_end = r.pages().end(); z < z_end; ++z) {
+                for (int y = r.rows().begin(), y_end = r.rows().end(); y < y_end; ++y) {
+                    for (int x = r.cols().begin(), x_end = r.cols().end(); x < x_end; ++x) {
 
                         const size_t index = x + (numLevelsX * y) + (numLevelsX * numLevelsY * z);
                         
@@ -259,11 +261,11 @@ void DataProducerSceneIndexExample::_AddAllPrimsWithInstancing()
 
                         //Update translation
                         matrices[index].SetTranslate(initTrans + (GfCompMult(_currentCubeGridParams._deltaTrans, GfVec3f(x,y,z))));
-					}
-				}
-			}
-		}
-	);
+                    }
+                }
+            }
+        }
+    );
 
     //Add new prims to the scene index
     PrototypeInstancing::createInstancer(_instancerPath, _cubeRootPath, prototypeIndices, matrices, _retainedSceneIndex);
@@ -271,61 +273,82 @@ void DataProducerSceneIndexExample::_AddAllPrimsWithInstancing()
 
 void DataProducerSceneIndexExample::_AddAllPrimsNoInstancing()
 {
-    static const bool instancing = false;
+    constexpr bool instancing = false;
 
-    //Arrays of added prims
-    HdRetainedSceneIndex::AddedPrimEntries  addedPrims;
-    
-    //Copy the main cube primitive in the array, we will update only the SdfPath and the transform of the other cubes created, all others attributes are identical.
-    HdRetainedSceneIndex::AddedPrimEntry cubePrimEntry = _CreateCubePrim(_cubeRootPath, _currentCubeGridParams._halfSize, 
-                                                                        _currentCubeGridParams._color, _currentCubeGridParams._opacity, 
-                                                                        _currentCubeGridParams._initalTransform, instancing);
-    
-    //We build a 3D grid of cubes
-    const size_t totalSize = _currentCubeGridParams._numLevelsX * _currentCubeGridParams._numLevelsY * _currentCubeGridParams._numLevelsZ;
+    //Readability shorthand.
+    const auto& cgp = _currentCubeGridParams;
 
-    //Resize the addedPrims array to the exact size of the number of cube primitives we want in the grid.
-    addedPrims.resize(totalSize, cubePrimEntry);
+    //Array of added prims.  We want to fill in our addedPrims vector in
+    //parallel.  Pre-allocate the addedPrims array for the maximum number of
+    //cube primitives in the grid.  Hidden cubes reduce the size of the array.
+    const size_t maxSize = cgp._numLevelsX * cgp._numLevelsY * cgp._numLevelsZ;
+    HdRetainedSceneIndex::AddedPrimEntries addedPrims{maxSize};
+    std::atomic<int> nbEntries;
 
     //Init some variables before looping
-    const std::string cubeRootString    = _cubeRootPath.GetString();
-    const GfVec3d initTrans             = _currentCubeGridParams._initalTransform.ExtractTranslation();
-    const int numLevelsX                = _currentCubeGridParams._numLevelsX;
-    const int numLevelsY                = _currentCubeGridParams._numLevelsY;
-    const int numLevelsZ                = _currentCubeGridParams._numLevelsZ;
+    const std::string cubeRootString    = _cubeRootPath.GetName();
+    const GfVec3d initTrans             = cgp._initialTransform.ExtractTranslation();
+    const int numLevelsX                = cgp._numLevelsX;
+    const int numLevelsY                = cgp._numLevelsY;
+    const int numLevelsZ                = cgp._numLevelsZ;
 
     //Create the 3D grid of cubes primitives in Hydra
     tbb::parallel_for(tbb::blocked_range3d<int, int, int>(0, numLevelsZ, 0, numLevelsY, 0, numLevelsX),
-		[&](const tbb::blocked_range3d<int, int, int>& r)
-		{
-			for (int z = r.pages().begin(), z_end = r.pages().end(); z < z_end; ++z) {
-				for (int y = r.rows().begin(), y_end = r.rows().end(); y < y_end; ++y) {
-					for (int x = r.cols().begin(), x_end = r.cols().end(); x < x_end; ++x) {
+        [&](const tbb::blocked_range3d<int, int, int>& r)
+        {
+            for (int z = r.pages().begin(), z_end = r.pages().end(); z < z_end; ++z) {
+                for (int y = r.rows().begin(), y_end = r.rows().end(); y < y_end; ++y) {
+                    for (int x = r.cols().begin(), x_end = r.cols().end(); x < x_end; ++x) {
+
+                        //Compute the prim path so that all cube prim path are unique
+                        std::string cubePathStr(
+                            cubeRootString + std::to_string(x) +
+                            "_" + std::to_string(y) + "_" + std::to_string(z));
+
+                        //If cube is hidden, skip to the next one.
+                        if (cgp._hidden.count(cubePathStr) > 0) {
+                            continue;
+                        }
+
+                        int ndx = nbEntries++;
+                        HdRetainedSceneIndex::AddedPrimEntry& cubePrimEntry =
+                            addedPrims[ndx];
+                        // Prims added to retained scene index must have
+                        // absolute path, otherwise infinite recursion.
+                        auto cubePath = SdfPath::AbsoluteRootPath().AppendChild(TfToken(cubePathStr));
+                        cubePrimEntry = _CreateCubePrim(
+                            cubePath, cgp._halfSize, cgp._color,
+                            cgp._opacity, cgp._initialTransform, instancing);
 
                         //Update translation, by getting the initial transform
-                        GfMatrix4d currentXForm = _currentCubeGridParams._initalTransform;
+                        GfMatrix4d currentXForm = cgp._initialTransform;
+
+                        //Is the cube in set of transformed cubes?  Currently
+                        //only supporting translation, so add the translation
+                        //to the transform if appropriate.
+                        auto cubeTrans = initTrans;
+                        auto found = cgp._transformed.find(cubePathStr);
+                        if (found != cgp._transformed.end()) {
+                            cubeTrans += found->second;
+                        }
+
                         //And updating the translation only in the matrix, _currentCubeGridParams._deltaTrans holds the number of units to separate the cubes in the grid in X, Y, and Z.
-                        currentXForm.SetTranslateOnly(initTrans + (GfCompMult(_currentCubeGridParams._deltaTrans, GfVec3f(x,y,z))));
-
-                        //Update information at the right place in the array
-                        HdRetainedSceneIndex::AddedPrimEntry& currentCubePrimEntry  = addedPrims[x + (numLevelsX * y) + (numLevelsX * numLevelsY * z)];
-
-                        //Update the prim path so that all cube prim path are unique
-                        currentCubePrimEntry.primPath                               = SdfPath(  cubeRootString +  std::to_string(x) + 
-                                                                                                std::string("_") + std::to_string(y)+ 
-                                                                                                std::string("_") + std::to_string(z));
+                        currentXForm.SetTranslateOnly(cubeTrans + (GfCompMult(cgp._deltaTrans, GfVec3f(x,y,z))));
 
                         //Update the matrix in the data source for this cube prim
-                        currentCubePrimEntry.dataSource                             = HdContainerDataSourceEditor(currentCubePrimEntry.dataSource)
+                        cubePrimEntry.dataSource                             = HdContainerDataSourceEditor(cubePrimEntry.dataSource)
                                                                                         .Set(HdXformSchema::GetDefaultLocator(), 
                                                                                         HdXformSchema::Builder().SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(currentXForm))
                                                                                         .Build())
                                                                                         .Finish();
-					}
-				}
-			}
-		}
-	);
+                    }
+                }
+            }
+        }
+    );
+
+    //All done, bring the added entries vector down to size.
+    addedPrims.resize(nbEntries);
     
     //Add all the cube prims to the retained scene index
     _retainedSceneIndex->AddPrims(addedPrims);
@@ -363,11 +386,11 @@ void DataProducerSceneIndexExample::_RemoveAllPrimsNoInstancing()
 
     //Remove cube primitives in Hydra
     tbb::parallel_for(tbb::blocked_range3d<int, int, int>(0, numLevelsZ, 0, numLevelsY, 0, numLevelsX),
-		[&](const tbb::blocked_range3d<int, int, int>& r)
-		{
-			for (int z = r.pages().begin(), z_end = r.pages().end(); z < z_end; ++z) {
-				for (int y = r.rows().begin(), y_end = r.rows().end(); y < y_end; ++y) {
-					for (int x = r.cols().begin(), x_end = r.cols().end(); x < x_end; ++x) {
+        [&](const tbb::blocked_range3d<int, int, int>& r)
+        {
+            for (int z = r.pages().begin(), z_end = r.pages().end(); z < z_end; ++z) {
+                for (int y = r.rows().begin(), y_end = r.rows().end(); y < y_end; ++y) {
+                    for (int x = r.cols().begin(), x_end = r.cols().end(); x < x_end; ++x) {
                         
                         //Get the SdfPath from the cube prim at that place in the 3D grid. It's the same way as when we create the cube prim, see DataProducerSceneIndexExample::AddAllPrimsNoInstancing()
                         const SdfPath currentCubePath(cubeRootString + std::to_string(x) + std::string("_") + std::to_string(y)+ std::string("_") + std::to_string(z));
@@ -471,14 +494,7 @@ HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubeP
             HdPrimvarSchema::Builder()
                 .SetPrimvarValue(
                     HdRetainedTypedSampledDataSource<VtFloatArray>::New(
-                        VtFloatArray{
-                            opacity, opacity, opacity, opacity,//Is a value per face vertex (quads)
-                            opacity, opacity, opacity, opacity,
-                            opacity, opacity, opacity, opacity,
-                            opacity, opacity, opacity, opacity,
-                            opacity, opacity, opacity, opacity,
-                            opacity, opacity, opacity, opacity
-                        }))
+                        VtFloatArray(24, opacity))) //Is a value per face vertex (quads)
                 .SetInterpolation(
                     HdPrimvarSchema::BuildInterpolationDataSource(
                         HdPrimvarSchemaTokens->faceVarying))
@@ -554,11 +570,10 @@ HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubeP
     return addedPrim;
 }
 
-void DataProducerSceneIndexExample::addDataProducerSceneIndex()
+void DataProducerSceneIndexExample::addDataProducerSceneIndex(const PXR_NS::SdfPath& prefix)
 {
     if (!_dataProducerSceneIndexAdded && _hydraInterface){
-        SdfPath inoutPrefix = PXR_NS::SdfPath::AbsoluteRootPath();
-        const bool res = _hydraInterface->addDataProducerSceneIndex(_retainedSceneIndex, inoutPrefix, _containerNode, PXR_NS::FvpViewportAPITokens->allViewports, PXR_NS::FvpViewportAPITokens->allRenderers);
+        const bool res = _hydraInterface->addDataProducerSceneIndex(_retainedSceneIndex, prefix, _containerNode, PXR_NS::FvpViewportAPITokens->allViewports, PXR_NS::FvpViewportAPITokens->allRenderers);
         if (false == res){
             TF_CODING_ERROR("_hydraInterface->addDataProducerSceneIndex returned false !");
         }

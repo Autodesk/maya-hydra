@@ -203,4 +203,5 @@ endif()
 # subdirectories
 # -----------------------------------------------------------------------------
 add_subdirectory(adapters)
+add_subdirectory(pick)
 add_subdirectory(sceneIndex)

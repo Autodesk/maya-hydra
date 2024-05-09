@@ -48,6 +48,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testViewportFilters.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
+    cpp/testDataProducerExample.py
     cpp/testMayaSceneFlattening.py
     cpp/testMayaUsdUfeItems.py
     cpp/testMergingSceneIndex.py

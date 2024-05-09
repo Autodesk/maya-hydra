@@ -23,6 +23,7 @@
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/usd/sdf/path.h>
+#include <pxr/imaging/hd/sceneIndex.h>
 
 #include <maya/MFloatMatrix.h>
 #include <maya/MFnDependencyNode.h>
@@ -224,6 +225,16 @@ bool getIndexedColorPreferenceValue(
     const std::string& colorName,
     const std::string& tableName,
     PXR_NS::GfVec4f&   outColor);
+
+//! Using a standard suffix and the depend node type, call uniqueChildName() to
+//! create a unique scene index path prefix based at the root of the scene
+//! index scene.  The mayaNode MObject is passed by non-const reference to
+//! satisfy MFnDependencyNode API requirements.
+MAYAHYDRALIB_API
+PXR_NS::SdfPath sceneIndexPathPrefix(
+    const PXR_NS::HdSceneIndexBaseRefPtr& sceneIndex,
+    MObject&                              mayaNode
+);
 
 } // namespace MAYAHYDRA_NS_DEF
 

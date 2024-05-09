@@ -7,12 +7,14 @@ add_library(${TARGET_NAME} SHARED)
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME} 
     PRIVATE
-		Global.cpp
+        cvtTypeUtils.h
+        Global.cpp
 )
 
 set(HEADERS
     api.h
-	Global.h
+        cvtTypeUtils.h
+        Global.h
 )
 
 # -----------------------------------------------------------------------------
@@ -64,15 +66,15 @@ endif()
 # -----------------------------------------------------------------------------
 
 target_link_libraries(${TARGET_NAME} 
-	PUBLIC
-		sdf
-		tf
-		usd
-		${MAYA_LIBRARIES}
-	PRIVATE
+    PUBLIC
+        sdf
+        tf
+        usd
+        ${MAYA_LIBRARIES}
+    PRIVATE
         $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
-		$<$<BOOL:${USD_001905_BUILD}>:hio>
-		${PYTHON_LIBRARIES} 
+        $<$<BOOL:${USD_001905_BUILD}>:hio>
+        ${PYTHON_LIBRARIES} 
 )
 
 # -----------------------------------------------------------------------------
