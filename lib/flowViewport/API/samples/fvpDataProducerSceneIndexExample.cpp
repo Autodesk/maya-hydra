@@ -21,6 +21,10 @@
 
 //Local headers
 #include "fvpDataProducerSceneIndexExample.h"
+#include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/gf/vec3d.h>
+#include <pxr/base/gf/vec3f.h>
+#include <pxr/usd/sdf/path.h>
 
 #ifdef CODE_COVERAGE_WORKAROUND
 #include <flowViewport/fvpUtils.h>
@@ -223,13 +227,26 @@ void DataProducerSceneIndexExample::_AddAllPrims()
 void DataProducerSceneIndexExample::_AddAllPrimsWithInstancing()
 {
     static const bool instancing = true;
-
+    GfMatrix4d instanceeTransform;
+    instanceeTransform.SetTranslate(GfVec3d(1.67, 1.67, 1.67));
     //Copy the main cube primitive in the array, we will update only the SdfPath and the transform, all others attributes are identical
-    HdRetainedSceneIndex::AddedPrimEntry cubePrimEntry = _CreateCubePrim(_cubeRootPath, _currentCubeGridParams._halfSize, 
+    SdfPath cubePath = _cubeRootPath.AppendElementString("_mesh");
+    HdRetainedSceneIndex::AddedPrimEntry cubePrimEntry = _CreateCubePrim(cubePath, _currentCubeGridParams._halfSize, 
                                                                         _currentCubeGridParams._color, _currentCubeGridParams._opacity, 
-                                                                        _currentCubeGridParams._initalTransform, instancing);
+                                                                        instanceeTransform, instancing);
+    const HdDataSourceBaseHandle cubeRootInstancedByData =
+            HdInstancedBySchema::Builder()
+            .SetPaths(HdRetainedTypedSampledDataSource<VtArray<SdfPath>>::New(VtArray<SdfPath>({ _instancerPath })))
+            .SetPrototypeRoots(HdRetainedTypedSampledDataSource<VtArray<SdfPath>>::New(VtArray<SdfPath>({ _cubeRootPath })))
+            .Build();
+    HdRetainedSceneIndex::AddedPrimEntry cubeRoot;
+    cubeRoot.primPath = _cubeRootPath;
+    cubeRoot.dataSource = HdRetainedContainerDataSource::New(
+        HdInstancedBySchema::GetSchemaToken(), cubeRootInstancedByData
+    );
 
     //Add the cube to the retained scene index
+    _retainedSceneIndex->AddPrims({cubeRoot});
     _retainedSceneIndex->AddPrims({cubePrimEntry});
 
     const size_t totalSize = _currentCubeGridParams._numLevelsX * _currentCubeGridParams._numLevelsY * _currentCubeGridParams._numLevelsZ;
@@ -258,7 +275,7 @@ void DataProducerSceneIndexExample::_AddAllPrimsWithInstancing()
                         prototypeIndices[index] = index;
 
                         //Update translation
-                        matrices[index].SetTranslate(initTrans + (GfCompMult(_currentCubeGridParams._deltaTrans, GfVec3f(x,y,z))));
+                        matrices[index].SetTranslate(initTrans + (GfCompMult(_currentCubeGridParams._deltaTrans, GfVec3f(x + 2,y + 2,z + 2))));
 					}
 				}
 			}
@@ -267,6 +284,9 @@ void DataProducerSceneIndexExample::_AddAllPrimsWithInstancing()
 
     //Add new prims to the scene index
     PrototypeInstancing::createInstancer(_instancerPath, _cubeRootPath, prototypeIndices, matrices, _retainedSceneIndex);
+    //SdfPath cubePath = _instancerPath.AppendElementString("MyCube");
+    //auto cube = _CreateCubePrim(cubePath, 2, GfVec3f(1, 0, 0), 1.0, GfMatrix4d(1), false);
+    //_retainedSceneIndex->AddPrims({cube});
 }
 
 void DataProducerSceneIndexExample::_AddAllPrimsNoInstancing()
@@ -494,9 +514,10 @@ HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubeP
     addedPrim.primType      = HdPrimTypeTokens->mesh;
     if (instanced){
 
-        const HdDataSourceBaseHandle instancedByData =
+        const HdDataSourceBaseHandle cubeInstancedByData =
             HdInstancedBySchema::Builder()
             .SetPaths(HdRetainedTypedSampledDataSource<VtArray<SdfPath>>::New(VtArray<SdfPath>({ _instancerPath })))
+            .SetPrototypeRoots(HdRetainedTypedSampledDataSource<VtArray<SdfPath>>::New(VtArray<SdfPath>({ _cubeRootPath })))
             .Build();
 
         addedPrim.dataSource = HdRetainedContainerDataSource::New(
@@ -523,8 +544,8 @@ HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubeP
                         HdPrimvarsSchemaTokens->primvars,
                         primvarsDs,
 
-                        HdInstancedBySchema::GetSchemaToken(), //Add the instancer path in the HdInstancedBySchema
-                        instancedByData
+                        HdInstancedBySchema::GetSchemaToken(),
+                        cubeInstancedByData
                     );
     }else{
 
