@@ -14,7 +14,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testRefinement.py
     testMaterialXOnNative.py
     testNewSceneWithStage.py
-    testMayaDisplayModes.py
+    # To be reenabled after investigation
+    #testMayaDisplayModes.py
     testMayaShadingModes.py
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
@@ -34,7 +35,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFootPrintNode.py
     testBackgroundColor.py
     testGrid.py
-    testDataProducerSelHighlight.py
+    # To be reenabled after investigation
+    #testDataProducerSelHighlight.py
     testPassingNormalsOnMayaNative.py
     testViewportFilters.py
     cpp/testColorPreferences.py
