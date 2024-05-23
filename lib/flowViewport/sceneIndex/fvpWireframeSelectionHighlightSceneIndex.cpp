@@ -27,6 +27,7 @@
 #include <pxr/base/vt/types.h>
 #include <pxr/imaging/hd/dataSource.h>
 #include <pxr/imaging/hd/dataSourceLocator.h>
+#include <pxr/imaging/hd/dataSourceTypeDefs.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
@@ -65,7 +66,7 @@ const HdRetainedContainerDataSourceHandle sRefinedWireOnSurfaceDisplayStyleDataS
         HdRetainedContainerDataSource::New(
             HdLegacyDisplayStyleSchemaTokens->reprSelector,
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
-                { HdReprTokens->refinedWireOnSurf, TfToken(), TfToken() })));
+                { HdReprTokens->refinedWire, TfToken(), TfToken() })));
 
 const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
@@ -873,6 +874,26 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         if (prim.primType == HdPrimTypeTokens->mesh) {
             prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath.ReplacePrefix(shMirrorAncestor, _GetOriginalPathFromSelectionHighlightMirror(shMirrorAncestor)));
         }
+        // if (prim.primType == HdPrimTypeTokens->instancer) {
+        //     HdSelectionsSchema selections = HdSelectionsSchema::GetFromParent(prim.dataSource);
+        //     if (selections.IsDefined()) {
+        //         HdInstanceIndicesSchema::Builder instanceIndicesBuilder;
+        //         instanceIndicesBuilder.SetInstancer(HdRetainedTypedSampledDataSource<SdfPath>::New(primPath));
+        //         instanceIndicesBuilder.SetInstanceIndices(HdRetainedTypedSampledDataSource<VtArray<int>>::New({0}));
+        //         instanceIndicesBuilder.SetPrototypeIndex(HdRetainedTypedSampledDataSource<int>::New(0));
+        //         HdSelectionSchema::Builder selectionBuilder;
+        //         selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
+        //         auto newInstanceIndices = HdDataSourceBase::Cast(instanceIndicesBuilder.Build());
+        //         selectionBuilder.SetNestedInstanceIndices(HdRetainedSmallVectorDataSource::New(1, &newInstanceIndices));
+        //         auto newSelection = HdDataSourceBase::Cast(selectionBuilder.Build());
+        //         auto newSelections = HdRetainedSmallVectorDataSource::New(1, &newSelection);
+        //         HdContainerDataSourceEditor editor(prim.dataSource);
+        //         editor.Set(HdSelectionsSchema::GetDefaultLocator(), newSelections);
+
+        //         editor.Set(HdInstancerTopologySchema::GetDefaultLocator().Append(TfToken("mask")), HdRetainedTypedSampledDataSource<VtArray<bool>>::New(VtArray<bool>({true, false})));
+        //         prim.dataSource = editor.Finish();
+        //     }
+        // }
         return prim;
     }
     // for (const auto& shSceneIndex : _shSceneIndices) {
@@ -1033,7 +1054,7 @@ HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSel
     GfMatrix4d matrix;
     matrix.SetScale(1.25);
     xformBuilder.SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(matrix));
-    edited.Set(HdXformSchema::GetDefaultLocator(), xformBuilder.Build());
+    //edited.Set(HdXformSchema::GetDefaultLocator(), xformBuilder.Build());
     
     //Is the prim in refined displayStyle (meaning shaded) ?
     if (HdLegacyDisplayStyleSchema styleSchema =
@@ -1153,6 +1174,16 @@ WireframeSelectionHighlightSceneIndex::_PrimsRemoved(
 {
     TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
         .Msg("WireframeSelectionHighlightSceneIndex::_PrimsRemoved() called.\n");
+
+    for (const auto& entry : entries) {
+        // TODO : Check if instancer with selections, or if an instancee whose instancer(s) have selections?
+        // Maybe only need new instancers with selections?
+        // New proto subprim : handled automatically
+        // New proto : means an instancer has changed -> should be reflected automatically?
+        if (_IsInstancerWithSelections(GetInputSceneIndex()->GetPrim(entry.primPath))) {
+            _RemoveShMirrorsForInstancer(entry.primPath);
+        }
+    }
 
     _SendPrimsRemoved(entries);
 }
