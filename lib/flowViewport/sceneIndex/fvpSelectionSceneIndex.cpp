@@ -42,9 +42,11 @@
 
 #include "flowViewport/debugCodes.h"
 
+#include "fvpPathInterface.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
 #include "pxr/imaging/hd/selectionSchema.h"
 #include "pxr/imaging/hd/selectionsSchema.h"
+#include <pxr/base/tf/smallVector.h>
 
 #include <ufe/pathString.h>
 #include <ufe/selection.h>
@@ -156,13 +158,17 @@ SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
 
     // Call our input scene index to convert the application path to a scene
     // index path.
-    auto sceneIndexPath = SceneIndexPath(appPath);
+    auto primSelections = ConvertUfeSelectionToHydra(appPath);
 
-    TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
-        .Msg("    Adding %s to the Hydra selection.\n", sceneIndexPath.GetText());
+    for (const auto& primSelection : primSelections) {
+        TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
+        .Msg("    Adding %s to the Hydra selection.\n", primSelection.primPath.GetText());
+    }
 
-    if (_selection->Add(sceneIndexPath)) {
-        _SendPrimsDirtied({{sceneIndexPath, selectionsSchemaDefaultLocator}});
+    for (const auto& primSelection : primSelections) {
+        if (_selection->Add(primSelection)) {
+            _SendPrimsDirtied({{primSelection.primPath, selectionsSchemaDefaultLocator}});
+        }
     }
 }
 
@@ -173,10 +179,12 @@ void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
 
     // Call our input scene index to convert the application path to a scene
     // index path.
-    auto sceneIndexPath = SceneIndexPath(appPath);
+    auto primSelections = ConvertUfeSelectionToHydra(appPath);
 
-    if (_selection->Remove(sceneIndexPath)) {
-        _SendPrimsDirtied({{sceneIndexPath, selectionsSchemaDefaultLocator}});
+    for (const auto& primSelection : primSelections) {
+        if (_selection->Remove(primSelection.primPath)) {
+            _SendPrimsDirtied({{primSelection.primPath, selectionsSchemaDefaultLocator}});
+        }
     }
 }
 
@@ -219,21 +227,32 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
 
     _selection->Clear();
 
-    SdfPathVector sceneIndexSn;
-    sceneIndexSn.reserve(selection.size());
+    PrimSelectionInfoVector sceneIndexSn;
+    sceneIndexSn.reserve(selection.size());//TODO: sufficient/efficient? Ufe selection may not 1:1 map to a single SdfPath
     for (const auto& snItem : selection) {
         // Call our input scene index to convert the application path to a scene
         // index path.
-        auto sceneIndexPath = SceneIndexPath(snItem->path());
+        // TODO : What if a single UFE path maps to multiple SdfPaths?
+        // TODO : Handle instances selection.
+        // Potential : make (and rename) SceneIndexPath to return a "PrimSelectionInfoVector"
+        // struct PrimSelectionInfo
+        // {
+        //     SdfPath primPath;
+        //     HdSelectionsSchema selections;
+        // };
+        // using PrimSelectionInfoVector = TfSmallVector<PrimSelectionInfo, 8>;
+        auto primSelections = ConvertUfeSelectionToHydra(snItem->path());
 
-        if (sceneIndexPath.IsEmpty()) {
+        if (primSelections.empty()) {
             continue;
         }
 
-        sceneIndexSn.emplace_back(sceneIndexPath);
-        TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
-            .Msg("    Adding %s to the Hydra selection.\n", sceneIndexPath.GetText());
-        entries.emplace_back(sceneIndexPath, selectionsSchemaDefaultLocator);
+        for (const auto& primSelection : primSelections) {
+            sceneIndexSn.emplace_back(primSelection);
+            TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
+                .Msg("    Adding %s to the Hydra selection.\n", primSelection.primPath.GetText());
+            entries.emplace_back(primSelection.primPath, selectionsSchemaDefaultLocator);
+        }
     }
 
     _selection->Replace(sceneIndexSn);
@@ -250,15 +269,15 @@ bool SelectionSceneIndex::HasFullySelectedAncestorInclusive(const SdfPath& primP
     return _selection->HasFullySelectedAncestorInclusive(primPath);
 }
 
-SdfPath SelectionSceneIndex::SceneIndexPath(const Ufe::Path& appPath) const
+PrimSelectionInfoVector SelectionSceneIndex::ConvertUfeSelectionToHydra(const Ufe::Path& appPath) const
 {
-    auto sceneIndexPath = _inputSceneIndexPathInterface->SceneIndexPath(appPath);
+    auto primSelections = _inputSceneIndexPathInterface->ConvertUfeSelectionToHydra(appPath);
 
-    if (sceneIndexPath.IsEmpty()) {
-        TF_WARN("SelectionSceneIndex::SceneIndexPath(%s) returned an empty path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
+    if (primSelections.empty()) {
+        TF_WARN("SelectionSceneIndex::ConvertUfeSelectionToHydra(%s) returned no selection, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
     }
 
-    return sceneIndexPath;
+    return primSelections;
 }
 
 SdfPathVector SelectionSceneIndex::GetFullySelectedPaths() const

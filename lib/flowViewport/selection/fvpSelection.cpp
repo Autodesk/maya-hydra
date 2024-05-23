@@ -37,7 +37,9 @@
 //
 
 #include "flowViewport/selection/fvpSelection.h"
+#include "flowViewport/sceneIndex/fvpPathInterface.h"
 
+#include "fvpSelection.h"
 #include "pxr/imaging/hd/selectionSchema.h"
 #include "pxr/imaging/hd/selectionsSchema.h"
 
@@ -75,13 +77,13 @@ Selection::_PrimSelectionState::GetVectorDataSource() const
 };
 
 bool
-Selection::Add(const PXR_NS::SdfPath& primPath)
+Selection::Add(const PrimSelectionInfo& primSelection)
 {
-    if (primPath.IsEmpty()) {
+    if (primSelection.primPath.IsEmpty()) {
         return false;
     }
 
-    _pathToState[primPath].selectionSources.push_back(selectionBuilder.Build());
+    _pathToState[primSelection.primPath] = primSelection.selectionsDataSource;
 
     return true;
 }
@@ -97,16 +99,15 @@ Selection::Clear()
     _pathToState.clear();
 }
 
-void Selection::Replace(const PXR_NS::SdfPathVector& selection)
+void Selection::Replace(const PrimSelectionInfoVector& primSelections)
 {
     Clear();
 
-    for (const auto& primPath : selection) {
-        if (primPath.IsEmpty()) {
+    for (const auto& primSelection : primSelections) {
+        if (primSelection.primPath.IsEmpty()) {
             continue;
         }
-        _pathToState[primPath].selectionSources.push_back(
-            selectionBuilder.Build());
+        _pathToState[primSelection.primPath] = primSelection.selectionsDataSource;
     }
 }
 
@@ -157,7 +158,7 @@ HdDataSourceBaseHandle Selection::GetVectorDataSource(
 {
     auto it = _pathToState.find(primPath);
     return (it != _pathToState.end()) ? 
-        it->second.GetVectorDataSource() : nullptr;
+        it->second : nullptr;
 }
 
 }

@@ -42,6 +42,7 @@
 #include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+#include "fvpPathInterface.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
@@ -117,7 +118,7 @@ public:
     //! and warns about empty return paths.
     //@{
     FVP_API
-    PXR_NS::SdfPath SceneIndexPath(const Ufe::Path& appPath) const override;
+    PrimSelectionInfoVector ConvertUfeSelectionToHydra(const Ufe::Path& appPath) const override;
     //@}
 
     FVP_API

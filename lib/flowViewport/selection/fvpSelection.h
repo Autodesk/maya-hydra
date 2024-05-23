@@ -19,12 +19,16 @@
 #include "flowViewport/api.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
 
+#include <pxr/imaging/hd/dataSource.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/usd/sdf/path.h>
 
 #include <map>
 
 namespace FVP_NS_DEF {
+
+struct PrimSelectionInfo;
+using PrimSelectionInfoVector = std::vector<PrimSelectionInfo>;
 
 /// \class Selection
 ///
@@ -44,7 +48,7 @@ public:
 
     // Add primPath to selection and return true if the argument is not empty.
     FVP_API
-    bool Add(const PXR_NS::SdfPath& primPath);
+    bool Add(const PrimSelectionInfo& primSelection);
 
     // Returns true if the removal was successful, false otherwise.
     FVP_API
@@ -53,7 +57,7 @@ public:
     // Replace the selection with the contents of the argument primPath vector.
     // Any empty primPath in the argument will be skipped.
     FVP_API
-    void Replace(const PXR_NS::SdfPathVector& selection);
+    void Replace(const PrimSelectionInfoVector& primSelections);
 
     // Remove all entries from the selection.
     FVP_API
@@ -94,7 +98,7 @@ private:
     
     // Maps prim path to data sources to be returned by the vector data
     // source at locator selections.
-    std::map<PXR_NS::SdfPath, _PrimSelectionState> _pathToState;
+    std::map<PXR_NS::SdfPath, PXR_NS::HdVectorDataSourceHandle> _pathToState;
 };
 
 }

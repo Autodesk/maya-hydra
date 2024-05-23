@@ -17,6 +17,7 @@
 
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
+#include "fvpPathInterface.h"
 
 #include <pxr/imaging/hd/mergingSceneIndex.h>
 
@@ -41,7 +42,7 @@ public:
     static MergingSceneIndexRefPtr New();
 
     FVP_API
-    PXR_NS::SdfPath SceneIndexPath(const Ufe::Path& appPath) const override;
+    PrimSelectionInfoVector ConvertUfeSelectionToHydra(const Ufe::Path& appPath) const override;
 
 private:
     MergingSceneIndex();

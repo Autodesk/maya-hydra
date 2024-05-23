@@ -161,8 +161,8 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndexDirty)
     sn->append(sphereItem);
 
     // Find the sphere in the Hydra scene index scene.
-    auto sphereSiPath = mergingSi->SceneIndexPath(spherePath);
-    auto cubeSiPath = mergingSi->SceneIndexPath(scParentPath + "cube");
+    auto sphereSiPath = mergingSi->ConvertUfeSelectionToHydra(spherePath).front().primPath;
+    auto cubeSiPath = mergingSi->ConvertUfeSelectionToHydra(scParentPath + "cube").front().primPath;
 
     // Sphere is selected.
     hdSn = ssio.GetSelection();
@@ -191,9 +191,9 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndexDirty)
 
     sn->replaceWith(newSn);
 
-    auto ccSiPath = mergingSi->SceneIndexPath(ccParentPath);
-    auto coneSiPath = mergingSi->SceneIndexPath(ccParentPath + "cone");
-    auto cylinderSiPath = mergingSi->SceneIndexPath(ccParentPath + "cylinder");
+    auto ccSiPath = mergingSi->ConvertUfeSelectionToHydra(ccParentPath).front().primPath;
+    auto coneSiPath = mergingSi->ConvertUfeSelectionToHydra(ccParentPath + "cone").front().primPath;
+    auto cylinderSiPath = mergingSi->ConvertUfeSelectionToHydra(ccParentPath + "cylinder").front().primPath;
 
     // Cone and cylinder parent is selected.
     // Cone is not selected.

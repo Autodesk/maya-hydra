@@ -53,7 +53,7 @@ TEST(TestUsdPicking, pick)
     const auto snSi = findSelectionSceneIndexInTree(siRoot);
     ASSERT_TRUE(snSi);
 
-    const auto sceneIndexPath = snSi->SceneIndexPath(selected);
+    const auto sceneIndexPath = snSi->ConvertUfeSelectionToHydra(selected).front().primPath;
 
     ASSERT_FALSE(sceneIndexPath.IsEmpty());
 

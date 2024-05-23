@@ -38,7 +38,7 @@ SdfPath getArgSceneIndexPath(const Fvp::SelectionSceneIndexRefPtr& snSi)
     const auto mayaPath = Ufe::PathString::path(argv[0]);
 
     // Translate the application path into a scene index path.
-    return snSi->SceneIndexPath(mayaPath);
+    return snSi->ConvertUfeSelectionToHydra(mayaPath).front().primPath;
 }
 
 Fvp::SelectionSceneIndexRefPtr getSelectionSceneIndex()

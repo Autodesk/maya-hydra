@@ -19,6 +19,9 @@
 
 #include <ufe/ufe.h>
 
+#include <pxr/base/tf/smallVector.h>
+#include <pxr/usd/sdf/path.h>
+#include <pxr/imaging/hd/dataSource.h>
 #include <pxr/pxr.h>
 
 UFE_NS_DEF {
@@ -30,6 +33,15 @@ class SdfPath;
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace FVP_NS_DEF {
+
+struct PrimSelectionInfo
+{
+    PXR_NS::SdfPath primPath;
+    PXR_NS::HdVectorDataSourceHandle selectionsDataSource;
+};
+
+// TODO : Use TfSmallVector for perf?
+using PrimSelectionInfoVector = std::vector<PrimSelectionInfo>;
 
 /// \class PathInterface
 ///
@@ -45,7 +57,8 @@ public:
     //! If no such path exists, an empty SdfPath should be returned.
     //! \return scene index path.
     FVP_API
-    virtual PXR_NS::SdfPath SceneIndexPath(const Ufe::Path& appPath) const = 0;
+    // TODO : Use TfSmallVector for perf?
+    virtual PrimSelectionInfoVector ConvertUfeSelectionToHydra(const Ufe::Path& appPath) const = 0;
 
 protected:
 

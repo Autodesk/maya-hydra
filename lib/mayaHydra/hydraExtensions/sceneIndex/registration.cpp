@@ -17,6 +17,7 @@
 #include "mayaHydraLib/hydraUtils.h"
 #include "mayaHydraLib/sceneIndex/registration.h"
 #include "mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndex.h"
+#include <pxr/imaging/hd/dataSource.h>
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpPathInterfaceSceneIndex.h>
@@ -25,6 +26,9 @@
 #include <flowViewport/fvpUtils.h>
 #endif
 
+#include <pxr/imaging/hd/instanceIndicesSchema.h>
+#include <pxr/imaging/hd/selectionSchema.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/sceneIndexPlugin.h>
@@ -104,7 +108,7 @@ public:
             inputSceneIndex, sceneIndexPathPrefix, sceneIndexAppPath));
     }
 
-    SdfPath SceneIndexPath(const Ufe::Path& appPath) const override
+    Fvp::PrimSelectionInfoVector ConvertUfeSelectionToHydra(const Ufe::Path& appPath) const override
     {
         // We only handle USD objects, so if the UFE path is not a USD object,
         // early out with failure.
@@ -122,14 +126,38 @@ public:
         // 1) The scene index path prefix, which is fixed on construction.
         // 2) The second segment of the UFE path, with each UFE path component
         //    becoming an SdfPath component.
-        SdfPath sceneIndexPath = _sceneIndexPathPrefix;
+        SdfPath primPath = _sceneIndexPathPrefix;
         TF_AXIOM(appPath.nbSegments() == 2);
         const auto& secondSegment = appPath.getSegments()[1];
         for (const auto& pathComponent : secondSegment) {
-            sceneIndexPath = sceneIndexPath.AppendChild(
-                TfToken(pathComponent.string()));
+            if (pathComponent.string().find_first_not_of("0123456789") == std::string::npos) {
+                continue;
+            }
+            primPath = primPath.AppendChild(TfToken(pathComponent.string()));
         }
-        return sceneIndexPath;
+        const auto lastComponentString = secondSegment.components().back().string();
+        bool lastComponentIsNumeric = lastComponentString.find_first_not_of("0123456789") == std::string::npos;
+        HdVectorDataSourceHandle selectionsDataSource;
+        if (lastComponentIsNumeric) {
+            HdInstanceIndicesSchema::Builder instanceIndicesBuilder;
+            instanceIndicesBuilder.SetInstancer(HdRetainedTypedSampledDataSource<SdfPath>::New(primPath));
+            instanceIndicesBuilder.SetInstanceIndices(HdRetainedTypedSampledDataSource<VtArray<int>>::New({std::stoi(lastComponentString)}));
+            //instanceIndicesBuilder.SetPrototypeIndex(HdRetainedTypedSampledDataSource<int>::New(0));
+            HdSelectionSchema::Builder selectionBuilder;
+            selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
+            auto instanceIndicesDataSource = HdDataSourceBase::Cast(instanceIndicesBuilder.Build());
+            selectionBuilder.SetNestedInstanceIndices(HdRetainedSmallVectorDataSource::New(1, &instanceIndicesDataSource));
+            auto selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
+            selectionsDataSource = HdRetainedSmallVectorDataSource::New(1, &selectionDataSource);
+        }
+        else {
+            HdSelectionSchema::Builder selectionBuilder;
+            selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
+            auto selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
+            selectionsDataSource = HdRetainedSmallVectorDataSource::New(1, &selectionDataSource);
+        }
+        Fvp::PrimSelectionInfo primSelection {primPath, selectionsDataSource};
+        return Fvp::PrimSelectionInfoVector({primSelection});
     }
 
     const Ufe::Path& GetSceneIndexAppPath() const { return _sceneIndexAppPath; }

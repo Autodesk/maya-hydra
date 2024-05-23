@@ -83,7 +83,9 @@ MhLeadObjectPathTracker::MhLeadObjectPathTracker(const HdSceneIndexBaseRefPtr& s
         _leadObjectUfePath = leadObjectSceneItem->path();
         //_leadObjectPrimPath can be empty with a valid _leadObjectUfePath when the lead object is in a data producer scene index not yet added to the merging scene index
         //This is fixed at some point by calling updatePrimPath()
-        _leadObjectPrimPath = _pathInterface->SceneIndexPath(_leadObjectUfePath); 
+        // TODO : Handle multiple lead prim paths
+        auto hydraSelections = _pathInterface->ConvertUfeSelectionToHydra(_leadObjectUfePath);
+        _leadObjectPrimPath = hydraSelections.empty() ? SdfPath() : hydraSelections.front().primPath;
     }
 
    // Add ourself as an observer to the selection
@@ -114,7 +116,8 @@ void MhLeadObjectPathTracker::setLeadObjectUfePath(const Ufe::Path& newLeadObjec
     auto oldLeadObjectPrimPath = _leadObjectPrimPath;
 
     _leadObjectUfePath  = newLeadObjectUfePath;
-    _leadObjectPrimPath = _pathInterface->SceneIndexPath(_leadObjectUfePath);
+    auto hydraSelections = _pathInterface->ConvertUfeSelectionToHydra(_leadObjectUfePath);
+    _leadObjectPrimPath = hydraSelections.empty() ? SdfPath() : hydraSelections.front().primPath;
 
     // Dirty the previous lead object
     if(_dirtyLeadObjectSceneIndex){
@@ -126,7 +129,8 @@ void MhLeadObjectPathTracker::updatePrimPath()
 { 
    // Update the lead object prim path in case it was not valid yet
     if ( (_leadObjectUfePath.size() > 0) && _leadObjectPrimPath.IsEmpty()) {
-        _leadObjectPrimPath = _pathInterface->SceneIndexPath(_leadObjectUfePath);
+        auto hydraSelections = _pathInterface->ConvertUfeSelectionToHydra(_leadObjectUfePath);
+        _leadObjectPrimPath = hydraSelections.empty() ? SdfPath() : hydraSelections.front().primPath;
     }
 }
 

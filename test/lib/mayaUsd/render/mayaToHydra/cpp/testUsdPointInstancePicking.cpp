@@ -51,7 +51,7 @@ TEST(TestUsdPointInstancePicking, pickPointInstance)
     const auto selectionSi = findSelectionSceneIndexInTree(siRoot);
     ASSERT_TRUE(selectionSi);
 
-    const auto sceneIndexPath = selectionSi->SceneIndexPath(marker);
+    const auto sceneIndexPath = selectionSi->ConvertUfeSelectionToHydra(marker).front().primPath;
 
     ASSERT_FALSE(sceneIndexPath.IsEmpty());
 

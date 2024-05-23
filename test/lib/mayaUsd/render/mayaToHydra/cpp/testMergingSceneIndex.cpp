@@ -69,11 +69,11 @@ TEST(FlowViewport, mergingSceneIndex)
 
     // The Maya data producer scene index supports the path interface.  Ask it
     // to translate the application path into a scene index path.
-    auto sceneIndexPath = mayaSi->SceneIndexPath(mayaPath);
+    auto primSelections = mayaSi->ConvertUfeSelectionToHydra(mayaPath);
 
     // Regardless of prefix, the scene index path tail component will match the
     // Maya node name
-    ASSERT_EQ(sceneIndexPath.GetName(), mayaPath.back().string());
+    ASSERT_EQ(primSelections.front().primPath.GetName(), mayaPath.back().string());
 
     // If we ask the terminal scene index for a prim at that path, there must be
     // one.  Prims that exist have a non-null data source.
@@ -81,12 +81,12 @@ TEST(FlowViewport, mergingSceneIndex)
     auto nonExistentPrim = sceneIndices.front()->GetPrim(nonExistentPrimPath);
     ASSERT_FALSE(nonExistentPrim.dataSource);
     
-    auto spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
+    auto spherePrim = sceneIndices.front()->GetPrim(primSelections.front().primPath);
     ASSERT_TRUE(spherePrim.dataSource);
 
     // Flow Viewport merging scene index must give the same scene index path
     // answer as the Maya data producer scene index.
-    ASSERT_EQ(mergingSi->SceneIndexPath(mayaPath), sceneIndexPath);
+    ASSERT_EQ(mergingSi->ConvertUfeSelectionToHydra(mayaPath).front().primPath, primSelections.front().primPath);
 }
 
 TEST(FlowViewport, mergingSceneIndexAddRemove)
@@ -105,13 +105,13 @@ TEST(FlowViewport, mergingSceneIndexAddRemove)
         producers.begin(), producers.end(), isMayaProducerSceneIndex);
     auto mayaSi = TfDynamic_cast<PXR_NS::MayaHydraSceneIndexRefPtr>(*found);
     auto mayaPath = Ufe::PathString::path("|aSphere");
-    auto sceneIndexPath = mayaSi->SceneIndexPath(mayaPath);
+    auto primSelections = mayaSi->ConvertUfeSelectionToHydra(mayaPath);
 
     // With Maya scene index in the merging scene index, the sphere prim has
     // a valid scene index path.
-    auto spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
+    auto spherePrim = sceneIndices.front()->GetPrim(primSelections.front().primPath);
     ASSERT_TRUE(spherePrim.dataSource);
-    spherePrim = mergingSi->GetPrim(sceneIndexPath);
+    spherePrim = mergingSi->GetPrim(primSelections.front().primPath);
     ASSERT_TRUE(spherePrim.dataSource);
 
     // Remove the Maya scene index from the Flow Viewport merging scene index.
@@ -121,9 +121,9 @@ TEST(FlowViewport, mergingSceneIndexAddRemove)
 
     // Without the Maya scene index in the merging scene index, the sphere prim
     // is no longer in the Hydra scene index scene.
-    spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
+    spherePrim = sceneIndices.front()->GetPrim(primSelections.front().primPath);
     ASSERT_FALSE(spherePrim.dataSource);
-    spherePrim = mergingSi->GetPrim(sceneIndexPath);
+    spherePrim = mergingSi->GetPrim(primSelections.front().primPath);
     ASSERT_FALSE(spherePrim.dataSource);
 
     // Add the Maya scene index back to the Flow Viewport merging scene index,
@@ -131,8 +131,8 @@ TEST(FlowViewport, mergingSceneIndexAddRemove)
     // with the absolute root path as scene root, so duplicate that here.
     mergingSi->AddInputScene(mayaSi, SdfPath::AbsoluteRootPath());
     ASSERT_EQ(mergingSi->GetInputScenes().size(), 1u);
-    spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
+    spherePrim = sceneIndices.front()->GetPrim(primSelections.front().primPath);
     ASSERT_TRUE(spherePrim.dataSource);
-    spherePrim = mergingSi->GetPrim(sceneIndexPath);
+    spherePrim = mergingSi->GetPrim(primSelections.front().primPath);
     ASSERT_TRUE(spherePrim.dataSource);
 }

@@ -21,6 +21,7 @@
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
+#include "fvpPathInterface.h"
 
 //Hydra headers
 #include <pxr/imaging/hd/filteringSceneIndex.h>
@@ -70,8 +71,8 @@ public:
 
     //from PathInterface
     FVP_API
-    PXR_NS::SdfPath SceneIndexPath(const Ufe::Path& appPath) const override{
-        return _pathInterface->SceneIndexPath(appPath);
+    PrimSelectionInfoVector ConvertUfeSelectionToHydra(const Ufe::Path& appPath) const override{
+        return _pathInterface->ConvertUfeSelectionToHydra(appPath);
     }
 
 protected:
