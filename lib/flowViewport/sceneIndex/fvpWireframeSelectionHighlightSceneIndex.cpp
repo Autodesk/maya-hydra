@@ -120,20 +120,37 @@ SdfPath _GetOriginalPathFromSelectionHighlightMirror(const SdfPath& mirrorPath)
     return mirrorPath.GetParentPath().AppendElementString(mirrorPath.GetElementString().substr(0, mirrorPath.GetElementString().size() - shMirrorTag.size()));
 }
 
-VtBoolArray _GetSelectionHighlightMask(const VtBoolArray& originalMask, const HdSelectionsSchema& selections) 
+VtBoolArray _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionsSchema& selections) 
 {
-    VtBoolArray selectionHighlightMask(originalMask.size(), false);
+    if (!selections.IsDefined()) {
+        return originalInstancerTopology.GetMask()->GetTypedValue(0);
+    }
+    size_t nbInstances = 0;
+    auto instanceIndices = originalInstancerTopology.GetInstanceIndices();
+    for (size_t iInstanceIndex = 0; iInstanceIndex < instanceIndices.GetNumElements(); iInstanceIndex++) {
+        auto protoInstances = instanceIndices.GetElement(iInstanceIndex)->GetTypedValue(0);
+        nbInstances += protoInstances.size();
+    }
+    VtBoolArray originalMask = originalInstancerTopology.GetMask()->GetTypedValue(0);
+    TF_AXIOM(originalMask.empty() || originalMask.size() == nbInstances);
+    VtBoolArray selectionHighlightMask(nbInstances, false);
 
     for (size_t iSelection = 0; iSelection < selections.GetNumElements(); iSelection++) {
         HdSelectionSchema selection = selections.GetElement(iSelection);
+        // See something.cpp for comment mentioning that currently only fully selected is supported.
         if (!selection.GetFullySelected() || !selection.GetFullySelected()->GetTypedValue(0)) {
             continue;
+        }
+        if (!selection.GetNestedInstanceIndices()) {
+            // We have a selection that has no instances, which means the whole instancer is selected :
+            // this overrides any individual instance selection.
+            return originalInstancerTopology.GetMask()->GetTypedValue(0);
         }
         HdInstanceIndicesVectorSchema nestedInstanceIndices = selection.GetNestedInstanceIndices();
         for (size_t iInstanceIndices = 0; iInstanceIndices < nestedInstanceIndices.GetNumElements(); iInstanceIndices++) {
             HdInstanceIndicesSchema instanceIndices = nestedInstanceIndices.GetElement(0);
             for (const auto& instanceIndex : instanceIndices.GetInstanceIndices()->GetTypedValue(0)) {
-                selectionHighlightMask[instanceIndex] = originalMask[instanceIndex];
+                selectionHighlightMask[instanceIndex] = originalMask.empty() ? true : originalMask[instanceIndex];
             }
         }
     }
@@ -153,23 +170,24 @@ HdContainerDataSourceHandle _GetSelectionHighlightInstancerDataSource(const HdCo
 
     HdContainerDataSourceEditor editedDataSource = HdContainerDataSourceEditor(originalDataSource);
 
-
-    HdDataSourceLocator maskLocator(TfToken("instancerTopology"), TfToken("mask"));
-    VtBoolArray originalMask = instancerTopology.GetMask()->GetTypedValue(0);
-    //VtBoolArray selectionHighlightMask = _GetSelectionHighlightMask(originalMask, selections);
-    VtBoolArray selectionHighlightMask = {true, false};
-    auto selectionHighlightMaskDataSource = HdRetainedTypedSampledDataSource<VtBoolArray>::New(selectionHighlightMask);
-    editedDataSource.Set(maskLocator, selectionHighlightMaskDataSource);
-
-    HdDataSourceLocator prototypesLocator(TfToken("instancerTopology"), TfToken("prototypes"));
-    VtArray<SdfPath> originalPrototypes = instancerTopology.GetPrototypes()->GetTypedValue(0);
-    VtArray<SdfPath> selectionHighlightPrototypes = originalPrototypes;
-    for (auto& shProtoPath : selectionHighlightPrototypes) {
-        shProtoPath = _GetSelectionHighlightMirrorPathFromOriginal(shProtoPath);
+    if (selections.IsDefined()) {
+        HdDataSourceLocator maskLocator(TfToken("instancerTopology"), TfToken("mask"));
+        VtBoolArray selectionHighlightMask = _GetSelectionHighlightMask(instancerTopology, selections);
+        auto selectionHighlightMaskDataSource = HdRetainedTypedSampledDataSource<VtBoolArray>::New(selectionHighlightMask);
+        editedDataSource.Set(maskLocator, selectionHighlightMaskDataSource);
     }
-    editedDataSource.Set(prototypesLocator, HdRetainedTypedSampledDataSource<VtArray<SdfPath>>::New(selectionHighlightPrototypes));
 
-    return SelectionHighlightDataSource::New(editedDataSource.Finish());
+    // HdDataSourceLocator prototypesLocator(TfToken("instancerTopology"), TfToken("prototypes"));
+    // VtArray<SdfPath> originalPrototypes = instancerTopology.GetPrototypes()->GetTypedValue(0);
+    // VtArray<SdfPath> selectionHighlightPrototypes = originalPrototypes;
+    // for (auto& shProtoPath : selectionHighlightPrototypes) {
+    //     shProtoPath = _GetSelectionHighlightMirrorPathFromOriginal(shProtoPath);
+    // }
+    // editedDataSource.Set(prototypesLocator, HdRetainedTypedSampledDataSource<VtArray<SdfPath>>::New(selectionHighlightPrototypes));
+
+    editedDataSource.Set(HdSelectionsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+
+    return editedDataSource.Finish();
 }
 
 
@@ -872,6 +890,9 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         }
         if (prim.primType == HdPrimTypeTokens->mesh) {
             prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath.ReplacePrefix(shMirrorAncestor, _GetOriginalPathFromSelectionHighlightMirror(shMirrorAncestor)));
+        }
+        if (prim.primType == HdPrimTypeTokens->instancer) {
+            prim.dataSource = _GetSelectionHighlightInstancerDataSource(prim.dataSource);
         }
         // if (prim.primType == HdPrimTypeTokens->instancer) {
         //     HdSelectionsSchema selections = HdSelectionsSchema::GetFromParent(prim.dataSource);
