@@ -1162,6 +1162,15 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
         }
     }
 
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedShMirrors;
+    for (const auto& entry : entries) {
+        auto shMirrorPath = _RepathToSelectionHighlightMirror(entry.primPath);
+        if (!shMirrorPath.IsEmpty()) {
+            dirtiedShMirrors.emplace_back(shMirrorPath, entry.dirtyLocators);
+        }
+    }
+    _SendPrimsDirtied(dirtiedShMirrors);
+
     HdSceneIndexObserver::AddedPrimEntries newSelectionHighlightPrims;
     HdSceneIndexObserver::RemovedPrimEntries removedSelectionHighlightPrims;
     for (const auto& entry : entries) {
