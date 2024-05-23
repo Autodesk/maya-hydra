@@ -698,8 +698,7 @@ WireframeSelectionHighlightSceneIndex(
 
         HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPrimPath);
         if (_IsInstancerWithSelections(currPrim)) {
-            HdSceneIndexObserver::AddedPrimEntries newPrims;
-            _CreateSelectionHighlightMirror(currPrimPath, newPrims);
+            _CreateShMirrorsForInstancer(currPrimPath);
         }
 
         for (const auto& childPath : inputSceneIndex->GetChildPrimPaths(currPrimPath)) {
@@ -896,6 +895,13 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         // }
         return prim;
     }
+    // TODO: 
+    //else {
+        // do as before with isancestorselected
+    //}
+
+
+    
     // for (const auto& shSceneIndex : _shSceneIndices) {
     //     if (primPath.HasPrefix(shSceneIndex.first)) {
     //         //HdSceneIndexPrim prim = shSceneIndex.second->GetPrim(primPath);
