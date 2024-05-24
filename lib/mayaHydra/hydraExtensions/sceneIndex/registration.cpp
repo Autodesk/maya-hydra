@@ -137,7 +137,7 @@ public:
         }
         const auto lastComponentString = secondSegment.components().back().string();
         bool lastComponentIsNumeric = lastComponentString.find_first_not_of("0123456789") == std::string::npos;
-        HdVectorDataSourceHandle selectionsDataSource;
+        HdDataSourceBaseHandle selectionDataSource;
         if (lastComponentIsNumeric) {
             HdInstanceIndicesSchema::Builder instanceIndicesBuilder;
             instanceIndicesBuilder.SetInstancer(HdRetainedTypedSampledDataSource<SdfPath>::New(primPath));
@@ -147,16 +147,14 @@ public:
             selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
             auto instanceIndicesDataSource = HdDataSourceBase::Cast(instanceIndicesBuilder.Build());
             selectionBuilder.SetNestedInstanceIndices(HdRetainedSmallVectorDataSource::New(1, &instanceIndicesDataSource));
-            auto selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
-            selectionsDataSource = HdRetainedSmallVectorDataSource::New(1, &selectionDataSource);
+            selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
         }
         else {
             HdSelectionSchema::Builder selectionBuilder;
             selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
-            auto selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
-            selectionsDataSource = HdRetainedSmallVectorDataSource::New(1, &selectionDataSource);
+            selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
         }
-        Fvp::PrimSelectionInfo primSelection {primPath, selectionsDataSource};
+        Fvp::PrimSelectionInfo primSelection {primPath, selectionDataSource};
         return Fvp::PrimSelectionInfoVector({primSelection});
     }
 

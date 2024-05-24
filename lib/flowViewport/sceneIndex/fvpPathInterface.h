@@ -37,7 +37,7 @@ namespace FVP_NS_DEF {
 struct PrimSelectionInfo
 {
     PXR_NS::SdfPath primPath;
-    PXR_NS::HdVectorDataSourceHandle selectionsDataSource;
+    PXR_NS::HdDataSourceBaseHandle selectionDataSource;
 };
 
 // TODO : Use TfSmallVector for perf?

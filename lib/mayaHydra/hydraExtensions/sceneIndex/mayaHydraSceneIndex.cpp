@@ -666,7 +666,7 @@ Fvp::PrimSelectionInfoVector MayaHydraSceneIndex::ConvertUfeSelectionToHydra(con
     HdSelectionSchema::Builder selectionBuilder;
     selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
     auto selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
-    Fvp::PrimSelectionInfo primSelection {primPath, HdRetainedSmallVectorDataSource::New(1, &selectionDataSource)};
+    Fvp::PrimSelectionInfo primSelection {primPath, selectionDataSource};
     return Fvp::PrimSelectionInfoVector({primSelection});
 }
 

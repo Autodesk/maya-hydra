@@ -98,7 +98,7 @@ private:
     
     // Maps prim path to data sources to be returned by the vector data
     // source at locator selections.
-    std::map<PXR_NS::SdfPath, PXR_NS::HdVectorDataSourceHandle> _pathToState;
+    std::map<PXR_NS::SdfPath, _PrimSelectionState> _pathToState;
 };
 
 }

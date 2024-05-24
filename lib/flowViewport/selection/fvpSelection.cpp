@@ -83,7 +83,7 @@ Selection::Add(const PrimSelectionInfo& primSelection)
         return false;
     }
 
-    _pathToState[primSelection.primPath] = primSelection.selectionsDataSource;
+    _pathToState[primSelection.primPath].selectionSources.push_back(primSelection.selectionDataSource);
 
     return true;
 }
@@ -107,7 +107,7 @@ void Selection::Replace(const PrimSelectionInfoVector& primSelections)
         if (primSelection.primPath.IsEmpty()) {
             continue;
         }
-        _pathToState[primSelection.primPath] = primSelection.selectionsDataSource;
+        _pathToState[primSelection.primPath].selectionSources.push_back(primSelection.selectionDataSource);
     }
 }
 
@@ -158,7 +158,7 @@ HdDataSourceBaseHandle Selection::GetVectorDataSource(
 {
     auto it = _pathToState.find(primPath);
     return (it != _pathToState.end()) ? 
-        it->second : nullptr;
+        it->second.GetVectorDataSource() : nullptr;
 }
 
 }
