@@ -11,6 +11,7 @@ target_sources(${TARGET_NAME}
     fvpSelectionSceneIndex.cpp
     fvpWireframeSelectionHighlightSceneIndex.cpp
     fvpDisplayStyleOverrideSceneIndex.cpp
+    fvpPruneTexturesSceneIndex.cpp
     fvpBBoxSceneIndex.cpp
     fvpReprSelectorSceneIndex.cpp
     fvpBlockPrimRemovalPropagationSceneIndex.cpp
@@ -26,6 +27,7 @@ set(HEADERS
     fvpSelectionSceneIndex.h
     fvpWireframeSelectionHighlightSceneIndex.h
     fvpDisplayStyleOverrideSceneIndex.h
+    fvpPruneTexturesSceneIndex.h
     fvpBBoxSceneIndex.h
     fvpReprSelectorSceneIndex.h
     fvpBlockPrimRemovalPropagationSceneIndex.h
