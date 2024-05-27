@@ -111,25 +111,15 @@ private:
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
     PXR_NS::HdContainerDataSourceHandle _HighlightSelectedPrim(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::SdfPath& primPath)const;
 
-    void _CreateSelectionHighlightInstancer(const PXR_NS::SdfPath& originalPath, const PXR_NS::HdContainerDataSourceHandle& originalDataSource);
-    
     bool _IsPrototypeRoot(const PXR_NS::SdfPath& primPath);
     bool _IsInstancingRoot(const PXR_NS::SdfPath& primPath) const;
     bool _IsPropagatedPrototype(const PXR_NS::SdfPath& primPath) const;
     bool _IsPrototype(const PXR_NS::SdfPath& primPath) const;
-    PXR_NS::SdfPathVector _CollectAffectedOriginalPrimPaths(const PXR_NS::SdfPath& primPath);
-    void _CreateSelectionHighlightMirror(const PXR_NS::SdfPath& primPath, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& createdPrims);
-    void _InvalidateSelectionHighlightMirror(const PXR_NS::SdfPath& primPath, PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& removedPrims);
-    void _PropagateDirtySelectionHighlightMirror(const PXR_NS::SdfPath& primPath, PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& dirtiedPrims);
 
+    PXR_NS::SdfPathVector _CollectAffectedOriginalPrimPaths(const PXR_NS::SdfPath& primPath);
     bool _CollectShMirrorPaths(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outShMirrorPaths, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outCreatedPrims);
-    void _UpdateShMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath);
     void _RemoveShMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath);
     void _CreateShMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath);
-
-    void _CreateSelectionHighlightMirrorForInstancer(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSceneIndexPrim& prim);
-    void _CreateSelectionHighlightMirrorForMesh(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSceneIndexPrim& prim);
-    void _CreateSelectionHighlightMirrorForArbitraryPrim(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSceneIndexPrim& prim);
 
     PXR_NS::SdfPath _FindSelectionHighlightMirrorAncestor(const PXR_NS::SdfPath& path) const;
     PXR_NS::SdfPath _RepathToSelectionHighlightMirror(const PXR_NS::SdfPath& path) const;
@@ -137,10 +127,6 @@ private:
     const SelectionConstPtr   _selection;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 
-    //std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPath, PXR_NS::SdfPath::Hash> _pathsOgToSh;
-    //std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPath, PXR_NS::SdfPath::Hash> _pathsShToOg;
-    //std::unordered_map<PXR_NS::SdfPath, PXR_NS::HdContainerDataSourceHandle, PXR_NS::SdfPath::Hash> _selectionHighlightDataSourceOverlays;
-    //std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathVector, PXR_NS::SdfPath::Hash> _extraChildPaths;
     std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _shMirrorsByInstancer;
     std::unordered_map<PXR_NS::SdfPath, size_t, PXR_NS::SdfPath::Hash> _shMirrorsUseCount;
     std::set<PXR_NS::SdfPath> _highlightedProtoPaths;
