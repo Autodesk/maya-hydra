@@ -62,13 +62,21 @@ TF_DEFINE_PRIVATE_TOKENS(
      (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
  );
 
-const HdRetainedContainerDataSourceHandle sRefinedWireOnSurfaceDisplayStyleDataSource
+const HdRetainedContainerDataSourceHandle sRefinedWireDisplayStyleDataSource
     = HdRetainedContainerDataSource::New(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
         HdRetainedContainerDataSource::New(
             HdLegacyDisplayStyleSchemaTokens->reprSelector,
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
                 { HdReprTokens->refinedWire, TfToken(), TfToken() })));
+
+const HdRetainedContainerDataSourceHandle sRefinedWireOnSurfaceDisplayStyleDataSource
+    = HdRetainedContainerDataSource::New(
+        HdLegacyDisplayStyleSchemaTokens->displayStyle,
+        HdRetainedContainerDataSource::New(
+            HdLegacyDisplayStyleSchemaTokens->reprSelector,
+            HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
+                { HdReprTokens->refinedWireOnSurf, TfToken(), TfToken() })));
 
 const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
@@ -623,7 +631,7 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
             prim.dataSource = WireframeSelectionHighlightSceneIndex::_RerootingSceneIndexContainerDataSource::New(prim.dataSource, this);
         }
         if (prim.primType == HdPrimTypeTokens->mesh) {
-            prim.dataSource = _HighlightSelectedPrim(prim.dataSource, originalPrimPath);
+            prim.dataSource = _HighlightSelectedPrim(prim.dataSource, originalPrimPath, sRefinedWireDisplayStyleDataSource);
         }
         if (prim.primType == HdPrimTypeTokens->instancer) {
             prim.dataSource = _GetSelectionHighlightInstancerDataSource(prim.dataSource);
@@ -639,14 +647,14 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         // prim (even though it should already not be drawn due to being under an instancer, this is an additional safety? to confirm)
         if (_IsPrototype(primPath)) {
             if (_selection->IsFullySelected(primPath)) {
-                prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath);
+                prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
             }
             else if (_highlightedProtoPaths.find(primPath) != _highlightedProtoPaths.end()) {
-                prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath);
+                prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
             }
         } else {
             if (_selection->HasFullySelectedAncestorInclusive(primPath)) {
-                prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath);
+                prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
             }
         }
     }
@@ -681,7 +689,7 @@ WireframeSelectionHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath
 }
 
 //We want to set the displayStyle of the selected prim to refinedWireOnSurf only if the displayStyle of the prim is refined (meaning shaded)
-HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSelectedPrim(const HdContainerDataSourceHandle& dataSource, const SdfPath& primPath)const
+HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSelectedPrim(const HdContainerDataSourceHandle& dataSource, const SdfPath& primPath, const HdContainerDataSourceHandle& highlightDataSource) const
 {
     //Always edit its override wireframe color
     auto edited = HdContainerDataSourceEditor(dataSource);
@@ -701,11 +709,11 @@ HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSel
             TfToken refinedToken = ar[0];
             if(HdReprTokens->refined == refinedToken){
                 //Is in refined display style, apply the wire on top of shaded reprselector
-                return HdOverlayContainerDataSource::New({ edited.Finish(), sRefinedWireOnSurfaceDisplayStyleDataSource});
+                return HdOverlayContainerDataSource::New({ edited.Finish(), highlightDataSource});
             }
         }else{
             //No reprSelector found, assume it's in the Collection that we have set HdReprTokens->refined
-            return HdOverlayContainerDataSource::New({ edited.Finish(), sRefinedWireOnSurfaceDisplayStyleDataSource});
+            return HdOverlayContainerDataSource::New({ edited.Finish(), highlightDataSource});
         }
     }
 

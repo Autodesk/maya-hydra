@@ -109,7 +109,7 @@ private:
     bool _IsExcluded(const PXR_NS::SdfPath& sceneRoot) const;
 
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
-    PXR_NS::HdContainerDataSourceHandle _HighlightSelectedPrim(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::SdfPath& primPath)const;
+    PXR_NS::HdContainerDataSourceHandle _HighlightSelectedPrim(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::SdfPath& primPath, const PXR_NS::HdContainerDataSourceHandle& highlightDataSource) const;
 
     bool _IsPrototypeRoot(const PXR_NS::SdfPath& primPath);
     bool _IsInstancingRoot(const PXR_NS::SdfPath& primPath) const;
