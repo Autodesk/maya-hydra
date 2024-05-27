@@ -42,11 +42,9 @@
 
 #include "flowViewport/debugCodes.h"
 
-#include "fvpPathInterface.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
 #include "pxr/imaging/hd/selectionSchema.h"
 #include "pxr/imaging/hd/selectionsSchema.h"
-#include <pxr/base/tf/smallVector.h>
 
 #include <ufe/pathString.h>
 #include <ufe/selection.h>
@@ -156,13 +154,12 @@ SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::AddSelection(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
 
-    // Call our input scene index to convert the application path to a scene
-    // index path.
+    // Call our input scene index to convert the application path to scene index paths.
     auto primSelections = ConvertUfeSelectionToHydra(appPath);
 
     for (const auto& primSelection : primSelections) {
         TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
-        .Msg("    Adding %s to the Hydra selection.\n", primSelection.primPath.GetText());
+            .Msg("    Adding %s to the Hydra selection.\n", primSelection.primPath.GetText());
     }
 
     for (const auto& primSelection : primSelections) {
@@ -228,19 +225,12 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
     _selection->Clear();
 
     PrimSelectionInfoVector sceneIndexSn;
-    sceneIndexSn.reserve(selection.size());//TODO: sufficient/efficient? Ufe selection may not 1:1 map to a single SdfPath
+    // This .reserve() call is mostly a heuristic : the ConvertUfeSelectionToHydra API allows one UFE path
+    // to map to any number of SdfPaths (0 to infinity). However, in most cases, it is likely to map to 
+    // one SdfPath, so we reserve space accordingly. (2024/05/27)
+    sceneIndexSn.reserve(selection.size());
     for (const auto& snItem : selection) {
-        // Call our input scene index to convert the application path to a scene
-        // index path.
-        // TODO : What if a single UFE path maps to multiple SdfPaths?
-        // TODO : Handle instances selection.
-        // Potential : make (and rename) SceneIndexPath to return a "PrimSelectionInfoVector"
-        // struct PrimSelectionInfo
-        // {
-        //     SdfPath primPath;
-        //     HdSelectionsSchema selections;
-        // };
-        // using PrimSelectionInfoVector = TfSmallVector<PrimSelectionInfo, 8>;
+        // Call our input scene index to convert the application path to scene index paths.
         auto primSelections = ConvertUfeSelectionToHydra(snItem->path());
 
         if (primSelections.empty()) {
@@ -274,7 +264,7 @@ PrimSelectionInfoVector SelectionSceneIndex::ConvertUfeSelectionToHydra(const Uf
     auto primSelections = _inputSceneIndexPathInterface->ConvertUfeSelectionToHydra(appPath);
 
     if (primSelections.empty()) {
-        TF_WARN("SelectionSceneIndex::ConvertUfeSelectionToHydra(%s) returned no selection, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
+        TF_WARN("SelectionSceneIndex::ConvertUfeSelectionToHydra(%s) returned no path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
     }
 
     return primSelections;

@@ -14,9 +14,9 @@
 //
 
 #include "flowViewport/sceneIndex/fvpMergingSceneIndex.h"
+#include "flowViewport/sceneIndex/fvpPathInterface.h"
 
 #include "flowViewport/debugCodes.h"
-#include "fvpPathInterface.h"
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

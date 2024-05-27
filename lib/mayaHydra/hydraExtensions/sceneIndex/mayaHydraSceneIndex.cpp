@@ -45,10 +45,10 @@
 #include <ufe/pathString.h>
 
 #include <pxr/base/tf/envSetting.h>
+#include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
-#include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>

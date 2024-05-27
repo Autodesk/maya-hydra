@@ -17,7 +17,6 @@
 #include "mayaHydraLib/hydraUtils.h"
 #include "mayaHydraLib/sceneIndex/registration.h"
 #include "mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndex.h"
-#include <pxr/imaging/hd/dataSource.h>
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpPathInterfaceSceneIndex.h>
@@ -26,15 +25,15 @@
 #include <flowViewport/fvpUtils.h>
 #endif
 
-#include <pxr/imaging/hd/instanceIndicesSchema.h>
-#include <pxr/imaging/hd/selectionSchema.h>
-#include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
+#include <pxr/imaging/hd/instanceIndicesSchema.h>
+#include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/sceneIndexPlugin.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
+#include <pxr/imaging/hd/selectionSchema.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/renderDelegate.h>
-#include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/usd/sdf/path.h>
 
 #if defined(MAYAHYDRALIB_MAYAUSDAPI_ENABLED)
@@ -142,7 +141,6 @@ public:
             HdInstanceIndicesSchema::Builder instanceIndicesBuilder;
             instanceIndicesBuilder.SetInstancer(HdRetainedTypedSampledDataSource<SdfPath>::New(primPath));
             instanceIndicesBuilder.SetInstanceIndices(HdRetainedTypedSampledDataSource<VtArray<int>>::New({std::stoi(lastComponentString)}));
-            //instanceIndicesBuilder.SetPrototypeIndex(HdRetainedTypedSampledDataSource<int>::New(0));
             HdSelectionSchema::Builder selectionBuilder;
             selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
             auto instanceIndicesDataSource = HdDataSourceBase::Cast(instanceIndicesBuilder.Build());

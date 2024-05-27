@@ -19,10 +19,10 @@
 
 #include <ufe/ufe.h>
 
-#include <pxr/base/tf/smallVector.h>
-#include <pxr/usd/sdf/path.h>
-#include <pxr/imaging/hd/dataSource.h>
 #include <pxr/pxr.h>
+#include <pxr/base/tf/smallVector.h>
+#include <pxr/imaging/hd/dataSource.h>
+#include <pxr/usd/sdf/path.h>
 
 UFE_NS_DEF {
 class Path;

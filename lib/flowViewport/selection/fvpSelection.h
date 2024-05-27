@@ -18,17 +18,14 @@
 
 #include "flowViewport/api.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
+#include "flowViewport/sceneIndex/fvpPathInterface.h"
 
-#include <pxr/imaging/hd/dataSource.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/usd/sdf/path.h>
 
 #include <map>
 
 namespace FVP_NS_DEF {
-
-struct PrimSelectionInfo;
-using PrimSelectionInfoVector = std::vector<PrimSelectionInfo>;
 
 /// \class Selection
 ///

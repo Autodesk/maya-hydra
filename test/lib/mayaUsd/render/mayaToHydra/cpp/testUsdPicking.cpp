@@ -53,7 +53,9 @@ TEST(TestUsdPicking, pick)
     const auto snSi = findSelectionSceneIndexInTree(siRoot);
     ASSERT_TRUE(snSi);
 
-    const auto sceneIndexPath = snSi->ConvertUfeSelectionToHydra(selected).front().primPath;
+    const auto primSelections = snSi->ConvertUfeSelectionToHydra(selected);
+    ASSERT_EQ(primSelections.size(), 1u);
+    const auto sceneIndexPath = primSelections.front().primPath;
 
     ASSERT_FALSE(sceneIndexPath.IsEmpty());
 

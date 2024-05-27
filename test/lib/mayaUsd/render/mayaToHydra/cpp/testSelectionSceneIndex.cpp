@@ -153,7 +153,9 @@ TEST(FlowViewport, selectionSceneIndexDirty)
     MSelectionList sphereSn;
     sphereSn.add("|aSphere");
     const auto mayaPath = Ufe::PathString::path("|aSphere");
-    const auto sceneIndexPath = selectionSi->ConvertUfeSelectionToHydra(mayaPath).front().primPath;
+    const auto primSelections = selectionSi->ConvertUfeSelectionToHydra(mayaPath);
+    ASSERT_EQ(primSelections.size(), 1u);
+    const auto sceneIndexPath = primSelections.front().primPath;
 
     MGlobal::setActiveSelectionList(sphereSn);
     hdSn = ssio.GetSelection();

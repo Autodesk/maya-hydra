@@ -42,7 +42,6 @@
 #include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
-#include "fvpPathInterface.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 

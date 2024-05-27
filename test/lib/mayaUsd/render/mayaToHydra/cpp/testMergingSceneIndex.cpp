@@ -70,6 +70,7 @@ TEST(FlowViewport, mergingSceneIndex)
     // The Maya data producer scene index supports the path interface.  Ask it
     // to translate the application path into a scene index path.
     auto primSelections = mayaSi->ConvertUfeSelectionToHydra(mayaPath);
+    ASSERT_EQ(primSelections.size(), 1u);
 
     // Regardless of prefix, the scene index path tail component will match the
     // Maya node name
@@ -86,7 +87,9 @@ TEST(FlowViewport, mergingSceneIndex)
 
     // Flow Viewport merging scene index must give the same scene index path
     // answer as the Maya data producer scene index.
-    ASSERT_EQ(mergingSi->ConvertUfeSelectionToHydra(mayaPath).front().primPath, primSelections.front().primPath);
+    auto mergingSiSelections = mergingSi->ConvertUfeSelectionToHydra(mayaPath);
+    ASSERT_EQ(mergingSiSelections.size(), 1u);
+    ASSERT_EQ(mergingSiSelections.front().primPath, primSelections.front().primPath);
 }
 
 TEST(FlowViewport, mergingSceneIndexAddRemove)
@@ -106,6 +109,7 @@ TEST(FlowViewport, mergingSceneIndexAddRemove)
     auto mayaSi = TfDynamic_cast<PXR_NS::MayaHydraSceneIndexRefPtr>(*found);
     auto mayaPath = Ufe::PathString::path("|aSphere");
     auto primSelections = mayaSi->ConvertUfeSelectionToHydra(mayaPath);
+    ASSERT_EQ(primSelections.size(), 1u);
 
     // With Maya scene index in the merging scene index, the sphere prim has
     // a valid scene index path.

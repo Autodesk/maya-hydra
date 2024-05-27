@@ -116,6 +116,7 @@ void MhLeadObjectPathTracker::setLeadObjectUfePath(const Ufe::Path& newLeadObjec
     auto oldLeadObjectPrimPath = _leadObjectPrimPath;
 
     _leadObjectUfePath  = newLeadObjectUfePath;
+    // TODO : Handle multiple lead prim paths
     auto hydraSelections = _pathInterface->ConvertUfeSelectionToHydra(_leadObjectUfePath);
     _leadObjectPrimPath = hydraSelections.empty() ? SdfPath() : hydraSelections.front().primPath;
 
@@ -129,6 +130,7 @@ void MhLeadObjectPathTracker::updatePrimPath()
 { 
    // Update the lead object prim path in case it was not valid yet
     if ( (_leadObjectUfePath.size() > 0) && _leadObjectPrimPath.IsEmpty()) {
+        // TODO : Handle multiple lead prim paths
         auto hydraSelections = _pathInterface->ConvertUfeSelectionToHydra(_leadObjectUfePath);
         _leadObjectPrimPath = hydraSelections.empty() ? SdfPath() : hydraSelections.front().primPath;
     }

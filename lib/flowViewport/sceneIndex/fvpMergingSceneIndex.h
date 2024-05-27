@@ -17,7 +17,6 @@
 
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
-#include "fvpPathInterface.h"
 
 #include <pxr/imaging/hd/mergingSceneIndex.h>
 

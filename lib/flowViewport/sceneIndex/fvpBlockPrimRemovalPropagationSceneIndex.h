@@ -21,7 +21,6 @@
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
-#include "fvpPathInterface.h"
 
 //Hydra headers
 #include <pxr/imaging/hd/filteringSceneIndex.h>
