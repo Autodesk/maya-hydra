@@ -114,8 +114,9 @@ private:
     void _CreateSelectionHighlightInstancer(const PXR_NS::SdfPath& originalPath, const PXR_NS::HdContainerDataSourceHandle& originalDataSource);
     
     bool _IsPrototypeRoot(const PXR_NS::SdfPath& primPath);
-    bool _IsInstancingRoot(const PXR_NS::SdfPath& primPath);
-    bool _IsPropagatedPrototype(const PXR_NS::SdfPath& primPath);
+    bool _IsInstancingRoot(const PXR_NS::SdfPath& primPath) const;
+    bool _IsPropagatedPrototype(const PXR_NS::SdfPath& primPath) const;
+    bool _IsPrototype(const PXR_NS::SdfPath& primPath) const;
     PXR_NS::SdfPathVector _CollectAffectedOriginalPrimPaths(const PXR_NS::SdfPath& primPath);
     void _CreateSelectionHighlightMirror(const PXR_NS::SdfPath& primPath, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& createdPrims);
     void _InvalidateSelectionHighlightMirror(const PXR_NS::SdfPath& primPath, PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& removedPrims);
@@ -142,6 +143,7 @@ private:
     //std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathVector, PXR_NS::SdfPath::Hash> _extraChildPaths;
     std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _shMirrorsByInstancer;
     std::unordered_map<PXR_NS::SdfPath, size_t, PXR_NS::SdfPath::Hash> _shMirrorsUseCount;
+    std::set<PXR_NS::SdfPath> _highlightedProtoPaths;
     class _RerootingSceneIndexPathDataSource;
     class _RerootingSceneIndexPathArrayDataSource;
     class _RerootingSceneIndexContainerDataSource;

@@ -33,6 +33,7 @@
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
+#include <pxr/imaging/hd/primOriginSchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/sceneIndexObserver.h>
@@ -44,6 +45,7 @@
 #include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/usd/sdf/path.h>
 #include <pxr/usdImaging/usdImaging/rerootingSceneIndex.h>
+#include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
 #include <algorithm>
 #include <numeric>
 #include <stack>
@@ -523,7 +525,7 @@ WireframeSelectionHighlightSceneIndex::_IsPrototypeRoot(const SdfPath& primPath)
 }
 
 bool
-WireframeSelectionHighlightSceneIndex::_IsInstancingRoot(const SdfPath& primPath)
+WireframeSelectionHighlightSceneIndex::_IsInstancingRoot(const SdfPath& primPath) const
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
@@ -543,11 +545,19 @@ WireframeSelectionHighlightSceneIndex::_IsInstancingRoot(const SdfPath& primPath
 }
 
 bool
-WireframeSelectionHighlightSceneIndex::_IsPropagatedPrototype(const SdfPath& primPath)
+WireframeSelectionHighlightSceneIndex::_IsPropagatedPrototype(const SdfPath& primPath) const
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
     return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() && !instancedBy.GetPrototypeRoots()->GetTypedValue(0).empty();
+}
+
+bool
+WireframeSelectionHighlightSceneIndex::_IsPrototype(const SdfPath& primPath) const
+{
+    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    return instancedBy.IsDefined();
 }
 
 void
@@ -769,6 +779,7 @@ WireframeSelectionHighlightSceneIndex::_CollectShMirrorPaths(const PXR_NS::SdfPa
         SdfPath currPath = pathsToTraverse.top();
         pathsToTraverse.pop();
 
+        // TODO : Propagated protos only or all protos?
         if (_IsPropagatedPrototype(currPath) && _IsInstancingRoot(currPath) && currPath != originalPrimPath) {
             continue;
         }
@@ -862,6 +873,9 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
     TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
         .Msg("WireframeSelectionHighlightSceneIndex::GetPrim(%s) called.\n", primPath.GetText());
 
+    if (_IsExcluded(primPath)) {
+        return GetInputSceneIndex()->GetPrim(primPath);
+    }
     // if (_IsSelectionHighlightMirrorPath(primPath)) {
     //     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(_GetOriginalPathFromSelectionHighlightMirror(primPath));
     //     return {prim.primType, {}};
@@ -881,6 +895,9 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
     static std::mutex printMutex;
     std::lock_guard printLock(printMutex);
     SdfPath shMirrorAncestor = _FindSelectionHighlightMirrorAncestor(primPath);
+    if (primPath.GetElementString() == "Pyramid") {
+        std::cout << "Pyramid" << std::endl;
+    }
     //std::cout << "For " << primPath.GetString() << " , SH is : " << shMirrorAncestor.GetString() << std::endl;
     if (!shMirrorAncestor.IsEmpty()) {
         // TODO : Use _shSceneIndices?
@@ -916,11 +933,50 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         // }
         return prim;
     }
+    
     // TODO: 
     //else {
         // do as before with isancestorselected
     //}
 
+    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+
+    //if ()/// is proto and/or is propagated proto
+    if (prim.primType == HdPrimTypeTokens->mesh) {
+        if (_IsPrototype(primPath)) {
+            //HdPrimOriginSchema primOrigin = HdPrimOriginSchema::GetFromParent(prim.dataSource);
+            //auto primOriginScenePath = primOrigin.GetOriginPath(HdPrimOriginSchemaTokens->scenePath);
+            if (_selection->IsFullySelected(primPath)) {
+                prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath);
+            }
+            else if (_highlightedProtoPaths.find(primPath) != _highlightedProtoPaths.end()) {
+                std::cout << "Highlighting " << primPath.GetString() << std::endl;
+                prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath);
+            }
+            return prim;
+        } else {
+            if (_selection->HasFullySelectedAncestorInclusive(primPath)) {
+                prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath);
+            }
+            return prim;
+        }
+    }
+
+    //else
+    // as before with isancestorselected? prolly not, need to skip if under an instancer. or is that going to be taken care of/avoided automatically?
+
+    // // If prim is in excluded hierarchy, don't provide selection highlighting
+    // // for it.  Selection highlighting is done only on meshes.  HYDRA-569: this
+    // // means that HdsiImplicitSurfaceSceneIndex must be used before this scene
+    // // index to convert implicit surfaces (e.g. USD cube / cone / sphere /
+    // // capsule primitive types) to meshes.
+    // if (prim.primType == HdPrimTypeTokens->mesh) {
+    //     // TODO : Check that this is not an instanced mesh (check there is no instancedBy schema)
+    //     if (_selection->HasFullySelectedAncestorInclusive(primPath)) {
+    //         prim.dataSource =
+    //          _HighlightSelectedPrim(prim.dataSource, primPath);
+    //     }
+    // }
 
     
     // for (const auto& shSceneIndex : _shSceneIndices) {
@@ -1160,6 +1216,51 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             // dirty wireframe selection highlight.
             _DirtySelectionHighlightRecursive(entry.primPath, &highlightEntries);
         }
+    }
+
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedSelectedMeshProtos;
+    for (const auto& entry : entries) {
+        HdSceneIndexPrim entryPrim = GetInputSceneIndex()->GetPrim(entry.primPath);
+        if (!entry.dirtyLocators.Contains(HdSelectionsSchema::GetDefaultLocator())) {
+            continue;
+        }
+        auto ancestorsRange = entry.primPath.GetAncestorsRange();
+        bool foundPropagatedProtos = false;
+        for (const auto& ancestorPath : ancestorsRange) {
+            HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(ancestorPath);
+            UsdImagingUsdPrimInfoSchema usdPrimInfo = UsdImagingUsdPrimInfoSchema::GetFromParent(currPrim.dataSource);
+            if (usdPrimInfo.IsDefined()) {
+                auto propagatedProtosDataSource = usdPrimInfo.GetPiPropagatedPrototypes();
+                if (propagatedProtosDataSource) {
+                    auto propagatedProtoNames = propagatedProtosDataSource->GetNames();
+                    for (const auto& propagatedProtoName : propagatedProtoNames) {
+                        auto propagatedProtoPathDataSource = HdTypedSampledDataSource<SdfPath>::Cast(propagatedProtosDataSource->Get(propagatedProtoName));
+                        if (propagatedProtoPathDataSource) {
+                            SdfPath propagatedProtoPath = propagatedProtoPathDataSource->GetTypedValue(0);
+                            SdfPath propagatedPrimPath = entry.primPath.ReplacePrefix(ancestorPath, propagatedProtoPath);
+                            HdSceneIndexPrim propagatedPrim = GetInputSceneIndex()->GetPrim(propagatedPrimPath);
+                            if (propagatedPrim.primType == HdPrimTypeTokens->mesh) {
+                                auto newLocators = HdDataSourceLocatorSet(entry.dirtyLocators);
+                                newLocators.append(HdLegacyDisplayStyleSchema::GetDefaultLocator());
+                                dirtiedSelectedMeshProtos.push_back({propagatedPrimPath, newLocators});
+                                if (HdSelectionsSchema::GetFromParent(entryPrim.dataSource).IsDefined()) {
+                                    _highlightedProtoPaths.insert(propagatedPrimPath);
+                                } else {
+                                    _highlightedProtoPaths.erase(propagatedPrimPath);
+                                }
+                            }
+                            foundPropagatedProtos = true;
+                        }
+                    }
+                }
+            }
+            if (foundPropagatedProtos) {
+                break;
+            }
+        }
+    }
+    if (!dirtiedSelectedMeshProtos.empty()) {
+        _SendPrimsDirtied(dirtiedSelectedMeshProtos);
     }
 
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedShMirrors;
