@@ -183,7 +183,7 @@ WireframeSelectionHighlightSceneIndex::_FindSelectionHighlightMirrorAncestor(con
 }
 
 SdfPath
-WireframeSelectionHighlightSceneIndex::_RepathToSelectionHighlightMirror(const SdfPath& path) const
+WireframeSelectionHighlightSceneIndex::GetSelectionHighlightPath(const SdfPath& path) const
 {
     auto ancestorsRange = path.GetAncestorsRange();
     for (auto ancestor : ancestorsRange) {
@@ -192,7 +192,7 @@ WireframeSelectionHighlightSceneIndex::_RepathToSelectionHighlightMirror(const S
             return path.ReplacePrefix(ancestor, mirrorPath);
         }
     }
-    return SdfPath::EmptyPath();
+    return path;
 }
 
 class WireframeSelectionHighlightSceneIndex::_RerootingSceneIndexPathDataSource : public HdPathDataSource
@@ -233,8 +233,7 @@ public:
         }
 
         const SdfPath srcPath = _inputDataSource->GetTypedValue(shutterOffset);
-        const SdfPath mirrorPath =_inputSceneIndex->_RepathToSelectionHighlightMirror(srcPath);
-        return mirrorPath.IsEmpty() ? srcPath : mirrorPath;
+        return _inputSceneIndex->GetSelectionHighlightPath(srcPath);
     }
 
 private:
@@ -285,10 +284,7 @@ public:
             = _inputDataSource->GetTypedValue(shutterOffset);
 
         for (size_t i = 0; i < result.size(); i++) {
-            const SdfPath mirrorPath = _inputSceneIndex->_RepathToSelectionHighlightMirror(result[i]);
-            if (!mirrorPath.IsEmpty()) {
-                result[i] = mirrorPath;
-            }
+            result[i] = _inputSceneIndex->GetSelectionHighlightPath(result[i]);
         }
 
         return result;
@@ -818,14 +814,16 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
         _SendPrimsDirtied(dirtiedSelectedMeshProtos);
     }
 
-    HdSceneIndexObserver::DirtiedPrimEntries dirtiedShMirrors;
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedSelectionHighlightPrims;
     for (const auto& entry : entries) {
-        auto shMirrorPath = _RepathToSelectionHighlightMirror(entry.primPath);
-        if (!shMirrorPath.IsEmpty()) {
-            dirtiedShMirrors.emplace_back(shMirrorPath, entry.dirtyLocators);
+        auto selectionHighlightPath = GetSelectionHighlightPath(entry.primPath);
+        if (selectionHighlightPath != entry.primPath) {
+            dirtiedSelectionHighlightPrims.emplace_back(selectionHighlightPath, entry.dirtyLocators);
         }
     }
-    _SendPrimsDirtied(dirtiedShMirrors);
+    if (!dirtiedSelectionHighlightPrims.empty()) {
+        _SendPrimsDirtied(dirtiedSelectionHighlightPrims);
+    }
 
     HdSceneIndexObserver::AddedPrimEntries newSelectionHighlightPrims;
     HdSceneIndexObserver::RemovedPrimEntries removedSelectionHighlightPrims;

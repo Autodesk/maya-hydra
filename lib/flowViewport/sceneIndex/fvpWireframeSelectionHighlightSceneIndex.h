@@ -75,6 +75,9 @@ public:
     FVP_API
     void addExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot);
 
+    FVP_API
+    PXR_NS::SdfPath GetSelectionHighlightPath(const PXR_NS::SdfPath& path) const;
+
 protected:
 
     FVP_API
@@ -122,7 +125,6 @@ private:
     void _CreateShMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath);
 
     PXR_NS::SdfPath _FindSelectionHighlightMirrorAncestor(const PXR_NS::SdfPath& path) const;
-    PXR_NS::SdfPath _RepathToSelectionHighlightMirror(const PXR_NS::SdfPath& path) const;
 
     const SelectionConstPtr   _selection;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
