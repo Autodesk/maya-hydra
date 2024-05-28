@@ -119,8 +119,8 @@ private:
     bool _IsPropagatedPrototype(const PXR_NS::SdfPath& primPath) const;
     bool _IsPrototype(const PXR_NS::SdfPath& primPath) const;
 
-    PXR_NS::SdfPathVector _GetInstancingRelatedPaths(const PXR_NS::SdfPath& primPath);
-    bool _CollectSelectionHighlightPaths(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outShMirrorPaths, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outCreatedPrims);
+    PXR_NS::SdfPathVector _GetInstancingRelatedPaths(const PXR_NS::HdContainerDataSourceHandle& dataSource);
+    void _CollectSelectionHighlightPaths(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outShMirrorPaths, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outCreatedPrims);
     void _RemoveShMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath);
     void _CreateShMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath);
 

@@ -358,14 +358,10 @@ const HdDataSourceLocator& WireframeSelectionHighlightSceneIndex::ReprSelectorLo
 }
 
 SdfPathVector
-WireframeSelectionHighlightSceneIndex::_GetInstancingRelatedPaths(const SdfPath& originalPrimPath)
+WireframeSelectionHighlightSceneIndex::_GetInstancingRelatedPaths(const HdContainerDataSourceHandle& dataSource)
 {
-    TF_AXIOM(_FindSelectionHighlightMirrorAncestor(originalPrimPath).IsEmpty());
-
-    HdSceneIndexPrim originalPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
-    
-    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(originalPrim.dataSource);
-    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(originalPrim.dataSource);
+    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(dataSource);
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(dataSource);
     
     SdfPathVector instancingRelatedPaths;
 
@@ -473,35 +469,26 @@ WireframeSelectionHighlightSceneIndex(
     }
 }
 
-bool
+void
 WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightPaths(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outShMirrorPaths, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outCreatedPrims)
 {
     // This should never be called on selection highlight mirrors, only on original prims
     TF_AXIOM(_FindSelectionHighlightMirrorAncestor(originalPrimPath).IsEmpty());
 
-    static std::mutex printMutex;
-    {
-        std::lock_guard printLock(printMutex);
-        std::cout << "Processing : " << originalPrimPath.GetString() << std::endl;
-    }
-
     if (!_IsInstancingRoot(originalPrimPath)) {
         HdSceneIndexPrim originalPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
         HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(originalPrim.dataSource);
-        bool result = false;
-        if (instancedBy.IsDefined()) {
-            auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
-            for (const auto& protoRootPath : protoRootPaths) {
-                result = result || _CollectSelectionHighlightPaths(protoRootPath, outShMirrorPaths, outCreatedPrims);
-            }
+        auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
+        for (const auto& protoRootPath : protoRootPaths) {
+            _CollectSelectionHighlightPaths(protoRootPath, outShMirrorPaths, outCreatedPrims);
         }
-        return result;
+        return;
     }
     
     SdfPath selectionHighlightPrimPath = _GetSelectionHighlightMirrorPathFromOriginal(originalPrimPath);
     
     if (outShMirrorPaths.find(selectionHighlightPrimPath) != outShMirrorPaths.end()) {
-        return false;
+        return;
     }
     outShMirrorPaths.insert(selectionHighlightPrimPath);
 
@@ -511,23 +498,18 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightPaths(const PXR
         SdfPath currPath = pathsToTraverse.top();
         pathsToTraverse.pop();
 
-        // TODO : Propagated protos only or all protos?
-        if (_IsPropagatedPrototype(currPath) && _IsInstancingRoot(currPath) && currPath != originalPrimPath) {
+        // Skip processing of prototypes nested under the prim's hierarchy, as prototypes should be processed by
+        // traversing the instancing-related paths of instancers and instancees. And if they aren't, then it means
+        // the prototype is either not instanced in the first place, or is part of a different instancing hierarchy.
+        if (_IsPrototype(currPath) && _IsInstancingRoot(currPath) && currPath != originalPrimPath) {
             continue;
         }
 
         HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
         outCreatedPrims.push_back({currPath.ReplacePrefix(originalPrimPath, selectionHighlightPrimPath), currPrim.primType});
         if (currPrim.primType == HdPrimTypeTokens->instancer) {
-            SdfPathVector extraAffectedOriginalPrimPaths = _GetInstancingRelatedPaths(currPath);
-            std::cout << "Processing extra paths for : " << currPath.GetString() << std::endl;
-            for (const auto& path : extraAffectedOriginalPrimPaths) {
-                {
-                    std::lock_guard printLock(printMutex);
-                    std::cout << "|-----Adding : " << path.GetString() << std::endl;
-                }
-            }
-            affectedOriginalPrimPaths.insert(affectedOriginalPrimPaths.end(), extraAffectedOriginalPrimPaths.begin(), extraAffectedOriginalPrimPaths.end());
+            SdfPathVector instancingRelatedPaths = _GetInstancingRelatedPaths(currPrim.dataSource);
+            affectedOriginalPrimPaths.insert(affectedOriginalPrimPaths.end(), instancingRelatedPaths.begin(), instancingRelatedPaths.end());
         }
 
         for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(currPath)) {
@@ -538,8 +520,6 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightPaths(const PXR
     for (const auto& affectedOriginalPrimPath : affectedOriginalPrimPaths) {
         _CollectSelectionHighlightPaths(affectedOriginalPrimPath, outShMirrorPaths, outCreatedPrims);
     }
-
-    return true;
 }
 
 void 
