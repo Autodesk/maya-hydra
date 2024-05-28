@@ -358,10 +358,10 @@ const HdDataSourceLocator& WireframeSelectionHighlightSceneIndex::ReprSelectorLo
 }
 
 SdfPathVector
-WireframeSelectionHighlightSceneIndex::_GetInstancingRelatedPaths(const HdContainerDataSourceHandle& dataSource)
+WireframeSelectionHighlightSceneIndex::_GetInstancingRelatedPaths(const HdSceneIndexPrim& prim)
 {
-    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(dataSource);
-    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(dataSource);
+    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
     
     SdfPathVector instancingRelatedPaths;
 
@@ -388,26 +388,8 @@ WireframeSelectionHighlightSceneIndex::_GetInstancingRelatedPaths(const HdContai
 }
 
 bool
-WireframeSelectionHighlightSceneIndex::_IsPrototypeRoot(const SdfPath& primPath)
+WireframeSelectionHighlightSceneIndex::_IsInstancingRoot(const HdSceneIndexPrim& prim, const SdfPath& primPath) const
 {
-    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    if (instancedBy.IsDefined()) {
-        auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
-        for (const auto& protoRootPath : protoRootPaths) {
-            if (protoRootPath == primPath) {
-                return true;
-            }
-        }
-        return false;
-    }
-    return true;
-}
-
-bool
-WireframeSelectionHighlightSceneIndex::_IsInstancingRoot(const SdfPath& primPath) const
-{
-    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
     if (!instancedBy.IsDefined()) {
         return true;
@@ -425,17 +407,15 @@ WireframeSelectionHighlightSceneIndex::_IsInstancingRoot(const SdfPath& primPath
 }
 
 bool
-WireframeSelectionHighlightSceneIndex::_IsPropagatedPrototype(const SdfPath& primPath) const
+WireframeSelectionHighlightSceneIndex::_IsPropagatedPrototype(const HdSceneIndexPrim& prim) const
 {
-    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
     return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() && !instancedBy.GetPrototypeRoots()->GetTypedValue(0).empty();
 }
 
 bool
-WireframeSelectionHighlightSceneIndex::_IsPrototype(const SdfPath& primPath) const
+WireframeSelectionHighlightSceneIndex::_IsPrototype(const HdSceneIndexPrim& prim) const
 {
-    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
     return instancedBy.IsDefined();
 }
@@ -470,27 +450,27 @@ WireframeSelectionHighlightSceneIndex(
 }
 
 void
-WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightPaths(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outShMirrorPaths, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outCreatedPrims)
+WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightPaths(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outSelectionHighlightMirrorPaths, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outAddedPrims)
 {
-    // This should never be called on selection highlight mirrors, only on original prims
+    // This should never be called on selection highlight prims, only on original prims
     TF_AXIOM(_FindSelectionHighlightMirrorAncestor(originalPrimPath).IsEmpty());
 
-    if (!_IsInstancingRoot(originalPrimPath)) {
-        HdSceneIndexPrim originalPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
+    HdSceneIndexPrim originalPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
+    if (!_IsInstancingRoot(originalPrim, originalPrimPath)) {
         HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(originalPrim.dataSource);
         auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
         for (const auto& protoRootPath : protoRootPaths) {
-            _CollectSelectionHighlightPaths(protoRootPath, outShMirrorPaths, outCreatedPrims);
+            _CollectSelectionHighlightPaths(protoRootPath, outSelectionHighlightMirrorPaths, outAddedPrims);
         }
         return;
     }
     
     SdfPath selectionHighlightPrimPath = _GetSelectionHighlightMirrorPathFromOriginal(originalPrimPath);
     
-    if (outShMirrorPaths.find(selectionHighlightPrimPath) != outShMirrorPaths.end()) {
+    if (outSelectionHighlightMirrorPaths.find(selectionHighlightPrimPath) != outSelectionHighlightMirrorPaths.end()) {
         return;
     }
-    outShMirrorPaths.insert(selectionHighlightPrimPath);
+    outSelectionHighlightMirrorPaths.insert(selectionHighlightPrimPath);
 
     SdfPathVector affectedOriginalPrimPaths;
     std::stack<SdfPath> pathsToTraverse({originalPrimPath});
@@ -498,17 +478,19 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightPaths(const PXR
         SdfPath currPath = pathsToTraverse.top();
         pathsToTraverse.pop();
 
+        HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
+
         // Skip processing of prototypes nested under the prim's hierarchy, as prototypes should be processed by
         // traversing the instancing-related paths of instancers and instancees. And if they aren't, then it means
         // the prototype is either not instanced in the first place, or is part of a different instancing hierarchy.
-        if (_IsPrototype(currPath) && _IsInstancingRoot(currPath) && currPath != originalPrimPath) {
+        if (_IsPrototype(currPrim) && _IsInstancingRoot(currPrim, currPath) && currPath != originalPrimPath) {
             continue;
         }
 
-        HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
-        outCreatedPrims.push_back({currPath.ReplacePrefix(originalPrimPath, selectionHighlightPrimPath), currPrim.primType});
+        outAddedPrims.push_back({currPath.ReplacePrefix(originalPrimPath, selectionHighlightPrimPath), currPrim.primType});
+
         if (currPrim.primType == HdPrimTypeTokens->instancer) {
-            SdfPathVector instancingRelatedPaths = _GetInstancingRelatedPaths(currPrim.dataSource);
+            SdfPathVector instancingRelatedPaths = _GetInstancingRelatedPaths(currPrim);
             affectedOriginalPrimPaths.insert(affectedOriginalPrimPaths.end(), instancingRelatedPaths.begin(), instancingRelatedPaths.end());
         }
 
@@ -518,7 +500,7 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightPaths(const PXR
     }
 
     for (const auto& affectedOriginalPrimPath : affectedOriginalPrimPaths) {
-        _CollectSelectionHighlightPaths(affectedOriginalPrimPath, outShMirrorPaths, outCreatedPrims);
+        _CollectSelectionHighlightPaths(affectedOriginalPrimPath, outSelectionHighlightMirrorPaths, outAddedPrims);
     }
 }
 
@@ -613,7 +595,7 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         // Note : in the USD data model, the original prims that get propagated as prototypes have their original prim types erased.
         // Only the resulting propagated prototypes keep the original prim type. Presumably this is to avoid drawing the original
         // prim (even though it should already not be drawn due to being under an instancer, this is an additional safety? to confirm)
-        if (_IsPrototype(primPath)) {
+        if (_IsPrototype(prim)) {
             // Prototype selection
             if (_selection->IsFullySelected(primPath) || _highlightedProtoPaths.find(primPath) != _highlightedProtoPaths.end()) {
                 prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
