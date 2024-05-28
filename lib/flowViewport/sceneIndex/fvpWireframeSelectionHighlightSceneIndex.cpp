@@ -16,12 +16,15 @@
 
 #include "flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h"
 #include "flowViewport/selection/fvpSelection.h"
+#include "flowViewport/colorPreferences/fvpColorPreferences.h"
+#include "flowViewport/colorPreferences/fvpColorPreferencesTokens.h"
 #include "flowViewport/fvpUtils.h"
 
 #include "flowViewport/debugCodes.h"
 #include "fvpWireframeSelectionHighlightSceneIndex.h"
 
 #include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/gf/vec4f.h>
 #include <pxr/base/tf/diagnosticLite.h>
 #include <pxr/base/vt/array.h>
 #include <pxr/base/vt/types.h>
@@ -693,9 +696,13 @@ HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSel
 {
     //Always edit its override wireframe color
     auto edited = HdContainerDataSourceEditor(dataSource);
+
+    // TODO HYDRA-1047 : Handle the different wireframe selection highlight colors
+    GfVec4f wireframeColor;
+    ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->wireframeSelection, wireframeColor);
     edited.Set(HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),
                         Fvp::PrimvarDataSource::New(
-                            HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{_wireframeColorInterface->getWireframeColor(primPath)}),
+                            HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{wireframeColor}),
                             HdPrimvarSchemaTokens->constant,
                             HdPrimvarSchemaTokens->color));
     
