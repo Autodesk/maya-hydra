@@ -132,9 +132,6 @@ private:
     std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _shMirrorsByInstancer;
     std::unordered_map<PXR_NS::SdfPath, size_t, PXR_NS::SdfPath::Hash> _shMirrorsUseCount;
     std::set<PXR_NS::SdfPath> _highlightedProtoPaths;
-    class _RerootingSceneIndexPathDataSource;
-    class _RerootingSceneIndexPathArrayDataSource;
-    class _RerootingSceneIndexContainerDataSource;
 };
 
 }

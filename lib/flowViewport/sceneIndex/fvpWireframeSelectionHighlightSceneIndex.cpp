@@ -166,6 +166,153 @@ bool _IsInstancerWithSelections(const HdSceneIndexPrim& prim)
     return selections.IsDefined() && selections.GetNumElements() > 0;
 }
 
+class _SelectionHighlightRepathingPathDataSource : public HdPathDataSource
+{
+public:
+    HD_DECLARE_DATASOURCE(_SelectionHighlightRepathingPathDataSource)
+
+    _SelectionHighlightRepathingPathDataSource(
+        HdPathDataSourceHandle const &inputDataSource,
+        Fvp::WireframeSelectionHighlightSceneIndex const * const inputSceneIndex)
+      : _inputDataSource(inputDataSource),
+        _inputSceneIndex(inputSceneIndex)
+    {
+    }
+
+    VtValue GetValue(const Time shutterOffset) override
+    {
+        return VtValue(GetTypedValue(shutterOffset));
+    }
+
+    bool GetContributingSampleTimesForInterval(
+        const Time startTime,
+        const Time endTime,
+        std::vector<Time> * const outSampleTimes) override
+    {
+        if (!_inputDataSource) {
+            return false;
+        }
+
+        return _inputDataSource->GetContributingSampleTimesForInterval(startTime, endTime, outSampleTimes);
+    }
+
+    SdfPath GetTypedValue(const Time shutterOffset) override
+    {
+        if (!_inputDataSource) {
+            return SdfPath();
+        }
+
+        const SdfPath originalPath = _inputDataSource->GetTypedValue(shutterOffset);
+        return _inputSceneIndex->GetSelectionHighlightPath(originalPath);
+    }
+
+private:
+    HdPathDataSourceHandle const _inputDataSource;
+    Fvp::WireframeSelectionHighlightSceneIndex const * const _inputSceneIndex;
+};
+
+// ----------------------------------------------------------------------------
+
+class _SelectionHighlightRepathingPathArrayDataSource : public HdPathArrayDataSource
+{
+public:
+    HD_DECLARE_DATASOURCE(_SelectionHighlightRepathingPathArrayDataSource)
+
+    _SelectionHighlightRepathingPathArrayDataSource(
+        HdPathArrayDataSourceHandle const & inputDataSource,
+        Fvp::WireframeSelectionHighlightSceneIndex const * const inputSceneIndex)
+      : _inputDataSource(inputDataSource),
+        _inputSceneIndex(inputSceneIndex)
+    {
+    }
+
+    VtValue GetValue(const Time shutterOffset) override
+    {
+        return VtValue(GetTypedValue(shutterOffset));
+    }
+
+    bool GetContributingSampleTimesForInterval(
+        const Time startTime,
+        const Time endTime,
+        std::vector<Time>*  const outSampleTimes) override
+    {
+        if (!_inputDataSource) {
+            return false;
+        }
+
+        return _inputDataSource->GetContributingSampleTimesForInterval(startTime, endTime, outSampleTimes);
+    }
+
+    VtArray<SdfPath> GetTypedValue(const Time shutterOffset) override
+    {
+        if (!_inputDataSource) {
+            return {};
+        }
+
+        VtArray<SdfPath> result = _inputDataSource->GetTypedValue(shutterOffset);
+        for (auto& path : result) {
+            path = _inputSceneIndex->GetSelectionHighlightPath(path);
+        }
+
+        return result;
+    }
+
+private:
+    HdPathArrayDataSourceHandle const _inputDataSource;
+    Fvp::WireframeSelectionHighlightSceneIndex const * const _inputSceneIndex;
+};
+
+// ----------------------------------------------------------------------------
+
+class _SelectionHighlightRepathingContainerDataSource : public HdContainerDataSource
+{
+public:
+    HD_DECLARE_DATASOURCE(_SelectionHighlightRepathingContainerDataSource)
+
+    _SelectionHighlightRepathingContainerDataSource(
+        HdContainerDataSourceHandle const &inputDataSource,
+        Fvp::WireframeSelectionHighlightSceneIndex const * const inputSceneIndex)
+      : _inputDataSource(inputDataSource),
+        _inputSceneIndex(inputSceneIndex)
+    {
+    }
+
+    TfTokenVector GetNames() override
+    {
+        return _inputDataSource ? _inputDataSource->GetNames() : TfTokenVector();
+    }
+
+    HdDataSourceBaseHandle Get(const TfToken& name) override
+    {
+        if (!_inputDataSource) {
+            return nullptr;
+        }
+
+        HdDataSourceBaseHandle const childDataSource = _inputDataSource->Get(name);
+        if (!childDataSource) {
+            return nullptr;
+        }
+
+        if (auto childContainerDataSource = HdContainerDataSource::Cast(childDataSource)) {
+            return New(childContainerDataSource, _inputSceneIndex);
+        }
+
+        if (auto childPathDataSource = HdTypedSampledDataSource<SdfPath>::Cast(childDataSource)) {
+            return _SelectionHighlightRepathingPathDataSource::New(childPathDataSource, _inputSceneIndex);
+        }
+
+        if (auto childPathArrayDataSource = HdTypedSampledDataSource<VtArray<SdfPath>>::Cast(childDataSource)) {
+            return _SelectionHighlightRepathingPathArrayDataSource::New(childPathArrayDataSource, _inputSceneIndex);
+        }
+
+        return childDataSource;
+    }
+
+private:
+    HdContainerDataSourceHandle const _inputDataSource;
+    Fvp::WireframeSelectionHighlightSceneIndex const * const _inputSceneIndex;
+};
+
 }
 
 namespace FVP_NS_DEF {
@@ -194,166 +341,6 @@ WireframeSelectionHighlightSceneIndex::GetSelectionHighlightPath(const SdfPath& 
     }
     return path;
 }
-
-class WireframeSelectionHighlightSceneIndex::_RerootingSceneIndexPathDataSource : public HdPathDataSource
-{
-public:
-    HD_DECLARE_DATASOURCE(_RerootingSceneIndexPathDataSource)
-
-    _RerootingSceneIndexPathDataSource(
-        HdPathDataSourceHandle const &inputDataSource,
-        WireframeSelectionHighlightSceneIndex const * const inputSceneIndex)
-      : _inputDataSource(inputDataSource),
-        _inputSceneIndex(inputSceneIndex)
-    {
-    }
-
-    VtValue GetValue(const Time shutterOffset) override
-    {
-        return VtValue(GetTypedValue(shutterOffset));
-    }
-
-    bool GetContributingSampleTimesForInterval(
-        const Time startTime,
-        const Time endTime,
-        std::vector<Time> * const outSampleTimes) override
-    {
-        if (!_inputDataSource) {
-            return false;
-        }
-
-        return _inputDataSource->GetContributingSampleTimesForInterval(
-                startTime, endTime, outSampleTimes);
-    }
-
-    SdfPath GetTypedValue(const Time shutterOffset) override
-    {
-        if (!_inputDataSource) {
-            return SdfPath();
-        }
-
-        const SdfPath srcPath = _inputDataSource->GetTypedValue(shutterOffset);
-        return _inputSceneIndex->GetSelectionHighlightPath(srcPath);
-    }
-
-private:
-    HdPathDataSourceHandle const _inputDataSource;
-    WireframeSelectionHighlightSceneIndex const * const _inputSceneIndex;
-};
-
-// ----------------------------------------------------------------------------
-
-class WireframeSelectionHighlightSceneIndex::_RerootingSceneIndexPathArrayDataSource : public HdPathArrayDataSource
-{
-public:
-    HD_DECLARE_DATASOURCE(_RerootingSceneIndexPathArrayDataSource)
-
-    _RerootingSceneIndexPathArrayDataSource(
-        HdPathArrayDataSourceHandle const & inputDataSource,
-        WireframeSelectionHighlightSceneIndex const * const inputSceneIndex)
-      : _inputDataSource(inputDataSource),
-        _inputSceneIndex(inputSceneIndex)
-    {
-    }
-
-    VtValue GetValue(const Time shutterOffset) override
-    {
-        return VtValue(GetTypedValue(shutterOffset));
-    }
-
-    bool GetContributingSampleTimesForInterval(
-        const Time startTime,
-        const Time endTime,
-        std::vector<Time>*  const outSampleTimes) override
-    {
-        if (!_inputDataSource) {
-            return false;
-        }
-
-        return _inputDataSource->GetContributingSampleTimesForInterval(
-            startTime, endTime, outSampleTimes);
-    }
-
-    VtArray<SdfPath> GetTypedValue(const Time shutterOffset) override
-    {
-        if (!_inputDataSource) {
-            return {};
-        }
-
-        VtArray<SdfPath> result
-            = _inputDataSource->GetTypedValue(shutterOffset);
-
-        for (size_t i = 0; i < result.size(); i++) {
-            result[i] = _inputSceneIndex->GetSelectionHighlightPath(result[i]);
-        }
-
-        return result;
-    }
-
-private:
-    HdPathArrayDataSourceHandle const _inputDataSource;
-    WireframeSelectionHighlightSceneIndex const * const _inputSceneIndex;
-};
-
-// ----------------------------------------------------------------------------
-
-class WireframeSelectionHighlightSceneIndex::_RerootingSceneIndexContainerDataSource : public HdContainerDataSource
-{
-public:
-    HD_DECLARE_DATASOURCE(_RerootingSceneIndexContainerDataSource)
-
-    _RerootingSceneIndexContainerDataSource(
-        HdContainerDataSourceHandle const &inputDataSource,
-        WireframeSelectionHighlightSceneIndex const * const inputSceneIndex)
-      : _inputDataSource(inputDataSource),
-        _inputSceneIndex(inputSceneIndex)
-    {
-    }
-
-    TfTokenVector GetNames() override
-    {
-        if (!_inputDataSource) {
-            return {};
-        }
-
-        return _inputDataSource->GetNames();
-    }
-
-    HdDataSourceBaseHandle Get(const TfToken& name) override
-    {
-        if (!_inputDataSource) {
-            return nullptr;
-        }
-
-        // wrap child containers so that we can wrap their children
-        HdDataSourceBaseHandle const childSource = _inputDataSource->Get(name);
-        if (!childSource) {
-            return nullptr;
-        }
-
-        if (auto childContainer =
-                HdContainerDataSource::Cast(childSource)) {
-            return New(std::move(childContainer), _inputSceneIndex);
-        }
-
-        if (auto childPathDataSource =
-                HdTypedSampledDataSource<SdfPath>::Cast(childSource)) {
-            return _RerootingSceneIndexPathDataSource::New(childPathDataSource, _inputSceneIndex);
-        }
-
-        if (auto childPathArrayDataSource =
-                HdTypedSampledDataSource<VtArray<SdfPath>>::Cast(
-                    childSource)) {
-            return _RerootingSceneIndexPathArrayDataSource::New(childPathArrayDataSource, _inputSceneIndex);
-        }
-
-        return childSource;
-    }
-
-private:
-    HdContainerDataSourceHandle const _inputDataSource;
-    WireframeSelectionHighlightSceneIndex const * const _inputSceneIndex;
-};
 
 HdSceneIndexBaseRefPtr
 WireframeSelectionHighlightSceneIndex::New(
@@ -627,7 +614,7 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         SdfPath originalPrimPath = primPath.ReplacePrefix(shMirrorAncestor, _GetOriginalPathFromSelectionHighlightMirror(shMirrorAncestor));
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPrimPath);
         if (prim.dataSource) {
-            prim.dataSource = WireframeSelectionHighlightSceneIndex::_RerootingSceneIndexContainerDataSource::New(prim.dataSource, this);
+            prim.dataSource = _SelectionHighlightRepathingContainerDataSource::New(prim.dataSource, this);
         }
         if (prim.primType == HdPrimTypeTokens->mesh) {
             prim.dataSource = _HighlightSelectedPrim(prim.dataSource, originalPrimPath, sRefinedWireDisplayStyleDataSource);
