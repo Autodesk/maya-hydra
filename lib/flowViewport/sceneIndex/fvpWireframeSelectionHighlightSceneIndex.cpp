@@ -373,31 +373,6 @@ private:
 
 namespace FVP_NS_DEF {
 
-SdfPath
-WireframeSelectionHighlightSceneIndex::_FindSelectionHighlightMirrorAncestor(const SdfPath& path) const
-{
-    auto ancestorsRange = path.GetAncestorsRange();
-    for (auto ancestor : ancestorsRange) {
-        if (_shMirrorsUseCount.find(ancestor) != _shMirrorsUseCount.end()) {
-            return ancestor;
-        }
-    }
-    return SdfPath::EmptyPath();
-}
-
-SdfPath
-WireframeSelectionHighlightSceneIndex::GetSelectionHighlightPath(const SdfPath& path) const
-{
-    auto ancestorsRange = path.GetAncestorsRange();
-    for (auto ancestor : ancestorsRange) {
-        const SdfPath mirrorPath = _GetSelectionHighlightMirrorPathFromOriginal(ancestor);
-        if (_shMirrorsUseCount.find(mirrorPath) != _shMirrorsUseCount.end()) {
-            return path.ReplacePrefix(ancestor, mirrorPath);
-        }
-    }
-    return path;
-}
-
 HdSceneIndexBaseRefPtr
 WireframeSelectionHighlightSceneIndex::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
@@ -426,10 +401,10 @@ WireframeSelectionHighlightSceneIndex(
 {
     TF_AXIOM(_wireframeColorInterface);
 
-    std::stack<SdfPath> primPathsToTraverse({ SdfPath::AbsoluteRootPath() });
-    while (!primPathsToTraverse.empty()) {
-        SdfPath currPrimPath = primPathsToTraverse.top();
-        primPathsToTraverse.pop();
+    std::stack<SdfPath> pathsToTraverse({ SdfPath::AbsoluteRootPath() });
+    while (!pathsToTraverse.empty()) {
+        SdfPath currPrimPath = pathsToTraverse.top();
+        pathsToTraverse.pop();
 
         HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPrimPath);
         if (_IsInstancerWithSelections(currPrim)) {
@@ -437,120 +412,8 @@ WireframeSelectionHighlightSceneIndex(
         }
 
         for (const auto& childPath : inputSceneIndex->GetChildPrimPaths(currPrimPath)) {
-            primPathsToTraverse.push(childPath);
-        }
-    }
-}
-
-void
-WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightPaths(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outSelectionHighlightMirrorPaths, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outAddedPrims)
-{
-    // This should never be called on selection highlight prims, only on original prims
-    TF_AXIOM(_FindSelectionHighlightMirrorAncestor(originalPrimPath).IsEmpty());
-
-    HdSceneIndexPrim originalPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
-    if (!_IsInstancingRoot(originalPrim, originalPrimPath)) {
-        HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(originalPrim.dataSource);
-        auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
-        for (const auto& protoRootPath : protoRootPaths) {
-            _CollectSelectionHighlightPaths(protoRootPath, outSelectionHighlightMirrorPaths, outAddedPrims);
-        }
-        return;
-    }
-    
-    SdfPath selectionHighlightPrimPath = _GetSelectionHighlightMirrorPathFromOriginal(originalPrimPath);
-    
-    if (outSelectionHighlightMirrorPaths.find(selectionHighlightPrimPath) != outSelectionHighlightMirrorPaths.end()) {
-        return;
-    }
-    outSelectionHighlightMirrorPaths.insert(selectionHighlightPrimPath);
-
-    SdfPathVector affectedOriginalPrimPaths;
-    std::stack<SdfPath> pathsToTraverse({originalPrimPath});
-    while (!pathsToTraverse.empty()) {
-        SdfPath currPath = pathsToTraverse.top();
-        pathsToTraverse.pop();
-
-        HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
-
-        // Skip processing of prototypes nested under the prim's hierarchy, as prototypes should be processed by
-        // traversing the instancing-related paths of instancers and instancees. And if they aren't, then it means
-        // the prototype is either not instanced in the first place, or is part of a different instancing hierarchy.
-        if (_IsPrototype(currPrim) && _IsInstancingRoot(currPrim, currPath) && currPath != originalPrimPath) {
-            continue;
-        }
-
-        outAddedPrims.push_back({currPath.ReplacePrefix(originalPrimPath, selectionHighlightPrimPath), currPrim.primType});
-
-        if (currPrim.primType == HdPrimTypeTokens->instancer) {
-            SdfPathVector instancingRelatedPaths = _GetInstancingRelatedPaths(currPrim);
-            affectedOriginalPrimPaths.insert(affectedOriginalPrimPaths.end(), instancingRelatedPaths.begin(), instancingRelatedPaths.end());
-        }
-
-        for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(currPath)) {
             pathsToTraverse.push(childPath);
         }
-    }
-
-    for (const auto& affectedOriginalPrimPath : affectedOriginalPrimPaths) {
-        _CollectSelectionHighlightPaths(affectedOriginalPrimPath, outSelectionHighlightMirrorPaths, outAddedPrims);
-    }
-}
-
-void 
-WireframeSelectionHighlightSceneIndex::_RemoveShMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath)
-{
-    TF_AXIOM(GetInputSceneIndex()->GetPrim(instancerPath).primType == HdPrimTypeTokens->instancer);
-
-    HdSceneIndexObserver::RemovedPrimEntries removedPrims;
-
-    SdfPathSet oldShMirrors;
-    if (_shMirrorsByInstancer.find(instancerPath) != _shMirrorsByInstancer.end()) {
-        oldShMirrors = _shMirrorsByInstancer.at(instancerPath);
-    }
-    for (const auto& shMirror : oldShMirrors) {
-        TF_AXIOM(_shMirrorsUseCount.find(shMirror) != _shMirrorsUseCount.end());
-        TF_AXIOM(_shMirrorsUseCount[shMirror] > 0);
-        _shMirrorsUseCount[shMirror]--;
-        if (_shMirrorsUseCount[shMirror] == 0) {
-            _shMirrorsUseCount.erase(shMirror);
-            removedPrims.push_back(shMirror);
-        }
-    }
-
-    _shMirrorsByInstancer.erase(instancerPath);
-    
-    if (!removedPrims.empty()) {
-        _SendPrimsRemoved(removedPrims);
-    }
-}
-
-void 
-WireframeSelectionHighlightSceneIndex::_CreateShMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath)
-{
-    TF_AXIOM(GetInputSceneIndex()->GetPrim(instancerPath).primType == HdPrimTypeTokens->instancer);
-
-    if (_shMirrorsByInstancer.find(instancerPath) != _shMirrorsByInstancer.end()) {
-        _RemoveShMirrorsForInstancer(instancerPath);
-    }
-
-    SdfPathSet newShMirrors;
-    HdSceneIndexObserver::AddedPrimEntries addedPrims;
-    _CollectSelectionHighlightPaths(instancerPath, newShMirrors, addedPrims);
-
-    _shMirrorsByInstancer[instancerPath] = newShMirrors;
-    for (const auto& shMirror : newShMirrors) {
-        if (_shMirrorsUseCount.find(shMirror) == _shMirrorsUseCount.end()) {
-            _shMirrorsUseCount[shMirror] = 1;
-        } else {
-            TF_AXIOM(_shMirrorsUseCount.find(shMirror) != _shMirrorsUseCount.end());
-            TF_AXIOM(_shMirrorsUseCount[shMirror] > 0);
-            _shMirrorsUseCount[shMirror]++;
-        }
-    }
-
-    if (!addedPrims.empty()) {
-        _SendPrimsAdded(addedPrims);
     }
 }
 
@@ -851,6 +714,143 @@ bool WireframeSelectionHighlightSceneIndex::_IsExcluded(
         }
     }
     return false;
+}
+
+SdfPath
+WireframeSelectionHighlightSceneIndex::GetSelectionHighlightPath(const SdfPath& path) const
+{
+    auto ancestorsRange = path.GetAncestorsRange();
+    for (auto ancestor : ancestorsRange) {
+        const SdfPath mirrorPath = _GetSelectionHighlightMirrorPathFromOriginal(ancestor);
+        if (_shMirrorsUseCount.find(mirrorPath) != _shMirrorsUseCount.end()) {
+            return path.ReplacePrefix(ancestor, mirrorPath);
+        }
+    }
+    return path;
+}
+
+SdfPath
+WireframeSelectionHighlightSceneIndex::_FindSelectionHighlightMirrorAncestor(const SdfPath& path) const
+{
+    auto ancestorsRange = path.GetAncestorsRange();
+    for (auto ancestor : ancestorsRange) {
+        if (_shMirrorsUseCount.find(ancestor) != _shMirrorsUseCount.end()) {
+            return ancestor;
+        }
+    }
+    return SdfPath::EmptyPath();
+}
+
+void
+WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightPaths(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outSelectionHighlightMirrorPaths, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outAddedPrims)
+{
+    // This should never be called on selection highlight prims, only on original prims
+    TF_AXIOM(_FindSelectionHighlightMirrorAncestor(originalPrimPath).IsEmpty());
+
+    HdSceneIndexPrim originalPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
+    if (!_IsInstancingRoot(originalPrim, originalPrimPath)) {
+        HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(originalPrim.dataSource);
+        auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
+        for (const auto& protoRootPath : protoRootPaths) {
+            _CollectSelectionHighlightPaths(protoRootPath, outSelectionHighlightMirrorPaths, outAddedPrims);
+        }
+        return;
+    }
+    
+    SdfPath selectionHighlightPrimPath = _GetSelectionHighlightMirrorPathFromOriginal(originalPrimPath);
+    
+    if (outSelectionHighlightMirrorPaths.find(selectionHighlightPrimPath) != outSelectionHighlightMirrorPaths.end()) {
+        return;
+    }
+    outSelectionHighlightMirrorPaths.insert(selectionHighlightPrimPath);
+
+    SdfPathVector affectedOriginalPrimPaths;
+    std::stack<SdfPath> pathsToTraverse({originalPrimPath});
+    while (!pathsToTraverse.empty()) {
+        SdfPath currPath = pathsToTraverse.top();
+        pathsToTraverse.pop();
+
+        HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
+
+        // Skip processing of prototypes nested under the prim's hierarchy, as prototypes should be processed by
+        // traversing the instancing-related paths of instancers and instancees. And if they aren't, then it means
+        // the prototype is either not instanced in the first place, or is part of a different instancing hierarchy.
+        if (_IsPrototype(currPrim) && _IsInstancingRoot(currPrim, currPath) && currPath != originalPrimPath) {
+            continue;
+        }
+
+        outAddedPrims.push_back({currPath.ReplacePrefix(originalPrimPath, selectionHighlightPrimPath), currPrim.primType});
+
+        if (currPrim.primType == HdPrimTypeTokens->instancer) {
+            SdfPathVector instancingRelatedPaths = _GetInstancingRelatedPaths(currPrim);
+            affectedOriginalPrimPaths.insert(affectedOriginalPrimPaths.end(), instancingRelatedPaths.begin(), instancingRelatedPaths.end());
+        }
+
+        for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(currPath)) {
+            pathsToTraverse.push(childPath);
+        }
+    }
+
+    for (const auto& affectedOriginalPrimPath : affectedOriginalPrimPaths) {
+        _CollectSelectionHighlightPaths(affectedOriginalPrimPath, outSelectionHighlightMirrorPaths, outAddedPrims);
+    }
+}
+
+void 
+WireframeSelectionHighlightSceneIndex::_RemoveShMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath)
+{
+    TF_AXIOM(GetInputSceneIndex()->GetPrim(instancerPath).primType == HdPrimTypeTokens->instancer);
+
+    HdSceneIndexObserver::RemovedPrimEntries removedPrims;
+
+    SdfPathSet oldShMirrors;
+    if (_shMirrorsByInstancer.find(instancerPath) != _shMirrorsByInstancer.end()) {
+        oldShMirrors = _shMirrorsByInstancer.at(instancerPath);
+    }
+    for (const auto& shMirror : oldShMirrors) {
+        TF_AXIOM(_shMirrorsUseCount.find(shMirror) != _shMirrorsUseCount.end());
+        TF_AXIOM(_shMirrorsUseCount[shMirror] > 0);
+        _shMirrorsUseCount[shMirror]--;
+        if (_shMirrorsUseCount[shMirror] == 0) {
+            _shMirrorsUseCount.erase(shMirror);
+            removedPrims.push_back(shMirror);
+        }
+    }
+
+    _shMirrorsByInstancer.erase(instancerPath);
+    
+    if (!removedPrims.empty()) {
+        _SendPrimsRemoved(removedPrims);
+    }
+}
+
+void 
+WireframeSelectionHighlightSceneIndex::_CreateShMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath)
+{
+    TF_AXIOM(GetInputSceneIndex()->GetPrim(instancerPath).primType == HdPrimTypeTokens->instancer);
+
+    if (_shMirrorsByInstancer.find(instancerPath) != _shMirrorsByInstancer.end()) {
+        _RemoveShMirrorsForInstancer(instancerPath);
+    }
+
+    SdfPathSet newShMirrors;
+    HdSceneIndexObserver::AddedPrimEntries addedPrims;
+    _CollectSelectionHighlightPaths(instancerPath, newShMirrors, addedPrims);
+
+    _shMirrorsByInstancer[instancerPath] = newShMirrors;
+    for (const auto& shMirror : newShMirrors) {
+        if (_shMirrorsUseCount.find(shMirror) == _shMirrorsUseCount.end()) {
+            _shMirrorsUseCount[shMirror] = 1;
+        } else {
+            TF_AXIOM(_shMirrorsUseCount.find(shMirror) != _shMirrorsUseCount.end());
+            TF_AXIOM(_shMirrorsUseCount[shMirror] > 0);
+            _shMirrorsUseCount[shMirror]++;
+        }
+    }
+
+    if (!addedPrims.empty()) {
+        _SendPrimsAdded(addedPrims);
+    }
 }
 
 }
