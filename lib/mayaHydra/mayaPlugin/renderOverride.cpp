@@ -1089,8 +1089,8 @@ MStatus MtohRenderOverride::Render(
     }
 
     // Toggle textures in the material network
-    const unsigned int currentTextureMode = drawContext.getDisplayStyle();
-    bool isTextured = currentTextureMode & MHWRender::MFrameContext::kTextured;
+    const unsigned int currentDisplayMode = drawContext.getDisplayStyle();
+    bool isTextured = currentDisplayMode & MHWRender::MFrameContext::kTextured;
     if (_pruneTexturesSceneIndex && 
         _currentlyTextured != isTextured) {
         _pruneTexturesSceneIndex->MarkTexturesDirty(isTextured);
