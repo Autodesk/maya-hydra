@@ -358,37 +358,37 @@ const HdDataSourceLocator& WireframeSelectionHighlightSceneIndex::ReprSelectorLo
 }
 
 SdfPathVector
-WireframeSelectionHighlightSceneIndex::_CollectAffectedOriginalPrimPaths(const SdfPath& originalPrimPath)
+WireframeSelectionHighlightSceneIndex::_GetInstancingRelatedPaths(const SdfPath& originalPrimPath)
 {
     TF_AXIOM(_FindSelectionHighlightMirrorAncestor(originalPrimPath).IsEmpty());
 
     HdSceneIndexPrim originalPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
-    SdfPathVector affectedOriginalPrimPaths;
-
+    
     HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(originalPrim.dataSource);
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(originalPrim.dataSource);
-    HdSelectionsSchema selections = HdSelectionsSchema::GetFromParent(originalPrim.dataSource);
+    
+    SdfPathVector instancingRelatedPaths;
 
     if (instancerTopology.IsDefined()) {
         auto protoPaths = instancerTopology.GetPrototypes()->GetTypedValue(0);
         for (const auto& protoPath : protoPaths) {
-            affectedOriginalPrimPaths.push_back(protoPath);
+            instancingRelatedPaths.push_back(protoPath);
         }
     }
 
     if (instancedBy.IsDefined()) {
         auto instancerPaths = instancedBy.GetPaths()->GetTypedValue(0);
         for (const auto& instancerPath : instancerPaths) {
-            affectedOriginalPrimPaths.push_back(instancerPath);
+            instancingRelatedPaths.push_back(instancerPath);
         }
 
         auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
         for (const auto& protoRootPath : protoRootPaths) {
-            affectedOriginalPrimPaths.push_back(protoRootPath);
+            instancingRelatedPaths.push_back(protoRootPath);
         }
     }
 
-    return affectedOriginalPrimPaths;
+    return instancingRelatedPaths;
 }
 
 bool
@@ -474,7 +474,7 @@ WireframeSelectionHighlightSceneIndex(
 }
 
 bool
-WireframeSelectionHighlightSceneIndex::_CollectShMirrorPaths(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outShMirrorPaths, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outCreatedPrims)
+WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightPaths(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outShMirrorPaths, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outCreatedPrims)
 {
     // This should never be called on selection highlight mirrors, only on original prims
     TF_AXIOM(_FindSelectionHighlightMirrorAncestor(originalPrimPath).IsEmpty());
@@ -492,7 +492,7 @@ WireframeSelectionHighlightSceneIndex::_CollectShMirrorPaths(const PXR_NS::SdfPa
         if (instancedBy.IsDefined()) {
             auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
             for (const auto& protoRootPath : protoRootPaths) {
-                result = result || _CollectShMirrorPaths(protoRootPath, outShMirrorPaths, outCreatedPrims);
+                result = result || _CollectSelectionHighlightPaths(protoRootPath, outShMirrorPaths, outCreatedPrims);
             }
         }
         return result;
@@ -519,7 +519,7 @@ WireframeSelectionHighlightSceneIndex::_CollectShMirrorPaths(const PXR_NS::SdfPa
         HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
         outCreatedPrims.push_back({currPath.ReplacePrefix(originalPrimPath, selectionHighlightPrimPath), currPrim.primType});
         if (currPrim.primType == HdPrimTypeTokens->instancer) {
-            SdfPathVector extraAffectedOriginalPrimPaths = _CollectAffectedOriginalPrimPaths(currPath);
+            SdfPathVector extraAffectedOriginalPrimPaths = _GetInstancingRelatedPaths(currPath);
             std::cout << "Processing extra paths for : " << currPath.GetString() << std::endl;
             for (const auto& path : extraAffectedOriginalPrimPaths) {
                 {
@@ -536,7 +536,7 @@ WireframeSelectionHighlightSceneIndex::_CollectShMirrorPaths(const PXR_NS::SdfPa
     }
 
     for (const auto& affectedOriginalPrimPath : affectedOriginalPrimPaths) {
-        _CollectShMirrorPaths(affectedOriginalPrimPath, outShMirrorPaths, outCreatedPrims);
+        _CollectSelectionHighlightPaths(affectedOriginalPrimPath, outShMirrorPaths, outCreatedPrims);
     }
 
     return true;
@@ -581,7 +581,7 @@ WireframeSelectionHighlightSceneIndex::_CreateShMirrorsForInstancer(const PXR_NS
 
     SdfPathSet newShMirrors;
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
-    _CollectShMirrorPaths(instancerPath, newShMirrors, addedPrims);
+    _CollectSelectionHighlightPaths(instancerPath, newShMirrors, addedPrims);
 
     _shMirrorsByInstancer[instancerPath] = newShMirrors;
     for (const auto& shMirror : newShMirrors) {
