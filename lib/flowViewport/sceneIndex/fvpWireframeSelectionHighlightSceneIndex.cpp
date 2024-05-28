@@ -435,17 +435,17 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
     SdfPath selectionHighlightMirrorAncestor = _FindSelectionHighlightMirrorAncestor(primPath);
     if (!selectionHighlightMirrorAncestor.IsEmpty()) {
         SdfPath originalPrimPath = primPath.ReplacePrefix(selectionHighlightMirrorAncestor, _GetOriginalPathFromSelectionHighlightMirror(selectionHighlightMirrorAncestor));
-        HdSceneIndexPrim shPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
-        if (shPrim.dataSource) {
-            shPrim.dataSource = _SelectionHighlightRepathingContainerDataSource::New(shPrim.dataSource, this);
+        HdSceneIndexPrim selectionHighlightPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
+        if (selectionHighlightPrim.dataSource) {
+            selectionHighlightPrim.dataSource = _SelectionHighlightRepathingContainerDataSource::New(selectionHighlightPrim.dataSource, this);
         }
-        if (shPrim.primType == HdPrimTypeTokens->mesh) {
-            shPrim.dataSource = _HighlightSelectedPrim(shPrim.dataSource, originalPrimPath, sRefinedWireDisplayStyleDataSource);
+        if (selectionHighlightPrim.primType == HdPrimTypeTokens->mesh) {
+            selectionHighlightPrim.dataSource = _HighlightSelectedPrim(selectionHighlightPrim.dataSource, originalPrimPath, sRefinedWireDisplayStyleDataSource);
         }
-        if (shPrim.primType == HdPrimTypeTokens->instancer) {
-            shPrim.dataSource = _GetSelectionHighlightInstancerDataSource(shPrim.dataSource);
+        if (selectionHighlightPrim.primType == HdPrimTypeTokens->instancer) {
+            selectionHighlightPrim.dataSource = _GetSelectionHighlightInstancerDataSource(selectionHighlightPrim.dataSource);
         }
-        return shPrim;
+        return selectionHighlightPrim;
     }
     
     // We may be dealing with a prototype selection, a regular selection, or no selection at all.
@@ -472,26 +472,28 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
 SdfPathVector
 WireframeSelectionHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath) const
 {
+    // When within a selection highlight mirror hierarchy, query the corresponding original prim
     SdfPath selectionHighlightMirrorAncestor = _FindSelectionHighlightMirrorAncestor(primPath);
     if (!selectionHighlightMirrorAncestor.IsEmpty()) {
-        SdfPath originalAncestorPath = _GetOriginalPathFromSelectionHighlightMirror(selectionHighlightMirrorAncestor);
-        auto childPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath.ReplacePrefix(selectionHighlightMirrorAncestor, originalAncestorPath));
+        SdfPath originalAncestor = _GetOriginalPathFromSelectionHighlightMirror(selectionHighlightMirrorAncestor);
+        auto childPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath.ReplacePrefix(selectionHighlightMirrorAncestor, originalAncestor));
         for (auto& childPath : childPaths) {
-            childPath = childPath.ReplacePrefix(originalAncestorPath, selectionHighlightMirrorAncestor);
+            childPath = childPath.ReplacePrefix(originalAncestor, selectionHighlightMirrorAncestor);
         }
         return childPaths;
     }
 
+    // When outside a selection highlight mirror hierarchy, add each child's corresponding
+    // selection highlight mirror, if there is one.
     auto childPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
     SdfPathVector additionalChildPaths;
     for (const auto& childPath : childPaths) {
-        SdfPath shPath = _GetSelectionHighlightMirrorPathFromOriginal(childPath);
-        if (_selectionHighlightMirrorUseCounters.find(shPath) != _selectionHighlightMirrorUseCounters.end()) {
-            additionalChildPaths.push_back(shPath);
+        SdfPath selectionHighlightPath = _GetSelectionHighlightMirrorPathFromOriginal(childPath);
+        if (_selectionHighlightMirrorUseCounters.find(selectionHighlightPath) != _selectionHighlightMirrorUseCounters.end()) {
+            additionalChildPaths.push_back(selectionHighlightPath);
         }
     }
     childPaths.insert(childPaths.end(), additionalChildPaths.begin(), additionalChildPaths.end());
-
     return childPaths;
 }
 
@@ -541,17 +543,12 @@ WireframeSelectionHighlightSceneIndex::_PrimsAdded(
     TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
         .Msg("WireframeSelectionHighlightSceneIndex::_PrimsAdded() called.\n");
 
-    auto newEntries = entries;
+    _SendPrimsAdded(entries);
     for (const auto& entry : entries) {
-        // TODO : Check if instancer with selections, or if an instancee whose instancer(s) have selections?
-        // Maybe only need new instancers with selections?
-        // New proto subprim : handled automatically
-        // New proto : means an instancer has changed -> should be reflected automatically?
         if (_IsInstancerWithSelections(GetInputSceneIndex()->GetPrim(entry.primPath))) {
             _CreateSelectionHighlightMirrorsForInstancer(entry.primPath);
         }
     }
-    _SendPrimsAdded(newEntries);
 }
 
 void
@@ -674,15 +671,10 @@ WireframeSelectionHighlightSceneIndex::_PrimsRemoved(
         .Msg("WireframeSelectionHighlightSceneIndex::_PrimsRemoved() called.\n");
 
     for (const auto& entry : entries) {
-        // TODO : Check if instancer with selections, or if an instancee whose instancer(s) have selections?
-        // Maybe only need new instancers with selections?
-        // New proto subprim : handled automatically
-        // New proto : means an instancer has changed -> should be reflected automatically?
         if (_IsInstancerWithSelections(GetInputSceneIndex()->GetPrim(entry.primPath))) {
             _RemoveSelectionHighlightMirrorsForInstancer(entry.primPath);
         }
     }
-
     _SendPrimsRemoved(entries);
 }
 
