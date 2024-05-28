@@ -14,9 +14,10 @@
 //
 
 #include "flowViewport/sceneIndex/fvpPruneTexturesSceneIndex.h"
-#include "pxr/base/tf/staticTokens.h"
-#include "pxr/imaging/hd/sceneIndexPrimView.h"
-#include "pxr/imaging/hd/materialSchema.h"
+
+#include <pxr/base/tf/staticTokens.h>
+#include <pxr/imaging/hd/sceneIndexPrimView.h>
+#include <pxr/imaging/hd/materialSchema.h>
 
 #include <iostream>
 namespace FVP_NS_DEF {
@@ -46,7 +47,7 @@ _PruneTexturesFromMatNetwork(
             // Look for incoming connection(textures) to surface shader params
             TfTokenVector inputConnections = networkInterface->GetNodeInputConnectionNames(nodeName);
             for (TfToken const &connection : inputConnections) {
-                // Trivially  input connections.
+                // Trivially remove all input connections to match Maya VP2 behavior
                 networkInterface->DeleteNodeInputConnection(nodeName, connection);
             }
         }

@@ -18,9 +18,9 @@
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 
-#include "pxr/imaging/hdsi/api.h"
-#include "pxr/imaging/hd/materialFilteringSceneIndexBase.h"
-#include "pxr/imaging/hd/materialNetworkInterface.h"
+#include <pxr/imaging/hdsi/api.h>
+#include <pxr/imaging/hd/materialFilteringSceneIndexBase.h>
+#include <pxr/imaging/hd/materialNetworkInterface.h>
 
 namespace FVP_NS_DEF {
 
