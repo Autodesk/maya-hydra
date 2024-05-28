@@ -166,6 +166,65 @@ bool _IsInstancerWithSelections(const HdSceneIndexPrim& prim)
     return selections.IsDefined() && selections.GetNumElements() > 0;
 }
 
+SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim)
+{
+    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    
+    SdfPathVector instancingRelatedPaths;
+
+    if (instancerTopology.IsDefined()) {
+        auto protoPaths = instancerTopology.GetPrototypes()->GetTypedValue(0);
+        for (const auto& protoPath : protoPaths) {
+            instancingRelatedPaths.push_back(protoPath);
+        }
+    }
+
+    if (instancedBy.IsDefined()) {
+        auto instancerPaths = instancedBy.GetPaths()->GetTypedValue(0);
+        for (const auto& instancerPath : instancerPaths) {
+            instancingRelatedPaths.push_back(instancerPath);
+        }
+
+        auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
+        for (const auto& protoRootPath : protoRootPaths) {
+            instancingRelatedPaths.push_back(protoRootPath);
+        }
+    }
+
+    return instancingRelatedPaths;
+}
+
+bool _IsInstancingRoot(const HdSceneIndexPrim& prim, const SdfPath& primPath)
+{
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    if (!instancedBy.IsDefined()) {
+        return true;
+    }
+    if (!instancedBy.GetPrototypeRoots()) {
+        return true;
+    }
+    auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
+    for (const auto& protoRootPath : protoRootPaths) {
+        if (protoRootPath == primPath) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool _IsPropagatedPrototype(const HdSceneIndexPrim& prim)
+{
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() && !instancedBy.GetPrototypeRoots()->GetTypedValue(0).empty();
+}
+
+bool _IsPrototype(const HdSceneIndexPrim& prim)
+{
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    return instancedBy.IsDefined();
+}
+
 class _SelectionHighlightRepathingPathDataSource : public HdPathDataSource
 {
 public:
@@ -210,8 +269,6 @@ private:
     HdPathDataSourceHandle const _inputDataSource;
     Fvp::WireframeSelectionHighlightSceneIndex const * const _inputSceneIndex;
 };
-
-// ----------------------------------------------------------------------------
 
 class _SelectionHighlightRepathingPathArrayDataSource : public HdPathArrayDataSource
 {
@@ -261,8 +318,6 @@ private:
     HdPathArrayDataSourceHandle const _inputDataSource;
     Fvp::WireframeSelectionHighlightSceneIndex const * const _inputSceneIndex;
 };
-
-// ----------------------------------------------------------------------------
 
 class _SelectionHighlightRepathingContainerDataSource : public HdContainerDataSource
 {
@@ -355,69 +410,6 @@ WireframeSelectionHighlightSceneIndex::New(
 const HdDataSourceLocator& WireframeSelectionHighlightSceneIndex::ReprSelectorLocator()
 {
     return reprSelectorLocator;
-}
-
-SdfPathVector
-WireframeSelectionHighlightSceneIndex::_GetInstancingRelatedPaths(const HdSceneIndexPrim& prim)
-{
-    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
-    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    
-    SdfPathVector instancingRelatedPaths;
-
-    if (instancerTopology.IsDefined()) {
-        auto protoPaths = instancerTopology.GetPrototypes()->GetTypedValue(0);
-        for (const auto& protoPath : protoPaths) {
-            instancingRelatedPaths.push_back(protoPath);
-        }
-    }
-
-    if (instancedBy.IsDefined()) {
-        auto instancerPaths = instancedBy.GetPaths()->GetTypedValue(0);
-        for (const auto& instancerPath : instancerPaths) {
-            instancingRelatedPaths.push_back(instancerPath);
-        }
-
-        auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
-        for (const auto& protoRootPath : protoRootPaths) {
-            instancingRelatedPaths.push_back(protoRootPath);
-        }
-    }
-
-    return instancingRelatedPaths;
-}
-
-bool
-WireframeSelectionHighlightSceneIndex::_IsInstancingRoot(const HdSceneIndexPrim& prim, const SdfPath& primPath) const
-{
-    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    if (!instancedBy.IsDefined()) {
-        return true;
-    }
-    if (!instancedBy.GetPrototypeRoots()) {
-        return true;
-    }
-    auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
-    for (const auto& protoRootPath : protoRootPaths) {
-        if (protoRootPath == primPath) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool
-WireframeSelectionHighlightSceneIndex::_IsPropagatedPrototype(const HdSceneIndexPrim& prim) const
-{
-    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() && !instancedBy.GetPrototypeRoots()->GetTypedValue(0).empty();
-}
-
-bool
-WireframeSelectionHighlightSceneIndex::_IsPrototype(const HdSceneIndexPrim& prim) const
-{
-    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    return instancedBy.IsDefined();
 }
 
 WireframeSelectionHighlightSceneIndex::

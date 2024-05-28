@@ -114,11 +114,6 @@ private:
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
     PXR_NS::HdContainerDataSourceHandle _HighlightSelectedPrim(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::SdfPath& primPath, const PXR_NS::HdContainerDataSourceHandle& highlightDataSource) const;
 
-    bool _IsInstancingRoot(const PXR_NS::HdSceneIndexPrim& prim, const PXR_NS::SdfPath& primPath) const;
-    bool _IsPropagatedPrototype(const PXR_NS::HdSceneIndexPrim& prim) const;
-    bool _IsPrototype(const PXR_NS::HdSceneIndexPrim& prim) const;
-
-    PXR_NS::SdfPathVector _GetInstancingRelatedPaths(const PXR_NS::HdSceneIndexPrim& prim);
     void _CollectSelectionHighlightPaths(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outSelectionHighlightMirrorPaths, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outAddedPrims);
     void _RemoveShMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath);
     void _CreateShMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath);
