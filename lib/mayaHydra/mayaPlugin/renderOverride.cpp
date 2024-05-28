@@ -1088,6 +1088,15 @@ MStatus MtohRenderOverride::Render(
        _displayStyleSceneIndex->SetRefineLevel({true, delegateParams.refineLevel});
     }
 
+    // Toggle textures in the material network
+    const unsigned int currentDisplayMode = drawContext.getDisplayStyle();
+    bool isTextured = currentDisplayMode & MHWRender::MFrameContext::kTextured;
+    if (_pruneTexturesSceneIndex && 
+        _currentlyTextured != isTextured) {
+        _pruneTexturesSceneIndex->MarkTexturesDirty(isTextured);
+        _currentlyTextured = isTextured;
+    }
+
     HdxRenderTaskParams params;
     params.enableLighting = true;
     params.enableSceneMaterials = true;
@@ -1389,6 +1398,8 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     #endif
 
     _displayStyleSceneIndex = nullptr;
+    _pruneTexturesSceneIndex = nullptr;
+    _currentlyTextured = false;
     _selectionSceneIndex.Reset();
     _selection.reset();
     _wireframeColorInterfaceImp.reset();
@@ -1435,6 +1446,10 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _lastFilteringSceneIndexBeforeCustomFiltering = _displayStyleSceneIndex =
             Fvp::DisplayStyleOverrideSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
     _displayStyleSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims don't use global refinement
+
+    // Add texture disabling Scene Index
+    _lastFilteringSceneIndexBeforeCustomFiltering = _pruneTexturesSceneIndex = 
+    Fvp::PruneTexturesSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
 
     const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
     const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
@@ -1941,8 +1956,7 @@ bool MtohRenderOverride::_NeedToRecreateTheSceneIndicesChain(unsigned int curren
 {
     if (areDifferentForOneOfTheseBits(currentDisplayStyle, _oldDisplayStyle, 
             MHWRender::MFrameContext::kGouraudShaded    | 
-            MHWRender::MFrameContext::kTextured         | 
-            MHWRender::MFrameContext::kWireFrame        |
+            MHWRender::MFrameContext::kWireFrame        | 
             MHWRender::MFrameContext::kBoundingBox      )
         ){
         return true;

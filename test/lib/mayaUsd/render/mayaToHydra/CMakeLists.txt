@@ -35,6 +35,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFootPrintNode.py
     testBackgroundColor.py
     testGrid.py
+    testUsdTextureToggle.py
     # To be reenabled after investigation
     #testDataProducerSelHighlight.py
     testPassingNormalsOnMayaNative.py
