@@ -124,7 +124,6 @@ private:
 
     std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _selectionHighlightMirrorsByInstancer;
     std::unordered_map<PXR_NS::SdfPath, size_t, PXR_NS::SdfPath::Hash> _selectionHighlightMirrorUseCounters;
-    std::set<PXR_NS::SdfPath> _highlightedPrototypePaths;
 };
 
 }

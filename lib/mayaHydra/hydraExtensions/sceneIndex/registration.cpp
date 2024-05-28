@@ -27,6 +27,7 @@
 
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
+#include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/sceneIndexPlugin.h>
@@ -34,6 +35,7 @@
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/renderDelegate.h>
+#include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
 #include <pxr/usd/sdf/path.h>
 
 #if defined(MAYAHYDRALIB_MAYAUSDAPI_ENABLED)
@@ -152,8 +154,41 @@ public:
             selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
             selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
         }
-        Fvp::PrimSelectionInfo primSelection {primPath, selectionDataSource};
-        return Fvp::PrimSelectionInfoVector({primSelection});
+        Fvp::PrimSelectionInfo basePrimSelection {primPath, selectionDataSource};
+        Fvp::PrimSelectionInfoVector primSelections({basePrimSelection});
+
+        // Propagate selection to propagated prototypes
+        auto ancestorsRange = primPath.GetAncestorsRange();
+        for (const auto& ancestorPath : ancestorsRange) {
+            HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(ancestorPath);
+            UsdImagingUsdPrimInfoSchema usdPrimInfo = UsdImagingUsdPrimInfoSchema::GetFromParent(currPrim.dataSource);
+            if (!usdPrimInfo.IsDefined()) {
+                continue;
+            }
+            auto propagatedProtosDataSource = usdPrimInfo.GetPiPropagatedPrototypes();
+            if (!propagatedProtosDataSource) {
+                continue;
+            }
+            auto propagatedProtoNames = propagatedProtosDataSource->GetNames();
+            for (const auto& propagatedProtoName : propagatedProtoNames) {
+                auto propagatedProtoPathDataSource = HdTypedSampledDataSource<SdfPath>::Cast(propagatedProtosDataSource->Get(propagatedProtoName));
+                if (propagatedProtoPathDataSource) {
+                    SdfPath propagatedProtoPath = propagatedProtoPathDataSource->GetTypedValue(0);
+                    SdfPath propagatedPrimPath = primPath.ReplacePrefix(ancestorPath, propagatedProtoPath);
+                    HdSceneIndexPrim propagatedPrim = GetInputSceneIndex()->GetPrim(propagatedPrimPath);
+                    // This check controls which types of prims have their selection data source propagated. Currently we skip
+                    // instancers so that selecting an instancer A that is both drawing geometry but also prototyped and propagated
+                    // for another instancer B will only mark the geometry-drawing instancer A as selected. This can be changed.
+                    // For now (2024/05/28), this only affects selection highlighting.
+                    if (propagatedPrim.primType != HdPrimTypeTokens->instancer) {
+                        primSelections.push_back({propagatedPrimPath, selectionDataSource});
+                    }
+                }
+            }
+            break; // We found propagated prototypes, exit now to avoid propagating selection to prototypes of other parents 
+        }
+
+        return primSelections;
     }
 
     const Ufe::Path& GetSceneIndexAppPath() const { return _sceneIndexAppPath; }
