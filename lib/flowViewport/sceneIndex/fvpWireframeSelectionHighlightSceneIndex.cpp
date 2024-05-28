@@ -804,9 +804,9 @@ WireframeSelectionHighlightSceneIndex::_RemoveSelectionHighlightMirrorsForInstan
     }
     for (const auto& selectionHighlightMirror : oldSelectionHighlightMirrors) {
         TF_AXIOM(_selectionHighlightMirrorUseCounters.find(selectionHighlightMirror) != _selectionHighlightMirrorUseCounters.end());
-        TF_AXIOM(_selectionHighlightMirrorUseCounters[selectionHighlightMirror] > 0);
+        TF_AXIOM(_selectionHighlightMirrorUseCounters.at(selectionHighlightMirror) > 0);
         _selectionHighlightMirrorUseCounters[selectionHighlightMirror]--;
-        if (_selectionHighlightMirrorUseCounters[selectionHighlightMirror] == 0) {
+        if (_selectionHighlightMirrorUseCounters.at(selectionHighlightMirror) == 0) {
             _selectionHighlightMirrorUseCounters.erase(selectionHighlightMirror);
             removedPrims.push_back(selectionHighlightMirror);
         }
@@ -838,7 +838,7 @@ WireframeSelectionHighlightSceneIndex::_CreateSelectionHighlightMirrorsForInstan
             _selectionHighlightMirrorUseCounters[selectionHighlightMirror] = 1;
         } else {
             TF_AXIOM(_selectionHighlightMirrorUseCounters.find(selectionHighlightMirror) != _selectionHighlightMirrorUseCounters.end());
-            TF_AXIOM(_selectionHighlightMirrorUseCounters[selectionHighlightMirror] > 0);
+            TF_AXIOM(_selectionHighlightMirrorUseCounters.at(selectionHighlightMirror) > 0);
             _selectionHighlightMirrorUseCounters[selectionHighlightMirror]++;
         }
     }
