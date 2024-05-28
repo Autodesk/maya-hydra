@@ -609,42 +609,42 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         return GetInputSceneIndex()->GetPrim(primPath);
     }
     
-    SdfPath shMirrorAncestor = _FindSelectionHighlightMirrorAncestor(primPath);
-    if (!shMirrorAncestor.IsEmpty()) {
-        SdfPath originalPrimPath = primPath.ReplacePrefix(shMirrorAncestor, _GetOriginalPathFromSelectionHighlightMirror(shMirrorAncestor));
-        HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPrimPath);
-        if (prim.dataSource) {
-            prim.dataSource = _SelectionHighlightRepathingContainerDataSource::New(prim.dataSource, this);
+    // Is this prim part of a selection highlight mirror hierarchy?
+    // If so, then we are dealing with a point instancer or instance selection.
+    SdfPath shMirrorAncestorPath = _FindSelectionHighlightMirrorAncestor(primPath);
+    if (!shMirrorAncestorPath.IsEmpty()) {
+        SdfPath originalPrimPath = primPath.ReplacePrefix(shMirrorAncestorPath, _GetOriginalPathFromSelectionHighlightMirror(shMirrorAncestorPath));
+        HdSceneIndexPrim shPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
+        if (shPrim.dataSource) {
+            shPrim.dataSource = _SelectionHighlightRepathingContainerDataSource::New(shPrim.dataSource, this);
         }
-        if (prim.primType == HdPrimTypeTokens->mesh) {
-            prim.dataSource = _HighlightSelectedPrim(prim.dataSource, originalPrimPath, sRefinedWireDisplayStyleDataSource);
+        if (shPrim.primType == HdPrimTypeTokens->mesh) {
+            shPrim.dataSource = _HighlightSelectedPrim(shPrim.dataSource, originalPrimPath, sRefinedWireDisplayStyleDataSource);
         }
-        if (prim.primType == HdPrimTypeTokens->instancer) {
-            prim.dataSource = _GetSelectionHighlightInstancerDataSource(prim.dataSource);
+        if (shPrim.primType == HdPrimTypeTokens->instancer) {
+            shPrim.dataSource = _GetSelectionHighlightInstancerDataSource(shPrim.dataSource);
         }
-        return prim;
+        return shPrim;
     }
     
+    // We may be dealing with a prototype selection, a regular selection, or no selection at all.
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-
     if (prim.primType == HdPrimTypeTokens->mesh) {
         // Note : in the USD data model, the original prims that get propagated as prototypes have their original prim types erased.
         // Only the resulting propagated prototypes keep the original prim type. Presumably this is to avoid drawing the original
         // prim (even though it should already not be drawn due to being under an instancer, this is an additional safety? to confirm)
         if (_IsPrototype(primPath)) {
-            if (_selection->IsFullySelected(primPath)) {
-                prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
-            }
-            else if (_highlightedProtoPaths.find(primPath) != _highlightedProtoPaths.end()) {
+            // Prototype selection
+            if (_selection->IsFullySelected(primPath) || _highlightedProtoPaths.find(primPath) != _highlightedProtoPaths.end()) {
                 prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
             }
         } else {
+            // Regular selection
             if (_selection->HasFullySelectedAncestorInclusive(primPath)) {
                 prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
             }
         }
     }
-
     return prim;
 }
 
