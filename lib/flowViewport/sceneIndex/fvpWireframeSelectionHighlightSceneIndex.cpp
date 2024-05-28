@@ -88,16 +88,16 @@ const HdDataSourceLocator reprSelectorLocator(
 const HdDataSourceLocator primvarsOverrideWireframeColorLocator(
         HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor));
 
-const std::string shMirrorTag = "_SHMirror";
+const std::string selectionHighlightMirrorTag = "_SelectionHighlight";
 
 SdfPath _GetSelectionHighlightMirrorPathFromOriginal(const SdfPath& originalPath)
 {
-    return originalPath.GetParentPath().AppendElementString(originalPath.GetElementString() + shMirrorTag);
+    return originalPath.GetParentPath().AppendElementString(originalPath.GetElementString() + selectionHighlightMirrorTag);
 }
 
 SdfPath _GetOriginalPathFromSelectionHighlightMirror(const SdfPath& mirrorPath)
 {
-    return mirrorPath.GetParentPath().AppendElementString(mirrorPath.GetElementString().substr(0, mirrorPath.GetElementString().size() - shMirrorTag.size()));
+    return mirrorPath.GetParentPath().AppendElementString(mirrorPath.GetElementString().substr(0, mirrorPath.GetElementString().size() - selectionHighlightMirrorTag.size()));
 }
 
 VtBoolArray _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionsSchema& selections) 
@@ -105,6 +105,7 @@ VtBoolArray _GetSelectionHighlightMask(const HdInstancerTopologySchema& original
     if (!selections.IsDefined()) {
         return originalInstancerTopology.GetMask()->GetTypedValue(0);
     }
+
     size_t nbInstances = 0;
     auto instanceIndices = originalInstancerTopology.GetInstanceIndices();
     for (size_t iInstanceIndex = 0; iInstanceIndex < instanceIndices.GetNumElements(); iInstanceIndex++) {
@@ -146,7 +147,7 @@ HdContainerDataSourceHandle _GetSelectionHighlightInstancerDataSource(const HdCo
     HdContainerDataSourceEditor editedDataSource = HdContainerDataSourceEditor(originalDataSource);
 
     if (selections.IsDefined()) {
-        HdDataSourceLocator maskLocator(TfToken("instancerTopology"), TfToken("mask"));
+        HdDataSourceLocator maskLocator = HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask);
         VtBoolArray selectionHighlightMask = _GetSelectionHighlightMask(instancerTopology, selections);
         auto selectionHighlightMaskDataSource = HdRetainedTypedSampledDataSource<VtBoolArray>::New(selectionHighlightMask);
         editedDataSource.Set(maskLocator, selectionHighlightMaskDataSource);
@@ -155,15 +156,6 @@ HdContainerDataSourceHandle _GetSelectionHighlightInstancerDataSource(const HdCo
     editedDataSource.Set(HdSelectionsSchema::GetDefaultLocator(), HdBlockDataSource::New());
 
     return editedDataSource.Finish();
-}
-
-bool _IsInstancerWithSelections(const HdSceneIndexPrim& prim)
-{
-    if (prim.primType != HdPrimTypeTokens->instancer) {
-        return false;
-    }
-    auto selections = HdSelectionsSchema::GetFromParent(prim.dataSource);
-    return selections.IsDefined() && selections.GetNumElements() > 0;
 }
 
 SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim)
@@ -195,6 +187,15 @@ SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim)
     return instancingRelatedPaths;
 }
 
+bool _IsInstancerWithSelections(const HdSceneIndexPrim& prim)
+{
+    if (prim.primType != HdPrimTypeTokens->instancer) {
+        return false;
+    }
+    auto selections = HdSelectionsSchema::GetFromParent(prim.dataSource);
+    return selections.IsDefined() && selections.GetNumElements() > 0;
+}
+
 bool _IsInstancingRoot(const HdSceneIndexPrim& prim, const SdfPath& primPath)
 {
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
@@ -213,16 +214,16 @@ bool _IsInstancingRoot(const HdSceneIndexPrim& prim, const SdfPath& primPath)
     return false;
 }
 
-bool _IsPropagatedPrototype(const HdSceneIndexPrim& prim)
-{
-    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() && !instancedBy.GetPrototypeRoots()->GetTypedValue(0).empty();
-}
-
 bool _IsPrototype(const HdSceneIndexPrim& prim)
 {
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
     return instancedBy.IsDefined();
+}
+
+bool _IsPropagatedPrototype(const HdSceneIndexPrim& prim)
+{
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() && !instancedBy.GetPrototypeRoots()->GetTypedValue(0).empty();
 }
 
 class _SelectionHighlightRepathingPathDataSource : public HdPathDataSource
