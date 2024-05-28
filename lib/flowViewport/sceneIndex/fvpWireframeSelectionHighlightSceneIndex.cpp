@@ -92,12 +92,13 @@ const std::string selectionHighlightMirrorTag = "_SelectionHighlight";
 
 SdfPath _GetSelectionHighlightMirrorPathFromOriginal(const SdfPath& originalPath)
 {
-    return originalPath.GetParentPath().AppendElementString(originalPath.GetElementString() + selectionHighlightMirrorTag);
+    return originalPath.ReplaceName(TfToken(originalPath.GetName() + selectionHighlightMirrorTag));
 }
 
 SdfPath _GetOriginalPathFromSelectionHighlightMirror(const SdfPath& mirrorPath)
 {
-    return mirrorPath.GetParentPath().AppendElementString(mirrorPath.GetElementString().substr(0, mirrorPath.GetElementString().size() - selectionHighlightMirrorTag.size()));
+    const std::string primName = mirrorPath.GetName();
+    return mirrorPath.ReplaceName(TfToken(primName.substr(0, primName.size() - selectionHighlightMirrorTag.size())));
 }
 
 VtBoolArray _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionsSchema& selections) 
@@ -118,13 +119,15 @@ VtBoolArray _GetSelectionHighlightMask(const HdInstancerTopologySchema& original
 
     for (size_t iSelection = 0; iSelection < selections.GetNumElements(); iSelection++) {
         HdSelectionSchema selection = selections.GetElement(iSelection);
-        // See something.cpp for comment mentioning that currently only fully selected is supported.
+        // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
+        // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
+        // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
         if (!selection.GetFullySelected() || !selection.GetFullySelected()->GetTypedValue(0)) {
             continue;
         }
         if (!selection.GetNestedInstanceIndices()) {
             // We have a selection that has no instances, which means the whole instancer is selected :
-            // this overrides any individual instance selection.
+            // this overrides any instances selection.
             return originalInstancerTopology.GetMask()->GetTypedValue(0);
         }
         HdInstanceIndicesVectorSchema nestedInstanceIndices = selection.GetNestedInstanceIndices();
@@ -220,12 +223,8 @@ bool _IsPrototype(const HdSceneIndexPrim& prim)
     return instancedBy.IsDefined();
 }
 
-bool _IsPropagatedPrototype(const HdSceneIndexPrim& prim)
-{
-    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() && !instancedBy.GetPrototypeRoots()->GetTypedValue(0).empty();
-}
-
+// Similar to USD's _RerootingSceneIndexPathDataSource :
+// https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/usdImaging/usdImaging/rerootingSceneIndex.cpp#L35
 class _SelectionHighlightRepathingPathDataSource : public HdPathDataSource
 {
 public:
@@ -271,6 +270,8 @@ private:
     Fvp::WireframeSelectionHighlightSceneIndex const * const _inputSceneIndex;
 };
 
+// Similar to USD's _RerootingSceneIndexPathArrayDataSource :
+// https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/usdImaging/usdImaging/rerootingSceneIndex.cpp#L86
 class _SelectionHighlightRepathingPathArrayDataSource : public HdPathArrayDataSource
 {
 public:
@@ -320,6 +321,8 @@ private:
     Fvp::WireframeSelectionHighlightSceneIndex const * const _inputSceneIndex;
 };
 
+// Similar to USD's _RerootingSceneIndexContainerDataSource :
+// https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/usdImaging/usdImaging/rerootingSceneIndex.cpp#L172
 class _SelectionHighlightRepathingContainerDataSource : public HdContainerDataSource
 {
 public:
