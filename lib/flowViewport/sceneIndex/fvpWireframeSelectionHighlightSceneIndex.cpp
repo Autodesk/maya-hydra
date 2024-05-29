@@ -559,61 +559,55 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
     TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
         .Msg("WireframeSelectionHighlightSceneIndex::_PrimsDirtied() called.\n");
 
-    HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
+    SdfPathVector selectedInstancers;
+    SdfPathVector deselectedInstancers;
     for (const auto& entry : entries) {
-        // If the dirtied prim is excluded, don't provide selection
-        // highlighting for it.
-        if (! _IsExcluded(entry.primPath) && 
-            entry.dirtyLocators.Contains(
-                HdSelectionsSchema::GetDefaultLocator())) {
+        if (_IsExcluded(entry.primPath)) {
+            // If the dirtied prim is excluded, don't provide selection
+            // highlighting for it.
+            continue;
+        }
+
+        if (entry.dirtyLocators.Contains(HdSelectionsSchema::GetDefaultLocator())) {
             TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
                 .Msg("    %s selections locator dirty.\n", entry.primPath.GetText());
+            
+            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+            
             // All mesh prims recursively under the selection dirty prim have a
             // dirty wireframe selection highlight.
-            _DirtySelectionHighlightRecursive(entry.primPath, &highlightEntries);
-        }
-    }
+            _DirtySelectionHighlightRecursive(entry.primPath, &dirtiedPrims);
 
-    HdSceneIndexObserver::DirtiedPrimEntries dirtiedSelectionHighlightPrims;
-    for (const auto& entry : entries) {
-        auto selectionHighlightPath = GetSelectionHighlightPath(entry.primPath);
-        if (selectionHighlightPath != entry.primPath) {
-            dirtiedSelectionHighlightPrims.emplace_back(selectionHighlightPath, entry.dirtyLocators);
-        }
-    }
-    if (!dirtiedSelectionHighlightPrims.empty()) {
-        _SendPrimsDirtied(dirtiedSelectionHighlightPrims);
-    }
-
-    HdSceneIndexObserver::AddedPrimEntries newSelectionHighlightPrims;
-    HdSceneIndexObserver::RemovedPrimEntries removedSelectionHighlightPrims;
-    for (const auto& entry : entries) {
-        if (entry.dirtyLocators.Contains(HdSelectionsSchema::GetDefaultLocator())) {
-            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
-            if (_IsInstancerWithSelections(prim)) {
-                _CreateSelectionHighlightMirrorsForInstancer(entry.primPath);
-            } else if (prim.primType == HdPrimTypeTokens->instancer) {
-                _RemoveSelectionHighlightMirrorsForInstancer(entry.primPath);
+            auto selectionHighlightPath = GetSelectionHighlightPath(entry.primPath);
+            if (selectionHighlightPath != entry.primPath) {
+                dirtiedPrims.emplace_back(selectionHighlightPath, entry.dirtyLocators);
+                _DirtySelectionHighlightRecursive(entry.primPath, &dirtiedPrims);
             }
-            // TODO : Forward dirtiness to SH mirrors masks
+
+            if (_IsInstancerWithSelections(prim)) {
+                selectedInstancers.push_back(entry.primPath);
+            } else if (prim.primType == HdPrimTypeTokens->instancer) {
+                deselectedInstancers.push_back(entry.primPath);
+            }
         }
     }
-    if (!newSelectionHighlightPrims.empty())
-        _SendPrimsAdded(newSelectionHighlightPrims);
-    if (!removedSelectionHighlightPrims.empty()) {
-        _SendPrimsRemoved(removedSelectionHighlightPrims);
-    }
 
-
-    if (!highlightEntries.empty()) {
+    if (!dirtiedPrims.empty()) {
         // Append all incoming dirty entries.
-        highlightEntries.reserve(highlightEntries.size()+entries.size());
-        highlightEntries.insert(
-            highlightEntries.end(), entries.begin(), entries.end());
-        _SendPrimsDirtied(highlightEntries);
+        dirtiedPrims.reserve(dirtiedPrims.size() + entries.size());
+        dirtiedPrims.insert(dirtiedPrims.end(), entries.begin(), entries.end());
+        _SendPrimsDirtied(dirtiedPrims);
     }
     else {
         _SendPrimsDirtied(entries);
+    }
+
+    for (const auto& selectedInstancer : selectedInstancers) {
+        _CreateSelectionHighlightMirrorsForInstancer(selectedInstancer);
+    }
+    for (const auto& deselectedInstancer : deselectedInstancers) {
+        _RemoveSelectionHighlightMirrorsForInstancer(deselectedInstancer);
     }
 }
 
