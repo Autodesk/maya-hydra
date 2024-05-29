@@ -77,6 +77,9 @@ public:
     bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath, const PXR_NS::SdfPath& topmostAncestor = PXR_NS::SdfPath::AbsoluteRootPath()) const;
 
     FVP_API
+    PXR_NS::SdfPathVector FindFullySelectedAncestorsInclusive(const PXR_NS::SdfPath& primPath, const PXR_NS::SdfPath& topmostAncestor = PXR_NS::SdfPath::AbsoluteRootPath()) const;
+
+    FVP_API
     PXR_NS::SdfPathVector GetFullySelectedPaths() const;
 
     // Return the vector data source of the argument prim if selected, else

@@ -141,6 +141,20 @@ bool Selection::HasFullySelectedAncestorInclusive(const SdfPath& primPath, const
     return false;
 }
 
+SdfPathVector Selection::FindFullySelectedAncestorsInclusive(const SdfPath& primPath, const SdfPath& topmostAncestor/* = SdfPath::AbsoluteRootPath()*/) const
+{
+    // FLOW_VIEWPORT_TODO  Prefix tree would be much higher performance
+    // than iterating over the whole selection, especially for a large
+    // selection.  PPT, 13-Sep-2023.
+    SdfPathVector fullySelectedAncestors;
+    for(const auto& entry : _pathToState) {
+        if (primPath.HasPrefix(entry.first) && entry.first.HasPrefix(topmostAncestor)) {
+            fullySelectedAncestors.push_back(entry.first);
+        }
+    }
+    return fullySelectedAncestors;
+}
+
 SdfPathVector Selection::GetFullySelectedPaths() const
 {
     SdfPathVector fullySelectedPaths;

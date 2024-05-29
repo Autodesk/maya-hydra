@@ -118,11 +118,18 @@ private:
     void _CollectSelectionHighlightMirrors(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outSelectionHighlightMirrors, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outAddedPrims);
     void _RemoveSelectionHighlightMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath);
     void _CreateSelectionHighlightMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath);
+    void _UpdateSelectionHighlightMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath);
+    PXR_NS::HdSceneIndexObserver::RemovedPrimEntries _DecrementSelectionHighlightMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath);
+    void _IncrementSelectionHighlightMirrorsForInstancer(const PXR_NS::SdfPath& instancerPath);
+    void _RemoveSelectionHighlightMirrorsUsageForInstancer(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
+    void _DeleteSelectionHighlightMirrorsUsageForInstancer(const PXR_NS::SdfPath& instancerPath);
+    void _AddSelectionHighlightMirrorsUsageForInstancer(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
 
     const SelectionConstPtr   _selection;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 
     std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _selectionHighlightMirrorsByInstancer;
+    std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _instancerHighlightUsers;
     std::unordered_map<PXR_NS::SdfPath, size_t, PXR_NS::SdfPath::Hash> _selectionHighlightMirrorUseCounters;
 };
 
