@@ -612,6 +612,11 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             continue;
         }
 
+        auto selectionHighlightPath = GetSelectionHighlightPath(entry.primPath);
+        if (selectionHighlightPath != entry.primPath) {
+            dirtiedPrims.emplace_back(selectionHighlightPath, entry.dirtyLocators);
+        }
+
         if (entry.dirtyLocators.Contains(HdSelectionsSchema::GetDefaultLocator())) {
             TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
                 .Msg("    %s selections locator dirty.\n", entry.primPath.GetText());
@@ -621,10 +626,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             // All mesh prims recursively under the selection dirty prim have a
             // dirty wireframe selection highlight.
             _DirtySelectionHighlightRecursive(entry.primPath, &dirtiedPrims);
-
-            auto selectionHighlightPath = GetSelectionHighlightPath(entry.primPath);
             if (selectionHighlightPath != entry.primPath) {
-                dirtiedPrims.emplace_back(selectionHighlightPath, entry.dirtyLocators);
                 _DirtySelectionHighlightRecursive(entry.primPath, &dirtiedPrims);
             }
 
