@@ -128,13 +128,13 @@ bool Selection::IsFullySelected(const SdfPath& primPath) const
     return _pathToState.find(primPath) != _pathToState.end();
 }
 
-bool Selection::HasFullySelectedAncestorInclusive(const SdfPath& primPath) const
+bool Selection::HasFullySelectedAncestorInclusive(const SdfPath& primPath, const SdfPath& topmostAncestor/* = SdfPath::AbsoluteRootPath()*/) const
 {
     // FLOW_VIEWPORT_TODO  Prefix tree would be much higher performance
     // than iterating over the whole selection, especially for a large
     // selection.  PPT, 13-Sep-2023.
     for(const auto& entry : _pathToState) {
-        if (primPath.HasPrefix(entry.first)) {
+        if (primPath.HasPrefix(entry.first) && entry.first.HasPrefix(topmostAncestor)) {
             return true;
         }
     }

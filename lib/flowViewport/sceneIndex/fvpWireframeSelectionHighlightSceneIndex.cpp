@@ -456,8 +456,20 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         // prim (even though it should already not be drawn due to being under an instancer, this is an additional safety? to confirm)
         if (_IsPrototype(prim)) {
             // Prototype selection
-            if (_selection->IsFullySelected(primPath)) {
-                prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
+            HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+            if (instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() && !instancedBy.GetPrototypeRoots()->GetTypedValue(0).empty()) {
+                auto protoRoots = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
+                for (const auto& protoRoot : protoRoots) {
+                    if (_selection->HasFullySelectedAncestorInclusive(primPath, protoRoot)) {
+                        prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
+                        break;
+                    }
+                }
+            }
+            else {
+                if (_selection->HasFullySelectedAncestorInclusive(primPath)) {
+                    prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
+                }
             }
         } else {
             // Regular selection

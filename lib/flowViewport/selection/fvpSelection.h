@@ -71,9 +71,10 @@ public:
     bool IsFullySelected(const PXR_NS::SdfPath& primPath) const;
 
     // Returns true if the argument is itself selected, or any of its ancestors
-    // is selected.
+    // is selected, up to the specified topmost ancestor. By default, the topmost
+    // ancestor is set to the absolute root path, so that all ancestors are considered.
     FVP_API
-    bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath) const;
+    bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath, const PXR_NS::SdfPath& topmostAncestor = PXR_NS::SdfPath::AbsoluteRootPath()) const;
 
     FVP_API
     PXR_NS::SdfPathVector GetFullySelectedPaths() const;
