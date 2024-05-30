@@ -412,16 +412,7 @@ WireframeSelectionHighlightSceneIndex(
 
         HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
         if (currPrim.primType == HdPrimTypeTokens->instancer) {
-            auto roots = _GetPrototypeRoots(currPrim);
-            if (roots.empty()) {
-                roots.push_back(SdfPath::AbsoluteRootPath());
-            }
-            for (const auto& root : roots) {
-                auto selectedAncestors = _selection->FindFullySelectedAncestorsInclusive(currPath, root);
-                for (const auto& selectedAncestor : selectedAncestors) {
-                    _AddInstancerHighlightUser(currPath, selectedAncestor);
-                }
-            }
+            _CreateInstancerHighlightsForInstancer(currPrim, currPath);
         }
         else {
             for (const auto& childPath : inputSceneIndex->GetChildPrimPaths(currPath)) {
@@ -571,16 +562,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsAdded(
     for (const auto& entry : entries) {
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
         if (prim.primType == HdPrimTypeTokens->instancer) {
-            auto roots = _GetPrototypeRoots(prim);
-            if (roots.empty()) {
-                roots.push_back(SdfPath::AbsoluteRootPath());
-            }
-            for (const auto& root : roots) {
-                auto selectedAncestors = _selection->FindFullySelectedAncestorsInclusive(entry.primPath, root);
-                for (const auto& selectedAncestor : selectedAncestors) {
-                    _AddInstancerHighlightUser(entry.primPath, selectedAncestor);
-                }
-            }
+            _CreateInstancerHighlightsForInstancer(prim, entry.primPath);
         }
     }
 }
@@ -876,6 +858,21 @@ WireframeSelectionHighlightSceneIndex::_DeleteInstancerHighlight(const PXR_NS::S
     auto instancerHighlightUsers = _instancerHighlightUsers[instancerPath];
     for (const auto& instancerHighlightUser : instancerHighlightUsers) {
         _RemoveInstancerHighlightUser(instancerPath, instancerHighlightUser);
+    }
+}
+
+void
+WireframeSelectionHighlightSceneIndex::_CreateInstancerHighlightsForInstancer(const HdSceneIndexPrim& instancerPrim, const SdfPath& instancerPath)
+{
+    auto roots = _GetPrototypeRoots(instancerPrim);
+    if (roots.empty()) {
+        roots.push_back(SdfPath::AbsoluteRootPath());
+    }
+    for (const auto& root : roots) {
+        auto selectedAncestors = _selection->FindFullySelectedAncestorsInclusive(instancerPath, root);
+        for (const auto& selectedAncestor : selectedAncestors) {
+            _AddInstancerHighlightUser(instancerPath, selectedAncestor);
+        }
     }
 }
 
