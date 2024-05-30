@@ -613,12 +613,16 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
                 .Msg("    %s selections locator dirty.\n", entry.primPath.GetText());
             
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+
+            if (prim.primType == HdPrimTypeTokens->instancer) {
+                dirtiedPrims.emplace_back(selectionHighlightPath, HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask));
+            }
             
             // All mesh prims recursively under the selection dirty prim have a
             // dirty wireframe selection highlight.
             _DirtySelectionHighlightRecursive(entry.primPath, &dirtiedPrims);
             if (selectionHighlightPath != entry.primPath) {
-                _DirtySelectionHighlightRecursive(entry.primPath, &dirtiedPrims);
+                _DirtySelectionHighlightRecursive(selectionHighlightPath, &dirtiedPrims);
             }
 
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
