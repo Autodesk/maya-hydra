@@ -59,6 +59,8 @@
 
 namespace {
 
+const std::string digits = "0123456789";
+
 // Pixar macros won't work without PXR_NS.
 PXR_NAMESPACE_USING_DIRECTIVE
 using namespace Ufe;
@@ -131,13 +133,14 @@ public:
         TF_AXIOM(appPath.nbSegments() == 2);
         const auto& secondSegment = appPath.getSegments()[1];
         for (const auto& pathComponent : secondSegment) {
-            if (pathComponent.string().find_first_not_of("0123456789") == std::string::npos) {
+            // This should only be able to occur on the last component
+            if (pathComponent.string().find_first_not_of(digits) == std::string::npos) {
                 continue;
             }
             primPath = primPath.AppendChild(TfToken(pathComponent.string()));
         }
         const auto lastComponentString = secondSegment.components().back().string();
-        bool lastComponentIsNumeric = lastComponentString.find_first_not_of("0123456789") == std::string::npos;
+        bool lastComponentIsNumeric = lastComponentString.find_first_not_of(digits) == std::string::npos;
         HdDataSourceBaseHandle selectionDataSource;
         if (lastComponentIsNumeric) {
             HdInstanceIndicesSchema::Builder instanceIndicesBuilder;

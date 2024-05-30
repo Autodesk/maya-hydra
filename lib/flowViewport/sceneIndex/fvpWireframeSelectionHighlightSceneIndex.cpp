@@ -411,6 +411,11 @@ WireframeSelectionHighlightSceneIndex(
         pathsToTraverse.pop();
 
         HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
+
+        // We only want to create highlights for "top-level" instancers (i.e. instancers that are not children
+        // of another instancer), as these are the ones that are drawn. Nested instancers will be drawn
+        // through another top-level instancer. Thus, we do not process child prims once we hit an instancer,
+        // so that only top-level ones are considered.
         if (currPrim.primType == HdPrimTypeTokens->instancer) {
             _CreateInstancerHighlightsForInstancer(currPrim, currPath);
         }
@@ -439,44 +444,36 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         SdfPath originalPrimPath = primPath.ReplacePrefix(selectionHighlightMirrorAncestor, _GetOriginalPathFromSelectionHighlightMirror(selectionHighlightMirrorAncestor));
         HdSceneIndexPrim selectionHighlightPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
         if (selectionHighlightPrim.dataSource) {
+            // Repath the data sources to the selection highlight mirror hierarchy
             selectionHighlightPrim.dataSource = _SelectionHighlightRepathingContainerDataSource::New(selectionHighlightPrim.dataSource, this);
-        }
-        if (selectionHighlightPrim.primType == HdPrimTypeTokens->mesh) {
-            selectionHighlightPrim.dataSource = _HighlightSelectedPrim(selectionHighlightPrim.dataSource, originalPrimPath, sRefinedWireDisplayStyleDataSource);
-        }
-        if (selectionHighlightPrim.primType == HdPrimTypeTokens->instancer) {
-            selectionHighlightPrim.dataSource = _GetSelectionHighlightInstancerDataSource(selectionHighlightPrim.dataSource);
+
+            // Use prim type-specific data source overrides
+            if (selectionHighlightPrim.primType == HdPrimTypeTokens->instancer) {
+                selectionHighlightPrim.dataSource = _GetSelectionHighlightInstancerDataSource(selectionHighlightPrim.dataSource);
+            }
+            else if (selectionHighlightPrim.primType == HdPrimTypeTokens->mesh) {
+                selectionHighlightPrim.dataSource = _HighlightSelectedPrim(selectionHighlightPrim.dataSource, originalPrimPath, sRefinedWireDisplayStyleDataSource);
+            }
         }
         return selectionHighlightPrim;
     }
     
-    // We may be dealing with a prototype selection, a regular selection, or no selection at all.
+    // We are dealing with a prototype selection, a regular selection, or no selection at all.
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     if (prim.primType == HdPrimTypeTokens->mesh) {
         // Note : in the USD data model, the original prims that get propagated as prototypes have their original prim types erased.
-        // Only the resulting propagated prototypes keep the original prim type. Presumably this is to avoid drawing the original
-        // prim (even though it should already not be drawn due to being under an instancer, this is an additional safety? to confirm)
-        if (_IsPrototype(prim)) {
-            // Prototype selection
-            HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-            if (instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() && !instancedBy.GetPrototypeRoots()->GetTypedValue(0).empty()) {
-                auto protoRoots = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
-                for (const auto& protoRoot : protoRoots) {
-                    if (_selection->HasFullySelectedAncestorInclusive(primPath, protoRoot)) {
-                        prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
-                        break;
-                    }
-                }
-            }
-            else {
-                if (_selection->HasFullySelectedAncestorInclusive(primPath)) {
-                    prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
-                }
-            }
-        } else {
-            // Regular selection
-            if (_selection->HasFullySelectedAncestorInclusive(primPath)) {
+        // Only the resulting propagated prototypes keep the original prim type.
+
+        // We want to constrain the selected ancestor lookup to the propagated prototype only, if it is one.
+        auto roots = _GetPrototypeRoots(prim);
+        // If it is not a propagated prototype, consider the whole hierarchy.
+        if (roots.empty()) {
+            roots.push_back(SdfPath::AbsoluteRootPath());
+        }
+        for (const auto& root : roots) {
+            if (_selection->HasFullySelectedAncestorInclusive(primPath, root)) {
                 prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
+                break;
             }
         }
     }
@@ -574,6 +571,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
     std::vector<std::pair<SdfPath, SdfPath>> selectedInstancerHighlightUsages;
     std::vector<std::pair<SdfPath, SdfPath>> deselectedInstancerHighlightUsages;
+
     for (const auto& entry : entries) {
         if (_IsExcluded(entry.primPath)) {
             // If the dirtied prim is excluded, don't provide selection
@@ -581,6 +579,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             continue;
         }
 
+        // Propagate dirtiness to selection highlight prim
         auto selectionHighlightPath = GetSelectionHighlightPath(entry.primPath);
         if (selectionHighlightPath != entry.primPath) {
             dirtiedPrims.emplace_back(selectionHighlightPath, entry.dirtyLocators);
@@ -592,6 +591,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
 
+            // Selection was changed on an instancer, so dirty its selection highlight mirror's instancerTopology mask.
             if (prim.primType == HdPrimTypeTokens->instancer) {
                 dirtiedPrims.emplace_back(selectionHighlightPath, HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask));
             }
@@ -606,13 +606,23 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
             bool isSelected = selectionsSchema.IsDefined() && selectionsSchema.GetNumElements() > 0;
 
+            // Update child instancer highlights for ancestor-based selection highlighting
             std::stack<SdfPath> pathsToTraverse({entry.primPath});
             while (!pathsToTraverse.empty()) {
                 SdfPath currPath = pathsToTraverse.top();
                 pathsToTraverse.pop();
 
                 HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
+
+                // Skip processing of prototypes nested under the prim's hierarchy, as we consider prototype hierarchies to be separate.
+                if (_IsPrototype(currPrim) && _IsInstancingRoot(currPrim, currPath) && currPath != entry.primPath) {
+                    continue;
+                }
                 
+                // We only want to consider highlights for "top-level" instancers (i.e. instancers that are not children
+                // of another instancer), as these are the ones that are drawn. Nested instancers will be drawn
+                // through another top-level instancer. Thus, we do not process child prims once we hit an instancer,
+                // so that only top-level ones are considered.
                 if (currPrim.primType == HdPrimTypeTokens->instancer) {
                     if (isSelected) {
                         selectedInstancerHighlightUsages.push_back({currPath,entry.primPath});
@@ -620,7 +630,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
                         deselectedInstancerHighlightUsages.push_back({currPath,entry.primPath});
                     }
                 }
-                else if (!_IsPrototype(currPrim)) {
+                else {
                     for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(currPath)) {
                         pathsToTraverse.push(childPath);
                     }
@@ -736,6 +746,10 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const P
     TF_AXIOM(_FindSelectionHighlightMirrorAncestor(originalPrimPath).IsEmpty());
 
     HdSceneIndexPrim originalPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
+
+    // If this is a prototype sub-prim, redirect the call to the prototype root, so that the prototype root
+    // becomes the actual selection highlight mirror. The instancing-related paths of the instancer will be
+    // processed as part of the children traversal later down this method.
     if (!_IsInstancingRoot(originalPrim, originalPrimPath)) {
         HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(originalPrim.dataSource);
         auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
@@ -752,6 +766,8 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const P
     }
     outSelectionHighlightMirrors.insert(selectionHighlightPrimPath);
 
+    // Traverse the children of this prim to find the child instancers, and add its instancing-related
+    // paths so we can process them and create selection highlight mirrors for them as well.
     SdfPathVector affectedOriginalPrimPaths;
     std::stack<SdfPath> pathsToTraverse({originalPrimPath});
     while (!pathsToTraverse.empty()) {
@@ -769,13 +785,18 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const P
 
         outAddedPrims.push_back({currPath.ReplacePrefix(originalPrimPath, selectionHighlightPrimPath), currPrim.primType});
 
+        // We only want to create highlights for "top-level" instancers (i.e. instancers that are not children
+        // of another instancer), as these are the ones that are drawn. Nested instancers will be drawn
+        // through another top-level instancer. Thus, we do not process child prims once we hit an instancer,
+        // so that only top-level ones are considered.
         if (currPrim.primType == HdPrimTypeTokens->instancer) {
             SdfPathVector instancingRelatedPaths = _GetInstancingRelatedPaths(currPrim);
             affectedOriginalPrimPaths.insert(affectedOriginalPrimPaths.end(), instancingRelatedPaths.begin(), instancingRelatedPaths.end());
         }
-
-        for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(currPath)) {
-            pathsToTraverse.push(childPath);
+        else {
+            for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(currPath)) {
+                pathsToTraverse.push(childPath);
+            }
         }
     }
 
@@ -861,10 +882,12 @@ void
 WireframeSelectionHighlightSceneIndex::_CreateInstancerHighlightsForInstancer(const HdSceneIndexPrim& instancerPrim, const SdfPath& instancerPath)
 {
     auto roots = _GetPrototypeRoots(instancerPrim);
+    // If there are no prototype roots, consider the whole hierarchy
     if (roots.empty()) {
         roots.push_back(SdfPath::AbsoluteRootPath());
     }
     for (const auto& root : roots) {
+        // Ancestors include the instancer itself
         auto selectedAncestors = _selection->FindFullySelectedAncestorsInclusive(instancerPath, root);
         for (const auto& selectedAncestor : selectedAncestors) {
             _AddInstancerHighlightUser(instancerPath, selectedAncestor);
