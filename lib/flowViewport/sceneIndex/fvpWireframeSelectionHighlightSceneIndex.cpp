@@ -850,12 +850,14 @@ WireframeSelectionHighlightSceneIndex::_RemoveInstancerHighlightUser(const PXR_N
         TF_AXIOM(_selectionHighlightMirrorUseCounters[selectionHighlightMirror] > 0);
         _selectionHighlightMirrorUseCounters[selectionHighlightMirror]--;
         if (_selectionHighlightMirrorUseCounters[selectionHighlightMirror] == 0) {
+            _selectionHighlightMirrorUseCounters.erase(selectionHighlightMirror);
             removedPrims.push_back(selectionHighlightMirror);
         }
     }
 
     _instancerHighlightUsers[instancerPath].erase(userPath);
     if (_instancerHighlightUsers[instancerPath].empty()) {
+        _instancerHighlightUsers.erase(instancerPath);
         _selectionHighlightMirrorsByInstancer.erase(instancerPath);
     }
     
