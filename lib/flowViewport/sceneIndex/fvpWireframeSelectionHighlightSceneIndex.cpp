@@ -606,7 +606,9 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
                 }
                 return true;
             };
-            _ForEachPrimInHierarchy(entry.primPath, operation);
+            if (!_IsPrototype(prim)) {
+                _ForEachPrimInHierarchy(entry.primPath, operation);
+            }
         }
     }
 
@@ -714,7 +716,7 @@ WireframeSelectionHighlightSceneIndex::_ForEachPrimInHierarchy(
         if (_IsPrototype(currPrim) && _IsInstancingRoot(currPrim, currPath) && currPath != hierarchyRoot) {
             continue;
         }
-        
+
         if (operation(currPath, currPrim)) {
             for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(currPath)) {
                 pathsToTraverse.push(childPath);
@@ -816,7 +818,6 @@ WireframeSelectionHighlightSceneIndex::_AddInstancerHighlightUser(const PXR_NS::
 void
 WireframeSelectionHighlightSceneIndex::_RemoveInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const SdfPath& userPath)
 {
-    TF_AXIOM(GetInputSceneIndex()->GetPrim(instancerPath).primType == HdPrimTypeTokens->instancer);
     TF_AXIOM(_instancerHighlightUsers.find(instancerPath) != _instancerHighlightUsers.end());
     TF_AXIOM(_instancerHighlightUsers.at(instancerPath).find(userPath) != _instancerHighlightUsers.at(instancerPath).end());
     TF_AXIOM(_selectionHighlightMirrorsByInstancer.find(instancerPath) != _selectionHighlightMirrorsByInstancer.end());
@@ -845,7 +846,6 @@ WireframeSelectionHighlightSceneIndex::_RemoveInstancerHighlightUser(const PXR_N
 void
 WireframeSelectionHighlightSceneIndex::_DeleteInstancerHighlight(const PXR_NS::SdfPath& instancerPath)
 {
-    TF_AXIOM(GetInputSceneIndex()->GetPrim(instancerPath).primType == HdPrimTypeTokens->instancer);
     TF_AXIOM(_instancerHighlightUsers.find(instancerPath) != _instancerHighlightUsers.end());
     TF_AXIOM(_selectionHighlightMirrorsByInstancer.find(instancerPath) != _selectionHighlightMirrorsByInstancer.end());
 
