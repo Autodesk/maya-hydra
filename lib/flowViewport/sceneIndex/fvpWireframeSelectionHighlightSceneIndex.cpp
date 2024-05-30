@@ -200,15 +200,6 @@ VtArray<SdfPath> _GetPrototypeRoots(const HdSceneIndexPrim& prim)
     return instancedBy.GetPrototypeRoots()->GetTypedValue(0);
 }
 
-bool _IsInstancerWithSelections(const HdSceneIndexPrim& prim)
-{
-    if (prim.primType != HdPrimTypeTokens->instancer) {
-        return false;
-    }
-    auto selections = HdSelectionsSchema::GetFromParent(prim.dataSource);
-    return selections.IsDefined() && selections.GetNumElements() > 0;
-}
-
 bool _IsInstancingRoot(const HdSceneIndexPrim& prim, const SdfPath& primPath)
 {
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
@@ -683,12 +674,14 @@ WireframeSelectionHighlightSceneIndex::_PrimsRemoved(
         .Msg("WireframeSelectionHighlightSceneIndex::_PrimsRemoved() called.\n");
 
     for (const auto& entry : entries) {
-        auto instancerPathsCopy = _selectionHighlightMirrorsByInstancer;
-        for (const auto& selectionHighlightMirrorsForInstancer : instancerPathsCopy) {
-            auto instancerPath = selectionHighlightMirrorsForInstancer.first;
-            if (instancerPath.HasPrefix(entry.primPath)) {
-                _DeleteInstancerHighlight(instancerPath);
+        SdfPathVector instancerHighlightsToDelete;
+        for (const auto& selectionHighlightMirrorsForInstancer : _selectionHighlightMirrorsByInstancer) {
+            if (selectionHighlightMirrorsForInstancer.first.HasPrefix(entry.primPath)) {
+                instancerHighlightsToDelete.push_back(selectionHighlightMirrorsForInstancer.first);
             }
+        }
+        for (const auto& instancerHighlightToDelete : instancerHighlightsToDelete) {
+            _DeleteInstancerHighlight(instancerHighlightToDelete);
         }
     }
     _SendPrimsRemoved(entries);
@@ -829,9 +822,6 @@ WireframeSelectionHighlightSceneIndex::_AddInstancerHighlightUser(const PXR_NS::
             _selectionHighlightMirrorUseCounters[selectionHighlightMirror]++;
         }
 
-        // addedPrims.erase(std::remove_if(addedPrims.begin(), addedPrims.end(), [this](const HdSceneIndexObserver::AddedPrimEntry entry) -> bool {
-        //     return _selectionHighlightMirrorUseCounters[entry.primPath] != 1;
-        // }));
         if (!addedPrims.empty()) {
             _SendPrimsAdded(addedPrims);
         }
@@ -877,20 +867,9 @@ WireframeSelectionHighlightSceneIndex::_DeleteInstancerHighlight(const PXR_NS::S
     TF_AXIOM(_instancerHighlightUsers.find(instancerPath) != _instancerHighlightUsers.end());
     TF_AXIOM(_selectionHighlightMirrorsByInstancer.find(instancerPath) != _selectionHighlightMirrorsByInstancer.end());
 
-    HdSceneIndexObserver::RemovedPrimEntries removedPrims;
-    for (const auto& selectionHighlightMirror : _selectionHighlightMirrorsByInstancer[instancerPath]) {
-        TF_AXIOM(_selectionHighlightMirrorUseCounters[selectionHighlightMirror] > 0);
-        _selectionHighlightMirrorUseCounters[selectionHighlightMirror]--;
-        if (_selectionHighlightMirrorUseCounters[selectionHighlightMirror] == 0) {
-            removedPrims.push_back(selectionHighlightMirror);
-        }
-    }
-
-    _instancerHighlightUsers[instancerPath].clear();
-    _selectionHighlightMirrorsByInstancer.erase(instancerPath);
-    
-    if (!removedPrims.empty()) {
-        _SendPrimsRemoved(removedPrims);
+    auto instancerHighlightUsers = _instancerHighlightUsers[instancerPath];
+    for (const auto& instancerHighlightUser : instancerHighlightUsers) {
+        _RemoveInstancerHighlightUser(instancerPath, instancerHighlightUser);
     }
 }
 
