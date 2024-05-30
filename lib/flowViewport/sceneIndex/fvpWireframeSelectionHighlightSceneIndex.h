@@ -116,9 +116,9 @@ private:
 
     PXR_NS::SdfPath _FindSelectionHighlightMirrorAncestor(const PXR_NS::SdfPath& path) const;
     void _CollectSelectionHighlightMirrors(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outSelectionHighlightMirrors, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outAddedPrims);
-    void _RemoveSelectionHighlightMirrorsUsageForInstancer(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
-    void _DeleteSelectionHighlightMirrorsUsageForInstancer(const PXR_NS::SdfPath& instancerPath);
-    void _AddSelectionHighlightMirrorsUsageForInstancer(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
+    void _AddInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
+    void _RemoveInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
+    void _DeleteInstancerHighlight(const PXR_NS::SdfPath& instancerPath);
 
     const SelectionConstPtr   _selection;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
