@@ -27,6 +27,7 @@
 #include <pxr/usdImaging/usdImaging/rerootingSceneIndex.h>
 #include <pxr/usd/sdf/path.h>
 
+#include <functional>
 #include <set>
 #include <unordered_map>
 
@@ -114,6 +115,7 @@ private:
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
     PXR_NS::HdContainerDataSourceHandle _HighlightSelectedPrim(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::SdfPath& primPath, const PXR_NS::HdContainerDataSourceHandle& highlightDataSource) const;
 
+    void _ForEachPrimInHierarchy(const PXR_NS::SdfPath& hierarchyRoot, const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation);
     PXR_NS::SdfPath _FindSelectionHighlightMirrorAncestor(const PXR_NS::SdfPath& path) const;
     void _CollectSelectionHighlightMirrors(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outSelectionHighlightMirrors, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outAddedPrims);
     void _AddInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);

@@ -405,26 +405,14 @@ WireframeSelectionHighlightSceneIndex(
 {
     TF_AXIOM(_wireframeColorInterface);
 
-    std::stack<SdfPath> pathsToTraverse({ SdfPath::AbsoluteRootPath() });
-    while (!pathsToTraverse.empty()) {
-        SdfPath currPath = pathsToTraverse.top();
-        pathsToTraverse.pop();
-
-        HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
-
-        // We only want to create highlights for "top-level" instancers (i.e. instancers that are not children
-        // of another instancer), as these are the ones that are drawn. Nested instancers will be drawn
-        // through another top-level instancer. Thus, we do not process child prims once we hit an instancer,
-        // so that only top-level ones are considered.
-        if (currPrim.primType == HdPrimTypeTokens->instancer) {
-            _CreateInstancerHighlightsForInstancer(currPrim, currPath);
+    auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
+        if (prim.primType == HdPrimTypeTokens->instancer) {
+            _CreateInstancerHighlightsForInstancer(prim, primPath);
+            return false; // Only create highlights for top-level instancers
         }
-        else {
-            for (const auto& childPath : inputSceneIndex->GetChildPrimPaths(currPath)) {
-                pathsToTraverse.push(childPath);
-            }
-        }
-    }
+        return true;
+    };
+    _ForEachPrimInHierarchy(SdfPath::AbsoluteRootPath(), operation);
 }
 
 HdSceneIndexPrim
@@ -607,35 +595,18 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             bool isSelected = selectionsSchema.IsDefined() && selectionsSchema.GetNumElements() > 0;
 
             // Update child instancer highlights for ancestor-based selection highlighting
-            std::stack<SdfPath> pathsToTraverse({entry.primPath});
-            while (!pathsToTraverse.empty()) {
-                SdfPath currPath = pathsToTraverse.top();
-                pathsToTraverse.pop();
-
-                HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
-
-                // Skip processing of prototypes nested under the prim's hierarchy, as we consider prototype hierarchies to be separate.
-                if (_IsPrototype(currPrim) && _IsInstancingRoot(currPrim, currPath) && currPath != entry.primPath) {
-                    continue;
-                }
-                
-                // We only want to consider highlights for "top-level" instancers (i.e. instancers that are not children
-                // of another instancer), as these are the ones that are drawn. Nested instancers will be drawn
-                // through another top-level instancer. Thus, we do not process child prims once we hit an instancer,
-                // so that only top-level ones are considered.
-                if (currPrim.primType == HdPrimTypeTokens->instancer) {
+            auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
+                if (prim.primType == HdPrimTypeTokens->instancer) {
                     if (isSelected) {
-                        selectedInstancerHighlightUsages.push_back({currPath,entry.primPath});
+                        selectedInstancerHighlightUsages.push_back({primPath,entry.primPath});
                     } else {
-                        deselectedInstancerHighlightUsages.push_back({currPath,entry.primPath});
+                        deselectedInstancerHighlightUsages.push_back({primPath,entry.primPath});
                     }
+                    return false; // Only update direct/immediate instancer children
                 }
-                else {
-                    for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(currPath)) {
-                        pathsToTraverse.push(childPath);
-                    }
-                }
-            }
+                return true;
+            };
+            _ForEachPrimInHierarchy(entry.primPath, operation);
         }
     }
 
@@ -726,6 +697,32 @@ WireframeSelectionHighlightSceneIndex::GetSelectionHighlightPath(const SdfPath& 
     return path;
 }
 
+void
+WireframeSelectionHighlightSceneIndex::_ForEachPrimInHierarchy(
+    const PXR_NS::SdfPath& hierarchyRoot, 
+    const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation
+)
+{
+    std::stack<SdfPath> pathsToTraverse({hierarchyRoot});
+    while (!pathsToTraverse.empty()) {
+        SdfPath currPath = pathsToTraverse.top();
+        pathsToTraverse.pop();
+
+        HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
+
+        // Skip processing of prototypes nested under the hierarchy, as we consider prototype hierarchies to be separate.
+        if (_IsPrototype(currPrim) && _IsInstancingRoot(currPrim, currPath) && currPath != hierarchyRoot) {
+            continue;
+        }
+        
+        if (operation(currPath, currPrim)) {
+            for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(currPath)) {
+                pathsToTraverse.push(childPath);
+            }
+        }
+    }
+}
+
 SdfPath
 WireframeSelectionHighlightSceneIndex::_FindSelectionHighlightMirrorAncestor(const SdfPath& path) const
 {
@@ -769,36 +766,16 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const P
     // Traverse the children of this prim to find the child instancers, and add its instancing-related
     // paths so we can process them and create selection highlight mirrors for them as well.
     SdfPathVector affectedOriginalPrimPaths;
-    std::stack<SdfPath> pathsToTraverse({originalPrimPath});
-    while (!pathsToTraverse.empty()) {
-        SdfPath currPath = pathsToTraverse.top();
-        pathsToTraverse.pop();
-
-        HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
-
-        // Skip processing of prototypes nested under the prim's hierarchy, as prototypes should be processed by
-        // traversing the instancing-related paths of instancers and instancees. And if they aren't, then it means
-        // the prototype is either not instanced in the first place, or is part of a different instancing hierarchy.
-        if (_IsPrototype(currPrim) && _IsInstancingRoot(currPrim, currPath) && currPath != originalPrimPath) {
-            continue;
-        }
-
-        outAddedPrims.push_back({currPath.ReplacePrefix(originalPrimPath, selectionHighlightPrimPath), currPrim.primType});
-
-        // We only want to create highlights for "top-level" instancers (i.e. instancers that are not children
-        // of another instancer), as these are the ones that are drawn. Nested instancers will be drawn
-        // through another top-level instancer. Thus, we do not process child prims once we hit an instancer,
-        // so that only top-level ones are considered.
-        if (currPrim.primType == HdPrimTypeTokens->instancer) {
-            SdfPathVector instancingRelatedPaths = _GetInstancingRelatedPaths(currPrim);
+    auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
+        outAddedPrims.push_back({primPath.ReplacePrefix(originalPrimPath, selectionHighlightPrimPath), prim.primType});
+        if (prim.primType == HdPrimTypeTokens->instancer) {
+            SdfPathVector instancingRelatedPaths = _GetInstancingRelatedPaths(prim);
             affectedOriginalPrimPaths.insert(affectedOriginalPrimPaths.end(), instancingRelatedPaths.begin(), instancingRelatedPaths.end());
+            return false; // We have found an instancer, don't process its children (nested instancers will be processed through the instancing-related paths).
         }
-        else {
-            for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(currPath)) {
-                pathsToTraverse.push(childPath);
-            }
-        }
-    }
+        return true;
+    };
+    _ForEachPrimInHierarchy(originalPrimPath, operation);
 
     for (const auto& affectedOriginalPrimPath : affectedOriginalPrimPaths) {
         _CollectSelectionHighlightMirrors(affectedOriginalPrimPath, outSelectionHighlightMirrors, outAddedPrims);
