@@ -580,7 +580,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
 
             // Selection was changed on an instancer, so dirty its selection highlight mirror's instancerTopology mask.
-            if (prim.primType == HdPrimTypeTokens->instancer) {
+            if (prim.primType == HdPrimTypeTokens->instancer && selectionHighlightPath != entry.primPath) {
                 dirtiedPrims.emplace_back(selectionHighlightPath, HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask));
             }
             
