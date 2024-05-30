@@ -517,13 +517,9 @@ HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSel
 {
     //Always edit its override wireframe color
     auto edited = HdContainerDataSourceEditor(dataSource);
-
-    // TODO HYDRA-1047 : Handle the different wireframe selection highlight colors
-    GfVec4f wireframeColor;
-    ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->wireframeSelection, wireframeColor);
     edited.Set(HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),
                         Fvp::PrimvarDataSource::New(
-                            HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{wireframeColor}),
+                            HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{_wireframeColorInterface->getWireframeColor(primPath)}),
                             HdPrimvarSchemaTokens->constant,
                             HdPrimvarSchemaTokens->color));
     
