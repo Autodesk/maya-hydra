@@ -363,3 +363,26 @@ instancing selection highlighting. Using the `instancerTopology/prototypes`, the
 networks of instancers as a graph to be traversed.
 
 ### Implementation for point instancer and instance selection
+
+This section will focus on selection highlighting when trying to highlight point instancers
+as a whole or specific instances, as these require a more complicated workflow. Unlike standard
+selection, we cannot simply override instanced meshes to use the `refinedWireOnSurf`/`wireOnSurf`
+HdReprs, as that would lead to highlighting all instances of the prototype all the time. Instead, 
+we opt for the following approach : when an instancer is selected (entirely or only certain instances), 
+we will create a mirror of the instancing network it is a part of. This mirror network includes 
+everything from the most deeply buried prims to the topmost instancers; anything that this instancer 
+affects or is affected by, including itself. In practice, this means that each prototype will have a 
+corresponding mirror prim for selection highlighting, that will be located alongside it as a sibling. 
+This way, any parent transforms affecting the original prim will also affect the selection highlight 
+mirror prim.
+
+Note that in the case where a prototype is not a single prim but a sub-hierarchy, we only need to 
+create a single *explicit* selection highlight mirror for the whole hierarchy; the child prims of 
+the selection highlight mirror will simply be pulled from the corresponding original prim, and thus
+implicitly be selection highlight mirrors as well.
+
+Something to be aware of is that a nested/composed instancer is not necessarily directly selected, 
+as it is not necessarily a prototype root itself. If an instancer is a child prim of another prim 
+that is itself instanced by another instancer, these instancers are still composed together, but 
+will not point to each other directly. Such cases are an example of when we need to use the 
+`instancedBy/prototypeRoots` data source to properly construct the mirror network of instancers.
