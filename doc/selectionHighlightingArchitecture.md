@@ -289,3 +289,77 @@ WireframeSelectionHighlightSceneIndex o-- Selection : Read
   propagate across scene index inputs, so that if a Maya Dag ancestor is
   selected, a USD descendant's appearance can change.  This is the same
   situation as global transformation and visibility.
+
+## Mesh point instancing selection highlighting
+
+We currently support selection highlighting for point instancing of meshes
+for the three different point instancing selection modes :
+- Point Instancer
+- Instance
+- Prototype
+
+Here is an overview of how selection highlighting for point instancing
+is implemented. We'll be using USD as the source data model, which has
+some idiosyncracies of its own (which we'll go over when needed), but 
+the vast majority of it is Hydra-based.
+
+### Point instancing data sources
+
+In Hydra, a point instancer is represented as a prim of type instancer,
+with an `instancerTopology` data source. This data source contains three
+inner data sources :
+- The `prototypes` data source, of type `VtArray<SdfPath>`, lists the paths
+to each prototype this point instancer instances.
+- The `instanceIndices` data source, a vector data source where each element
+data source (`i0, i1, i2, etc.`) is of type `VtArray<int>` and contains
+which instances correspond to which prototype. For example, if `i1` contains
+`0, 3`, then the first and fourth instances will be using the second prototype.
+- The `mask` data source, of type `VtArray<bool>`, which can optionally be used
+to show/hide specific instances (e.g. if the 3rd element of the mask is `false`,
+then the 3rd instance will be hidden). If this array is empty, all prims will be
+shown.
+
+Per-instance data is specified using primvar data sources, namely :
+- hydra:instanceTranslations
+- hydra:instanceRotations
+- hydra:instanceScales
+- hydra:instanceTransforms
+Where the corresponding primvarValue data source lists the instance-specific data.
+Note that while the first three are 3-dimensional vectors and `hydra:instanceTransforms`
+is a 4x4 matrix, they can all be used simultaneously (internally, they will all be
+converted to 4x4 matrices, and then multiplied together).
+
+On the other end of instancing, prototypes have an `instancedBy` data source.
+This data source contains up to two inner data sources :
+- (required) : The `paths` data source, of type `VtArray<SdfPath>`, lists the paths
+to each instancer that instances this prototype.
+- (optional) : When a sub-hierarchy is prototyped, the `prototypeRoots`, of type 
+`VtArray<SdfPath>`, lists the paths to the roots of the sub-hierarchies that are being 
+prototyped. For example, if we are instancing an xform that has a child mesh,
+then the prototype xform and mesh prims will each have the same instancedBy data source,
+where the `paths` data source will point to the instancers that use this prototype, and
+where the `prototypeRoots` will point to the xform prim.
+
+Some notes about the behavioral impacts of the hierarchical location of prims :
+- Prims that are rooted under an instancer will not be drawn unless instanced
+- Prototypes that are instanced will still be drawn as if they were not instanced
+(i.e. the instances will be drawn in addition to the base prim itself), unless as 
+mentioned they are rooted under an instancer.
+
+### Nested instancers
+
+It is possible for an instancer itself to be instanced by another, and thus have both the
+`instancerTopology` and the `instancedBy` data sources. Note that this does not preclude
+such a prototyped instancer from also drawing geometry itself. If the prototyped instancer 
+is a child of the instancing instancer, then yes, such a nested instancer will not draw by
+itself, and will be instance-drawn through the parent instancer. However, if the prototyped
+instancer has no parent instancer, but it is instanced by another instancer somewhere else
+in the hierarchy, then both the prototyped instancer will draw as if it were by itself, but
+also be instance-drawn by the other instancer.
+
+This nesting and composition of instancers is what leads to most of the complexity of point
+instancing selection highlighting. Using the `instancerTopology/prototypes`, the
+`instancedBy/paths`, and in some cases the `instancedBy/prototypeRoots`, we can view such
+networks of instancers as a graph to be traversed.
+
+### Implementation for point instancer and instance selection
