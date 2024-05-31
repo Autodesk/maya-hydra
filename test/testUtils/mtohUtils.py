@@ -204,6 +204,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     def assertSnapshotEqual(self, refImage, imageVersion=None):
         '''Use of this method is discouraged, as renders can vary slightly between renderer architectures.'''
         refImage = self.resolveRefImage(refImage, imageVersion)
+        super(MayaHydraBaseTestCase, self).assertSnapshotEqual(refImage)
 
     def runCppTest(self, testFilter):
         with PluginLoaded("mayaHydraCppTests"):
