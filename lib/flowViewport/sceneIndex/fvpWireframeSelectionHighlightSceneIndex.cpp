@@ -557,8 +557,9 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
         .Msg("WireframeSelectionHighlightSceneIndex::_PrimsDirtied() called.\n");
 
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
-    std::vector<std::pair<SdfPath, SdfPath>> selectedInstancerHighlightUsages;
-    std::vector<std::pair<SdfPath, SdfPath>> deselectedInstancerHighlightUsages;
+    std::vector<SdfPath> instancerHighlightsToRebuild;
+    std::vector<std::pair<SdfPath, SdfPath>> instancerHighlightUsersToAdd;
+    std::vector<std::pair<SdfPath, SdfPath>> instancerHighlightUsersToRemove;
 
     for (const auto& entry : entries) {
         if (_IsExcluded(entry.primPath)) {
@@ -573,7 +574,14 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             dirtiedPrims.emplace_back(selectionHighlightPath, entry.dirtyLocators);
         }
 
-        if (entry.dirtyLocators.Contains(HdSelectionsSchema::GetDefaultLocator())) {
+        if (entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator())) {
+            // We do not need to check for instancedBy dirtying : if an instancedBy data source is dirtied,
+            // then either a new instancer was added, which will be handled in _PrimsAdded, either an
+            // existing instancer's instancerTopology data source was dirtied. 
+            instancerHighlightsToRebuild.push_back(entry.primPath);
+        }
+        
+        if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
                 .Msg("    %s selections locator dirty.\n", entry.primPath.GetText());
             
@@ -598,9 +606,9 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
                 if (prim.primType == HdPrimTypeTokens->instancer) {
                     if (isSelected) {
-                        selectedInstancerHighlightUsages.push_back({primPath,entry.primPath});
+                        instancerHighlightUsersToAdd.push_back({primPath,entry.primPath});
                     } else {
-                        deselectedInstancerHighlightUsages.push_back({primPath,entry.primPath});
+                        instancerHighlightUsersToRemove.push_back({primPath,entry.primPath});
                     }
                     return false; // Only update direct/immediate instancer children
                 }
@@ -622,11 +630,14 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
         _SendPrimsDirtied(entries);
     }
 
-    for (const auto& selectedInstancerHighlightUsage : selectedInstancerHighlightUsages) {
-        _AddInstancerHighlightUser(selectedInstancerHighlightUsage.first, selectedInstancerHighlightUsage.second);
+    for (const auto& instancerHighlightToRebuild : instancerHighlightsToRebuild) {
+        _RebuildInstancerHighlight(instancerHighlightToRebuild);
     }
-    for (const auto& deselectedInstancerHighlightUsage : deselectedInstancerHighlightUsages) {
-        _RemoveInstancerHighlightUser(deselectedInstancerHighlightUsage.first, deselectedInstancerHighlightUsage.second);
+    for (const auto& instancerHighlightUserToAdd : instancerHighlightUsersToAdd) {
+        _AddInstancerHighlightUser(instancerHighlightUserToAdd.first, instancerHighlightUserToAdd.second);
+    }
+    for (const auto& instancerHighlightUserToRemove : instancerHighlightUsersToRemove) {
+        _RemoveInstancerHighlightUser(instancerHighlightUserToRemove.first, instancerHighlightUserToRemove.second);
     }
 }
 
@@ -840,6 +851,24 @@ WireframeSelectionHighlightSceneIndex::_RemoveInstancerHighlightUser(const PXR_N
     
     if (!removedPrims.empty()) {
         _SendPrimsRemoved(removedPrims);
+    }
+}
+
+void
+WireframeSelectionHighlightSceneIndex::_RebuildInstancerHighlight(const PXR_NS::SdfPath& instancerPath)
+{
+    TF_AXIOM(GetInputSceneIndex()->GetPrim(instancerPath).primType == HdPrimTypeTokens->instancer);
+    TF_AXIOM(_instancerHighlightUsers.find(instancerPath) != _instancerHighlightUsers.end());
+    TF_AXIOM(_selectionHighlightMirrorsByInstancer.find(instancerPath) != _selectionHighlightMirrorsByInstancer.end());
+
+    auto instancerHighlightUsers = _instancerHighlightUsers[instancerPath];
+    
+    for (const auto& instancerHighlightUser : instancerHighlightUsers) {
+        _RemoveInstancerHighlightUser(instancerPath, instancerHighlightUser);
+    }
+
+    for (const auto& instancerHighlightUser : instancerHighlightUsers) {
+        _AddInstancerHighlightUser(instancerPath, instancerHighlightUser);
     }
 }
 
