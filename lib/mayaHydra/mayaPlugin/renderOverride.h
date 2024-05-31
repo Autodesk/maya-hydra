@@ -45,6 +45,7 @@
 #include <flowViewport/selection/fvpSelectionTracker.h>
 #include <flowViewport/selection/fvpSelectionFwd.h>
 #include <flowViewport/sceneIndex/fvpDisplayStyleOverrideSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpPruneTexturesSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
@@ -247,6 +248,7 @@ private:
     HdSceneIndexBaseRefPtr                    _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
     HdSceneIndexBaseRefPtr                    _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
     Fvp::DisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
+    Fvp::PruneTexturesSceneIndexRefPtr        _pruneTexturesSceneIndex;
     HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
@@ -295,6 +297,7 @@ private:
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
     bool       _hasDefaultLighting = false;
+    bool       _currentlyTextured = false;
     unsigned int _oldDisplayStyle {0};
     bool       _useDefaultMaterial;
     bool       _xRayEnabled;
