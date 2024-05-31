@@ -8,7 +8,7 @@ supports Hydra rendering in this repository as the Flow Viewport Toolkit (name
 subject to change).
 
 This document will describe the state of Flow Viewport Toolkit selection
-highlighting as of 21-Sep-2023.
+highlighting as of 31-May-2024.
 
 ## Behavior
 
@@ -18,8 +18,9 @@ are shown differently in the viewport for ease of understanding.
 
 An application will provide a way to select an object, or to select components
 of an object.  For example, for a mesh object, these components may be points,
-edges, or faces.  At time of writing, only object selection highlighting is
-supported, and selection highlighting of components is unimplemented.
+edges, or faces.  Currently, only object selection highlighting and USD point
+instancing highlighting of meshes are supported.  Selection highlighting of
+components is unimplemented.
 
 ## Selection: Application versus Hydra
 
@@ -27,7 +28,8 @@ The application maintains an edit-friendly version of the scene.  This scene is
 translated into a Hydra scene by scene indices.  Correspondingly, there are two
 versions of the selection, one in the application, with objects and their paths
 described with application-specific classes, and a version of the selection in
-the Hydra scene, described as prims and their `SdfPath`s
+the Hydra scene, described as prims and their `SdfPath`s, as well as their
+associated selection data sources.
 
 ## Requirements
 
@@ -45,8 +47,8 @@ Requirements for selection highlighting are:
   highlight appearance.
 
 - It must be possible to let a data injecting data model provide prims to Hydra
-  that already contain selection highlighting.  At time of writing
-  (19-Sep-2023), this is true of Maya native Dag data, where selection
+  that already contain selection highlighting.  Currently,
+  this is true of Maya native Dag data, where selection
   highlighting is done by OGS.
 
 ## Selection Highlighting Styles
@@ -59,7 +61,7 @@ special way, e.g. object contour, modified object color, or object overlay.
 
 The former approach is handled by having a plugin provide a selection
 highlighting filtering scene index to the Flow Viewport Toolkit, and is the
-topic of this document at time of writing (20-Sep-2023).  The
+topic of this document at time of writing.  The
 latter is handled by having a plugin provide a selection highlighting 
 task to the Flow Viewport Toolkit, and is currently unimplemented.
 
@@ -68,7 +70,7 @@ task to the Flow Viewport Toolkit, and is currently unimplemented.
 A selection highlighting plugin that provides added geometry to scene must
 provide the following services:
 
-- A way to translate the application's selection path(s) into Hydra paths:
+- A way to translate the application's selection path(s) into Hydra paths and data sources:
     - So that the appropriate prims in Hydra can be dirtied on selection change.
     - So that selected prims in Hydra can have a data source added.
   This is embodied in a **Path interface**.
@@ -83,8 +85,8 @@ provide the following services:
 ### Selection Change
 
 This
-[selection change code](../lib/flowViewport/sceneIndex/fvpSelectionSceneIndex.cpp#L150-L167)
-shows the use of the *Path Interface*, through the *SceneIndexPath()* method,
+[selection change code](../lib/flowViewport/sceneIndex/fvpSelectionSceneIndex.cpp#L151-L170)
+shows the use of the *Path Interface*, through the *ConvertUfeSelectionToHydra()* method,
 called on the input scene index.  The path interface allows the selection scene
 index to translate selected application paths to selected Hydra scene index
 paths.
@@ -92,7 +94,7 @@ paths.
 ### Wireframe Selection Highlighting
 
 This
-[wireframe selection highlighting code](../lib/flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.cpp#L76-L97)
+[wireframe selection highlighting code](../lib/flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.cpp#L462-L465)
 shows the use of the *Selection*, through the
 *HasFullySelectedAncestorInclusive()* method, called on the input selection.
 The selection allows a selection highlighting filtering scene index to query
@@ -178,7 +180,7 @@ index is optional.
 
 The object modeling is the following:
 - **Selection**: builtin provided by the Flow Viewport Toolkit.
-    - Encapsulates the Hydra selection as scene index paths.
+    - Encapsulates the Hydra selection as scene index paths and selection data sources.
     - Is shared by the selection scene index and all selection highlighting
       scene indices.
 - **Selection scene index**: builtin provided by the Flow Viewport Toolkit.
@@ -232,7 +234,7 @@ class Selection{
 }
 
 class PathInterface{
-+SceneIndexPath(Ufe::Path) SdfPath
++ConvertUfeSelectionToHydra(Ufe::Path) SdfPath
 }
 
 class SelectionSceneIndex
