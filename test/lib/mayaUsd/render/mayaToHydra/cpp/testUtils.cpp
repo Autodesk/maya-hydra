@@ -40,15 +40,15 @@
 namespace {
 std::pair<int, char**> testingArgs{0, nullptr};
 
+std::filesystem::path  testInputDir;
+std::filesystem::path  testOutputDir;
+
 // Store the ongoing state of the pressed moused & keyboard buttons.
 // These are normally kept track of internally by Qt and can be retrieved using 
 // methods of the same name. But since we are sending artificial events, Qt does 
 // not get the opportunity to set these, so we keep track of them manually here.
 Qt::MouseButtons      mouseButtons;
 Qt::KeyboardModifiers keyboardModifiers;
-
-std::filesystem::path  testInputDir;
-std::filesystem::path  testOutputDir;
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
