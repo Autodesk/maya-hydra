@@ -303,9 +303,9 @@ is implemented. We'll be using USD as the source data model, which has
 some idiosyncracies of its own (which we'll go over when needed), but 
 the vast majority of it is Hydra-based.
 
-### Point instancing data sources
+### Scene index structure
 
-In Hydra, a point instancer is represented as a prim of type instancer,
+In Hydra, a point instancer is represented as a prim of type `instancer`,
 with an `instancerTopology` data source. This data source contains three
 inner data sources :
 - The `prototypes` data source, of type `VtArray<SdfPath>`, lists the paths
@@ -316,7 +316,7 @@ which instances correspond to which prototype. For example, if `i1` contains
 `0, 3`, then the first and fourth instances will be using the second prototype.
 - The `mask` data source, of type `VtArray<bool>`, which can optionally be used
 to show/hide specific instances (e.g. if the 3rd element of the mask is `false`,
-then the 3rd instance will be hidden). If this array is empty, all prims will be
+then the 3rd instance will be hidden). If this array is empty, all instances will be
 shown.
 
 Per-instance data is specified using primvar data sources, namely :
@@ -324,19 +324,20 @@ Per-instance data is specified using primvar data sources, namely :
 - hydra:instanceRotations
 - hydra:instanceScales
 - hydra:instanceTransforms
+
 Where the corresponding primvarValue data source lists the instance-specific data.
 Note that while the first three are 3-dimensional vectors and `hydra:instanceTransforms`
 is a 4x4 matrix, they can all be used simultaneously (internally, they will all be
 converted to 4x4 matrices, and then multiplied together).
 
-On the other end of instancing, prototypes have an `instancedBy` data source.
+On the other end of instancing, prototype prims have an `instancedBy` data source.
 This data source contains up to two inner data sources :
 - (required) : The `paths` data source, of type `VtArray<SdfPath>`, lists the paths
 to each instancer that instances this prototype.
 - (optional) : When a sub-hierarchy is prototyped, the `prototypeRoots`, of type 
 `VtArray<SdfPath>`, lists the paths to the roots of the sub-hierarchies that are being 
 prototyped. For example, if we are instancing an xform that has a child mesh,
-then the prototype xform and mesh prims will each have the same instancedBy data source,
+then the prototype xform and mesh prims will each have the same `instancedBy` data source,
 where the `paths` data source will point to the instancers that use this prototype, and
 where the `prototypeRoots` will point to the xform prim.
 
@@ -371,18 +372,18 @@ HdReprs, as that would lead to highlighting all instances of the prototype all t
 we opt for the following approach : when an instancer is selected (entirely or only certain instances), 
 we will create a mirror of the instancing network it is a part of. This mirror network includes 
 everything from the most deeply buried prims to the topmost instancers; anything that this instancer 
-affects or is affected by, including itself. In practice, this means that each prototype will have a 
-corresponding mirror prim for selection highlighting, that will be located alongside it as a sibling. 
-This way, any parent transforms affecting the original prim will also affect the selection highlight 
-mirror prim.
+affects or is affected by, including itself. In practice, this means that each prototype and each 
+top-level instancer will have a corresponding mirror prim for selection highlighting, that will be 
+located alongside it as a sibling. This way, any parent transforms affecting the original prim will 
+also affect the selection highlight mirror prim.
 
 Note that in the case where a prototype is not a single prim but a sub-hierarchy, we only need to 
-create a single *explicit* selection highlight mirror for the whole hierarchy; the child prims of 
-the selection highlight mirror will simply be pulled from the corresponding original prim, and thus
-implicitly be selection highlight mirrors as well.
+create a single *explicit* selection highlight mirror for the whole prototype sub-hierarchy; the 
+child prims of the selection highlight mirror will simply be pulled from the corresponding original 
+prim, and thus implicitly be selection highlight mirrors as well.
 
 Something to be aware of is that a nested/composed instancer is not necessarily directly selected, 
 as it is not necessarily a prototype root itself. If an instancer is a child prim of another prim 
-that is itself instanced by another instancer, these instancers are still composed together, but 
-will not point to each other directly. Such cases are an example of when we need to use the 
-`instancedBy/prototypeRoots` data source to properly construct the mirror network of instancers.
+that is itself selected or instanced by another instancer, these instancers are still composed 
+together, but will not point to each other directly. Such cases are an example of when we need to 
+use the `instancedBy/prototypeRoots` data source to properly construct the mirror network of instancers.
