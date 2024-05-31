@@ -20,8 +20,7 @@
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
-#include <mayaHydraLib/delegates/sceneDelegate.h>
-#include <mayaHydraLib/mayaHydraSceneProducer.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -62,9 +61,9 @@ MayaHydraRenderItemAdapter::MayaHydraRenderItemAdapter(
     const MDagPath&       dagPath,
     const SdfPath&        slowId,
     int                   fastId,
-    MayaHydraSceneProducer* producer,
+    MayaHydraSceneIndex*  mayaHydraSceneIndex,
     const MRenderItem&    ri)
-    : MayaHydraAdapter(MObject(), slowId, producer)
+    : MayaHydraAdapter(MObject(), slowId, mayaHydraSceneIndex)
     , _dagPath(dagPath)
     , _primitive(ri.primitive())
     , _name(ri.name())
@@ -82,7 +81,7 @@ void MayaHydraRenderItemAdapter::UpdateTransform(const MRenderItem& ri)
     MMatrix matrix;
     if (ri.getMatrix(matrix) == MStatus::kSuccess) {
         _transform[0] = GetGfMatrixFromMaya(matrix);
-        if (GetSceneProducer()->GetParams().motionSamplesEnabled()) {
+        if (GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled()) {
             MDGContextGuard guard(MAnimControl::currentTime() + 1.0);
             _transform[1] = GetGfMatrixFromMaya(matrix);
         } else {
@@ -95,12 +94,12 @@ bool MayaHydraRenderItemAdapter::IsSupported() const
 {
     switch (_primitive) {
     case MHWRender::MGeometry::Primitive::kTriangles:
-        return GetSceneProducer()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->mesh);
+        return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->mesh);
     case MHWRender::MGeometry::Primitive::kLines:
     case MHWRender::MGeometry::Primitive::kLineStrip:
-        return GetSceneProducer()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->basisCurves);
+        return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->basisCurves);
     case MHWRender::MGeometry::Primitive::kPoints:
-        return GetSceneProducer()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->points);
+        return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->points);
     default: return false;
     }
 }
@@ -109,14 +108,14 @@ void MayaHydraRenderItemAdapter::_InsertRprim(MayaHydraAdapter* adapter)
 {
     switch (GetPrimitive()) {
     case MHWRender::MGeometry::Primitive::kTriangles:
-        GetSceneProducer()->InsertRprim(adapter, HdPrimTypeTokens->mesh, GetID(), {});
+        GetMayaHydraSceneIndex()->InsertPrim(adapter, HdPrimTypeTokens->mesh, GetID());
         break;
     case MHWRender::MGeometry::Primitive::kLines:
     case MHWRender::MGeometry::Primitive::kLineStrip:
-        GetSceneProducer()->InsertRprim(adapter, HdPrimTypeTokens->basisCurves, GetID(), {});
+        GetMayaHydraSceneIndex()->InsertPrim(adapter, HdPrimTypeTokens->basisCurves, GetID());
         break;
     case MHWRender::MGeometry::Primitive::kPoints:
-        GetSceneProducer()->InsertRprim(adapter, HdPrimTypeTokens->points, GetID(), {});
+        GetMayaHydraSceneIndex()->InsertPrim(adapter, HdPrimTypeTokens->points, GetID());
         break;
     default:
         assert(false); // unexpected/unsupported primitive type
@@ -124,7 +123,7 @@ void MayaHydraRenderItemAdapter::_InsertRprim(MayaHydraAdapter* adapter)
     }
 }
 
-void MayaHydraRenderItemAdapter::_RemoveRprim() { GetSceneProducer()->RemoveRprim(GetID());} 
+void MayaHydraRenderItemAdapter::_RemoveRprim() { GetMayaHydraSceneIndex()->RemovePrim(GetID());} 
 
 // We receive in that function the changes made in the Maya viewport between the last frame rendered
 // and the current frame
@@ -180,65 +179,101 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         dirtyBits |= HdChangeTracker::DirtyTransform;
     }
     if (geomChanged) {
-        dirtyBits |= HdChangeTracker::DirtyPoints;
+        dirtyBits |= (HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent | HdChangeTracker::DirtyNormals);
     }
     if (topoChanged) {
-        dirtyBits |= (HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar);
+        dirtyBits |= (HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyExtent);
     }
 
     MGeometry* geom = nullptr;
     if (geomChanged || topoChanged) {
         geom = data._ri.geometry();
+        auto bbox = data._ri.boundingBox();
+        const MPoint& min = bbox.min();
+        const MPoint& max = bbox.max();
+        _bounds.SetRange(GfRange3d({min.x, min.y, min.z}, {max.x, max.y, max.z}));
     }
     VtIntArray vertexIndices;
     VtIntArray vertexCounts;
 
+    static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
+        
+    const int vertexBuffercount = geom ? geom->vertexBufferCount() : 0;
     // Vertices
-    MVertexBuffer* verts = nullptr;
-    if (geomChanged && geom && geom->vertexBufferCount() > 0) {
-        // Assume first stream contains the positions. We do not handle multiple streams for now.
-        verts = geom->vertexBuffer(0);
-        if (verts) {
-            int                vertCount = 0;
-            const unsigned int originalVertexCount = verts->vertexCount();
-            if (topoChanged) {
-                vertCount = originalVertexCount;
-            } else {
-                // Keep the previously-determined vertex count in case it was truncated.
-                const size_t positionSize = _positions.size();
-                if (positionSize > 0 && positionSize <= originalVertexCount) {
-                    vertCount = positionSize;
-                } else {
-                    vertCount = originalVertexCount;
-                }
+    if (geomChanged && vertexBuffercount) {
+        //vertexBuffercount > 0 means geom is non null
+        for (int vbIdx = 0; vbIdx < vertexBuffercount; vbIdx++) {
+            MVertexBuffer* mvb = geom->vertexBuffer(vbIdx);
+            if ( ! mvb) {
+                continue;
             }
 
-            _positions.clear();
-            //_positions.resize(vertCount);
-            // map() is usually just reading from the software copy of the vp2 buffers.  It was also
-            // showing up in vtune that it was sometimes mapping OpenGL buffers to read from, which
-            // is slow.  Disabling processing of non-triangle render made that disappear.  Maybe
-            // something like joint render items point to hardware only buffers?
-            const auto* vertexPositions = reinterpret_cast<const GfVec3f*>(verts->map());
-            // NOTE: Looking at MayaHydraMeshAdapter::GetPoints notice assign(vertexPositions,
-            // vertexPositions + vertCount) Why are we not multiplying with sizeof(GfVec3f) to
-            // calculate the offset ? The following happens when I try to do it : Invalid Hydra prim
-            // - Vertex primvar points has 288 elements, while its topology references only upto
-            // element index 24.
-            if (TF_VERIFY(vertexPositions)) {
-                _positions.assign(vertexPositions, vertexPositions + vertCount);
+            const MVertexBufferDescriptor& desc = mvb->descriptor();
+            const auto semantic = desc.semantic();
+            switch(semantic){
+
+                case MGeometry::Semantic::kPosition: {
+                    //Vertices
+                    MVertexBuffer*verts = mvb;
+                    int                vertCount = 0;
+                    const unsigned int originalVertexCount = verts->vertexCount();
+                    if (topoChanged) {
+                        vertCount = originalVertexCount;
+                    } else {
+                        // Keep the previously-determined vertex count in case it was truncated.
+                        const size_t positionSize = _positions.size();
+                        if (positionSize > 0 && positionSize <= originalVertexCount) {
+                            vertCount = positionSize;
+                        } else {
+                            vertCount = originalVertexCount;
+                        }
+                    }
+
+                    _positions.clear();
+                    const auto* vertexPositions = reinterpret_cast<const GfVec3f*>(verts->map());
+                    if (TF_VERIFY(vertexPositions)) {
+                        _positions.assign(vertexPositions, vertexPositions + vertCount);
+                    }
+                    verts->unmap();
+                }
+                break;
+                case MGeometry::Semantic::kNormal: {
+                    //Normals
+                    if (passNormalsToHydra){
+                        MVertexBuffer* normals = mvb;
+                        int normalsCount = 0;
+                        const unsigned int originalNormalsCount = normals->vertexCount();
+                        if (topoChanged) {
+                            normalsCount = originalNormalsCount;
+                        } else {
+                            // Keep the previously-determined normals count in case it was truncated.
+                            const size_t normalSize = _normals.size();
+                            if (normalSize > 0 && normalSize <= originalNormalsCount) {
+                                normalsCount = normalSize;
+                            } else {
+                                normalsCount = originalNormalsCount;
+                            }
+                        }
+
+                        _normals.clear();
+                        const auto* vertexNormals = reinterpret_cast<const GfVec3f*>(normals->map());
+                        if (TF_VERIFY(vertexNormals)) {
+                            _normals.assign(vertexNormals, vertexNormals + normalsCount);
+                        }
+                        normals->unmap();
+                    }
+                }
+                break;
+                default:
+                break;
             }
-            verts->unmap();
         }
     }
 
     // Indices
-    // Note that a Primitive::kLineStrip index buffer is unavailable. The following section is
-    // skipped. In such case, indices are implicitly defined below.
-    MIndexBuffer* indices = nullptr;
-    if (topoChanged && geom && geom->indexBufferCount() > 0) {
+    if (topoChanged && vertexBuffercount) {
         // Assume first stream contains the positions.
-        indices = geom->indexBuffer(0);
+        MIndexBuffer* indices = geom->indexBuffer(0);
         if (indices) {
             int indexCount = indices->size();
             vertexIndices.resize(indexCount);
@@ -255,12 +290,14 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 }
             }
 
-            // VtArray operator[] is oddly expensive, ~10ms per frame here. Replace with assign().
-            // for (int i = 0; i < indexCount; i++) vertexIndices[i] = indicesData[i];
             vertexIndices.assign(indicesData, indicesData + indexCount);
 
             if (maxIndex < (int64_t)_positions.size() - 1) {
                 _positions.resize(maxIndex + 1);
+            }
+            const size_t numNormals = _normals.size();
+            if (numNormals > 0 && (maxIndex < (int64_t)numNormals - 1)) {
+                _normals.resize(maxIndex + 1);
             }
 
             switch (GetPrimitive()) {
@@ -268,29 +305,44 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 vertexCounts.resize(indexCount / 3);
                 vertexCounts.assign(indexCount / 3, 3);
 
-                // UVs
+                // Get face varying data from Maya like uvs
                 if (indexCount > 0) {
+                    
                     MVertexBuffer* mvb = nullptr;
-                    for (int vbIdx = 0; vbIdx < geom->vertexBufferCount(); vbIdx++) {
+
+                    for (int vbIdx = 0; vbIdx < vertexBuffercount; vbIdx++) {
                         mvb = geom->vertexBuffer(vbIdx);
                         if (!mvb)
                             continue;
 
                         const MVertexBufferDescriptor& desc = mvb->descriptor();
-
-                        if (desc.semantic() != MGeometry::Semantic::kTexture)
-                            continue;
-
-                        // Hydra expects a uv coordinate for each face-index, not 1 per vertex. 
-                        // e.g. a cube expects 36 uvs not 24.
-                        _uvs.clear();
-                        _uvs.resize(indices->size());
-                        float* uvs = (float*)mvb->map();
-                        for (int i = 0; i < indexCount; ++i) {
-                            _uvs[i].Set(&uvs[indicesData[i] * 2]);
+                        const auto semantic = desc.semantic();
+                        switch(semantic){
+                            case MGeometry::Semantic::kTexture: {
+                                // Hydra supports a uv coordinate for each face-index (face varying), though we could use its own set of indices which should be smaller.
+                                _uvs.clear();
+                                _uvs.resize(indices->size());
+                                float* uvs = (float*)mvb->map();
+                                for (int i = 0; i < indexCount; ++i){
+                                    _uvs[i].Set(&uvs[indicesData[i] * 2]);
+                                }
+                                mvb->unmap();
+                            }
+                            break;
+                            case MHWRender::MGeometry::kTangent:{
+                                // Hydra supports a tangent for each face-index (face varying), though we could use its own set of indices which should be smaller.
+                                _tangents.clear();
+                                _tangents.resize(indices->size());
+                                float* tangents = (float*)mvb->map();
+                                for (int i = 0; i < indexCount; ++i){
+                                    _tangents[i].Set(&tangents[indicesData[i] * 2]);
+                                }
+                                mvb->unmap();
+                            }
+                            break;
+                            default:
+                            break;
                         }
-                        mvb->unmap();
-                        break;
                     }
                 }
                 break;
@@ -309,15 +361,25 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
 
     if (topoChanged) {
         switch (GetPrimitive()) {
-        case MGeometry::Primitive::kTriangles:
-            _topology.reset(new HdMeshTopology(
-                (GetSceneProducer()->GetParams().displaySmoothMeshes
-                 || GetDisplayStyle().refineLevel > 0)
-                    ? PxOsdOpenSubdivTokens->catmullClark
-                    : PxOsdOpenSubdivTokens->none,
-                UsdGeomTokens->rightHanded,
-                vertexCounts,
-                vertexIndices));
+        case MGeometry::Primitive::kTriangles:{
+            static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
+            if (passNormalsToHydra){
+                _topology.reset(new HdMeshTopology(
+                    PxOsdOpenSubdivTokens->none,//For the OGS normals vertex buffer to be used, we need to use PxOsdOpenSubdivTokens->none
+                    UsdGeomTokens->rightHanded,
+                    vertexCounts,
+                    vertexIndices));
+            } else{
+                _topology.reset(new HdMeshTopology(
+                    (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes
+                     || GetDisplayStyle().refineLevel > 0)
+                        ? PxOsdOpenSubdivTokens->catmullClark
+                        : PxOsdOpenSubdivTokens->none,
+                    UsdGeomTokens->rightHanded,
+                    vertexCounts,
+                    vertexIndices));
+            }
+            }
             break;
         case MGeometry::Primitive::kLines:
         case MGeometry::Primitive::kLineStrip: {
@@ -364,6 +426,12 @@ VtValue MayaHydraRenderItemAdapter::Get(const TfToken& key)
     if (key == HdTokens->points) {
         return VtValue(_positions);
     }
+    if (key == HdTokens->normals) {
+        return VtValue(_normals);
+    }
+    if (key == MayaHydraAdapterTokens->tangents){
+        return VtValue(_tangents);
+    }
     if (key == MayaHydraAdapterTokens->st) {
         return VtValue(_uvs);
     }
@@ -378,7 +446,7 @@ VtValue MayaHydraRenderItemAdapter::Get(const TfToken& key)
 void MayaHydraRenderItemAdapter::MarkDirty(HdDirtyBits dirtyBits)
 {
     if (dirtyBits != 0) {
-        GetSceneProducer()->MarkRprimDirty(GetID(), dirtyBits);
+        GetMayaHydraSceneIndex()->MarkRprimDirty(GetID(), dirtyBits);
     }
 }
 
@@ -389,17 +457,24 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
 
     // Vertices
     if (interpolation == HdInterpolationVertex) {
-        desc.name           = UsdGeomTokens->points;
-        desc.interpolation  = interpolation;
-        desc.role           = HdPrimvarRoleTokens->point;
-        return { desc };
-    } else if (interpolation == HdInterpolationFaceVarying) {
-        // UVs are face varying in maya.
+        static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
+        return  passNormalsToHydra ? 
+        HdPrimvarDescriptorVector{
+            {UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point},//Vertices
+            {UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal}//Normals
+        } : 
+        HdPrimvarDescriptorVector{
+            {UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point}//Vertices only
+        };
+    } 
+    else if (interpolation == HdInterpolationFaceVarying) {
+        // UVs and tangents are face varying in maya.
         if (_primitive == MGeometry::Primitive::kTriangles) {
-            desc.name           = MayaHydraAdapterTokens->st;
-            desc.interpolation  = interpolation;
-            desc.role           = HdPrimvarRoleTokens->textureCoordinate;
-            return { desc };
+            return  
+            HdPrimvarDescriptorVector{
+                {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate},//uvs
+                {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate},//tangents
+            };
         }
     } else if (interpolation == HdInterpolationConstant) {
         switch(_primitive){
@@ -432,8 +507,8 @@ bool MayaHydraRenderItemAdapter::GetVisible()
     if (_isHideOnPlayback) {
         // MAYA-127216: Remove dependency on parent class MayaHydraAdapter. This will let us use
         // MayaHydraSceneDelegate directly
-        auto sceneProducer = static_cast<MayaHydraSceneProducer*>(GetSceneProducer());
-        return !sceneProducer->GetPlaybackRunning();
+        auto mayaHydraSceneIndex = static_cast<MayaHydraSceneIndex*>(GetMayaHydraSceneIndex());
+        return !mayaHydraSceneIndex->GetPlaybackRunning();
     }
 
     return _visible;

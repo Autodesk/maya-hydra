@@ -35,6 +35,7 @@ const std::string kDormantColorTableName = "dormant";
 // Color names
 const std::string kLeadColorName = "lead";
 const std::string kPolymeshActiveColorName = "polymeshActive";
+const std::string kPolymeshDormantColorName = "polymeshDormant";
 const std::string kPolyVertexColorName = "polyVertex";
 const std::string kPolyEdgeColorName = "polyEdge";
 const std::string kPolyFaceColorName = "polyFace";

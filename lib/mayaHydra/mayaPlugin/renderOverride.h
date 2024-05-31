@@ -33,15 +33,19 @@
 #include "renderGlobals.h"
 #include "pluginUtils.h"
 
-#include <mayaHydraLib/delegates/delegate.h>
-#include <mayaHydraLib/delegates/params.h>
-#include <mayaHydraLib/mayaHydraSceneProducer.h>
+#include <mayaHydraLib/mayaHydraParams.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexDataFactoriesSetup.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+#include <mayaHydraLib/mhWireframeColorInterfaceImp.h>
+#include <mayaHydraLib/mhLeadObjectPathTracker.h>
+#include <mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h>
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h>
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
 #include <flowViewport/selection/fvpSelectionTracker.h>
 #include <flowViewport/selection/fvpSelectionFwd.h>
+#include <flowViewport/sceneIndex/fvpDisplayStyleOverrideSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
@@ -64,10 +68,12 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <vector>
 
 #include <ufe/ufe.h>
 UFE_NS_DEF {
 class SelectionChanged;
+class Selection;
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -85,6 +91,10 @@ using HdxPickHitVector = std::vector<struct HdxPickHit>;
 class MtohRenderOverride : public MHWRender::MRenderOverride
 {
 public:
+    // Picking support.
+    class PickHandlerBase;
+    friend PickHandlerBase;
+
     MtohRenderOverride(const MtohRendererDescription& desc);
     ~MtohRenderOverride() override;
 
@@ -125,6 +135,9 @@ public:
     MStatus setup(const MString& destination) override;
     MStatus cleanup() override;
 
+    // Utility function to get GPU memory usage stats
+    static int GetUsedGPUMemory();
+
     bool                         startOperationIterator() override;
     MHWRender::MRenderOperation* renderOperation() override;
     bool                         nextRenderOperation() override;
@@ -145,9 +158,11 @@ private:
     void              _InitHydraResources(const MHWRender::MDrawContext& drawContext);
     void              _RemovePanel(MString panelName);
     void              _DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext);
-    HdRenderDelegate* _GetRenderDelegate();
+    HdRenderDelegate* _GetRenderDelegate();   
+    void              _ClearMayaHydraSceneIndex();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
-    void              _CreateSceneIndicesChainAfterMergingSceneIndex();
+    void              _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
+    VtValue           _GetUsedGPUMemory() const;
 
     void _PickByRegion(
         HdxPickHitVector& outHits,
@@ -174,7 +189,6 @@ private:
             [&panelName](const PanelCallbacks& item) { return item.first == panelName; });
     }
 
-    MAYAHYDRALIB_API
     void _PopulateSelectionList(
         const HdxPickHitVector&          hits,
         const MHWRender::MSelectionInfo& selectInfo,
@@ -183,10 +197,16 @@ private:
 
     void _AddPluginSelectionHighlighting();
 
+    bool _NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool currentUseDefaultMaterial, bool xRayEnabled);
+
+    // Determine the pick handler which should handle a pick hit, to transform
+    // the pick hit into a selection.
+    const PickHandlerBase* _PickHandler(const HdxPickHit& hit) const;
+
     // Callbacks
     static void _ClearHydraCallback(void* data);
     static void _TimerCallback(float, float, void* data);
-    static void _PlayblastingChanged(bool state, void*);
+    static void _PlayblastingChanged(bool state, void*); 
     static void _PanelDeletedCallback(const MString& panelName, void* data);
     static void _RendererChangedCallback(
         const MString& panelName,
@@ -225,10 +245,18 @@ private:
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
     Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
     HdSceneIndexBaseRefPtr                    _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
+    HdSceneIndexBaseRefPtr                    _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
+    Fvp::DisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
     HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
     Fvp::SelectionPtr                         _selection;
+    Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
+    // Naming this identifier _ufeSelection clashes with UFE's selection.h
+    // include guard and produces
+    // "error C2351: obsolete C++ constructor initialization syntax"
+    // with Visual Studio 2022, in MtohRenderOverride::MtohRenderOverride().
+    std::shared_ptr<Ufe::Selection>           _ufeSn;
     class SelectionObserver;
     using SelectionObserverPtr = std::shared_ptr<SelectionObserver>;
     SelectionObserverPtr                      _mayaSelectionObserver;
@@ -244,7 +272,12 @@ private:
 
     GlfSimpleLight _defaultLight;
 
-    std::unique_ptr<MayaHydraSceneProducer> _mayaHydraSceneProducer;
+    MayaHydraSceneIndexRefPtr _mayaHydraSceneIndex;
+
+    //Lead object selection and wireframe color for selection highlight
+    std::shared_ptr<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp> _wireframeColorInterfaceImp {nullptr};
+    std::shared_ptr<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker> _leadObjectPathTracker {nullptr};
+    MAYAHYDRA_NS_DEF::MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex{nullptr};
 
     /** This class creates the scene index data factories and set them up into the flow viewport library to be able to create DCC 
     *   specific scene index data classes without knowing their content in Flow viewport.
@@ -252,7 +285,7 @@ private:
     */
     MAYAHYDRA_NS_DEF::SceneIndexDataFactoriesSetup  _sceneIndexDataFactoriesSetup;
 
-    SdfPath _ID;
+    SdfPath _ID; // Root path to runtime data (like task controller) 
 
     GfVec4d _viewport;
 
@@ -262,6 +295,12 @@ private:
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
     bool       _hasDefaultLighting = false;
+    unsigned int _oldDisplayStyle {0};
+    bool       _useDefaultMaterial;
+    bool       _xRayEnabled;
+
+    // Picking support.
+    const std::vector<std::unique_ptr<PickHandlerBase>> _pickHandlers;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

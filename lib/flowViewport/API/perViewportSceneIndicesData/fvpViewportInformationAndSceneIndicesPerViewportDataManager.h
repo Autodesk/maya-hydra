@@ -40,7 +40,8 @@ public:
     static ViewportInformationAndSceneIndicesPerViewportDataManager& Get();
  
     //A new Hydra viewport was created, we need inputSceneIndexForCustomFiltering to be used as an input scene index for custom filtering scene indices
-    void AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, const Fvp::RenderIndexProxyPtr& renderIndexProxy, 
+    //return true if some data producer scene indices were added
+    bool AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, const Fvp::RenderIndexProxyPtr& renderIndexProxy, 
                                 const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndexForCustomFiltering);
     
     //A Hydra viewport was deleted

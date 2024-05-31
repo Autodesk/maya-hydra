@@ -20,26 +20,15 @@ import mtohUtils
 import mayaUtils
 import platform
 
-class TestObjectTemplate(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
+class TestObjectTemplate(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    @property
-    def imageDiffFailThreshold(self):
-        return 0.01
-    
-    @property
-    def imageDiffFailPercent(self):
-        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
-        # for that platform specifically for now, so we can still catch issues on other platforms.
-        if platform.system() == "Darwin":
-            return 3
-        return 0.2
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
+    IMAGE_DIFF_FAIL_PERCENT = 0.2
 
     #Test object display & selection when template attribute is on.
     def test_ObjectTemplate(self):
-        cmds.file(new=True, force=True)
-
         # Load a maya scene with a maya native sphere
         testFile = mayaUtils.openTestScene(
                 "testObjectTemplate",
@@ -48,18 +37,18 @@ class TestObjectTemplate(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTes
 
         #Verify Default display
         panel = mayaUtils.activeModelPanel()
-        self.assertSnapshotClose("default" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("default" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Verify template attribute
         #Display
         cmds.setAttr('pSphere1.template', 1)
         cmds.refresh()
-        self.assertSnapshotClose("templateOn" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("templateOn" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         #Selection
         cmds.select( clear=True )
         cmds.select( 'pSphere1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("templateOnSelection" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("templateOnSelection" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

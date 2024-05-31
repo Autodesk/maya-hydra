@@ -3,6 +3,11 @@
 # -----------------------------------------------------------------------------
 find_package(GTest REQUIRED)
 
+if (NOT Qt6_FOUND)
+    message(WARNING "No Qt6 package found. Cannot build ${TARGET_NAME}.")
+    return()
+endif()
+
 set(TARGET_NAME mayaHydraCppTests)
 add_library(${TARGET_NAME} SHARED)
 
@@ -14,6 +19,7 @@ target_sources(${TARGET_NAME}
         mayaHydraCppTestsCmd.cpp
         testColorPreferences.cpp
         testCppFramework.cpp
+        testHydraPrim.cpp
         testMayaSceneFlattening.cpp
         testMayaUsdUfeItems.cpp
         testMergingSceneIndex.cpp
@@ -27,13 +33,22 @@ target_sources(${TARGET_NAME}
         testUsdStageLayerMuting.cpp
         testMeshAdapterTransform.cpp
         testFlowViewportAPIFilterPrims.cpp
+        testSceneCorrectness.cpp
         testPrimInstancing.cpp
+        testPicking.cpp
+        testUsdAnim.cpp
+        testUsdPointInstancePicking.cpp
+        testUsdPicking.cpp
         testNurbsSurfaces.cpp
 )
 
 # -----------------------------------------------------------------------------
 # compiler configuration
 # -----------------------------------------------------------------------------
+# QT_NO_KEYWORDS prevents Qt from defining the foreach, signals, slots and emit macros.
+# this avoids overlap between Qt macros and boost, and enforces using Q_ macros.
+set_target_properties(Qt6::Core PROPERTIES INTERFACE_COMPILE_DEFINITIONS QT_NO_KEYWORDS)
+
 mayaHydra_compile_config(${TARGET_NAME})
 
 target_compile_definitions(${TARGET_NAME}
@@ -59,6 +74,8 @@ target_link_libraries(${TARGET_NAME}
         mayaHydraLib
         ${GTEST_LIBRARIES}
         flowViewport
+        Qt6::Core
+        Qt6::Widgets
 )
 
 # -----------------------------------------------------------------------------

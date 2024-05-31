@@ -20,32 +20,19 @@ import mtohUtils
 
 import platform
 
-class TestMayaIsolateSelect(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
+class TestMayaIsolateSelect(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    @property
-    def imageDiffFailThreshold(self):
-        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
-        # for that platform specifically for now, so we can still catch issues on other platforms.
-        if platform.system() == "Darwin":
-            return 0.1
-        return 0.01
-    
-    @property
-    def imageDiffFailPercent(self):
-        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
-        # for that platform specifically for now, so we can still catch issues on other platforms.
-        if platform.system() == "Darwin":
-            return 4
-        return 0.2
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
+    IMAGE_DIFF_FAIL_PERCENT = 0.2
 
     def test_IsolateSelect(self):
 
         sphere = cmds.sphere( n='sphere1' )
         cone = cmds.cone( n='cone1' )
         cmds.move( 1, 5, 1 )
-        self.assertSnapshotClose("default" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("default" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         # Use the current modelPanel for isolation
         isolated_panel = cmds.paneLayout('viewPanes', q=True, pane1=True)  
@@ -54,7 +41,7 @@ class TestMayaIsolateSelect(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
         
         cmds.select(sphere)
         cmds.isolateSelect( isolated_panel, state=1 )
-        self.assertSnapshotClose("isolateSelect" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("isolateSelect" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

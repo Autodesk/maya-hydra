@@ -11,12 +11,14 @@ target_sources(${TARGET_NAME}
     mayaHydraCameraDataSource.cpp
     mayaHydraLightDataSource.cpp
     mayaHydraDefaultLightDataSource.cpp
+    mayaHydraDefaultMaterialDataSource.cpp
     mayaHydraMayaDataProducerSceneIndexData.cpp
     mayaHydraMayaDataProducerSceneIndexDataConcreteFactory.cpp
     mayaHydraSceneIndexDataFactoriesSetup.cpp
     mayaHydraMayaFilteringSceneIndexData.cpp
     mayaHydraMayaFilteringSceneIndexDataConcreteFactory.cpp
     mhMayaUsdProxyShapeSceneIndex.cpp
+    mhDirtyLeadObjectSceneIndex.cpp
 )
 
 set(HEADERS
@@ -27,13 +29,16 @@ set(HEADERS
     mayaHydraDisplayStyleDataSource.h
     mayaHydraCameraDataSource.h
     mayaHydraLightDataSource.h
+    mayaHydraSceneIndexUtils.h
     mayaHydraDefaultLightDataSource.h
+    mayaHydraDefaultMaterialDataSource.h
     mayaHydraMayaDataProducerSceneIndexData.h
     mayaHydraMayaDataProducerSceneIndexDataConcreteFactory.h
     mayaHydraSceneIndexDataFactoriesSetup.h
     mayaHydraMayaFilteringSceneIndexData.h
     mayaHydraMayaFilteringSceneIndexDataConcreteFactory.h
     mhMayaUsdProxyShapeSceneIndex.h
+    mhDirtyLeadObjectSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------

@@ -24,7 +24,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 // clang-format off
 #define MTOH_TOKENS \
     (HdStormRendererPlugin) \
-    (mtohMaximumShadowMapResolution)
+    (mtohMaximumShadowMapResolution) \
+    (mayaHydraRefinementLevel)
 // clang-format on
 
 // This is not an exported API.

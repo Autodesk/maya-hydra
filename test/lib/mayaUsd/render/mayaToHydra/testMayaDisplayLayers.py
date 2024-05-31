@@ -20,25 +20,12 @@ import mtohUtils
 
 import platform
 
-class TestMayaDisplayLayers(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
+class TestMayaDisplayLayers(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    @property
-    def imageDiffFailThreshold(self):
-        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
-        # for that platform specifically for now, so we can still catch issues on other platforms.
-        if platform.system() == "Darwin":
-            return 0.1
-        return 0.01
-    
-    @property
-    def imageDiffFailPercent(self):
-        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
-        # for that platform specifically for now, so we can still catch issues on other platforms.
-        if platform.system() == "Darwin":
-            return 4
-        return 0.2
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
+    IMAGE_DIFF_FAIL_PERCENT = 0.2
     
     def setLayerDisplayType(self, val):        
         allLayers = cmds.ls(long=True, type='displayLayer')
@@ -53,7 +40,7 @@ class TestMayaDisplayLayers(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
         cone = cmds.cone( n='cone1' )
         cmds.move( 1, 5, 1 )
         cmds.select(None)
-        self.assertSnapshotClose("default" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("default" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
         cmds.select(sphere)
         # Create the Display layer for Sphere
@@ -67,14 +54,14 @@ class TestMayaDisplayLayers(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
         cmds.select(None)
         cmds.refresh()
         # All layers  
-        self.assertSnapshotClose("allLayers" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("allLayers" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         # Hide Sphere
         cmds.setAttr(sphereLayer+".visibility", False)
         cmds.refresh()
 
         # Only Cone  
-        self.assertSnapshotClose("coneLayer" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("coneLayer" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         # Unhide Sphere
         cmds.setAttr(sphereLayer+".visibility", True)
@@ -83,7 +70,7 @@ class TestMayaDisplayLayers(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
         # Custom Wireframe Color for Cone layer
         cmds.setAttr(conePlayer+".levelOfDetail", 1)
         cmds.setAttr(conePlayer+".color", 11)
-        self.assertSnapshotClose("coneLayerCustomWireframe" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("coneLayerCustomWireframe" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.setAttr(conePlayer+".levelOfDetail", 0)
         cmds.refresh()
 
@@ -92,18 +79,18 @@ class TestMayaDisplayLayers(mtohUtils.MtohTestCase): #Subclassing mtohUtils.Mtoh
         # Template        
         cmds.select(None)
         self.setLayerDisplayType(1)
-        self.assertSnapshotClose("layerTemplate" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)        
+        self.assertSnapshotClose("layerTemplate" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
         cmds.refresh()
         cmds.select(sphere)
-        self.assertSnapshotClose("layerTemplateSelected" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("layerTemplateSelected" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.select(None)
         
         # Reference
         self.setLayerDisplayType(2)
-        self.assertSnapshotClose("layerReference" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)      
+        self.assertSnapshotClose("layerReference" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)      
         cmds.refresh()
         cmds.select(sphere)
-        self.assertSnapshotClose("layerReferenceSelected" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("layerReferenceSelected" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.select(None)
 
         # reset to normal

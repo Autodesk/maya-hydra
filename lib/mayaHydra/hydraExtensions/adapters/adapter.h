@@ -19,18 +19,32 @@
 #define MAYAHYDRALIB_ADAPTER_H
 
 #include <mayaHydraLib/api.h>
-#include <mayaHydraLib/delegates/delegateCtx.h>
 
+#include <pxr/imaging/hd/sceneDelegate.h>
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
+#include <pxr/base/arch/hints.h>
+#include <pxr/base/gf/interval.h>
+#include <pxr/imaging/hd/engine.h>
+#include <pxr/imaging/hd/renderIndex.h>
+#include <pxr/imaging/hd/rendererPlugin.h>
+#include <pxr/imaging/hd/selection.h>
+#include <pxr/imaging/hdx/pickTask.h>
+#include <pxr/imaging/hdx/taskController.h>
 
 #include <maya/MMessage.h>
+#include <maya/MAnimControl.h>
+#include <maya/MDGContextGuard.h>
+#include <maya/MDrawContext.h>
+#include <maya/MPointArray.h>
+#include <maya/MSelectionContext.h>
+#include <maya/MSelectionList.h>
 
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class MayaHydraSceneProducer;
+class MayaHydraSceneIndex;
 
 /**
  * \brief MayaHydraAdapter is the base class for all adapters. An adapter is used to translate from
@@ -41,12 +55,12 @@ class MayaHydraAdapter
 {
 public:
     MAYAHYDRALIB_API
-    MayaHydraAdapter(const MObject& node, const SdfPath& id, MayaHydraSceneProducer* producer);
+    MayaHydraAdapter(const MObject& node, const SdfPath& id, MayaHydraSceneIndex* mayaHydraSceneIndex);
     MAYAHYDRALIB_API
     virtual ~MayaHydraAdapter();
 
-    const SdfPath&        GetID() const { return _id; }
-    MayaHydraSceneProducer* GetSceneProducer() const { return _sceneProducer; }
+    const SdfPath&       GetID() const { return _id; }
+    MayaHydraSceneIndex* GetMayaHydraSceneIndex() const { return _mayaHydraSceneIndex; }
     MAYAHYDRALIB_API
     void AddCallback(MCallbackId callbackId);
     MAYAHYDRALIB_API
@@ -90,12 +104,23 @@ public:
     MAYAHYDRALIB_API
     virtual HdCullStyle GetCullStyle() const { return HdCullStyleNothing; }
     MAYAHYDRALIB_API
-    virtual HdDisplayStyle GetDisplayStyle() { return { 0, false, false }; }
+    virtual HdDisplayStyle GetDisplayStyle() { 
+        constexpr int refineLevel = 0;
+        constexpr bool flatShading = false;
+        constexpr bool displacement = false;
+        constexpr bool occludedSelectionShowsThrough = false;
+        constexpr bool pointsShadingEnabled = false;
+        constexpr bool materialIsFinal = false;
+        return HdDisplayStyle(refineLevel, flatShading, displacement, occludedSelectionShowsThrough, pointsShadingEnabled, materialIsFinal); }
+    MAYAHYDRALIB_API
+    virtual GfBBox3d GetBoundingBox() const { return GfBBox3d(); }
+    MAYAHYDRALIB_API
+    virtual GfVec4f GetDisplayColor() const { return {1.f,1.f,1.f,1.f}; }
 
 protected:
     SdfPath                  _id;
     std::vector<MCallbackId> _callbacks;
-    MayaHydraSceneProducer*  _sceneProducer;
+    MayaHydraSceneIndex*     _mayaHydraSceneIndex;
     MObject                  _node;
 
     bool _isPopulated = false;

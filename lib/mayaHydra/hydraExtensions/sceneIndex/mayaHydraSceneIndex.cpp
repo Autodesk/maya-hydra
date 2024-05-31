@@ -1,5 +1,5 @@
 //
-// Copyright 2023 Autodesk, Inc. All rights reserved.
+// Copyright 2024 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -39,7 +39,6 @@
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
-#include <mayaHydraLib/mayaHydraSceneProducer.h>
 
 #include <ufeExtensions/Global.h>
 
@@ -72,9 +71,12 @@ TF_DEFINE_ENV_SETTING(MAYA_HYDRA_USE_MESH_ADAPTER, false,
     "Use mesh adapter instead of MRenderItem for Maya meshes.");
 
 bool useMeshAdapter() {
-    static bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
+    static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
     return uma;
 }
+
+TF_DEFINE_ENV_SETTING(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA, true,
+    "Pass the normals to Hydra (works for both render item and mesh adapters).");
 
 namespace {
     bool filterMesh(const MRenderItem& ri) {
@@ -361,6 +363,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((MayaDefaultMaterial, "__maya_default_material__"))
     (diffuseColor)
     (emissiveColor)
+    (opacity)
     (roughness)
     (MayaHydraMeshPoints)
     (constantLighting)
@@ -373,10 +376,10 @@ VtValue MayaHydraSceneIndex::_mayaDefaultMaterial;
 SdfPath MayaHydraSceneIndex::_mayaDefaultLightPath; // Common to all scene indexes
 
 MayaHydraSceneIndex::MayaHydraSceneIndex(
-    MayaHydraDelegate::InitData& initData,
+    MayaHydraInitData& initData,
     bool lightEnabled)
-    : _ID(initData.delegateID)
-    , _producer(initData.producer)
+    : _ID(initData.delegateID.AppendChild(
+        TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this))))
     , _renderIndex(initData.renderIndex)
     , _isHdSt(initData.isHdSt)
     , _rprimPath(initData.delegateID.AppendPath(SdfPath(std::string("rprims"))))
@@ -476,7 +479,7 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
             }
             // MAYA-128021: We do not currently support maya instances.
             MDagPath dagPath(ri.sourceDagPath());
-            ria = std::make_shared<MayaHydraRenderItemAdapter>(dagPath, slowId, fastId, _producer, ri);
+            ria = std::make_shared<MayaHydraRenderItemAdapter>(dagPath, slowId, fastId, this, ri);
 
             //Update the render item adapter if this render item is an aiSkydomeLight shape
             ria->SetIsRenderITemAnaiSkydomeLightTriangleShape(isRenderItem_aiSkyDomeLightTriangleShape(ri));
@@ -584,9 +587,29 @@ void MayaHydraSceneIndex::SetDefaultLight(const GlfSimpleLight& light)
     }
 }
 
+void modifyDefaultMaterialOpacity(HdMaterialNetworkMap& materialNetworkMap, bool xrayEnabled) {
+    
+    // Hardcoded value taken from OGSMayaRenderItem::UpdateExtraOpacityParam
+    constexpr float xRayOpacityValue = 0.3f;
+    const TfToken _opacityToken("opacity");
+    for (auto &iter: materialNetworkMap.map) {
+        HdMaterialNetwork &hdNetwork = iter.second;
+        if (hdNetwork.nodes.empty())      
+            continue;
+        for (HdMaterialNode &node : hdNetwork.nodes) {
+            const auto it = node.parameters.find(_opacityToken);
+            if (it != node.parameters.cend()) 
+                node.parameters[_opacityToken] = xrayEnabled ? xRayOpacityValue : 1.f;
+        }
+    }
+}
+
 VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
 {
     if (id == _mayaDefaultMaterialPath) {
+        modifyDefaultMaterialOpacity(
+            const_cast<HdMaterialNetworkMap&>(_mayaDefaultMaterial.UncheckedGet<HdMaterialNetworkMap>()),
+            _xRayEnabled);
         return _mayaDefaultMaterial;
     }
 
@@ -613,6 +636,9 @@ VtValue MayaHydraSceneIndex::CreateMayaDefaultMaterial()
     node.parameters.insert(
         { _tokens->diffuseColor,
           VtValue(GfVec3f(kDefaultGrayColor[0], kDefaultGrayColor[1], kDefaultGrayColor[2])) });
+    node.parameters.insert(
+        { _tokens->opacity,
+          VtValue(float(1.0f))});
     network.nodes.push_back(std::move(node));
     networkMap.map.insert({ HdMaterialTerminalTokens->surface, std::move(network) });
     networkMap.terminals.push_back(_mayaDefaultMaterialPath);
@@ -649,7 +675,7 @@ SdfPath MayaHydraSceneIndex::SetCameraViewport(const MDagPath& camPath, const Gf
 
 bool MayaHydraSceneIndex::AddPickHitToSelectionList(
     const HdxPickHit& hit,
-    const MHWRender::MSelectionInfo& selectInfo,
+    const MHWRender::MSelectionInfo& /* selectInfo */,
     MSelectionList& selectionList,
     MPointArray& worldSpaceHitPts)
 {
@@ -703,12 +729,24 @@ LightDagPathMap MayaHydraSceneIndex::_GetGlobalLightPaths() const
     return allLightPaths;
 }
 
+
+void MayaHydraSceneIndex::SetDefaultMaterial(bool useDefMaterial)
+{
+    if (useDefMaterial) {
+        auto mayaDefaultMaterialDataSource = MayaHydraDefaultMaterialDataSource::New(_mayaDefaultMaterialPath, HdPrimTypeTokens->material, this);
+        AddPrims({ { _mayaDefaultMaterialPath, HdPrimTypeTokens->material, mayaDefaultMaterialDataSource } });
+    }
+    else
+        RemovePrim(_mayaDefaultMaterialPath);
+}
+
 void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
 {
     bool useDefaultMaterial
         = (context.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
     if (useDefaultMaterial != _useDefaultMaterial) {
         _useDefaultMaterial = useDefaultMaterial;
+        SetDefaultMaterial(_useDefaultMaterial);
         if (useMeshAdapter()) {
             for (const auto& shape : _shapeAdapters)
                 shape.second->MarkDirty(HdChangeTracker::DirtyMaterialId);
@@ -721,7 +759,6 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         for (auto& matAdapter : _materialAdapters)
             matAdapter.second->EnableXRayShadingMode(_xRayEnabled);
     }
-
     if (!_materialTagsChanged.empty()) {
         if (IsHdSt()) {
             for (const auto& id : _materialTagsChanged) {
@@ -903,6 +940,11 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         _lightAdapters);
 }
 
+bool MayaHydraSceneIndex::GetPlaybackRunning() const
+{
+    return _isPlaybackRunning;
+}
+
 void MayaHydraSceneIndex::PostFrame()
 {
 }
@@ -927,7 +969,6 @@ void MayaHydraSceneIndex::InsertPrim(
     // Therefore, insert missing ancestors ourselves, with a non-null data
     // source and empty type.
     _AddPrimAncestors(id);
-
     AddPrims({ { id, typeId, dataSource } });
 }
 
@@ -1049,10 +1090,6 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
 
 SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
 {
-    if (_useDefaultMaterial) {
-        return _mayaDefaultMaterialPath;
-    }
-
     auto result = TfMapLookupPtr(_renderItemsAdapters, id);
     if (result != nullptr) {
         auto& renderItemAdapter = *result;
@@ -1062,7 +1099,9 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
             || MHWRender::MGeometry::Primitive::kLineStrip == renderItemAdapter->GetPrimitive()) {
             return _fallbackMaterial;
         }
-
+        else if (_useDefaultMaterial) {
+            return _mayaDefaultMaterialPath;
+        }
         auto& material = renderItemAdapter->GetMaterial();
 
         if (material == kInvalidMaterial) {
@@ -1075,6 +1114,9 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
     }
 
     if (useMeshAdapter()) {
+        if (_useDefaultMaterial) {
+            return _mayaDefaultMaterialPath;
+        }
         auto shapeAdapter = TfMapLookupPtr(_shapeAdapters, id);
         if (shapeAdapter == nullptr) {
             return _fallbackMaterial;
@@ -1287,7 +1329,7 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
 template <typename AdapterPtr, typename Map>
 AdapterPtr MayaHydraSceneIndex::_CreateAdapter(
     const MDagPath& dag,
-    const std::function<AdapterPtr(MayaHydraSceneProducer*, const MDagPath&)>& adapterCreator,
+    const std::function<AdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>& adapterCreator,
     Map& adapterMap,
     bool                                                                     isSprim)
 {
@@ -1308,7 +1350,7 @@ AdapterPtr MayaHydraSceneIndex::_CreateAdapter(
     if (TfMapLookupPtr(adapterMap, id) != nullptr) {
         return {};
     }
-    auto adapter = adapterCreator(GetProducer(), dag);
+    auto adapter = adapterCreator(this, dag);
     if (adapter == nullptr || !adapter->IsSupported()) {
         return {};
     }
@@ -1447,7 +1489,7 @@ bool MayaHydraSceneIndex::_CreateMaterial(const SdfPath& id, const MObject& obj)
     if (materialCreator == nullptr) {
         return false;
     }
-    auto materialAdapter = materialCreator(id, GetProducer(), obj);
+    auto materialAdapter = materialCreator(id, this, obj);
     if (materialAdapter == nullptr || !materialAdapter->IsSupported()) {
         return false;
     }
@@ -1511,12 +1553,10 @@ VtValue MayaHydraSceneIndex::GetShadingStyle(SdfPath const& id)
     return VtValue();
 }
 
-const std::shared_ptr<Fvp::RenderIndexProxy> MayaHydraSceneIndex::GetRenderIndexProxy()
+bool MayaHydraSceneIndex::passNormalsToHydra() 
 {
-    if (! _producer){
-        TF_CODING_ERROR("The MayaHydraSceneProducer pointer should not be a nullptr !");
-    }
-    return _producer->GetRenderIndexProxy();
+    static const bool val = TfGetEnvSetting(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA);
+    return val;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

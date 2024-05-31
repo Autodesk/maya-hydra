@@ -23,8 +23,6 @@ import ufe
 
 from testUtils import PluginLoaded
 
-import unittest
-
 class TestPathInterface(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
@@ -66,7 +64,6 @@ class TestPathInterface(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.refresh()
 
-    @unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")
     def test_PathInterface(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):

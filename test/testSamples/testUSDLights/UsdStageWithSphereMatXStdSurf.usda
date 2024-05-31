@@ -1,0 +1,25 @@
+#usda 1.0
+
+def Sphere "Sphere1" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    rel material:binding = </mtl/standard_surface1>
+    double3 xformOp:translate = (0, 0, -2.3244301402269603)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+
+def Scope "mtl"
+{
+    def Material "standard_surface1"
+    {
+        token outputs:mtlx:surface.connect = </mtl/standard_surface1/standard_surface1.outputs:out>
+
+        def Shader "standard_surface1"
+        {
+            uniform token info:id = "ND_standard_surface_surfaceshader"
+            token outputs:out
+        }
+    }
+}
+

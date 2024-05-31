@@ -13,16 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import sys
-import unittest
-
 import maya.cmds as cmds
 import maya.mel
 
 import fixturesUtils
+import mayaUtils
 import mtohUtils
 
-class TestDagChanges(mtohUtils.MtohTestCase):
+class TestDagChanges(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def setUp(self):
@@ -262,7 +260,7 @@ class TestDagChanges(mtohUtils.MtohTestCase):
         self.assertSnapshotEqual("instances_12.png", self.imageVersion)
 
 
-class TestUndo(mtohUtils.MtohTestCase):
+class TestUndo(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def test_node_creation_undo(self):
@@ -274,7 +272,7 @@ class TestUndo(mtohUtils.MtohTestCase):
 
         cmds.undoInfo(state=0)
         try:
-            cmds.file(new=1, f=1)
+            mayaUtils.openNewScene()
             self.setBasicCam()
 
             self.setHdStormRenderer()

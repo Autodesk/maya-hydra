@@ -15,8 +15,6 @@
 #
 import os
 import maya.cmds as cmds
-import maya.mel
-import mayaUtils
 import subprocess
 
 KNOWN_FORMATS = {
@@ -31,19 +29,8 @@ KNOWN_FORMATS = {
     'bmp': 20,
     'png': 32,
 }
-def resetDefaultLightIntensity():
-    """If the current Maya version supports setting the default light intensity,
-        then restore it to 1 so snapshots look equal across versions."""
-    if maya.mel.eval("optionVar -exists defaultLightIntensity"):
-        maya.mel.eval("optionVar -fv defaultLightIntensity 1")
-    if cmds.attributeQuery('defaultLightIntensity', node='hardwareRenderingGlobals', exists=True):
-        cmds.setAttr('hardwareRenderingGlobals.defaultLightIntensity', 1.0)
-resetDefaultLightIntensity()
 
-def snapshot(outputPath, width=400, height=None, hud=False, grid=False, camera=None):
-    resetDefaultLightIntensity()
-    cmds.displayRGBColor('background', 0.36, 0.36, 0.36)
-    
+def snapshot(outputPath, width=400, height=None):
     if height is None:
         height = width
 
@@ -60,71 +47,15 @@ def snapshot(outputPath, width=400, height=None, hud=False, grid=False, camera=N
 
     # save the old output image format
     oldFormat = cmds.getAttr("defaultRenderGlobals.imageFormat")
-    # save the hud setting
-    oldHud = cmds.headsUpDisplay(q=1, layoutVisibility=1)
-    # save the grid setting
-    oldGrid = cmds.grid(q=1, toggle=1)
-    # save the old view transform
-    oldColorTransform = cmds.colorManagementPrefs(q=1, outputTarget="playblast",
-                                                  outputTransformName=1)
 
-    # Some environments use legacy synColor transforms with 2022 and above.
-    # Find whether the color config should be Raw or Raw legacy
-    # However depending on the MAYA_COLOR_MANAGEMENT_SYNCOLOR env var or the loaded
-    # configs, this may be under a different names. So procedurally find it.
-    colorTransforms = cmds.colorManagementPrefs(q=1, outputTransformNames=True)
-    if "Raw" in colorTransforms:
-        newColorTransform = "Raw"
-    elif "Raw (legacy)" in colorTransforms:
-        newColorTransform = "Raw (legacy)"
-    else:
-        # RAW should be reliably raw-like in most configs, so find the first ending in RAW
-        newColorTransform = [c for c in colorTransforms if c.startswith("Raw ")]
-        if newColorTransform:
-            newColorTransform = newColorTransform[0]
-        else:
-            raise RuntimeError("Could not find Raw color space in available color transforms")
-
-    # Some environments have locked color policies that prevent changing color policies
-    # so we must disable and restore this accordingly.
-    lockedColorTransforms = os.environ.get("MAYA_COLOR_MANAGEMENT_POLICY_LOCK") == '1'
-    if lockedColorTransforms:
-        os.environ['MAYA_COLOR_MANAGEMENT_POLICY_LOCK'] = '0'
-
-
-    # Find the current model panel for playblasting
-    # to make sure the desired camera is set, if any
-    panel = mayaUtils.activeModelPanel()
-    oldCamera = cmds.modelPanel(panel, q=True, cam=True)
-    if camera:
-        cmds.modelEditor(panel, edit=True, camera=camera)
-
-
-    # do these in a separate try/finally from color management, because
-    # color management seems a bit more finicky
     cmds.setAttr("defaultRenderGlobals.imageFormat", formatNum)
-    cmds.headsUpDisplay(layoutVisibility=hud)
-    cmds.grid(toggle=grid)
     try:
-        cmds.colorManagementPrefs(e=1, outputTarget="playblast",
-                                  outputTransformName=newColorTransform)
-        try:
-            cmds.refresh()
-            cmds.playblast(cf=outputPath, viewer=False, format="image",
-                           frame=cmds.currentTime(q=1), offScreen=1,
-                           widthHeight=(width, height), percent=100)
-        finally:
-            cmds.colorManagementPrefs(e=1, outputTarget="playblast",
-                                      outputTransformName=oldColorTransform)
+        cmds.refresh()
+        cmds.playblast(cf=outputPath, viewer=False, format="image",
+                       frame=cmds.currentTime(q=1), offScreen=1,
+                       widthHeight=(width, height), percent=100)
     finally:
         cmds.setAttr("defaultRenderGlobals.imageFormat", oldFormat)
-        cmds.headsUpDisplay(layoutVisibility=oldHud)
-        cmds.grid(toggle=oldGrid)
-        if lockedColorTransforms:
-            os.environ['MAYA_COLOR_MANAGEMENT_POLICY_LOCK'] = '1'
-        
-        if camera:
-            cmds.lookThru(panel, oldCamera)
 
 def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail, 
                 warn, warnpercent, hardwarn, perceptual):    

@@ -13,8 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Copyright 2023 Autodesk, Inc. All rights reserved.
+// Copyright 2024 Autodesk, Inc. All rights reserved.
 //
+
 
 // GL loading library needs to be included before any other OpenGL headers.
 #include <pxr/imaging/garch/glApi.h>
@@ -26,8 +27,6 @@
 #include "renderOverrideUtils.h"
 #include "tokens.h"
 
-#include <mayaHydraLib/delegates/delegateRegistry.h>
-#include <mayaHydraLib/delegates/sceneDelegate.h>
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
 #include <mayaHydraLib/hydraUtils.h>
@@ -45,13 +44,19 @@
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
+#include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
+#include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/type.h>
 #include <pxr/base/gf/vec3f.h>
+#include <pxr/base/tf/staticTokens.h>
+#include <pxr/pxr.h>
 
 #include <ufe/hierarchy.h>
+#include <ufe/selection.h>
 #include <ufe/namedSelection.h>
 #include <ufe/path.h>
 #include <ufe/pathString.h>
@@ -77,7 +82,12 @@
 #include <pxr/imaging/hdx/tokens.h>
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
+#include <pxr/usd/kind/registry.h>
+#include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usd/modelAPI.h>
 #include <pxr/pxr.h>
+
+#include <mayaUsdAPI/proxyStage.h>
 
 #include <maya/M3dView.h>
 #include <maya/MConditionMessage.h>
@@ -103,6 +113,271 @@
 int _profilerCategory = MProfiler::addCategory(
     "MtohRenderOverride (mayaHydra)",
     "Events from mayaHydra render override");
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+// Copy-pasted and adapted from maya-usd's
+// https://github.com/Autodesk/maya-usd/blob/dev/lib/mayaUsd/base/tokens.h
+// https://github.com/Autodesk/maya-usd/blob/dev/lib/mayaUsd/base/tokens.cpp
+
+// Tokens that are used as picking optionVars in MayaUSD
+//
+// clang-format off
+#define MAYAUSD_PICK_OPTIONVAR_TOKENS                   \
+    /* The kind to be selected when viewport picking. */ \
+    /* After resolving the picked prim, a search from */ \
+    /* that prim up the USD namespace hierarchy will  */ \
+    /* be performed looking for a prim that matches   */ \
+    /* the kind in the optionVar. If no prim matches, */ \
+    /* or if the selection kind is unspecified or     */ \
+    /* empty, the exact prim picked in the viewport   */ \
+    /* is selected.                                   */ \
+    ((SelectionKind, "mayaUsd_SelectionKind"))           \
+    /* The method to use to resolve viewport picking  */ \
+    /* when the picked object is a point instance.    */ \
+    /* The default behavior is "PointInstancer" which */ \
+    /* will resolve to the PointInstancer prim that   */ \
+    /* generated the point instance. The optionVar    */ \
+    /* can also be set to "Instances" which will      */ \
+    /* resolve to individual point instances, or to   */ \
+    /* "Prototypes" which will resolve to the prim    */ \
+    /* that is being instanced by the point instance. */ \
+    ((PointInstancesPickMode, "mayaUsd_PointInstancesPickMode")) \
+// clang-format on
+
+TF_DEFINE_PRIVATE_TOKENS(MayaUsdPickOptionVars, MAYAUSD_PICK_OPTIONVAR_TOKENS);
+
+// Copy-pasted and adapted from maya-usd's
+// https://github.com/Autodesk/maya-usd/blob/dev/lib/mayaUsd/render/vp2RenderDelegate/proxyRenderDelegate.h
+// https://github.com/Autodesk/maya-usd/blob/dev/lib/mayaUsd/render/vp2RenderDelegate/proxyRenderDelegate.cpp
+
+// clang-format off
+TF_DEFINE_PRIVATE_TOKENS(
+    _pointInstancesPickModeTokens,
+
+    (PointInstancer)
+    (Instances)
+    (Prototypes)
+);
+// clang-format on
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
+namespace {
+
+PXR_NAMESPACE_USING_DIRECTIVE
+
+static const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaHydraViewportRenderer");
+
+// Copy pasted from
+// https://github.com/Autodesk/maya-usd/blob/dev/lib/mayaUsd/render/vp2RenderDelegate/proxyRenderDelegate.cpp
+
+//! \brief  Query the Kind to be selected from viewport.
+//! \return A Kind token (https://graphics.pixar.com/usd/docs/api/kind_page_front.html). If the
+//!         token is empty or non-existing in the hierarchy, the exact prim that gets picked
+//!         in the viewport will be selected.
+TfToken GetSelectionKind()
+{
+    static const MString kOptionVarName(MayaUsdPickOptionVars->SelectionKind.GetText());
+
+    if (MGlobal::optionVarExists(kOptionVarName)) {
+        MString optionVarValue = MGlobal::optionVarStringValue(kOptionVarName);
+        return TfToken(optionVarValue.asChar());
+    }
+    return TfToken();
+}
+
+//! \brief  Returns the prim or an ancestor of it that is of the given kind.
+//
+// If neither the prim itself nor any of its ancestors above it in the
+// namespace hierarchy have an authored kind that matches, an invalid null
+// prim is returned.
+UsdPrim GetPrimOrAncestorWithKind(const UsdPrim& prim, const TfToken& kind)
+{
+    UsdPrim iterPrim = prim;
+    TfToken primKind;
+
+    while (iterPrim) {
+        if (UsdModelAPI(iterPrim).GetKind(&primKind) && KindRegistry::IsA(primKind, kind)) {
+            break;
+        }
+
+        iterPrim = iterPrim.GetParent();
+    }
+
+    return iterPrim;
+}
+
+//! Pick resolution behavior to use when the picked object is a point instance.
+enum UsdPointInstancesPickMode
+{
+    //! The PointInstancer prim that generated the point instance is picked. If
+    //! multiple nested PointInstancers are involved, the top-level
+    //! PointInstancer is the one picked. If a selection kind is specified, the
+    //! traversal up the hierarchy looking for a kind match will begin at that
+    //! PointInstancer.
+    PointInstancer = 0,
+    //! The specific point instance is picked. These are represented as
+    //! UsdSceneItems with UFE paths to a PointInstancer prim and a non-negative
+    //! instanceIndex for the specific point instance. In this mode, any setting
+    //! for selection kind is ignored.
+    Instances,
+    //! The prototype being instanced by the point instance is picked. If a
+    //! selection kind is specified, the traversal up the hierarchy looking for
+    //! a kind match will begin at the prototype prim.
+    Prototypes
+};
+
+//! \brief  Query the pick mode to use when picking point instances in the viewport.
+//! \return A UsdPointInstancesPickMode enum value indicating the pick mode behavior
+//!         to employ when the picked object is a point instance.
+//!
+//! This function retrieves the value for the point instances pick mode optionVar
+//! and converts it into a UsdPointInstancesPickMode enum value. If the optionVar
+//! has not been set or otherwise has an invalid value, the default pick mode of
+//! PointInstancer is returned.
+UsdPointInstancesPickMode GetPointInstancesPickMode()
+{
+    static const MString kOptionVarName(MayaUsdPickOptionVars->PointInstancesPickMode.GetText());
+
+    auto pickMode = UsdPointInstancesPickMode::PointInstancer;
+
+    if (MGlobal::optionVarExists(kOptionVarName)) {
+        const TfToken pickModeToken(MGlobal::optionVarStringValue(kOptionVarName).asChar());
+
+        if (pickModeToken == _pointInstancesPickModeTokens->Instances) {
+            pickMode = UsdPointInstancesPickMode::Instances;
+        } else if (pickModeToken == _pointInstancesPickModeTokens->Prototypes) {
+            pickMode = UsdPointInstancesPickMode::Prototypes;
+        }
+    }
+
+    return pickMode;
+}
+
+struct PickInput {
+    PickInput(
+        const HdxPickHit&                pickHitArg, 
+        const MHWRender::MSelectionInfo& pickInfoArg
+    ) : pickHit(pickHitArg), pickInfo(pickInfoArg) {}
+
+    const HdxPickHit&                pickHit;
+    const MHWRender::MSelectionInfo& pickInfo;
+};
+
+// Picking output can go either to the UFE representation of the Maya selection
+// (which supports non-Maya objects), or the classic MSelectionList
+// representation of the Maya selection (which only supports Maya objects). It
+// is up to the implementer of the pick handler to decide which is used. If the
+// Maya selection is used, there must be a world space hit point in one to one
+// correspondence with each Maya selection item placed into the MSelectionList.
+struct PickOutput {
+    PickOutput(
+        MSelectionList&                 mayaSn,
+        MPointArray&                    worldSpaceHitPts,
+        const Ufe::NamedSelection::Ptr& ufeSn
+    ) : mayaSelection(mayaSn), mayaWorldSpaceHitPts(worldSpaceHitPts),
+        ufeSelection(ufeSn) {}
+
+    MSelectionList&                 mayaSelection;
+    MPointArray&                    mayaWorldSpaceHitPts;
+    const Ufe::NamedSelection::Ptr& ufeSelection;
+};
+
+// The SdfPath is in the original data model scene (USD), not in
+// the scene index scene. 
+using HitPath = std::tuple<SdfPath, int>;
+
+SdfPath instancerPrimOrigin(const HdxInstancerContext& instancerContext)
+{
+    // When USD prims are converted to Hydra prims (including point instancers),
+    // they are given a prim origin data source which provides the information
+    // as to which prim in the USD data model produced the rprim in the Hydra
+    // scene index scene. This is what is used here to provide the Hydra scene
+    // path to USD scene path picking to selection mapping.
+    auto schema = HdPrimOriginSchema(instancerContext.instancerPrimOrigin);
+    if (!schema) {
+        return {};
+    }
+
+    return schema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath);
+}
+
+HitPath pickInstance(
+    const HdxPrimOriginInfo& primOrigin, const HdxPickHit& hit
+)
+{
+    // We match VP2 behavior and return the instance on the top-level instancer.
+    const auto& instancerContext = primOrigin.instancerContexts.front();
+    return {
+        instancerPrimOrigin(instancerContext), instancerContext.instanceId};
+}
+
+HitPath pickPrototype(
+    const HdxPrimOriginInfo& primOrigin, const HdxPickHit& hit
+)
+{
+    // The prototype path is the prim origin path in the USD data model.
+    return {primOrigin.GetFullPath(), -1};
+}
+
+HitPath pickInstancer(
+    const HdxPrimOriginInfo& primOrigin, const HdxPickHit& hit
+)
+{
+    // To return the top-level instancer, we use the first instancer context
+    // prim origin.  To return the innermost instancer, we would use the last
+    // instancer context prim origin.
+    return {instancerPrimOrigin(primOrigin.instancerContexts.front()), -1};
+}
+
+Ufe::Path usdPathToUfePath(
+    const MayaHydraSceneIndexRegistrationPtr& registration,
+    const SdfPath&                            usdPath
+)
+{
+    return registration ? registration->interpretRprimPathFn(
+        registration->pluginSceneIndex, usdPath) : Ufe::Path();
+}
+
+inline bool areDifferentForOneOfTheseBits(unsigned int val1, unsigned int val2, unsigned int bitsToTest)
+{
+    return ((val1 & bitsToTest) != (val2 & bitsToTest));
+}
+
+}
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+class MtohRenderOverride::PickHandlerBase {
+public:
+
+    virtual bool handlePickHit(
+        const PickInput& pickInput, PickOutput& pickOutput
+    ) const = 0;
+
+protected:
+
+    PickHandlerBase(MtohRenderOverride& renderOverride) : 
+        _renderOverride(renderOverride) {}
+
+    MayaHydraSceneIndexRefPtr mayaSceneIndex() const {
+        return _renderOverride._mayaHydraSceneIndex;
+    }
+
+    std::shared_ptr<const MayaHydraSceneIndexRegistry>
+    sceneIndexRegistry() const {
+        return _renderOverride._sceneIndexRegistry;
+    }
+
+    HdRenderIndex* renderIndex() const { return _renderOverride._renderIndex; }
+
+private:
+
+    MtohRenderOverride& _renderOverride;
+};
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace {
 
@@ -132,6 +407,152 @@ void replaceSelectionTask(PXR_NS::HdTaskSharedPtrVector* tasks)
 
     *found = HdTaskSharedPtr(new Fvp::SelectionTask);
 }
+
+class MayaPickHandler : public MtohRenderOverride::PickHandlerBase {
+public:
+
+    MayaPickHandler(MtohRenderOverride& renderOverride) : 
+        PickHandlerBase(renderOverride) {}
+
+    bool handlePickHit(
+        const PickInput& pickInput, PickOutput& pickOutput
+    ) const override
+    {
+        if (!mayaSceneIndex()) {
+            TF_FATAL_ERROR("Picking called while no Maya scene index exists");
+            return false;
+        }
+
+        // Maya does not create Hydra instances, so if the pick hit instancer
+        // ID isn't empty, it's not a Maya pick hit.
+        if (!pickInput.pickHit.instancerId.IsEmpty()) {
+            return false;
+        }
+
+        return mayaSceneIndex()->AddPickHitToSelectionList(
+            pickInput.pickHit, pickInput.pickInfo, 
+            pickOutput.mayaSelection, pickOutput.mayaWorldSpaceHitPts
+        );
+    }
+};
+
+class UsdPickHandler : public MtohRenderOverride::PickHandlerBase {
+public:
+
+    UsdPickHandler(MtohRenderOverride& renderOverride) : 
+        PickHandlerBase(renderOverride) {}
+
+    // Return the closest path and the instance index in the scene index scene
+    // that corresponds to the pick hit.  If the pick hit is not an instance,
+    // the instance index will be -1.
+    HitPath hitPath(const HdxPickHit& hit) const {
+        auto primOrigin = HdxPrimOriginInfo::FromPickHit(
+            renderIndex(), hit);
+
+        if (hit.instancerId.IsEmpty()) {
+            return {primOrigin.GetFullPath(), -1};
+        }
+
+        // If there is a Hydra instancer, distinguish between native instancing
+        // (implicit USD prototype created by USD itself) and point instancing
+        // (explicitly authored USD prototypes).  As per HdxInstancerContext
+        // documentation:
+        // 
+        // [...] "exactly one of instancePrimOrigin or instancerPrimOrigin will
+        // contain data depending on whether the instancing at the current
+        // level was implicit or not, respectively."
+        const auto& instancerContext = primOrigin.instancerContexts.front();
+
+        if (instancerContext.instancePrimOrigin) {
+            // Implicit prototype instancing (i.e. USD native instancing).
+            auto schema = HdPrimOriginSchema(instancerContext.instancePrimOrigin);
+            if (!TF_VERIFY(schema, "Cannot build prim origin schema for USD native instance.")) {
+                return {SdfPath(), -1};
+            }
+            return {schema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath), -1};
+        }
+
+        // Explicit prototype instancing (i.e. USD point instancing).
+        std::function<HitPath(const HdxPrimOriginInfo& primOrigin, const HdxPickHit& hit)> pickFn[] = {pickInstancer, pickInstance, pickPrototype};
+                            
+        // Retrieve pick mode from mayaUsd optionVar, to see if we're picking
+        // instances, the instancer itself, or the prototype instanced by the
+        // point instance.
+        return pickFn[GetPointInstancesPickMode()](primOrigin, hit);
+    }
+
+    bool handlePickHit(
+        const PickInput& pickInput, PickOutput& pickOutput
+    ) const override
+    {
+        if (!sceneIndexRegistry()) {
+            TF_FATAL_ERROR("Picking called while no scene index registry exists");
+            return false;
+        }
+
+        if (!renderIndex()) {
+            TF_FATAL_ERROR("Picking called while no render index exists");
+            return false;
+        }
+
+        auto registration = sceneIndexRegistry()->GetSceneIndexRegistrationForRprim(pickInput.pickHit.objectId);
+
+        if (!registration) {
+            return false;
+        }
+
+        // For the USD pick handler pick results are directly returned with USD
+        // scene paths, so no need to remove scene index plugin path prefix.
+        const auto& [pickedUsdPath, instanceNdx] = hitPath(pickInput.pickHit);
+
+        const auto pickedMayaPath = usdPathToUfePath(registration, pickedUsdPath);
+        const auto snMayaPath =
+            // As per https://stackoverflow.com/questions/46114214
+            // structured bindings cannot be captured by a lambda in C++ 17,
+            // so pass in pickedUsdPath and instanceNdx as lambda arguments.
+            [&pickedMayaPath, &registration](
+                const SdfPath& pickedUsdPath, int instanceNdx) {
+
+            if (instanceNdx >= 0) {
+                // Point instance: add the instance index to the path.
+                // Appending a numeric component to the path to identify a
+                // point instance cannot be done on the picked SdfPath, as
+                // numeric path components are not allowed by SdfPath.  Do so
+                // here with Ufe::Path, which has no such restriction.
+                return pickedMayaPath + std::to_string(instanceNdx);
+            }
+
+            // Not an instance: adjust picked path for selection kind.
+            auto snKind = GetSelectionKind();
+            if (snKind.IsEmpty()) {
+                return pickedMayaPath;
+            }
+
+            // Get the prim from the stage and path, to access the
+            // UsdModelAPI for the prim.
+            auto proxyShapeObj = registration->dagNode.object();
+            if (proxyShapeObj.isNull()) {
+                TF_FATAL_ERROR("No mayaUsd proxy shape object corresponds to USD pick");
+                return pickedMayaPath;
+            }
+
+            MayaUsdAPI::ProxyStage proxyStage{proxyShapeObj};
+            auto prim = proxyStage.getUsdStage()->GetPrimAtPath(pickedUsdPath);
+            prim = GetPrimOrAncestorWithKind(prim, snKind);
+            const auto usdPath = prim ? prim.GetPath() : pickedUsdPath;
+
+            return usdPathToUfePath(registration, usdPath);
+        }(pickedUsdPath, instanceNdx);
+
+        auto si = Ufe::Hierarchy::createItem(snMayaPath);
+        if (!si) {
+            return false;
+        }
+
+        pickOutput.ufeSelection->append(si);
+        return true;
+    }
+};
 
 }
 
@@ -221,8 +642,16 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
     , _hgi(Hgi::CreatePlatformDefaultHgi())
     , _hgiDriver { HgiTokens->renderDriver, VtValue(_hgi.get()) }
     , _fvpSelectionTracker(new Fvp::SelectionTracker)
+    , _ufeSn(Ufe::NamedSelection::get("MayaSelectTool"))
     , _mayaSelectionObserver(std::make_shared<SelectionObserver>(*this))
     , _isUsingHdSt(desc.rendererName == MtohTokens->HdStormRendererPlugin)
+    // unique_ptr is not copyable, so can't use initializer_list, which copies.
+    , _pickHandlers([this](){
+            std::vector<std::unique_ptr<PickHandlerBase>> v;
+            v.push_back(std::make_unique<MayaPickHandler>(*this));
+            v.push_back(std::make_unique<UsdPickHandler>(*this));
+            return v;
+        }())
 {
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg(
@@ -230,9 +659,7 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
             _rendererDesc.rendererName.GetText(),
             _rendererDesc.overrideName.GetText(),
             _rendererDesc.displayName.GetText());
-    MayaHydraDelegateRegistry::InstallDelegatesChangedSignal([this]() { _needsClear.store(true); });
-    _ID = SdfPath("/MayaHydraViewportRenderer")
-              .AppendChild(
+    _ID = MAYA_NATIVE_ROOT.AppendChild(
                   TfToken(TfStringPrintf("_MayaHydra_%s_%p", desc.rendererName.GetText(), this)));
 
     MStatus status;
@@ -340,6 +767,28 @@ void MtohRenderOverride::UpdateRenderGlobals(
     MGlobal::executeCommandOnIdle("refresh -f");
 }
 
+VtValue MtohRenderOverride::_GetUsedGPUMemory() const
+{
+    // Currently, only Storm is the known/tested renderer that provides GPU stats
+    // via the Render Delegate.
+    if (_isUsingHdSt && _renderDelegate)
+    {
+        VtDictionary hdStRenderStat = _renderDelegate->GetRenderStats();
+        return hdStRenderStat[HdPerfTokens->gpuMemoryUsed.GetString()];
+    }
+    return VtValue();
+}
+
+int MtohRenderOverride::GetUsedGPUMemory()
+{   
+    int totalGPUMemory = 0;
+    std::lock_guard<std::mutex> lock(_allInstancesMutex);
+    for (auto* instance : _allInstances) {
+        totalGPUMemory += instance->_GetUsedGPUMemory().UncheckedGet<int>();
+    }
+    return totalGPUMemory / (1024*1024); 
+}
+
 std::vector<MString> MtohRenderOverride::AllActiveRendererNames()
 {
     std::vector<MString> renderers;
@@ -388,8 +837,8 @@ SdfPath MtohRenderOverride::RendererSceneDelegateId(TfToken rendererName, TfToke
         return SdfPath();
     }
 
-    if (instance->_mayaHydraSceneProducer) {
-        return instance->_mayaHydraSceneProducer->GetDelegateID(sceneDelegateName);
+    if (instance->_mayaHydraSceneIndex) {
+        return instance->_mayaHydraSceneIndex->GetDelegateID(sceneDelegateName);
     }
     return SdfPath();
 }
@@ -529,8 +978,8 @@ MStatus MtohRenderOverride::Render(
         replaceSelectionTask(&tasks);
 
         if (scene.changed()) {
-            if (_mayaHydraSceneProducer) {
-                _mayaHydraSceneProducer->HandleCompleteViewportScene(
+            if (_mayaHydraSceneIndex) {
+                _mayaHydraSceneIndex->HandleCompleteViewportScene(
                     scene, static_cast<MFrameContext::DisplayStyle>(drawContext.getDisplayStyle()));
             }
         }
@@ -585,19 +1034,58 @@ MStatus MtohRenderOverride::Render(
     
             //Create a HydraViewportInformation 
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(panelName.asChar()), cameraName);
-            manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
+            const bool dataProducerSceneIndicesAdded = manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
+            //Update the selection since we have added data producer scene indices through manager.AddViewportInformation to the merging scene index
+            if (dataProducerSceneIndicesAdded && _selectionSceneIndex){
+                _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+            }
+            //Update the leadObjectTacker in case it could not find the current lead object which could be in a custom data producer scene index or a maya usd proxy shape scene index
+            if (_leadObjectPathTracker){
+                _leadObjectPathTracker->updatePrimPath();
+            }
         }
     }
 
-    const auto      displayStyle = drawContext.getDisplayStyle();
+    const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
     MayaHydraParams delegateParams = _globals.delegateParams;
-    delegateParams.displaySmoothMeshes = !(displayStyle & MHWRender::MFrameContext::kFlatShaded);
+    delegateParams.displaySmoothMeshes = !(currentDisplayStyle & MHWRender::MFrameContext::kFlatShaded);
+    
+    const bool currentUseDefaultMaterial = (drawContext.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
+    const bool xRayEnabled = (drawContext.getDisplayStyle() & MHWRender::MFrameContext::kXray);
 
-    if (_mayaHydraSceneProducer) {
-        _mayaHydraSceneProducer->SetDefaultLightEnabled(_hasDefaultLighting);
-        _mayaHydraSceneProducer->SetDefaultLight(_defaultLight);
-        _mayaHydraSceneProducer->SetParams(delegateParams);
-        _mayaHydraSceneProducer->PreFrame(drawContext);
+    if (_mayaHydraSceneIndex) {
+        _mayaHydraSceneIndex->SetDefaultLightEnabled(_hasDefaultLighting);
+        _mayaHydraSceneIndex->SetDefaultLight(_defaultLight);
+        _mayaHydraSceneIndex->SetParams(delegateParams);
+        _mayaHydraSceneIndex->PreFrame(drawContext);
+        
+        if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle, currentUseDefaultMaterial, xRayEnabled)){
+            _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(true);//Prevent prim removal propagation to keep the current selection.
+            //We need to recreate the filtering scene index chain after the merging scene index as there was a change such as in the BBox display style which has been turned on or off.
+            _lastFilteringSceneIndexBeforeCustomFiltering = nullptr;//Release
+            _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
+            auto& manager = Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get();
+            manager.RemoveViewportInformation(std::string(panelName.asChar()));
+            //Get information from viewport
+            std::string cameraName;
+            M3dView view;
+            if (M3dView::getM3dViewFromModelPanel(panelName, view)){
+                MDagPath dpath;
+                view.getCamera(dpath);
+                MFnCamera viewCamera(dpath);
+                cameraName = viewCamera.name().asChar();
+            }
+            const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(panelName.asChar()), cameraName);
+            manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
+            
+            _xRayEnabled = xRayEnabled;
+            _useDefaultMaterial = currentUseDefaultMaterial;
+            _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(false);//Allow prim removal propagation again.
+        }
+    }
+
+    if (_displayStyleSceneIndex) {
+       _displayStyleSceneIndex->SetRefineLevel({true, delegateParams.refineLevel});
     }
 
     HdxRenderTaskParams params;
@@ -625,6 +1113,23 @@ MStatus MtohRenderOverride::Render(
     // Set Purpose tags
     SetRenderPurposeTags(delegateParams);
 
+    // Set MSAA as per Maya AntiAliasing settings
+    if (_isUsingHdSt)
+    {  
+        // Maya's MSAA toggle settings
+        bool isMultiSampled = framecontext->getPostEffectEnabled(MHWRender::MFrameContext::kAntiAliasing);
+
+        // Set MSAA on Color Buffer
+        HdAovDescriptor colorAovDesc = _taskController->GetRenderOutputSettings(HdAovTokens->color);
+        colorAovDesc.multiSampled = isMultiSampled;
+        _taskController->SetRenderOutputSettings(HdAovTokens->color, colorAovDesc);
+
+        // Set MSAA of Depth buffer
+        HdAovDescriptor depthAovDesc = _taskController->GetRenderOutputSettings(HdAovTokens->depth);
+        depthAovDesc.multiSampled = isMultiSampled;        
+        _taskController->SetRenderOutputSettings(HdAovTokens->depth, depthAovDesc);
+    }
+
     _taskController->SetFreeCameraMatrices(
         GetGfMatrixFromMaya(
             drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx)),
@@ -639,10 +1144,10 @@ MStatus MtohRenderOverride::Render(
             Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
             bool isMayaCamera = ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId();
             if (isMayaCamera) {
-                if (_mayaHydraSceneProducer) {
-                    params.camera = _mayaHydraSceneProducer->SetCameraViewport(camPath, _viewport);
+                if (_mayaHydraSceneIndex) {
+                    params.camera = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
                     if (vpDirty)
-                        _mayaHydraSceneProducer->MarkSprimDirty(params.camera, HdCamera::DirtyParams);
+                        _mayaHydraSceneIndex->MarkSprimDirty(params.camera, HdCamera::DirtyParams);
                 }
             }
         } else {
@@ -669,6 +1174,12 @@ MStatus MtohRenderOverride::Render(
         _taskController->SetSelectionEnableOutline(false);
 
     _taskController->SetCollection(_renderCollection);
+
+    // Update all registered plugin before render.
+    for (auto& entry : _sceneIndexRegistry->GetRegistrations()) {
+        entry.second->Update();
+    }
+
     if (_isUsingHdSt) {
         auto  enableShadows = true;
         auto* lightParam = drawContext.getLightParameterInformation(
@@ -700,9 +1211,12 @@ MStatus MtohRenderOverride::Render(
     } else {
         renderFrame(true);
     }
-    if (_mayaHydraSceneProducer) {
-        _mayaHydraSceneProducer->PostFrame();
+    if (_mayaHydraSceneIndex) {
+        _mayaHydraSceneIndex->PostFrame();
     }
+    
+    //Store as old display style
+    _oldDisplayStyle = currentDisplayStyle;
 
     return MStatus::kSuccess;
 }
@@ -728,6 +1242,13 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
     if (delegateParams.guidePurpose)
         mhRenderTags.push_back(HdRenderTagTokens->guide);
     _taskController->SetRenderTags(mhRenderTags);
+}
+
+void MtohRenderOverride::_ClearMayaHydraSceneIndex()
+{
+    _renderIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
+    _mayaHydraSceneIndex->RemoveCallbacksAndDeleteAdapters(); //This should be called before calling _sceneIndex.Reset(); which will call the destructor if the ref count reaches 0
+    _mayaHydraSceneIndex.Reset();
 }
 
 void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& drawContext)
@@ -764,13 +1285,13 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
         _taskController->SetRenderOutputs({ HdAovTokens->color });
     }
 
-    MayaHydraDelegate::InitData delegateInitData(
-        TfToken(),
+    MayaHydraInitData mhInitData(
+        TfToken("MayaHydraSceneIndex"),
         _engine,
         _renderIndex,
         _rendererPlugin,
         _taskController,
-        SdfPath(),
+        MAYA_NATIVE_ROOT,
         _isUsingHdSt
     );
 
@@ -783,15 +1304,38 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 
     _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(_renderIndex);
 
-    _mayaHydraSceneProducer.reset(new MayaHydraSceneProducer(_renderIndexProxy, _ID, delegateInitData, !_hasDefaultLighting));
-
+    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, !_hasDefaultLighting);
+    TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
+    
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
     _engine.SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
 
-    _mayaHydraSceneProducer->Populate();
+    _mayaHydraSceneIndex->Populate();
+    //Add the scene index as an input scene index of the merging scene index
+    _renderIndexProxy->InsertSceneIndex(_mayaHydraSceneIndex, SdfPath::AbsoluteRootPath());
     
-    _CreateSceneIndicesChainAfterMergingSceneIndex();
+    if (!_sceneIndexRegistry) {
+        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy));
+    }
+    
+    //Create internal scene indices chain
+    _inputSceneIndexOfFilteringSceneIndicesChain = _renderIndexProxy->GetMergingSceneIndex();
 
+    //Put BlockPrimRemovalPropagationSceneIndex first as it can block/unblock the prim removal propagation on the whole scene indices chain
+    _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
+    _selection = std::make_shared<Fvp::Selection>();
+    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_blockPrimRemovalPropagationSceneIndex, _selection);
+    _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
+    _inputSceneIndexOfFilteringSceneIndicesChain = _selectionSceneIndex;
+
+    _dirtyLeadObjectSceneIndex = MAYAHYDRA_NS_DEF::MhDirtyLeadObjectSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
+    _inputSceneIndexOfFilteringSceneIndicesChain = _dirtyLeadObjectSceneIndex;
+
+    // Set the initial selection onto the selection scene index.
+    _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+
+    _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
+    
     if (auto* renderDelegate = _GetRenderDelegate()) {
         // Pull in any options that may have changed due file-open.
         // If the currentScene has defaultRenderGlobals we'll absorb those new settings,
@@ -835,16 +1379,20 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
         _sceneIndexRegistry.reset();
     }
 
-#ifdef CODE_COVERAGE_WORKAROUND
-    // Leak the Maya scene index, as its base class HdRetainedSceneIndex
-    // destructor crashes under Windows clang code coverage build.
-    _mayaHydraSceneProducer->Cleanup();
-    _mayaHydraSceneProducer.release();
-#else
-    _mayaHydraSceneProducer.reset();
-#endif
+    #ifdef CODE_COVERAGE_WORKAROUND
+        // Leak the Maya scene index, as its base class HdRetainedSceneIndex
+        // destructor crashes under Windows clang code coverage build.
+        _mayaHydraSceneIndex->RemoveCallbacksAndDeleteAdapters();
+        _mayaHydraSceneIndex.Reset();
+    #else
+       _ClearMayaHydraSceneIndex();
+    #endif
+
+    _displayStyleSceneIndex = nullptr;
     _selectionSceneIndex.Reset();
     _selection.reset();
+    _wireframeColorInterfaceImp.reset();
+    _leadObjectPathTracker.reset();
 
     // Cleanup internal context data that keep references to data that is now
     // invalid.
@@ -879,37 +1427,77 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _initializationAttempted = false;
 }
 
-void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex()
+void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext)
 {
     //This function is where happens the ordering of filtering scene indices that are after the merging scene index
-    TF_AXIOM(_renderIndexProxy);
+    //We use as its input scene index : _inputSceneIndexOfFilteringSceneIndicesChain
+    // Add display style scene index
+    _lastFilteringSceneIndexBeforeCustomFiltering = _displayStyleSceneIndex =
+            Fvp::DisplayStyleOverrideSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
+    _displayStyleSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims don't use global refinement
 
-    _lastFilteringSceneIndexBeforeCustomFiltering = _renderIndexProxy->GetMergingSceneIndex();
+    const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
+    const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
 
-    _selection = std::make_shared<Fvp::Selection>();
-    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering , _selection);
-    _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
-    _lastFilteringSceneIndexBeforeCustomFiltering  = _selectionSceneIndex;
-  
-    if (!_sceneIndexRegistry) {
-        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy));
+    auto mergingSceneIndex = _renderIndexProxy->GetMergingSceneIndex();
+    if(! _leadObjectPathTracker){
+        _leadObjectPathTracker = std::make_shared<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker>(mergingSceneIndex, _dirtyLeadObjectSceneIndex);
     }
 
-    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection));
+    if (! _wireframeColorInterfaceImp){
+        _wireframeColorInterfaceImp = std::make_shared<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp>(_selection, _leadObjectPathTracker);
+    }
+    
+    //Are we using Bounding Box display style ?
+    if (currentDisplayStyle & MHWRender::MFrameContext::kBoundingBox){
+        //Insert the bounding box filtering scene index which converts geometries into a bounding box using the extent attribute
+        auto bboxSceneIndex  = Fvp::BboxSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _wireframeColorInterfaceImp);
+        bboxSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
+        _lastFilteringSceneIndexBeforeCustomFiltering = bboxSceneIndex;
+    }
+    else if (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame){//Are we using wireframe somehow ?
+        
+        if( (currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded) || (currentDisplayStyle & MHWRender::MFrameContext::kTextured)){
+            // Wireframe on top of shaded
+            //Reduced quality
+            if (MFrameContext::WireOnShadedMode::kWireFrameOnShadedReduced == wireOnShadedMode ){
+                //Insert the reprselector filtering scene index which updates the repr selector on geometries
+                auto reprSelectorSceneIndex = Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
+                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface, _wireframeColorInterfaceImp);
+                reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
+                _lastFilteringSceneIndexBeforeCustomFiltering = reprSelectorSceneIndex;
+            } else {//Full quality
+                //Should we support kWireFrameOnShadedNone and do not display any wireframe ?
+                //Insert the reprselector filtering scene index which updates the repr selector on geometries
+                auto reprSelectorSceneIndex = Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
+                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined, _wireframeColorInterfaceImp);
+                reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
+                _lastFilteringSceneIndexBeforeCustomFiltering = reprSelectorSceneIndex;
+            }
+        }
+        else{
+                //wireframe only, not on top of shaded
+                
+                //Insert the reprselector filtering scene index which updates the repr selector on geometries
+                auto reprSelectorSceneIndex = Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
+                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined, _wireframeColorInterfaceImp);
+                reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
+                _lastFilteringSceneIndexBeforeCustomFiltering = reprSelectorSceneIndex;
+            }
+    }
+
+    auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection, _wireframeColorInterfaceImp));
     wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
     
     // At time of writing, wireframe selection highlighting of Maya native data
     // is done by Maya at render item creation time, so avoid double wireframe
     // selection highlighting.
-    wfSi->addExcludedSceneRoot(_ID);
+    wfSi->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
     _lastFilteringSceneIndexBeforeCustomFiltering  = wfSi;
-
+    
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);
 #endif
-  
-    // Set the initial selection onto the selection scene index.
-    _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
 }
 
 void MtohRenderOverride::_RemovePanel(MString panelName)
@@ -1083,60 +1671,37 @@ bool MtohRenderOverride::nextRenderOperation()
     return ++_currentOperation < static_cast<int>(_operations.size());
 }
 
-constexpr char kNamedSelection[] = "MayaSelectTool";
-
 void MtohRenderOverride::_PopulateSelectionList(
     const HdxPickHitVector&          hits,
     const MHWRender::MSelectionInfo& selectInfo,
     MSelectionList&                  selectionList,
     MPointArray&                     worldSpaceHitPts)
 {
-    if (hits.empty())
+    if (hits.empty() || !_mayaHydraSceneIndex || !_ufeSn) {
         return;
-
-    if (_mayaHydraSceneProducer) {
-
-        MStatus status;
-        if (auto ufeSel = Ufe::NamedSelection::get(kNamedSelection)) {
-            for (const HdxPickHit& hit : hits) {
-                if (_mayaHydraSceneProducer->AddPickHitToSelectionList(
-                        hit, selectInfo, selectionList, worldSpaceHitPts)) {
-                    continue;
-                }
-                SdfPath pickedPath = hit.objectId;
-                if (auto registration
-                    = _sceneIndexRegistry->GetSceneIndexRegistrationForRprim(pickedPath))
-                // Scene index is incompatible with UFE. Skip
-                {
-                    // Keep the path after the scene index plugin path prefix to obtain local picked path with
-                    // respect to current scene index. This is because the scene index was inserted
-                    // into the render index using a custom prefix. As a result the scene index
-                    // prefix will be prepended to rprims tied to that scene index automatically.
-                    const SdfPath& sceneIndexPathPrefix = registration->sceneIndexPathPrefix;
-                    if ( ! pickedPath.HasPrefix(sceneIndexPathPrefix)){
-                        TF_CODING_ERROR("pickedPathAsString.find(sceneIndexPathPrefixAsString) returned std::string::npos !");
-                        return;
-                    }
-                    const SdfPath relativePath = pickedPath.MakeRelativePath(sceneIndexPathPrefix);
-                    
-                    Ufe::Path interpretedPath(registration->interpretRprimPathFn(
-                        registration->pluginSceneIndex, relativePath));
-
-                    // If this is a maya UFE path, then select using MSelectionList
-                    // This is because the NamedSelection ignores Ufe items made from maya ufe path
-                    if (interpretedPath.runTimeId() == UfeExtensions::getMayaRunTimeId()) {
-                        selectionList.add(UfeExtensions::ufeToDagPath(interpretedPath));
-                        worldSpaceHitPts.append(
-                            hit.worldSpaceHitPoint[0],
-                            hit.worldSpaceHitPoint[1],
-                            hit.worldSpaceHitPoint[2]);
-                    } else if (auto si = Ufe::Hierarchy::createItem(interpretedPath)) {
-                        ufeSel->append(si);
-                    }
-                }
-            }
-        }
     }
+
+    PickOutput pickOutput(selectionList, worldSpaceHitPts, _ufeSn);
+
+    MStatus status;
+    for (const HdxPickHit& hit : hits) {
+        PickInput pickInput(hit, selectInfo);
+
+        _PickHandler(hit)->handlePickHit(pickInput, pickOutput);
+    }
+}
+
+const MtohRenderOverride::PickHandlerBase*
+MtohRenderOverride::_PickHandler(const HdxPickHit& pickHit) const
+{
+    // As of 19-Mar-2024, we only have two kinds of pick handlers, one for Maya
+    // objects, the other for USD objects.  USD objects are generated by
+    // mayaUsd proxy shape Maya nodes, which add one registration to the
+    // MayaHydraSceneIndexRegistry per proxy shape node.  We use the trivial
+    // strategy of choosing the USD pick handler if there is a registration
+    // that matches the pick hit, otherwise the Maya pick handler is used.
+    // This will need to be revised for extensibility.
+    return _sceneIndexRegistry->GetSceneIndexRegistrationForRprim(pickHit.objectId) ? _pickHandlers[1].get() : _pickHandlers[0].get();
 }
 
 void MtohRenderOverride::_PickByRegion(
@@ -1369,6 +1934,29 @@ void MtohRenderOverride::_RenderOverrideChangedCallback(
     if (newOverride != instance->name()) {
         instance->_RemovePanel(panelName);
     }
+}
+
+// return true if we need to recreate the filtering scene indices chain because of a change, false otherwise.
+bool MtohRenderOverride::_NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool currentUseDefaultMaterial, bool xRayEnabled)
+{
+    if (areDifferentForOneOfTheseBits(currentDisplayStyle, _oldDisplayStyle, 
+            MHWRender::MFrameContext::kGouraudShaded    | 
+            MHWRender::MFrameContext::kTextured         | 
+            MHWRender::MFrameContext::kWireFrame        |
+            MHWRender::MFrameContext::kBoundingBox      )
+        ){
+        return true;
+    }
+    
+    if (_useDefaultMaterial != currentUseDefaultMaterial){
+        return true;
+    }
+    
+    if (_xRayEnabled != xRayEnabled){
+        return true;
+    }
+
+    return false;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

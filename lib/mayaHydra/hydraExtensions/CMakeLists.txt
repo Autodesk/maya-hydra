@@ -13,18 +13,21 @@ target_sources(${TARGET_NAME}
         mayaUtils.cpp
         mhBuildInfo.cpp
         mixedUtils.cpp
-        mayaHydraSceneProducer.cpp
+        mhWireframeColorInterfaceImp.cpp
+        mhLeadObjectPathTracker.cpp
 )
 
 set(HEADERS
     api.h
     debugCodes.h
     hydraUtils.h
+    mayaHydraParams.h
     mayaHydraLibInterface.h
     mayaHydraLibInterfaceImp.h
     mayaUtils.h
     mixedUtils.h
-    mayaHydraSceneProducer.h
+    mhWireframeColorInterfaceImp.h
+    mhLeadObjectPathTracker.h
 )
 
 # -----------------------------------------------------------------------------
@@ -200,5 +203,4 @@ endif()
 # subdirectories
 # -----------------------------------------------------------------------------
 add_subdirectory(adapters)
-add_subdirectory(delegates)
 add_subdirectory(sceneIndex)

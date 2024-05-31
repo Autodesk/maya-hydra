@@ -18,7 +18,7 @@
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/shapeAdapter.h>
 #include <mayaHydraLib/adapters/tokens.h>
-#include <mayaHydraLib/mayaHydraSceneProducer.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/gf/interval.h>
 #include <pxr/base/tf/type.h>
@@ -53,11 +53,11 @@ namespace {
 const std::pair<MObject&, HdDirtyBits> _dirtyBits[] {
     { MayaAttrs::mesh::pnts,
       // This is useful when the user edits the mesh.
-      HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent
+      HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent | HdChangeTracker::DirtyNormals
           | HdChangeTracker::DirtySubdivTags },
     { MayaAttrs::mesh::inMesh,
       // We are tracking topology changes and uv changes separately
-      HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent
+      HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent | HdChangeTracker::DirtyNormals
           | HdChangeTracker::DirtySubdivTags },
     { MayaAttrs::mesh::worldMatrix, HdChangeTracker::DirtyTransform },
     { MayaAttrs::mesh::doubleSided, HdChangeTracker::DirtyDoubleSided },
@@ -79,8 +79,8 @@ const std::pair<MObject&, HdDirtyBits> _dirtyBits[] {
 class MayaHydraMeshAdapter : public MayaHydraShapeAdapter
 {
 public:
-    MayaHydraMeshAdapter(MayaHydraSceneProducer* producer, const MDagPath& dag)
-        : MayaHydraShapeAdapter(producer->GetPrimPath(dag, false), producer, dag)
+    MayaHydraMeshAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag)
+        : MayaHydraShapeAdapter(mayaHydraSceneIndex->GetPrimPath(dag, false), mayaHydraSceneIndex, dag)
     {
     }
 
@@ -91,7 +91,7 @@ public:
         if (_isPopulated) {
             return;
         }
-        GetSceneProducer()->InsertRprim(this, HdPrimTypeTokens->mesh, GetID(), GetInstancerID());
+        GetMayaHydraSceneIndex()->InsertPrim(this, HdPrimTypeTokens->mesh, GetID());
         _isPopulated = true;
     }
 
@@ -150,7 +150,7 @@ public:
 
     bool IsSupported() const override
     {
-        return GetSceneProducer()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->mesh);
+        return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->mesh);
     }
 
     VtValue GetUVs()
@@ -160,29 +160,88 @@ public:
         if (ARCH_UNLIKELY(!status)) {
             return {};
         }
+
+        //Uvs are face varying
         VtArray<GfVec2f> uvs;
-        uvs.reserve(static_cast<size_t>(mesh.numFaceVertices()));
+        const size_t numFacesVertices = mesh.numFaceVertices();
+        uvs.resize(numFacesVertices);
+        float2* uvsPointer = (float2*)uvs.cdata();
+        size_t numUVsFloat2 = 0;
         for (MItMeshPolygon pit(GetDagPath()); !pit.isDone(); pit.next()) {
             const auto vertexCount = pit.polygonVertexCount();
             for (auto i = decltype(vertexCount) { 0 }; i < vertexCount; ++i) {
-                float2 uv = { 0.0f, 0.0f };
-                pit.getUV(i, uv);
-                uvs.push_back(GfVec2f(uv[0], uv[1]));
+                pit.getUV(i, *uvsPointer);
+                ++uvsPointer;
+                ++numUVsFloat2;
             }
+        }
+
+        if (numUVsFloat2 != numFacesVertices){
+            TF_CODING_ERROR("Number of UVs does not match number of face vertices" );
         }
 
         return VtValue(uvs);
     }
 
-    VtValue GetPoints(const MFnMesh& mesh)
+    VtValue GetTangents()
     {
-        MStatus     status;
+        MStatus status;
+        MFnMesh mesh(GetDagPath(), &status);
+        if (ARCH_UNLIKELY(!status)) {
+            return {};
+        }
+
+        //Tangents are face varying
+        const size_t numFacesVertices = mesh.numFaceVertices();
+        MFloatVectorArray mayaTangents;
+        mesh.getTangents(mayaTangents);
+        const size_t tangentsCount = mayaTangents.length();
+        if (0 == tangentsCount){
+            return {};
+        }
+
+        if (tangentsCount != numFacesVertices){
+            TF_CODING_ERROR("Number of tangents does not match number of face vertices" );
+        }
+
+       const auto* tangentsArray = reinterpret_cast<const GfVec2f*>(&mayaTangents[0]);
+        VtVec2fArray ret;
+        ret.assign(tangentsArray, tangentsArray + numFacesVertices);
+        return VtValue(ret);
+    }
+
+    VtValue GetPoints()
+    {
+        MStatus status;
+        MFnMesh mesh(GetDagPath(), &status);
+        if (ARCH_UNLIKELY(!status)) {
+            return {};
+        }
+
         const auto* rawPoints = reinterpret_cast<const GfVec3f*>(mesh.getRawPoints(&status));
         if (ARCH_UNLIKELY(!status)) {
             return {};
         }
         VtVec3fArray ret;
         ret.assign(rawPoints, rawPoints + mesh.numVertices());
+        return VtValue(ret);
+    }
+
+    VtValue GetNormals()
+    {
+        MStatus status;
+        MFnMesh mesh(GetDagPath(), &status);
+        if (ARCH_UNLIKELY(!status)) {
+            return {};
+        }
+
+        //Normals are per vertex
+        MFloatVectorArray normals;
+        constexpr bool angleWeighted = false;
+        mesh.getVertexNormals(angleWeighted, normals);
+        const auto* rawNormals = reinterpret_cast<const GfVec3f*>(&normals[0]);
+        VtVec3fArray ret;
+        ret.assign(rawNormals, rawNormals + mesh.numVertices());
         return VtValue(ret);
     }
 
@@ -195,15 +254,21 @@ public:
                 GetDagPath().partialPathName().asChar());
 
         if (key == HdTokens->points) {
-            MStatus status;
-            MFnMesh mesh(GetDagPath(), &status);
-            if (ARCH_UNLIKELY(!status)) {
-                return {};
-            }
-            return GetPoints(mesh);
-        } else if (key == MayaHydraAdapterTokens->st) {
+            return GetPoints();
+        } 
+
+        if (key == HdTokens->normals) {
+            return GetNormals();
+        } 
+        
+        if (key == MayaHydraAdapterTokens->tangents) {
+            return GetTangents();
+        }
+
+        if (key == MayaHydraAdapterTokens->st) {
             return GetUVs();
         }
+
         return {};
     }
 
@@ -215,18 +280,27 @@ public:
         }
 
         if (key == HdTokens->points) {
-            MStatus status;
-            MFnMesh mesh(GetDagPath(), &status);
-            if (ARCH_UNLIKELY(!status)) {
-                return 0;
-            }
-            return GetSceneProducer()->SampleValues(
-                maxSampleCount, times, samples, [&]() -> VtValue { return GetPoints(mesh); });
-        } else if (key == MayaHydraAdapterTokens->st) {
+            return GetMayaHydraSceneIndex()->SampleValues(
+                maxSampleCount, times, samples, [&]() -> VtValue { return GetPoints(); });
+        } 
+
+        if (key == HdTokens->normals) {
+            return GetMayaHydraSceneIndex()->SampleValues(
+                maxSampleCount, times, samples, [&]() -> VtValue { return GetNormals(); });
+        } 
+        
+        if (key == MayaHydraAdapterTokens->tangents) {
+            times[0] = 0.0f;
+            samples[0] = GetTangents();
+            return 1;
+        }
+
+        if (key == MayaHydraAdapterTokens->st) {
             times[0] = 0.0f;
             samples[0] = GetUVs();
             return 1;
         }
+
         return 0;
     }
 
@@ -246,11 +320,17 @@ public:
             }
         }
 
-        return HdMeshTopology(
-            (GetSceneProducer()->GetParams().displaySmoothMeshes || GetDisplayStyle().refineLevel > 0)
+        static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
+        return  (passNormalsToHydra) ?
+            HdMeshTopology(
+                        PxOsdOpenSubdivTokens->none,//For the OGS normals vertex buffer to be used, we need to use PxOsdOpenSubdivTokens->none
+                        UsdGeomTokens->rightHanded,
+                        faceVertexCounts,
+                        faceVertexIndices) :
+            HdMeshTopology(
+            (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes || GetDisplayStyle().refineLevel > 0)
                 ? PxOsdOpenSubdivTokens->catmullClark
                 : PxOsdOpenSubdivTokens->none,
-
             UsdGeomTokens->rightHanded,
             faceVertexCounts,
             faceVertexIndices);
@@ -339,20 +419,23 @@ public:
     HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation) override
     {
         if (interpolation == HdInterpolationVertex) {
-            HdPrimvarDescriptor desc;
-            desc.name = UsdGeomTokens->points;
-            desc.interpolation = interpolation;
-            desc.role = HdPrimvarRoleTokens->point;
-            return { desc };
+            static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
+            return  passNormalsToHydra ? 
+            HdPrimvarDescriptorVector{
+                {UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point},//Vertices
+                {UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal}//Normals
+            } : 
+            HdPrimvarDescriptorVector{
+                {UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point}//Vertices only
+            };
         } else if (interpolation == HdInterpolationFaceVarying) {
-            // UVs are face varying in maya.
+            // UVs and tangents are face varying in maya.
             MFnMesh mesh(GetDagPath());
             if (mesh.numUVs() > 0) {
-                HdPrimvarDescriptor desc;
-                desc.name = MayaHydraAdapterTokens->st;
-                desc.interpolation = interpolation;
-                desc.role = HdPrimvarRoleTokens->textureCoordinate;
-                return { desc };
+                return HdPrimvarDescriptorVector{
+                    {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate},//uvs
+                    {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate},//tangents
+                };
             }
         }
         return {};
@@ -422,7 +505,7 @@ private:
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
         adapter->MarkDirty(
             HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar
-            | HdChangeTracker::DirtyPoints);
+            | HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyNormals);
     }
 
     static void ComponentIdChanged(MUintArray componentIds[], unsigned int count, void* clientData)
@@ -463,8 +546,8 @@ TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, mesh)
 {
     MayaHydraAdapterRegistry::RegisterShapeAdapter(
         TfToken("mesh"),
-        [](MayaHydraSceneProducer* producer, const MDagPath& dag) -> MayaHydraShapeAdapterPtr {
-            return MayaHydraShapeAdapterPtr(new MayaHydraMeshAdapter(producer, dag));
+        [](MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag) -> MayaHydraShapeAdapterPtr {
+            return MayaHydraShapeAdapterPtr(new MayaHydraMeshAdapter(mayaHydraSceneIndex, dag));
         });
 }
 

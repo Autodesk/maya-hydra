@@ -19,7 +19,7 @@ import maya.mel
 import fixturesUtils
 import mtohUtils
 
-class TestVisibility(mtohUtils.MtohTestCase):
+class TestVisibility(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     IMAGEDIFF_FAIL_THRESHOLD = 0.01

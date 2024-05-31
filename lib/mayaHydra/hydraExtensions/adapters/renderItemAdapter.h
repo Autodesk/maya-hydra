@@ -22,6 +22,7 @@
 #include <mayaHydraLib/adapters/materialNetworkConverter.h>
 
 #include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/gf/bbox3d.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/meshTopology.h>
 #include <pxr/imaging/hd/renderIndex.h>
@@ -37,7 +38,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class MayaHydraSceneProducer;
+class MayaHydraSceneIndex;
 
 namespace {
 std::string kRenderItemTypeName = "renderItem";
@@ -61,7 +62,7 @@ public:
         const MDagPath&       dagPath,
         const SdfPath&        slowId,
         int                   fastId,
-        MayaHydraSceneProducer* producer,
+        MayaHydraSceneIndex*  mayaHydraSceneIndex,
         const MRenderItem&    ri);
 
     MAYAHYDRALIB_API
@@ -81,6 +82,12 @@ public:
 
     MAYAHYDRALIB_API
     bool GetDoubleSided() const override { return false; };
+
+    MAYAHYDRALIB_API
+    GfBBox3d GetBoundingBox()const override { return _bounds; }
+
+    MAYAHYDRALIB_API
+    GfVec4f GetDisplayColor() const override { return {_wireframeColor.r, _wireframeColor.g, _wireframeColor.b, _wireframeColor.a}; }
 
     MAYAHYDRALIB_API
     HdCullStyle GetCullStyle() const override;
@@ -199,7 +206,9 @@ private:
     MDagPath                    _dagPath;
     std::unique_ptr<HdTopology> _topology = nullptr;
     VtVec3fArray                _positions = {};
-    VtVec2fArray                _uvs = {};
+    VtVec3fArray                _normals = {};//Are per vertex
+    VtVec3fArray                _tangents = {}; //Are face varying
+    VtVec2fArray                _uvs = {}; //Are face varying
     MGeometry::Primitive        _primitive;
     MString                     _name;
     GfMatrix4d                  _transform[2];
@@ -209,6 +218,7 @@ private:
     bool                        _isHideOnPlayback = false;
     MHWRender::DisplayStatus    _displayStatus = MHWRender::DisplayStatus::kNoStatus;
     bool                        _isArnoldSkyDomeLightTriangleShape = false;
+    GfBBox3d                    _bounds;//Bounding box
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

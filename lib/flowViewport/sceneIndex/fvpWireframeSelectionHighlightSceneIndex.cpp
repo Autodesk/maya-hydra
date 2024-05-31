@@ -16,36 +16,40 @@
 
 #include "flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h"
 #include "flowViewport/selection/fvpSelection.h"
+#include "flowViewport/fvpUtils.h"
 
 #include "flowViewport/debugCodes.h"
 
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
+#include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
-const HdRetainedContainerDataSourceHandle sSelectedDisplayStyleDataSource
-    = HdRetainedContainerDataSource::New(
-        HdLegacyDisplayStyleSchemaTokens->displayStyle,
-        HdRetainedContainerDataSource::New(
-            HdLegacyDisplayStyleSchemaTokens->reprSelector,
-            HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
-                { HdReprTokens->refinedWireOnSurf, HdReprTokens->wireOnSurf, TfToken() })));
+//Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
+TF_DEFINE_PRIVATE_TOKENS(
+     _primVarsTokens,
+ 
+     (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
+ );
 
-const HdRetainedContainerDataSourceHandle sUnselectedDisplayStyleDataSource
+const HdRetainedContainerDataSourceHandle sRefinedWireOnSurfaceDisplayStyleDataSource
     = HdRetainedContainerDataSource::New(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
         HdRetainedContainerDataSource::New(
             HdLegacyDisplayStyleSchemaTokens->reprSelector,
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
-                { HdReprTokens->refined, HdReprTokens->refined, TfToken() })));
+                { HdReprTokens->refinedWireOnSurf, TfToken(), TfToken() })));
 
 const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
         HdLegacyDisplayStyleSchemaTokens->reprSelector);
+
+const HdDataSourceLocator primvarsOverrideWireframeColorLocator(
+        HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor));
 }
 
 namespace FVP_NS_DEF {
@@ -53,10 +57,11 @@ namespace FVP_NS_DEF {
 HdSceneIndexBaseRefPtr
 WireframeSelectionHighlightSceneIndex::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
-    const SelectionConstPtr&      selection
+    const SelectionConstPtr&      selection,
+    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
 )
 {
-    return TfCreateRefPtr(new WireframeSelectionHighlightSceneIndex(inputSceneIndex, selection));
+    return TfCreateRefPtr(new WireframeSelectionHighlightSceneIndex(inputSceneIndex, selection, wireframeColorInterface));
 }
 
 const HdDataSourceLocator& WireframeSelectionHighlightSceneIndex::ReprSelectorLocator()
@@ -67,12 +72,16 @@ const HdDataSourceLocator& WireframeSelectionHighlightSceneIndex::ReprSelectorLo
 WireframeSelectionHighlightSceneIndex::
 WireframeSelectionHighlightSceneIndex(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
-    const SelectionConstPtr&      selection
+    const SelectionConstPtr&      selection,
+    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
 )
   : HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
-  , InputSceneIndexUtils(inputSceneIndex)
-  , _selection(selection)
-{}
+    , InputSceneIndexUtils(inputSceneIndex)
+    , _selection(selection)
+    , _wireframeColorInterface(wireframeColorInterface)
+{
+    TF_AXIOM(_wireframeColorInterface);
+}
 
 HdSceneIndexPrim
 WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
@@ -87,11 +96,10 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
     // means that HdsiImplicitSurfaceSceneIndex must be used before this scene
     // index to convert implicit surfaces (e.g. USD cube / cone / sphere /
     // capsule primitive types) to meshes.
-    if (!isExcluded(primPath) && prim.primType == HdPrimTypeTokens->mesh) {
-        prim.dataSource = HdOverlayContainerDataSource::New(
-            { prim.dataSource, _selection->HasFullySelectedAncestorInclusive(primPath) ? 
-                sSelectedDisplayStyleDataSource : 
-                sUnselectedDisplayStyleDataSource });
+    if (! _IsExcluded(primPath) && prim.primType == HdPrimTypeTokens->mesh) {
+        if (_selection->HasFullySelectedAncestorInclusive(primPath)) {
+            prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath);
+        }
     }
     return prim;
 }
@@ -101,6 +109,40 @@ WireframeSelectionHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath
 {
     return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
+
+//We want to set the displayStyle of the selected prim to refinedWireOnSurf only if the displayStyle of the prim is refined (meaning shaded)
+HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSelectedPrim(const HdContainerDataSourceHandle& dataSource, const SdfPath& primPath)const
+{
+    //Always edit its override wireframe color
+    auto edited = HdContainerDataSourceEditor(dataSource);
+    edited.Set(HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),
+                        Fvp::PrimvarDataSource::New(
+                            HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{_wireframeColorInterface->getWireframeColor(primPath)}),
+                            HdPrimvarSchemaTokens->constant,
+                            HdPrimvarSchemaTokens->color));
+    
+    //Is the prim in refined displayStyle (meaning shaded) ?
+    if (HdLegacyDisplayStyleSchema styleSchema =
+            HdLegacyDisplayStyleSchema::GetFromParent(dataSource)) {
+
+        if (HdTokenArrayDataSourceHandle ds =
+                styleSchema.GetReprSelector()) {
+            VtArray<TfToken> ar = ds->GetTypedValue(0.0f);
+            TfToken refinedToken = ar[0];
+            if(HdReprTokens->refined == refinedToken){
+                //Is in refined display style, apply the wire on top of shaded reprselector
+                return HdOverlayContainerDataSource::New({ edited.Finish(), sRefinedWireOnSurfaceDisplayStyleDataSource});
+            }
+        }else{
+            //No reprSelector found, assume it's in the Collection that we have set HdReprTokens->refined
+            return HdOverlayContainerDataSource::New({ edited.Finish(), sRefinedWireOnSurfaceDisplayStyleDataSource});
+        }
+    }
+
+    //For the other case, we are only updating the wireframe color assuming we are already drawing lines
+    return edited.Finish();
+}
+
 
 void
 WireframeSelectionHighlightSceneIndex::_PrimsAdded(
@@ -125,14 +167,14 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
     for (const auto& entry : entries) {
         // If the dirtied prim is excluded, don't provide selection
         // highlighting for it.
-        if (!isExcluded(entry.primPath) && 
+        if (! _IsExcluded(entry.primPath) && 
             entry.dirtyLocators.Contains(
                 HdSelectionsSchema::GetDefaultLocator())) {
             TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
                 .Msg("    %s selections locator dirty.\n", entry.primPath.GetText());
             // All mesh prims recursively under the selection dirty prim have a
             // dirty wireframe selection highlight.
-            dirtySelectionHighlightRecursive(entry.primPath, &highlightEntries);
+            _DirtySelectionHighlightRecursive(entry.primPath, &highlightEntries);
         }
     }
 
@@ -159,16 +201,17 @@ WireframeSelectionHighlightSceneIndex::_PrimsRemoved(
     _SendPrimsRemoved(entries);
 }
 
-void WireframeSelectionHighlightSceneIndex::dirtySelectionHighlightRecursive(
+void WireframeSelectionHighlightSceneIndex::_DirtySelectionHighlightRecursive(
     const SdfPath&                            primPath, 
     HdSceneIndexObserver::DirtiedPrimEntries* highlightEntries
 )
 {
     TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
         .Msg("    marking %s wireframe highlight locator dirty.\n", primPath.GetText());
-    highlightEntries->emplace_back(primPath, HdDataSourceLocatorSet(reprSelectorLocator));
+
+    highlightEntries->emplace_back(primPath, HdDataSourceLocatorSet {reprSelectorLocator, primvarsOverrideWireframeColorLocator});
     for (const auto& childPath : GetChildPrimPaths(primPath)) {
-        dirtySelectionHighlightRecursive(childPath, highlightEntries);
+        _DirtySelectionHighlightRecursive(childPath, highlightEntries);
     }
 }
 
@@ -179,7 +222,7 @@ void WireframeSelectionHighlightSceneIndex::addExcludedSceneRoot(
     _excludedSceneRoots.emplace(sceneRoot);
 }
 
-bool WireframeSelectionHighlightSceneIndex::isExcluded(
+bool WireframeSelectionHighlightSceneIndex::_IsExcluded(
     const PXR_NS::SdfPath& sceneRoot
 ) const
 {

@@ -41,7 +41,10 @@
 #include <maya/MFnDependencyNode.h>
 #include <maya/MItDag.h>
 #include <maya/MMessage.h>
-#include <maya/MNodeMessage.h>
+#include <maya/MSceneMessage.h>
+#include <maya/MFileIO.h>
+#include <maya/MFnPlugin.h>
+#include <maya/MGlobal.h>
 
 #include <ufeExtensions/Global.h>
 
@@ -201,20 +204,39 @@ PXR_NAMESPACE_OPEN_SCOPE
 // Remove this once the code has been moved to the MayaHydra namespace.
 using namespace MayaHydra;
 
-// MayaHydraSceneIndexRegistration is used to register a scene index for a given dag node type.
+struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
+{
+    void Update() override {
+        auto proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(pluginSceneIndex);
+        proxyShapeSceneIndex->UpdateTime();
+    }
+};
+
+// MayaHydraSceneIndexRegistration is used to register a scene index for
+// mayaUsdPlugin proxy shape nodes.
 MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy)
     : _renderIndexProxy(renderIndexProxy)
 {
+    if (!MFnPlugin::isNodeRegistered(kMayaUsdProxyShapeNode)) {
+        MGlobal::displayWarning("mayaUsdPlugin not loaded, cannot be registered to Maya Hydra.  Please load mayaUsdPlugin, then switch back to a Maya Hydra viewport renderer.");
+        return;
+    }
+
     MCallbackId id;
     MStatus     status;
     id = MDGMessage::addNodeAddedCallback(
         _SceneIndexNodeAddedCallback, kMayaUsdProxyShapeNode, this, &status);//We need only to monitor the MayaUsdProxyShapeNode
     if (TF_VERIFY(status == MS::kSuccess, "NodeAdded callback registration failed."))
-        _sceneIndexDagNodeMessageCallbacks.append(id);
+        _DGCallbackIds.append(id);
     id = MDGMessage::addNodeRemovedCallback(
         _SceneIndexNodeRemovedCallback, kMayaUsdProxyShapeNode, this, &status);//We need only to monitor the MayaUsdProxyShapeNode
     if (TF_VERIFY(status == MS::kSuccess, "NodeRemoved callback registration failed."))
-        _sceneIndexDagNodeMessageCallbacks.append(id);
+        _DGCallbackIds.append(id);
+
+    //Because we cannot process a node while loading a maya file, we are storing them in an array in _SceneIndexNodeAddedCallback 
+    // and process them once the after load has completed through _AfterOpenCallback.
+    _AfterOpenCBId = MSceneMessage::addCallback(MSceneMessage::kAfterOpen, _AfterOpenCallback, this, &status);
+    TF_VERIFY(status == MS::kSuccess, "MSceneMessage::kAfterOpen callback registration failed.");
 
     static const MTypeId MAYAUSD_PROXYSHAPE_ID(0x58000095); //Hardcoded
         
@@ -259,8 +281,12 @@ MayaHydraSceneIndexRegistry::GetRegistrations() const
 
 MayaHydraSceneIndexRegistry::~MayaHydraSceneIndexRegistry()
 {
-    MDGMessage::removeCallbacks(_sceneIndexDagNodeMessageCallbacks);
-    _sceneIndexDagNodeMessageCallbacks.clear();
+    MDGMessage::removeCallbacks(_DGCallbackIds);
+    _DGCallbackIds.clear();
+    if (_AfterOpenCBId){
+        MSceneMessage::removeCallback(_AfterOpenCBId);
+    }
+    _AfterOpenCBId = 0;
     _registrationsByObjectHandle.clear();
     _registrations.clear();
 }
@@ -286,7 +312,7 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
 void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
 {
     constexpr char kSceneIndexPluginSuffix[] = {"_PluginNode"};
-    const MayaHydraSceneIndexRegistrationPtr registration(new MayaHydraSceneIndexRegistration());
+    const MayaHydraSceneIndexRegistrationPtr registration(new MayaUsdSceneIndexRegistration());
     MFnDependencyNode dependNodeFn(dagNode);
     // To match plugin TfType registration, name must begin with upper case.
     const std::string sceneIndexPluginName([&](){
@@ -443,10 +469,28 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
 
 void MayaHydraSceneIndexRegistry::_SceneIndexNodeAddedCallback(MObject& dagNode, void* clientData)
 {
-    if (dagNode.isNull() || dagNode.apiType() != MFn::kPluginShape)
+    if (dagNode.isNull() || dagNode.apiType() != MFn::kPluginShape){
         return;
-    auto renderOverride = static_cast<MayaHydraSceneIndexRegistry*>(clientData);
-    renderOverride->_AddSceneIndexForNode(dagNode);
+    }
+
+    auto mayaHydraSceneIndexRegistry = static_cast<MayaHydraSceneIndexRegistry*>(clientData);
+    if (MFileIO::isOpeningFile()){
+        //We cannot process a node while loading a file
+        mayaHydraSceneIndexRegistry->_AppendNodeToProcessAfterOpenScene(dagNode);
+    }else{
+        mayaHydraSceneIndexRegistry->_AddSceneIndexForNode(dagNode);
+    }
+}
+
+//We need to check if some nodes that need to be processed were added to our array during a file load
+void MayaHydraSceneIndexRegistry::_AfterOpenCallback(void *clientData) 
+{
+    if (! clientData){
+        return;
+    }
+
+    auto mayaHydraSceneIndexRegistry = static_cast<MayaHydraSceneIndexRegistry*>(clientData);
+    mayaHydraSceneIndexRegistry->_ProcessNodesAfterOpen();
 }
 
 void MayaHydraSceneIndexRegistry::_SceneIndexNodeRemovedCallback(MObject& dagNode, void* clientData)
@@ -455,6 +499,17 @@ void MayaHydraSceneIndexRegistry::_SceneIndexNodeRemovedCallback(MObject& dagNod
         return;
     auto renderOverride = static_cast<MayaHydraSceneIndexRegistry*>(clientData);
     renderOverride->_RemoveSceneIndexForNode(dagNode);
+}
+
+void MayaHydraSceneIndexRegistry::_ProcessNodesAfterOpen()
+{
+    for (auto& dagNode : _nodesToProcessAfterOpenScene){
+        if (dagNode.isNull() || dagNode.apiType() != MFn::kPluginShape){
+            continue;
+        }
+        _AddSceneIndexForNode(dagNode);
+    }
+    _nodesToProcessAfterOpenScene.clear();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

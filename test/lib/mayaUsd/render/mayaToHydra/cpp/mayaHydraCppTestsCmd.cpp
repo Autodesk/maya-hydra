@@ -16,6 +16,8 @@
 
 #include "testUtils.h"
 
+#include <flowViewport/fvpInstruments.h>
+
 #include <maya/MArgDatabase.h>
 #include <maya/MFnPlugin.h>
 #include <maya/MGlobal.h>
@@ -110,10 +112,75 @@ MStatus mayaHydraCppTestCmd::doIt( const MArgList& args )
     return MS::kFailure;
 }
 
+//============================================================
+// CLASS mayaHydraInstruments
+//============================================================
+
+MSyntax mayaHydraInstruments::createSyntax()
+{
+    MSyntax syntax;
+    syntax.setMinObjects(1);
+    syntax.setMaxObjects(1);
+    syntax.setObjectType(MSyntax::kStringObjects);
+    syntax.enableQuery(true);
+    syntax.enableEdit(false);
+    return syntax;
+}
+
+MStatus mayaHydraInstruments::doIt( const MArgList& args ) 
+{
+    MStatus status;
+    MArgDatabase db(syntax(), args, &status);
+    if (!status) {
+        return status;
+    }
+
+    if (!db.isQuery()) {
+        return MS::kFailure;
+    }
+
+    MStringArray instruments;   // Will be size 1.
+    status = db.getObjects(instruments);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    
+    if (instruments.length() != 1u) {
+        displayError("Must query a single instrument.");
+        return MS::kFailure;
+    }
+
+    auto value = Fvp::Instruments::instance().get(instruments[0].asChar());
+    
+    if (value.IsEmpty()) {
+        displayError("Queried instrument has no value.");
+        return MS::kFailure;
+    }
+
+    // Type-based translation of VtValue to result.
+    if (value.IsHolding<int>()) {
+        setResult(value.UncheckedGet<int>());
+    }
+    else if (value.IsHolding<long int>()) {
+        setResult(int(value.UncheckedGet<long int>()));
+    }
+    else if (value.IsHolding<float>()) {
+        setResult(value.UncheckedGet<float>());
+    }
+    else if (value.IsHolding<double>()) {
+        setResult(value.UncheckedGet<double>());
+    }
+
+    return MS::kSuccess;
+}
+
+//============================================================
+// CLASS mayaHydraCppTests
+//============================================================
+
 MStatus initializePlugin( MObject obj ) 
 {
     MFnPlugin plugin( obj, "Autodesk", "1.0", "Any" );
     plugin.registerCommand( "mayaHydraCppTest", mayaHydraCppTestCmd::creator, mayaHydraCppTestCmd::createSyntax );
+    plugin.registerCommand( "mayaHydraInstruments", mayaHydraInstruments::creator, mayaHydraInstruments::createSyntax );
     return MS::kSuccess;
 }
 
@@ -121,5 +188,6 @@ MStatus uninitializePlugin( MObject obj )
 {
     MFnPlugin plugin( obj );
     plugin.deregisterCommand( "mayaHydraCppTest" );
+    plugin.deregisterCommand( "mayaHydraInstruments" );
     return MS::kSuccess;
 }

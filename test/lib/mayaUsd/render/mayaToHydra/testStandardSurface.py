@@ -19,7 +19,7 @@ import fixturesUtils
 import mtohUtils
 import mayaUtils
 
-class TestStandardSurface(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
+class TestStandardSurface(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -28,8 +28,6 @@ class TestStandardSurface(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTe
 
     #Test the translation from maya standard surface with a maya native plane to usd preview surface.
     def test_StandardSurface(self):
-        cmds.file(new=True, force=True)
-
         # Load a maya scene with a maya native plane, which has autodesk standard surface as material
         testFile = mayaUtils.openTestScene(
                 "testStandardSurface",

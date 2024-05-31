@@ -25,7 +25,13 @@
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
 #include <maya/MGlobal.h>
-#include <maya/MSelectionList.h>
+#include <maya/MMatrix.h>
+#include <maya/M3dView.h>
+#include <maya/MPoint.h>
+
+#include <gtest/gtest.h>
+
+#include <QApplication>
 
 #include <algorithm>
 #include <exception>
@@ -33,6 +39,13 @@
 
 namespace {
 std::pair<int, char**> testingArgs{0, nullptr};
+
+// Store the ongoing state of the pressed moused & keyboard buttons.
+// These are normally kept track of internally by Qt and can be retrieved using 
+// methods of the same name. But since we are sending artificial events, Qt does 
+// not get the opportunity to set these, so we keep track of them manually here.
+Qt::MouseButtons      mouseButtons;
+Qt::KeyboardModifiers keyboardModifiers;
 
 std::filesystem::path  testInputDir;
 std::filesystem::path  testOutputDir;
@@ -249,7 +262,20 @@ HdSceneIndexBaseRefPtr findSceneIndexInTree(
     return {};
 }
 
+Fvp::SelectionSceneIndexRefPtr findSelectionSceneIndexInTree(
+    const HdSceneIndexBaseRefPtr& sceneIndex
+)
+{
+    auto isFvpSelectionSceneIndex = SceneIndexDisplayNamePred(
+        "Flow Viewport Selection Scene Index");
+    auto selectionSiBase = findSceneIndexInTree(
+        sceneIndex, isFvpSelectionSceneIndex);
+    return TfDynamic_cast<Fvp::SelectionSceneIndexRefPtr>(selectionSiBase);
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
+
+PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
 
@@ -327,6 +353,88 @@ bool dataSourceMatchesReference(
     // entire dumps to stdout and pollute the logs in case of a test failure. Using EXPECT_TRUE
     // at the callsites still logs exactly which comparison failed, but keeps logs readable.
     return outputString == referenceString;
+}
+
+void mouseMoveTo(QWidget* widget, QPoint localMousePos)
+{
+    QMouseEvent mouseMoveEvent(
+        QEvent::Type::MouseMove,
+        localMousePos,
+        widget->mapToGlobal(localMousePos),
+        Qt::MouseButton::NoButton,
+        mouseButtons,
+        keyboardModifiers);
+
+    QApplication::sendEvent(widget, &mouseMoveEvent);
+}
+
+void mousePress(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos)
+{
+    QMouseEvent mousePressEvent(
+        QEvent::Type::MouseButtonPress,
+        localMousePos,
+        widget->mapToGlobal(localMousePos),
+        mouseButton,
+        mouseButtons,
+        keyboardModifiers);
+
+    // Update mouse state
+    mouseButtons |= mouseButton;
+
+    QApplication::sendEvent(widget, &mousePressEvent);
+}
+
+void mouseRelease(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos)
+{
+    // Update mouse state
+    mouseButtons &= ~mouseButton;
+
+    QMouseEvent mouseReleaseEvent(
+        QEvent::Type::MouseButtonRelease,
+        localMousePos,
+        widget->mapToGlobal(localMousePos),
+        mouseButton,
+        mouseButtons,
+        keyboardModifiers);
+
+    QApplication::sendEvent(widget, &mouseReleaseEvent);
+}
+
+void mouseClick(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos)
+{
+    mousePress(mouseButton, widget, localMousePos);
+    mouseRelease(mouseButton, widget, localMousePos);
+}
+
+QPoint getPrimMouseCoords(const HdSceneIndexPrim& prim, M3dView& view)
+{
+    HdDataSourceBaseHandle xformDataSource = HdContainerDataSource::Get(prim.dataSource, HdXformSchema::GetDefaultLocator());
+    if (!xformDataSource) {
+        ADD_FAILURE() << "Scene index prim has no default locator data source, cannot get mouse coordinates for it.";
+        return {};
+    }
+    HdContainerDataSourceHandle xformContainerDataSource = HdContainerDataSource::Cast(xformDataSource);
+    TF_AXIOM(xformContainerDataSource);
+    HdXformSchema xformSchema(xformContainerDataSource);
+    TF_AXIOM(xformSchema.GetMatrix());
+    GfMatrix4d xformMatrix = xformSchema.GetMatrix()->GetTypedValue(0);
+    GfVec3d translation = xformMatrix.ExtractTranslation();
+
+    MPoint worldPosition(translation[0], translation[1], translation[2], 1.0);
+    short   viewportX = 0, viewportY = 0;
+    MStatus worldToViewStatus;
+    // First assert checks that the point was not clipped, second assert checks the general MStatus
+    if (!view.worldToView(worldPosition, viewportX, viewportY, &worldToViewStatus)) {
+        ADD_FAILURE() << "point was clipped by world to view projection, cannot get mouse coordinates for scene index prim.";
+        return {};
+    }
+    if (worldToViewStatus != MS::kSuccess) {
+        ADD_FAILURE() << "M3dView::worldToView() failed, cannot get mouse coordinates for scene index prim.";
+        return {};
+    }
+
+    // Qt and M3dView use opposite Y-coordinates
+    return QPoint(viewportX, view.portHeight() - viewportY);
 }
 
 } // namespace MAYAHYDRA_NS_DEF

@@ -20,9 +20,9 @@
 #include "renderGlobals.h"
 #include "renderOverride.h"
 
-#include <mayaHydraLib/delegates/delegateRegistry.h>
 #include <mayaHydraLib/mhBuildInfo.h>
 #include <mayaHydraLib/mayaHydra.h>
+#include <mayaHydraLib/mixedUtils.h>
 
 #include <maya/MArgDatabase.h>
 #include <maya/MGlobal.h>
@@ -41,6 +41,12 @@ constexpr auto _listRenderersLong = "-listRenderers";
 
 constexpr auto _listActiveRenderers = "-lar";
 constexpr auto _listActiveRenderersLong = "-listActiveRenderers";
+
+constexpr auto _currentProcessMemory = "-cpm";
+constexpr auto _currentProcessMemoryLong = "-currentProcessMemory";
+
+constexpr auto _hdGPUMem = "-hdm";
+constexpr auto _hdGPUMemLong = "-hdGPUMem";
 
 constexpr auto _getRendererDisplayName = "-gn";
 constexpr auto _getRendererDisplayNameLong = "-getRendererDisplayName";
@@ -140,9 +146,11 @@ MSyntax MtohViewCmd::createSyntax()
 
     syntax.addFlag(_rendererId, _rendererIdLong, MSyntax::kString);
 
-    syntax.addFlag(_getRendererDisplayName, _getRendererDisplayNameLong);
+    syntax.addFlag(_currentProcessMemory, _currentProcessMemoryLong);
 
-    syntax.addFlag(_listDelegates, _listDelegatesLong);
+    syntax.addFlag(_hdGPUMem, _hdGPUMemLong);
+
+    syntax.addFlag(_getRendererDisplayName, _getRendererDisplayNameLong);
 
     syntax.addFlag(_createRenderGlobals, _createRenderGlobalsLong);
 
@@ -196,7 +204,11 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
         }
     }
 
-    if (db.isFlagSet(_listRenderers)) {
+    if (db.isFlagSet(_hdGPUMem)) {
+        appendToResult(MtohRenderOverride::GetUsedGPUMemory());
+    } if (db.isFlagSet(_currentProcessMemory)) {
+        appendToResult(getProcessMemory());
+    } else if (db.isFlagSet(_listRenderers)) {
         for (auto& plugin : MtohGetRendererDescriptions())
             appendToResult(plugin.rendererName.GetText());
 
@@ -222,14 +234,6 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
 
         const auto dn = MtohGetRendererPluginDisplayName(renderDelegateName);
         setResult(MString(dn.c_str()));
-    } else if (db.isFlagSet(_listDelegates)) {
-        for (const auto& delegate : MayaHydraDelegateRegistry::GetDelegateNames()) {
-            appendToResult(delegate.GetText());
-        }
-        // Want to return an empty list, not None
-        if (!isCurrentResultArray()) {
-            setResult(MStringArray());
-        }
     } else if (db.isFlagSet(_help)) {
         MString helpText = _helpText;
         if (db.isFlagSet(_verbose)) {

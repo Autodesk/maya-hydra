@@ -24,9 +24,11 @@ For example, to run testVisibility on RelWithDebInfo :
 
 ```ctest -C RelWithDebInfo -VV --output-on-failure -R testVisibility```
 
+Note that when running Python tests the Python source is read directly from the source directory.  Therefore, when changing Python test code source, no build needs to be done to update the test, which can be run immediately using ctest.  This is a convenient time saver, as the test development cycle is not edit, build, run, but simply edit and run.  Only if C++ test code is changed is a build then necessary.
+
 ### Running tests with MayaUSD
 
-Some tests require the MayaUSD plugin to be loaded in order to be run. If MayaUSD cannot be loaded, those tests will be skipped. In order for the test framework to find and load MayaUSD, the `-DMAYAUSD_LOCATION` CMake flag must be set to your MayaUSD installation directory when building MayaHydra. For convenience, you can use the `--mayausd-location` parameter when using the [build.py](../../../../../build.py) script, which will set the CMake flag for you with the given argument. The specified path should point to the directory where your MayaUSD `.mod` file resides. Note that the test framework will not find MayaUSD using the MAYA_MODULE_PATH environment variable.
+The tests require MayaUSD in order to be run. In order for the test framework to find and load MayaUSD, the `-DMAYAUSD_LOCATION` CMake flag must be set to your MayaUSD installation directory when building MayaHydra. For convenience, you can use the `--mayausd-location` parameter when using the [build.py](../../../../../build.py) script, which will set the CMake flag for you with the given argument. The specified path should point to the directory where your MayaUSD `.mod` file resides. Note that the test framework will not find MayaUSD using the MAYA_MODULE_PATH environment variable.
 
 For example, if your MayaUSD `.mod` file resides in `<some-path>/install/RelWithDebInfo`, you could call build.py as such :
 
@@ -54,29 +56,37 @@ Looking to add a C++ test suite? See the corresponding [README.md](./cpp/README.
 To add a new Python-only test suite : 
 
 1. Create a new test[...].py file in the current folder.
-2. Create a test class that derives from unittest.TestCase (doesn't need to directly inherit from it).
-3. Add `test_[...]` methods for each test case in your test suite.
-4. Add the following snippet at the bottom of your file :
+2. Create a test class that derives from `mtohUtils.MayaHydraBaseTestCase`.
+3. Add the line `_file = __file__` in your class definition.
+4. If needed, set `_requiredPlugins` to list any plugins that need to be loaded for your test. MayaUSD does not need to be specified, it will be loaded automatically.
+5. Add `test_[...]` methods for each test case in your test suite.
+6. Add the following snippet at the bottom of your file :
     ```python
     if __name__ == '__main__':
         fixturesUtils.runTests(globals())
     ```
-5. Add the name of your test[...].py file to the list of `TEST_SCRIPT_FILES` in the [current folder's CMakeLists.txt](./CMakeLists.txt)
+7. Add the name of your test[...].py file to the list of `TEST_SCRIPT_FILES` in the [current folder's CMakeLists.txt](./CMakeLists.txt)
 
 Some important notes :
-- By default, the mayaHydra plugin will not be loaded. An easy way to load it is to have your test class derive from `MayaHydraBaseTestCase`, which will automatically load mayaHydra when running tests. Don't forget to add the line `_file = __file__` in your class.
-- After loading mayaHydra, the renderer will still be on Viewport 2.0. If you want to use another renderer, your test will have to switch to it. If you want to use HdStorm, an easy way to do it is to have your test class derive from `MayaHydraBaseTestCase` and call `self.setHdStormRenderer()`
+- Before each test, a new file will be opened and the renderer will be switched to Hydra. If you need to switch between renderers, you can use the `self.setHdStormRenderer()` and `self.setViewport2Renderer()` methods.
+- Some test settings (such as turning color management off, disabling the grid, etc.) are applied by default when opening a scene using `mayaUtils.openNewScene` or `mayaUtils.openTestScene`. The new scene opened before each test is opened using `mayaUtils.openNewScene`, meaning those test settings will automatically be applied before each test. These methods provide the option not to apply those settings if desired, by passing in `useTestSettings=False`. If you want to test a setting that is modified as part of those test settings, you can either re-set it explicitly in the test, and/or load a scene with the desired settings by calling `mayaUtils.openTestScene(<path arguments>, useTestSettings=False)`. In case you want to avoid ever changing the test settings entirely, you can also override the `setUp` method.
+
+# Best practices
+- Don't skip tests unless necessary. If a test requires a certain plugin to be loaded, don't skip the test if the plugin fails to load, as this will falsely be reported as a pass. For such cases, prefer setting the `_requiredPlugins` variable in your test class.
+- Use relative paths in test data to make sure the tests will work anywhere.
+- Prefer storing USD data in text-form .usda instead of binary, for readability and ease of modification should a test need to be tweaked.
+- By default, tests will disable color management. However, it tends to be automatically re-enabled in certain conditions; while we have mitigated this by re-disabling it every time we've seen this occur, it is safer to make sure it is explicitly disabled if possible, such as by saving test scenes with color management off (as opposed to saving them with an undefined color management status, or having it enabled).
+- If you add tests for color management, do **NOT** use the legacy SynColor system, as it is no longer supported on OSX.
 
 # Image comparison
 
 Image comparison is done using [idiff from OpenImageIO](https://openimageio.readthedocs.io/en/latest/idiff.html).
 
 Some utilities exist to facilitate image comparison tests. Here is the simplest way to get going : 
-1. Make your test class derive from `MtohTestCase`.
-2. Don't forget to add the line `_file = __file__` in your class.
-3. Create a folder called [TestName]Test (e.g. for testVisibility, create a folder VisibilityTest)
-4. Put the images you want to use for comparison in that folder
-5. Call `self.assertImagesClose`, `self.assertImagesEqual` and/or `self.assertSnapshotClose` with the file names of the images to compare with.
+1. Make sure your test class derives from `mtohUtils.MayaHydraBaseTestCase` (and has the line `_file = __file__`).
+2. Create a folder called [TestName]Test (e.g. for testVisibility, create a folder VisibilityTest)
+3. Put the images you want to use for comparison in that folder
+4. Call `self.assertImagesClose`, `self.assertImagesEqual` and/or `self.assertSnapshotClose` with the file names of the images to compare with.
 
 For the `assert[...]Close` methods, you will need to pass in a fail threshold for individual pixels and a fail percentage for the whole image. Other parameters are also available for you to specify. You can find more information on these parameters on the [idiff documentation page](https://openimageio.readthedocs.io/en/latest/idiff.html).
 
@@ -88,10 +98,4 @@ To create a reference snapshot, an easy way is to first write your test, and the
 
 # Utilities
 
-Utility files are located under [/test/testUtils](../../../../testUtils/). Note that at the time of writing this (2023/08/16), many of the utils files and their contents were inherited from the USD plugin, and are not all used. Here are some of the main utilities you might find useful :
-
-- mtohutils.py :
-    - `checkForMayaUsdPlugin()` will try to load the MayaUsd plugin and return a boolean indicating if the plugin was loaded successfully. By decorating a test case with the following line, you can run the test only if the MayaUsd plugin is found and loaded : 
-    ```@unittest.skipUnless(mtohUtils.checkForMayaUsdPlugin(), "Requires Maya USD Plugin.")```
-    - `MayaHydraBaseTestCase` is a base class you can use for your test classes that will provide you with some useful functionality, such as automatically loading the mayaHydra plugin. It also provides a method to use the HdStorm renderer (`setHdStormRenderer`), and another to create a simple scene with a cube (`makeCubeScene`).
-    - `MtohTestCase` is a class you can use as a base for your test classes that will provide you with image comparison functionality (see [Image comparison](#Image-comparison) section). Note that this class already derives from MayaHydraBaseTestCase, so it will also automatically load the mayaHydra plugin.
+Utility files are located under [/test/testUtils](../../../../testUtils/). Note that at the time of writing this (2023/08/16), many of the utils files and their contents were inherited from the USD plugin, and are not all used.

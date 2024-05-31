@@ -9,9 +9,9 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNamespaces.py
     testVisibility.py
     testRendererSwitching.py
-    testSceneBrowser.py
     testStageAddPrim.py
     testTransforms.py
+    testRefinement.py
     testMaterialXOnNative.py
     testNewSceneWithStage.py
     testMayaDisplayModes.py
@@ -20,6 +20,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaIsolateSelect.py
     testMayaLights.py
     testUSDLights.py
+    testUVandUDIM.py
     testArnoldLights.py
     testLookThrough.py
     testObjectTemplate.py
@@ -30,6 +31,11 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNurbsPrimitives.py
     testCurveTools.py
     testPolygonPrimitives.py
+    testFootPrintNode.py
+    testBackgroundColor.py
+    testGrid.py
+    testDataProducerSelHighlight.py
+    testPassingNormalsOnMayaNative.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py
@@ -42,7 +48,12 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testFlowViewportAPIAddPrims.py
     cpp/testUsdStageLayerMuting.py
     cpp/testFlowViewportAPIFilterPrims.py
+    cpp/testSceneCorrectness.py
     cpp/testPrimInstancing.py
+    cpp/testPicking.py
+    cpp/testUsdPointInstancePicking.py
+    cpp/testUsdNativeInstancePicking.py
+    cpp/testUsdPickKind.py
     cpp/testNurbsSurfaces.py
 )
 
@@ -50,6 +61,11 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 if(MayaUsd_FOUND)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testMayaUsdAPIUsage.py)
 endif(MayaUsd_FOUND)
+
+# Code coverage is not computed for the Hydra scene browser.
+if (NOT CODE_COVERAGE)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py)
+endif()
 
 # Interactive Unit test scripts for mesh adapter (launched with maya.exe instead of mayapy.exe)
 # Test use of mesh adapter code for mesh support, using environment variable.
@@ -59,6 +75,13 @@ endif(MayaUsd_FOUND)
 set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshes.py
     cpp/testMeshAdapterTransform.py
+)
+
+# Run the following tests with the VP2 render delegate disabled, to ensure 
+# that mayaHydra does not rely on computations made by VP2 for its use.
+set(INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_VP2_RENDER_DELEGATE
+    cpp/testUsdAnim.py
+    cpp/testUsdStageFromFile.py
 )
 
 # Unit test scripts run with mayapy.exe (no UI, so no image diffing and not possible to set Hydra Storm as the renderer)
@@ -88,12 +111,6 @@ foreach(script ${TEST_SCRIPT_FILES})
             # Maya uses a very old version of GLEW, so we need support for
             # pre-loading a newer version from elsewhere.
             "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
-
-            # Fallback to old color management. We will have to investigate
-            # and introduce OCIOv2 compatible version of these tests.
-            "MAYA_COLOR_MANAGEMENT_SYNCOLOR=1"
-
-            "MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX=1"
     )
 
     # Assign a CTest label to these tests for easy filtering.
@@ -114,15 +131,31 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
 
             "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
 
-            "MAYA_COLOR_MANAGEMENT_SYNCOLOR=1"
-
             "MAYA_HYDRA_USE_MESH_ADAPTER=1"
-
-            "MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX=1"
     )
 
     # Assign a CTest label to these tests for easy filtering.
     set_property(TEST ${target} APPEND PROPERTY LABELS mayaHydraMeshAdapter)
+endforeach()
+
+# Disable VP2 render delegate and use interactive Maya with UI.
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_VP2_RENDER_DELEGATE})
+    mayaUsd_get_unittest_target(target ${script})
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        PYTHON_SCRIPT ${script}
+        ENV
+            "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
+            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
+
+            "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
+
+            "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+    )
+
+    # Assign a CTest label to these tests for easy filtering.
+    set_property(TEST ${target} APPEND PROPERTY LABELS MayaHydraInteractive)
 endforeach()
 
 # Use Maya.exe with UI, interactive tests.
@@ -151,12 +184,6 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
             # Maya uses a very old version of GLEW, so we need support for
             # pre-loading a newer version from elsewhere.
             "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
-
-            # Fallback to old color management. We will have to investigate
-            # and introduce OCIOv2 compatible version of these tests.
-            "MAYA_COLOR_MANAGEMENT_SYNCOLOR=1"
-
-            "MAYA_HYDRA_ENABLE_NATIVE_SCENE_INDEX=1"
     )
 
     # Add a ctest label to these tests for easy filtering.

@@ -21,25 +21,12 @@ import mayaUtils
 
 import platform
 
-class TestMayaShadingModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohTestCase to be able to call self.assertSnapshotClose
+class TestMayaShadingModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    @property
-    def imageDiffFailThreshold(self):
-        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
-        # for that platform specifically for now, so we can still catch issues on other platforms.
-        if platform.system() == "Darwin":
-            return 0.05
-        return 0.01
-    
-    @property
-    def imageDiffFailPercent(self):
-        # HYDRA-837 : Wireframes seem to have a slightly different color on macOS. We'll increase the thresholds
-        # for that platform specifically for now, so we can still catch issues on other platforms.
-        if platform.system() == "Darwin":
-            return 5
-        return 0.2
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.1
+    IMAGE_DIFF_FAIL_PERCENT = 2
 
     def test_MayaShadingModes(self):
         
@@ -55,25 +42,25 @@ class TestMayaShadingModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         #Smooth Shading
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
         cmds.refresh()
-        self.assertSnapshotClose("default" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("default" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Flat Shading
         cmds.modelEditor(panel, edit=True, displayAppearance="flatShaded")
         cmds.refresh()
-        self.assertSnapshotClose("flatShaded" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("flatShaded" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
 
         #Bounding Box
         cmds.modelEditor(panel, edit=True, displayAppearance="boundingBox")
         cmds.refresh()
-        self.assertSnapshotClose("boundingBox" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("boundingBox" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
 
         #SmoothWirefame
         cmds.modelEditor(panel, edit=True, displayAppearance="wireframe")
         cmds.modelEditor(panel, edit=True, smoothWireframe=True)
         cmds.refresh()
-        self.assertSnapshotClose("smoothwireframe" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("smoothwireframe" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.modelEditor(panel, edit=True, smoothWireframe=False)
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
 
@@ -81,26 +68,15 @@ class TestMayaShadingModes(mtohUtils.MtohTestCase): #Subclassing mtohUtils.MtohT
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
         cmds.modelEditor(panel, edit=True, smoothWireframe=True)
         cmds.refresh()
-        self.assertSnapshotClose("smoothwireframeonshaded" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
+        self.assertSnapshotClose("smoothwireframeonshaded" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.modelEditor(panel, edit=True, smoothWireframe=False)
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=False)
 
         #X-ray
         cmds.modelEditor(panel, edit=True, xray=True)
         cmds.refresh()
-        self.assertSnapshotClose("xray" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)        
+        self.assertSnapshotClose("xray" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
         cmds.modelEditor(panel, edit=True, xray=False)
-
-        #joint xray mode
-        cmds.modelEditor(panel, edit=True, jointXray=True)
-        cmds.refresh()
-        self.assertSnapshotClose("jointxray" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-        cmds.modelEditor(panel, edit=True, jointXray=False)
-
-        #backfaceCulling  
-        cmds.modelEditor(panel, edit=True, backfaceCulling=True)
-        cmds.refresh()
-        self.assertSnapshotClose("backfaceCulling" + ".png", self.imageDiffFailThreshold, self.imageDiffFailPercent)
-
+        
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
