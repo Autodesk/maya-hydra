@@ -37,6 +37,7 @@ HdDataSourceLocator curvesTopologyLocator = HdBasisCurvesSchema::GetTopologyLoca
 HdDataSourceLocator meshTopologyLocator = HdMeshSchema::GetTopologyLocator();
 HdDataSourceLocator pointsLocator = HdPrimvarsSchema::GetPointsLocator();
 
+#ifdef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
 FindPrimPredicate getNurbPrimPredicate(const std::string& nurbsName, const TfToken& primType)
 {
     return [nurbsName,
@@ -48,6 +49,7 @@ FindPrimPredicate getNurbPrimPredicate(const std::string& nurbsName, const TfTok
         return prim.primType == primType;
     };
 }
+#endif
 
 } // namespace
 
