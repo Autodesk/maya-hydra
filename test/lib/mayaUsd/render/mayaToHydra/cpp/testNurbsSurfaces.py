@@ -16,7 +16,7 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 
-class TestNurbsSurfaces(mtohUtils.MtohTestCase):
+class TestNurbsSurfaces(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
