@@ -408,7 +408,6 @@ WireframeSelectionHighlightSceneIndex(
     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
         if (prim.primType == HdPrimTypeTokens->instancer) {
             _CreateInstancerHighlightsForInstancer(prim, primPath);
-            return false; // Only create highlights for top-level instancers
         }
         return true;
     };
@@ -432,11 +431,12 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         SdfPath originalPrimPath = primPath.ReplacePrefix(selectionHighlightMirrorAncestor, _GetOriginalPathFromSelectionHighlightMirror(selectionHighlightMirrorAncestor));
         HdSceneIndexPrim selectionHighlightPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
         if (selectionHighlightPrim.dataSource) {
-            // Repath the data sources to the selection highlight mirror hierarchy
+            // Redirects paths within data sources to their corresponding selection highlight mirror paths (when there is one)
             selectionHighlightPrim.dataSource = _SelectionHighlightRepathingContainerDataSource::New(selectionHighlightPrim.dataSource, this);
 
             // Use prim type-specific data source overrides
             if (selectionHighlightPrim.primType == HdPrimTypeTokens->instancer) {
+                // Handles setting the mask for instance-specific highlighting
                 selectionHighlightPrim.dataSource = _GetSelectionHighlightInstancerDataSource(selectionHighlightPrim.dataSource);
             }
             else if (selectionHighlightPrim.primType == HdPrimTypeTokens->mesh) {
@@ -471,7 +471,7 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
 SdfPathVector
 WireframeSelectionHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath) const
 {
-    // When within a selection highlight mirror hierarchy, query the corresponding original prim
+    // When within a selection highlight mirror hierarchy, query the corresponding original prim's children
     SdfPath selectionHighlightMirrorAncestor = _FindSelectionHighlightMirrorAncestor(primPath);
     if (!selectionHighlightMirrorAncestor.IsEmpty()) {
         SdfPath originalAncestor = _GetOriginalPathFromSelectionHighlightMirror(selectionHighlightMirrorAncestor);
@@ -575,9 +575,10 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
         }
 
         if (entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator())) {
+            // An instancer was changed; rebuild its selection highlight.
             // We do not need to check for instancedBy dirtying : if an instancedBy data source is dirtied,
             // then either a new instancer was added, which will be handled in _PrimsAdded, either an
-            // existing instancer's instancerTopology data source was dirtied. 
+            // existing instancer's instancerTopology data source was dirtied., which is handled here.
             instancerHighlightsToRebuild.push_back(entry.primPath);
         }
         
@@ -587,7 +588,8 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
 
-            // Selection was changed on an instancer, so dirty its selection highlight mirror's instancerTopology mask.
+            // Selection was changed on an instancer, so dirty its selection highlight mirror's instancerTopology mask
+            // to update which instances are highlighted in the case of instance selection.
             if (prim.primType == HdPrimTypeTokens->instancer && selectionHighlightPath != entry.primPath) {
                 dirtiedPrims.emplace_back(selectionHighlightPath, HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask));
             }
@@ -603,6 +605,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             bool isSelected = selectionsSchema.IsDefined() && selectionsSchema.GetNumElements() > 0;
 
             // Update child instancer highlights for ancestor-based selection highlighting
+            // (i.e. selecting one or more of an instancer's parents should highlight the instancer)
             auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
                 if (prim.primType == HdPrimTypeTokens->instancer) {
                     if (isSelected) {
@@ -610,7 +613,6 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
                     } else {
                         instancerHighlightUsersToRemove.push_back({primPath,entry.primPath});
                     }
-                    return false; // Only update direct/immediate instancer children
                 }
                 return true;
             };
