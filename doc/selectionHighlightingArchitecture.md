@@ -383,23 +383,61 @@ as a whole or specific instances, as these require a more complicated workflow. 
 selection, we cannot simply override instanced meshes to use the `refinedWireOnSurf`/`wireOnSurf`
 HdReprs, as that would lead to highlighting all instances of the prototype all the time. Instead, 
 we opt for the following approach : when an instancer is selected (entirely or only certain instances), 
-we will create a mirror of the instancing network it is a part of. This mirror network includes 
+we will create a mirror of the instancing graph it is a part of. This mirror graph includes 
 everything from the most deeply buried prims to the topmost instancers; anything that this instancer 
 affects or is affected by, including itself. In practice, this means that each prototype and each 
 top-level instancer will have a corresponding mirror prim for selection highlighting, that will be 
 located alongside it as a sibling. This way, any parent transforms affecting the original prim will 
 also affect the selection highlight mirror prim.
 
+For example, given the following scene structure : 
+```
+Root
+|__TopInstancer
+   |__NestedInstancer
+      |__Prototype
+```
+the resulting scene structure with selection highlighting would become :
+```
+Root
+|__TopInstancer
+|  |__NestedInstancer
+|  |  |__Prototype
+|  |  |__Prototype_SelectionHighlight
+|  |__NestedInstancer_SelectionHighlight
+|__TopInstancer_SelectionHighlight
+```
+where `TopInstancer_SelectionHighlight` would instance `NestedInstancer_SelectionHighlight`, which would in turn instance `Prototype_SelectionHighlight`.
+
 Note that in the case where a prototype is not a single prim but a sub-hierarchy, we only need to 
 create a single *explicit* selection highlight mirror for the whole prototype sub-hierarchy; the 
 child prims of the selection highlight mirror will simply be pulled from the corresponding original 
 prim, and thus implicitly be selection highlight mirrors as well.
 
-Something to be aware of is that a nested/composed instancer is not necessarily directly selected, 
+Another thing to be aware of is that a nested/composed instancer is not necessarily directly selected, 
 as it is not necessarily a prototype root itself. If an instancer is a child prim of another prim 
 that is itself selected or instanced by another instancer, these instancers are still composed 
 together, but will not point to each other directly. Such cases are an example of when we need to 
-use the `instancedBy/prototypeRoots` data source to properly construct the mirror network of instancers.
+use the `instancedBy/prototypeRoots` data source to properly construct the mirror graph of instancers.
+
+An example of this is the following :
+```
+Root
+|__TopInstancer
+   |__Prototype
+      |__ChildInstancer
+```
+for which we end up with :
+```
+Root
+|__TopInstancer
+|  |__Prototype
+|  |  |__ChildInstancer
+|  |__Prototype_SelectionHighlight
+|     |__ChildInstancer
+|__TopInstancer_SelectionHighlight
+```
+where `TopInstancer_SelectionHighlight` instances `Prototype_SelectionHighlight`, which implicitly draws the selection highlight version of `ChildInstancer`.
 
 Of note are the following selection highlighting scenarios and their corresponding behaviors :
 - Selecting a point instancer in its entirety
