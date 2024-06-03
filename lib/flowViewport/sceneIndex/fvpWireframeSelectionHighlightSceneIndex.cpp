@@ -446,7 +446,7 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         return selectionHighlightPrim;
     }
     
-    // We are dealing with a prototype selection, a regular selection, or no selection at all.
+    // We are dealing with a mesh prototype selection, a regular selection, or no selection at all.
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     if (prim.primType == HdPrimTypeTokens->mesh) {
         // Note : in the USD data model, the original prims that get propagated as prototypes have their original prim types erased.
