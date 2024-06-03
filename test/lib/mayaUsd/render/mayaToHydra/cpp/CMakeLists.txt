@@ -39,6 +39,7 @@ target_sources(${TARGET_NAME}
         testUsdAnim.cpp
         testUsdPointInstancePicking.cpp
         testUsdPicking.cpp
+        testNurbsSurfaces.cpp
 )
 
 # -----------------------------------------------------------------------------

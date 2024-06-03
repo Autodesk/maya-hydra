@@ -13,28 +13,44 @@
 // limitations under the License.
 //
 #include "mayaHydraCppTestsCmd.h"
+
 #include "testUtils.h"
 
 #include <flowViewport/fvpInstruments.h>
 
-#include <maya/MString.h>
-#include <maya/MFnPlugin.h>
 #include <maya/MArgDatabase.h>
-#include <maya/MSyntax.h>
+#include <maya/MFnPlugin.h>
 #include <maya/MGlobal.h>
+#include <maya/MString.h>
+#include <maya/MSyntax.h>
+
 #include <gtest/gtest.h>
 
 namespace 
 {
 constexpr auto _filter = "-f";
 constexpr auto _filterLong = "-filter";
+constexpr auto _inputDir = "-id";
+constexpr auto _inputDirLong = "-inputDir";
+constexpr auto _outputDir = "-od";
+constexpr auto _outputDirLong = "-outputDir";
 
 MStringArray constructGoogleTestArgs(const MArgDatabase& database)
 {
     MString filter = "*";
+    if (database.isFlagSet(_filter)) {
+        database.getFlagArgument(_filter, 0, filter);
+    }
+    ::testing::GTEST_FLAG(filter) = filter.asChar();
 
-    if (database.isFlagSet("-f")) {
-        if (database.getFlagArgument("-f", 0, filter)) { }
+    MString inputDir;
+    if (database.isFlagSet(_inputDir) && database.getFlagArgument(_inputDir, 0, inputDir)) {
+        MayaHydra::setInputDir(inputDir.asChar());
+    }
+
+    MString outputDir;
+    if (database.isFlagSet(_outputDir) && database.getFlagArgument(_outputDir, 0, outputDir)) {
+        MayaHydra::setOutputDir(outputDir.asChar());
     }
 
     MStringArray args;
@@ -53,8 +69,6 @@ MStringArray constructGoogleTestArgs(const MArgDatabase& database)
         args.append("dummy");
     }
 
-    ::testing::GTEST_FLAG(filter) = filter.asChar();
-
     return args;
 }
 
@@ -64,6 +78,8 @@ MSyntax mayaHydraCppTestCmd::createSyntax()
 {
     MSyntax syntax;
     syntax.addFlag(_filter, _filterLong, MSyntax::kString);
+    syntax.addFlag(_inputDir, _inputDirLong, MSyntax::kString);
+    syntax.addFlag(_outputDir, _outputDirLong, MSyntax::kString);
     syntax.setObjectType(MSyntax::kStringObjects);
     return syntax;
 }

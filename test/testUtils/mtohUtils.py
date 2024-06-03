@@ -23,6 +23,7 @@ import fixturesUtils
 import mayaUtils
 import testUtils
 from imageUtils import ImageDiffingTestCase
+from testUtils import PluginLoaded
 
 import platform
 import subprocess
@@ -204,3 +205,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         '''Use of this method is discouraged, as renders can vary slightly between renderer architectures.'''
         refImage = self.resolveRefImage(refImage, imageVersion)
         super(MayaHydraBaseTestCase, self).assertSnapshotEqual(refImage)
+
+    def runCppTest(self, testFilter):
+        with PluginLoaded("mayaHydraCppTests"):
+            cmds.mayaHydraCppTest(f=testFilter, inputDir=self._inputDir, outputDir=self._testDir)
