@@ -387,3 +387,13 @@ as it is not necessarily a prototype root itself. If an instancer is a child pri
 that is itself selected or instanced by another instancer, these instancers are still composed 
 together, but will not point to each other directly. Such cases are an example of when we need to 
 use the `instancedBy/prototypeRoots` data source to properly construct the mirror network of instancers.
+
+Of note are the following selection highlighting scenarios and their corresponding behaviors :
+- Selecting a point instancer in its entirety
+  - If the instancer is a top-level instancer, all instances it draws WILL be highlighted
+  - If the instancer is a prototype, instances of itself drawn by other instancers will NOT be highlighted
+- Selecting specific instances of point instancer
+  - If the instancer is a top-level instancer, the selected instances it draws WILL be highlighted
+  - If the instancer is a prototype, the instances it would indirectly draw through instances of itself drawn by other instancers will NOT be highlighted
+- Selecting a parent prim of a point instancer
+  - (same as selecting a point instancer in its entirety)
