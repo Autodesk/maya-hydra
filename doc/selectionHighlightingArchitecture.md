@@ -290,24 +290,25 @@ WireframeSelectionHighlightSceneIndex o-- Selection : Read
   selected, a USD descendant's appearance can change.  This is the same
   situation as global transformation and visibility.
 
-## Mesh point instancing selection highlighting
+## Mesh point instancing wireframe selection highlighting
 
-We currently support selection highlighting for point instancing of meshes
+We currently support wireframe selection highlighting for point instancing of meshes
 for the three different point instancing selection modes :
 - Point Instancer
 - Instance
 - Prototype
 
-Here is an overview of how selection highlighting for point instancing
-is implemented. We'll be using USD as the source data model, which has
-some idiosyncracies of its own (which we'll go over when needed), but 
-the vast majority of it is Hydra-based.
+Here is an overview of point instancing in Hydra, and how we implement wireframe 
+selection highlighting for it.
 
 ### Scene index structure
 
 In Hydra, a point instancer is represented as a prim of type `instancer`,
-with an `instancerTopology` data source. This data source contains three
-inner data sources :
+with an `instancerTopology` data source. 
+
+![instancerTopology data source](images/instancerTopology.png)
+
+This data source contains three inner data sources :
 - The `prototypes` data source, of type `VtArray<SdfPath>`, lists the paths
 to each prototype this point instancer instances.
 - The `instanceIndices` data source, a vector data source where each element
@@ -319,18 +320,27 @@ to show/hide specific instances (e.g. if the 3rd element of the mask is `false`,
 then the 3rd instance will be hidden). If this array is empty, all instances will be
 shown.
 
+---
+
 Per-instance data is specified using primvar data sources, namely :
 - hydra:instanceTranslations
 - hydra:instanceRotations
 - hydra:instanceScales
 - hydra:instanceTransforms
 
+![instanceTranslations primvar data source](images/instanceTranslations.png)
+
 Where the corresponding primvarValue data source lists the instance-specific data.
 Note that while the first three are 3-dimensional vectors and `hydra:instanceTransforms`
 is a 4x4 matrix, they can all be used simultaneously (internally, they will all be
 converted to 4x4 matrices, and then multiplied together).
 
+---
+
 On the other end of instancing, prototype prims have an `instancedBy` data source.
+
+![instancedBy data source](images/instancedBy.png)
+
 This data source contains up to two inner data sources :
 - (required) : The `paths` data source, of type `VtArray<SdfPath>`, lists the paths
 to each instancer that instances this prototype.
@@ -341,13 +351,15 @@ then the prototype xform and mesh prims will each have the same `instancedBy` da
 where the `paths` data source will point to the instancers that use this prototype, and
 where the `prototypeRoots` will point to the xform prim.
 
+---
+
 Some notes about the behavioral impacts of the hierarchical location of prims :
 - Prims that are rooted under an instancer will not be drawn unless instanced
 - Prototypes that are instanced will still be drawn as if they were not instanced
 (i.e. the instances will be drawn in addition to the base prim itself), unless as 
 mentioned they are rooted under an instancer.
 
-### Nested instancers
+### Nested/Composed instancers
 
 It is possible for an instancer itself to be instanced by another, and thus have both the
 `instancerTopology` and the `instancedBy` data sources. Note that this does not preclude
@@ -397,3 +409,12 @@ Of note are the following selection highlighting scenarios and their correspondi
   - If the instancer is a prototype, the instances it would indirectly draw through instances of itself drawn by other instancers will NOT be highlighted
 - Selecting a parent prim of a point instancer
   - (same as selecting a point instancer in its entirety)
+
+### Code overview
+
+This section is to briefly explain some of the less immediately clear code structures used in the
+implementation. 
+
+### Current limitations
+
+- Wireframe colors for lead/active selection are unsupported
