@@ -205,3 +205,65 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     testInstancerIndirectHighlightFn(thirdInstancerItem, thirdInstancerPath);
     testInstancerIndirectHighlightFn(fourthInstancerItem, fourthInstancerPath);
 }
+
+TEST(PointInstancingWireframeHighlight, instance)
+{
+    const SceneIndicesVector& terminalSceneIndices = GetTerminalSceneIndices();
+    ASSERT_FALSE(terminalSceneIndices.empty());
+    SceneIndexInspector inspector(terminalSceneIndices.front());
+
+    auto isFvpMergingSceneIndexPredicate = SceneIndexDisplayNamePred("Flow Viewport Merging Scene Index");
+    auto fvpMergingSceneIndex = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
+        findSceneIndexInTree(terminalSceneIndices.front(), isFvpMergingSceneIndexPredicate));
+
+    auto ufeSelection = Ufe::GlobalSelection::get();
+
+    HdxSelectionSceneIndexObserver selectionObserver;
+    selectionObserver.SetSceneIndex(terminalSceneIndices.front());
+
+    auto topInstancerFirstInstancePath = Ufe::PathString::path(stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/0");
+    auto secondInstancerSecondInstancePath = Ufe::PathString::path(stagePathSegment + "," + "/Root/SecondInstancer/1");
+
+    auto topInstancerFirstInstanceItem = Ufe::Hierarchy::createItem(topInstancerFirstInstancePath);
+    auto secondInstancerSecondInstanceItem = Ufe::Hierarchy::createItem(secondInstancerSecondInstancePath);
+
+    // Initial state : ensure nothing is highlighted
+    ufeSelection->clear();
+
+    auto selectionHighlightMirrors = inspector.FindPrims(findSelectionHighlightMirrorsPredicate);
+    EXPECT_TRUE(selectionHighlightMirrors.empty());
+
+    auto meshPrims = inspector.FindPrims(findMeshPrimsPredicate);
+    for (const auto& meshPrim : meshPrims) {
+        EXPECT_EQ(getReprToken(meshPrim.prim), HdReprTokens->refined);
+    }
+
+    // Select instances
+    auto testInstanceHighlightFn = [&](const Ufe::SceneItem::Ptr& instanceItem, const Ufe::Path& instancePath) -> void {
+        ufeSelection->replaceWith(instanceItem);
+
+        auto instanceHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(instancePath);
+        ASSERT_EQ(instanceHydraSelections.size(), 1u);
+    
+        auto instancerPrimPath = instanceHydraSelections.front().primPath;
+        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath));
+    
+        ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().size(), 1u);
+        ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().front(), instancerPrimPath);
+
+        HdSceneIndexPrim instancerHighlightPrim = inspector.GetSceneIndex()->GetPrim(getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath));
+        HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(instancerHighlightPrim.dataSource);
+        ASSERT_TRUE(instancerTopology.IsDefined());
+        ASSERT_NE(instancerTopology.GetMask(), nullptr);
+        auto mask = instancerTopology.GetMask()->GetTypedValue(0);
+        ASSERT_FALSE(mask.empty());
+
+        auto selectedInstanceIndex = std::stoi(instancePath.getSegments().back().components().back().string());
+        for (size_t iMask = 0; iMask < mask.size(); iMask++) {
+            EXPECT_EQ(mask[iMask], iMask == selectedInstanceIndex);
+        }
+    };
+    
+    testInstanceHighlightFn(topInstancerFirstInstanceItem, topInstancerFirstInstancePath);
+    testInstanceHighlightFn(secondInstancerSecondInstanceItem, secondInstancerSecondInstancePath);
+}

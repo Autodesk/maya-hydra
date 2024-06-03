@@ -27,7 +27,9 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
                 f="PointInstancingWireframeHighlight.pointInstancer")
             
     def test_InstanceSelection(self):
-        pass
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(
+                f="PointInstancingWireframeHighlight.instance")
 
     def test_PrototypeSelection(self):
         pass
