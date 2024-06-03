@@ -371,9 +371,10 @@ in the hierarchy, then both the prototyped instancer will draw as if it were by 
 also be instance-drawn by the other instancer.
 
 This nesting and composition of instancers is what leads to most of the complexity of point
-instancing selection highlighting. Using the `instancerTopology/prototypes`, the
-`instancedBy/paths`, and in some cases the `instancedBy/prototypeRoots`, we can view such
-networks of instancers as a graph to be traversed.
+instancing selection highlighting. We can view such nesting and composition of instancers as 
+graphs, with the vertices being the instancer prims, and the edges being the paths contained 
+in the `instancerTopology/prototypes`, `instancedBy/paths` and `instancedBy/prototypeRoots` 
+data sources.
 
 ### Implementation for point instancer and instance selection
 
