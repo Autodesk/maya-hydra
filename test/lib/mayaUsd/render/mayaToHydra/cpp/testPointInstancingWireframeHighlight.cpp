@@ -152,7 +152,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     }
 
     // Select point instancers directly
-    auto testInstancerDirectFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
+    auto testInstancerDirectHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
         ufeSelection->replaceWith(instancerItem);
 
         auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(instancerPath);
@@ -164,32 +164,44 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
         ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().front(), instancerHydraSelections.front().primPath);
     };
     
-    testInstancerDirectFn(topInstancerItem, topInstancerPath);
-    testInstancerDirectFn(secondInstancerItem, secondInstancerPath);
-    testInstancerDirectFn(thirdInstancerItem, thirdInstancerPath);
-    testInstancerDirectFn(fourthInstancerItem, fourthInstancerPath);
+    testInstancerDirectHighlightFn(topInstancerItem, topInstancerPath);
+    testInstancerDirectHighlightFn(secondInstancerItem, secondInstancerPath);
+    testInstancerDirectHighlightFn(thirdInstancerItem, thirdInstancerPath);
+    testInstancerDirectHighlightFn(fourthInstancerItem, fourthInstancerPath);
     
     // Select point instancer ancestors
-    auto testInstancerIndirectFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
+    auto testInstancerIndirectHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
         // This is not an actual selection, we use it to get the Hydra path
         auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(instancerPath);
         ASSERT_EQ(instancerHydraSelections.size(), 1u);
     
         assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerHydraSelections.front().primPath));
     };
+    auto testInstancerNoHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
+        // This is not an actual selection, we use it to get the Hydra path
+        auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(instancerPath);
+        ASSERT_EQ(instancerHydraSelections.size(), 1u);
+    
+        HdSceneIndexPrim selectionHighlightMirrorPrim = inspector.GetSceneIndex()->GetPrim(
+            getSelectionHighlightMirrorPathFromOriginal(instancerHydraSelections.front().primPath));
+        ASSERT_EQ(selectionHighlightMirrorPrim.primType, TfToken());
+    };
 
     // Select TopInstancer's parent : only TopInstancer should be highlighted
     auto topInstancerParentPath = Ufe::PathString::path(stagePathSegment + "," + "/Root/TopInstancerXform");
     auto topInstancerParentItem = Ufe::Hierarchy::createItem(topInstancerParentPath);
     ufeSelection->replaceWith(topInstancerParentItem);
-    testInstancerIndirectFn(topInstancerItem, topInstancerPath);
+    testInstancerIndirectHighlightFn(topInstancerItem, topInstancerPath);
+    testInstancerNoHighlightFn(secondInstancerItem, secondInstancerPath);
+    testInstancerNoHighlightFn(thirdInstancerItem, thirdInstancerPath);
+    testInstancerNoHighlightFn(fourthInstancerItem, fourthInstancerPath);
 
     // Select Root : all instancers should be highlighted
     auto rootPath = Ufe::PathString::path(stagePathSegment + "," + "/Root");
     auto rootItem = Ufe::Hierarchy::createItem(rootPath);
     ufeSelection->replaceWith(rootItem);
-    testInstancerIndirectFn(topInstancerItem, topInstancerPath);
-    testInstancerIndirectFn(secondInstancerItem, secondInstancerPath);
-    testInstancerIndirectFn(thirdInstancerItem, thirdInstancerPath);
-    testInstancerIndirectFn(fourthInstancerItem, fourthInstancerPath);
+    testInstancerIndirectHighlightFn(topInstancerItem, topInstancerPath);
+    testInstancerIndirectHighlightFn(secondInstancerItem, secondInstancerPath);
+    testInstancerIndirectHighlightFn(thirdInstancerItem, thirdInstancerPath);
+    testInstancerIndirectHighlightFn(fourthInstancerItem, fourthInstancerPath);
 }
