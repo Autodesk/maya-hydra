@@ -1,0 +1,195 @@
+
+#include "testUtils.h"
+#include "ufe/pathSegment.h"
+#include "ufe/sceneItem.h"
+#include "ufe/selection.h"
+
+#include <mayaHydraLib/mayaHydra.h>
+
+#include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpMergingSceneIndex.h>
+
+#include <pxr/base/tf/token.h>
+#include <pxr/base/vt/array.h>
+#include <pxr/imaging/hd/instancedBySchema.h>
+#include <pxr/imaging/hd/instancerTopologySchema.h>
+#include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
+#include <pxr/imaging/hd/sceneDelegate.h>
+#include <pxr/imaging/hd/sceneIndex.h>
+#include <pxr/imaging/hd/sceneIndexPrimView.h>
+#include <pxr/imaging/hdx/selectionSceneIndexObserver.h>
+#include <pxr/imaging/hd/tokens.h>
+#include <pxr/usd/sdf/path.h>
+
+#include <ufe/pathString.h>
+#include <ufe/hierarchy.h>
+#include <ufe/globalSelection.h>
+#include <ufe/observableSelection.h>
+
+#include <gtest/gtest.h>
+
+PXR_NAMESPACE_USING_DIRECTIVE
+using namespace MayaHydra;
+
+namespace {
+
+const std::string selectionHighlightTag = "_SelectionHighlight";
+
+const std::string stagePathSegment = "|nestedAndComposedPointInstancers|nestedAndComposedPointInstancersShape";
+
+SdfPath getSelectionHighlightMirrorPathFromOriginal(const SdfPath& originalPath)
+{
+    return originalPath.ReplaceName(TfToken(originalPath.GetName() + selectionHighlightTag));
+}
+
+// SdfPath getOriginalPathFromSelectionHighlightMirror(const SdfPath& mirrorPath)
+// {
+//     const std::string primName = mirrorPath.GetName();
+//     return mirrorPath.ReplaceName(TfToken(primName.substr(0, primName.size() - selectionHighlightTag.size())));
+// }
+
+TfToken getReprToken(const HdSceneIndexPrim& prim)
+{
+    HdLegacyDisplayStyleSchema displayStyle = HdLegacyDisplayStyleSchema::GetFromParent(prim.dataSource);
+    if (!displayStyle.IsDefined() || !displayStyle.GetReprSelector()) {
+        return {};
+    }
+    auto reprSelectors = displayStyle.GetReprSelector()->GetTypedValue(0);
+    EXPECT_EQ(reprSelectors.size(), 1u);
+    return reprSelectors.empty() ? TfToken() : reprSelectors.front();
+}
+
+VtArray<SdfPath> getPrototypeRoots(const HdSceneIndexPrim& prim)
+{
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() 
+        ? instancedBy.GetPrototypeRoots()->GetTypedValue(0) 
+        : VtArray<SdfPath>({SdfPath::AbsoluteRootPath()});
+}
+
+void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath)
+{
+    HdSceneIndexPrimView view(sceneIndex, primPath);
+    for (auto it = view.begin(); it != view.end(); ++it) {
+        const SdfPath& currPath = *it;
+        HdSceneIndexPrim currPrim = sceneIndex->GetPrim(currPath);
+
+        VtArray<SdfPath> prototypeRoots = getPrototypeRoots(currPrim);
+        bool isInSamePrototypeHierarchy = std::find_if(prototypeRoots.begin(), prototypeRoots.end(), [primPath](const auto& prototypeRoot) -> bool {
+            return primPath.HasPrefix(prototypeRoot);
+        }) != prototypeRoots.end();
+        if (!isInSamePrototypeHierarchy) {
+            it.SkipDescendants();
+            continue;
+        }
+
+        HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(currPrim.dataSource);
+        if (instancerTopology.IsDefined()) {
+            ASSERT_NE(instancerTopology.GetPrototypes(), nullptr);
+            auto prototypePaths = instancerTopology.GetPrototypes()->GetTypedValue(0);
+            ASSERT_GE(prototypePaths.size(), 1u);
+            for (const auto& prototypePath : prototypePaths) {
+                auto prototypeName = prototypePath.GetElementString();
+                ASSERT_EQ(prototypeName.substr(prototypeName.size() - selectionHighlightTag.size()), selectionHighlightTag);
+                assertSelectionHighlightCorrectness(sceneIndex, prototypePath);
+            }
+            it.SkipDescendants();
+            continue;
+        }
+
+        if (currPrim.primType == HdPrimTypeTokens->mesh) {
+            EXPECT_EQ(getReprToken(currPrim), HdReprTokens->refinedWire);
+        }
+    }
+}
+
+bool findSelectionHighlightMirrorsPredicate(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
+{
+    return primPath.GetElementString().find(selectionHighlightTag) != std::string::npos;
+}
+
+bool findMeshPrimsPredicate(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
+{
+    return sceneIndex->GetPrim(primPath).primType == HdPrimTypeTokens->mesh;
+}
+
+} // namespace
+
+TEST(PointInstancingWireframeHighlight, pointInstancer)
+{
+    const SceneIndicesVector& terminalSceneIndices = GetTerminalSceneIndices();
+    ASSERT_FALSE(terminalSceneIndices.empty());
+    SceneIndexInspector inspector(terminalSceneIndices.front());
+
+    auto isFvpMergingSceneIndexPredicate = SceneIndexDisplayNamePred("Flow Viewport Merging Scene Index");
+    auto fvpMergingSceneIndex = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
+        findSceneIndexInTree(terminalSceneIndices.front(), isFvpMergingSceneIndexPredicate));
+
+    auto ufeSelection = Ufe::GlobalSelection::get();
+
+    HdxSelectionSceneIndexObserver selectionObserver;
+    selectionObserver.SetSceneIndex(terminalSceneIndices.front());
+
+    auto topInstancerPath = Ufe::PathString::path(stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer");
+    auto secondInstancerPath = Ufe::PathString::path(stagePathSegment + "," + "/Root/SecondInstancer");
+    auto thirdInstancerPath = Ufe::PathString::path(stagePathSegment + "," + "/Root/ThirdInstancer");
+    auto fourthInstancerPath = Ufe::PathString::path(stagePathSegment + "," + "/Root/FourthInstancer");
+
+    auto topInstancerItem = Ufe::Hierarchy::createItem(topInstancerPath);
+    auto secondInstancerItem = Ufe::Hierarchy::createItem(secondInstancerPath);
+    auto thirdInstancerItem = Ufe::Hierarchy::createItem(thirdInstancerPath);
+    auto fourthInstancerItem = Ufe::Hierarchy::createItem(fourthInstancerPath);
+
+    // Initial state : ensure nothing is highlighted
+    ufeSelection->clear();
+
+    auto selectionHighlightMirrors = inspector.FindPrims(findSelectionHighlightMirrorsPredicate);
+    EXPECT_TRUE(selectionHighlightMirrors.empty());
+
+    auto meshPrims = inspector.FindPrims(findMeshPrimsPredicate);
+    for (const auto& meshPrim : meshPrims) {
+        EXPECT_EQ(getReprToken(meshPrim.prim), HdReprTokens->refined);
+    }
+
+    // Select point instancers directly
+    auto testInstancerDirectFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
+        ufeSelection->replaceWith(instancerItem);
+
+        auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(instancerPath);
+        ASSERT_EQ(instancerHydraSelections.size(), 1u);
+    
+        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerHydraSelections.front().primPath));
+    
+        ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().size(), 1u);
+        ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().front(), instancerHydraSelections.front().primPath);
+    };
+    
+    testInstancerDirectFn(topInstancerItem, topInstancerPath);
+    testInstancerDirectFn(secondInstancerItem, secondInstancerPath);
+    testInstancerDirectFn(thirdInstancerItem, thirdInstancerPath);
+    testInstancerDirectFn(fourthInstancerItem, fourthInstancerPath);
+    
+    // Select point instancer ancestors
+    auto testInstancerIndirectFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
+        // This is not an actual selection, we use it to get the Hydra path
+        auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(instancerPath);
+        ASSERT_EQ(instancerHydraSelections.size(), 1u);
+    
+        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerHydraSelections.front().primPath));
+    };
+
+    // Select TopInstancer's parent : only TopInstancer should be highlighted
+    auto topInstancerParentPath = Ufe::PathString::path(stagePathSegment + "," + "/Root/TopInstancerXform");
+    auto topInstancerParentItem = Ufe::Hierarchy::createItem(topInstancerParentPath);
+    ufeSelection->replaceWith(topInstancerParentItem);
+    testInstancerIndirectFn(topInstancerItem, topInstancerPath);
+
+    // Select Root : all instancers should be highlighted
+    auto rootPath = Ufe::PathString::path(stagePathSegment + "," + "/Root");
+    auto rootItem = Ufe::Hierarchy::createItem(rootPath);
+    ufeSelection->replaceWith(rootItem);
+    testInstancerIndirectFn(topInstancerItem, topInstancerPath);
+    testInstancerIndirectFn(secondInstancerItem, secondInstancerPath);
+    testInstancerIndirectFn(thirdInstancerItem, thirdInstancerPath);
+    testInstancerIndirectFn(fourthInstancerItem, fourthInstancerPath);
+}
