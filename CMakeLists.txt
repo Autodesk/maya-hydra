@@ -124,6 +124,21 @@ if (CMAKE_WANT_MATERIALX_BUILD)
 endif()
 include(cmake/usd.cmake)
 
+set(CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE FALSE)
+if (DEFINED PXR_USD_LOCATION)
+    file(GLOB_RECURSE STRING_UTILS_HEADER_PATH
+        LIST_DIRECTORIES FALSE
+        "${PXR_USD_LOCATION}/include/**stringUtils.h")
+
+    file(READ ${STRING_UTILS_HEADER_PATH} STRING_UTILS_HEADER_CONTENTS)
+
+    string(REGEX MATCH "struct TfDecimalToStringConfig" DECIMAL_TO_STRING_MATCH ${STRING_UTILS_HEADER_CONTENTS})
+
+    if (DECIMAL_TO_STRING_MATCH)
+        set(CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE TRUE)
+    endif()
+endif()
+
 option(BUILD_MAYAHYDRALIB "Build the Maya-To-Hydra plugin and scene delegate." ON)
 
 find_package(UFE REQUIRED)

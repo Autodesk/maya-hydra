@@ -22,6 +22,7 @@
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
 
 #include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/tf/stringUtils.h>
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 
@@ -31,6 +32,7 @@
 #include <QMouseEvent>
 #include <QWidget>
 
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <limits>
@@ -331,6 +333,81 @@ void setTestingArgs(int argc, char** argv);
 std::pair<int, char**> getTestingArgs();
 
 /**
+ * @brief Get the input directory used for test samples.
+ *
+ * @return Path to the directory containing test samples.
+ */
+std::filesystem::path getInputDir();
+
+/**
+ * @brief Set the input directory used for test samples.
+ *
+ * @param[in] inputDir Path to the directory containing test samples.
+ */
+void setInputDir(std::filesystem::path inputDir);
+
+/**
+ * @brief Get the output directory used for test output files.
+ *
+ * @return Path to the test output files directory.
+ */
+std::filesystem::path getOutputDir();
+
+/**
+ * @brief Set the output directory used for test output files.
+ *
+ * @param[in] outputDir Path to the test output files directory.
+ */
+void setOutputDir(std::filesystem::path outputDir);
+
+/**
+ * @brief Get the full path to a test sample file.
+ *
+ * @param[in] filename Name of the sample file (including its extension, if any).
+ *
+ * @return Full path to the sample file.
+ */
+std::filesystem::path getPathToSample(std::string filename);
+
+/**
+ * @brief Compares a data source text dump to a reference dump. The text dump will be also be
+ * written to a file in the output directory.
+ *
+ * @param[in] dataSource The data source to dump and compare to a reference.
+ * @param[in] referencePath The path to the reference dump file.
+ *
+ * @return Whether the data source dump matches the reference dump.
+ */
+bool dataSourceMatchesReference(
+    PXR_NS::HdDataSourceBaseHandle dataSource,
+    std::filesystem::path          referencePath);
+
+#ifdef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
+/**
+* @class A RAII-style class to temporarily override the string conversion settings used when
+* streaming out VtValues containing floats or doubles.
+*/
+class DecimalStreamingOverride {
+public:
+    DecimalStreamingOverride(const pxr::TfDecimalToStringConfig& overrideConfig)
+    {
+        _prevFloatConfig = pxr::TfStreamFloat::ToStringConfig();
+        _prevDoubleConfig = pxr::TfStreamDouble::ToStringConfig();
+        pxr::TfStreamFloat::ToStringConfig() = overrideConfig;
+        pxr::TfStreamDouble::ToStringConfig() = overrideConfig;
+    }
+    ~DecimalStreamingOverride()
+    {
+        pxr::TfStreamFloat::ToStringConfig() = _prevFloatConfig;
+        pxr::TfStreamDouble::ToStringConfig() = _prevDoubleConfig;
+    }
+private:
+    pxr::TfDecimalToStringConfig _prevFloatConfig;
+    pxr::TfDecimalToStringConfig _prevDoubleConfig;
+};
+#endif
+
+/**
  * @brief Send a mouse move event to a widget to move the mouse at a given position.
  *
  * @param[in] widget The widget to send the event to.
@@ -383,6 +460,6 @@ void mouseClick(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMouseP
  */
 QPoint getPrimMouseCoords(const PXR_NS::HdSceneIndexPrim& prim, M3dView& view);
 
-}
+} // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRA_TEST_UTILS_H
