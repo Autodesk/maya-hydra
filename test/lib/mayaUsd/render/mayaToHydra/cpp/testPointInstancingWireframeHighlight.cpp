@@ -1,8 +1,5 @@
 
 #include "testUtils.h"
-#include "ufe/pathSegment.h"
-#include "ufe/sceneItem.h"
-#include "ufe/selection.h"
 
 #include <mayaHydraLib/mayaHydra.h>
 
@@ -16,17 +13,24 @@
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/sceneDelegate.h>
 #include <pxr/imaging/hd/sceneIndex.h>
+#include <pxr/imaging/hd/sceneIndexObserver.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hdx/selectionSceneIndexObserver.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/usd/sdf/path.h>
+#include <pxr/imaging/hd/utils.h>
 
+#include "ufe/pathSegment.h"
+#include "ufe/sceneItem.h"
+#include "ufe/selection.h"
 #include <ufe/pathString.h>
 #include <ufe/hierarchy.h>
 #include <ufe/globalSelection.h>
 #include <ufe/observableSelection.h>
 
 #include <gtest/gtest.h>
+
+#include <string>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 using namespace MayaHydra;
@@ -35,7 +39,7 @@ namespace {
 
 const std::string selectionHighlightTag = "_SelectionHighlight";
 
-const std::string stagePathSegment = "|nestedAndComposedPointInstancers|nestedAndComposedPointInstancersShape";
+const std::string stagePathSegment = "|NestedAndComposedPointInstancers|NestedAndComposedPointInstancersShape";
 
 SdfPath getSelectionHighlightMirrorPathFromOriginal(const SdfPath& originalPath)
 {
@@ -48,14 +52,14 @@ SdfPath getSelectionHighlightMirrorPathFromOriginal(const SdfPath& originalPath)
 //     return mirrorPath.ReplaceName(TfToken(primName.substr(0, primName.size() - selectionHighlightTag.size())));
 // }
 
-TfToken getReprToken(const HdSceneIndexPrim& prim)
+TfToken getRefinedReprToken(const HdSceneIndexPrim& prim)
 {
     HdLegacyDisplayStyleSchema displayStyle = HdLegacyDisplayStyleSchema::GetFromParent(prim.dataSource);
     if (!displayStyle.IsDefined() || !displayStyle.GetReprSelector()) {
         return {};
     }
     auto reprSelectors = displayStyle.GetReprSelector()->GetTypedValue(0);
-    EXPECT_EQ(reprSelectors.size(), 1u);
+    EXPECT_EQ(reprSelectors.size(), 3u); // refined, unrefined, points
     return reprSelectors.empty() ? TfToken() : reprSelectors.front();
 }
 
@@ -98,7 +102,7 @@ void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneInde
         }
 
         if (currPrim.primType == HdPrimTypeTokens->mesh) {
-            EXPECT_EQ(getReprToken(currPrim), HdReprTokens->refinedWire);
+            EXPECT_EQ(getRefinedReprToken(currPrim), HdReprTokens->refinedWire);
         }
     }
 }
@@ -148,7 +152,9 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
 
     auto meshPrims = inspector.FindPrims(findMeshPrimsPredicate);
     for (const auto& meshPrim : meshPrims) {
-        EXPECT_EQ(getReprToken(meshPrim.prim), HdReprTokens->refined);
+        HdLegacyDisplayStyleSchema displayStyle = HdLegacyDisplayStyleSchema::GetFromParent(meshPrim.prim.dataSource);
+        EXPECT_TRUE(displayStyle.IsDefined());
+        EXPECT_FALSE(displayStyle.GetReprSelector());
     }
 
     // Select point instancers directly
@@ -157,11 +163,13 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
 
         auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(instancerPath);
         ASSERT_EQ(instancerHydraSelections.size(), 1u);
-    
-        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerHydraSelections.front().primPath));
+        auto instancerPrimPath = instancerHydraSelections.front().primPath;
     
         ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().size(), 1u);
-        ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().front(), instancerHydraSelections.front().primPath);
+        ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().front(), instancerPrimPath);
+
+        ASSERT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
+        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath));
     };
     
     testInstancerDirectHighlightFn(topInstancerItem, topInstancerPath);
@@ -175,6 +183,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
         auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(instancerPath);
         ASSERT_EQ(instancerHydraSelections.size(), 1u);
     
+        ASSERT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
         assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerHydraSelections.front().primPath));
     };
     auto testInstancerNoHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
@@ -235,7 +244,9 @@ TEST(PointInstancingWireframeHighlight, instance)
 
     auto meshPrims = inspector.FindPrims(findMeshPrimsPredicate);
     for (const auto& meshPrim : meshPrims) {
-        EXPECT_EQ(getReprToken(meshPrim.prim), HdReprTokens->refined);
+        HdLegacyDisplayStyleSchema displayStyle = HdLegacyDisplayStyleSchema::GetFromParent(meshPrim.prim.dataSource);
+        EXPECT_TRUE(displayStyle.IsDefined());
+        EXPECT_FALSE(displayStyle.GetReprSelector());
     }
 
     // Select instances
@@ -244,12 +255,13 @@ TEST(PointInstancingWireframeHighlight, instance)
 
         auto instanceHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(instancePath);
         ASSERT_EQ(instanceHydraSelections.size(), 1u);
-    
         auto instancerPrimPath = instanceHydraSelections.front().primPath;
-        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath));
-    
+
         ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().size(), 1u);
         ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().front(), instancerPrimPath);
+
+        ASSERT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
+        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath));
 
         HdSceneIndexPrim instancerHighlightPrim = inspector.GetSceneIndex()->GetPrim(getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath));
         HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(instancerHighlightPrim.dataSource);

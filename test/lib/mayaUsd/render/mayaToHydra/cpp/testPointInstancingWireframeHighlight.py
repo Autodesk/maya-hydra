@@ -11,7 +11,7 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
     def loadUsdScene(self):
         import usdUtils
-        usdScenePath = testUtils.getTestScene('testPointInstancingWireframeHighlight', 'nestedAndComposedPointInstancers.usda')
+        usdScenePath = testUtils.getTestScene('testPointInstancingWireframeHighlight', 'NestedAndComposedPointInstancers.usda')
         usdUtils.createStageFromFile(usdScenePath)
         #self.setHdStormRenderer()
         #cmds.refresh()
@@ -19,7 +19,7 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     def setUp(self):
         super(TestPointInstancingWireframeHighlight, self).setUp()
         self.loadUsdScene()
-        #cmds.refresh()
+        cmds.refresh(force=True)
 
     def test_PointInstancerSelection(self):
         with PluginLoaded('mayaHydraCppTests'):
@@ -31,8 +31,13 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
             cmds.mayaHydraCppTest(
                 f="PointInstancingWireframeHighlight.instance")
 
-    def test_PrototypeSelection(self):
-        pass
+    # def test_PrototypeSelection(self):
+    #     with PluginLoaded('mayaHydraCppTests'):
+    #         cmds.refresh(force=True)
+    #         import time
+    #         time.sleep(10)
+    #         cmds.mayaHydraCppTest(
+    #             f="PointInstancingWireframeHighlight.prototype")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
