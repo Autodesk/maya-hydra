@@ -138,7 +138,7 @@ private:
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 
     // The following three data members (_selectionHighlightMirrorsByInstancer, _selectionHighlightMirrorUseCounters and 
-    // _instancerHighlightUsers) hold the data required to properly manage the selection highlight mirror graph/hierarchy.
+    // _instancerHighlightUsersByInstancer) hold the data required to properly manage the selection highlight mirror graph/hierarchy.
     // A potential idea to support multiple wireframe colors for point instancer and instance selections could be to use
     // a different mirror hierarchy for each color; in such a case, we could wrap these data members in a struct, and have 
     // one instance of this new struct for each differently colored selection highlight mirror hierarchy.
@@ -157,7 +157,7 @@ private:
     // instancer's selection highlight mirrors by one, or they could end up floating around in memory forever. However, 
     // we would have no way of knowing how many times this instancer actually uses its selection highlight mirrors. 
     // Keeping track of which selected prims contribute to the instancer's highlight solves this problem.
-    std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _instancerHighlightUsers;
+    std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _instancerHighlightUsersByInstancer;
 };
 
 }

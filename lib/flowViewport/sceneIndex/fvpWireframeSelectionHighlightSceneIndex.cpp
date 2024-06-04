@@ -779,11 +779,11 @@ WireframeSelectionHighlightSceneIndex::_AddInstancerHighlightUser(const PXR_NS::
 {
     TF_AXIOM(GetInputSceneIndex()->GetPrim(instancerPath).primType == HdPrimTypeTokens->instancer);
     
-    if (_instancerHighlightUsers[instancerPath].find(userPath) != _instancerHighlightUsers[instancerPath].end()) {
+    if (_instancerHighlightUsersByInstancer[instancerPath].find(userPath) != _instancerHighlightUsersByInstancer[instancerPath].end()) {
         return;
     }
 
-    _instancerHighlightUsers[instancerPath].insert(userPath);
+    _instancerHighlightUsersByInstancer[instancerPath].insert(userPath);
     if (_selectionHighlightMirrorsByInstancer.find(instancerPath) == _selectionHighlightMirrorsByInstancer.end()) {
         SdfPathSet selectionHighlightMirrors;
         HdSceneIndexObserver::AddedPrimEntries addedPrims;
@@ -808,8 +808,8 @@ WireframeSelectionHighlightSceneIndex::_AddInstancerHighlightUser(const PXR_NS::
 void
 WireframeSelectionHighlightSceneIndex::_RemoveInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const SdfPath& userPath)
 {
-    TF_AXIOM(_instancerHighlightUsers.find(instancerPath) != _instancerHighlightUsers.end());
-    TF_AXIOM(_instancerHighlightUsers.at(instancerPath).find(userPath) != _instancerHighlightUsers.at(instancerPath).end());
+    TF_AXIOM(_instancerHighlightUsersByInstancer.find(instancerPath) != _instancerHighlightUsersByInstancer.end());
+    TF_AXIOM(_instancerHighlightUsersByInstancer.at(instancerPath).find(userPath) != _instancerHighlightUsersByInstancer.at(instancerPath).end());
     TF_AXIOM(_selectionHighlightMirrorsByInstancer.find(instancerPath) != _selectionHighlightMirrorsByInstancer.end());
 
     HdSceneIndexObserver::RemovedPrimEntries removedPrims;
@@ -822,9 +822,9 @@ WireframeSelectionHighlightSceneIndex::_RemoveInstancerHighlightUser(const PXR_N
         }
     }
 
-    _instancerHighlightUsers[instancerPath].erase(userPath);
-    if (_instancerHighlightUsers[instancerPath].empty()) {
-        _instancerHighlightUsers.erase(instancerPath);
+    _instancerHighlightUsersByInstancer[instancerPath].erase(userPath);
+    if (_instancerHighlightUsersByInstancer[instancerPath].empty()) {
+        _instancerHighlightUsersByInstancer.erase(instancerPath);
         _selectionHighlightMirrorsByInstancer.erase(instancerPath);
     }
     
@@ -837,10 +837,10 @@ void
 WireframeSelectionHighlightSceneIndex::_RebuildInstancerHighlight(const PXR_NS::SdfPath& instancerPath)
 {
     TF_AXIOM(GetInputSceneIndex()->GetPrim(instancerPath).primType == HdPrimTypeTokens->instancer);
-    TF_AXIOM(_instancerHighlightUsers.find(instancerPath) != _instancerHighlightUsers.end());
+    TF_AXIOM(_instancerHighlightUsersByInstancer.find(instancerPath) != _instancerHighlightUsersByInstancer.end());
     TF_AXIOM(_selectionHighlightMirrorsByInstancer.find(instancerPath) != _selectionHighlightMirrorsByInstancer.end());
 
-    auto instancerHighlightUsers = _instancerHighlightUsers[instancerPath];
+    auto instancerHighlightUsers = _instancerHighlightUsersByInstancer[instancerPath];
     
     for (const auto& instancerHighlightUser : instancerHighlightUsers) {
         _RemoveInstancerHighlightUser(instancerPath, instancerHighlightUser);
@@ -854,10 +854,10 @@ WireframeSelectionHighlightSceneIndex::_RebuildInstancerHighlight(const PXR_NS::
 void
 WireframeSelectionHighlightSceneIndex::_DeleteInstancerHighlight(const PXR_NS::SdfPath& instancerPath)
 {
-    TF_AXIOM(_instancerHighlightUsers.find(instancerPath) != _instancerHighlightUsers.end());
+    TF_AXIOM(_instancerHighlightUsersByInstancer.find(instancerPath) != _instancerHighlightUsersByInstancer.end());
     TF_AXIOM(_selectionHighlightMirrorsByInstancer.find(instancerPath) != _selectionHighlightMirrorsByInstancer.end());
 
-    auto instancerHighlightUsers = _instancerHighlightUsers[instancerPath];
+    auto instancerHighlightUsers = _instancerHighlightUsersByInstancer[instancerPath];
     for (const auto& instancerHighlightUser : instancerHighlightUsers) {
         _RemoveInstancerHighlightUser(instancerPath, instancerHighlightUser);
     }
