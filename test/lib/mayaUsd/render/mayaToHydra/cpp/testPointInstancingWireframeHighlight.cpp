@@ -279,3 +279,64 @@ TEST(PointInstancingWireframeHighlight, instance)
     testInstanceHighlightFn(topInstancerFirstInstanceItem, topInstancerFirstInstancePath);
     testInstanceHighlightFn(secondInstancerSecondInstanceItem, secondInstancerSecondInstancePath);
 }
+
+TEST(PointInstancingWireframeHighlight, prototype)
+{
+    const SceneIndicesVector& terminalSceneIndices = GetTerminalSceneIndices();
+    ASSERT_FALSE(terminalSceneIndices.empty());
+    SceneIndexInspector inspector(terminalSceneIndices.front());
+
+    auto isFvpMergingSceneIndexPredicate = SceneIndexDisplayNamePred("Flow Viewport Merging Scene Index");
+    auto fvpMergingSceneIndex = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
+        findSceneIndexInTree(terminalSceneIndices.front(), isFvpMergingSceneIndexPredicate));
+
+    auto ufeSelection = Ufe::GlobalSelection::get();
+
+    HdxSelectionSceneIndexObserver selectionObserver;
+    selectionObserver.SetSceneIndex(terminalSceneIndices.front());
+
+    auto prototypePath = Ufe::PathString::path(stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube/Geom/Cube");
+    auto prototypeParentPath = Ufe::PathString::path(stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube");
+
+    auto prototypeItem = Ufe::Hierarchy::createItem(prototypePath);
+    auto prototypeParentItem = Ufe::Hierarchy::createItem(prototypeParentPath);
+
+    // Initial state : ensure nothing is highlighted
+    ufeSelection->clear();
+
+    auto selectionHighlightMirrors = inspector.FindPrims(findSelectionHighlightMirrorsPredicate);
+    EXPECT_TRUE(selectionHighlightMirrors.empty());
+
+    auto meshPrims = inspector.FindPrims(findMeshPrimsPredicate);
+    for (const auto& meshPrim : meshPrims) {
+        HdLegacyDisplayStyleSchema displayStyle = HdLegacyDisplayStyleSchema::GetFromParent(meshPrim.prim.dataSource);
+        EXPECT_TRUE(displayStyle.IsDefined());
+        EXPECT_FALSE(displayStyle.GetReprSelector());
+    }
+
+    // Select prototype
+    auto testPrototypeHighlightFn = [&](const Ufe::SceneItem::Ptr& prototypeItem, const Ufe::Path& prototypePath) -> void {
+        ufeSelection->replaceWith(prototypeItem);
+
+        auto prototypeHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(prototypePath);
+        // Original prim + 4 propagated prototypes
+        ASSERT_EQ(prototypeHydraSelections.size(), 1u + 4u);
+
+        ASSERT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
+        for (const auto& prototypeSelection : prototypeHydraSelections) {
+            HdSceneIndexPrimView view(inspector.GetSceneIndex(), prototypeSelection.primPath);
+            for (auto it = view.begin(); it != view.end(); ++it) {
+                HdSceneIndexPrim prim = inspector.GetSceneIndex()->GetPrim(*it);
+                if (prim.primType == HdPrimTypeTokens->mesh) {
+                    EXPECT_EQ(getRefinedReprToken(prim), HdReprTokens->refinedWireOnSurf);
+                }
+            }
+        }
+    
+        // Original prim + 4 propagated prototypes
+        ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().size(), 1u + 4u);
+    };
+    
+    testPrototypeHighlightFn(prototypeItem, prototypePath);
+    testPrototypeHighlightFn(prototypeParentItem, prototypeParentPath);
+}
