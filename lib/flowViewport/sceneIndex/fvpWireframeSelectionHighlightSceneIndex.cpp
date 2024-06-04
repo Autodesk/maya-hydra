@@ -78,6 +78,9 @@ SdfPath _GetOriginalPathFromSelectionHighlightMirror(const SdfPath& mirrorPath)
     return mirrorPath.ReplaceName(TfToken(primName.substr(0, primName.size() - selectionHighlightMirrorTag.size())));
 }
 
+// Computes the mask to use for an instancer's selection highlight mirror
+// based on the instancer's topology and its selections. This allows
+// highlighting only specific instances in the case of instance selections.
 VtBoolArray _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionsSchema& selections) 
 {
     if (!selections.IsDefined()) {
@@ -119,6 +122,8 @@ VtBoolArray _GetSelectionHighlightMask(const HdInstancerTopologySchema& original
     return selectionHighlightMask;
 }
 
+// Returns the overall data source for an instancer's selection highlight mirror.
+// This replaces the mask data source and blocks the selections data source.
 HdContainerDataSourceHandle _GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& originalDataSource)
 {
     HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(originalDataSource);
@@ -138,6 +143,8 @@ HdContainerDataSourceHandle _GetSelectionHighlightInstancerDataSource(const HdCo
     return editedDataSource.Finish();
 }
 
+// Returns all paths related to instancing for this prim; this is analogous to getting the edges
+// connected to the given vertex (in this case a prim) of an instancing graph.
 SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim)
 {
     HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
@@ -177,6 +184,7 @@ VtArray<SdfPath> _GetPrototypeRoots(const HdSceneIndexPrim& prim)
     return instancedBy.GetPrototypeRoots()->GetTypedValue(0);
 }
 
+// This method is essentially "is not a prototype sub-prim".
 bool _IsInstancingRoot(const HdSceneIndexPrim& prim, const SdfPath& primPath)
 {
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
@@ -630,6 +638,8 @@ WireframeSelectionHighlightSceneIndex::_PrimsRemoved(
         .Msg("WireframeSelectionHighlightSceneIndex::_PrimsRemoved() called.\n");
 
     for (const auto& entry : entries) {
+        // Collect and delete instancer highlights for all instancers rooted under the removed prim
+        // (or if the removed prim is an instancer itself and has a highlight)
         SdfPathVector instancerHighlightsToDelete;
         for (const auto& selectionHighlightMirrorsForInstancer : _selectionHighlightMirrorsByInstancer) {
             SdfPath instancerPath = selectionHighlightMirrorsForInstancer.first;
