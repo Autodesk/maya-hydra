@@ -1,10 +1,24 @@
 
+// Copyright 2024 Autodesk
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 #include "testUtils.h"
 
 #include <mayaHydraLib/mayaHydra.h>
 
-#include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpMergingSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 
 #include <pxr/base/tf/token.h>
 #include <pxr/base/vt/array.h>
@@ -15,18 +29,17 @@
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/sceneIndexObserver.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
-#include <pxr/imaging/hdx/selectionSceneIndexObserver.h>
 #include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hdx/selectionSceneIndexObserver.h>
 #include <pxr/usd/sdf/path.h>
-#include <pxr/imaging/hd/utils.h>
 
-#include "ufe/pathSegment.h"
-#include "ufe/sceneItem.h"
-#include "ufe/selection.h"
-#include <ufe/pathString.h>
-#include <ufe/hierarchy.h>
 #include <ufe/globalSelection.h>
+#include <ufe/hierarchy.h>
 #include <ufe/observableSelection.h>
+#include <ufe/pathSegment.h>
+#include <ufe/pathString.h>
+#include <ufe/selection.h>
+#include <ufe/sceneItem.h>
 
 #include <gtest/gtest.h>
 
@@ -45,12 +58,6 @@ SdfPath getSelectionHighlightMirrorPathFromOriginal(const SdfPath& originalPath)
 {
     return originalPath.ReplaceName(TfToken(originalPath.GetName() + selectionHighlightTag));
 }
-
-// SdfPath getOriginalPathFromSelectionHighlightMirror(const SdfPath& mirrorPath)
-// {
-//     const std::string primName = mirrorPath.GetName();
-//     return mirrorPath.ReplaceName(TfToken(primName.substr(0, primName.size() - selectionHighlightTag.size())));
-// }
 
 TfToken getRefinedReprToken(const HdSceneIndexPrim& prim)
 {
