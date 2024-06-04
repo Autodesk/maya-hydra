@@ -117,7 +117,7 @@ public:
     //! and warns about empty return paths.
     //@{
     FVP_API
-    PrimSelectionInfoVector ConvertUfeSelectionToHydra(const Ufe::Path& appPath) const override;
+    PrimSelectionInfoVector ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const override;
     //@}
 
     FVP_API

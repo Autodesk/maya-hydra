@@ -56,7 +56,7 @@ public:
     //! If no such path exists, an empty SdfPath should be returned.
     //! \return scene index path.
     FVP_API
-    virtual PrimSelectionInfoVector ConvertUfeSelectionToHydra(const Ufe::Path& appPath) const = 0;
+    virtual PrimSelectionInfoVector ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const = 0;
 
 protected:
 

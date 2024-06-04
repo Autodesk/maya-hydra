@@ -648,10 +648,10 @@ VtValue MayaHydraSceneIndex::CreateMayaDefaultMaterial()
     return VtValue(networkMap);
 }
 
-Fvp::PrimSelectionInfoVector MayaHydraSceneIndex::ConvertUfeSelectionToHydra(const Ufe::Path& appPath) const
+Fvp::PrimSelectionInfoVector MayaHydraSceneIndex::ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const
 {
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
-        .Msg("MayaHydraSceneIndex::ConvertUfeSelectionToHydra(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
+        .Msg("MayaHydraSceneIndex::ConvertUfePathToHydraSelections(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
 
     // We only handle Maya objects, so if the UFE path is not a Maya object,
     // early out with failure.

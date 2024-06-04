@@ -168,7 +168,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     auto testInstancerDirectHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
         ufeSelection->replaceWith(instancerItem);
 
-        auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(instancerPath);
+        auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfePathToHydraSelections(instancerPath);
         ASSERT_EQ(instancerHydraSelections.size(), 1u);
         auto instancerPrimPath = instancerHydraSelections.front().primPath;
     
@@ -187,7 +187,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     // Select point instancer ancestors
     auto testInstancerIndirectHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
         // This is not an actual selection, we use it to get the Hydra path
-        auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(instancerPath);
+        auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfePathToHydraSelections(instancerPath);
         ASSERT_EQ(instancerHydraSelections.size(), 1u);
     
         ASSERT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
@@ -195,7 +195,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     };
     auto testInstancerNoHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
         // This is not an actual selection, we use it to get the Hydra path
-        auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(instancerPath);
+        auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfePathToHydraSelections(instancerPath);
         ASSERT_EQ(instancerHydraSelections.size(), 1u);
     
         HdSceneIndexPrim selectionHighlightMirrorPrim = inspector.GetSceneIndex()->GetPrim(
@@ -260,7 +260,7 @@ TEST(PointInstancingWireframeHighlight, instance)
     auto testInstanceHighlightFn = [&](const Ufe::SceneItem::Ptr& instanceItem, const Ufe::Path& instancePath) -> void {
         ufeSelection->replaceWith(instanceItem);
 
-        auto instanceHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(instancePath);
+        auto instanceHydraSelections = fvpMergingSceneIndex->ConvertUfePathToHydraSelections(instancePath);
         ASSERT_EQ(instanceHydraSelections.size(), 1u);
         auto instancerPrimPath = instanceHydraSelections.front().primPath;
 
@@ -325,7 +325,7 @@ TEST(PointInstancingWireframeHighlight, prototype)
     auto testPrototypeHighlightFn = [&](const Ufe::SceneItem::Ptr& prototypeItem, const Ufe::Path& prototypePath) -> void {
         ufeSelection->replaceWith(prototypeItem);
 
-        auto prototypeHydraSelections = fvpMergingSceneIndex->ConvertUfeSelectionToHydra(prototypePath);
+        auto prototypeHydraSelections = fvpMergingSceneIndex->ConvertUfePathToHydraSelections(prototypePath);
         // Original prim + 4 propagated prototypes
         ASSERT_EQ(prototypeHydraSelections.size(), 1u + 4u);
 

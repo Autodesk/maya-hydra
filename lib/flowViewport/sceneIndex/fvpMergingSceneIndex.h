@@ -41,7 +41,7 @@ public:
     static MergingSceneIndexRefPtr New();
 
     FVP_API
-    PrimSelectionInfoVector ConvertUfeSelectionToHydra(const Ufe::Path& appPath) const override;
+    PrimSelectionInfoVector ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const override;
 
 private:
     MergingSceneIndex();

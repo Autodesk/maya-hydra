@@ -35,7 +35,7 @@ MergingSceneIndex::MergingSceneIndex() : HdMergingSceneIndex()
         .Msg("MergingSceneIndex::MergingSceneIndex() called.\n");
 }
 
-PrimSelectionInfoVector MergingSceneIndex::ConvertUfeSelectionToHydra(const Ufe::Path& appPath) const
+PrimSelectionInfoVector MergingSceneIndex::ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const
 {
     // FLOW_VIEWPORT_TODO  May be able to use a caching scheme for app path to
     // scene index path conversion using the run-time ID of the UFE path, as it
@@ -51,7 +51,7 @@ PrimSelectionInfoVector MergingSceneIndex::ConvertUfeSelectionToHydra(const Ufe:
         // scene we know whether it supports the PathInterface or not.
         auto pathInterface = dynamic_cast<const PathInterface*>(&*inputScene);
         if (pathInterface) {
-            auto primSelections = pathInterface->ConvertUfeSelectionToHydra(appPath);
+            auto primSelections = pathInterface->ConvertUfePathToHydraSelections(appPath);
             if (!primSelections.empty()) {
                 return primSelections;
             }

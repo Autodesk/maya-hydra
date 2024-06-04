@@ -27,7 +27,7 @@ TEST(TestUsdAnim, timeVaryingTransform)
     const auto snSi = findSelectionSceneIndexInTree(siRoot);
     ASSERT_TRUE(snSi);
 
-    const auto primSelections = snSi->ConvertUfeSelectionToHydra(cubePath);
+    const auto primSelections = snSi->ConvertUfePathToHydraSelections(cubePath);
     ASSERT_EQ(primSelections.size(), 1u);
     const auto cubeSiPath = primSelections.front().primPath;
 

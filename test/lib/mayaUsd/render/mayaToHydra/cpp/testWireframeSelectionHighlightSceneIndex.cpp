@@ -161,10 +161,10 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndexDirty)
     sn->append(sphereItem);
 
     // Find the sphere in the Hydra scene index scene.
-    auto sphereSelections = mergingSi->ConvertUfeSelectionToHydra(spherePath);
+    auto sphereSelections = mergingSi->ConvertUfePathToHydraSelections(spherePath);
     ASSERT_EQ(sphereSelections.size(), 1u);
     auto sphereSiPath = sphereSelections.front().primPath;
-    auto cubeSelections = mergingSi->ConvertUfeSelectionToHydra(scParentPath + "cube");
+    auto cubeSelections = mergingSi->ConvertUfePathToHydraSelections(scParentPath + "cube");
     ASSERT_EQ(cubeSelections.size(), 1u);
     auto cubeSiPath = cubeSelections.front().primPath;
 
@@ -195,13 +195,13 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndexDirty)
 
     sn->replaceWith(newSn);
 
-    auto ccSelections = mergingSi->ConvertUfeSelectionToHydra(ccParentPath);
+    auto ccSelections = mergingSi->ConvertUfePathToHydraSelections(ccParentPath);
     ASSERT_EQ(ccSelections.size(), 1u);
     auto ccSiPath = ccSelections.front().primPath;
-    auto coneSelections = mergingSi->ConvertUfeSelectionToHydra(ccParentPath + "cone");
+    auto coneSelections = mergingSi->ConvertUfePathToHydraSelections(ccParentPath + "cone");
     ASSERT_EQ(coneSelections.size(), 1u);
     auto coneSiPath = coneSelections.front().primPath;
-    auto cylinderSelections = mergingSi->ConvertUfeSelectionToHydra(ccParentPath + "cylinder");
+    auto cylinderSelections = mergingSi->ConvertUfePathToHydraSelections(ccParentPath + "cylinder");
     ASSERT_EQ(cylinderSelections.size(), 1u);
     auto cylinderSiPath = cylinderSelections.front().primPath;
 

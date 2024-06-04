@@ -155,7 +155,7 @@ SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
         .Msg("SelectionSceneIndex::AddSelection(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
 
     // Call our input scene index to convert the application path to scene index paths.
-    auto primSelections = ConvertUfeSelectionToHydra(appPath);
+    auto primSelections = ConvertUfePathToHydraSelections(appPath);
 
     for (const auto& primSelection : primSelections) {
         TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
@@ -176,7 +176,7 @@ void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
 
     // Call our input scene index to convert the application path to a scene
     // index path.
-    auto primSelections = ConvertUfeSelectionToHydra(appPath);
+    auto primSelections = ConvertUfePathToHydraSelections(appPath);
 
     for (const auto& primSelection : primSelections) {
         if (_selection->Remove(primSelection.primPath)) {
@@ -225,13 +225,13 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
     _selection->Clear();
 
     PrimSelectionInfoVector sceneIndexSn;
-    // This .reserve() call is mostly a heuristic : the ConvertUfeSelectionToHydra API allows one UFE path
+    // This .reserve() call is mostly a heuristic : the ConvertUfePathToHydraSelections API allows one UFE path
     // to map to any number of SdfPaths (0 to infinity). However, in most cases, it is likely to map to 
     // one SdfPath, so we reserve space accordingly. (2024/05/27)
     sceneIndexSn.reserve(selection.size());
     for (const auto& snItem : selection) {
         // Call our input scene index to convert the application path to scene index paths.
-        auto primSelections = ConvertUfeSelectionToHydra(snItem->path());
+        auto primSelections = ConvertUfePathToHydraSelections(snItem->path());
 
         if (primSelections.empty()) {
             continue;
@@ -259,12 +259,12 @@ bool SelectionSceneIndex::HasFullySelectedAncestorInclusive(const SdfPath& primP
     return _selection->HasFullySelectedAncestorInclusive(primPath);
 }
 
-PrimSelectionInfoVector SelectionSceneIndex::ConvertUfeSelectionToHydra(const Ufe::Path& appPath) const
+PrimSelectionInfoVector SelectionSceneIndex::ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const
 {
-    auto primSelections = _inputSceneIndexPathInterface->ConvertUfeSelectionToHydra(appPath);
+    auto primSelections = _inputSceneIndexPathInterface->ConvertUfePathToHydraSelections(appPath);
 
     if (primSelections.empty()) {
-        TF_WARN("SelectionSceneIndex::ConvertUfeSelectionToHydra(%s) returned no path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
+        TF_WARN("SelectionSceneIndex::ConvertUfePathToHydraSelections(%s) returned no path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
     }
 
     return primSelections;
