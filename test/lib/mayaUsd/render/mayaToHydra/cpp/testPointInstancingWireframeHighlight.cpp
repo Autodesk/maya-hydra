@@ -277,7 +277,7 @@ TEST(PointInstancingWireframeHighlight, instance)
         auto mask = instancerTopology.GetMask()->GetTypedValue(0);
         ASSERT_FALSE(mask.empty());
 
-        auto selectedInstanceIndex = std::stoi(instancePath.getSegments().back().components().back().string());
+        size_t selectedInstanceIndex = std::stoul(instancePath.getSegments().back().components().back().string());
         for (size_t iMask = 0; iMask < mask.size(); iMask++) {
             EXPECT_EQ(mask[iMask], iMask == selectedInstanceIndex);
         }
