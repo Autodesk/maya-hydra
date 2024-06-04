@@ -20,7 +20,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMaterialXOnNative.py|depOnPlugins:lookdevx
     testNewSceneWithStage.py
     # To be reenabled after investigation
-    testMayaDisplayModes.py|skipOnPlatform:osx
+    #testMayaDisplayModes.py|skipOnPlatform:osx
     testMayaShadingModes.py
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
