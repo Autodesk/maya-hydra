@@ -449,11 +449,8 @@ Of note are the following selection highlighting scenarios and their correspondi
 - Selecting a parent prim of a point instancer
   - (same as selecting a point instancer in its entirety)
 
-### Code overview
-
-This section is to briefly explain some of the less immediately clear code structures used in the
-implementation. 
-
 ### Current limitations
 
-- Wireframe colors for lead/active selection are unsupported
+- The wireframe colors for point instancer & instance selections might not always be correct (with 
+  respect to the lead/active selection colors). However, prototype selections should be using the 
+  correct colors.
