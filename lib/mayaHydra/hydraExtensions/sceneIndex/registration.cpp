@@ -127,21 +127,24 @@ public:
         // The scene index path is composed of 2 parts, in order:
         // 1) The scene index path prefix, which is fixed on construction.
         // 2) The second segment of the UFE path, with each UFE path component
-        //    becoming an SdfPath component.
+        //    becoming an SdfPath component. If the last component is a number,
+        //    then we are dealing with an instance selection.
         SdfPath primPath = _sceneIndexPathPrefix;
         TF_AXIOM(appPath.nbSegments() == 2);
         const auto& secondSegment = appPath.getSegments()[1];
         for (const auto& pathComponent : secondSegment) {
-            // This should only be able to occur on the last component
+            // This should only occur on the last component, if we have an instance selection
             if (pathComponent.string().find_first_not_of(digits) == std::string::npos) {
                 continue;
             }
             primPath = primPath.AppendChild(TfToken(pathComponent.string()));
         }
+
         const auto lastComponentString = secondSegment.components().back().string();
         bool lastComponentIsNumeric = lastComponentString.find_first_not_of(digits) == std::string::npos;
         HdDataSourceBaseHandle selectionDataSource;
         if (lastComponentIsNumeric) {
+            // Instance selection
             HdInstanceIndicesSchema::Builder instanceIndicesBuilder;
             instanceIndicesBuilder.SetInstancer(HdRetainedTypedSampledDataSource<SdfPath>::New(primPath));
             instanceIndicesBuilder.SetInstanceIndices(HdRetainedTypedSampledDataSource<VtArray<int>>::New({std::stoi(lastComponentString)}));
@@ -152,6 +155,7 @@ public:
             selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
         }
         else {
+            // Full prim selection
             HdSelectionSchema::Builder selectionBuilder;
             selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
             selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
