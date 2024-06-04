@@ -44,27 +44,6 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace {
-
-using namespace Fvp;
-
-class SelectionSchemaFullySelectedBuilder {
-public:
-    SelectionSchemaFullySelectedBuilder() {
-        _builder.SetFullySelected(
-            HdRetainedTypedSampledDataSource<bool>::New(true));
-    }
-
-    HdContainerDataSourceHandle Build() { return _builder.Build(); }
-
-private:
-    HdSelectionSchema::Builder _builder;
-};
-
-SelectionSchemaFullySelectedBuilder selectionBuilder;
-
-}
-
 namespace FVP_NS_DEF {
 
 HdDataSourceBaseHandle 
