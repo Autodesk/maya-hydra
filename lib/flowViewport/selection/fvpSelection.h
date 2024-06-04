@@ -76,6 +76,10 @@ public:
     FVP_API
     bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath, const PXR_NS::SdfPath& topmostAncestor = PXR_NS::SdfPath::AbsoluteRootPath()) const;
 
+    // Returns the paths to all fully selected ancestors of the prim up to the specified
+    // topmost ancestor. If the prim is itself selected, its path will also be returned.
+    // By default, the topmost ancestor is set to the absolute root path, so that all 
+    // ancestors are considered.
     FVP_API
     PXR_NS::SdfPathVector FindFullySelectedAncestorsInclusive(const PXR_NS::SdfPath& primPath, const PXR_NS::SdfPath& topmostAncestor = PXR_NS::SdfPath::AbsoluteRootPath()) const;
 
