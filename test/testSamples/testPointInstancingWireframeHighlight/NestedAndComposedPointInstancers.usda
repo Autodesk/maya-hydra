@@ -1,0 +1,86 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+    metersPerUnit = 0.01
+    upAxis = "Z"
+)
+
+def Xform "Root"
+{
+    def Xform "TopInstancerXform"
+    {
+        def PointInstancer "TopInstancer"
+        {
+            point3f[] positions = [(0, 0, 6), (0, 0, 8)]
+            int[] protoIndices = [0, 0]
+            rel prototypes = [
+
+                </Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform>,
+            ]
+
+            def "prototypes"
+            {
+                def Xform "NestedInstancerXform"
+                {
+                    def PointInstancer "NestedInstancer"
+                    {
+                        point3f[] positions = [(1, 0, 0), (-1, 0, 0)]
+                        int[] protoIndices = [0, 1]
+                        rel prototypes = [
+                            </Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube>,
+                            </Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/BluePyramid>,
+                        ]
+
+                        def "prototypes"
+                        {
+                            def "RedCube" (
+                                prepend references = @./CubeModel.usda@
+                                variants = {
+                                    string shadingVariant = "Red"
+                                }
+                            )
+                            {
+                            }
+                            def "BluePyramid" (
+                                prepend references = @./PyramidModel.usda@
+                                variants = {
+                                    string shadingVariant = "Blue"
+                                }
+                            )
+                            {
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    def PointInstancer "SecondInstancer"
+    {
+        point3f[] positions = [(0, 0, -4), (0, 2, -4)]
+        int[] protoIndices = [0, 0]
+        rel prototypes = [
+            </Root/TopInstancerXform>,
+        ]
+    }
+
+    def PointInstancer "ThirdInstancer"
+    {
+        point3f[] positions = [(0, 0, -8), (0, 2, -8)]
+        int[] protoIndices = [0, 0]
+        rel prototypes = [
+            </Root/TopInstancerXform>,
+        ]
+    }
+
+    def PointInstancer "FourthInstancer"
+    {
+        point3f[] positions = [(0, 0, -12), (0, 2, -12)]
+        int[] protoIndices = [0, 0]
+        rel prototypes = [
+            </Root/TopInstancerXform>,
+        ]
+    }
+}
+
