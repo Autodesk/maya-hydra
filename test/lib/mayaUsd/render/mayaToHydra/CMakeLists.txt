@@ -111,13 +111,8 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
     )
 
     # Assign a CTest label to these tests for easy filtering.
-    #set_property(TEST ${target} APPEND PROPERTY LABELS mayaHydraMeshAdapter)
-    if(NOT all_labels STREQUAL "") 
-        foreach(label ${all_labels})
-            set_property(TEST ${target} APPEND PROPERTY LABELS ${label})          
-            message(STATUS "Added test label \"${label}\" for ${target}")
-        endforeach()
-    endif()
+    apply_labels_to_test("${all_labels}" ${target})
+
 endforeach()
 
 # Disable VP2 render delegate and use interactive Maya with UI.
@@ -138,13 +133,7 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_VP2_RENDER_DELEGATE})
     )
 
     # Assign a CTest label to these tests for easy filtering.
-    # set_property(TEST ${target} APPEND PROPERTY LABELS MayaHydraInteractive)
-    if(NOT all_labels STREQUAL "") 
-        foreach(label ${all_labels})
-            set_property(TEST ${target} APPEND PROPERTY LABELS ${label})          
-            message(STATUS "Added test label \"${label}\" for ${target}")
-        endforeach()
-    endif()
+    apply_labels_to_test("${all_labels}" ${target})
 
 endforeach()
 
@@ -178,13 +167,7 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
     )
 
     # Add a ctest label to these tests for easy filtering.
-    # set_property(TEST ${target} APPEND PROPERTY LABELS MayaHydraInteractive)
-    if(NOT all_labels STREQUAL "") 
-        foreach(label ${all_labels})
-            set_property(TEST ${target} APPEND PROPERTY LABELS ${label})          
-            message(STATUS "Added test label \"${label}\" for ${target}")
-        endforeach()
-    endif()
+    apply_labels_to_test("${all_labels}" ${target})
 
 endforeach()
 
