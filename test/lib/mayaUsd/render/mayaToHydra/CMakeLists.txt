@@ -1,7 +1,12 @@
 # Interactive Unit test scripts (launched with maya.exe instead of mayapy.exe)
+# Unit test can be disabled with ctest labels.
+# Adding labels to the unit test follows this convention:
+# testMyTestFile.py|depOnPlugins:lookdev,mtoa,newPlugin|skipOnPlatform:[osx,win,lin]
+# only single platform exclusion is supported currently.
+# For specifying exclusion based on plugin dependency, look at: test_to_run.json
 set(INTERACTIVE_TEST_SCRIPT_FILES
-    testImageDiffing.py|excludeOnPlatform:osx
-    testMtohCommand.py|excludeOnPlatform:win
+    testImageDiffing.py
+    testMtohCommand.py
 # Fail as of 22-Feb-2023.  Entered as MAYA-127898.
 #    testMtohBasicRender.py
 #    testMtohDagChanges.py
@@ -15,7 +20,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMaterialXOnNative.py|depOnPlugins:lookdevx
     testNewSceneWithStage.py
     # To be reenabled after investigation
-    #testMayaDisplayModes.py|excludeOnPlatform:osx
+    testMayaDisplayModes.py|skipOnPlatform:osx
     testMayaShadingModes.py
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
@@ -37,7 +42,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testGrid.py
     testUsdTextureToggle.py
     # To be reenabled after investigation
-    #testDataProducerSelHighlight.py|excludeOnPlatform:osx
+    testDataProducerSelHighlight.py|skipOnPlatform:osx
     testPassingNormalsOnMayaNative.py
     testViewportFilters.py
     cpp/testColorPreferences.py
