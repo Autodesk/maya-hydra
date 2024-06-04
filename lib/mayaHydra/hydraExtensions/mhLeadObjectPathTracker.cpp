@@ -22,9 +22,6 @@
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
 #include <flowViewport/selection/fvpSelection.h>
 
-//Pixar headers
-#include <pxr/usd/sdf/path.h>
-
 //ufe
 #include <ufe/globalSelection.h>
 #include <ufe/observableSelection.h>

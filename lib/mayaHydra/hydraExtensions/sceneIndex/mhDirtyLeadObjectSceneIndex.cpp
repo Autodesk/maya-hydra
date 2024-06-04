@@ -20,7 +20,6 @@
 // Hydra headers
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
-#include <pxr/usd/sdf/path.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

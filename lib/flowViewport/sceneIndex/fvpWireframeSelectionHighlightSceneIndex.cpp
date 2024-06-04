@@ -16,44 +16,21 @@
 
 #include "flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h"
 #include "flowViewport/selection/fvpSelection.h"
-#include "flowViewport/colorPreferences/fvpColorPreferences.h"
-#include "flowViewport/colorPreferences/fvpColorPreferencesTokens.h"
 #include "flowViewport/fvpUtils.h"
 
 #include "flowViewport/debugCodes.h"
-#include "fvpWireframeSelectionHighlightSceneIndex.h"
 
-#include <pxr/base/gf/matrix4d.h>
-#include <pxr/base/gf/vec4f.h>
-#include <pxr/base/tf/diagnosticLite.h>
-#include <pxr/base/vt/array.h>
-#include <pxr/base/vt/types.h>
-#include <pxr/imaging/hd/dataSource.h>
-#include <pxr/imaging/hd/dataSourceLocator.h>
-#include <pxr/imaging/hd/dataSourceTypeDefs.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
+#include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
-#include <pxr/imaging/hd/primOriginSchema.h>
-#include <pxr/imaging/hd/retainedDataSource.h>
-#include <pxr/imaging/hd/sceneIndex.h>
-#include <pxr/imaging/hd/sceneIndexObserver.h>
-#include <pxr/imaging/hd/schemaTypeDefs.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
-#include <pxr/imaging/hd/instanceIndicesSchema.h>
-#include <pxr/imaging/hd/xformSchema.h>
-#include <pxr/usd/sdf/path.h>
-#include <pxr/usdImaging/usdImaging/rerootingSceneIndex.h>
-#include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
-#include <algorithm>
-#include <numeric>
+
 #include <stack>
-#include <iostream>
-#include <mutex>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

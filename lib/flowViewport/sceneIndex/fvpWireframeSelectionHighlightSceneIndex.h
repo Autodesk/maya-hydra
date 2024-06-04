@@ -20,11 +20,8 @@
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 #include "flowViewport/fvpWireframeColorInterface.h"
 
-#include <pxr/imaging/hd/dataSource.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
-#include <pxr/imaging/hd/sceneIndex.h>
-#include <pxr/usd/sdf/path.h>
 
 #include <functional>
 #include <set>
