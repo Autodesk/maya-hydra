@@ -28,10 +28,6 @@ UFE_NS_DEF {
 class Path;
 }
 
-PXR_NAMESPACE_OPEN_SCOPE
-class SdfPath;
-PXR_NAMESPACE_CLOSE_SCOPE
-
 namespace FVP_NS_DEF {
 
 struct PrimSelectionInfo
