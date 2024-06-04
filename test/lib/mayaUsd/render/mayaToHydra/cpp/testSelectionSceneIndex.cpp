@@ -61,7 +61,9 @@ TEST(FlowViewport, selectionSceneIndex)
 
     // The sphere prim in the Hydra scene index scene has no selection data
     // source.  First, translate the application path into a scene index path.
-    const auto sceneIndexPath = selectionSi->ConvertUfePathToHydraSelections(mayaPath).front().primPath;
+    const auto primSelections = selectionSi->ConvertUfePathToHydraSelections(mayaPath);
+    ASSERT_EQ(primSelections.size(), 1u);
+    const auto sceneIndexPath = primSelections.front().primPath;
     ASSERT_EQ(sceneIndexPath.GetName(), mayaPath.back().string());
 
     // Next, check that there is no selections data source on the prim.
@@ -104,7 +106,9 @@ TEST(FlowViewport, selectionSceneIndex)
     // The shape under the sphere transform is not selected, but it has a
     // selected ancestor.
     auto mayaShapePath = Ufe::PathString::path("|aSphere|aSphereShape");
-    const auto sceneIndexShapePath = selectionSi->ConvertUfePathToHydraSelections(mayaShapePath).front().primPath;
+    const auto shapePrimSelections = selectionSi->ConvertUfePathToHydraSelections(mayaShapePath);
+    ASSERT_EQ(shapePrimSelections.size(), 1u);
+    const auto sceneIndexShapePath = shapePrimSelections.front().primPath;
 
     auto sphereShapePrim = sceneIndices.front()->GetPrim(sceneIndexShapePath);
     ASSERT_TRUE(sphereShapePrim.dataSource);

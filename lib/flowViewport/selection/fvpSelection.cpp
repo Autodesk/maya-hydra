@@ -37,9 +37,7 @@
 //
 
 #include "flowViewport/selection/fvpSelection.h"
-#include "flowViewport/sceneIndex/fvpPathInterface.h"
 
-#include "pxr/imaging/hd/selectionSchema.h"
 #include "pxr/imaging/hd/selectionsSchema.h"
 
 PXR_NAMESPACE_USING_DIRECTIVE

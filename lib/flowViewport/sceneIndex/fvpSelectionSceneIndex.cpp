@@ -229,12 +229,8 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
     _selection->Clear();
 
     PrimSelectionInfoVector sceneIndexSn;
-    // This .reserve() call is mostly a heuristic : the ConvertUfePathToHydraSelections API allows one UFE path
-    // to map to any number of SdfPaths (0 to infinity). However, in most cases, it is likely to map to 
-    // one SdfPath, so we reserve space accordingly. (2024/05/27)
-    sceneIndexSn.reserve(selection.size());
     for (const auto& snItem : selection) {
-        // Call our input scene index to convert the application path to scene index paths.
+        // Call our input scene index to convert the application path to scene index paths and selection data sources.
         auto primSelections = ConvertUfePathToHydraSelections(snItem->path());
 
         if (primSelections.empty()) {

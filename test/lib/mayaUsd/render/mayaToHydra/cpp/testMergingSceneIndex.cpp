@@ -71,10 +71,11 @@ TEST(FlowViewport, mergingSceneIndex)
     // to translate the application path into a scene index path.
     auto primSelections = mayaSi->ConvertUfePathToHydraSelections(mayaPath);
     ASSERT_EQ(primSelections.size(), 1u);
+    auto sceneIndexPath = primSelections.front().primPath;
 
     // Regardless of prefix, the scene index path tail component will match the
     // Maya node name
-    ASSERT_EQ(primSelections.front().primPath.GetName(), mayaPath.back().string());
+    ASSERT_EQ(sceneIndexPath.GetName(), mayaPath.back().string());
 
     // If we ask the terminal scene index for a prim at that path, there must be
     // one.  Prims that exist have a non-null data source.
@@ -82,14 +83,14 @@ TEST(FlowViewport, mergingSceneIndex)
     auto nonExistentPrim = sceneIndices.front()->GetPrim(nonExistentPrimPath);
     ASSERT_FALSE(nonExistentPrim.dataSource);
     
-    auto spherePrim = sceneIndices.front()->GetPrim(primSelections.front().primPath);
+    auto spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
     ASSERT_TRUE(spherePrim.dataSource);
 
     // Flow Viewport merging scene index must give the same scene index path
     // answer as the Maya data producer scene index.
     auto mergingSiSelections = mergingSi->ConvertUfePathToHydraSelections(mayaPath);
     ASSERT_EQ(mergingSiSelections.size(), 1u);
-    ASSERT_EQ(mergingSiSelections.front().primPath, primSelections.front().primPath);
+    ASSERT_EQ(mergingSiSelections.front().primPath, sceneIndexPath);
 }
 
 TEST(FlowViewport, mergingSceneIndexAddRemove)
