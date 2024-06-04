@@ -18,20 +18,13 @@
 #include <mayaHydraLib/mayaHydra.h>
 
 #include <flowViewport/sceneIndex/fvpMergingSceneIndex.h>
-#include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 
-#include <pxr/base/tf/token.h>
-#include <pxr/base/vt/array.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
-#include <pxr/imaging/hd/sceneDelegate.h>
-#include <pxr/imaging/hd/sceneIndex.h>
-#include <pxr/imaging/hd/sceneIndexObserver.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hdx/selectionSceneIndexObserver.h>
-#include <pxr/usd/sdf/path.h>
 
 #include <ufe/globalSelection.h>
 #include <ufe/hierarchy.h>
@@ -42,8 +35,6 @@
 #include <ufe/sceneItem.h>
 
 #include <gtest/gtest.h>
-
-#include <string>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 using namespace MayaHydra;
@@ -78,6 +69,9 @@ VtArray<SdfPath> getPrototypeRoots(const HdSceneIndexPrim& prim)
         : VtArray<SdfPath>({SdfPath::AbsoluteRootPath()});
 }
 
+// This method takes in a path to a prim in a selection highlight hierarchy and ensures that 
+// the selection highlight graph is structured properly, and that the leaf mesh prims have
+// the proper display style.
 void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath)
 {
     HdSceneIndexPrimView view(sceneIndex, primPath);
@@ -141,6 +135,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     HdxSelectionSceneIndexObserver selectionObserver;
     selectionObserver.SetSceneIndex(terminalSceneIndices.front());
 
+    // Create this test's selected scene items
     auto topInstancerPath = Ufe::PathString::path(stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer");
     auto secondInstancerPath = Ufe::PathString::path(stagePathSegment + "," + "/Root/SecondInstancer");
     auto thirdInstancerPath = Ufe::PathString::path(stagePathSegment + "," + "/Root/ThirdInstancer");
@@ -155,13 +150,13 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     ufeSelection->clear();
 
     auto selectionHighlightMirrors = inspector.FindPrims(findSelectionHighlightMirrorsPredicate);
-    EXPECT_TRUE(selectionHighlightMirrors.empty());
+    EXPECT_TRUE(selectionHighlightMirrors.empty()); // No selection highlight mirrors
 
     auto meshPrims = inspector.FindPrims(findMeshPrimsPredicate);
     for (const auto& meshPrim : meshPrims) {
         HdLegacyDisplayStyleSchema displayStyle = HdLegacyDisplayStyleSchema::GetFromParent(meshPrim.prim.dataSource);
         EXPECT_TRUE(displayStyle.IsDefined());
-        EXPECT_FALSE(displayStyle.GetReprSelector());
+        EXPECT_FALSE(displayStyle.GetReprSelector()); // No specific repr is defined
     }
 
     // Select point instancers directly
@@ -237,6 +232,7 @@ TEST(PointInstancingWireframeHighlight, instance)
     HdxSelectionSceneIndexObserver selectionObserver;
     selectionObserver.SetSceneIndex(terminalSceneIndices.front());
 
+    // Create this test's selected scene items
     auto topInstancerFirstInstancePath = Ufe::PathString::path(stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/0");
     auto secondInstancerSecondInstancePath = Ufe::PathString::path(stagePathSegment + "," + "/Root/SecondInstancer/1");
 
@@ -247,13 +243,13 @@ TEST(PointInstancingWireframeHighlight, instance)
     ufeSelection->clear();
 
     auto selectionHighlightMirrors = inspector.FindPrims(findSelectionHighlightMirrorsPredicate);
-    EXPECT_TRUE(selectionHighlightMirrors.empty());
+    EXPECT_TRUE(selectionHighlightMirrors.empty()); // No selection highlight mirrors
 
     auto meshPrims = inspector.FindPrims(findMeshPrimsPredicate);
     for (const auto& meshPrim : meshPrims) {
         HdLegacyDisplayStyleSchema displayStyle = HdLegacyDisplayStyleSchema::GetFromParent(meshPrim.prim.dataSource);
         EXPECT_TRUE(displayStyle.IsDefined());
-        EXPECT_FALSE(displayStyle.GetReprSelector());
+        EXPECT_FALSE(displayStyle.GetReprSelector()); // No specific repr is defined
     }
 
     // Select instances
@@ -302,6 +298,7 @@ TEST(PointInstancingWireframeHighlight, prototype)
     HdxSelectionSceneIndexObserver selectionObserver;
     selectionObserver.SetSceneIndex(terminalSceneIndices.front());
 
+    // Create this test's selected scene items
     auto prototypePath = Ufe::PathString::path(stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube/Geom/Cube");
     auto prototypeParentPath = Ufe::PathString::path(stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube");
 
@@ -312,13 +309,13 @@ TEST(PointInstancingWireframeHighlight, prototype)
     ufeSelection->clear();
 
     auto selectionHighlightMirrors = inspector.FindPrims(findSelectionHighlightMirrorsPredicate);
-    EXPECT_TRUE(selectionHighlightMirrors.empty());
+    EXPECT_TRUE(selectionHighlightMirrors.empty()); // No selection highlight mirrors
 
     auto meshPrims = inspector.FindPrims(findMeshPrimsPredicate);
     for (const auto& meshPrim : meshPrims) {
         HdLegacyDisplayStyleSchema displayStyle = HdLegacyDisplayStyleSchema::GetFromParent(meshPrim.prim.dataSource);
         EXPECT_TRUE(displayStyle.IsDefined());
-        EXPECT_FALSE(displayStyle.GetReprSelector());
+        EXPECT_FALSE(displayStyle.GetReprSelector()); // No specific repr is defined
     }
 
     // Select prototype
@@ -329,6 +326,7 @@ TEST(PointInstancingWireframeHighlight, prototype)
         // Original prim + 4 propagated prototypes
         ASSERT_EQ(prototypeHydraSelections.size(), 1u + 4u);
 
+        // Ensure meshes use the correct display style
         ASSERT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
         for (const auto& prototypeSelection : prototypeHydraSelections) {
             HdSceneIndexPrimView view(inspector.GetSceneIndex(), prototypeSelection.primPath);
