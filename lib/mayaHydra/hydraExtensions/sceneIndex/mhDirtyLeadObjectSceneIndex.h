@@ -25,6 +25,7 @@
 
 //Usd/Hydra headers
 #include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/usd/sdf/path.h>
 
 
 namespace MAYAHYDRA_NS_DEF {
@@ -60,7 +61,7 @@ public:
     ~MhDirtyLeadObjectSceneIndex() override = default;
 
     MAYAHYDRALIB_API
-    void dirtyLeadObjectRelatedPrims(const PXR_NS::SdfPath& previousLeadObjectPath, const PXR_NS::SdfPath& currentLeadObjectPath);
+    void dirtyLeadObjectRelatedPrims(const PXR_NS::SdfPathVector& previousLeadObjectPrimPaths, const PXR_NS::SdfPathVector& currentLeadObjectPrimPaths);
 
 protected:
     
