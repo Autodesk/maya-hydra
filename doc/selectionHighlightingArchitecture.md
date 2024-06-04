@@ -18,7 +18,7 @@ are shown differently in the viewport for ease of understanding.
 
 An application will provide a way to select an object, or to select components
 of an object.  For example, for a mesh object, these components may be points,
-edges, or faces.  Currently, only object selection highlighting and USD point
+edges, or faces.  Currently, only object selection highlighting and point
 instancing highlighting of meshes are supported.  Selection highlighting of
 components is unimplemented.
 
