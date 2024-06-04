@@ -96,6 +96,25 @@ To create a reference snapshot, an easy way is to first write your test, and the
 
 :warning: **Important note** : While there *is* an `assertSnapshotEqual` method, its use is discouraged, as renders can differ very slightly between renderer architectures.
 
+# Adding labels for tests
+ctest allows attaching labels to test which then can be read when running the test to determine whether the test needs to be run. 
+For example, you might have some tests that are all related to 'performance', so you label them with 'performance'. Other tests might be about 'security', so you label them 'security'. Later, when you want to run your tests, you can tell CTest to only run the tests with a certain label. Say you only want to run your 'performance' tests. You can tell CTest to do this by using the `-L` option followed by 'performance'. CTest will then only run the tests that have the 'performance' label, and ignore the rest. Similarly, tests can be excluded by passing arguments to `-LE` flag.
+
+To add label in MayaHydra test suite
+1. For any particlar unit test of interest in [CMakeLists.txt](./CMakeLists.txt), add the required labels with the following convention:
+    `testMyTestFile.py|depOnPlugins:lookdev,mtoa,newPlugin|skipOnPlatform:[osx,win,lin]`
+2. Where the label groups follows the unit test name and are separated by `'|'`. You may have multiple label groups.
+3. The label groups are of key:values type. They label key can be any meaningful string and has correspondence to the accompanying json file. [See](../../../../../../maya-hydra/tests-to-run.json)
+4. The label values are comma separated lists. The values are added to the test via cmake's `set_tests_properties`
+
+MayaHydra currently is filtering tests based on dependent plugins and platform on which to run them.
+
+To add flags to ctest commandline
+1. Modify the corresponding [JSON file](../../../../../../maya-hydra/tests-to-run.json) to indicate which test to run or skip. 
+For ex: if you want to run only tests tagged with "lookdevx" then edit the json file like so: `"plugins_to_include": ["lookdevx]`. If the include list is empty, all tests are run by default. Similarly, edit `"plugin_to_exclude"` in the json file to skip test with certain labels.
+
+Note that for platform dependent runs, we only support exclusion mode for a single platform. So if you tag the test `skipOnPlatform:osx`, it skips on MacOS. No corresponding changes to json file is required in this case.
+
 # Utilities
 
 Utility files are located under [/test/testUtils](../../../../testUtils/). Note that at the time of writing this (2023/08/16), many of the utils files and their contents were inherited from the USD plugin, and are not all used.
