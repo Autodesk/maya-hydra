@@ -551,8 +551,9 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             dirtiedPrims.emplace_back(selectionHighlightPath, entry.dirtyLocators);
         }
 
-        if (entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator())) {
-            // An instancer was changed; rebuild its selection highlight.
+        if (entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator())
+            && _selectionHighlightMirrorsByInstancer.find(entry.primPath) != _selectionHighlightMirrorsByInstancer.end()) {
+            // An instancer with a selection highlight was changed; rebuild its selection highlight.
             // We do not need to check for instancedBy dirtying : if an instancedBy data source is dirtied,
             // then either a new instancer was added, which will be handled in _PrimsAdded, either an
             // existing instancer's instancerTopology data source was dirtied., which is handled here.
@@ -631,8 +632,9 @@ WireframeSelectionHighlightSceneIndex::_PrimsRemoved(
     for (const auto& entry : entries) {
         SdfPathVector instancerHighlightsToDelete;
         for (const auto& selectionHighlightMirrorsForInstancer : _selectionHighlightMirrorsByInstancer) {
-            if (selectionHighlightMirrorsForInstancer.first.HasPrefix(entry.primPath)) {
-                instancerHighlightsToDelete.push_back(selectionHighlightMirrorsForInstancer.first);
+            SdfPath instancerPath = selectionHighlightMirrorsForInstancer.first;
+            if (instancerPath.HasPrefix(entry.primPath)) {
+                instancerHighlightsToDelete.push_back(instancerPath);
             }
         }
         for (const auto& instancerHighlightToDelete : instancerHighlightsToDelete) {
