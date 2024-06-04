@@ -40,8 +40,7 @@ struct PrimSelectionInfo
     PXR_NS::HdDataSourceBaseHandle selectionDataSource;
 };
 
-// TODO : Use TfSmallVector for perf?
-using PrimSelectionInfoVector = std::vector<PrimSelectionInfo>;
+using PrimSelectionInfoVector = PXR_NS::TfSmallVector<PrimSelectionInfo, 8>;
 
 /// \class PathInterface
 ///
@@ -57,7 +56,6 @@ public:
     //! If no such path exists, an empty SdfPath should be returned.
     //! \return scene index path.
     FVP_API
-    // TODO : Use TfSmallVector for perf?
     virtual PrimSelectionInfoVector ConvertUfeSelectionToHydra(const Ufe::Path& appPath) const = 0;
 
 protected:
