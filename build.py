@@ -37,6 +37,15 @@ import sys
 import tarfile
 import time
 import zipfile
+import json
+
+###########################################################
+# mapping for platform string from python builtin str
+platform_mapping = {
+                    "darwin": "osx",
+                    "windows": "win",
+                    "linux": "lin"
+                   }
 
 ############################################################
 # Helpers for printing output
@@ -635,6 +644,44 @@ verbosity = args.verbosity
 ############################################################
 # InstallContext
 class InstallContext:
+
+    kFailingTests = []
+    kFilesToInclude = []
+    kFilesToExclude = []
+    kPluginsToExclude = []
+    kPluginsToInclude = []
+    kPlatformToInclude = []
+    kPlatformToExclude = []
+    allLabelsToInclude = []
+    
+    ctestArgs = list()
+
+    # get list of labels to pass to ctest-args
+    def get_ctest_labels(self):
+        try:       
+            with open("tests-to-run.json", 'r') as file:
+                ctest_labels_config = json.load(file)
+        except json.JSONDecodeError as e:
+            print(f"Failed to decode JSON: {e}")
+        except FileNotFoundError as e:
+            print(f"File not found: {e}")
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
+        for key, values in ctest_labels_config.items():
+            if key == "plugins_to_include":
+                self.kPluginsToInclude = values
+            if key == "plugins_to_exclude":
+                self.kPluginsToExclude = values
+            if key == "platforms_to_include":
+                self.kPlatformToInclude = values
+            if key == "platforms_to_exclude":
+                self.kPlatformToExclude = values
+            if key == "files_to_include":
+                self.kPlatformToExclude = values
+            if key == "files_to_exclude":
+                self.kPlatformToExclude = values
+
     def __init__(self, args):
         # Assume the project's top level cmake is in the current source directory
         self.mayaHydraSrcDir = os.path.normpath(
@@ -716,12 +763,25 @@ class InstallContext:
                 self.stagesArgs.append(arg)
 
         # CTest arguments
-        self.ctestArgs = list()
         for argList in args.ctest_args:
             for arg in argList.split(","):
                 self.ctestArgs.append(arg)
 
-        # Redirect output stream to file
+        #get labels to be passed for ctest
+        self.get_ctest_labels()
+        
+        # add -L args, test with following labels to run
+        if self.kPluginsToInclude:
+            self.ctestArgs.append(f'{"-L"} {"|".join(self.kPluginsToInclude)}')
+
+        # only support platform exclusion mode for tests
+        # Determine the current platform
+        current_platform = platform.system().lower()
+        allExcludeLabels = self.kPluginsToExclude + [platform_mapping.get(current_platform)]        
+        # add -LE args, test with following labels to be skipped
+        if allExcludeLabels:
+            self.ctestArgs.append(f'{"-LE"} {"|".join(allExcludeLabels)}') 
+        
         self.redirectOutstreamFile = args.redirect_outstream_file
 
 try:

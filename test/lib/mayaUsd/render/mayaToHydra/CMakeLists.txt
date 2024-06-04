@@ -1,7 +1,7 @@
 # Interactive Unit test scripts (launched with maya.exe instead of mayapy.exe)
 set(INTERACTIVE_TEST_SCRIPT_FILES
-    testImageDiffing.py
-    testMtohCommand.py
+    testImageDiffing.py|excludeOnPlatform:osx
+    testMtohCommand.py|excludeOnPlatform:win
 # Fail as of 22-Feb-2023.  Entered as MAYA-127898.
 #    testMtohBasicRender.py
 #    testMtohDagChanges.py
@@ -12,17 +12,17 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStageAddPrim.py
     testTransforms.py
     testRefinement.py
-    testMaterialXOnNative.py
+    testMaterialXOnNative.py|depOnPlugins:lookdevx
     testNewSceneWithStage.py
     # To be reenabled after investigation
-    #testMayaDisplayModes.py
+    #testMayaDisplayModes.py|excludeOnPlatform:osx
     testMayaShadingModes.py
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
     testMayaLights.py
     testUSDLights.py
     testUVandUDIM.py
-    testArnoldLights.py
+    testArnoldLights.py|depOnPlugins:mtoa
     testLookThrough.py
     testObjectTemplate.py
     testStandardSurface.py
@@ -37,7 +37,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testGrid.py
     testUsdTextureToggle.py
     # To be reenabled after investigation
-    #testDataProducerSelHighlight.py
+    #testDataProducerSelHighlight.py|excludeOnPlatform:osx
     testPassingNormalsOnMayaNative.py
     testViewportFilters.py
     cpp/testColorPreferences.py
@@ -87,47 +87,15 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_VP2_RENDER_DELEGATE
     cpp/testUsdStageFromFile.py
 )
 
-# Unit test scripts run with mayapy.exe (no UI, so no image diffing and not possible to set Hydra Storm as the renderer)
-set(TEST_SCRIPT_FILES
-)
-
-foreach(script ${TEST_SCRIPT_FILES})
-    mayaUsd_get_unittest_target(target ${script})
-    mayaUsd_add_test(${target}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        PYTHON_MODULE ${target}
-        ENV
-            "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
-            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
-            "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
-
-            # LD_LIBRARY_PATH needs to be set for the idiff executable because its 
-            # RPATH is absolute rather than relative to ORIGIN, meaning the RPATH 
-            # points to the absolute path on the machine where idiff was built.
-            # This absence of relative paths for RPATH comes from OpenImageIO.
-            # We introduce a second workaround to avoid Maya using usd's libpng, 
-            # because both use incompatible versions of libpng. This is done by 
-            # setting LD_LIBRARY_PATH to IDIFF_LD_LIBRARY_PATH only when we run 
-            # idiff using Python's subprocess module.
-            "IDIFF_LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}:${PXR_USD_LOCATION}/lib64:${PXR_USD_LOCATION}/lib"
-
-            # Maya uses a very old version of GLEW, so we need support for
-            # pre-loading a newer version from elsewhere.
-            "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
-    )
-
-    # Assign a CTest label to these tests for easy filtering.
-    set_property(TEST ${target} APPEND PROPERTY LABELS mayaHydra)
-endforeach()
-
 # Use mesh adapter for mesh support instead of MRenderItem. using Interactive (Maya.exe with UI)
 foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
-    mayaUsd_get_unittest_target(target ${script})
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaUsd_get_unittest_target(target ${test_filename})
     set(target "${target}_meshAdapter")
     mayaUsd_add_test(${target}
         INTERACTIVE
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        PYTHON_SCRIPT ${script}
+        PYTHON_SCRIPT ${test_filename}
         ENV
             "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
             "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
@@ -138,16 +106,23 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
     )
 
     # Assign a CTest label to these tests for easy filtering.
-    set_property(TEST ${target} APPEND PROPERTY LABELS mayaHydraMeshAdapter)
+    #set_property(TEST ${target} APPEND PROPERTY LABELS mayaHydraMeshAdapter)
+    if(NOT all_labels STREQUAL "") 
+        foreach(label ${all_labels})
+            set_property(TEST ${target} APPEND PROPERTY LABELS ${label})          
+            message(STATUS "Added test label \"${label}\" for ${target}")
+        endforeach()
+    endif()
 endforeach()
 
 # Disable VP2 render delegate and use interactive Maya with UI.
 foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_VP2_RENDER_DELEGATE})
-    mayaUsd_get_unittest_target(target ${script})
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaUsd_get_unittest_target(target ${test_filename})
     mayaUsd_add_test(${target}
         INTERACTIVE
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        PYTHON_SCRIPT ${script}
+        PYTHON_SCRIPT ${test_filename}
         ENV
             "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
             "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
@@ -158,16 +133,24 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_VP2_RENDER_DELEGATE})
     )
 
     # Assign a CTest label to these tests for easy filtering.
-    set_property(TEST ${target} APPEND PROPERTY LABELS MayaHydraInteractive)
+    # set_property(TEST ${target} APPEND PROPERTY LABELS MayaHydraInteractive)
+    if(NOT all_labels STREQUAL "") 
+        foreach(label ${all_labels})
+            set_property(TEST ${target} APPEND PROPERTY LABELS ${label})          
+            message(STATUS "Added test label \"${label}\" for ${target}")
+        endforeach()
+    endif()
+
 endforeach()
 
 # Use Maya.exe with UI, interactive tests.
-foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
-    mayaUsd_get_unittest_target(target ${script})
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})    
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaUsd_get_unittest_target(target ${test_filename})
     mayaUsd_add_test(${target}
         INTERACTIVE
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        PYTHON_SCRIPT ${script}
+        PYTHON_SCRIPT ${test_filename}
         ENV
             "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
             "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
@@ -190,7 +173,14 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
     )
 
     # Add a ctest label to these tests for easy filtering.
-    set_property(TEST ${target} APPEND PROPERTY LABELS MayaHydraInteractive)
+    # set_property(TEST ${target} APPEND PROPERTY LABELS MayaHydraInteractive)
+    if(NOT all_labels STREQUAL "") 
+        foreach(label ${all_labels})
+            set_property(TEST ${target} APPEND PROPERTY LABELS ${label})          
+            message(STATUS "Added test label \"${label}\" for ${target}")
+        endforeach()
+    endif()
+
 endforeach()
 
 # C++ unit tests
