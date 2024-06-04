@@ -43,6 +43,7 @@
 #include "flowViewport/debugCodes.h"
 
 #include "pxr/imaging/hd/retainedDataSource.h"
+#include <pxr/imaging/hd/sceneIndexObserver.h>
 #include "pxr/imaging/hd/selectionSchema.h"
 #include "pxr/imaging/hd/selectionsSchema.h"
 
@@ -154,7 +155,7 @@ SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::AddSelection(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
 
-    // Call our input scene index to convert the application path to scene index paths.
+    // Call our input scene index to convert the application path to scene index paths and selection data sources.
     auto primSelections = ConvertUfePathToHydraSelections(appPath);
 
     for (const auto& primSelection : primSelections) {
@@ -162,11 +163,13 @@ SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
             .Msg("    Adding %s to the Hydra selection.\n", primSelection.primPath.GetText());
     }
 
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
     for (const auto& primSelection : primSelections) {
         if (_selection->Add(primSelection)) {
-            _SendPrimsDirtied({{primSelection.primPath, selectionsSchemaDefaultLocator}});
+            dirtiedPrims.emplace_back(primSelection.primPath, selectionsSchemaDefaultLocator);
         }
     }
+    _SendPrimsDirtied(dirtiedPrims);
 }
 
 void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
@@ -174,15 +177,16 @@ void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::RemoveSelection(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
 
-    // Call our input scene index to convert the application path to a scene
-    // index path.
+    // Call our input scene index to convert the application path to scene index paths and selection data sources.
     auto primSelections = ConvertUfePathToHydraSelections(appPath);
 
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
     for (const auto& primSelection : primSelections) {
         if (_selection->Remove(primSelection.primPath)) {
-            _SendPrimsDirtied({{primSelection.primPath, selectionsSchemaDefaultLocator}});
+            dirtiedPrims.emplace_back(primSelection.primPath, selectionsSchemaDefaultLocator);
         }
     }
+    _SendPrimsDirtied(dirtiedPrims);
 }
 
 void
