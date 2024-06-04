@@ -36,6 +36,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 using namespace MayaHydra;
 
@@ -92,10 +94,11 @@ void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneInde
         if (instancerTopology.IsDefined()) {
             ASSERT_NE(instancerTopology.GetPrototypes(), nullptr);
             auto prototypePaths = instancerTopology.GetPrototypes()->GetTypedValue(0);
-            ASSERT_GE(prototypePaths.size(), 1u);
+            EXPECT_GE(prototypePaths.size(), 1u);
             for (const auto& prototypePath : prototypePaths) {
                 auto prototypeName = prototypePath.GetElementString();
-                ASSERT_EQ(prototypeName.substr(prototypeName.size() - selectionHighlightTag.size()), selectionHighlightTag);
+                ASSERT_GT(prototypeName.size(), selectionHighlightTag.size());
+                EXPECT_EQ(prototypeName.substr(prototypeName.size() - selectionHighlightTag.size()), selectionHighlightTag);
                 assertSelectionHighlightCorrectness(sceneIndex, prototypePath);
             }
             it.SkipDescendants();
@@ -168,9 +171,9 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
         auto instancerPrimPath = instancerHydraSelections.front().primPath;
     
         ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().size(), 1u);
-        ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().front(), instancerPrimPath);
+        EXPECT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().front(), instancerPrimPath);
 
-        ASSERT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
+        EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
         assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath));
     };
     
@@ -185,7 +188,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
         auto instancerHydraSelections = fvpMergingSceneIndex->ConvertUfePathToHydraSelections(instancerPath);
         ASSERT_EQ(instancerHydraSelections.size(), 1u);
     
-        ASSERT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
+        EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
         assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerHydraSelections.front().primPath));
     };
     auto testInstancerNoHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
@@ -195,7 +198,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     
         HdSceneIndexPrim selectionHighlightMirrorPrim = inspector.GetSceneIndex()->GetPrim(
             getSelectionHighlightMirrorPathFromOriginal(instancerHydraSelections.front().primPath));
-        ASSERT_EQ(selectionHighlightMirrorPrim.primType, TfToken());
+        EXPECT_EQ(selectionHighlightMirrorPrim.primType, TfToken());
     };
 
     // Select TopInstancer's parent : only TopInstancer should be highlighted
@@ -261,9 +264,9 @@ TEST(PointInstancingWireframeHighlight, instance)
         auto instancerPrimPath = instanceHydraSelections.front().primPath;
 
         ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().size(), 1u);
-        ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().front(), instancerPrimPath);
+        EXPECT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().front(), instancerPrimPath);
 
-        ASSERT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
+        EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
         assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath));
 
         HdSceneIndexPrim instancerHighlightPrim = inspector.GetSceneIndex()->GetPrim(getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath));
@@ -271,7 +274,7 @@ TEST(PointInstancingWireframeHighlight, instance)
         ASSERT_TRUE(instancerTopology.IsDefined());
         ASSERT_NE(instancerTopology.GetMask(), nullptr);
         auto mask = instancerTopology.GetMask()->GetTypedValue(0);
-        ASSERT_FALSE(mask.empty());
+        EXPECT_FALSE(mask.empty());
 
         size_t selectedInstanceIndex = std::stoul(instancePath.getSegments().back().components().back().string());
         for (size_t iMask = 0; iMask < mask.size(); iMask++) {
@@ -324,10 +327,10 @@ TEST(PointInstancingWireframeHighlight, prototype)
 
         auto prototypeHydraSelections = fvpMergingSceneIndex->ConvertUfePathToHydraSelections(prototypePath);
         // Original prim + 4 propagated prototypes
-        ASSERT_EQ(prototypeHydraSelections.size(), 1u + 4u);
+        EXPECT_EQ(prototypeHydraSelections.size(), 1u + 4u);
 
         // Ensure meshes use the correct display style
-        ASSERT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
+        EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
         for (const auto& prototypeSelection : prototypeHydraSelections) {
             HdSceneIndexPrimView view(inspector.GetSceneIndex(), prototypeSelection.primPath);
             for (auto it = view.begin(); it != view.end(); ++it) {
@@ -337,9 +340,13 @@ TEST(PointInstancingWireframeHighlight, prototype)
                 }
             }
         }
-    
-        // Original prim + 4 propagated prototypes
-        ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().size(), 1u + 4u);
+
+        auto selectedPrimPaths = selectionObserver.GetSelection()->GetAllSelectedPrimPaths();
+        ASSERT_EQ(selectedPrimPaths.size(), prototypeHydraSelections.size());
+        for (const auto& prototypeHydraSelection : prototypeHydraSelections) {
+            auto foundSelectedPrimPath = std::find(selectedPrimPaths.begin(), selectedPrimPaths.end(), prototypeHydraSelection.primPath);
+            EXPECT_NE(foundSelectedPrimPath, selectedPrimPaths.end());
+        }
     };
     
     testPrototypeHighlightFn(prototypeItem, prototypePath);
