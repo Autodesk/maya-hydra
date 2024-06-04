@@ -83,17 +83,30 @@ SdfPath _GetOriginalPathFromSelectionHighlightMirror(const SdfPath& mirrorPath)
 // highlighting only specific instances in the case of instance selections.
 VtBoolArray _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionsSchema& selections) 
 {
+    // Schema getters were made const in USD 24.05 (specifically Hydra API version 66).
+    // We work around this for previous versions by const casting.
+    VtBoolArray originalMask = 
+#if HD_API_VERSION < 66
+    const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetMask()->GetTypedValue(0);
+#else
+    originalInstancerTopology.GetMask()->GetTypedValue(0);
+#endif
+
     if (!selections.IsDefined()) {
-        return originalInstancerTopology.GetMask()->GetTypedValue(0);
+        return originalMask;
     }
 
     size_t nbInstances = 0;
-    auto instanceIndices = originalInstancerTopology.GetInstanceIndices();
+    auto instanceIndices = 
+#if HD_API_VERSION < 66
+    const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetInstanceIndices();
+#else
+    originalInstancerTopology.GetInstanceIndices();
+#endif
     for (size_t iInstanceIndex = 0; iInstanceIndex < instanceIndices.GetNumElements(); iInstanceIndex++) {
         auto protoInstances = instanceIndices.GetElement(iInstanceIndex)->GetTypedValue(0);
         nbInstances += protoInstances.size();
     }
-    VtBoolArray originalMask = originalInstancerTopology.GetMask()->GetTypedValue(0);
     TF_AXIOM(originalMask.empty() || originalMask.size() == nbInstances);
     VtBoolArray selectionHighlightMask(nbInstances, false);
 
@@ -108,7 +121,7 @@ VtBoolArray _GetSelectionHighlightMask(const HdInstancerTopologySchema& original
         if (!selection.GetNestedInstanceIndices()) {
             // We have a selection that has no instances, which means the whole instancer is selected :
             // this overrides any instances selection.
-            return originalInstancerTopology.GetMask()->GetTypedValue(0);
+            return originalMask;
         }
         HdInstanceIndicesVectorSchema nestedInstanceIndices = selection.GetNestedInstanceIndices();
         for (size_t iInstanceIndices = 0; iInstanceIndices < nestedInstanceIndices.GetNumElements(); iInstanceIndices++) {
