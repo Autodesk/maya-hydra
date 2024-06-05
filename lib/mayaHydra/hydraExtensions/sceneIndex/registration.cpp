@@ -133,8 +133,9 @@ public:
         TF_AXIOM(appPath.nbSegments() == 2);
         const auto& secondSegment = appPath.getSegments()[1];
         for (const auto& pathComponent : secondSegment) {
-            // This should only occur on the last component, if we have an instance selection
             if (pathComponent.string().find_first_not_of(digits) == std::string::npos) {
+                // This should only occur on the last component, when we have an instance selection
+                TF_VERIFY(pathComponent == secondSegment.components().back());
                 continue;
             }
             primPath = primPath.AppendChild(TfToken(pathComponent.string()));
