@@ -61,9 +61,9 @@ special way, e.g. object contour, modified object color, or object overlay.
 
 The former approach is handled by having a plugin provide a selection
 highlighting filtering scene index to the Flow Viewport Toolkit, and is the
-topic of this document at time of writing.  The
-latter is handled by having a plugin provide a selection highlighting 
-task to the Flow Viewport Toolkit, and is currently unimplemented.
+topic of this document at time of writing.  The latter is handled by having 
+a plugin provide a selection highlighting task to the Flow Viewport Toolkit, 
+and is currently unimplemented.
 
 ## Added Geometry Plugin Software Architecture Requirements
 
@@ -85,7 +85,7 @@ provide the following services:
 ### Selection Change
 
 This
-[selection change code](../lib/flowViewport/sceneIndex/fvpSelectionSceneIndex.cpp#L151-L170)
+[selection change code](../lib/flowViewport/sceneIndex/fvpSelectionSceneIndex.cpp#L152-L173)
 shows the use of the *Path Interface*, through the *ConvertUfePathToHydraSelections()* method,
 called on the input scene index.  The path interface allows the selection scene
 index to translate selected application paths to selected Hydra scene index
@@ -317,7 +317,7 @@ with an `instancerTopology` data source.
 
 ![instancerTopology data source](images/instancerTopology.png)
 
-This data source contains three inner data sources :
+This data source contains three relevant inner data sources :
 - The `prototypes` data source, of type `VtArray<SdfPath>`, lists the paths
 to each prototype this point instancer instances.
 - The `instanceIndices` data source, a vector data source where each element
