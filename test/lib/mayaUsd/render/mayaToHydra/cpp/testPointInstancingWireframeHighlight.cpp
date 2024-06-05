@@ -81,6 +81,8 @@ void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneInde
         const SdfPath& currPath = *it;
         HdSceneIndexPrim currPrim = sceneIndex->GetPrim(currPath);
 
+        // This check is similar in nature to the one in WireframeSelectionHighlightSceneIndex::_ForEachPrimInHierarchy
+        // to skip child prototypes
         VtArray<SdfPath> prototypeRoots = getPrototypeRoots(currPrim);
         bool isInSamePrototypeHierarchy = std::find_if(prototypeRoots.begin(), prototypeRoots.end(), [primPath](const auto& prototypeRoot) -> bool {
             return primPath.HasPrefix(prototypeRoot);
@@ -90,8 +92,9 @@ void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneInde
             continue;
         }
 
-        HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(currPrim.dataSource);
-        if (instancerTopology.IsDefined()) {
+        if (currPrim.primType == HdPrimTypeTokens->instancer) {
+            HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(currPrim.dataSource);
+            ASSERT_TRUE(instancerTopology.IsDefined());
             ASSERT_NE(instancerTopology.GetPrototypes(), nullptr);
             auto prototypePaths = instancerTopology.GetPrototypes()->GetTypedValue(0);
             EXPECT_GE(prototypePaths.size(), 1u);
