@@ -26,9 +26,10 @@
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
+#include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/selectionSchema.h>
-#include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
+#include <pxr/imaging/hd/tokens.h>
 
 #include <stack>
 
@@ -189,14 +190,14 @@ SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim)
     return instancingRelatedPaths;
 }
 
-VtArray<SdfPath> _GetPrototypeRoots(const HdSceneIndexPrim& prim)
+// We consider prototypes that have child prims to be different hierarchies,
+// separate from each other and from the "root" hierarchy.
+VtArray<SdfPath> _GetHierarchyRoots(const HdSceneIndexPrim& prim)
 {
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    if (!instancedBy.IsDefined() || !instancedBy.GetPrototypeRoots()) {
-        return {};
-    }
-
-    return instancedBy.GetPrototypeRoots()->GetTypedValue(0);
+    return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() 
+        ? instancedBy.GetPrototypeRoots()->GetTypedValue(0) 
+        : VtArray<SdfPath>({SdfPath::AbsoluteRootPath()});
 }
 
 bool _IsPrototype(const HdSceneIndexPrim& prim)
@@ -451,12 +452,8 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         // Note : in the USD data model, the original prims that get propagated as prototypes have their original prim types erased.
         // Only the resulting propagated prototypes keep the original prim type.
 
-        // We want to constrain the selected ancestor lookup to the propagated prototype only, if it is one.
-        auto roots = _GetPrototypeRoots(prim);
-        // If it is not a propagated prototype, consider the whole hierarchy.
-        if (roots.empty()) {
-            roots.push_back(SdfPath::AbsoluteRootPath());
-        }
+        // We want to constrain the selected ancestor lookup to only the hierarchies the prim is a part of.
+        auto roots = _GetHierarchyRoots(prim);
         for (const auto& root : roots) {
             if (_selection->HasFullySelectedAncestorInclusive(primPath, root)) {
                 prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
@@ -721,22 +718,25 @@ WireframeSelectionHighlightSceneIndex::_ForEachPrimInHierarchy(
     const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation
 )
 {
-    std::stack<SdfPath> pathsToTraverse({hierarchyRoot});
-    while (!pathsToTraverse.empty()) {
-        SdfPath currPath = pathsToTraverse.top();
-        pathsToTraverse.pop();
+    HdSceneIndexPrimView hierarchyView(GetInputSceneIndex(), hierarchyRoot);
+    for (auto itPrim = hierarchyView.begin(); itPrim != hierarchyView.end(); ++itPrim) {
+        const SdfPath& currPath = *itPrim;
 
         HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
 
-        // Skip processing of prototypes nested under the hierarchy, as we consider prototype hierarchies to be separate.
-        if (_IsPrototype(currPrim) && !_IsPrototypeSubPrim(currPrim, currPath) && currPath != hierarchyRoot) {
+        // If the current prim is not part of the same hierarchy we are traversing, skip it and its descendents.
+        VtArray<SdfPath> primRoots = _GetHierarchyRoots(currPrim);
+        bool sharesHierarchy = std::find_if(primRoots.begin(), primRoots.end(), [hierarchyRoot](const auto& primRoot) -> bool {
+            return hierarchyRoot.HasPrefix(primRoot);
+        }) != primRoots.end();
+        if (!sharesHierarchy) {
+            itPrim.SkipDescendants();
             continue;
         }
 
-        if (operation(currPath, currPrim)) {
-            for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(currPath)) {
-                pathsToTraverse.push(childPath);
-            }
+        if (!operation(currPath, currPrim)) {
+            itPrim.SkipDescendants();
+            continue;
         }
     }
 }
@@ -892,11 +892,7 @@ WireframeSelectionHighlightSceneIndex::_DeleteInstancerHighlight(const PXR_NS::S
 void
 WireframeSelectionHighlightSceneIndex::_CreateInstancerHighlightsForInstancer(const HdSceneIndexPrim& instancerPrim, const SdfPath& instancerPath)
 {
-    auto roots = _GetPrototypeRoots(instancerPrim);
-    // If there are no prototype roots, consider the whole hierarchy
-    if (roots.empty()) {
-        roots.push_back(SdfPath::AbsoluteRootPath());
-    }
+    auto roots = _GetHierarchyRoots(instancerPrim);
     for (const auto& root : roots) {
         // Ancestors include the instancer itself
         auto selectedAncestors = _selection->FindFullySelectedAncestorsInclusive(instancerPath, root);

@@ -63,7 +63,7 @@ TfToken getRefinedReprToken(const HdSceneIndexPrim& prim)
     return reprSelectors.empty() ? TfToken() : reprSelectors.front();
 }
 
-VtArray<SdfPath> getPrototypeRoots(const HdSceneIndexPrim& prim)
+VtArray<SdfPath> getHierarchyRoots(const HdSceneIndexPrim& prim)
 {
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
     return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() 
@@ -76,19 +76,18 @@ VtArray<SdfPath> getPrototypeRoots(const HdSceneIndexPrim& prim)
 // the proper display style.
 void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath)
 {
-    HdSceneIndexPrimView view(sceneIndex, primPath);
-    for (auto it = view.begin(); it != view.end(); ++it) {
-        const SdfPath& currPath = *it;
+    HdSceneIndexPrimView primView(sceneIndex, primPath);
+    for (auto itPrim = primView.begin(); itPrim != primView.end(); ++itPrim) {
+        const SdfPath& currPath = *itPrim;
         HdSceneIndexPrim currPrim = sceneIndex->GetPrim(currPath);
 
-        // This check is similar in nature to the one in WireframeSelectionHighlightSceneIndex::_ForEachPrimInHierarchy
-        // to skip child prototypes
-        VtArray<SdfPath> prototypeRoots = getPrototypeRoots(currPrim);
-        bool isInSamePrototypeHierarchy = std::find_if(prototypeRoots.begin(), prototypeRoots.end(), [primPath](const auto& prototypeRoot) -> bool {
-            return primPath.HasPrefix(prototypeRoot);
-        }) != prototypeRoots.end();
-        if (!isInSamePrototypeHierarchy) {
-            it.SkipDescendants();
+        // Same check as in WireframeSelectionHighlightSceneIndex::_ForEachPrimInHierarchy
+        VtArray<SdfPath> currPrimRoots = getHierarchyRoots(currPrim);
+        bool sharesHierarchy = std::find_if(currPrimRoots.begin(), currPrimRoots.end(), [primPath](const auto& currPrimRoot) -> bool {
+            return primPath.HasPrefix(currPrimRoot);
+        }) != currPrimRoots.end();
+        if (!sharesHierarchy) {
+            itPrim.SkipDescendants();
             continue;
         }
 
@@ -105,7 +104,7 @@ void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneInde
                 EXPECT_EQ(prototypeName.substr(prototypeName.size() - selectionHighlightTag.size()), selectionHighlightTag);
                 assertSelectionHighlightCorrectness(sceneIndex, prototypePath);
             }
-            it.SkipDescendants();
+            itPrim.SkipDescendants();
             continue;
         }
 
