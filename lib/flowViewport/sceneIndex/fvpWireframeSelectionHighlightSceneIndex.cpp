@@ -199,29 +199,28 @@ VtArray<SdfPath> _GetPrototypeRoots(const HdSceneIndexPrim& prim)
     return instancedBy.GetPrototypeRoots()->GetTypedValue(0);
 }
 
-// This method is essentially "is not a prototype sub-prim".
-bool _IsInstancingRoot(const HdSceneIndexPrim& prim, const SdfPath& primPath)
-{
-    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    if (!instancedBy.IsDefined()) {
-        return true;
-    }
-    if (!instancedBy.GetPrototypeRoots()) {
-        return true;
-    }
-    auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
-    for (const auto& protoRootPath : protoRootPaths) {
-        if (protoRootPath == primPath) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool _IsPrototype(const HdSceneIndexPrim& prim)
 {
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
     return instancedBy.IsDefined();
+}
+
+bool _IsPrototypeSubPrim(const HdSceneIndexPrim& prim, const SdfPath& primPath)
+{
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    if (!instancedBy.IsDefined()) {
+        return false;
+    }
+    if (!instancedBy.GetPrototypeRoots()) {
+        return false;
+    }
+    auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
+    for (const auto& protoRootPath : protoRootPaths) {
+        if (protoRootPath == primPath) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // Similar to USD's _RerootingSceneIndexPathDataSource :
@@ -730,7 +729,7 @@ WireframeSelectionHighlightSceneIndex::_ForEachPrimInHierarchy(
         HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
 
         // Skip processing of prototypes nested under the hierarchy, as we consider prototype hierarchies to be separate.
-        if (_IsPrototype(currPrim) && _IsInstancingRoot(currPrim, currPath) && currPath != hierarchyRoot) {
+        if (_IsPrototype(currPrim) && !_IsPrototypeSubPrim(currPrim, currPath) && currPath != hierarchyRoot) {
             continue;
         }
 
@@ -766,7 +765,7 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const P
     // If this is a prototype sub-prim, redirect the call to the prototype root, so that the prototype root
     // becomes the actual selection highlight mirror. The instancing-related paths of the instancer will be
     // processed as part of the children traversal later down this method.
-    if (!_IsInstancingRoot(originalPrim, originalPrimPath)) {
+    if (_IsPrototypeSubPrim(originalPrim, originalPrimPath)) {
         HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(originalPrim.dataSource);
         auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
         for (const auto& protoRootPath : protoRootPaths) {
