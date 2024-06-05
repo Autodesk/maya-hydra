@@ -392,12 +392,13 @@ as a whole or specific instances, as these require a more complicated workflow. 
 selection, we cannot simply override instanced meshes to use the `refinedWireOnSurf`/`wireOnSurf`
 HdReprs, as that would lead to highlighting all instances of the prototype all the time. Instead, 
 we opt for the following approach : when an instancer is selected (entirely or only certain instances), 
-we will create a mirror of the instancing graph it is a part of. This mirror graph includes 
-everything from the most deeply buried prims to the topmost instancers; anything that this instancer 
-affects or is affected by, including itself. In practice, this means that each prototype and each 
-top-level instancer will have a corresponding mirror prim for selection highlighting, that will be 
-located alongside it as a sibling. This way, any parent transforms affecting the original prim will 
-also affect the selection highlight mirror prim.
+we will create a mirror of the instancing graph it is a part of, and make the mirror copies of the 
+instanced meshes draw with a wireframe representation. This mirror graph includes everything from 
+the most deeply buried prims to the topmost instancers; anything that this instancer affects or is 
+affected by, including itself. In practice, this means that each prototype and each instancer will 
+have a corresponding mirror prim for selection highlighting, that will be located alongside it as 
+a sibling. This way, any parent transforms affecting the original prim will also affect the selection 
+highlight mirror prim.
 
 For example, given the following scene structure : 
 ```
@@ -457,6 +458,11 @@ Of note are the following selection highlighting scenarios and their correspondi
   - If the instancer is a prototype, the instances it would indirectly draw through instances of itself drawn by other instancers will NOT be highlighted
 - Selecting a parent prim of a point instancer
   - (same as selecting a point instancer in its entirety)
+
+### Implementation for prototype selection
+
+We simply do as for a regular selection, and override the original prim's display style 
+to draw as a wireframe-on-surface representation.
 
 ### Current limitations
 
