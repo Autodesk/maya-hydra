@@ -229,6 +229,7 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
     _selection->Clear();
 
     PrimSelectionInfoVector sceneIndexSn;
+    sceneIndexSn.reserve(selection.size());
     for (const auto& snItem : selection) {
         // Call our input scene index to convert the application path to scene index paths and selection data sources.
         auto primSelections = ConvertUfePathToHydraSelections(snItem->path());
