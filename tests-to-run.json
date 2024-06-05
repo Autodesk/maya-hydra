@@ -2,5 +2,6 @@
   "files_to_include": [],
   "files_to_exclude": [],
   "plugins_to_include": [],
-  "plugins_to_exclude": []
+  "plugins_to_exclude": [],
+  "platforms_to_exclude": ["osx"]
 }
