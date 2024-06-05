@@ -100,6 +100,7 @@ void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneInde
             EXPECT_GE(prototypePaths.size(), 1u);
             for (const auto& prototypePath : prototypePaths) {
                 auto prototypeName = prototypePath.GetElementString();
+                // Ensure prototype is a selection highlight mirror
                 ASSERT_GT(prototypeName.size(), selectionHighlightTag.size());
                 EXPECT_EQ(prototypeName.substr(prototypeName.size() - selectionHighlightTag.size()), selectionHighlightTag);
                 assertSelectionHighlightCorrectness(sceneIndex, prototypePath);
