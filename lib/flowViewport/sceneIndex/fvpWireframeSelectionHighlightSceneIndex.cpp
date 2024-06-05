@@ -107,7 +107,9 @@ VtBoolArray _GetSelectionHighlightMask(const HdInstancerTopologySchema& original
         auto protoInstances = instanceIndices.GetElement(iInstanceIndex)->GetTypedValue(0);
         nbInstances += protoInstances.size();
     }
-    TF_AXIOM(originalMask.empty() || originalMask.size() == nbInstances);
+    if (TF_VERIFY(originalMask.empty() || originalMask.size() == nbInstances, "Instancer mask has incorrect size.")) {
+        return originalMask;
+    }
     VtBoolArray selectionHighlightMask(nbInstances, false);
 
     for (size_t iSelection = 0; iSelection < selections.GetNumElements(); iSelection++) {
