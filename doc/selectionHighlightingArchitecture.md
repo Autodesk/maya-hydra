@@ -294,12 +294,21 @@ WireframeSelectionHighlightSceneIndex o-- Selection : Read
 
 We currently support wireframe selection highlighting for point instancing of meshes
 for the three different point instancing selection modes :
+
 - Point Instancer
+
+![Point instancer selection highlight](images/pointInstancerSelectionHighlight.png)
+
 - Instance
+
+![Instance selection highlight](images/instanceSelectionHighlight.png)
+
 - Prototype
 
-Here is an overview of point instancing in Hydra, and how we implement wireframe 
-selection highlighting for it.
+![Prototype selection highlight](images/prototypeSelectionHighlight.png)
+
+Here is an overview of how point instancing works in Hydra, and how we implement 
+wireframe selection highlighting for it.
 
 ### Scene index structure
 
