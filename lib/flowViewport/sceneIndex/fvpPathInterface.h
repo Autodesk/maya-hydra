@@ -36,12 +36,15 @@ struct PrimSelectionInfo
     PXR_NS::HdDataSourceBaseHandle selectionDataSource;
 };
 
+// Using TfSmallVector to optimize for selections that map to a few prims,
+// which is likely going to be the bulk of use cases.
 using PrimSelectionInfoVector = PXR_NS::TfSmallVector<PrimSelectionInfo, 8>;
 
 /// \class PathInterface
 ///
 /// A pure interface class to allow for conversion between an application's
-/// path, expressed as a Ufe::Path, into an SdfPath valid for a scene index.
+/// path, expressed as a Ufe::Path, into SdfPaths valid for a scene index
+/// and selection data sources.
 /// To be used as a mix-in class for scene indices.
 ///
 class PathInterface
