@@ -33,12 +33,11 @@ if(MayaUsd_FOUND)
 endif()
 
 function(find_labels label_set label_list)
-
     string(REPLACE ":" ";" split_labels ${label_set})
     list(LENGTH split_labels len)
     if(len GREATER 0)
         list(GET split_labels 1 labels_value)
-        # we expect comma seprated labels
+        # we expect comma separated labels
         string(REPLACE "," ";" all_labels ${labels_value})
         set(local_label_list "")
         foreach(label ${all_labels})
@@ -52,7 +51,7 @@ function(get_testfile_and_labels all_labels test_filename test_script)
     # fetch labels for each test file
     string(REPLACE "|" ";" tests_with_tags ${test_script})
     list(GET tests_with_tags 0 filename)
-    #set the test file to input as no labels were passed
+    # set the test file to input as no labels were passed
     set(${test_filename} ${filename} PARENT_SCOPE)
     list(LENGTH tests_with_tags length)
     math(EXPR one_less_length "${length} - 1")
@@ -71,7 +70,9 @@ endfunction()
 
 function(apply_labels_to_test test_labels test_file)
     set_property(TEST ${test_file} APPEND PROPERTY LABELS "default")
-    if(NOT ${test_labels} STREQUAL "")
+    list(LENGTH test_labels list_length)
+    if(${list_length} GREATER 0)
+    # if(NOT ${test_labels} STREQUAL "")
         foreach(label ${test_labels})
             set_property(TEST ${test_file} APPEND PROPERTY LABELS ${label})
             message(STATUS "Added test label \"${label}\" for ${test_file}")

@@ -97,7 +97,8 @@ To create a reference snapshot, an easy way is to first write your test, and the
 :warning: **Important note** : While there *is* an `assertSnapshotEqual` method, its use is discouraged, as renders can differ very slightly between renderer architectures.
 
 # Adding labels for tests
-ctest allows attaching labels to test which then can be read when running the test to determine whether the test needs to be run. 
+ctest allows attaching labels to tests to determine whether a test needs to be run or not.
+ 
 For example, you might have some tests that are all related to 'performance', so you label them with 'performance'. Other tests might be about 'security', so you label them 'security'. Later, when you want to run your tests, you can tell CTest to only run the tests with a certain label. Say you only want to run your 'performance' tests. You can tell CTest to do this by using the `-L` option followed by 'performance'. CTest will then only run the tests that have the 'performance' label, and ignore the rest. Similarly, tests can be excluded by passing arguments to `-LE` flag.
 
 To add label in MayaHydra test suite

@@ -645,8 +645,6 @@ verbosity = args.verbosity
 # InstallContext
 class InstallContext:
 
-    kFailingTests = []
-    kFilesToInclude = []
     kFilesToExclude = []
     kPluginsToExclude = []
     kPluginsToInclude = []
@@ -677,10 +675,8 @@ class InstallContext:
                 self.kPlatformToInclude = values
             if key == "platforms_to_exclude":
                 self.kPlatformToExclude = values
-            if key == "files_to_include":
-                self.kPlatformToExclude = values
             if key == "files_to_exclude":
-                self.kPlatformToExclude = values
+                self.kFilesToExclude = values
 
     def __init__(self, args):
         # Assume the project's top level cmake is in the current source directory
@@ -767,17 +763,25 @@ class InstallContext:
             for arg in argList.split(","):
                 self.ctestArgs.append(arg)
 
-        #get labels to be passed for ctest
+        # get labels to be passed for ctest
         self.get_ctest_labels()
         
+        # add -E args for test file to be excluded by name
+        if self.kFilesToExclude:
+            self.ctestArgs.append(f'{"-E"} {"|".join(self.kFilesToExclude)}')
+
         # add -L args, test with following labels to run
         if self.kPluginsToInclude:
             self.ctestArgs.append(f'{"-L"} {"|".join(self.kPluginsToInclude)}')
 
-        # only support platform exclusion mode for tests
         # Determine the current platform
         current_platform = platform.system().lower()
-        allExcludeLabels = self.kPluginsToExclude + [platform_mapping.get(current_platform)]        
+        exclPlatform = []
+        for a in self.kPlatformToExclude:
+            if platform_mapping.get(current_platform) in a:
+                exclPlatform.append(a)
+
+        allExcludeLabels = self.kPluginsToExclude + exclPlatform
         # add -LE args, test with following labels to be skipped
         if allExcludeLabels:
             self.ctestArgs.append(f'{"-LE"} {"|".join(allExcludeLabels)}') 
