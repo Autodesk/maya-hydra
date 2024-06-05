@@ -111,12 +111,13 @@ TEST(FlowViewport, mergingSceneIndexAddRemove)
     auto mayaPath = Ufe::PathString::path("|aSphere");
     auto primSelections = mayaSi->ConvertUfePathToHydraSelections(mayaPath);
     ASSERT_EQ(primSelections.size(), 1u);
+    auto sceneIndexPath = primSelections.front().primPath;
 
     // With Maya scene index in the merging scene index, the sphere prim has
     // a valid scene index path.
-    auto spherePrim = sceneIndices.front()->GetPrim(primSelections.front().primPath);
+    auto spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
     ASSERT_TRUE(spherePrim.dataSource);
-    spherePrim = mergingSi->GetPrim(primSelections.front().primPath);
+    spherePrim = mergingSi->GetPrim(sceneIndexPath);
     ASSERT_TRUE(spherePrim.dataSource);
 
     // Remove the Maya scene index from the Flow Viewport merging scene index.
@@ -126,9 +127,9 @@ TEST(FlowViewport, mergingSceneIndexAddRemove)
 
     // Without the Maya scene index in the merging scene index, the sphere prim
     // is no longer in the Hydra scene index scene.
-    spherePrim = sceneIndices.front()->GetPrim(primSelections.front().primPath);
+    spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
     ASSERT_FALSE(spherePrim.dataSource);
-    spherePrim = mergingSi->GetPrim(primSelections.front().primPath);
+    spherePrim = mergingSi->GetPrim(sceneIndexPath);
     ASSERT_FALSE(spherePrim.dataSource);
 
     // Add the Maya scene index back to the Flow Viewport merging scene index,
@@ -136,8 +137,8 @@ TEST(FlowViewport, mergingSceneIndexAddRemove)
     // with the absolute root path as scene root, so duplicate that here.
     mergingSi->AddInputScene(mayaSi, SdfPath::AbsoluteRootPath());
     ASSERT_EQ(mergingSi->GetInputScenes().size(), 1u);
-    spherePrim = sceneIndices.front()->GetPrim(primSelections.front().primPath);
+    spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
     ASSERT_TRUE(spherePrim.dataSource);
-    spherePrim = mergingSi->GetPrim(primSelections.front().primPath);
+    spherePrim = mergingSi->GetPrim(sceneIndexPath);
     ASSERT_TRUE(spherePrim.dataSource);
 }
