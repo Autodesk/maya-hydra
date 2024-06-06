@@ -5,11 +5,12 @@
 **Build:**
 * Viewport filters test [#124](https://github.com/Autodesk/maya-hydra/pull/124)
 * Add support for text-based data source dump comparisons in tests [#88](https://github.com/Autodesk/maya-hydra/pull/88)
+* Disable testMayaDisplayModes and testDataProducerSelHighlight [#129](https://github.com/Autodesk/maya-hydra/pull/129)
 
 **Features:**
-* Global Default Material Override for Maya data [#117](https://github.com/Autodesk/maya-hydra/pull/117)
+* Global default material override for Maya data [#117](https://github.com/Autodesk/maya-hydra/pull/117)
 * Support wireframe and wire on shaded and support selection highlight with the right colors [#118](https://github.com/Autodesk/maya-hydra/pull/118)
-* Add Scene Index for Texture Toggling [#131](https://github.com/Autodesk/maya-hydra/pull/131)
+* Added SceneIndex for texture toggling [#131](https://github.com/Autodesk/maya-hydra/pull/131)
 
 **Miscellaneous:**
 * Pass normals and tangents to Hydra from render item and mesh adapters [#116](https://github.com/Autodesk/maya-hydra/pull/116)
@@ -17,10 +18,9 @@
 * Fix Linux CPU memory reporting [#127](https://github.com/Autodesk/maya-hydra/pull/127)
 * Update to USD 24.05 [#126](https://github.com/Autodesk/maya-hydra/pull/126)
 * Removed dependence on Maya version and mtoa plugin [#125](https://github.com/Autodesk/maya-hydra/pull/125)
-* Disable testMayaDisplayModes and testDataProducerSelHighlight [#129](https://github.com/Autodesk/maya-hydra/pull/129)
 
 **Bugfix:**
-* Fixed time update, Bifrost stage update, and USD stage file update [#120](https://github.com/Autodesk/maya-hydra/pull/120)
+* Fixed time update, Bifrost stage update and USD stage file update [#120](https://github.com/Autodesk/maya-hydra/pull/120)
 
 **Documentation:**
 * Added tip for Python test development [#119](https://github.com/Autodesk/maya-hydra/pull/119)
