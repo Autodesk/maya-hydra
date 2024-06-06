@@ -2,6 +2,7 @@
 # Unit test can be disabled with ctest labels.
 # Adding labels to the unit test follows this convention:
 # testMyTestFile.py|depOnPlugins:lookdev,mtoa,newPlugin|skipOnPlatform:[osx,win,lin]
+# See accompanying README.md for currently supported list of label mapping.
 # only single platform exclusion is supported currently.
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
 set(INTERACTIVE_TEST_SCRIPT_FILES
