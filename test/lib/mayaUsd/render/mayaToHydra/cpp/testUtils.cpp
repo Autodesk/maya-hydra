@@ -33,10 +33,15 @@
 
 #include <QApplication>
 
+#include <algorithm>
+#include <exception>
 #include <iostream>
 
 namespace {
 std::pair<int, char**> testingArgs{0, nullptr};
+
+std::filesystem::path  testInputDir;
+std::filesystem::path  testOutputDir;
 
 // Store the ongoing state of the pressed moused & keyboard buttons.
 // These are normally kept track of internally by Qt and can be retrieved using 
@@ -284,6 +289,72 @@ std::pair<int, char**> getTestingArgs()
     return testingArgs;
 }
 
+std::filesystem::path getInputDir()
+{
+    if (testInputDir.empty()) {
+        throw std::invalid_argument(
+            "Attempted to access test input directory but it was not specified.");
+    }
+    return testInputDir;
+}
+
+void setInputDir(std::filesystem::path inputDir)
+{ 
+    testInputDir = inputDir;
+}
+
+std::filesystem::path getOutputDir()
+{
+    if (testOutputDir.empty()) {
+        throw std::invalid_argument(
+            "Attempted to access test output directory but it was not specified.");
+    }
+    return testOutputDir;
+}
+
+void setOutputDir(std::filesystem::path outputDir)
+{ 
+    testOutputDir = outputDir;
+}
+
+std::filesystem::path getPathToSample(std::string filename)
+{ 
+    return getInputDir() / filename;
+}
+
+bool dataSourceMatchesReference(
+    PXR_NS::HdDataSourceBaseHandle dataSource,
+    std::filesystem::path          referencePath)
+{
+    // We'll dump the data source to a file and then read from it. That way we have a trace
+    // of what value was used for comparison, and can inspect it in case of failures.
+    std::filesystem::path outputPath = getOutputDir() / referencePath.filename();
+    std::fstream          outputFile(outputPath, std::ios::out);
+    HdDebugPrintDataSource(outputFile, dataSource);
+    outputFile.close();
+
+    outputFile.open(outputPath, std::ios::in);
+    std::stringstream outputDump;
+    outputDump << outputFile.rdbuf();
+    std::string outputString = outputDump.str();
+
+    std::ifstream     referenceFile(referencePath);
+    std::stringstream referenceDump;
+    referenceDump << referenceFile.rdbuf();
+    std::string referenceString = referenceDump.str();
+
+    // Remove carriage returns from the reference string, as these can sometimes be 
+    // inadvertently/automatically added to the reference files stored in git.
+    // The test outputs always use line feeds only, so no need to do it for those.
+    referenceString.erase(
+        std::remove(referenceString.begin(), referenceString.end(), '\r'), referenceString.end());
+
+    // We return a boolean instead of using something like EXPECT_EQ, as that would print the
+    // entire dumps to stdout and pollute the logs in case of a test failure. Using EXPECT_TRUE
+    // at the callsites still logs exactly which comparison failed, but keeps logs readable.
+    return outputString == referenceString;
+}
+
 void mouseMoveTo(QWidget* widget, QPoint localMousePos)
 {
     QMouseEvent mouseMoveEvent(
@@ -366,4 +437,4 @@ QPoint getPrimMouseCoords(const HdSceneIndexPrim& prim, M3dView& view)
     return QPoint(viewportX, view.portHeight() - viewportY);
 }
 
-}
+} // namespace MAYAHYDRA_NS_DEF

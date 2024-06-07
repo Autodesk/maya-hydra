@@ -32,6 +32,7 @@
 #include <mayaHydraLib/adapters/lightAdapter.h>
 #include <mayaHydraLib/adapters/cameraAdapter.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDefaultLightDataSource.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraDefaultMaterialDataSource.h>
 
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
 
@@ -199,6 +200,8 @@ public:
 
     bool GetPlaybackRunning() const;
 
+    void SetDefaultMaterial(bool useDefMaterial);
+
     SdfPath SceneIndexPath(const Ufe::Path& appPath) const override;
 
     // Common function to return templated sample types
@@ -243,6 +246,9 @@ public:
         return nSamples;
     }
    
+    /// Is using an environment variable to tell if we should pass normals to Hydra when using the render item and mesh adapters
+    static bool passNormalsToHydra();
+
 private:
     MayaHydraSceneIndex(
         MayaHydraInitData& initData,

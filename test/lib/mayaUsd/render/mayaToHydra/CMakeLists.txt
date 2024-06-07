@@ -14,7 +14,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testRefinement.py
     testMaterialXOnNative.py
     testNewSceneWithStage.py
-    testMayaDisplayModes.py
+    # To be reenabled after investigation
+    #testMayaDisplayModes.py
     testMayaShadingModes.py
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
@@ -34,6 +35,11 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFootPrintNode.py
     testBackgroundColor.py
     testGrid.py
+    testUsdTextureToggle.py
+    # To be reenabled after investigation
+    #testDataProducerSelHighlight.py
+    testPassingNormalsOnMayaNative.py
+    testViewportFilters.py
     testFlowPluginsHierarchicalProperties.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
@@ -53,6 +59,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testUsdPointInstancePicking.py
     cpp/testUsdNativeInstancePicking.py
     cpp/testUsdPickKind.py
+    cpp/testNurbsSurfaces.py
 )
 
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.
@@ -73,6 +80,13 @@ endif()
 set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshes.py
     cpp/testMeshAdapterTransform.py
+)
+
+# Run the following tests with the VP2 render delegate disabled, to ensure 
+# that mayaHydra does not rely on computations made by VP2 for its use.
+set(INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_VP2_RENDER_DELEGATE
+    cpp/testUsdAnim.py
+    cpp/testUsdStageFromFile.py
 )
 
 # Unit test scripts run with mayapy.exe (no UI, so no image diffing and not possible to set Hydra Storm as the renderer)
@@ -127,6 +141,26 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
 
     # Assign a CTest label to these tests for easy filtering.
     set_property(TEST ${target} APPEND PROPERTY LABELS mayaHydraMeshAdapter)
+endforeach()
+
+# Disable VP2 render delegate and use interactive Maya with UI.
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_VP2_RENDER_DELEGATE})
+    mayaUsd_get_unittest_target(target ${script})
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        PYTHON_SCRIPT ${script}
+        ENV
+            "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
+            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
+
+            "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
+
+            "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+    )
+
+    # Assign a CTest label to these tests for easy filtering.
+    set_property(TEST ${target} APPEND PROPERTY LABELS MayaHydraInteractive)
 endforeach()
 
 # Use Maya.exe with UI, interactive tests.

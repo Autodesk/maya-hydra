@@ -36,13 +36,17 @@
 #include <mayaHydraLib/mayaHydraParams.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexDataFactoriesSetup.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
-
+#include <mayaHydraLib/mhWireframeColorInterfaceImp.h>
+#include <mayaHydraLib/mhLeadObjectPathTracker.h>
+#include <mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h>
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h>
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
 #include <flowViewport/selection/fvpSelectionTracker.h>
 #include <flowViewport/selection/fvpSelectionFwd.h>
 #include <flowViewport/sceneIndex/fvpDisplayStyleOverrideSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpPruneTexturesSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
@@ -194,6 +198,8 @@ private:
 
     void _AddPluginSelectionHighlighting();
 
+    bool _NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool currentUseDefaultMaterial, bool xRayEnabled);
+
     // Determine the pick handler which should handle a pick hit, to transform
     // the pick hit into a selection.
     const PickHandlerBase* _PickHandler(const HdxPickHit& hit) const;
@@ -240,11 +246,14 @@ private:
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
     Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
     HdSceneIndexBaseRefPtr                    _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
+    HdSceneIndexBaseRefPtr                    _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
     Fvp::DisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
+    Fvp::PruneTexturesSceneIndexRefPtr        _pruneTexturesSceneIndex;
     HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
     Fvp::SelectionPtr                         _selection;
+    Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     // Naming this identifier _ufeSelection clashes with UFE's selection.h
     // include guard and produces
     // "error C2351: obsolete C++ constructor initialization syntax"
@@ -267,6 +276,11 @@ private:
 
     MayaHydraSceneIndexRefPtr _mayaHydraSceneIndex;
 
+    //Lead object selection and wireframe color for selection highlight
+    std::shared_ptr<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp> _wireframeColorInterfaceImp {nullptr};
+    std::shared_ptr<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker> _leadObjectPathTracker {nullptr};
+    MAYAHYDRA_NS_DEF::MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex{nullptr};
+
     /** This class creates the scene index data factories and set them up into the flow viewport library to be able to create DCC 
     *   specific scene index data classes without knowing their content in Flow viewport.
     *   This is done in the constructor of this class
@@ -283,7 +297,10 @@ private:
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
     bool       _hasDefaultLighting = false;
+    bool       _currentlyTextured = false;
     unsigned int _oldDisplayStyle {0};
+    bool       _useDefaultMaterial;
+    bool       _xRayEnabled;
 
     // Picking support.
     const std::vector<std::unique_ptr<PickHandlerBase>> _pickHandlers;

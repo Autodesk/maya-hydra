@@ -220,5 +220,6 @@ function(mayaHydra_compile_config TARGET)
         PRIVATE
             TBB_SUPPRESS_DEPRECATED_MESSAGES # Remove TBB deprecation warnings
             BOOST_ALL_NO_LIB # Avoid Boost autolinking libraries
+            $<$<BOOL:${CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE}>:CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE>
     )
 endfunction()

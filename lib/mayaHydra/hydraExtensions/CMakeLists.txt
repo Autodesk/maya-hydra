@@ -13,6 +13,8 @@ target_sources(${TARGET_NAME}
         mayaUtils.cpp
         mhBuildInfo.cpp
         mixedUtils.cpp
+        mhWireframeColorInterfaceImp.cpp
+        mhLeadObjectPathTracker.cpp
 )
 
 set(HEADERS
@@ -24,6 +26,8 @@ set(HEADERS
     mayaHydraLibInterfaceImp.h
     mayaUtils.h
     mixedUtils.h
+    mhWireframeColorInterfaceImp.h
+    mhLeadObjectPathTracker.h
 )
 
 # -----------------------------------------------------------------------------

@@ -18,6 +18,7 @@
 #include "flowViewport/api.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+#include "flowViewport/fvpWireframeColorInterface.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -49,7 +50,8 @@ public:
     FVP_API
     static PXR_NS::HdSceneIndexBaseRefPtr New(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
-        const std::shared_ptr<const Selection>& selection
+        const SelectionConstPtr& selection,
+        const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
 
     FVP_API
@@ -73,7 +75,8 @@ protected:
     FVP_API
     WireframeSelectionHighlightSceneIndex(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
-        const std::shared_ptr<const Selection>& selection
+        const SelectionConstPtr& selection,
+        const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
 
     FVP_API
@@ -93,16 +96,18 @@ protected:
 
 private:
 
-    void dirtySelectionHighlightRecursive(
+    void _DirtySelectionHighlightRecursive(
         const PXR_NS::SdfPath&                            primPath, 
         PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries* highlightEntries
     );
 
-    bool isExcluded(const PXR_NS::SdfPath& sceneRoot) const;
+    bool _IsExcluded(const PXR_NS::SdfPath& sceneRoot) const;
 
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
+    PXR_NS::HdContainerDataSourceHandle _HighlightSelectedPrim(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::SdfPath& primPath)const;
 
     const SelectionConstPtr   _selection;
+    const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 };
 
 }

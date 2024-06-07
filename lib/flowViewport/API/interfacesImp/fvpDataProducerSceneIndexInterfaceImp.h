@@ -72,7 +72,8 @@ public:
 
     //Called by flow viewport
     ///hydraViewportSceneIndexAdded is called when a new hydra viewport is created by the ViewportInformationAndSceneIndicesPerViewportDataManager, it's not a callback.
-    void hydraViewportSceneIndexAdded(const InformationInterface::ViewportInformation& viewportInfo);
+    //returns true if some data producer scene indices were added
+    bool hydraViewportSceneIndexAdded(const InformationInterface::ViewportInformation& viewportInfo);
     void removeAllViewportDataProducerSceneIndices(ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData);
 
     ///Since Flow viewport is DCC agnostic, the DCC will implement a concrete factory and call setSceneIndexDataFactory to register it in this class.

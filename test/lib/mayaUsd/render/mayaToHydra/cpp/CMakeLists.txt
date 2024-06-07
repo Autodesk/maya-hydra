@@ -19,6 +19,7 @@ target_sources(${TARGET_NAME}
         mayaHydraCppTestsCmd.cpp
         testColorPreferences.cpp
         testCppFramework.cpp
+        testHydraPrim.cpp
         testMayaSceneFlattening.cpp
         testMayaUsdUfeItems.cpp
         testMergingSceneIndex.cpp
@@ -35,8 +36,10 @@ target_sources(${TARGET_NAME}
         testSceneCorrectness.cpp
         testPrimInstancing.cpp
         testPicking.cpp
+        testUsdAnim.cpp
         testUsdPointInstancePicking.cpp
         testUsdPicking.cpp
+        testNurbsSurfaces.cpp
 )
 
 # -----------------------------------------------------------------------------
