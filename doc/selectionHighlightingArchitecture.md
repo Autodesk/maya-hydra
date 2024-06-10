@@ -420,7 +420,7 @@ Root
 where `TopInstancer_SelectionHighlight` would instance `NestedInstancer_SelectionHighlight`, which would in turn instance `Prototype_SelectionHighlight`.
 
 Note that in the case where a prototype is not a single prim but a sub-hierarchy, we only need to 
-create a single *explicit* selection highlight mirror for the whole prototype sub-hierarchy; the 
+create a single *explicit* selection highlight mirror prim for the whole prototype sub-hierarchy; the 
 child prims of the selection highlight mirror will simply be pulled from the corresponding original 
 prim, and thus implicitly be selection highlight mirrors as well.
 
@@ -451,11 +451,13 @@ where `TopInstancer_SelectionHighlight` instances `Prototype_SelectionHighlight`
 
 Of note are the following selection highlighting scenarios and their corresponding behaviors :
 - Selecting a point instancer in its entirety
-  - If the instancer is a top-level instancer, all instances it draws WILL be highlighted
-  - If the instancer is a prototype, instances of itself drawn by other instancers will NOT be highlighted
+  - If the instancer is a top-level instancer, all instances it draws WILL be highlighted.
+  - If the instancer is a prototype, instances of itself drawn by other instancers will NOT be highlighted. 
+    This is an intentional workflow decision from the Hydra for Maya team.
 - Selecting specific instances of point instancer
-  - If the instancer is a top-level instancer, the selected instances it draws WILL be highlighted
-  - If the instancer is a prototype, the instances it would indirectly draw through instances of itself drawn by other instancers will NOT be highlighted
+  - If the instancer is a top-level instancer, the selected instances it draws WILL be highlighted.
+  - If the instancer is a prototype, the instances it would indirectly draw through instances of itself drawn by other instancers will NOT be highlighted. 
+    This is an intentional workflow decision from the Hydra for Maya team.
 - Selecting a parent prim of a point instancer
   - (same as selecting a point instancer in its entirety)
 
