@@ -110,7 +110,7 @@ public:
             inputSceneIndex, sceneIndexPathPrefix, sceneIndexAppPath));
     }
 
-    Fvp::PrimSelectionInfoVector ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const override
+    Fvp::PrimSelections ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const override
     {
         // We only handle USD objects, so if the UFE path is not a USD object,
         // early out with failure.
@@ -164,7 +164,7 @@ public:
             selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
             selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
         }
-        Fvp::PrimSelectionInfoVector primSelections({{primPath, selectionDataSource}});
+        Fvp::PrimSelections primSelections({{primPath, selectionDataSource}});
 
         // Propagate selection to propagated prototypes
         auto ancestorsRange = primPath.GetAncestorsRange();

@@ -648,7 +648,7 @@ VtValue MayaHydraSceneIndex::CreateMayaDefaultMaterial()
     return VtValue(networkMap);
 }
 
-Fvp::PrimSelectionInfoVector MayaHydraSceneIndex::ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const
+Fvp::PrimSelections MayaHydraSceneIndex::ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const
 {
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg("MayaHydraSceneIndex::ConvertUfePathToHydraSelections(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
@@ -666,8 +666,8 @@ Fvp::PrimSelectionInfoVector MayaHydraSceneIndex::ConvertUfePathToHydraSelection
     HdSelectionSchema::Builder selectionBuilder;
     selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
     auto selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
-    Fvp::PrimSelectionInfo primSelection {primPath, selectionDataSource};
-    return Fvp::PrimSelectionInfoVector({primSelection});
+    Fvp::PrimSelection primSelection {primPath, selectionDataSource};
+    return Fvp::PrimSelections({primSelection});
 }
 
 SdfPath MayaHydraSceneIndex::SetCameraViewport(const MDagPath& camPath, const GfVec4d& viewport)

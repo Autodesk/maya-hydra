@@ -228,7 +228,7 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
 
     _selection->Clear();
 
-    PrimSelectionInfoVector sceneIndexSn;
+    PrimSelections sceneIndexSn;
     sceneIndexSn.reserve(selection.size());
     for (const auto& snItem : selection) {
         // Call our input scene index to convert the application path to scene index paths and selection data sources.
@@ -260,7 +260,7 @@ bool SelectionSceneIndex::HasFullySelectedAncestorInclusive(const SdfPath& primP
     return _selection->HasFullySelectedAncestorInclusive(primPath);
 }
 
-PrimSelectionInfoVector SelectionSceneIndex::ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const
+PrimSelections SelectionSceneIndex::ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const
 {
     auto primSelections = _inputSceneIndexPathInterface->ConvertUfePathToHydraSelections(appPath);
 

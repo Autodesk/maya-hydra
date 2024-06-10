@@ -65,7 +65,7 @@ class GlobalSelectionChangedObs : public Ufe::Observer
             MayaHydra::MhLeadObjectPathTracker& _leadObjectPathTracker;
     };
 
-SdfPathVector hydraSelectionsToSdfPathVector(const Fvp::PrimSelectionInfoVector& hydraSelections)
+SdfPathVector hydraSelectionsToSdfPathVector(const Fvp::PrimSelections& hydraSelections)
 {
     SdfPathVector outVector;
     for (const auto& hydraSelection : hydraSelections) {

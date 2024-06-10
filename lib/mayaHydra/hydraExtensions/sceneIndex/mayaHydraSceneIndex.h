@@ -202,7 +202,7 @@ public:
 
     void SetDefaultMaterial(bool useDefMaterial);
 
-    Fvp::PrimSelectionInfoVector ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const override;
+    Fvp::PrimSelections ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const override;
 
     // Common function to return templated sample types
     template <typename T, typename Getter>

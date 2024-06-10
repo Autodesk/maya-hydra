@@ -45,7 +45,7 @@ public:
 
     // Add primPath to selection and return true if the argument is not empty.
     FVP_API
-    bool Add(const PrimSelectionInfo& primSelection);
+    bool Add(const PrimSelection& primSelection);
 
     // Returns true if the removal was successful, false otherwise.
     FVP_API
@@ -54,7 +54,7 @@ public:
     // Replace the selection with the contents of the argument primPath vector.
     // Any empty primPath in the argument will be skipped.
     FVP_API
-    void Replace(const PrimSelectionInfoVector& primSelections);
+    void Replace(const PrimSelections& primSelections);
 
     // Remove all entries from the selection.
     FVP_API

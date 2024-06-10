@@ -53,7 +53,7 @@ Selection::_PrimSelectionState::GetVectorDataSource() const
 };
 
 bool
-Selection::Add(const PrimSelectionInfo& primSelection)
+Selection::Add(const PrimSelection& primSelection)
 {
     if (primSelection.primPath.IsEmpty()) {
         return false;
@@ -75,7 +75,7 @@ Selection::Clear()
     _pathToState.clear();
 }
 
-void Selection::Replace(const PrimSelectionInfoVector& primSelections)
+void Selection::Replace(const PrimSelections& primSelections)
 {
     Clear();
 

@@ -30,7 +30,7 @@ class Path;
 
 namespace FVP_NS_DEF {
 
-struct PrimSelectionInfo
+struct PrimSelection
 {
     PXR_NS::SdfPath primPath;
     PXR_NS::HdDataSourceBaseHandle selectionDataSource;
@@ -38,7 +38,7 @@ struct PrimSelectionInfo
 
 // Using TfSmallVector to optimize for selections that map to a few prims,
 // which is likely going to be the bulk of use cases.
-using PrimSelectionInfoVector = PXR_NS::TfSmallVector<PrimSelectionInfo, 8>;
+using PrimSelections = PXR_NS::TfSmallVector<PrimSelection, 8>;
 
 /// \class PathInterface
 ///
@@ -55,7 +55,7 @@ public:
     //! If no such path exists, an empty SdfPath should be returned.
     //! \return scene index path.
     FVP_API
-    virtual PrimSelectionInfoVector ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const = 0;
+    virtual PrimSelections ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const = 0;
 
 protected:
 

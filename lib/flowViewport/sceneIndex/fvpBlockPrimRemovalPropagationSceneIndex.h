@@ -70,7 +70,7 @@ public:
 
     //from PathInterface
     FVP_API
-    PrimSelectionInfoVector ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const override{
+    PrimSelections ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const override{
         return _pathInterface->ConvertUfePathToHydraSelections(appPath);
     }
 
