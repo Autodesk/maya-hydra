@@ -154,19 +154,12 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         dirtyBits |= HdChangeTracker::DirtyPrimvar; // displayColor primVar
     }
 
-    const bool displayStatusChanged = (_displayStatus != data._displayStatus);
-    _displayStatus = data._displayStatus;
     const bool hideOnPlayback = data._ri.isHideOnPlayback();
     if (hideOnPlayback != _isHideOnPlayback) {
         _isHideOnPlayback = hideOnPlayback;
         dirtyBits |= HdChangeTracker::DirtyVisibility;
     }
 
-    //Special case for aiSkydomeLight which is visible only when it is selected
-    if (_isArnoldSkyDomeLightTriangleShape && displayStatusChanged){ 
-        SetVisible(IsRenderItemSelected());
-        dirtyBits |= HdChangeTracker::DirtyVisibility;
-    } else
     if (visibChanged) {
         SetVisible(visible);
         dirtyBits |= HdChangeTracker::DirtyVisibility;
@@ -521,12 +514,6 @@ void MayaHydraRenderItemAdapter::SetPlaybackChanged()
     if (_isHideOnPlayback) {
         MarkDirty(HdChangeTracker::DirtyVisibility);
     }
-}
-
-bool MayaHydraRenderItemAdapter::IsRenderItemSelected() const
-{ 
-    return  (MHWRender::DisplayStatus::kActive  == _displayStatus) || 
-            (MHWRender::DisplayStatus::kLead    == _displayStatus);
 }
 
 HdCullStyle MayaHydraRenderItemAdapter::GetCullStyle() const
