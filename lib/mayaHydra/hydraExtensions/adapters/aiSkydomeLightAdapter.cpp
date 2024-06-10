@@ -104,7 +104,8 @@ public:
 
         // We are not using precomputed attributes here, because we don't have
         // a guarantee that mtoa will be loaded before mayaHydra.
-        if (paramName == HdLightTokens->color) {
+        if (paramName == HdLightTokens->color ||
+            paramName == UsdLuxTokens->inputsColor) {
             const auto plug = light.findPlug("color", true);
             MPlugArray conns;
             plug.connectedTo(conns, true, false);
@@ -150,23 +151,29 @@ public:
                 }
             }
             return VtValue(GfVec3f(r,g,b));
-        } else if (paramName == HdLightTokens->intensity) {
+        } else if (paramName == HdLightTokens->intensity ||
+                   paramName == UsdLuxTokens->inputsIntensity) {
             return VtValue(light.findPlug("intensity", true).asFloat());
-        } else if (paramName == HdLightTokens->diffuse) {
+        } else if (paramName == HdLightTokens->diffuse ||
+                   paramName == UsdLuxTokens->inputsDiffuse) {
             MPlug aiDiffuse = light.findPlug("aiDiffuse", true, &status);
             if (status == MS::kSuccess) {
                 return VtValue(aiDiffuse.asFloat());
             }
-        } else if (paramName == HdLightTokens->specular) {
+        } else if (paramName == HdLightTokens->specular || 
+                   paramName == UsdLuxTokens->inputsSpecular) {
             MPlug aiSpecular = light.findPlug("aiSpecular", true, &status);
             if (status == MS::kSuccess) {
                 return VtValue(aiSpecular.asFloat());
             }
-        } else if (paramName == HdLightTokens->exposure) {
+        } else if (paramName == HdLightTokens->exposure ||
+                   paramName == UsdLuxTokens->inputsExposure) {
             return VtValue(light.findPlug("aiExposure", true).asFloat());
-        } else if (paramName == HdLightTokens->normalize) {
+        } else if (paramName == HdLightTokens->normalize ||
+                   paramName == UsdLuxTokens->inputsNormalize) {
             return VtValue(light.findPlug("aiNormalize", true).asBool());
-        } else if (paramName == HdLightTokens->textureFormat) {
+        } else if (paramName == HdLightTokens->textureFormat ||
+                   paramName == UsdLuxTokens->inputsTextureFormat) {
             const auto format = light.findPlug("format", true).asShort();
             // mirrored_ball : 0
             // angular : 1
@@ -178,7 +185,8 @@ public:
             } else {
                 return VtValue(UsdLuxTokens->automatic);
             }
-        } else if (paramName == HdLightTokens->textureFile) {
+        } else if (paramName == HdLightTokens->textureFile ||
+                   paramName == UsdLuxTokens->inputsTextureFile) {
             // Be aware that dome lights in HdStorm always need a texture to work correctly,
             // the color is not used if no texture is present. 
 
@@ -220,7 +228,8 @@ public:
             // SdfAssetPath requires both "path" "resolvedPath"
             return VtValue(SdfAssetPath(fileTextureName, fileTextureName));
 
-        } else if (paramName == HdLightTokens->enableColorTemperature) {
+        } else if (paramName == HdLightTokens->enableColorTemperature ||
+                   paramName == UsdLuxTokens->inputsEnableColorTemperature) {
             return VtValue(false);
         }
         return {};
