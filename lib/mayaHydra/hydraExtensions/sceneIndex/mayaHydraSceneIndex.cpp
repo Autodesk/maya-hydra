@@ -183,6 +183,16 @@ namespace {
         return mayaPath;
     }
 
+    bool IsTexturedSkyDomeRenderItem(const SdfPath& name)
+    {
+        static const std::string _aiTexturedSkyDome("texturedSkyDome");
+        if (name.GetString().find(_aiTexturedSkyDome) != std::string::npos) {
+            // This render item is an texturedDomeLighnt
+            return true;
+        }
+        return false;
+    }
+
     SdfPath _GetPrimPath(const SdfPath& base, const MDagPath& dg)
     {
         return base.AppendPath(GetMayaPrimPath(dg));
@@ -474,7 +484,10 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
         MayaHydraRenderItemAdapterPtr ria = nullptr;
         if (!_GetRenderItem(fastId, ria)) {
             const SdfPath slowId = _GetRenderItemPrimPath(ri);
-            if (slowId.IsEmpty()) {
+
+            // Maya/MtoA adds texturedSkyDome mesh object for VP2.
+            // We do not want that to be translated to Hydra
+            if (slowId.IsEmpty() || IsTexturedSkyDomeRenderItem(slowId)) {
                 continue;
             }
             // MAYA-128021: We do not currently support maya instances.
@@ -500,18 +513,16 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
         }
 
         MColor                   wireframeColor;
-        MHWRender::DisplayStatus displayStatus = MHWRender::kNoStatus;
 
         MDagPath dagPath = ri.sourceDagPath();
         if (dagPath.isValid()) {
             wireframeColor = MGeometryUtilities::wireframeColor(
                 dagPath); // This is a color managed VP2 color, it will need to be unmanaged at some
             // point
-            displayStatus = MGeometryUtilities::displayStatus(dagPath);
         }
 
         const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(
-            ri, flags, wireframeColor, displayStatus);
+            ri, flags, wireframeColor);
         ria->UpdateFromDelta(data);
         if (flags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
             ria->UpdateTransform(ri);

@@ -114,9 +114,6 @@ public:
     const MColor& GetWireframeColor() const { return _wireframeColor; }
 
     MAYAHYDRALIB_API
-    MHWRender::DisplayStatus GetDisplayStatus() const { return _displayStatus; }
-
-    MAYAHYDRALIB_API
     GfMatrix4d GetTransform() override { return _transform[0]; }
 
     MAYAHYDRALIB_API
@@ -139,19 +136,16 @@ public:
         UpdateFromDeltaData(
             MRenderItem&             ri,
             unsigned int             flags,
-            const MColor&            wireframeColor,
-            MHWRender::DisplayStatus displayStatus)
+            const MColor&            wireframeColor)
             : _ri(ri)
             , _flags(flags)
             , _wireframeColor(wireframeColor)
-            , _displayStatus(displayStatus)
         {
         }
 
         MRenderItem&             _ri;
         unsigned int             _flags;
         const MColor&            _wireframeColor;
-        MHWRender::DisplayStatus _displayStatus;
     };
 
     /// We receive in that function the changes made in the Maya viewport between the last frame
@@ -192,9 +186,6 @@ public:
     MAYAHYDRALIB_API
     bool GetIsRenderITemAnaiSkydomeLightTriangleShape() const {return _isArnoldSkyDomeLightTriangleShape;}
 
-    MAYAHYDRALIB_API
-    bool IsRenderItemSelected() const;
-
 private:
     MAYAHYDRALIB_API
     void _RemoveRprim();
@@ -216,7 +207,6 @@ private:
     bool                        _visible = false;
     MColor                      _wireframeColor = { 1.f, 1.f, 1.f, 1.f };
     bool                        _isHideOnPlayback = false;
-    MHWRender::DisplayStatus    _displayStatus = MHWRender::DisplayStatus::kNoStatus;
     bool                        _isArnoldSkyDomeLightTriangleShape = false;
     GfBBox3d                    _bounds;//Bounding box
 };
