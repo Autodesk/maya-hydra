@@ -65,13 +65,15 @@ class GlobalSelectionChangedObs : public Ufe::Observer
             MayaHydra::MhLeadObjectPathTracker& _leadObjectPathTracker;
     };
 
-void pushHydraSelectionsToPathVector(const Fvp::PrimSelectionInfoVector& hydraSelections, SdfPathVector& outPathVector)
+SdfPathVector hydraSelectionsToSdfPathVector(const Fvp::PrimSelectionInfoVector& hydraSelections)
 {
+    SdfPathVector outVector;
     for (const auto& hydraSelection : hydraSelections) {
         if (!hydraSelection.primPath.IsEmpty()) {
-            outPathVector.push_back(hydraSelection.primPath);
+            outVector.emplace_back(hydraSelection.primPath);
         }
     }
+    return outVector;
 }
 
 }
@@ -92,8 +94,7 @@ MhLeadObjectPathTracker::MhLeadObjectPathTracker(const HdSceneIndexBaseRefPtr& s
         _leadObjectUfePath = leadObjectSceneItem->path();
         //_leadObjectPrimPaths can be empty with a valid _leadObjectUfePath when the lead object is in a data producer scene index not yet added to the merging scene index
         //This is fixed at some point by calling updatePrimPaths()
-        auto hydraSelections = _pathInterface->ConvertUfePathToHydraSelections(_leadObjectUfePath);
-        pushHydraSelectionsToPathVector(hydraSelections, _leadObjectPrimPaths);
+        _leadObjectPrimPaths = hydraSelectionsToSdfPathVector(_pathInterface->ConvertUfePathToHydraSelections(_leadObjectUfePath));
     }
 
    // Add ourself as an observer to the selection
@@ -129,9 +130,7 @@ void MhLeadObjectPathTracker::setLeadObjectUfePath(const Ufe::Path& newLeadObjec
     auto oldLeadObjectPrimPaths = _leadObjectPrimPaths;
 
     _leadObjectUfePath  = newLeadObjectUfePath;
-    auto hydraSelections = _pathInterface->ConvertUfePathToHydraSelections(_leadObjectUfePath);
-    _leadObjectPrimPaths.clear();
-    pushHydraSelectionsToPathVector(hydraSelections, _leadObjectPrimPaths);
+    _leadObjectPrimPaths = hydraSelectionsToSdfPathVector(_pathInterface->ConvertUfePathToHydraSelections(_leadObjectUfePath));
 
     // Dirty the previous lead object
     if(_dirtyLeadObjectSceneIndex){
@@ -143,8 +142,7 @@ void MhLeadObjectPathTracker::updatePrimPaths()
 { 
    // Update the lead object prim paths in case it was not valid yet
     if ( (_leadObjectUfePath.size() > 0) && _leadObjectPrimPaths.empty()) {
-        auto hydraSelections = _pathInterface->ConvertUfePathToHydraSelections(_leadObjectUfePath);
-        pushHydraSelectionsToPathVector(hydraSelections, _leadObjectPrimPaths);
+        _leadObjectPrimPaths = hydraSelectionsToSdfPathVector(_pathInterface->ConvertUfePathToHydraSelections(_leadObjectUfePath));
     }
 }
 
