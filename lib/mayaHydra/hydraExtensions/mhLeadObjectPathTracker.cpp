@@ -108,7 +108,7 @@ MhLeadObjectPathTracker::~MhLeadObjectPathTracker()
     _ufeSelectionObserver = nullptr;
 }
 
-bool MhLeadObjectPathTracker::isLeadPrim(const PXR_NS::SdfPath& primPath) const
+bool MhLeadObjectPathTracker::isLeadObjectPrim(const PXR_NS::SdfPath& primPath) const
 {
     //_leadObjectPrimPaths can be hierarchy paths, so we need to check if the primPath is a prefix
     //of a lead object prim path
