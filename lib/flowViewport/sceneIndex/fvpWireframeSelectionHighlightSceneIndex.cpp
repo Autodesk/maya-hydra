@@ -699,6 +699,12 @@ bool WireframeSelectionHighlightSceneIndex::_IsExcluded(
     return false;
 }
 
+std::string
+WireframeSelectionHighlightSceneIndex::GetSelectionHighlightMirrorTag() const
+{
+    return selectionHighlightMirrorTag;
+}
+
 SdfPath
 WireframeSelectionHighlightSceneIndex::GetSelectionHighlightPath(const SdfPath& path) const
 {

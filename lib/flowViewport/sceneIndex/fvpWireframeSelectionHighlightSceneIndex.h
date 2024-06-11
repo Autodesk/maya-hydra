@@ -72,6 +72,10 @@ public:
     FVP_API
     void addExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot);
 
+    // Returns the selection highlight tag used in selection highlight mirror prim names.
+    FVP_API
+    std::string GetSelectionHighlightMirrorTag() const;
+
     // Returns the corresponding selection highlight mirror path, if one exists.
     // Otherwise, returns the given path as-is.
     FVP_API

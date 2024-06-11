@@ -17,6 +17,7 @@
 #include <mayaHydraLib/mayaHydra.h>
 
 #include <flowViewport/sceneIndex/fvpMergingSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
@@ -42,13 +43,11 @@ using namespace MayaHydra;
 
 namespace {
 
-const std::string selectionHighlightTag = "_SelectionHighlight";
-
 const std::string stagePathSegment = "|NestedAndComposedPointInstancers|NestedAndComposedPointInstancersShape";
 
-SdfPath getSelectionHighlightMirrorPathFromOriginal(const SdfPath& originalPath)
+SdfPath getSelectionHighlightMirrorPathFromOriginal(const SdfPath& originalPath, const std::string& selectionHighlightMirrorTag)
 {
-    return originalPath.ReplaceName(TfToken(originalPath.GetName() + selectionHighlightTag));
+    return originalPath.ReplaceName(TfToken(originalPath.GetName() + selectionHighlightMirrorTag));
 }
 
 TfToken getRefinedReprToken(const HdSceneIndexPrim& prim)
@@ -73,7 +72,7 @@ VtArray<SdfPath> getHierarchyRoots(const HdSceneIndexPrim& prim)
 // This method takes in a path to a prim in a selection highlight hierarchy and ensures that 
 // the selection highlight graph is structured properly, and that the leaf mesh prims have
 // the proper display style.
-void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath)
+void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath, const std::string& selectionHighlightMirrorTag)
 {
     HdSceneIndexPrimView primView(sceneIndex, primPath);
     for (auto itPrim = primView.begin(); itPrim != primView.end(); ++itPrim) {
@@ -99,9 +98,9 @@ void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneInde
             for (const auto& prototypePath : prototypePaths) {
                 auto prototypeName = prototypePath.GetElementString();
                 // Ensure prototype is a selection highlight mirror
-                ASSERT_GT(prototypeName.size(), selectionHighlightTag.size());
-                EXPECT_EQ(prototypeName.substr(prototypeName.size() - selectionHighlightTag.size()), selectionHighlightTag);
-                assertSelectionHighlightCorrectness(sceneIndex, prototypePath);
+                ASSERT_GT(prototypeName.size(), selectionHighlightMirrorTag.size());
+                EXPECT_EQ(prototypeName.substr(prototypeName.size() - selectionHighlightMirrorTag.size()), selectionHighlightMirrorTag);
+                assertSelectionHighlightCorrectness(sceneIndex, prototypePath, selectionHighlightMirrorTag);
             }
             itPrim.SkipDescendants();
             continue;
@@ -113,9 +112,9 @@ void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneInde
     }
 }
 
-bool findSelectionHighlightMirrorsPredicate(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
+bool isSelectionHighlightMirror(const SdfPath& primPath, const std::string& selectionHighlightMirrorTag)
 {
-    return primPath.GetElementString().find(selectionHighlightTag) != std::string::npos;
+    return primPath.GetElementString().find(selectionHighlightMirrorTag) != std::string::npos;
 }
 
 bool findMeshPrimsPredicate(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
@@ -134,6 +133,12 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     auto isFvpMergingSceneIndexPredicate = SceneIndexDisplayNamePred("Flow Viewport Merging Scene Index");
     auto fvpMergingSceneIndex = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
         findSceneIndexInTree(terminalSceneIndices.front(), isFvpMergingSceneIndexPredicate));
+
+    auto isFvpWireframeSelectionHighlightSceneIndex = SceneIndexDisplayNamePred(
+        "Flow Viewport Wireframe Selection Highlight Scene Index");
+    auto fvpWireframeSelectionHighlightSceneIndex = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(
+        findSceneIndexInTree(terminalSceneIndices.front(), isFvpWireframeSelectionHighlightSceneIndex));
+    std::string selectionHighlightMirrorTag = fvpWireframeSelectionHighlightSceneIndex->GetSelectionHighlightMirrorTag();
 
     auto ufeSelection = Ufe::GlobalSelection::get();
 
@@ -154,7 +159,9 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     // Initial state : ensure nothing is highlighted
     ufeSelection->clear();
 
-    auto selectionHighlightMirrors = inspector.FindPrims(findSelectionHighlightMirrorsPredicate);
+    auto selectionHighlightMirrors = inspector.FindPrims([selectionHighlightMirrorTag](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
+        return isSelectionHighlightMirror(primPath, selectionHighlightMirrorTag);
+    });
     EXPECT_TRUE(selectionHighlightMirrors.empty()); // No selection highlight mirrors
 
     auto meshPrims = inspector.FindPrims(findMeshPrimsPredicate);
@@ -178,7 +185,8 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
 
         // Validate scene structure
         EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
-        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath));
+        auto selectionHighlightPath = getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath, selectionHighlightMirrorTag);
+        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag);
     };
     
     testInstancerDirectHighlightFn(topInstancerItem, topInstancerPath);
@@ -193,7 +201,8 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     
         // Validate scene structure
         EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
-        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerPrimPaths.front()));
+        auto selectionHighlightPath = getSelectionHighlightMirrorPathFromOriginal(instancerPrimPaths.front(), selectionHighlightMirrorTag);
+        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag);
     };
     auto testInstancerNoHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
         auto instancerPrimPaths = fvpMergingSceneIndex->SceneIndexPaths(instancerPath);
@@ -201,7 +210,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
 
         // Ensure there is no selection highlight mirror for the prim
         HdSceneIndexPrim selectionHighlightMirrorPrim = inspector.GetSceneIndex()->GetPrim(
-            getSelectionHighlightMirrorPathFromOriginal(instancerPrimPaths.front()));
+            getSelectionHighlightMirrorPathFromOriginal(instancerPrimPaths.front(), selectionHighlightMirrorTag));
         EXPECT_EQ(selectionHighlightMirrorPrim.primType, TfToken());
     };
 
@@ -234,6 +243,12 @@ TEST(PointInstancingWireframeHighlight, instance)
     auto fvpMergingSceneIndex = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
         findSceneIndexInTree(terminalSceneIndices.front(), isFvpMergingSceneIndexPredicate));
 
+    auto isFvpWireframeSelectionHighlightSceneIndex = SceneIndexDisplayNamePred(
+        "Flow Viewport Wireframe Selection Highlight Scene Index");
+    auto fvpWireframeSelectionHighlightSceneIndex = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(
+        findSceneIndexInTree(terminalSceneIndices.front(), isFvpWireframeSelectionHighlightSceneIndex));
+    std::string selectionHighlightMirrorTag = fvpWireframeSelectionHighlightSceneIndex->GetSelectionHighlightMirrorTag();
+
     auto ufeSelection = Ufe::GlobalSelection::get();
 
     HdxSelectionSceneIndexObserver selectionObserver;
@@ -249,7 +264,9 @@ TEST(PointInstancingWireframeHighlight, instance)
     // Initial state : ensure nothing is highlighted
     ufeSelection->clear();
 
-    auto selectionHighlightMirrors = inspector.FindPrims(findSelectionHighlightMirrorsPredicate);
+    auto selectionHighlightMirrors = inspector.FindPrims([selectionHighlightMirrorTag](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
+        return isSelectionHighlightMirror(primPath, selectionHighlightMirrorTag);
+    });
     EXPECT_TRUE(selectionHighlightMirrors.empty()); // No selection highlight mirrors
 
     auto meshPrims = inspector.FindPrims(findMeshPrimsPredicate);
@@ -273,10 +290,12 @@ TEST(PointInstancingWireframeHighlight, instance)
 
         // Validate scene structure
         EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
-        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath));
+        auto selectionHighlightPath = getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath, selectionHighlightMirrorTag);
+        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag);
 
         // Get the selection highlight instancer's mask
-        HdSceneIndexPrim instancerHighlightPrim = inspector.GetSceneIndex()->GetPrim(getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath));
+        HdSceneIndexPrim instancerHighlightPrim = inspector.GetSceneIndex()->GetPrim(
+            getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath, selectionHighlightMirrorTag));
         HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(instancerHighlightPrim.dataSource);
         ASSERT_TRUE(instancerTopology.IsDefined());
         ASSERT_NE(instancerTopology.GetMask(), nullptr);
@@ -304,6 +323,12 @@ TEST(PointInstancingWireframeHighlight, prototype)
     auto fvpMergingSceneIndex = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
         findSceneIndexInTree(terminalSceneIndices.front(), isFvpMergingSceneIndexPredicate));
 
+    auto isFvpWireframeSelectionHighlightSceneIndex = SceneIndexDisplayNamePred(
+        "Flow Viewport Wireframe Selection Highlight Scene Index");
+    auto fvpWireframeSelectionHighlightSceneIndex = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(
+        findSceneIndexInTree(terminalSceneIndices.front(), isFvpWireframeSelectionHighlightSceneIndex));
+    std::string selectionHighlightMirrorTag = fvpWireframeSelectionHighlightSceneIndex->GetSelectionHighlightMirrorTag();
+
     auto ufeSelection = Ufe::GlobalSelection::get();
 
     HdxSelectionSceneIndexObserver selectionObserver;
@@ -319,7 +344,9 @@ TEST(PointInstancingWireframeHighlight, prototype)
     // Initial state : ensure nothing is highlighted
     ufeSelection->clear();
 
-    auto selectionHighlightMirrors = inspector.FindPrims(findSelectionHighlightMirrorsPredicate);
+    auto selectionHighlightMirrors = inspector.FindPrims([selectionHighlightMirrorTag](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
+        return isSelectionHighlightMirror(primPath, selectionHighlightMirrorTag);
+    });
     EXPECT_TRUE(selectionHighlightMirrors.empty()); // No selection highlight mirrors
 
     auto meshPrims = inspector.FindPrims(findMeshPrimsPredicate);
