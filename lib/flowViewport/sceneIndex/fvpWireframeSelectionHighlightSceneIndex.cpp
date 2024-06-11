@@ -573,9 +573,10 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
         if (entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator())
             && _selectionHighlightMirrorsByInstancer.find(entry.primPath) != _selectionHighlightMirrorsByInstancer.end()) {
             // An instancer with a selection highlight was changed; rebuild its selection highlight.
-            // We do not need to check for instancedBy dirtying : if an instancedBy data source is dirtied,
-            // then either a new instancer was added, which will be handled in _PrimsAdded, either an
-            // existing instancer's instancerTopology data source was dirtied., which is handled here.
+            // We do not need to check for instancedBy dirtying. If an instancedBy data source is dirtied,
+            // then either :
+            // 1) A new instancer was added : this is handled in _PrimsAdded.
+            // 2) An existing instancer's instancerTopology data source was dirtied : this is handled here.
             instancerHighlightsToRebuild.push_back(entry.primPath);
         }
         
