@@ -39,8 +39,7 @@ TEST(TestHydraPrim, fromAppPath)
     const auto snSi = findSelectionSceneIndexInTree(siRoot);
     ASSERT_TRUE(snSi);
 
-    const auto primSelections = snSi->UfePathToPrimSelections(appPath);
-    ASSERT_EQ(primSelections.size(), 1u);
-    const auto sceneIndexPath = primSelections.front().primPath;
+    const auto sceneIndexPath = snSi->SceneIndexPath(appPath);
+
     ASSERT_FALSE(sceneIndexPath.IsEmpty());
 }

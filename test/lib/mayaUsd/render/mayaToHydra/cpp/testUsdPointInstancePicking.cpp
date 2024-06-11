@@ -51,9 +51,7 @@ TEST(TestUsdPointInstancePicking, pickPointInstance)
     const auto selectionSi = findSelectionSceneIndexInTree(siRoot);
     ASSERT_TRUE(selectionSi);
 
-    const auto primSelections = selectionSi->UfePathToPrimSelections(marker);
-    ASSERT_EQ(primSelections.size(), 1u);
-    const auto sceneIndexPath = primSelections.front().primPath;
+    const auto sceneIndexPath = selectionSi->SceneIndexPath(marker);
 
     ASSERT_FALSE(sceneIndexPath.IsEmpty());
 

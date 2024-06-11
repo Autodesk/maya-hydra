@@ -27,9 +27,7 @@ TEST(TestUsdAnim, timeVaryingTransform)
     const auto snSi = findSelectionSceneIndexInTree(siRoot);
     ASSERT_TRUE(snSi);
 
-    const auto primSelections = snSi->UfePathToPrimSelections(cubePath);
-    ASSERT_EQ(primSelections.size(), 1u);
-    const auto cubeSiPath = primSelections.front().primPath;
+    const auto cubeSiPath = snSi->SceneIndexPath(cubePath);
 
     ASSERT_FALSE(cubeSiPath.IsEmpty());
 
