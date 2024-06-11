@@ -89,6 +89,28 @@ private:
     }
 };
 
+HdDataSourceBaseHandle createInstanceSelectionDataSource(const SdfPath& instancerPrimPath, int instanceIndex)
+{
+    HdInstanceIndicesSchema::Builder instanceIndicesBuilder;
+    instanceIndicesBuilder.SetInstancer(HdRetainedTypedSampledDataSource<SdfPath>::New(instancerPrimPath));
+    instanceIndicesBuilder.SetInstanceIndices(HdRetainedTypedSampledDataSource<VtArray<int>>::New({instanceIndex}));
+    HdSelectionSchema::Builder selectionBuilder;
+    // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
+    // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
+    // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
+    selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
+    auto instanceIndicesDataSource = HdDataSourceBase::Cast(instanceIndicesBuilder.Build());
+    selectionBuilder.SetNestedInstanceIndices(HdRetainedSmallVectorDataSource::New(1, &instanceIndicesDataSource));
+    return HdDataSourceBase::Cast(selectionBuilder.Build());
+}
+
+HdDataSourceBaseHandle createFullPrimSelectionDataSource()
+{
+    HdSelectionSchema::Builder selectionBuilder;
+    selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
+    return HdDataSourceBase::Cast(selectionBuilder.Build());
+}
+
 /// \class PathInterfaceSceneIndex
 ///
 /// Implement the path interface for plugin scene indices.
@@ -131,39 +153,24 @@ public:
         //    then we are dealing with an instance selection.
         SdfPath primPath = _sceneIndexPathPrefix;
         TF_AXIOM(appPath.nbSegments() == 2);
+
+        bool lastComponentIsNumeric = false;
         const auto& secondSegment = appPath.getSegments()[1];
         for (const auto& pathComponent : secondSegment) {
             if (pathComponent.string().find_first_not_of(digits) == std::string::npos) {
                 // This should only occur on the last component, when we have an instance selection
-                TF_VERIFY(pathComponent == secondSegment.components().back());
+                if (TF_VERIFY(pathComponent == secondSegment.components().back())) {
+                    lastComponentIsNumeric = true;
+                }
                 continue;
             }
             primPath = primPath.AppendChild(TfToken(pathComponent.string()));
         }
 
         const auto lastComponentString = secondSegment.components().back().string();
-        bool lastComponentIsNumeric = lastComponentString.find_first_not_of(digits) == std::string::npos;
-        HdDataSourceBaseHandle selectionDataSource;
-        if (lastComponentIsNumeric) {
-            // Instance selection
-            HdInstanceIndicesSchema::Builder instanceIndicesBuilder;
-            instanceIndicesBuilder.SetInstancer(HdRetainedTypedSampledDataSource<SdfPath>::New(primPath));
-            instanceIndicesBuilder.SetInstanceIndices(HdRetainedTypedSampledDataSource<VtArray<int>>::New({std::stoi(lastComponentString)}));
-            HdSelectionSchema::Builder selectionBuilder;
-            // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
-            // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
-            // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
-            selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
-            auto instanceIndicesDataSource = HdDataSourceBase::Cast(instanceIndicesBuilder.Build());
-            selectionBuilder.SetNestedInstanceIndices(HdRetainedSmallVectorDataSource::New(1, &instanceIndicesDataSource));
-            selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
-        }
-        else {
-            // Full prim selection
-            HdSelectionSchema::Builder selectionBuilder;
-            selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
-            selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
-        }
+        HdDataSourceBaseHandle selectionDataSource = lastComponentIsNumeric 
+            ? createInstanceSelectionDataSource(primPath, std::stoi(lastComponentString))
+            : createFullPrimSelectionDataSource();
         Fvp::PrimSelections primSelections({{primPath, selectionDataSource}});
 
         // Propagate selection to propagated prototypes
@@ -262,7 +269,7 @@ private:
 };
 
 constexpr char kMayaUsdProxyShapeNode[] = { "mayaUsdProxyShape" };
-}
+} // namespace
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
