@@ -110,7 +110,7 @@ public:
             inputSceneIndex, sceneIndexPathPrefix, sceneIndexAppPath));
     }
 
-    Fvp::PrimSelections ConvertUfePathToHydraSelections(const Ufe::Path& appPath) const override
+    Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override
     {
         // We only handle USD objects, so if the UFE path is not a USD object,
         // early out with failure.

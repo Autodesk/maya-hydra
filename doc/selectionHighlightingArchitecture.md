@@ -86,7 +86,7 @@ provide the following services:
 
 This
 [selection change code](../lib/flowViewport/sceneIndex/fvpSelectionSceneIndex.cpp#L152-L173)
-shows the use of the *Path Interface*, through the *ConvertUfePathToHydraSelections()* method,
+shows the use of the *Path Interface*, through the *UfePathToPrimSelections()* method,
 called on the input scene index.  The path interface allows the selection scene
 index to translate selected application paths to selected Hydra scene index
 paths.
@@ -234,7 +234,7 @@ class Selection{
 }
 
 class PathInterface{
-+ConvertUfePathToHydraSelections(Ufe::Path) SdfPath
++UfePathToPrimSelections(Ufe::Path) SdfPath
 }
 
 class SelectionSceneIndex
