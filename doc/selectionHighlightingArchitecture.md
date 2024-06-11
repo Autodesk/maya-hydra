@@ -383,7 +383,35 @@ This nesting and composition of instancers is what leads to most of the complexi
 instancing selection highlighting. We can view such nesting and composition of instancers as 
 graphs, with the vertices being the instancer prims, and the edges being the paths contained 
 in the `instancerTopology/prototypes`, `instancedBy/paths` and `instancedBy/prototypeRoots` 
-data sources.
+data sources, as well as parent-child relationships.
+
+For example, given the following scene structure :
+```
+Root
+|__TopInstancer
+|  |__NestedInstancer
+|  |  |__LeafInstancer
+|  |     |__PrototypePrim
+|  |        |__PrototypeSubPrim
+|__AnotherPrototypePrim
+   |__ChildInstancer
+```
+
+```mermaid
+graph LR
+    TopInstancer -->|instancerTopology/prototypes| NestedInstancer
+    NestedInstancer -->|instancerTopology/prototypes| LeafInstancer
+    LeafInstancer -->|instancedBy/paths| NestedInstancer
+    NestedInstancer -->|instancedBy/paths| TopInstancer
+    LeafInstancer -->|instancerTopology/prototypes| PrototypePrim
+    PrototypePrim -->|instancedBy/paths| LeafInstancer
+    PrototypeSubPrim -->|instancedBy/prototypeRoots| PrototypePrim
+
+    TopInstancer -->|instancerTopology/prototypes| AnotherPrototypePrim
+    AnotherPrototypePrim -->|parent-child relationship| ChildInstancer
+    ChildInstancer -->|instancedBy/prototypeRoots| AnotherPrototypePrim
+    ChildInstancer -->|instancedBy/paths| TopInstancer
+```
 
 ### Implementation for point instancer and instance selection
 
