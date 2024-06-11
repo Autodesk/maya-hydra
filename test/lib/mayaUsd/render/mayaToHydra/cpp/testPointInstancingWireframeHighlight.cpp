@@ -188,22 +188,20 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     
     // Select point instancer ancestors
     auto testInstancerIndirectHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
-        // This is not an actual selection, we use it to get the Hydra path
-        auto instancerPrimSelections = fvpMergingSceneIndex->UfePathToPrimSelections(instancerPath);
-        ASSERT_EQ(instancerPrimSelections.size(), 1u);
+        auto instancerPrimPaths = fvpMergingSceneIndex->SceneIndexPaths(instancerPath);
+        ASSERT_EQ(instancerPrimPaths.size(), 1u);
     
         // Validate scene structure
         EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
-        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerPrimSelections.front().primPath));
+        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), getSelectionHighlightMirrorPathFromOriginal(instancerPrimPaths.front()));
     };
     auto testInstancerNoHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
-        // This is not an actual selection, we use it to get the Hydra path
-        auto instancerPrimSelections = fvpMergingSceneIndex->UfePathToPrimSelections(instancerPath);
-        ASSERT_EQ(instancerPrimSelections.size(), 1u);
+        auto instancerPrimPaths = fvpMergingSceneIndex->SceneIndexPaths(instancerPath);
+        ASSERT_EQ(instancerPrimPaths.size(), 1u);
 
         // Ensure there is no selection highlight mirror for the prim
         HdSceneIndexPrim selectionHighlightMirrorPrim = inspector.GetSceneIndex()->GetPrim(
-            getSelectionHighlightMirrorPathFromOriginal(instancerPrimSelections.front().primPath));
+            getSelectionHighlightMirrorPathFromOriginal(instancerPrimPaths.front()));
         EXPECT_EQ(selectionHighlightMirrorPrim.primType, TfToken());
     };
 

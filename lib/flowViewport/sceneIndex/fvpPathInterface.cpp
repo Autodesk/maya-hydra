@@ -34,6 +34,18 @@ SdfPath PathInterface::SceneIndexPath(const Ufe::Path& appPath) const
     return primSelections.empty() ? SdfPath() : primSelections.front().primPath;
 }
 
+SdfPathVector PathInterface::SceneIndexPaths(const Ufe::Path& appPath) const
+{
+    auto primSelections = UfePathToPrimSelections(appPath);
+
+    SdfPathVector outVector;
+    outVector.reserve(primSelections.size());
+    for (const auto& primSelection : primSelections) {
+        outVector.emplace_back(primSelection.primPath);
+    }
+    return outVector;
+}
+
 PrimPathsCountOutOfRangeException::PrimPathsCountOutOfRangeException(size_t min, size_t max, size_t actual)
     : std::out_of_range("Prim paths count out of range, expected [" 
         + std::to_string(min) + "," + std::to_string(max) 

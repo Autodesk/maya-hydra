@@ -67,6 +67,12 @@ public:
     FVP_API
     PXR_NS::SdfPath SceneIndexPath(const Ufe::Path& appPath) const;
 
+    //! Return the prim paths corresponding to the argument application path.
+    //! If no such paths exist, an empty SdfPathVector should be returned.
+    //! \return Scene index paths.
+    FVP_API
+    PXR_NS::SdfPathVector SceneIndexPaths(const Ufe::Path& appPath) const;
+
 protected:
 
     FVP_API
