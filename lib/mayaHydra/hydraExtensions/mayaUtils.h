@@ -18,7 +18,6 @@
 #define MAYAHYDRALIB_MAYA_UTILS_H
 
 #include <mayaHydraLib/api.h>
-#include <mayaHydraLib/mayaHydra.h>
 
 #include <maya/MApiNamespace.h>
 #include <maya/MFnDependencyNode.h>

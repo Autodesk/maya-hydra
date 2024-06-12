@@ -18,7 +18,6 @@
 
 //MayaHydra headers
 #include "mayaHydraLib/api.h"
-#include "mayaHydraLib/mayaHydra.h"
 
 // Flow Viewport Toolkit headers.
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
