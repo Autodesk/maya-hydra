@@ -18,7 +18,6 @@
 
 //Local headers
 #include <mayaHydraLib/api.h>
-#include <mayaHydraLib/mayaHydra.h>
 #include <mayaHydraLib/mhLeadObjectPathTracker.h>
 
 //Flow viewport headers

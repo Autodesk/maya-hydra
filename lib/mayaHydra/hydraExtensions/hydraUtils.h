@@ -19,7 +19,6 @@
 #define MAYAHYDRALIB_HYDRA_UTILS_H
 
 #include <mayaHydraLib/api.h>
-#include <mayaHydraLib/mayaHydra.h>
 
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/gf/vec3f.h>
