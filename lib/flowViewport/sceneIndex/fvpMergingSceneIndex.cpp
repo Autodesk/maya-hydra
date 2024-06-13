@@ -34,7 +34,7 @@ MergingSceneIndex::MergingSceneIndex() : HdMergingSceneIndex()
         .Msg("MergingSceneIndex::MergingSceneIndex() called.\n");
 }
 
-SdfPath MergingSceneIndex::SceneIndexPath(const Ufe::Path& appPath) const
+PrimSelections MergingSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) const
 {
     // FLOW_VIEWPORT_TODO  May be able to use a caching scheme for app path to
     // scene index path conversion using the run-time ID of the UFE path, as it
@@ -50,13 +50,13 @@ SdfPath MergingSceneIndex::SceneIndexPath(const Ufe::Path& appPath) const
         // scene we know whether it supports the PathInterface or not.
         auto pathInterface = dynamic_cast<const PathInterface*>(&*inputScene);
         if (pathInterface) {
-            auto sceneIndexPath = pathInterface->SceneIndexPath(appPath);
-            if (!sceneIndexPath.IsEmpty()) {
-                return sceneIndexPath;
+            auto primSelections = pathInterface->UfePathToPrimSelections(appPath);
+            if (!primSelections.empty()) {
+                return primSelections;
             }
         }
     }
-    return SdfPath();
+    return PrimSelections();
 }
 
 }

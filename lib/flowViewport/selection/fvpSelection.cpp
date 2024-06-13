@@ -38,31 +38,9 @@
 
 #include "flowViewport/selection/fvpSelection.h"
 
-#include "pxr/imaging/hd/selectionSchema.h"
 #include "pxr/imaging/hd/selectionsSchema.h"
 
 PXR_NAMESPACE_USING_DIRECTIVE
-
-namespace {
-
-using namespace Fvp;
-
-class SelectionSchemaFullySelectedBuilder {
-public:
-    SelectionSchemaFullySelectedBuilder() {
-        _builder.SetFullySelected(
-            HdRetainedTypedSampledDataSource<bool>::New(true));
-    }
-
-    HdContainerDataSourceHandle Build() { return _builder.Build(); }
-
-private:
-    HdSelectionSchema::Builder _builder;
-};
-
-SelectionSchemaFullySelectedBuilder selectionBuilder;
-
-}
 
 namespace FVP_NS_DEF {
 
@@ -75,13 +53,13 @@ Selection::_PrimSelectionState::GetVectorDataSource() const
 };
 
 bool
-Selection::Add(const PXR_NS::SdfPath& primPath)
+Selection::Add(const PrimSelection& primSelection)
 {
-    if (primPath.IsEmpty()) {
+    if (primSelection.primPath.IsEmpty()) {
         return false;
     }
 
-    _pathToState[primPath].selectionSources.push_back(selectionBuilder.Build());
+    _pathToState[primSelection.primPath].selectionSources.push_back(primSelection.selectionDataSource);
 
     return true;
 }
@@ -97,16 +75,15 @@ Selection::Clear()
     _pathToState.clear();
 }
 
-void Selection::Replace(const PXR_NS::SdfPathVector& selection)
+void Selection::Replace(const PrimSelections& primSelections)
 {
     Clear();
 
-    for (const auto& primPath : selection) {
-        if (primPath.IsEmpty()) {
+    for (const auto& primSelection : primSelections) {
+        if (primSelection.primPath.IsEmpty()) {
             continue;
         }
-        _pathToState[primPath].selectionSources.push_back(
-            selectionBuilder.Build());
+        _pathToState[primSelection.primPath].selectionSources.push_back(primSelection.selectionDataSource);
     }
 }
 
@@ -128,17 +105,31 @@ bool Selection::IsFullySelected(const SdfPath& primPath) const
     return _pathToState.find(primPath) != _pathToState.end();
 }
 
-bool Selection::HasFullySelectedAncestorInclusive(const SdfPath& primPath) const
+bool Selection::HasFullySelectedAncestorInclusive(const SdfPath& primPath, const SdfPath& topmostAncestor/* = SdfPath::AbsoluteRootPath()*/) const
 {
     // FLOW_VIEWPORT_TODO  Prefix tree would be much higher performance
     // than iterating over the whole selection, especially for a large
     // selection.  PPT, 13-Sep-2023.
     for(const auto& entry : _pathToState) {
-        if (primPath.HasPrefix(entry.first)) {
+        if (primPath.HasPrefix(entry.first) && entry.first.HasPrefix(topmostAncestor)) {
             return true;
         }
     }
     return false;
+}
+
+SdfPathVector Selection::FindFullySelectedAncestorsInclusive(const SdfPath& primPath, const SdfPath& topmostAncestor/* = SdfPath::AbsoluteRootPath()*/) const
+{
+    // FLOW_VIEWPORT_TODO  Prefix tree would be much higher performance
+    // than iterating over the whole selection, especially for a large
+    // selection.  PPT, 13-Sep-2023.
+    SdfPathVector fullySelectedAncestors;
+    for(const auto& entry : _pathToState) {
+        if (primPath.HasPrefix(entry.first) && entry.first.HasPrefix(topmostAncestor)) {
+            fullySelectedAncestors.push_back(entry.first);
+        }
+    }
+    return fullySelectedAncestors;
 }
 
 SdfPathVector Selection::GetFullySelectedPaths() const

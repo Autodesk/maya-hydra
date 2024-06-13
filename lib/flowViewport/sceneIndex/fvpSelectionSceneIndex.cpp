@@ -43,6 +43,7 @@
 #include "flowViewport/debugCodes.h"
 
 #include "pxr/imaging/hd/retainedDataSource.h"
+#include <pxr/imaging/hd/sceneIndexObserver.h>
 #include "pxr/imaging/hd/selectionSchema.h"
 #include "pxr/imaging/hd/selectionsSchema.h"
 
@@ -154,16 +155,21 @@ SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::AddSelection(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
 
-    // Call our input scene index to convert the application path to a scene
-    // index path.
-    auto sceneIndexPath = SceneIndexPath(appPath);
+    // Call our input scene index to convert the application path to scene index paths and selection data sources.
+    auto primSelections = UfePathToPrimSelections(appPath);
 
-    TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
-        .Msg("    Adding %s to the Hydra selection.\n", sceneIndexPath.GetText());
-
-    if (_selection->Add(sceneIndexPath)) {
-        _SendPrimsDirtied({{sceneIndexPath, selectionsSchemaDefaultLocator}});
+    for (const auto& primSelection : primSelections) {
+        TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
+            .Msg("    Adding %s to the Hydra selection.\n", primSelection.primPath.GetText());
     }
+
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
+    for (const auto& primSelection : primSelections) {
+        if (_selection->Add(primSelection)) {
+            dirtiedPrims.emplace_back(primSelection.primPath, selectionsSchemaDefaultLocator);
+        }
+    }
+    _SendPrimsDirtied(dirtiedPrims);
 }
 
 void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
@@ -171,13 +177,16 @@ void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::RemoveSelection(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
 
-    // Call our input scene index to convert the application path to a scene
-    // index path.
-    auto sceneIndexPath = SceneIndexPath(appPath);
+    // Call our input scene index to convert the application path to scene index paths and selection data sources.
+    auto primSelections = UfePathToPrimSelections(appPath);
 
-    if (_selection->Remove(sceneIndexPath)) {
-        _SendPrimsDirtied({{sceneIndexPath, selectionsSchemaDefaultLocator}});
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
+    for (const auto& primSelection : primSelections) {
+        if (_selection->Remove(primSelection.primPath)) {
+            dirtiedPrims.emplace_back(primSelection.primPath, selectionsSchemaDefaultLocator);
+        }
     }
+    _SendPrimsDirtied(dirtiedPrims);
 }
 
 void
@@ -219,21 +228,22 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
 
     _selection->Clear();
 
-    SdfPathVector sceneIndexSn;
+    PrimSelections sceneIndexSn;
     sceneIndexSn.reserve(selection.size());
     for (const auto& snItem : selection) {
-        // Call our input scene index to convert the application path to a scene
-        // index path.
-        auto sceneIndexPath = SceneIndexPath(snItem->path());
+        // Call our input scene index to convert the application path to scene index paths and selection data sources.
+        auto primSelections = UfePathToPrimSelections(snItem->path());
 
-        if (sceneIndexPath.IsEmpty()) {
+        if (primSelections.empty()) {
             continue;
         }
 
-        sceneIndexSn.emplace_back(sceneIndexPath);
-        TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
-            .Msg("    Adding %s to the Hydra selection.\n", sceneIndexPath.GetText());
-        entries.emplace_back(sceneIndexPath, selectionsSchemaDefaultLocator);
+        for (const auto& primSelection : primSelections) {
+            sceneIndexSn.emplace_back(primSelection);
+            TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
+                .Msg("    Adding %s to the Hydra selection.\n", primSelection.primPath.GetText());
+            entries.emplace_back(primSelection.primPath, selectionsSchemaDefaultLocator);
+        }
     }
 
     _selection->Replace(sceneIndexSn);
@@ -250,15 +260,15 @@ bool SelectionSceneIndex::HasFullySelectedAncestorInclusive(const SdfPath& primP
     return _selection->HasFullySelectedAncestorInclusive(primPath);
 }
 
-SdfPath SelectionSceneIndex::SceneIndexPath(const Ufe::Path& appPath) const
+PrimSelections SelectionSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) const
 {
-    auto sceneIndexPath = _inputSceneIndexPathInterface->SceneIndexPath(appPath);
+    auto primSelections = _inputSceneIndexPathInterface->UfePathToPrimSelections(appPath);
 
-    if (sceneIndexPath.IsEmpty()) {
-        TF_WARN("SelectionSceneIndex::SceneIndexPath(%s) returned an empty path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
+    if (primSelections.empty()) {
+        TF_WARN("SelectionSceneIndex::UfePathToPrimSelections(%s) returned no path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
     }
 
-    return sceneIndexPath;
+    return primSelections;
 }
 
 SdfPathVector SelectionSceneIndex::GetFullySelectedPaths() const

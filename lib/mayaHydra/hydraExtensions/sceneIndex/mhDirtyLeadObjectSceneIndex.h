@@ -60,7 +60,7 @@ public:
     ~MhDirtyLeadObjectSceneIndex() override = default;
 
     MAYAHYDRALIB_API
-    void dirtyLeadObjectRelatedPrims(const PXR_NS::SdfPath& previousLeadObjectPath, const PXR_NS::SdfPath& currentLeadObjectPath);
+    void dirtyLeadObjectRelatedPrims(const PXR_NS::SdfPathVector& previousLeadObjectPrimPaths, const PXR_NS::SdfPathVector& currentLeadObjectPrimPaths);
 
 protected:
     

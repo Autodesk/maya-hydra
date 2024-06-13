@@ -53,7 +53,7 @@ MhWireframeColorInterfaceImp::MhWireframeColorInterfaceImp(const std::shared_ptr
 MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getSelectionState(const PXR_NS::SdfPath& primPath)const
 {
     if (_selection->HasFullySelectedAncestorInclusive(primPath)){
-        return (_leadObjectPathTracker->isLeadObject(primPath)) ? kLead : kActive;
+        return (_leadObjectPathTracker->isLeadObjectPrim(primPath)) ? kLead : kActive;
     }
     
     return kDormant;

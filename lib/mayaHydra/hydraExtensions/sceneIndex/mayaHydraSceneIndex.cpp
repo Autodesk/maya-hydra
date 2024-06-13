@@ -45,9 +45,12 @@
 #include <ufe/pathString.h>
 
 #include <pxr/base/tf/envSetting.h>
+#include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/selectionSchema.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include "pxr/imaging/hd/dirtyBitsTranslator.h"
 #include <pxr/imaging/hd/rprim.h>
@@ -656,10 +659,10 @@ VtValue MayaHydraSceneIndex::CreateMayaDefaultMaterial()
     return VtValue(networkMap);
 }
 
-SdfPath MayaHydraSceneIndex::SceneIndexPath(const Ufe::Path& appPath) const
+Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) const
 {
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
-        .Msg("MayaHydraSceneIndex::SceneIndexPath(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
+        .Msg("MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
 
     // We only handle Maya objects, so if the UFE path is not a Maya object,
     // early out with failure.
@@ -670,7 +673,12 @@ SdfPath MayaHydraSceneIndex::SceneIndexPath(const Ufe::Path& appPath) const
     // Not the best implementation performance-wise, as ufeToDagPath converts
     // the UFE path to a string, then does a Dag path lookup with the string.
     constexpr bool isSprim = false; // Can't handle sprims as of 15-Aug-2023.
-    return GetPrimPath(UfeExtensions::ufeToDagPath(appPath), isSprim);
+    SdfPath primPath = GetPrimPath(UfeExtensions::ufeToDagPath(appPath), isSprim);
+    HdSelectionSchema::Builder selectionBuilder;
+    selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
+    auto selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
+    Fvp::PrimSelection primSelection {primPath, selectionDataSource};
+    return Fvp::PrimSelections({primSelection});
 }
 
 SdfPath MayaHydraSceneIndex::SetCameraViewport(const MDagPath& camPath, const GfVec4d& viewport)

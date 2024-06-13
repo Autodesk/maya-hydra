@@ -47,7 +47,7 @@ public:
     ~MhLeadObjectPathTracker();
 
     MAYAHYDRALIB_API
-    bool isLeadObject(const PXR_NS::SdfPath& primPath) const;
+    bool isLeadObjectPrim(const PXR_NS::SdfPath& primPath) const;
     
     MAYAHYDRALIB_API
     Ufe::Path getLeadObjectUfePath() const {return _leadObjectUfePath;}
@@ -56,11 +56,11 @@ public:
     void setLeadObjectUfePath(const Ufe::Path& newLeadObjectUfePath);
 
     MAYAHYDRALIB_API
-    void updatePrimPath(); // For example : this is called after the data producer scene indices are loaded
+    void updatePrimPaths(); // For example : this is called after the data producer scene indices are loaded
 
 private:
     const Fvp::PathInterface* const _pathInterface {nullptr};
-    PXR_NS::SdfPath                 _leadObjectPrimPath;
+    PXR_NS::SdfPathVector           _leadObjectPrimPaths;
     Ufe::Observer::Ptr              _ufeSelectionObserver {nullptr};
     Ufe::Path                       _leadObjectUfePath;
     const MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex;
