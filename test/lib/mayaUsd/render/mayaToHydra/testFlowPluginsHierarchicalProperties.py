@@ -17,6 +17,8 @@
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
+import testUtils
+import usdUtils
 
 class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -55,6 +57,23 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         cmds.parent(stagePath, stageParent)
         stageShape = stagePath.split('|')[-1]
         return stageParent, stageShape
+
+    def usdStageAnimatedPrimSetup(self):
+        usdScenePath = testUtils.getTestScene('testFlowPluginsHierarchicalProperties', 'animated_prim2.usda')
+        stagePath =  usdUtils.createStageFromFile(usdScenePath)
+        stageParent = cmds.group(empty=True)
+        cmds.parent(stagePath, stageParent)
+        stageShape = stagePath.split('|')[-1]
+        return stageParent, stageShape
+    
+    def assertSnapshots(self, referenceFile):
+        self.setHdStormRenderer()
+        self.assertSnapshotClose(referenceFile, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        self.setViewport2Renderer()
+        self.assertSnapshotSilhouetteClose(referenceFile, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        self.setHdStormRenderer()
 
     def test_Authoring_Locator(self):
         self.setBasicCam(10)
@@ -150,6 +169,34 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.currentTime(7)
         self.assertSnapshotClose("usdStage_playback_hidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+    def test_UsdStageAnimatedPrim(self):
+        # Setup
+        self.setBasicCam(15)
+
+        stageParent, stageShape = self.usdStageAnimatedPrimSetup()
+
+        cmds.currentTime(0)
+        self.keyframeAttribute(stageParent, "translateX", 0)
+
+        cmds.currentTime(4)
+        self.keyframeAttribute(stageParent, "translateX", 3)
+
+        def assertSnapshotsAtTime(time):
+            cmds.currentTime(time)
+            self.assertSnapshots("usdStageAnimatedPrim_t" + str(time) + ".png")
+
+        # Translation
+        assertSnapshotsAtTime(0)
+        assertSnapshotsAtTime(1)
+        assertSnapshotsAtTime(3)
+        assertSnapshotsAtTime(5)
+        assertSnapshotsAtTime(7)
+        assertSnapshotsAtTime(10)
+        assertSnapshotsAtTime(12)
+
+        # Visibility
+        assertSnapshotsAtTime(15)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

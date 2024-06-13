@@ -197,14 +197,20 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
 
     def assertSnapshotClose(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
                 warn=None, warnpercent=None, hardwarn=None, perceptual=False):
-        refImage = self.resolveRefImage(refImage, imageVersion)
-        super(MayaHydraBaseTestCase, self).assertSnapshotClose(refImage, fail, failpercent, hardfail,
+        refImagePath = self.resolveRefImage(refImage, imageVersion)
+        super(MayaHydraBaseTestCase, self).assertSnapshotClose(refImagePath, fail, failpercent, hardfail,
                             warn, warnpercent, hardwarn, perceptual)
 
     def assertSnapshotEqual(self, refImage, imageVersion=None):
         '''Use of this method is discouraged, as renders can vary slightly between renderer architectures.'''
-        refImage = self.resolveRefImage(refImage, imageVersion)
-        super(MayaHydraBaseTestCase, self).assertSnapshotEqual(refImage)
+        refImagePath = self.resolveRefImage(refImage, imageVersion)
+        super(MayaHydraBaseTestCase, self).assertSnapshotEqual(refImagePath)
+    
+    def assertSnapshotSilhouetteClose(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
+                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+        refImagePath = self.resolveRefImage(refImage, imageVersion)
+        super(MayaHydraBaseTestCase, self).assertSnapshotSilhouetteClose(refImagePath, fail, failpercent, hardfail,
+                            warn, warnpercent, hardwarn, perceptual)
 
     def runCppTest(self, testFilter):
         with PluginLoaded("mayaHydraCppTests"):

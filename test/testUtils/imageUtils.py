@@ -15,6 +15,7 @@
 #
 import os
 import maya.cmds as cmds
+import shutil
 import subprocess
 
 KNOWN_FORMATS = {
@@ -31,6 +32,9 @@ KNOWN_FORMATS = {
 }
 
 def snapshot(outputPath, width=400, height=None):
+    #Disable undo so that when we call undo it doesn't undo any operation from self.assertSnapshotClose
+    cmds.undoInfo(stateWithoutFlush=False)
+
     if height is None:
         height = width
 
@@ -56,6 +60,9 @@ def snapshot(outputPath, width=400, height=None):
                        widthHeight=(width, height), percent=100)
     finally:
         cmds.setAttr("defaultRenderGlobals.imageFormat", oldFormat)
+
+    #Enable undo again
+    cmds.undoInfo(stateWithoutFlush=True)
 
 def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail, 
                 warn, warnpercent, hardwarn, perceptual):    
@@ -115,8 +122,26 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail,
     proc = subprocess.run(cmd, shell=False, env=os.environ.copy(), stdout=subprocess.PIPE)
     return proc
 
+def convertToSilhouette(imagePath):
+    from PySide6.QtGui import QImage, QColor
+
+    image = QImage(imagePath)
+
+    for x in range(image.width()):
+        for y in range(image.height()):
+            if image.pixelColor(x, y).alpha() > 0:
+                image.setPixelColor(x, y, QColor(255, 255, 255, 255))
+
+    image.save(imagePath)
+
 class ImageDiffingTestCase:
     '''Mixin class for unit tests that require image comparison.'''
+
+    def getSnapshotDir(self):
+        snapshotDir = os.path.join(os.path.abspath('.'), self._testMethodName)
+        if not os.path.isdir(snapshotDir):
+            os.makedirs(snapshotDir)
+        return snapshotDir
 
     def assertImagesClose(self, imagePath1, imagePath2, fail, failpercent, hardfail=None,
                     warn=None, warnpercent=None, hardwarn=None, perceptual=False):
@@ -146,23 +171,33 @@ class ImageDiffingTestCase:
     def assertImagesEqual(self, imagePath1, imagePath2):
         self.assertImagesClose(imagePath1, imagePath2, fail=None, failpercent=None)
     
-    def assertSnapshotClose(self, refImage, fail, failpercent, hardfail=None, 
+    def assertSnapshotClose(self, refImagePath, fail, failpercent, hardfail=None, 
                 warn=None, warnpercent=None, hardwarn=None, perceptual=False):
-        #Disable undo so that when we call undo it doesn't undo any operation from self.assertSnapshotClose
-        cmds.undoInfo(stateWithoutFlush=False)
-        snapDir = os.path.join(os.path.abspath('.'), self._testMethodName)
-        if not os.path.isdir(snapDir):
-            os.makedirs(snapDir)
-        snapImage = os.path.join(snapDir, os.path.basename(refImage))
-        snapshot(snapImage)
-        #Enable undo again
-        cmds.undoInfo(stateWithoutFlush=True)
+        snapImagePath = os.path.join(self.getSnapshotDir(), os.path.basename(refImagePath))
+        snapshot(snapImagePath)
         
-        return self.assertImagesClose(refImage, snapImage, 
+        return self.assertImagesClose(refImagePath, snapImagePath, 
                fail=fail, failpercent=failpercent, hardfail=hardfail,
                warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, 
                perceptual=perceptual)
         
-    def assertSnapshotEqual(self, refImage):
+    def assertSnapshotEqual(self, refImagePath):
         '''Use of this method is discouraged, as renders can vary slightly between renderer architectures.'''
-        return self.assertSnapshotClose(refImage, fail=None, failpercent=None)
+        return self.assertSnapshotClose(refImagePath, fail=None, failpercent=None)
+
+    def assertSnapshotSilhouetteClose(self, refImagePath, fail, failpercent, hardfail=None, 
+                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+        refImageName, refImageExtension = os.path.splitext(os.path.basename(refImagePath))
+
+        refSilhouetteImagePath = os.path.join(self.getSnapshotDir(), refImageName + "_ReferenceSilhouette" + refImageExtension)
+        shutil.copy(refImagePath, refSilhouetteImagePath)
+        convertToSilhouette(refSilhouetteImagePath)        
+
+        snapSilhouetteImagePath = os.path.join(self.getSnapshotDir(), refImageName + "_SnapshotSilhouette" + refImageExtension)
+        snapshot(snapSilhouetteImagePath)
+        convertToSilhouette(snapSilhouetteImagePath)
+
+        return self.assertImagesClose(refSilhouetteImagePath, snapSilhouetteImagePath, 
+               fail=fail, failpercent=failpercent, hardfail=hardfail,
+               warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, 
+               perceptual=perceptual)
