@@ -66,7 +66,7 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         stageShape = stagePath.split('|')[-1]
         return stageParent, stageShape
     
-    def assertSnapshots(self, referenceFile):
+    def assertSnapshotAndCompareVp2(self, referenceFile):
         self.setHdStormRenderer()
         self.assertSnapshotClose(referenceFile, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
@@ -107,23 +107,23 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         stageParent, stageShape = self.usdStageSetup()
 
         # Hide/unhide parent
-        self.assertSnapshotClose("usdStage_visibility_on.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotAndCompareVp2("usdStage_visibility_on.png")
         cmds.setAttr(stageParent + ".visibility", False)
-        self.assertSnapshotClose("usdStage_visibility_off.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotAndCompareVp2("usdStage_visibility_off.png")
         cmds.setAttr(stageParent + ".visibility", True)
-        self.assertSnapshotClose("usdStage_visibility_on.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotAndCompareVp2("usdStage_visibility_on.png")
         # Hide/unhide the shape directly
         cmds.setAttr(stageShape + ".visibility", False)
-        self.assertSnapshotClose("usdStage_visibility_off.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotAndCompareVp2("usdStage_visibility_off.png")
         cmds.setAttr(stageShape + ".visibility", True)
-        self.assertSnapshotClose("usdStage_visibility_on.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotAndCompareVp2("usdStage_visibility_on.png")
 
         # Change a parent transform
         cmds.xform(stageParent, translation=[1,-2,3], rotation=[5,-10,15], scale=[1,-2,3])
-        self.assertSnapshotClose("usdStage_parentTransformChanged.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotAndCompareVp2("usdStage_parentTransformChanged.png")
         # Change the shape's transform directly
         cmds.xform(cmds.listRelatives(stageShape, parent=True)[0], translation=[-3,2,-1], rotation=[-15,10,-5], scale=[-2.5, 2.0, -1.5])
-        self.assertSnapshotClose("usdStage_shapeTransformChanged.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotAndCompareVp2("usdStage_shapeTransformChanged.png")
 
     def test_Playback_Locator(self):
         self.setBasicCam(10)
@@ -162,13 +162,13 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         self.keyframeAttribute(stageParent, "translateX", 15)
 
         cmds.currentTime(0)
-        self.assertSnapshotClose("usdStage_playback_initial.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotAndCompareVp2("usdStage_playback_initial.png")
 
         cmds.currentTime(2)
-        self.assertSnapshotClose("usdStage_playback_translated.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotAndCompareVp2("usdStage_playback_translated.png")
 
         cmds.currentTime(7)
-        self.assertSnapshotClose("usdStage_playback_hidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotAndCompareVp2("usdStage_playback_hidden.png")
 
     def test_UsdStageAnimatedPrim(self):
         # Setup
@@ -184,7 +184,7 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
 
         def assertSnapshotsAtTime(time):
             cmds.currentTime(time)
-            self.assertSnapshots("usdStageAnimatedPrim_t" + str(time) + ".png")
+            self.assertSnapshotAndCompareVp2("usdStageAnimatedPrim_t" + str(time) + ".png")
 
         # Translation
         assertSnapshotsAtTime(0)
