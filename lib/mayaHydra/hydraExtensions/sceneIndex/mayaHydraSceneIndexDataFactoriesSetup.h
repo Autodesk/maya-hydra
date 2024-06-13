@@ -18,7 +18,6 @@
 
 //Local headers
 #include "mayaHydraLib/api.h"
-#include "mayaHydraLib/mayaHydra.h"
 
 namespace MAYAHYDRA_NS_DEF{
 

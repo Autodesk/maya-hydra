@@ -202,7 +202,7 @@ public:
 
     void SetDefaultMaterial(bool useDefMaterial);
 
-    SdfPath SceneIndexPath(const Ufe::Path& appPath) const override;
+    Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override;
 
     // Common function to return templated sample types
     template <typename T, typename Getter>

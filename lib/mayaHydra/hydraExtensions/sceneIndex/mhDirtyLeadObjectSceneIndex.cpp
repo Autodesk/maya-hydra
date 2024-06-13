@@ -40,15 +40,15 @@ namespace {
                                                          };
 }
 
-void MhDirtyLeadObjectSceneIndex::dirtyLeadObjectRelatedPrims(const SdfPath& previousLeadObjectPath, const SdfPath& currentLeadObjectPath)
+void MhDirtyLeadObjectSceneIndex::dirtyLeadObjectRelatedPrims(const SdfPathVector& previousLeadObjectPrimPaths, const SdfPathVector& currentLeadObjectPrimPaths)
 {
     // Each SdfPath could be a hierarchy path, so we need to get the children prim paths
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrimEntries;
-    if (! previousLeadObjectPath.IsEmpty()) {
-        _AddDirtyPathRecursively(previousLeadObjectPath, dirtiedPrimEntries);
+    for (const auto& previousLeadObjectPrimPath : previousLeadObjectPrimPaths) {
+        _AddDirtyPathRecursively(previousLeadObjectPrimPath, dirtiedPrimEntries);
     }
-    if (!currentLeadObjectPath.IsEmpty()) {
-        _AddDirtyPathRecursively(currentLeadObjectPath, dirtiedPrimEntries);
+    for (const auto& currentLeadObjectPrimPath : currentLeadObjectPrimPaths) {
+        _AddDirtyPathRecursively(currentLeadObjectPrimPath, dirtiedPrimEntries);
     }
 
     if (! dirtiedPrimEntries.empty()){

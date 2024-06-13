@@ -19,7 +19,6 @@
 #if defined(MAYAHYDRALIB_MAYAUSDAPI_ENABLED)
 //MayaHydra headers
 #include "mayaHydraLib/api.h"
-#include "mayaHydraLib/mayaHydra.h"
 
 //MayaUsdAPI headers
 #include <mayaUsdAPI/proxyStage.h>

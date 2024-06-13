@@ -19,7 +19,6 @@
 #define MAYAHYDRALIB_MIXED_UTILS_H
 
 #include <mayaHydraLib/api.h>
-#include <mayaHydraLib/mayaHydra.h>
 
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/tf/token.h>

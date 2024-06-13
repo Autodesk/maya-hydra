@@ -18,6 +18,7 @@
 
 #include "flowViewport/api.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
+#include "flowViewport/sceneIndex/fvpPathInterface.h"
 
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/usd/sdf/path.h>
@@ -44,7 +45,7 @@ public:
 
     // Add primPath to selection and return true if the argument is not empty.
     FVP_API
-    bool Add(const PXR_NS::SdfPath& primPath);
+    bool Add(const PrimSelection& primSelection);
 
     // Returns true if the removal was successful, false otherwise.
     FVP_API
@@ -53,7 +54,7 @@ public:
     // Replace the selection with the contents of the argument primPath vector.
     // Any empty primPath in the argument will be skipped.
     FVP_API
-    void Replace(const PXR_NS::SdfPathVector& selection);
+    void Replace(const PrimSelections& primSelections);
 
     // Remove all entries from the selection.
     FVP_API
@@ -70,9 +71,17 @@ public:
     bool IsFullySelected(const PXR_NS::SdfPath& primPath) const;
 
     // Returns true if the argument is itself selected, or any of its ancestors
-    // is selected.
+    // is selected, up to the specified topmost ancestor. By default, the topmost
+    // ancestor is set to the absolute root path, so that all ancestors are considered.
     FVP_API
-    bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath) const;
+    bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath, const PXR_NS::SdfPath& topmostAncestor = PXR_NS::SdfPath::AbsoluteRootPath()) const;
+
+    // Returns the paths to all fully selected ancestors of the prim up to the specified
+    // topmost ancestor. If the prim is itself selected, its path will also be returned.
+    // By default, the topmost ancestor is set to the absolute root path, so that all 
+    // ancestors are considered.
+    FVP_API
+    PXR_NS::SdfPathVector FindFullySelectedAncestorsInclusive(const PXR_NS::SdfPath& primPath, const PXR_NS::SdfPath& topmostAncestor = PXR_NS::SdfPath::AbsoluteRootPath()) const;
 
     FVP_API
     PXR_NS::SdfPathVector GetFullySelectedPaths() const;

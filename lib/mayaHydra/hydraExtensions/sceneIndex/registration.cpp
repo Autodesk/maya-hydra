@@ -26,11 +26,15 @@
 #endif
 
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
+#include <pxr/imaging/hd/instanceIndicesSchema.h>
+#include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/sceneIndexPlugin.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
+#include <pxr/imaging/hd/selectionSchema.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/renderDelegate.h>
-#include <pxr/imaging/hd/prefixingSceneIndex.h>
+#include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
 #include <pxr/usd/sdf/path.h>
 
 #if defined(MAYAHYDRALIB_MAYAUSDAPI_ENABLED)
@@ -53,6 +57,8 @@
 #include <ufe/scene.h>
 
 namespace {
+
+const std::string digits = "0123456789";
 
 // Pixar macros won't work without PXR_NS.
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -83,6 +89,28 @@ private:
     }
 };
 
+HdDataSourceBaseHandle createInstanceSelectionDataSource(const SdfPath& instancerPrimPath, int instanceIndex)
+{
+    HdInstanceIndicesSchema::Builder instanceIndicesBuilder;
+    instanceIndicesBuilder.SetInstancer(HdRetainedTypedSampledDataSource<SdfPath>::New(instancerPrimPath));
+    instanceIndicesBuilder.SetInstanceIndices(HdRetainedTypedSampledDataSource<VtArray<int>>::New({instanceIndex}));
+    HdSelectionSchema::Builder selectionBuilder;
+    // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
+    // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
+    // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
+    selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
+    auto instanceIndicesDataSource = HdDataSourceBase::Cast(instanceIndicesBuilder.Build());
+    selectionBuilder.SetNestedInstanceIndices(HdRetainedSmallVectorDataSource::New(1, &instanceIndicesDataSource));
+    return HdDataSourceBase::Cast(selectionBuilder.Build());
+}
+
+HdDataSourceBaseHandle createFullPrimSelectionDataSource()
+{
+    HdSelectionSchema::Builder selectionBuilder;
+    selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
+    return HdDataSourceBase::Cast(selectionBuilder.Build());
+}
+
 /// \class PathInterfaceSceneIndex
 ///
 /// Implement the path interface for plugin scene indices.
@@ -104,7 +132,7 @@ public:
             inputSceneIndex, sceneIndexPathPrefix, sceneIndexAppPath));
     }
 
-    SdfPath SceneIndexPath(const Ufe::Path& appPath) const override
+    Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override
     {
         // We only handle USD objects, so if the UFE path is not a USD object,
         // early out with failure.
@@ -121,15 +149,62 @@ public:
         // The scene index path is composed of 2 parts, in order:
         // 1) The scene index path prefix, which is fixed on construction.
         // 2) The second segment of the UFE path, with each UFE path component
-        //    becoming an SdfPath component.
-        SdfPath sceneIndexPath = _sceneIndexPathPrefix;
+        //    becoming an SdfPath component. If the last component is a number,
+        //    then we are dealing with an instance selection.
+        SdfPath primPath = _sceneIndexPathPrefix;
         TF_AXIOM(appPath.nbSegments() == 2);
+
+        bool lastComponentIsNumeric = false;
         const auto& secondSegment = appPath.getSegments()[1];
         for (const auto& pathComponent : secondSegment) {
-            sceneIndexPath = sceneIndexPath.AppendChild(
-                TfToken(pathComponent.string()));
+            if (pathComponent.string().find_first_not_of(digits) == std::string::npos) {
+                // This should only occur on the last component, when we have an instance selection
+                if (TF_VERIFY(pathComponent == secondSegment.components().back())) {
+                    lastComponentIsNumeric = true;
+                }
+                continue;
+            }
+            primPath = primPath.AppendChild(TfToken(pathComponent.string()));
         }
-        return sceneIndexPath;
+
+        const auto lastComponentString = secondSegment.components().back().string();
+        HdDataSourceBaseHandle selectionDataSource = lastComponentIsNumeric 
+            ? createInstanceSelectionDataSource(primPath, std::stoi(lastComponentString))
+            : createFullPrimSelectionDataSource();
+        Fvp::PrimSelections primSelections({{primPath, selectionDataSource}});
+
+        // Propagate selection to propagated prototypes
+        auto ancestorsRange = primPath.GetAncestorsRange();
+        for (const auto& ancestorPath : ancestorsRange) {
+            HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(ancestorPath);
+            UsdImagingUsdPrimInfoSchema usdPrimInfo = UsdImagingUsdPrimInfoSchema::GetFromParent(currPrim.dataSource);
+            if (!usdPrimInfo.IsDefined()) {
+                continue;
+            }
+            auto propagatedProtosDataSource = usdPrimInfo.GetPiPropagatedPrototypes();
+            if (!propagatedProtosDataSource) {
+                continue;
+            }
+            auto propagatedProtoNames = propagatedProtosDataSource->GetNames();
+            for (const auto& propagatedProtoName : propagatedProtoNames) {
+                auto propagatedProtoPathDataSource = HdTypedSampledDataSource<SdfPath>::Cast(propagatedProtosDataSource->Get(propagatedProtoName));
+                if (propagatedProtoPathDataSource) {
+                    SdfPath propagatedProtoPath = propagatedProtoPathDataSource->GetTypedValue(0);
+                    SdfPath propagatedPrimPath = primPath.ReplacePrefix(ancestorPath, propagatedProtoPath);
+                    HdSceneIndexPrim propagatedPrim = GetInputSceneIndex()->GetPrim(propagatedPrimPath);
+                    // This check controls which types of prims have their selection data source propagated. Currently we skip
+                    // instancers so that selecting an instancer A that is both drawing geometry but also prototyped and propagated
+                    // for another instancer B will only mark the geometry-drawing instancer A as selected. This can be changed.
+                    // For now (2024/05/28), this only affects selection highlighting.
+                    if (propagatedPrim.primType != HdPrimTypeTokens->instancer) {
+                        primSelections.push_back({propagatedPrimPath, selectionDataSource});
+                    }
+                }
+            }
+            break; // We found propagated prototypes, exit now to avoid propagating selection to prototypes of other parents 
+        }
+
+        return primSelections;
     }
 
     const Ufe::Path& GetSceneIndexAppPath() const { return _sceneIndexAppPath; }
@@ -194,7 +269,7 @@ private:
 };
 
 constexpr char kMayaUsdProxyShapeNode[] = { "mayaUsdProxyShape" };
-}
+} // namespace
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.

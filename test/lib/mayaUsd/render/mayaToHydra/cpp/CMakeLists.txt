@@ -40,6 +40,7 @@ target_sources(${TARGET_NAME}
         testUsdPointInstancePicking.cpp
         testUsdPicking.cpp
         testNurbsSurfaces.cpp
+        testPointInstancingWireframeHighlight.cpp
 )
 
 # -----------------------------------------------------------------------------

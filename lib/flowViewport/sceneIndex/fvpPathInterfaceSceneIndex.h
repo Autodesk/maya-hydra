@@ -27,7 +27,7 @@ namespace FVP_NS_DEF {
 ///
 /// A simple pass-through filtering scene index that adds support for the path
 /// interface.  Derived classes need only implement the 
-/// PathInterface::SceneIndexPath() virtual.
+/// PathInterface::UfePathToPrimSelections() virtual.
 ///
 class PathInterfaceSceneIndexBase 
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
