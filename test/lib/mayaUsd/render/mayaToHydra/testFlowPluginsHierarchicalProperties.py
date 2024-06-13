@@ -63,8 +63,8 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         stagePath =  usdUtils.createStageFromFile(usdScenePath)
         stageParent = cmds.group(empty=True)
         cmds.parent(stagePath, stageParent)
-        stageShape = stagePath.split('|')[-1]
-        return stageParent, stageShape
+        stageTransform = stagePath.split('|')[1]
+        return stageParent, stageTransform
     
     def assertSnapshotAndCompareVp2(self, referenceFile):
         self.setHdStormRenderer()
@@ -172,15 +172,17 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
 
     def test_UsdStageAnimatedPrim(self):
         # Setup
-        self.setBasicCam(15)
+        self.setBasicCam(10)
 
-        stageParent, stageShape = self.usdStageAnimatedPrimSetup()
+        stageParent, stageTransform = self.usdStageAnimatedPrimSetup()
 
         cmds.currentTime(0)
-        self.keyframeAttribute(stageParent, "translateX", 0)
+        self.keyframeAttribute(stageParent, "translateY", 0)
+        self.keyframeAttribute(stageTransform, "translateZ", 0)
 
         cmds.currentTime(4)
-        self.keyframeAttribute(stageParent, "translateX", 3)
+        self.keyframeAttribute(stageParent, "translateY", 5)
+        self.keyframeAttribute(stageTransform, "translateZ", 5)
 
         def assertSnapshotsAtTime(time):
             cmds.currentTime(time)
