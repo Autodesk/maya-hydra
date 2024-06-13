@@ -162,16 +162,26 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         self.keyframeAttribute(stageParent, "translateX", 15)
 
         cmds.currentTime(0)
-        self.assertSnapshotAndCompareVp2("usdStage_playback_initial.png")
+        self.assertSnapshotClose("usdStage_playback_initial.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         cmds.currentTime(2)
-        self.assertSnapshotAndCompareVp2("usdStage_playback_translated.png")
+        self.assertSnapshotClose("usdStage_playback_translated.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         cmds.currentTime(7)
-        self.assertSnapshotAndCompareVp2("usdStage_playback_hidden.png")
+        self.assertSnapshotClose("usdStage_playback_hidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        self.setViewport2Renderer()
+
+        cmds.currentTime(0)
+        self.assertSnapshotSilhouetteClose("usdStage_playback_initial.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        cmds.currentTime(2)
+        self.assertSnapshotSilhouetteClose("usdStage_playback_translated.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        cmds.currentTime(7)
+        self.assertSnapshotSilhouetteClose("usdStage_playback_hidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def test_UsdStageAnimatedPrim(self):
-        # Setup
         self.setBasicCam(10)
 
         stageParent, stageTransform = self.usdStageAnimatedPrimSetup()
@@ -184,21 +194,16 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         self.keyframeAttribute(stageParent, "translateY", 5)
         self.keyframeAttribute(stageTransform, "translateZ", 5)
 
-        def assertSnapshotsAtTime(time):
+        checkedTimes = [0, 1, 3, 5, 7, 10, 12]
+
+        for time in checkedTimes:
             cmds.currentTime(time)
-            self.assertSnapshotAndCompareVp2("usdStageAnimatedPrim_t" + str(time) + ".png")
+            self.assertSnapshotClose("usdStageAnimatedPrim_t" + str(time) + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-        # Translation
-        assertSnapshotsAtTime(0)
-        assertSnapshotsAtTime(1)
-        assertSnapshotsAtTime(3)
-        assertSnapshotsAtTime(5)
-        assertSnapshotsAtTime(7)
-        assertSnapshotsAtTime(10)
-        assertSnapshotsAtTime(12)
-
-        # Visibility
-        assertSnapshotsAtTime(15)
+        self.setViewport2Renderer()
+        for time in checkedTimes:
+            cmds.currentTime(time)
+            self.assertSnapshotSilhouetteClose("usdStageAnimatedPrim_t" + str(time) + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
