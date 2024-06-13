@@ -123,6 +123,17 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail,
     return proc
 
 def convertToSilhouette(imagePath):
+    # 2024-06-13 : Tried to use oiiotool instead of PySide for this to be more efficient,
+    # however it did not work under certain circumstances, for example when trying to
+    # run it on the copied reference image assertSnapshotSilhouetteClose. It did work on
+    # captured snapshots for some reason. The error oiiotool gave out was something like
+    # "Could not open file someFileName.[randomAlphaNumericCharacters].temp.[png|jpg]".
+    # The temp file mentioned is itself being created by OIIO. Attaching a debugger is not 
+    # straightforward at least on Windows, as the process is started by the tests, and 
+    # trying to run oiiotool independently did not work due to not finding boost libs.
+    # Decided not to investigate further for now, as this is an implementation detail
+    # that can always be swapped out later if we need the performance, and it is not
+    # going to be used in most cases.
     from PySide6.QtGui import QImage, QColor
 
     image = QImage(imagePath)
