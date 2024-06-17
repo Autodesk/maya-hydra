@@ -42,7 +42,7 @@ PathMapperRegistry& PathMapperRegistry::Instance()
 
 bool PathMapperRegistry::Register(const Ufe::Path& prefix, const PathMapperConstPtr& pathMapper)
 {
-    if (mappers.containsDescendantInclusive(prefix) || 
+    if (prefix.empty() || mappers.containsDescendantInclusive(prefix) || 
         mappers.containsAncestor(prefix)) {
         return false;
     }
