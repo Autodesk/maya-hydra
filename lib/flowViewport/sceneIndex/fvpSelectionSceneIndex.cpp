@@ -275,8 +275,7 @@ PrimSelections SelectionSceneIndex::UfePathToPrimSelections(const Ufe::Path& app
             TF_WARN("SelectionSceneIndex::UfePathToPrimSelections(%s) returned no path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
         }
         else {
-            // FIXME Adjust to new interface.  PPT 14-Jun-2024.
-            // sceneIndexPath = mapper->SceneIndexPath(appPath);
+            primSelections = mapper->UfePathToPrimSelections(appPath);
         }
     }
 

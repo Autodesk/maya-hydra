@@ -18,6 +18,7 @@
 
 #include <flowViewport/api.h>
 #include <flowViewport/selection/fvpPathMapperFwd.h>
+#include <flowViewport/sceneIndex/fvpPathInterface.h>
 
 #include <pxr/usd/sdf/path.h>
 
@@ -37,12 +38,12 @@ namespace FVP_NS_DEF {
 /// path is converted to a path to a Hydra scene index prim that must be
 /// highlighted.
 
-class PathMapper
+class PathMapper : public PathInterface
 {
-public:
+protected:
 
     FVP_API
-    virtual PXR_NS::SdfPath SceneIndexPath(const Ufe::Path& appPath) const = 0;
+    PathMapper() = default;
 };
 
 }

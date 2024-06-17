@@ -44,7 +44,7 @@ public:
     );
 
     FVP_API
-    PXR_NS::SdfPath SceneIndexPath(const Ufe::Path& appPath) const override;
+    PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override;
 
 private:
 

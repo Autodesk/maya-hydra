@@ -15,6 +15,7 @@
 //
 
 #include <flowViewport/selection/fvpPrefixPathMapper.h>
+#include <flowViewport/fvpUtils.h>
 
 // Need Pixar namespace for TF_ diagnostics macros.
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -29,7 +30,7 @@ PrefixPathMapper::PrefixPathMapper(
     _sceneIndexPathPrefix(sceneIndexPathPrefix)
 {}
 
-PXR_NS::SdfPath PrefixPathMapper::SceneIndexPath(const Ufe::Path& appPath) const
+PrimSelections PrefixPathMapper::UfePathToPrimSelections(const Ufe::Path& appPath) const
 {
     // We only handle scene items from our assigned run time ID.
     if (appPath.runTimeId() != _rtid) {
@@ -46,14 +47,16 @@ PXR_NS::SdfPath PrefixPathMapper::SceneIndexPath(const Ufe::Path& appPath) const
     // 1) The scene index path prefix, which is fixed on construction.
     // 2) The second segment of the UFE path, with each UFE path component
     //    becoming an SdfPath component.
-    PXR_NS::SdfPath sceneIndexPath = _sceneIndexPathPrefix;
+    PXR_NS::SdfPath primPath = _sceneIndexPathPrefix;
     TF_AXIOM(appPath.nbSegments() == 2);
     const auto& secondSegment = appPath.getSegments()[1];
     for (const auto& pathComponent : secondSegment) {
-        sceneIndexPath = sceneIndexPath.AppendChild(
-            TfToken(pathComponent.string()));
+        primPath = primPath.AppendChild(TfToken(pathComponent.string()));
     }
-    return sceneIndexPath;
+
+    auto selectionDataSource = createFullySelectedDataSource();
+
+    return PrimSelections{{primPath, selectionDataSource}};
 }
 
 }

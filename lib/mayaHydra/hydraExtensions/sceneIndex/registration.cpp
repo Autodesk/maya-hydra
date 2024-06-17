@@ -21,9 +21,7 @@
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpPathInterfaceSceneIndex.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
-#ifdef CODE_COVERAGE_WORKAROUND
 #include <flowViewport/fvpUtils.h>
-#endif
 
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
@@ -104,13 +102,6 @@ HdDataSourceBaseHandle createInstanceSelectionDataSource(const SdfPath& instance
     return HdDataSourceBase::Cast(selectionBuilder.Build());
 }
 
-HdDataSourceBaseHandle createFullPrimSelectionDataSource()
-{
-    HdSelectionSchema::Builder selectionBuilder;
-    selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
-    return HdDataSourceBase::Cast(selectionBuilder.Build());
-}
-
 /// \class PathInterfaceSceneIndex
 ///
 /// Implement the path interface for plugin scene indices.
@@ -170,7 +161,7 @@ public:
         const auto lastComponentString = secondSegment.components().back().string();
         HdDataSourceBaseHandle selectionDataSource = lastComponentIsNumeric 
             ? createInstanceSelectionDataSource(primPath, std::stoi(lastComponentString))
-            : createFullPrimSelectionDataSource();
+            : Fvp::createFullySelectedDataSource();
         Fvp::PrimSelections primSelections({{primPath, selectionDataSource}});
 
         // Propagate selection to propagated prototypes
