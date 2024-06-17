@@ -46,6 +46,11 @@ PickHandlerRegistry& PickHandlerRegistry::Instance()
 
 bool PickHandlerRegistry::Register(const SdfPath& prefix, const PickHandlerConstPtr& pickHandler)
 {
+    // Can't register an empty path.
+    if (prefix.IsEmpty()) {
+        return false;
+    }
+
     // No entries yet?  Add.
     if (pickHandlers.empty()) {
         pickHandlers.emplace(prefix, pickHandler);
