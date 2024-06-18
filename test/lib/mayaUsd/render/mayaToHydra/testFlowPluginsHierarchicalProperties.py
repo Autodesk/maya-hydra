@@ -25,8 +25,8 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
     _requiredPlugins = ['mayaHydraFlowViewportAPILocator']
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.1
-    IMAGE_DIFF_FAIL_PERCENT = 2
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.05
+    IMAGE_DIFF_FAIL_PERCENT = 1
 
     def keyframeAttribute(self, object, attribute, value):
         cmds.setAttr(object + "." + attribute, value)
