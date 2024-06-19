@@ -85,9 +85,6 @@ public:
     const SdfPath&                  GetPrefix()const{return _prefix;}
     const std::string&              GetRendererNames() const {return _rendererNames;}
 
-    /// Provide the node name from the DCC to be overriden in a DCC specific subclass
-    virtual std::string GetDCCNodeName() const {return "";}
-
     virtual bool UpdateVisibility() = 0;
     virtual bool UpdateTransform() = 0;
 

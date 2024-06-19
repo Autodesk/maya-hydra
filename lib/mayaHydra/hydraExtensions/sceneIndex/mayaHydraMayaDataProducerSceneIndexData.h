@@ -47,9 +47,6 @@ public:
     ///Destructor
     ~MayaDataProducerSceneIndexData() override = default;
     
-    /// Provide the node name from maya
-    std::string GetDCCNodeName() const override;
-
     bool UpdateVisibility() override;
     bool UpdateTransform() override;
 

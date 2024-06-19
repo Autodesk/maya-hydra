@@ -58,16 +58,6 @@ MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(FVP_NS_DEF::DataP
     _CreateSceneIndexChainForUsdStageSceneIndex(params);
 }
 
-std::string MayaDataProducerSceneIndexData::GetDCCNodeName() const
-{
-    if (!_path.has_value()) {
-        return {};
-    }
-    std::string nodeName = _path.value().back().string();
-    MAYAHYDRA_NS_DEF::SanitizeNameForSdfPath(nodeName);
-    return nodeName;
-}
-
 void MayaDataProducerSceneIndexData::SetupUfeObservation(void* dccNode)
 {
     // If the data producer is based on a scene item, monitor changes to it to reflect them on the
@@ -142,7 +132,7 @@ void MayaDataProducerSceneIndexData::UfeSceneChangesHandler::operator()(const Uf
 {
     // We're processing UFE notifications, which implies that a path must be in use.
     TF_AXIOM(_dataProducer._path.has_value());
-    
+
     const Ufe::SceneChanged& sceneChangedNotif = notification.staticCast<Ufe::SceneChanged>();
     if (_dataProducer._path.value().startsWith(sceneChangedNotif.changedPath())) {
         handleSceneChanged(sceneChangedNotif);
