@@ -987,10 +987,8 @@ MStatus MtohRenderOverride::Render(
         }
 
         // Update plugin data producers
-        auto& viewportData = Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetAllViewportInfoAndData();
-        for (auto& viewportDatum : viewportData) {
-            auto& dataProducers = viewportDatum.GetDataProducerSceneIndicesData();
-            for (auto& dataProducer : dataProducers) {
+        for (auto& viewportData : Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetAllViewportInfoAndData()) {
+            for (auto& dataProducer : viewportData.GetDataProducerSceneIndicesData()) {
                 dataProducer->UpdateVisibility();
                 dataProducer->UpdateTransform();
             }
@@ -998,16 +996,14 @@ MStatus MtohRenderOverride::Render(
 
         // Update plugin filtering scene indices
         std::string rendererNamesToUpdate;
-        auto sceneFilteringSceneIndicesData = Fvp::FilteringSceneIndexInterfaceImp::get().getSceneFilteringSceneIndicesData();
-        for (auto& sceneFilteringSceneIndexDatum : sceneFilteringSceneIndicesData) {
-            if (sceneFilteringSceneIndexDatum->UpdateVisibility()) {
-                rendererNamesToUpdate += sceneFilteringSceneIndexDatum->GetClient()->getRendererNames();
+        for (auto& sceneFilteringSceneIndexData : Fvp::FilteringSceneIndexInterfaceImp::get().getSceneFilteringSceneIndicesData()) {
+            if (sceneFilteringSceneIndexData->UpdateVisibility()) {
+                rendererNamesToUpdate += sceneFilteringSceneIndexData->GetClient()->getRendererNames();
             }
         }
-        auto selectionHighlightFilteringSceneIndicesData = Fvp::FilteringSceneIndexInterfaceImp::get().getSelectionHighlightFilteringSceneIndicesData();
-        for (auto& selectionHighlightFilteringSceneIndexDatum : selectionHighlightFilteringSceneIndicesData) {
-            if (selectionHighlightFilteringSceneIndexDatum->UpdateVisibility()) {
-                rendererNamesToUpdate += selectionHighlightFilteringSceneIndexDatum->GetClient()->getRendererNames();
+        for (auto& selectionHighlightFilteringSceneIndexData : Fvp::FilteringSceneIndexInterfaceImp::get().getSelectionHighlightFilteringSceneIndicesData()) {
+            if (selectionHighlightFilteringSceneIndexData->UpdateVisibility()) {
+                rendererNamesToUpdate += selectionHighlightFilteringSceneIndexData->GetClient()->getRendererNames();
             }
         }
         if (!rendererNamesToUpdate.empty()) {
