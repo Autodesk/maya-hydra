@@ -23,6 +23,10 @@
 
 // UFE headers
 #include "ufeExtensions/Global.h"
+#include <ufe/hierarchy.h>
+#include <ufe/object3d.h>
+#include <ufe/scene.h>
+#include <ufe/sceneNotification.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 

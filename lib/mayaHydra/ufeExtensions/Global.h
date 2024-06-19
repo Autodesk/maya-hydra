@@ -23,17 +23,9 @@
 #include <pxr/usd/sdf/path.h>
 
 #include <maya/MDagPath.h>
-#include <ufe/hierarchy.h>
-#include <ufe/object3d.h>
-#include <ufe/object3dNotification.h>
 #include <ufe/path.h>
 #include <ufe/pathSegment.h>
 #include <ufe/rtid.h>
-#include <ufe/scene.h>
-#include <ufe/sceneNotification.h>
-#include <ufe/transform3d.h>
-#include <ufe/transform3dNotification.h>
-#include <ufe/transform3dPathSubject.h>
 
 #include <ufeExtensions/api.h>
 
