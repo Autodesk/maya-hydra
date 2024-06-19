@@ -68,7 +68,11 @@ void MayaFilteringSceneIndexData::SetupUfeObservation(void* dccNode)
 
         // Note : while we currently use a query-based approach to update the visibility,
         // we could also move to a UFE notifications-based approach if necessary. In this case,
-        // we would setup the subject-observer relationships here.
+        // we would setup the subject-observer relationships here. The observer would observe
+        // the Ufe::Object3d subject, receive Ufe::VisibilityChanged notifications and call
+        // UpdateVisibility() if the received notification is relevant (i.e. if the filtering 
+        // scene index's path starts with the notification's path, the same way as in
+        // MayaFilteringSceneIndexData::UfeSceneChangesHandler::operator()).
     }
 }
 

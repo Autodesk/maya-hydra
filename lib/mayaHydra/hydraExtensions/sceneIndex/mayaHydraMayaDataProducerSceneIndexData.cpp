@@ -76,6 +76,14 @@ void MayaDataProducerSceneIndexData::SetupUfeObservation(void* dccNode)
         // Note : while we currently use a query-based approach to update the transform and visibility,
         // we could also move to a UFE notifications-based approach if necessary. In this case, we would
         // setup the subject-observer relationships here.
+        // For visibility changes, the observer would observe the Ufe::Object3d subject, receive 
+        // Ufe::VisibilityChanged notifications and call UpdateVisibility() if the received notification 
+        // is relevant (i.e. if the data producer's path starts with the notification's path, the 
+        // same way as in MayaDataProducerSceneIndexData::UfeSceneChangesHandler::operator()).
+        // For transform changes, the observer would observe a Ufe::Transform3dPathSubject created off the
+        // UFE path of the node (_path), receive Ufe::Transform3dChanged notifications and call UpdateTransform() 
+        // if the received notification is relevant (i.e. if the data producer's path starts with the notification's 
+        // path, the same way as in MayaDataProducerSceneIndexData::UfeSceneChangesHandler::operator()).
     }
 }
 
