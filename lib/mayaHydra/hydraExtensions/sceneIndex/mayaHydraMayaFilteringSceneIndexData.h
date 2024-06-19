@@ -52,9 +52,9 @@ private:
     std::optional<Ufe::Path> _path;
 
     // To observe changes to the scene item, if it exists
-    Ufe::Observer::Ptr _notificationsHandler;
+    Ufe::Observer::Ptr _ufeSceneChangesHandler;
 
-    class UfeNotificationsHandler;
+    class UfeSceneChangesHandler;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -25,10 +25,10 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-class MayaDataProducerSceneIndexData::UfeNotificationsHandler : public Ufe::Observer
+class MayaDataProducerSceneIndexData::UfeSceneChangesHandler : public Ufe::Observer
 {
 public:
-    UfeNotificationsHandler(MayaDataProducerSceneIndexData& dataProducer)
+    UfeSceneChangesHandler(MayaDataProducerSceneIndexData& dataProducer)
         : _dataProducer(dataProducer)
     {
     }
@@ -80,12 +80,12 @@ void MayaDataProducerSceneIndexData::SetupUfeObservation(void* dccNode)
 
         _path = Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath));
 
-        _pathSubject = std::make_shared<Ufe::Transform3dPathSubject>(_path.value());
-        _notificationsHandler = std::make_shared<UfeNotificationsHandler>(*this);
+        _ufeSceneChangesHandler = std::make_shared<UfeSceneChangesHandler>(*this);
+        Ufe::Scene::instance().addObserver(_ufeSceneChangesHandler);
 
-        Ufe::Scene::instance().addObserver(_notificationsHandler); // For hierarchy changes
-        Ufe::Object3d::addObserver(_notificationsHandler);         // For visibility changes
-        _pathSubject->addObserver(_notificationsHandler);          // For transform changes
+        // Note : while we currently use a query-based approach to update the transform and visibility,
+        // we could also move to a UFE notifications-based approach if necessary. In this case, we would
+        // setup the subject-observer relationships here.
     }
 }
 
@@ -138,41 +138,18 @@ bool MayaDataProducerSceneIndexData::UpdateTransform()
     return false;
 }
 
-void MayaDataProducerSceneIndexData::UfeNotificationsHandler::operator()(const Ufe::Notification& notification)
+void MayaDataProducerSceneIndexData::UfeSceneChangesHandler::operator()(const Ufe::Notification& notification)
 {
     // We're processing UFE notifications, which implies that a path must be in use.
     TF_AXIOM(_dataProducer._path.has_value());
-
-    const Ufe::Transform3dChanged* transformChangedNotif
-        = dynamic_cast<const Ufe::Transform3dChanged*>(&notification);
-    if (transformChangedNotif != nullptr
-        && _dataProducer._path.value().startsWith(transformChangedNotif->item()->path())) {
-        _dataProducer.UpdateTransform();
-        return;
+    
+    const Ufe::SceneChanged& sceneChangedNotif = notification.staticCast<Ufe::SceneChanged>();
+    if (_dataProducer._path.value().startsWith(sceneChangedNotif.changedPath())) {
+        handleSceneChanged(sceneChangedNotif);
     }
-
-    const Ufe::VisibilityChanged* visibilityChangedNotif
-        = dynamic_cast<const Ufe::VisibilityChanged*>(&notification);
-    if (visibilityChangedNotif != nullptr
-        && _dataProducer._path.value().startsWith(visibilityChangedNotif->path())) {
-        _dataProducer.UpdateVisibility();
-        return;
-    }
-
-    const Ufe::SceneChanged* sceneChangedNotif
-        = dynamic_cast<const Ufe::SceneChanged*>(&notification);
-    if (sceneChangedNotif != nullptr
-        && _dataProducer._path.value().startsWith(sceneChangedNotif->changedPath())) {
-        handleSceneChanged(*sceneChangedNotif);
-        return;
-    }
-
-    // The three main types of notifications being handled here (Transform3dChanged, VisibilityChanged and SceneChanged)
-    // are all sent from three different subjects. We share the same observer for all subjects for simplicity, but if we ever want to 
-    // avoid cascading dynamic casts, we could instead use a dedicated observer for each subject, and use static casts instead.
 }
 
-void MayaDataProducerSceneIndexData::UfeNotificationsHandler::handleSceneChanged(const Ufe::SceneChanged& sceneChanged)
+void MayaDataProducerSceneIndexData::UfeSceneChangesHandler::handleSceneChanged(const Ufe::SceneChanged& sceneChanged)
 {
     auto handleSingleOperation = [&](const Ufe::SceneCompositeNotification::Op& sceneOperation) -> void {
         // We're processing UFE notifications, which implies that a path must be in use.

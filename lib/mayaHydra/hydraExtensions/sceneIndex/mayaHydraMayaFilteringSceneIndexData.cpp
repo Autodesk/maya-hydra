@@ -26,10 +26,10 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-class MayaFilteringSceneIndexData::UfeNotificationsHandler : public Ufe::Observer
+class MayaFilteringSceneIndexData::UfeSceneChangesHandler : public Ufe::Observer
 {
 public:
-    UfeNotificationsHandler(MayaFilteringSceneIndexData& filteringData)
+    UfeSceneChangesHandler(MayaFilteringSceneIndexData& filteringData)
         : _filteringData(filteringData)
     {
     }
@@ -63,16 +63,12 @@ void MayaFilteringSceneIndexData::SetupUfeObservation(void* dccNode)
 
         _path = Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath));
 
-        _notificationsHandler = std::make_shared<UfeNotificationsHandler>(*this);
+        _ufeSceneChangesHandler = std::make_shared<UfeSceneChangesHandler>(*this);
+        Ufe::Scene::instance().addObserver(_ufeSceneChangesHandler);
 
-        Ufe::Scene::instance().addObserver(_notificationsHandler); // For hierarchy changes
-        Ufe::Object3d::addObserver(_notificationsHandler);         // For visibility changes
-
-        // Note : do not manually call UpdateVisibility/SetVisibility to initialize the visibility, 
-        // as it will try to recreate the filtering scene index chain while the node is still being
-        // added to the scene, which leads to a crash when using MayaHydra. Anyways, it is not 
-        // necessary : once the node is actually added to the scene, a corresponding Ufe::ObjectAdd 
-        // notification will be sent by Maya, so the observer will receive it and call UpdateVisibility.
+        // Note : while we currently use a query-based approach to update the visibility,
+        // we could also move to a UFE notifications-based approach if necessary. In this case,
+        // we would setup the subject-observer relationships here.
     }
 }
 
@@ -97,35 +93,19 @@ bool MayaFilteringSceneIndexData::UpdateVisibility()
     return false;
 }
 
-void MayaFilteringSceneIndexData::UfeNotificationsHandler::operator()(
+void MayaFilteringSceneIndexData::UfeSceneChangesHandler::operator()(
     const Ufe::Notification& notification)
 {
     // We're processing UFE notifications, which implies that a path must be in use.
     TF_AXIOM(_filteringData._path.has_value());
 
-    const Ufe::VisibilityChanged* visibilityChangedNotif
-        = dynamic_cast<const Ufe::VisibilityChanged*>(&notification);
-    if (visibilityChangedNotif != nullptr
-        && _filteringData._path.value().startsWith(visibilityChangedNotif->path())) {
-        _filteringData.UpdateVisibility();
-        return;
+    const Ufe::SceneChanged& sceneChangedNotif = notification.staticCast<Ufe::SceneChanged>();
+    if (_filteringData._path.value().startsWith(sceneChangedNotif.changedPath())) {
+        handleSceneChanged(sceneChangedNotif);
     }
-
-    const Ufe::SceneChanged* sceneChangedNotif
-        = dynamic_cast<const Ufe::SceneChanged*>(&notification);
-    if (sceneChangedNotif != nullptr
-        && _filteringData._path.value().startsWith(sceneChangedNotif->changedPath())) {
-        handleSceneChanged(*sceneChangedNotif);
-        return;
-    }
-
-    // The two main types of notifications being handled here (VisibilityChanged and SceneChanged)
-    // are all sent from two different subjects. We share the same observer for all subjects for simplicity, 
-    // but if we ever want to avoid cascading dynamic casts, we could instead use a dedicated observer for each 
-    // subject, and use static casts instead.
 }
 
-void MayaFilteringSceneIndexData::UfeNotificationsHandler::handleSceneChanged(
+void MayaFilteringSceneIndexData::UfeSceneChangesHandler::handleSceneChanged(
     const Ufe::SceneChanged& sceneChanged)
 {
     auto handleSingleOperation
