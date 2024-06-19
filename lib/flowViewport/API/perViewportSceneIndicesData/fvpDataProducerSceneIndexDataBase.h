@@ -88,8 +88,8 @@ public:
     /// Provide the node name from the DCC to be overriden in a DCC specific subclass
     virtual std::string GetDCCNodeName() const {return "";}
 
-    void SetVisibility(bool isVisible);
-    void SetTransform(const GfMatrix4d& transformMatrix);
+    virtual bool UpdateVisibility() = 0;
+    virtual bool UpdateTransform() = 0;
 
 protected:
 

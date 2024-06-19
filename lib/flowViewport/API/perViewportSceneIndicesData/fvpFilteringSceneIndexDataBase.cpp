@@ -29,13 +29,6 @@ FilteringSceneIndexDataBase::FilteringSceneIndexDataBase(const std::shared_ptr<:
 {
 }
 
-void FilteringSceneIndexDataBase::SetVisibility(bool isVisible)
-{
-    _isVisible = isVisible;
-    const std::string& rendererNames = _client->getRendererNames();
-    ::Fvp::FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(rendererNames);
-}
-
 }//End of namespace FVP_NS_DEF
 
 PXR_NAMESPACE_CLOSE_SCOPE

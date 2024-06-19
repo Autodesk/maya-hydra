@@ -22,6 +22,7 @@
 
 //flow viewport headers
 #include <flowViewport/API/fvpFilteringSceneIndexClient.h>
+#include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -75,10 +76,10 @@ void MayaFilteringSceneIndexData::SetupUfeObservation(void* dccNode)
     }
 }
 
-void MayaFilteringSceneIndexData::UpdateVisibility()
+bool MayaFilteringSceneIndexData::UpdateVisibility()
 {
     if (!_path.has_value()) {
-        return;
+        return false;
     }
 
     bool      isVisible = true;
@@ -89,7 +90,11 @@ void MayaFilteringSceneIndexData::UpdateVisibility()
         isVisible = isVisible && object3d != nullptr && object3d->visibility();
         currPath = currPath.pop();
     }
-    SetVisibility(isVisible);
+    if (_isVisible != isVisible) {
+        _isVisible = isVisible;
+        return true;
+    }
+    return false;
 }
 
 void MayaFilteringSceneIndexData::UfeNotificationsHandler::operator()(
@@ -134,8 +139,19 @@ void MayaFilteringSceneIndexData::UfeNotificationsHandler::handleSceneChanged(
         }
 
         switch (sceneOperation.opType) {
-        case Ufe::SceneChanged::ObjectAdd: _filteringData.UpdateVisibility(); break;
-        case Ufe::SceneChanged::ObjectDelete: _filteringData.SetVisibility(false); break;
+        case Ufe::SceneChanged::ObjectAdd: {
+            if (_filteringData.UpdateVisibility()) {
+                Fvp::FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(_filteringData.GetClient()->getRendererNames());
+            }
+            break;
+        }
+        case Ufe::SceneChanged::ObjectDelete: {
+            if (_filteringData._isVisible) {
+                _filteringData._isVisible = false;
+                Fvp::FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(_filteringData.GetClient()->getRendererNames());
+            }
+            break;
+        }
         case Ufe::SceneChanged::ObjectPathChange:
             switch (sceneOperation.subOpType) {
             case Ufe::ObjectPathChange::None: break;
@@ -156,7 +172,13 @@ void MayaFilteringSceneIndexData::UfeNotificationsHandler::handleSceneChanged(
                 break;
             }
             break;
-        case Ufe::SceneChanged::SubtreeInvalidate: _filteringData.SetVisibility(false); break;
+        case Ufe::SceneChanged::SubtreeInvalidate: {
+            if (_filteringData._isVisible) {
+                _filteringData._isVisible = false;
+                Fvp::FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(_filteringData.GetClient()->getRendererNames());
+            }
+            break;
+        }
         case Ufe::SceneChanged::SceneCompositeNotification:
             TF_CODING_ERROR("SceneCompositeNotification cannot be turned into an Op.");
             break;

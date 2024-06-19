@@ -50,14 +50,14 @@ public:
     /// Provide the node name from maya
     std::string GetDCCNodeName() const override;
 
+    bool UpdateVisibility() override;
+    bool UpdateTransform() override;
+
 private:
     MayaDataProducerSceneIndexData(const FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params);
     MayaDataProducerSceneIndexData(FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParametersForUsdStage& params);
     
     void SetupUfeObservation(void* dccNode);
-
-    void UpdateTransform();
-    void UpdateVisibility();
 
     // Path to the scene item, if it was added as one
     std::optional<Ufe::Path> _path;

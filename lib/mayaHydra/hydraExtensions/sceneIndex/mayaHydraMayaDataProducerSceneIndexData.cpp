@@ -89,28 +89,14 @@ void MayaDataProducerSceneIndexData::SetupUfeObservation(void* dccNode)
     }
 }
 
-void MayaDataProducerSceneIndexData::UpdateTransform()
+bool MayaDataProducerSceneIndexData::UpdateVisibility()
 {
     if (!_path.has_value()) {
-        return;
+        return false;
     }
-    auto transform = Ufe::Transform3dRead::transform3dRead(Ufe::Hierarchy::createItem(_path.value()));
-    if (!transform) {
-        return;
-    }
-    GfMatrix4d transformMatrix;
-    std::memcpy(
-        transformMatrix.GetArray(),
-        transform->inclusiveMatrix().matrix.data(),
-        sizeof(decltype(transformMatrix)::ScalarType) * transformMatrix.numRows * transformMatrix.numColumns);
-    SetTransform(transformMatrix);
-}
-
-void MayaDataProducerSceneIndexData::UpdateVisibility()
-{
-    if (!_path.has_value()) {
-        return;
-    }
+    // Having a UFE path means we have an associated DCC node,
+    // so we should also have a UsdImagingRootOverridesSceneIndex
+    TF_AXIOM(_rootOverridesSceneIndex);
 
     bool      isVisible = true;
     Ufe::Path currPath = _path.value();
@@ -120,7 +106,36 @@ void MayaDataProducerSceneIndexData::UpdateVisibility()
         isVisible = isVisible && object3d != nullptr && object3d->visibility();
         currPath = currPath.pop();
     }
-    SetVisibility(isVisible);
+    if (_rootOverridesSceneIndex->GetRootVisibility() != isVisible) {
+        _rootOverridesSceneIndex->SetRootVisibility(isVisible);
+        return true;
+    }
+    return false;
+}
+
+bool MayaDataProducerSceneIndexData::UpdateTransform()
+{
+    if (!_path.has_value()) {
+        return false;
+    }
+    // Having a UFE path means we have an associated DCC node,
+    // so we should also have a UsdImagingRootOverridesSceneIndex
+    TF_AXIOM(_rootOverridesSceneIndex);
+
+    auto transform = Ufe::Transform3dRead::transform3dRead(Ufe::Hierarchy::createItem(_path.value()));
+    if (!transform) {
+        return false;
+    }
+    GfMatrix4d transformMatrix;
+    std::memcpy(
+        transformMatrix.GetArray(),
+        transform->inclusiveMatrix().matrix.data(),
+        sizeof(decltype(transformMatrix)::ScalarType) * transformMatrix.numRows * transformMatrix.numColumns);
+    if (!GfIsClose(_rootOverridesSceneIndex->GetRootTransform(), transformMatrix, 1e-9)) {
+        _rootOverridesSceneIndex->SetRootTransform(transformMatrix);
+        return true;
+    }
+    return false;
 }
 
 void MayaDataProducerSceneIndexData::UfeNotificationsHandler::operator()(const Ufe::Notification& notification)
@@ -162,6 +177,9 @@ void MayaDataProducerSceneIndexData::UfeNotificationsHandler::handleSceneChanged
     auto handleSingleOperation = [&](const Ufe::SceneCompositeNotification::Op& sceneOperation) -> void {
         // We're processing UFE notifications, which implies that a path must be in use.
         TF_AXIOM(_dataProducer._path.has_value());
+        // Having a UFE path means we have an associated DCC node,
+        // so we should also have a UsdImagingRootOverridesSceneIndex
+        TF_AXIOM(_dataProducer._rootOverridesSceneIndex);
 
         if (!_dataProducer._path.value().startsWith(sceneOperation.path)) {
             // This notification does not relate to our parent hierarchy, so we have nothing to do.
@@ -173,7 +191,7 @@ void MayaDataProducerSceneIndexData::UfeNotificationsHandler::handleSceneChanged
             _dataProducer.UpdateTransform();
             _dataProducer.UpdateVisibility();
             break;
-        case Ufe::SceneChanged::ObjectDelete: _dataProducer.SetVisibility(false); break;
+        case Ufe::SceneChanged::ObjectDelete: _dataProducer._rootOverridesSceneIndex->SetRootVisibility(false); break;
         case Ufe::SceneChanged::ObjectPathChange:
             switch (sceneOperation.subOpType) {
             case Ufe::ObjectPathChange::None: break;
@@ -194,7 +212,7 @@ void MayaDataProducerSceneIndexData::UfeNotificationsHandler::handleSceneChanged
                 break;
             }
             break;
-        case Ufe::SceneChanged::SubtreeInvalidate: _dataProducer.SetVisibility(false); break;
+        case Ufe::SceneChanged::SubtreeInvalidate: _dataProducer._rootOverridesSceneIndex->SetRootVisibility(false); break;
         case Ufe::SceneChanged::SceneCompositeNotification:
             TF_CODING_ERROR("SceneCompositeNotification cannot be turned into an Op.");
             break;

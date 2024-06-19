@@ -68,24 +68,6 @@ DataProducerSceneIndexDataBase::~DataProducerSceneIndexDataBase()
 #endif
 }
 
-void DataProducerSceneIndexDataBase::SetTransform(const GfMatrix4d& transformMatrix) 
-{ 
-    if (! _rootOverridesSceneIndex){
-        return;
-    }
-
-    _rootOverridesSceneIndex->SetRootTransform(transformMatrix);
-}
-
-void DataProducerSceneIndexDataBase::SetVisibility(bool isVisible) 
-{ 
-    if (! _rootOverridesSceneIndex){
-        return;
-    }
-
-    _rootOverridesSceneIndex->SetRootVisibility(isVisible);
-}
-
 void DataProducerSceneIndexDataBase::_CreateSceneIndexChainForDataProducerSceneIndex()
 {
     if (_dccNode){

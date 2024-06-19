@@ -41,12 +41,12 @@ public:
     
     ~MayaFilteringSceneIndexData() override = default;
 
+    bool UpdateVisibility() override;
+
 private:
     MayaFilteringSceneIndexData(const std::shared_ptr<::FVP_NS_DEF::FilteringSceneIndexClient>& client);
 
     void SetupUfeObservation(void* dccNode);
-
-    void UpdateVisibility();
 
     // Path to the scene item, if it was added as one
     std::optional<Ufe::Path> _path;
