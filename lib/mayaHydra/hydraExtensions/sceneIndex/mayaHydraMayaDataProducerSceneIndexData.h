@@ -64,7 +64,7 @@ private:
     // Path to the scene item, if it was added as one
     std::optional<Ufe::Path> _path;
 
-    // To observe changes to the data producer scene item, if it exists
+    // To observe scene changes to the data producer scene item, if it exists
     Ufe::Observer::Ptr       _ufeSceneChangesHandler;
 
     class UfeSceneChangesHandler;
