@@ -60,8 +60,6 @@ MayaFilteringSceneIndexData::~MayaFilteringSceneIndexData()
 
 void MayaFilteringSceneIndexData::SetupUfeObservation(void* dccNode)
 {
-    // If the filter is based on a scene item, monitor changes to it to reflect them on
-    // the filtering scene index.
     if (dccNode) {
         MObject* mObject = reinterpret_cast<MObject*>(dccNode);
         MDagPath dagPath;
