@@ -78,7 +78,8 @@ PruneTexturesSceneIndex::MarkTexturesDirty(bool isTextured)
 
 PruneTexturesSceneIndex::PruneTexturesSceneIndex(
     HdSceneIndexBaseRefPtr const &inputSceneIndex)
-  : HdMaterialFilteringSceneIndexBase(inputSceneIndex)
+  : HdMaterialFilteringSceneIndexBase(inputSceneIndex), 
+    InputSceneIndexUtils(inputSceneIndex)
 {   
 }
 
@@ -95,7 +96,7 @@ PruneTexturesSceneIndex::_DirtyAllPrims(
     const HdDataSourceLocatorSet locators)
 {
     HdSceneIndexObserver::DirtiedPrimEntries entries;
-    for (const SdfPath &path : HdSceneIndexPrimView(_GetInputSceneIndex())) {
+    for (const SdfPath &path : HdSceneIndexPrimView(GetInputSceneIndex())) {
         entries.push_back({path, locators});
     }
     _SendPrimsDirtied(entries);
