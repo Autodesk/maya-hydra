@@ -50,7 +50,7 @@ public:
     }
 
     ///Destructor
-    ~MayaDataProducerSceneIndexData() override = default;
+    ~MayaDataProducerSceneIndexData() override;
     
     bool UpdateVisibility() override;
     bool UpdateTransform() override;

@@ -51,6 +51,14 @@ MayaFilteringSceneIndexData::MayaFilteringSceneIndexData(const std::shared_ptr<:
     }
 }
 
+MayaFilteringSceneIndexData::~MayaFilteringSceneIndexData()
+{
+    if (_ufeSceneChangesHandler) {
+        Ufe::Scene::instance().removeObserver(_ufeSceneChangesHandler);
+        _ufeSceneChangesHandler.reset();
+    }
+}
+
 void MayaFilteringSceneIndexData::SetupUfeObservation(void* dccNode)
 {
     // If the filter is based on a scene item, monitor changes to it to reflect them on

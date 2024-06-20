@@ -43,7 +43,7 @@ public:
         return TfCreateRefPtr(new MayaFilteringSceneIndexData(client));
     }
     
-    ~MayaFilteringSceneIndexData() override = default;
+    ~MayaFilteringSceneIndexData() override;
 
     bool UpdateVisibility() override;
 

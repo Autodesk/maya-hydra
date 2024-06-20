@@ -58,6 +58,14 @@ MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(FVP_NS_DEF::DataP
     _CreateSceneIndexChainForUsdStageSceneIndex(params);
 }
 
+MayaDataProducerSceneIndexData::~MayaDataProducerSceneIndexData()
+{
+    if (_ufeSceneChangesHandler) {
+        Ufe::Scene::instance().removeObserver(_ufeSceneChangesHandler);
+        _ufeSceneChangesHandler.reset();
+    }
+}
+
 void MayaDataProducerSceneIndexData::SetupUfeObservation(void* dccNode)
 {
     // If the data producer is based on a scene item, monitor changes to it to reflect them on the
