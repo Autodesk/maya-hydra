@@ -85,7 +85,10 @@ public:
     const SdfPath&                  GetPrefix()const{return _prefix;}
     const std::string&              GetRendererNames() const {return _rendererNames;}
 
+    // Returns true if visibility was changed, false otherwise.
     virtual bool UpdateVisibility() = 0;
+
+    // Returns true if transform was changed, false otherwise.
     virtual bool UpdateTransform() = 0;
 
 protected:

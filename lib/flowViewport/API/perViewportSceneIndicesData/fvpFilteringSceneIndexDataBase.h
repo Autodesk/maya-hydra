@@ -45,6 +45,7 @@ public:
 
     bool GetVisibility() { return _isVisible; }
 
+    // Returns true if visibility was changed, false otherwise.
     virtual bool UpdateVisibility() = 0;
 
 protected:

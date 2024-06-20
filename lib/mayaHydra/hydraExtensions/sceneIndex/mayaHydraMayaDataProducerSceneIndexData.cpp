@@ -169,36 +169,16 @@ void MayaDataProducerSceneIndexData::UfeSceneChangesHandler::handleSceneChanged(
             return;
         }
 
-        switch (sceneOperation.opType) {
-        case Ufe::SceneChanged::ObjectAdd:
-            _dataProducer.UpdateTransform();
-            _dataProducer.UpdateVisibility();
-            break;
-        case Ufe::SceneChanged::ObjectDelete: _dataProducer._rootOverridesSceneIndex->SetRootVisibility(false); break;
-        case Ufe::SceneChanged::ObjectPathChange:
+        if (sceneOperation.opType == Ufe::SceneChanged::ObjectPathChange) {
             switch (sceneOperation.subOpType) {
-            case Ufe::ObjectPathChange::None: break;
             case Ufe::ObjectPathChange::ObjectRename:
                 _dataProducer._path = _dataProducer._path.value().replaceComponent(
                     sceneOperation.item->path().size() - 1, sceneOperation.item->path().back());
                 break;
             case Ufe::ObjectPathChange::ObjectReparent:
                 _dataProducer._path = _dataProducer._path.value().reparent(sceneOperation.path, sceneOperation.item->path());
-                _dataProducer.UpdateTransform();
-                _dataProducer.UpdateVisibility();
-                break;
-            case Ufe::ObjectPathChange::ObjectPathAdd:
-                TF_WARN("Instancing is not supported for this item.");
-                break;
-            case Ufe::ObjectPathChange::ObjectPathRemove:
-                TF_WARN("Instancing is not supported for this item.");
                 break;
             }
-            break;
-        case Ufe::SceneChanged::SubtreeInvalidate: _dataProducer._rootOverridesSceneIndex->SetRootVisibility(false); break;
-        case Ufe::SceneChanged::SceneCompositeNotification:
-            TF_CODING_ERROR("SceneCompositeNotification cannot be turned into an Op.");
-            break;
         }
     };
     if (sceneChanged.opType() == Ufe::SceneChanged::SceneCompositeNotification) {
