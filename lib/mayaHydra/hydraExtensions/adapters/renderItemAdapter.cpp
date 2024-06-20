@@ -142,7 +142,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // const bool isNew = flags & MViewportScene::MVS_new;  //not used yet
     const bool visible          = data._flags & MVS::MVS_visible;
     const bool matrixChanged    = data._flags & MVS::MVS_changedMatrix;
-    const bool geomChanged      = (data._flags & MVS::MVS_changedGeometry) || positionsHaveBeenReset;
+          bool geomChanged      = (data._flags & MVS::MVS_changedGeometry) || positionsHaveBeenReset;//Non const as we may modify it later
     const bool topoChanged      = (data._flags & MVS::MVS_changedTopo) || positionsHaveBeenReset;
     const bool visibChanged     = data._flags & MVS::MVS_changedVisibility;
     const bool effectChanged    = data._flags & MVS::MVS_changedEffect;
@@ -192,6 +192,34 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
         
     const int vertexBuffercount = geom ? geom->vertexBufferCount() : 0;
+
+    //Temp workaround for a bug in Maya MAYA-134200
+    if ((!geomChanged && topoChanged) && vertexBuffercount) { 
+        //With face components selection, we have topoChanged which is true but geomChanged is false, but this is wrong, the number of vertices may have changed.
+        //We want to check here if we also need to update the geometry if the number of vertices is different from what is stored already
+        for (int vbIdx = 0; vbIdx < vertexBuffercount; vbIdx++) {
+            MVertexBuffer* mvb = geom->vertexBuffer(vbIdx);
+            if (!mvb) {
+                continue;
+            }
+
+            const MVertexBufferDescriptor& desc = mvb->descriptor();
+            const auto                     semantic = desc.semantic();
+            switch (semantic) {
+            case MGeometry::Semantic::kPosition: {
+                // Vertices
+                MVertexBuffer*     verts = mvb;
+                const unsigned int originalVertexCount = verts->vertexCount();
+                if (_positions.size() != originalVertexCount) {//Is it different ?
+                    geomChanged = true;
+                    vbIdx = vertexBuffercount; //Stop looping
+                }
+            } break;
+            default: break;
+            }
+        }
+    }
+
     // Vertices
     if (geomChanged && vertexBuffercount) {
         //vertexBuffercount > 0 means geom is non null
@@ -352,7 +380,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         }
     }
 
-    if (topoChanged) {
+    if (topoChanged && (vertexCounts.size())) {
         switch (GetPrimitive()) {
         case MGeometry::Primitive::kTriangles:{
             static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();

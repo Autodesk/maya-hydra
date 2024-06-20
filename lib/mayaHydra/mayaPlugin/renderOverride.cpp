@@ -345,6 +345,17 @@ inline bool areDifferentForOneOfTheseBits(unsigned int val1, unsigned int val2, 
     return ((val1 & bitsToTest) != (val2 & bitsToTest));
 }
 
+inline bool isInComponentsPickingMode(const MHWRender::MSelectionInfo& selectInfo)
+{
+    return selectInfo.selectable(MSelectionMask::kSelectMeshVerts)
+        || selectInfo.selectable(MSelectionMask::kSelectMeshEdges)
+        || selectInfo.selectable(MSelectionMask::kSelectMeshFreeEdges)
+        || selectInfo.selectable(MSelectionMask::kSelectMeshFaces)
+        || selectInfo.selectable(MSelectionMask::kSelectVertices)
+        || selectInfo.selectable(MSelectionMask::kSelectEdges)
+        || selectInfo.selectable(MSelectionMask::kSelectFacets);
+}
+
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -1791,6 +1802,11 @@ bool MtohRenderOverride::select(
         "MtohRenderOverride::select",
         "MtohRenderOverride::select");
 #endif
+    
+    if (isInComponentsPickingMode(selectInfo)) {
+        return false; //When being in components picking, returning false will use maya/OGS for components selection
+    }
+
     MStatus status = MStatus::kFailure;
 
     MMatrix viewMatrix = frameContext.getMatrix(MHWRender::MFrameContext::kViewMtx, &status);
