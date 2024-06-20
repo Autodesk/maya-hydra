@@ -68,8 +68,6 @@ MayaDataProducerSceneIndexData::~MayaDataProducerSceneIndexData()
 
 void MayaDataProducerSceneIndexData::SetupUfeObservation(void* dccNode)
 {
-    // If the data producer is based on a scene item, monitor changes to it to reflect them on the
-    // data producer scene index.
     if (dccNode) {
         MObject* mObject = reinterpret_cast<MObject*>(dccNode);
         MDagPath dagPath;

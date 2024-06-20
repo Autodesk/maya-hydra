@@ -44,7 +44,6 @@ private:
 MayaFilteringSceneIndexData::MayaFilteringSceneIndexData(const std::shared_ptr<::FVP_NS_DEF::FilteringSceneIndexClient>& client)
 : PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBase(client)
 {
-    // If a Maya node is present in client->getDccNode(), add callbacks to handle node added/deleted/reparented/renamed and hide/unhide
     void* dccNode = client->getDccNode();
     if (dccNode) {
         SetupUfeObservation(dccNode);
