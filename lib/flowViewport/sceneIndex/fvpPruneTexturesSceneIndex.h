@@ -30,8 +30,11 @@ typedef PXR_NS::TfRefPtr<const PruneTexturesSceneIndex> PruneTexturesSceneIndexC
 
 class PruneTexturesSceneIndex :
     public PXR_NS::HdMaterialFilteringSceneIndexBase
+    , public Fvp::InputSceneIndexUtils<PruneTexturesSceneIndex>
 {
 public:
+    using PXR_NS::HdMaterialFilteringSceneIndexBase::_GetInputSceneIndex;
+
     FVP_API
     static PruneTexturesSceneIndexRefPtr New(
             const PXR_NS::HdSceneIndexBaseRefPtr &inputScene);
