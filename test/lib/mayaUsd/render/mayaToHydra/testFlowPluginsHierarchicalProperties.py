@@ -59,7 +59,7 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         return stageParent, stageShape
 
     def usdStageAnimatedPrimSetup(self):
-        usdScenePath = testUtils.getTestScene('testFlowPluginsHierarchicalProperties', 'animated_prim2.usda')
+        usdScenePath = testUtils.getTestScene('testFlowPluginsHierarchicalProperties', 'usd_animated_prim.usda')
         stagePath =  usdUtils.createStageFromFile(usdScenePath)
         stageParent = cmds.group(empty=True)
         cmds.parent(stagePath, stageParent)
