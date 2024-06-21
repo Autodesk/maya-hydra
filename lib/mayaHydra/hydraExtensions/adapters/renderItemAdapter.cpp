@@ -380,25 +380,29 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         }
     }
 
-    if (topoChanged && (vertexCounts.size())) {
+    if (topoChanged) {
         switch (GetPrimitive()) {
         case MGeometry::Primitive::kTriangles:{
             static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
-            if (passNormalsToHydra){
-                _topology.reset(new HdMeshTopology(
-                    PxOsdOpenSubdivTokens->none,//For the OGS normals vertex buffer to be used, we need to use PxOsdOpenSubdivTokens->none
-                    UsdGeomTokens->rightHanded,
-                    vertexCounts,
-                    vertexIndices));
-            } else{
-                _topology.reset(new HdMeshTopology(
-                    (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes
-                     || GetDisplayStyle().refineLevel > 0)
-                        ? PxOsdOpenSubdivTokens->catmullClark
-                        : PxOsdOpenSubdivTokens->none,
-                    UsdGeomTokens->rightHanded,
-                    vertexCounts,
-                    vertexIndices));
+            if (vertexCounts.size()) {
+                if (passNormalsToHydra) {
+                    _topology.reset(new HdMeshTopology(
+                        PxOsdOpenSubdivTokens
+                            ->none, // For the OGS normals vertex buffer to be used, we need to use
+                                    // PxOsdOpenSubdivTokens->none
+                        UsdGeomTokens->rightHanded,
+                        vertexCounts,
+                        vertexIndices));
+                } else {
+                    _topology.reset(new HdMeshTopology(
+                        (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes
+                         || GetDisplayStyle().refineLevel > 0)
+                            ? PxOsdOpenSubdivTokens->catmullClark
+                            : PxOsdOpenSubdivTokens->none,
+                        UsdGeomTokens->rightHanded,
+                        vertexCounts,
+                        vertexIndices));
+                }
             }
             }
             break;
