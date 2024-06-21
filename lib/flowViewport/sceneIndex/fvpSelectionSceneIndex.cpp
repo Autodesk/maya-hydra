@@ -271,11 +271,18 @@ PrimSelections SelectionSceneIndex::UfePathToPrimSelections(const Ufe::Path& app
         // Try path mapper registry.
         auto mapper = Fvp::PathMapperRegistry::Instance().GetMapper(appPath);
         
-        if (!mapper) {
+        auto warnEmptyPath = [](const Ufe::Path& appPath) {
             TF_WARN("SelectionSceneIndex::UfePathToPrimSelections(%s) returned no path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
+        };
+
+        if (!mapper) {
+            warnEmptyPath(appPath);
         }
         else {
             primSelections = mapper->UfePathToPrimSelections(appPath);
+            if (primSelections.empty()) {
+                warnEmptyPath(appPath);
+            }
         }
     }
 

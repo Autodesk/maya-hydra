@@ -46,8 +46,8 @@ PickHandlerRegistry& PickHandlerRegistry::Instance()
 
 bool PickHandlerRegistry::Register(const SdfPath& prefix, const PickHandlerConstPtr& pickHandler)
 {
-    // Can't register an empty path.
-    if (prefix.IsEmpty()) {
+    // Can't register an empty path, or an absolute root path prefix.
+    if (prefix.IsEmpty() || prefix.IsAbsoluteRootPath()) {
         return false;
     }
 

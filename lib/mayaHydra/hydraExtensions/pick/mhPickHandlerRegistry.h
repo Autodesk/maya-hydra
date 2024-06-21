@@ -40,7 +40,8 @@ public:
     static PickHandlerRegistry& Instance();
 
     //! Register a pick handler to deal with all Hydra scene index prims
-    //! under prefix.
+    //! under prefix.  An empty prefix, or a prefix that is the absolute
+    //! root, are illegal.
     /*!
       \return False if an ancestor, descendant, or prefix itself is found in the registry, true otherwise.
     */

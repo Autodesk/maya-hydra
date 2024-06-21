@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#ifndef FVP_PATH_MAPPER_FWD_H
-#define FVP_PATH_MAPPER_FWD_H
+#ifndef FVP_SELECTION_PATH_MAPPER_FWD_H
+#define FVP_SELECTION_PATH_MAPPER_FWD_H
 
 #include <flowViewport/api.h>
 

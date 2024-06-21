@@ -26,7 +26,7 @@
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 //Maya Hydra headers
-#include "mayaHydraLib/mixedUtils.h"
+#include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/pick/mhPickHandler.h>
@@ -130,7 +130,7 @@ public:
     // Get sparse list of hidden cubes.
     HiddenCubes hiddenCubes() const;
 
-    // Set sparce list of hidden cubes.
+    // Set sparse list of hidden cubes.
     void hideCubes(const HiddenCubes& hidden);
 
     // Get sparse list of transformed cubes.

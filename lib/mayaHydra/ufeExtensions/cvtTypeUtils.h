@@ -28,6 +28,8 @@
 
 #include <cstring> // memcpy
 
+// Type conversion utilities.
+
 namespace UfeExtensions {
 
 //! Copy the argument matrix into the return matrix.

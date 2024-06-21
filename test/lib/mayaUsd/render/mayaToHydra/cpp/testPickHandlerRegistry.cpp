@@ -50,6 +50,9 @@ TEST(TestPickHandlerRegistry, testRegistry)
     // Can't register for an empty prefix.
     ASSERT_FALSE(r.Register(SdfPath(), dummy));
 
+    // Can't register for an absolute root prefix.
+    ASSERT_FALSE(r.Register(SdfPath::AbsoluteRootPath(), dummy));
+
     std::vector<SdfPath> registered;
     auto fooBarH = TestPickHandler::create();
     SdfPath fooBarP("/foo/bar");

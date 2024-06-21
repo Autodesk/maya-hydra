@@ -7,7 +7,7 @@ add_library(${TARGET_NAME} SHARED)
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME} 
     PRIVATE
-        cvtTypeUtils.h
+        cvtTypeUtils.cpp
         Global.cpp
 )
 
