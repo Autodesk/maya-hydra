@@ -194,7 +194,8 @@ private:
         const HdxPickHitVector&          hits,
         const MHWRender::MSelectionInfo& selectInfo,
         MSelectionList&                  selectionList,
-        MPointArray&                     worldSpaceHitPts);
+        MPointArray&                     worldSpaceHitPts,
+        bool&                            isOneNodeInComponentsPickingMode);
 
     void _AddPluginSelectionHighlighting();
 

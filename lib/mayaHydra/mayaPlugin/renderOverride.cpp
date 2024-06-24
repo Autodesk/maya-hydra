@@ -363,8 +363,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 class MtohRenderOverride::PickHandlerBase {
 public:
 
+    //isOneNodeInComponentsPickingMode will be true if one of the picked node is in components picking mode
     virtual bool handlePickHit(
-        const PickInput& pickInput, PickOutput& pickOutput
+        const PickInput& pickInput, PickOutput& pickOutput, bool& isOneNodeInComponentsPickingMode
     ) const = 0;
 
 protected:
@@ -426,7 +427,7 @@ public:
         PickHandlerBase(renderOverride) {}
 
     bool handlePickHit(
-        const PickInput& pickInput, PickOutput& pickOutput
+        const PickInput& pickInput, PickOutput& pickOutput, bool& isOneNodeInComponentsPickingMode
     ) const override
     {
         if (!mayaSceneIndex()) {
@@ -442,7 +443,7 @@ public:
 
         return mayaSceneIndex()->AddPickHitToSelectionList(
             pickInput.pickHit, pickInput.pickInfo, 
-            pickOutput.mayaSelection, pickOutput.mayaWorldSpaceHitPts
+            pickOutput.mayaSelection, pickOutput.mayaWorldSpaceHitPts, isOneNodeInComponentsPickingMode
         );
     }
 };
@@ -493,7 +494,7 @@ public:
     }
 
     bool handlePickHit(
-        const PickInput& pickInput, PickOutput& pickOutput
+        const PickInput& pickInput, PickOutput& pickOutput, bool&
     ) const override
     {
         if (!sceneIndexRegistry()) {
@@ -1701,7 +1702,8 @@ void MtohRenderOverride::_PopulateSelectionList(
     const HdxPickHitVector&          hits,
     const MHWRender::MSelectionInfo& selectInfo,
     MSelectionList&                  selectionList,
-    MPointArray&                     worldSpaceHitPts)
+    MPointArray&                     worldSpaceHitPts, 
+    bool&                            isOneNodeInComponentsPickingMode)
 {
     if (hits.empty() || !_mayaHydraSceneIndex || !_ufeSn) {
         return;
@@ -1713,7 +1715,10 @@ void MtohRenderOverride::_PopulateSelectionList(
     for (const HdxPickHit& hit : hits) {
         PickInput pickInput(hit, selectInfo);
 
-        _PickHandler(hit)->handlePickHit(pickInput, pickOutput);
+        _PickHandler(hit)->handlePickHit(pickInput, pickOutput, isOneNodeInComponentsPickingMode);
+        if (isOneNodeInComponentsPickingMode){
+            return;//No need to continue iterating, we'll use maya/OGS to do the components selection
+        }
     }
 }
 
@@ -1880,7 +1885,12 @@ bool MtohRenderOverride::select(
         }
     }
 
-    _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts);
+    //isOneNodeInComponentsPickingMode will be true if one of the picked node is in components picking mode
+    bool isOneNodeInComponentsPickingMode = false;
+    _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneNodeInComponentsPickingMode);
+    if (isOneNodeInComponentsPickingMode){
+        return false;//When being in components picking on a node, returning false will use maya/OGS for components selection
+    }
     return true;
 }
 

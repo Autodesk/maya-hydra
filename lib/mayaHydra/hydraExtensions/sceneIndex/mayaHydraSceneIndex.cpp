@@ -32,6 +32,8 @@
 #include <maya/MSelectionList.h>
 #include <maya/MShaderManager.h>
 #include <maya/MString.h>
+#include <maya/MGlobal.h>
+#include <maya/MItSelectionList.h>
 
 #include <mayaHydraLib/debugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
@@ -738,7 +740,8 @@ bool MayaHydraSceneIndex::AddPickHitToSelectionList(
     const HdxPickHit& hit,
     const MHWRender::MSelectionInfo& /* selectInfo */,
     MSelectionList& selectionList,
-    MPointArray& worldSpaceHitPts)
+    MPointArray& worldSpaceHitPts,
+    bool& isOneNodeInComponentsPickingMode)
 {
     SdfPath hitId = hit.objectId;
     // validate that hit is indeed a maya item. Alternatively, the rprim hit could be an rprim
@@ -746,18 +749,32 @@ bool MayaHydraSceneIndex::AddPickHitToSelectionList(
     if (hitId.HasPrefix(GetRprimPath())) {
         _FindAdapter<MayaHydraRenderItemAdapter>(
             hitId,
-            [&selectionList, &worldSpaceHitPts, &hit](MayaHydraRenderItemAdapter* a) {
+            [&selectionList, &worldSpaceHitPts, &hit, &isOneNodeInComponentsPickingMode](MayaHydraRenderItemAdapter* a) {
                 // prepare the selection path of the hit item, the transform path is expected if available
                 const auto& itemPath = a->GetDagPath();
-        MDagPath selectPath;
-        if (MS::kSuccess != MDagPath::getAPathTo(itemPath.transform(), selectPath)) {
-            selectPath = itemPath;
-        }
-        selectionList.add(selectPath);
-        worldSpaceHitPts.append(
-            hit.worldSpaceHitPoint[0],
-            hit.worldSpaceHitPoint[1],
-            hit.worldSpaceHitPoint[2]);
+        
+                //Is the picked node in components selection mode ? If so it is in the hilite list
+                MSelectionList hiliteList;
+                MGlobal::getHiliteList(hiliteList);
+                MItSelectionList selListIter(hiliteList, MFn::kMesh);//Iterate on meshes only
+                for (; !selListIter.isDone(); selListIter.next()) {
+                    MDagPath dagPath;
+                    selListIter.getDagPath(dagPath);
+                    if (itemPath == dagPath){
+                        isOneNodeInComponentsPickingMode = true;
+                        return;
+                    }
+                }
+
+                MDagPath selectPath;
+                if (MS::kSuccess != MDagPath::getAPathTo(itemPath.transform(), selectPath)) {
+                    selectPath = itemPath;
+                }
+                selectionList.add(selectPath);
+                worldSpaceHitPts.append(
+                    hit.worldSpaceHitPoint[0],
+                    hit.worldSpaceHitPoint[1],
+                    hit.worldSpaceHitPoint[2]);
             },
             _renderItemsAdapters);
         return true;
