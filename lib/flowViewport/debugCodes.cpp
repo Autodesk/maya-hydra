@@ -44,6 +44,10 @@ TF_REGISTRY_FUNCTION(TfDebug)
     TF_DEBUG_ENVIRONMENT_SYMBOL(
         PXR_NS::FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX,
         "Print information about the Flow Viewport wireframe selection highlight scene index.");
+
+    TF_DEBUG_ENVIRONMENT_SYMBOL(
+        PXR_NS::FVP_ISOLATE_SELECT_SCENE_INDEX,
+        "Print information about the Flow Viewport isolate select scene index.");
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

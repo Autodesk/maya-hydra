@@ -87,6 +87,11 @@ void Selection::Replace(const PrimSelections& primSelections)
     }
 }
 
+void Selection::Replace(const Selection& rhs)
+{
+    _pathToState = rhs._pathToState;
+}
+
 void Selection::RemoveHierarchy(const PXR_NS::SdfPath& primPath)
 {
     auto it = _pathToState.lower_bound(primPath);
@@ -116,6 +121,74 @@ bool Selection::HasFullySelectedAncestorInclusive(const SdfPath& primPath, const
         }
     }
     return false;
+}
+
+bool Selection::HasDescendantInclusive(const PXR_NS::SdfPath& primPath) const
+{
+    // No entries?  No descendant
+    if (_pathToState.empty()) {
+        return false;
+    }
+
+    // At least one entry.  Skip all entries before argument.  The iterator
+    // points to an entry with matching or greater key.
+    auto it = _pathToState.lower_bound(primPath);
+
+    // Reached the end?  Last entry is strictly smaller than, so no descendants.
+    if (it == _pathToState.end()) {
+        return false;
+    }
+
+    // Not at the end.  Query is exactly in the map, or is prefix to what is in
+    // the map (i.e. map contents is a descendant)?  Return true.
+    return (it->first == primPath || it->first.HasPrefix(primPath));
+}
+
+bool 
+Selection::HasAncestorOrDescendantInclusive(const PXR_NS::SdfPath& primPath) const
+{
+    // Use std::map::lower_bound to accelerate prim path lookup. The map is
+    // lexically ordered on SdfPath, with shorter paths less than longer
+    // paths. Makes determining ancestors and descendants somewhat tricky, but
+    // efficient. A prefix tree would be an easier data structure to implement
+    // this functionality.
+
+    // No entries?  No ancestors or descendants.
+    if (_pathToState.empty()) {
+        return false;
+    }
+
+    // At least one entry.  Skip all entries before argument.  The iterator
+    // points to an entry with matching or greater key.
+    auto it = _pathToState.lower_bound(primPath);
+
+    // Reached the end?  Last entry is strictly smaller than, so no descendants
+    // in map.  Check if it's an ancestor.
+    if (it == _pathToState.end()) {
+        auto rit = _pathToState.rbegin();
+        return primPath.HasPrefix(rit->first);
+    }
+
+    // Not at the end.  Map entry has matching or greater key, so check 
+    // match, or if the map entry with greater key is a descendant (i.e. query
+    // is an ancestor).
+    if (it->first == primPath ||         // Query is in map
+        it->first.HasPrefix(primPath)) { // Query descendant in map
+            return true;
+    }
+
+    // Map entry is strictly greater and not a descendant.  For the map entry
+    // to be an ancestor of the query, it would have to be less than the query.
+    // Thus, if we're at the beginning, the map entry is unrelated to the query.
+    if (it == _pathToState.begin()) {
+        return false;
+    }
+
+    // Map entry still strictly greater and not a descendant.  Is the previous
+    // map entry (lower key) a prefix (ancestor) to the query (i.e. query is a
+    // descendant)?
+    it = std::prev(it);
+    return primPath.HasPrefix(it->first); // Ancestor in map
 }
 
 SdfPathVector Selection::FindFullySelectedAncestorsInclusive(const SdfPath& primPath, const SdfPath& topmostAncestor/* = SdfPath::AbsoluteRootPath()*/) const
