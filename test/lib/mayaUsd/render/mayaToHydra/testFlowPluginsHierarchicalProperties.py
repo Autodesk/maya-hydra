@@ -28,9 +28,9 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1
 
-    def keyframeAttribute(self, object, attribute, value):
-        cmds.setAttr(object + "." + attribute, value)
-        cmds.setKeyframe(object, attribute=attribute)
+    def keyframeAttribute(self, object, attr, value):
+        cmds.setAttr(object + "." + attr, value)
+        cmds.setKeyframe(object, attribute=attr)
 
     def locatorSetup(self):
         # Sphere that should be filtered by the locator filtering scene index (>10k vertices)
@@ -65,15 +65,6 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         cmds.parent(stagePath, stageParent)
         stageTransform = stagePath.split('|')[1]
         return stageParent, stageTransform
-    
-    def assertSnapshotAndCompareVp2(self, referenceFile):
-        self.setHdStormRenderer()
-        self.assertSnapshotClose(referenceFile, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
-        self.setViewport2Renderer()
-        self.assertSnapshotSilhouetteClose(referenceFile, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
-        self.setHdStormRenderer()
 
     def test_Authoring_Locator(self):
         self.setBasicCam(10)
@@ -107,23 +98,23 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         stageParent, stageShape = self.usdStageSetup()
 
         # Hide/unhide parent
-        self.assertSnapshotAndCompareVp2("usdStage_visibility_on.png")
+        self.assertSnapshotAndCompareVp2("usdStage_visibility_on.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.setAttr(stageParent + ".visibility", False)
-        self.assertSnapshotAndCompareVp2("usdStage_visibility_off.png")
+        self.assertSnapshotAndCompareVp2("usdStage_visibility_off.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.setAttr(stageParent + ".visibility", True)
-        self.assertSnapshotAndCompareVp2("usdStage_visibility_on.png")
+        self.assertSnapshotAndCompareVp2("usdStage_visibility_on.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         # Hide/unhide the shape directly
         cmds.setAttr(stageShape + ".visibility", False)
-        self.assertSnapshotAndCompareVp2("usdStage_visibility_off.png")
+        self.assertSnapshotAndCompareVp2("usdStage_visibility_off.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.setAttr(stageShape + ".visibility", True)
-        self.assertSnapshotAndCompareVp2("usdStage_visibility_on.png")
+        self.assertSnapshotAndCompareVp2("usdStage_visibility_on.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         # Change a parent transform
         cmds.xform(stageParent, translation=[1,-2,3], rotation=[5,-10,15], scale=[1,-2,3])
-        self.assertSnapshotAndCompareVp2("usdStage_parentTransformChanged.png")
+        self.assertSnapshotAndCompareVp2("usdStage_parentTransformChanged.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         # Change the shape's transform directly
         cmds.xform(cmds.listRelatives(stageShape, parent=True)[0], translation=[-3,2,-1], rotation=[-15,10,-5], scale=[-2.5, 2.0, -1.5])
-        self.assertSnapshotAndCompareVp2("usdStage_shapeTransformChanged.png")
+        self.assertSnapshotAndCompareVp2("usdStage_shapeTransformChanged.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def test_Playback_Locator(self):
         self.setBasicCam(10)

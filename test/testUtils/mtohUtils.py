@@ -212,6 +212,16 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         super(MayaHydraBaseTestCase, self).assertSnapshotSilhouetteClose(refImagePath, fail, failpercent, hardfail,
                             warn, warnpercent, hardwarn, perceptual)
 
+    def assertSnapshotAndCompareVp2(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
+                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+        self.setHdStormRenderer()
+        self.assertSnapshotClose(refImage, fail, failpercent, imageVersion, hardfail, warn, warnpercent, hardwarn, perceptual)
+
+        self.setViewport2Renderer()
+        self.assertSnapshotSilhouetteClose(refImage, fail, failpercent, imageVersion, hardfail, warn, warnpercent, hardwarn, perceptual)
+
+        self.setHdStormRenderer()
+
     def runCppTest(self, testFilter):
         with PluginLoaded("mayaHydraCppTests"):
             cmds.mayaHydraCppTest(f=testFilter, inputDir=self._inputDir, outputDir=self._testDir)
