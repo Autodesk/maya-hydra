@@ -185,7 +185,8 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         self.keyframeAttribute(stageParent, "translateY", 5)
         self.keyframeAttribute(stageTransform, "translateZ", 5)
 
-        checkedTimes = [0, 1, 3, 5, 7, 10, 12]
+        # Note : frame 15 is empty, as the prim is hidden
+        checkedTimes = [0, 1, 3, 5, 7, 10, 12, 15]
 
         for time in checkedTimes:
             cmds.currentTime(time)
