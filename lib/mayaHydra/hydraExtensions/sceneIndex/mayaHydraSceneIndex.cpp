@@ -394,7 +394,6 @@ SdfPath MayaHydraSceneIndex::_mayaDefaultMaterialPath; // Common to all scene in
 VtValue MayaHydraSceneIndex::_mayaDefaultMaterial;
 SdfPath MayaHydraSceneIndex::_mayaDefaultLightPath; // Common to all scene indexes
 SdfPath MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath; // Common to all scene indexes
-VtValue MayaHydraSceneIndex::_mayaFacesSelectionMaterial;
 
 MayaHydraSceneIndex::MayaHydraSceneIndex(
     MayaHydraInitData& initData,
@@ -416,7 +415,7 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
         _mayaFacesSelectionMaterialPath = SdfPath::AbsoluteRootPath().AppendChild(
             _tokens
                 ->MayaFacesSelectionMaterial); // Is an absolute path, not linked to a scene index
-        _mayaFacesSelectionMaterial = MayaHydraSceneIndex::CreateMayaFacesSelectionMaterial();
+        
         _fallbackMaterial = SdfPath::EmptyPath(); // Empty path for hydra fallback material
     });
 
@@ -426,6 +425,8 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
     AddPrims({ { _mayaFacesSelectionMaterialPath,
                  HdPrimTypeTokens->material,
                  mayaHydraFacesSelectionMaterialDataSource } });
+    //Always Create the material since it will update the color from the preferences if it has changed.
+    _mayaFacesSelectionMaterial = MayaHydraSceneIndex::CreateMayaFacesSelectionMaterial();
 }
 
 MayaHydraSceneIndex::~MayaHydraSceneIndex()

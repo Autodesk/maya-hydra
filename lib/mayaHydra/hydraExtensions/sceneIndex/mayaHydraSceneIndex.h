@@ -331,7 +331,7 @@ private:
     /// _mayaFacesSelectionMaterialPath is a path to a Hydra material used to display the faces selection on nodes when being in components selection mode
     static SdfPath _mayaFacesSelectionMaterialPath;
     /// _mayaFacesSelectionMaterial is a Hydra material used to display the faces selection on nodes when being in components selection mode
-    static VtValue _mayaFacesSelectionMaterial;
+    VtValue _mayaFacesSelectionMaterial;
 
     // Default light
     GlfSimpleLight _mayaDefaultLight;
