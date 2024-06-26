@@ -737,12 +737,50 @@ SdfPath MayaHydraSceneIndex::SetCameraViewport(const MDagPath& camPath, const Gf
     return {};
 }
 
+bool MayaHydraSceneIndex::IsPickedNodeInComponentsPickingMode(const HdxPickHit& hit)const
+{
+    // Is the picked node in components selection mode ? If so it is in the hilite list
+    MSelectionList hiliteList;
+    MGlobal::getHiliteList(hiliteList);
+    if (hiliteList.isEmpty()){
+        return false;
+    }
+
+    bool isOneNodeInComponentsPickingMode = false;
+            
+    SdfPath hitId = hit.objectId;
+    if (hitId.HasPrefix(GetRprimPath())) {
+        _FindAdapter<MayaHydraRenderItemAdapter>(
+            hitId,
+            [&hit, &hiliteList, &isOneNodeInComponentsPickingMode](
+                MayaHydraRenderItemAdapter* a) {
+                // prepare the selection path of the hit item, the transform path is expected if
+                // available
+                const auto& itemPath = a->GetDagPath();
+
+                // Is the picked node in components selection mode ? If so it is in the hilite list
+                MItSelectionList selListIter(hiliteList, MFn::kMesh); // Iterate on meshes only
+                for (; !selListIter.isDone(); selListIter.next()) {
+                    MDagPath dagPath;
+                    selListIter.getDagPath(dagPath);
+                    if (itemPath == dagPath) {
+                        isOneNodeInComponentsPickingMode = true;
+                        return;
+                    }
+                }
+            },
+            _renderItemsAdapters);
+        return isOneNodeInComponentsPickingMode;
+    }
+
+    return false;
+}
+
 bool MayaHydraSceneIndex::AddPickHitToSelectionList(
     const HdxPickHit& hit,
     const MHWRender::MSelectionInfo& /* selectInfo */,
     MSelectionList& selectionList,
-    MPointArray& worldSpaceHitPts,
-    bool& isOneNodeInComponentsPickingMode)
+    MPointArray& worldSpaceHitPts)
 {
     SdfPath hitId = hit.objectId;
     // validate that hit is indeed a maya item. Alternatively, the rprim hit could be an rprim
@@ -750,23 +788,10 @@ bool MayaHydraSceneIndex::AddPickHitToSelectionList(
     if (hitId.HasPrefix(GetRprimPath())) {
         _FindAdapter<MayaHydraRenderItemAdapter>(
             hitId,
-            [&selectionList, &worldSpaceHitPts, &hit, &isOneNodeInComponentsPickingMode](MayaHydraRenderItemAdapter* a) {
+            [&selectionList, &worldSpaceHitPts, &hit](MayaHydraRenderItemAdapter* a) {
                 // prepare the selection path of the hit item, the transform path is expected if available
                 const auto& itemPath = a->GetDagPath();
         
-                //Is the picked node in components selection mode ? If so it is in the hilite list
-                MSelectionList hiliteList;
-                MGlobal::getHiliteList(hiliteList);
-                MItSelectionList selListIter(hiliteList, MFn::kMesh);//Iterate on meshes only
-                for (; !selListIter.isDone(); selListIter.next()) {
-                    MDagPath dagPath;
-                    selListIter.getDagPath(dagPath);
-                    if (itemPath == dagPath){
-                        isOneNodeInComponentsPickingMode = true;
-                        return;
-                    }
-                }
-
                 MDagPath selectPath;
                 if (MS::kSuccess != MDagPath::getAPathTo(itemPath.transform(), selectPath)) {
                     selectPath = itemPath;

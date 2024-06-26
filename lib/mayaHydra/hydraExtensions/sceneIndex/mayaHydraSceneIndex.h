@@ -126,8 +126,10 @@ public:
         const HdxPickHit& hit,
         const MHWRender::MSelectionInfo& selectInfo,
         MSelectionList& selectionList,
-        MPointArray& worldSpaceHitPts,
-        bool& isOneNodeInComponentsPickingMode);
+        MPointArray& worldSpaceHitPts);
+
+    bool IsPickedNodeInComponentsPickingMode(const HdxPickHit& hit)const;
+    
 
     // Insert a primitive to hydra scene
     void InsertPrim(

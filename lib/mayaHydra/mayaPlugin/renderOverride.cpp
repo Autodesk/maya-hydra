@@ -365,8 +365,7 @@ public:
 
     //isOneNodeInComponentsPickingMode will be true if one of the picked node is in components picking mode
     virtual bool handlePickHit(
-        const PickInput& pickInput, PickOutput& pickOutput, bool& isOneNodeInComponentsPickingMode
-    ) const = 0;
+        const PickInput& pickInput, PickOutput& pickOutput) const = 0;
 
 protected:
 
@@ -427,8 +426,7 @@ public:
         PickHandlerBase(renderOverride) {}
 
     bool handlePickHit(
-        const PickInput& pickInput, PickOutput& pickOutput, bool& isOneNodeInComponentsPickingMode
-    ) const override
+        const PickInput& pickInput, PickOutput& pickOutput) const override
     {
         if (!mayaSceneIndex()) {
             TF_FATAL_ERROR("Picking called while no Maya scene index exists");
@@ -443,7 +441,7 @@ public:
 
         return mayaSceneIndex()->AddPickHitToSelectionList(
             pickInput.pickHit, pickInput.pickInfo, 
-            pickOutput.mayaSelection, pickOutput.mayaWorldSpaceHitPts, isOneNodeInComponentsPickingMode
+            pickOutput.mayaSelection, pickOutput.mayaWorldSpaceHitPts
         );
     }
 };
@@ -494,7 +492,7 @@ public:
     }
 
     bool handlePickHit(
-        const PickInput& pickInput, PickOutput& pickOutput, bool&
+        const PickInput& pickInput, PickOutput& pickOutput
     ) const override
     {
         if (!sceneIndexRegistry()) {
@@ -1703,7 +1701,7 @@ void MtohRenderOverride::_PopulateSelectionList(
     const MHWRender::MSelectionInfo& selectInfo,
     MSelectionList&                  selectionList,
     MPointArray&                     worldSpaceHitPts, 
-    bool&                            isOneNodeInComponentsPickingMode)
+    bool&                            isOneMayaNodeInComponentsPickingMode)
 {
     if (hits.empty() || !_mayaHydraSceneIndex || !_ufeSn) {
         return;
@@ -1711,15 +1709,30 @@ void MtohRenderOverride::_PopulateSelectionList(
 
     PickOutput pickOutput(selectionList, worldSpaceHitPts, _ufeSn);
 
+     // Is the picked node in components selection mode ? If so it is in the hilite list
+    MSelectionList hiliteList;
+    MGlobal::getHiliteList(hiliteList);
+    const bool hiliteListIsEmpty = hiliteList.isEmpty();
+
     MStatus status;
     for (const HdxPickHit& hit : hits) {
         PickInput pickInput(hit, selectInfo);
-
-        _PickHandler(hit)->handlePickHit(pickInput, pickOutput, isOneNodeInComponentsPickingMode);
-        if (isOneNodeInComponentsPickingMode){
-            return;//No need to continue iterating, we'll use maya/OGS to do the components selection
+        auto pickHandler = _PickHandler(hit);
+        if (!hiliteListIsEmpty && _IsMayaPickHandler(pickHandler)){
+            // Maya does not create Hydra instances, so if the pick hit instancer
+            // ID isn't empty, it's not a Maya pick hit.
+            if (_mayaHydraSceneIndex && pickInput.pickHit.instancerId.IsEmpty() && _mayaHydraSceneIndex->IsPickedNodeInComponentsPickingMode(pickInput.pickHit)){
+                isOneMayaNodeInComponentsPickingMode = true;
+                return;
+            }
         }
+        pickHandler->handlePickHit(pickInput, pickOutput);
     }
+}
+
+bool MtohRenderOverride::_IsMayaPickHandler(const MtohRenderOverride::PickHandlerBase* pickHandler)const
+{
+    return pickHandler == _pickHandlers[0].get();
 }
 
 const MtohRenderOverride::PickHandlerBase*

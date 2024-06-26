@@ -195,11 +195,13 @@ private:
         const MHWRender::MSelectionInfo& selectInfo,
         MSelectionList&                  selectionList,
         MPointArray&                     worldSpaceHitPts,
-        bool&                            isOneNodeInComponentsPickingMode);
+        bool&                            isOneMayaNodeInComponentsPickingMode);
 
     void _AddPluginSelectionHighlighting();
 
     bool _NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool currentUseDefaultMaterial, bool xRayEnabled);
+
+    bool _IsMayaPickHandler(const MtohRenderOverride::PickHandlerBase* pickHandler)const;
 
     // Determine the pick handler which should handle a pick hit, to transform
     // the pick hit into a selection.
