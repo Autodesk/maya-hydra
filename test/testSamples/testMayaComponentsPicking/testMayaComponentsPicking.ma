@@ -1,8 +1,8 @@
-//Maya ASCII 2026ff01 scene
+//Maya ASCII 2025ff01 scene
 //Name: componentsPicking.ma
 //Last modified: Wed, Jun 19, 2024 06:08:46 PM
 //Codeset: 1252
-requires maya "2026ff01";
+requires maya "2025ff01";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";
 fileInfo "product" "Maya 2025";
