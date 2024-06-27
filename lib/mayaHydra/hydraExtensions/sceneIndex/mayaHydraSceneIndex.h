@@ -32,7 +32,7 @@
 #include <mayaHydraLib/adapters/lightAdapter.h>
 #include <mayaHydraLib/adapters/cameraAdapter.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDefaultLightDataSource.h>
-#include <mayaHydraLib/sceneIndex/mayaHydraDefaultMaterialDataSource.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraMaterialDataSource.h>
 
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
 
@@ -126,6 +126,9 @@ public:
         const MHWRender::MSelectionInfo& selectInfo,
         MSelectionList& selectionList,
         MPointArray& worldSpaceHitPts);
+
+    bool IsPickedNodeInComponentsPickingMode(const HdxPickHit& hit)const;
+    
 
     // Insert a primitive to hydra scene
     void InsertPrim(
@@ -277,6 +280,7 @@ private:
     using LightDagPathMap = std::unordered_map<std::string, MDagPath>;
     LightDagPathMap _GetGlobalLightPaths() const;
     static VtValue CreateMayaDefaultMaterial();
+    static VtValue  CreateMayaFacesSelectionMaterial();
 
     using DirtyBitsToLocatorsFunc = std::function<void(TfToken const&, const HdDirtyBits, HdDataSourceLocatorSet*)>;
     void _MarkPrimDirty(
@@ -324,6 +328,11 @@ private:
     /// _mayaDefaultMaterial is a Hydra material used to override all materials from the scene when
     /// _useDefaultMaterial is true
     static VtValue _mayaDefaultMaterial;
+
+    /// _mayaFacesSelectionMaterialPath is a path to a Hydra material used to display the faces selection on nodes when being in components selection mode
+    static SdfPath _mayaFacesSelectionMaterialPath;
+    /// _mayaFacesSelectionMaterial is a Hydra material used to display the faces selection on nodes when being in components selection mode
+    VtValue _mayaFacesSelectionMaterial;
 
     // Default light
     GlfSimpleLight _mayaDefaultLight;

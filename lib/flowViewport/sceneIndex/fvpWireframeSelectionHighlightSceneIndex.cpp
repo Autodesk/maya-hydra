@@ -70,6 +70,9 @@ const std::string selectionHighlightMirrorTag = "_SelectionHighlight";
 
 SdfPath _GetSelectionHighlightMirrorPathFromOriginal(const SdfPath& originalPath)
 {
+    if (originalPath == SdfPath::AbsoluteRootPath()) {
+        return originalPath; //Avoid a warning in Hydra
+    }
     return originalPath.ReplaceName(TfToken(originalPath.GetName() + selectionHighlightMirrorTag));
 }
 

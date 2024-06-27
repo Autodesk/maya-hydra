@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef MAYAHYDRADEFAULTMATERIALDATASOURCE_H
-#define MAYAHYDRADEFAULTMATERIALDATASOURCE_H
+#ifndef SCENEINDEX_MAYA_HYDRA_MATERIAL_DATASOURCE_H
+#define SCENEINDEX_MAYA_HYDRA_MATERIAL_DATASOURCE_H
 
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
@@ -27,12 +27,12 @@ PXR_NAMESPACE_OPEN_SCOPE
 class MayaHydraSceneIndex;
 
 /**
- * \brief A container data source representing a default material with USDPreviewSurface
+ * \brief A generic container data source representing a maya hydra material
  */
- class MayaHydraDefaultMaterialDataSource : public HdContainerDataSource
+ class MayaHydraMaterialDataSource : public HdContainerDataSource
 {
 public:
-    HD_DECLARE_DATASOURCE(MayaHydraDefaultMaterialDataSource);
+    HD_DECLARE_DATASOURCE(MayaHydraMaterialDataSource);
 
     // ------------------------------------------------------------------------
     // HdContainerDataSource implementations
@@ -40,7 +40,7 @@ public:
     HdDataSourceBaseHandle Get(const TfToken& name) override;
 
 private:
-    MayaHydraDefaultMaterialDataSource(
+    MayaHydraMaterialDataSource(
         const SdfPath& id,
         TfToken type,
         MayaHydraSceneIndex* sceneIndex);
@@ -53,8 +53,8 @@ private:
     MayaHydraSceneIndex* _sceneIndex = nullptr;
 };
 
-HD_DECLARE_DATASOURCE_HANDLES(MayaHydraDefaultMaterialDataSource);
+HD_DECLARE_DATASOURCE_HANDLES(MayaHydraMaterialDataSource);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // MAYAHYDRADEFAULTMATERIALDATASOURCE_H
+#endif // SCENEINDEX_MAYA_HYDRA_MATERIAL_DATASOURCE_H

@@ -46,6 +46,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testDataProducerSelHighlight.py|skipOnPlatform:osx
     testPassingNormalsOnMayaNative.py
     testViewportFilters.py
+    testMayaComponentsPicking.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py

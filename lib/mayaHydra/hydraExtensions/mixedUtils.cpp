@@ -17,6 +17,8 @@
 
 #include "mixedUtils.h"
 
+#include <flowViewport/colorPreferences/fvpColorPreferences.h>
+
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/hydraUtils.h>
 
@@ -170,6 +172,13 @@ bool getIndexedColorPreferenceValue(
         return getColorPreferencesPaletteColor(tableName, colorIndex, outColor);
     }
     return false;
+}
+
+PXR_NS::GfVec4f getPreferencesColor(const PXR_NS::TfToken& token)
+{
+    PXR_NS::GfVec4f color;
+    Fvp::ColorPreferences::getInstance().getColor(token, color);
+    return color;
 }
 
 } // namespace MAYAHYDRA_NS_DEF
