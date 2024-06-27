@@ -88,7 +88,10 @@ static std::optional<MCallbackId> gsPluginLoadCallbackId;
 
 void pluginLoadCallback( const MStringArray& strs, void* clientData )
 {
-
+    std::cout << "pluginLoadCallback ------------------------- " << std::endl;
+    for (const auto& str : strs) {
+        std::cout << str.asChar() << std::endl;
+    }
 }
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
@@ -144,6 +147,12 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         ret.perror("Error registering plugin load callback.");
         return ret;
     }
+
+    plugin.registerUI(
+        "mayaHydra_registerUI_load",
+        "mayaHydra_registerUI_unload",
+        "mayaHydra_registerUI_batch_load",
+        "mayaHydra_registerUI_batch_unload");
 
     initialize();
 

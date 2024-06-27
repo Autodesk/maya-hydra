@@ -1,0 +1,51 @@
+global proc mayaHydraMenus_PrepareMenus() {
+    global string $gMainSelectMenu; // Maya's "Select" menu
+    addMenuCallback($gMainSelectMenu, "mayaHydraMenus_SelectMenuOpenedCallback");
+}
+
+global int $g_mayaHydraMenus_SelectMenuIdleEventId;
+
+global string $gMayaUsdSelectModeSubMenu;
+
+global proc mayaHydraMenus_SelectMenuOpenedCallback() {
+    global string $gMainSelectMenu; // Maya's "Select" menu
+    removeMenuCallback($gMainSelectMenu, "mayaHydraMenus_SelectMenuOpenedCallback");
+
+    $g_mayaHydraMenus_SelectMenuIdleEventId = `scriptJob -idleEvent "mayaHydraMenus_CreateSelectMenuItems"`;
+}
+
+global proc mayaHydraMenus_CreateSelectMenuItems() {
+    // Check if the USD Selection menu exists, and if not, wait for it by returning immediately
+    if ($gMayaUsdSelectModeSubMenu == "" || !`menuItem -q -exists $gMayaUsdSelectModeSubMenu`) {
+        return;
+    }
+
+    // The USD Selection menu now exists, so stop calling this idle event callback
+    scriptJob -kill $g_mayaHydraMenus_SelectMenuIdleEventId;
+
+    menuItem -divider true -dividerLabel "New Divider" -parent $gMayaUsdSelectModeSubMenu;
+}
+
+
+// addMenuCallback and removeMenuCallback copied from MayaUSD
+// See here : [TODO : insert link]
+
+///////////////////////////////////////////////////////////////////////////////
+// addMenuCallback
+// safely add a post menu callback to a menu
+proc addMenuCallback(string $menuName, string $cmd) {
+    string $existingCallbacks = `menu -q -pmc $menuName`;
+    // append the callback
+    menu -e -pmc ($existingCallbacks + ";" + $cmd + ";") $menuName;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// removeMenuCallback
+// safely remove a post menu callback to a menu
+proc removeMenuCallback(string $menuName, string $cmd) {
+    string $existingCallbacks = `menu -q -pmc $menuName`;
+    // remove our callback from the string of callbacks
+    string $newCallbacks =
+        `substitute (";"+$cmd+".*;") $existingCallbacks ""`;
+    menu -e -pmc $newCallbacks $menuName;
+}
