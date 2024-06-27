@@ -345,6 +345,17 @@ inline bool areDifferentForOneOfTheseBits(unsigned int val1, unsigned int val2, 
     return ((val1 & bitsToTest) != (val2 & bitsToTest));
 }
 
+inline bool isInComponentsPickingMode(const MHWRender::MSelectionInfo& selectInfo)
+{
+    return selectInfo.selectable(MSelectionMask::kSelectMeshVerts)
+        || selectInfo.selectable(MSelectionMask::kSelectMeshEdges)
+        || selectInfo.selectable(MSelectionMask::kSelectMeshFreeEdges)
+        || selectInfo.selectable(MSelectionMask::kSelectMeshFaces)
+        || selectInfo.selectable(MSelectionMask::kSelectVertices)
+        || selectInfo.selectable(MSelectionMask::kSelectEdges)
+        || selectInfo.selectable(MSelectionMask::kSelectFacets);
+}
+
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -353,8 +364,7 @@ class MtohRenderOverride::PickHandlerBase {
 public:
 
     virtual bool handlePickHit(
-        const PickInput& pickInput, PickOutput& pickOutput
-    ) const = 0;
+        const PickInput& pickInput, PickOutput& pickOutput) const = 0;
 
 protected:
 
@@ -415,8 +425,7 @@ public:
         PickHandlerBase(renderOverride) {}
 
     bool handlePickHit(
-        const PickInput& pickInput, PickOutput& pickOutput
-    ) const override
+        const PickInput& pickInput, PickOutput& pickOutput) const override
     {
         if (!mayaSceneIndex()) {
             TF_FATAL_ERROR("Picking called while no Maya scene index exists");
@@ -1690,7 +1699,8 @@ void MtohRenderOverride::_PopulateSelectionList(
     const HdxPickHitVector&          hits,
     const MHWRender::MSelectionInfo& selectInfo,
     MSelectionList&                  selectionList,
-    MPointArray&                     worldSpaceHitPts)
+    MPointArray&                     worldSpaceHitPts, 
+    bool&                            isOneMayaNodeInComponentsPickingMode)
 {
     if (hits.empty() || !_mayaHydraSceneIndex || !_ufeSn) {
         return;
@@ -1698,12 +1708,30 @@ void MtohRenderOverride::_PopulateSelectionList(
 
     PickOutput pickOutput(selectionList, worldSpaceHitPts, _ufeSn);
 
+     // Is the picked node in components selection mode ? If so it is in the hilite list
+    MSelectionList hiliteList;
+    MGlobal::getHiliteList(hiliteList);
+    const bool hiliteListIsEmpty = hiliteList.isEmpty();
+
     MStatus status;
     for (const HdxPickHit& hit : hits) {
         PickInput pickInput(hit, selectInfo);
-
-        _PickHandler(hit)->handlePickHit(pickInput, pickOutput);
+        auto pickHandler = _PickHandler(hit);
+        if (!hiliteListIsEmpty && _IsMayaPickHandler(pickHandler)){
+            // Maya does not create Hydra instances, so if the pick hit instancer
+            // ID isn't empty, it's not a Maya pick hit.
+            if (_mayaHydraSceneIndex && pickInput.pickHit.instancerId.IsEmpty() && _mayaHydraSceneIndex->IsPickedNodeInComponentsPickingMode(pickInput.pickHit)){
+                isOneMayaNodeInComponentsPickingMode = true;
+                return;
+            }
+        }
+        pickHandler->handlePickHit(pickInput, pickOutput);
     }
+}
+
+bool MtohRenderOverride::_IsMayaPickHandler(const MtohRenderOverride::PickHandlerBase* pickHandler)const
+{
+    return pickHandler == _pickHandlers[0].get();
 }
 
 const MtohRenderOverride::PickHandlerBase*
@@ -1791,6 +1819,16 @@ bool MtohRenderOverride::select(
         "MtohRenderOverride::select",
         "MtohRenderOverride::select");
 #endif
+    /*
+    * There are 2 modes of selection picking for components in maya :
+    * 1) You can be in components picking mode, this setting is global.This is detected in the function "isInComponentsPickingMode(selectInfo)"
+    * 2) The second mode is when you right click on a node and choose a component to pick it (e.g : Face), this is
+    * where we use the variable "isOneNodeInComponentsPickingMode" to detect that case, later in this function.
+    */
+    if (isInComponentsPickingMode(selectInfo)) {
+        return false; //When being in components picking, returning false will use maya/OGS for components selection
+    }
+
     MStatus status = MStatus::kFailure;
 
     MMatrix viewMatrix = frameContext.getMatrix(MHWRender::MFrameContext::kViewMtx, &status);
@@ -1864,7 +1902,12 @@ bool MtohRenderOverride::select(
         }
     }
 
-    _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts);
+    //isOneMayaNodeInComponentsPickingMode will be true if one of the picked node is in components picking mode
+    bool isOneMayaNodeInComponentsPickingMode = false;
+    _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneMayaNodeInComponentsPickingMode);
+    if (isOneMayaNodeInComponentsPickingMode){
+        return false;//When being in components picking on a node, returning false will use maya/OGS for components selection
+    }
     return true;
 }
 
