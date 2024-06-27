@@ -413,8 +413,7 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
         _mayaDefaultLightPath = SdfPath::AbsoluteRootPath().AppendChild(_tokens->DefaultMayaLight);
         _mayaDefaultMaterial = MayaHydraSceneIndex::CreateMayaDefaultMaterial();
         _mayaFacesSelectionMaterialPath = SdfPath::AbsoluteRootPath().AppendChild(
-            _tokens
-                ->MayaFacesSelectionMaterial); // Is an absolute path, not linked to a scene index
+            _tokens->MayaFacesSelectionMaterial);
         
         _fallbackMaterial = SdfPath::EmptyPath(); // Empty path for hydra fallback material
     });
@@ -746,13 +745,13 @@ bool MayaHydraSceneIndex::IsPickedNodeInComponentsPickingMode(const HdxPickHit& 
         return false;
     }
 
-    bool isOneNodeInComponentsPickingMode = false;
+    bool isOneMayaNodeInComponentsPickingMode = false;
             
     SdfPath hitId = hit.objectId;
     if (hitId.HasPrefix(GetRprimPath())) {
         _FindAdapter<MayaHydraRenderItemAdapter>(
             hitId,
-            [&hit, &hiliteList, &isOneNodeInComponentsPickingMode](
+            [&hit, &hiliteList, &isOneMayaNodeInComponentsPickingMode](
                 MayaHydraRenderItemAdapter* a) {
                 // prepare the selection path of the hit item, the transform path is expected if
                 // available
@@ -764,13 +763,13 @@ bool MayaHydraSceneIndex::IsPickedNodeInComponentsPickingMode(const HdxPickHit& 
                     MDagPath dagPath;
                     selListIter.getDagPath(dagPath);
                     if (itemPath == dagPath) {
-                        isOneNodeInComponentsPickingMode = true;
+                        isOneMayaNodeInComponentsPickingMode = true;
                         return;
                     }
                 }
             },
             _renderItemsAdapters);
-        return isOneNodeInComponentsPickingMode;
+        return isOneMayaNodeInComponentsPickingMode;
     }
 
     return false;

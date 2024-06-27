@@ -363,7 +363,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 class MtohRenderOverride::PickHandlerBase {
 public:
 
-    //isOneNodeInComponentsPickingMode will be true if one of the picked node is in components picking mode
     virtual bool handlePickHit(
         const PickInput& pickInput, PickOutput& pickOutput) const = 0;
 
@@ -1820,7 +1819,12 @@ bool MtohRenderOverride::select(
         "MtohRenderOverride::select",
         "MtohRenderOverride::select");
 #endif
-    
+    /*
+    * There are 2 modes of selection picking for components in maya :
+    * 1) You can be in components picking mode, this setting is global.This is detected in the function "isInComponentsPickingMode(selectInfo)"
+    * 2) The second mode is when you right click on a node and choose a component to pick it (e.g : Face), this is
+    * where we use the variable "isOneNodeInComponentsPickingMode" to detect that case, later in this function.
+    */
     if (isInComponentsPickingMode(selectInfo)) {
         return false; //When being in components picking, returning false will use maya/OGS for components selection
     }
@@ -1898,10 +1902,10 @@ bool MtohRenderOverride::select(
         }
     }
 
-    //isOneNodeInComponentsPickingMode will be true if one of the picked node is in components picking mode
-    bool isOneNodeInComponentsPickingMode = false;
-    _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneNodeInComponentsPickingMode);
-    if (isOneNodeInComponentsPickingMode){
+    //isOneMayaNodeInComponentsPickingMode will be true if one of the picked node is in components picking mode
+    bool isOneMayaNodeInComponentsPickingMode = false;
+    _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneMayaNodeInComponentsPickingMode);
+    if (isOneMayaNodeInComponentsPickingMode){
         return false;//When being in components picking on a node, returning false will use maya/OGS for components selection
     }
     return true;

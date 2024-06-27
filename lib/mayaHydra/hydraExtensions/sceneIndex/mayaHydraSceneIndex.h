@@ -120,8 +120,7 @@ public:
     // Populate data from Maya
     void Populate();
 
-    // Add hydra pick points and items to Maya's selection list, if isOneNodeInComponentsPickingMode is true when returning from this function, 
-    // then one of the picked node is on the hilite list meaning we are selecting one of its components
+    // Add hydra pick points and items to Maya's selection list
     bool AddPickHitToSelectionList(
         const HdxPickHit& hit,
         const MHWRender::MSelectionInfo& selectInfo,
