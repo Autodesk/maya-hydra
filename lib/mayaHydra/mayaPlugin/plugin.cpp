@@ -31,6 +31,7 @@
 
 #include <maya/MFnPlugin.h>
 #include <maya/MGlobal.h>
+#include <maya/MSceneMessage.h>
 
 #include <memory>
 #include <vector>
@@ -83,6 +84,13 @@ void finalize()
     MayaHydra::MayaColorPreferencesTranslator::deleteInstance();
 }
 
+static std::optional<MCallbackId> gsPluginLoadCallbackId;
+
+void pluginLoadCallback( const MStringArray& strs, void* clientData )
+{
+
+}
+
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
     MString experimental("mayaHydra is experimental.");
@@ -123,6 +131,20 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         }
     }
 
+    MStatus pluginLoadCallbackStatus;
+    MCallbackId pluginLoadCallbackId = MSceneMessage::addStringArrayCallback(
+        MSceneMessage::Message::kAfterPluginLoad, 
+        pluginLoadCallback, 
+        nullptr, 
+        &pluginLoadCallbackStatus);
+    if (pluginLoadCallbackStatus) {
+        gsPluginLoadCallbackId = pluginLoadCallbackId;
+    } else {
+        ret = MS::kFailure;
+        ret.perror("Error registering plugin load callback.");
+        return ret;
+    }
+
     initialize();
 
     return ret;
@@ -131,6 +153,10 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 {
     finalize();
+
+    if (gsPluginLoadCallbackId.has_value()) {
+        MSceneMessage::removeCallback(gsPluginLoadCallbackId.value());
+    }
 
     MFnPlugin plugin(obj, "Autodesk", PLUGIN_VERSION, "Any");
     MStatus   ret = MS::kSuccess;
