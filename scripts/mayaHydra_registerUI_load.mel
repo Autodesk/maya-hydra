@@ -3,43 +3,5 @@ global proc mayaHydra_registerUI_load()
 // Used to initialize any UI we create.
 {
     source "mayaHydra_GeomSubsetsPickModeMenu.mel";
-    mayaHydra_createRuntimeCommands;
     mayaHydra_GeomSubsetsPickModeMenu_Setup;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// mayaHydra_setGeomSubsetsPickMode
-// Helper function to set the GeomSubsets pick mode.
-global proc mayaHydra_setGeomSubsetsPickMode(string $mode) {
-    optionVar -stringValue "mayaHydra_GeomSubsetsPickMode" $mode;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// mayaHydra_getGeomSubsetsPickMode
-// Helper function to get the GeomSubsets pick mode.
-global proc string mayaHydra_getGeomSubsetsPickMode() {
-    string $mode = "";
-    if (`optionVar -exists "mayaHydra_GeomSubsetsPickMode"`) {
-        $mode = `optionVar -q "mayaHydra_GeomSubsetsPickMode"`;
-    }
-    return $mode;
-}
-
-global proc mayaHydra_createRuntimeCommands() {
-    if (!`runTimeCommand -exists mayaHydraGeomSubsetsPickMode_Prims`) {
-        runTimeCommand -default true -plugin "mayaHydra"
-            -label      "Prims"
-            -annotation "Select whole prims"
-            -category   "Menu items.Maya USD"
-            -command    ("mayaHydra_setGeomSubsetsPickMode(\"Prims\")")
-        mayaHydraGeomSubsetsPickMode_Prims;
-    }
-    if (!`runTimeCommand -exists mayaHydraGeomSubsetsPickMode_GeomSubsets`) {
-        runTimeCommand -default true -plugin "mayaHydra"
-            -label      "GeomSubsets"
-            -annotation "Select GeomSubsets"
-            -category   "Menu items.Maya USD"
-            -command    ("mayaHydra_setGeomSubsetsPickMode(\"GeomSubsets\")")
-        mayaHydraGeomSubsetsPickMode_GeomSubsets;
-    }
 }
