@@ -84,6 +84,50 @@ global proc mayaHydraMenus_CreatePickModeMenuItems() {
     global int $g_mayaHydraMenus_SelectMenuIdleEventId;
     scriptJob -kill $g_mayaHydraMenus_SelectMenuIdleEventId -force;
 
-    menuItem -divider true -dividerLabel "New Divider" -parent $gMayaUsdSelectModeSubMenu;
+    createPickModeMenuItems();
 }
 
+global proc createPickModeMenuItems() {
+    $origParent = `setParent -q -menu`;
+    global string $gMayaUsdSelectModeSubMenu;
+    setParent -menu $gMayaUsdSelectModeSubMenu;
+
+    menuItem -divider true -dividerLabel "GeomSubsets (Hydra viewports only)";
+
+    radioMenuItemCollection;
+    menuItem -radioButton on -runTimeCommand ("mayaHydraGeomSubsetsPickMode_Prims") geomSubsetsPickMode_Prims;
+    menuItem -radioButton off -runTimeCommand ("mayaHydraGeomSubsetsPickMode_GeomSubsets") geomSubsetsPickMode_GeomSubsets;
+
+    mayaHydra_updateGeomSubsetsPickModeMenuItems();
+
+    scriptJob -parent $gMayaUsdSelectModeSubMenu
+            -optionVarChanged "mayaHydra_GeomSubsetsPickMode" "mayaHydra_updateGeomSubsetsPickModeMenuItems";
+
+    setParent -menu $origParent;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+// mayaHydra_updateGeomSubsetsPickModeMenuItems
+// Update the menu item radio buttons in the GeomSubsets Pick Mode menu
+global proc mayaHydra_updateGeomSubsetsPickModeMenuItems() {
+    // Note: we do all string compares as case-insenstive (lowercase)
+    //       as the menu labels are capitalized.
+    string $pickMode = `tolower(mayaHydra_getGeomSubsetsPickMode())`;
+    switch($pickMode) {
+        case "":
+            menuItem -e -radioButton on geomSubsetsPickMode_Prims;
+            break;
+        default:
+            // Enable the menu item based on the label.
+            global string $gMayaUsdSelectModeSubMenu;
+            $menuItems = `menu -q -itemArray $gMayaUsdSelectModeSubMenu`;
+            for($i = 0; $i < size($menuItems); $i++) {
+                string $label = `menuItem -q -label $menuItems[$i]`;
+                if(`tolower($label)` == $pickMode) {
+                    menuItem -e -radioButton on $menuItems[$i];
+                    break;
+                }
+            }
+    }
+}
