@@ -136,6 +136,12 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         }
     }
 
+    plugin.registerUI(
+        "mayaHydra_registerUI_load",
+        "mayaHydra_registerUI_unload",
+        "mayaHydra_registerUI_batch_load",
+        "mayaHydra_registerUI_batch_unload");
+
     MStatus beforePluginUnloadCallbackStatus;
     MCallbackId beforePluginUnloadCallbackId = MSceneMessage::addStringArrayCallback(
         MSceneMessage::Message::kBeforePluginUnload, 
@@ -149,12 +155,6 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         ret.perror("Error registering BeforePluginUnload callback.");
         return ret;
     }
-
-    plugin.registerUI(
-        "mayaHydra_registerUI_load",
-        "mayaHydra_registerUI_unload",
-        "mayaHydra_registerUI_batch_load",
-        "mayaHydra_registerUI_batch_unload");
 
     initialize();
 
