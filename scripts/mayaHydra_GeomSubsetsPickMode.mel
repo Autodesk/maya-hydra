@@ -73,10 +73,26 @@ global proc mayaHydra_GeomSubsetsPickMode_TeardownUI() {
 }
 
 global proc mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback() {
+    // Explanation of how we augment MayaUSD's selection modes menu with our custom options
+    // for GeomSubsets picking :
+    // To create its selection modes menu, MayaUSD, on plugin UI load, will setup a callback
+    // on when the "Select" menu in Maya is opened. The callback will then create the selection
+    // modes submenu and its menu items. So what we do in order to add our own menu items is that
+    // we also add our own callback on the "Select" menu. However, we can't count on the order
+    // in which callbacks will be registered and processed, and just blindly add the menu items here.
+    // To work around this, we thus create the UI elements in a method that will be called by an idle 
+    // event/scriptJob, which will be executed after the "Select" menu open callbacks have been 
+    // processed. The USD selection modes menu should then exist, and we can add our menu items then.
+
+    // If MayaUSD is not loaded, the USD selection modes menu won't exist, so no need to try and add
+    // our own menu items.
     if (!`pluginInfo -q -loaded mayaUsdPlugin`) {
         return;
     }
 
+    // If our custom UI elements name is empty, then they do not exist or have been torn down previously,
+    // so create them. Note that we check that all UI elements have empty names : normally they should
+    // always either all have a name and exist, or all have no name and not exist.
     global string $gMayaHydra_GeomSubsetsPickMode_Divider;
     global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
     if ($gMayaHydra_GeomSubsetsPickMode_Divider == ""

@@ -89,6 +89,9 @@ static std::optional<MCallbackId> gsBeforePluginUnloadCallbackId;
 void beforePluginUnloadCallback( const MStringArray& strs, void* clientData )
 {
     for (const auto& str : strs) {
+        // If MayaUSD is being unloaded, tear down our GeomSubsets picking mode UI.
+        // This resets the variables used to keep track of the UI elements' existence,
+        // and allows us to recreate them if MayaUSD is reloaded.
         if (str == "mayaUsdPlugin") {
             MGlobal::executeCommand("mayaHydra_GeomSubsetsPickMode_TeardownUI");
             break;
