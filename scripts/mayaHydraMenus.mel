@@ -1,32 +1,3 @@
-global proc mayaHydraMenus_PrepareMenus() {
-    global string $gMainSelectMenu; // Maya's "Select" menu
-    addMenuCallback($gMainSelectMenu, "mayaHydraMenus_SelectMenuOpenedCallback");
-}
-
-global int $g_mayaHydraMenus_SelectMenuIdleEventId;
-
-global string $gMayaUsdSelectModeSubMenu;
-
-global proc mayaHydraMenus_SelectMenuOpenedCallback() {
-    global string $gMainSelectMenu; // Maya's "Select" menu
-    removeMenuCallback($gMainSelectMenu, "mayaHydraMenus_SelectMenuOpenedCallback");
-
-    $g_mayaHydraMenus_SelectMenuIdleEventId = `scriptJob -idleEvent "mayaHydraMenus_CreateSelectMenuItems"`;
-}
-
-global proc mayaHydraMenus_CreateSelectMenuItems() {
-    // Check if the USD Selection menu exists, and if not, wait for it by returning immediately
-    if ($gMayaUsdSelectModeSubMenu == "" || !`menuItem -q -exists $gMayaUsdSelectModeSubMenu`) {
-        return;
-    }
-
-    // The USD Selection menu now exists, so stop calling this idle event callback
-    scriptJob -kill $g_mayaHydraMenus_SelectMenuIdleEventId;
-
-    menuItem -divider true -dividerLabel "New Divider" -parent $gMayaUsdSelectModeSubMenu;
-}
-
-
 // addMenuCallback and removeMenuCallback copied from MayaUSD
 // See here : [TODO : insert link]
 
@@ -49,3 +20,70 @@ proc removeMenuCallback(string $menuName, string $cmd) {
         `substitute (";"+$cmd+".*;") $existingCallbacks ""`;
     menu -e -pmc $newCallbacks $menuName;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// addMenuItemCallback
+// safely add a post menu item callback to a menu item
+proc addMenuItemCallback(string $menuItemName, string $cmd) {
+    string $existingCallbacks = `menuItem -q -pmc $menuItemName`;
+    // append the callback
+    menuItem -e -pmc ($existingCallbacks + ";" + $cmd + ";") $menuItemName;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// removeMenuItemCallback
+// safely remove a post menu item callback to a menu item
+proc removeMenuItemCallback(string $menuItemName, string $cmd) {
+    string $existingCallbacks = `menuItem -q -pmc $menuItemName`;
+    // remove our callback from the string of callbacks
+    string $newCallbacks =
+        `substitute (";"+$cmd+".*;") $existingCallbacks ""`;
+    menuItem -e -pmc $newCallbacks $menuItemName;
+}
+
+
+global proc mayaHydraMenus_PrepareMenus() {
+    global string $gMainSelectMenu; // Maya's "Select" menu
+    addMenuCallback($gMainSelectMenu, "mayaHydraMenus_SelectMenuOpenedCallback");
+}
+
+global int $g_mayaHydraMenus_SelectMenuIdleEventId;
+
+global string $gMayaUsdSelectModeSubMenu;
+
+global int $g_mayaHydraMenus_PickModeMenuEventRegistered;
+
+global proc mayaHydraMenus_SelectMenuOpenedCallback() {
+    global string $gMainSelectMenu; // Maya's "Select" menu
+    removeMenuCallback($gMainSelectMenu, "mayaHydraMenus_SelectMenuOpenedCallback");
+
+    global int $g_mayaHydraMenus_SelectMenuIdleEventId;
+    $g_mayaHydraMenus_SelectMenuIdleEventId = `scriptJob -idleEvent "mayaHydraMenus_CreateSelectMenuItems"`;
+}
+
+global proc mayaHydraMenus_CreateSelectMenuItems() {
+    global string $gMayaUsdSelectModeSubMenu;
+    // Check if the USD Selection menu exists, and if not, wait for it by returning immediately
+    if ($gMayaUsdSelectModeSubMenu == "" || !`menuItem -q -exists $gMayaUsdSelectModeSubMenu`) {
+        return;
+    }
+
+    print "ScriptJob running";
+
+    global int $g_mayaHydraMenus_PickModeMenuEventRegistered;
+    if ($g_mayaHydraMenus_PickModeMenuEventRegistered == 0) {
+        addMenuItemCallback($gMayaUsdSelectModeSubMenu, "mayaHydraMenus_CreatePickModeMenuItems");
+        $g_mayaHydraMenus_PickModeMenuEventRegistered = 1;
+    }
+}
+
+global proc mayaHydraMenus_CreatePickModeMenuItems() {
+    global string $gMayaUsdSelectModeSubMenu;
+    removeMenuItemCallback($gMayaUsdSelectModeSubMenu, "mayaHydraMenus_CreatePickModeMenuItems");
+
+    global int $g_mayaHydraMenus_SelectMenuIdleEventId;
+    scriptJob -kill $g_mayaHydraMenus_SelectMenuIdleEventId -force;
+
+    menuItem -divider true -dividerLabel "New Divider" -parent $gMayaUsdSelectModeSubMenu;
+}
+
