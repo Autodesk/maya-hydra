@@ -222,26 +222,6 @@ UsdPrim GetPrimOrAncestorWithKind(const UsdPrim& prim, const TfToken& kind)
     return iterPrim;
 }
 
-std::vector<SdfPath> GetSelectedFaceSubsets(const UsdPrim& prim, const int faceIndex)
-{
-    std::vector<SdfPath> selectedFaceSubsets;
-
-    auto faceSubsets = UsdGeomSubset::GetGeomSubsets(UsdGeomImageable(prim), UsdGeomTokens->face);
-    for (const auto& faceSubset : faceSubsets) {
-        auto indicesAttr = faceSubset.GetIndicesAttr();
-        VtIntArray indices;
-        indicesAttr.Get(&indices);
-        for (auto index : indices) {
-            if (index == faceIndex) {
-                selectedFaceSubsets.push_back(faceSubset.GetPath());
-                break;
-            }
-        }
-    }
-
-    return selectedFaceSubsets;
-}
-
 //! Pick resolution behavior to use when the picked object is a point instance.
 enum UsdPointInstancesPickMode
 {
@@ -1887,6 +1867,7 @@ void MtohRenderOverride::_PickByRegion(
     HdxPickHitVector& outHits,
     const MMatrix& viewMatrix,
     const MMatrix& projMatrix,
+    bool pickGeomSubsets,
     bool pointSnappingActive,
     int view_x,
     int view_y,
@@ -1917,10 +1898,15 @@ void MtohRenderOverride::_PickByRegion(
     HdxPickTaskContextParams pickParams;
     // Use the same size as selection region is enough to get all pick results.
     pickParams.resolution.Set(sel_w, sel_h);
+    pickParams.pickTarget = HdxPickTokens->pickPrimsAndInstances;
+    pickParams.resolveMode = HdxPickTokens->resolveUnique;
+    pickParams.doUnpickablesOcclude = false;
     pickParams.viewMatrix.Set(viewMatrix.matrix);
     pickParams.projectionMatrix.Set(adjustedProjMatrix.matrix);
-    pickParams.resolveMode = HdxPickTokens->resolveUnique;
-    if (GetGeomSubsetsPickMode() == UsdGeomSubsetsPickMode::GeomSubsets) {
+    pickParams.collection = _renderCollection;
+    pickParams.outHits = &outHits;
+    
+    if (pickGeomSubsets) {
         pickParams.pickTarget = HdxPickTokens->pickFaces;
     }
 
@@ -1931,11 +1917,6 @@ void MtohRenderOverride::_PickByRegion(
         pickParams.collection = _pointSnappingCollection;
         pickParams.collection.SetExcludePaths(_selectionSceneIndex->GetFullySelectedPaths());
     }
-    else {
-        pickParams.collection = _renderCollection;
-    }
-
-    pickParams.outHits = &outHits;
 
     // Execute picking tasks.
     HdTaskSharedPtrVector pickingTasks = _taskController->GetPickingTasks();
@@ -1979,6 +1960,7 @@ bool MtohRenderOverride::select(
         return false;
 
     HdxPickHitVector outHits;
+    const bool pickGeomSubsets = GetGeomSubsetsPickMode() == UsdGeomSubsetsPickMode::GeomSubsets;
     const bool pointSnappingActive = selectInfo.pointSnapping();
     if (pointSnappingActive)
     {
@@ -1999,7 +1981,7 @@ bool MtohRenderOverride::select(
             unsigned int curr_sel_x = cursor_x > (int)curr_sel_w / 2 ? cursor_x - (int)curr_sel_w / 2 : 0;
             unsigned int curr_sel_y = cursor_y > (int)curr_sel_h / 2 ? cursor_y - (int)curr_sel_h / 2 : 0;
 
-            _PickByRegion(outHits, viewMatrix, projMatrix, pointSnappingActive,
+            _PickByRegion(outHits, viewMatrix, projMatrix, pickGeomSubsets, pointSnappingActive,
                 view_x, view_y, view_w, view_h, curr_sel_x, curr_sel_y, curr_sel_w, curr_sel_h);
 
             // Increase the size of picking region.
@@ -2010,7 +1992,7 @@ bool MtohRenderOverride::select(
     // Pick from original region directly when point snapping is not active or no hit is found yet.
     if (outHits.empty())
     {
-        _PickByRegion(outHits, viewMatrix, projMatrix, pointSnappingActive,
+        _PickByRegion(outHits, viewMatrix, projMatrix, pickGeomSubsets, pointSnappingActive,
             view_x, view_y, view_w, view_h, sel_x, sel_y, sel_w, sel_h);
     }
 
@@ -2030,17 +2012,7 @@ bool MtohRenderOverride::select(
             outHits.clear();
         }
     }
-    static std::mutex printMutex;
-    {
-        std::lock_guard printLock(printMutex);
-        //std::cout << " ----------------- " << std::endl;
-        for (size_t iHit = 0; iHit < outHits.size(); iHit++) {
-            //std::cout << "Pick #" << iHit + 1 << " : " << std::endl;
-            std::stringstream ss;
-            ss << outHits[iHit];
-            //std::cout << ss.str() << std::endl;
-        }
-    }
+
     _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts);
     return true;
 }
