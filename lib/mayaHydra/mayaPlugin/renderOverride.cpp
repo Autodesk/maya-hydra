@@ -606,10 +606,10 @@ public:
             hitPaths.push_back(resolvePointInstancePicking(*renderIndex(), pickInput.pickHit));
         }
 
-        // For the USD pick handler pick results are directly returned with USD
-        // scene paths, so no need to remove scene index plugin path prefix.
         size_t nbSelectedUfeItems = 0;
         for (const auto& [pickedUsdPath, instanceNdx] : hitPaths) {
+            // For the USD pick handler pick results are directly returned with USD
+            // scene paths, so no need to remove scene index plugin path prefix.
             const auto pickedMayaPath = usdPathToUfePath(registration, pickedUsdPath);
             const auto snMayaPath =
                 // As per https://stackoverflow.com/questions/46114214
