@@ -30,18 +30,6 @@
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
 #include <mayaHydraLib/hydraUtils.h>
-#include <pxr/base/vt/types.h>
-#include <pxr/imaging/hd/dataSource.h>
-#include <pxr/imaging/hd/dataSourceLocator.h>
-#include <pxr/imaging/hd/geomSubsetSchema.h>
-#include <pxr/imaging/hd/primOriginSchema.h>
-#include <pxr/imaging/hd/renderDelegate.h>
-#include <pxr/imaging/hd/sceneIndex.h>
-#include <pxr/imaging/hd/tokens.h>
-#include <pxr/usd/sdf/path.h>
-#include <pxr/usd/usd/timeCode.h>
-#include <pxr/usd/usdGeom/imageable.h>
-#include <pxr/usd/usdGeom/subset.h>
 
 #ifdef CODE_COVERAGE_WORKAROUND
 #include <flowViewport/fvpUtils.h>
@@ -88,6 +76,7 @@
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/imaging/hd/rprim.h>
+#include <pxr/imaging/hd/geomSubsetSchema.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
 #include <pxr/imaging/hdx/selectionTask.h>
 #include <pxr/imaging/hdx/colorizeSelectionTask.h>
@@ -530,7 +519,7 @@ public:
     // Return the closest path and the instance index in the scene index scene
     // that corresponds to the pick hit.  If the pick hit is not an instance,
     // the instance index will be -1.
-    HitPath resolvePointInstancePicking(HdRenderIndex& renderIndex, const HdxPickHit& pickHit) const
+    HitPath resolvePrimAndInstancePicking(HdRenderIndex& renderIndex, const HdxPickHit& pickHit) const
     {
         auto primOrigin = HdxPrimOriginInfo::FromPickHit(&renderIndex, pickHit);
 
@@ -600,10 +589,10 @@ public:
 
             // If we did not find any geomSubset and this is the only pick hit, then fallback to selecting the base prim/instance.
             if (hitPaths.empty() && pickInput.isSolePickHit) {
-                hitPaths.push_back(resolvePointInstancePicking(*renderIndex(), pickInput.pickHit));
+                hitPaths.push_back(resolvePrimAndInstancePicking(*renderIndex(), pickInput.pickHit));
             }
         } else {
-            hitPaths.push_back(resolvePointInstancePicking(*renderIndex(), pickInput.pickHit));
+            hitPaths.push_back(resolvePrimAndInstancePicking(*renderIndex(), pickInput.pickHit));
         }
 
         size_t nbSelectedUfeItems = 0;
