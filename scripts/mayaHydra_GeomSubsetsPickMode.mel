@@ -20,6 +20,10 @@ proc removeMenuCallback(string $menuName, string $cmd) {
     menu -e -pmc $newCallbacks $menuName;
 }
 
+global string $gMayaHydra_GeomSubsetsPickMode_Divider;
+global string $gMayaHydra_GeomSubsetsPickMode_ButtonPrims;
+global string $gMayaHydra_GeomSubsetsPickMode_ButtonGeomSubsets;
+
 // Helper function to get the GeomSubsets pick mode.
 global proc string mayaHydra_GeomSubsetsPickMode_GetMode() {
     string $mode = "";
@@ -59,15 +63,32 @@ global proc mayaHydra_GeomSubsetsPickMode_SetupUI() {
     addMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
 }
 
+global proc mayaHydra_GeomSubsetsPickMode_TeardownUI() {
+    global string $gMayaHydra_GeomSubsetsPickMode_Divider;
+    global string $gMayaHydra_GeomSubsetsPickMode_ButtonPrims;
+    global string $gMayaHydra_GeomSubsetsPickMode_ButtonGeomSubsets;
+    deleteUI -menuItem 
+        $gMayaHydra_GeomSubsetsPickMode_Divider 
+        $gMayaHydra_GeomSubsetsPickMode_ButtonPrims 
+        $gMayaHydra_GeomSubsetsPickMode_ButtonGeomSubsets;
+    $gMayaHydra_GeomSubsetsPickMode_Divider = "";
+    $gMayaHydra_GeomSubsetsPickMode_ButtonPrims = "";
+    $gMayaHydra_GeomSubsetsPickMode_ButtonGeomSubsets = "";
+}
+
 global proc mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback() {
     if (!`pluginInfo -q -loaded mayaUsdPlugin`) {
         return;
     }
 
-    global string $gMainSelectMenu; // Maya's "Select" menu
-    removeMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
-
-    scriptJob -idleEvent "mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems" -runOnce true;
+    global string $gMayaHydra_GeomSubsetsPickMode_Divider;
+    global string $gMayaHydra_GeomSubsetsPickMode_ButtonPrims;
+    global string $gMayaHydra_GeomSubsetsPickMode_ButtonGeomSubsets;
+    if ($gMayaHydra_GeomSubsetsPickMode_Divider == ""
+        && $gMayaHydra_GeomSubsetsPickMode_ButtonPrims == ""
+        && $gMayaHydra_GeomSubsetsPickMode_ButtonGeomSubsets == "") {
+        scriptJob -idleEvent "mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems" -runOnce true;
+    }
 }
 
 global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
@@ -80,11 +101,11 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
     $origParent = `setParent -q -menu`;
     setParent -menu $gMayaUsdSelectModeSubMenu;
 
-    menuItem -divider true -dividerLabel "GeomSubsets (Hydra only)";
+    $gMayaHydra_GeomSubsetsPickMode_Divider = `menuItem -divider true -dividerLabel "GeomSubsets (Hydra only)"`;
 
     radioMenuItemCollection;
-    menuItem -radioButton on -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetPrims") mayaHydra_GeomSubsetsPickMode_Prims;
-    menuItem -radioButton off -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetGeomSubsets") mayaHydra_GeomSubsetsPickMode_GeomSubsets;
+    $gMayaHydra_GeomSubsetsPickMode_ButtonPrims = `menuItem -radioButton on -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetPrims") mayaHydra_GeomSubsetsPickMode_Prims`;
+    $gMayaHydra_GeomSubsetsPickMode_ButtonGeomSubsets = `menuItem -radioButton off -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetGeomSubsets") mayaHydra_GeomSubsetsPickMode_GeomSubsets`;
 
     mayaHydra_GeomSubsetsPickModeMenu_UpdateRadioButtons();
 

@@ -84,13 +84,17 @@ void finalize()
     MayaHydra::MayaColorPreferencesTranslator::deleteInstance();
 }
 
-static std::optional<MCallbackId> gsPluginLoadCallbackId;
+static std::optional<MCallbackId> gsBeforePluginUnloadCallbackId;
 
-void pluginLoadCallback( const MStringArray& strs, void* clientData )
+void beforePluginUnloadCallback( const MStringArray& strs, void* clientData )
 {
-    std::cout << "pluginLoadCallback ------------------------- " << std::endl;
+    std::cout << "beforePluginUnloadCallback ------------------------- " << std::endl;
     for (const auto& str : strs) {
         std::cout << str.asChar() << std::endl;
+        if (str == "mayaUsdPlugin") {
+            MGlobal::executeCommand("mayaHydra_GeomSubsetsPickMode_TeardownUI");
+            break;
+        }
     }
 }
 
@@ -134,17 +138,17 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         }
     }
 
-    MStatus pluginLoadCallbackStatus;
-    MCallbackId pluginLoadCallbackId = MSceneMessage::addStringArrayCallback(
-        MSceneMessage::Message::kAfterPluginLoad, 
-        pluginLoadCallback, 
+    MStatus beforePluginUnloadCallbackStatus;
+    MCallbackId beforePluginUnloadCallbackId = MSceneMessage::addStringArrayCallback(
+        MSceneMessage::Message::kBeforePluginUnload, 
+        beforePluginUnloadCallback, 
         nullptr, 
-        &pluginLoadCallbackStatus);
-    if (pluginLoadCallbackStatus) {
-        gsPluginLoadCallbackId = pluginLoadCallbackId;
+        &beforePluginUnloadCallbackStatus);
+    if (beforePluginUnloadCallbackStatus) {
+        gsBeforePluginUnloadCallbackId = beforePluginUnloadCallbackId;
     } else {
         ret = MS::kFailure;
-        ret.perror("Error registering plugin load callback.");
+        ret.perror("Error registering BeforePluginUnload callback.");
         return ret;
     }
 
@@ -163,8 +167,8 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 {
     finalize();
 
-    if (gsPluginLoadCallbackId.has_value()) {
-        MSceneMessage::removeCallback(gsPluginLoadCallbackId.value());
+    if (gsBeforePluginUnloadCallbackId.has_value()) {
+        MSceneMessage::removeCallback(gsBeforePluginUnloadCallbackId.value());
     }
 
     MFnPlugin plugin(obj, "Autodesk", PLUGIN_VERSION, "Any");
