@@ -17,29 +17,23 @@ proc removeMenuCallback(string $menuName, string $cmd) {
     menu -e -pmc $newCallbacks $menuName;
 }
 
-global proc mayaHydraMenus_PrepareMenus() {
+global proc mayaHydra_GeomSubsetsPickModeMenu_Setup() {
     global string $gMainSelectMenu; // Maya's "Select" menu
-    addMenuCallback($gMainSelectMenu, "mayaHydraMenus_SelectMenuOpenedCallback");
+    addMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
 }
 
-global int $g_mayaHydraMenus_SelectMenuIdleEventId;
-
-global string $gMayaUsdSelectModeSubMenu;
-
-global int $g_mayaHydraMenus_PickModeMenuEventRegistered;
-
-global proc mayaHydraMenus_SelectMenuOpenedCallback() {
+global proc mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback() {
     if (!`pluginInfo -q -loaded mayaUsdPlugin`) {
         return;
     }
 
     global string $gMainSelectMenu; // Maya's "Select" menu
-    removeMenuCallback($gMainSelectMenu, "mayaHydraMenus_SelectMenuOpenedCallback");
+    removeMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
 
-    scriptJob -idleEvent "mayaHydraMenus_CreatePickModeMenuItems" -runOnce true;
+    scriptJob -idleEvent "mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems" -runOnce true;
 }
 
-global proc mayaHydraMenus_CreatePickModeMenuItems() {
+global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
     global string $gMayaUsdSelectModeSubMenu;
     if ($gMayaUsdSelectModeSubMenu == "" || !`menuItem -q -exists $gMayaUsdSelectModeSubMenu`) {
         print "Error : USD selection submenu was not found, could not add GeomSubsets pick mode UI.\n";
@@ -49,7 +43,7 @@ global proc mayaHydraMenus_CreatePickModeMenuItems() {
     $origParent = `setParent -q -menu`;
     setParent -menu $gMayaUsdSelectModeSubMenu;
 
-    menuItem -divider true -dividerLabel "GeomSubsets (Hydra viewports only)";
+    menuItem -divider true -dividerLabel "GeomSubsets (Hydra only)";
 
     radioMenuItemCollection;
     menuItem -radioButton on -runTimeCommand ("mayaHydraGeomSubsetsPickMode_Prims") geomSubsetsPickMode_Prims;
