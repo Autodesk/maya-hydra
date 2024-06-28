@@ -231,7 +231,7 @@ enum UsdPointInstancesPickMode
 
 enum UsdGeomSubsetsPickMode
 {
-    Prims = 0,
+    PrimsAndInstances = 0,
     GeomSubsets
 };
 
@@ -266,13 +266,13 @@ UsdGeomSubsetsPickMode GetGeomSubsetsPickMode()
 {
     static const MString kOptionVarName(MayaHydraPickOptionVars->GeomSubsetsPickMode.GetText());
 
-    auto pickMode = UsdGeomSubsetsPickMode::Prims;
+    auto pickMode = UsdGeomSubsetsPickMode::PrimsAndInstances;
 
     if (MGlobal::optionVarExists(kOptionVarName)) {
         const TfToken pickModeToken(MGlobal::optionVarStringValue(kOptionVarName).asChar());
 
-        if (pickModeToken == GeomSubsetsPickModeTokens->Prims) {
-            pickMode = UsdGeomSubsetsPickMode::Prims;
+        if (pickModeToken == GeomSubsetsPickModeTokens->PrimsAndInstances) {
+            pickMode = UsdGeomSubsetsPickMode::PrimsAndInstances;
         } else if (pickModeToken == GeomSubsetsPickModeTokens->GeomSubsets) {
             pickMode = UsdGeomSubsetsPickMode::GeomSubsets;
         }

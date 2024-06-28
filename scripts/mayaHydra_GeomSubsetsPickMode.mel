@@ -38,13 +38,13 @@ global proc mayaHydra_GeomSubsetsPickMode_SetMode(string $mode) {
 }
 
 global proc mayaHydra_GeomSubsetsPickMode_SetupRuntimeCommands() {
-    if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetPrims`) {
+    if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetPrimsAndInstances`) {
         runTimeCommand -default true -plugin "mayaHydra"
-            -label      "Prims"
+            -label      "Prims & Instances"
             -annotation "Select whole prims"
             -category   "Menu items.Maya USD"
-            -command    ("mayaHydra_GeomSubsetsPickMode_SetMode(\"Prims\")")
-        mayaHydra_GeomSubsetsPickMode_SetPrims;
+            -command    ("mayaHydra_GeomSubsetsPickMode_SetMode(\"PrimsAndInstances\")")
+        mayaHydra_GeomSubsetsPickMode_SetPrimsAndInstances;
     }
     if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetGeomSubsets`) {
         runTimeCommand -default true -plugin "mayaHydra"
@@ -114,7 +114,7 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
     $gMayaHydra_GeomSubsetsPickMode_Divider = `menuItem -divider true -dividerLabel "GeomSubsets (Hydra only)"`;
 
     $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup = `radioMenuItemCollection`;
-    menuItem -radioButton on -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetPrims") mayaHydra_GeomSubsetsPickMode_Prims;
+    menuItem -radioButton on -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetPrimsAndInstances") mayaHydra_GeomSubsetsPickMode_PrimsAndInstances;
     menuItem -radioButton off -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetGeomSubsets") mayaHydra_GeomSubsetsPickMode_GeomSubsets;
 
     mayaHydra_GeomSubsetsPickModeMenu_UpdateRadioButtons();
@@ -132,7 +132,7 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_UpdateRadioButtons() {
     string $pickMode = `tolower(mayaHydra_GeomSubsetsPickMode_GetMode())`;
     switch($pickMode) {
         case "":
-            menuItem -e -radioButton on mayaHydra_GeomSubsetsPickMode_Prims;
+            menuItem -e -radioButton on mayaHydra_GeomSubsetsPickMode_PrimsAndInstances;
             break;
         default:
             // Enable the menu item based on the label.
