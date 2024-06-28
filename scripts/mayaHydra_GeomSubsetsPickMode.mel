@@ -40,7 +40,7 @@ global proc mayaHydra_GeomSubsetsPickMode_SetMode(string $mode) {
 global proc mayaHydra_GeomSubsetsPickMode_SetupRuntimeCommands() {
     if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetPrimsAndInstances`) {
         runTimeCommand -default true -plugin "mayaHydra"
-            -label      "Prims & Instances"
+            -label      "Prims and Instances"
             -annotation "Select whole prims"
             -category   "Menu items.Maya USD"
             -command    ("mayaHydra_GeomSubsetsPickMode_SetMode(\"PrimsAndInstances\")")
