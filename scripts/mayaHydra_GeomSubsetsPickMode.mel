@@ -1,4 +1,7 @@
-// addMenuCallback and removeMenuCallback copied from MayaUSD
+// Contents of this file are largely adaptations of MayaUSD code for Kind and Point Instance picking modes UI setup.
+// See the following MEL files in MayaUSD : [TODO : list file names, with links?]
+
+// addMenuCallback and removeMenuCallback were copied over from MayaUSD
 // See here : [TODO : insert link]
 
 // safely add a post menu callback to a menu
@@ -17,8 +20,41 @@ proc removeMenuCallback(string $menuName, string $cmd) {
     menu -e -pmc $newCallbacks $menuName;
 }
 
-global proc mayaHydra_GeomSubsetsPickModeMenu_Setup() {
-    mayaHydra_createRuntimeCommands;
+// Helper function to get the GeomSubsets pick mode.
+global proc string mayaHydra_GeomSubsetsPickMode_GetMode() {
+    string $mode = "";
+    if (`optionVar -exists "mayaHydra_GeomSubsetsPickMode"`) {
+        $mode = `optionVar -q "mayaHydra_GeomSubsetsPickMode"`;
+    }
+    return $mode;
+}
+
+// Helper function to set the GeomSubsets pick mode.
+global proc mayaHydra_GeomSubsetsPickMode_SetMode(string $mode) {
+    optionVar -stringValue "mayaHydra_GeomSubsetsPickMode" $mode;
+}
+
+global proc mayaHydra_GeomSubsetsPickMode_SetupRuntimeCommands() {
+    if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetPrims`) {
+        runTimeCommand -default true -plugin "mayaHydra"
+            -label      "Prims"
+            -annotation "Select whole prims"
+            -category   "Menu items.Maya USD"
+            -command    ("mayaHydra_GeomSubsetsPickMode_SetMode(\"Prims\")")
+        mayaHydra_GeomSubsetsPickMode_SetPrims;
+    }
+    if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetGeomSubsets`) {
+        runTimeCommand -default true -plugin "mayaHydra"
+            -label      "GeomSubsets"
+            -annotation "Select GeomSubsets"
+            -category   "Menu items.Maya USD"
+            -command    ("mayaHydra_GeomSubsetsPickMode_SetMode(\"GeomSubsets\")")
+        mayaHydra_GeomSubsetsPickMode_SetGeomSubsets;
+    }
+}
+
+global proc mayaHydra_GeomSubsetsPickMode_SetupUI() {
+    mayaHydra_GeomSubsetsPickMode_SetupRuntimeCommands;
     global string $gMainSelectMenu; // Maya's "Select" menu
     addMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
 }
@@ -47,8 +83,8 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
     menuItem -divider true -dividerLabel "GeomSubsets (Hydra only)";
 
     radioMenuItemCollection;
-    menuItem -radioButton on -runTimeCommand ("mayaHydraGeomSubsetsPickMode_Prims") geomSubsetsPickMode_Prims;
-    menuItem -radioButton off -runTimeCommand ("mayaHydraGeomSubsetsPickMode_GeomSubsets") geomSubsetsPickMode_GeomSubsets;
+    menuItem -radioButton on -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetPrims") mayaHydra_GeomSubsetsPickMode_Prims;
+    menuItem -radioButton off -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetGeomSubsets") mayaHydra_GeomSubsetsPickMode_GeomSubsets;
 
     mayaHydra_GeomSubsetsPickModeMenu_UpdateRadioButtons();
 
@@ -58,15 +94,14 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
     setParent -menu $origParent;
 }
 
-
 // Update the menu item radio buttons in the GeomSubsets pick mode UI
 global proc mayaHydra_GeomSubsetsPickModeMenu_UpdateRadioButtons() {
     // Note: we do all string compares as case-insensitive (lowercase)
     //       as the menu labels are capitalized.
-    string $pickMode = `tolower(mayaHydra_getGeomSubsetsPickMode())`;
+    string $pickMode = `tolower(mayaHydra_GeomSubsetsPickMode_GetMode())`;
     switch($pickMode) {
         case "":
-            menuItem -e -radioButton on geomSubsetsPickMode_Prims;
+            menuItem -e -radioButton on mayaHydra_GeomSubsetsPickMode_Prims;
             break;
         default:
             // Enable the menu item based on the label.
@@ -79,43 +114,5 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_UpdateRadioButtons() {
                     break;
                 }
             }
-    }
-}
-
-
-///////////////////////////////////////////////////////////////////////////////
-// mayaHydra_setGeomSubsetsPickMode
-// Helper function to set the GeomSubsets pick mode.
-global proc mayaHydra_setGeomSubsetsPickMode(string $mode) {
-    optionVar -stringValue "mayaHydra_GeomSubsetsPickMode" $mode;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// mayaHydra_getGeomSubsetsPickMode
-// Helper function to get the GeomSubsets pick mode.
-global proc string mayaHydra_getGeomSubsetsPickMode() {
-    string $mode = "";
-    if (`optionVar -exists "mayaHydra_GeomSubsetsPickMode"`) {
-        $mode = `optionVar -q "mayaHydra_GeomSubsetsPickMode"`;
-    }
-    return $mode;
-}
-
-global proc mayaHydra_createRuntimeCommands() {
-    if (!`runTimeCommand -exists mayaHydraGeomSubsetsPickMode_Prims`) {
-        runTimeCommand -default true -plugin "mayaHydra"
-            -label      "Prims"
-            -annotation "Select whole prims"
-            -category   "Menu items.Maya USD"
-            -command    ("mayaHydra_setGeomSubsetsPickMode(\"Prims\")")
-        mayaHydraGeomSubsetsPickMode_Prims;
-    }
-    if (!`runTimeCommand -exists mayaHydraGeomSubsetsPickMode_GeomSubsets`) {
-        runTimeCommand -default true -plugin "mayaHydra"
-            -label      "GeomSubsets"
-            -annotation "Select GeomSubsets"
-            -category   "Menu items.Maya USD"
-            -command    ("mayaHydra_setGeomSubsetsPickMode(\"GeomSubsets\")")
-        mayaHydraGeomSubsetsPickMode_GeomSubsets;
     }
 }
