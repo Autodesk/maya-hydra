@@ -483,7 +483,11 @@ public:
     UsdPickHandler(MtohRenderOverride& renderOverride) : 
         PickHandlerBase(renderOverride) {}
     
-    std::vector<HitPath> resolveGeomSubsetsPicking(HdSceneIndexBaseConstRefPtr sceneIndex, const SdfPath& basePrimPath, const TfToken& geomSubsetType, int componentIndex) const
+    std::vector<HitPath> resolveGeomSubsetsPicking(
+        HdSceneIndexBaseConstRefPtr sceneIndex, 
+        const SdfPath& basePrimPath, 
+        const TfToken& geomSubsetType, 
+        int componentIndex) const
     {
         if (componentIndex < 0 || sceneIndex->GetPrim(basePrimPath).primType != HdPrimTypeTokens->mesh) {
             return {};
@@ -523,50 +527,14 @@ public:
         return pickedGeomSubsets;
     }
 
-    std::vector<HitPath> resolvePointInstancePicking(HdRenderIndex& renderIndex, const HdxPickHit& pickHit) const
+    // Return the closest path and the instance index in the scene index scene
+    // that corresponds to the pick hit.  If the pick hit is not an instance,
+    // the instance index will be -1.
+    HitPath resolvePointInstancePicking(HdRenderIndex& renderIndex, const HdxPickHit& pickHit) const
     {
         auto primOrigin = HdxPrimOriginInfo::FromPickHit(&renderIndex, pickHit);
 
         if (pickHit.instancerId.IsEmpty()) {
-            return {{primOrigin.GetFullPath(), -1}};
-        }
-
-        // If there is a Hydra instancer, distinguish between native instancing
-        // (implicit USD prototype created by USD itself) and point instancing
-        // (explicitly authored USD prototypes).  As per HdxInstancerContext
-        // documentation:
-        // 
-        // [...] "exactly one of instancePrimOrigin or instancerPrimOrigin will
-        // contain data depending on whether the instancing at the current
-        // level was implicit or not, respectively."
-        const auto& instancerContext = primOrigin.instancerContexts.front();
-
-        if (instancerContext.instancePrimOrigin) {
-            // Implicit prototype instancing (i.e. USD native instancing).
-            auto schema = HdPrimOriginSchema(instancerContext.instancePrimOrigin);
-            if (!TF_VERIFY(schema, "Cannot build prim origin schema for USD native instance.")) {
-                return {{SdfPath(), -1}};
-            }
-            return {{schema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath), -1}};
-        }
-
-        // Explicit prototype instancing (i.e. USD point instancing).
-        std::function<HitPath(const HdxPrimOriginInfo& primOrigin, const HdxPickHit& hit)> pickFn[] = {pickInstancer, pickInstance, pickPrototype};
-                            
-        // Retrieve pick mode from mayaUsd optionVar, to see if we're picking
-        // instances, the instancer itself, or the prototype instanced by the
-        // point instance.
-        return {pickFn[GetPointInstancesPickMode()](primOrigin, pickHit)};
-    }
-
-    // Return the closest path and the instance index in the scene index scene
-    // that corresponds to the pick hit.  If the pick hit is not an instance,
-    // the instance index will be -1.
-    HitPath hitPath(const HdxPickHit& hit) const {
-        auto primOrigin = HdxPrimOriginInfo::FromPickHit(
-            renderIndex(), hit);
-
-        if (hit.instancerId.IsEmpty()) {
             return {primOrigin.GetFullPath(), -1};
         }
 
@@ -595,7 +563,7 @@ public:
         // Retrieve pick mode from mayaUsd optionVar, to see if we're picking
         // instances, the instancer itself, or the prototype instanced by the
         // point instance.
-        return pickFn[GetPointInstancesPickMode()](primOrigin, hit);
+        return pickFn[GetPointInstancesPickMode()](primOrigin, pickHit);
     }
 
     bool handlePickHit(
@@ -630,17 +598,12 @@ public:
                 hitPaths.insert(hitPaths.end(), geomSubsetsHitPaths.begin(), geomSubsetsHitPaths.end());
             }
 
+            // If we did not find any geomSubset and this is the only pick hit, then fallback to selecting the base prim/instance.
             if (hitPaths.empty() && pickInput.isSolePickHit) {
-                auto pointInstanceHitPaths = resolvePointInstancePicking(*renderIndex(), pickInput.pickHit);
-                if (!pointInstanceHitPaths.empty()) {
-                    hitPaths.insert(hitPaths.end(), pointInstanceHitPaths.begin(), pointInstanceHitPaths.end());
-                }
+                hitPaths.push_back(resolvePointInstancePicking(*renderIndex(), pickInput.pickHit));
             }
         } else {
-            auto pointInstanceHitPaths = resolvePointInstancePicking(*renderIndex(), pickInput.pickHit);
-            if (!pointInstanceHitPaths.empty()) {
-                hitPaths.insert(hitPaths.end(), pointInstanceHitPaths.begin(), pointInstanceHitPaths.end());
-            }
+            hitPaths.push_back(resolvePointInstancePicking(*renderIndex(), pickInput.pickHit));
         }
 
         // For the USD pick handler pick results are directly returned with USD
