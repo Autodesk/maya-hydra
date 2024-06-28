@@ -88,9 +88,7 @@ static std::optional<MCallbackId> gsBeforePluginUnloadCallbackId;
 
 void beforePluginUnloadCallback( const MStringArray& strs, void* clientData )
 {
-    std::cout << "beforePluginUnloadCallback ------------------------- " << std::endl;
     for (const auto& str : strs) {
-        std::cout << str.asChar() << std::endl;
         if (str == "mayaUsdPlugin") {
             MGlobal::executeCommand("mayaHydra_GeomSubsetsPickMode_TeardownUI");
             break;
