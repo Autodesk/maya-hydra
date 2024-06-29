@@ -104,11 +104,11 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback() {
 global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
     global string $gMayaUsdSelectModeSubMenu;
     if ($gMayaUsdSelectModeSubMenu == "" || !`menuItem -q -exists $gMayaUsdSelectModeSubMenu`) {
-        print "Error : USD selection submenu was not found, could not add GeomSubsets pick mode UI.\n";
+        print "Error : USD selection submenu was not found, could not create GeomSubsets pick mode UI.\n";
         return;
     }
 
-    $origParent = `setParent -q -menu`;
+    $prevParent = `setParent -q -menu`;
     setParent -menu $gMayaUsdSelectModeSubMenu;
 
     $gMayaHydra_GeomSubsetsPickMode_Divider = `menuItem -divider true -dividerLabel "GeomSubsets (Hydra only)"`;
@@ -122,7 +122,7 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
     scriptJob -parent $gMayaUsdSelectModeSubMenu
             -optionVarChanged "mayaHydra_GeomSubsetsPickMode" "mayaHydra_GeomSubsetsPickModeMenu_UpdateRadioButtons";
 
-    setParent -menu $origParent;
+    setParent -menu $prevParent;
 }
 
 // Update the menu item radio buttons in the GeomSubsets pick mode UI
