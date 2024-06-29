@@ -108,6 +108,7 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
         return;
     }
 
+    // Store the current parent menu and change it to the USD selection submenu
     $prevParent = `setParent -q -menu`;
     setParent -menu $gMayaUsdSelectModeSubMenu;
 
@@ -122,6 +123,7 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
     scriptJob -parent $gMayaUsdSelectModeSubMenu
             -optionVarChanged "mayaHydra_GeomSubsetsPickMode" "mayaHydra_GeomSubsetsPickModeMenu_UpdateRadioButtons";
 
+    // Restore the previous parent menu
     setParent -menu $prevParent;
 }
 
