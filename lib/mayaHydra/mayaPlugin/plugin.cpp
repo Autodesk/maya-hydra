@@ -184,7 +184,7 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     gsRenderOverrides.clear();
 
     // Clear any registered callbacks
-    MGlobal::executeCommand("callbacks -cc mayaHydra;");
+    MGlobal::executeCommand("callbacks -cc -owner mayaHydra;");
 
     if (!plugin.deregisterCommand(MtohViewCmd::name)) {
         ret = MS::kFailure;
