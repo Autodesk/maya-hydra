@@ -125,8 +125,10 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback() {
     // always either all have a name and exist, or all have no name and not exist.
     global string $gMayaHydra_GeomSubsetsPickMode_Divider;
     global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
+    global string $gMayaHydra_GeomSubsetsPickMode_RadioButtons[];
     if ($gMayaHydra_GeomSubsetsPickMode_Divider == ""
-        && $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup == "") {
+        && $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup == ""
+        && `size($gMayaHydra_GeomSubsetsPickMode_RadioButtons)` == 0) {
         scriptJob -idleEvent "mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems" -runOnce true;
     }
 }
