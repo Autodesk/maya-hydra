@@ -63,6 +63,9 @@ global proc mayaHydra_GeomSubsetsPickMode_SetupUI() {
 }
 
 global proc mayaHydra_GeomSubsetsPickMode_TeardownUI() {
+    global string $gMainSelectMenu; // Maya's "Select" menu
+    removeMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
+
     global string $gMayaHydra_GeomSubsetsPickMode_Divider;
     if (`menuItem -q -exists $gMayaHydra_GeomSubsetsPickMode_Divider`) {
         deleteUI -menuItem $gMayaHydra_GeomSubsetsPickMode_Divider;
