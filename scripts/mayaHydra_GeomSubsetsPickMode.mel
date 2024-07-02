@@ -20,8 +20,8 @@ proc removeMenuCallback(string $menuName, string $cmd) {
     menu -e -pmc $newCallbacks $menuName;
 }
 
-global string $gMayaHydra_GeomSubsetsPickMode_Divider;
-global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
+global string $gMayaHydra_GeomSubsetsPickMode_Divider = "";
+global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup = "";
 
 // Helper function to get the GeomSubsets pick mode.
 global proc string mayaHydra_GeomSubsetsPickMode_GetMode() {
@@ -64,11 +64,15 @@ global proc mayaHydra_GeomSubsetsPickMode_SetupUI() {
 
 global proc mayaHydra_GeomSubsetsPickMode_TeardownUI() {
     global string $gMayaHydra_GeomSubsetsPickMode_Divider;
-    global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
-    deleteUI -menuItem 
-        $gMayaHydra_GeomSubsetsPickMode_Divider 
-        $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
+    if (`menuItem -q -exists $gMayaHydra_GeomSubsetsPickMode_Divider`) {
+        deleteUI -menuItem $gMayaHydra_GeomSubsetsPickMode_Divider;
+    }
     $gMayaHydra_GeomSubsetsPickMode_Divider = "";
+
+    global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
+    if (`menuItem -q -exists $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup`) {
+        deleteUI -menuItem $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
+    }
     $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup = "";
 }
 
@@ -112,8 +116,10 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
     $prevParent = `setParent -q -menu`;
     setParent -menu $gMayaUsdSelectModeSubMenu;
 
+    global string $gMayaHydra_GeomSubsetsPickMode_Divider;
     $gMayaHydra_GeomSubsetsPickMode_Divider = `menuItem -divider true -dividerLabel "GeomSubsets (Hydra only)"`;
 
+    global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
     $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup = `radioMenuItemCollection`;
     menuItem -radioButton on -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetPrimsAndInstances") mayaHydra_GeomSubsetsPickMode_PrimsAndInstances;
     menuItem -radioButton off -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetGeomSubsets") mayaHydra_GeomSubsetsPickMode_GeomSubsets;
