@@ -1,0 +1,71 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+    metersPerUnit = 0.01
+    upAxis = "Z"
+)
+
+def Xform "Root"
+{
+    def Xform "CubeMeshXform"
+    {
+        double3 xformOp:translate = (2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+
+        def Mesh "CubeMesh" (
+            references = @./UpperHalfGeomSubsetCube.usda@
+        )
+        {
+            over "upperHalf" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token familyName = "materialBind"
+                rel material:binding = </mtl/GeomSubsetMaterial>
+            }
+        }
+    }
+
+    def Xform "SphereMeshXform"
+    {
+        double3 xformOp:translate = (-2, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+
+        def Mesh "SphereMesh" (
+            references = @./UpperHalfGeomSubsetSphere.usda@
+        )
+        {
+            over "upperHalf" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token familyName = "materialBind"
+                rel material:binding = </mtl/GeomSubsetMaterial>
+            }
+        }
+    }
+
+    def PointInstancer "SphereInstancer"
+    {
+        point3f[] positions = [(0, 0, -4), (0, 2, -4)]
+        int[] protoIndices = [0, 0]
+        rel prototypes = [
+            </Root/SphereMeshXform/SphereMesh>,
+        ]
+    }
+}
+
+def Scope "mtl"
+{
+    def Material "GeomSubsetMaterial"
+    {
+        token outputs:surface.connect = </mtl/GeomSubsetMaterial/GeomSubsetMaterial.outputs:surface>
+
+        def Shader "GeomSubsetMaterial"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            token outputs:surface
+        }
+    }
+}
+
