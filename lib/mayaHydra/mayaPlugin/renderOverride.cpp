@@ -1817,6 +1817,7 @@ void MtohRenderOverride::_PickByRegion(
     HdxPickHitVector& outHits,
     const MMatrix& viewMatrix,
     const MMatrix& projMatrix,
+    bool singlePick,
     bool pickGeomSubsets,
     bool pointSnappingActive,
     int view_x,
@@ -1849,7 +1850,7 @@ void MtohRenderOverride::_PickByRegion(
     // Use the same size as selection region is enough to get all pick results.
     pickParams.resolution.Set(sel_w, sel_h);
     pickParams.pickTarget = HdxPickTokens->pickPrimsAndInstances;
-    pickParams.resolveMode = HdxPickTokens->resolveUnique;
+    pickParams.resolveMode = singlePick ? HdxPickTokens->resolveNearestToCenter : HdxPickTokens->resolveUnique;
     pickParams.doUnpickablesOcclude = false;
     pickParams.viewMatrix.Set(viewMatrix.matrix);
     pickParams.projectionMatrix.Set(adjustedProjMatrix.matrix);
@@ -1910,6 +1911,7 @@ bool MtohRenderOverride::select(
         return false;
 
     HdxPickHitVector outHits;
+    const bool singlePick = selectInfo.singleSelection();
     const bool pickGeomSubsets = GetGeomSubsetsPickMode() == UsdGeomSubsetsPickMode::GeomSubsets;
     const bool pointSnappingActive = selectInfo.pointSnapping();
     if (pointSnappingActive)
@@ -1931,7 +1933,7 @@ bool MtohRenderOverride::select(
             unsigned int curr_sel_x = cursor_x > (int)curr_sel_w / 2 ? cursor_x - (int)curr_sel_w / 2 : 0;
             unsigned int curr_sel_y = cursor_y > (int)curr_sel_h / 2 ? cursor_y - (int)curr_sel_h / 2 : 0;
 
-            _PickByRegion(outHits, viewMatrix, projMatrix, pickGeomSubsets, pointSnappingActive,
+            _PickByRegion(outHits, viewMatrix, projMatrix, singlePick, pickGeomSubsets, pointSnappingActive,
                 view_x, view_y, view_w, view_h, curr_sel_x, curr_sel_y, curr_sel_w, curr_sel_h);
 
             // Increase the size of picking region.
@@ -1942,7 +1944,7 @@ bool MtohRenderOverride::select(
     // Pick from original region directly when point snapping is not active or no hit is found yet.
     if (outHits.empty())
     {
-        _PickByRegion(outHits, viewMatrix, projMatrix, pickGeomSubsets, pointSnappingActive,
+        _PickByRegion(outHits, viewMatrix, projMatrix, singlePick, pickGeomSubsets, pointSnappingActive,
             view_x, view_y, view_w, view_h, sel_x, sel_y, sel_w, sel_h);
     }
 
