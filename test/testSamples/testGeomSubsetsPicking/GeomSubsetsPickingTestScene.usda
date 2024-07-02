@@ -9,8 +9,9 @@ def Xform "Root"
 {
     def Xform "CubeMeshXform"
     {
-        double3 xformOp:translate = (2, 0, 0)
-        uniform token[] xformOpOrder = ["xformOp:translate"]
+        double3 xformOp:translate = (-2, 0, 0)
+        float3 xformOp:scale = (2, 2, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
 
         def Mesh "CubeMesh" (
             references = @./UpperHalfGeomSubsetCube.usda@
@@ -28,7 +29,7 @@ def Xform "Root"
 
     def Xform "SphereMeshXform"
     {
-        double3 xformOp:translate = (-2, 0, 0)
+        double3 xformOp:translate = (-2, 2, 0)
         uniform token[] xformOpOrder = ["xformOp:translate"]
 
         def Mesh "SphereMesh" (
@@ -47,7 +48,7 @@ def Xform "Root"
 
     def PointInstancer "SphereInstancer"
     {
-        point3f[] positions = [(0, 0, -4), (0, 2, -4)]
+        point3f[] positions = [(2, 0, 0), (2, 2, 0)]
         int[] protoIndices = [0, 0]
         rel prototypes = [
             </Root/SphereMeshXform/SphereMesh>,
