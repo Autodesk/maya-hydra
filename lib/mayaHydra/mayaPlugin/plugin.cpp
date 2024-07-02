@@ -181,13 +181,15 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         }
     };
     
-    registerPluginLoadingCallback(MSceneMessage::Message::kAfterPluginLoad, afterPluginLoadCallback);
-    if (!ret) {
-        return ret;
-    }
-    registerPluginLoadingCallback(MSceneMessage::Message::kBeforePluginUnload, beforePluginUnloadCallback);
-    if (!ret) {
-        return ret;
+    std::vector<std::pair<MSceneMessage::Message, MMessage::MStringArrayFunction>> pluginLoadingCallbacks = {
+        {MSceneMessage::Message::kAfterPluginLoad, afterPluginLoadCallback},
+        {MSceneMessage::Message::kBeforePluginUnload, beforePluginUnloadCallback}
+    };
+    for (const auto& pluginLoadingCallback : pluginLoadingCallbacks) {
+        registerPluginLoadingCallback(pluginLoadingCallback.first, pluginLoadingCallback.second);
+        if (!ret) {
+            return ret;
+        }
     }
 
     initialize();
