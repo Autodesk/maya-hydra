@@ -72,17 +72,11 @@ global proc mayaHydra_GeomSubsetsPickMode_SetupUI() {
 }
 
 global proc mayaHydra_GeomSubsetsPickMode_TeardownUI() {
-    print "mayaHydra_GeomSubsetsPickMode_TeardownUI\n";
     global string $gMainSelectMenu; // Maya's "Select" menu
     removeMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
-    
+
     global string $gMayaHydra_GeomSubsetsPickMode_Divider;
-    //print $gMayaHydra_GeomSubsetsPickMode_Divider;
-    //print "\n";
     if (`menuItem -q -exists $gMayaHydra_GeomSubsetsPickMode_Divider`) {
-        print "Deleting ";
-        print $gMayaHydra_GeomSubsetsPickMode_Divider;
-        print "\n";
         deleteUI -menuItem $gMayaHydra_GeomSubsetsPickMode_Divider;
     }
     $gMayaHydra_GeomSubsetsPickMode_Divider = "";
@@ -90,21 +84,13 @@ global proc mayaHydra_GeomSubsetsPickMode_TeardownUI() {
     global string $gMayaHydra_GeomSubsetsPickMode_RadioButtons[];
     for ($radioButton in $gMayaHydra_GeomSubsetsPickMode_RadioButtons) {
         if (`menuItem -q -exists $radioButton`) {
-            print "Deleting ";
-            print $radioButton;
-            print "\n";
             deleteUI -menuItem $radioButton;
         }
     }
     clear($gMayaHydra_GeomSubsetsPickMode_RadioButtons);
 
     global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
-    //print $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
-    //print "\n";
     if (`radioMenuItemCollection -q -exists $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup`) {
-        print "Deleting ";
-        print $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
-        print "\n";
         deleteUI -radioMenuItemCollection $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
     }
     $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup = "";
@@ -139,18 +125,10 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback() {
     // always either all have a name and exist, or all have no name and not exist.
     global string $gMayaHydra_GeomSubsetsPickMode_Divider;
     global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
-    //print $gMayaHydra_GeomSubsetsPickMode_Divider;
-    //print "\n";
-    //print $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
-    //print "\n";
     if ($gMayaHydra_GeomSubsetsPickMode_Divider == ""
         && $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup == "") {
         scriptJob -idleEvent "mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems" -runOnce true;
     }
-    //print $gMayaHydra_GeomSubsetsPickMode_Divider;
-    //print "\n";
-    //print $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
-    //print "\n";
 }
 
 global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
@@ -165,8 +143,6 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
     if (!$callbackExists) {
         return;
     }
-
-    print "Creating items\n";
 
     // Store the current parent menu and change it to the USD selection submenu
     $prevParent = `setParent -q -menu`;
