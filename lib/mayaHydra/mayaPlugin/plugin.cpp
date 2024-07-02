@@ -84,7 +84,19 @@ void finalize()
     MayaHydra::MayaColorPreferencesTranslator::deleteInstance();
 }
 
-static std::optional<MCallbackId> gsBeforePluginUnloadCallbackId;
+static std::vector<MCallbackId> gsPluginLoadingCallbackIds;
+
+void afterPluginLoadCallback( const MStringArray& strs, void* clientData )
+{
+    for (const auto& str : strs) {
+        // If MayaUSD is being loaded, set up our GeomSubsets picking mode UI.
+        // This will re-create the "Select" menu callback if it has been previously torn down.
+        if (str == "mayaUsdPlugin") {
+            MGlobal::executeCommand("if (`exists mayaHydra_GeomSubsetsPickMode_SetupUI`) { mayaHydra_GeomSubsetsPickMode_SetupUI; }");
+            break;
+        }
+    }
+}
 
 void beforePluginUnloadCallback( const MStringArray& strs, void* clientData )
 {
@@ -92,7 +104,10 @@ void beforePluginUnloadCallback( const MStringArray& strs, void* clientData )
         // If MayaUSD is being unloaded, tear down our GeomSubsets picking mode UI.
         // This resets the variables used to keep track of the UI elements' existence,
         // and allows us to recreate them if MayaUSD is reloaded.
-        if (str == "mayaUsdPlugin") {
+        // We also do the same if mayaHydra is about to be unloaded : we can't rely on
+        // the deletion procedure registered through registerUI, as it seems the global 
+        // variables tracking our UI elements have been reset at that point for some reason.
+        if (str == "mayaUsdPlugin" || str == "mayaHydra") {
             MGlobal::executeCommand("mayaHydra_GeomSubsetsPickMode_TeardownUI");
             break;
         }
@@ -145,17 +160,27 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         "mayaHydra_registerUI_batch_load",
         "mayaHydra_registerUI_batch_unload");
 
-    MStatus beforePluginUnloadCallbackStatus;
-    MCallbackId beforePluginUnloadCallbackId = MSceneMessage::addStringArrayCallback(
-        MSceneMessage::Message::kBeforePluginUnload, 
-        beforePluginUnloadCallback, 
-        nullptr, 
-        &beforePluginUnloadCallbackStatus);
-    if (beforePluginUnloadCallbackStatus) {
-        gsBeforePluginUnloadCallbackId = beforePluginUnloadCallbackId;
-    } else {
-        ret = MS::kFailure;
-        ret.perror("Error registering BeforePluginUnload callback.");
+    auto registerPluginLoadingCallback = [&](MSceneMessage::Message pluginLoadingMessage, MMessage::MStringArrayFunction callback) {
+        MStatus callbackStatus;
+        MCallbackId callbackId = MSceneMessage::addStringArrayCallback(
+            pluginLoadingMessage, 
+            callback, 
+            nullptr, 
+            &callbackStatus);
+        if (callbackStatus) {
+            gsPluginLoadingCallbackIds.push_back(callbackId);
+        } else {
+            ret = MS::kFailure;
+            ret.perror("Error registering plugin loading callback.");
+        }
+    };
+    
+    registerPluginLoadingCallback(MSceneMessage::Message::kAfterPluginLoad, afterPluginLoadCallback);
+    if (!ret) {
+        return ret;
+    }
+    registerPluginLoadingCallback(MSceneMessage::Message::kBeforePluginUnload, beforePluginUnloadCallback);
+    if (!ret) {
         return ret;
     }
 
@@ -168,8 +193,8 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 {
     finalize();
 
-    if (gsBeforePluginUnloadCallbackId.has_value()) {
-        MSceneMessage::removeCallback(gsBeforePluginUnloadCallbackId.value());
+    for (const auto& callbackId : gsPluginLoadingCallbackIds) {
+        MSceneMessage::removeCallback(callbackId);
     }
 
     MFnPlugin plugin(obj, "Autodesk", PLUGIN_VERSION, "Any");
