@@ -491,7 +491,7 @@ public:
             auto modelPathDataSource = HdTypedSampledDataSource<SdfPath>::Cast(
                 HdContainerDataSource::Get(childPrim.dataSource, HdDataSourceLocator(TfToken("model"), TfToken("modelPath")))
             );
-            if (!modelPathDataSource || modelPathDataSource->GetTypedValue(0) != basePrimPath) {
+            if (modelPathDataSource && modelPathDataSource->GetTypedValue(0) != basePrimPath) {
                 continue;
             }
 
