@@ -114,12 +114,6 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback() {
         return;
     }
 
-    global string $gMainSelectMenu; // Maya's "Select" menu
-    $callbackExists = hasMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
-    if (!$callbackExists) {
-        return;
-    }
-
     // If our custom UI elements name is empty, then they do not exist or have been torn down previously,
     // so create them. Note that we check that all UI elements have empty names : normally they should
     // always either all have a name and exist, or all have no name and not exist.
@@ -140,12 +134,6 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
         return;
     }
 
-    global string $gMainSelectMenu; // Maya's "Select" menu
-    $callbackExists = hasMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
-    if (!$callbackExists) {
-        return;
-    }
-
     // Store the current parent menu and change it to the USD selection submenu
     $prevParent = `setParent -q -menu`;
     setParent -menu $gMayaUsdSelectModeSubMenu;
@@ -154,7 +142,7 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
     $gMayaHydra_GeomSubsetsPickMode_Divider = `menuItem -divider true -dividerLabel "GeomSubsets (Hydra only)"`;
 
     global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
-    $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup = `radioMenuItemCollection -global true`;
+    $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup = `radioMenuItemCollection`;
     global string $gMayaHydra_GeomSubsetsPickMode_RadioButtons[];
     $gMayaHydra_GeomSubsetsPickMode_RadioButtons[0] = `menuItem -radioButton on -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetPrimsAndInstances") mayaHydra_GeomSubsetsPickMode_PrimsAndInstances`;
     $gMayaHydra_GeomSubsetsPickMode_RadioButtons[1] = `menuItem -radioButton off -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetGeomSubsets") mayaHydra_GeomSubsetsPickMode_GeomSubsets`;
