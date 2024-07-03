@@ -35,6 +35,8 @@ class TestGeomSubsetsPicking(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(clear=True)
         cmds.optionVar(
                 sv=('mayaHydra_GeomSubsetsPickMode', 'GeomSubsets'))
+        cmds.setAttr('persp.translate', 0, 0, 15, type='float3')
+        cmds.setAttr('persp.rotate', 0, 0, 0, type='float3')
         self.setHdStormRenderer()
         cmds.refresh()
 
@@ -85,6 +87,22 @@ class TestGeomSubsetsPicking(mtohUtils.MayaHydraBaseTestCase):
     #             usdCubeName, "mesh",
     #             usdRectLightName, "rectLight",
     #             f="TestGeomSubsetsPicking.marqueeSelect")
+
+    def test_GeomSubsetPicking(self):
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="TestGeomSubsetsPicking.geomSubsetPicking")
+    
+    # def test_FallbackPicking(self):
+    #     with PluginLoaded('mayaHydraCppTests'):
+    #         cmds.mayaHydraCppTest(f="TestGeomSubsetsPicking.fallbackPicking")
+
+    # def test_InstanceGeomSubsetPicking(self):
+    #     with PluginLoaded('mayaHydraCppTests'):
+    #         cmds.mayaHydraCppTest(f="TestGeomSubsetsPicking.instanceGeomSubsetPicking")
+    
+    # def test_InstanceFallbackPicking(self):
+    #     with PluginLoaded('mayaHydraCppTests'):
+    #         cmds.mayaHydraCppTest(f="TestGeomSubsetsPicking.instanceFallbackPicking")
 
     def test_MarqueeSelect(self):
         with PluginLoaded('mayaHydraCppTests'):
