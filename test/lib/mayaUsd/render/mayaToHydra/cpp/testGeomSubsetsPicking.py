@@ -92,9 +92,9 @@ class TestGeomSubsetsPicking(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="TestGeomSubsetsPicking.geomSubsetPicking")
     
-    # def test_FallbackPicking(self):
-    #     with PluginLoaded('mayaHydraCppTests'):
-    #         cmds.mayaHydraCppTest(f="TestGeomSubsetsPicking.fallbackPicking")
+    def test_FallbackPicking(self):
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="TestGeomSubsetsPicking.fallbackPicking")
 
     # def test_InstanceGeomSubsetPicking(self):
     #     with PluginLoaded('mayaHydraCppTests'):

@@ -135,6 +135,31 @@ TEST(TestGeomSubsetsPicking, geomSubsetPicking)
     ensureSelected(inspector, PrimNamePredicate(geomSubsetName));
 }
 
+TEST(TestGeomSubsetsPicking, fallbackPicking)
+{
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+    SceneIndexInspector inspector(sceneIndices.front());
+
+    const std::string objectName = "CubeMesh";
+
+    ensureUnselected(inspector, PrimNamePredicate(objectName));
+
+    PrimEntriesVector prims = inspector.FindPrims(findPickPrimPredicate(objectName, HdPrimTypeTokens->mesh));
+    ASSERT_EQ(prims.size(), 1u);
+
+    M3dView active3dView = M3dView::active3dView();
+
+    auto primMouseCoords = getPrimMouseCoords(prims.front().prim, active3dView);
+    primMouseCoords += QPoint(0, 25); // Move coords upwards
+
+    mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
+
+    active3dView.refresh(false, true);
+
+    ensureSelected(inspector, PrimNamePredicate(objectName));
+}
+
 TEST(TestGeomSubsetsPicking, marqueeSelect)
 {
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
