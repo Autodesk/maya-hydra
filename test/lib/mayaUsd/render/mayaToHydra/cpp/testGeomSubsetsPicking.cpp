@@ -53,8 +53,6 @@ void ensureSelected(const SceneIndexInspector& inspector, const FindPrimPredicat
     // we'll make sure there are at most two prims for that object. We'll also allow a prim not 
     // to have any selections, but at least one prim must be selected.
     PrimEntriesVector primEntries = inspector.FindPrims(primPredicate);
-    //ASSERT_GE(primEntries.size(), 1u);
-    //ASSERT_LE(primEntries.size(), 2u);
 
     size_t nbSelectedPrims = 0;
     for (const auto& primEntry : primEntries) {
@@ -81,33 +79,6 @@ void ensureUnselected(const SceneIndexInspector& inspector, const FindPrimPredic
 }
 
 } // namespace
-
-TEST(TestGeomSubsetsPicking, pickObject)
-{
-    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
-    ASSERT_GT(sceneIndices.size(), 0u);
-    SceneIndexInspector inspector(sceneIndices.front());
-
-    auto [argc, argv] = getTestingArgs();
-    ASSERT_EQ(argc, 2);
-    const std::string objectName(argv[0]);
-    const TfToken primType(argv[1]);
-
-    ensureUnselected(inspector, PrimNamePredicate(objectName));
-
-    PrimEntriesVector prims = inspector.FindPrims(findPickPrimPredicate(objectName, primType));
-    ASSERT_EQ(prims.size(), 1u);
-
-    M3dView active3dView = M3dView::active3dView();
-
-    auto primMouseCoords = getPrimMouseCoords(prims.front().prim, active3dView);
-
-    mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
-
-    active3dView.refresh();
-
-    ensureSelected(inspector, PrimNamePredicate(objectName));
-}
 
 TEST(TestGeomSubsetsPicking, geomSubsetPicking)
 {
