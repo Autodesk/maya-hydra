@@ -460,6 +460,8 @@ void mouseClick(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMouseP
  */
 QPoint getPrimMouseCoords(const PXR_NS::HdSceneIndexPrim& prim, M3dView& view);
 
+QPoint getInstanceMouseCoords(const PXR_NS::HdSceneIndexPrim& instancerPrim, size_t instanceIndex, M3dView& view);
+
 } // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRA_TEST_UTILS_H
