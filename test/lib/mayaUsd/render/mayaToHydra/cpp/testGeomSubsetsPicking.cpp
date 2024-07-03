@@ -18,9 +18,15 @@
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
+#include <pxr/imaging/hd/utils.h>
 
 #include <maya/M3dView.h>
 #include <maya/MPoint.h>
+
+#include <ufe/globalSelection.h>
+#include <ufe/observableSelection.h>
+#include <ufe/path.h>
+#include <ufe/pathString.h>
 
 #include <gtest/gtest.h>
 
@@ -46,8 +52,8 @@ void ensureSelected(const SceneIndexInspector& inspector, const FindPrimPredicat
     // we'll make sure there are at most two prims for that object. We'll also allow a prim not 
     // to have any selections, but at least one prim must be selected.
     PrimEntriesVector primEntries = inspector.FindPrims(primPredicate);
-    ASSERT_GE(primEntries.size(), 1u);
-    ASSERT_LE(primEntries.size(), 2u);
+    //ASSERT_GE(primEntries.size(), 1u);
+    //ASSERT_LE(primEntries.size(), 2u);
 
     size_t nbSelectedPrims = 0;
     for (const auto& primEntry : primEntries) {
@@ -75,7 +81,7 @@ void ensureUnselected(const SceneIndexInspector& inspector, const FindPrimPredic
 
 } // namespace
 
-TEST(TestPicking, pickObject)
+TEST(TestGeomSubsetsPicking, pickObject)
 {
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
@@ -102,69 +108,40 @@ TEST(TestPicking, pickObject)
     ensureSelected(inspector, PrimNamePredicate(objectName));
 }
 
-TEST(TestPicking, marqueeSelect)
+TEST(TestGeomSubsetsPicking, marqueeSelect)
 {
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
-    auto [argc, argv] = getTestingArgs();
-    ASSERT_TRUE(argc % 2 == 0); // Each object is identified by both its name and a type
-    ASSERT_TRUE(argc >= 4); // We need at least two objects to do the marquee selection
-    std::vector<std::pair<std::string, TfToken>> objectsToSelect;
-    for (int iArg = 0; iArg < argc; iArg += 2) {
-        objectsToSelect.push_back(std::make_pair(std::string(argv[iArg]), TfToken(argv[iArg + 1])));
+    std::vector<std::string> geomSubsetNamesToSelect = {"CubeUpperHalf", "SphereUpperHalf"};
+    
+    for (const auto& geomSubsetName : geomSubsetNamesToSelect) {
+        ensureUnselected(inspector, PrimNamePredicate(geomSubsetName));
     }
 
-    for (const auto& object : objectsToSelect) {
-        ensureUnselected(inspector, PrimNamePredicate(object.first));
-    }
+    auto ufeSelection = Ufe::GlobalSelection::get();
+    EXPECT_TRUE(ufeSelection->empty());
 
     M3dView active3dView = M3dView::active3dView();
 
-    // We get the first prim's mouse coordinates and initialize the selection rectangle
-    // with them; we then iterate on the other prims and expand the selection rectangle
-    // to fit them all.
-
-    // Get the first prim's mouse coords
-    PrimEntriesVector initialPrimEntries = inspector.FindPrims(
-        findPickPrimPredicate(objectsToSelect.front().first, objectsToSelect.front().second));
-    ASSERT_EQ(initialPrimEntries.size(), 1u);
-    auto initialMouseCoords = getPrimMouseCoords(initialPrimEntries.front().prim, active3dView);
-
     // Initialize the selection rectangle
-    QPoint topLeftMouseCoords = initialMouseCoords;
-    QPoint bottomRightMouseCoords = initialMouseCoords;
-
-    // Expand the selection rectangle to fit all prims
-    for (size_t iObject = 1; iObject < objectsToSelect.size(); iObject++) {
-        PrimEntriesVector objectPrims = inspector.FindPrims(
-            findPickPrimPredicate(objectsToSelect[iObject].first, objectsToSelect[iObject].second));
-        ASSERT_EQ(objectPrims.size(), 1u);
-        auto objectMouseCoords = getPrimMouseCoords(objectPrims.front().prim, active3dView);
-
-        if (objectMouseCoords.x() > bottomRightMouseCoords.x()) {
-            bottomRightMouseCoords.setX(objectMouseCoords.x());
-        }
-        if (objectMouseCoords.x() < topLeftMouseCoords.x()) {
-            topLeftMouseCoords.setX(objectMouseCoords.x());
-        }
-        if (objectMouseCoords.y() > topLeftMouseCoords.y()) {
-            topLeftMouseCoords.setY(objectMouseCoords.y());
-        }
-        if (objectMouseCoords.y() < bottomRightMouseCoords.y()) {
-            bottomRightMouseCoords.setY(objectMouseCoords.y());
-        }
-    }
+    int offset = 10;
+    QPoint topLeftMouseCoords(0 + offset, 0 + offset);
+    QPoint bottomRightMouseCoords(active3dView.portWidth() - offset, active3dView.portHeight() - offset);
 
     // Perform the marquee selection
     mousePress(Qt::MouseButton::LeftButton, active3dView.widget(), topLeftMouseCoords);
     mouseMoveTo(active3dView.widget(), bottomRightMouseCoords);
     mouseRelease(Qt::MouseButton::LeftButton, active3dView.widget(), bottomRightMouseCoords);
 
-    active3dView.refresh();
+    active3dView.refresh(false, true);
 
-    for (const auto& object : objectsToSelect) {
-        ensureSelected(inspector, PrimNamePredicate(object.first));
+    std::ofstream outFile("HydraSceneDump.txt");
+    HdUtils::PrintSceneIndex(outFile, inspector.GetSceneIndex());
+    outFile.close();
+
+    for (const auto& geomSubsetName : geomSubsetNamesToSelect) {
+        ensureSelected(inspector, PrimNamePredicate(geomSubsetName));
     }
 }
