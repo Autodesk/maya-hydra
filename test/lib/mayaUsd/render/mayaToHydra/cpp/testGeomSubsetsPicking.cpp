@@ -188,6 +188,34 @@ TEST(TestGeomSubsetsPicking, instanceGeomSubsetPicking)
     ensureSelected(inspector, PrimNamePredicate(geomSubsetName));
 }
 
+TEST(TestGeomSubsetsPicking, instanceFallbackPicking)
+{
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+    SceneIndexInspector inspector(sceneIndices.front());
+
+    const std::string objectName = "SphereMesh";
+    const std::string geomSubsetName = "SphereUpperHalf";
+    const std::string instancerName = "SphereInstancer";
+
+    ensureUnselected(inspector, PrimNamePredicate(objectName));
+
+    PrimEntriesVector instancerPrims = inspector.FindPrims(findPickPrimPredicate(instancerName, HdPrimTypeTokens->instancer));
+    ASSERT_EQ(instancerPrims.size(), 1u);
+
+
+    M3dView active3dView = M3dView::active3dView();
+
+    auto primMouseCoords = getInstanceMouseCoords(instancerPrims.front().prim, 0, active3dView);
+    primMouseCoords += QPoint(0, 25); // Move coords downwards
+
+    mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
+
+    active3dView.refresh(false, true);
+
+    ensureSelected(inspector, PrimNamePredicate(objectName));
+}
+
 TEST(TestGeomSubsetsPicking, marqueeSelect)
 {
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
