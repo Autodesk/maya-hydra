@@ -14,7 +14,6 @@
 #
 import maya.cmds as cmds
 import fixturesUtils
-import mayaUtils
 import mtohUtils
 import testUtils
 import usdUtils
@@ -39,56 +38,7 @@ class TestGeomSubsetsPicking(mtohUtils.MayaHydraBaseTestCase):
                 sv=('mayaUsd_PointInstancesPickMode', 'Prototypes'))
         cmds.setAttr('persp.translate', 0, 0, 15, type='float3')
         cmds.setAttr('persp.rotate', 0, 0, 0, type='float3')
-        self.setHdStormRenderer()
         cmds.refresh()
-
-    # def test_SinglePickGeomSubset(self):
-    #     cubeObjectName = self.createMayaCube()
-    #     with PluginLoaded('mayaHydraCppTests'):
-    #         cmds.mayaHydraCppTest(cubeObjectName, "mesh", f="TestGeomSubsetsPicking.pickGeomSubset")
-
-    # def test_PickMayaLight(self):
-    #     directionalLightObjectName = self.createMayaDirectionalLight()
-    #     with PluginLoaded('mayaHydraCppTests'):
-    #         cmds.mayaHydraCppTest(directionalLightObjectName, "simpleLight", f="TestGeomSubsetsPicking.pickObject")
-
-    # def test_PickUsdMesh(self):
-    #     import mayaUsd_createStageWithNewLayer
-    #     stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
-    #     cubeObjectName = self.createUsdCubeFromMaya(stagePath)
-    #     with PluginLoaded('mayaHydraCppTests'):
-    #         cmds.mayaHydraCppTest(cubeObjectName, "mesh", f="TestGeomSubsetsPicking.pickObject")
-
-    # def test_PickUsdImplicitSurface(self):
-    #     import mayaUsd_createStageWithNewLayer
-    #     stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
-    #     cubeObjectName = self.createUsdCube(stagePath)
-    #     with PluginLoaded('mayaHydraCppTests'):
-    #         cmds.mayaHydraCppTest(cubeObjectName, "mesh", f="TestGeomSubsetsPicking.pickObject")
-    
-    # def test_PickUsdLight(self):
-    #     import mayaUsd_createStageWithNewLayer
-    #     stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
-    #     rectLightObjectName = self.createUsdRectLight(stagePath)
-    #     with PluginLoaded('mayaHydraCppTests'):
-    #         cmds.mayaHydraCppTest(rectLightObjectName, "rectLight", f="TestGeomSubsetsPicking.pickObject")
-
-    # def test_MarqueeSelection(self):
-    #     import mayaUsd_createStageWithNewLayer
-    #     stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
-    #     mayaCubeName = self.createMayaCube()
-    #     mayaDirectionalLightName = self.createMayaDirectionalLight()
-    #     usdMayaCubeName = self.createUsdCubeFromMaya(stagePath)
-    #     usdCubeName = self.createUsdCube(stagePath)
-    #     usdRectLightName = self.createUsdRectLight(stagePath)
-    #     with PluginLoaded('mayaHydraCppTests'):
-    #         cmds.mayaHydraCppTest(
-    #             mayaCubeName, "mesh",
-    #             mayaDirectionalLightName, "simpleLight",
-    #             usdMayaCubeName, "mesh",
-    #             usdCubeName, "mesh",
-    #             usdRectLightName, "rectLight",
-    #             f="TestGeomSubsetsPicking.marqueeSelect")
 
     def test_GeomSubsetPicking(self):
         with PluginLoaded('mayaHydraCppTests'):
