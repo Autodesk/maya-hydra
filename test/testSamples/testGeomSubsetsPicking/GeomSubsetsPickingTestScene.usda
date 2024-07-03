@@ -17,7 +17,7 @@ def Xform "Root"
             references = @./UpperHalfGeomSubsetCube.usda@
         )
         {
-            over "upperHalf" (
+            over "CubeUpperHalf" (
                 prepend apiSchemas = ["MaterialBindingAPI"]
             )
             {
@@ -36,7 +36,7 @@ def Xform "Root"
             references = @./UpperHalfGeomSubsetSphere.usda@
         )
         {
-            over "upperHalf" (
+            over "SphereUpperHalf" (
                 prepend apiSchemas = ["MaterialBindingAPI"]
             )
             {
