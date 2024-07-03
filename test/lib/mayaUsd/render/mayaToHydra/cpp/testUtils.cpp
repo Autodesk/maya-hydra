@@ -412,25 +412,13 @@ void mouseClick(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMouseP
     mouseRelease(mouseButton, widget, localMousePos);
 }
 
-QPoint getPrimMouseCoords(const HdSceneIndexPrim& prim, M3dView& view)
+QPoint worldPositionToMouseCoords(const PXR_NS::GfVec3d& worldPosition, M3dView& view)
 {
-    HdDataSourceBaseHandle xformDataSource = HdContainerDataSource::Get(prim.dataSource, HdXformSchema::GetDefaultLocator());
-    if (!xformDataSource) {
-        ADD_FAILURE() << "Scene index prim has no default locator data source, cannot get mouse coordinates for it.";
-        return {};
-    }
-    HdContainerDataSourceHandle xformContainerDataSource = HdContainerDataSource::Cast(xformDataSource);
-    TF_AXIOM(xformContainerDataSource);
-    HdXformSchema xformSchema(xformContainerDataSource);
-    TF_AXIOM(xformSchema.GetMatrix());
-    GfMatrix4d xformMatrix = xformSchema.GetMatrix()->GetTypedValue(0);
-    GfVec3d translation = xformMatrix.ExtractTranslation();
-
-    MPoint worldPosition(translation[0], translation[1], translation[2], 1.0);
+    MPoint mayaWorldPosition(worldPosition[0], worldPosition[1], worldPosition[2], 1.0);
     short   viewportX = 0, viewportY = 0;
     MStatus worldToViewStatus;
     // First assert checks that the point was not clipped, second assert checks the general MStatus
-    if (!view.worldToView(worldPosition, viewportX, viewportY, &worldToViewStatus)) {
+    if (!view.worldToView(mayaWorldPosition, viewportX, viewportY, &worldToViewStatus)) {
         ADD_FAILURE() << "point was clipped by world to view projection, cannot get mouse coordinates for scene index prim.";
         return {};
     }
@@ -443,6 +431,23 @@ QPoint getPrimMouseCoords(const HdSceneIndexPrim& prim, M3dView& view)
     return QPoint(viewportX, view.portHeight() - viewportY);
 }
 
+QPoint getPrimMouseCoords(const HdSceneIndexPrim& prim, M3dView& view)
+{
+    HdDataSourceBaseHandle xformDataSource = HdContainerDataSource::Get(prim.dataSource, HdXformSchema::GetDefaultLocator());
+    if (!xformDataSource) {
+        ADD_FAILURE() << "Scene index prim has no default locator data source, cannot get mouse coordinates for it.";
+        return {};
+    }
+    HdContainerDataSourceHandle xformContainerDataSource = HdContainerDataSource::Cast(xformDataSource);
+    TF_AXIOM(xformContainerDataSource);
+    HdXformSchema xformSchema(xformContainerDataSource);
+    TF_AXIOM(xformSchema.GetMatrix());
+    GfMatrix4d xformMatrix = xformSchema.GetMatrix()->GetTypedValue(0);
+
+    GfVec3d worldPosition = xformMatrix.ExtractTranslation();
+    return worldPositionToMouseCoords(worldPosition, view);
+}
+
 QPoint getInstanceMouseCoords(const PXR_NS::HdSceneIndexPrim& instancerPrim, size_t instanceIndex, M3dView& view)
 {
     HdDataSourceBaseHandle instancerXformDataSource = HdContainerDataSource::Get(instancerPrim.dataSource, HdXformSchema::GetDefaultLocator());
@@ -450,11 +455,11 @@ QPoint getInstanceMouseCoords(const PXR_NS::HdSceneIndexPrim& instancerPrim, siz
         ADD_FAILURE() << "Scene index instancer prim has no default locator data source, cannot get mouse coordinates for the instance.";
         return {};
     }
-    HdContainerDataSourceHandle xformContainerDataSource = HdContainerDataSource::Cast(instancerXformDataSource);
-    TF_AXIOM(xformContainerDataSource);
-    HdXformSchema xformSchema(xformContainerDataSource);
-    TF_AXIOM(xformSchema.GetMatrix());
-    GfMatrix4d xformMatrix = xformSchema.GetMatrix()->GetTypedValue(0);
+    HdContainerDataSourceHandle instancerXformContainerDataSource = HdContainerDataSource::Cast(instancerXformDataSource);
+    TF_AXIOM(instancerXformContainerDataSource);
+    HdXformSchema instancerXformSchema(instancerXformContainerDataSource);
+    TF_AXIOM(instancerXformSchema.GetMatrix());
+    GfMatrix4d instancerXformMatrix = instancerXformSchema.GetMatrix()->GetTypedValue(0);
     
     HdDataSourceLocator instanceTranslationsLocator(HdPrimvarsSchemaTokens->primvars, TfToken("hydra:instanceTranslations"), HdPrimvarSchemaTokens->primvarValue);
     auto instanceTranslationsDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(
@@ -466,23 +471,8 @@ QPoint getInstanceMouseCoords(const PXR_NS::HdSceneIndexPrim& instancerPrim, siz
     }
     GfVec3f instanceTranslation = instanceTranslationsDataSource->GetTypedValue(0)[instanceIndex];
     
-    GfVec3d translation = xformMatrix.ExtractTranslation() + instanceTranslation;
-
-    MPoint worldPosition(translation[0], translation[1], translation[2], 1.0);
-    short   viewportX = 0, viewportY = 0;
-    MStatus worldToViewStatus;
-    // First assert checks that the point was not clipped, second assert checks the general MStatus
-    if (!view.worldToView(worldPosition, viewportX, viewportY, &worldToViewStatus)) {
-        ADD_FAILURE() << "point was clipped by world to view projection, cannot get mouse coordinates for scene index prim.";
-        return {};
-    }
-    if (worldToViewStatus != MS::kSuccess) {
-        ADD_FAILURE() << "M3dView::worldToView() failed, cannot get mouse coordinates for scene index prim.";
-        return {};
-    }
-
-    // Qt and M3dView use opposite Y-coordinates
-    return QPoint(viewportX, view.portHeight() - viewportY);
+    GfVec3d worldPosition = instancerXformMatrix.ExtractTranslation() + instanceTranslation;
+    return worldPositionToMouseCoords(worldPosition, view);
 }
 
 } // namespace MAYAHYDRA_NS_DEF

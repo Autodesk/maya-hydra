@@ -447,6 +447,20 @@ void mouseRelease(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMous
 void mouseClick(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMousePos);
 
 /**
+ * @brief Get the mouse coordinates of a position in the world.
+ *
+ * This function will return the mouse coordinates for the given world position,
+ * based on the given view.  Note that the view argument is not changed and is
+ * passed in by non const reference only because its interface is not
+ * const-correct.
+ *
+ * @param[in] worldPosition The world position for which mouse coordinates must be computed. 
+ * @param[in] view The view for which mouse coordinates are returned.
+ * @return Mouse coordinates.
+ */
+QPoint worldPositionToMouseCoords(const PXR_NS::GfVec3d& worldPosition, M3dView& view);
+
+/**
  * @brief Get the mouse coordinates for a scene index prim.
  *
  * This function will return the mouse coordinates for the scene index prim's
@@ -460,6 +474,19 @@ void mouseClick(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMouseP
  */
 QPoint getPrimMouseCoords(const PXR_NS::HdSceneIndexPrim& prim, M3dView& view);
 
+/**
+ * @brief Get the mouse coordinates for a scene index prim instance.
+ *
+ * This function will return the mouse coordinates for the scene index prim instance's
+ * local coordinate origin.  Note that the view argument is not changed and is
+ * passed in by non const reference only because its interface is not
+ * const-correct.
+ *
+ * @param[in] instancerPrim The scene index instancer prim that owns the relevant instance.
+ * @param[in] instanceIndex The index of the relevant instance within the instancer prim.
+ * @param[in] view The view for which mouse coordinates are returned.
+ * @return Mouse coordinates.
+ */
 QPoint getInstanceMouseCoords(const PXR_NS::HdSceneIndexPrim& instancerPrim, size_t instanceIndex, M3dView& view);
 
 } // namespace MAYAHYDRA_NS_DEF
