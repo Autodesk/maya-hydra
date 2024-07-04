@@ -35,6 +35,7 @@ using namespace MayaHydra;
 
 namespace {
 
+#if PXR_VERSION >= 2403
 const std::string kStageUfePathSegment = "|GeomSubsetsPickingTestScene|GeomSubsetsPickingTestSceneShape";
 const std::string kCubeMeshUfePathSegment = "/Root/CubeMeshXform/CubeMesh";
 const std::string kSphereMeshUfePathSegment = "/Root/SphereMeshXform/SphereMesh";
@@ -147,6 +148,7 @@ void testInstancePicking(const Ufe::Path& clickInstancerUfePath, int clickInstan
         ASSERT_TRUE(selectionsSchema.GetElement(0).GetFullySelected());
     }
 }
+#endif
 
 } // namespace
 
