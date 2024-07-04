@@ -33,7 +33,7 @@ class TestGeomSubsetsPicking(mtohUtils.MayaHydraBaseTestCase):
         self.loadUsdScene()
         cmds.select(clear=True)
         cmds.optionVar(
-                sv=('mayaHydra_GeomSubsetsPickMode', 'GeomSubsets'))
+                sv=('mayaHydra_GeomSubsetsPickMode', 'Faces'))
         cmds.optionVar(
                 sv=('mayaUsd_PointInstancesPickMode', 'Prototypes'))
         cmds.setAttr('persp.translate', 0, 0, 15, type='float3')

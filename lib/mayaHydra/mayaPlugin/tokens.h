@@ -40,8 +40,8 @@ TF_DECLARE_PUBLIC_TOKENS(MayaHydraPickOptionVars, MAYAHYDRA_PICK_OPTIONVAR_TOKEN
 
 // clang-format off
 #define GEOMSUBSETS_PICK_MODE_TOKENS \
-    (PrimsAndInstances) \
-    (GeomSubsets)
+    (None) \
+    (Faces)
 // clang-format on
 
 TF_DECLARE_PUBLIC_TOKENS(GeomSubsetsPickModeTokens, GEOMSUBSETS_PICK_MODE_TOKENS);

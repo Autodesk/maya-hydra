@@ -170,7 +170,7 @@ private:
         const MMatrix& viewMatrix,
         const MMatrix& projMatrix,
         bool singlePick,
-        bool pickGeomSubsets,
+        TfToken geomSubsetsPickMode,
         bool pointSnappingActive,
         int view_x,
         int view_y,

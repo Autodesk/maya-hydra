@@ -229,12 +229,6 @@ enum UsdPointInstancesPickMode
     Prototypes
 };
 
-enum UsdGeomSubsetsPickMode
-{
-    PrimsAndInstances = 0,
-    GeomSubsets
-};
-
 //! \brief  Query the pick mode to use when picking point instances in the viewport.
 //! \return A UsdPointInstancesPickMode enum value indicating the pick mode behavior
 //!         to employ when the picked object is a point instance.
@@ -262,23 +256,15 @@ UsdPointInstancesPickMode GetPointInstancesPickMode()
     return pickMode;
 }
 
-UsdGeomSubsetsPickMode GetGeomSubsetsPickMode()
+TfToken GetGeomSubsetsPickMode()
 {
     static const MString kOptionVarName(MayaHydraPickOptionVars->GeomSubsetsPickMode.GetText());
 
-    auto pickMode = UsdGeomSubsetsPickMode::PrimsAndInstances;
-
     if (MGlobal::optionVarExists(kOptionVarName)) {
-        const TfToken pickModeToken(MGlobal::optionVarStringValue(kOptionVarName).asChar());
-
-        if (pickModeToken == GeomSubsetsPickModeTokens->PrimsAndInstances) {
-            pickMode = UsdGeomSubsetsPickMode::PrimsAndInstances;
-        } else if (pickModeToken == GeomSubsetsPickModeTokens->GeomSubsets) {
-            pickMode = UsdGeomSubsetsPickMode::GeomSubsets;
-        }
+        return TfToken(MGlobal::optionVarStringValue(kOptionVarName).asChar());
     }
 
-    return pickMode;
+    return GeomSubsetsPickModeTokens->None;
 }
 
 struct PickInput {
@@ -575,7 +561,7 @@ public:
 
         std::vector<HitPath> hitPaths;
 
-        if (GetGeomSubsetsPickMode() == UsdGeomSubsetsPickMode::GeomSubsets) {
+        if (GetGeomSubsetsPickMode() == GeomSubsetsPickModeTokens->Faces) {
             auto geomSubsetsHitPaths = resolveGeomSubsetsPicking(
                 renderIndex()->GetTerminalSceneIndex(), 
                 pickInput.pickHit.objectId, 
@@ -1818,7 +1804,7 @@ void MtohRenderOverride::_PickByRegion(
     const MMatrix& viewMatrix,
     const MMatrix& projMatrix,
     bool singlePick,
-    bool pickGeomSubsets,
+    TfToken geomSubsetsPickMode,
     bool pointSnappingActive,
     int view_x,
     int view_y,
@@ -1857,7 +1843,7 @@ void MtohRenderOverride::_PickByRegion(
     pickParams.collection = _renderCollection;
     pickParams.outHits = &outHits;
     
-    if (pickGeomSubsets) {
+    if (geomSubsetsPickMode == GeomSubsetsPickModeTokens->Faces) {
         pickParams.pickTarget = HdxPickTokens->pickFaces;
     }
 
@@ -1912,7 +1898,7 @@ bool MtohRenderOverride::select(
 
     HdxPickHitVector outHits;
     const bool singlePick = selectInfo.singleSelection();
-    const bool pickGeomSubsets = GetGeomSubsetsPickMode() == UsdGeomSubsetsPickMode::GeomSubsets;
+    const TfToken geomSubsetsPickMode = GetGeomSubsetsPickMode();
     const bool pointSnappingActive = selectInfo.pointSnapping();
     if (pointSnappingActive)
     {
@@ -1933,7 +1919,7 @@ bool MtohRenderOverride::select(
             unsigned int curr_sel_x = cursor_x > (int)curr_sel_w / 2 ? cursor_x - (int)curr_sel_w / 2 : 0;
             unsigned int curr_sel_y = cursor_y > (int)curr_sel_h / 2 ? cursor_y - (int)curr_sel_h / 2 : 0;
 
-            _PickByRegion(outHits, viewMatrix, projMatrix, singlePick, pickGeomSubsets, pointSnappingActive,
+            _PickByRegion(outHits, viewMatrix, projMatrix, singlePick, geomSubsetsPickMode, pointSnappingActive,
                 view_x, view_y, view_w, view_h, curr_sel_x, curr_sel_y, curr_sel_w, curr_sel_h);
 
             // Increase the size of picking region.
@@ -1944,7 +1930,7 @@ bool MtohRenderOverride::select(
     // Pick from original region directly when point snapping is not active or no hit is found yet.
     if (outHits.empty())
     {
-        _PickByRegion(outHits, viewMatrix, projMatrix, singlePick, pickGeomSubsets, pointSnappingActive,
+        _PickByRegion(outHits, viewMatrix, projMatrix, singlePick, geomSubsetsPickMode, pointSnappingActive,
             view_x, view_y, view_w, view_h, sel_x, sel_y, sel_w, sel_h);
     }
 
