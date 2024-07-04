@@ -69,5 +69,21 @@ TEST(TestUsdPointInstancePicking, pickPointInstance)
     // object is returned.  Therefore test that the expected selected path is
     // in the selection.
     ASSERT_GE(sn->size(), 1u);
+    std::cout << "Expected selected path string : " << selected.string() << std::endl;
+    std::cout << "Actual selected path string : " << sn->front()->path().string() << std::endl;
+    for (const auto& seg : selected.getSegments()) {
+        std::cout << "Expected segment rtid : " << seg.runTimeId() << std::endl;
+        std::cout << "Expected segment separator : " << seg.separator() << std::endl;
+        for (const auto& comp : seg.components()) {
+            std::cout << "Expected component string : " << comp.string() << std::endl;
+        }
+    }
+    for (const auto& seg : sn->front()->path().getSegments()) {
+        std::cout << "Actual segment rtid : " << seg.runTimeId() << std::endl;
+        std::cout << "Actual segment separator : " << seg.separator() << std::endl;
+        for (const auto& comp : seg.components()) {
+            std::cout << "Actual component string : " << comp.string() << std::endl;
+        }
+    }
     ASSERT_TRUE(sn->contains(selected));
 }
