@@ -39,50 +39,34 @@ using namespace MayaHydra;
 
 namespace {
 
-const std::string kCubeMesh = "CubeMesh";
-const std::string kCubeUpperHalf = "CubeUpperHalf";
-const std::string kSphereMesh = "SphereMesh";
-const std::string kSphereUpperHalf = "SphereUpperHalf";
-
 const std::string kStageUfePathSegment = "|GeomSubsetsPickingTestScene|GeomSubsetsPickingTestSceneShape";
 const std::string kCubeMeshUfePathSegment = "/Root/CubeMeshXform/CubeMesh";
 const std::string kSphereMeshUfePathSegment = "/Root/SphereMeshXform/SphereMesh";
 const std::string kSphereInstancerUfePathSegment = "/Root/SphereInstancer";
 
-FindPrimPredicate findPickPrimPredicate(const std::string& objectName, const TfToken& primType)
-{
-    return [objectName,
-            primType](const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath) -> bool {
-        return primPath.GetAsString().find(objectName) != std::string::npos
-            && sceneIndex->GetPrim(primPath).primType == primType;
-    };
-}
+const std::string kCubeUpperHalfName = "CubeUpperHalf";
+const std::string kSphereUpperHalfName = "SphereUpperHalf";
 
-void ensureSelected(const SceneIndexInspector& inspector, const FindPrimPredicate& primPredicate)
+void assertUnselected(const SceneIndexInspector& inspector, const FindPrimPredicate& primPredicate)
 {
     PrimEntriesVector primEntries = inspector.FindPrims(primPredicate);
-
-    size_t nbSelectedPrims = 0;
     for (const auto& primEntry : primEntries) {
         HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(primEntry.prim.dataSource);
-        if (selectionsSchema.GetNumElements() > 0u) {
-            ASSERT_EQ(selectionsSchema.GetNumElements(), 1u);
-            HdSelectionSchema selectionSchema = selectionsSchema.GetElement(0);
-            EXPECT_TRUE(selectionSchema.GetFullySelected());
-            nbSelectedPrims++;
-        }
+        ASSERT_FALSE(selectionsSchema.IsDefined());
     }
-
-    ASSERT_GT(nbSelectedPrims, 0u);
 }
 
-void ensureUnselected(const SceneIndexInspector& inspector, const FindPrimPredicate& primPredicate)
+void assertSelected(const SceneIndexInspector& inspector, const FindPrimPredicate& primPredicate)
 {
     PrimEntriesVector primEntries = inspector.FindPrims(primPredicate);
+    ASSERT_FALSE(primEntries.empty());
+
     for (const auto& primEntry : primEntries) {
-        HdSelectionsSchema selectionsSchema
-            = HdSelectionsSchema::GetFromParent(primEntry.prim.dataSource);
-        ASSERT_EQ(selectionsSchema.IsDefined(), false);
+        HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(primEntry.prim.dataSource);
+        ASSERT_TRUE(selectionsSchema.IsDefined());
+        ASSERT_EQ(selectionsSchema.GetNumElements(), 1u);
+        HdSelectionSchema selectionSchema = selectionsSchema.GetElement(0);
+        ASSERT_TRUE(selectionSchema.GetFullySelected());
     }
 }
 
@@ -168,7 +152,7 @@ TEST(TestGeomSubsetsPicking, geomSubsetPicking)
 {
     const auto cubeMeshUfePathString = kStageUfePathSegment + "," + kCubeMeshUfePathSegment;
     const auto cubeMeshUfePath = Ufe::PathString::path(cubeMeshUfePathString);
-    const auto cubeUpperHalfUfePath = Ufe::PathString::path(cubeMeshUfePathString + "/" + kCubeUpperHalf);
+    const auto cubeUpperHalfUfePath = Ufe::PathString::path(cubeMeshUfePathString + "/" + kCubeUpperHalfName);
     testPrimPicking(cubeMeshUfePath, QPoint(0, -25), cubeUpperHalfUfePath);
 }
 
@@ -185,7 +169,7 @@ TEST(TestGeomSubsetsPicking, instanceGeomSubsetPicking)
     const auto sphereInstancerUfePath = Ufe::PathString::path(sphereInstancerUfePathString);
 
     const auto sphereMeshUfePathString = kStageUfePathSegment + "," + kSphereMeshUfePathSegment;
-    const auto sphereUpperHalfUfePath = Ufe::PathString::path(sphereMeshUfePathString + "/" + kSphereUpperHalf);
+    const auto sphereUpperHalfUfePath = Ufe::PathString::path(sphereMeshUfePathString + "/" + kSphereUpperHalfName);
 
     testInstancePicking(sphereInstancerUfePath, 0, QPoint(0, -25), sphereUpperHalfUfePath);
 }
@@ -208,33 +192,30 @@ TEST(TestGeomSubsetsPicking, marqueeSelect)
     SceneIndexInspector inspector(sceneIndices.front());
 
     std::vector<std::string> geomSubsetNamesToSelect = {"CubeUpperHalf", "SphereUpperHalf"};
-    
-    for (const auto& geomSubsetName : geomSubsetNamesToSelect) {
-        ensureUnselected(inspector, PrimNamePredicate(geomSubsetName));
-    }
 
     auto ufeSelection = Ufe::GlobalSelection::get();
-    EXPECT_TRUE(ufeSelection->empty());
+    ASSERT_TRUE(ufeSelection->empty());
+    
+    for (const auto& geomSubsetName : geomSubsetNamesToSelect) {
+        assertUnselected(inspector, PrimNamePredicate(geomSubsetName));
+    }
 
     M3dView active3dView = M3dView::active3dView();
 
     // Initialize the selection rectangle
-    int offset = 10;
-    QPoint topLeftMouseCoords(0 + offset, 0 + offset);
-    QPoint bottomRightMouseCoords(active3dView.portWidth() - offset, active3dView.portHeight() - offset);
+    int offsetFromBorder = 10;
+    QPoint topLeftMouseCoords(0 + offsetFromBorder, 0 + offsetFromBorder);
+    QPoint bottomRightMouseCoords(active3dView.portWidth() - offsetFromBorder, active3dView.portHeight() - offsetFromBorder);
 
     // Perform the marquee selection
     mousePress(Qt::MouseButton::LeftButton, active3dView.widget(), topLeftMouseCoords);
     mouseMoveTo(active3dView.widget(), bottomRightMouseCoords);
     mouseRelease(Qt::MouseButton::LeftButton, active3dView.widget(), bottomRightMouseCoords);
+    active3dView.refresh();
 
-    active3dView.refresh(false, true);
-
-    std::ofstream outFile("HydraSceneDump.txt");
-    HdUtils::PrintSceneIndex(outFile, inspector.GetSceneIndex());
-    outFile.close();
+    ASSERT_EQ(ufeSelection->size(), 2u);
 
     for (const auto& geomSubsetName : geomSubsetNamesToSelect) {
-        ensureSelected(inspector, PrimNamePredicate(geomSubsetName));
+        assertSelected(inspector, PrimNamePredicate(geomSubsetName));
     }
 }
