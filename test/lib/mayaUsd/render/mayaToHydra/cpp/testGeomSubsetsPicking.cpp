@@ -152,21 +152,32 @@ void testInstancePicking(const Ufe::Path& clickInstancerUfePath, int clickInstan
 
 TEST(TestGeomSubsetsPicking, geomSubsetPicking)
 {
+#if PXR_VERSION < 2403
+    GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
+#else
     const auto cubeMeshUfePathString = kStageUfePathSegment + "," + kCubeMeshUfePathSegment;
     const auto cubeMeshUfePath = Ufe::PathString::path(cubeMeshUfePathString);
     const auto cubeUpperHalfUfePath = Ufe::PathString::path(cubeMeshUfePathString + "/" + kCubeUpperHalfName);
     testPrimPicking(cubeMeshUfePath, QPoint(0, -25), cubeUpperHalfUfePath);
+#endif
 }
 
 TEST(TestGeomSubsetsPicking, fallbackPicking)
 {
+#if PXR_VERSION < 2403
+    GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
+#else
     const auto cubeMeshUfePathString = kStageUfePathSegment + "," + kCubeMeshUfePathSegment;
     const auto cubeMeshUfePath = Ufe::PathString::path(cubeMeshUfePathString);
     testPrimPicking(cubeMeshUfePath, QPoint(0, 25), cubeMeshUfePath);
+#endif
 }
 
 TEST(TestGeomSubsetsPicking, instanceGeomSubsetPicking)
 {
+#if PXR_VERSION < 2403
+    GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
+#else
     const auto sphereInstancerUfePathString = kStageUfePathSegment + "," + kSphereInstancerUfePathSegment;
     const auto sphereInstancerUfePath = Ufe::PathString::path(sphereInstancerUfePathString);
 
@@ -174,10 +185,14 @@ TEST(TestGeomSubsetsPicking, instanceGeomSubsetPicking)
     const auto sphereUpperHalfUfePath = Ufe::PathString::path(sphereMeshUfePathString + "/" + kSphereUpperHalfName);
 
     testInstancePicking(sphereInstancerUfePath, 0, QPoint(0, -25), sphereUpperHalfUfePath);
+#endif
 }
 
 TEST(TestGeomSubsetsPicking, instanceFallbackPicking)
 {
+#if PXR_VERSION < 2403
+    GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
+#else
     const auto sphereInstancerUfePathString = kStageUfePathSegment + "," + kSphereInstancerUfePathSegment;
     const auto sphereInstancerUfePath = Ufe::PathString::path(sphereInstancerUfePathString);
 
@@ -185,10 +200,14 @@ TEST(TestGeomSubsetsPicking, instanceFallbackPicking)
     const auto sphereMeshUfePath = Ufe::PathString::path(sphereMeshUfePathString);
 
     testInstancePicking(sphereInstancerUfePath, 0, QPoint(0, 25), sphereMeshUfePath);
+#endif
 }
 
 TEST(TestGeomSubsetsPicking, marqueeSelect)
 {
+#if PXR_VERSION < 2403
+    GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
+#else
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
@@ -229,4 +248,5 @@ TEST(TestGeomSubsetsPicking, marqueeSelect)
     for (const auto& geomSubsetName : geomSubsetNamesToSelect) {
         assertSelected(inspector, PrimNamePredicate(geomSubsetName));
     }
+#endif
 }
