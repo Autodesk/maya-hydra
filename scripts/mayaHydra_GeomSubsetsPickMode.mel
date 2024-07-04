@@ -1,17 +1,17 @@
 // Contents of this file are largely adaptations of MayaUSD code for Kind and Point Instance picking modes UI setup.
-// See the following MEL files in MayaUSD : [TODO : list file names, with links?]
+// See mayaUsdMenu.mel in MayaUSD : https://github.com/Autodesk/maya-usd/blob/d7e4ee276f752a745e563f1dfb54e932b11c013f/plugin/adsk/scripts/mayaUsdMenu.mel
 
 // addMenuCallback and removeMenuCallback were copied over from MayaUSD
-// See here : [TODO : insert link]
+// See here : https://github.com/Autodesk/maya-usd/blob/d7e4ee276f752a745e563f1dfb54e932b11c013f/plugin/adsk/scripts/mayaUsdMenu.mel#L53-L72
 
-// safely add a post menu callback to a menu
+// Safely add a post menu callback to a menu
 proc addMenuCallback(string $menuName, string $cmd) {
     string $existingCallbacks = `menu -q -pmc $menuName`;
     // append the callback
     menu -e -pmc ($existingCallbacks + ";" + $cmd + ";") $menuName;
 }
 
-// safely remove a post menu callback to a menu
+// Safely remove a post menu callback to a menu
 proc removeMenuCallback(string $menuName, string $cmd) {
     string $existingCallbacks = `menu -q -pmc $menuName`;
     // remove our callback from the string of callbacks
@@ -20,11 +20,13 @@ proc removeMenuCallback(string $menuName, string $cmd) {
     menu -e -pmc $newCallbacks $menuName;
 }
 
+// Check if a post menu callback is present on a menu
 proc int hasMenuCallback(string $menuName, string $cmd) {
     string $existingCallbacks = `menu -q -pmc $menuName`;
     return `gmatch $existingCallbacks ("*" + $cmd + "*")`;
 }
 
+// Global variables to keep track of our UI elements
 global string $gMayaHydra_GeomSubsetsPickMode_Divider = "";
 global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup = "";
 global string $gMayaHydra_GeomSubsetsPickMode_RadioButtons[] = {};
@@ -43,25 +45,7 @@ global proc mayaHydra_GeomSubsetsPickMode_SetMode(string $mode) {
     optionVar -stringValue "mayaHydra_GeomSubsetsPickMode" $mode;
 }
 
-global proc mayaHydra_GeomSubsetsPickMode_SetupRuntimeCommands() {
-    if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetNone`) {
-        runTimeCommand -default true -plugin "mayaHydra"
-            -label      "None"
-            -annotation "Don't select GeomSubsets"
-            -category   "Menu items.Maya USD"
-            -command    ("mayaHydra_GeomSubsetsPickMode_SetMode(\"None\")")
-        mayaHydra_GeomSubsetsPickMode_SetNone;
-    }
-    if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetFaces`) {
-        runTimeCommand -default true -plugin "mayaHydra"
-            -label      "Faces"
-            -annotation "Select GeomSubsets of faces"
-            -category   "Menu items.Maya USD"
-            -command    ("mayaHydra_GeomSubsetsPickMode_SetMode(\"Faces\")")
-        mayaHydra_GeomSubsetsPickMode_SetFaces;
-    }
-}
-
+// Main entry point to create the GeomSubsets UI
 global proc mayaHydra_GeomSubsetsPickMode_SetupUI() {
     mayaHydra_GeomSubsetsPickMode_SetupRuntimeCommands;
     global string $gMainSelectMenu; // Maya's "Select" menu
@@ -71,6 +55,7 @@ global proc mayaHydra_GeomSubsetsPickMode_SetupUI() {
     }
 }
 
+// Main entry point to delete the GeomSubsets UI
 global proc mayaHydra_GeomSubsetsPickMode_TeardownUI() {
     global string $gMainSelectMenu; // Maya's "Select" menu
     removeMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
@@ -94,6 +79,25 @@ global proc mayaHydra_GeomSubsetsPickMode_TeardownUI() {
         deleteUI -radioMenuItemCollection $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
     }
     $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup = "";
+}
+
+global proc mayaHydra_GeomSubsetsPickMode_SetupRuntimeCommands() {
+    if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetNone`) {
+        runTimeCommand -default true -plugin "mayaHydra"
+            -label      "None"
+            -annotation "Don't select GeomSubsets"
+            -category   "Menu items.Maya USD"
+            -command    ("mayaHydra_GeomSubsetsPickMode_SetMode(\"None\")")
+        mayaHydra_GeomSubsetsPickMode_SetNone;
+    }
+    if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetFaces`) {
+        runTimeCommand -default true -plugin "mayaHydra"
+            -label      "Faces"
+            -annotation "Select GeomSubsets of faces"
+            -category   "Menu items.Maya USD"
+            -command    ("mayaHydra_GeomSubsetsPickMode_SetMode(\"Faces\")")
+        mayaHydra_GeomSubsetsPickMode_SetFaces;
+    }
 }
 
 global proc mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback() {
