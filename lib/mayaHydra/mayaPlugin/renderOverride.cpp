@@ -474,13 +474,6 @@ public:
                 continue;
             }
 
-            auto modelPathDataSource = HdTypedSampledDataSource<SdfPath>::Cast(
-                HdContainerDataSource::Get(childPrim.dataSource, HdDataSourceLocator(TfToken("model"), TfToken("modelPath")))
-            );
-            if (modelPathDataSource && modelPathDataSource->GetTypedValue(0) != basePrimPath) {
-                continue;
-            }
-
             HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema(childPrim.dataSource);
             if (!geomSubsetSchema.IsDefined() || geomSubsetSchema.GetType()->GetTypedValue(0) != geomSubsetType) {
                 continue;
@@ -1804,7 +1797,7 @@ void MtohRenderOverride::_PickByRegion(
     const MMatrix& viewMatrix,
     const MMatrix& projMatrix,
     bool singlePick,
-    TfToken geomSubsetsPickMode,
+    const TfToken& geomSubsetsPickMode,
     bool pointSnappingActive,
     int view_x,
     int view_y,

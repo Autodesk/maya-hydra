@@ -20,15 +20,11 @@
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/mixedUtils.h>
 
-#include <pxr/base/gf/vec3f.h>
-#include <pxr/base/vt/array.h>
-#include <pxr/imaging/hd/dataSource.h>
 #include <pxr/imaging/hd/dataSourceLegacyPrim.h>
-#include <pxr/imaging/hd/dataSourceLocator.h>
-#include <pxr/imaging/hd/primvarSchema.h>
-#include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/imaging/hd/primvarSchema.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
 
 #include <maya/MGlobal.h>
 #include <maya/MMatrix.h>
