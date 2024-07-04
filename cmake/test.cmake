@@ -32,6 +32,54 @@ if(MayaUsd_FOUND)
     endif()
 endif()
 
+function(find_labels label_set label_list)
+    string(REPLACE ":" ";" split_labels ${label_set})
+    list(LENGTH split_labels len)
+    if(len GREATER 0)
+        list(GET split_labels 1 labels_value)
+        # we expect comma separated labels
+        string(REPLACE "," ";" all_labels ${labels_value})
+        set(local_label_list "")
+        foreach(label ${all_labels})
+            list(APPEND local_label_list ${label})
+        endforeach()
+        set(${label_list} ${local_label_list} PARENT_SCOPE)
+    endif()
+endfunction()
+
+function(get_testfile_and_labels all_labels test_filename test_script)
+    # fetch labels for each test file
+    string(REPLACE "|" ";" tests_with_tags ${test_script})
+    list(GET tests_with_tags 0 filename)
+    # set the test file to input as no labels were passed
+    set(${test_filename} ${filename} PARENT_SCOPE)
+    list(LENGTH tests_with_tags length)
+    math(EXPR one_less_length "${length} - 1")
+    if(length GREATER 1)        
+        set(collect_labels "")
+        foreach(i RANGE 1 ${one_less_length})
+            list(GET tests_with_tags ${i} item)
+            find_labels(${item} label_list)
+            list(APPEND collect_labels ${label_list})
+        endforeach()
+        set(${all_labels} ${collect_labels} PARENT_SCOPE)    
+    else()
+        set(${all_labels} "" PARENT_SCOPE)
+    endif()
+endfunction()
+
+function(apply_labels_to_test test_labels test_file)
+    set_property(TEST ${test_file} APPEND PROPERTY LABELS "default")
+    list(LENGTH test_labels list_length)
+    if(${list_length} GREATER 0)
+    # if(NOT ${test_labels} STREQUAL "")
+        foreach(label ${test_labels})
+            set_property(TEST ${test_file} APPEND PROPERTY LABELS ${label})
+            message(STATUS "Added test label \"${label}\" for ${test_file}")
+        endforeach()
+    endif()
+endfunction()
+
 function(mayaUsd_get_unittest_target unittest_target unittest_basename)
     get_filename_component(unittest_name ${unittest_basename} NAME_WE)
     set(${unittest_target} "${unittest_name}" PARENT_SCOPE)
@@ -94,7 +142,7 @@ endif()
 #                        separate_argument_list before passing to this func
 #                        if you start with a cmake-style list.
 #
-function(mayaUsd_add_test test_name)
+function(mayaUsd_add_test test_name)    
     # -----------------
     # 1) Arg processing
     # -----------------

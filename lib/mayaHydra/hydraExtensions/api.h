@@ -37,4 +37,8 @@
 #endif
 #endif
 
+// Convenience symbol versioning include: because api.h is widely
+// included, this reduces the need to explicitly include mayaHydra.h.
+#include <mayaHydraLib/mayaHydra.h>
+
 #endif // MAYAHYDRALIB_API_H

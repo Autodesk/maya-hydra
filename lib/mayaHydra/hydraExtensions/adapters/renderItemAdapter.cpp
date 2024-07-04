@@ -142,7 +142,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // const bool isNew = flags & MViewportScene::MVS_new;  //not used yet
     const bool visible          = data._flags & MVS::MVS_visible;
     const bool matrixChanged    = data._flags & MVS::MVS_changedMatrix;
-    const bool geomChanged      = (data._flags & MVS::MVS_changedGeometry) || positionsHaveBeenReset;
+          bool geomChanged      = (data._flags & MVS::MVS_changedGeometry) || positionsHaveBeenReset;//Non const as we may modify it later => Temp workaround for a bug in Maya MAYA-134200
     const bool topoChanged      = (data._flags & MVS::MVS_changedTopo) || positionsHaveBeenReset;
     const bool visibChanged     = data._flags & MVS::MVS_changedVisibility;
     const bool effectChanged    = data._flags & MVS::MVS_changedEffect;
@@ -154,19 +154,12 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         dirtyBits |= HdChangeTracker::DirtyPrimvar; // displayColor primVar
     }
 
-    const bool displayStatusChanged = (_displayStatus != data._displayStatus);
-    _displayStatus = data._displayStatus;
     const bool hideOnPlayback = data._ri.isHideOnPlayback();
     if (hideOnPlayback != _isHideOnPlayback) {
         _isHideOnPlayback = hideOnPlayback;
         dirtyBits |= HdChangeTracker::DirtyVisibility;
     }
 
-    //Special case for aiSkydomeLight which is visible only when it is selected
-    if (_isArnoldSkyDomeLightTriangleShape && displayStatusChanged){ 
-        SetVisible(IsRenderItemSelected());
-        dirtyBits |= HdChangeTracker::DirtyVisibility;
-    } else
     if (visibChanged) {
         SetVisible(visible);
         dirtyBits |= HdChangeTracker::DirtyVisibility;
@@ -199,6 +192,33 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
         
     const int vertexBuffercount = geom ? geom->vertexBufferCount() : 0;
+
+    //Temp workaround for a bug in Maya MAYA-134200
+    if ((!geomChanged && topoChanged) && vertexBuffercount) { 
+        //With face components selection, we have topoChanged which is true but geomChanged is false, but this is wrong, the number of vertices may have changed.
+        //We want to check here if we also need to update the geometry if the number of vertices is different from what is stored already
+        for (int vbIdx = 0; (vbIdx < vertexBuffercount) && (!geomChanged); vbIdx++) {
+            MVertexBuffer* mvb = geom->vertexBuffer(vbIdx);
+            if (!mvb) {
+                continue;
+            }
+
+            const MVertexBufferDescriptor& desc = mvb->descriptor();
+            const auto                     semantic = desc.semantic();
+            switch (semantic) {
+            case MGeometry::Semantic::kPosition: {
+                // Vertices
+                MVertexBuffer*     verts = mvb;
+                const unsigned int originalVertexCount = verts->vertexCount();
+                if (_positions.size() != originalVertexCount) {//Is it different ?
+                    geomChanged = true;//this will stop the loop
+                }
+            } break;
+            default: break;
+            }
+        }
+    }
+
     // Vertices
     if (geomChanged && vertexBuffercount) {
         //vertexBuffercount > 0 means geom is non null
@@ -363,21 +383,25 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         switch (GetPrimitive()) {
         case MGeometry::Primitive::kTriangles:{
             static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
-            if (passNormalsToHydra){
-                _topology.reset(new HdMeshTopology(
-                    PxOsdOpenSubdivTokens->none,//For the OGS normals vertex buffer to be used, we need to use PxOsdOpenSubdivTokens->none
-                    UsdGeomTokens->rightHanded,
-                    vertexCounts,
-                    vertexIndices));
-            } else{
-                _topology.reset(new HdMeshTopology(
-                    (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes
-                     || GetDisplayStyle().refineLevel > 0)
-                        ? PxOsdOpenSubdivTokens->catmullClark
-                        : PxOsdOpenSubdivTokens->none,
-                    UsdGeomTokens->rightHanded,
-                    vertexCounts,
-                    vertexIndices));
+            if (vertexCounts.size()) {
+                if (passNormalsToHydra) {
+                    // For the OGS normals vertex buffer to be used, we need to use
+                    // PxOsdOpenSubdivTokens->none
+                    _topology.reset(new HdMeshTopology(
+                        PxOsdOpenSubdivTokens->none, 
+                        UsdGeomTokens->rightHanded,
+                        vertexCounts,
+                        vertexIndices));
+                } else {
+                    _topology.reset(new HdMeshTopology(
+                        (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes
+                         || GetDisplayStyle().refineLevel > 0)
+                            ? PxOsdOpenSubdivTokens->catmullClark
+                            : PxOsdOpenSubdivTokens->none,
+                        UsdGeomTokens->rightHanded,
+                        vertexCounts,
+                        vertexIndices));
+                }
             }
             }
             break;
@@ -521,12 +545,6 @@ void MayaHydraRenderItemAdapter::SetPlaybackChanged()
     if (_isHideOnPlayback) {
         MarkDirty(HdChangeTracker::DirtyVisibility);
     }
-}
-
-bool MayaHydraRenderItemAdapter::IsRenderItemSelected() const
-{ 
-    return  (MHWRender::DisplayStatus::kActive  == _displayStatus) || 
-            (MHWRender::DisplayStatus::kLead    == _displayStatus);
 }
 
 HdCullStyle MayaHydraRenderItemAdapter::GetCullStyle() const

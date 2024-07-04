@@ -16,6 +16,7 @@
 
 //Local headers
 #include "mhWireframeColorInterfaceImp.h"
+#include "mixedUtils.h"
 
 //Flow viewport headers
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
@@ -29,14 +30,6 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-// An implementation for maya of the WireframeColorInterface to get the wireframe color from a prim for selection highlighting
-namespace {
-    PXR_NS::GfVec4f getPreferencesColor(const PXR_NS::TfToken& token) {
-        PXR_NS::GfVec4f color;
-        Fvp::ColorPreferences::getInstance().getColor(token, color);
-        return color;
-    }
-}
 namespace MAYAHYDRA_NS_DEF {
 
 MhWireframeColorInterfaceImp::MhWireframeColorInterfaceImp(const std::shared_ptr<Fvp::Selection>& selection
@@ -53,7 +46,7 @@ MhWireframeColorInterfaceImp::MhWireframeColorInterfaceImp(const std::shared_ptr
 MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getSelectionState(const PXR_NS::SdfPath& primPath)const
 {
     if (_selection->HasFullySelectedAncestorInclusive(primPath)){
-        return (_leadObjectPathTracker->isLeadObject(primPath)) ? kLead : kActive;
+        return (_leadObjectPathTracker->isLeadObjectPrim(primPath)) ? kLead : kActive;
     }
     
     return kDormant;

@@ -70,8 +70,8 @@ public:
 
     //from PathInterface
     FVP_API
-    PXR_NS::SdfPath SceneIndexPath(const Ufe::Path& appPath) const override{
-        return _pathInterface->SceneIndexPath(appPath);
+    PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override{
+        return _pathInterface->UfePathToPrimSelections(appPath);
     }
 
 protected:

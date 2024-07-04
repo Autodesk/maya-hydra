@@ -23,7 +23,9 @@
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 
+#include <functional>
 #include <set>
+#include <unordered_map>
 
 namespace FVP_NS_DEF {
 
@@ -70,6 +72,15 @@ public:
     FVP_API
     void addExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot);
 
+    // Returns the selection highlight tag used in selection highlight mirror prim names.
+    FVP_API
+    std::string GetSelectionHighlightMirrorTag() const;
+
+    // Returns the corresponding selection highlight mirror path, if one exists.
+    // Otherwise, returns the given path as-is.
+    FVP_API
+    PXR_NS::SdfPath GetSelectionHighlightPath(const PXR_NS::SdfPath& path) const;
+
 protected:
 
     FVP_API
@@ -96,18 +107,61 @@ protected:
 
 private:
 
+    bool _IsExcluded(const PXR_NS::SdfPath& sceneRoot) const;
+
     void _DirtySelectionHighlightRecursive(
         const PXR_NS::SdfPath&                            primPath, 
         PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries* highlightEntries
     );
 
-    bool _IsExcluded(const PXR_NS::SdfPath& sceneRoot) const;
+    PXR_NS::HdContainerDataSourceHandle _HighlightSelectedPrim(
+        const PXR_NS::HdContainerDataSourceHandle& dataSource, 
+        const PXR_NS::SdfPath& primPath, 
+        const PXR_NS::HdContainerDataSourceHandle& highlightDataSource
+    ) const;
+
+    void _ForEachPrimInHierarchy(const PXR_NS::SdfPath& hierarchyRoot, const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation);
+
+    PXR_NS::SdfPath _FindSelectionHighlightMirrorAncestor(const PXR_NS::SdfPath& path) const;
+
+    void _CollectSelectionHighlightMirrors(
+        const PXR_NS::SdfPath& originalPrimPath, 
+        PXR_NS::SdfPathSet& outSelectionHighlightMirrors, 
+        PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outAddedPrims
+    );
+    void _AddInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
+    void _RemoveInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
+    void _RebuildInstancerHighlight(const PXR_NS::SdfPath& instancerPath);
+    void _DeleteInstancerHighlight(const PXR_NS::SdfPath& instancerPath);
+
+    void _CreateInstancerHighlightsForInstancer(const PXR_NS::HdSceneIndexPrim& instancerPrim, const PXR_NS::SdfPath& instancerPath);
 
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
-    PXR_NS::HdContainerDataSourceHandle _HighlightSelectedPrim(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::SdfPath& primPath)const;
 
     const SelectionConstPtr   _selection;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
+
+    // The following three data members (_selectionHighlightMirrorsByInstancer, _selectionHighlightMirrorUseCounters and 
+    // _instancerHighlightUsersByInstancer) hold the data required to properly manage the selection highlight mirror graph/hierarchy.
+    // A potential idea to support multiple wireframe colors for point instancer and instance selections could be to use
+    // a different mirror hierarchy for each color; in such a case, we could wrap these data members in a struct, and have 
+    // one instance of this new struct for each differently colored selection highlight mirror hierarchy.
+
+    // Maps an instancer's path to its required selection highlight mirror paths.
+    std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _selectionHighlightMirrorsByInstancer;
+
+    // "Ref-counting" of selection highlight mirror prims, which are shared across instancer highlights.
+    std::unordered_map<PXR_NS::SdfPath, size_t, PXR_NS::SdfPath::Hash> _selectionHighlightMirrorUseCounters;
+
+    // Tracks which prims contributes to using this instancer's selection highlight.
+    // Why? Suppose the following scenario : we have two selections that each would lead to highlighting the same instancer.
+    // Since both would increment the use counts of the instancer's corresponding selection highlight mirrors, we would
+    // need to also decrement the use counts symetrically. However, what happens if we receive a PrimRemoved notification
+    // on a parent prim (of all contributing selected prims and the instancer itself)? We couldn't just decrement the
+    // instancer's selection highlight mirrors by one, or they could end up floating around in memory forever. However, 
+    // we would have no way of knowing how many times this instancer actually uses its selection highlight mirrors. 
+    // Keeping track of which selected prims contribute to the instancer's highlight solves this problem.
+    std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _instancerHighlightUsersByInstancer;
 };
 
 }

@@ -19,7 +19,6 @@
 #define MAYAHYDRALIB_MIXED_UTILS_H
 
 #include <mayaHydraLib/api.h>
-#include <mayaHydraLib/mayaHydra.h>
 
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/tf/token.h>
@@ -225,6 +224,15 @@ bool getIndexedColorPreferenceValue(
     const std::string& colorName,
     const std::string& tableName,
     PXR_NS::GfVec4f&   outColor);
+
+/**
+ * @brief Retrieves a color preference from Maya using the Flow Viewport Color Preferences API.
+ *
+ * @param[in] token is a Flow Viewport color preferences token e.g : FvpColorPreferencesTokens->polymeshDormant
+ *
+ * @return the color that will be populated if retrieved from Maya.
+ */
+PXR_NS::GfVec4f getPreferencesColor(const PXR_NS::TfToken& token);
 
 } // namespace MAYAHYDRA_NS_DEF
 

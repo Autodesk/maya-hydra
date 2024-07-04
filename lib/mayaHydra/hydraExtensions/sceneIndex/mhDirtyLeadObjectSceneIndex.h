@@ -18,7 +18,6 @@
 
 //MayaHydra headers
 #include "mayaHydraLib/api.h"
-#include "mayaHydraLib/mayaHydra.h"
 
 // Flow Viewport Toolkit headers.
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
@@ -60,7 +59,7 @@ public:
     ~MhDirtyLeadObjectSceneIndex() override = default;
 
     MAYAHYDRALIB_API
-    void dirtyLeadObjectRelatedPrims(const PXR_NS::SdfPath& previousLeadObjectPath, const PXR_NS::SdfPath& currentLeadObjectPath);
+    void dirtyLeadObjectRelatedPrims(const PXR_NS::SdfPathVector& previousLeadObjectPrimPaths, const PXR_NS::SdfPathVector& currentLeadObjectPrimPaths);
 
 protected:
     
