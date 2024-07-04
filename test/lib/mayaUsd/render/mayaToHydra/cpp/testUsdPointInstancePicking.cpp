@@ -65,10 +65,7 @@ TEST(TestUsdPointInstancePicking, pickPointInstance)
     mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
     active3dView.refresh();
 
-    // When picking on the boundary of multiple objects, one Hydra pick hit per
-    // object is returned.  Therefore test that the expected selected path is
-    // in the selection.
-    ASSERT_GE(sn->size(), 1u);
+    ASSERT_EQ(sn->size(), 1u);
     std::cout << "Expected selected path string : " << selected.string() << std::endl;
     std::cout << "Actual selected path string : " << sn->front()->path().string() << std::endl;
     for (const auto& seg : selected.getSegments()) {

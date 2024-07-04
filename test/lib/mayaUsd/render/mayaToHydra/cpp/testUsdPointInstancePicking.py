@@ -40,8 +40,8 @@ class TestUsdPointInstancePicking(mtohUtils.MayaHydraBaseTestCase):
     def setUp(self):
         super(TestUsdPointInstancePicking, self).setUp()
         self.loadUsdScene()
-        cmds.setAttr('persp.translate', 19.3, 13.7, 11.4, type='float3')
-        cmds.setAttr('persp.rotate', -33.4, 63.0, 0, type='float3')
+        cmds.setAttr('persp.translate', 15, 15, 10, type='float3')
+        cmds.setAttr('persp.rotate', -40, 60, 0, type='float3')
         cmds.refresh()
 
     def test_PickPointInstancer(self):
