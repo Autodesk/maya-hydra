@@ -160,11 +160,22 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         }
     }
 
-    plugin.registerUI(
+    if (!plugin.registerUIStrings(nullptr, "mayaHydra_registerUIStrings")) {
+        ret = MS::kFailure;
+        ret.perror("Error registering mayaHydra UI string resources.");
+        return ret;
+    }
+
+    if (!plugin.registerUI(
         "mayaHydra_registerUI_load",
         "mayaHydra_registerUI_unload",
         "mayaHydra_registerUI_batch_load",
-        "mayaHydra_registerUI_batch_unload");
+        "mayaHydra_registerUI_batch_unload"))
+    {
+        ret = MS::kFailure;
+        ret.perror("Error registering mayaHydra UI procedures.");
+        return ret;
+    }
 
     auto registerPluginLoadingCallback = [&](MSceneMessage::Message pluginLoadingMessage, MMessage::MStringArrayFunction callback) {
         MStatus callbackStatus;
@@ -177,7 +188,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
             _pluginLoadingCallbackIds.push_back(callbackId);
         } else {
             ret = MS::kFailure;
-            ret.perror("Error registering plugin loading callback.");
+            ret.perror("Error registering mayaHydra plugin loading callback.");
         }
     };
     

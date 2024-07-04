@@ -84,16 +84,16 @@ global proc mayaHydra_GeomSubsetsPickMode_TeardownUI() {
 global proc mayaHydra_GeomSubsetsPickMode_SetupRuntimeCommands() {
     if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetNone`) {
         runTimeCommand -default true -plugin "mayaHydra"
-            -label      "None"
-            -annotation "Don't select GeomSubsets"
+            -label      `getMayaHydraString("kUSDGeomSubsetsPickMode_None")`
+            -annotation `getMayaHydraString("kUSDGeomSubsetsPickMode_NoneAnn")`
             -category   "Menu items.Maya USD"
             -command    ("mayaHydra_GeomSubsetsPickMode_SetMode(\"None\")")
         mayaHydra_GeomSubsetsPickMode_SetNone;
     }
     if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetFaces`) {
         runTimeCommand -default true -plugin "mayaHydra"
-            -label      "Faces"
-            -annotation "Select GeomSubsets of faces"
+            -label      `getMayaHydraString("kUSDGeomSubsetsPickMode_Faces")`
+            -annotation `getMayaHydraString("kUSDGeomSubsetsPickMode_FacesAnn")`
             -category   "Menu items.Maya USD"
             -command    ("mayaHydra_GeomSubsetsPickMode_SetMode(\"Faces\")")
         mayaHydra_GeomSubsetsPickMode_SetFaces;
@@ -143,7 +143,8 @@ global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
     setParent -menu $gMayaUsdSelectModeSubMenu;
 
     global string $gMayaHydra_GeomSubsetsPickMode_Divider;
-    $gMayaHydra_GeomSubsetsPickMode_Divider = `menuItem -divider true -dividerLabel "GeomSubsets (Hydra only)"`;
+    $dividerLabel = getMayaHydraString("kGeomSubsets");
+    $gMayaHydra_GeomSubsetsPickMode_Divider = `menuItem -divider true -dividerLabel $dividerLabel`;
 
     global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
     $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup = `radioMenuItemCollection`;
