@@ -44,7 +44,6 @@ namespace FVP_NS_DEF {
 */
 DataProducerSceneIndexDataBase::DataProducerSceneIndexDataBase(const CreationParameters& params)
 {
-    _parentMatrix.SetIdentity();
     _dataProducerSceneIndex     = params._customDataProducerSceneIndex;
     _prefix                     = params._prefix;
     _lastSceneIndexChain        = params._customDataProducerSceneIndex;
@@ -55,7 +54,6 @@ DataProducerSceneIndexDataBase::DataProducerSceneIndexDataBase(const CreationPar
 //For Usd stages
 DataProducerSceneIndexDataBase::DataProducerSceneIndexDataBase(const CreationParametersForUsdStage& params)
 {
-    _parentMatrix.SetIdentity();
     _dataProducerSceneIndex     = nullptr;//Will be set later
     _prefix                     = params._prefix;
     _lastSceneIndexChain        = nullptr;//Will be set later
@@ -68,24 +66,6 @@ DataProducerSceneIndexDataBase::~DataProducerSceneIndexDataBase()
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_rootOverridesSceneIndex);
 #endif
-}
-
-void DataProducerSceneIndexDataBase::UpdateHydraTransformFromParentPath() 
-{ 
-    if (! _rootOverridesSceneIndex){
-        return;
-    }
-
-    _rootOverridesSceneIndex->SetRootTransform(_parentMatrix);
-}
-
-void DataProducerSceneIndexDataBase::UpdateVisibilityFromDCCNode(bool isVisible) 
-{ 
-    if (! _rootOverridesSceneIndex){
-        return;
-    }
-
-    _rootOverridesSceneIndex->SetRootVisibility(isVisible);
 }
 
 void DataProducerSceneIndexDataBase::_CreateSceneIndexChainForDataProducerSceneIndex()
@@ -135,7 +115,6 @@ void DataProducerSceneIndexDataBase::_CreateSceneIndexChainForDataProducerSceneI
 {
     _rootOverridesSceneIndex    = UsdImagingRootOverridesSceneIndex::New(inputSceneIndex);
     _lastSceneIndexChain        = _rootOverridesSceneIndex;
-    UpdateHydraTransformFromParentPath();//Update the transform, this is useful when deleting the node and undoing it
 }
 
 void DataProducerSceneIndexDataBase::_CreateSceneIndexChainForDataProducerSceneIndexWithoutDCCNode(HdSceneIndexBaseRefPtr const & inputSceneIndex)

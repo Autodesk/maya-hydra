@@ -141,7 +141,7 @@ void FilteringSceneIndicesChainManager::_AppendFilteringSceneIndicesChain(  View
     //Call our Hydra viewport API mechanism for custom filtering scene index clients
     const auto& viewportFilteringSceneIndicesData = FilteringSceneIndexInterfaceImp::get().getSceneFilteringSceneIndicesData();
     for (const auto& filteringSceneIndexData : viewportFilteringSceneIndicesData) {
-        auto client = filteringSceneIndexData->getClient();
+        auto client = filteringSceneIndexData->GetClient();
         const std::string& rendererNames = client->getRendererNames();
         //Filter by render delegate name
         if ( (FvpViewportAPITokens->allRenderers != rendererNames) && rendererNames.find(rendererDisplayName) == std::string::npos){
@@ -149,7 +149,7 @@ void FilteringSceneIndicesChainManager::_AppendFilteringSceneIndicesChain(  View
             continue;
         }
 
-        const bool isVisible = filteringSceneIndexData->getVisible();
+        const bool isVisible = filteringSceneIndexData->GetVisibility();
         if (! isVisible){
             continue; //We should not append not visible filtering scene indices
         }

@@ -21,10 +21,12 @@
 #include <flowViewport/API/fvpFilteringSceneIndexInterface.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndexDataBase.h>
 
-//Maya headers
-#include <maya/MObjectHandle.h>
-#include <maya/MNodeMessage.h>
-#include <maya/MCallbackIdArray.h>
+// UFE headers
+#include "ufeExtensions/Global.h"
+#include <ufe/hierarchy.h>
+#include <ufe/object3d.h>
+#include <ufe/scene.h>
+#include <ufe/sceneNotification.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -43,21 +45,20 @@ public:
     
     ~MayaFilteringSceneIndexData() override;
 
-    const MObjectHandle& getObjHandle()const {return _mObjHandle;}  
-    
+    bool UpdateVisibility() override;
+
 private:
     MayaFilteringSceneIndexData(const std::shared_ptr<::FVP_NS_DEF::FilteringSceneIndexClient>& client);
 
-    ///The following members are optional and used only when a dccNode was passed in the FilteringSceneIndexClient
-    
-    /// Is the MObjectHandle of the maya node shape, it may be invalid if no maya node MObject pointer was passed in the FilteringSceneIndexClient.
-    MObjectHandle                       _mObjHandle;  
-    
-    /// Are the callbacks Ids set in maya to forward the changes done in maya on the dataProducer scene index.
-    MCallbackIdArray                    _nodeMessageCallbackIds;
+    void SetupUfeObservation(void* dccNode);
 
-    /// Are the callbacks Ids set in maya to handle delete and deletion undo/redo
-    MCallbackIdArray                    _dGMessageCallbackIds;
+    // Path to the scene item, if it was added as one
+    std::optional<Ufe::Path> _path;
+
+    // To observe scene changes to the scene item, if it exists
+    Ufe::Observer::Ptr _ufeSceneChangesHandler;
+
+    class UfeSceneChangesHandler;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
