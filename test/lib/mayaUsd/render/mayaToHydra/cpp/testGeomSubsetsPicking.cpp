@@ -47,6 +47,7 @@ const std::string kSphereUpperHalf = "SphereUpperHalf";
 const std::string kStageUfePathSegment = "|GeomSubsetsPickingTestScene|GeomSubsetsPickingTestSceneShape";
 const std::string kCubeMeshUfePathSegment = "/Root/CubeMeshXform/CubeMesh";
 const std::string kSphereMeshUfePathSegment = "/Root/SphereMeshXform/SphereMesh";
+const std::string kSphereInstancerUfePathSegment = "/Root/SphereInstancer";
 
 FindPrimPredicate findPickPrimPredicate(const std::string& objectName, const TfToken& primType)
 {
@@ -104,8 +105,8 @@ void testPrimPicking(const Ufe::Path& clickObjectUfePath, const QPoint& clickOff
     ASSERT_EQ(selectionsSchema.IsDefined(), false);
 
     M3dView active3dView = M3dView::active3dView();
-    const auto clickSceneIndexPath = selectionSceneIndex->SceneIndexPath(clickObjectUfePath);
-    auto primMouseCoords = getPrimMouseCoords(inspector.GetSceneIndex()->GetPrim(clickSceneIndexPath), active3dView);
+    const auto clickObjectSceneIndexPath = selectionSceneIndex->SceneIndexPath(clickObjectUfePath);
+    auto primMouseCoords = getPrimMouseCoords(inspector.GetSceneIndex()->GetPrim(clickObjectSceneIndexPath), active3dView);
     primMouseCoords += clickOffset;
 
     mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
@@ -119,6 +120,46 @@ void testPrimPicking(const Ufe::Path& clickObjectUfePath, const QPoint& clickOff
     ASSERT_EQ(selectionsSchema.IsDefined(), true);
     ASSERT_EQ(selectionsSchema.GetNumElements(), 1u);
     ASSERT_TRUE(selectionsSchema.GetElement(0).GetFullySelected());
+}
+
+void testInstancePicking(const Ufe::Path& clickInstancerUfePath, int clickInstanceIndex, const QPoint& clickOffset, const Ufe::Path& selectedObjectUfePath)
+{
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+    SceneIndexInspector inspector(sceneIndices.front());
+
+    auto ufeSelection = Ufe::GlobalSelection::get();
+    ASSERT_TRUE(ufeSelection->empty());
+
+    const auto selectionSceneIndex = findSelectionSceneIndexInTree(inspector.GetSceneIndex());
+    ASSERT_TRUE(selectionSceneIndex);
+
+    const auto selectedObjectSceneIndexPaths = selectionSceneIndex->SceneIndexPaths(selectedObjectUfePath);
+
+    for (const auto& selectedObjectSceneIndexPath : selectedObjectSceneIndexPaths) {
+        HdSceneIndexPrim selectedObjectSceneIndexPrim = inspector.GetSceneIndex()->GetPrim(selectedObjectSceneIndexPath);
+        HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(selectedObjectSceneIndexPrim.dataSource);
+        ASSERT_EQ(selectionsSchema.IsDefined(), false);
+    }
+
+    M3dView active3dView = M3dView::active3dView();
+    const auto clickInstancerSceneIndexPath = selectionSceneIndex->SceneIndexPath(clickInstancerUfePath);
+    auto primMouseCoords = getInstanceMouseCoords(inspector.GetSceneIndex()->GetPrim(clickInstancerSceneIndexPath), clickInstanceIndex, active3dView);
+    primMouseCoords += clickOffset;
+
+    mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
+    active3dView.refresh();
+
+    ASSERT_EQ(ufeSelection->size(), 1u);
+    ASSERT_TRUE(ufeSelection->contains(selectedObjectUfePath));
+
+    for (const auto& selectedObjectSceneIndexPath : selectedObjectSceneIndexPaths) {
+        HdSceneIndexPrim selectedObjectSceneIndexPrim = inspector.GetSceneIndex()->GetPrim(selectedObjectSceneIndexPath);
+        HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(selectedObjectSceneIndexPrim.dataSource);
+        ASSERT_EQ(selectionsSchema.IsDefined(), true);
+        ASSERT_EQ(selectionsSchema.GetNumElements(), 1u);
+        ASSERT_TRUE(selectionsSchema.GetElement(0).GetFullySelected());
+    }
 }
 
 } // namespace
@@ -140,58 +181,24 @@ TEST(TestGeomSubsetsPicking, fallbackPicking)
 
 TEST(TestGeomSubsetsPicking, instanceGeomSubsetPicking)
 {
-    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
-    ASSERT_GT(sceneIndices.size(), 0u);
-    SceneIndexInspector inspector(sceneIndices.front());
+    const auto sphereInstancerUfePathString = kStageUfePathSegment + "," + kSphereInstancerUfePathSegment;
+    const auto sphereInstancerUfePath = Ufe::PathString::path(sphereInstancerUfePathString);
 
-    const std::string objectName = "SphereMesh";
-    const std::string geomSubsetName = "SphereUpperHalf";
-    const std::string instancerName = "SphereInstancer";
+    const auto sphereMeshUfePathString = kStageUfePathSegment + "," + kSphereMeshUfePathSegment;
+    const auto sphereUpperHalfUfePath = Ufe::PathString::path(sphereMeshUfePathString + "/" + kSphereUpperHalf);
 
-    ensureUnselected(inspector, PrimNamePredicate(geomSubsetName));
-
-    PrimEntriesVector instancerPrims = inspector.FindPrims(findPickPrimPredicate(instancerName, HdPrimTypeTokens->instancer));
-    ASSERT_EQ(instancerPrims.size(), 1u);
-
-
-    M3dView active3dView = M3dView::active3dView();
-
-    auto primMouseCoords = getInstanceMouseCoords(instancerPrims.front().prim, 0, active3dView);
-    primMouseCoords -= QPoint(0, 25); // Move coords upwards
-
-    mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
-
-    active3dView.refresh(false, true);
-
-    ensureSelected(inspector, PrimNamePredicate(geomSubsetName));
+    testInstancePicking(sphereInstancerUfePath, 0, QPoint(0, -25), sphereUpperHalfUfePath);
 }
 
 TEST(TestGeomSubsetsPicking, instanceFallbackPicking)
 {
-    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
-    ASSERT_GT(sceneIndices.size(), 0u);
-    SceneIndexInspector inspector(sceneIndices.front());
+    const auto sphereInstancerUfePathString = kStageUfePathSegment + "," + kSphereInstancerUfePathSegment;
+    const auto sphereInstancerUfePath = Ufe::PathString::path(sphereInstancerUfePathString);
 
-    const std::string objectName = "SphereMesh";
-    const std::string geomSubsetName = "SphereUpperHalf";
-    const std::string instancerName = "SphereInstancer";
+    const auto sphereMeshUfePathString = kStageUfePathSegment + "," + kSphereMeshUfePathSegment;
+    const auto sphereMeshUfePath = Ufe::PathString::path(sphereMeshUfePathString);
 
-    ensureUnselected(inspector, PrimNamePredicate(objectName));
-
-    PrimEntriesVector instancerPrims = inspector.FindPrims(findPickPrimPredicate(instancerName, HdPrimTypeTokens->instancer));
-    ASSERT_EQ(instancerPrims.size(), 1u);
-
-
-    M3dView active3dView = M3dView::active3dView();
-
-    auto primMouseCoords = getInstanceMouseCoords(instancerPrims.front().prim, 0, active3dView);
-    primMouseCoords += QPoint(0, 25); // Move coords downwards
-
-    mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
-
-    active3dView.refresh(false, true);
-
-    ensureSelected(inspector, PrimNamePredicate(objectName));
+    testInstancePicking(sphereInstancerUfePath, 0, QPoint(0, 25), sphereMeshUfePath);
 }
 
 TEST(TestGeomSubsetsPicking, marqueeSelect)
