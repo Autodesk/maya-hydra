@@ -72,6 +72,7 @@ void testPrimPicking(const Ufe::Path& clickObjectUfePath, const QPoint& clickOff
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
+    // Preconditions
     auto ufeSelection = Ufe::GlobalSelection::get();
     ASSERT_TRUE(ufeSelection->empty());
 
@@ -84,6 +85,7 @@ void testPrimPicking(const Ufe::Path& clickObjectUfePath, const QPoint& clickOff
     HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(selectedObjectSceneIndexPrim.dataSource);
     ASSERT_EQ(selectionsSchema.IsDefined(), false);
 
+    // Picking
     M3dView active3dView = M3dView::active3dView();
     const auto clickObjectSceneIndexPath = selectionSceneIndex->SceneIndexPath(clickObjectUfePath);
     auto primMouseCoords = getPrimMouseCoords(inspector.GetSceneIndex()->GetPrim(clickObjectSceneIndexPath), active3dView);
@@ -92,6 +94,7 @@ void testPrimPicking(const Ufe::Path& clickObjectUfePath, const QPoint& clickOff
     mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
     active3dView.refresh();
 
+    // Postconditions
     ASSERT_EQ(ufeSelection->size(), 1u);
     ASSERT_TRUE(ufeSelection->contains(selectedObjectUfePath));
 
@@ -108,6 +111,7 @@ void testInstancePicking(const Ufe::Path& clickInstancerUfePath, int clickInstan
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
+    // Preconditions
     auto ufeSelection = Ufe::GlobalSelection::get();
     ASSERT_TRUE(ufeSelection->empty());
 
@@ -122,6 +126,7 @@ void testInstancePicking(const Ufe::Path& clickInstancerUfePath, int clickInstan
         ASSERT_EQ(selectionsSchema.IsDefined(), false);
     }
 
+    // Picking
     M3dView active3dView = M3dView::active3dView();
     const auto clickInstancerSceneIndexPath = selectionSceneIndex->SceneIndexPath(clickInstancerUfePath);
     auto primMouseCoords = getInstanceMouseCoords(inspector.GetSceneIndex()->GetPrim(clickInstancerSceneIndexPath), clickInstanceIndex, active3dView);
@@ -130,6 +135,7 @@ void testInstancePicking(const Ufe::Path& clickInstancerUfePath, int clickInstan
     mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
     active3dView.refresh();
 
+    // Postconditions
     ASSERT_EQ(ufeSelection->size(), 1u);
     ASSERT_TRUE(ufeSelection->contains(selectedObjectUfePath));
 
@@ -195,6 +201,7 @@ TEST(TestGeomSubsetsPicking, marqueeSelect)
 
     std::vector<std::string> geomSubsetNamesToSelect = {"CubeUpperHalf", "SphereUpperHalf"};
 
+    // Preconditions
     auto ufeSelection = Ufe::GlobalSelection::get();
     ASSERT_TRUE(ufeSelection->empty());
     
@@ -202,19 +209,19 @@ TEST(TestGeomSubsetsPicking, marqueeSelect)
         assertUnselected(inspector, PrimNamePredicate(geomSubsetName));
     }
 
+    // Marquee selection
     M3dView active3dView = M3dView::active3dView();
 
-    // Initialize the selection rectangle
     int offsetFromBorder = 10;
     QPoint topLeftMouseCoords(0 + offsetFromBorder, 0 + offsetFromBorder);
     QPoint bottomRightMouseCoords(active3dView.portWidth() - offsetFromBorder, active3dView.portHeight() - offsetFromBorder);
 
-    // Perform the marquee selection
     mousePress(Qt::MouseButton::LeftButton, active3dView.widget(), topLeftMouseCoords);
     mouseMoveTo(active3dView.widget(), bottomRightMouseCoords);
     mouseRelease(Qt::MouseButton::LeftButton, active3dView.widget(), bottomRightMouseCoords);
     active3dView.refresh();
 
+    // Postconditions
     ASSERT_EQ(ufeSelection->size(), 2u);
     ASSERT_TRUE(ufeSelection->contains(cubeUpperHalfUfePath));
     ASSERT_TRUE(ufeSelection->contains(sphereUpperHalfUfePath));
