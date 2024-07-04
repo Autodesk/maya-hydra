@@ -26,6 +26,7 @@
 #include <flowViewport/API/samples/fvpFilteringSceneIndexClientExample.h>
 
 //maya headers
+#include <maya/M3dView.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MPlug.h>
 #include <maya/MObjectArray.h>
@@ -96,6 +97,9 @@ TEST(FlowViewportAPI, filterPrimitives)
     PrimEntriesVector foundPrims = inspector.FindPrims(smallSpherePredicate, 1);
     ASSERT_EQ(foundPrims.size(), 1u); //The small sphere should be found and visible
 
+    // Refresh to update the filtering scene index chain
+    M3dView::active3dView().refresh(false, true);
+
     foundPrims = inspector.FindPrims(bigSpherePredicate, 1);
     ASSERT_EQ(foundPrims.size(), 0u); //The big sphere should be filtered (not visible)
 
@@ -105,13 +109,19 @@ TEST(FlowViewportAPI, filterPrimitives)
     MPlug visibilityPlug = depNode.findPlug("visibility");
     ASSERT_FALSE(visibilityPlug.isNull());
     visibilityPlug.setBool(false);
-    
+
+    // Refresh to update the filtering scene index chain
+    M3dView::active3dView().refresh(false, true);
+
     foundPrims = inspector.FindPrims(bigSpherePredicate, 1);
     ASSERT_EQ(foundPrims.size(), 1u);//The big sphere should be visible, as the filtering is disabled since the cube which is its parent node is hidden.
 
     //Unhide the cube shape node
     visibilityPlug.setBool(true);
-    
+
+    // Refresh to update the filtering scene index chain
+    M3dView::active3dView().refresh(false, true);
+
     foundPrims = inspector.FindPrims(bigSpherePredicate, 1);
     ASSERT_EQ(foundPrims.size(), 0u);//The big sphere should not be visible, as filtering is applied again
 

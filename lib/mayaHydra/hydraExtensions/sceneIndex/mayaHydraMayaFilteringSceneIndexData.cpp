@@ -17,111 +17,138 @@
 
 //Local headers
 #include "mayaHydraMayaFilteringSceneIndexData.h"
+#include "mayaHydraLib/hydraUtils.h"
 #include "mayaHydraLib/mayaUtils.h"
 
 //flow viewport headers
 #include <flowViewport/API/fvpFilteringSceneIndexClient.h>
-
-//Maya headers
-#include <maya/MDGMessage.h>
-#include <maya/MFnDependencyNode.h>
-#include <maya/MFnAttribute.h>
-#include <maya/MStringArray.h>
-#include <maya/MPlug.h>
-#include <maya/MDagPath.h>
-
-namespace
-{
-    //Callback when an attribute of this a Maya node changes
-    void attributeChangedCallback(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* data)
-    {
-        if( ! data){
-            return;
-        }
-
-        bool isVisible = false;
-        if (MayaHydra::IsAMayaVisibilityAttribute(plug, isVisible)){
-            PXR_NS::MayaFilteringSceneIndexData* mayaFilteringSceneIndexData    = (PXR_NS::MayaFilteringSceneIndexData*)data;
-            mayaFilteringSceneIndexData->updateVisibilityFromDCCNode(isVisible);
-        }
-    }
-
-    //Callback when a node is added
-    void onDagNodeAdded(MObject& obj,  void* data)
-    {
-        //Since when an object is recreated (such as doing an undo after a delete of the node), the MObject are different but their MObjectHandle::hasCode() are identical so 
-        //this is how we identify which object we need to deal with.
-        PXR_NS::MayaFilteringSceneIndexData* mayaFilteringSceneIndexData    = (PXR_NS::MayaFilteringSceneIndexData*)data;
-        const MObjectHandle objHandle(obj);
-        if(mayaFilteringSceneIndexData&& mayaFilteringSceneIndexData->getObjHandle().isValid() && objHandle.hashCode() == mayaFilteringSceneIndexData->getObjHandle().hashCode()){
-            mayaFilteringSceneIndexData->updateVisibilityFromDCCNode(true);
-        }
-    }
-
-    //Callback when a node is removed
-    void onDagNodeRemoved(MObject& obj,  void* data)
-    {
-        //Since when an object is recreated (such as doing an undo after a delete of the node), the MObject are different but their MObjectHandle::hasCode() are identical so 
-        //this is how we identify which object we need to deal with.
-        PXR_NS::MayaFilteringSceneIndexData* mayaFilteringSceneIndexData    = (PXR_NS::MayaFilteringSceneIndexData*)data;
-        const MObjectHandle objHandle(obj);
-        if(mayaFilteringSceneIndexData&& mayaFilteringSceneIndexData->getObjHandle().isValid() && objHandle.hashCode() == mayaFilteringSceneIndexData->getObjHandle().hashCode()){
-            mayaFilteringSceneIndexData->updateVisibilityFromDCCNode(false);
-        }
-    }
-}
+#include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
+
+class MayaFilteringSceneIndexData::UfeSceneChangesHandler : public Ufe::Observer
+{
+public:
+    UfeSceneChangesHandler(MayaFilteringSceneIndexData& filteringData)
+        : _filteringData(filteringData)
+    {
+    }
+
+    void operator()(const Ufe::Notification& notification) override;
+    void handleSceneChanged(const Ufe::SceneChanged& sceneChanged);
+
+private:
+    MayaFilteringSceneIndexData& _filteringData;
+};
 
 MayaFilteringSceneIndexData::MayaFilteringSceneIndexData(const std::shared_ptr<::FVP_NS_DEF::FilteringSceneIndexClient>& client)
 : PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBase(client)
 {
-    //If a maya node is present in client.getDccNode(), add callbacks to handle node deleted/undo/redo and hide/unhide
     void* dccNode = client->getDccNode();
-    if (dccNode){
-        MObject* mObj = reinterpret_cast<MObject*>(dccNode);
-        _mObjHandle   = MObjectHandle(*mObj);
-
-        MCallbackId cbId = MNodeMessage::addAttributeChangedCallback(*mObj, attributeChangedCallback, this);
-        if (cbId){
-            _nodeMessageCallbackIds.append(cbId);
-        }
-
-        const MDagPath mayaNodeDagPath  = MDagPath::getAPathTo(*mObj);
-                
-        //Also monitor parent DAG node to be able to update the scene index if the visibility is modified
-        MDagPath parentDagPath  = mayaNodeDagPath;
-        parentDagPath.pop();
-        MObject parentObj       = parentDagPath.node();
-        cbId    = 0;
-        cbId    = MNodeMessage::addAttributeChangedCallback(parentObj, attributeChangedCallback, this);
-        if (cbId){
-            _nodeMessageCallbackIds.append(cbId);
-        }
-
-        //Get node type name to filter by node type for callbacks
-        MFnDependencyNode dep(*mObj);
-        const MString nodeTypeName = dep.typeName();
-
-        //Setup node added callback, filter by node type using nodeTypeName
-        cbId    = 0;
-        cbId = MDGMessage::addNodeAddedCallback(onDagNodeAdded, nodeTypeName, this);
-        if (cbId) {
-            _dGMessageCallbackIds.append(cbId);
-        }
-
-        //Setup node remove callback, filter by node type using nodeTypeName
-        cbId    = 0;
-        cbId = MDGMessage::addNodeRemovedCallback(onDagNodeRemoved, nodeTypeName, this);
-        if (cbId) {
-            _dGMessageCallbackIds.append(cbId);
-        }
+    if (dccNode) {
+        SetupUfeObservation(dccNode);
     }
 }
 
 MayaFilteringSceneIndexData::~MayaFilteringSceneIndexData()
 {
-    MNodeMessage::removeCallbacks   (_nodeMessageCallbackIds);
-    MMessage::removeCallbacks       (_dGMessageCallbackIds);
+    if (_ufeSceneChangesHandler) {
+        Ufe::Scene::instance().removeObserver(_ufeSceneChangesHandler);
+        _ufeSceneChangesHandler.reset();
+    }
 }
 
+void MayaFilteringSceneIndexData::SetupUfeObservation(void* dccNode)
+{
+    if (dccNode) {
+        MObject* mObject = reinterpret_cast<MObject*>(dccNode);
+        MDagPath dagPath;
+        MDagPath::getAPathTo(*mObject, dagPath);
+        dagPath.extendToShape();
+
+        _path = Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath));
+
+        _ufeSceneChangesHandler = std::make_shared<UfeSceneChangesHandler>(*this);
+        Ufe::Scene::instance().addObserver(_ufeSceneChangesHandler);
+
+        // Note : while we currently use a query-based approach to update the visibility,
+        // we could also move to a UFE notifications-based approach if necessary. In this case,
+        // we would setup the subject-observer relationships here. The observer would observe
+        // the Ufe::Object3d subject, receive Ufe::VisibilityChanged notifications and call
+        // UpdateVisibility() if the received notification is relevant (i.e. if the filtering 
+        // scene index's path starts with the notification's path, the same way as in
+        // MayaFilteringSceneIndexData::UfeSceneChangesHandler::operator()).
+    }
+}
+
+bool MayaFilteringSceneIndexData::UpdateVisibility()
+{
+    if (!_path.has_value()) {
+        return false;
+    }
+
+    bool      isVisible = true;
+    Ufe::Path currPath = _path.value();
+    while (isVisible && !currPath.empty()) {
+        auto sceneItem = Ufe::Hierarchy::createItem(currPath);
+        auto object3d = Ufe::Object3d::object3d(sceneItem);
+        isVisible = isVisible && object3d != nullptr && object3d->visibility();
+        currPath = currPath.pop();
+    }
+    if (_isVisible != isVisible) {
+        _isVisible = isVisible;
+        return true;
+    }
+    return false;
+}
+
+void MayaFilteringSceneIndexData::UfeSceneChangesHandler::operator()(
+    const Ufe::Notification& notification)
+{
+    // We're processing UFE notifications, which implies that a path must be in use.
+    TF_AXIOM(_filteringData._path.has_value());
+
+    const Ufe::SceneChanged& sceneChangedNotif = notification.staticCast<Ufe::SceneChanged>();
+    if (_filteringData._path.value().startsWith(sceneChangedNotif.changedPath())) {
+        handleSceneChanged(sceneChangedNotif);
+    }
+}
+
+void MayaFilteringSceneIndexData::UfeSceneChangesHandler::handleSceneChanged(
+    const Ufe::SceneChanged& sceneChanged)
+{
+    auto handleSingleOperation
+        = [&](const Ufe::SceneCompositeNotification::Op& sceneOperation) -> void {
+        // We're processing UFE notifications, which implies that a path must be in use.
+        TF_AXIOM(_filteringData._path.has_value());
+
+        if (!_filteringData._path.value().startsWith(sceneOperation.path)) {
+            // This notification does not relate to our parent hierarchy, so we have nothing to do.
+            return;
+        }
+
+        if (sceneOperation.opType == Ufe::SceneChanged::ObjectPathChange) {
+            switch (sceneOperation.subOpType) {
+            case Ufe::ObjectPathChange::ObjectRename: {
+                _filteringData._path = _filteringData._path.value().replaceComponent(
+                    sceneOperation.item->path().size() - 1, sceneOperation.item->path().back());
+                break;
+            }
+            case Ufe::ObjectPathChange::ObjectReparent: {
+                _filteringData._path = _filteringData._path.value().reparent(
+                    sceneOperation.path, sceneOperation.item->path());
+                break;
+            }
+            }
+        }
+    };
+    if (sceneChanged.opType() == Ufe::SceneChanged::SceneCompositeNotification) {
+        const auto& compositeNotification
+            = sceneChanged.staticCast<Ufe::SceneCompositeNotification>();
+        for (const auto& operation : compositeNotification) {
+            handleSingleOperation(operation);
+        }
+    } else {
+        handleSingleOperation(sceneChanged);
+    }
+}

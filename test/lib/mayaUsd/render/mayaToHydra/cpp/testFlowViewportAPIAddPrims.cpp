@@ -26,6 +26,7 @@
 #include <flowViewport/API/samples/fvpDataProducerSceneIndexExample.h>
 
 //maya headers
+#include <maya/M3dView.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MPlug.h>
 #include <maya/MObjectArray.h>
@@ -107,13 +108,19 @@ TEST(FlowViewportAPI, addPrimitives)
     MPlug visibilityPlug = depNode.findPlug("visibility");
     ASSERT_FALSE(visibilityPlug.isNull());
     visibilityPlug.setBool(false);
-    
+
+    // Refresh to update the data producer transform & visibility
+    M3dView::active3dView().refresh();
+
     foundPrims = inspector.FindPrims(findFirstCubePrimPredicate, 1);
     ASSERT_EQ(foundPrims.size(), 0u);//The cube should not be found
 
     //Unhide the shape node
     visibilityPlug.setBool(true);
-    
+
+    // Refresh to update the data producer transform & visibility
+    M3dView::active3dView().refresh();
+
     foundPrims = inspector.FindPrims(findFirstCubePrimPredicate, 1);
     ASSERT_EQ(foundPrims.size(), 1u);//The cube should be found
 

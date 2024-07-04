@@ -96,7 +96,7 @@ bool FilteringSceneIndexInterfaceImp::_CreateSceneFilteringSceneIndicesData(cons
         std::lock_guard<std::mutex> lock(sceneFilteringClient_mutex);
 
         auto findResult = std::find_if(sceneFilteringSceneIndicesData().cbegin(), sceneFilteringSceneIndicesData().cend(),
-                    [&client](const PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr& filteringSIData) { return filteringSIData->getClient() == client;});
+                    [&client](const PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr& filteringSIData) { return filteringSIData->GetClient() == client;});
         if (findResult != sceneFilteringSceneIndicesData().cend()){
             return false;
         }
@@ -123,7 +123,7 @@ bool FilteringSceneIndexInterfaceImp::_CreateSelectionHighlightFilteringSceneInd
         std::lock_guard<std::mutex> lock(selectionHighlightFilteringClient_mutex);
 
         auto findResult = std::find_if(selectionHighlightFilteringSceneIndicesData.cbegin(), selectionHighlightFilteringSceneIndicesData.cend(),
-                    [&client](const PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr& filteringSIData) { return filteringSIData->getClient() == client;});
+                    [&client](const PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr& filteringSIData) { return filteringSIData->GetClient() == client;});
         if (findResult != selectionHighlightFilteringSceneIndicesData.cend()){
             return false;
         }
@@ -149,11 +149,11 @@ void FilteringSceneIndexInterfaceImp::_DestroySceneFilteringSceneIndicesData(con
         std::lock_guard<std::mutex> lock(sceneFilteringClient_mutex);
 
         auto findResult = std::find_if(sceneFilteringSceneIndicesData().cbegin(), sceneFilteringSceneIndicesData().cend(),
-                    [&client](const PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr& filteringSIData) { return filteringSIData->getClient() == client;});
+                    [&client](const PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr& filteringSIData) { return filteringSIData->GetClient() == client;});
         if (findResult != sceneFilteringSceneIndicesData().cend()){
             const auto& filteringSIData = (*findResult);
             rendererNames = (filteringSIData)
-                ? filteringSIData->getClient()->getRendererNames()
+                ? filteringSIData->GetClient()->getRendererNames()
                 : FvpViewportAPITokens->allRenderers;
 
             sceneFilteringSceneIndicesData().erase(findResult);//This also decreases ref count
@@ -175,7 +175,7 @@ void FilteringSceneIndexInterfaceImp::_DestroySelectionHighlightFilteringSceneIn
         std::lock_guard<std::mutex> lock(selectionHighlightFilteringClient_mutex);
 
         auto findResult = std::find_if(selectionHighlightFilteringSceneIndicesData.cbegin(), selectionHighlightFilteringSceneIndicesData.cend(),
-                    [&client](const PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr& filteringSIData) { return filteringSIData->getClient() == client;});
+                    [&client](const PXR_NS::FVP_NS_DEF::FilteringSceneIndexDataBaseRefPtr& filteringSIData) { return filteringSIData->GetClient() == client;});
         if (findResult != selectionHighlightFilteringSceneIndicesData.cend()){
             selectionHighlightFilteringSceneIndicesData.erase(findResult);//Also decreases ref count
         }

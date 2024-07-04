@@ -41,10 +41,12 @@ public:
 
     ~FilteringSceneIndexDataBase() override = default;
     
-    void updateVisibilityFromDCCNode(bool isVisible);
-    std::shared_ptr<::Fvp::FilteringSceneIndexClient> getClient() {return _client;}
-    bool getVisible() const{return _isVisible;}
-    void setVisible(bool visible) {_isVisible = visible;}
+    std::shared_ptr<::Fvp::FilteringSceneIndexClient> GetClient() {return _client;}
+
+    bool GetVisibility() { return _isVisible; }
+
+    // Returns true if visibility was changed, false otherwise.
+    virtual bool UpdateVisibility() = 0;
 
 protected:
     FilteringSceneIndexDataBase(const std::shared_ptr<::Fvp::FilteringSceneIndexClient>& filteringSIClient);
@@ -53,7 +55,7 @@ protected:
     const std::shared_ptr<::Fvp::FilteringSceneIndexClient>  _client;
 
     ///_isVisible is true when the filteringSceneIndices should be visible and false when they are not such as when the hosting node has been hidden/deleted.
-    bool    _isVisible = true;
+    bool    _isVisible = false;
 };
 
 }//End of namespace FVP_NS_DEF {

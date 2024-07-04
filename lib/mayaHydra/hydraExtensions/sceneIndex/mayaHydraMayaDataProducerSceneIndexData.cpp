@@ -23,156 +23,168 @@
 #include "mayaHydraLib/hydraUtils.h"
 #include "mayaHydraLib/mayaUtils.h"
 
-//Maya headers
-#include <maya/MMatrix.h>
-#include <maya/MDGMessage.h>
-#include <maya/MFnDependencyNode.h>
-#include <maya/MStringArray.h>
-#include <maya/MFnAttribute.h>
-#include <maya/MPlug.h>
-
-namespace
-{
-    //Callback when an attribute of a maya node changes
-    void attributeChangedCallback(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug & otherPlug, void* mayaDataProducerSceneIndexData)
-    {
-        if( ! mayaDataProducerSceneIndexData){
-            return;
-        }
-
-        //We care only about transform and visibility attributes
-        MFnAttribute attr (plug.attribute());
-        if (MayaHydra::IsAMayaTransformAttributeName(attr.name())){
-            PXR_NS::MayaDataProducerSceneIndexData* MayaDataProducerSceneIndexData = (PXR_NS::MayaDataProducerSceneIndexData*)mayaDataProducerSceneIndexData;
-            MayaDataProducerSceneIndexData->UpdateTransformFromMayaNode();
-        } else{
-            bool isVisible = false;
-            if (MayaHydra::IsAMayaVisibilityAttribute(plug, isVisible)){
-                PXR_NS::MayaDataProducerSceneIndexData* MayaDataProducerSceneIndexData = (PXR_NS::MayaDataProducerSceneIndexData*)mayaDataProducerSceneIndexData;
-                MayaDataProducerSceneIndexData->UpdateVisibilityFromDCCNode(isVisible);
-            }
-        }
-    }
-
-    //Callback when a maya node is added
-    void onDagNodeAdded(MObject& obj,  void* data)
-    {
-        //Since when an object is recreated (when doing an undo after a delete of the node), the MObject from the same node are different but their MObjectHandle::hashCode() are identical so 
-        //this is how we identify which object we need to deal with.
-        PXR_NS::MayaDataProducerSceneIndexData* mayaDataProducerSceneIndexData    = (PXR_NS::MayaDataProducerSceneIndexData*)data;
-        const MObjectHandle objHandle(obj);
-        if(mayaDataProducerSceneIndexData && mayaDataProducerSceneIndexData->getObjHandle().isValid() && objHandle.hashCode() == mayaDataProducerSceneIndexData->getObjHandle().hashCode()){
-            mayaDataProducerSceneIndexData->UpdateVisibilityFromDCCNode(true);
-        }
-    }
-
-    //Callback when a maya node is removed
-    void onDagNodeRemoved(MObject& obj,  void* data)
-    {
-        //Since when an object is recreated (when doing an undo after a delete of the node), the MObject from the same node are different but their MObjectHandle::hashCode() are identical so 
-        //this is how we identify which object we need to deal with.
-        PXR_NS::MayaDataProducerSceneIndexData* mayaDataProducerSceneIndexData    = (PXR_NS::MayaDataProducerSceneIndexData*)data;
-        const MObjectHandle objHandle(obj);
-        if(mayaDataProducerSceneIndexData && mayaDataProducerSceneIndexData->getObjHandle().isValid() && objHandle.hashCode() == mayaDataProducerSceneIndexData->getObjHandle().hashCode()){
-            mayaDataProducerSceneIndexData->UpdateVisibilityFromDCCNode(false);
-        }
-    }
-}
-
 PXR_NAMESPACE_USING_DIRECTIVE
+
+class MayaDataProducerSceneIndexData::UfeSceneChangesHandler : public Ufe::Observer
+{
+public:
+    UfeSceneChangesHandler(MayaDataProducerSceneIndexData& dataProducer)
+        : _dataProducer(dataProducer)
+    {
+    }
+
+    void operator()(const Ufe::Notification& notification) override;
+    void handleSceneChanged(const Ufe::SceneChanged& sceneChanged);
+
+private:
+    MayaDataProducerSceneIndexData& _dataProducer;
+};
 
 MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(const FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params) 
     : FVP_NS_DEF::DataProducerSceneIndexDataBase(params)
 {
-    CreateNodeCallbacks();
+    if (_dccNode) {
+        SetupUfeObservation(_dccNode);
+    }
     _CreateSceneIndexChainForDataProducerSceneIndex();
 }
 
 MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParametersForUsdStage& params) 
     : FVP_NS_DEF::DataProducerSceneIndexDataBase(params)
 {
-    CreateNodeCallbacks();
-    _CreateSceneIndexChainForUsdStageSceneIndex(params);
-}
-
-void MayaDataProducerSceneIndexData::CreateNodeCallbacks() 
-{ 
-    //When the user has passed a maya node we are adding callbacks on various changes to be able to act on the data producer scene index prims automatically
-    if (_dccNode){
-        MObject* mObj = reinterpret_cast<MObject*>(_dccNode);
-        _mObjHandle   = MObjectHandle(*mObj);
-
-        _mayaNodeDagPath  = MDagPath::getAPathTo(*mObj);
-
-        _CopyMayaNodeTransform();//Copy it so that the classes created in _CreateSceneIndexChainForDataProducerSceneIndex have the up to date matrix
-
-        MCallbackId cbId = MNodeMessage::addAttributeChangedCallback(*mObj, attributeChangedCallback, this);
-        if (cbId){
-            _nodeMessageCallbackIds.append(cbId);
-        }
-
-        //Also monitor parent DAG node to be able to update the scene index if the parent transform is modified or the visibility changed
-        MDagPath parentDagPath  = _mayaNodeDagPath;
-        parentDagPath.pop();
-        MObject parentObj       = parentDagPath.node();
-        cbId    = 0;
-        cbId    = MNodeMessage::addAttributeChangedCallback(parentObj, attributeChangedCallback, this);
-        if (cbId){
-            _nodeMessageCallbackIds.append(cbId);
-        }
-
-        //Get node type name to filter by node type for callbacks
-        MFnDependencyNode dep(*mObj);
-        const MString nodeTypeName = dep.typeName();
-
-        //Setup node added callback, filter by node type using nodeTypeName
-        cbId = 0;
-        cbId = MDGMessage::addNodeAddedCallback(onDagNodeAdded, nodeTypeName, this);
-        if (cbId) {
-            _dGMessageCallbackIds.append(cbId);
-        }
-
-        //Setup node remove callback, filter by node type using nodeTypeName
-        cbId = 0;
-        cbId = MDGMessage::addNodeRemovedCallback(onDagNodeRemoved, nodeTypeName, this);
-        if (cbId) {
-            _dGMessageCallbackIds.append(cbId);
-        }
+    if (_dccNode) {
+        SetupUfeObservation(_dccNode);
     }
+    _CreateSceneIndexChainForUsdStageSceneIndex(params);
 }
 
 MayaDataProducerSceneIndexData::~MayaDataProducerSceneIndexData()
 {
-    CHECK_MSTATUS(MNodeMessage::removeCallbacks   (_nodeMessageCallbackIds));
-    CHECK_MSTATUS(MMessage::removeCallbacks       (_dGMessageCallbackIds));
-}
-
-void MayaDataProducerSceneIndexData::UpdateTransformFromMayaNode() 
-{ 
-    _CopyMayaNodeTransform(); 
-    UpdateHydraTransformFromParentPath();
-}
-
-void MayaDataProducerSceneIndexData::_CopyMayaNodeTransform() 
-{ 
-    if (_mayaNodeDagPath.isValid()){
-        //Get Maya transform value
-        //Convert from Maya matrix to GfMatrix4d
-        const MMatrix mayaMat = _mayaNodeDagPath.inclusiveMatrix();
-        
-        //Copy Maya matrix into _parentMatrix member of this struct
-        memcpy(_parentMatrix.GetArray(), mayaMat[0], sizeof(double) * 16);
+    if (_ufeSceneChangesHandler) {
+        Ufe::Scene::instance().removeObserver(_ufeSceneChangesHandler);
+        _ufeSceneChangesHandler.reset();
     }
 }
 
-std::string MayaDataProducerSceneIndexData::GetDCCNodeName() const
+void MayaDataProducerSceneIndexData::SetupUfeObservation(void* dccNode)
 {
-    std::string outNodeName;
-    if (_mObjHandle.isValid() && _mObjHandle.isAlive()){
-        MFnDependencyNode dep(_mObjHandle.object());
-        outNodeName = std::string(dep.name().asChar());
-        MAYAHYDRA_NS_DEF::SanitizeNameForSdfPath(outNodeName);
-    }
+    if (dccNode) {
+        MObject* mObject = reinterpret_cast<MObject*>(dccNode);
+        MDagPath dagPath;
+        MDagPath::getAPathTo(*mObject, dagPath);
+        dagPath.extendToShape();
 
-    return outNodeName;
+        _path = Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath));
+
+        _ufeSceneChangesHandler = std::make_shared<UfeSceneChangesHandler>(*this);
+        Ufe::Scene::instance().addObserver(_ufeSceneChangesHandler);
+
+        // Note : while we currently use a query-based approach to update the transform and visibility,
+        // we could also move to a UFE notifications-based approach if necessary. In this case, we would
+        // setup the subject-observer relationships here.
+        // For visibility changes, the observer would observe the Ufe::Object3d subject, receive 
+        // Ufe::VisibilityChanged notifications and call UpdateVisibility() if the received notification 
+        // is relevant (i.e. if the data producer's path starts with the notification's path, the 
+        // same way as in MayaDataProducerSceneIndexData::UfeSceneChangesHandler::operator()).
+        // For transform changes, the observer would observe a Ufe::Transform3dPathSubject created off the
+        // UFE path of the node (_path), receive Ufe::Transform3dChanged notifications and call UpdateTransform() 
+        // if the received notification is relevant (i.e. if the data producer's path starts with the notification's 
+        // path, the same way as in MayaDataProducerSceneIndexData::UfeSceneChangesHandler::operator()).
+    }
+}
+
+bool MayaDataProducerSceneIndexData::UpdateVisibility()
+{
+    if (!_path.has_value()) {
+        return false;
+    }
+    // Having a UFE path means we have an associated DCC node,
+    // so we should also have a UsdImagingRootOverridesSceneIndex
+    TF_AXIOM(_rootOverridesSceneIndex);
+
+    bool      isVisible = true;
+    Ufe::Path currPath = _path.value();
+    while (isVisible && !currPath.empty()) {
+        auto sceneItem = Ufe::Hierarchy::createItem(currPath);
+        auto object3d = Ufe::Object3d::object3d(sceneItem);
+        isVisible = isVisible && object3d != nullptr && object3d->visibility();
+        currPath = currPath.pop();
+    }
+    if (_rootOverridesSceneIndex->GetRootVisibility() != isVisible) {
+        _rootOverridesSceneIndex->SetRootVisibility(isVisible);
+        return true;
+    }
+    return false;
+}
+
+bool MayaDataProducerSceneIndexData::UpdateTransform()
+{
+    if (!_path.has_value()) {
+        return false;
+    }
+    // Having a UFE path means we have an associated DCC node,
+    // so we should also have a UsdImagingRootOverridesSceneIndex
+    TF_AXIOM(_rootOverridesSceneIndex);
+
+    auto transform = Ufe::Transform3dRead::transform3dRead(Ufe::Hierarchy::createItem(_path.value()));
+    if (!transform) {
+        return false;
+    }
+    GfMatrix4d transformMatrix;
+    std::memcpy(
+        transformMatrix.GetArray(),
+        transform->inclusiveMatrix().matrix.data(),
+        sizeof(decltype(transformMatrix)::ScalarType) * transformMatrix.numRows * transformMatrix.numColumns);
+    if (!GfIsClose(_rootOverridesSceneIndex->GetRootTransform(), transformMatrix, 1e-9)) {
+        _rootOverridesSceneIndex->SetRootTransform(transformMatrix);
+        return true;
+    }
+    return false;
+}
+
+void MayaDataProducerSceneIndexData::UfeSceneChangesHandler::operator()(const Ufe::Notification& notification)
+{
+    // We're processing UFE notifications, which implies that a path must be in use.
+    TF_AXIOM(_dataProducer._path.has_value());
+
+    const Ufe::SceneChanged& sceneChangedNotif = notification.staticCast<Ufe::SceneChanged>();
+    if (_dataProducer._path.value().startsWith(sceneChangedNotif.changedPath())) {
+        handleSceneChanged(sceneChangedNotif);
+    }
+}
+
+void MayaDataProducerSceneIndexData::UfeSceneChangesHandler::handleSceneChanged(const Ufe::SceneChanged& sceneChanged)
+{
+    auto handleSingleOperation = [&](const Ufe::SceneCompositeNotification::Op& sceneOperation) -> void {
+        // We're processing UFE notifications, which implies that a path must be in use.
+        TF_AXIOM(_dataProducer._path.has_value());
+        // Having a UFE path means we have an associated DCC node,
+        // so we should also have a UsdImagingRootOverridesSceneIndex
+        TF_AXIOM(_dataProducer._rootOverridesSceneIndex);
+
+        if (!_dataProducer._path.value().startsWith(sceneOperation.path)) {
+            // This notification does not relate to our parent hierarchy, so we have nothing to do.
+            return;
+        }
+
+        if (sceneOperation.opType == Ufe::SceneChanged::ObjectPathChange) {
+            switch (sceneOperation.subOpType) {
+            case Ufe::ObjectPathChange::ObjectRename:
+                _dataProducer._path = _dataProducer._path.value().replaceComponent(
+                    sceneOperation.item->path().size() - 1, sceneOperation.item->path().back());
+                break;
+            case Ufe::ObjectPathChange::ObjectReparent:
+                _dataProducer._path = _dataProducer._path.value().reparent(sceneOperation.path, sceneOperation.item->path());
+                break;
+            }
+        }
+    };
+    if (sceneChanged.opType() == Ufe::SceneChanged::SceneCompositeNotification) {
+        const auto& compositeNotification = sceneChanged.staticCast<Ufe::SceneCompositeNotification>();
+        for (const auto& operation : compositeNotification) {
+            handleSingleOperation(operation);
+        }
+    } else {
+        handleSingleOperation(sceneChanged);
+    }
 }
