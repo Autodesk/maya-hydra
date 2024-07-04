@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-#include "mayaHydraDefaultMaterialDataSource.h"
+#include "mayaHydraMaterialDataSource.h"
 
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexUtils.h>
@@ -32,7 +32,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 // ----------------------------------------------------------------------------
 
-MayaHydraDefaultMaterialDataSource::MayaHydraDefaultMaterialDataSource(
+MayaHydraMaterialDataSource::MayaHydraMaterialDataSource(
     const SdfPath& id,
     TfToken type,
     MayaHydraSceneIndex* sceneIndex)
@@ -44,7 +44,7 @@ MayaHydraDefaultMaterialDataSource::MayaHydraDefaultMaterialDataSource(
 
 
 TfTokenVector
-MayaHydraDefaultMaterialDataSource::GetNames()
+MayaHydraMaterialDataSource::GetNames()
 {
     TfTokenVector result;
     result.push_back(HdMaterialSchemaTokens->material);
@@ -52,7 +52,7 @@ MayaHydraDefaultMaterialDataSource::GetNames()
 }
 
 HdDataSourceBaseHandle
-MayaHydraDefaultMaterialDataSource::Get(const TfToken& name)
+MayaHydraMaterialDataSource::Get(const TfToken& name)
 {
     if (name == HdMaterialSchemaTokens->material) {
        return _GetMaterialDataSource();
@@ -66,7 +66,7 @@ MayaHydraDefaultMaterialDataSource::Get(const TfToken& name)
 }
 
 HdDataSourceBaseHandle
-MayaHydraDefaultMaterialDataSource::_GetMaterialBindingDataSource()
+MayaHydraMaterialDataSource::_GetMaterialBindingDataSource()
 {
     const SdfPath path = _sceneIndex->GetMaterialId(_id);
     if (path.IsEmpty()) {
@@ -88,7 +88,7 @@ MayaHydraDefaultMaterialDataSource::_GetMaterialBindingDataSource()
 }
 
 HdDataSourceBaseHandle
-MayaHydraDefaultMaterialDataSource::_GetMaterialDataSource()
+MayaHydraMaterialDataSource::_GetMaterialDataSource()
 {    
     VtValue materialContainer = _sceneIndex->GetMaterialResource(_id);
 
