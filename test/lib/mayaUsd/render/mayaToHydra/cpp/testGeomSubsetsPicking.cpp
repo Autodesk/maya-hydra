@@ -18,10 +18,6 @@
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
-#include <pxr/imaging/hd/tokens.h>
-#include <pxr/imaging/hd/xformSchema.h>
-#include <pxr/imaging/hd/utils.h>
-#include <pxr/usd/sdf/path.h>
 
 #include <maya/M3dView.h>
 #include <maya/MPoint.h>
@@ -191,6 +187,12 @@ TEST(TestGeomSubsetsPicking, marqueeSelect)
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
+    const auto cubeMeshUfePathString = kStageUfePathSegment + "," + kCubeMeshUfePathSegment;
+    const auto cubeUpperHalfUfePath = Ufe::PathString::path(cubeMeshUfePathString + "/" + kCubeUpperHalfName);
+
+    const auto sphereMeshUfePathString = kStageUfePathSegment + "," + kSphereMeshUfePathSegment;
+    const auto sphereUpperHalfUfePath = Ufe::PathString::path(sphereMeshUfePathString + "/" + kSphereUpperHalfName);
+
     std::vector<std::string> geomSubsetNamesToSelect = {"CubeUpperHalf", "SphereUpperHalf"};
 
     auto ufeSelection = Ufe::GlobalSelection::get();
@@ -214,6 +216,8 @@ TEST(TestGeomSubsetsPicking, marqueeSelect)
     active3dView.refresh();
 
     ASSERT_EQ(ufeSelection->size(), 2u);
+    ASSERT_TRUE(ufeSelection->contains(cubeUpperHalfUfePath));
+    ASSERT_TRUE(ufeSelection->contains(sphereUpperHalfUfePath));
 
     for (const auto& geomSubsetName : geomSubsetNamesToSelect) {
         assertSelected(inspector, PrimNamePredicate(geomSubsetName));
