@@ -28,6 +28,8 @@
 #include <maya/MGlobal.h>
 #include <maya/MSyntax.h>
 
+#include <pxr/pxr.h>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -91,6 +93,9 @@ constexpr auto _buildNumberLong = "-buildNumber";
 constexpr auto _gitCommitLong   = "-gitCommit";
 constexpr auto _gitBranchLong   = "-gitBranch";
 constexpr auto _buildDateLong   = "-buildDate";
+
+constexpr auto _usdVersion = "-uv";
+constexpr auto _usdVersionLong = "-usdVersion";
 
 constexpr auto _rendererId = "-r";
 constexpr auto _rendererIdLong = "-renderer";
@@ -180,6 +185,8 @@ MSyntax MtohViewCmd::createSyntax()
     syntax.addFlag(_gitCommit,   _gitCommitLong);
     syntax.addFlag(_gitBranch,   _gitBranchLong);
     syntax.addFlag(_buildDate,   _buildDateLong);
+
+    syntax.addFlag(_usdVersion, _usdVersionLong);
 
     return syntax;
 }
@@ -303,6 +310,8 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
         setResult(MhBuildInfo::gitBranch());
     } else if (db.isFlagSet(_buildDate)) {
         setResult(MhBuildInfo::buildDate());
+    } else if (db.isFlagSet(_usdVersion)) {
+        setResult(PXR_VERSION);
     }
     return MS::kSuccess;
 }

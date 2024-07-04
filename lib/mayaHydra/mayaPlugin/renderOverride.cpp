@@ -465,6 +465,7 @@ public:
     UsdPickHandler(MtohRenderOverride& renderOverride) : 
         PickHandlerBase(renderOverride) {}
     
+#if PXR_VERSION >= 2403
     std::vector<HitPath> resolveGeomSubsetsPicking(
         HdSceneIndexBaseConstRefPtr sceneIndex, 
         const SdfPath& basePrimPath, 
@@ -501,6 +502,7 @@ public:
         }
         return pickedGeomSubsets;
     }
+#endif
 
     // Return the closest path and the instance index in the scene index scene
     // that corresponds to the pick hit.  If the pick hit is not an instance,
@@ -563,6 +565,7 @@ public:
 
         std::vector<HitPath> hitPaths;
 
+#if PXR_VERSION >= 2403
         if (GetGeomSubsetsPickMode() == GeomSubsetsPickModeTokens->Faces) {
             auto geomSubsetsHitPaths = resolveGeomSubsetsPicking(
                 renderIndex()->GetTerminalSceneIndex(), 
@@ -580,6 +583,9 @@ public:
         } else {
             hitPaths.push_back(resolvePrimAndInstancePicking(*renderIndex(), pickInput.pickHit));
         }
+#else
+        hitPaths.push_back(resolvePrimAndInstancePicking(*renderIndex(), pickInput.pickHit));
+#endif
 
         size_t nbSelectedUfeItems = 0;
         for (const auto& [pickedUsdPath, instanceNdx] : hitPaths) {

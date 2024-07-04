@@ -62,6 +62,10 @@ global proc mayaHydra_GeomSubsetsPickMode_SetMode(string $mode) {
 
 // Main entry point to create the GeomSubsets UI
 global proc mayaHydra_GeomSubsetsPickMode_SetupUI() {
+    if (`mayaHydra -usdVersion` < 2403) {
+        return;
+    }
+
     mayaHydra_GeomSubsetsPickMode_SetupRuntimeCommands;
     global string $gMainSelectMenu; // Maya's "Select" menu
     $callbackExists = hasMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
@@ -72,6 +76,10 @@ global proc mayaHydra_GeomSubsetsPickMode_SetupUI() {
 
 // Main entry point to delete the GeomSubsets UI
 global proc mayaHydra_GeomSubsetsPickMode_TeardownUI() {
+    if (`mayaHydra -usdVersion` < 2403) {
+        return;
+    }
+
     global string $gMainSelectMenu; // Maya's "Select" menu
     removeMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
 
