@@ -626,8 +626,8 @@ void MhCustomShaders::removedFromModelCb()
 void MhCustomShaders::_UpdateMaterialColor(const double3& color)
 {
     //Look in the material network which material node holds the _tokens->FVP_CustomColor parameter name
-    HdMaterialNetwork& network = _networkMap.map[HdMaterialTerminalTokens->surface];
-    const size_t       numNodes = network.nodes.size();
+    HdMaterialNetwork& network  = _networkMap.map[HdMaterialTerminalTokens->surface];
+    const int       numNodes    = (int)network.nodes.size();
     for (int i = 0; i < numNodes; ++i) {
         HdMaterialNode& node = network.nodes[i];
         const auto      it = node.parameters.find(_tokens->FVP_CustomColor);
