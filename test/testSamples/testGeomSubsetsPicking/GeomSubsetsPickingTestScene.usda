@@ -54,6 +54,30 @@ def Xform "Root"
             </Root/SphereMeshXform/SphereMesh>,
         ]
     }
+
+    def Xform "CubeUpperHalfMarker"
+    {
+        double3 xformOp:translate = (-2, 0.5, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "CubeLowerHalfMarker"
+    {
+        double3 xformOp:translate = (-2, -0.5, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "SphereInstanceUpperHalfMarker"
+    {
+        double3 xformOp:translate = (2, 0.5, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "SphereInstanceLowerHalfMarker"
+    {
+        double3 xformOp:translate = (2, -0.5, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
 }
 
 def Scope "mtl"

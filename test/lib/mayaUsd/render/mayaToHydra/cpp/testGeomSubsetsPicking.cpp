@@ -44,6 +44,11 @@ const std::string kSphereInstancerUfePathSegment = "/Root/SphereInstancer";
 const std::string kCubeUpperHalfName = "CubeUpperHalf";
 const std::string kSphereUpperHalfName = "SphereUpperHalf";
 
+const std::string kCubeUpperHalfMarkerUfePathSegment = "/Root/CubeUpperHalfMarker";
+const std::string kCubeLowerHalfMarkerUfePathSegment = "/Root/CubeLowerHalfMarker";
+const std::string kSphereInstanceUpperHalfMarkerUfePathSegment = "/Root/SphereInstanceUpperHalfMarker";
+const std::string kSphereInstanceLowerHalfMarkerUfePathSegment = "/Root/SphereInstanceLowerHalfMarker";
+
 void debugPrintUfePath(const std::string varName, const Ufe::Path& path) {
     std::cout << "Printing " << varName << std::endl;
     std::cout << "\t" << "Path : " << path.string() << std::endl;
@@ -79,53 +84,7 @@ void assertSelected(const SceneIndexInspector& inspector, const FindPrimPredicat
     }
 }
 
-void testPrimPicking(const Ufe::Path& clickObjectUfePath, const QPoint& clickOffset, const Ufe::Path& selectedObjectUfePath)
-{
-    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
-    ASSERT_GT(sceneIndices.size(), 0u);
-    SceneIndexInspector inspector(sceneIndices.front());
-
-    // Preconditions
-    auto ufeSelection = Ufe::GlobalSelection::get();
-    ASSERT_TRUE(ufeSelection->empty());
-
-    const auto selectionSceneIndex = findSelectionSceneIndexInTree(inspector.GetSceneIndex());
-    ASSERT_TRUE(selectionSceneIndex);
-
-    debugPrintUfePath("selectedObjectUfePath", selectedObjectUfePath);
-    const auto selectedObjectSceneIndexPath = selectionSceneIndex->SceneIndexPath(selectedObjectUfePath);
-    std::cout << "selectedObjectSceneIndexPath : " << selectedObjectSceneIndexPath.GetString() << std::endl;
-
-    HdSceneIndexPrim selectedObjectSceneIndexPrim = inspector.GetSceneIndex()->GetPrim(selectedObjectSceneIndexPath);
-    HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(selectedObjectSceneIndexPrim.dataSource);
-    ASSERT_EQ(selectionsSchema.IsDefined(), false);
-
-    // Picking
-    M3dView active3dView = M3dView::active3dView();
-    debugPrintUfePath("clickObjectUfePath", clickObjectUfePath);
-    const auto clickObjectSceneIndexPath = selectionSceneIndex->SceneIndexPath(clickObjectUfePath);
-    std::cout << "clickObjectSceneIndexPath : " << clickObjectSceneIndexPath.GetString() << std::endl;
-    auto primMouseCoords = getPrimMouseCoords(inspector.GetSceneIndex()->GetPrim(clickObjectSceneIndexPath), active3dView);
-    primMouseCoords += clickOffset;
-
-    std::cout << "primMouseCoords : " << primMouseCoords.x() << ", " << primMouseCoords.y() << std::endl;
-    std::cout << "viewportSize : " << active3dView.portWidth() << ", " << active3dView.portHeight() << std::endl;
-    mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
-    active3dView.refresh();
-
-    // Postconditions
-    ASSERT_EQ(ufeSelection->size(), 1u);
-    debugPrintUfePath("ufeSelection->front()->path()", ufeSelection->front()->path());
-    ASSERT_TRUE(ufeSelection->contains(selectedObjectUfePath));
-
-    selectedObjectSceneIndexPrim = inspector.GetSceneIndex()->GetPrim(selectedObjectSceneIndexPath);
-    selectionsSchema = HdSelectionsSchema::GetFromParent(selectedObjectSceneIndexPrim.dataSource);
-    ASSERT_EQ(selectionsSchema.IsDefined(), true);
-    ASSERT_EQ(selectionsSchema.GetNumElements(), 1u);
-    ASSERT_TRUE(selectionsSchema.GetElement(0).GetFullySelected());
-}
-
-void testInstancePicking(const Ufe::Path& clickInstancerUfePath, int clickInstanceIndex, const QPoint& clickOffset, const Ufe::Path& selectedObjectUfePath)
+void testPicking(const Ufe::Path& clickMarkerUfePath, const Ufe::Path& selectedObjectUfePath)
 {
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
@@ -148,15 +107,19 @@ void testInstancePicking(const Ufe::Path& clickInstancerUfePath, int clickInstan
 
     // Picking
     M3dView active3dView = M3dView::active3dView();
-    const auto clickInstancerSceneIndexPath = selectionSceneIndex->SceneIndexPath(clickInstancerUfePath);
-    auto primMouseCoords = getInstanceMouseCoords(inspector.GetSceneIndex()->GetPrim(clickInstancerSceneIndexPath), clickInstanceIndex, active3dView);
-    primMouseCoords += clickOffset;
+    debugPrintUfePath("clickMarkerUfePath", clickMarkerUfePath);
+    const auto clickMarkerSceneIndexPath = selectionSceneIndex->SceneIndexPath(clickMarkerUfePath);
+    std::cout << "clickMarkerSceneIndexPath : " << clickMarkerSceneIndexPath.GetString() << std::endl;
+    auto primMouseCoords = getPrimMouseCoords(inspector.GetSceneIndex()->GetPrim(clickMarkerSceneIndexPath), active3dView);
 
+    std::cout << "primMouseCoords : " << primMouseCoords.x() << ", " << primMouseCoords.y() << std::endl;
+    std::cout << "viewportSize : " << active3dView.portWidth() << ", " << active3dView.portHeight() << std::endl;
     mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
     active3dView.refresh();
 
     // Postconditions
     ASSERT_EQ(ufeSelection->size(), 1u);
+    debugPrintUfePath("ufeSelection->front()->path()", ufeSelection->front()->path());
     ASSERT_TRUE(ufeSelection->contains(selectedObjectUfePath));
 
     for (const auto& selectedObjectSceneIndexPath : selectedObjectSceneIndexPaths) {
@@ -176,10 +139,9 @@ TEST(TestGeomSubsetsPicking, geomSubsetPicking)
 #if PXR_VERSION < 2403
     GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
 #else
-    const auto cubeMeshUfePathString = kStageUfePathSegment + "," + kCubeMeshUfePathSegment;
-    const auto cubeMeshUfePath = Ufe::PathString::path(cubeMeshUfePathString);
-    const auto cubeUpperHalfUfePath = Ufe::PathString::path(cubeMeshUfePathString + "/" + kCubeUpperHalfName);
-    testPrimPicking(cubeMeshUfePath, QPoint(0, -25), cubeUpperHalfUfePath);
+    const auto cubeUpperHalfMarkerUfePath = Ufe::PathString::path(kStageUfePathSegment + "," + kCubeUpperHalfMarkerUfePathSegment);
+    const auto cubeUpperHalfUfePath = Ufe::PathString::path(kStageUfePathSegment + "," + kCubeMeshUfePathSegment + "/" + kCubeUpperHalfName);
+    testPicking(cubeUpperHalfMarkerUfePath, cubeUpperHalfUfePath);
 #endif
 }
 
@@ -188,9 +150,9 @@ TEST(TestGeomSubsetsPicking, fallbackPicking)
 #if PXR_VERSION < 2403
     GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
 #else
-    const auto cubeMeshUfePathString = kStageUfePathSegment + "," + kCubeMeshUfePathSegment;
-    const auto cubeMeshUfePath = Ufe::PathString::path(cubeMeshUfePathString);
-    testPrimPicking(cubeMeshUfePath, QPoint(0, 25), cubeMeshUfePath);
+    const auto cubeLowerHalfMarkerUfePath = Ufe::PathString::path(kStageUfePathSegment + "," + kCubeLowerHalfMarkerUfePathSegment);
+    const auto cubeMeshUfePath = Ufe::PathString::path(kStageUfePathSegment + "," + kCubeMeshUfePathSegment);
+    testPicking(cubeLowerHalfMarkerUfePath, cubeMeshUfePath);
 #endif
 }
 
@@ -199,13 +161,9 @@ TEST(TestGeomSubsetsPicking, instanceGeomSubsetPicking)
 #if PXR_VERSION < 2403
     GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
 #else
-    const auto sphereInstancerUfePathString = kStageUfePathSegment + "," + kSphereInstancerUfePathSegment;
-    const auto sphereInstancerUfePath = Ufe::PathString::path(sphereInstancerUfePathString);
-
-    const auto sphereMeshUfePathString = kStageUfePathSegment + "," + kSphereMeshUfePathSegment;
-    const auto sphereUpperHalfUfePath = Ufe::PathString::path(sphereMeshUfePathString + "/" + kSphereUpperHalfName);
-
-    testInstancePicking(sphereInstancerUfePath, 0, QPoint(0, -25), sphereUpperHalfUfePath);
+    const auto sphereInstanceUpperHalfMarkerUfePath = Ufe::PathString::path(kStageUfePathSegment + "," + kSphereInstanceUpperHalfMarkerUfePathSegment);
+    const auto sphereUpperHalfUfePath = Ufe::PathString::path(kStageUfePathSegment + "," + kSphereMeshUfePathSegment + "/" + kSphereUpperHalfName);
+    testPicking(sphereInstanceUpperHalfMarkerUfePath, sphereUpperHalfUfePath);
 #endif
 }
 
@@ -214,13 +172,9 @@ TEST(TestGeomSubsetsPicking, instanceFallbackPicking)
 #if PXR_VERSION < 2403
     GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
 #else
-    const auto sphereInstancerUfePathString = kStageUfePathSegment + "," + kSphereInstancerUfePathSegment;
-    const auto sphereInstancerUfePath = Ufe::PathString::path(sphereInstancerUfePathString);
-
-    const auto sphereMeshUfePathString = kStageUfePathSegment + "," + kSphereMeshUfePathSegment;
-    const auto sphereMeshUfePath = Ufe::PathString::path(sphereMeshUfePathString);
-
-    testInstancePicking(sphereInstancerUfePath, 0, QPoint(0, 25), sphereMeshUfePath);
+    const auto sphereInstanceLowerHalfMarkerUfePath = Ufe::PathString::path(kStageUfePathSegment + "," + kSphereInstanceLowerHalfMarkerUfePathSegment);
+    const auto sphereMeshUfePath = Ufe::PathString::path(kStageUfePathSegment + "," + kSphereMeshUfePathSegment);
+    testPicking(sphereInstanceLowerHalfMarkerUfePath, sphereMeshUfePath);
 #endif
 }
 
