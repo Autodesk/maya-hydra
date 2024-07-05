@@ -13,6 +13,9 @@
 // limitations under the License.
 //
 
+// Largely copied from MayaUSD's mayaUSDRegisterStrings.mel
+// See here : https://github.com/Autodesk/maya-usd/blob/d7e4ee276f752a745e563f1dfb54e932b11c013f/plugin/adsk/scripts/mayaUSDRegisterStrings.mel
+
 proc registerMayaHydraString(string $key, string $value) 
 {
     registerPluginResource("mayaHydra", $key, $value);
