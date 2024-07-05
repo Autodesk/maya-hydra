@@ -507,7 +507,7 @@ public:
     // Return the closest path and the instance index in the scene index scene
     // that corresponds to the pick hit.  If the pick hit is not an instance,
     // the instance index will be -1.
-    HitPath resolvePrimAndInstancePicking(HdRenderIndex& renderIndex, const HdxPickHit& pickHit) const
+    HitPath resolveInstancePicking(HdRenderIndex& renderIndex, const HdxPickHit& pickHit) const
     {
         auto primOrigin = HdxPrimOriginInfo::FromPickHit(&renderIndex, pickHit);
 
@@ -578,13 +578,13 @@ public:
 
             // If we did not find any geomSubset and this is the only pick hit, then fallback to selecting the base prim/instance.
             if (hitPaths.empty() && pickInput.isSolePickHit) {
-                hitPaths.push_back(resolvePrimAndInstancePicking(*renderIndex(), pickInput.pickHit));
+                hitPaths.push_back(resolveInstancePicking(*renderIndex(), pickInput.pickHit));
             }
         } else {
-            hitPaths.push_back(resolvePrimAndInstancePicking(*renderIndex(), pickInput.pickHit));
+            hitPaths.push_back(resolveInstancePicking(*renderIndex(), pickInput.pickHit));
         }
 #else
-        hitPaths.push_back(resolvePrimAndInstancePicking(*renderIndex(), pickInput.pickHit));
+        hitPaths.push_back(resolveInstancePicking(*renderIndex(), pickInput.pickHit));
 #endif
 
         size_t nbSelectedUfeItems = 0;
