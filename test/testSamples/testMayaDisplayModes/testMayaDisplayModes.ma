@@ -1,8 +1,8 @@
-//Maya ASCII 2026ff01 scene
+//Maya ASCII 2025ff01 scene
 //Name: testMayaDisplayModes.ma
 //Last modified: Tue, Apr 16, 2024 02:39:26 PM
 //Codeset: 1252
-requires maya "2026ff01";
+requires maya "2025ff01";
 requires -nodeType "polyPlatonic" "modelingToolkit" "0.0.0.0";
 requires -nodeType "mayaUsdLayerManager" -dataType "pxrUsdStageData" "mayaUsdPlugin" "0.28.0";
 requires "stereoCamera" "10.0";

@@ -1,0 +1,118 @@
+-- glslfx version 0.1
+
+//
+// Copyright 2024 Autodesk, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+-- configuration
+{
+    "techniques": {
+        "default": {
+			"displacementShader": {
+                "source": [ "customBasicLightingShader.Displacement" ]
+            },
+            "surfaceShader": {
+                "source": [ "customBasicLightingShader.Surface" ]
+            }
+        }
+    }
+}
+
+--- --------------------------------------------------------------------------
+-- glsl customBasicLightingShader.Displacement
+
+//Optional vertex displacement shader
+vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
+{
+    //Apply your custom vertex displacement on Peye or remove that function and its definition above for more performance
+    return Peye;
+}
+
+-- glsl customBasicLightingShader.Surface
+
+struct BasicLightingCoeffs
+{
+    float diffuse;
+    float specular;
+};
+
+vec4 lit(float NdotL , float NdotH , float m)
+{
+    float spec = (NdotL > 0.0) ? pow(max(0.0, NdotH), m) : 0.0;
+    return vec4(1.0, max(0.0, NdotL), spec, 1.0);
+}
+
+BasicLightingCoeffs computeLightingCoefficients(vec3 L, vec3 N, vec3 V, float exp)
+{
+    BasicLightingCoeffs coeffs;
+
+    float NdotL = dot(N, L);
+
+    vec3 H = normalize(V + L);
+    float NdotH = dot(N, H);
+
+    vec4 lighting = lit(NdotL, NdotH, exp);
+    coeffs.diffuse = lighting.y;
+    coeffs.specular = lighting.z;
+
+    return coeffs;
+}
+
+vec4
+surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
+{
+    //vec2 st = HdGet_st().xy;//This doesn't work unless you add a texture node in the material network
+
+    //Get the vertex colors from the prim vars of the quad primitive
+    vec3 vertexColors = HdGet_displayColor().rgb;
+
+    vec3 ambientColor = vec3(0);//Hardcoded
+    //Get the value of the custom color float3 parameter from the material, it is named "FVP_CustomColor"
+    vec3 diffuseColor = HdGet_FVP_CustomColor() *0.5 +  vertexColors*0.5;//Blend the custom color with the vertex colors
+    vec3 specularColor = vec3(1);//Hardcoded
+    
+    vec3 n = Neye;
+    vec3 e = normalize(-Peye.xyz);
+    vec3 directLight = vec3(0.0);
+    float glossiness = 30.0;//Hardcoded
+
+    //Do basic lighting
+#if NUM_LIGHTS > 0
+    for (int i = 0; i < NUM_LIGHTS; ++i)
+    {
+        LightSource light = GetLightSource(i);
+        if (!light.isIndirectLight)
+        {
+            vec4 Plight = light.position;
+            vec3 l = (Plight.w == 0.0)
+                        ? normalize(Plight.xyz)
+                        : normalize(Plight - Peye).xyz;
+
+            float atten = lightDistanceAttenuation(Peye, i);
+            float spot = lightSpotAttenuation(l, i);
+
+            float intensity = 1.0 * atten * spot;
+
+            vec3 lightDiffuseIrradiance = intensity * light.diffuse.rgb;
+            vec3 lightSpecularIrradiance = intensity * light.specular.rgb;
+
+            BasicLightingCoeffs coeffs = computeLightingCoefficients(l, n, e, glossiness);
+            directLight += (light.ambient.rgb *ambientColor + lightDiffuseIrradiance * coeffs.diffuse * diffuseColor + lightSpecularIrradiance * coeffs.specular * specularColor);
+        }
+    }
+#endif
+
+    return vec4(directLight, 1.0);
+}

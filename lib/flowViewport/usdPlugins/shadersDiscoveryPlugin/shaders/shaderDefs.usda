@@ -1,0 +1,16 @@
+#usda 1.0
+
+#FVP_CustomBasicLightingShader is the identifier to use in a material node from a material network to use this shader
+def Shader "FVP_CustomBasicLightingShader"
+{
+    uniform token info:implementationSource = "sourceAsset"
+    uniform asset info:glslfx:sourceAsset = @./customBasicLightingShader.glslfx@
+
+    # Outputs
+    token outputs:surface
+
+	#This is a custom parameter which is used in the glslfx shader with HdGet_FVP_CustomColor()
+	#It should also be defined as a terminal node parameter in the material network when you use that shader
+    float3 inputs:FVP_CustomColor = (1.0, 0.0, 0.0) (
+    )
+}

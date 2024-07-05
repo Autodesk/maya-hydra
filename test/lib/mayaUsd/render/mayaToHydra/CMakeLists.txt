@@ -48,6 +48,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testViewportFilters.py
     testMayaComponentsPicking.py
     testFlowPluginsHierarchicalProperties.py
+	testCustomShadersNode.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testMayaSceneFlattening.py

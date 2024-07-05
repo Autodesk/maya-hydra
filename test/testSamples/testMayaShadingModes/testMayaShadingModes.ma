@@ -1,8 +1,8 @@
-//Maya ASCII 2026ff01 scene
+//Maya ASCII 2025ff01 scene
 //Name: testMayaShadingModes.ma
 //Last modified: Wed, Mar 06, 2024 11:39:28 AM
 //Codeset: 1252
-requires maya "2026ff01";
+requires maya "2025ff01";
 requires "stereoCamera" "10.0";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";
