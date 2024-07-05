@@ -37,9 +37,9 @@ namespace {
 
 #if PXR_VERSION >= 2403
 const std::string kStageUfePathSegment = "|GeomSubsetsPickingTestScene|GeomSubsetsPickingTestSceneShape";
+
 const std::string kCubeMeshUfePathSegment = "/Root/CubeMeshXform/CubeMesh";
 const std::string kSphereMeshUfePathSegment = "/Root/SphereMeshXform/SphereMesh";
-const std::string kSphereInstancerUfePathSegment = "/Root/SphereInstancer";
 
 const std::string kCubeUpperHalfName = "CubeUpperHalf";
 const std::string kSphereUpperHalfName = "SphereUpperHalf";
@@ -48,18 +48,6 @@ const std::string kCubeUpperHalfMarkerUfePathSegment = "/Root/CubeUpperHalfMarke
 const std::string kCubeLowerHalfMarkerUfePathSegment = "/Root/CubeLowerHalfMarker";
 const std::string kSphereInstanceUpperHalfMarkerUfePathSegment = "/Root/SphereInstanceUpperHalfMarker";
 const std::string kSphereInstanceLowerHalfMarkerUfePathSegment = "/Root/SphereInstanceLowerHalfMarker";
-
-void debugPrintUfePath(const std::string varName, const Ufe::Path& path) {
-    std::cout << "Printing " << varName << std::endl;
-    std::cout << "\t" << "Path : " << path.string() << std::endl;
-    for (const auto& seg : path.getSegments()) {
-        std::cout << "\t\t" << "Segment Rtid : " << seg.runTimeId() << std::endl;
-        std::cout << "\t\t" << "Segment separator : " << seg.separator() << std::endl;
-        for (const auto& comp : seg.components()) {
-            std::cout << "\t\t\t" << "Component : " << comp.string() << std::endl;
-        }
-    }
-}
 
 void assertUnselected(const SceneIndexInspector& inspector, const FindPrimPredicate& primPredicate)
 {
@@ -107,19 +95,14 @@ void testPicking(const Ufe::Path& clickMarkerUfePath, const Ufe::Path& selectedO
 
     // Picking
     M3dView active3dView = M3dView::active3dView();
-    debugPrintUfePath("clickMarkerUfePath", clickMarkerUfePath);
     const auto clickMarkerSceneIndexPath = selectionSceneIndex->SceneIndexPath(clickMarkerUfePath);
-    std::cout << "clickMarkerSceneIndexPath : " << clickMarkerSceneIndexPath.GetString() << std::endl;
     auto primMouseCoords = getPrimMouseCoords(inspector.GetSceneIndex()->GetPrim(clickMarkerSceneIndexPath), active3dView);
 
-    std::cout << "primMouseCoords : " << primMouseCoords.x() << ", " << primMouseCoords.y() << std::endl;
-    std::cout << "viewportSize : " << active3dView.portWidth() << ", " << active3dView.portHeight() << std::endl;
     mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
     active3dView.refresh();
 
     // Postconditions
     ASSERT_EQ(ufeSelection->size(), 1u);
-    debugPrintUfePath("ufeSelection->front()->path()", ufeSelection->front()->path());
     ASSERT_TRUE(ufeSelection->contains(selectedObjectUfePath));
 
     for (const auto& selectedObjectSceneIndexPath : selectedObjectSceneIndexPaths) {
