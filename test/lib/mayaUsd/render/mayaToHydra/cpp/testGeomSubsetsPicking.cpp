@@ -44,6 +44,18 @@ const std::string kSphereInstancerUfePathSegment = "/Root/SphereInstancer";
 const std::string kCubeUpperHalfName = "CubeUpperHalf";
 const std::string kSphereUpperHalfName = "SphereUpperHalf";
 
+void debugPrintUfePath(const std::string varName, const Ufe::Path& path) {
+    std::cout << "Printing " << varName << std::endl;
+    std::cout << "\t" << "Path : " << path.string() << std::endl;
+    for (const auto& seg : path.getSegments()) {
+        std::cout << "\t\t" << "Segment Rtid : " << seg.runTimeId() << std::endl;
+        std::cout << "\t\t" << "Segment separator : " << seg.separator() << std::endl;
+        for (const auto& comp : seg.components()) {
+            std::cout << "\t\t\t" << "Component : " << comp.string() << std::endl;
+        }
+    }
+}
+
 void assertUnselected(const SceneIndexInspector& inspector, const FindPrimPredicate& primPredicate)
 {
     PrimEntriesVector primEntries = inspector.FindPrims(primPredicate);
@@ -80,7 +92,9 @@ void testPrimPicking(const Ufe::Path& clickObjectUfePath, const QPoint& clickOff
     const auto selectionSceneIndex = findSelectionSceneIndexInTree(inspector.GetSceneIndex());
     ASSERT_TRUE(selectionSceneIndex);
 
+    debugPrintUfePath("selectedObjectUfePath", selectedObjectUfePath);
     const auto selectedObjectSceneIndexPath = selectionSceneIndex->SceneIndexPath(selectedObjectUfePath);
+    std::cout << "selectedObjectSceneIndexPath : " << selectedObjectSceneIndexPath.GetString() << std::endl;
 
     HdSceneIndexPrim selectedObjectSceneIndexPrim = inspector.GetSceneIndex()->GetPrim(selectedObjectSceneIndexPath);
     HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(selectedObjectSceneIndexPrim.dataSource);
@@ -88,15 +102,20 @@ void testPrimPicking(const Ufe::Path& clickObjectUfePath, const QPoint& clickOff
 
     // Picking
     M3dView active3dView = M3dView::active3dView();
+    debugPrintUfePath("clickObjectUfePath", clickObjectUfePath);
     const auto clickObjectSceneIndexPath = selectionSceneIndex->SceneIndexPath(clickObjectUfePath);
+    std::cout << "clickObjectSceneIndexPath : " << clickObjectSceneIndexPath.GetString() << std::endl;
     auto primMouseCoords = getPrimMouseCoords(inspector.GetSceneIndex()->GetPrim(clickObjectSceneIndexPath), active3dView);
     primMouseCoords += clickOffset;
 
+    std::cout << "primMouseCoords : " << primMouseCoords.x() << ", " << primMouseCoords.y() << std::endl;
+    std::cout << "viewportSize : " << active3dView.portWidth() << ", " << active3dView.portHeight() << std::endl;
     mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
     active3dView.refresh();
 
     // Postconditions
     ASSERT_EQ(ufeSelection->size(), 1u);
+    debugPrintUfePath("ufeSelection->front()->path()", ufeSelection->front()->path());
     ASSERT_TRUE(ufeSelection->contains(selectedObjectUfePath));
 
     selectedObjectSceneIndexPrim = inspector.GetSceneIndex()->GetPrim(selectedObjectSceneIndexPath);
