@@ -34,6 +34,7 @@ class TestGeomSubsetsPicking(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(clear=True)
         cmds.optionVar(
                 sv=('mayaHydra_GeomSubsetsPickMode', 'Faces'))
+        # Used to ensure the fallback picking behavior works when clicking on a non-GeomSubset
         cmds.optionVar(
                 sv=('mayaUsd_PointInstancesPickMode', 'Prototypes'))
         cmds.setAttr('persp.translate', 0, 0, 15, type='float3')
