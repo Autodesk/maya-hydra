@@ -64,7 +64,7 @@ else(
 )
 endif()
 
-configure_file(${PLUG_INFO_PATH} ${CMAKE_CURRENT_BINARY_DIR}/${PLUG_INFO_FILE})
+configure_file("${PLUG_INFO_PATH}" ${CMAKE_CURRENT_BINARY_DIR}/${PLUG_INFO_FILE})
 
 install(FILES ${PLUG_INFO_PATH}
         DESTINATION 
