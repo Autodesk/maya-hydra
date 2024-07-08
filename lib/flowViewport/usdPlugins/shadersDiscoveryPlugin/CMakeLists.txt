@@ -57,10 +57,16 @@ set(PLUG_INFO_PATH "plugInfo.json")
 
 configure_file(${PLUG_INFO_PATH} ${CMAKE_CURRENT_BINARY_DIR}/${PLUG_INFO_PATH})
 
-install(FILES ${PLUG_INFO_PATH}
+if(IS_WINDOWS)
+install(FILES Windows/${PLUG_INFO_PATH}
         DESTINATION 
-            ${CMAKE_INSTALL_PREFIX}/lib/usd/flowViewportShadersDiscoveryPlugin/resources
-)
+            ${CMAKE_INSTALL_PREFIX}/lib/usd/flowViewportShadersDiscoveryPlugin/resources)
+endif()
+if(IS_MACOSX OR IS_LINUX) 
+install(FILES Linux-OSX/${PLUG_INFO_PATH}
+        DESTINATION 
+            ${CMAKE_INSTALL_PREFIX}/lib/usd/flowViewportShadersDiscoveryPlugin/resources)    
+endif()
 			
 install(TARGETS ${TARGET_NAME}
         LIBRARY
