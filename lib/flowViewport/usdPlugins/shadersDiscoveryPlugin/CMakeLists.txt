@@ -53,16 +53,18 @@ target_link_libraries(${TARGET_NAME}
 # install
 # -----------------------------------------------------------------------------
 
+set(PLUG_INFO_FILE "plugInfo.json")
+
 if(IS_WINDOWS)
-  set(PLUG_INFO_PATH "Windows/plugInfo.json")
+  set(PLUG_INFO_PATH "Windows/${PLUG_INFO_FILE}")
 else(
   if(IS_MACOSX OR IS_LINUX) 
-    set(PLUG_INFO_PATH "Linux-OSX/plugInfo.json")
+    set(PLUG_INFO_PATH "Linux-OSX/${PLUG_INFO_FILE}")
   endif()
 )
 endif()
 
-configure_file(${PLUG_INFO_PATH} ${CMAKE_CURRENT_BINARY_DIR}/${PLUG_INFO_PATH})
+configure_file(${PLUG_INFO_PATH} ${CMAKE_CURRENT_BINARY_DIR}/${PLUG_INFO_FILE})
 
 install(FILES ${PLUG_INFO_PATH}
         DESTINATION 
