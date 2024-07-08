@@ -25,24 +25,37 @@ class TestUsdTextureToggle(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.2
-    IMAGE_DIFF_FAIL_PERCENT = 0.55
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
+    IMAGE_DIFF_FAIL_PERCENT = 0.1
 
-    def test_UsdTextureToggle(self):        
-
-        # open simple Maya scene
+    def setUp(self):
+        # Open simple Maya scene
         testFile = mayaUtils.openTestScene(
                 "testUsdTextureToggle",
-                "testUsdTextureToggle.ma", useTestSettings=False)
+                "testUsdTextureToggle.ma")
         cmds.refresh()
-        
-        panel = mayaUtils.activeModelPanel()
+    
+    def setTextureMode(self, enabled):
+        cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, displayTextures=enabled)        
+        cmds.refresh()
+
+    def test_UsdTextureToggleInitiallyOn(self):
+        self.setTextureMode(True)
+        self.setViewport2Renderer()
+        self.setHdStormRenderer()
         self.assertSnapshotClose("usd_texture_on" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
-        cmds.refresh()      
-        cmds.modelEditor(panel, edit=True, displayTextures=False)        
+        self.setTextureMode(False)
         self.assertSnapshotClose("usd_texture_off" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
+    def test_UsdTextureToggleInitiallyOff(self):
+        self.setTextureMode(False)
+        self.setViewport2Renderer()
+        self.setHdStormRenderer()
+        self.assertSnapshotClose("usd_texture_off" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        
+        self.setTextureMode(True)
+        self.assertSnapshotClose("usd_texture_on" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
