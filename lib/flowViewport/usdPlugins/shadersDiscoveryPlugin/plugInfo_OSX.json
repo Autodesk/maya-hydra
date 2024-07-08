@@ -10,7 +10,7 @@
           },
           "ShaderResources": "shaders"
         },
-		"LibraryPath": "flowViewportShadersDiscoveryPlugin.so",
+		"LibraryPath": "libflowViewportShadersDiscoveryPlugin.dylib",
         "Name": "flowViewportShadersDiscoveryPlugin",
         "ResourcePath": "shaders",
         "Root": "..",
