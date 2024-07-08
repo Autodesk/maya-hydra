@@ -53,20 +53,20 @@ target_link_libraries(${TARGET_NAME}
 # install
 # -----------------------------------------------------------------------------
 
-set(PLUG_INFO_PATH "plugInfo.json")
+if(IS_WINDOWS)
+  set(PLUG_INFO_PATH "Windows/plugInfo.json")
+else(
+  if(IS_MACOSX OR IS_LINUX) 
+    set(PLUG_INFO_PATH "Linux-OSX/plugInfo.json")
+  endif()
+)
+endif()
 
 configure_file(${PLUG_INFO_PATH} ${CMAKE_CURRENT_BINARY_DIR}/${PLUG_INFO_PATH})
 
-if(IS_WINDOWS)
-install(FILES Windows/${PLUG_INFO_PATH}
+install(FILES ${PLUG_INFO_PATH}
         DESTINATION 
             ${CMAKE_INSTALL_PREFIX}/lib/usd/flowViewportShadersDiscoveryPlugin/resources)
-endif()
-if(IS_MACOSX OR IS_LINUX) 
-install(FILES Linux-OSX/${PLUG_INFO_PATH}
-        DESTINATION 
-            ${CMAKE_INSTALL_PREFIX}/lib/usd/flowViewportShadersDiscoveryPlugin/resources)    
-endif()
 			
 install(TARGETS ${TARGET_NAME}
         LIBRARY
