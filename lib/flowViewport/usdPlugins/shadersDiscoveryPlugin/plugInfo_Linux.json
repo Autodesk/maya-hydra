@@ -1,0 +1,20 @@
+{
+    "Plugins":[
+      {
+        "Info": {
+          "Types": {
+            "FlowViewportShadersDiscoveryPlugin": {
+              "bases": [ "NdrDiscoveryPlugin" ],
+              "displayName": "Flow viewport custom shaders discovery plugin."
+            }
+          },
+          "ShaderResources": "shaders"
+        },
+		"LibraryPath": "libflowViewportShadersDiscoveryPlugin.so",
+        "Name": "flowViewportShadersDiscoveryPlugin",
+        "ResourcePath": "shaders",
+        "Root": "..",
+        "Type": "library"
+      }
+    ]
+}

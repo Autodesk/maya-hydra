@@ -1,4 +1,4 @@
-set(TARGET_NAME flowViewport)
+set(TARGET_NAME flowViewportShadersDiscoveryPlugin)
 
 add_library(${TARGET_NAME} SHARED)
 
@@ -7,21 +7,11 @@ add_library(${TARGET_NAME} SHARED)
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME} 
     PRIVATE
-        debugCodes.cpp
-        fvpInstruments.cpp
-        fvpUtils.cpp
-        global.cpp
-        tokens.cpp
+        fvpShadersDiscoveryPlugin.cpp
 )
 
 set(HEADERS
-    api.h
-    debugCodes.h
-    fvpInstruments.h
-    fvpUtils.h
-    global.h
-    tokens.h
-    fvpWireframeColorInterface.h
+    fvpShadersDiscoveryPlugin.h
 )
 
 # -----------------------------------------------------------------------------
@@ -31,7 +21,6 @@ target_include_directories(${TARGET_NAME}
     PUBLIC
         ${PXR_INCLUDE_DIRS}
         ${CMAKE_BINARY_DIR}/include
-        ${UFE_INCLUDE_DIR}
 )
 
 # -----------------------------------------------------------------------------
@@ -39,7 +28,7 @@ target_include_directories(${TARGET_NAME}
 # -----------------------------------------------------------------------------
 target_compile_definitions(${TARGET_NAME} 
     PRIVATE
-        FVP_EXPORT
+        FVP_CUSTOMSHADERS_EXPORT
         $<$<BOOL:${IS_MACOSX}>:OSMac_>
         # Copy-pasted from lib/mayaUsd/CMakeLists.txt
 )
@@ -50,50 +39,37 @@ mayaHydra_compile_config(${TARGET_NAME})
 # link libraries
 # -----------------------------------------------------------------------------
 target_link_libraries(${TARGET_NAME} 
-    PUBLIC
-        hd
-        hdx
-        sdf
-        usdImaging
-        ${UFE_LIBRARY}
     PRIVATE
         ar
         gf
         tf
-)
-
-# -----------------------------------------------------------------------------
-# promoted headers
-# -----------------------------------------------------------------------------
-set(SRCFILE ${CMAKE_CURRENT_SOURCE_DIR}/flowViewport.h.src)
-set(DSTFILE ${CMAKE_BINARY_DIR}/include/flowViewport/flowViewport.h)
-configure_file(${SRCFILE} ${DSTFILE})
-
-mayaUsd_promoteHeaderList( 
-    HEADERS
-        ${HEADERS}
-    BASEDIR
-        ${TARGET_NAME}
+		hd
+        hdx
+        sdf
+        usdImaging
 )
 
 # -----------------------------------------------------------------------------
 # install
 # -----------------------------------------------------------------------------
 
+if (IS_WINDOWS)
+    configure_file("plugInfo_Win.json" ${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json) 
+endif()
+if (IS_LINUX)
+	configure_file("plugInfo_Linux.json" ${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json)
+endif()
+if (IS_MACOSX)
+	configure_file("plugInfo_OSX.json" ${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json)
+endif()
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/flowViewportShadersDiscoveryPlugin/resources)
+			
 install(TARGETS ${TARGET_NAME}
         LIBRARY
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/flowViewportShadersDiscoveryPlugin
         RUNTIME
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-)
-
-install(FILES ${HEADERS}
-        DESTINATION 
-            ${CMAKE_INSTALL_PREFIX}/include/flowViewport
-)
-
-install(FILES ${CMAKE_BINARY_DIR}/include/flowViewport/flowViewport.h
-    DESTINATION ${CMAKE_INSTALL_PREFIX}/include/flowViewport
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/flowViewportShadersDiscoveryPlugin
 )
 
 if(IS_WINDOWS)
@@ -103,11 +79,4 @@ if(IS_WINDOWS)
     endif()
 endif()
 
-# -----------------------------------------------------------------------------
-# subdirectories
-# -----------------------------------------------------------------------------
-add_subdirectory(colorPreferences)
-add_subdirectory(sceneIndex)
-add_subdirectory(API)
-add_subdirectory(selection)
-add_subdirectory(usdPlugins)
+add_subdirectory(shaders)

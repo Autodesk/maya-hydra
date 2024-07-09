@@ -1,0 +1,5 @@
+This is a pure usd plugin that is a shaders discovery plugin.
+The shaders defined in shadersDef.usda will be loaded by usd/hydra and available for use in a material network in any Hydra plugin.
+
+You can add the plugInfo.json file path in the environment variable PXR_PLUGINPATH_NAME or use another .json file to load it
+so USD/Hydra loads it at startup.
