@@ -31,6 +31,21 @@ PXR_NAMESPACE_OPEN_SCOPE
 // This is not an exported API.
 TF_DECLARE_PUBLIC_TOKENS(MtohTokens, , MTOH_TOKENS);
 
+// clang-format off
+#define MAYAHYDRA_PICK_OPTIONVAR_TOKENS \
+    ((GeomSubsetsPickMode, "mayaHydra_GeomSubsetsPickMode"))
+// clang-format on
+
+TF_DECLARE_PUBLIC_TOKENS(MayaHydraPickOptionVars, MAYAHYDRA_PICK_OPTIONVAR_TOKENS);
+
+// clang-format off
+#define GEOMSUBSETS_PICK_MODE_TOKENS \
+    (None) \
+    (Faces)
+// clang-format on
+
+TF_DECLARE_PUBLIC_TOKENS(GeomSubsetsPickModeTokens, GEOMSUBSETS_PICK_MODE_TOKENS);
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // MTOH_TOKENS_H
