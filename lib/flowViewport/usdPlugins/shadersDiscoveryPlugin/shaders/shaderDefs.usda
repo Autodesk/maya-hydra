@@ -7,6 +7,7 @@ def Shader "FVP_CustomBasicLightingShader"
     uniform asset info:glslfx:sourceAsset = @./customBasicLightingShader.glslfx@
 
     # Outputs
+	token outputs:displacement
     token outputs:surface
 
 	#This is a custom parameter which is used in the glslfx shader with HdGet_FVP_CustomColor()
