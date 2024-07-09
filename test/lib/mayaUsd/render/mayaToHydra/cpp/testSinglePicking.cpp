@@ -66,6 +66,5 @@ TEST(TestSinglePicking, singlePick)
 
     // Postconditions
     ASSERT_EQ(Ufe::GlobalSelection::get()->size(), 1u);
-    std::cout << Ufe::GlobalSelection::get()->front()->path().string() << std::endl;
     ASSERT_EQ(inspector.FindPrims(isPrimSelectedPredicate).size(), 1u);
 }
