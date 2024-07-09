@@ -76,6 +76,7 @@
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/imaging/hd/rprim.h>
+#include <pxr/imaging/hd/geomSubsetSchema.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
 #include <pxr/imaging/hdx/selectionTask.h>
 #include <pxr/imaging/hdx/colorizeSelectionTask.h>
@@ -257,14 +258,27 @@ UsdPointInstancesPickMode GetPointInstancesPickMode()
     return pickMode;
 }
 
+TfToken GetGeomSubsetsPickMode()
+{
+    static const MString kOptionVarName(MayaHydraPickOptionVars->GeomSubsetsPickMode.GetText());
+
+    if (MGlobal::optionVarExists(kOptionVarName)) {
+        return TfToken(MGlobal::optionVarStringValue(kOptionVarName).asChar());
+    }
+
+    return GeomSubsetsPickModeTokens->None;
+}
+
 struct PickInput {
     PickInput(
         const HdxPickHit&                pickHitArg, 
-        const MHWRender::MSelectionInfo& pickInfoArg
-    ) : pickHit(pickHitArg), pickInfo(pickInfoArg) {}
+        const MHWRender::MSelectionInfo& pickInfoArg,
+        const bool                       isSolePickHit
+    ) : pickHit(pickHitArg), pickInfo(pickInfoArg), isSolePickHit(isSolePickHit) {}
 
     const HdxPickHit&                pickHit;
     const MHWRender::MSelectionInfo& pickInfo;
+    const bool                       isSolePickHit;
 };
 
 // Picking output can go either to the UFE representation of the Maya selection
@@ -452,15 +466,54 @@ public:
 
     UsdPickHandler(MtohRenderOverride& renderOverride) : 
         PickHandlerBase(renderOverride) {}
+    
+#if PXR_VERSION >= 2403
+    std::vector<HitPath> resolveGeomSubsetsPicking(
+        HdSceneIndexBaseConstRefPtr sceneIndex, 
+        const SdfPath& basePrimPath, 
+        const TfToken& geomSubsetType, 
+        int componentIndex) const
+    {
+        if (componentIndex < 0 || sceneIndex->GetPrim(basePrimPath).primType != HdPrimTypeTokens->mesh) {
+            return {};
+        }
+
+        std::vector<HitPath> pickedGeomSubsets;
+        auto childPaths = sceneIndex->GetChildPrimPaths(basePrimPath);
+        for (const auto& childPath : childPaths) {
+            HdSceneIndexPrim childPrim = sceneIndex->GetPrim(childPath);
+            if (childPrim.primType != HdPrimTypeTokens->geomSubset) {
+                continue;
+            }
+
+            HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema(childPrim.dataSource);
+            if (!geomSubsetSchema.IsDefined() || geomSubsetSchema.GetType()->GetTypedValue(0) != geomSubsetType) {
+                continue;
+            }
+
+            auto geomSubsetIndices = geomSubsetSchema.GetIndices()->GetTypedValue(0);
+            for (const auto& index : geomSubsetIndices) {
+                if (index == componentIndex) {
+                    HdPrimOriginSchema primOriginSchema = HdPrimOriginSchema::GetFromParent(childPrim.dataSource);
+                    if (primOriginSchema.IsDefined()) {
+                        auto usdPath = primOriginSchema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath);
+                        pickedGeomSubsets.push_back({usdPath, -1});
+                    }
+                }
+            }
+        }
+        return pickedGeomSubsets;
+    }
+#endif
 
     // Return the closest path and the instance index in the scene index scene
     // that corresponds to the pick hit.  If the pick hit is not an instance,
     // the instance index will be -1.
-    HitPath hitPath(const HdxPickHit& hit) const {
-        auto primOrigin = HdxPrimOriginInfo::FromPickHit(
-            renderIndex(), hit);
+    HitPath resolveInstancePicking(HdRenderIndex& renderIndex, const HdxPickHit& pickHit) const
+    {
+        auto primOrigin = HdxPrimOriginInfo::FromPickHit(&renderIndex, pickHit);
 
-        if (hit.instancerId.IsEmpty()) {
+        if (pickHit.instancerId.IsEmpty()) {
             return {primOrigin.GetFullPath(), -1};
         }
 
@@ -489,7 +542,7 @@ public:
         // Retrieve pick mode from mayaUsd optionVar, to see if we're picking
         // instances, the instancer itself, or the prototype instanced by the
         // point instance.
-        return pickFn[GetPointInstancesPickMode()](primOrigin, hit);
+        return pickFn[GetPointInstancesPickMode()](primOrigin, pickHit);
     }
 
     bool handlePickHit(
@@ -512,56 +565,82 @@ public:
             return false;
         }
 
-        // For the USD pick handler pick results are directly returned with USD
-        // scene paths, so no need to remove scene index plugin path prefix.
-        const auto& [pickedUsdPath, instanceNdx] = hitPath(pickInput.pickHit);
+        std::vector<HitPath> hitPaths;
 
-        const auto pickedMayaPath = usdPathToUfePath(registration, pickedUsdPath);
-        const auto snMayaPath =
-            // As per https://stackoverflow.com/questions/46114214
-            // structured bindings cannot be captured by a lambda in C++ 17,
-            // so pass in pickedUsdPath and instanceNdx as lambda arguments.
-            [&pickedMayaPath, &registration](
-                const SdfPath& pickedUsdPath, int instanceNdx) {
-
-            if (instanceNdx >= 0) {
-                // Point instance: add the instance index to the path.
-                // Appending a numeric component to the path to identify a
-                // point instance cannot be done on the picked SdfPath, as
-                // numeric path components are not allowed by SdfPath.  Do so
-                // here with Ufe::Path, which has no such restriction.
-                return pickedMayaPath + std::to_string(instanceNdx);
+#if PXR_VERSION >= 2403
+        if (GetGeomSubsetsPickMode() == GeomSubsetsPickModeTokens->Faces) {
+            auto geomSubsetsHitPaths = resolveGeomSubsetsPicking(
+                renderIndex()->GetTerminalSceneIndex(), 
+                pickInput.pickHit.objectId, 
+                HdGeomSubsetSchemaTokens->typeFaceSet, 
+                pickInput.pickHit.elementIndex);
+            if (!geomSubsetsHitPaths.empty()) {
+                hitPaths.insert(hitPaths.end(), geomSubsetsHitPaths.begin(), geomSubsetsHitPaths.end());
             }
 
-            // Not an instance: adjust picked path for selection kind.
-            auto snKind = GetSelectionKind();
-            if (snKind.IsEmpty()) {
-                return pickedMayaPath;
+            // If we did not find any geomSubset and this is the only pick hit, then fallback to selecting the base prim/instance.
+            if (hitPaths.empty() && pickInput.isSolePickHit) {
+                hitPaths.push_back(resolveInstancePicking(*renderIndex(), pickInput.pickHit));
             }
-
-            // Get the prim from the stage and path, to access the
-            // UsdModelAPI for the prim.
-            auto proxyShapeObj = registration->dagNode.object();
-            if (proxyShapeObj.isNull()) {
-                TF_FATAL_ERROR("No mayaUsd proxy shape object corresponds to USD pick");
-                return pickedMayaPath;
-            }
-
-            MayaUsdAPI::ProxyStage proxyStage{proxyShapeObj};
-            auto prim = proxyStage.getUsdStage()->GetPrimAtPath(pickedUsdPath);
-            prim = GetPrimOrAncestorWithKind(prim, snKind);
-            const auto usdPath = prim ? prim.GetPath() : pickedUsdPath;
-
-            return usdPathToUfePath(registration, usdPath);
-        }(pickedUsdPath, instanceNdx);
-
-        auto si = Ufe::Hierarchy::createItem(snMayaPath);
-        if (!si) {
-            return false;
+        } else {
+            hitPaths.push_back(resolveInstancePicking(*renderIndex(), pickInput.pickHit));
         }
+#else
+        hitPaths.push_back(resolveInstancePicking(*renderIndex(), pickInput.pickHit));
+#endif
 
-        pickOutput.ufeSelection->append(si);
-        return true;
+        size_t nbSelectedUfeItems = 0;
+        for (const auto& [pickedUsdPath, instanceNdx] : hitPaths) {
+            // For the USD pick handler pick results are directly returned with USD
+            // scene paths, so no need to remove scene index plugin path prefix.
+            const auto pickedMayaPath = usdPathToUfePath(registration, pickedUsdPath);
+            const auto snMayaPath =
+                // As per https://stackoverflow.com/questions/46114214
+                // structured bindings cannot be captured by a lambda in C++ 17,
+                // so pass in pickedUsdPath and instanceNdx as lambda arguments.
+                [&pickedMayaPath, &registration](
+                    const SdfPath& pickedUsdPath, int instanceNdx) {
+
+                if (instanceNdx >= 0) {
+                    // Point instance: add the instance index to the path.
+                    // Appending a numeric component to the path to identify a
+                    // point instance cannot be done on the picked SdfPath, as
+                    // numeric path components are not allowed by SdfPath.  Do so
+                    // here with Ufe::Path, which has no such restriction.
+                    return pickedMayaPath + std::to_string(instanceNdx);
+                }
+
+                // Not an instance: adjust picked path for selection kind.
+                auto snKind = GetSelectionKind();
+                if (snKind.IsEmpty()) {
+                    return pickedMayaPath;
+                }
+
+                // Get the prim from the stage and path, to access the
+                // UsdModelAPI for the prim.
+                auto proxyShapeObj = registration->dagNode.object();
+                if (proxyShapeObj.isNull()) {
+                    TF_FATAL_ERROR("No mayaUsd proxy shape object corresponds to USD pick");
+                    return pickedMayaPath;
+                }
+
+                MayaUsdAPI::ProxyStage proxyStage{proxyShapeObj};
+                auto prim = proxyStage.getUsdStage()->GetPrimAtPath(pickedUsdPath);
+                prim = GetPrimOrAncestorWithKind(prim, snKind);
+                const auto usdPath = prim ? prim.GetPath() : pickedUsdPath;
+
+                return usdPathToUfePath(registration, usdPath);
+            }(pickedUsdPath, instanceNdx);
+
+            auto si = Ufe::Hierarchy::createItem(snMayaPath);
+            if (!si) {
+                continue;
+            }
+
+            pickOutput.ufeSelection->append(si);
+            nbSelectedUfeItems++;
+        }
+        return nbSelectedUfeItems > 0;
     }
 };
 
@@ -1741,7 +1820,7 @@ void MtohRenderOverride::_PopulateSelectionList(
 
     MStatus status;
     for (const HdxPickHit& hit : hits) {
-        PickInput pickInput(hit, selectInfo);
+        PickInput pickInput(hit, selectInfo, hits.size() == 1u);
         auto pickHandler = _PickHandler(hit);
         if (!hiliteListIsEmpty && _IsMayaPickHandler(pickHandler)){
             // Maya does not create Hydra instances, so if the pick hit instancer
@@ -1777,6 +1856,8 @@ void MtohRenderOverride::_PickByRegion(
     HdxPickHitVector& outHits,
     const MMatrix& viewMatrix,
     const MMatrix& projMatrix,
+    bool singlePick,
+    const TfToken& geomSubsetsPickMode,
     bool pointSnappingActive,
     int view_x,
     int view_y,
@@ -1807,9 +1888,17 @@ void MtohRenderOverride::_PickByRegion(
     HdxPickTaskContextParams pickParams;
     // Use the same size as selection region is enough to get all pick results.
     pickParams.resolution.Set(sel_w, sel_h);
+    pickParams.pickTarget = HdxPickTokens->pickPrimsAndInstances;
+    pickParams.resolveMode = singlePick ? HdxPickTokens->resolveNearestToCenter : HdxPickTokens->resolveUnique;
+    pickParams.doUnpickablesOcclude = false;
     pickParams.viewMatrix.Set(viewMatrix.matrix);
     pickParams.projectionMatrix.Set(adjustedProjMatrix.matrix);
-    pickParams.resolveMode = HdxPickTokens->resolveUnique;
+    pickParams.collection = _renderCollection;
+    pickParams.outHits = &outHits;
+    
+    if (geomSubsetsPickMode == GeomSubsetsPickModeTokens->Faces) {
+        pickParams.pickTarget = HdxPickTokens->pickFaces;
+    }
 
     if (pointSnappingActive) {
         pickParams.pickTarget = HdxPickTokens->pickPoints;
@@ -1818,11 +1907,6 @@ void MtohRenderOverride::_PickByRegion(
         pickParams.collection = _pointSnappingCollection;
         pickParams.collection.SetExcludePaths(_selectionSceneIndex->GetFullySelectedPaths());
     }
-    else {
-        pickParams.collection = _renderCollection;
-    }
-
-    pickParams.outHits = &outHits;
 
     // Execute picking tasks.
     HdTaskSharedPtrVector pickingTasks = _taskController->GetPickingTasks();
@@ -1876,6 +1960,8 @@ bool MtohRenderOverride::select(
         return false;
 
     HdxPickHitVector outHits;
+    const bool singlePick = selectInfo.singleSelection();
+    const TfToken geomSubsetsPickMode = GetGeomSubsetsPickMode();
     const bool pointSnappingActive = selectInfo.pointSnapping();
     if (pointSnappingActive)
     {
@@ -1896,7 +1982,7 @@ bool MtohRenderOverride::select(
             unsigned int curr_sel_x = cursor_x > (int)curr_sel_w / 2 ? cursor_x - (int)curr_sel_w / 2 : 0;
             unsigned int curr_sel_y = cursor_y > (int)curr_sel_h / 2 ? cursor_y - (int)curr_sel_h / 2 : 0;
 
-            _PickByRegion(outHits, viewMatrix, projMatrix, pointSnappingActive,
+            _PickByRegion(outHits, viewMatrix, projMatrix, singlePick, geomSubsetsPickMode, pointSnappingActive,
                 view_x, view_y, view_w, view_h, curr_sel_x, curr_sel_y, curr_sel_w, curr_sel_h);
 
             // Increase the size of picking region.
@@ -1907,7 +1993,7 @@ bool MtohRenderOverride::select(
     // Pick from original region directly when point snapping is not active or no hit is found yet.
     if (outHits.empty())
     {
-        _PickByRegion(outHits, viewMatrix, projMatrix, pointSnappingActive,
+        _PickByRegion(outHits, viewMatrix, projMatrix, singlePick, geomSubsetsPickMode, pointSnappingActive,
             view_x, view_y, view_w, view_h, sel_x, sel_y, sel_w, sel_h);
     }
 

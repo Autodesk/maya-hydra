@@ -1,0 +1,208 @@
+// Copyright 2024 Autodesk
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// Contents of this file are largely adaptations of MayaUSD code for Kind and Point Instance picking modes UI setup.
+// See mayaUsdMenu.mel in MayaUSD : https://github.com/Autodesk/maya-usd/blob/d7e4ee276f752a745e563f1dfb54e932b11c013f/plugin/adsk/scripts/mayaUsdMenu.mel
+
+// addMenuCallback and removeMenuCallback were copied over from MayaUSD
+// See here : https://github.com/Autodesk/maya-usd/blob/d7e4ee276f752a745e563f1dfb54e932b11c013f/plugin/adsk/scripts/mayaUsdMenu.mel#L53-L72
+
+// Safely add a post menu callback to a menu
+proc addMenuCallback(string $menuName, string $cmd) {
+    string $existingCallbacks = `menu -q -pmc $menuName`;
+    // append the callback
+    menu -e -pmc ($existingCallbacks + ";" + $cmd + ";") $menuName;
+}
+
+// Safely remove a post menu callback to a menu
+proc removeMenuCallback(string $menuName, string $cmd) {
+    string $existingCallbacks = `menu -q -pmc $menuName`;
+    // remove our callback from the string of callbacks
+    string $newCallbacks =
+        `substitute (";"+$cmd+".*;") $existingCallbacks ""`;
+    menu -e -pmc $newCallbacks $menuName;
+}
+
+// Check if a post menu callback is present on a menu
+proc int hasMenuCallback(string $menuName, string $cmd) {
+    string $existingCallbacks = `menu -q -pmc $menuName`;
+    return `gmatch $existingCallbacks ("*" + $cmd + "*")`;
+}
+
+// Global variables to keep track of our UI elements
+global string $gMayaHydra_GeomSubsetsPickMode_Divider = "";
+global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup = "";
+global string $gMayaHydra_GeomSubsetsPickMode_RadioButtons[] = {};
+
+// Helper function to get the GeomSubsets pick mode.
+global proc string mayaHydra_GeomSubsetsPickMode_GetMode() {
+    string $mode = "";
+    if (`optionVar -exists "mayaHydra_GeomSubsetsPickMode"`) {
+        $mode = `optionVar -q "mayaHydra_GeomSubsetsPickMode"`;
+    }
+    return $mode;
+}
+
+// Helper function to set the GeomSubsets pick mode.
+global proc mayaHydra_GeomSubsetsPickMode_SetMode(string $mode) {
+    optionVar -stringValue "mayaHydra_GeomSubsetsPickMode" $mode;
+}
+
+// Main entry point to create the GeomSubsets UI
+global proc mayaHydra_GeomSubsetsPickMode_SetupUI() {
+    if (`mayaHydra -usdVersion` < 2403) {
+        return;
+    }
+
+    mayaHydra_GeomSubsetsPickMode_SetupRuntimeCommands;
+    global string $gMainSelectMenu; // Maya's "Select" menu
+    $callbackExists = hasMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
+    if (!$callbackExists) {
+        addMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
+    }
+}
+
+// Main entry point to delete the GeomSubsets UI
+global proc mayaHydra_GeomSubsetsPickMode_TeardownUI() {
+    if (`mayaHydra -usdVersion` < 2403) {
+        return;
+    }
+
+    global string $gMainSelectMenu; // Maya's "Select" menu
+    removeMenuCallback($gMainSelectMenu, "mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback");
+
+    global string $gMayaHydra_GeomSubsetsPickMode_Divider;
+    if (`menuItem -q -exists $gMayaHydra_GeomSubsetsPickMode_Divider`) {
+        deleteUI -menuItem $gMayaHydra_GeomSubsetsPickMode_Divider;
+    }
+    $gMayaHydra_GeomSubsetsPickMode_Divider = "";
+
+    global string $gMayaHydra_GeomSubsetsPickMode_RadioButtons[];
+    for ($radioButton in $gMayaHydra_GeomSubsetsPickMode_RadioButtons) {
+        if (`menuItem -q -exists $radioButton`) {
+            deleteUI -menuItem $radioButton;
+        }
+    }
+    clear($gMayaHydra_GeomSubsetsPickMode_RadioButtons);
+
+    global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
+    if (`radioMenuItemCollection -q -exists $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup`) {
+        deleteUI -radioMenuItemCollection $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
+    }
+    $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup = "";
+}
+
+global proc mayaHydra_GeomSubsetsPickMode_SetupRuntimeCommands() {
+    if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetNone`) {
+        runTimeCommand -default true -plugin "mayaHydra"
+            -label      `getMayaHydraString("kUSDGeomSubsetsPickMode_None")`
+            -annotation `getMayaHydraString("kUSDGeomSubsetsPickMode_NoneAnn")`
+            -category   "Menu items.Maya USD"
+            -command    ("mayaHydra_GeomSubsetsPickMode_SetMode(\"None\")")
+        mayaHydra_GeomSubsetsPickMode_SetNone;
+    }
+    if (!`runTimeCommand -exists mayaHydra_GeomSubsetsPickMode_SetFaces`) {
+        runTimeCommand -default true -plugin "mayaHydra"
+            -label      `getMayaHydraString("kUSDGeomSubsetsPickMode_Faces")`
+            -annotation `getMayaHydraString("kUSDGeomSubsetsPickMode_FacesAnn")`
+            -category   "Menu items.Maya USD"
+            -command    ("mayaHydra_GeomSubsetsPickMode_SetMode(\"Faces\")")
+        mayaHydra_GeomSubsetsPickMode_SetFaces;
+    }
+}
+
+global proc mayaHydra_GeomSubsetsPickModeMenu_SelectMenuOpenedCallback() {
+    // Explanation of how we augment MayaUSD's selection modes menu with our custom options
+    // for GeomSubsets picking :
+    // To create its selection modes menu, MayaUSD, on plugin UI load, will setup a callback
+    // on when the "Select" menu in Maya is opened. The callback will then create the selection
+    // modes submenu and its menu items. So what we do in order to add our own menu items is that
+    // we also add our own callback on the "Select" menu. However, we can't count on the order
+    // in which callbacks will be registered and processed, and just blindly add the menu items here.
+    // To work around this, we thus create the UI elements in a method that will be called by an idle 
+    // event/scriptJob, which will be executed after the "Select" menu open callbacks have been 
+    // processed. The USD selection modes menu should then exist, and we can add our menu items then.
+
+    // If MayaUSD is not loaded, the USD selection modes menu won't exist, so no need to try and add
+    // our own menu items.
+    if (!`pluginInfo -q -loaded mayaUsdPlugin`) {
+        return;
+    }
+
+    // If our custom UI elements name is empty, then they do not exist or have been torn down previously,
+    // so create them. Note that we check that all UI elements have empty names : normally they should
+    // always either all have a name and exist, or all have no name and not exist.
+    global string $gMayaHydra_GeomSubsetsPickMode_Divider;
+    global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
+    global string $gMayaHydra_GeomSubsetsPickMode_RadioButtons[];
+    if ($gMayaHydra_GeomSubsetsPickMode_Divider == ""
+        && $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup == ""
+        && `size($gMayaHydra_GeomSubsetsPickMode_RadioButtons)` == 0) {
+        scriptJob -idleEvent "mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems" -runOnce true;
+    }
+}
+
+global proc mayaHydra_GeomSubsetsPickModeMenu_CreateMenuItems() {
+    global string $gMayaUsdSelectModeSubMenu;
+    if ($gMayaUsdSelectModeSubMenu == "" || !`menuItem -q -exists $gMayaUsdSelectModeSubMenu`) {
+        print "Error : USD selection submenu was not found, could not create GeomSubsets pick mode UI.\n";
+        return;
+    }
+
+    // Store the current parent menu and change it to the USD selection submenu
+    $prevParent = `setParent -q -menu`;
+    setParent -menu $gMayaUsdSelectModeSubMenu;
+
+    global string $gMayaHydra_GeomSubsetsPickMode_Divider;
+    $dividerLabel = getMayaHydraString("kGeomSubsets");
+    $gMayaHydra_GeomSubsetsPickMode_Divider = `menuItem -divider true -dividerLabel $dividerLabel`;
+
+    global string $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup;
+    $gMayaHydra_GeomSubsetsPickMode_RadioButtonsGroup = `radioMenuItemCollection`;
+    global string $gMayaHydra_GeomSubsetsPickMode_RadioButtons[];
+    $gMayaHydra_GeomSubsetsPickMode_RadioButtons[0] = `menuItem -radioButton on -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetNone") mayaHydra_GeomSubsetsPickMode_None`;
+    $gMayaHydra_GeomSubsetsPickMode_RadioButtons[1] = `menuItem -radioButton off -runTimeCommand ("mayaHydra_GeomSubsetsPickMode_SetFaces") mayaHydra_GeomSubsetsPickMode_Faces`;
+
+    mayaHydra_GeomSubsetsPickModeMenu_UpdateRadioButtons();
+
+    scriptJob -parent $gMayaUsdSelectModeSubMenu
+            -optionVarChanged "mayaHydra_GeomSubsetsPickMode" "mayaHydra_GeomSubsetsPickModeMenu_UpdateRadioButtons";
+
+    // Restore the previous parent menu
+    setParent -menu $prevParent;
+}
+
+// Update the menu item radio buttons in the GeomSubsets pick mode UI
+global proc mayaHydra_GeomSubsetsPickModeMenu_UpdateRadioButtons() {
+    // Note: we do all string compares as case-insensitive (lowercase)
+    //       as the menu labels are capitalized.
+    string $pickMode = `tolower(mayaHydra_GeomSubsetsPickMode_GetMode())`;
+    switch($pickMode) {
+        case "":
+            menuItem -e -radioButton on mayaHydra_GeomSubsetsPickMode_None;
+            break;
+        default:
+            // Enable the menu item based on the label.
+            global string $gMayaUsdSelectModeSubMenu;
+            $menuItems = `menu -q -itemArray $gMayaUsdSelectModeSubMenu`;
+            for($i = 0; $i < size($menuItems); $i++) {
+                string $label = `menuItem -q -label $menuItems[$i]`;
+                if(`tolower($label)` == $pickMode) {
+                    menuItem -e -radioButton on $menuItems[$i];
+                    break;
+                }
+            }
+    }
+}

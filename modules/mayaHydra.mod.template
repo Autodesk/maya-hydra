@@ -13,6 +13,6 @@ PXR_MTLX_STDLIB_SEARCH_PATHS+:=libraries
 icons: 
 plug-ins: lib/maya
 presets: 
-scripts: 
+scripts: scripts
 resources: 
 ${PXR_OVERRIDE_PLUGINPATH_NAME}+:=lib/usd

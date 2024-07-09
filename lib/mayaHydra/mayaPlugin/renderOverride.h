@@ -169,6 +169,8 @@ private:
         HdxPickHitVector& outHits,
         const MMatrix& viewMatrix,
         const MMatrix& projMatrix,
+        bool singlePick,
+        const TfToken& geomSubsetsPickMode,
         bool pointSnappingActive,
         int view_x,
         int view_y,
