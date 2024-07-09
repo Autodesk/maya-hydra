@@ -24,8 +24,10 @@
 #include <pxr/imaging/hd/materialNetworkSchema.h>
 #include <pxr/imaging/hd/materialNodeSchema.h>
 #include <pxr/imaging/hd/materialSchema.h>
+#include <pxr/imaging/hd/perfLog.h>//For HD_TRACE_FUNCTION
+
 #if PXR_VERSION >= 2405
-#include "pxr/imaging/hd/materialNodeParameterSchema.h"
+#include <pxr/imaging/hd/materialNodeParameterSchema.h>
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE

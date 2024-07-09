@@ -255,7 +255,7 @@ namespace
 }//end of anonymous namespace
 
 //Initialization of static members
-MTypeId MhFlowViewportAPILocator::id( 0x58000086 );
+MTypeId MhFlowViewportAPILocator::id( 0x58000993 );
 MString	MhFlowViewportAPILocator::nodeClassification("hydraAPIExample/geometry/MhFlowViewportAPILocator");
 MObject MhFlowViewportAPILocator::mNumCubeLevelsX;
 MObject MhFlowViewportAPILocator::mNumCubeLevelsY;

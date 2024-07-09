@@ -1,8 +1,8 @@
-//Maya ASCII 2026ff01 scene
+//Maya ASCII 2025ff01 scene
 //Name: testUsdTextureToggle.ma
 //Last modified: Thu, May 23, 2024 07:59:50 PM
 //Codeset: 1252
-requires maya "2026ff01";
+requires maya "2025ff01";
 requires -nodeType "mayaUsdLayerManager" -nodeType "mayaUsdProxyShape" -dataType "pxrUsdStageData"
 		 "mayaUsdPlugin" "0.28.0";
 currentUnit -l centimeter -a degree -t film;

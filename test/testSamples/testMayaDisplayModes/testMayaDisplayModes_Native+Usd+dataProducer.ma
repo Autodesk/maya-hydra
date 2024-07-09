@@ -1,8 +1,8 @@
-//Maya ASCII 2026ff01 scene
+//Maya ASCII 2025ff01 scene
 //Name: testMayaDisplayModes_Native+Usd+dataProducer.ma
 //Last modified: Tue, Apr 09, 2024 05:32:52 PM
 //Codeset: 1252
-requires maya "2026ff01";
+requires maya "2025ff01";
 requires -nodeType "MhFlowViewportAPILocator" "mayaHydraFlowViewportAPILocator" "1.0";
 requires -nodeType "aiOptions" -nodeType "aiAOVDriver" -nodeType "aiAOVFilter" "mtoa" "5.4.0";
 requires -nodeType "mayaUsdLayerManager" -nodeType "mayaUsdProxyShape" -dataType "pxrUsdStageData"
