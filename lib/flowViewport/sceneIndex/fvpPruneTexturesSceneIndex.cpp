@@ -72,6 +72,7 @@ PruneTexturesSceneIndex::MarkTexturesDirty(bool isTextured)
     _needsTexturesPruned = isTextured;
     const HdDataSourceLocatorSet locators {
         HdMaterialSchema::GetDefaultLocator().Append(HdMaterialSchemaTokens->material),
+        // Workaround for HYDRA-1061, see https://forum.aousd.org/t/primvars-and-material-dirtying-issue-in-storm/1675
         HdPrimvarsSchema::GetDefaultLocator()
     };
 
