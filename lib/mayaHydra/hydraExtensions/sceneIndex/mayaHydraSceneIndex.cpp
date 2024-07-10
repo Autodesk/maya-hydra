@@ -1200,13 +1200,13 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
         auto& renderItemAdapter = *result;
         
         auto& material = renderItemAdapter->GetMaterial();
-
+        auto ismayaFacesSelectionMaterial = material == _mayaFacesSelectionMaterialPath;
         // Check if this render item is a wireframe primitive
         if (MHWRender::MGeometry::Primitive::kLines == renderItemAdapter->GetPrimitive()
             || MHWRender::MGeometry::Primitive::kLineStrip == renderItemAdapter->GetPrimitive()) {
             return _fallbackMaterial;
         }
-        else if (_useDefaultMaterial && !(material == _mayaFacesSelectionMaterialPath)) {
+        else if (_useDefaultMaterial && !ismayaFacesSelectionMaterial) {
             return _mayaDefaultMaterialPath;
         }
 
@@ -1214,7 +1214,7 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
             return _fallbackMaterial;
         }
 
-        if (material == _mayaFacesSelectionMaterialPath) {
+        if (ismayaFacesSelectionMaterial) {
             return _mayaFacesSelectionMaterialPath;
         }
 
