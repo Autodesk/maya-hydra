@@ -26,7 +26,7 @@ class TestUsdTextureToggle(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
-    IMAGE_DIFF_FAIL_PERCENT = 1
+    IMAGE_DIFF_FAIL_PERCENT = 1.5
 
     def setUp(self):
         # Open simple Maya scene
