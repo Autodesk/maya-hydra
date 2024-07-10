@@ -129,6 +129,10 @@ private:
         PXR_NS::SdfPathSet& outSelectionHighlightMirrors, 
         PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outAddedPrims
     );
+
+    void _IncrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath);
+    void _DecrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath);
+
     void _AddInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
     void _RemoveInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
     void _RebuildInstancerHighlight(const PXR_NS::SdfPath& instancerPath);
