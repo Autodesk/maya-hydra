@@ -693,9 +693,17 @@ VtValue MayaHydraSceneIndex::CreateMayaFacesSelectionMaterial()
     HdMaterialNode       node;
     node.identifier = UsdImagingTokens->UsdPreviewSurface;
     node.path = _mayaFacesSelectionMaterialPath;
+
+    // Diffuse
     node.parameters.insert(
         { _tokens->diffuseColor,
-          VtValue(GfVec3f(faceSelectioncolor[0], faceSelectioncolor[1], faceSelectioncolor[2])) });
+          VtValue(GfVec3f(faceSelectioncolor[0], faceSelectioncolor[1], faceSelectioncolor[2])*0.3f) });
+    
+    // Emissive (component selection highlighting material should be independent of scene lighting)
+    node.parameters.insert(
+        { _tokens->emissiveColor,
+          VtValue(GfVec3f(faceSelectioncolor[0], faceSelectioncolor[1], faceSelectioncolor[2])*0.3f) });
+
     node.parameters.insert({ _tokens->opacity, VtValue(float(0.3f)) });
     network.nodes.push_back(std::move(node));
     networkMap.map.insert({ HdMaterialTerminalTokens->surface, std::move(network) });
