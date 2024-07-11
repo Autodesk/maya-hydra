@@ -442,8 +442,7 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         return GetInputSceneIndex()->GetPrim(primPath);
     }
     
-    // Is this prim part of a selection highlight mirror hierarchy?
-    // If so, then we are dealing with a point instancer or instance selection.
+    // If this prim is part of a selection highlight mirror hierarchy, tweak the prim's data source accordingly.
     SdfPath selectionHighlightMirrorAncestor = _FindSelectionHighlightMirrorAncestor(primPath);
     if (!selectionHighlightMirrorAncestor.IsEmpty()) {
         SdfPath originalPrimPath = primPath.ReplacePrefix(selectionHighlightMirrorAncestor, _GetOriginalPathFromSelectionHighlightMirror(selectionHighlightMirrorAncestor));
@@ -470,22 +469,8 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         return selectionHighlightPrim;
     }
     
-    // We are dealing with a mesh prototype selection, a regular selection, or no selection at all.
-    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-    // if (prim.primType == HdPrimTypeTokens->mesh) {
-    //     // Note : in the USD data model, the original prims that get propagated as prototypes have their original prim types erased.
-    //     // Only the resulting propagated prototypes keep the original prim type.
-
-    //     // We want to constrain the selected ancestor lookup to only the hierarchies the prim is a part of.
-    //     auto roots = _GetHierarchyRoots(prim);
-    //     for (const auto& root : roots) {
-    //         if (_selection->HasFullySelectedAncestorInclusive(primPath, root)) {
-    //             prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
-    //             break;
-    //         }
-    //     }
-    // }
-    return prim;
+    // This prim is not in a selection highlight mirror hierarchy; just pass-through our input.
+    return GetInputSceneIndex()->GetPrim(primPath);
 }
 
 SdfPathVector
