@@ -939,32 +939,8 @@ WireframeSelectionHighlightSceneIndex::_DecrementSelectionHighlightMirrorUseCoun
 }
 
 void
-WireframeSelectionHighlightSceneIndex::_AddGprimHighlightUser(const PXR_NS::SdfPath& gprimPath, const PXR_NS::SdfPath& userPath)
-{
-    SdfPath gprimHighlightPrimPath = _GetSelectionHighlightMirrorPathFromOriginal(gprimPath);
-    _IncrementSelectionHighlightMirrorUseCounter(gprimHighlightPrimPath);
-
-    HdSceneIndexObserver::AddedPrimEntries addedPrims;
-    auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
-        addedPrims.push_back({primPath.ReplacePrefix(gprimPath, gprimHighlightPrimPath), prim.primType});
-        return true;
-    };
-    _ForEachPrimInHierarchy(gprimPath, operation);
-    _SendPrimsAdded(addedPrims);
-}
-
-void
-WireframeSelectionHighlightSceneIndex::_RemoveGprimHighlightUser(const PXR_NS::SdfPath& gprimPath, const PXR_NS::SdfPath& userPath)
-{
-    SdfPath gprimHighlightPrimPath = _GetSelectionHighlightMirrorPathFromOriginal(gprimPath);
-    _DecrementSelectionHighlightMirrorUseCounter(gprimHighlightPrimPath);
-}
-
-void
 WireframeSelectionHighlightSceneIndex::_AddInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const SdfPath& userPath)
 {
-    //TF_AXIOM(GetInputSceneIndex()->GetPrim(instancerPath).primType == HdPrimTypeTokens->instancer);
-    
     if (_instancerHighlightUsersByInstancer[instancerPath].find(userPath) != _instancerHighlightUsersByInstancer[instancerPath].end()) {
         return;
     }
@@ -974,10 +950,6 @@ WireframeSelectionHighlightSceneIndex::_AddInstancerHighlightUser(const PXR_NS::
         SdfPathSet selectionHighlightMirrors;
         HdSceneIndexObserver::AddedPrimEntries addedPrims;
         _CollectSelectionHighlightMirrors(instancerPath, selectionHighlightMirrors, addedPrims);
-        std::cout << "---------- Adding highlights for " << userPath.GetString() << std::endl;
-        for (const auto& path : selectionHighlightMirrors) {
-            std::cout << path.GetString() << std::endl;
-        }
 
         _selectionHighlightMirrorsByInstancer[instancerPath] = selectionHighlightMirrors;
         for (const auto& selectionHighlightMirror : _selectionHighlightMirrorsByInstancer[instancerPath]) {
@@ -1016,7 +988,6 @@ WireframeSelectionHighlightSceneIndex::_RemoveInstancerHighlightUser(const PXR_N
 void
 WireframeSelectionHighlightSceneIndex::_RebuildInstancerHighlight(const PXR_NS::SdfPath& instancerPath)
 {
-    //TF_AXIOM(GetInputSceneIndex()->GetPrim(instancerPath).primType == HdPrimTypeTokens->instancer);
     TF_AXIOM(_instancerHighlightUsersByInstancer.find(instancerPath) != _instancerHighlightUsersByInstancer.end());
     TF_AXIOM(_selectionHighlightMirrorsByInstancer.find(instancerPath) != _selectionHighlightMirrorsByInstancer.end());
 

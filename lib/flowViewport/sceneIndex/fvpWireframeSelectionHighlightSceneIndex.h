@@ -135,9 +135,6 @@ private:
     void _IncrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath);
     void _DecrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath);
 
-    void _AddGprimHighlightUser(const PXR_NS::SdfPath& gprimPath, const PXR_NS::SdfPath& userPath);
-    void _RemoveGprimHighlightUser(const PXR_NS::SdfPath& gprimPath, const PXR_NS::SdfPath& userPath);
-
     void _AddInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
     void _RemoveInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
     void _RebuildInstancerHighlight(const PXR_NS::SdfPath& instancerPath);
