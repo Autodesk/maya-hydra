@@ -133,12 +133,17 @@ private:
     void _IncrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath);
     void _DecrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath);
 
+    void _AddGprimHighlightUser(const PXR_NS::SdfPath& gprimPath, const PXR_NS::SdfPath& userPath);
+    void _RemoveGprimHighlightUser(const PXR_NS::SdfPath& gprimPath, const PXR_NS::SdfPath& userPath);
+
     void _AddInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
     void _RemoveInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
     void _RebuildInstancerHighlight(const PXR_NS::SdfPath& instancerPath);
     void _DeleteInstancerHighlight(const PXR_NS::SdfPath& instancerPath);
 
     void _CreateInstancerHighlightsForInstancer(const PXR_NS::HdSceneIndexPrim& instancerPrim, const PXR_NS::SdfPath& instancerPath);
+    void _CreateInstancerHighlightsForMesh(const PXR_NS::HdSceneIndexPrim& meshPrim, const PXR_NS::SdfPath& meshPath);
+    void _CreateInstancerHighlightsForGeomSubset(const PXR_NS::SdfPath& geomSubsetPath);
 
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
 
