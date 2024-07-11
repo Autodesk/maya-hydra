@@ -42,6 +42,7 @@ target_sources(${TARGET_NAME}
         testNurbsSurfaces.cpp
         testPointInstancingWireframeHighlight.cpp
         testGeomSubsetsPicking.cpp
+        testSinglePicking.cpp
 )
 
 # -----------------------------------------------------------------------------
