@@ -1198,22 +1198,23 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
     auto result = TfMapLookupPtr(_renderItemsAdapters, id);
     if (result != nullptr) {
         auto& renderItemAdapter = *result;
-
+        
+        auto& material = renderItemAdapter->GetMaterial();
+        auto ismayaFacesSelectionMaterial = material == _mayaFacesSelectionMaterialPath;
         // Check if this render item is a wireframe primitive
         if (MHWRender::MGeometry::Primitive::kLines == renderItemAdapter->GetPrimitive()
             || MHWRender::MGeometry::Primitive::kLineStrip == renderItemAdapter->GetPrimitive()) {
             return _fallbackMaterial;
         }
-        else if (_useDefaultMaterial) {
+        else if (_useDefaultMaterial && !ismayaFacesSelectionMaterial) {
             return _mayaDefaultMaterialPath;
         }
-        auto& material = renderItemAdapter->GetMaterial();
 
         if (material == kInvalidMaterial) {
             return _fallbackMaterial;
         }
 
-        if (material == _mayaFacesSelectionMaterialPath) {
+        if (ismayaFacesSelectionMaterial) {
             return _mayaFacesSelectionMaterialPath;
         }
 
