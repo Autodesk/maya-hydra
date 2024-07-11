@@ -21,12 +21,20 @@
 #include "flowViewport/debugCodes.h"
 #include "fvpWireframeSelectionHighlightSceneIndex.h"
 
+#include <pxr/base/vt/array.h>
+#include <pxr/base/vt/types.h>
+#include <pxr/imaging/hd/dataSource.h>
+#include <pxr/imaging/hd/dataSourceLocator.h>
+#include <pxr/imaging/hd/geomSubsetSchema.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
+#include <pxr/imaging/hd/meshSchema.h>
+#include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
+#include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
@@ -451,6 +459,12 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
             }
             else if (selectionHighlightPrim.primType == HdPrimTypeTokens->mesh) {
                 selectionHighlightPrim.dataSource = _HighlightSelectedPrim(selectionHighlightPrim.dataSource, originalPrimPath, sRefinedWireDisplayStyleDataSource);
+                selectionHighlightPrim.dataSource = _TrimMeshForSelectedGeomSubsets(selectionHighlightPrim.dataSource, originalPrimPath);
+            } else if (selectionHighlightPrim.primType == HdPrimTypeTokens->geomSubset) {
+                // If we returned the geomSubset prims unchanged, they could contain face indices that exceed
+                // the trimmed mesh's number of faces, which prints a warning. We don't need the geomSubset
+                // highlight mirrors anyways, so just return nothing.
+                selectionHighlightPrim.dataSource = {};
             }
         }
         return selectionHighlightPrim;
@@ -536,6 +550,76 @@ HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSel
     return edited.Finish();
 }
 
+// Edits the mesh topology to only only contain its selected GeomSubsets
+HdContainerDataSourceHandle
+WireframeSelectionHighlightSceneIndex::_TrimMeshForSelectedGeomSubsets(const HdContainerDataSourceHandle& originalDataSource, const SdfPath& originalPrimPath) const
+{
+    HdMeshSchema meshSchema = HdMeshSchema::GetFromParent(originalDataSource);
+    if (!meshSchema.IsDefined()) {
+        return originalDataSource;
+    }
+    HdMeshTopologySchema meshTopologySchema = meshSchema.GetTopology();
+    if (!meshTopologySchema.IsDefined()) {
+        return originalDataSource;
+    }
+
+    // Collect faces to keep based on selected GeomSubsets
+    std::unordered_set<int> faceIndicesToKeep;
+    for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(originalPrimPath)) {
+        HdSceneIndexPrim childPrim = GetInputSceneIndex()->GetPrim(childPath);
+        if (childPrim.primType != HdPrimTypeTokens->geomSubset) {
+            continue;
+        }
+
+        HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema(childPrim.dataSource);
+        if (!geomSubsetSchema.IsDefined() || geomSubsetSchema.GetType()->GetTypedValue(0) != HdGeomSubsetSchemaTokens->typeFaceSet) {
+            continue;
+        }
+
+        HdSelectionsSchema geomSubsetSelections = HdSelectionsSchema::GetFromParent(childPrim.dataSource);
+        if (!geomSubsetSelections.IsDefined() || geomSubsetSelections.GetNumElements() == 0) {
+            continue;
+        }
+
+        VtArray<int> faceIndices = geomSubsetSchema.GetIndices()->GetTypedValue(0);
+        for (const auto& faceIndex : faceIndices) {
+            faceIndicesToKeep.insert(faceIndex);
+        }
+    }
+    if (faceIndicesToKeep.empty()) {
+        // If there no selected geomSubsets, don't trim the mesh.
+        return originalDataSource;
+    }
+
+    // Edit the mesh topology
+    HdContainerDataSourceEditor dataSourceEditor = HdContainerDataSourceEditor(originalDataSource);
+    VtArray<int> originalFaceVertexCounts = meshTopologySchema.GetFaceVertexCounts()->GetTypedValue(0);
+    VtArray<int> originalFaceVertexIndices = meshTopologySchema.GetFaceVertexIndices()->GetTypedValue(0);
+    VtArray<int> trimmedFaceVertexCounts;
+    VtArray<int> trimmedFaceVertexIndices;
+    size_t iFaceCounts = 0;
+    size_t iFaceIndices = 0;
+    while (iFaceCounts < originalFaceVertexCounts.size() && iFaceIndices < originalFaceVertexIndices.size()) {
+        int currFaceCount = originalFaceVertexCounts[iFaceCounts];
+
+        if (faceIndicesToKeep.find(iFaceCounts) != faceIndicesToKeep.end()) {
+            trimmedFaceVertexCounts.push_back(currFaceCount);
+            for (size_t faceIndicesOffset = 0; faceIndicesOffset < currFaceCount; faceIndicesOffset++) {
+                trimmedFaceVertexIndices.push_back(originalFaceVertexIndices[iFaceIndices + faceIndicesOffset]);
+            }
+        }
+
+        iFaceCounts++;
+        iFaceIndices += currFaceCount;
+    }
+    auto faceVertexCountsLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexCounts);
+    auto faceVertexIndicesLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexIndices);
+    
+    dataSourceEditor.Set(faceVertexCountsLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexCounts));
+    dataSourceEditor.Set(faceVertexIndicesLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexIndices));
+
+    return dataSourceEditor.Finish();
+}
 
 void
 WireframeSelectionHighlightSceneIndex::_PrimsAdded(
@@ -604,6 +688,15 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             // to update which instances are highlighted in the case of instance selection.
             if (prim.primType == HdPrimTypeTokens->instancer && selectionHighlightPath != entry.primPath) {
                 dirtiedPrims.emplace_back(selectionHighlightPath, HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask));
+            }
+
+            // If a geomSubset's selection changes, dirty the selection highlight mesh to trim it appropriately.
+            if (prim.primType == HdPrimTypeTokens->geomSubset) {
+                SdfPath meshPath = entry.primPath.GetParentPath();
+                SdfPath selectionHighlightMeshPath = GetSelectionHighlightPath(meshPath);
+                if (selectionHighlightMeshPath != meshPath) {
+                    dirtiedPrims.emplace_back(selectionHighlightMeshPath, HdDataSourceLocator(HdMeshSchemaTokens->mesh, HdMeshSchemaTokens->topology));
+                }
             }
             
             // All mesh prims recursively under the selection dirty prim have a
