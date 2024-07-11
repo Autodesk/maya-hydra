@@ -499,7 +499,7 @@ HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSel
 {
     //Always edit its override wireframe color
     auto edited = HdContainerDataSourceEditor(dataSource);
-    edited.Set(HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),
+    edited.Set(primvarsOverrideWireframeColorLocator,
                         Fvp::PrimvarDataSource::New(
                             HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{_wireframeColorInterface->getWireframeColor(primPath)}),
                             HdPrimvarSchemaTokens->constant,
