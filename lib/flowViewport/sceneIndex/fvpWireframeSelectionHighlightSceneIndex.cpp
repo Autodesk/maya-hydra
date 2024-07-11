@@ -62,14 +62,6 @@ const HdRetainedContainerDataSourceHandle sRefinedWireDisplayStyleDataSource
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
                 { HdReprTokens->refinedWire, TfToken(), TfToken() })));
 
-const HdRetainedContainerDataSourceHandle sRefinedWireOnSurfaceDisplayStyleDataSource
-    = HdRetainedContainerDataSource::New(
-        HdLegacyDisplayStyleSchemaTokens->displayStyle,
-        HdRetainedContainerDataSource::New(
-            HdLegacyDisplayStyleSchemaTokens->reprSelector,
-            HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
-                { HdReprTokens->refinedWireOnSurf, TfToken(), TfToken() })));
-
 const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
         HdLegacyDisplayStyleSchemaTokens->reprSelector);
