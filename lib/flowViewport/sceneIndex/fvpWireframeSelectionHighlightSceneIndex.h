@@ -37,6 +37,13 @@ class WireframeSelectionHighlightSceneIndex;
 typedef PXR_NS::TfRefPtr<WireframeSelectionHighlightSceneIndex> WireframeSelectionHighlightSceneIndexRefPtr;
 typedef PXR_NS::TfRefPtr<const WireframeSelectionHighlightSceneIndex> WireframeSelectionHighlightSceneIndexConstRefPtr;
 
+enum SelectionHighlightsCollectionDirection {
+    None = 0,
+    Prototypes = 1 << 0,
+    Instancers = 1 << 1,
+    Bidirectional = Prototypes | Instancers
+};
+
 /// \class WireframeSelectionHighlightSceneIndex
 ///
 /// Uses Hydra HdRepr to add wireframe representation to selected objects
@@ -128,6 +135,7 @@ private:
 
     void _CollectSelectionHighlightMirrors(
         const PXR_NS::SdfPath& originalPrimPath, 
+        SelectionHighlightsCollectionDirection direction,
         PXR_NS::SdfPathSet& outSelectionHighlightMirrors, 
         PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outAddedPrims
     );
