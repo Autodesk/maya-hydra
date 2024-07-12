@@ -194,3 +194,12 @@ def Mesh "pPlane1" (
     }
 }
 
+def DistantLight "DistantLight1"
+{
+    color3f inputs:shadow:color
+    bool inputs:shadow:enable = 1
+    float3 xformOp:rotateXYZ = (-90, 0, 0)
+    double3 xformOp:translate = (0, 10, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+}
+
