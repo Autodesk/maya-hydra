@@ -160,8 +160,6 @@ HdContainerDataSourceHandle _GetSelectionHighlightInstancerDataSource(const HdCo
         editedDataSource.Set(maskLocator, selectionHighlightMaskDataSource);
     }
 
-    editedDataSource.Set(HdSelectionsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-
     return editedDataSource.Finish();
 }
 
@@ -443,6 +441,11 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
             // Redirects paths within data sources to their corresponding selection highlight mirror paths (when there is one)
             selectionHighlightPrim.dataSource = _SelectionHighlightRepathingContainerDataSource::New(selectionHighlightPrim.dataSource, this);
 
+            // Block out the selections data source as we don't actually select a highlight
+            HdContainerDataSourceEditor dataSourceEditor = HdContainerDataSourceEditor(selectionHighlightPrim.dataSource);
+            dataSourceEditor.Set(HdSelectionsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+            selectionHighlightPrim.dataSource = dataSourceEditor.Finish();
+
             // Use prim type-specific data source overrides
             if (selectionHighlightPrim.primType == HdPrimTypeTokens->instancer) {
                 // Handles setting the mask for instance-specific highlighting
@@ -504,9 +507,6 @@ HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSel
                             HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{_wireframeColorInterface->getWireframeColor(primPath)}),
                             HdPrimvarSchemaTokens->constant,
                             HdPrimvarSchemaTokens->color));
-    
-    // Block out the selections data source as we don't actually select a highlight
-    edited.Set(HdSelectionsSchema::GetDefaultLocator(), HdBlockDataSource::New());
     
     //Is the prim in refined displayStyle (meaning shaded) ?
     if (HdLegacyDisplayStyleSchema styleSchema =
