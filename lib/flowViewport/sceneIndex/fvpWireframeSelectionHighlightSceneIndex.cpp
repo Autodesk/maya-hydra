@@ -505,6 +505,9 @@ HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSel
                             HdPrimvarSchemaTokens->constant,
                             HdPrimvarSchemaTokens->color));
     
+    // Block out the selections data source as we don't actually select a highlight
+    edited.Set(HdSelectionsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+    
     //Is the prim in refined displayStyle (meaning shaded) ?
     if (HdLegacyDisplayStyleSchema styleSchema =
             HdLegacyDisplayStyleSchema::GetFromParent(dataSource)) {
