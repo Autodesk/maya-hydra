@@ -461,11 +461,6 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
             // Redirects paths within data sources to their corresponding selection highlight mirror paths (when there is one)
             selectionHighlightPrim.dataSource = _SelectionHighlightRepathingContainerDataSource::New(selectionHighlightPrim.dataSource, this);
 
-            // Block out the selections data source as we don't actually select a highlight
-            HdContainerDataSourceEditor dataSourceEditor = HdContainerDataSourceEditor(selectionHighlightPrim.dataSource);
-            dataSourceEditor.Set(HdSelectionsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-            selectionHighlightPrim.dataSource = dataSourceEditor.Finish();
-
             // Use prim type-specific data source overrides
             if (selectionHighlightPrim.primType == HdPrimTypeTokens->instancer) {
                 // Handles setting the mask for instance-specific highlighting
@@ -479,6 +474,13 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
                 // the trimmed mesh's number of faces, which prints a warning. We don't need the geomSubset
                 // highlight mirrors anyways, so just return nothing.
                 selectionHighlightPrim.dataSource = {};
+            }
+
+            // Block out the selections data source as we don't actually select a highlight
+            if (selectionHighlightPrim.dataSource) {
+                HdContainerDataSourceEditor dataSourceEditor = HdContainerDataSourceEditor(selectionHighlightPrim.dataSource);
+                dataSourceEditor.Set(HdSelectionsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+                selectionHighlightPrim.dataSource = dataSourceEditor.Finish();
             }
         }
         return selectionHighlightPrim;
@@ -720,7 +722,8 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             // Update child instancer highlights for ancestor-based selection highlighting
             // (i.e. selecting one or more of an instancer's parents should highlight the instancer)
             auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
-                if (prim.primType == HdPrimTypeTokens->instancer || prim.primType == HdPrimTypeTokens->mesh) {
+                if ((prim.primType == HdPrimTypeTokens->instancer && !_IsPrototype(prim))
+                    || prim.primType == HdPrimTypeTokens->mesh) {
                     if (isSelected) {
                         instancerHighlightUsersToAdd.push_back({primPath,entry.primPath});
                     } else {
@@ -913,12 +916,19 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const P
 
     // Traverse the children of this prim to find the child instancers, and add its instancing-related
     // paths so we can process them and create selection highlight mirrors for them as well.
-    SdfPathVector affectedOriginalPrimPaths;
+    SdfPathVector affectedPrototypePaths;
+    SdfPathVector affectedInstancerPaths;
     auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
         outAddedPrims.push_back({primPath.ReplacePrefix(originalPrimPath, selectionHighlightPrimPath), prim.primType});
         if (prim.primType == HdPrimTypeTokens->instancer || prim.primType == HdPrimTypeTokens->mesh) {
-            SdfPathVector instancingRelatedPaths = _GetInstancingRelatedPaths(prim, direction);
-            affectedOriginalPrimPaths.insert(affectedOriginalPrimPaths.end(), instancingRelatedPaths.begin(), instancingRelatedPaths.end());
+            if (direction & SelectionHighlightsCollectionDirection::Prototypes) {
+                auto prototypePaths = _GetInstancingRelatedPaths(prim, SelectionHighlightsCollectionDirection::Prototypes);
+                affectedPrototypePaths.insert(affectedPrototypePaths.end(), prototypePaths.begin(), prototypePaths.end());
+            }
+            if (direction & SelectionHighlightsCollectionDirection::Instancers) {
+                auto instancerPaths = _GetInstancingRelatedPaths(prim, SelectionHighlightsCollectionDirection::Instancers);
+                affectedInstancerPaths.insert(affectedInstancerPaths.end(), instancerPaths.begin(), instancerPaths.end());
+            }
             // We hit an instancing-related prim, don't process its children (nested instancing will be processed through the instancing-related paths).
             return false;
         }
@@ -926,8 +936,11 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const P
     };
     _ForEachPrimInHierarchy(originalPrimPath, operation);
 
-    for (const auto& affectedOriginalPrimPath : affectedOriginalPrimPaths) {
-        _CollectSelectionHighlightMirrors(affectedOriginalPrimPath, direction, outSelectionHighlightMirrors, outAddedPrims);
+    for (const auto& affectedPrototypePath : affectedPrototypePaths) {
+        _CollectSelectionHighlightMirrors(affectedPrototypePath, SelectionHighlightsCollectionDirection::Prototypes, outSelectionHighlightMirrors, outAddedPrims);
+    }
+    for (const auto& affectedInstancerPath : affectedInstancerPaths) {
+        _CollectSelectionHighlightMirrors(affectedInstancerPath, SelectionHighlightsCollectionDirection::Instancers, outSelectionHighlightMirrors, outAddedPrims);
     }
 }
 

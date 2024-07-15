@@ -364,16 +364,11 @@ TEST(PointInstancingWireframeHighlight, prototype)
         // Original prim + 4 propagated prototypes
         EXPECT_EQ(prototypePrimSelections.size(), 1u + 4u);
 
-        // Ensure meshes use the correct display style
+        // Validate scene structure
         EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
-        for (const auto& prototypeSelection : prototypePrimSelections) {
-            HdSceneIndexPrimView view(inspector.GetSceneIndex(), prototypeSelection.primPath);
-            for (auto it = view.begin(); it != view.end(); ++it) {
-                HdSceneIndexPrim prim = inspector.GetSceneIndex()->GetPrim(*it);
-                if (prim.primType == HdPrimTypeTokens->mesh) {
-                    EXPECT_EQ(getRefinedReprToken(prim), HdReprTokens->refinedWireOnSurf);
-                }
-            }
+        for (const auto& prototypePrimSelection : prototypePrimSelections) {
+            auto selectionHighlightPath = getSelectionHighlightMirrorPathFromOriginal(prototypePrimSelection.primPath, selectionHighlightMirrorTag);
+            assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag);
         }
 
         // Ensure the accumulated selected paths correspond to the intended/translated paths
