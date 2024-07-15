@@ -687,24 +687,24 @@ VtValue MayaHydraSceneIndex::CreateMayaDefaultMaterial()
 VtValue MayaHydraSceneIndex::CreateMayaFacesSelectionMaterial()
 {
     const GfVec4f faceSelectioncolor = getPreferencesColor(FvpColorPreferencesTokens->faceSelection);
-    
+    constexpr float ogsMatchParamMult = 0.3f;
     HdMaterialNetworkMap networkMap;
     HdMaterialNetwork    network;
     HdMaterialNode       node;
     node.identifier = UsdImagingTokens->UsdPreviewSurface;
     node.path = _mayaFacesSelectionMaterialPath;
 
-    // Diffuse
+    // Diffuse 
     node.parameters.insert(
-        { _tokens->diffuseColor,
-          VtValue(GfVec3f(faceSelectioncolor[0], faceSelectioncolor[1], faceSelectioncolor[2])*0.3f) });
+        { _tokens->diffuseColor, 
+          VtValue(GfVec3f(faceSelectioncolor[0], faceSelectioncolor[1], faceSelectioncolor[2])*ogsMatchParamMult) });
     
     // Emissive (component selection highlighting material should be independent of scene lighting)
     node.parameters.insert(
         { _tokens->emissiveColor,
-          VtValue(GfVec3f(faceSelectioncolor[0], faceSelectioncolor[1], faceSelectioncolor[2])*0.3f) });
+          VtValue(GfVec3f(faceSelectioncolor[0], faceSelectioncolor[1], faceSelectioncolor[2])*ogsMatchParamMult) });
 
-    node.parameters.insert({ _tokens->opacity, VtValue(float(0.3f)) });
+    node.parameters.insert({ _tokens->opacity, VtValue(ogsMatchParamMult) });
     network.nodes.push_back(std::move(node));
     networkMap.map.insert({ HdMaterialTerminalTokens->surface, std::move(network) });
     networkMap.terminals.push_back(_mayaFacesSelectionMaterialPath);
