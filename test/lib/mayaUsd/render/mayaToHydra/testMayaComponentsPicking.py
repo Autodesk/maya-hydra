@@ -52,6 +52,14 @@ class TestMayaComponentsPicking(mtohUtils.MayaHydraBaseTestCase): #Subclassing m
         cmds.modelEditor(panel, edit=True, smoothWireframe=True)
         cmds.refresh()
         self.assertSnapshotClose("smoothwireframe" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        #Add lights
+        cmds.directionalLight(rotation=(45, 30, 15)) 
+        cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
+        cmds.modelEditor(panel, edit=True, displayLights="all")        
+        cmds.select( 'pSphere1.f[1:200]', r=True )
+        cmds.refresh()
+        self.assertSnapshotClose("selectionWithLights" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
