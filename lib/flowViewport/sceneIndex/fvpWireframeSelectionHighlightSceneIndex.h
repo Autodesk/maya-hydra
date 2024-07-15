@@ -21,7 +21,9 @@
 #include "flowViewport/fvpWireframeColorInterface.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
 
 #include <functional>
 #include <set>
@@ -119,6 +121,9 @@ protected:
 private:
 
     bool _IsExcluded(const PXR_NS::SdfPath& sceneRoot) const;
+
+    PXR_NS::VtBoolArray _GetSelectionHighlightMask(const PXR_NS::HdInstancerTopologySchema& originalInstancerTopology, const PXR_NS::HdSelectionsSchema& selections) const;
+    PXR_NS::HdContainerDataSourceHandle _GetSelectionHighlightInstancerDataSource(const PXR_NS::HdContainerDataSourceHandle& originalDataSource) const;
 
     void _DirtySelectionHighlightRecursive(
         const PXR_NS::SdfPath&                            primPath, 

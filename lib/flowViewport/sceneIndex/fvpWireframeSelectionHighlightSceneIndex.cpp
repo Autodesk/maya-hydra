@@ -85,100 +85,6 @@ SdfPath _GetOriginalPathFromSelectionHighlightMirror(const SdfPath& mirrorPath)
     return mirrorPath.ReplaceName(TfToken(primName.substr(0, primName.size() - selectionHighlightMirrorTag.size())));
 }
 
-// Computes the mask to use for an instancer's selection highlight mirror
-// based on the instancer's topology and its selections. This allows
-// highlighting only specific instances in the case of instance selections.
-VtBoolArray _GetSelectionHighlightMask(const Fvp::WireframeSelectionHighlightSceneIndex& whSi, const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionsSchema& selections) 
-{
-    // Schema getters were made const in USD 24.05 (specifically Hydra API version 66).
-    // We work around this for previous versions by const casting.
-    VtBoolArray originalMask = 
-#if HD_API_VERSION < 66
-    const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetMask()->GetTypedValue(0);
-#else
-    originalInstancerTopology.GetMask()->GetTypedValue(0);
-#endif
-
-    size_t nbInstances = 0;
-    auto instanceIndices = 
-#if HD_API_VERSION < 66
-    const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetInstanceIndices();
-#else
-    originalInstancerTopology.GetInstanceIndices();
-#endif
-    for (size_t iInstanceIndex = 0; iInstanceIndex < instanceIndices.GetNumElements(); iInstanceIndex++) {
-        auto protoInstances = instanceIndices.GetElement(iInstanceIndex)->GetTypedValue(0);
-        nbInstances += protoInstances.size();
-    }
-    if (!TF_VERIFY(originalMask.empty() || originalMask.size() == nbInstances, "Instancer mask has incorrect size.")) {
-        return originalMask;
-    }
-    VtBoolArray selectionHighlightMask = [&]() {
-        if (!selections.IsDefined()) {
-            return originalMask.empty() ? VtBoolArray(nbInstances, true) : originalMask;
-        }
-        return VtBoolArray(nbInstances, false);
-    }();
-
-    if (!selections.IsDefined()) {
-        auto protos = originalInstancerTopology.GetPrototypes()->GetTypedValue(0);
-        for (size_t iProto = 0; iProto < protos.size(); iProto++) {
-            auto protoPath = protos[iProto];
-            auto protoHighlightPath = whSi.GetSelectionHighlightPath(protoPath);
-            if (protoHighlightPath == protoPath) {
-                // No selection highlight for this prototype; disable its instances
-                auto protoInstanceIndices = originalInstancerTopology.GetInstanceIndices().GetElement(iProto)->GetTypedValue(0);
-                for (const auto& protoInstanceIndex : protoInstanceIndices) {
-                    selectionHighlightMask[protoInstanceIndex] = false;
-                }
-            }
-        }
-        return selectionHighlightMask;
-    }
-
-    for (size_t iSelection = 0; iSelection < selections.GetNumElements(); iSelection++) {
-        HdSelectionSchema selection = selections.GetElement(iSelection);
-        // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
-        // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
-        // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
-        if (!selection.GetFullySelected() || !selection.GetFullySelected()->GetTypedValue(0)) {
-            continue;
-        }
-        if (!selection.GetNestedInstanceIndices()) {
-            // We have a selection that has no instances, which means the whole instancer is selected :
-            // this overrides any instances selection.
-            return originalMask;
-        }
-        HdInstanceIndicesVectorSchema nestedInstanceIndices = selection.GetNestedInstanceIndices();
-        for (size_t iInstanceIndices = 0; iInstanceIndices < nestedInstanceIndices.GetNumElements(); iInstanceIndices++) {
-            HdInstanceIndicesSchema instanceIndices = nestedInstanceIndices.GetElement(0);
-            for (const auto& instanceIndex : instanceIndices.GetInstanceIndices()->GetTypedValue(0)) {
-                selectionHighlightMask[instanceIndex] = originalMask.empty() ? true : originalMask[instanceIndex];
-            }
-        }
-    }
-    return selectionHighlightMask;
-}
-
-// Returns the overall data source for an instancer's selection highlight mirror.
-// This replaces the mask data source and blocks the selections data source.
-HdContainerDataSourceHandle _GetSelectionHighlightInstancerDataSource(const Fvp::WireframeSelectionHighlightSceneIndex& whSi, const HdContainerDataSourceHandle& originalDataSource)
-{
-    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(originalDataSource);
-    HdSelectionsSchema selections = HdSelectionsSchema::GetFromParent(originalDataSource);
-
-    HdContainerDataSourceEditor editedDataSource = HdContainerDataSourceEditor(originalDataSource);
-
-    if (selections.IsDefined()) {
-        HdDataSourceLocator maskLocator = HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask);
-        VtBoolArray selectionHighlightMask = _GetSelectionHighlightMask(whSi, instancerTopology, selections);
-        auto selectionHighlightMaskDataSource = HdRetainedTypedSampledDataSource<VtBoolArray>::New(selectionHighlightMask);
-        editedDataSource.Set(maskLocator, selectionHighlightMaskDataSource);
-    }
-
-    return editedDataSource.Finish();
-}
-
 // Returns all paths related to instancing for this prim; this is analogous to getting the edges
 // connected to the given vertex (in this case a prim) of an instancing graph.
 SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim, Fvp::SelectionHighlightsCollectionDirection direction)
@@ -440,6 +346,102 @@ WireframeSelectionHighlightSceneIndex(
     _ForEachPrimInHierarchy(SdfPath::AbsoluteRootPath(), operation);
 }
 
+// Computes the mask to use for an instancer's selection highlight mirror
+// based on the instancer's topology and its selections. This allows
+// highlighting only specific instances in the case of instance selections.
+VtBoolArray
+WireframeSelectionHighlightSceneIndex::_GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionsSchema& selections) const
+{
+    // Schema getters were made const in USD 24.05 (specifically Hydra API version 66).
+    // We work around this for previous versions by const casting.
+    VtBoolArray originalMask = 
+#if HD_API_VERSION < 66
+    const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetMask()->GetTypedValue(0);
+#else
+    originalInstancerTopology.GetMask()->GetTypedValue(0);
+#endif
+
+    size_t nbInstances = 0;
+    auto instanceIndices = 
+#if HD_API_VERSION < 66
+    const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetInstanceIndices();
+#else
+    originalInstancerTopology.GetInstanceIndices();
+#endif
+    for (size_t iInstanceIndex = 0; iInstanceIndex < instanceIndices.GetNumElements(); iInstanceIndex++) {
+        auto protoInstances = instanceIndices.GetElement(iInstanceIndex)->GetTypedValue(0);
+        nbInstances += protoInstances.size();
+    }
+    if (!TF_VERIFY(originalMask.empty() || originalMask.size() == nbInstances, "Instancer mask has incorrect size.")) {
+        return originalMask;
+    }
+    VtBoolArray selectionHighlightMask = [&]() {
+        if (!selections.IsDefined()) {
+            return originalMask.empty() ? VtBoolArray(nbInstances, true) : originalMask;
+        }
+        return VtBoolArray(nbInstances, false);
+    }();
+
+    if (!selections.IsDefined()) {
+        auto protos = originalInstancerTopology.GetPrototypes()->GetTypedValue(0);
+        for (size_t iProto = 0; iProto < protos.size(); iProto++) {
+            auto protoPath = protos[iProto];
+            auto protoHighlightPath = GetSelectionHighlightPath(protoPath);
+            if (protoHighlightPath == protoPath) {
+                // No selection highlight for this prototype; disable its instances
+                auto protoInstanceIndices = originalInstancerTopology.GetInstanceIndices().GetElement(iProto)->GetTypedValue(0);
+                for (const auto& protoInstanceIndex : protoInstanceIndices) {
+                    selectionHighlightMask[protoInstanceIndex] = false;
+                }
+            }
+        }
+        return selectionHighlightMask;
+    }
+
+    for (size_t iSelection = 0; iSelection < selections.GetNumElements(); iSelection++) {
+        HdSelectionSchema selection = selections.GetElement(iSelection);
+        // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
+        // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
+        // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
+        if (!selection.GetFullySelected() || !selection.GetFullySelected()->GetTypedValue(0)) {
+            continue;
+        }
+        if (!selection.GetNestedInstanceIndices()) {
+            // We have a selection that has no instances, which means the whole instancer is selected :
+            // this overrides any instances selection.
+            return originalMask;
+        }
+        HdInstanceIndicesVectorSchema nestedInstanceIndices = selection.GetNestedInstanceIndices();
+        for (size_t iInstanceIndices = 0; iInstanceIndices < nestedInstanceIndices.GetNumElements(); iInstanceIndices++) {
+            HdInstanceIndicesSchema instanceIndices = nestedInstanceIndices.GetElement(0);
+            for (const auto& instanceIndex : instanceIndices.GetInstanceIndices()->GetTypedValue(0)) {
+                selectionHighlightMask[instanceIndex] = originalMask.empty() ? true : originalMask[instanceIndex];
+            }
+        }
+    }
+    return selectionHighlightMask;
+}
+
+// Returns the overall data source for an instancer's selection highlight mirror.
+// This replaces the mask data source and blocks the selections data source.
+HdContainerDataSourceHandle
+WireframeSelectionHighlightSceneIndex::_GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& originalDataSource) const
+{
+    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(originalDataSource);
+    HdSelectionsSchema selections = HdSelectionsSchema::GetFromParent(originalDataSource);
+
+    HdContainerDataSourceEditor editedDataSource = HdContainerDataSourceEditor(originalDataSource);
+
+    if (selections.IsDefined()) {
+        HdDataSourceLocator maskLocator = HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask);
+        VtBoolArray selectionHighlightMask = _GetSelectionHighlightMask(instancerTopology, selections);
+        auto selectionHighlightMaskDataSource = HdRetainedTypedSampledDataSource<VtBoolArray>::New(selectionHighlightMask);
+        editedDataSource.Set(maskLocator, selectionHighlightMaskDataSource);
+    }
+
+    return editedDataSource.Finish();
+}
+
 HdSceneIndexPrim
 WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
 {
@@ -467,7 +469,7 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
             // Use prim type-specific data source overrides
             if (selectionHighlightPrim.primType == HdPrimTypeTokens->instancer) {
                 // Handles setting the mask for instance-specific highlighting
-                selectionHighlightPrim.dataSource = _GetSelectionHighlightInstancerDataSource(*this, selectionHighlightPrim.dataSource);
+                selectionHighlightPrim.dataSource = _GetSelectionHighlightInstancerDataSource(selectionHighlightPrim.dataSource);
             }
             else if (selectionHighlightPrim.primType == HdPrimTypeTokens->mesh) {
                 selectionHighlightPrim.dataSource = _HighlightSelectedPrim(selectionHighlightPrim.dataSource, originalPrimPath, sRefinedWireDisplayStyleDataSource);
