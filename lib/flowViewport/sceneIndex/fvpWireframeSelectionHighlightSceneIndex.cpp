@@ -830,6 +830,16 @@ WireframeSelectionHighlightSceneIndex::GetSelectionHighlightPath(const SdfPath& 
     return path;
 }
 
+SdfPathVector
+WireframeSelectionHighlightSceneIndex::GetSelectionHighlightMirrorPaths() const
+{
+    SdfPathVector mirrorPaths;
+    for (const auto& selectionHighlightMirrorKvp : _selectionHighlightMirrorUseCounters) {
+        mirrorPaths.push_back(selectionHighlightMirrorKvp.first);
+    }
+    return mirrorPaths;
+}
+
 void
 WireframeSelectionHighlightSceneIndex::_ForEachPrimInHierarchy(
     const PXR_NS::SdfPath& hierarchyRoot, 

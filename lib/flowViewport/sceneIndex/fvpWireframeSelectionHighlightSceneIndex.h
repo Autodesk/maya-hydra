@@ -88,6 +88,10 @@ public:
     FVP_API
     PXR_NS::SdfPath GetSelectionHighlightPath(const PXR_NS::SdfPath& path) const;
 
+    // Returns the paths to all selection highlight mirrors
+    FVP_API
+    PXR_NS::SdfPathVector GetSelectionHighlightMirrorPaths() const;
+
 protected:
 
     FVP_API
