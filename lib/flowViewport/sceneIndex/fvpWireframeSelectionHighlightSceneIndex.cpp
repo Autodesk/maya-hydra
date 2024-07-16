@@ -497,11 +497,19 @@ WireframeSelectionHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath
     SdfPath selectionHighlightMirrorAncestor = _FindSelectionHighlightMirrorAncestor(primPath);
     if (!selectionHighlightMirrorAncestor.IsEmpty()) {
         SdfPath originalAncestor = _GetOriginalPathFromSelectionHighlightMirror(selectionHighlightMirrorAncestor);
-        auto childPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath.ReplacePrefix(selectionHighlightMirrorAncestor, originalAncestor));
-        for (auto& childPath : childPaths) {
-            childPath = childPath.ReplacePrefix(originalAncestor, selectionHighlightMirrorAncestor);
+        auto originalChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath.ReplacePrefix(selectionHighlightMirrorAncestor, originalAncestor));
+        SdfPathVector implicitSelectionHighlightChildPaths;
+        for (const auto& originalChildPath : originalChildPaths) {
+            SdfPath explicitSelectionHighlightChildPath = _GetSelectionHighlightMirrorPathFromOriginal(originalChildPath);
+            if (_selectionHighlightMirrorUseCounters.find(explicitSelectionHighlightChildPath) != _selectionHighlightMirrorUseCounters.end()
+                && _selectionHighlightMirrorUseCounters.at(explicitSelectionHighlightChildPath) > 0) {
+                // There already exists an explicit selection highlight mirror for this child (e.g. point instance prototypes),
+                // so don't create a duplicate implicit one.
+                continue;
+            }
+            implicitSelectionHighlightChildPaths.push_back(originalChildPath.ReplacePrefix(originalAncestor, selectionHighlightMirrorAncestor));
         }
-        return childPaths;
+        return implicitSelectionHighlightChildPaths;
     }
 
     // When outside a selection highlight mirror hierarchy, add each child's corresponding
