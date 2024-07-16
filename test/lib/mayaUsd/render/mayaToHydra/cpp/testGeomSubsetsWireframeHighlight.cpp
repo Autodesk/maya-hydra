@@ -58,11 +58,6 @@ const std::string kCubeLowerHalfMarkerUfePathSegment = "/Root/CubeLowerHalfMarke
 const std::string kSphereInstanceUpperHalfMarkerUfePathSegment = "/Root/SphereInstanceUpperHalfMarker";
 const std::string kSphereInstanceLowerHalfMarkerUfePathSegment = "/Root/SphereInstanceLowerHalfMarker";
 
-SdfPath getSelectionHighlightMirrorPathFromOriginal(const SdfPath& originalPath, const std::string& selectionHighlightMirrorTag)
-{
-    return originalPath.ReplaceName(TfToken(originalPath.GetName() + selectionHighlightMirrorTag));
-}
-
 bool isSelectionHighlightMirror(const SdfPath& primPath, const std::string& selectionHighlightMirrorTag)
 {
     return primPath.GetElementString().find(selectionHighlightMirrorTag) != std::string::npos;
@@ -146,12 +141,20 @@ void testGeomSubsetHighlight(const Ufe::Path& geomSubsetPath)
 
 TEST(GeomSubsetsWireframeHighlight, simpleGeomSubsetHighlight)
 {
+#if PXR_VERSION < 2403
+    GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
+#else
     auto cubeGeomSubsetPath = Ufe::PathString::path(kStageUfePathSegment + "," + kCubeMeshUfePathSegment + "/" + kCubeUpperHalfName);
     testGeomSubsetHighlight(cubeGeomSubsetPath);
+#endif
 }
 
 TEST(GeomSubsetsWireframeHighlight, instancedGeomSubsetHighlight)
 {
+#if PXR_VERSION < 2403
+    GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
+#else
     auto spherGeomSubsetPath = Ufe::PathString::path(kStageUfePathSegment + "," + kSphereMeshUfePathSegment + "/" + kSphereUpperHalfName);
     testGeomSubsetHighlight(spherGeomSubsetPath);
+#endif
 }
