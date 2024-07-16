@@ -136,7 +136,9 @@ private:
         const PXR_NS::HdContainerDataSourceHandle& highlightDataSource
     ) const;
 
+#if PXR_VERSION >= 2403
     PXR_NS::HdContainerDataSourceHandle _TrimMeshForSelectedGeomSubsets(const PXR_NS::HdContainerDataSourceHandle& originalDataSource, const PXR_NS::SdfPath& originalPrimPath) const;
+#endif
 
     void _ForEachPrimInHierarchy(const PXR_NS::SdfPath& hierarchyRoot, const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation);
 

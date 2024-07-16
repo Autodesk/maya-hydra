@@ -338,9 +338,12 @@ WireframeSelectionHighlightSceneIndex(
             _CreateInstancerHighlightsForInstancer(prim, primPath);
         } else if (prim.primType == HdPrimTypeTokens->mesh) {
             _CreateInstancerHighlightsForMesh(prim, primPath);
-        } else if (prim.primType == HdPrimTypeTokens->geomSubset) {
+        }
+#if PXR_VERSION >= 2403
+        else if (prim.primType == HdPrimTypeTokens->geomSubset) {
             _CreateInstancerHighlightsForGeomSubset(primPath);
         }
+#endif
         return true;
     };
     _ForEachPrimInHierarchy(SdfPath::AbsoluteRootPath(), operation);
@@ -469,12 +472,15 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
             else if (selectionHighlightPrim.primType == HdPrimTypeTokens->mesh) {
                 selectionHighlightPrim.dataSource = _HighlightSelectedPrim(selectionHighlightPrim.dataSource, originalPrimPath, sRefinedWireDisplayStyleDataSource);
                 selectionHighlightPrim.dataSource = _TrimMeshForSelectedGeomSubsets(selectionHighlightPrim.dataSource, originalPrimPath);
-            } else if (selectionHighlightPrim.primType == HdPrimTypeTokens->geomSubset) {
+            }
+#if PXR_VERSION >= 2403
+            else if (selectionHighlightPrim.primType == HdPrimTypeTokens->geomSubset) {
                 // If we returned the geomSubset prims unchanged, they could contain face indices that exceed
                 // the trimmed mesh's number of faces, which prints a warning. We don't need the geomSubset
                 // highlight mirrors anyways, so just return nothing.
                 selectionHighlightPrim.dataSource = {};
             }
+#endif
 
             // Block out the selections data source as we don't actually select a highlight
             if (selectionHighlightPrim.dataSource) {
@@ -560,6 +566,7 @@ HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSel
     return edited.Finish();
 }
 
+#if PXR_VERSION >= 2403
 // Edits the mesh topology to only only contain its selected GeomSubsets
 HdContainerDataSourceHandle
 WireframeSelectionHighlightSceneIndex::_TrimMeshForSelectedGeomSubsets(const HdContainerDataSourceHandle& originalDataSource, const SdfPath& originalPrimPath) const
@@ -630,6 +637,7 @@ WireframeSelectionHighlightSceneIndex::_TrimMeshForSelectedGeomSubsets(const HdC
 
     return dataSourceEditor.Finish();
 }
+#endif
 
 void
 WireframeSelectionHighlightSceneIndex::_PrimsAdded(
@@ -646,9 +654,12 @@ WireframeSelectionHighlightSceneIndex::_PrimsAdded(
             _CreateInstancerHighlightsForInstancer(prim, entry.primPath);
         } else if (prim.primType == HdPrimTypeTokens->mesh) {
             _CreateInstancerHighlightsForMesh(prim, entry.primPath);
-        } else if (prim.primType == HdPrimTypeTokens->geomSubset) {
+        }
+#if PXR_VERSION >= 2403
+        else if (prim.primType == HdPrimTypeTokens->geomSubset) {
             _CreateInstancerHighlightsForGeomSubset(entry.primPath);
         }
+#endif
     }
 }
 
@@ -700,6 +711,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
                 dirtiedPrims.emplace_back(selectionHighlightPath, HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask));
             }
 
+#if PXR_VERSION >= 2403
             // If a geomSubset's selection changes, dirty the selection highlight mesh to trim it appropriately.
             if (prim.primType == HdPrimTypeTokens->geomSubset) {
                 SdfPath meshPath = entry.primPath.GetParentPath();
@@ -708,6 +720,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
                     dirtiedPrims.emplace_back(selectionHighlightMeshPath, HdDataSourceLocator(HdMeshSchemaTokens->mesh, HdMeshSchemaTokens->topology));
                 }
             }
+#endif
             
             // All mesh prims recursively under the selection dirty prim have a
             // dirty wireframe selection highlight.
@@ -719,6 +732,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
             bool isSelected = selectionsSchema.IsDefined() && selectionsSchema.GetNumElements() > 0;
 
+#if PXR_VERSION >= 2403
             if (prim.primType == HdPrimTypeTokens->geomSubset) {
                 if (isSelected) {
                     instancerHighlightUsersToAdd.push_back({entry.primPath.GetParentPath(), entry.primPath});
@@ -726,6 +740,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
                     instancerHighlightUsersToRemove.push_back({entry.primPath.GetParentPath(), entry.primPath});
                 }
             }
+#endif
 
             // Update child instancer highlights for ancestor-based selection highlighting
             // (i.e. selecting one or more of an instancer's parents should highlight the instancer)
