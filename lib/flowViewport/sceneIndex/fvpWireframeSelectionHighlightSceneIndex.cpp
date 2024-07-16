@@ -36,6 +36,7 @@
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 
+#include <unordered_set>
 #include <stack>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -618,7 +619,7 @@ WireframeSelectionHighlightSceneIndex::_TrimMeshForSelectedGeomSubsets(const HdC
 
         if (faceIndicesToKeep.find(iFaceCounts) != faceIndicesToKeep.end()) {
             trimmedFaceVertexCounts.push_back(currFaceCount);
-            for (size_t faceIndicesOffset = 0; faceIndicesOffset < currFaceCount; faceIndicesOffset++) {
+            for (int faceIndicesOffset = 0; faceIndicesOffset < currFaceCount; faceIndicesOffset++) {
                 trimmedFaceVertexIndices.push_back(originalFaceVertexIndices[iFaceIndices + faceIndicesOffset]);
             }
         }
