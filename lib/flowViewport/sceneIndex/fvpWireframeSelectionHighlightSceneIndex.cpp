@@ -19,13 +19,10 @@
 #include "flowViewport/fvpUtils.h"
 
 #include "flowViewport/debugCodes.h"
-#include "fvpWireframeSelectionHighlightSceneIndex.h"
 
-#include <pxr/base/vt/array.h>
-#include <pxr/base/vt/types.h>
-#include <pxr/imaging/hd/dataSource.h>
-#include <pxr/imaging/hd/dataSourceLocator.h>
+#if PXR_VERSION >= 2403
 #include <pxr/imaging/hd/geomSubsetSchema.h>
+#endif
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
@@ -34,13 +31,10 @@
 #include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
-#include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
-#include <pxr/usd/sdf/path.h>
-#include <iostream>
 
 #include <stack>
 
@@ -336,7 +330,8 @@ WireframeSelectionHighlightSceneIndex(
     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
         if (prim.primType == HdPrimTypeTokens->instancer) {
             _CreateInstancerHighlightsForInstancer(prim, primPath);
-        } else if (prim.primType == HdPrimTypeTokens->mesh) {
+        }
+        else if (prim.primType == HdPrimTypeTokens->mesh) {
             _CreateInstancerHighlightsForMesh(prim, primPath);
         }
 #if PXR_VERSION >= 2403
@@ -471,7 +466,9 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
             }
             else if (selectionHighlightPrim.primType == HdPrimTypeTokens->mesh) {
                 selectionHighlightPrim.dataSource = _HighlightSelectedPrim(selectionHighlightPrim.dataSource, originalPrimPath, sRefinedWireDisplayStyleDataSource);
+#if PXR_VERSION >= 2403
                 selectionHighlightPrim.dataSource = _TrimMeshForSelectedGeomSubsets(selectionHighlightPrim.dataSource, originalPrimPath);
+#endif
             }
 #if PXR_VERSION >= 2403
             else if (selectionHighlightPrim.primType == HdPrimTypeTokens->geomSubset) {
@@ -652,7 +649,8 @@ WireframeSelectionHighlightSceneIndex::_PrimsAdded(
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
         if (prim.primType == HdPrimTypeTokens->instancer) {
             _CreateInstancerHighlightsForInstancer(prim, entry.primPath);
-        } else if (prim.primType == HdPrimTypeTokens->mesh) {
+        }
+        else if (prim.primType == HdPrimTypeTokens->mesh) {
             _CreateInstancerHighlightsForMesh(prim, entry.primPath);
         }
 #if PXR_VERSION >= 2403
