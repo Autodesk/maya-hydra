@@ -73,9 +73,7 @@ bool findMeshPrimsPredicate(const HdSceneIndexBasePtr& sceneIndex, const SdfPath
     return sceneIndex->GetPrim(primPath).primType == HdPrimTypeTokens->mesh;
 }
 
-} // namespace
-
-TEST(GeomSubsetsWireframeHighlight, instancedGeomSubsetHighlight)
+void testGeomSubsetHighlight(const Ufe::Path& geomSubsetPath)
 {
     const SceneIndicesVector& terminalSceneIndices = GetTerminalSceneIndices();
     ASSERT_FALSE(terminalSceneIndices.empty());
@@ -97,7 +95,6 @@ TEST(GeomSubsetsWireframeHighlight, instancedGeomSubsetHighlight)
     selectionObserver.SetSceneIndex(terminalSceneIndices.front());
 
     // Create this test's selected scene items
-    auto geomSubsetPath = Ufe::PathString::path(kStageUfePathSegment + "," + kSphereMeshUfePathSegment + "/" + kSphereUpperHalfName);
     auto geomSubsetItem = Ufe::Hierarchy::createItem(geomSubsetPath);
 
     // Initial state : ensure nothing is highlighted
@@ -112,20 +109,28 @@ TEST(GeomSubsetsWireframeHighlight, instancedGeomSubsetHighlight)
     ufeSelection->replaceWith(geomSubsetItem);
 
     auto geomSubsetPrimSelections = fvpMergingSceneIndex->UfePathToPrimSelections(geomSubsetPath);
-    // Original prim + propagated prototype
-    EXPECT_EQ(geomSubsetPrimSelections.size(), 1u + 1u);
 
     // Validate scene structure
-    EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
+    ASSERT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
     for (size_t iSelection = 0; iSelection < geomSubsetPrimSelections.size(); iSelection++) {
-        const auto& geomSubsetPrimSelection = geomSubsetPrimSelections[iSelection];
-        auto selectionHighlightPath = fvpWireframeSelectionHighlightSceneIndex->GetSelectionHighlightPath(geomSubsetPrimSelection.primPath);
-        ASSERT_NE(selectionHighlightPath, geomSubsetPrimSelection.primPath);
-        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag);
-        HdSceneIndexPrim geomSubsetPrim = inspector.GetSceneIndex()->GetPrim(geomSubsetPrimSelection.primPath);
-        dataSourceMatchesReference(
-            HdContainerDataSource::Get(geomSubsetPrim.dataSource, HdMeshSchema::GetTopologyLocator()),
-            getPathToSample("geomSubset_topology" + std::to_string(iSelection) + ".txt"));
+        const auto& meshPath = geomSubsetPrimSelections[iSelection].primPath.GetParentPath();
+        auto meshHighlightPath = fvpWireframeSelectionHighlightSceneIndex->GetSelectionHighlightPath(meshPath);
+        ASSERT_NE(meshHighlightPath, meshPath);
+        HdSceneIndexPrim meshPrim = inspector.GetSceneIndex()->GetPrim(meshPath);
+        HdInstancedBySchema meshInstancedBySchema = HdInstancedBySchema::GetFromParent(meshPrim.dataSource);
+        HdSceneIndexPrim meshHighlightPrim = inspector.GetSceneIndex()->GetPrim(meshHighlightPath);
+        HdInstancedBySchema meshHighlightInstancedBySchema = HdInstancedBySchema::GetFromParent(meshHighlightPrim.dataSource);
+        ASSERT_EQ(meshHighlightInstancedBySchema.IsDefined(), meshInstancedBySchema.IsDefined());
+        if (meshHighlightInstancedBySchema.IsDefined()) {
+            for (const auto& instancerPath : meshHighlightInstancedBySchema.GetPaths()->GetTypedValue(0)) {
+                assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), instancerPath, selectionHighlightMirrorTag);
+            }
+        } else {
+            assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), meshHighlightPath, selectionHighlightMirrorTag);
+        }
+        EXPECT_TRUE(dataSourceMatchesReference(
+            HdContainerDataSource::Get(meshHighlightPrim.dataSource, HdMeshSchema::GetTopologyLocator()),
+            getPathToSample(geomSubsetPath.getSegments().back().components().back().string() + "_MeshHighlight_" + std::to_string(iSelection) + "_topology" + ".txt")));
     }
 
     // Ensure the accumulated selected paths correspond to the intended/translated paths
@@ -135,4 +140,18 @@ TEST(GeomSubsetsWireframeHighlight, instancedGeomSubsetHighlight)
         auto foundSelectedPrimPath = std::find(selectedPrimPaths.begin(), selectedPrimPaths.end(), geomSubsetPrimSelection.primPath);
         EXPECT_NE(foundSelectedPrimPath, selectedPrimPaths.end());
     }
+}
+
+} // namespace
+
+TEST(GeomSubsetsWireframeHighlight, simpleGeomSubsetHighlight)
+{
+    auto cubeGeomSubsetPath = Ufe::PathString::path(kStageUfePathSegment + "," + kCubeMeshUfePathSegment + "/" + kCubeUpperHalfName);
+    testGeomSubsetHighlight(cubeGeomSubsetPath);
+}
+
+TEST(GeomSubsetsWireframeHighlight, instancedGeomSubsetHighlight)
+{
+    auto spherGeomSubsetPath = Ufe::PathString::path(kStageUfePathSegment + "," + kSphereMeshUfePathSegment + "/" + kSphereUpperHalfName);
+    testGeomSubsetHighlight(spherGeomSubsetPath);
 }

@@ -41,6 +41,9 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr('persp.rotate', 0, 0, 0, type='float3')
         cmds.refresh()
 
+    def test_SimpleGeomSubsetHighlight(self):
+        self.runCppTest("GeomSubsetsWireframeHighlight.simpleGeomSubsetHighlight")
+
     def test_InstancedGeomSubsetHighlight(self):
         self.runCppTest("GeomSubsetsWireframeHighlight.instancedGeomSubsetHighlight")
 
