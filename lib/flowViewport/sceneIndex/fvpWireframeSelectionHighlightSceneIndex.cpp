@@ -382,13 +382,23 @@ WireframeSelectionHighlightSceneIndex::_GetSelectionHighlightMask(const HdInstan
     }();
 
     if (!selections.IsDefined()) {
-        auto protos = originalInstancerTopology.GetPrototypes()->GetTypedValue(0);
+        auto protos = 
+#if HD_API_VERSION < 66
+        const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetPrototypes()->GetTypedValue(0);
+#else
+        originalInstancerTopology.GetPrototypes()->GetTypedValue(0);
+#endif
         for (size_t iProto = 0; iProto < protos.size(); iProto++) {
             auto protoPath = protos[iProto];
             auto protoHighlightPath = GetSelectionHighlightPath(protoPath);
             if (protoHighlightPath == protoPath) {
                 // No selection highlight for this prototype; disable its instances
-                auto protoInstanceIndices = originalInstancerTopology.GetInstanceIndices().GetElement(iProto)->GetTypedValue(0);
+                auto protoInstanceIndices = 
+#if HD_API_VERSION < 66
+                const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetInstanceIndices().GetElement(iProto)->GetTypedValue(0);
+#else
+                originalInstancerTopology.GetInstanceIndices().GetElement(iProto)->GetTypedValue(0);
+#endif
                 for (const auto& protoInstanceIndex : protoInstanceIndices) {
                     selectionHighlightMask[protoInstanceIndex] = false;
                 }
