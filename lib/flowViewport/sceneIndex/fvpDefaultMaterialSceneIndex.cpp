@@ -83,18 +83,18 @@ bool DefaultMaterialSceneIndex::_ShouldWeApplyTheDefaultMaterial(const HdSceneIn
     HdMaterialBindingsSchema bindings = HdMaterialBindingsSchema::GetFromParent(prim.dataSource);
     HdMaterialBindingSchema  binding = bindings.GetMaterialBinding();
     HdPathDataSourceHandle   bindingPathDS = binding.GetPath();
-    if (bindingPathDS) {
+    if (bindingPathDS) { // If a mesh prim has no material( bindingPathDS is empty), apply anyway the default material
         const SdfPath materialPath = bindingPathDS->GetTypedValue(0.0f);
         auto    foundExcludedMaterialPath = std::find(
             _defaultMaterialExclusionList.cbegin(),
             _defaultMaterialExclusionList.cend(),
             materialPath);
-        if (foundExcludedMaterialPath == _defaultMaterialExclusionList.cend()) {
-            return true; // materialPath was not found in the exclusion list
+        if (foundExcludedMaterialPath != _defaultMaterialExclusionList.cend()) {
+            return false; // materialPath is in the exclusion list !
         }
     }
 
-    return false;
+    return true;
 }
 
 void DefaultMaterialSceneIndex::_SetDefaultMaterial(HdSceneIndexPrim& inoutPrim)const
