@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Luma Pictures
+// Copyright 2024 Autodesk
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,16 +13,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#include "tokens.h"
+#ifndef MH_PICK_HANDLER_FWD_H
+#define MH_PICK_HANDLER_FWD_H
 
-PXR_NAMESPACE_OPEN_SCOPE
+#include <mayaHydraLib/api.h>
 
-// clang-format off
-TF_DEFINE_PUBLIC_TOKENS(
-    MtohTokens,
-    
-    MTOH_TOKENS
-);
-// clang-format on
+#include <memory>
 
-PXR_NAMESPACE_CLOSE_SCOPE
+namespace MAYAHYDRA_NS_DEF {
+
+class PickHandler;
+
+using PickHandlerPtr      = std::shared_ptr<PickHandler>;
+using PickHandlerConstPtr = std::shared_ptr<const PickHandler>;
+
+}
+
+#endif

@@ -34,7 +34,10 @@ target_sources(${TARGET_NAME}
         testMeshAdapterTransform.cpp
         testFlowViewportAPIFilterPrims.cpp
         testSceneCorrectness.cpp
+        testSelection.cpp
         testPrimInstancing.cpp
+        testPathMapperRegistry.cpp
+        testPickHandlerRegistry.cpp
         testPicking.cpp
         testUsdAnim.cpp
         testUsdPointInstancePicking.cpp

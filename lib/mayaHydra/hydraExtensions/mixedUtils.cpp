@@ -21,6 +21,7 @@
 
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/hydraUtils.h>
+#include <mayaHydraLib/tokens.h>
 
 #include <maya/MDagPath.h>
 #include <maya/MGlobal.h>
@@ -112,7 +113,7 @@ SdfPath RenderItemToSdfPath(const MRenderItem& ri, const bool stripNamespaces)
     return sdfPath;
 }
 
-bool getRGBAColorPreferenceValue(const std::string& colorName, PXR_NS::GfVec4f& outColor)
+bool getRGBAColorPreferenceValue(const std::string& colorName, GfVec4f& outColor)
 {
     MDoubleArray rgbaColorValues;
     bool         wasCommandSuccessful = MGlobal::executeCommand(
@@ -146,7 +147,7 @@ bool getIndexedColorPreferenceIndex(
 bool getColorPreferencesPaletteColor(
     const std::string& tableName,
     size_t             index,
-    PXR_NS::GfVec4f&   outColor)
+    GfVec4f&   outColor)
 {
     MDoubleArray rgbColorValues;
     std::string  getColorCommand = "colorIndex -q -" + tableName + " " + std::to_string(index);
@@ -165,7 +166,7 @@ bool getColorPreferencesPaletteColor(
 bool getIndexedColorPreferenceValue(
     const std::string& colorName,
     const std::string& tableName,
-    PXR_NS::GfVec4f&   outColor)
+    GfVec4f&   outColor)
 {
     size_t colorIndex = 0;
     if (getIndexedColorPreferenceIndex(colorName, tableName, colorIndex)) {
@@ -174,11 +175,50 @@ bool getIndexedColorPreferenceValue(
     return false;
 }
 
+SdfPath sceneIndexPathPrefix(
+    const HdSceneIndexBaseRefPtr& sceneIndex,
+    MObject&                      mayaNode
+)
+{
+    constexpr char kSceneIndexPluginSuffix[] = {"_PluginNode"};
+    MFnDependencyNode dependNodeFn(mayaNode);
+    // To match plugin TfType registration, name must begin with upper case.
+    const auto sceneIndexPluginName = [&](){
+        std::string name = dependNodeFn.typeName().asChar();
+        name[0] = toupper(name[0]);
+        name += kSceneIndexPluginSuffix;
+        return TfToken(name);}();
+
+    // Create a unique scene index path prefix by starting with the
+    // Dag node name, and checking for uniqueness under the scene
+    // index plugin parent rprim.  If not unique, add an
+    // incrementing numerical suffix until it is.
+    const auto sceneIndexPluginPath = SdfPath::AbsoluteRootPath().AppendChild(sceneIndexPluginName);
+    const auto newName = uniqueChildName(
+        sceneIndex,
+        sceneIndexPluginPath,
+        SanitizeNameForSdfPath(dependNodeFn.name().asChar())
+    );
+
+    return sceneIndexPluginPath.AppendChild(newName);
+}
+
 PXR_NS::GfVec4f getPreferencesColor(const PXR_NS::TfToken& token)
 {
     PXR_NS::GfVec4f color;
     Fvp::ColorPreferences::getInstance().getColor(token, color);
     return color;
+}
+
+PXR_NS::TfToken GetGeomSubsetsPickMode()
+{
+    static const MString kOptionVarName(MayaHydraPickOptionVars->GeomSubsetsPickMode.GetText());
+
+    if (MGlobal::optionVarExists(kOptionVarName)) {
+        return TfToken(MGlobal::optionVarStringValue(kOptionVarName).asChar());
+    }
+
+    return GeomSubsetsPickModeTokens->None;
 }
 
 } // namespace MAYAHYDRA_NS_DEF
