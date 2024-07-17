@@ -19,6 +19,12 @@
 #include "flowViewport/fvpUtils.h"
 
 #include "flowViewport/debugCodes.h"
+#include <pxr/base/gf/vec3f.h>
+#include <pxr/base/vt/array.h>
+#include <pxr/imaging/hd/dataSource.h>
+#include <pxr/imaging/hd/dataSourceLocator.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
 
 #if PXR_VERSION >= 2403
 #include <pxr/imaging/hd/geomSubsetSchema.h>
@@ -587,6 +593,11 @@ WireframeSelectionHighlightSceneIndex::_TrimMeshForSelectedGeomSubsets(const HdC
     if (!meshTopologySchema.IsDefined()) {
         return originalDataSource;
     }
+    HdDataSourceLocator pointsValueLocator = HdDataSourceLocator(HdPrimvarsSchemaTokens->primvars, HdPrimvarsSchemaTokens->points, HdPrimvarSchemaTokens->primvarValue);
+    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(originalDataSource, pointsValueLocator));
+    if (!pointsValueDataSource) {
+        return originalDataSource;
+    }
 
     // Collect faces to keep based on selected GeomSubsets
     std::unordered_set<int> faceIndicesToKeep;
@@ -622,6 +633,7 @@ WireframeSelectionHighlightSceneIndex::_TrimMeshForSelectedGeomSubsets(const HdC
     VtArray<int> originalFaceVertexIndices = meshTopologySchema.GetFaceVertexIndices()->GetTypedValue(0);
     VtArray<int> trimmedFaceVertexCounts;
     VtArray<int> trimmedFaceVertexIndices;
+    int maxVertexIndex = 0;
     size_t iFaceCounts = 0;
     size_t iFaceIndices = 0;
     while (iFaceCounts < originalFaceVertexCounts.size() && iFaceIndices < originalFaceVertexIndices.size()) {
@@ -630,7 +642,11 @@ WireframeSelectionHighlightSceneIndex::_TrimMeshForSelectedGeomSubsets(const HdC
         if (faceIndicesToKeep.find(iFaceCounts) != faceIndicesToKeep.end()) {
             trimmedFaceVertexCounts.push_back(currFaceCount);
             for (int faceIndicesOffset = 0; faceIndicesOffset < currFaceCount; faceIndicesOffset++) {
-                trimmedFaceVertexIndices.push_back(originalFaceVertexIndices[iFaceIndices + faceIndicesOffset]);
+                int vertexIndex = originalFaceVertexIndices[iFaceIndices + faceIndicesOffset];
+                trimmedFaceVertexIndices.push_back(vertexIndex);
+                if (vertexIndex > maxVertexIndex) {
+                    maxVertexIndex = vertexIndex;
+                }
             }
         }
 
@@ -642,6 +658,10 @@ WireframeSelectionHighlightSceneIndex::_TrimMeshForSelectedGeomSubsets(const HdC
     
     dataSourceEditor.Set(faceVertexCountsLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexCounts));
     dataSourceEditor.Set(faceVertexIndicesLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexIndices));
+
+    auto points = pointsValueDataSource->GetTypedValue(0);
+    points.resize(maxVertexIndex + 1);
+    dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
 
     return dataSourceEditor.Finish();
 }
