@@ -623,7 +623,7 @@ WireframeSelectionHighlightSceneIndex::_TrimMeshForSelectedGeomSubsets(const HdC
         }
     }
     if (faceIndicesToKeep.empty()) {
-        // If there no selected geomSubsets, don't trim the mesh.
+        // If there are no selected geomSubsets, don't trim the mesh.
         return originalDataSource;
     }
 
