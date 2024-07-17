@@ -1211,6 +1211,11 @@ MStatus MtohRenderOverride::Render(
     }
 
     if (_defaultMaterialSceneIndex && _useDefaultMaterial != currentUseDefaultMaterial){
+        // Create default material data when switching to the default material in the viewport
+        if (_mayaHydraSceneIndex && !_mayaHydraSceneIndex->GetDefaultMaterialAlreadyCreated()) {
+            _mayaHydraSceneIndex->CreateMayaDefaultMaterialData();
+        }
+    
         _defaultMaterialSceneIndex->Enable(currentUseDefaultMaterial);
         _useDefaultMaterial = currentUseDefaultMaterial;
     }
@@ -1570,20 +1575,9 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _lastFilteringSceneIndexBeforeCustomFiltering = _pruneTexturesSceneIndex = 
     Fvp::PruneTexturesSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
 
-    //Create default material data when switching to the default material in the viewport
-    SdfPath defaultMaterialPath;
-    if (_mayaHydraSceneIndex){
-        defaultMaterialPath = _mayaHydraSceneIndex->GetDefaultMaterialPath();
-        if (defaultMaterialPath.IsEmpty()){
-            _mayaHydraSceneIndex->CreateMayaDefaultMaterialData();
-            defaultMaterialPath = _mayaHydraSceneIndex->GetDefaultMaterialPath();
-            TF_VERIFY(! defaultMaterialPath.IsEmpty());
-        }
-    }
-    
     // Add default material scene index
     _lastFilteringSceneIndexBeforeCustomFiltering = _defaultMaterialSceneIndex = Fvp::DefaultMaterialSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
-                                                                                defaultMaterialPath,
+                                                                                _mayaHydraSceneIndex ? _mayaHydraSceneIndex->GetDefaultMaterialPath() : SdfPath(),
                                                                                 _mayaHydraSceneIndex ? _mayaHydraSceneIndex->GetDefaultMaterialExclusionPaths(): SdfPathVector());
 
     const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();

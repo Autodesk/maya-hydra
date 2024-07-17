@@ -443,9 +443,11 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
     static std::once_flag once;
     std::call_once(once, []() {
         _mayaDefaultLightPath = SdfPath::AbsoluteRootPath().AppendChild(_tokens->DefaultMayaLight);
-        _mayaFacesSelectionMaterialPath = SdfPath::AbsoluteRootPath().AppendChild(
+        MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath = SdfPath::AbsoluteRootPath().AppendChild(
             _tokens->MayaFacesSelectionMaterial);
-        
+        MayaHydraSceneIndex::_mayaDefaultMaterialPath = SdfPath::AbsoluteRootPath().AppendChild(
+            _tokens->MayaDefaultMaterial); // Is an absolute path, not linked to a scene index
+
         _fallbackMaterial = SdfPath::EmptyPath(); // Empty path for hydra fallback material
     });
 
@@ -473,9 +475,9 @@ void MayaHydraSceneIndex::RemoveCallbacksAndDeleteAdapters()
     //Remove global materials
     if (_mayaDefaultMaterialFallback.IsHolding<HdMaterialNetworkMap>()){
         //Remove the fallback material in case it was created
-        RemovePrims({ { _mayaFacesSelectionMaterialPath, _mayaDefaultMaterialPath} }); 
+        RemovePrims({ { MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath, MayaHydraSceneIndex::_mayaDefaultMaterialPath} }); 
     }else{
-        RemovePrims({ { _mayaFacesSelectionMaterialPath} }); 
+        RemovePrims({ { MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath} }); 
     }
 
     for (auto callback : _callbacks) {
@@ -698,10 +700,6 @@ VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
 //Create the default material from the "standardsurface1" maya material or create a fallback material if it cannot be found
 void MayaHydraSceneIndex::CreateMayaDefaultMaterialData() 
 { 
-    //Create its SdfPath
-    _mayaDefaultMaterialPath = SdfPath::AbsoluteRootPath().AppendChild(
-        _tokens->MayaDefaultMaterial); // Is an absolute path, not linked to a scene index
-
     // Try to get the standardsurface1 material
     MObject defaultShaderObj = getStandardSurfaceShader();
     bool defaultMaterialSuccessfullyCreated = false;
@@ -709,21 +707,24 @@ void MayaHydraSceneIndex::CreateMayaDefaultMaterialData()
         //Get its shading group as it is what we use to create a material adapter
         MObject defaultMaterialShadingGroupObj = getShadingGroup(defaultShaderObj);
         if (MObjectHandle(defaultMaterialShadingGroupObj).isValid()) {
-            defaultMaterialSuccessfullyCreated = _CreateMaterial(_mayaDefaultMaterialPath, defaultMaterialShadingGroupObj);
+            defaultMaterialSuccessfullyCreated = _CreateMaterial(MayaHydraSceneIndex::_mayaDefaultMaterialPath, defaultMaterialShadingGroupObj);
         }
     }
 
     if (! defaultMaterialSuccessfullyCreated){
+        TF_CODING_WARNING("standardSurface1 material and its shading group could not be retrieved, using a fallback material");
         // In case we could not create the default material from the standardsurface1 material, we
         // create a fallback material
         _mayaDefaultMaterialFallback = MayaHydraSceneIndex::_CreateDefaultMaterialFallback();
 
         auto mayaHydraDefaultMaterialDataSource = MayaHydraMaterialDataSource::New(
-            _mayaDefaultMaterialPath, HdPrimTypeTokens->material, this);
-        AddPrims({ { _mayaDefaultMaterialPath,
+            MayaHydraSceneIndex::_mayaDefaultMaterialPath, HdPrimTypeTokens->material, this);
+        AddPrims({ { MayaHydraSceneIndex::_mayaDefaultMaterialPath,
                      HdPrimTypeTokens->material,
                      mayaHydraDefaultMaterialDataSource } });
     }
+
+    _defaultMaterialCreated = true;
 }
 
 Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) const
