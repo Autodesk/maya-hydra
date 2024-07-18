@@ -168,27 +168,27 @@ private:
     const SelectionConstPtr   _selection;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 
-    // The following three data members (_selectionHighlightMirrorsByInstancer, _selectionHighlightMirrorUseCounters and 
-    // _instancerHighlightUsersByInstancer) hold the data required to properly manage the selection highlight mirror graph/hierarchy.
+    // The following three data members (_selectionHighlightMirrorsByPrim, _selectionHighlightMirrorUseCounters and 
+    // _selectionHighlightUsersByPrim) hold the data required to properly manage the selection highlight mirror graph/hierarchy.
     // A potential idea to support multiple wireframe colors for point instancer and instance selections could be to use
     // a different mirror hierarchy for each color; in such a case, we could wrap these data members in a struct, and have 
     // one instance of this new struct for each differently colored selection highlight mirror hierarchy.
 
-    // Maps an instancer's path to its required selection highlight mirror paths.
-    std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _selectionHighlightMirrorsByInstancer;
+    // Maps a prim's path to its required selection highlight mirror paths.
+    std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _selectionHighlightMirrorsByPrim;
 
-    // "Ref-counting" of selection highlight mirror prims, which are shared across instancer highlights.
+    // "Ref-counting" of selection highlight mirror prims, which are shared across prim highlights.
     std::unordered_map<PXR_NS::SdfPath, size_t, PXR_NS::SdfPath::Hash> _selectionHighlightMirrorUseCounters;
 
-    // Tracks which prims contributes to using this instancer's selection highlight.
-    // Why? Suppose the following scenario : we have two selections that each would lead to highlighting the same instancer.
-    // Since both would increment the use counts of the instancer's corresponding selection highlight mirrors, we would
+    // Tracks which prims contributes to using this prim's selection highlight. (including itself?)
+    // Why? Suppose the following scenario : we have two selections that each would lead to highlighting the same prim.
+    // Since both would increment the use counts of the prim's corresponding selection highlight mirrors, we would
     // need to also decrement the use counts symetrically. However, what happens if we receive a PrimRemoved notification
-    // on a parent prim (of all contributing selected prims and the instancer itself)? We couldn't just decrement the
-    // instancer's selection highlight mirrors by one, or they could end up floating around in memory forever. However, 
-    // we would have no way of knowing how many times this instancer actually uses its selection highlight mirrors. 
-    // Keeping track of which selected prims contribute to the instancer's highlight solves this problem.
-    std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _instancerHighlightUsersByInstancer;
+    // on a parent prim (of all contributing selected prims and the prim itself)? We couldn't just decrement the
+    // prim's selection highlight mirrors by one, or they could end up floating around in memory forever. However, 
+    // we would have no way of knowing how many times this prim actually uses its selection highlight mirrors. 
+    // Keeping track of which selected prims contribute to the prim's highlight solves this problem.
+    std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _selectionHighlightUsersByPrim;
 };
 
 }
