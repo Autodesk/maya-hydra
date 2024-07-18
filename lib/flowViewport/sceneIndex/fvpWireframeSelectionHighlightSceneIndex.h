@@ -151,6 +151,8 @@ private:
         PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outAddedPrims
     );
 
+    bool _SelectionHighlightMirrorExists(const PXR_NS::SdfPath& selectionHighlightMirrorPath) const;
+
     void _IncrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath);
     void _DecrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath);
 

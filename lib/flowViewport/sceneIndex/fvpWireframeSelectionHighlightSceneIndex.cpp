@@ -346,8 +346,7 @@ WireframeSelectionHighlightSceneIndex(
 }
 
 // Computes the mask to use for an instancer's selection highlight mirror
-// based on the instancer's topology and its selections. This allows
-// highlighting only specific instances in the case of instance selections.
+// based on the instancer's topology and its selections.
 VtBoolArray
 WireframeSelectionHighlightSceneIndex::_GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionsSchema& selections) const
 {
@@ -519,8 +518,7 @@ WireframeSelectionHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath
         SdfPathVector implicitSelectionHighlightChildPaths;
         for (const auto& originalChildPath : originalChildPaths) {
             SdfPath explicitSelectionHighlightChildPath = _GetSelectionHighlightMirrorPathFromOriginal(originalChildPath);
-            if (_selectionHighlightMirrorUseCounters.find(explicitSelectionHighlightChildPath) != _selectionHighlightMirrorUseCounters.end()
-                && _selectionHighlightMirrorUseCounters.at(explicitSelectionHighlightChildPath) > 0) {
+            if (_SelectionHighlightMirrorExists(explicitSelectionHighlightChildPath)) {
                 // There already exists an explicit selection highlight mirror for this child (e.g. point instance prototypes),
                 // so don't create a duplicate implicit one.
                 continue;
@@ -536,8 +534,7 @@ WireframeSelectionHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath
     SdfPathVector additionalChildPaths;
     for (const auto& childPath : childPaths) {
         SdfPath selectionHighlightPath = _GetSelectionHighlightMirrorPathFromOriginal(childPath);
-        if (_selectionHighlightMirrorUseCounters.find(selectionHighlightPath) != _selectionHighlightMirrorUseCounters.end() 
-            && _selectionHighlightMirrorUseCounters.at(selectionHighlightPath) > 0) {
+        if (_SelectionHighlightMirrorExists(selectionHighlightPath)) {
             additionalChildPaths.push_back(selectionHighlightPath);
         }
     }
@@ -880,8 +877,7 @@ WireframeSelectionHighlightSceneIndex::GetSelectionHighlightPath(const SdfPath& 
     auto ancestorsRange = path.GetAncestorsRange();
     for (auto ancestor : ancestorsRange) {
         const SdfPath mirrorPath = _GetSelectionHighlightMirrorPathFromOriginal(ancestor);
-        if (_selectionHighlightMirrorUseCounters.find(mirrorPath) != _selectionHighlightMirrorUseCounters.end()
-            && _selectionHighlightMirrorUseCounters.at(mirrorPath) > 0) {
+        if (_SelectionHighlightMirrorExists(mirrorPath)) {
             return path.ReplacePrefix(ancestor, mirrorPath);
         }
     }
@@ -932,8 +928,7 @@ WireframeSelectionHighlightSceneIndex::_FindSelectionHighlightMirrorAncestor(con
 {
     auto ancestorsRange = path.GetAncestorsRange();
     for (auto ancestor : ancestorsRange) {
-        if (_selectionHighlightMirrorUseCounters.find(ancestor) != _selectionHighlightMirrorUseCounters.end() 
-            && _selectionHighlightMirrorUseCounters.at(ancestor) > 0) {
+        if (_SelectionHighlightMirrorExists(ancestor)) {
             return ancestor;
         }
     }
@@ -997,6 +992,13 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const P
     }
 }
 
+bool
+WireframeSelectionHighlightSceneIndex::_SelectionHighlightMirrorExists(const SdfPath& selectionHighlightMirrorPath) const
+{
+    return _selectionHighlightMirrorUseCounters.find(selectionHighlightMirrorPath) != _selectionHighlightMirrorUseCounters.end() 
+        && _selectionHighlightMirrorUseCounters.at(selectionHighlightMirrorPath) > 0;
+}
+
 void
 WireframeSelectionHighlightSceneIndex::_IncrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath)
 {
@@ -1006,7 +1008,7 @@ WireframeSelectionHighlightSceneIndex::_IncrementSelectionHighlightMirrorUseCoun
 void
 WireframeSelectionHighlightSceneIndex::_DecrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath)
 {
-    TF_AXIOM(_selectionHighlightMirrorUseCounters[selectionHighlightMirrorPath] > 0);
+    TF_AXIOM(_SelectionHighlightMirrorExists(selectionHighlightMirrorPath));
     _selectionHighlightMirrorUseCounters[selectionHighlightMirrorPath]--;
     if (_selectionHighlightMirrorUseCounters[selectionHighlightMirrorPath] == 0) {
         _selectionHighlightMirrorUseCounters.erase(selectionHighlightMirrorPath);
