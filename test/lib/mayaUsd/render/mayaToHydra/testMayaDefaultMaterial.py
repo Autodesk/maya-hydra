@@ -38,7 +38,7 @@ class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mto
             # open a Maya scene with maya mesh, usd prims and custom scene indices prims
             testFile = mayaUtils.openTestScene(
                     "testDefaultMaterial",
-                    "testMayaDefaultMaterial_Native_Usd_dataProducer.ma")
+                    "testMayaDefaultMaterial_Native_Usd_dataProducer.ma", useTestSettings=False)
             cmds.refresh()
             panel = mayaUtils.activeModelPanel()
             self.assertSnapshotClose("sceneLoaded" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
