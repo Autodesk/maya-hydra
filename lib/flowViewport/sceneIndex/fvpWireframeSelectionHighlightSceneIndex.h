@@ -154,10 +154,10 @@ private:
     void _IncrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath);
     void _DecrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath);
 
-    void _AddSelectionHighlightUser(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
-    void _RemoveSelectionHighlightUser(const PXR_NS::SdfPath& instancerPath, const PXR_NS::SdfPath& userPath);
-    void _RebuildSelectionHighlight(const PXR_NS::SdfPath& instancerPath);
-    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& instancerPath);
+    void _AddSelectionHighlightUser(const PXR_NS::SdfPath& primPath, const PXR_NS::SdfPath& userPath);
+    void _RemoveSelectionHighlightUser(const PXR_NS::SdfPath& primPath, const PXR_NS::SdfPath& userPath);
+    void _RebuildSelectionHighlight(const PXR_NS::SdfPath& primPath);
+    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& primPath);
 
     void _CreateSelectionHighlightsForInstancer(const PXR_NS::HdSceneIndexPrim& instancerPrim, const PXR_NS::SdfPath& instancerPath);
     void _CreateSelectionHighlightsForMesh(const PXR_NS::HdSceneIndexPrim& meshPrim, const PXR_NS::SdfPath& meshPath);
