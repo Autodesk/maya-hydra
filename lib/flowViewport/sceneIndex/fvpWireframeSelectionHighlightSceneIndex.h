@@ -42,8 +42,8 @@ typedef PXR_NS::TfRefPtr<const WireframeSelectionHighlightSceneIndex> WireframeS
 enum SelectionHighlightsCollectionDirection {
     None = 0,
     Prototypes = 1 << 0,
-    Instancers = 1 << 1,
-    Bidirectional = Prototypes | Instancers
+    InstancedBy = 1 << 1,
+    Bidirectional = Prototypes | InstancedBy
 };
 
 /// \class WireframeSelectionHighlightSceneIndex

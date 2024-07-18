@@ -97,7 +97,7 @@ SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim, Fvp::Sele
         }
     }
 
-    if ((direction & Fvp::SelectionHighlightsCollectionDirection::Instancers)
+    if ((direction & Fvp::SelectionHighlightsCollectionDirection::InstancedBy)
         && instancedBy.IsDefined()) {
         auto instancerPaths = instancedBy.GetPaths()->GetTypedValue(0);
         for (const auto& instancerPath : instancerPaths) {
@@ -970,7 +970,7 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const P
     // Traverse the children of this prim to find the affected child prims, and process their instancing-related
     // paths so we can create selection highlight mirrors for these prims as well.
     SdfPathVector affectedPrototypePaths;
-    SdfPathVector affectedInstancerPaths;
+    SdfPathVector affectedInstancedByPaths;
     auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
         outAddedPrims.push_back({primPath.ReplacePrefix(originalPrimPath, selectionHighlightPrimPath), prim.primType});
         if (prim.primType == HdPrimTypeTokens->instancer || prim.primType == HdPrimTypeTokens->mesh) {
@@ -978,9 +978,9 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const P
                 auto prototypePaths = _GetInstancingRelatedPaths(prim, SelectionHighlightsCollectionDirection::Prototypes);
                 affectedPrototypePaths.insert(affectedPrototypePaths.end(), prototypePaths.begin(), prototypePaths.end());
             }
-            if (direction & SelectionHighlightsCollectionDirection::Instancers) {
-                auto instancerPaths = _GetInstancingRelatedPaths(prim, SelectionHighlightsCollectionDirection::Instancers);
-                affectedInstancerPaths.insert(affectedInstancerPaths.end(), instancerPaths.begin(), instancerPaths.end());
+            if (direction & SelectionHighlightsCollectionDirection::InstancedBy) {
+                auto instancedByPaths = _GetInstancingRelatedPaths(prim, SelectionHighlightsCollectionDirection::InstancedBy);
+                affectedInstancedByPaths.insert(affectedInstancedByPaths.end(), instancedByPaths.begin(), instancedByPaths.end());
             }
             // We hit an instancing-related prim, don't process its children (nested instancing will be processed through the instancing-related paths).
             return false;
@@ -992,8 +992,8 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const P
     for (const auto& affectedPrototypePath : affectedPrototypePaths) {
         _CollectSelectionHighlightMirrors(affectedPrototypePath, SelectionHighlightsCollectionDirection::Prototypes, outSelectionHighlightMirrors, outAddedPrims);
     }
-    for (const auto& affectedInstancerPath : affectedInstancerPaths) {
-        _CollectSelectionHighlightMirrors(affectedInstancerPath, SelectionHighlightsCollectionDirection::Instancers, outSelectionHighlightMirrors, outAddedPrims);
+    for (const auto& affectedInstancedByPath : affectedInstancedByPaths) {
+        _CollectSelectionHighlightMirrors(affectedInstancedByPath, SelectionHighlightsCollectionDirection::InstancedBy, outSelectionHighlightMirrors, outAddedPrims);
     }
 }
 
@@ -1024,18 +1024,11 @@ WireframeSelectionHighlightSceneIndex::_AddSelectionHighlightUser(const PXR_NS::
         return;
     }
 
-    SelectionHighlightsCollectionDirection selectionHighlightsCollectionDirection = SelectionHighlightsCollectionDirection::None;
-    if (primType == HdPrimTypeTokens->instancer) {
-        selectionHighlightsCollectionDirection = SelectionHighlightsCollectionDirection::Bidirectional;
-    } else if (primType == HdPrimTypeTokens->mesh) {
-        selectionHighlightsCollectionDirection = SelectionHighlightsCollectionDirection::Instancers;
-    }
-
     _selectionHighlightUsersByPrim[primPath].insert(userPath);
     if (_selectionHighlightMirrorsByPrim.find(primPath) == _selectionHighlightMirrorsByPrim.end()) {
         SdfPathSet selectionHighlightMirrors;
         HdSceneIndexObserver::AddedPrimEntries addedPrims;
-        _CollectSelectionHighlightMirrors(primPath, selectionHighlightsCollectionDirection, selectionHighlightMirrors, addedPrims);
+        _CollectSelectionHighlightMirrors(primPath, SelectionHighlightsCollectionDirection::Bidirectional, selectionHighlightMirrors, addedPrims);
 
         _selectionHighlightMirrorsByPrim[primPath] = selectionHighlightMirrors;
         for (const auto& selectionHighlightMirror : _selectionHighlightMirrorsByPrim[primPath]) {
