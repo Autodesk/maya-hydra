@@ -19,12 +19,6 @@
 #include "flowViewport/fvpUtils.h"
 
 #include "flowViewport/debugCodes.h"
-#include <pxr/base/gf/vec3f.h>
-#include <pxr/base/vt/array.h>
-#include <pxr/imaging/hd/dataSource.h>
-#include <pxr/imaging/hd/dataSourceLocator.h>
-#include <pxr/imaging/hd/primvarsSchema.h>
-#include <pxr/imaging/hd/retainedDataSource.h>
 
 #if PXR_VERSION >= 2403
 #include <pxr/imaging/hd/geomSubsetSchema.h>
