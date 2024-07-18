@@ -659,7 +659,7 @@ WireframeSelectionHighlightSceneIndex::_TrimMeshForSelectedGeomSubsets(const HdC
 
     // We reduce the points primvar so that it has only the exact number of points required by the trimmed topology;
     // this avoids a warning from USD.
-    auto points = pointsValueDataSource->GetTypedValue(0);
+    VtArray<GfVec3f> points = pointsValueDataSource->GetTypedValue(0);
     points.resize(maxVertexIndex + 1);
     dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
 
