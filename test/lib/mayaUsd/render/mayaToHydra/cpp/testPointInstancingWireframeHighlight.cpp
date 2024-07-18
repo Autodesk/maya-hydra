@@ -124,7 +124,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
         // Validate scene structure
         EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
         auto selectionHighlightPath = getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath, selectionHighlightMirrorTag);
-        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag);
+        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag, HdReprTokens->refinedWire);
     };
     
     testInstancerDirectHighlightFn(topInstancerItem, topInstancerPath);
@@ -140,7 +140,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
         // Validate scene structure
         EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
         auto selectionHighlightPath = getSelectionHighlightMirrorPathFromOriginal(instancerPrimPaths.front(), selectionHighlightMirrorTag);
-        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag);
+        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag, HdReprTokens->refinedWire);
     };
     auto testInstancerNoHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
         auto instancerPrimPaths = fvpMergingSceneIndex->SceneIndexPaths(instancerPath);
@@ -229,7 +229,7 @@ TEST(PointInstancingWireframeHighlight, instance)
         // Validate scene structure
         EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
         auto selectionHighlightPath = getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath, selectionHighlightMirrorTag);
-        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag);
+        assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag, HdReprTokens->refinedWire);
 
         // Get the selection highlight instancer's mask
         HdSceneIndexPrim instancerHighlightPrim = inspector.GetSceneIndex()->GetPrim(
@@ -306,7 +306,7 @@ TEST(PointInstancingWireframeHighlight, prototype)
         EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
         for (const auto& prototypePrimSelection : prototypePrimSelections) {
             auto selectionHighlightPath = getSelectionHighlightMirrorPathFromOriginal(prototypePrimSelection.primPath, selectionHighlightMirrorTag);
-            assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag);
+            assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag, HdReprTokens->refinedWire);
         }
 
         // Ensure the accumulated selected paths correspond to the intended/translated paths

@@ -445,7 +445,11 @@ QPoint getPrimMouseCoords(const HdSceneIndexPrim& prim, M3dView& view)
 // This method takes in a path to a prim in a selection highlight hierarchy and ensures that 
 // the selection highlight graph is structured properly, and that the leaf mesh prims have
 // the proper display style.
-void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath, const std::string& selectionHighlightMirrorTag)
+void assertSelectionHighlightCorrectness(
+    const HdSceneIndexBaseRefPtr& sceneIndex,
+    const SdfPath& primPath,
+    const std::string& selectionHighlightMirrorTag,
+    const TfToken& leafDisplayStyle)
 {
     auto getHierarchyRoots = [](const HdSceneIndexPrim& prim) -> VtArray<SdfPath> {
         HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
@@ -489,14 +493,14 @@ void assertSelectionHighlightCorrectness(const HdSceneIndexBaseRefPtr& sceneInde
                 // Ensure prototype is a selection highlight mirror
                 ASSERT_GT(prototypeName.size(), selectionHighlightMirrorTag.size());
                 EXPECT_EQ(prototypeName.substr(prototypeName.size() - selectionHighlightMirrorTag.size()), selectionHighlightMirrorTag);
-                assertSelectionHighlightCorrectness(sceneIndex, prototypePath, selectionHighlightMirrorTag);
+                assertSelectionHighlightCorrectness(sceneIndex, prototypePath, selectionHighlightMirrorTag, leafDisplayStyle);
             }
             itPrim.SkipDescendants();
             continue;
         }
 
         if (currPrim.primType == HdPrimTypeTokens->mesh) {
-            EXPECT_EQ(getRefinedReprToken(currPrim), HdReprTokens->refinedWire);
+            EXPECT_EQ(getRefinedReprToken(currPrim), leafDisplayStyle);
         }
     }
 }

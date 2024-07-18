@@ -474,7 +474,8 @@ QPoint getPrimMouseCoords(const PXR_NS::HdSceneIndexPrim& prim, M3dView& view);
 void assertSelectionHighlightCorrectness(
     const PXR_NS::HdSceneIndexBaseRefPtr& sceneIndex,
     const PXR_NS::SdfPath& primPath,
-    const std::string& selectionHighlightMirrorTag);
+    const std::string& selectionHighlightMirrorTag,
+    const PXR_NS::TfToken& leafDisplayStyle);
 
 } // namespace MAYAHYDRA_NS_DEF
 

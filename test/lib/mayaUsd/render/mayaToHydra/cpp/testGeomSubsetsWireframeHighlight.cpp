@@ -109,10 +109,10 @@ void testGeomSubsetHighlight(const Ufe::Path& geomSubsetPath)
         ASSERT_EQ(meshHighlightInstancedBySchema.IsDefined(), meshInstancedBySchema.IsDefined());
         if (meshHighlightInstancedBySchema.IsDefined()) {
             for (const auto& instancerPath : meshHighlightInstancedBySchema.GetPaths()->GetTypedValue(0)) {
-                assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), instancerPath, selectionHighlightMirrorTag);
+                assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), instancerPath, selectionHighlightMirrorTag, HdReprTokens->refinedWire);
             }
         } else {
-            assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), meshHighlightPath, selectionHighlightMirrorTag);
+            assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), meshHighlightPath, selectionHighlightMirrorTag, HdReprTokens->refinedWire);
         }
         EXPECT_TRUE(dataSourceMatchesReference(
             HdContainerDataSource::Get(meshHighlightPrim.dataSource, HdMeshSchema::GetTopologyLocator()),
