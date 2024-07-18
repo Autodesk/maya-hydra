@@ -167,6 +167,22 @@ bool SetNodeAttribute(MObject node, std::string attrName, AttrType newValue)
     return plug.setValue(newValue);
 }
 
+/**
+ * @brief Get the shading group MObject from a shader MObject.
+ *
+ * @param[in] shader is the MObject of the shader
+ *
+ * @return the MObject of the shading group
+ */
+MObject GetShadingGroupFromShader(const MObject& shader);
+
+/**
+ * @brief Get the default standard surface shader MObject (named "standardSurface1").
+ *
+ * @return the MObject of the "standardSurface1" shader
+ */
+MObject GetDefaultStandardSurfaceShader();
+
 } // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRALIB_MAYA_UTILS_H

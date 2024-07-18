@@ -21,6 +21,7 @@
 #include <maya/MGlobal.h>
 #include <maya/MMatrix.h>
 #include <maya/MPlug.h>
+#include <maya/MPlugArray.h>
 #include <maya/MSelectionList.h>
 #include <maya/MObjectArray.h>
 #include <maya/MFnAttribute.h>
@@ -156,6 +157,45 @@ bool IsAMayaVisibilityAttribute(const MPlug& plug, bool& outVal)
         plug.getValue(outVal);
     }
     return isVisibility;
+}
+
+MObject GetShadingGroupFromShader(const MObject& shader)
+{
+    MObject           shadingGroup;
+    MFnDependencyNode fn(shader);
+
+    // Get the "outColor" plug of the shader
+    MPlug outColorPlug = fn.findPlug("outColor", true);
+
+    // Get the connected plugs
+    MPlugArray connectedPlugs;
+    outColorPlug.connectedTo(connectedPlugs, false, true);
+
+    // Loop over the connected plugs
+    for (unsigned int i = 0; i < connectedPlugs.length(); ++i) {
+        MObject node = connectedPlugs[i].node();
+        if (node.apiType() == MFn::kShadingEngine) // Check if the node is a shading group
+        {
+            shadingGroup = node;
+            break;
+        }
+    }
+
+    return shadingGroup;
+}
+
+MObject GetDefaultStandardSurfaceShader()
+{
+    MSelectionList list;
+    MObject        node;
+
+    // Add the shader to the selection list
+    list.add("standardSurface1");
+
+    // Get the shader as an MObject
+    list.getDependNode(0, node);
+
+    return node;
 }
 
 } // namespace MAYAHYDRA_NS_DEF

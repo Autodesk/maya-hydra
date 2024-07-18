@@ -389,44 +389,6 @@ namespace {
         sActiveFacesName(L"PolyActiveFaces"); // When we have a render item which is a selection of
                                               // faces, it always has this name in maya.
 
-    MObject getShadingGroup(const MObject& shader)
-    {
-        MObject           shadingGroup;
-        MFnDependencyNode fn(shader);
-
-        // Get the "outColor" plug of the shader
-        MPlug outColorPlug = fn.findPlug("outColor", true);
-
-        // Get the connected plugs
-        MPlugArray connectedPlugs;
-        outColorPlug.connectedTo(connectedPlugs, false, true);
-
-        // Loop over the connected plugs
-        for (unsigned int i = 0; i < connectedPlugs.length(); ++i) {
-            MObject node = connectedPlugs[i].node();
-            if (node.apiType() == MFn::kShadingEngine) // Check if the node is a shading group
-            {
-                shadingGroup = node;
-                break;
-            }
-        }
-
-        return shadingGroup;
-    }
-
-    MObject getStandardSurfaceShader()
-    {
-        MSelectionList list;
-        MObject        node;
-
-        // Add the shader to the selection list
-        list.add("standardSurface1");
-
-        // Get the shader as an MObject
-        list.getDependNode(0, node);
-
-        return node;
-    }
 }
 
 MayaHydraSceneIndex::MayaHydraSceneIndex(
@@ -701,11 +663,12 @@ VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
 void MayaHydraSceneIndex::CreateMayaDefaultMaterialData() 
 { 
     // Try to get the standardsurface1 material
-    MObject defaultShaderObj = getStandardSurfaceShader();
+    MObject defaultShaderObj = GetDefaultStandardSurfaceShader(); // From mayautils.cpp
     bool defaultMaterialSuccessfullyCreated = false;
     if (MObjectHandle(defaultShaderObj).isValid()) {
         //Get its shading group as it is what we use to create a material adapter
-        MObject defaultMaterialShadingGroupObj = getShadingGroup(defaultShaderObj);
+        MObject defaultMaterialShadingGroupObj
+            = GetShadingGroupFromShader(defaultShaderObj); // From mayautils.cpp
         if (MObjectHandle(defaultMaterialShadingGroupObj).isValid()) {
             defaultMaterialSuccessfullyCreated = _CreateMaterial(MayaHydraSceneIndex::_mayaDefaultMaterialPath, defaultMaterialShadingGroupObj);
         }
