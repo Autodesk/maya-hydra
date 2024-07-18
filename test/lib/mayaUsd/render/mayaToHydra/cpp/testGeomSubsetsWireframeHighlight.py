@@ -25,7 +25,7 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def loadUsdScene(self):
-        usdScenePath = testUtils.getTestScene('testGeomSubsetsPicking', 'GeomSubsetsPickingTestScene.usda')
+        usdScenePath = testUtils.getTestScene('testGeomSubsetsWireframeHighlight', 'GeomSubsetsWireframeHighlightTestScene.usda')
         usdUtils.createStageFromFile(usdScenePath)
 
     def setUp(self):
@@ -34,9 +34,6 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(clear=True)
         cmds.optionVar(
                 sv=('mayaHydra_GeomSubsetsPickMode', 'Faces'))
-        # Used to ensure the fallback picking behavior works when clicking on a non-GeomSubset
-        cmds.optionVar(
-                sv=('mayaUsd_PointInstancesPickMode', 'Prototypes'))
         cmds.setAttr('persp.translate', 0, 0, 15, type='float3')
         cmds.setAttr('persp.rotate', 0, 0, 0, type='float3')
         cmds.refresh()
