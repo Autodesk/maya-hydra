@@ -31,13 +31,6 @@ namespace{
     static const TfToken purposes[] = { HdMaterialBindingsSchemaTokens->allPurpose };
 }
 
-TF_DEFINE_PRIVATE_TOKENS(
-    _tokens,
-    (UsdPreviewSurface)
-    (ND_standard_surface_surfaceshader)
-    (MayaDefaultMaterial)
-);
-
 // static
 DefaultMaterialSceneIndexRefPtr
 DefaultMaterialSceneIndex::New(
