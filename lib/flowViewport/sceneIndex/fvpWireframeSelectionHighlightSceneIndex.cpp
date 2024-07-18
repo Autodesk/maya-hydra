@@ -382,6 +382,10 @@ WireframeSelectionHighlightSceneIndex::_GetSelectionHighlightMask(const HdInstan
     }();
 
     if (!selections.IsDefined()) {
+        // There are no selections on this instancer highlight mirror; this means it was created 
+        // in order to propagate the selection highlight mirror of at least one of its prototypes.
+        // Since we don't want to highlight non-selected prototypes, hide all instances for which`
+        // their prototype has no selection highlight.
         auto protos = 
 #if HD_API_VERSION < 66
         const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetPrototypes()->GetTypedValue(0);
