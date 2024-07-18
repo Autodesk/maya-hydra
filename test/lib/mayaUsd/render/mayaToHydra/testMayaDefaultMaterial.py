@@ -18,6 +18,7 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 import mayaUtils
+from testUtils import PluginLoaded
 
 class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -28,18 +29,19 @@ class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mto
 
     def test_MayaDefaultMaterial(self):
 
-        # open a Maya scene with maya mesh, usd prims and custom scene indices prims
-        testFile = mayaUtils.openTestScene(
-                "TestDefaultMaterial",
-                "testMayaDefaultMaterial_Native+Usd+dataProducer.ma", useTestSettings=False)
-        cmds.refresh()
-        panel = mayaUtils.activeModelPanel()
-        self.assertSnapshotClose("sceneLoaded" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
+        with PluginLoaded('mayaHydraFlowViewportAPILocator'):
+            # open a Maya scene with maya mesh, usd prims and custom scene indices prims
+            testFile = mayaUtils.openTestScene(
+                    "TestDefaultMaterial",
+                    "testMayaDefaultMaterial_Native+Usd+dataProducer.ma", useTestSettings=False)
+            cmds.refresh()
+            panel = mayaUtils.activeModelPanel()
+            self.assertSnapshotClose("sceneLoaded" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
         
-        #Use Default Material
-        cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
-        cmds.refresh()
-        self.assertSnapshotClose("defaultMaterial" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
+            #Use Default Material
+            cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
+            cmds.refresh()
+            self.assertSnapshotClose("defaultMaterial" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
     
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
