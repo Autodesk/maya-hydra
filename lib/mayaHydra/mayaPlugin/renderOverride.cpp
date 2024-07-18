@@ -1173,7 +1173,7 @@ MStatus MtohRenderOverride::Render(
         _mayaHydraSceneIndex->SetParams(delegateParams);
         _mayaHydraSceneIndex->PreFrame(drawContext);
         
-        if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle, currentUseDefaultMaterial, xRayEnabled)){
+        if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle, xRayEnabled)){
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(true);//Prevent prim removal propagation to keep the current selection.
             //We need to recreate the filtering scene index chain after the merging scene index as there was a change such as in the BBox display style which has been turned on or off.
             _lastFilteringSceneIndexBeforeCustomFiltering = nullptr;//Release
@@ -1193,7 +1193,6 @@ MStatus MtohRenderOverride::Render(
             manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
             
             _xRayEnabled = xRayEnabled;
-            _useDefaultMaterial = currentUseDefaultMaterial;
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(false);//Allow prim removal propagation again.
         }
     }
@@ -1209,6 +1208,16 @@ MStatus MtohRenderOverride::Render(
         _currentlyTextured != isTextured) {
         _pruneTexturesSceneIndex->MarkTexturesDirty(isTextured);
         _currentlyTextured = isTextured;
+    }
+
+    if (_defaultMaterialSceneIndex && _useDefaultMaterial != currentUseDefaultMaterial){
+        // Create default material data when switching to the default material in the viewport
+        if (_mayaHydraSceneIndex && !_mayaHydraSceneIndex->DefaultMaterialCreated()) {
+            _mayaHydraSceneIndex->CreateMayaDefaultMaterialData();
+        }
+    
+        _defaultMaterialSceneIndex->Enable(currentUseDefaultMaterial);
+        _useDefaultMaterial = currentUseDefaultMaterial;
     }
 
     HdxRenderTaskParams params;
@@ -1513,6 +1522,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 
     _displayStyleSceneIndex = nullptr;
     _pruneTexturesSceneIndex = nullptr;
+    _defaultMaterialSceneIndex = nullptr;
     _currentlyTextured = false;
     _selectionSceneIndex.Reset();
     _selection.reset();
@@ -1564,6 +1574,11 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     // Add texture disabling Scene Index
     _lastFilteringSceneIndexBeforeCustomFiltering = _pruneTexturesSceneIndex = 
     Fvp::PruneTexturesSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+
+    // Add default material scene index
+    _lastFilteringSceneIndexBeforeCustomFiltering = _defaultMaterialSceneIndex = Fvp::DefaultMaterialSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
+                                                                                _mayaHydraSceneIndex ? _mayaHydraSceneIndex->GetDefaultMaterialPath() : SdfPath(),
+                                                                                _mayaHydraSceneIndex ? _mayaHydraSceneIndex->GetDefaultMaterialExclusionPaths(): SdfPathVector());
 
     const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
     const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
@@ -2107,17 +2122,13 @@ void MtohRenderOverride::_RenderOverrideChangedCallback(
 }
 
 // return true if we need to recreate the filtering scene indices chain because of a change, false otherwise.
-bool MtohRenderOverride::_NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool currentUseDefaultMaterial, bool xRayEnabled)
+bool MtohRenderOverride::_NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool xRayEnabled)
 {
     if (areDifferentForOneOfTheseBits(currentDisplayStyle, _oldDisplayStyle, 
             MHWRender::MFrameContext::kGouraudShaded    | 
             MHWRender::MFrameContext::kWireFrame        | 
             MHWRender::MFrameContext::kBoundingBox      )
         ){
-        return true;
-    }
-    
-    if (_useDefaultMaterial != currentUseDefaultMaterial){
         return true;
     }
     

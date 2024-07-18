@@ -46,6 +46,7 @@
 #include <flowViewport/selection/fvpSelectionFwd.h>
 #include <flowViewport/sceneIndex/fvpDisplayStyleOverrideSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruneTexturesSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpDefaultMaterialSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
@@ -201,7 +202,7 @@ private:
 
     void _AddPluginSelectionHighlighting();
 
-    bool _NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool currentUseDefaultMaterial, bool xRayEnabled);
+    bool _NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool xRayEnabled);
 
     bool _IsMayaPickHandler(const MtohRenderOverride::PickHandlerBase* pickHandler)const;
 
@@ -254,6 +255,7 @@ private:
     HdSceneIndexBaseRefPtr                    _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
     Fvp::DisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
     Fvp::PruneTexturesSceneIndexRefPtr        _pruneTexturesSceneIndex;
+    Fvp::DefaultMaterialSceneIndexRefPtr      _defaultMaterialSceneIndex;
     HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;

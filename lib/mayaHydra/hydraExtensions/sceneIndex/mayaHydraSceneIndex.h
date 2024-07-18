@@ -203,9 +203,15 @@ public:
 
     bool GetPlaybackRunning() const;
 
-    void SetDefaultMaterial(bool useDefMaterial);
-
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override;
+
+    //Sdfpath of the maya default material
+    SdfPath GetDefaultMaterialPath() const{return _mayaDefaultMaterialPath;}
+
+    bool DefaultMaterialCreated() const{return _defaultMaterialCreated;}
+
+    //Is the exclusion list of materials that should be skipped when using the default material
+    SdfPathVector GetDefaultMaterialExclusionPaths()const{ return {_mayaFacesSelectionMaterialPath};}
 
     // Common function to return templated sample types
     template <typename T, typename Getter>
@@ -252,6 +258,9 @@ public:
     /// Is using an environment variable to tell if we should pass normals to Hydra when using the render item and mesh adapters
     static bool passNormalsToHydra();
 
+    ///Create the default material from the "standardSurface1" maya material or create a fallback material if it cannot be found
+    void CreateMayaDefaultMaterialData();
+    
 private:
     MayaHydraSceneIndex(
         MayaHydraInitData& initData,
@@ -279,8 +288,9 @@ private:
     
     using LightDagPathMap = std::unordered_map<std::string, MDagPath>;
     LightDagPathMap _GetGlobalLightPaths() const;
-    static VtValue CreateMayaDefaultMaterial();
-    static VtValue  CreateMayaFacesSelectionMaterial();
+    
+    static VtValue  _CreateDefaultMaterialFallback();
+    static VtValue  _CreateMayaFacesSelectionMaterial();
 
     using DirtyBitsToLocatorsFunc = std::function<void(TfToken const&, const HdDirtyBits, HdDataSourceLocatorSet*)>;
     void _MarkPrimDirty(
@@ -320,14 +330,11 @@ private:
     std::vector<std::pair<MObject, LightAdapterCreator>> _lightsToAdd;
     std::vector<SdfPath> _materialTagsChanged;
 
-    bool _useDefaultMaterial = false;
+    bool _defaultMaterialCreated = false;
     static SdfPath _fallbackMaterial;
-    /// _mayaDefaultMaterialPath is common to all scene indexes, it's the SdfPath of
-    /// _mayaDefaultMaterial
+    /// _mayaDefaultMaterialPath is common to all scene indexes
     static SdfPath _mayaDefaultMaterialPath;
-    /// _mayaDefaultMaterial is a Hydra material used to override all materials from the scene when
-    /// _useDefaultMaterial is true
-    static VtValue _mayaDefaultMaterial;
+    static VtValue _mayaDefaultMaterialFallback;//Used only if we cannot find the default material named standardSurface1
 
     /// _mayaFacesSelectionMaterialPath is a path to a Hydra material used to display the faces selection on nodes when being in components selection mode
     static SdfPath _mayaFacesSelectionMaterialPath;
