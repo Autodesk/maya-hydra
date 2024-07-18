@@ -60,14 +60,8 @@
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
-namespace
-{
-    static std::mutex _adaptersToRecreateMutex;
-    static std::mutex _adaptersToRebuildMutex;
-    static const MString sActiveFacesName(L"PolyActiveFaces");//When we have a render item which is a selection of faces, it always has this name in maya.
-}
-
 PXR_NAMESPACE_OPEN_SCOPE
+
 // Bring the MayaHydra namespace into scope.
 // The following code currently lives inside the pxr namespace, but it would make more sense to 
 // have it inside the MayaHydra namespace. This using statement allows us to use MayaHydra symbols
@@ -78,15 +72,30 @@ using namespace MayaHydra;
 TF_DEFINE_ENV_SETTING(MAYA_HYDRA_USE_MESH_ADAPTER, false,
     "Use mesh adapter instead of MRenderItem for Maya meshes.");
 
-bool useMeshAdapter() {
-    static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
-    return uma;
-}
-
 TF_DEFINE_ENV_SETTING(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA, true,
     "Pass the normals to Hydra (works for both render item and mesh adapters).");
 
+TF_DEFINE_PRIVATE_TOKENS(
+    _tokens,
+
+    ((MayaDefaultMaterial, "__maya_default_material__"))(
+        (MayaFacesSelectionMaterial, "__maya_faces_selection_material__"))(
+        diffuseColor)(emissiveColor)(opacity)(roughness)(MayaHydraMeshPoints)(constantLighting)(DefaultMayaLight));
+
+SdfPath MayaHydraSceneIndex::_fallbackMaterial;
+SdfPath MayaHydraSceneIndex::_mayaDefaultMaterialPath; // Common to all scene indexes
+VtValue MayaHydraSceneIndex::_mayaDefaultMaterialFallback;//Used only if we cannot find the default material named standardSurface1
+SdfPath MayaHydraSceneIndex::_mayaDefaultLightPath;           // Common to all scene indexes
+SdfPath MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath; // Common to all scene indexes
+
 namespace {
+    
+    bool useMeshAdapter()
+    {
+        static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
+        return uma;
+    }
+
     bool filterMesh(const MRenderItem& ri) {
         return useMeshAdapter() ?
             // Filter our mesh render items, and let the mesh adapter handle Maya
@@ -373,27 +382,14 @@ namespace {
         }
         return false;
     }
+
+    std::mutex _adaptersToRecreateMutex;
+    std::mutex _adaptersToRebuildMutex;
+    const MString
+        sActiveFacesName(L"PolyActiveFaces"); // When we have a render item which is a selection of
+                                              // faces, it always has this name in maya.
+
 }
-
-TF_DEFINE_PRIVATE_TOKENS(
-    _tokens,
-
-    ((MayaDefaultMaterial, "__maya_default_material__"))
-    ((MayaFacesSelectionMaterial, "__maya_faces_selection_material__"))
-    (diffuseColor)
-    (emissiveColor)
-    (opacity)
-    (roughness)
-    (MayaHydraMeshPoints)
-    (constantLighting)
-    (DefaultMayaLight)
-);
-
-SdfPath MayaHydraSceneIndex::_fallbackMaterial;
-SdfPath MayaHydraSceneIndex::_mayaDefaultMaterialPath; // Common to all scene indexes
-VtValue MayaHydraSceneIndex::_mayaDefaultMaterial;
-SdfPath MayaHydraSceneIndex::_mayaDefaultLightPath; // Common to all scene indexes
-SdfPath MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath; // Common to all scene indexes
 
 MayaHydraSceneIndex::MayaHydraSceneIndex(
     MayaHydraInitData& initData,
@@ -408,24 +404,25 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
 {
     static std::once_flag once;
     std::call_once(once, []() {
-        _mayaDefaultMaterialPath = SdfPath::AbsoluteRootPath().AppendChild(
-            _tokens->MayaDefaultMaterial); // Is an absolute path, not linked to a scene index
         _mayaDefaultLightPath = SdfPath::AbsoluteRootPath().AppendChild(_tokens->DefaultMayaLight);
-        _mayaDefaultMaterial = MayaHydraSceneIndex::CreateMayaDefaultMaterial();
-        _mayaFacesSelectionMaterialPath = SdfPath::AbsoluteRootPath().AppendChild(
+        MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath = SdfPath::AbsoluteRootPath().AppendChild(
             _tokens->MayaFacesSelectionMaterial);
-        
+        MayaHydraSceneIndex::_mayaDefaultMaterialPath = SdfPath::AbsoluteRootPath().AppendChild(
+            _tokens->MayaDefaultMaterial); // Is an absolute path, not linked to a scene index
+
         _fallbackMaterial = SdfPath::EmptyPath(); // Empty path for hydra fallback material
     });
 
     //Always add the mayaHydraFacesSelectionMaterialDataSource to display faces selection
+    // Always Create the material since it will update the color from the preferences if it has
+    // changed.
+    _mayaFacesSelectionMaterial = MayaHydraSceneIndex::_CreateMayaFacesSelectionMaterial();
+
     auto mayaHydraFacesSelectionMaterialDataSource = MayaHydraMaterialDataSource::New(
         _mayaFacesSelectionMaterialPath, HdPrimTypeTokens->material, this);
     AddPrims({ { _mayaFacesSelectionMaterialPath,
                  HdPrimTypeTokens->material,
                  mayaHydraFacesSelectionMaterialDataSource } });
-    //Always Create the material since it will update the color from the preferences if it has changed.
-    _mayaFacesSelectionMaterial = MayaHydraSceneIndex::CreateMayaFacesSelectionMaterial();
 }
 
 MayaHydraSceneIndex::~MayaHydraSceneIndex()
@@ -437,7 +434,13 @@ MayaHydraSceneIndex::~MayaHydraSceneIndex()
 
 void MayaHydraSceneIndex::RemoveCallbacksAndDeleteAdapters()
 {
-    RemovePrims({ { _mayaFacesSelectionMaterialPath} }); //Remove _mayaFacesSelectionMaterialPath used to display faces selection
+    //Remove global materials
+    if (_mayaDefaultMaterialFallback.IsHolding<HdMaterialNetworkMap>()){
+        //Remove the fallback material in case it was created
+        RemovePrims({ { MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath, MayaHydraSceneIndex::_mayaDefaultMaterialPath} }); 
+    }else{
+        RemovePrims({ { MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath} }); 
+    }
 
     for (auto callback : _callbacks) {
         MMessage::removeCallback(callback);
@@ -641,13 +644,6 @@ void modifyDefaultMaterialOpacity(HdMaterialNetworkMap& materialNetworkMap, bool
 
 VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
 {
-    if (id == _mayaDefaultMaterialPath) {
-        modifyDefaultMaterialOpacity(
-            const_cast<HdMaterialNetworkMap&>(_mayaDefaultMaterial.UncheckedGet<HdMaterialNetworkMap>()),
-            _xRayEnabled);
-        return _mayaDefaultMaterial;
-    }
-
     if (id == _mayaFacesSelectionMaterialPath) {
         return _mayaFacesSelectionMaterial;
     }
@@ -663,52 +659,36 @@ VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
     return ret.IsEmpty() ? MayaHydraMaterialAdapter::GetPreviewMaterialResource(id) : ret;
 }
 
-VtValue MayaHydraSceneIndex::CreateMayaDefaultMaterial()
-{
-    static const MColor kDefaultGrayColor = MColor(0.5f, 0.5f, 0.5f) * 0.8f;
+//Create the default material from the "standardSurface1" maya material or create a fallback material if it cannot be found
+void MayaHydraSceneIndex::CreateMayaDefaultMaterialData() 
+{ 
+    // Try to get the standardSurface1 material
+    MObject defaultShaderObj;
+    GetDependNodeFromNodeName("standardSurface1", defaultShaderObj); // From mayautils.cpp
+    bool defaultMaterialSuccessfullyCreated = false;
+    if (MObjectHandle(defaultShaderObj).isValid()) {
+        //Get its shading group as it is what we use to create a material adapter
+        MObject defaultMaterialShadingGroupObj
+            = GetShadingGroupFromShader(defaultShaderObj); // From mayautils.cpp
+        if (MObjectHandle(defaultMaterialShadingGroupObj).isValid()) {
+            defaultMaterialSuccessfullyCreated = _CreateMaterial(MayaHydraSceneIndex::_mayaDefaultMaterialPath, defaultMaterialShadingGroupObj);
+        }
+    }
 
-    HdMaterialNetworkMap networkMap;
-    HdMaterialNetwork    network;
-    HdMaterialNode       node;
-    node.identifier = UsdImagingTokens->UsdPreviewSurface;
-    node.path = _mayaDefaultMaterialPath;
-    node.parameters.insert(
-        { _tokens->diffuseColor,
-          VtValue(GfVec3f(kDefaultGrayColor[0], kDefaultGrayColor[1], kDefaultGrayColor[2])) });
-    node.parameters.insert(
-        { _tokens->opacity,
-          VtValue(float(1.0f))});
-    network.nodes.push_back(std::move(node));
-    networkMap.map.insert({ HdMaterialTerminalTokens->surface, std::move(network) });
-    networkMap.terminals.push_back(_mayaDefaultMaterialPath);
-    return VtValue(networkMap);
-}
+    if (! defaultMaterialSuccessfullyCreated){
+        TF_CODING_WARNING("standardSurface1 material and its shading group could not be retrieved, using a fallback material");
+        // In case we could not create the default material from the standardSurface1 material, we
+        // create a fallback material
+        _mayaDefaultMaterialFallback = MayaHydraSceneIndex::_CreateDefaultMaterialFallback();
 
-VtValue MayaHydraSceneIndex::CreateMayaFacesSelectionMaterial()
-{
-    const GfVec4f faceSelectioncolor = getPreferencesColor(FvpColorPreferencesTokens->faceSelection);
-    constexpr float ogsMatchParamMult = 0.3f;
-    HdMaterialNetworkMap networkMap;
-    HdMaterialNetwork    network;
-    HdMaterialNode       node;
-    node.identifier = UsdImagingTokens->UsdPreviewSurface;
-    node.path = _mayaFacesSelectionMaterialPath;
+        auto mayaHydraDefaultMaterialDataSource = MayaHydraMaterialDataSource::New(
+            MayaHydraSceneIndex::_mayaDefaultMaterialPath, HdPrimTypeTokens->material, this);
+        AddPrims({ { MayaHydraSceneIndex::_mayaDefaultMaterialPath,
+                     HdPrimTypeTokens->material,
+                     mayaHydraDefaultMaterialDataSource } });
+    }
 
-    // Diffuse 
-    node.parameters.insert(
-        { _tokens->diffuseColor, 
-          VtValue(GfVec3f(faceSelectioncolor[0], faceSelectioncolor[1], faceSelectioncolor[2])*ogsMatchParamMult) });
-    
-    // Emissive (component selection highlighting material should be independent of scene lighting)
-    node.parameters.insert(
-        { _tokens->emissiveColor,
-          VtValue(GfVec3f(faceSelectioncolor[0], faceSelectioncolor[1], faceSelectioncolor[2])*ogsMatchParamMult) });
-
-    node.parameters.insert({ _tokens->opacity, VtValue(ogsMatchParamMult) });
-    network.nodes.push_back(std::move(node));
-    networkMap.map.insert({ HdMaterialTerminalTokens->surface, std::move(network) });
-    networkMap.terminals.push_back(_mayaFacesSelectionMaterialPath);
-    return VtValue(networkMap);
+    _defaultMaterialCreated = true;
 }
 
 Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) const
@@ -840,32 +820,8 @@ LightDagPathMap MayaHydraSceneIndex::_GetGlobalLightPaths() const
     return allLightPaths;
 }
 
-
-void MayaHydraSceneIndex::SetDefaultMaterial(bool useDefMaterial)
-{
-    if (useDefMaterial) {
-        auto mayaHydraDefaultMaterialDataSource = MayaHydraMaterialDataSource::New(_mayaDefaultMaterialPath, HdPrimTypeTokens->material, this);
-        AddPrims({ { _mayaDefaultMaterialPath,
-                     HdPrimTypeTokens->material,
-                     mayaHydraDefaultMaterialDataSource } });
-    }
-    else
-        RemovePrim(_mayaDefaultMaterialPath);
-}
-
 void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
 {
-    bool useDefaultMaterial
-        = (context.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
-    if (useDefaultMaterial != _useDefaultMaterial) {
-        _useDefaultMaterial = useDefaultMaterial;
-        SetDefaultMaterial(_useDefaultMaterial);
-        if (useMeshAdapter()) {
-            for (const auto& shape : _shapeAdapters)
-                shape.second->MarkDirty(HdChangeTracker::DirtyMaterialId);
-        }
-    }
-
     const bool xRayEnabled = (context.getDisplayStyle() & MHWRender::MFrameContext::kXray);
     if (xRayEnabled != _xRayEnabled) {
         _xRayEnabled = xRayEnabled;
@@ -1214,10 +1170,7 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
             || MHWRender::MGeometry::Primitive::kLineStrip == renderItemAdapter->GetPrimitive()) {
             return _fallbackMaterial;
         }
-        else if (_useDefaultMaterial && !ismayaFacesSelectionMaterial) {
-            return _mayaDefaultMaterialPath;
-        }
-
+        
         if (material == kInvalidMaterial) {
             return _fallbackMaterial;
         }
@@ -1232,9 +1185,6 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
     }
 
     if (useMeshAdapter()) {
-        if (_useDefaultMaterial) {
-            return _mayaDefaultMaterialPath;
-        }
         auto shapeAdapter = TfMapLookupPtr(_shapeAdapters, id);
         if (shapeAdapter == nullptr) {
             return _fallbackMaterial;
@@ -1685,4 +1635,55 @@ bool MayaHydraSceneIndex::passNormalsToHydra()
     return val;
 }
 
+VtValue MayaHydraSceneIndex::_CreateDefaultMaterialFallback()
+{
+    static const MColor kDefaultGrayColor = MColor(0.5f, 0.5f, 0.5f) * 0.8f;
+
+    HdMaterialNetworkMap networkMap;
+    HdMaterialNetwork    network;
+    HdMaterialNode       node;
+    node.identifier = UsdImagingTokens->UsdPreviewSurface;
+    node.path = MayaHydraSceneIndex::_mayaDefaultMaterialPath;
+    node.parameters.insert(
+        { _tokens->diffuseColor,
+          VtValue(GfVec3f(kDefaultGrayColor[0], kDefaultGrayColor[1], kDefaultGrayColor[2])) });
+    node.parameters.insert({ _tokens->opacity, VtValue(float(1.0f)) });
+    network.nodes.push_back(std::move(node));
+    networkMap.map.insert({ HdMaterialTerminalTokens->surface, std::move(network) });
+    networkMap.terminals.push_back(MayaHydraSceneIndex::_mayaDefaultMaterialPath);
+    return VtValue(networkMap);
+}
+
+VtValue MayaHydraSceneIndex::_CreateMayaFacesSelectionMaterial()
+{
+    const GfVec4f faceSelectioncolor
+        = getPreferencesColor(FvpColorPreferencesTokens->faceSelection);
+    constexpr float      ogsMatchParamMult = 0.3f;
+    HdMaterialNetworkMap networkMap;
+    HdMaterialNetwork    network;
+    HdMaterialNode       node;
+    node.identifier = UsdImagingTokens->UsdPreviewSurface;
+    node.path = MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath;
+
+    // Diffuse
+    node.parameters.insert(
+        { _tokens->diffuseColor,
+          VtValue(
+              GfVec3f(faceSelectioncolor[0], faceSelectioncolor[1], faceSelectioncolor[2])
+              * ogsMatchParamMult) });
+
+    // Emissive (component selection highlighting material should be independent of scene
+    // lighting)
+    node.parameters.insert(
+        { _tokens->emissiveColor,
+          VtValue(
+              GfVec3f(faceSelectioncolor[0], faceSelectioncolor[1], faceSelectioncolor[2])
+              * ogsMatchParamMult) });
+
+    node.parameters.insert({ _tokens->opacity, VtValue(ogsMatchParamMult) });
+    network.nodes.push_back(std::move(node));
+    networkMap.map.insert({ HdMaterialTerminalTokens->surface, std::move(network) });
+    networkMap.terminals.push_back(MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath);
+    return VtValue(networkMap);
+}
 PXR_NAMESPACE_CLOSE_SCOPE
