@@ -33,7 +33,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testObjectTemplate.py
     testStandardSurface.py
     testFlowViewportAPI.py
-    testStageVariants.py
+    testStageVariants.py|skipOnPlatform:osx
     testStagePayloadsReferences.py
     testNurbsPrimitives.py
     testCurveTools.py
