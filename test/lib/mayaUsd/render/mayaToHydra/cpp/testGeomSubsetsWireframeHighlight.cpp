@@ -20,11 +20,7 @@
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 
 #include <pxr/imaging/hd/instancedBySchema.h>
-#include <pxr/imaging/hd/instancerTopologySchema.h>
-#include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
-#include <pxr/imaging/hd/sceneIndex.h>
-#include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hdx/selectionSceneIndexObserver.h>
 
@@ -53,11 +49,6 @@ const std::string kSphereMeshUfePathSegment = "/Root/SphereMeshXform/SphereMesh"
 
 const std::string kCubeUpperHalfName = "CubeUpperHalf";
 const std::string kSphereUpperHalfName = "SphereUpperHalf";
-
-const std::string kCubeUpperHalfMarkerUfePathSegment = "/Root/CubeUpperHalfMarker";
-const std::string kCubeLowerHalfMarkerUfePathSegment = "/Root/CubeLowerHalfMarker";
-const std::string kSphereInstanceUpperHalfMarkerUfePathSegment = "/Root/SphereInstanceUpperHalfMarker";
-const std::string kSphereInstanceLowerHalfMarkerUfePathSegment = "/Root/SphereInstanceLowerHalfMarker";
 
 bool isSelectionHighlightMirror(const SdfPath& primPath, const std::string& selectionHighlightMirrorTag)
 {
@@ -90,7 +81,7 @@ void testGeomSubsetHighlight(const Ufe::Path& geomSubsetPath)
     HdxSelectionSceneIndexObserver selectionObserver;
     selectionObserver.SetSceneIndex(terminalSceneIndices.front());
 
-    // Create this test's selected scene items
+    // Create this test's selected GeomSubset item
     auto geomSubsetItem = Ufe::Hierarchy::createItem(geomSubsetPath);
 
     // Initial state : ensure nothing is highlighted
@@ -101,13 +92,12 @@ void testGeomSubsetHighlight(const Ufe::Path& geomSubsetPath)
     });
     EXPECT_TRUE(selectionHighlightMirrors.empty()); // No selection highlight mirrors
 
-    // Select prototype
+    // Select the GeomSubset
     ufeSelection->replaceWith(geomSubsetItem);
 
-    auto geomSubsetPrimSelections = fvpMergingSceneIndex->UfePathToPrimSelections(geomSubsetPath);
-
-    // Validate scene structure
+    // Validate scene structure and data source values
     ASSERT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
+    auto geomSubsetPrimSelections = fvpMergingSceneIndex->UfePathToPrimSelections(geomSubsetPath);
     for (size_t iSelection = 0; iSelection < geomSubsetPrimSelections.size(); iSelection++) {
         const auto& meshPath = geomSubsetPrimSelections[iSelection].primPath.GetParentPath();
         auto meshHighlightPath = fvpWireframeSelectionHighlightSceneIndex->GetSelectionHighlightPath(meshPath);
@@ -156,7 +146,7 @@ TEST(GeomSubsetsWireframeHighlight, instancedGeomSubsetHighlight)
 #if PXR_VERSION < 2403
     GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
 #else
-    auto spherGeomSubsetPath = Ufe::PathString::path(kStageUfePathSegment + "," + kSphereMeshUfePathSegment + "/" + kSphereUpperHalfName);
-    testGeomSubsetHighlight(spherGeomSubsetPath);
+    auto sphereGeomSubsetPath = Ufe::PathString::path(kStageUfePathSegment + "," + kSphereMeshUfePathSegment + "/" + kSphereUpperHalfName);
+    testGeomSubsetHighlight(sphereGeomSubsetPath);
 #endif
 }
