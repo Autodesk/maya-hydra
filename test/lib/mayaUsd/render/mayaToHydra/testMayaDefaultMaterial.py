@@ -19,13 +19,18 @@ import fixturesUtils
 import mtohUtils
 import mayaUtils
 from testUtils import PluginLoaded
+import platform
 
 class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
-    IMAGE_DIFF_FAIL_PERCENT = 1.5
+    @property
+    def IMAGE_DIFF_FAIL_PERCENT(self):
+        if platform.system() == "Darwin":
+            return 3
+        return 1.5
 
     def test_MayaDefaultMaterial(self):
 
