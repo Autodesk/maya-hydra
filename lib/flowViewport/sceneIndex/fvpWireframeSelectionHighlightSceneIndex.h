@@ -180,7 +180,7 @@ private:
     // "Ref-counting" of selection highlight mirror prims, which are shared across prim highlights.
     std::unordered_map<PXR_NS::SdfPath, size_t, PXR_NS::SdfPath::Hash> _selectionHighlightMirrorUseCounters;
 
-    // Tracks which prims contributes to using this prim's selection highlight. (including itself?)
+    // Tracks which prims contributes to using this prim's selection highlight (including itself).
     // Why? Suppose the following scenario : we have two selections that each would lead to highlighting the same prim.
     // Since both would increment the use counts of the prim's corresponding selection highlight mirrors, we would
     // need to also decrement the use counts symetrically. However, what happens if we receive a PrimRemoved notification
