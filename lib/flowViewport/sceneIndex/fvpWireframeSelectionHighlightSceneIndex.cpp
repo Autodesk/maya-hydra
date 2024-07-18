@@ -760,6 +760,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
 
 #if PXR_VERSION >= 2403
             if (prim.primType == HdPrimTypeTokens->geomSubset) {
+                // Create a selection highlight on the parent mesh of the selected geomSubset 
                 if (isSelected) {
                     selectionHighlightUsersToAdd.push_back({entry.primPath.GetParentPath(), entry.primPath});
                 } else {
