@@ -184,18 +184,4 @@ MObject GetShadingGroupFromShader(const MObject& shader)
     return shadingGroup;
 }
 
-MObject GetDefaultStandardSurfaceShader()
-{
-    MSelectionList list;
-    MObject        node;
-
-    // Add the shader to the selection list
-    list.add("standardSurface1");
-
-    // Get the shader as an MObject
-    list.getDependNode(0, node);
-
-    return node;
-}
-
 } // namespace MAYAHYDRA_NS_DEF

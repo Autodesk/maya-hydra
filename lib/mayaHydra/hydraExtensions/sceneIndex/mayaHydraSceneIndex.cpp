@@ -84,7 +84,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 SdfPath MayaHydraSceneIndex::_fallbackMaterial;
 SdfPath MayaHydraSceneIndex::_mayaDefaultMaterialPath; // Common to all scene indexes
-VtValue MayaHydraSceneIndex::_mayaDefaultMaterialFallback;//Used only if we cannot find the default material named standardsurface1
+VtValue MayaHydraSceneIndex::_mayaDefaultMaterialFallback;//Used only if we cannot find the default material named standardSurface1
 SdfPath MayaHydraSceneIndex::_mayaDefaultLightPath;           // Common to all scene indexes
 SdfPath MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath; // Common to all scene indexes
 
@@ -659,11 +659,12 @@ VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
     return ret.IsEmpty() ? MayaHydraMaterialAdapter::GetPreviewMaterialResource(id) : ret;
 }
 
-//Create the default material from the "standardsurface1" maya material or create a fallback material if it cannot be found
+//Create the default material from the "standardSurface1" maya material or create a fallback material if it cannot be found
 void MayaHydraSceneIndex::CreateMayaDefaultMaterialData() 
 { 
-    // Try to get the standardsurface1 material
-    MObject defaultShaderObj = GetDefaultStandardSurfaceShader(); // From mayautils.cpp
+    // Try to get the standardSurface1 material
+    MObject defaultShaderObj;
+    GetDependNodeFromNodeName("standardSurface1", defaultShaderObj); // From mayautils.cpp
     bool defaultMaterialSuccessfullyCreated = false;
     if (MObjectHandle(defaultShaderObj).isValid()) {
         //Get its shading group as it is what we use to create a material adapter
@@ -676,7 +677,7 @@ void MayaHydraSceneIndex::CreateMayaDefaultMaterialData()
 
     if (! defaultMaterialSuccessfullyCreated){
         TF_CODING_WARNING("standardSurface1 material and its shading group could not be retrieved, using a fallback material");
-        // In case we could not create the default material from the standardsurface1 material, we
+        // In case we could not create the default material from the standardSurface1 material, we
         // create a fallback material
         _mayaDefaultMaterialFallback = MayaHydraSceneIndex::_CreateDefaultMaterialFallback();
 

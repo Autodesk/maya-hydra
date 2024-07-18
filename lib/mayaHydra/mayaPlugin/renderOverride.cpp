@@ -1212,7 +1212,7 @@ MStatus MtohRenderOverride::Render(
 
     if (_defaultMaterialSceneIndex && _useDefaultMaterial != currentUseDefaultMaterial){
         // Create default material data when switching to the default material in the viewport
-        if (_mayaHydraSceneIndex && !_mayaHydraSceneIndex->GetDefaultMaterialAlreadyCreated()) {
+        if (_mayaHydraSceneIndex && !_mayaHydraSceneIndex->DefaultMaterialCreated()) {
             _mayaHydraSceneIndex->CreateMayaDefaultMaterialData();
         }
     

@@ -208,7 +208,7 @@ public:
     //Sdfpath of the maya default material
     SdfPath GetDefaultMaterialPath() const{return _mayaDefaultMaterialPath;}
 
-    bool GetDefaultMaterialAlreadyCreated() const{return _defaultMaterialCreated;}
+    bool DefaultMaterialCreated() const{return _defaultMaterialCreated;}
 
     //Is the exclusion list of materials that should be skipped when using the default material
     SdfPathVector GetDefaultMaterialExclusionPaths()const{ return {_mayaFacesSelectionMaterialPath};}
@@ -258,7 +258,7 @@ public:
     /// Is using an environment variable to tell if we should pass normals to Hydra when using the render item and mesh adapters
     static bool passNormalsToHydra();
 
-    ///Create the default material from the "standardsurface1" maya material or create a fallback material if it cannot be found
+    ///Create the default material from the "standardSurface1" maya material or create a fallback material if it cannot be found
     void CreateMayaDefaultMaterialData();
     
 private:
@@ -334,7 +334,7 @@ private:
     static SdfPath _fallbackMaterial;
     /// _mayaDefaultMaterialPath is common to all scene indexes
     static SdfPath _mayaDefaultMaterialPath;
-    static VtValue _mayaDefaultMaterialFallback;//Used only if we cannot find the default material named standardsurface1
+    static VtValue _mayaDefaultMaterialFallback;//Used only if we cannot find the default material named standardSurface1
 
     /// _mayaFacesSelectionMaterialPath is a path to a Hydra material used to display the faces selection on nodes when being in components selection mode
     static SdfPath _mayaFacesSelectionMaterialPath;
