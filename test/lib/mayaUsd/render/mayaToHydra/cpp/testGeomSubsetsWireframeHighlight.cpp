@@ -42,7 +42,7 @@ using namespace MayaHydra;
 namespace {
 
 #if PXR_VERSION >= 2403
-const std::string kStageUfePathSegment = "|GeomSubsetsPickingTestScene|GeomSubsetsPickingTestSceneShape";
+const std::string kStageUfePathSegment = "|GeomSubsetsWireframeHighlightTestScene|GeomSubsetsWireframeHighlightTestSceneShape";
 
 const std::string kCubeMeshUfePathSegment = "/Root/CubeMeshXform/CubeMesh";
 const std::string kSphereMeshUfePathSegment = "/Root/SphereMeshXform/SphereMesh";
