@@ -39,5 +39,10 @@ class TestUVandUDIM(mtohUtils.MayaHydraBaseTestCase):
         self.setHdStormRenderer()
         self.verifySnapshot("quads_with_UDIMs.png")
 
+    def test_HDR(self):
+        mayaUtils.openTestScene("testUVandUDIM", "testHDR.ma")
+        self.setHdStormRenderer()
+        self.verifySnapshot("quads_with_HDR.png")
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
