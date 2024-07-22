@@ -1,8 +1,8 @@
-//Maya ASCII 2026ff01 scene
+//Maya ASCII 2025ff01 scene
 //Name: testHDR.ma
 //Last modified: Thu, Jul 18, 2024 02:05:49 PM
 //Codeset: 1252
-requires maya "2026ff01";
+requires maya "2025ff01";
 requires "stereoCamera" "10.0";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";

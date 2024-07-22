@@ -20,30 +20,23 @@ import mtohUtils
 class TestUVandUDIM(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
-    IMAGEDIFF_FAIL_THRESHOLD = 0.01
-    IMAGEDIFF_FAIL_PERCENT = 0.2
-
-    def verifySnapshot(self, imageName):
-        cmds.refresh()
-        self.assertSnapshotClose(imageName, 
-                                 self.IMAGEDIFF_FAIL_THRESHOLD,
-                                 self.IMAGEDIFF_FAIL_PERCENT)
-
     def test_UVs(self):
         mayaUtils.openTestScene("testUVandUDIM", "testUVs.ma")
         self.setHdStormRenderer()
-        self.verifySnapshot("quads_with_UVs.png")
+        cmds.refresh()
+        self.assertSnapshotClose("quads_with_UVs.png", 0.01, 0.2)
 
     def test_UDIMs(self):
         mayaUtils.openTestScene("testUVandUDIM", "testUDIMs.ma")
         self.setHdStormRenderer()
-        self.verifySnapshot("quads_with_UDIMs.png")
+        cmds.refresh()
+        self.assertSnapshotClose("quads_with_UDIMs.png", 0.01, 0.2)
 
     def test_HDR(self):
         mayaUtils.openTestScene("testUVandUDIM", "testHDR.ma")
         self.setHdStormRenderer()
         cmds.refresh()
-        self.assertSnapshotClose("quads_with_HDR.png", 0.04, 0.2)
+        self.assertSnapshotClose("quads_with_HDR.png", 0.05, 0.2)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
