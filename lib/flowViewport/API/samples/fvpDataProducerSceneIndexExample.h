@@ -24,9 +24,13 @@
 #include <pxr/base/tf/refPtr.h>
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/vt/array.h>
+#include <pxr/usd/sdf/path.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
 #include <pxr/imaging/hd/dataSource.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
+
+#include <set>
+#include <map>
 
 namespace FVP_NS_DEF {
 
@@ -67,17 +71,7 @@ public:
     struct CubeGridCreationParams
     {
         /// Constructor
-        CubeGridCreationParams(){
-            _numLevelsX = 10;//Default values
-            _numLevelsY = 10;
-            _numLevelsZ = 1;
-            _halfSize   = 2.0;
-            _color      = {0.f, 1.0f, 0.0f};
-            _opacity    = 0.8;
-            _deltaTrans = {5.0f, 5.0f, 5.0f};
-            _initalTransform.SetIdentity();
-            _useInstancing = false;
-        }
+        CubeGridCreationParams() = default;
 
         //Comparison operator
         bool operator == (const CubeGridCreationParams& other)const{
@@ -87,9 +81,11 @@ public:
                     (_halfSize          == other._halfSize) && 
                     (_color             == other._color) &&
                     (_opacity           == other._opacity) &&
-                    (_initalTransform   == other._initalTransform)&&
+                    (_initialTransform  == other._initialTransform)&&
                     (_deltaTrans        == other._deltaTrans) &&
-                    (_useInstancing     == other._useInstancing);
+                    (_useInstancing     == other._useInstancing) &&
+                    (_hidden            == other._hidden) &&
+                    (_transformed       == other._transformed);
         }
 
         /// Number of X levels for the 3D grid of cube primitives
@@ -105,7 +101,7 @@ public:
         /// Opacity of each cube in the 3D grid.
         double              _opacity{0.8};
         /// Initial transform of each cube in the 3D grid.
-        PXR_NS::GfMatrix4d  _initalTransform;
+        PXR_NS::GfMatrix4d  _initialTransform{1.0};
         /** _deltaTrans.x is the space between 2 cubes on the X axis of the 3D grid.
         *   _deltaTrans.y is the space between 2 cubes on the Y axis of the 3D grid.
         *   _deltaTrans.z is the space between 2 cubes on the Z axis of the 3D grid.
@@ -113,13 +109,20 @@ public:
         PXR_NS::GfVec3f     _deltaTrans{5.0f, 5.0f, 5.0f};
         /// if _useInstancing is true, then we are using Hydra instancing to create the cube primitives, if it is false then we are not using Hydra instancing.
         bool                _useInstancing{false};
+
+        // Hidden cubes, indexed by name, when not using instancing.
+        std::set<std::string> _hidden{};
+
+        // Transformed cubes, indexed by name, when not using instancing.
+        // At time of writing (31-May-2024) only translation is supported.
+        std::map<std::string, PXR_NS::GfVec3d> _transformed{};
     };
 
     ///Set the CubeGridCreationParams
     void setCubeGridParams(const CubeGridCreationParams& params);
 
     ///Call FlowViewport::DataProducerSceneIndexInterface::_AddDataProducerSceneIndex to add our data producer scene index to create the 3D grid of cubes
-    void addDataProducerSceneIndex();
+    void addDataProducerSceneIndex(const PXR_NS::SdfPath& prefix = PXR_NS::SdfPath::AbsoluteRootPath());
     
     ///Call the FlowViewport::DataProducerSceneIndexInterface::RemoveViewportDataProducerSceneIndex to remove our data producer scene index from the Hydra viewport
     void removeDataProducerSceneIndex();

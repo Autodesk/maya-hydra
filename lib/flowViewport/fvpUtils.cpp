@@ -15,6 +15,8 @@
 
 #include "fvpUtils.h"
 
+#include <pxr/imaging/hd/selectionSchema.h>
+
 namespace FVP_NS_DEF {
 
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -29,5 +31,12 @@ void leakSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& si) {
     leakedSi->push_back(si);
 }
 #endif
+
+PXR_NS::HdDataSourceBaseHandle createFullySelectedDataSource()
+{
+    PXR_NS::HdSelectionSchema::Builder selectionBuilder;
+    selectionBuilder.SetFullySelected(PXR_NS::HdRetainedTypedSampledDataSource<bool>::New(true));
+    return PXR_NS::HdDataSourceBase::Cast(selectionBuilder.Build());
+}
 
 } // namespace FVP_NS_DEF

@@ -408,6 +408,12 @@ private:
 #endif
 
 /**
+ * @brief Predicate to return if global command-line arguments are empty.
+ *
+ */
+bool testingArgsEmpty();
+
+/**
  * @brief Send a mouse move event to a widget to move the mouse at a given position.
  *
  * @param[in] widget The widget to send the event to.

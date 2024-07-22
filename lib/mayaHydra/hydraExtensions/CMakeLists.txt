@@ -15,6 +15,7 @@ target_sources(${TARGET_NAME}
         mixedUtils.cpp
         mhWireframeColorInterfaceImp.cpp
         mhLeadObjectPathTracker.cpp
+        tokens.cpp
 )
 
 set(HEADERS
@@ -28,6 +29,7 @@ set(HEADERS
     mixedUtils.h
     mhWireframeColorInterfaceImp.h
     mhLeadObjectPathTracker.h
+    tokens.h
 )
 
 # -----------------------------------------------------------------------------
@@ -203,4 +205,5 @@ endif()
 # subdirectories
 # -----------------------------------------------------------------------------
 add_subdirectory(adapters)
+add_subdirectory(pick)
 add_subdirectory(sceneIndex)

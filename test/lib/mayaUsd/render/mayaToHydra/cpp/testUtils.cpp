@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <exception>
 #include <iostream>
+#include <cstring>
 
 namespace {
 std::pair<int, char**> testingArgs{0, nullptr};
@@ -353,6 +354,13 @@ bool dataSourceMatchesReference(
     // entire dumps to stdout and pollute the logs in case of a test failure. Using EXPECT_TRUE
     // at the callsites still logs exactly which comparison failed, but keeps logs readable.
     return outputString == referenceString;
+}
+
+bool testingArgsEmpty()
+{
+    // See mayaHydraCppTestsCmd.cpp:constructGoogleTestArgs() documentation.
+    auto [argc, argv] = getTestingArgs();
+    return (std::strcmp(argv[0], "dummy") == 0);
 }
 
 void mouseMoveTo(QWidget* widget, QPoint localMousePos)

@@ -100,16 +100,15 @@ MAYAHYDRALIB_API
 bool GetXformMatrixFromPrim(const PXR_NS::HdSceneIndexPrim& prim, PXR_NS::GfMatrix4d& outMatrix);
 
 /**
- * @brief Get the Hydra Xform matrix from a given prim.
+ * @brief Get a directional light position from a direction vector.
  *
- * This method makes no guarantee on whether the matrix is flattened or not.
+ * A directional light without a position does not seem to be supported by
+ * Hydra at time of writing (6-May-2024).  Simulate a directional light by
+ * positioning a light far away.
  *
- * @param[in] prim is the Hydra prim in the SceneIndex of which to get the transform matrix.
- * @param[out] outMatrix is the transform matrix of the prim.
- *
- * @return True if the operation succeeded, false otherwise.
+ * @param[in] direction
+ * @param[out] outPosition computed distant light position.
  */
-
 MAYAHYDRALIB_API
 void GetDirectionalLightPositionFromDirectionVector(PXR_NS::GfVec3f& outPosition, const PXR_NS::GfVec3f& direction);
 

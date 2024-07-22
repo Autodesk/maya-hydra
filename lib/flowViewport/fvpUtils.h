@@ -89,6 +89,8 @@ private:
     PXR_NS::TfToken _role;
 };
 
+PXR_NS::HdDataSourceBaseHandle FVP_API createFullySelectedDataSource();
+
 } // namespace FVP_NS_DEF
 
 #endif // FVP_UTILS_H

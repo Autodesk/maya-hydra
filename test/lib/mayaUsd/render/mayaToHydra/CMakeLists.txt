@@ -52,10 +52,13 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testMayaDefaultMaterial.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
+    cpp/testDataProducerExample.py
     cpp/testMayaSceneFlattening.py
     cpp/testMayaUsdUfeItems.py
     cpp/testMergingSceneIndex.py
     cpp/testPathInterface.py
+    cpp/testPathMapperRegistry.py
+    cpp/testPickHandlerRegistry.py
     cpp/testSelectionSceneIndex.py
     cpp/testWireframeSelectionHighlightSceneIndex.py
     cpp/testFlowViewportAPIViewportInformation.py

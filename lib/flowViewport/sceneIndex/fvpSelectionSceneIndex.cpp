@@ -39,6 +39,8 @@
 #include "flowViewport/sceneIndex/fvpSelectionSceneIndex.h"
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
 #include "flowViewport/selection/fvpSelection.h"
+#include <flowViewport/selection/fvpPathMapper.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include "flowViewport/debugCodes.h"
 
@@ -265,7 +267,23 @@ PrimSelections SelectionSceneIndex::UfePathToPrimSelections(const Ufe::Path& app
     auto primSelections = _inputSceneIndexPathInterface->UfePathToPrimSelections(appPath);
 
     if (primSelections.empty()) {
-        TF_WARN("SelectionSceneIndex::UfePathToPrimSelections(%s) returned no path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
+        // Path interface of input scene index didn't provide information.
+        // Try path mapper registry.
+        auto mapper = Fvp::PathMapperRegistry::Instance().GetMapper(appPath);
+        
+        auto warnEmptyPath = [](const Ufe::Path& appPath) {
+            TF_WARN("SelectionSceneIndex::UfePathToPrimSelections(%s) returned no path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
+        };
+
+        if (!mapper) {
+            warnEmptyPath(appPath);
+        }
+        else {
+            primSelections = mapper->UfePathToPrimSelections(appPath);
+            if (primSelections.empty()) {
+                warnEmptyPath(appPath);
+            }
+        }
     }
 
     return primSelections;

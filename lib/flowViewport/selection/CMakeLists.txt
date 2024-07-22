@@ -7,6 +7,10 @@ target_sources(${TARGET_NAME}
     fvpSelectionFwd.cpp
     fvpSelectionTask.cpp
     fvpSelectionTracker.cpp
+    fvpPathMapper.cpp
+    fvpPathMapperFwd.cpp
+    fvpPathMapperRegistry.cpp
+    fvpPrefixPathMapper.cpp
 )
 
 set(HEADERS
@@ -14,6 +18,10 @@ set(HEADERS
     fvpSelectionFwd.h
     fvpSelectionTask.h
     fvpSelectionTracker.h
+    fvpPathMapper.h
+    fvpPathMapperFwd.h
+    fvpPathMapperRegistry.h
+    fvpPrefixPathMapper.h
 )
 
 # -----------------------------------------------------------------------------
