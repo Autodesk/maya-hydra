@@ -16,6 +16,9 @@
 
 #include "mhMayaUsdProxyShapeSceneIndex.h"
 
+#include <mayaHydraLib/pick/mhUsdPickHandler.h>
+#include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
+
 #include <flowViewport/fvpInstruments.h>
 
 #if defined(MAYAHYDRALIB_MAYAUSDAPI_ENABLED)
@@ -27,15 +30,18 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
 
-MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(const MAYAUSDAPI_NS::ProxyStage& proxyStage,
-                                                        const HdSceneIndexBaseRefPtr& sceneIndexChainLastElement,
-                                                        const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
-                                                        const MObjectHandle& dagNodeHandle)
+MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(
+    const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
+    const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
+    const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
+    const MObjectHandle&                   dagNodeHandle,
+    const PXR_NS::SdfPath&                 prefix)
     : ParentClass(sceneIndexChainLastElement)
     , InputSceneIndexUtils(sceneIndexChainLastElement)
     , _usdImagingStageSceneIndex(usdImagingStageSceneIndex)
     , _proxyStage(proxyStage)
     , _dagNodeHandle(dagNodeHandle)
+    , _prefix(prefix)
 {
     TfWeakPtr<MayaUsdProxyShapeSceneIndex> ptr(this);
     _stageSetNoticeKey = TfNotice::Register(ptr, &MayaUsdProxyShapeSceneIndex::_StageSet);
@@ -43,6 +49,11 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(const MAYAUSDAPI_NS::Pr
     _objectsChangedNoticeKey = TfNotice::Register(ptr, &MayaUsdProxyShapeSceneIndex::_ObjectsChanged);
 
     Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
+
+    // Add our pick handler to the pick handler registry.  All USD scene indices
+    // could share the same pick handler, but create a new one for simplicity.
+    auto pickHandler = std::make_shared<UsdPickHandler>();
+    TF_AXIOM(PickHandlerRegistry::Instance().Register(prefix, pickHandler));
 }
 
 MayaUsdProxyShapeSceneIndex::~MayaUsdProxyShapeSceneIndex()
@@ -50,14 +61,18 @@ MayaUsdProxyShapeSceneIndex::~MayaUsdProxyShapeSceneIndex()
     TfNotice::Revoke(_stageSetNoticeKey);
     TfNotice::Revoke(_stageInvalidateNoticeKey);
     TfNotice::Revoke(_objectsChangedNoticeKey);
+
+    TF_AXIOM(PickHandlerRegistry::Instance().Unregister(_prefix));
 }
 
-MayaUsdProxyShapeSceneIndexRefPtr MayaUsdProxyShapeSceneIndex::New(const MAYAUSDAPI_NS::ProxyStage& proxyStage, 
-                                                                   const HdSceneIndexBaseRefPtr& sceneIndexChainLastElement,
-                                                                   const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
-                                                                   const MObjectHandle& dagNodeHandle)
+MayaUsdProxyShapeSceneIndexRefPtr MayaUsdProxyShapeSceneIndex::New(
+    const MAYAUSDAPI_NS::ProxyStage&       proxyStage, 
+    const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
+    const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
+    const MObjectHandle&                   dagNodeHandle,
+    const PXR_NS::SdfPath&                 prefix)
 {
-    return TfCreateRefPtr(new MayaUsdProxyShapeSceneIndex(proxyStage, sceneIndexChainLastElement, usdImagingStageSceneIndex, dagNodeHandle));
+    return TfCreateRefPtr(new MayaUsdProxyShapeSceneIndex(proxyStage, sceneIndexChainLastElement, usdImagingStageSceneIndex, dagNodeHandle, prefix));
 }
 
 void MayaUsdProxyShapeSceneIndex::UpdateTime()

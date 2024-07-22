@@ -261,7 +261,7 @@ void GetDirectionalLightPositionFromDirectionVector(GfVec3f& outPosition, const 
 {
     //To simulate a directional light which has no actual position, but doesn't seem to be supported in hydra, we set a position very very far
     //so it looks like a directional light.    
-    static const float farfarAway {1.0e15f};//we use a point on the Z axis far far away
+    constexpr float farfarAway {1.0e15f};//we use a point on the Z axis far far away
     outPosition = {-farfarAway*direction.data()[0], -farfarAway*direction.data()[1], -farfarAway*direction.data()[2]};
 }
 
