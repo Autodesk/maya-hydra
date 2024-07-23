@@ -49,6 +49,7 @@
 #include <flowViewport/sceneIndex/fvpDisplayStyleOverrideSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruneTexturesSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpDefaultMaterialSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
@@ -259,6 +260,7 @@ private:
     HdSceneIndexBaseRefPtr                    _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
     Fvp::DisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
     Fvp::PruneTexturesSceneIndexRefPtr        _pruneTexturesSceneIndex;
+    Fvp::ReprSelectorSceneIndexRefPtr         _reprSelectorSceneIndex;
     Fvp::DefaultMaterialSceneIndexRefPtr      _defaultMaterialSceneIndex;
     HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;

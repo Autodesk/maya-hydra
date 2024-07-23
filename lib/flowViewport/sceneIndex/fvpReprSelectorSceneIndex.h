@@ -47,11 +47,12 @@ public:
         WireframeRefined, //Refined wireframe (refined means that it supports a "refineLevel" attribute in the displayStyle to get a more refined drawing, valid range is from 0 to 8)
         WireframeOnSurface, //Wireframe on surface not refined
         WireframeOnSurfaceRefined,//Wireframe on surface refined
+        None,
     };
 
     FVP_API
-    static ReprSelectorSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface){
-        return PXR_NS::TfCreateRefPtr(new ReprSelectorSceneIndex(inputSceneIndex, type, wireframeColorInterface));
+    static ReprSelectorSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface){
+        return PXR_NS::TfCreateRefPtr(new ReprSelectorSceneIndex(inputSceneIndex, wireframeColorInterface));
     }
 
     // From HdSceneIndexBase
@@ -70,10 +71,13 @@ public:
     void addExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot) { 
         _excludedSceneRoots.emplace(sceneRoot);
     }
+    
+    FVP_API
+    void SetReprType(RepSelectorType, bool);
 
 protected:
     
-ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface);
+ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface);
 
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override{
@@ -99,6 +103,9 @@ ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, Re
     }
 
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
+    
+    void _DirtyAllPrims(const PXR_NS::HdDataSourceLocatorSet locators);
+    bool _needsReprChanged {false};
 
     PXR_NS::HdRetainedContainerDataSourceHandle _wireframeTypeDataSource = nullptr;
     std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;

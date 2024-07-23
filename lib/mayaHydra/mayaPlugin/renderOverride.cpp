@@ -738,6 +738,27 @@ MStatus MtohRenderOverride::Render(
         _defaultMaterialSceneIndex->Enable(currentUseDefaultMaterial);
         _useDefaultMaterial = currentUseDefaultMaterial;
     }
+    
+    const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
+    if ( _reprSelectorSceneIndex && (currentDisplayStyle !=_oldDisplayStyle)){
+        if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) && 
+            ((currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded) || 
+            (currentDisplayStyle & MHWRender::MFrameContext::kTextured)) ) {
+                // Wireframe on top of shaded
+                // Reduced quality
+                if (MFrameContext::WireOnShadedMode::kWireFrameOnShadedReduced == wireOnShadedMode ){
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface, true);
+                } else {//Full quality                
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined, true);
+                }
+            }
+            else if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) ){
+                    //wireframe only, not on top of shaded
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined, true); 
+                }
+            else // Shaded mode
+                _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false);
+    }
 
     HdxRenderTaskParams params;
     params.enableLighting = true;
@@ -1107,15 +1128,10 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
                                                                                 _mayaHydraSceneIndex ? _mayaHydraSceneIndex->GetDefaultMaterialExclusionPaths(): SdfPathVector());
 
     const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
-    const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
 
     auto mergingSceneIndex = _renderIndexProxy->GetMergingSceneIndex();
     if(! _leadObjectPathTracker){
         _leadObjectPathTracker = std::make_shared<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker>(mergingSceneIndex, _dirtyLeadObjectSceneIndex);
-    }
-
-    if (! _wireframeColorInterfaceImp){
-        _wireframeColorInterfaceImp = std::make_shared<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp>(_selection, _leadObjectPathTracker);
     }
     
     //Are we using Bounding Box display style ?
@@ -1125,36 +1141,16 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         bboxSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
         _lastFilteringSceneIndexBeforeCustomFiltering = bboxSceneIndex;
     }
-    else if (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame){//Are we using wireframe somehow ?
-        
-        if( (currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded) || (currentDisplayStyle & MHWRender::MFrameContext::kTextured)){
-            // Wireframe on top of shaded
-            //Reduced quality
-            if (MFrameContext::WireOnShadedMode::kWireFrameOnShadedReduced == wireOnShadedMode ){
-                //Insert the reprselector filtering scene index which updates the repr selector on geometries
-                auto reprSelectorSceneIndex = Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
-                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface, _wireframeColorInterfaceImp);
-                reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
-                _lastFilteringSceneIndexBeforeCustomFiltering = reprSelectorSceneIndex;
-            } else {//Full quality
-                //Should we support kWireFrameOnShadedNone and do not display any wireframe ?
-                //Insert the reprselector filtering scene index which updates the repr selector on geometries
-                auto reprSelectorSceneIndex = Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
-                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined, _wireframeColorInterfaceImp);
-                reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
-                _lastFilteringSceneIndexBeforeCustomFiltering = reprSelectorSceneIndex;
-            }
-        }
-        else{
-                //wireframe only, not on top of shaded
-                
-                //Insert the reprselector filtering scene index which updates the repr selector on geometries
-                auto reprSelectorSceneIndex = Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
-                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined, _wireframeColorInterfaceImp);
-                reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
-                _lastFilteringSceneIndexBeforeCustomFiltering = reprSelectorSceneIndex;
-            }
+
+    if (! _wireframeColorInterfaceImp){
+        _wireframeColorInterfaceImp = std::make_shared<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp>(_selection, _leadObjectPathTracker);
     }
+
+    // Repr selector Scene Index
+    _lastFilteringSceneIndexBeforeCustomFiltering = _reprSelectorSceneIndex = 
+                                                 Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
+                                                 _wireframeColorInterfaceImp);
+    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::None,false);
 
     auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection, _wireframeColorInterfaceImp));
     wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");

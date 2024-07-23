@@ -24,7 +24,9 @@
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/sceneIndexPrimView.h>
 
+#include <iostream>
 
 // This class is a filtering scene index that that applies a different RepSelector on geometries (such as wireframe or wireframe on shaded)
 // and also applies an overrideWireframecolor for HdStorm 
@@ -73,13 +75,17 @@ const HdRetainedContainerDataSourceHandle sWireframeDisplayStyleDataSource
 
 }//End of namespace
 
-ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, RepSelectorType type, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface) 
+ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface) 
     : ParentClass(inputSceneIndex), 
     InputSceneIndexUtils(inputSceneIndex),
     _wireframeColorInterface(wireframeColorInterface)
 {
     TF_AXIOM(_wireframeColorInterface);
-    switch (type){
+}
+
+void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsReprChanged)
+{    
+    switch (reprType){
         case RepSelectorType::WireframeRefined:
             _wireframeTypeDataSource = sWireframeDisplayStyleDataSource;
             break;
@@ -90,13 +96,31 @@ ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inp
             _wireframeTypeDataSource = sRefinedWireframeOnShadedDisplayStyleDataSource;
             break;
     }
+    
+    const HdDataSourceLocatorSet locators{
+    HdLegacyDisplayStyleSchema::GetDefaultLocator()
+    };
+    _needsReprChanged = needsReprChanged;
+    _DirtyAllPrims(locators);
+}
+
+void
+ReprSelectorSceneIndex::_DirtyAllPrims(
+    const HdDataSourceLocatorSet locators)
+{
+    HdSceneIndexObserver::DirtiedPrimEntries entries;
+    for (const SdfPath &path : HdSceneIndexPrimView(GetInputSceneIndex())) {
+        entries.push_back({path, locators});
+    }
+    _SendPrimsDirtied(entries);
 }
 
 HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-    if (prim.dataSource && !_isExcluded(primPath) && (prim.primType == HdPrimTypeTokens->mesh) ){
-        
+    if (prim.dataSource && !_isExcluded(primPath) && 
+       (prim.primType == HdPrimTypeTokens->mesh) && _needsReprChanged){
+
         //Edit the dataSource as an overlay will not replace any existing attribute value.
         // So we need to edit the _primVarsTokens->overrideWireframeColor attribute as they may already exist in the prim
         auto edited = HdContainerDataSourceEditor(prim.dataSource);
@@ -111,10 +135,8 @@ HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
         //Edit the cull style
         edited.Set(HdLegacyDisplayStyleSchema::GetCullStyleLocator(),
                         HdRetainedTypedSampledDataSource<TfToken>::New(HdCullStyleTokens->nothing));//No culling
-    
         prim.dataSource = HdOverlayContainerDataSource::New({ edited.Finish(), _wireframeTypeDataSource});
     }
-
     return prim;
 }
 
