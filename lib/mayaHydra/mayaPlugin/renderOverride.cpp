@@ -684,7 +684,6 @@ MStatus MtohRenderOverride::Render(
     delegateParams.displaySmoothMeshes = !(currentDisplayStyle & MHWRender::MFrameContext::kFlatShaded);
     
     const bool currentUseDefaultMaterial = (drawContext.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
-    const bool xRayEnabled = (drawContext.getDisplayStyle() & MHWRender::MFrameContext::kXray);
 
     if (_mayaHydraSceneIndex) {
         _mayaHydraSceneIndex->SetDefaultLightEnabled(_hasDefaultLighting);
@@ -692,7 +691,7 @@ MStatus MtohRenderOverride::Render(
         _mayaHydraSceneIndex->SetParams(delegateParams);
         _mayaHydraSceneIndex->PreFrame(drawContext);
         
-        if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle, xRayEnabled)){
+        if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle)){
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(true);//Prevent prim removal propagation to keep the current selection.
             //We need to recreate the filtering scene index chain after the merging scene index as there was a change such as in the BBox display style which has been turned on or off.
             _lastFilteringSceneIndexBeforeCustomFiltering = nullptr;//Release
@@ -710,8 +709,6 @@ MStatus MtohRenderOverride::Render(
             }
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(panelName.asChar()), cameraName);
             manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
-            
-            _xRayEnabled = xRayEnabled;
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(false);//Allow prim removal propagation again.
         }
     }
@@ -1072,7 +1069,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _selection.reset();
     _wireframeColorInterfaceImp.reset();
     _leadObjectPathTracker.reset();
-
+    _oldDisplayStyle = 0;
     // Cleanup internal context data that keep references to data that is now
     // invalid.
     _engine.ClearTaskContextData();
@@ -1628,14 +1625,10 @@ void MtohRenderOverride::_RenderOverrideChangedCallback(
 }
 
 // return true if we need to recreate the filtering scene indices chain because of a change, false otherwise.
-bool MtohRenderOverride::_NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool xRayEnabled)
+bool MtohRenderOverride::_NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle)
 {
     if (areDifferentForOneOfTheseBits(currentDisplayStyle, _oldDisplayStyle,  
                                       MHWRender::MFrameContext::kBoundingBox)){
-        return true;
-    }
-    
-    if (_xRayEnabled != xRayEnabled){
         return true;
     }
 

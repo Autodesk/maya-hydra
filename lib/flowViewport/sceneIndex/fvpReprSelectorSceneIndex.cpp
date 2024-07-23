@@ -26,8 +26,6 @@
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 
-#include <iostream>
-
 // This class is a filtering scene index that that applies a different RepSelector on geometries (such as wireframe or wireframe on shaded)
 // and also applies an overrideWireframecolor for HdStorm 
 
@@ -84,7 +82,7 @@ ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inp
 }
 
 void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsReprChanged)
-{    
+{
     switch (reprType){
         case RepSelectorType::WireframeRefined:
             _wireframeTypeDataSource = sWireframeDisplayStyleDataSource;
@@ -102,9 +100,6 @@ void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsRep
     HdPrimvarsSchema::GetDefaultLocator()
     };
     _needsReprChanged = needsReprChanged;
-
-    // Dirty notification only if required.
-    
     _DirtyAllPrims(locators);
 }
 
@@ -122,8 +117,8 @@ ReprSelectorSceneIndex::_DirtyAllPrims(
 HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-    if (prim.dataSource && !_isExcluded(primPath) && 
-       (prim.primType == HdPrimTypeTokens->mesh) && _needsReprChanged){
+    if ( (prim.dataSource && !_isExcluded(primPath)) && 
+         (prim.primType == HdPrimTypeTokens->mesh) && _needsReprChanged ) {
 
         //Edit the dataSource as an overlay will not replace any existing attribute value.
         // So we need to edit the _primVarsTokens->overrideWireframeColor attribute as they may already exist in the prim
