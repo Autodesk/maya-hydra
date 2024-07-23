@@ -98,9 +98,13 @@ void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsRep
     }
     
     const HdDataSourceLocatorSet locators{
-    HdLegacyDisplayStyleSchema::GetDefaultLocator()
+    HdLegacyDisplayStyleSchema::GetDefaultLocator(),
+    HdPrimvarsSchema::GetDefaultLocator()
     };
     _needsReprChanged = needsReprChanged;
+
+    // Dirty notification only if required.
+    
     _DirtyAllPrims(locators);
 }
 

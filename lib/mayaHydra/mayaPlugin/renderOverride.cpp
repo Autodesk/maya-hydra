@@ -1150,7 +1150,7 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _lastFilteringSceneIndexBeforeCustomFiltering = _reprSelectorSceneIndex = 
                                                  Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
                                                  _wireframeColorInterfaceImp);
-    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::None,false);
+    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false);
 
     auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection, _wireframeColorInterfaceImp));
     wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
@@ -1630,11 +1630,8 @@ void MtohRenderOverride::_RenderOverrideChangedCallback(
 // return true if we need to recreate the filtering scene indices chain because of a change, false otherwise.
 bool MtohRenderOverride::_NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool xRayEnabled)
 {
-    if (areDifferentForOneOfTheseBits(currentDisplayStyle, _oldDisplayStyle, 
-            MHWRender::MFrameContext::kGouraudShaded    | 
-            MHWRender::MFrameContext::kWireFrame        | 
-            MHWRender::MFrameContext::kBoundingBox      )
-        ){
+    if (areDifferentForOneOfTheseBits(currentDisplayStyle, _oldDisplayStyle,  
+                                      MHWRender::MFrameContext::kBoundingBox)){
         return true;
     }
     
