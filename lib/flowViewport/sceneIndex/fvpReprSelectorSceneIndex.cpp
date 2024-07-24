@@ -93,6 +93,8 @@ void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsRep
         case RepSelectorType::WireframeOnSurfaceRefined:
             _wireframeTypeDataSource = sRefinedWireframeOnShadedDisplayStyleDataSource;
             break;
+        case RepSelectorType::Default:
+            break;
     }
     
     const HdDataSourceLocatorSet locators{
