@@ -736,25 +736,28 @@ MStatus MtohRenderOverride::Render(
         _useDefaultMaterial = currentUseDefaultMaterial;
     }
     
+    // Set Required Hydra Repr (Wireframe/WireframeOnShaded/Shaded)
+    // Hydra supports Wireframe and WireframeOnSurfaceRefined repr for wireframe on shaded mode.
+    // Refinement level for Hydra is set in Hydra Render Globals    
     const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
     if ( _reprSelectorSceneIndex && (currentDisplayStyle !=_oldDisplayStyle)){
         if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) && 
             ((currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded) || 
             (currentDisplayStyle & MHWRender::MFrameContext::kTextured)) ) {
                 // Wireframe on top of shaded
-                // Reduced quality
-                if (MFrameContext::WireOnShadedMode::kWireFrameOnShadedReduced == wireOnShadedMode ){
-                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface, true);
-                } else {//Full quality                
-                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined, true);
+                if (MFrameContext::WireOnShadedMode::kWireframeOnShadedFull == wireOnShadedMode &&
+                    delegateParams.refineLevel > 1 ) {
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined, /*needsReprChanged=*/true);
+                } else {              
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface, /*needsReprChanged=*/true);
                 }
             }
-            else if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) ){
+            else if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) ) {
                     //wireframe only, not on top of shaded
-                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined, true); 
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined, /*needsReprChanged=*/true); 
                 }
             else // Shaded mode
-                _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false);
+                _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, /*needsReprChanged=*/false);
     }
 
     HdxRenderTaskParams params;
@@ -1147,6 +1150,7 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _lastFilteringSceneIndexBeforeCustomFiltering = _reprSelectorSceneIndex = 
                                                  Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
                                                  _wireframeColorInterfaceImp);
+    _reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
     _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false);
 
     auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection, _wireframeColorInterfaceImp));

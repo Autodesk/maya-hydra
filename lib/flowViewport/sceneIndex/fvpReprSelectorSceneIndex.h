@@ -47,7 +47,7 @@ public:
         WireframeRefined, //Refined wireframe (refined means that it supports a "refineLevel" attribute in the displayStyle to get a more refined drawing, valid range is from 0 to 8)
         WireframeOnSurface, //Wireframe on surface not refined
         WireframeOnSurfaceRefined,//Wireframe on surface refined
-        Default,
+        Default, // Default shaded
     };
 
     FVP_API
