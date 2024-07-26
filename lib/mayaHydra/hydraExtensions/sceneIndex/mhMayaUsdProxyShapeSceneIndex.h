@@ -99,6 +99,7 @@ public:
 
 private:
     void _ObjectsChanged(const MAYAUSDAPI_NS::ProxyStageObjectsChangedNotice& notice);
+    void _StageContentsChanged(const MAYAUSDAPI_NS::ProxyStageStageContentsChangedNotice& notice);
     void _StageSet(const MAYAUSDAPI_NS::ProxyStageSetNotice& notice);
     void _StageInvalidate(const MAYAUSDAPI_NS::ProxyStageInvalidateNotice& notice);
     void _PopulateAndApplyPendingChanges();
@@ -112,6 +113,7 @@ private:
     TfNotice::Key                   _stageSetNoticeKey;
     TfNotice::Key                   _stageInvalidateNoticeKey;
     TfNotice::Key                   _objectsChangedNoticeKey;
+    TfNotice::Key                   _stageContentsChangedNoticeKey;
     long int                        _nbPopulateCalls{0};
 };
 

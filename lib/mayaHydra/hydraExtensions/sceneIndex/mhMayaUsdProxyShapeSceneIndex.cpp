@@ -41,6 +41,7 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(const MAYAUSDAPI_NS::Pr
     _stageSetNoticeKey = TfNotice::Register(ptr, &MayaUsdProxyShapeSceneIndex::_StageSet);
     _stageInvalidateNoticeKey = TfNotice::Register(ptr, &MayaUsdProxyShapeSceneIndex::_StageInvalidate);
     _objectsChangedNoticeKey = TfNotice::Register(ptr, &MayaUsdProxyShapeSceneIndex::_ObjectsChanged);
+    _stageContentsChangedNoticeKey = TfNotice::Register(ptr, &MayaUsdProxyShapeSceneIndex::_StageContentsChanged);
 
     Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
 }
@@ -50,6 +51,7 @@ MayaUsdProxyShapeSceneIndex::~MayaUsdProxyShapeSceneIndex()
     TfNotice::Revoke(_stageSetNoticeKey);
     TfNotice::Revoke(_stageInvalidateNoticeKey);
     TfNotice::Revoke(_objectsChangedNoticeKey);
+    TfNotice::Revoke(_stageContentsChangedNoticeKey);
 }
 
 MayaUsdProxyShapeSceneIndexRefPtr MayaUsdProxyShapeSceneIndex::New(const MAYAUSDAPI_NS::ProxyStage& proxyStage, 
@@ -92,6 +94,11 @@ void MayaUsdProxyShapeSceneIndex::_StageInvalidate(const MAYAUSDAPI_NS::ProxySta
 
 void MayaUsdProxyShapeSceneIndex::_ObjectsChanged(
     const MAYAUSDAPI_NS::ProxyStageObjectsChangedNotice& notice)
+{
+}
+
+void MayaUsdProxyShapeSceneIndex::_StageContentsChanged(
+    const MAYAUSDAPI_NS::ProxyStageStageContentsChangedNotice& notice)
 {
     _PopulateAndApplyPendingChanges();
 }
