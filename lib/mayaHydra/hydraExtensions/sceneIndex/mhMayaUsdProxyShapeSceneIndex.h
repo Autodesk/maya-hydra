@@ -69,16 +69,19 @@ public:
     New(const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
         const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
         const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
-        const MObjectHandle&                   dagNodeHandle);
+        const MObjectHandle&                   dagNodeHandle,
+        const PXR_NS::SdfPath&                 prefix
+    );
 
     // From HdSceneIndexBase
     HdSceneIndexPrim GetPrim(const SdfPath& primPath) const override;
     SdfPathVector GetChildPrimPaths(const SdfPath& primPath) const override;
 
-    MayaUsdProxyShapeSceneIndex(const MAYAUSDAPI_NS::ProxyStage&        proxyStage,
-                                const HdSceneIndexBaseRefPtr&           sceneIndexChainLastElement,
-                                const UsdImagingStageSceneIndexRefPtr&  usdImagingStageSceneIndex,
-                                const MObjectHandle&                    dagNodeHandle);
+    MayaUsdProxyShapeSceneIndex(const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
+                                const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
+                                const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
+                                const MObjectHandle&                   dagNodeHandle,
+                                const PXR_NS::SdfPath&                 prefix);
 
     virtual ~MayaUsdProxyShapeSceneIndex();
 
@@ -115,6 +118,7 @@ private:
     TfNotice::Key                   _objectsChangedNoticeKey;
     TfNotice::Key                   _stageContentsChangedNoticeKey;
     long int                        _nbPopulateCalls{0};
+    PXR_NS::SdfPath                 _prefix;
 };
 
 } // namespace MAYAHYDRA_NS_DEF

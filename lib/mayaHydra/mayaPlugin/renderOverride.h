@@ -39,6 +39,8 @@
 #include <mayaHydraLib/mhWireframeColorInterfaceImp.h>
 #include <mayaHydraLib/mhLeadObjectPathTracker.h>
 #include <mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h>
+#include <mayaHydraLib/pick/mhPickHandlerFwd.h>
+#include <mayaHydraLib/pick/mhPickContext.h>
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h>
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
@@ -46,6 +48,7 @@
 #include <flowViewport/selection/fvpSelectionFwd.h>
 #include <flowViewport/sceneIndex/fvpDisplayStyleOverrideSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruneTexturesSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpDefaultMaterialSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
@@ -89,12 +92,10 @@ using HdxPickHitVector = std::vector<struct HdxPickHit>;
 /*! \brief MtohRenderOverride is a rendering override class for the viewport to use Hydra instead of
  * VP2.0.
  */
-class MtohRenderOverride : public MHWRender::MRenderOverride
+class MtohRenderOverride : public MHWRender::MRenderOverride, 
+    public MayaHydra::PickContext
 {
 public:
-    // Picking support.
-    class PickHandlerBase;
-    friend PickHandlerBase;
 
     MtohRenderOverride(const MtohRendererDescription& desc);
     ~MtohRenderOverride() override;
@@ -150,6 +151,12 @@ public:
         MSelectionList&                  selectionList,
         MPointArray&                     worldSpaceHitPts) override;
 
+    // MayaHydra::PickContext overrides.
+    std::shared_ptr<const MayaHydraSceneIndexRegistry>
+    sceneIndexRegistry() const override;
+
+    HdRenderIndex* renderIndex() const override;
+
 private:
     typedef std::pair<MString, MCallbackIdArray> PanelCallbacks;
     typedef std::vector<PanelCallbacks>          PanelCallbacksList;
@@ -201,13 +208,11 @@ private:
 
     void _AddPluginSelectionHighlighting();
 
-    bool _NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool currentUseDefaultMaterial, bool xRayEnabled);
-
-    bool _IsMayaPickHandler(const MtohRenderOverride::PickHandlerBase* pickHandler)const;
+    bool _NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool xRayEnabled);
 
     // Determine the pick handler which should handle a pick hit, to transform
     // the pick hit into a selection.
-    const PickHandlerBase* _PickHandler(const HdxPickHit& hit) const;
+    MayaHydra::PickHandlerConstPtr _PickHandler(const HdxPickHit& hit) const;
 
     // Callbacks
     static void _ClearHydraCallback(void* data);
@@ -254,6 +259,7 @@ private:
     HdSceneIndexBaseRefPtr                    _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
     Fvp::DisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
     Fvp::PruneTexturesSceneIndexRefPtr        _pruneTexturesSceneIndex;
+    Fvp::DefaultMaterialSceneIndexRefPtr      _defaultMaterialSceneIndex;
     HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
@@ -306,9 +312,6 @@ private:
     unsigned int _oldDisplayStyle {0};
     bool       _useDefaultMaterial;
     bool       _xRayEnabled;
-
-    // Picking support.
-    const std::vector<std::unique_ptr<PickHandlerBase>> _pickHandlers;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
