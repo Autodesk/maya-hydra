@@ -54,7 +54,7 @@ if(DEFINED PXR_VERSION)
     # there is no need to extract them from the pxr/pxr.h header file anymore.
     # The only thing we need to do is assemble the USD_VERSION version string.
     set(USD_VERSION ${PXR_MAJOR_VERSION}.${PXR_MINOR_VERSION}.${PXR_PATCH_VERSION})
-elseif(USD_INCLUDE_DIR AND EXISTS "${PXR_INCLUDE_DIR}/pxr/pxr.h")
+elseif(USD_INCLUDE_DIR AND EXISTS "${USD_INCLUDE_DIR}/pxr/pxr.h")
     foreach(_usd_comp MAJOR MINOR PATCH)
         file(STRINGS
             "${USD_INCLUDE_DIR}/pxr/pxr.h"
@@ -146,7 +146,8 @@ if (USD_LIBRARY_DIR AND EXISTS "${USD_LIBRARY_DIR}/${USD_LIB_PREFIX}usdMtlx${CMA
     endif()
 endif()
 
-message(STATUS "USD include dir: ${PXR_INCLUDE_DIR}")
+message(STATUS "USD include dir: ${USD_INCLUDE_DIR}")
+message(STATUS "USD library dir: ${USD_LIBRARY_DIR}")
 message(STATUS "USD version: ${USD_VERSION}")
 if(DEFINED USD_BOOST_VERSION)
     message(STATUS "USD Boost::boost version: ${USD_BOOST_VERSION}")
@@ -157,14 +158,13 @@ include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(USD
     REQUIRED_VARS
         PXR_USD_LOCATION
-        PXR_INCLUDE_DIR
-        USD_LIBRARY_DIR
+        USD_INCLUDE_DIR
         USD_GENSCHEMA
         USD_CONFIG_FILE
         USD_VERSION
         PXR_VERSION
     VERSION_VAR
-        USD_VERSION
+        USD_VERSION 
 )
 
 find_program(OIIO_idiff_BINARY
