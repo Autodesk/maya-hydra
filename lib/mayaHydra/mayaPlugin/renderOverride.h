@@ -312,7 +312,7 @@ private:
     bool       _hasDefaultLighting = false;
     bool       _currentlyTextured = false;
     unsigned int _oldDisplayStyle {0};
-    unsigned int _oldReprLevel {0};
+    int        _oldRefineLevel {0};
     bool       _useDefaultMaterial;
     bool       _xRayEnabled;
 };

@@ -740,7 +740,7 @@ MStatus MtohRenderOverride::Render(
     // Hydra supports Wireframe and WireframeOnSurfaceRefined repr for wireframe on shaded mode.
     // Refinement level for Hydra is set in Hydra Render Globals    
     const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
-    if ( _reprSelectorSceneIndex && (currentDisplayStyle != _oldDisplayStyle) || delegateParams.refineLevel != _oldReprLevel){
+    if ( _reprSelectorSceneIndex && (currentDisplayStyle != _oldDisplayStyle) || delegateParams.refineLevel != _oldRefineLevel){
         if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) && 
             ((currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded) || 
             (currentDisplayStyle & MHWRender::MFrameContext::kTextured)) ) {
@@ -762,7 +762,7 @@ MStatus MtohRenderOverride::Render(
                 _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, 
                                                      /*needsReprChanged=*/false, delegateParams.refineLevel);
             
-        _oldReprLevel = delegateParams.refineLevel;
+        _oldRefineLevel = delegateParams.refineLevel;
     }
 
     HdxRenderTaskParams params;
@@ -1078,7 +1078,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _wireframeColorInterfaceImp.reset();
     _leadObjectPathTracker.reset();
     _oldDisplayStyle = 0;
-    _oldReprLevel = 0;
+    _oldRefineLevel = 0;
     // Cleanup internal context data that keep references to data that is now
     // invalid.
     _engine.ClearTaskContextData();
