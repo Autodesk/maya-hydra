@@ -70,6 +70,7 @@ target_link_libraries(${TARGET_NAME}
         sdf
         tf
         usd
+        ${MAYA_LIBRARIES}
     PRIVATE
         $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
         $<$<BOOL:${USD_001905_BUILD}>:hio>
