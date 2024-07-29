@@ -740,24 +740,29 @@ MStatus MtohRenderOverride::Render(
     // Hydra supports Wireframe and WireframeOnSurfaceRefined repr for wireframe on shaded mode.
     // Refinement level for Hydra is set in Hydra Render Globals    
     const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
-    if ( _reprSelectorSceneIndex && (currentDisplayStyle !=_oldDisplayStyle)){
+    if ( _reprSelectorSceneIndex && (currentDisplayStyle != _oldDisplayStyle) || delegateParams.refineLevel != _oldReprLevel){
         if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) && 
             ((currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded) || 
             (currentDisplayStyle & MHWRender::MFrameContext::kTextured)) ) {
                 // Wireframe on top of shaded
-                if (MFrameContext::WireOnShadedMode::kWireframeOnShadedFull == wireOnShadedMode &&
-                    delegateParams.refineLevel > 1 ) {
-                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined, /*needsReprChanged=*/true);
+                if (MFrameContext::WireOnShadedMode::kWireframeOnShadedFull == wireOnShadedMode) {
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined,
+                                                         /*needsReprChanged=*/true, delegateParams.refineLevel);
                 } else {              
-                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface, /*needsReprChanged=*/true);
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface, 
+                                                         /*needsReprChanged=*/true, delegateParams.refineLevel);
                 }
             }
             else if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) ) {
                     //wireframe only, not on top of shaded
-                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined, /*needsReprChanged=*/true); 
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined, 
+                                                         /*needsReprChanged=*/true, delegateParams.refineLevel); 
                 }
             else // Shaded mode
-                _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, /*needsReprChanged=*/false);
+                _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, 
+                                                     /*needsReprChanged=*/false, delegateParams.refineLevel);
+            
+        _oldReprLevel = delegateParams.refineLevel;
     }
 
     HdxRenderTaskParams params;
@@ -1073,6 +1078,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _wireframeColorInterfaceImp.reset();
     _leadObjectPathTracker.reset();
     _oldDisplayStyle = 0;
+    _oldReprLevel = 0;
     // Cleanup internal context data that keep references to data that is now
     // invalid.
     _engine.ClearTaskContextData();
@@ -1151,7 +1157,7 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
                                                  Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
                                                  _wireframeColorInterfaceImp);
     _reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
-    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false);
+    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false, _globals.delegateParams.refineLevel);
 
     auto wfSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection, _wireframeColorInterfaceImp));
     wfSi->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");

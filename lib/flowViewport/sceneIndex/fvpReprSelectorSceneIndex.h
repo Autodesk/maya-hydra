@@ -73,7 +73,7 @@ public:
     }
     
     FVP_API
-    void SetReprType(RepSelectorType, bool);
+    void SetReprType(RepSelectorType reprType, bool needsReprChanged, int refineLevel);
 
 protected:
     

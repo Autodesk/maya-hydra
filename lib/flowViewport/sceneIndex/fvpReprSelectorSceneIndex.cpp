@@ -81,7 +81,7 @@ ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inp
     TF_AXIOM(_wireframeColorInterface);
 }
 
-void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsReprChanged)
+void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsReprChanged, int refineLevel)
 {
     switch (reprType){
         case RepSelectorType::WireframeRefined:
@@ -91,7 +91,10 @@ void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsRep
             _wireframeTypeDataSource = sdWireframeOnShadedDisplayStyleDataSource;
             break;
         case RepSelectorType::WireframeOnSurfaceRefined:
-            _wireframeTypeDataSource = sRefinedWireframeOnShadedDisplayStyleDataSource;
+            if (refineLevel > 0)
+                _wireframeTypeDataSource = sRefinedWireframeOnShadedDisplayStyleDataSource;
+            else
+                _wireframeTypeDataSource = sdWireframeOnShadedDisplayStyleDataSource;
             break;
         case RepSelectorType::Default:
             break;
@@ -99,7 +102,8 @@ void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsRep
     
     const HdDataSourceLocatorSet locators{
     HdLegacyDisplayStyleSchema::GetDefaultLocator(),
-    HdPrimvarsSchema::GetDefaultLocator()
+    HdPrimvarsSchema::GetDefaultLocator(),
+    HdLegacyDisplayStyleSchema::GetDefaultLocator()
     };
     _needsReprChanged = needsReprChanged;
     _DirtyAllPrims(locators);
