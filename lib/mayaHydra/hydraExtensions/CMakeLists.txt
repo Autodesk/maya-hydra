@@ -56,8 +56,8 @@ target_include_directories(${TARGET_NAME}
 target_include_directories(${TARGET_NAME}
             PUBLIC
                 ${PYTHON_INCLUDE_DIR}
-                ${BOOST_INCLUDE_DIR}
-                ${PYTHON_INCLUDE_DIR}
+                ${BOOST_INCLUDE_DIR}               
+                ${CMAKE_BINARY_DIR}/include
             PRIVATE
                 $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
                 $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSD_INCLUDE_DIR}>
