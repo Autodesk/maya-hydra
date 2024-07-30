@@ -164,7 +164,7 @@ find_package_handle_standard_args(USD
         USD_VERSION
         PXR_VERSION
     VERSION_VAR
-        USD_VERSION 
+        USD_VERSION
 )
 
 find_program(OIIO_idiff_BINARY
