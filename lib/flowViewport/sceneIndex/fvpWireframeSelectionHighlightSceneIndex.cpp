@@ -20,10 +20,15 @@
 
 #include "flowViewport/debugCodes.h"
 
+#if PXR_VERSION >= 2403
+#include <pxr/imaging/hd/geomSubsetSchema.h>
+#endif
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
+#include <pxr/imaging/hd/meshSchema.h>
+#include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
@@ -31,6 +36,7 @@
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 
+#include <unordered_set>
 #include <stack>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -50,14 +56,6 @@ const HdRetainedContainerDataSourceHandle sRefinedWireDisplayStyleDataSource
             HdLegacyDisplayStyleSchemaTokens->reprSelector,
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
                 { HdReprTokens->refinedWire, TfToken(), TfToken() })));
-
-const HdRetainedContainerDataSourceHandle sRefinedWireOnSurfaceDisplayStyleDataSource
-    = HdRetainedContainerDataSource::New(
-        HdLegacyDisplayStyleSchemaTokens->displayStyle,
-        HdRetainedContainerDataSource::New(
-            HdLegacyDisplayStyleSchemaTokens->reprSelector,
-            HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
-                { HdReprTokens->refinedWireOnSurf, TfToken(), TfToken() })));
 
 const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
@@ -82,103 +80,25 @@ SdfPath _GetOriginalPathFromSelectionHighlightMirror(const SdfPath& mirrorPath)
     return mirrorPath.ReplaceName(TfToken(primName.substr(0, primName.size() - selectionHighlightMirrorTag.size())));
 }
 
-// Computes the mask to use for an instancer's selection highlight mirror
-// based on the instancer's topology and its selections. This allows
-// highlighting only specific instances in the case of instance selections.
-VtBoolArray _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionsSchema& selections) 
-{
-    // Schema getters were made const in USD 24.05 (specifically Hydra API version 66).
-    // We work around this for previous versions by const casting.
-    VtBoolArray originalMask = 
-#if HD_API_VERSION < 66
-    const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetMask()->GetTypedValue(0);
-#else
-    originalInstancerTopology.GetMask()->GetTypedValue(0);
-#endif
-
-    if (!selections.IsDefined()) {
-        return originalMask;
-    }
-
-    size_t nbInstances = 0;
-    auto instanceIndices = 
-#if HD_API_VERSION < 66
-    const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetInstanceIndices();
-#else
-    originalInstancerTopology.GetInstanceIndices();
-#endif
-    for (size_t iInstanceIndex = 0; iInstanceIndex < instanceIndices.GetNumElements(); iInstanceIndex++) {
-        auto protoInstances = instanceIndices.GetElement(iInstanceIndex)->GetTypedValue(0);
-        nbInstances += protoInstances.size();
-    }
-    if (!TF_VERIFY(originalMask.empty() || originalMask.size() == nbInstances, "Instancer mask has incorrect size.")) {
-        return originalMask;
-    }
-    VtBoolArray selectionHighlightMask(nbInstances, false);
-
-    for (size_t iSelection = 0; iSelection < selections.GetNumElements(); iSelection++) {
-        HdSelectionSchema selection = selections.GetElement(iSelection);
-        // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
-        // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
-        // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
-        if (!selection.GetFullySelected() || !selection.GetFullySelected()->GetTypedValue(0)) {
-            continue;
-        }
-        if (!selection.GetNestedInstanceIndices()) {
-            // We have a selection that has no instances, which means the whole instancer is selected :
-            // this overrides any instances selection.
-            return originalMask;
-        }
-        HdInstanceIndicesVectorSchema nestedInstanceIndices = selection.GetNestedInstanceIndices();
-        for (size_t iInstanceIndices = 0; iInstanceIndices < nestedInstanceIndices.GetNumElements(); iInstanceIndices++) {
-            HdInstanceIndicesSchema instanceIndices = nestedInstanceIndices.GetElement(0);
-            for (const auto& instanceIndex : instanceIndices.GetInstanceIndices()->GetTypedValue(0)) {
-                selectionHighlightMask[instanceIndex] = originalMask.empty() ? true : originalMask[instanceIndex];
-            }
-        }
-    }
-
-    return selectionHighlightMask;
-}
-
-// Returns the overall data source for an instancer's selection highlight mirror.
-// This replaces the mask data source and blocks the selections data source.
-HdContainerDataSourceHandle _GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& originalDataSource)
-{
-    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(originalDataSource);
-    HdSelectionsSchema selections = HdSelectionsSchema::GetFromParent(originalDataSource);
-
-    HdContainerDataSourceEditor editedDataSource = HdContainerDataSourceEditor(originalDataSource);
-
-    if (selections.IsDefined()) {
-        HdDataSourceLocator maskLocator = HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask);
-        VtBoolArray selectionHighlightMask = _GetSelectionHighlightMask(instancerTopology, selections);
-        auto selectionHighlightMaskDataSource = HdRetainedTypedSampledDataSource<VtBoolArray>::New(selectionHighlightMask);
-        editedDataSource.Set(maskLocator, selectionHighlightMaskDataSource);
-    }
-
-    editedDataSource.Set(HdSelectionsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-
-    return editedDataSource.Finish();
-}
-
 // Returns all paths related to instancing for this prim; this is analogous to getting the edges
 // connected to the given vertex (in this case a prim) of an instancing graph.
-SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim)
+SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim, Fvp::SelectionHighlightsCollectionDirection direction)
 {
     HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
     
     SdfPathVector instancingRelatedPaths;
 
-    if (instancerTopology.IsDefined()) {
+    if ((direction & Fvp::SelectionHighlightsCollectionDirection::Prototypes)
+        && instancerTopology.IsDefined()) {
         auto protoPaths = instancerTopology.GetPrototypes()->GetTypedValue(0);
         for (const auto& protoPath : protoPaths) {
             instancingRelatedPaths.push_back(protoPath);
         }
     }
 
-    if (instancedBy.IsDefined()) {
+    if ((direction & Fvp::SelectionHighlightsCollectionDirection::InstancedBy)
+        && instancedBy.IsDefined()) {
         auto instancerPaths = instancedBy.GetPaths()->GetTypedValue(0);
         for (const auto& instancerPath : instancerPaths) {
             instancingRelatedPaths.push_back(instancerPath);
@@ -410,11 +330,128 @@ WireframeSelectionHighlightSceneIndex(
 
     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
         if (prim.primType == HdPrimTypeTokens->instancer) {
-            _CreateInstancerHighlightsForInstancer(prim, primPath);
+            _CreateSelectionHighlightsForInstancer(prim, primPath);
         }
+        else if (prim.primType == HdPrimTypeTokens->mesh) {
+            _CreateSelectionHighlightsForMesh(prim, primPath);
+        }
+#if PXR_VERSION >= 2403
+        else if (prim.primType == HdPrimTypeTokens->geomSubset) {
+            _CreateSelectionHighlightsForGeomSubset(primPath);
+        }
+#endif
         return true;
     };
     _ForEachPrimInHierarchy(SdfPath::AbsoluteRootPath(), operation);
+}
+
+// Computes the mask to use for an instancer's selection highlight mirror
+// based on the instancer's topology and its selections.
+VtBoolArray
+WireframeSelectionHighlightSceneIndex::_GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionsSchema& selections) const
+{
+    // Schema getters were made const in USD 24.05 (specifically Hydra API version 66).
+    // We work around this for previous versions by const casting.
+    VtBoolArray originalMask = 
+#if HD_API_VERSION < 66
+    const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetMask()->GetTypedValue(0);
+#else
+    originalInstancerTopology.GetMask()->GetTypedValue(0);
+#endif
+
+    size_t nbInstances = 0;
+    auto instanceIndices = 
+#if HD_API_VERSION < 66
+    const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetInstanceIndices();
+#else
+    originalInstancerTopology.GetInstanceIndices();
+#endif
+    for (size_t iInstanceIndex = 0; iInstanceIndex < instanceIndices.GetNumElements(); iInstanceIndex++) {
+        auto protoInstances = instanceIndices.GetElement(iInstanceIndex)->GetTypedValue(0);
+        nbInstances += protoInstances.size();
+    }
+    if (!TF_VERIFY(originalMask.empty() || originalMask.size() == nbInstances, "Instancer mask has incorrect size.")) {
+        return originalMask;
+    }
+    VtBoolArray selectionHighlightMask = [&]() {
+        if (!selections.IsDefined()) {
+            return originalMask.empty() ? VtBoolArray(nbInstances, true) : originalMask;
+        }
+        return VtBoolArray(nbInstances, false);
+    }();
+
+    if (!selections.IsDefined()) {
+        // There are no selections on this instancer highlight mirror; this means it was created 
+        // in order to propagate the selection highlight mirror of at least one of its prototypes.
+        // Since we don't want to highlight non-selected prototypes, hide all instances for which`
+        // their prototype has no selection highlight.
+        auto protos = 
+#if HD_API_VERSION < 66
+        const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetPrototypes()->GetTypedValue(0);
+#else
+        originalInstancerTopology.GetPrototypes()->GetTypedValue(0);
+#endif
+        for (size_t iProto = 0; iProto < protos.size(); iProto++) {
+            auto protoPath = protos[iProto];
+            auto protoHighlightPath = GetSelectionHighlightPath(protoPath);
+            if (protoHighlightPath == protoPath) {
+                // No selection highlight for this prototype; disable its instances
+                auto protoInstanceIndices = 
+#if HD_API_VERSION < 66
+                const_cast<HdInstancerTopologySchema&>(originalInstancerTopology).GetInstanceIndices().GetElement(iProto)->GetTypedValue(0);
+#else
+                originalInstancerTopology.GetInstanceIndices().GetElement(iProto)->GetTypedValue(0);
+#endif
+                for (const auto& protoInstanceIndex : protoInstanceIndices) {
+                    selectionHighlightMask[protoInstanceIndex] = false;
+                }
+            }
+        }
+        return selectionHighlightMask;
+    }
+
+    for (size_t iSelection = 0; iSelection < selections.GetNumElements(); iSelection++) {
+        HdSelectionSchema selection = selections.GetElement(iSelection);
+        // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
+        // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
+        // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
+        if (!selection.GetFullySelected() || !selection.GetFullySelected()->GetTypedValue(0)) {
+            continue;
+        }
+        if (!selection.GetNestedInstanceIndices()) {
+            // We have a selection that has no instances, which means the whole instancer is selected :
+            // this overrides any instances selection.
+            return originalMask;
+        }
+        HdInstanceIndicesVectorSchema nestedInstanceIndices = selection.GetNestedInstanceIndices();
+        for (size_t iInstanceIndices = 0; iInstanceIndices < nestedInstanceIndices.GetNumElements(); iInstanceIndices++) {
+            HdInstanceIndicesSchema instanceIndices = nestedInstanceIndices.GetElement(0);
+            for (const auto& instanceIndex : instanceIndices.GetInstanceIndices()->GetTypedValue(0)) {
+                selectionHighlightMask[instanceIndex] = originalMask.empty() ? true : originalMask[instanceIndex];
+            }
+        }
+    }
+    return selectionHighlightMask;
+}
+
+// Returns the overall data source for an instancer's selection highlight mirror.
+// This replaces the mask data source.
+HdContainerDataSourceHandle
+WireframeSelectionHighlightSceneIndex::_GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& originalDataSource) const
+{
+    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(originalDataSource);
+    HdSelectionsSchema selections = HdSelectionsSchema::GetFromParent(originalDataSource);
+
+    HdContainerDataSourceEditor editedDataSource = HdContainerDataSourceEditor(originalDataSource);
+
+    if (selections.IsDefined()) {
+        HdDataSourceLocator maskLocator = HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask);
+        VtBoolArray selectionHighlightMask = _GetSelectionHighlightMask(instancerTopology, selections);
+        auto selectionHighlightMaskDataSource = HdRetainedTypedSampledDataSource<VtBoolArray>::New(selectionHighlightMask);
+        editedDataSource.Set(maskLocator, selectionHighlightMaskDataSource);
+    }
+
+    return editedDataSource.Finish();
 }
 
 HdSceneIndexPrim
@@ -427,8 +464,7 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         return GetInputSceneIndex()->GetPrim(primPath);
     }
     
-    // Is this prim part of a selection highlight mirror hierarchy?
-    // If so, then we are dealing with a point instancer or instance selection.
+    // If this prim is part of a selection highlight mirror hierarchy, tweak the prim's data source accordingly.
     SdfPath selectionHighlightMirrorAncestor = _FindSelectionHighlightMirrorAncestor(primPath);
     if (!selectionHighlightMirrorAncestor.IsEmpty()) {
         SdfPath originalPrimPath = primPath.ReplacePrefix(selectionHighlightMirrorAncestor, _GetOriginalPathFromSelectionHighlightMirror(selectionHighlightMirrorAncestor));
@@ -444,27 +480,31 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
             }
             else if (selectionHighlightPrim.primType == HdPrimTypeTokens->mesh) {
                 selectionHighlightPrim.dataSource = _HighlightSelectedPrim(selectionHighlightPrim.dataSource, originalPrimPath, sRefinedWireDisplayStyleDataSource);
+#if PXR_VERSION >= 2403
+                selectionHighlightPrim.dataSource = _TrimMeshForSelectedGeomSubsets(selectionHighlightPrim.dataSource, originalPrimPath);
+#endif
+            }
+#if PXR_VERSION >= 2403
+            else if (selectionHighlightPrim.primType == HdPrimTypeTokens->geomSubset) {
+                // If we returned the geomSubset prims unchanged, they could contain face indices that exceed
+                // the trimmed mesh's number of faces, which prints a warning. We don't need the geomSubset
+                // highlight mirrors anyways, so just return nothing.
+                selectionHighlightPrim.dataSource = {};
+            }
+#endif
+
+            // Block out the selections data source as we don't actually select a highlight
+            if (selectionHighlightPrim.dataSource) {
+                HdContainerDataSourceEditor dataSourceEditor = HdContainerDataSourceEditor(selectionHighlightPrim.dataSource);
+                dataSourceEditor.Set(HdSelectionsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+                selectionHighlightPrim.dataSource = dataSourceEditor.Finish();
             }
         }
         return selectionHighlightPrim;
     }
     
-    // We are dealing with a mesh prototype selection, a regular selection, or no selection at all.
-    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-    if (prim.primType == HdPrimTypeTokens->mesh) {
-        // Note : in the USD data model, the original prims that get propagated as prototypes have their original prim types erased.
-        // Only the resulting propagated prototypes keep the original prim type.
-
-        // We want to constrain the selected ancestor lookup to only the hierarchies the prim is a part of.
-        auto roots = _GetHierarchyRoots(prim);
-        for (const auto& root : roots) {
-            if (_selection->HasFullySelectedAncestorInclusive(primPath, root)) {
-                prim.dataSource = _HighlightSelectedPrim(prim.dataSource, primPath, sRefinedWireOnSurfaceDisplayStyleDataSource);
-                break;
-            }
-        }
-    }
-    return prim;
+    // This prim is not in a selection highlight mirror hierarchy; just pass-through our input.
+    return GetInputSceneIndex()->GetPrim(primPath);
 }
 
 SdfPathVector
@@ -474,11 +514,18 @@ WireframeSelectionHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath
     SdfPath selectionHighlightMirrorAncestor = _FindSelectionHighlightMirrorAncestor(primPath);
     if (!selectionHighlightMirrorAncestor.IsEmpty()) {
         SdfPath originalAncestor = _GetOriginalPathFromSelectionHighlightMirror(selectionHighlightMirrorAncestor);
-        auto childPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath.ReplacePrefix(selectionHighlightMirrorAncestor, originalAncestor));
-        for (auto& childPath : childPaths) {
-            childPath = childPath.ReplacePrefix(originalAncestor, selectionHighlightMirrorAncestor);
+        auto originalChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath.ReplacePrefix(selectionHighlightMirrorAncestor, originalAncestor));
+        SdfPathVector implicitSelectionHighlightChildPaths;
+        for (const auto& originalChildPath : originalChildPaths) {
+            SdfPath explicitSelectionHighlightChildPath = _GetSelectionHighlightMirrorPathFromOriginal(originalChildPath);
+            if (_SelectionHighlightMirrorExists(explicitSelectionHighlightChildPath)) {
+                // There already exists an explicit selection highlight mirror for this child (e.g. point instance prototypes),
+                // so don't create a duplicate implicit one.
+                continue;
+            }
+            implicitSelectionHighlightChildPaths.push_back(originalChildPath.ReplacePrefix(originalAncestor, selectionHighlightMirrorAncestor));
         }
-        return childPaths;
+        return implicitSelectionHighlightChildPaths;
     }
 
     // When outside a selection highlight mirror hierarchy, add each child's corresponding
@@ -487,8 +534,7 @@ WireframeSelectionHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath
     SdfPathVector additionalChildPaths;
     for (const auto& childPath : childPaths) {
         SdfPath selectionHighlightPath = _GetSelectionHighlightMirrorPathFromOriginal(childPath);
-        if (_selectionHighlightMirrorUseCounters.find(selectionHighlightPath) != _selectionHighlightMirrorUseCounters.end() 
-            && _selectionHighlightMirrorUseCounters.at(selectionHighlightPath) > 0) {
+        if (_SelectionHighlightMirrorExists(selectionHighlightPath)) {
             additionalChildPaths.push_back(selectionHighlightPath);
         }
     }
@@ -501,7 +547,7 @@ HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSel
 {
     //Always edit its override wireframe color
     auto edited = HdContainerDataSourceEditor(dataSource);
-    edited.Set(HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),
+    edited.Set(primvarsOverrideWireframeColorLocator,
                         Fvp::PrimvarDataSource::New(
                             HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{_wireframeColorInterface->getWireframeColor(primPath)}),
                             HdPrimvarSchemaTokens->constant,
@@ -529,6 +575,94 @@ HdContainerDataSourceHandle WireframeSelectionHighlightSceneIndex::_HighlightSel
     return edited.Finish();
 }
 
+#if PXR_VERSION >= 2403
+// Edits the mesh topology to only only contain its selected GeomSubsets
+HdContainerDataSourceHandle
+WireframeSelectionHighlightSceneIndex::_TrimMeshForSelectedGeomSubsets(const HdContainerDataSourceHandle& originalDataSource, const SdfPath& originalPrimPath) const
+{
+    HdMeshSchema meshSchema = HdMeshSchema::GetFromParent(originalDataSource);
+    if (!meshSchema.IsDefined()) {
+        return originalDataSource;
+    }
+    HdMeshTopologySchema meshTopologySchema = meshSchema.GetTopology();
+    if (!meshTopologySchema.IsDefined()) {
+        return originalDataSource;
+    }
+    HdDataSourceLocator pointsValueLocator = HdDataSourceLocator(HdPrimvarsSchemaTokens->primvars, HdPrimvarsSchemaTokens->points, HdPrimvarSchemaTokens->primvarValue);
+    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(originalDataSource, pointsValueLocator));
+    if (!pointsValueDataSource) {
+        return originalDataSource;
+    }
+
+    // Collect faces to keep based on selected GeomSubsets
+    std::unordered_set<int> faceIndicesToKeep;
+    for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(originalPrimPath)) {
+        HdSceneIndexPrim childPrim = GetInputSceneIndex()->GetPrim(childPath);
+        if (childPrim.primType != HdPrimTypeTokens->geomSubset) {
+            continue;
+        }
+
+        HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema(childPrim.dataSource);
+        if (!geomSubsetSchema.IsDefined() || geomSubsetSchema.GetType()->GetTypedValue(0) != HdGeomSubsetSchemaTokens->typeFaceSet) {
+            continue;
+        }
+
+        HdSelectionsSchema geomSubsetSelections = HdSelectionsSchema::GetFromParent(childPrim.dataSource);
+        if (!geomSubsetSelections.IsDefined() || geomSubsetSelections.GetNumElements() == 0) {
+            continue;
+        }
+
+        VtArray<int> faceIndices = geomSubsetSchema.GetIndices()->GetTypedValue(0);
+        for (const auto& faceIndex : faceIndices) {
+            faceIndicesToKeep.insert(faceIndex);
+        }
+    }
+    if (faceIndicesToKeep.empty()) {
+        // If there are no selected geomSubsets, don't trim the mesh.
+        return originalDataSource;
+    }
+
+    // Edit the mesh topology
+    HdContainerDataSourceEditor dataSourceEditor = HdContainerDataSourceEditor(originalDataSource);
+    VtArray<int> originalFaceVertexCounts = meshTopologySchema.GetFaceVertexCounts()->GetTypedValue(0);
+    VtArray<int> originalFaceVertexIndices = meshTopologySchema.GetFaceVertexIndices()->GetTypedValue(0);
+    VtArray<int> trimmedFaceVertexCounts;
+    VtArray<int> trimmedFaceVertexIndices;
+    int maxVertexIndex = 0;
+    size_t iFaceCounts = 0;
+    size_t iFaceIndices = 0;
+    while (iFaceCounts < originalFaceVertexCounts.size() && iFaceIndices < originalFaceVertexIndices.size()) {
+        int currFaceCount = originalFaceVertexCounts[iFaceCounts];
+
+        if (faceIndicesToKeep.find(iFaceCounts) != faceIndicesToKeep.end()) {
+            trimmedFaceVertexCounts.push_back(currFaceCount);
+            for (int faceIndicesOffset = 0; faceIndicesOffset < currFaceCount; faceIndicesOffset++) {
+                int vertexIndex = originalFaceVertexIndices[iFaceIndices + faceIndicesOffset];
+                trimmedFaceVertexIndices.push_back(vertexIndex);
+                if (vertexIndex > maxVertexIndex) {
+                    maxVertexIndex = vertexIndex;
+                }
+            }
+        }
+
+        iFaceCounts++;
+        iFaceIndices += currFaceCount;
+    }
+    auto faceVertexCountsLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexCounts);
+    auto faceVertexIndicesLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexIndices);
+    
+    dataSourceEditor.Set(faceVertexCountsLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexCounts));
+    dataSourceEditor.Set(faceVertexIndicesLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexIndices));
+
+    // We reduce the points primvar so that it has only the exact number of points required by the trimmed topology;
+    // this avoids a warning from USD.
+    VtArray<GfVec3f> points = pointsValueDataSource->GetTypedValue(0);
+    points.resize(maxVertexIndex + 1);
+    dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
+
+    return dataSourceEditor.Finish();
+}
+#endif
 
 void
 WireframeSelectionHighlightSceneIndex::_PrimsAdded(
@@ -542,8 +676,16 @@ WireframeSelectionHighlightSceneIndex::_PrimsAdded(
     for (const auto& entry : entries) {
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
         if (prim.primType == HdPrimTypeTokens->instancer) {
-            _CreateInstancerHighlightsForInstancer(prim, entry.primPath);
+            _CreateSelectionHighlightsForInstancer(prim, entry.primPath);
         }
+        else if (prim.primType == HdPrimTypeTokens->mesh) {
+            _CreateSelectionHighlightsForMesh(prim, entry.primPath);
+        }
+#if PXR_VERSION >= 2403
+        else if (prim.primType == HdPrimTypeTokens->geomSubset) {
+            _CreateSelectionHighlightsForGeomSubset(entry.primPath);
+        }
+#endif
     }
 }
 
@@ -556,9 +698,9 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
         .Msg("WireframeSelectionHighlightSceneIndex::_PrimsDirtied() called.\n");
 
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
-    std::vector<SdfPath> instancerHighlightsToRebuild;
-    std::vector<std::pair<SdfPath, SdfPath>> instancerHighlightUsersToAdd;
-    std::vector<std::pair<SdfPath, SdfPath>> instancerHighlightUsersToRemove;
+    std::vector<SdfPath> selectionHighlightsToRebuild;
+    std::vector<std::pair<SdfPath, SdfPath>> selectionHighlightUsersToAdd;
+    std::vector<std::pair<SdfPath, SdfPath>> selectionHighlightUsersToRemove;
 
     for (const auto& entry : entries) {
         if (_IsExcluded(entry.primPath)) {
@@ -574,13 +716,13 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
         }
 
         if (entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator())
-            && _selectionHighlightMirrorsByInstancer.find(entry.primPath) != _selectionHighlightMirrorsByInstancer.end()) {
+            && _selectionHighlightMirrorsByPrim.find(entry.primPath) != _selectionHighlightMirrorsByPrim.end()) {
             // An instancer with a selection highlight was changed; rebuild its selection highlight.
             // We do not need to check for instancedBy dirtying. If an instancedBy data source is dirtied,
             // then either :
             // 1) A new instancer was added : this is handled in _PrimsAdded.
             // 2) An existing instancer's instancerTopology data source was dirtied : this is handled here.
-            instancerHighlightsToRebuild.push_back(entry.primPath);
+            selectionHighlightsToRebuild.push_back(entry.primPath);
         }
         
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
@@ -594,6 +736,17 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             if (prim.primType == HdPrimTypeTokens->instancer && selectionHighlightPath != entry.primPath) {
                 dirtiedPrims.emplace_back(selectionHighlightPath, HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask));
             }
+
+#if PXR_VERSION >= 2403
+            // If a geomSubset's selection changes, dirty the selection highlight mesh to trim it appropriately.
+            if (prim.primType == HdPrimTypeTokens->geomSubset) {
+                SdfPath meshPath = entry.primPath.GetParentPath();
+                SdfPath selectionHighlightMeshPath = GetSelectionHighlightPath(meshPath);
+                if (selectionHighlightMeshPath != meshPath) {
+                    dirtiedPrims.emplace_back(selectionHighlightMeshPath, HdDataSourceLocator(HdMeshSchemaTokens->mesh, HdMeshSchemaTokens->topology));
+                }
+            }
+#endif
             
             // All mesh prims recursively under the selection dirty prim have a
             // dirty wireframe selection highlight.
@@ -605,21 +758,32 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
             bool isSelected = selectionsSchema.IsDefined() && selectionsSchema.GetNumElements() > 0;
 
-            // Update child instancer highlights for ancestor-based selection highlighting
-            // (i.e. selecting one or more of an instancer's parents should highlight the instancer)
+#if PXR_VERSION >= 2403
+            if (prim.primType == HdPrimTypeTokens->geomSubset) {
+                // Create a selection highlight on the parent mesh of the selected geomSubset 
+                if (isSelected) {
+                    selectionHighlightUsersToAdd.push_back({entry.primPath.GetParentPath(), entry.primPath});
+                } else {
+                    selectionHighlightUsersToRemove.push_back({entry.primPath.GetParentPath(), entry.primPath});
+                }
+            }
+#endif
+
+            // Update child selection highlights for ancestor-based selection highlighting
+            // (i.e. selecting one or more of an instancer's parents should highlight the instancer,
+            // same thing for meshes)
             auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
-                if (prim.primType == HdPrimTypeTokens->instancer) {
+                if ((prim.primType == HdPrimTypeTokens->instancer && !_IsPrototype(prim))
+                    || prim.primType == HdPrimTypeTokens->mesh) {
                     if (isSelected) {
-                        instancerHighlightUsersToAdd.push_back({primPath,entry.primPath});
+                        selectionHighlightUsersToAdd.push_back({primPath,entry.primPath});
                     } else {
-                        instancerHighlightUsersToRemove.push_back({primPath,entry.primPath});
+                        selectionHighlightUsersToRemove.push_back({primPath,entry.primPath});
                     }
                 }
                 return true;
             };
-            if (!_IsPrototype(prim)) {
-                _ForEachPrimInHierarchy(entry.primPath, operation);
-            }
+            _ForEachPrimInHierarchy(entry.primPath, operation);
         }
     }
 
@@ -633,14 +797,14 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
         _SendPrimsDirtied(entries);
     }
 
-    for (const auto& instancerHighlightToRebuild : instancerHighlightsToRebuild) {
-        _RebuildInstancerHighlight(instancerHighlightToRebuild);
+    for (const auto& selectionHighlightToRebuild : selectionHighlightsToRebuild) {
+        _RebuildSelectionHighlight(selectionHighlightToRebuild);
     }
-    for (const auto& instancerHighlightUserToAdd : instancerHighlightUsersToAdd) {
-        _AddInstancerHighlightUser(instancerHighlightUserToAdd.first, instancerHighlightUserToAdd.second);
+    for (const auto& selectionHighlightUserToAdd : selectionHighlightUsersToAdd) {
+        _AddSelectionHighlightUser(selectionHighlightUserToAdd.first, selectionHighlightUserToAdd.second);
     }
-    for (const auto& instancerHighlightUserToRemove : instancerHighlightUsersToRemove) {
-        _RemoveInstancerHighlightUser(instancerHighlightUserToRemove.first, instancerHighlightUserToRemove.second);
+    for (const auto& selectionHighlightUserToRemove : selectionHighlightUsersToRemove) {
+        _RemoveSelectionHighlightUser(selectionHighlightUserToRemove.first, selectionHighlightUserToRemove.second);
     }
 }
 
@@ -653,17 +817,17 @@ WireframeSelectionHighlightSceneIndex::_PrimsRemoved(
         .Msg("WireframeSelectionHighlightSceneIndex::_PrimsRemoved() called.\n");
 
     for (const auto& entry : entries) {
-        // Collect and delete instancer highlights for all instancers rooted under the removed prim
-        // (or if the removed prim is an instancer itself and has a highlight)
-        SdfPathVector instancerHighlightsToDelete;
-        for (const auto& selectionHighlightMirrorsForInstancer : _selectionHighlightMirrorsByInstancer) {
-            SdfPath instancerPath = selectionHighlightMirrorsForInstancer.first;
-            if (instancerPath.HasPrefix(entry.primPath)) {
-                instancerHighlightsToDelete.push_back(instancerPath);
+        // Collect and delete selection highlights for all prims rooted under the removed prim
+        // (or if the removed prim itself has a highlight)
+        SdfPathVector selectionHighlightsToDelete;
+        for (const auto& selectionHighlightMirrorsForPrim : _selectionHighlightMirrorsByPrim) {
+            SdfPath primPath = selectionHighlightMirrorsForPrim.first;
+            if (primPath.HasPrefix(entry.primPath)) {
+                selectionHighlightsToDelete.push_back(primPath);
             }
         }
-        for (const auto& instancerHighlightToDelete : instancerHighlightsToDelete) {
-            _DeleteInstancerHighlight(instancerHighlightToDelete);
+        for (const auto& selectionHighlightToDelete : selectionHighlightsToDelete) {
+            _DeleteSelectionHighlight(selectionHighlightToDelete);
         }
     }
     _SendPrimsRemoved(entries);
@@ -714,12 +878,21 @@ WireframeSelectionHighlightSceneIndex::GetSelectionHighlightPath(const SdfPath& 
     auto ancestorsRange = path.GetAncestorsRange();
     for (auto ancestor : ancestorsRange) {
         const SdfPath mirrorPath = _GetSelectionHighlightMirrorPathFromOriginal(ancestor);
-        if (_selectionHighlightMirrorUseCounters.find(mirrorPath) != _selectionHighlightMirrorUseCounters.end()
-            && _selectionHighlightMirrorUseCounters.at(mirrorPath) > 0) {
+        if (_SelectionHighlightMirrorExists(mirrorPath)) {
             return path.ReplacePrefix(ancestor, mirrorPath);
         }
     }
     return path;
+}
+
+SdfPathVector
+WireframeSelectionHighlightSceneIndex::GetSelectionHighlightMirrorPaths() const
+{
+    SdfPathVector mirrorPaths;
+    for (const auto& selectionHighlightMirrorKvp : _selectionHighlightMirrorUseCounters) {
+        mirrorPaths.push_back(selectionHighlightMirrorKvp.first);
+    }
+    return mirrorPaths;
 }
 
 void
@@ -756,8 +929,7 @@ WireframeSelectionHighlightSceneIndex::_FindSelectionHighlightMirrorAncestor(con
 {
     auto ancestorsRange = path.GetAncestorsRange();
     for (auto ancestor : ancestorsRange) {
-        if (_selectionHighlightMirrorUseCounters.find(ancestor) != _selectionHighlightMirrorUseCounters.end() 
-            && _selectionHighlightMirrorUseCounters.at(ancestor) > 0) {
+        if (_SelectionHighlightMirrorExists(ancestor)) {
             return ancestor;
         }
     }
@@ -765,7 +937,7 @@ WireframeSelectionHighlightSceneIndex::_FindSelectionHighlightMirrorAncestor(con
 }
 
 void
-WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const PXR_NS::SdfPath& originalPrimPath, PXR_NS::SdfPathSet& outSelectionHighlightMirrors, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outAddedPrims)
+WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const PXR_NS::SdfPath& originalPrimPath, SelectionHighlightsCollectionDirection direction, PXR_NS::SdfPathSet& outSelectionHighlightMirrors, PXR_NS::HdSceneIndexObserver::AddedPrimEntries& outAddedPrims)
 {
     // This should never be called on selection highlight prims, only on original prims
     TF_AXIOM(_FindSelectionHighlightMirrorAncestor(originalPrimPath).IsEmpty());
@@ -773,13 +945,13 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const P
     HdSceneIndexPrim originalPrim = GetInputSceneIndex()->GetPrim(originalPrimPath);
 
     // If this is a prototype sub-prim, redirect the call to the prototype root, so that the prototype root
-    // becomes the actual selection highlight mirror. The instancing-related paths of the instancer will be
-    // processed as part of the children traversal later down this method.
+    // becomes the actual selection highlight mirror. The instancing-related paths will be processed as part
+    // of the children traversal later down this method.
     if (_IsPrototypeSubPrim(originalPrim, originalPrimPath)) {
         HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(originalPrim.dataSource);
         auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
         for (const auto& protoRootPath : protoRootPaths) {
-            _CollectSelectionHighlightMirrors(protoRootPath, outSelectionHighlightMirrors, outAddedPrims);
+            _CollectSelectionHighlightMirrors(protoRootPath, direction, outSelectionHighlightMirrors, outAddedPrims);
         }
         return;
     }
@@ -791,43 +963,79 @@ WireframeSelectionHighlightSceneIndex::_CollectSelectionHighlightMirrors(const P
     }
     outSelectionHighlightMirrors.insert(selectionHighlightPrimPath);
 
-    // Traverse the children of this prim to find the child instancers, and add its instancing-related
-    // paths so we can process them and create selection highlight mirrors for them as well.
-    SdfPathVector affectedOriginalPrimPaths;
+    // Traverse the children of this prim to find the affected child prims, and process their instancing-related
+    // paths so we can create selection highlight mirrors for these prims as well.
+    SdfPathVector affectedPrototypePaths;
+    SdfPathVector affectedInstancedByPaths;
     auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
         outAddedPrims.push_back({primPath.ReplacePrefix(originalPrimPath, selectionHighlightPrimPath), prim.primType});
-        if (prim.primType == HdPrimTypeTokens->instancer) {
-            SdfPathVector instancingRelatedPaths = _GetInstancingRelatedPaths(prim);
-            affectedOriginalPrimPaths.insert(affectedOriginalPrimPaths.end(), instancingRelatedPaths.begin(), instancingRelatedPaths.end());
-            return false; // We have found an instancer, don't process its children (nested instancers will be processed through the instancing-related paths).
+        if (prim.primType == HdPrimTypeTokens->instancer || prim.primType == HdPrimTypeTokens->mesh) {
+            if (direction & SelectionHighlightsCollectionDirection::Prototypes) {
+                auto prototypePaths = _GetInstancingRelatedPaths(prim, SelectionHighlightsCollectionDirection::Prototypes);
+                affectedPrototypePaths.insert(affectedPrototypePaths.end(), prototypePaths.begin(), prototypePaths.end());
+            }
+            if (direction & SelectionHighlightsCollectionDirection::InstancedBy) {
+                auto instancedByPaths = _GetInstancingRelatedPaths(prim, SelectionHighlightsCollectionDirection::InstancedBy);
+                affectedInstancedByPaths.insert(affectedInstancedByPaths.end(), instancedByPaths.begin(), instancedByPaths.end());
+            }
+            // We hit an instancing-related prim, don't process its children (nested instancing will be processed through the instancing-related paths).
+            return false;
         }
         return true;
     };
     _ForEachPrimInHierarchy(originalPrimPath, operation);
 
-    for (const auto& affectedOriginalPrimPath : affectedOriginalPrimPaths) {
-        _CollectSelectionHighlightMirrors(affectedOriginalPrimPath, outSelectionHighlightMirrors, outAddedPrims);
+    for (const auto& affectedPrototypePath : affectedPrototypePaths) {
+        _CollectSelectionHighlightMirrors(affectedPrototypePath, SelectionHighlightsCollectionDirection::Prototypes, outSelectionHighlightMirrors, outAddedPrims);
+    }
+    for (const auto& affectedInstancedByPath : affectedInstancedByPaths) {
+        _CollectSelectionHighlightMirrors(affectedInstancedByPath, SelectionHighlightsCollectionDirection::InstancedBy, outSelectionHighlightMirrors, outAddedPrims);
+    }
+}
+
+bool
+WireframeSelectionHighlightSceneIndex::_SelectionHighlightMirrorExists(const SdfPath& selectionHighlightMirrorPath) const
+{
+    return _selectionHighlightMirrorUseCounters.find(selectionHighlightMirrorPath) != _selectionHighlightMirrorUseCounters.end() 
+        && _selectionHighlightMirrorUseCounters.at(selectionHighlightMirrorPath) > 0;
+}
+
+void
+WireframeSelectionHighlightSceneIndex::_IncrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath)
+{
+    _selectionHighlightMirrorUseCounters[selectionHighlightMirrorPath]++;
+}
+
+void
+WireframeSelectionHighlightSceneIndex::_DecrementSelectionHighlightMirrorUseCounter(const PXR_NS::SdfPath& selectionHighlightMirrorPath)
+{
+    TF_AXIOM(_SelectionHighlightMirrorExists(selectionHighlightMirrorPath));
+    _selectionHighlightMirrorUseCounters[selectionHighlightMirrorPath]--;
+    if (_selectionHighlightMirrorUseCounters[selectionHighlightMirrorPath] == 0) {
+        _selectionHighlightMirrorUseCounters.erase(selectionHighlightMirrorPath);
+        _SendPrimsRemoved({selectionHighlightMirrorPath});
     }
 }
 
 void
-WireframeSelectionHighlightSceneIndex::_AddInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const SdfPath& userPath)
+WireframeSelectionHighlightSceneIndex::_AddSelectionHighlightUser(const PXR_NS::SdfPath& primPath, const SdfPath& userPath)
 {
-    TF_AXIOM(GetInputSceneIndex()->GetPrim(instancerPath).primType == HdPrimTypeTokens->instancer);
-    
-    if (_instancerHighlightUsersByInstancer[instancerPath].find(userPath) != _instancerHighlightUsersByInstancer[instancerPath].end()) {
+    auto primType = GetInputSceneIndex()->GetPrim(primPath).primType;
+    TF_AXIOM(primType == HdPrimTypeTokens->instancer || primType == HdPrimTypeTokens->mesh);
+
+    if (_selectionHighlightUsersByPrim[primPath].find(userPath) != _selectionHighlightUsersByPrim[primPath].end()) {
         return;
     }
 
-    _instancerHighlightUsersByInstancer[instancerPath].insert(userPath);
-    if (_selectionHighlightMirrorsByInstancer.find(instancerPath) == _selectionHighlightMirrorsByInstancer.end()) {
+    _selectionHighlightUsersByPrim[primPath].insert(userPath);
+    if (_selectionHighlightMirrorsByPrim.find(primPath) == _selectionHighlightMirrorsByPrim.end()) {
         SdfPathSet selectionHighlightMirrors;
         HdSceneIndexObserver::AddedPrimEntries addedPrims;
-        _CollectSelectionHighlightMirrors(instancerPath, selectionHighlightMirrors, addedPrims);
+        _CollectSelectionHighlightMirrors(primPath, SelectionHighlightsCollectionDirection::Bidirectional, selectionHighlightMirrors, addedPrims);
 
-        _selectionHighlightMirrorsByInstancer[instancerPath] = selectionHighlightMirrors;
-        for (const auto& selectionHighlightMirror : _selectionHighlightMirrorsByInstancer[instancerPath]) {
-            _selectionHighlightMirrorUseCounters[selectionHighlightMirror]++;
+        _selectionHighlightMirrorsByPrim[primPath] = selectionHighlightMirrors;
+        for (const auto& selectionHighlightMirror : _selectionHighlightMirrorsByPrim[primPath]) {
+            _IncrementSelectionHighlightMirrorUseCounter(selectionHighlightMirror);
         }
 
         if (!addedPrims.empty()) {
@@ -835,80 +1043,92 @@ WireframeSelectionHighlightSceneIndex::_AddInstancerHighlightUser(const PXR_NS::
         }
     }
     else {
-        for (const auto& selectionHighlightMirror : _selectionHighlightMirrorsByInstancer[instancerPath]) {
-            _selectionHighlightMirrorUseCounters[selectionHighlightMirror]++;
+        for (const auto& selectionHighlightMirror : _selectionHighlightMirrorsByPrim[primPath]) {
+            _IncrementSelectionHighlightMirrorUseCounter(selectionHighlightMirror);
         }
     }
 }
 
 void
-WireframeSelectionHighlightSceneIndex::_RemoveInstancerHighlightUser(const PXR_NS::SdfPath& instancerPath, const SdfPath& userPath)
+WireframeSelectionHighlightSceneIndex::_RemoveSelectionHighlightUser(const PXR_NS::SdfPath& primPath, const SdfPath& userPath)
 {
-    TF_AXIOM(_instancerHighlightUsersByInstancer.find(instancerPath) != _instancerHighlightUsersByInstancer.end());
-    TF_AXIOM(_instancerHighlightUsersByInstancer.at(instancerPath).find(userPath) != _instancerHighlightUsersByInstancer.at(instancerPath).end());
-    TF_AXIOM(_selectionHighlightMirrorsByInstancer.find(instancerPath) != _selectionHighlightMirrorsByInstancer.end());
+    TF_AXIOM(_selectionHighlightUsersByPrim.find(primPath) != _selectionHighlightUsersByPrim.end());
+    TF_AXIOM(_selectionHighlightUsersByPrim.at(primPath).find(userPath) != _selectionHighlightUsersByPrim.at(primPath).end());
+    TF_AXIOM(_selectionHighlightMirrorsByPrim.find(primPath) != _selectionHighlightMirrorsByPrim.end());
 
-    HdSceneIndexObserver::RemovedPrimEntries removedPrims;
-    for (const auto& selectionHighlightMirror : _selectionHighlightMirrorsByInstancer[instancerPath]) {
-        TF_AXIOM(_selectionHighlightMirrorUseCounters[selectionHighlightMirror] > 0);
-        _selectionHighlightMirrorUseCounters[selectionHighlightMirror]--;
-        if (_selectionHighlightMirrorUseCounters[selectionHighlightMirror] == 0) {
-            _selectionHighlightMirrorUseCounters.erase(selectionHighlightMirror);
-            removedPrims.push_back(selectionHighlightMirror);
-        }
+    for (const auto& selectionHighlightMirror : _selectionHighlightMirrorsByPrim[primPath]) {
+        _DecrementSelectionHighlightMirrorUseCounter(selectionHighlightMirror);
     }
 
-    _instancerHighlightUsersByInstancer[instancerPath].erase(userPath);
-    if (_instancerHighlightUsersByInstancer[instancerPath].empty()) {
-        _instancerHighlightUsersByInstancer.erase(instancerPath);
-        _selectionHighlightMirrorsByInstancer.erase(instancerPath);
+    _selectionHighlightUsersByPrim[primPath].erase(userPath);
+    if (_selectionHighlightUsersByPrim[primPath].empty()) {
+        _selectionHighlightUsersByPrim.erase(primPath);
+        _selectionHighlightMirrorsByPrim.erase(primPath);
     }
+}
+
+void
+WireframeSelectionHighlightSceneIndex::_RebuildSelectionHighlight(const PXR_NS::SdfPath& primPath)
+{
+    auto primType = GetInputSceneIndex()->GetPrim(primPath).primType;
+    TF_AXIOM(primType == HdPrimTypeTokens->instancer || primType == HdPrimTypeTokens->mesh);
+    TF_AXIOM(_selectionHighlightUsersByPrim.find(primPath) != _selectionHighlightUsersByPrim.end());
+    TF_AXIOM(_selectionHighlightMirrorsByPrim.find(primPath) != _selectionHighlightMirrorsByPrim.end());
+
+    auto selectionHighlightUsers = _selectionHighlightUsersByPrim[primPath];
     
-    if (!removedPrims.empty()) {
-        _SendPrimsRemoved(removedPrims);
+    for (const auto& selectionHighlightUser : selectionHighlightUsers) {
+        _RemoveSelectionHighlightUser(primPath, selectionHighlightUser);
+    }
+
+    for (const auto& selectionHighlightUser : selectionHighlightUsers) {
+        _AddSelectionHighlightUser(primPath, selectionHighlightUser);
     }
 }
 
 void
-WireframeSelectionHighlightSceneIndex::_RebuildInstancerHighlight(const PXR_NS::SdfPath& instancerPath)
+WireframeSelectionHighlightSceneIndex::_DeleteSelectionHighlight(const PXR_NS::SdfPath& primPath)
 {
-    TF_AXIOM(GetInputSceneIndex()->GetPrim(instancerPath).primType == HdPrimTypeTokens->instancer);
-    TF_AXIOM(_instancerHighlightUsersByInstancer.find(instancerPath) != _instancerHighlightUsersByInstancer.end());
-    TF_AXIOM(_selectionHighlightMirrorsByInstancer.find(instancerPath) != _selectionHighlightMirrorsByInstancer.end());
+    TF_AXIOM(_selectionHighlightUsersByPrim.find(primPath) != _selectionHighlightUsersByPrim.end());
+    TF_AXIOM(_selectionHighlightMirrorsByPrim.find(primPath) != _selectionHighlightMirrorsByPrim.end());
 
-    auto instancerHighlightUsers = _instancerHighlightUsersByInstancer[instancerPath];
-    
-    for (const auto& instancerHighlightUser : instancerHighlightUsers) {
-        _RemoveInstancerHighlightUser(instancerPath, instancerHighlightUser);
-    }
-
-    for (const auto& instancerHighlightUser : instancerHighlightUsers) {
-        _AddInstancerHighlightUser(instancerPath, instancerHighlightUser);
+    auto selectionHighlightUsers = _selectionHighlightUsersByPrim[primPath];
+    for (const auto& selectionHighlightUser : selectionHighlightUsers) {
+        _RemoveSelectionHighlightUser(primPath, selectionHighlightUser);
     }
 }
 
 void
-WireframeSelectionHighlightSceneIndex::_DeleteInstancerHighlight(const PXR_NS::SdfPath& instancerPath)
-{
-    TF_AXIOM(_instancerHighlightUsersByInstancer.find(instancerPath) != _instancerHighlightUsersByInstancer.end());
-    TF_AXIOM(_selectionHighlightMirrorsByInstancer.find(instancerPath) != _selectionHighlightMirrorsByInstancer.end());
-
-    auto instancerHighlightUsers = _instancerHighlightUsersByInstancer[instancerPath];
-    for (const auto& instancerHighlightUser : instancerHighlightUsers) {
-        _RemoveInstancerHighlightUser(instancerPath, instancerHighlightUser);
-    }
-}
-
-void
-WireframeSelectionHighlightSceneIndex::_CreateInstancerHighlightsForInstancer(const HdSceneIndexPrim& instancerPrim, const SdfPath& instancerPath)
+WireframeSelectionHighlightSceneIndex::_CreateSelectionHighlightsForInstancer(const HdSceneIndexPrim& instancerPrim, const SdfPath& instancerPath)
 {
     auto roots = _GetHierarchyRoots(instancerPrim);
     for (const auto& root : roots) {
         // Ancestors include the instancer itself
         auto selectedAncestors = _selection->FindFullySelectedAncestorsInclusive(instancerPath, root);
         for (const auto& selectedAncestor : selectedAncestors) {
-            _AddInstancerHighlightUser(instancerPath, selectedAncestor);
+            _AddSelectionHighlightUser(instancerPath, selectedAncestor);
         }
+    }
+}
+
+void
+WireframeSelectionHighlightSceneIndex::_CreateSelectionHighlightsForMesh(const HdSceneIndexPrim& meshPrim, const SdfPath& meshPath)
+{
+    auto roots = _GetHierarchyRoots(meshPrim);
+    for (const auto& root : roots) {
+        // Ancestors include the mesh itself
+        auto selectedAncestors = _selection->FindFullySelectedAncestorsInclusive(meshPath, root);
+        for (const auto& selectedAncestor : selectedAncestors) {
+            _AddSelectionHighlightUser(meshPath, selectedAncestor);
+        }
+    }
+}
+
+void
+WireframeSelectionHighlightSceneIndex::_CreateSelectionHighlightsForGeomSubset(const SdfPath& geomSubsetPath)
+{
+    if (_selection->IsFullySelected(geomSubsetPath)) {
+        _AddSelectionHighlightUser(geomSubsetPath.GetParentPath(), geomSubsetPath);
     }
 }
 
