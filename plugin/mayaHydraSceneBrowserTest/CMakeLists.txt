@@ -25,8 +25,9 @@ mayaHydra_compile_config(${TARGET_NAME})
 # include directories
 # -----------------------------------------------------------------------------
 target_include_directories(${TARGET_NAME} 
-    PUBLIC
-        ${MAYA_INCLUDE_DIRS}
+            SYSTEM PUBLIC                
+                ${PXR_INCLUDE_DIRS}
+                ${MAYA_INCLUDE_DIRS}
 )
 
 # -----------------------------------------------------------------------------

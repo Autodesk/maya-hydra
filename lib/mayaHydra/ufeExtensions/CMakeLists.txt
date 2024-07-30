@@ -34,6 +34,11 @@ mayaHydra_compile_config(${TARGET_NAME})
 # -----------------------------------------------------------------------------
 target_include_directories(${TARGET_NAME} 
         PUBLIC
+            ${PXR_INCLUDE_DIRS}
+)
+
+target_include_directories(${TARGET_NAME} 
+        SYSTEM PUBLIC
             ${MAYA_INCLUDE_DIRS}
             ${CMAKE_BINARY_DIR}/include
             $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
