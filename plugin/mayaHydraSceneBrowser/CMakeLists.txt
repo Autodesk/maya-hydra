@@ -40,6 +40,7 @@ target_compile_definitions(${TARGET_NAME}
 # -----------------------------------------------------------------------------
 target_include_directories(${TARGET_NAME} 
     PUBLIC
+        ${PXR_INCLUDE_DIRS}
         ${MAYA_INCLUDE_DIRS}
 )
 
