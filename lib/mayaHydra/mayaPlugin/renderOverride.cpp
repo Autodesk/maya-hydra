@@ -684,7 +684,6 @@ MStatus MtohRenderOverride::Render(
     delegateParams.displaySmoothMeshes = !(currentDisplayStyle & MHWRender::MFrameContext::kFlatShaded);
     
     const bool currentUseDefaultMaterial = (drawContext.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
-    const bool xRayEnabled = (drawContext.getDisplayStyle() & MHWRender::MFrameContext::kXray);
 
     if (_mayaHydraSceneIndex) {
         _mayaHydraSceneIndex->SetDefaultLightEnabled(_hasDefaultLighting);
@@ -692,7 +691,7 @@ MStatus MtohRenderOverride::Render(
         _mayaHydraSceneIndex->SetParams(delegateParams);
         _mayaHydraSceneIndex->PreFrame(drawContext);
         
-        if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle, xRayEnabled)){
+        if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle)){
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(true);//Prevent prim removal propagation to keep the current selection.
             //We need to recreate the filtering scene index chain after the merging scene index as there was a change such as in the BBox display style which has been turned on or off.
             _lastFilteringSceneIndexBeforeCustomFiltering = nullptr;//Release
@@ -710,8 +709,6 @@ MStatus MtohRenderOverride::Render(
             }
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(panelName.asChar()), cameraName);
             manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
-            
-            _xRayEnabled = xRayEnabled;
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(false);//Allow prim removal propagation again.
         }
     }
@@ -737,6 +734,35 @@ MStatus MtohRenderOverride::Render(
     
         _defaultMaterialSceneIndex->Enable(currentUseDefaultMaterial);
         _useDefaultMaterial = currentUseDefaultMaterial;
+    }
+    
+    // Set Required Hydra Repr (Wireframe/WireframeOnShaded/Shaded)
+    // Hydra supports Wireframe and WireframeOnSurfaceRefined repr for wireframe on shaded mode.
+    // Refinement level for Hydra is set in Hydra Render Globals    
+    const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
+    if ( (_reprSelectorSceneIndex && (currentDisplayStyle != _oldDisplayStyle) ) || (delegateParams.refineLevel != _oldRefineLevel)){
+        if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) && 
+            ((currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded) || 
+            (currentDisplayStyle & MHWRender::MFrameContext::kTextured)) ) {
+                // Wireframe on top of shaded
+                if (MFrameContext::WireOnShadedMode::kWireframeOnShadedFull == wireOnShadedMode) {
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined,
+                                                         /*needsReprChanged=*/true, delegateParams.refineLevel);
+                } else {              
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface, 
+                                                         /*needsReprChanged=*/true, delegateParams.refineLevel);
+                }
+            }
+            else if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) ) {
+                    //wireframe only, not on top of shaded
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined, 
+                                                         /*needsReprChanged=*/true, delegateParams.refineLevel); 
+                }
+            else // Shaded mode
+                _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, 
+                                                     /*needsReprChanged=*/false, delegateParams.refineLevel);
+            
+        _oldRefineLevel = delegateParams.refineLevel;
     }
 
     HdxRenderTaskParams params;
@@ -1051,7 +1077,8 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _selection.reset();
     _wireframeColorInterfaceImp.reset();
     _leadObjectPathTracker.reset();
-
+    _oldDisplayStyle = 0;
+    _oldRefineLevel = 0;
     // Cleanup internal context data that keep references to data that is now
     // invalid.
     _engine.ClearTaskContextData();
@@ -1107,15 +1134,10 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
                                                                                 _mayaHydraSceneIndex ? _mayaHydraSceneIndex->GetDefaultMaterialExclusionPaths(): SdfPathVector());
 
     const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
-    const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
 
     auto mergingSceneIndex = _renderIndexProxy->GetMergingSceneIndex();
     if(! _leadObjectPathTracker){
         _leadObjectPathTracker = std::make_shared<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker>(mergingSceneIndex, _dirtyLeadObjectSceneIndex);
-    }
-
-    if (! _wireframeColorInterfaceImp){
-        _wireframeColorInterfaceImp = std::make_shared<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp>(_selection, _leadObjectPathTracker);
     }
     
     //Are we using Bounding Box display style ?
@@ -1125,36 +1147,17 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         bboxSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
         _lastFilteringSceneIndexBeforeCustomFiltering = bboxSceneIndex;
     }
-    else if (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame){//Are we using wireframe somehow ?
-        
-        if( (currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded) || (currentDisplayStyle & MHWRender::MFrameContext::kTextured)){
-            // Wireframe on top of shaded
-            //Reduced quality
-            if (MFrameContext::WireOnShadedMode::kWireFrameOnShadedReduced == wireOnShadedMode ){
-                //Insert the reprselector filtering scene index which updates the repr selector on geometries
-                auto reprSelectorSceneIndex = Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
-                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface, _wireframeColorInterfaceImp);
-                reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
-                _lastFilteringSceneIndexBeforeCustomFiltering = reprSelectorSceneIndex;
-            } else {//Full quality
-                //Should we support kWireFrameOnShadedNone and do not display any wireframe ?
-                //Insert the reprselector filtering scene index which updates the repr selector on geometries
-                auto reprSelectorSceneIndex = Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
-                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined, _wireframeColorInterfaceImp);
-                reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
-                _lastFilteringSceneIndexBeforeCustomFiltering = reprSelectorSceneIndex;
-            }
-        }
-        else{
-                //wireframe only, not on top of shaded
-                
-                //Insert the reprselector filtering scene index which updates the repr selector on geometries
-                auto reprSelectorSceneIndex = Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
-                                       Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined, _wireframeColorInterfaceImp);
-                reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
-                _lastFilteringSceneIndexBeforeCustomFiltering = reprSelectorSceneIndex;
-            }
+
+    if (! _wireframeColorInterfaceImp){
+        _wireframeColorInterfaceImp = std::make_shared<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp>(_selection, _leadObjectPathTracker);
     }
+  
+    // Repr selector Scene Index
+    _lastFilteringSceneIndexBeforeCustomFiltering = _reprSelectorSceneIndex = 
+                                                 Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
+                                                 _wireframeColorInterfaceImp);
+    _reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
+    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false, _globals.delegateParams.refineLevel);
 
     _wireframeSelectionHighlightSceneIndex = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection, _wireframeColorInterfaceImp));
     _wireframeSelectionHighlightSceneIndex->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
@@ -1636,17 +1639,10 @@ void MtohRenderOverride::_RenderOverrideChangedCallback(
 }
 
 // return true if we need to recreate the filtering scene indices chain because of a change, false otherwise.
-bool MtohRenderOverride::_NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool xRayEnabled)
+bool MtohRenderOverride::_NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle)
 {
-    if (areDifferentForOneOfTheseBits(currentDisplayStyle, _oldDisplayStyle, 
-            MHWRender::MFrameContext::kGouraudShaded    | 
-            MHWRender::MFrameContext::kWireFrame        | 
-            MHWRender::MFrameContext::kBoundingBox      )
-        ){
-        return true;
-    }
-    
-    if (_xRayEnabled != xRayEnabled){
+    if (areDifferentForOneOfTheseBits(currentDisplayStyle, _oldDisplayStyle,  
+                                      MHWRender::MFrameContext::kBoundingBox)){
         return true;
     }
 
