@@ -49,6 +49,7 @@
 #include <flowViewport/sceneIndex/fvpDisplayStyleOverrideSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruneTexturesSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpDefaultMaterialSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 
@@ -209,7 +210,7 @@ private:
 
     void _AddPluginSelectionHighlighting();
 
-    bool _NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle, bool xRayEnabled);
+    bool _NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle);
 
     // Determine the pick handler which should handle a pick hit, to transform
     // the pick hit into a selection.
@@ -260,6 +261,7 @@ private:
     HdSceneIndexBaseRefPtr                    _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
     Fvp::DisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
     Fvp::PruneTexturesSceneIndexRefPtr        _pruneTexturesSceneIndex;
+    Fvp::ReprSelectorSceneIndexRefPtr         _reprSelectorSceneIndex;
     Fvp::DefaultMaterialSceneIndexRefPtr      _defaultMaterialSceneIndex;
     HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
@@ -312,6 +314,7 @@ private:
     bool       _hasDefaultLighting = false;
     bool       _currentlyTextured = false;
     unsigned int _oldDisplayStyle {0};
+    int        _oldRefineLevel {0};
     bool       _useDefaultMaterial;
     bool       _xRayEnabled;
 };

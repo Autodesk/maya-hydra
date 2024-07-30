@@ -75,6 +75,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testPointInstancingWireframeHighlight.py
     cpp/testGeomSubsetsPicking.py
     cpp/testSinglePicking.py
+    cpp/testSceneIndexDirtying.py
     cpp/testGeomSubsetsWireframeHighlight.py
 )
 
