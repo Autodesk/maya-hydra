@@ -49,11 +49,14 @@ mayaHydra_compile_config(${TARGET_NAME})
 # include directories
 # -----------------------------------------------------------------------------
 target_include_directories(${TARGET_NAME} 
-            PUBLIC
-                ${MAYA_INCLUDE_DIRS}
-                ${PYTHON_INCLUDE_DIR}
+            SYSTEM PUBLIC
                 ${PXR_INCLUDE_DIRS}
-                ${BOOST_INCLUDE_DIR}
+                ${MAYA_INCLUDE_DIRS}
+)
+target_include_directories(${TARGET_NAME}
+            PUBLIC
+                ${PYTHON_INCLUDE_DIR}
+                ${BOOST_INCLUDE_DIR}               
                 ${CMAKE_BINARY_DIR}/include
             PRIVATE
                 $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>

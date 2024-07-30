@@ -159,7 +159,6 @@ find_package_handle_standard_args(USD
     REQUIRED_VARS
         PXR_USD_LOCATION
         USD_INCLUDE_DIR
-        USD_LIBRARY_DIR
         USD_GENSCHEMA
         USD_CONFIG_FILE
         USD_VERSION
