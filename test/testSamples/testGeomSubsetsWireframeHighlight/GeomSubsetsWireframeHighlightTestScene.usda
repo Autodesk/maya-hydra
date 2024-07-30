@@ -1,0 +1,96 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+    metersPerUnit = 0.01
+    upAxis = "Z"
+)
+
+def Xform "Root"
+{
+    def Xform "CubeMeshXform"
+    {
+        double3 xformOp:translate = (-2, 0, 0)
+        float3 xformOp:scale = (2, 2, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+
+        def Mesh "CubeMesh" (
+            references = @./UpperHalfGeomSubsetCube.usda@
+        )
+        {
+            over "CubeUpperHalf" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token familyName = "materialBind"
+                rel material:binding = </mtl/GeomSubsetMaterial>
+            }
+        }
+    }
+
+    def Xform "SphereMeshXform"
+    {
+        double3 xformOp:translate = (-2, 2, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+
+        def Mesh "SphereMesh" (
+            references = @./UpperHalfGeomSubsetSphere.usda@
+        )
+        {
+            over "SphereUpperHalf" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token familyName = "materialBind"
+                rel material:binding = </mtl/GeomSubsetMaterial>
+            }
+        }
+    }
+
+    def PointInstancer "SphereInstancer"
+    {
+        point3f[] positions = [(2, 0, 0), (2, 2, 0)]
+        int[] protoIndices = [0, 0]
+        rel prototypes = [
+            </Root/SphereMeshXform/SphereMesh>,
+        ]
+    }
+
+    def Xform "CubeUpperHalfMarker"
+    {
+        double3 xformOp:translate = (-2, 0.5, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "CubeLowerHalfMarker"
+    {
+        double3 xformOp:translate = (-2, -0.5, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "SphereInstanceUpperHalfMarker"
+    {
+        double3 xformOp:translate = (2, 0.5, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "SphereInstanceLowerHalfMarker"
+    {
+        double3 xformOp:translate = (2, -0.5, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+
+def Scope "mtl"
+{
+    def Material "GeomSubsetMaterial"
+    {
+        token outputs:surface.connect = </mtl/GeomSubsetMaterial/GeomSubsetMaterial.outputs:surface>
+
+        def Shader "GeomSubsetMaterial"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            token outputs:surface
+        }
+    }
+}
+

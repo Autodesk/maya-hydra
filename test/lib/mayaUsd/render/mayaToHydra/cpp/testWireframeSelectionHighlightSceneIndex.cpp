@@ -16,6 +16,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 using namespace MayaHydra;
 
@@ -67,22 +69,28 @@ private:
     SdfPathSet             _dirtiedPrims;
 };
 
-bool hasSelectionHighlight(const HdSceneIndexPrim& prim)
+bool hasSelectionHighlight(const Fvp::WireframeSelectionHighlightSceneIndex& sceneIndex, const SdfPath& primPath)
 {
-    if (!prim.dataSource) {
+    auto selectionHighlightPath = sceneIndex.GetSelectionHighlightPath(primPath);
+    if (selectionHighlightPath == primPath) {
+        return false;
+    }
+
+    auto selectionHighlightPrim = sceneIndex.GetPrim(selectionHighlightPath);
+    if (!selectionHighlightPrim.dataSource) {
         return false;
     }
 
     auto taDs = HdTypedSampledDataSource<VtArray<TfToken>>::Cast(
         HdContainerDataSource::Get(
-            prim.dataSource, 
+            selectionHighlightPrim.dataSource, 
             Fvp::WireframeSelectionHighlightSceneIndex::ReprSelectorLocator()
         ));
     if (!taDs) {
         return false;
     }
     
-    static VtArray<TfToken> expected({HdReprTokens->refinedWireOnSurf, TfToken(), TfToken()});
+    static VtArray<TfToken> expected({HdReprTokens->refinedWire, TfToken(), TfToken()});
 
     return taDs->GetValue(0) == expected;
 }
@@ -136,6 +144,10 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndexDirty)
         "Flow Viewport Merging Scene Index");
     auto mergingSi = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
         findSceneIndexInTree(si.front(), isFvpMergingSceneIndex));
+    auto isFvpWireframeHighlightSceneIndex = SceneIndexDisplayNamePred(
+        "Flow Viewport Wireframe Selection Highlight Scene Index");
+    auto whSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(
+        findSceneIndexInTree(si.front(), isFvpWireframeHighlightSceneIndex));
 
     // See testSelectionSceneIndex.cpp for selection scene index observer
     // comments.
@@ -166,8 +178,8 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndexDirty)
 
     // Sphere is selected.
     hdSn = ssio.GetSelection();
-    ASSERT_EQ(hdSn->GetAllSelectedPrimPaths().size(), 1u);
-    ASSERT_EQ(hdSn->GetAllSelectedPrimPaths()[0], sphereSiPath);
+    auto selectedPrimPaths = hdSn->GetAllSelectedPrimPaths();
+    ASSERT_TRUE(std::find(selectedPrimPaths.begin(), selectedPrimPaths.end(), sphereSiPath) != selectedPrimPaths.end());
 
     // Sphere is a mesh, so its repr selector locator will be marked dirty.
     ASSERT_EQ(shDirtiedPrims.size(), 1u);
@@ -175,12 +187,10 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndexDirty)
 
     // Pull on prim, sphere repr selector has been set by wireframe selection
     // highlighting.
-    auto spherePrim = si.front()->GetPrim(sphereSiPath);
-    ASSERT_TRUE(hasSelectionHighlight(spherePrim));
+    ASSERT_TRUE(hasSelectionHighlight(*whSi, sphereSiPath));
 
     // Cube is not selected and thus has no highlighting.
-    auto cubePrim = si.front()->GetPrim(cubeSiPath);
-    ASSERT_FALSE(hasSelectionHighlight(cubePrim));
+    ASSERT_FALSE(hasSelectionHighlight(*whSi, cubeSiPath));
 
     wfshsio.ClearDirtiedPrims();
     ASSERT_EQ(shDirtiedPrims.size(), 0u);
@@ -200,8 +210,8 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndexDirty)
     // Cylinder is not selected.
     // Sphere is not selected.
     hdSn = ssio.GetSelection();
-    ASSERT_EQ(hdSn->GetAllSelectedPrimPaths().size(), 1u);
-    ASSERT_EQ(hdSn->GetAllSelectedPrimPaths()[0], ccSiPath);
+    selectedPrimPaths = hdSn->GetAllSelectedPrimPaths();
+    ASSERT_TRUE(std::find(selectedPrimPaths.begin(), selectedPrimPaths.end(), ccSiPath) != selectedPrimPaths.end());
 
     // Sphere repr selector locator is dirty.
     // Cube repr selector locator is NOT dirty.
@@ -218,9 +228,9 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndexDirty)
 
     // Cone and cylinder parent is selected but has no highlight repr, as it is
     // not a mesh.  Cone and cylinder have selection lighlight repr.
-    ASSERT_FALSE(hasSelectionHighlight(si.front()->GetPrim(ccSiPath)));
-    ASSERT_TRUE(hasSelectionHighlight(si.front()->GetPrim(coneSiPath)));
-    ASSERT_TRUE(hasSelectionHighlight(si.front()->GetPrim(cylinderSiPath)));
+    ASSERT_FALSE(hasSelectionHighlight(*whSi, ccSiPath));
+    ASSERT_TRUE(hasSelectionHighlight(*whSi, coneSiPath));
+    ASSERT_TRUE(hasSelectionHighlight(*whSi, cylinderSiPath));
 
     // Clear selection.
     sn->clear();
@@ -239,7 +249,7 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndexDirty)
     ASSERT_NE(shDirtiedPrims.find(cylinderSiPath), shDirtiedPrims.end());
 
     // Selection cleared: no more selection highlighting.
-    ASSERT_FALSE(hasSelectionHighlight(si.front()->GetPrim(ccSiPath)));
-    ASSERT_FALSE(hasSelectionHighlight(si.front()->GetPrim(coneSiPath)));
-    ASSERT_FALSE(hasSelectionHighlight(si.front()->GetPrim(cylinderSiPath)));
+    ASSERT_FALSE(hasSelectionHighlight(*whSi, ccSiPath));
+    ASSERT_FALSE(hasSelectionHighlight(*whSi, coneSiPath));
+    ASSERT_FALSE(hasSelectionHighlight(*whSi, cylinderSiPath));
 }

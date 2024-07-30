@@ -18,6 +18,7 @@
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
+#include <pxr/imaging/hd/tokens.h>
 
 #include <maya/M3dView.h>
 #include <maya/MPoint.h>
@@ -48,6 +49,20 @@ const std::string kCubeUpperHalfMarkerUfePathSegment = "/Root/CubeUpperHalfMarke
 const std::string kCubeLowerHalfMarkerUfePathSegment = "/Root/CubeLowerHalfMarker";
 const std::string kSphereInstanceUpperHalfMarkerUfePathSegment = "/Root/SphereInstanceUpperHalfMarker";
 const std::string kSphereInstanceLowerHalfMarkerUfePathSegment = "/Root/SphereInstanceLowerHalfMarker";
+
+class FindGeomSubsetPredicate
+{
+public:
+    FindGeomSubsetPredicate(const std::string& geomSubsetName) : _geomSubsetName(geomSubsetName) {}
+
+    bool operator()(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) {
+        HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
+        return primPath.GetName() == _geomSubsetName && prim.primType == HdPrimTypeTokens->geomSubset && prim.dataSource;
+    }
+
+private:
+    const std::string _geomSubsetName;
+};
 
 void assertUnselected(const SceneIndexInspector& inspector, const FindPrimPredicate& primPredicate)
 {
@@ -183,7 +198,7 @@ TEST(TestGeomSubsetsPicking, marqueeSelect)
     ASSERT_TRUE(ufeSelection->empty());
     
     for (const auto& geomSubsetName : geomSubsetNamesToSelect) {
-        assertUnselected(inspector, PrimNamePredicate(geomSubsetName));
+        assertUnselected(inspector, FindGeomSubsetPredicate(geomSubsetName));
     }
 
     // Marquee selection
@@ -204,7 +219,7 @@ TEST(TestGeomSubsetsPicking, marqueeSelect)
     ASSERT_TRUE(ufeSelection->contains(sphereUpperHalfUfePath));
 
     for (const auto& geomSubsetName : geomSubsetNamesToSelect) {
-        assertSelected(inspector, PrimNamePredicate(geomSubsetName));
+        assertSelected(inspector, FindGeomSubsetPredicate(geomSubsetName));
     }
 #endif
 }

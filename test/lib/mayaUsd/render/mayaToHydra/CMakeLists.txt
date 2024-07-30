@@ -33,7 +33,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testObjectTemplate.py
     testStandardSurface.py
     testFlowViewportAPI.py
-    testStageVariants.py
+    testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testStagePayloadsReferences.py
     testNurbsPrimitives.py
     testCurveTools.py
@@ -43,7 +43,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testGrid.py
     testUsdTextureToggle.py
     # To be reenabled after investigation
-    testDataProducerSelHighlight.py|skipOnPlatform:osx
+    testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testPassingNormalsOnMayaNative.py
     testViewportFilters.py
     testMayaComponentsPicking.py
@@ -75,6 +75,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testPointInstancingWireframeHighlight.py
     cpp/testGeomSubsetsPicking.py
     cpp/testSinglePicking.py
+    cpp/testGeomSubsetsWireframeHighlight.py
 )
 
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.

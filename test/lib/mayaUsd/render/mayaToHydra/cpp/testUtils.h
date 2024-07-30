@@ -466,6 +466,23 @@ void mouseClick(Qt::MouseButton mouseButton, QWidget* widget, QPoint localMouseP
  */
 QPoint getPrimMouseCoords(const PXR_NS::HdSceneIndexPrim& prim, M3dView& view);
 
+/**
+ * @brief Ensures a selection highlight hierarchy is properly structured.
+ *
+ * This method takes in a path to a prim in a selection highlight hierarchy and ensures that 
+ * the selection highlight graph is structured properly, and that the leaf mesh prims have
+ * the proper display style.
+ *
+ * @param[in] sceneIndex The scene index containing the selection highlight hierarchy. 
+ * @param[in] primPath The path to the base prim of the selection highlight hierarchy.
+ * @param[in] selectionHighlightMirrorTag The tag marking what is a or is not a selection highlight prim.
+ */
+void assertSelectionHighlightCorrectness(
+    const PXR_NS::HdSceneIndexBaseRefPtr& sceneIndex,
+    const PXR_NS::SdfPath& primPath,
+    const std::string& selectionHighlightMirrorTag,
+    const PXR_NS::TfToken& leafDisplayStyle);
+
 } // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRA_TEST_UTILS_H
