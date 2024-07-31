@@ -1,5 +1,41 @@
 # Changelog
 
+## [v0.6.2] - 2024-06-06
+
+**Build:**
+* Viewport filters test [#124](https://github.com/Autodesk/maya-hydra/pull/124)
+* Add support for text-based data source dump comparisons in tests [#88](https://github.com/Autodesk/maya-hydra/pull/88)
+* Disable testMayaDisplayModes and testDataProducerSelHighlight [#129](https://github.com/Autodesk/maya-hydra/pull/129)
+
+**Features:**
+* Global default material override for Maya data [#117](https://github.com/Autodesk/maya-hydra/pull/117)
+* Support wireframe and wire on shaded and support selection highlight with the right colors [#118](https://github.com/Autodesk/maya-hydra/pull/118)
+* Added SceneIndex for texture toggling [#131](https://github.com/Autodesk/maya-hydra/pull/131)
+
+**Miscellaneous:**
+* Pass normals and tangents to Hydra from render item and mesh adapters [#116](https://github.com/Autodesk/maya-hydra/pull/116)
+* Removed test sample file dependencies on Maya future release and Arnold [#121](https://github.com/Autodesk/maya-hydra/pull/121)
+* Fix Linux CPU memory reporting [#127](https://github.com/Autodesk/maya-hydra/pull/127)
+* Update to USD 24.05 [#126](https://github.com/Autodesk/maya-hydra/pull/126)
+* Removed dependence on Maya version and mtoa plugin [#125](https://github.com/Autodesk/maya-hydra/pull/125)
+
+**Bugfix:**
+* Fixed time update, Bifrost stage update and USD stage file update [#120](https://github.com/Autodesk/maya-hydra/pull/120)
+
+**Documentation:**
+* Added tip for Python test development [#119](https://github.com/Autodesk/maya-hydra/pull/119)
+* Update build doc [#123](https://github.com/Autodesk/maya-hydra/pull/123)
+
+## [v0.6.1] - 2024-04-25
+
+**Highlights:**
+- Picking support for USD native instances and point instancers
+- Picking now supports the selected USD Kind
+- Complexity refinement is now available in the Hydra render settings
+- New API example: [FootPrint node](lib/mayaHydra/flowViewportAPIExamples/footPrintNode)
+- Basic bounding box display style
+- MaterialX stack support for native Maya geometries
+
 ## [v0.6.0] - 2024-01-29
 
 **Build:**
