@@ -1140,16 +1140,16 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         _leadObjectPathTracker = std::make_shared<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker>(mergingSceneIndex, _dirtyLeadObjectSceneIndex);
     }
     
+    if (! _wireframeColorInterfaceImp){
+        _wireframeColorInterfaceImp = std::make_shared<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp>(_selection, _leadObjectPathTracker);
+    }
+    
     //Are we using Bounding Box display style ?
     if (currentDisplayStyle & MHWRender::MFrameContext::kBoundingBox){
         //Insert the bounding box filtering scene index which converts geometries into a bounding box using the extent attribute
         auto bboxSceneIndex  = Fvp::BboxSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _wireframeColorInterfaceImp);
         bboxSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
         _lastFilteringSceneIndexBeforeCustomFiltering = bboxSceneIndex;
-    }
-
-    if (! _wireframeColorInterfaceImp){
-        _wireframeColorInterfaceImp = std::make_shared<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp>(_selection, _leadObjectPathTracker);
     }
   
     // Repr selector Scene Index
