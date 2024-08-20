@@ -324,12 +324,6 @@ SelectionSceneIndex::_PrimsRemoved(
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::_PrimsRemoved() called.\n");
 
-    if (!_selection->IsEmpty()) {
-        for (const auto &entry : entries) {
-            _selection->RemoveHierarchy(entry.primPath);
-        }
-    }
-
     _SendPrimsRemoved(entries);
 }
 
