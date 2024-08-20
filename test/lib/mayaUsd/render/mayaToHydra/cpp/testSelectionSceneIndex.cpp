@@ -17,6 +17,7 @@
 
 #include <mayaHydraLib/mayaHydra.h>
 
+#include <maya/M3dView.h>
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
 
@@ -199,4 +200,37 @@ TEST(FlowViewport, selectionSceneIndexDirty)
     ASSERT_TRUE(hdSn->GetAllSelectedPrimPaths().empty());
     ASSERT_FALSE(selectionSi->IsFullySelected(sceneIndexPath));
     ASSERT_FALSE(selectionSi->HasFullySelectedAncestorInclusive(sceneIndexPath));
+}
+
+TEST(FlowViewport, removeAndAddPrim)
+{
+    const auto& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_FALSE(sceneIndices.empty());
+    auto isFvpSelectionSceneIndex = SceneIndexDisplayNamePred(
+        "Flow Viewport Selection Scene Index");
+    auto selectionSiBase = findSceneIndexInTree(
+        sceneIndices.front(), isFvpSelectionSceneIndex);
+    auto selectionSi = TfDynamic_cast<Fvp::SelectionSceneIndexRefPtr>(selectionSiBase);
+
+    auto assertCubeHasSelection = [&](SdfPath cubePath) {
+        auto cubePrim = selectionSi->GetPrim(cubePath);
+        ASSERT_TRUE(cubePrim.dataSource);
+        HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(cubePrim.dataSource);
+        ASSERT_TRUE(selectionsSchema.IsDefined());
+    };
+
+    M3dView active3dView = M3dView::active3dView();
+    QPoint centerMouseCoords(active3dView.portWidth() / 2, active3dView.portHeight() / 2);
+    mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), centerMouseCoords);
+    active3dView.refresh();
+
+    auto selectedCubePaths = selectionSi->GetFullySelectedPaths();
+    ASSERT_EQ(selectedCubePaths.size(), 1u);
+
+    assertCubeHasSelection(selectedCubePaths.front());
+
+    MGlobal::executeCommand("move 0 0 1");
+    active3dView.refresh();
+
+    assertCubeHasSelection(selectedCubePaths.front());
 }

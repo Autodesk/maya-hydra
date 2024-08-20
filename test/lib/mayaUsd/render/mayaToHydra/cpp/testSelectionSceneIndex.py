@@ -20,6 +20,7 @@ from testUtils import PluginLoaded
 class TestSelectionSceneIndex(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
+    _requiredPlugins = ['mayaHydraFlowViewportAPILocator']
 
     def setupScene(self):
         self.setHdStormRenderer()
@@ -31,6 +32,11 @@ class TestSelectionSceneIndex(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="FlowViewport.selectionSceneIndex")
             cmds.mayaHydraCppTest(f="FlowViewport.selectionSceneIndexDirty")
+
+    def test_removeAndAddPrim(self):
+        cmds.createNode("MhFlowViewportAPILocator")
+        cmds.refresh()
+        self.runCppTest("FlowViewport.removeAndAddPrim")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
