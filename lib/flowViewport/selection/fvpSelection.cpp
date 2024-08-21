@@ -87,14 +87,6 @@ void Selection::Replace(const PrimSelections& primSelections)
     }
 }
 
-void Selection::RemoveHierarchy(const PXR_NS::SdfPath& primPath)
-{
-    auto it = _pathToState.lower_bound(primPath);
-    while (it != _pathToState.end() && it->first.HasPrefix(primPath)) {
-        it = _pathToState.erase(it);
-    }
-}
-
 bool Selection::IsEmpty() const
 {
     return _pathToState.empty();

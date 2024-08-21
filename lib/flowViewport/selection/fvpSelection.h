@@ -60,10 +60,6 @@ public:
     FVP_API
     void Clear();
 
-    // Remove the argument and all descendants from the selection.
-    FVP_API
-    void RemoveHierarchy(const PXR_NS::SdfPath& primPath);
-
     FVP_API
     bool IsEmpty() const;
 
