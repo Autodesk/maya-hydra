@@ -400,6 +400,7 @@ TEST(PointInstancingWireframeHighlight, multiInstances)
         EXPECT_EQ(mask[iMask], selectedInstanceIndices.find(iMask) != selectedInstanceIndices.end());
     }
     
+    // Deselect the first instance; the second instance should still be selected
     ufeSelection->remove(topInstancerFirstInstanceItem);
 
     // Get the selection highlight instancer's mask
