@@ -64,12 +64,18 @@ bool Selection::Remove(const PrimSelection& primSelection)
         return false;
     }
 
+    // Remove the specific selection
     auto itSelection = std::find(
         _pathToSelections[primSelection.primPath].begin(), 
         _pathToSelections[primSelection.primPath].end(),
         primSelection);
     if (itSelection != _pathToSelections[primSelection.primPath].end()) {
         _pathToSelections[primSelection.primPath].erase(itSelection);
+    }
+
+    // If no selections remain, remove the entry entirely
+    if (_pathToSelections[primSelection.primPath].empty()) {
+        _pathToSelections.erase(primSelection.primPath);
     }
 
     return true;
@@ -108,7 +114,8 @@ bool Selection::IsEmpty() const
 
 bool Selection::IsFullySelected(const SdfPath& primPath) const
 {
-    return _pathToSelections.find(primPath) != _pathToSelections.end();
+    return _pathToSelections.find(primPath) != _pathToSelections.end()
+        && !_pathToSelections.at(primPath).empty();
 }
 
 bool Selection::HasFullySelectedAncestorInclusive(const SdfPath& primPath, const SdfPath& topmostAncestor/* = SdfPath::AbsoluteRootPath()*/) const
