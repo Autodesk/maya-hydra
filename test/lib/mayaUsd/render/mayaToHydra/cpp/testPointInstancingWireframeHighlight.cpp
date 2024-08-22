@@ -321,3 +321,99 @@ TEST(PointInstancingWireframeHighlight, prototype)
     testPrototypeHighlightFn(prototypeItem, prototypePath);
     testPrototypeHighlightFn(prototypeParentItem, prototypeParentPath);
 }
+
+TEST(PointInstancingWireframeHighlight, multiInstances)
+{
+    const SceneIndicesVector& terminalSceneIndices = GetTerminalSceneIndices();
+    ASSERT_FALSE(terminalSceneIndices.empty());
+    SceneIndexInspector inspector(terminalSceneIndices.front());
+
+    auto isFvpMergingSceneIndexPredicate = SceneIndexDisplayNamePred("Flow Viewport Merging Scene Index");
+    auto fvpMergingSceneIndex = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
+        findSceneIndexInTree(terminalSceneIndices.front(), isFvpMergingSceneIndexPredicate));
+
+    auto isFvpWireframeSelectionHighlightSceneIndex = SceneIndexDisplayNamePred(
+        "Flow Viewport Wireframe Selection Highlight Scene Index");
+    auto fvpWireframeSelectionHighlightSceneIndex = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(
+        findSceneIndexInTree(terminalSceneIndices.front(), isFvpWireframeSelectionHighlightSceneIndex));
+    std::string selectionHighlightMirrorTag = fvpWireframeSelectionHighlightSceneIndex->GetSelectionHighlightMirrorTag();
+
+    auto ufeSelection = Ufe::GlobalSelection::get();
+
+    HdxSelectionSceneIndexObserver selectionObserver;
+    selectionObserver.SetSceneIndex(terminalSceneIndices.front());
+
+    // Create this test's selected scene items
+    auto topInstancerFirstInstancePath = Ufe::PathString::path(stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/0");
+    auto topInstancerSecondInstancePath = Ufe::PathString::path(stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/1");
+
+    auto topInstancerFirstInstanceItem = Ufe::Hierarchy::createItem(topInstancerFirstInstancePath);
+    auto topInstancerSecondInstanceItem = Ufe::Hierarchy::createItem(topInstancerSecondInstancePath);
+
+    // Initial state : ensure nothing is highlighted
+    ufeSelection->clear();
+
+    auto selectionHighlightMirrors = inspector.FindPrims([selectionHighlightMirrorTag](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
+        return isSelectionHighlightMirror(primPath, selectionHighlightMirrorTag);
+    });
+    EXPECT_TRUE(selectionHighlightMirrors.empty()); // No selection highlight mirrors
+
+    auto meshPrims = inspector.FindPrims(findMeshPrimsPredicate);
+    for (const auto& meshPrim : meshPrims) {
+        HdLegacyDisplayStyleSchema displayStyle = HdLegacyDisplayStyleSchema::GetFromParent(meshPrim.prim.dataSource);
+        EXPECT_TRUE(displayStyle.IsDefined());
+        EXPECT_FALSE(displayStyle.GetReprSelector()); // No specific repr is defined
+    }
+
+    // Select instances
+    ufeSelection->append(topInstancerFirstInstanceItem);
+    ufeSelection->append(topInstancerSecondInstanceItem);
+
+    auto firstInstancePrimSelections = fvpMergingSceneIndex->UfePathToPrimSelections(topInstancerFirstInstancePath);
+    ASSERT_EQ(firstInstancePrimSelections.size(), 1u);
+    auto instancerPrimPath = firstInstancePrimSelections.front().primPath;
+
+    // Ensure selection is correct
+    ASSERT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().size(), 1u);
+    EXPECT_EQ(selectionObserver.GetSelection()->GetAllSelectedPrimPaths().front(), instancerPrimPath);
+
+    // Validate scene structure
+    EXPECT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
+    auto selectionHighlightPath = getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath, selectionHighlightMirrorTag);
+    assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag, HdReprTokens->refinedWire);
+
+    // Get the selection highlight instancer's mask
+    HdSceneIndexPrim instancerHighlightPrim = inspector.GetSceneIndex()->GetPrim(
+        getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath, selectionHighlightMirrorTag));
+    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(instancerHighlightPrim.dataSource);
+    ASSERT_TRUE(instancerTopology.IsDefined());
+    ASSERT_NE(instancerTopology.GetMask(), nullptr);
+    auto mask = instancerTopology.GetMask()->GetTypedValue(0);
+    EXPECT_FALSE(mask.empty());
+
+    // Ensure only the selected instances are shown
+    std::set<size_t> selectedInstanceIndices = {
+        std::stoul(topInstancerFirstInstancePath.getSegments().back().components().back().string()),
+        std::stoul(topInstancerSecondInstancePath.getSegments().back().components().back().string())
+    };
+    for (size_t iMask = 0; iMask < mask.size(); iMask++) {
+        EXPECT_EQ(mask[iMask], selectedInstanceIndices.find(iMask) != selectedInstanceIndices.end());
+    }
+    
+    ufeSelection->remove(topInstancerFirstInstanceItem);
+
+    // Get the selection highlight instancer's mask
+    instancerHighlightPrim = inspector.GetSceneIndex()->GetPrim(
+        getSelectionHighlightMirrorPathFromOriginal(instancerPrimPath, selectionHighlightMirrorTag));
+    instancerTopology = HdInstancerTopologySchema::GetFromParent(instancerHighlightPrim.dataSource);
+    ASSERT_TRUE(instancerTopology.IsDefined());
+    ASSERT_NE(instancerTopology.GetMask(), nullptr);
+    mask = instancerTopology.GetMask()->GetTypedValue(0);
+    EXPECT_FALSE(mask.empty());
+
+    // Ensure only the selected instance is shown
+    size_t selectedInstanceIndex = std::stoul(topInstancerSecondInstancePath.getSegments().back().components().back().string());
+    for (size_t iMask = 0; iMask < mask.size(); iMask++) {
+        EXPECT_EQ(mask[iMask], iMask == selectedInstanceIndex);
+    }
+}
