@@ -64,11 +64,13 @@ bool Selection::Remove(const PrimSelection& primSelection)
         return false;
     }
 
-    _pathToSelections[primSelection.primPath].erase(std::find(
+    auto itSelection = std::find(
         _pathToSelections[primSelection.primPath].begin(), 
         _pathToSelections[primSelection.primPath].end(),
-        primSelection)
-    );
+        primSelection);
+    if (itSelection != _pathToSelections[primSelection.primPath].end()) {
+        _pathToSelections[primSelection.primPath].erase(itSelection);
+    }
 
     return true;
 }
