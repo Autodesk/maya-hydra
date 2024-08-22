@@ -159,10 +159,11 @@ public:
         }
 
         const auto lastComponentString = secondSegment.components().back().string();
-        HdDataSourceBaseHandle selectionDataSource = lastComponentIsNumeric 
-            ? createInstanceSelectionDataSource(primPath, std::stoi(lastComponentString))
-            : Fvp::createFullySelectedDataSource();
-        Fvp::PrimSelections primSelections({{primPath, selectionDataSource}});
+        std::optional<int> instanceIndex = std::nullopt;
+        if (lastComponentIsNumeric) {
+            instanceIndex = std::stoi(lastComponentString);
+        }
+        Fvp::PrimSelections primSelections({{primPath, instanceIndex}});
 
         // Propagate selection to propagated prototypes
         auto ancestorsRange = primPath.GetAncestorsRange();
@@ -188,7 +189,7 @@ public:
                     // for another instancer B will only mark the geometry-drawing instancer A as selected. This can be changed.
                     // For now (2024/05/28), this only affects selection highlighting.
                     if (propagatedPrim.primType != HdPrimTypeTokens->instancer) {
-                        primSelections.push_back({propagatedPrimPath, selectionDataSource});
+                        primSelections.push_back({propagatedPrimPath, instanceIndex});
                     }
                 }
             }
