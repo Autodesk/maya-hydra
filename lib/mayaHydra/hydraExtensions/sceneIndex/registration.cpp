@@ -87,21 +87,6 @@ private:
     }
 };
 
-HdDataSourceBaseHandle createInstanceSelectionDataSource(const SdfPath& instancerPrimPath, int instanceIndex)
-{
-    HdInstanceIndicesSchema::Builder instanceIndicesBuilder;
-    instanceIndicesBuilder.SetInstancer(HdRetainedTypedSampledDataSource<SdfPath>::New(instancerPrimPath));
-    instanceIndicesBuilder.SetInstanceIndices(HdRetainedTypedSampledDataSource<VtArray<int>>::New({instanceIndex}));
-    HdSelectionSchema::Builder selectionBuilder;
-    // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
-    // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
-    // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
-    selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
-    auto instanceIndicesDataSource = HdDataSourceBase::Cast(instanceIndicesBuilder.Build());
-    selectionBuilder.SetNestedInstanceIndices(HdRetainedSmallVectorDataSource::New(1, &instanceIndicesDataSource));
-    return HdDataSourceBase::Cast(selectionBuilder.Build());
-}
-
 /// \class PathInterfaceSceneIndex
 ///
 /// Implement the path interface for plugin scene indices.
