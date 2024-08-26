@@ -58,6 +58,9 @@ class TestDataProducerExample(mtohUtils.MayaHydraBaseTestCase):
     def cube222PathString(self):
         return '|transform1|' + self._locator + ',/cube_2_2_2'
 
+    def cubePrototypePathString(self):
+        return '|transform1|' + self._locator + ',/cube_'
+
     def test_Pick(self):
         # Pick an exterior cube to ensure we don't pick a hidden one.
         cmds.mayaHydraCppTest(self.cube222PathString(), f='TestUsdPicking.pick')
@@ -131,6 +134,28 @@ class TestDataProducerExample(mtohUtils.MayaHydraBaseTestCase):
         assertTranslationAlmostEqual([0, 0, 0])
         cmds.redo()
         assertTranslationAlmostEqual([3, 4, 5])
+
+    def test_SelectPrototype(self):
+        # Enable instancing
+        cmds.setAttr(self._locator + '.cubesUseInstancing', True)
+
+        # Clear selection
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        # Empty Maya selection, therefore no fully selected path in the scene
+        # index.
+        cmds.mayaHydraCppTest(f='TestSelection.fullySelectedPaths')
+
+        # Add cube to selection
+        item = ufe.Hierarchy.createItem(ufe.PathString.path(self.cubePrototypePathString()))
+        sn.append(item)
+        
+        # Item added to the Maya selection, it should be fully selected in the
+        # scene index.
+        cmds.mayaHydraCppTest(
+            self.cubePrototypePathString(), f='TestSelection.fullySelectedPaths')
+
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
