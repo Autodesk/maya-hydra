@@ -924,7 +924,6 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
 void MtohRenderOverride::_ClearMayaHydraSceneIndex()
 {
     _renderIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
-    _mayaHydraSceneIndex->RemoveCallbacksAndDeleteAdapters(); //This should be called before calling _sceneIndex.Reset(); which will call the destructor if the ref count reaches 0
     _mayaHydraSceneIndex.Reset();
 }
 
@@ -1063,7 +1062,6 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     #ifdef CODE_COVERAGE_WORKAROUND
         // Leak the Maya scene index, as its base class HdRetainedSceneIndex
         // destructor crashes under Windows clang code coverage build.
-        _mayaHydraSceneIndex->RemoveCallbacksAndDeleteAdapters();
         _mayaHydraSceneIndex.Reset();
     #else
        _ClearMayaHydraSceneIndex();
