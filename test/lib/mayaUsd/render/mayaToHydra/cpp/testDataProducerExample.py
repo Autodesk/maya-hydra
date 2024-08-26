@@ -156,6 +156,5 @@ class TestDataProducerExample(mtohUtils.MayaHydraBaseTestCase):
         cmds.mayaHydraCppTest(
             self.cubePrototypePathString(), f='TestSelection.fullySelectedPaths')
 
-
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
