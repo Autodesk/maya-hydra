@@ -104,9 +104,13 @@ SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim, Fvp::Sele
             instancingRelatedPaths.push_back(instancerPath);
         }
 
-        auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
-        for (const auto& protoRootPath : protoRootPaths) {
-            instancingRelatedPaths.push_back(protoRootPath);
+        // Having a prototype root is not a hard requirement (a single prim being instanced
+        // does not need to specify itself as its own prototype root).
+        if (instancedBy.GetPrototypeRoots()) {
+            auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
+            for (const auto& protoRootPath : protoRootPaths) {
+                instancingRelatedPaths.push_back(protoRootPath);
+            }
         }
     }
 
