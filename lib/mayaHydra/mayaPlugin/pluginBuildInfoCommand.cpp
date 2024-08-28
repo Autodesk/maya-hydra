@@ -110,4 +110,4 @@ MStatus MayaHydraPluginInfoCommand::doIt(const MArgList& args)
     return MS::kSuccess;
 }
 
-} // namespace MAYAUSD_NS_DEF
+} // namespace MAYAHYDRA_NS_DEF

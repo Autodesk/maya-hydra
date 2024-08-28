@@ -33,5 +33,5 @@ public:
     MStatus doIt(const MArgList& args) override;
 };
 
-} // namespace MAYAUSD_NS_DEF
+} // namespace MAYAHYDRA_NS_DEF
 #endif // MAYAHYDRA_PULINGINFO_CMD_H
