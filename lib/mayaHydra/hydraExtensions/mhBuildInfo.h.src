@@ -34,7 +34,7 @@ public:
     static int         buildNumber();
     static const char* gitCommit();
     static const char* gitBranch();
-		static const char* cutId();
+	static const char* cutId();
     static const char* buildDate();
 };
 
