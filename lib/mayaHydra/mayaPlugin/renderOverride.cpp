@@ -33,6 +33,7 @@
 #include <mayaHydraLib/hydraUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/tokens.h>
+#include <mayaHydraLib/mhDataProducersMayaNodeToSdfPathRegistry.h>
 
 #ifdef CODE_COVERAGE_WORKAROUND
 #include <flowViewport/fvpUtils.h>
@@ -647,7 +648,7 @@ MStatus MtohRenderOverride::Render(
         }
     }
 
-    //This code with strings comparison will go away when doing multi viewports
+    //This code with strings comparison will go away if we have multiple render proxies when doing multi viewports
     MString panelName;
     auto framecontext = getFrameContext();
     if (framecontext){
@@ -1009,10 +1010,11 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
     _inputSceneIndexOfFilteringSceneIndicesChain = _selectionSceneIndex;
 
-    _dirtyLeadObjectSceneIndex = MAYAHYDRA_NS_DEF::MhDirtyLeadObjectSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
+    _dirtyLeadObjectSceneIndex = MAYAHYDRA_NS::MhDirtyLeadObjectSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
     _inputSceneIndexOfFilteringSceneIndicesChain = _dirtyLeadObjectSceneIndex;
 
-    // Set the initial selection onto the selection scene index.
+    // Set the initial selection onto the selection scene index. 
+    // _selectionSceneIndex->ReplaceSelection may be called later again if there are some usd stage scene index or custom producer scene indices added to the merging scene index
     _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
 
     _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);

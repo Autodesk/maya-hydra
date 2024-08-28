@@ -16,6 +16,7 @@ target_sources(${TARGET_NAME}
         mhWireframeColorInterfaceImp.cpp
         mhLeadObjectPathTracker.cpp
         tokens.cpp
+		mhDataProducersMayaNodeToSdfPathRegistry.cpp
 )
 
 set(HEADERS
@@ -30,6 +31,7 @@ set(HEADERS
     mhWireframeColorInterfaceImp.h
     mhLeadObjectPathTracker.h
     tokens.h
+	mhDataProducersMayaNodeToSdfPathRegistry.h
 )
 
 # -----------------------------------------------------------------------------
@@ -38,7 +40,6 @@ set(HEADERS
 target_compile_definitions(${TARGET_NAME} 
     PRIVATE 
         MAYAHYDRALIB_EXPORT
-        $<$<BOOL:${MayaUsd_FOUND}>:MAYAHYDRALIB_MAYAUSDAPI_ENABLED>
         $<$<BOOL:${IS_MACOSX}>:OSMac_>
         # Copy-pasted from lib/mayaUsd/CMakeLists.txt
 )

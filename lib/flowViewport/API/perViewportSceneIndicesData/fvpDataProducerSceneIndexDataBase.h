@@ -113,6 +113,8 @@ protected:
     std::string                         _rendererNames;
     /// Is the DCC node so a MObject* DAG node for Maya
     void*                               _dccNode;
+    /// Is the DCC node hashcode (we use it to remove the node from a registry when it has been deleted)
+    unsigned long                       _dccNodeHashCode = 0;
 
     //The following members are optional and only used when a dccNode was passed in the constructor
     

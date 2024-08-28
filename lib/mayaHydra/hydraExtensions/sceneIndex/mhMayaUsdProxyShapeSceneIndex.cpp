@@ -21,8 +21,6 @@
 
 #include <flowViewport/fvpInstruments.h>
 
-#if defined(MAYAHYDRALIB_MAYAUSDAPI_ENABLED)
-
 //mayaHydra headers
 #include "ufeExtensions/Global.h"
 
@@ -158,5 +156,3 @@ SdfPathVector MayaUsdProxyShapeSceneIndex::GetChildPrimPaths(const SdfPath& prim
 }
 
 } // namespace MAYAUSD_NS_DEF
-
-#endif //MAYAHYDRALIB_MAYAUSDAPI_ENABLED

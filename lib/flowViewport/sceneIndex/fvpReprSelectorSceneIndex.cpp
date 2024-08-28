@@ -26,7 +26,7 @@
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 
-// This class is a filtering scene index that that applies a different RepSelector on geometries (such as wireframe or wireframe on shaded)
+// This class is a filtering scene index that applies a different RepSelector on geometries (such as wireframe or wireframe on shaded)
 // and also applies an overrideWireframecolor for HdStorm 
 
 namespace FVP_NS_DEF {

@@ -38,7 +38,6 @@ target_compile_definitions(${TARGET_NAME}
         $<$<BOOL:${IS_LINUX}>:LINUX>
         # Not sure if msvcc sets this automatically, but won't hurt to redefine
         $<$<BOOL:${IS_WINDOWS}>:_WIN32>
-        $<$<BOOL:${MayaUsd_FOUND}>:MAYAHYDRALIB_MAYAUSDAPI_ENABLED>
 )
 
 # -----------------------------------------------------------------------------
