@@ -59,7 +59,7 @@ TEST(PrimInstancing, testUsdPrimInstancing)
     auto findCubePredicate
         = [instancerPath](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
         std::string text = primPath.GetText();
-        const bool containsSelectionHighlight = text.find("SelectionHighlight") != std::string::npos;//Ignore the selection, highlight primitive for cubeMesh
+        const bool containsSelectionHighlight = text.find("SelectionHighlight") != std::string::npos;//Ignore the selection highlight primitive for cubeMesh
         return !containsSelectionHighlight && primPath.HasPrefix(instancerPath) && primPath.GetName() == "cubeMesh";
     };
     PrimEntriesVector cubePrims = inspector.FindPrims(findCubePredicate);
