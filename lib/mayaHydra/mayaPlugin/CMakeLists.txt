@@ -16,6 +16,7 @@ target_sources(${TARGET_NAME}
         renderOverride.cpp
         tokens.cpp
         viewCommand.cpp
+        pluginBuildInfoCommand.cpp
 )
 
 set(HEADERS
@@ -48,6 +49,7 @@ target_include_directories(${TARGET_NAME}
     PRIVATE
         $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSD_INCLUDE_DIR}>
+        ${CMAKE_BINARY_DIR}
 )
 
 if(DEFINED MAYAUSD_VERSION)
