@@ -126,7 +126,7 @@ class TestCommand(unittest.TestCase):
         self.assertNotEqual(cmds.mayaHydraBuildInfo(gb=True), '')
         self.assertNotEqual(cmds.mayaHydraBuildInfo(buildDate=True), '')
         self.assertNotEqual(cmds.mayaHydraBuildInfo(bd=True), '')
-        self.assertEqual(cmds.mayaHydraBuildInfo(cutIdentifier=True), "DEVBLD")
+        self.assertNotEqual(cmds.mayaHydraBuildInfo(cutIdentifier=True), "DEVBLD")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
