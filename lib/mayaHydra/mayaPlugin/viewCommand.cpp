@@ -20,6 +20,7 @@
 #include "renderGlobals.h"
 #include "renderOverride.h"
 
+#include <mayaHydraLib/mhBuildInfo.h>
 #include <mayaHydraLib/mayaHydra.h>
 #include <mayaHydraLib/mixedUtils.h>
 
@@ -61,8 +62,8 @@ constexpr auto _createRenderGlobalsLong = "-createRenderGlobals";
 constexpr auto _updateRenderGlobals = "-urg";
 constexpr auto _updateRenderGlobalsLong = "-updateRenderGlobals";
 
-constexpr auto _verbose = "-v";
-constexpr auto _verboseLong = "-verbose";
+constexpr auto _help = "-h";
+constexpr auto _helpLong = "-help";
 
 constexpr auto _listRenderIndex = "-lri";
 constexpr auto _listRenderIndexLong = "-listRenderIndex";
@@ -73,6 +74,23 @@ constexpr auto _visibleOnlyLong = "-visibleOnly";
 constexpr auto _sceneDelegateId = "-sid";
 constexpr auto _sceneDelegateIdLong = "-sceneDelegateId";
 
+// Versioning and build information.
+constexpr auto _majorVersion = "-mjv";
+constexpr auto _minorVersion = "-mnv";
+constexpr auto _patchVersion = "-pv";
+constexpr auto _majorVersionLong = "-majorVersion";
+constexpr auto _minorVersionLong = "-minorVersion";
+constexpr auto _patchVersionLong = "-patchVersion";
+
+constexpr auto _buildNumber = "-bn";
+constexpr auto _gitCommit   = "-gc";
+constexpr auto _gitBranch   = "-gb";
+constexpr auto _buildDate   = "-bd";
+constexpr auto _buildNumberLong = "-buildNumber";
+constexpr auto _gitCommitLong   = "-gitCommit";
+constexpr auto _gitBranchLong   = "-gitBranch";
+constexpr auto _buildDateLong   = "-buildDate";
+
 constexpr auto _usdVersion = "-uv";
 constexpr auto _usdVersionLong = "-usdVersion";
 
@@ -81,6 +99,10 @@ constexpr auto _rendererIdLong = "-renderer";
 
 constexpr auto _userDefaultsId = "-u";
 constexpr auto _userDefaultsIdLong = "-userDefaults";
+
+constexpr auto _helpText = R"HELP(For details on args usage please see 
+https://github.com/Autodesk/maya-hydra/tree/dev/doc/mayaHydraCommads.md
+)HELP";
 
 } // namespace
 
@@ -106,6 +128,8 @@ MSyntax MtohViewCmd::createSyntax()
 
     syntax.addFlag(_updateRenderGlobals, _updateRenderGlobalsLong, MSyntax::kString);
 
+    syntax.addFlag(_help, _helpLong);
+
     // Debug / testing flags
 
     syntax.addFlag(_listRenderIndex, _listRenderIndexLong);
@@ -113,6 +137,17 @@ MSyntax MtohViewCmd::createSyntax()
     syntax.addFlag(_visibleOnly, _visibleOnlyLong);
 
     syntax.addFlag(_sceneDelegateId, _sceneDelegateIdLong, MSyntax::kString);
+
+    // Versioning and build information flags.
+
+    syntax.addFlag(_majorVersion, _majorVersionLong);
+    syntax.addFlag(_minorVersion, _minorVersionLong);
+    syntax.addFlag(_patchVersion, _patchVersionLong);
+
+    syntax.addFlag(_buildNumber, _buildNumberLong);
+    syntax.addFlag(_gitCommit,   _gitCommitLong);
+    syntax.addFlag(_gitBranch,   _gitBranchLong);
+    syntax.addFlag(_buildDate,   _buildDateLong);
 
     syntax.addFlag(_usdVersion, _usdVersionLong);
 
@@ -169,6 +204,9 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
 
         const auto dn = MtohGetRendererPluginDisplayName(renderDelegateName);
         setResult(MString(dn.c_str()));
+    } else if (db.isFlagSet(_help)) {
+        MString helpText = _helpText;
+        MGlobal::displayInfo(helpText);
     } else if (db.isFlagSet(_createRenderGlobals)) {
         bool userDefaults = db.isFlagSet(_userDefaultsId);
         MtohRenderGlobals::CreateAttributes({ renderDelegateName, true, userDefaults });
@@ -216,8 +254,23 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
         SdfPath delegateId = MtohRenderOverride::RendererSceneDelegateId(
             renderDelegateName, TfToken(sceneDelegateName.asChar()));
         setResult(MString(delegateId.GetText()));
+    } else if (db.isFlagSet(_majorVersion)) {
+        setResult(MAYAHYDRA_MAJOR_VERSION);
+    } else if (db.isFlagSet(_minorVersion)) {
+        setResult(MAYAHYDRA_MINOR_VERSION);
+    } else if (db.isFlagSet(_patchVersion)) {
+        setResult(MAYAHYDRA_PATCH_LEVEL);
+    } else if (db.isFlagSet(_buildNumber)) {
+        setResult(MhBuildInfo::buildNumber());
+    } else if (db.isFlagSet(_gitCommit)) {
+        setResult(MhBuildInfo::gitCommit());
+    } else if (db.isFlagSet(_gitBranch)) {
+        setResult(MhBuildInfo::gitBranch());
+    } else if (db.isFlagSet(_buildDate)) {
+        setResult(MhBuildInfo::buildDate());
+    } else if (db.isFlagSet(_usdVersion)) {
+        setResult(PXR_VERSION);
     }
-
     return MS::kSuccess;
 }
 
