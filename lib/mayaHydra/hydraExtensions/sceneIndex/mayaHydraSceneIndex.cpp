@@ -771,7 +771,7 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
     //highlighted.
     MDagPath shapeDagPath(dagPath);
     shapeDagPath.extendToShape();
-    const SdfPath matchingPath = MhDataProducersMayaNodeToSdfPathRegistry::Get().GetPath(MObjectHandle(shapeDagPath.node()));
+    const SdfPath matchingPath = MhDataProducersMayaNodeToSdfPathRegistry::Instance().GetPath(MObjectHandle(shapeDagPath.node()).hashCode());
     if (! matchingPath.IsEmpty()) {
         primPath = matchingPath;
     }

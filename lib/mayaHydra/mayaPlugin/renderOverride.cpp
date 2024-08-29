@@ -671,13 +671,18 @@ MStatus MtohRenderOverride::Render(
             const bool dataProducerSceneIndicesAdded = manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
             //Update the selection since we have added data producer scene indices through manager.AddViewportInformation to the merging scene index
             if (dataProducerSceneIndicesAdded && _selectionSceneIndex){
-                _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+                _needToReplaceSelection = true;
             }
             //Update the leadObjectTacker in case it could not find the current lead object which could be in a custom data producer scene index or a maya usd proxy shape scene index
             if (_leadObjectPathTracker){
                 _leadObjectPathTracker->updatePrimPaths();
             }
         }
+    }
+
+    if (_needToReplaceSelection){
+        _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+        _needToReplaceSelection = false;
     }
 
     const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
@@ -1013,9 +1018,8 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     _dirtyLeadObjectSceneIndex = MAYAHYDRA_NS::MhDirtyLeadObjectSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
     _inputSceneIndexOfFilteringSceneIndicesChain = _dirtyLeadObjectSceneIndex;
 
-    // Set the initial selection onto the selection scene index. 
-    // _selectionSceneIndex->ReplaceSelection may be called later again if there are some usd stage scene index or custom producer scene indices added to the merging scene index
-    _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+    // Set the initial selection onto the selection scene index later. 
+    _needToReplaceSelection = true;
 
     _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
     

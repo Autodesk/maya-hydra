@@ -61,6 +61,7 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
     def usdStageAnimatedPrimSetup(self):
         usdScenePath = testUtils.getTestScene('testFlowPluginsHierarchicalProperties', 'usd_animated_prim.usda')
         stagePath =  usdUtils.createStageFromFile(usdScenePath)
+        cmds.select(clear=True)#Clear selection
         stageParent = cmds.group(empty=True)
         cmds.parent(stagePath, stageParent)
         stageTransform = stagePath.split('|')[1]
@@ -91,6 +92,7 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         # Change the shape's transform directly
         cmds.xform(cmds.listRelatives(locatorShape, parent=True)[0], translation=[-3,2,-1], rotation=[-15,10,-5], scale=[-2.5, 2.0, -1.5])
         self.assertSnapshotClose("authoring_locator_shapeTransformChanged.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        cmds.select(clear=True)#Clear selection
 
     def test_Authoring_UsdStage(self):
         self.setBasicCam(10)

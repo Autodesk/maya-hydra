@@ -20,6 +20,7 @@
 #include "mayaHydraLib/api.h"
 
 //Usd headers
+#include <pxr/base/tf/singleton.h>
 #include <pxr/usd/sdf/path.h>
 
 //Maya headers
@@ -29,41 +30,38 @@
 
 namespace MAYAHYDRA_NS_DEF {
 
-/// MhDataProducersMayaNodeToSdfPathRegistry does a mapping between Maya nodes and USD paths. 
+/// MhDataProducersMayaNodeToSdfPathRegistry does a mapping between Maya nodes and Hydra paths. 
 /// The maya nodes registered in this class are used by data producers as a parent to all primitives.
 /// The registration/unregistration in this class is automatic when you use the flow viewport API and provide a maya node as a parent.
 /// This class is used when we select one of these maya nodes to return the matching SdfPath so that all prims child of this maya node are highlighted.
 class MhDataProducersMayaNodeToSdfPathRegistry 
 {
 public:
+    // Access the singleton instance
     MAYAHYDRALIB_API
-    static MhDataProducersMayaNodeToSdfPathRegistry& Get();
+    static MhDataProducersMayaNodeToSdfPathRegistry& Instance();
 
     MAYAHYDRALIB_API
-    void Add(const MObjectHandle& objectHandle, const PXR_NS::SdfPath& thePath);
+    void Add(const unsigned long& objectHandlehashCode, const PXR_NS::SdfPath& thePath);
 
     MAYAHYDRALIB_API
-    void Remove(const MObjectHandle& objectHandle);
-
-    //When removing a node that has been deleted we cannot get its MObjectHandle, so we use the hash code
-    MAYAHYDRALIB_API
-    void Remove(unsigned long& objectHandleHashCode);
+    void Remove(const unsigned long& objectHandleHashCode);
 
     // Returns an empty SdfPath if the objectHandle is not registered or the matching SdfPath
     // otherwise
     MAYAHYDRALIB_API
-    PXR_NS::SdfPath GetPath(const MObjectHandle& objectHandle) const;
+    PXR_NS::SdfPath GetPath(const unsigned long& objectHandleHashCode) const;
 
 private:
      // Singleton, no public creation or copy.
     MhDataProducersMayaNodeToSdfPathRegistry() = default;
+    ~MhDataProducersMayaNodeToSdfPathRegistry() = default;
     MhDataProducersMayaNodeToSdfPathRegistry(const MhDataProducersMayaNodeToSdfPathRegistry& ) = delete;
+    MhDataProducersMayaNodeToSdfPathRegistry& operator=(const MhDataProducersMayaNodeToSdfPathRegistry& ) = delete;
 
-    struct _HashObjectHandle
-    {
-        unsigned long operator()(const MObjectHandle& handle) const { return handle.hashCode(); }
-    };
-    std::unordered_map<MObjectHandle, PXR_NS::SdfPath, _HashObjectHandle> _SdfPathByObjectHandle;
+    friend class PXR_NS::TfSingleton<MhDataProducersMayaNodeToSdfPathRegistry>;
+
+    std::unordered_map<unsigned long, PXR_NS::SdfPath> _SdfPathByHashCode;
 
     static std::unique_ptr<MhDataProducersMayaNodeToSdfPathRegistry>   _instance;
 };

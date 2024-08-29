@@ -275,9 +275,9 @@ PrimSelections SelectionSceneIndex::UfePathToPrimSelections(const Ufe::Path& app
             TF_WARN("SelectionSceneIndex::UfePathToPrimSelections(%s) returned no path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
         };
 
-        //Don't emit a warning if there is no mapper for this path, _selectionSceneIndex->ReplaceSelection may be called 
-        // later again if there are some usd stage scene index or custom producer scene indices added to the merging scene index.
-        if (mapper) {
+        if (!mapper) {
+            warnEmptyPath(appPath);
+        } else {
             primSelections = mapper->UfePathToPrimSelections(appPath);
             if (primSelections.empty()) {
                 warnEmptyPath(appPath);

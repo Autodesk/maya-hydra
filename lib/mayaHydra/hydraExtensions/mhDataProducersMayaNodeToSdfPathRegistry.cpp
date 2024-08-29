@@ -15,64 +15,49 @@
 //
 
 #include "mhDataProducersMayaNodeToSdfPathRegistry.h"
+#include <pxr/base/tf/instantiateSingleton.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
+TF_INSTANTIATE_SINGLETON(MAYAHYDRA_NS_DEF::MhDataProducersMayaNodeToSdfPathRegistry);
 
 namespace MAYAHYDRA_NS_DEF {
 
-std::unique_ptr<MhDataProducersMayaNodeToSdfPathRegistry>   MhDataProducersMayaNodeToSdfPathRegistry::_instance;
-
-MhDataProducersMayaNodeToSdfPathRegistry& MhDataProducersMayaNodeToSdfPathRegistry::Get()
+/* static */
+MhDataProducersMayaNodeToSdfPathRegistry& MhDataProducersMayaNodeToSdfPathRegistry::Instance()
 {
-    if (! _instance){
-        _instance.reset(new MhDataProducersMayaNodeToSdfPathRegistry());
-    }
-    return *_instance;
+    return PXR_NS::TfSingleton<MhDataProducersMayaNodeToSdfPathRegistry>::GetInstance();
 }
 
-void MhDataProducersMayaNodeToSdfPathRegistry::Add(const MObjectHandle& objectHandle, const SdfPath& thePath)
+void MhDataProducersMayaNodeToSdfPathRegistry::Add(const unsigned long& objectHandleHashCode, const SdfPath& thePath)
 {
-    if (thePath.IsEmpty() || ! objectHandle.isValid() ) {
-        TF_CODING_WARNING("Sending an empty SdfPath or an invalid objectHandle in MhDataProducersMayaNodeToSdfPathRegistry::Add, ignoring");
+    if (thePath.IsEmpty() || 0 == objectHandleHashCode) {
+        TF_CODING_WARNING("Sending an empty SdfPath or an invalid objectHandle has code in MhDataProducersMayaNodeToSdfPathRegistry::Add, ignoring");
         return;
     }
 
-    _SdfPathByObjectHandle.insert({ objectHandle, thePath });
+    _SdfPathByHashCode.insert({ objectHandleHashCode, thePath });
 }
 
-void MhDataProducersMayaNodeToSdfPathRegistry::Remove(unsigned long& objectHandleHashCode) 
+void MhDataProducersMayaNodeToSdfPathRegistry::Remove(const unsigned long& objectHandleHashCode) 
 { 
     if (0 == objectHandleHashCode) {
         return;
     }
 
-    for (auto it = _SdfPathByObjectHandle.begin(); it != _SdfPathByObjectHandle.end(); ++it) {
-        if (it->first.hashCode() == objectHandleHashCode) {
-            _SdfPathByObjectHandle.erase(it);
-            return;
-        }
+    auto it = _SdfPathByHashCode.find(objectHandleHashCode);
+    if (it != _SdfPathByHashCode.end()) {
+        _SdfPathByHashCode.erase(it);
     }
 }
 
-void MhDataProducersMayaNodeToSdfPathRegistry::Remove(const MObjectHandle& objectHandle)
+SdfPath MhDataProducersMayaNodeToSdfPathRegistry::GetPath(const unsigned long& objectHandleHashCode) const
 {
-    if(! objectHandle.isValid()){
-        return;
-    }
-    auto it = _SdfPathByObjectHandle.find(objectHandle);
-    if (it != _SdfPathByObjectHandle.end()) { 
-        _SdfPathByObjectHandle.erase(it);
-    }
-}
-
-SdfPath MhDataProducersMayaNodeToSdfPathRegistry::GetPath(const MObjectHandle& objectHandle) const
-{
-    if (!objectHandle.isValid()) {
-        TF_CODING_WARNING("Sending an invalid objectHandle in MhDataProducersMayaNodeToSdfPathRegistry::GetPath");
+    if (0 == objectHandleHashCode) {
+        TF_CODING_WARNING("Sending an invalid objectHandleHashCode in MhDataProducersMayaNodeToSdfPathRegistry::GetPath");
         return {};
     }
-    auto it = _SdfPathByObjectHandle.find(objectHandle);
-    if (it != _SdfPathByObjectHandle.end()) {
+    auto it = _SdfPathByHashCode.find(objectHandleHashCode);
+    if (it != _SdfPathByHashCode.end()) {
         return (it->second);
     }
     return SdfPath();

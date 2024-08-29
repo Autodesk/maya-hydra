@@ -70,7 +70,7 @@ MayaDataProducerSceneIndexData::~MayaDataProducerSceneIndexData()
     }
     if (0 != _dccNodeHashCode){
         //Remove the node from the registry
-        MAYAHYDRA_NS::MhDataProducersMayaNodeToSdfPathRegistry::Get().Remove(_dccNodeHashCode);
+        MAYAHYDRA_NS::MhDataProducersMayaNodeToSdfPathRegistry::Instance().Remove(_dccNodeHashCode);
     }
 }
 
@@ -89,8 +89,8 @@ void MayaDataProducerSceneIndexData::SetupDCCNode()
             if (!dagPath.node().isNull()) {
                 MObjectHandle hdl(dagPath.node());
                 _dccNodeHashCode = hdl.hashCode();
-                MAYAHYDRA_NS::MhDataProducersMayaNodeToSdfPathRegistry::Get().Add(
-                    hdl, _prefix);
+                MAYAHYDRA_NS::MhDataProducersMayaNodeToSdfPathRegistry::Instance().Add(
+                    _dccNodeHashCode, _prefix);
             }
         }
 
