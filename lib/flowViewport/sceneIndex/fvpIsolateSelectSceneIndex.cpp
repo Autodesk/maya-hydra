@@ -149,7 +149,7 @@ void IsolateSelectSceneIndex::RemoveIsolateSelection(const PrimSelections& primS
     for (const auto& primSelection : primSelections) {
         TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
             .Msg("    Removing %s from the isolate select set.\n", primSelection.primPath.GetText());
-        _isolateSelection->Remove(primSelection.primPath);
+        _isolateSelection->Remove(primSelection);
         _DirtyVisibility(primSelection.primPath, &dirtiedEntries);
     }
 

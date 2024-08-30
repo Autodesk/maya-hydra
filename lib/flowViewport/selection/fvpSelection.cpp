@@ -101,7 +101,7 @@ void Selection::Replace(const PrimSelections& primSelections)
 
 void Selection::Replace(const Selection& rhs)
 {
-    _pathToState = rhs._pathToState;
+    _pathToSelections = rhs._pathToSelections;
 }
 
 void Selection::RemoveHierarchy(const PXR_NS::SdfPath& primPath)
@@ -139,16 +139,16 @@ bool Selection::HasFullySelectedAncestorInclusive(const SdfPath& primPath, const
 bool Selection::HasDescendantInclusive(const PXR_NS::SdfPath& primPath) const
 {
     // No entries?  No descendant
-    if (_pathToState.empty()) {
+    if (_pathToSelections.empty()) {
         return false;
     }
 
     // At least one entry.  Skip all entries before argument.  The iterator
     // points to an entry with matching or greater key.
-    auto it = _pathToState.lower_bound(primPath);
+    auto it = _pathToSelections.lower_bound(primPath);
 
     // Reached the end?  Last entry is strictly smaller than, so no descendants.
-    if (it == _pathToState.end()) {
+    if (it == _pathToSelections.end()) {
         return false;
     }
 
@@ -167,18 +167,18 @@ Selection::HasAncestorOrDescendantInclusive(const PXR_NS::SdfPath& primPath) con
     // this functionality.
 
     // No entries?  No ancestors or descendants.
-    if (_pathToState.empty()) {
+    if (_pathToSelections.empty()) {
         return false;
     }
 
     // At least one entry.  Skip all entries before argument.  The iterator
     // points to an entry with matching or greater key.
-    auto it = _pathToState.lower_bound(primPath);
+    auto it = _pathToSelections.lower_bound(primPath);
 
     // Reached the end?  Last entry is strictly smaller than, so no descendants
     // in map.  Check if it's an ancestor.
-    if (it == _pathToState.end()) {
-        auto rit = _pathToState.rbegin();
+    if (it == _pathToSelections.end()) {
+        auto rit = _pathToSelections.rbegin();
         return primPath.HasPrefix(rit->first);
     }
 
@@ -193,7 +193,7 @@ Selection::HasAncestorOrDescendantInclusive(const PXR_NS::SdfPath& primPath) con
     // Map entry is strictly greater and not a descendant.  For the map entry
     // to be an ancestor of the query, it would have to be less than the query.
     // Thus, if we're at the beginning, the map entry is unrelated to the query.
-    if (it == _pathToState.begin()) {
+    if (it == _pathToSelections.begin()) {
         return false;
     }
 
