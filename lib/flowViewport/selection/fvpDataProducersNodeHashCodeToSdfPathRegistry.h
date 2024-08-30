@@ -59,8 +59,6 @@ private:
     friend class PXR_NS::TfSingleton<DataProducersNodeHashCodeToSdfPathRegistry>;
 
     std::unordered_map<unsigned long, PXR_NS::SdfPath> _SdfPathByHashCode;
-
-    static std::unique_ptr<DataProducersNodeHashCodeToSdfPathRegistry>   _instance;
 };
 
 } // namespace FVP_NS_DEF
