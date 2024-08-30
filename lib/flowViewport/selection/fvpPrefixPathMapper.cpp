@@ -54,9 +54,7 @@ PrimSelections PrefixPathMapper::UfePathToPrimSelections(const Ufe::Path& appPat
         primPath = primPath.AppendChild(TfToken(pathComponent.string()));
     }
 
-    auto selectionDataSource = createFullySelectedDataSource();
-
-    return PrimSelections{{primPath, selectionDataSource}};
+    return PrimSelections{PrimSelection{primPath}};
 }
 
 }
