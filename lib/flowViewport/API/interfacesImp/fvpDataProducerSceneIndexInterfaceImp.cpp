@@ -26,6 +26,13 @@
 //Std Headers
 #include <mutex>
 
+/// DataProducersNodeHashCodeToSdfPathRegistry does a mapping between DCC nodes hash code and Hydra
+/// paths. The DCC nodes registered in this class are used by data producers scene indices as a
+/// parent to all primitives. The registration/unregistration in this class is automatic when you
+/// use the flow viewport API and provide a DCC node as a parent. This class is used when we select
+/// one of these nodes to return the matching SdfPath so that all child prims of this node are
+/// highlighted.
+/// 
 namespace
 {
     std::mutex dataProducerSceneIndicesThatApplyToAllViewports_mutex;
@@ -69,7 +76,7 @@ PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr DataProducerSceneIndexI
 }
 
 bool DataProducerSceneIndexInterfaceImp::addUsdStageDataProducerSceneIndexDataBaseToAllViewports(PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr&  dataProducerSceneIndexData){
-    //Apply this maya usd scene index to all viewports
+    //Apply this usd scene index to all viewports
     return _AddDataProducerSceneIndexToAllViewports(dataProducerSceneIndexData);
 }
 

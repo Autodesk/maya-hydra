@@ -155,4 +155,4 @@ SdfPathVector MayaUsdProxyShapeSceneIndex::GetChildPrimPaths(const SdfPath& prim
     return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
-} // namespace MAYAUSD_NS_DEF
+} // namespace MAYAHYDRA_NS_DEF

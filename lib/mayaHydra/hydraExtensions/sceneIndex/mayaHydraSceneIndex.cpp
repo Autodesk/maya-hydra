@@ -45,7 +45,7 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
 #include <mayaHydraLib/pick/mhPickHandler.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
-#include <mayaHydraLib/mhDataProducersMayaNodeToSdfPathRegistry.h>
+#include <flowViewport/selection/fvpDataProducersNodeHashCodeToSdfPathRegistry.h>
 
 #include <ufeExtensions/Global.h>
 
@@ -771,7 +771,7 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
     //highlighted.
     MDagPath shapeDagPath(dagPath);
     shapeDagPath.extendToShape();
-    const SdfPath matchingPath = MhDataProducersMayaNodeToSdfPathRegistry::Instance().GetPath(MObjectHandle(shapeDagPath.node()).hashCode());
+    const SdfPath matchingPath = FVP_NS::DataProducersNodeHashCodeToSdfPathRegistry::Instance().GetPath(MObjectHandle(shapeDagPath.node()).hashCode());
     if (! matchingPath.IsEmpty()) {
         primPath = matchingPath;
     }

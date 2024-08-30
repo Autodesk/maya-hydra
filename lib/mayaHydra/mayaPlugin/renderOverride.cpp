@@ -33,7 +33,6 @@
 #include <mayaHydraLib/hydraUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/tokens.h>
-#include <mayaHydraLib/mhDataProducersMayaNodeToSdfPathRegistry.h>
 
 #ifdef CODE_COVERAGE_WORKAROUND
 #include <flowViewport/fvpUtils.h>

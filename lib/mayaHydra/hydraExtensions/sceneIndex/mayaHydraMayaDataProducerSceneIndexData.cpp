@@ -20,9 +20,14 @@
 
 //Local headers
 #include "mayaHydraMayaDataProducerSceneIndexData.h"
-#include "mayaHydraLib/mhDataProducersMayaNodeToSdfPathRegistry.h"
 #include "mayaHydraLib/hydraUtils.h"
 #include "mayaHydraLib/mayaUtils.h"
+
+//Flow viewport
+#include <flowViewport/selection/fvpDataProducersNodeHashCodeToSdfPathRegistry.h>
+
+//maya headers
+#include <maya/MObjectHandle.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -70,7 +75,7 @@ MayaDataProducerSceneIndexData::~MayaDataProducerSceneIndexData()
     }
     if (0 != _dccNodeHashCode){
         //Remove the node from the registry
-        MAYAHYDRA_NS::MhDataProducersMayaNodeToSdfPathRegistry::Instance().Remove(_dccNodeHashCode);
+        FVP_NS::DataProducersNodeHashCodeToSdfPathRegistry::Instance().Remove(_dccNodeHashCode);
     }
 }
 
@@ -89,7 +94,7 @@ void MayaDataProducerSceneIndexData::SetupDCCNode()
             if (!dagPath.node().isNull()) {
                 MObjectHandle hdl(dagPath.node());
                 _dccNodeHashCode = hdl.hashCode();
-                MAYAHYDRA_NS::MhDataProducersMayaNodeToSdfPathRegistry::Instance().Add(
+                FVP_NS::DataProducersNodeHashCodeToSdfPathRegistry::Instance().Add(
                     _dccNodeHashCode, _prefix);
             }
         }

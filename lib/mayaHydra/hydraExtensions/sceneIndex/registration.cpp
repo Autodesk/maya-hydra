@@ -17,7 +17,6 @@
 #include "mayaHydraLib/mixedUtils.h"
 #include "mayaHydraLib/sceneIndex/registration.h"
 #include "mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndex.h"
-#include "mayaHydraLib/mhDataProducersMayaNodeToSdfPathRegistry.h"
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpPathInterfaceSceneIndex.h>
