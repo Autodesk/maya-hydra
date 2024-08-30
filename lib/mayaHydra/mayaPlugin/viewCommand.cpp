@@ -65,9 +65,6 @@ constexpr auto _updateRenderGlobalsLong = "-updateRenderGlobals";
 constexpr auto _help = "-h";
 constexpr auto _helpLong = "-help";
 
-constexpr auto _verbose = "-v";
-constexpr auto _verboseLong = "-verbose";
-
 constexpr auto _listRenderIndex = "-lri";
 constexpr auto _listRenderIndexLong = "-listRenderIndex";
 
@@ -103,40 +100,8 @@ constexpr auto _rendererIdLong = "-renderer";
 constexpr auto _userDefaultsId = "-u";
 constexpr auto _userDefaultsIdLong = "-userDefaults";
 
-constexpr auto _helpText = R"HELP(
-Maya to Hydra utility function.
-Usage: mayaHydra [flags]
--listDelegates/-ld : Returns the names of available scene delegates.
--listRenderers/-lr : Returns the names of available render delegates.
--listActiveRenderers/-lar : Returns the names of render delegates that are in
-    use in at least one viewport.
-
--renderer/-r [RENDERER]: Renderer to target for the commands below.
--getRendererDisplayName/-gn : Returns the display name for the given render delegate.
--createRenderGlobals/-crg: Creates the render globals, optionally targetting a
-    specific renderer.
--userDefaults/-ud: Flag for createRenderGlobals to restore user defaults on create.
--updateRenderGlobals/-urg [ATTRIBUTE]: Forces the update of the render globals
-    for the viewport, optionally targetting a specific renderer or setting.
-)HELP";
-
-constexpr auto _helpNonVerboseText = R"HELP(
-Use -verbose/-v to see advanced / debugging flags
-
-)HELP";
-
-constexpr auto _helpVerboseText = R"HELP(
-Debug flags:
-
--listRenderIndex/-lri -r [RENDERER]: Returns a list of all the rprims in the
-    render index for the given render delegate.
-
--visibleOnly/-vo: Flag which affects the behavior of -listRenderIndex - if
-    given, then only visible items in the render index are returned.
-
--sceneDelegateId/-sid [SCENE_DELEGATE] -r [RENDERER]: Returns the path id
-    corresponding to the given render delegate / scene delegate pair.
-
+constexpr auto _helpText = R"HELP(For details on args usage please see 
+https://github.com/Autodesk/maya-hydra/tree/dev/doc/mayaHydraCommads.md
 )HELP";
 
 } // namespace
@@ -164,8 +129,6 @@ MSyntax MtohViewCmd::createSyntax()
     syntax.addFlag(_updateRenderGlobals, _updateRenderGlobalsLong, MSyntax::kString);
 
     syntax.addFlag(_help, _helpLong);
-
-    syntax.addFlag(_verbose, _verboseLong);
 
     // Debug / testing flags
 
@@ -243,11 +206,6 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
         setResult(MString(dn.c_str()));
     } else if (db.isFlagSet(_help)) {
         MString helpText = _helpText;
-        if (db.isFlagSet(_verbose)) {
-            helpText += _helpVerboseText;
-        } else {
-            helpText += _helpNonVerboseText;
-        }
         MGlobal::displayInfo(helpText);
     } else if (db.isFlagSet(_createRenderGlobals)) {
         bool userDefaults = db.isFlagSet(_userDefaultsId);
