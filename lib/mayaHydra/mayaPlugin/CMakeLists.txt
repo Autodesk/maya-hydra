@@ -16,6 +16,7 @@ target_sources(${TARGET_NAME}
         renderOverride.cpp
         tokens.cpp
         viewCommand.cpp
+        pluginBuildInfoCommand.cpp
 )
 
 set(HEADERS
