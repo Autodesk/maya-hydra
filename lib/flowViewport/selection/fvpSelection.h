@@ -49,7 +49,7 @@ public:
 
     // Returns true if the removal was successful, false otherwise.
     FVP_API
-    bool Remove(const PXR_NS::SdfPath& primPath);
+    bool Remove(const PrimSelection& primSelection);
 
     // Replace the selection with the contents of the argument vector.
     // Any empty primPath in the argument will be skipped.
@@ -106,17 +106,10 @@ public:
     GetVectorDataSource(const PXR_NS::SdfPath& primPath) const;
 
 private:
-
-    struct _PrimSelectionState {
-        // Container data sources conforming to HdSelectionSchema
-        std::vector<PXR_NS::HdDataSourceBaseHandle> selectionSources;
-
-        PXR_NS::HdDataSourceBaseHandle GetVectorDataSource() const;
-    };
     
-    // Maps prim path to data sources to be returned by the vector data
+    // Maps prim path to selections to be returned by the vector data
     // source at locator selections.
-    std::map<PXR_NS::SdfPath, _PrimSelectionState> _pathToState;
+    std::map<PXR_NS::SdfPath, std::vector<PrimSelection>> _pathToSelections;
 };
 
 }

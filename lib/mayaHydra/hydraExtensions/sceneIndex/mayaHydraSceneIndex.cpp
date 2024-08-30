@@ -787,11 +787,7 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
     SdfPath primPath = GetPrimPath(UfeExtensions::ufeToDagPath(appPath), isSprim);
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg("    mapped to scene index path %s.\n", primPath.GetText());
-    HdSelectionSchema::Builder selectionBuilder;
-    selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
-    auto selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
-    Fvp::PrimSelection primSelection {primPath, selectionDataSource};
-    return Fvp::PrimSelections({primSelection});
+    return Fvp::PrimSelections({Fvp::PrimSelection{primPath}});
 }
 
 Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelectionsLit(
@@ -812,11 +808,7 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelectionsLit(
     SdfPath primPath = GetLightedPrimsRootPath().AppendPath(toSdfPath(UfeExtensions::ufeToDagPath(appPath)).MakeRelativePath(SdfPath::AbsoluteRootPath()));
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg("    mapped to scene index path %s.\n", primPath.GetText());
-    HdSelectionSchema::Builder selectionBuilder;
-    selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
-    auto selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
-    Fvp::PrimSelection primSelection {primPath, selectionDataSource};
-    return Fvp::PrimSelections({primSelection});
+    return Fvp::PrimSelections({Fvp::PrimSelection{primPath}});
 }
 
 SdfPath MayaHydraSceneIndex::SetCameraViewport(const MDagPath& camPath, const GfVec4d& viewport)
