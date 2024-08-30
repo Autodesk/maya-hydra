@@ -27,6 +27,7 @@
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/sceneIndexPlugin.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
 #include <pxr/imaging/hd/selectionSchema.h>
@@ -145,21 +146,30 @@ public:
         SdfPath primPath = _sceneIndexPathPrefix;
         TF_AXIOM(appPath.nbSegments() == 2);
 
-        bool lastComponentIsNumeric = false;
         const auto& secondSegment = appPath.getSegments()[1];
         for (const auto& pathComponent : secondSegment) {
-            if (pathComponent.string().find_first_not_of(digits) == std::string::npos) {
-                // This should only occur on the last component, when we have an instance selection
-                if (TF_VERIFY(pathComponent == secondSegment.components().back())) {
-                    lastComponentIsNumeric = true;
-                }
-                continue;
+            auto targetChildPath = primPath.AppendChild(TfToken(pathComponent.string()));
+            auto actualChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
+            if (std::find(actualChildPaths.begin(), actualChildPaths.end(), targetChildPath) != actualChildPaths.end()) {
+                // Only append if the new path is valid
+                primPath = primPath.AppendChild(TfToken(pathComponent.string()));
+            } else {
+                // There is no prim corresponding to the converted path, stop appending
+                break;
             }
-            primPath = primPath.AppendChild(TfToken(pathComponent.string()));
         }
 
+        // while (!GetInputSceneIndex()->GetPrim(primPath).dataSource) {
+        //     // For native instancing, the UFE path that we blindly convert to a Hydra prim path
+        //     // might not actually point to an actual prim. The USD prim would instead be broken
+        //     // into an instanced prim and the prototype containing the subprims. Walk back the
+        //     // hierarchy to find the first parent that actually has data. This case should only
+        //     // occur with native instancing; in other cases this while loop should be skipped.
+        //     primPath = primPath.GetParentPath();
+        // }
+
         const auto lastComponentString = secondSegment.components().back().string();
-        HdDataSourceBaseHandle selectionDataSource = lastComponentIsNumeric 
+        HdDataSourceBaseHandle selectionDataSource = lastComponentString.find_first_not_of(digits) == std::string::npos
             ? createInstanceSelectionDataSource(primPath, std::stoi(lastComponentString))
             : Fvp::createFullySelectedDataSource();
         Fvp::PrimSelections primSelections({{primPath, selectionDataSource}});
