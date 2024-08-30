@@ -184,7 +184,7 @@ void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
 
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
     for (const auto& primSelection : primSelections) {
-        if (_selection->Remove(primSelection.primPath)) {
+        if (_selection->Remove(primSelection)) {
             dirtiedPrims.emplace_back(primSelection.primPath, selectionsSchemaDefaultLocator);
         }
     }

@@ -88,21 +88,6 @@ private:
     }
 };
 
-HdDataSourceBaseHandle createInstanceSelectionDataSource(const SdfPath& instancerPrimPath, int instanceIndex)
-{
-    HdInstanceIndicesSchema::Builder instanceIndicesBuilder;
-    instanceIndicesBuilder.SetInstancer(HdRetainedTypedSampledDataSource<SdfPath>::New(instancerPrimPath));
-    instanceIndicesBuilder.SetInstanceIndices(HdRetainedTypedSampledDataSource<VtArray<int>>::New({instanceIndex}));
-    HdSelectionSchema::Builder selectionBuilder;
-    // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
-    // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
-    // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
-    selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
-    auto instanceIndicesDataSource = HdDataSourceBase::Cast(instanceIndicesBuilder.Build());
-    selectionBuilder.SetNestedInstanceIndices(HdRetainedSmallVectorDataSource::New(1, &instanceIndicesDataSource));
-    return HdDataSourceBase::Cast(selectionBuilder.Build());
-}
-
 /// \class PathInterfaceSceneIndex
 ///
 /// Implement the path interface for plugin scene indices.
@@ -168,11 +153,12 @@ public:
         //     primPath = primPath.GetParentPath();
         // }
 
+        std::optional<int> instanceIndex = std::nullopt;
         const auto lastComponentString = secondSegment.components().back().string();
-        HdDataSourceBaseHandle selectionDataSource = lastComponentString.find_first_not_of(digits) == std::string::npos
-            ? createInstanceSelectionDataSource(primPath, std::stoi(lastComponentString))
-            : Fvp::createFullySelectedDataSource();
-        Fvp::PrimSelections primSelections({{primPath, selectionDataSource}});
+        if (lastComponentString.find_first_not_of(digits) == std::string::npos) {
+            instanceIndex = std::stoi(lastComponentString);
+        }
+        Fvp::PrimSelections primSelections({{primPath, instanceIndex}});
 
         // Propagate selection to propagated prototypes
         auto ancestorsRange = primPath.GetAncestorsRange();
@@ -198,7 +184,7 @@ public:
                     // for another instancer B will only mark the geometry-drawing instancer A as selected. This can be changed.
                     // For now (2024/05/28), this only affects selection highlighting.
                     if (propagatedPrim.primType != HdPrimTypeTokens->instancer) {
-                        primSelections.push_back({propagatedPrimPath, selectionDataSource});
+                        primSelections.push_back({propagatedPrimPath, instanceIndex});
                     }
                 }
             }

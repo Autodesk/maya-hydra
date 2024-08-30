@@ -110,22 +110,23 @@ class TestCommand(unittest.TestCase):
                 "defaultRenderGlobals.mtohMotionSampleStart"))            
 
     def test_versionInfo(self):
-        self.assertGreaterEqual(cmds.mayaHydra(majorVersion=True), 0)
-        self.assertGreaterEqual(cmds.mayaHydra(mjv=True), 0)
-        self.assertGreaterEqual(cmds.mayaHydra(minorVersion=True), 0)
-        self.assertGreaterEqual(cmds.mayaHydra(mnv=True), 0)
-        self.assertGreaterEqual(cmds.mayaHydra(patchVersion=True), 0)
-        self.assertGreaterEqual(cmds.mayaHydra(pv=True), 0)
+        self.assertGreaterEqual(cmds.mayaHydraBuildInfo(majorVersion=True), 0)
+        self.assertGreaterEqual(cmds.mayaHydraBuildInfo(mjv=True), 0)
+        self.assertGreaterEqual(cmds.mayaHydraBuildInfo(minorVersion=True), 0)
+        self.assertGreaterEqual(cmds.mayaHydraBuildInfo(mnv=True), 0)
+        self.assertGreaterEqual(cmds.mayaHydraBuildInfo(patchVersion=True), 0)
+        self.assertGreaterEqual(cmds.mayaHydraBuildInfo(pv=True), 0)
 
     def test_buildInfo(self):
-        self.assertGreaterEqual(cmds.mayaHydra(buildNumber=True), 0)
-        self.assertGreaterEqual(cmds.mayaHydra(bn=True), 0)
-        self.assertNotEqual(cmds.mayaHydra(gitCommit=True), '')
-        self.assertNotEqual(cmds.mayaHydra(gc=True), '')
-        self.assertNotEqual(cmds.mayaHydra(gitBranch=True), '')
-        self.assertNotEqual(cmds.mayaHydra(gb=True), '')
-        self.assertNotEqual(cmds.mayaHydra(buildDate=True), '')
-        self.assertNotEqual(cmds.mayaHydra(bd=True), '')
+        self.assertGreaterEqual(cmds.mayaHydraBuildInfo(buildNumber=True), 0)
+        self.assertGreaterEqual(cmds.mayaHydraBuildInfo(bn=True), 0)
+        self.assertNotEqual(cmds.mayaHydraBuildInfo(gitCommit=True), '')
+        self.assertNotEqual(cmds.mayaHydraBuildInfo(gc=True), '')
+        self.assertNotEqual(cmds.mayaHydraBuildInfo(gitBranch=True), '')
+        self.assertNotEqual(cmds.mayaHydraBuildInfo(gb=True), '')
+        self.assertNotEqual(cmds.mayaHydraBuildInfo(buildDate=True), '')
+        self.assertNotEqual(cmds.mayaHydraBuildInfo(bd=True), '')
+        self.assertNotEqual(cmds.mayaHydraBuildInfo(cutIdentifier=True), "DEVBLD")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
