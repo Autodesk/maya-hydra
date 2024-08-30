@@ -20,6 +20,7 @@
 #include "renderGlobals.h"
 #include "renderOverride.h"
 #include "viewCommand.h"
+#include "pluginBuildInfoCommand.h"
 
 #include <mayaHydraLib/adapters/adapter.h>
 
@@ -150,6 +151,13 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
+    if (!plugin.registerCommand(
+        MayaHydraPluginInfoCommand::commandName, MayaHydraPluginInfoCommand::creator, MayaHydraPluginInfoCommand::createSyntax)) {
+    ret = MS::kFailure;
+    ret.perror("Error registering MayaHydraPluginInfo command!");
+    return ret;
+    }
+
     if (auto* renderer = MHWRender::MRenderer::theRenderer()) {
         for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {
             auto    mtohRenderer = std::make_unique<PXR_NS::MtohRenderOverride>(desc);
@@ -233,6 +241,11 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     if (!plugin.deregisterCommand(MtohViewCmd::name)) {
         ret = MS::kFailure;
         ret.perror("Error deregistering mayaHydra command!");
+    }
+
+    if (!plugin.deregisterCommand(MayaHydraPluginInfoCommand::commandName)) {
+        ret = MS::kFailure;
+        ret.perror("Error deregistering MayaHydraPluginInfo command!");
     }
 
     return ret;

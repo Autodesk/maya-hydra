@@ -35,7 +35,12 @@ namespace FVP_NS_DEF {
 struct PrimSelection
 {
     PXR_NS::SdfPath primPath;
-    PXR_NS::HdDataSourceBaseHandle selectionDataSource;
+    std::optional<int> instanceIndex;
+
+    inline bool operator==(const PrimSelection &rhs) const {
+        return primPath == rhs.primPath
+            && instanceIndex == rhs.instanceIndex;
+    }
 };
 
 // Using TfSmallVector to optimize for selections that map to a few prims,

@@ -1,5 +1,5 @@
 //
-// Copyright 2023 Autodesk, Inc. All rights reserved.
+// Copyright 2024 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ namespace MAYAHYDRA_NS_DEF {
 int         MhBuildInfo::buildNumber() { return MAYAHYDRA_BUILD_NUMBER; }
 const char* MhBuildInfo::gitCommit()   { return MAYAHYDRA_GIT_COMMIT;   }
 const char* MhBuildInfo::gitBranch()   { return MAYAHYDRA_GIT_BRANCH;   }
+const char* MhBuildInfo::cutId()       { return MAYAHYDRA_CUT_ID;       }
 const char* MhBuildInfo::buildDate()   { return MAYAHYDRA_BUILD_DATE;   }
 
 } // namespace MAYAHYDRA_NS_DEF

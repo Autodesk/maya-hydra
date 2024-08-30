@@ -91,6 +91,8 @@ private:
 
 PXR_NS::HdDataSourceBaseHandle FVP_API createFullySelectedDataSource();
 
+PXR_NS::HdDataSourceBaseHandle FVP_API createInstanceSelectionDataSource(const PXR_NS::SdfPath& instancerPrimPath, int instanceIndex);
+
 } // namespace FVP_NS_DEF
 
 #endif // FVP_UTILS_H

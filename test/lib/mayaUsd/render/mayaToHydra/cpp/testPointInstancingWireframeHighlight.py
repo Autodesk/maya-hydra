@@ -45,6 +45,11 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 f="PointInstancingWireframeHighlight.prototype")
+            
+    def test_MultiInstancesSelection(self):
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(
+                f="PointInstancingWireframeHighlight.multiInstances")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

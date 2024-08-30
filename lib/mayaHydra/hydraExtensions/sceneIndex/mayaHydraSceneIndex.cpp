@@ -759,11 +759,7 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
     // the UFE path to a string, then does a Dag path lookup with the string.
     constexpr bool isSprim = false; // Can't handle sprims as of 15-Aug-2023.
     SdfPath primPath = GetPrimPath(UfeExtensions::ufeToDagPath(appPath), isSprim);
-    HdSelectionSchema::Builder selectionBuilder;
-    selectionBuilder.SetFullySelected(HdRetainedTypedSampledDataSource<bool>::New(true));
-    auto selectionDataSource = HdDataSourceBase::Cast(selectionBuilder.Build());
-    Fvp::PrimSelection primSelection {primPath, selectionDataSource};
-    return Fvp::PrimSelections({primSelection});
+    return Fvp::PrimSelections({Fvp::PrimSelection{primPath}});
 }
 
 SdfPath MayaHydraSceneIndex::SetCameraViewport(const MDagPath& camPath, const GfVec4d& viewport)
