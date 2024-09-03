@@ -3,6 +3,7 @@
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME}
     PRIVATE
+    fvpIsolateSelectSceneIndex.cpp
     fvpMergingSceneIndex.cpp
     fvpPathInterface.cpp
     fvpPathInterfaceSceneIndex.cpp
@@ -19,6 +20,7 @@ target_sources(${TARGET_NAME}
 )
 
 set(HEADERS
+    fvpIsolateSelectSceneIndex.h
     fvpMergingSceneIndex.h
     fvpPathInterface.h
     fvpPathInterfaceSceneIndex.h

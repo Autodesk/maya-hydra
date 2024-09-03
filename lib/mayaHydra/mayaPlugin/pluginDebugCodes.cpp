@@ -40,6 +40,10 @@ TF_REGISTRY_FUNCTION(TfDebug)
     TF_DEBUG_ENVIRONMENT_SYMBOL(
         MAYAHYDRALIB_RENDEROVERRIDE_SELECTION,
         "Print information about selection for the Maya VP2 RenderOverride.");
+
+    TF_DEBUG_ENVIRONMENT_SYMBOL(
+        MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT,
+        "Print information about scene index tree management for the Maya VP2 RenderOverride.");
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

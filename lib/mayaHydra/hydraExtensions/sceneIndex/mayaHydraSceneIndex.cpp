@@ -17,6 +17,8 @@
 #include "mayaHydraSceneIndex.h"
 
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
+#include <flowViewport/selection/fvpPathMapper.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include <maya/MDGMessage.h>
 #include <maya/MDagPath.h>
@@ -436,6 +438,21 @@ namespace {
         sActiveFacesName(L"PolyActiveFaces"); // When we have a render item which is a selection of
                                               // faces, it always has this name in maya.
 
+class MayaPathMapper : public Fvp::PathMapper
+{
+public:
+    MayaPathMapper(const MayaHydraSceneIndex& piSi) : _piSi(piSi) {}
+
+    Fvp::PrimSelections 
+    UfePathToPrimSelections(const Ufe::Path& appPath) const override {
+        return _piSi.UfePathToPrimSelectionsLit(appPath);
+    }
+
+private:
+    // Non-owning reference to prevent ownership cycle.
+    const MayaHydraSceneIndex& _piSi;
+};
+
 }
 
 MayaHydraSceneIndex::MayaHydraSceneIndex(
@@ -448,6 +465,7 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
     , _rprimPath(initData.delegateID.AppendPath(SdfPath(std::string("rprims"))))
     , _sprimPath(initData.delegateID.AppendPath(SdfPath(std::string("sprims"))))
     , _materialPath(initData.delegateID.AppendPath(SdfPath(std::string("materials"))))
+    , _mayaPathMapper(std::make_shared<MayaPathMapper>(*this))
 {
     static std::once_flag once;
     std::call_once(once, []() {
@@ -474,10 +492,18 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
     AddPrims({ { _mayaFacesSelectionMaterialPath,
                  HdPrimTypeTokens->material,
                  mayaHydraFacesSelectionMaterialDataSource } });
+
+    // Register a fallback path mapper in the path mapper registry.  Non-Maya
+    // data models will have a Maya path segment prefix in their UFE path.
+    // Maya data will not, and will be picked up by the fallback mapper.
+    Fvp::PathMapperRegistry::Instance().SetFallbackMapper(_mayaPathMapper);
 }
 
 MayaHydraSceneIndex::~MayaHydraSceneIndex()
 {
+    // Unregister the fallback path mapper.
+    Fvp::PathMapperRegistry::Instance().SetFallbackMapper(nullptr);
+
     //If you get a crash in a callback with a nullptr for _sceneIndex, 
     // it may be due to the fact that the _sceneIndex pointer has been nulled as its ref count reached 0 but the destructor is still being called.
     //You should call RemoveCallbacksAndDeleteAdapters(); before the destructor is called.
@@ -762,7 +788,9 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
 
     auto dagPath = UfeExtensions::ufeToDagPath(appPath);
     SdfPath primPath = GetPrimPath(dagPath, isSprim);
-    
+    TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
+        .Msg("    mapped to scene index path %s.\n", primPath.GetText());
+  
     //Check if this maya node has a special SdfPath associated with it, this is for custom or maya usd data producers scene indices.
     //The class MhDataProducersMayaNodeToSdfPathRegistry does a mapping between Maya nodes and USD paths.
     //The maya nodes registered in this class are used by data producers as a parent to all
@@ -776,6 +804,28 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
         primPath = matchingPath;
     }
  
+    return Fvp::PrimSelections({Fvp::PrimSelection{primPath}});
+}
+
+Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelectionsLit(
+    const Ufe::Path& appPath
+) const
+{
+    TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
+        .Msg("MayaHydraSceneIndex::UfePathToPrimSelectionsLit(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
+
+    // Same as UfePathToPrimSelections(), except returns the "Lighted"
+    // hierarchy.  Should not be required.  Having the path mapper call
+    // UfePathToPrimSelections() would allow factoring out into a single path
+    // mapper for Usd and Maya (see registration.cpp).
+    if (appPath.runTimeId() != UfeExtensions::getMayaRunTimeId()) {
+        return {};
+    }
+
+    SdfPath primPath = GetLightedPrimsRootPath().AppendPath(toSdfPath(UfeExtensions::ufeToDagPath(appPath)).MakeRelativePath(SdfPath::AbsoluteRootPath()));
+    TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
+        .Msg("    mapped to scene index path %s.\n", primPath.GetText());
+
     return Fvp::PrimSelections({Fvp::PrimSelection{primPath}});
 }
 

@@ -22,6 +22,8 @@
 #include <flowViewport/sceneIndex/fvpPathInterfaceSceneIndex.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/fvpUtils.h>
+#include <flowViewport/selection/fvpPathMapper.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
@@ -204,12 +206,38 @@ private:
                  (op.subOpType == ObjectPathChange::ObjectRename))) {
                 const auto& siPath = _pi.GetSceneIndexAppPath();
                 if (siPath.startsWith(op.path)) {
-                    _pi.SetSceneIndexAppPath(siPath.reparent(op.path, op.item->path()));
+                    const auto oldPath = siPath;
+                    auto newPath = oldPath.reparent(op.path, op.item->path());
+                    _pi.SetSceneIndexAppPath(newPath);
+
+                    // Update our entry in the path mapper registry.
+                    auto mapper = Fvp::PathMapperRegistry::Instance().GetMapper(
+                        oldPath);
+                    TF_AXIOM(mapper);
+                    TF_AXIOM(Fvp::PathMapperRegistry::Instance().Unregister(
+                                 oldPath));
+                    TF_AXIOM(Fvp::PathMapperRegistry::Instance().Register(
+                                 newPath, mapper));
                 }
             }
         }
     
         PathInterfaceSceneIndex& _pi;
+    };
+
+    class UsdPathMapper : public Fvp::PathMapper
+    {
+    public:
+        UsdPathMapper(const PathInterfaceSceneIndex& piSi) : _piSi(piSi) {}
+    
+        Fvp::PrimSelections 
+        UfePathToPrimSelections(const Ufe::Path& appPath) const override {
+            return _piSi.UfePathToPrimSelections(appPath);
+        }
+    
+    private:
+        // Non-owning reference to prevent ownership cycle.
+        const PathInterfaceSceneIndex& _piSi;
     };
 
     PathInterfaceSceneIndex(
@@ -221,6 +249,7 @@ private:
       , _sceneIndexPathPrefix(sceneIndexPathPrefix)
       , _appSceneObserver(std::make_shared<PathInterfaceSceneObserver>(*this))
       , _sceneIndexAppPath(sceneIndexAppPath)
+      , _usdPathMapper(std::make_shared<UsdPathMapper>(*this))
     {
         // The gateway node (proxy shape) is a Maya node, so the scene index
         // path must be a single segment.
@@ -229,9 +258,17 @@ private:
         // Observe the scene to be informed of path changes to the gateway node
         // (proxy shape) that corresponds to our scene index data producer.
         Scene::instance().addObserver(_appSceneObserver);
+
+        // Register a mapper in the path mapper registry.
+        TF_AXIOM(Fvp::PathMapperRegistry::Instance().Register(
+                     _sceneIndexAppPath, _usdPathMapper));
     }
 
     ~PathInterfaceSceneIndex() {
+        // Unregister our path mapper.
+        TF_AXIOM(Fvp::PathMapperRegistry::Instance().Unregister(
+                     _sceneIndexAppPath));
+
         // Ufe::Subject has automatic cleanup of stale observers, but this can
         // be problematic on application exit if the library of the observer is
         // cleaned up before that of the subject, so simply stop observing.
@@ -241,6 +278,7 @@ private:
     const SdfPath       _sceneIndexPathPrefix;
     const Observer::Ptr _appSceneObserver;
     Ufe::Path           _sceneIndexAppPath;
+    const Fvp::PathMapperConstPtr _usdPathMapper;
 };
 
 constexpr char kMayaUsdProxyShapeNode[] = { "mayaUsdProxyShape" };

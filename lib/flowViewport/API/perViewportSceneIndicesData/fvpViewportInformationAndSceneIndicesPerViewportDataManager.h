@@ -20,6 +20,9 @@
 //Local headers
 #include "fvpViewportInformationAndSceneIndicesPerViewportData.h"
 #include "flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h"
+#include "flowViewport/sceneIndex/fvpPathInterface.h"
+#include "flowViewport/sceneIndex/fvpIsolateSelectSceneIndex.h"
+#include "flowViewport/selection/fvpSelectionFwd.h"
 
 //Hydra headers
 #include <pxr/imaging/hd/sceneIndex.h>
@@ -31,10 +34,15 @@ namespace FVP_NS_DEF {
 * 
 *   To get an instance of this class, please use 
 *   ViewportInformationAndSceneIndicesPerViewportDataManager& manager = ViewportInformationAndSceneIndicesPerViewportDataManager:Get();
+*
+*  The PerViewportDataManager also manages the per-viewport isolate selection,
+*  as well as providing access to the single isolate select scene index.
 */
 class FVP_API ViewportInformationAndSceneIndicesPerViewportDataManager
 {
 public:
+
+    using ViewportIds = std::vector<std::string>;
 
     /// Manager accessor
     static ViewportInformationAndSceneIndicesPerViewportDataManager& Get();
@@ -53,17 +61,57 @@ public:
     const ViewportInformationAndSceneIndicesPerViewportData* GetViewportInfoAndDataFromViewportId(const std::string& viewportId)const;
     ViewportInformationAndSceneIndicesPerViewportData* GetViewportInfoAndDataFromViewportId(const std::string& viewportId);
 
+    SelectionPtr GetOrCreateIsolateSelection(const std::string& viewportId);
+    SelectionPtr GetIsolateSelection(const std::string& viewportId) const;
+
+    void AddIsolateSelection(
+        const std::string&    viewportId, 
+        const PrimSelections& primSelections
+    );
+    void RemoveIsolateSelection(
+        const std::string&    viewportId, 
+        const PrimSelections& primSelections
+    );
+    void ReplaceIsolateSelection(
+        const std::string&       viewportId, 
+        const SelectionConstPtr& selection
+    );
+    void ClearIsolateSelection(const std::string& viewportId);
+
+    // Get and set the isolate select scene index.  This scene index provides
+    // isolate select services for all viewports.
+    void SetIsolateSelectSceneIndex(
+        const IsolateSelectSceneIndexRefPtr& sceneIndex
+    );
+    IsolateSelectSceneIndexRefPtr GetIsolateSelectSceneIndex() const;
+
     const std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr>&  GetDataProducerSceneIndicesDataFromViewportId(const std::string& viewportId)const;
 
     bool ModelPanelIsAlreadyRegistered(const std::string& modelPanel)const;
     void RemoveAllViewportsInformation();
 
 private:
+
+    // Singleton, no public creation or copy.
+    ViewportInformationAndSceneIndicesPerViewportDataManager() = default;
+    ViewportInformationAndSceneIndicesPerViewportDataManager(
+        const ViewportInformationAndSceneIndicesPerViewportDataManager&
+    ) = delete;
+
+    void _CheckAndSetViewport(const std::string& viewportId);
+
     ///Hydra viewport information
     ViewportInformationAndSceneIndicesPerViewportDataVector     _viewportsInformationAndSceneIndicesPerViewportData;
     
-    ViewportInformationAndSceneIndicesPerViewportDataManager() = default;
+    // Isolate selection, keyed by viewportId.
+    std::map<std::string, SelectionPtr> _isolateSelection;
+
+    // Isolate select scene index.
+    IsolateSelectSceneIndexRefPtr _isolateSelectSceneIndex;
 };
+
+// Convenience shorthand declaration.
+using PerViewportDataManager = ViewportInformationAndSceneIndicesPerViewportDataManager;
 
 } //End of namespace FVP_NS_DEF
 

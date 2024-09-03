@@ -19,6 +19,7 @@
 #include "flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h"
 #include "flowViewport/API/interfacesImp/fvpInformationInterfaceImp.h"
 #include "flowViewport/sceneIndex/fvpRenderIndexProxy.h"
+#include "flowViewport/selection/fvpSelection.h"
 #include "flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h"
 
 //Hydra headers
@@ -149,6 +150,91 @@ ViewportInformationAndSceneIndicesPerViewportData* ViewportInformationAndSceneIn
     }
 
     return nullptr;
+}
+
+SelectionPtr ViewportInformationAndSceneIndicesPerViewportDataManager::GetOrCreateIsolateSelection(const std::string& viewportId)
+{
+    auto found = _isolateSelection.find(viewportId);
+    if (found != _isolateSelection.end()) {
+        return found->second;
+    }
+    auto selection = std::make_shared<Selection>();
+    _isolateSelection[viewportId] = selection;
+    return selection;
+}
+
+SelectionPtr ViewportInformationAndSceneIndicesPerViewportDataManager::GetIsolateSelection(const std::string& viewportId) const
+{
+    auto found = _isolateSelection.find(viewportId);
+    return (found != _isolateSelection.end()) ? found->second : nullptr;
+}
+
+void ViewportInformationAndSceneIndicesPerViewportDataManager::AddIsolateSelection(
+    const std::string&    viewportId, 
+    const PrimSelections& primSelections
+)
+{
+    if (!TF_VERIFY(_isolateSelectSceneIndex, "No isolate select scene index set.")) {
+        return;
+    }
+    _CheckAndSetViewport(viewportId);
+    _isolateSelectSceneIndex->AddIsolateSelection(primSelections);
+}
+
+void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveIsolateSelection(
+    const std::string&    viewportId, 
+    const PrimSelections& primSelections
+)
+{
+    if (!TF_VERIFY(_isolateSelectSceneIndex, "No isolate select scene index set.")) {
+        return;
+    }
+    _CheckAndSetViewport(viewportId);
+    _isolateSelectSceneIndex->RemoveIsolateSelection(primSelections);
+}
+
+void ViewportInformationAndSceneIndicesPerViewportDataManager::ReplaceIsolateSelection(
+    const std::string&       viewportId, 
+    const SelectionConstPtr& selection
+)
+{
+    if (!TF_VERIFY(_isolateSelectSceneIndex, "No isolate select scene index set.")) {
+        return;
+    }
+    _CheckAndSetViewport(viewportId);
+    _isolateSelectSceneIndex->ReplaceIsolateSelection(selection);
+}
+
+void ViewportInformationAndSceneIndicesPerViewportDataManager::ClearIsolateSelection(const std::string& viewportId)
+{
+    if (!TF_VERIFY(_isolateSelectSceneIndex, "No isolate select scene index set.")) {
+        return;
+    }
+    _CheckAndSetViewport(viewportId);
+    _isolateSelectSceneIndex->ClearIsolateSelection();
+}
+
+void ViewportInformationAndSceneIndicesPerViewportDataManager::SetIsolateSelectSceneIndex(
+    const IsolateSelectSceneIndexRefPtr& sceneIndex
+)
+{
+    _isolateSelectSceneIndex = sceneIndex;    
+}
+
+IsolateSelectSceneIndexRefPtr
+ViewportInformationAndSceneIndicesPerViewportDataManager::GetIsolateSelectSceneIndex() const
+{
+    return _isolateSelectSceneIndex;
+}
+
+void 
+ViewportInformationAndSceneIndicesPerViewportDataManager::_CheckAndSetViewport(
+    const std::string& viewportId
+)
+{
+    if (_isolateSelectSceneIndex->GetViewportId() != viewportId) {
+        _isolateSelectSceneIndex->SetViewport(viewportId, _isolateSelection.at(viewportId));
+    }
 }
 
 const std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr>&  
