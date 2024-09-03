@@ -37,7 +37,7 @@ void leakSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& si) {
 PXR_NS::HdDataSourceBaseHandle createSelectionDataSource(const Fvp::PrimSelection& selection)
 {
     PXR_NS::HdSelectionSchema::Builder selectionBuilder;
-    // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
+    // Instancers are still expected to be marked "fully selected" even if only certain instances are selected,
     // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
     // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
     selectionBuilder.SetFullySelected(PXR_NS::HdRetainedTypedSampledDataSource<bool>::New(true));
