@@ -57,6 +57,8 @@
 #include <ufe/sceneNotification.h>
 #include <ufe/scene.h>
 
+#include <optional>
+
 namespace {
 
 const std::string digits = "0123456789";
@@ -132,15 +134,11 @@ public:
         //    then we are dealing with an instance selection.
         TF_AXIOM(appPath.nbSegments() == 2);
         SdfPath primPath = _sceneIndexPathPrefix;
-        std::optional<int> instanceIndex = std::nullopt;
+        std::optional<Fvp::InstancesSelection> instanceSelection;
 
         auto secondSegment = appPath.getSegments()[1];
         const auto lastComponentString = secondSegment.components().back().string();
         const bool lastComponentIsNumeric = lastComponentString.find_first_not_of(digits) == std::string::npos;
-        if (lastComponentIsNumeric) {
-            instanceIndex = std::stoi(lastComponentString);
-            secondSegment.pop();
-        }
 
         for (size_t iSecondSegment = 0; iSecondSegment < secondSegment.size(); iSecondSegment++) {
             // Native instancing : if the current prim path points to a native instance, repath to the prototype
@@ -154,7 +152,7 @@ public:
                 auto prototypes = instancerTopologySchema.GetPrototypes()->GetTypedValue(0);
                 auto prototypeIndex = instanceSchema.GetPrototypeIndex()->GetTypedValue(0);
                 primPath = prototypes[prototypeIndex];
-                instanceIndex = prototypeIndex;
+                instanceSelection = {instancerPath, prototypeIndex, {instanceSchema.GetInstanceIndex()->GetTypedValue(0)}};
             }
 
             auto targetChildPath = primPath.AppendChild(TfToken(secondSegment.components()[iSecondSegment].string()));
@@ -163,6 +161,20 @@ public:
                 // Append if the new path is valid
                 primPath = primPath.AppendChild(TfToken(secondSegment.components()[iSecondSegment].string()));
             }
+            else if (iSecondSegment == secondSegment.size() - 1) {
+                if (TF_VERIFY(lastComponentIsNumeric, "Expected number as final UFE path component but got an invalid path instead.")) {
+                    HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(primPath);
+                    HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
+                    auto instanceIndicesByPrototype = instancerTopologySchema.GetInstanceIndices();
+                    for (int iInstanceIndices = 0; iInstanceIndices < instanceIndicesByPrototype.GetNumElements(); iInstanceIndices++) {
+                        auto instanceIndices = instanceIndicesByPrototype.GetElement(iInstanceIndices)->GetTypedValue(0);
+                        if (std::find(instanceIndices.begin(), instanceIndices.end(), std::stoi(lastComponentString)) != instanceIndices.end()) {
+                            instanceSelection = {primPath, iInstanceIndices, {std::stoi(lastComponentString)}};
+                            break;
+                        }
+                    }
+                }
+            }
             else {
                 // There is no prim corresponding to the converted path
                 TF_WARN("Could not convert UFE path %s to Hydra prims.", appPath.string().data());
@@ -170,7 +182,8 @@ public:
             }
         }
 
-        Fvp::PrimSelections primSelections({{primPath, instanceIndex}});
+        Fvp::PrimSelection baseSelection = instanceSelection.has_value() ? Fvp::PrimSelection{primPath, {instanceSelection.value()}} : Fvp::PrimSelection{primPath};
+        Fvp::PrimSelections primSelections({baseSelection});
 
         // Point instancing : propagate selection to propagated prototypes
         auto ancestorsRange = primPath.GetAncestorsRange();
@@ -196,7 +209,7 @@ public:
                     // for another instancer B will only mark the geometry-drawing instancer A as selected. This can be changed.
                     // For now (2024/05/28), this only affects selection highlighting.
                     if (propagatedPrim.primType != HdPrimTypeTokens->instancer) {
-                        primSelections.push_back({propagatedPrimPath, instanceIndex});
+                        primSelections.push_back({propagatedPrimPath, primSelections.front().nestedInstanceIndices});
                     }
                 }
             }

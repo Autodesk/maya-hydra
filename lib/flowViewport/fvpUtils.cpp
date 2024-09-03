@@ -14,6 +14,7 @@
 //
 
 #include "fvpUtils.h"
+#include "sceneIndex/fvpPathInterface.h"
 
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/selectionSchema.h>
@@ -33,25 +34,26 @@ void leakSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& si) {
 }
 #endif
 
-PXR_NS::HdDataSourceBaseHandle createFullySelectedDataSource()
+PXR_NS::HdDataSourceBaseHandle createSelectionDataSource(const Fvp::PrimSelection& selection)
 {
-    PXR_NS::HdSelectionSchema::Builder selectionBuilder;
-    selectionBuilder.SetFullySelected(PXR_NS::HdRetainedTypedSampledDataSource<bool>::New(true));
-    return PXR_NS::HdDataSourceBase::Cast(selectionBuilder.Build());
-}
-
-PXR_NS::HdDataSourceBaseHandle createInstanceSelectionDataSource(const PXR_NS::SdfPath& instancerPrimPath, int instanceIndex)
-{
-    PXR_NS::HdInstanceIndicesSchema::Builder instanceIndicesBuilder;
-    instanceIndicesBuilder.SetInstancer(PXR_NS::HdRetainedTypedSampledDataSource<PXR_NS::SdfPath>::New(instancerPrimPath));
-    instanceIndicesBuilder.SetInstanceIndices(PXR_NS::HdRetainedTypedSampledDataSource<PXR_NS::VtArray<int>>::New({instanceIndex}));
     PXR_NS::HdSelectionSchema::Builder selectionBuilder;
     // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
     // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
     // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
     selectionBuilder.SetFullySelected(PXR_NS::HdRetainedTypedSampledDataSource<bool>::New(true));
-    auto instanceIndicesDataSource = PXR_NS::HdDataSourceBase::Cast(instanceIndicesBuilder.Build());
-    selectionBuilder.SetNestedInstanceIndices(PXR_NS::HdRetainedSmallVectorDataSource::New(1, &instanceIndicesDataSource));
+
+    std::vector<PXR_NS::HdDataSourceBaseHandle> instanceIndicesDataSources;
+    for (const auto& nestedInstanceIndices : selection.nestedInstanceIndices) {
+        PXR_NS::HdInstanceIndicesSchema::Builder instanceIndicesBuilder;
+        instanceIndicesBuilder.SetInstancer(PXR_NS::HdRetainedTypedSampledDataSource<PXR_NS::SdfPath>::New(nestedInstanceIndices.instancerPath));
+        instanceIndicesBuilder.SetPrototypeIndex(PXR_NS::HdRetainedTypedSampledDataSource<int>::New(nestedInstanceIndices.prototypeIndex));
+        auto instanceIndices = PXR_NS::VtArray<int>(nestedInstanceIndices.instanceIndices.begin(), nestedInstanceIndices.instanceIndices.end());
+        instanceIndicesBuilder.SetInstanceIndices(PXR_NS::HdRetainedTypedSampledDataSource<PXR_NS::VtArray<int>>::New(instanceIndices));
+        instanceIndicesDataSources.push_back(PXR_NS::HdDataSourceBase::Cast(instanceIndicesBuilder.Build()));
+    }
+    if (!instanceIndicesDataSources.empty()) {
+        selectionBuilder.SetNestedInstanceIndices(PXR_NS::HdRetainedSmallVectorDataSource::New(instanceIndicesDataSources.size(), instanceIndicesDataSources.data()));
+    }
     return PXR_NS::HdDataSourceBase::Cast(selectionBuilder.Build());
 }
 

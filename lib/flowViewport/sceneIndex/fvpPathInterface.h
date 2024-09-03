@@ -32,14 +32,26 @@ class Path;
 
 namespace FVP_NS_DEF {
 
+struct InstancesSelection {
+    PXR_NS::SdfPath instancerPath;
+    int prototypeIndex;
+    std::vector<int> instanceIndices;
+
+    inline bool operator==(const InstancesSelection &rhs) const {
+        return instancerPath == rhs.instancerPath
+            && prototypeIndex == rhs.prototypeIndex
+            && instanceIndices == rhs.instanceIndices;
+    }
+};
+
 struct PrimSelection
 {
     PXR_NS::SdfPath primPath;
-    std::optional<int> instanceIndex;
+    std::vector<InstancesSelection> nestedInstanceIndices;
 
     inline bool operator==(const PrimSelection &rhs) const {
         return primPath == rhs.primPath
-            && instanceIndex == rhs.instanceIndex;
+            && nestedInstanceIndices == rhs.nestedInstanceIndices;
     }
 };
 
