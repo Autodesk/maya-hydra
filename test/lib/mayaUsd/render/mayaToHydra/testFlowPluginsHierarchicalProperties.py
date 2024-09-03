@@ -38,8 +38,7 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         cmds.move(0, 0, 5)
         cmds.setAttr(sphereNode + ".subdivisionsAxis", 200)
         cmds.setAttr(sphereNode + ".subdivisionsHeight", 200)
-        cmds.select(clear=True)
-
+        
         locatorGrandParent = cmds.group(empty=True)
         locatorParent = cmds.group(empty=True, parent=locatorGrandParent)
         return locatorGrandParent, locatorParent
@@ -52,7 +51,6 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         stage = mayaUsd.lib.GetPrim(stagePath).GetStage()
         UsdGeom.Cube.Define(stage, "/Cube")
-        cmds.select(clear=True)
         stageParent = cmds.group(empty=True)
         cmds.parent(stagePath, stageParent)
         stageShape = stagePath.split('|')[-1]
@@ -74,6 +72,8 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         # Ensure the initial visibility is set correctly if a parent's visibility affects it
         cmds.setAttr(locatorGrandParent + ".visibility", False)
         locatorShape = cmds.createNode("MhFlowViewportAPILocator", parent=locatorParent)
+        cmds.select(clear=True)
+        
         self.assertSnapshotClose("authoring_locator_visibility_off.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         # Check that updating a parent's visibility works after creation
         cmds.setAttr(locatorGrandParent + ".visibility", True)
@@ -91,29 +91,36 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         # Change the shape's transform directly
         cmds.xform(cmds.listRelatives(locatorShape, parent=True)[0], translation=[-3,2,-1], rotation=[-15,10,-5], scale=[-2.5, 2.0, -1.5])
         self.assertSnapshotClose("authoring_locator_shapeTransformChanged.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
+        
     def test_Authoring_UsdStage(self):
         self.setBasicCam(10)
 
         stageParent, stageShape = self.usdStageSetup()
 
         # Hide/unhide parent
+        cmds.select(clear=True)
         self.assertSnapshotAndCompareVp2("usdStage_visibility_on.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.setAttr(stageParent + ".visibility", False)
+        cmds.select(clear=True)
         self.assertSnapshotAndCompareVp2("usdStage_visibility_off.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.setAttr(stageParent + ".visibility", True)
+        cmds.select(clear=True)
         self.assertSnapshotAndCompareVp2("usdStage_visibility_on.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         # Hide/unhide the shape directly
         cmds.setAttr(stageShape + ".visibility", False)
+        cmds.select(clear=True)
         self.assertSnapshotAndCompareVp2("usdStage_visibility_off.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.setAttr(stageShape + ".visibility", True)
+        cmds.select(clear=True)
         self.assertSnapshotAndCompareVp2("usdStage_visibility_on.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         # Change a parent transform
         cmds.xform(stageParent, translation=[1,-2,3], rotation=[5,-10,15], scale=[1,-2,3])
+        cmds.select(clear=True)
         self.assertSnapshotAndCompareVp2("usdStage_parentTransformChanged.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         # Change the shape's transform directly
         cmds.xform(cmds.listRelatives(stageShape, parent=True)[0], translation=[-3,2,-1], rotation=[-15,10,-5], scale=[-2.5, 2.0, -1.5])
+        cmds.select(clear=True)
         self.assertSnapshotAndCompareVp2("usdStage_shapeTransformChanged.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def test_Playback_Locator(self):
@@ -121,7 +128,8 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
 
         locatorGrandParent, locatorParent = self.locatorSetup()
         cmds.createNode("MhFlowViewportAPILocator", parent=locatorParent)
-
+        cmds.select(clear=True)
+        
         cmds.currentTime(0)
         self.keyframeAttribute(locatorGrandParent, "visibility", True)
         self.keyframeAttribute(locatorGrandParent, "translateX", 0)
@@ -144,6 +152,8 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
 
         stageParent, _ = self.usdStageSetup()
 
+        cmds.select(clear=True)
+        
         cmds.currentTime(0)
         self.keyframeAttribute(stageParent, "visibility", True)
         self.keyframeAttribute(stageParent, "translateX", 0)
@@ -190,11 +200,13 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
 
         for time in checkedTimes:
             cmds.currentTime(time)
+            cmds.select(clear=True)
             self.assertSnapshotClose("usdStageAnimatedPrim_t" + str(time) + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         self.setViewport2Renderer()
         for time in checkedTimes:
             cmds.currentTime(time)
+            cmds.select(clear=True)
             self.assertSnapshotSilhouetteClose("usdStageAnimatedPrim_t" + str(time) + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':

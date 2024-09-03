@@ -59,8 +59,8 @@ private:
     MayaDataProducerSceneIndexData(const FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParameters& params);
     MayaDataProducerSceneIndexData(FVP_NS_DEF::DataProducerSceneIndexDataBase::CreationParametersForUsdStage& params);
     
-    void SetupUfeObservation(void* dccNode);
-
+    void SetupDCCNode();
+    void SetupUfeObservation(const MDagPath& dagPath) ;
     // Path to the scene item, if it was added as one
     std::optional<Ufe::Path> _path;
 

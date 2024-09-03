@@ -49,7 +49,8 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex
             footPrintNodeName = cmds.createNode("MhFootPrint")
-            
+            cmds.select(clear=True)#Clear selection
+
             #Increase its size
             cmds.setAttr(footPrintNodeName + '.size', 5)
             cmds.refresh()
@@ -104,6 +105,7 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex and a Filtering scene index
             footPrintNodeName = cmds.createNode("MhFootPrint")
+            cmds.select(clear=True)#Clear selection
             cmds.refresh()
             self.assertSnapshotClose("footPrint_BeforeModifs.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
@@ -126,7 +128,7 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex and a Filtering scene index
             footPrintNodeName1 = cmds.createNode("MhFootPrint", n="nodeShape1")
-
+            
             #Modify the attributes
             cmds.setAttr(footPrintNodeName1 + '.size', 3)
             cmds.setAttr(footPrintNodeName1 + '.color', 1.0, 1.0, 1.0, type="double3")
@@ -152,7 +154,8 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
             self.assertIsNotNone(transformNode2)
             cmds.move(2, 0, -2, transformNode2)
             cmds.refresh()
-            
+            cmds.select(clear=True)#Clear selection
+
             self.assertSnapshotClose("multipleNodes_BeforeModifs.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
             #Modify the color of node #2, it shouldn't change node's #1 color
@@ -163,6 +166,7 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
             cmds.rotate(0, 45, 0)
             cmds.scale(4, 1, 1)
             cmds.refresh()
+            cmds.select(clear=True)#Clear selection
             self.assertSnapshotClose("multipleNodes_AfterModifs.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
             #Hide node #1
@@ -202,6 +206,7 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
             
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex and a Filtering scene index
             footPrintNodeName1 = cmds.createNode("MhFootPrint", n="nodeShape1")
+            cmds.select(clear=True)#Clear selection
 
             cmds.setAttr(footPrintNodeName1 + '.size', 6)
             cmds.setAttr(footPrintNodeName1 + '.color', 0.0, 1.0, 0.0, type="double3")

@@ -23,6 +23,12 @@
 #include "mayaHydraLib/hydraUtils.h"
 #include "mayaHydraLib/mayaUtils.h"
 
+//Flow viewport
+#include <flowViewport/selection/fvpDataProducersNodeHashCodeToSdfPathRegistry.h>
+
+//maya headers
+#include <maya/MObjectHandle.h>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 class MayaDataProducerSceneIndexData::UfeSceneChangesHandler : public Ufe::Observer
@@ -44,7 +50,7 @@ MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(const FVP_NS_DEF:
     : FVP_NS_DEF::DataProducerSceneIndexDataBase(params)
 {
     if (_dccNode) {
-        SetupUfeObservation(_dccNode);
+        SetupDCCNode();
     }
     _CreateSceneIndexChainForDataProducerSceneIndex();
 }
@@ -53,8 +59,11 @@ MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(FVP_NS_DEF::DataP
     : FVP_NS_DEF::DataProducerSceneIndexDataBase(params)
 {
     if (_dccNode) {
-        SetupUfeObservation(_dccNode);
+        SetupDCCNode();
     }
+    //Reset the prefix member which was used only for SetupDCCNode, as for usd stages we add a prefixing scene index outside of flow viewport which holds the prefix.
+    //This is a way to have a common call to MAYAHYDRA_NS::MhDataProducersMayaNodeToSdfPathRegistry::Get().Add in this class.
+    _prefix = SdfPath::AbsoluteRootPath();
     _CreateSceneIndexChainForUsdStageSceneIndex(params);
 }
 
@@ -64,33 +73,55 @@ MayaDataProducerSceneIndexData::~MayaDataProducerSceneIndexData()
         Ufe::Scene::instance().removeObserver(_ufeSceneChangesHandler);
         _ufeSceneChangesHandler.reset();
     }
+    if (0 != _dccNodeHashCode){
+        //Remove the node from the registry
+        FVP_NS::DataProducersNodeHashCodeToSdfPathRegistry::Instance().Remove(_dccNodeHashCode);
+    }
 }
 
-void MayaDataProducerSceneIndexData::SetupUfeObservation(void* dccNode)
-{
-    if (dccNode) {
-        MObject* mObject = reinterpret_cast<MObject*>(dccNode);
+void MayaDataProducerSceneIndexData::SetupDCCNode()
+{ 
+    if (_dccNode) {
+        MObject* mObject = reinterpret_cast<MObject*>(_dccNode);
         MDagPath dagPath;
-        MDagPath::getAPathTo(*mObject, dagPath);
+        MDagPath::getAPathTo(
+            *mObject,
+            dagPath); // Do this only once as it's costly and SetupUfeObservation needs it as well.
         dagPath.extendToShape();
 
-        _path = Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath));
+        // Add the node and its SdfPath prefix to MhDataProducersMayaNodeToSdfPathRegistry
+        if (! _prefix.IsEmpty()) {
+            if (!dagPath.node().isNull()) {
+                MObjectHandle hdl(dagPath.node());
+                _dccNodeHashCode = hdl.hashCode();
+                FVP_NS::DataProducersNodeHashCodeToSdfPathRegistry::Instance().Add(
+                    _dccNodeHashCode, _prefix);
+            }
+        }
 
-        _ufeSceneChangesHandler = std::make_shared<UfeSceneChangesHandler>(*this);
-        Ufe::Scene::instance().addObserver(_ufeSceneChangesHandler);
-
-        // Note : while we currently use a query-based approach to update the transform and visibility,
-        // we could also move to a UFE notifications-based approach if necessary. In this case, we would
-        // setup the subject-observer relationships here.
-        // For visibility changes, the observer would observe the Ufe::Object3d subject, receive 
-        // Ufe::VisibilityChanged notifications and call UpdateVisibility() if the received notification 
-        // is relevant (i.e. if the data producer's path starts with the notification's path, the 
-        // same way as in MayaDataProducerSceneIndexData::UfeSceneChangesHandler::operator()).
-        // For transform changes, the observer would observe a Ufe::Transform3dPathSubject created off the
-        // UFE path of the node (_path), receive Ufe::Transform3dChanged notifications and call UpdateTransform() 
-        // if the received notification is relevant (i.e. if the data producer's path starts with the notification's 
-        // path, the same way as in MayaDataProducerSceneIndexData::UfeSceneChangesHandler::operator()).
+        SetupUfeObservation(dagPath);
     }
+}
+
+void MayaDataProducerSceneIndexData::SetupUfeObservation(const MDagPath& dagPath) 
+{ 
+     _path = Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath));
+
+    _ufeSceneChangesHandler = std::make_shared<UfeSceneChangesHandler>(*this);
+    Ufe::Scene::instance().addObserver(_ufeSceneChangesHandler);
+
+    // Note : while we currently use a query-based approach to update the transform and visibility,
+    // we could also move to a UFE notifications-based approach if necessary. In this case, we would
+    // setup the subject-observer relationships here.
+    // For visibility changes, the observer would observe the Ufe::Object3d subject, receive
+    // Ufe::VisibilityChanged notifications and call UpdateVisibility() if the received notification
+    // is relevant (i.e. if the data producer's path starts with the notification's path, the
+    // same way as in MayaDataProducerSceneIndexData::UfeSceneChangesHandler::operator()).
+    // For transform changes, the observer would observe a Ufe::Transform3dPathSubject created off
+    // the UFE path of the node (_path), receive Ufe::Transform3dChanged notifications and call
+    // UpdateTransform() if the received notification is relevant (i.e. if the data producer's path
+    // starts with the notification's path, the same way as in
+    // MayaDataProducerSceneIndexData::UfeSceneChangesHandler::operator()).
 }
 
 bool MayaDataProducerSceneIndexData::UpdateVisibility()

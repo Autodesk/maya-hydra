@@ -308,6 +308,7 @@ private:
 
     int _currentOperation = -1;
 
+    bool _needToReplaceSelection = false;
     const bool _isUsingHdSt = false;
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;

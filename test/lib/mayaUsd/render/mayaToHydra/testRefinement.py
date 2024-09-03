@@ -35,6 +35,8 @@ class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
         usdScenePath = testUtils.getTestScene('testStagePayloadsReferences', 'cube.usda')
         usdUtils.createStageFromFile(usdScenePath)
 
+        cmds.select(clear=True)#Clear selection
+
         self.setBasicCam(1)
         self.setHdStormRenderer()
         cmds.mayaHydra(createRenderGlobals=1)

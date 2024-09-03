@@ -61,6 +61,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
             #Create a MhFlowViewportAPILocator node which adds a dataProducerSceneIndex and a Filtering scene index
             flowViewportNodeName = cmds.createNode("MhFlowViewportAPILocator")
+            cmds.select(clear=True)#Clear selection
 
             #Original images are located for example in maya-hydra\test\lib\mayaUsd\render\mayaToHydra\FlowViewportAPITest
             self.assertSnapshotClose("add_NodeCreated.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
@@ -119,6 +120,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
             #Create a MhFlowViewportAPILocator node which adds a dataProducerSceneIndex and a Filtering scene index
             flowViewportNodeName = cmds.createNode("MhFlowViewportAPILocator")
+            cmds.select(clear=True)#Clear selection
             cmds.refresh()
             #Original images are located for example in maya-hydra\test\lib\mayaUsd\render\mayaToHydra\FlowViewportAPITest
             self.assertSnapshotClose("filter_NodeCreated.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
@@ -191,6 +193,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             
             #Create a MhFlowViewportAPILocator node which adds a dataProducerSceneIndex and a Filtering scene index
             flowViewportNodeName = cmds.createNode("MhFlowViewportAPILocator")
+            cmds.select(clear=True)#Clear selection
             self.assertSnapshotClose("cubeGrid_BeforeModifs.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
             #Get the matrix and set a rotation of 70 degress around Y axis.
@@ -239,6 +242,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             
             #Create a MhFlowViewportAPILocator node which adds a dataProducerSceneIndex and a Filtering scene index
             flowViewportNodeName1 = cmds.createNode("MhFlowViewportAPILocator", n="nodeShape1")
+            cmds.select(clear=True)#Clear selection
             
             #Get the matrix and set a rotation of 70 degress around Y axis.
             matrix = cmds.getAttr(flowViewportNodeName1 + '.cubeInitalTransform')
@@ -266,6 +270,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             
             #Create a MhFlowViewportAPILocator node which adds a dataProducerSceneIndex and a Filtering scene index
             flowViewportNodeName2 = cmds.createNode("MhFlowViewportAPILocator", n="nodeShape2")
+            cmds.select(clear=True)#Clear selection
             
             #Get the matrix and set a rotation of 70 degress around Y axis.
             matrix = cmds.getAttr(flowViewportNodeName2 + '.cubeInitalTransform')
@@ -344,6 +349,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
             #Create a MhFlowViewportAPILocator node which adds a dataProducerSceneIndex and a Filtering scene index
             flowViewportNodeName1 = cmds.createNode("MhFlowViewportAPILocator", n="nodeShape1")
+            cmds.select(clear=True)#Clear selection
             
             #Modify the cube grid parameters
             cmds.setAttr(flowViewportNodeName1 + '.numCubesX', 3)
