@@ -162,6 +162,8 @@ public:
                 primPath = primPath.AppendChild(TfToken(secondSegment.components()[iSecondSegment].string()));
             }
             else if (iSecondSegment == secondSegment.size() - 1) {
+                // Point instancing : instance selection. The path should end with a number corresponding to the selected instance,
+                // and the remainder of the path points to the point instancer.
                 if (TF_VERIFY(lastComponentIsNumeric, "Expected number as final UFE path component but got an invalid path instead.")) {
                     HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(primPath);
                     HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
