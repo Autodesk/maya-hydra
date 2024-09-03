@@ -30,7 +30,6 @@
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
-#include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/sceneIndexPlugin.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
 #include <pxr/imaging/hd/selectionSchema.h>
@@ -170,15 +169,6 @@ public:
                 return {};
             }
         }
-
-        // while (!GetInputSceneIndex()->GetPrim(primPath).dataSource) {
-        //     // For native instancing, the UFE path that we blindly convert to a Hydra prim path
-        //     // might not actually point to an actual prim. The USD prim would instead be broken
-        //     // into an instanced prim and the prototype containing the subprims. Walk back the
-        //     // hierarchy to find the first parent that actually has data. This case should only
-        //     // occur with native instancing; in other cases this while loop should be skipped.
-        //     primPath = primPath.GetParentPath();
-        // }
 
         Fvp::PrimSelections primSelections({{primPath, instanceIndex}});
 
