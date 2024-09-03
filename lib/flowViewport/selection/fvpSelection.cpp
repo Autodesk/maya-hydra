@@ -38,19 +38,13 @@
 
 #include "flowViewport/selection/fvpSelection.h"
 
+#include "flowViewport/fvpUtils.h"
+
 #include "pxr/imaging/hd/selectionsSchema.h"
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
-
-HdDataSourceBaseHandle 
-Selection::_PrimSelectionState::GetVectorDataSource() const
-{
-    return HdSelectionsSchema::BuildRetained(
-        selectionSources.size(), selectionSources.data()
-    );
-};
 
 bool
 Selection::Add(const PrimSelection& primSelection)
@@ -59,20 +53,38 @@ Selection::Add(const PrimSelection& primSelection)
         return false;
     }
 
-    _pathToState[primSelection.primPath].selectionSources.push_back(primSelection.selectionDataSource);
+    _pathToSelections[primSelection.primPath].push_back(primSelection);
 
     return true;
 }
 
-bool Selection::Remove(const PXR_NS::SdfPath& primPath)
+bool Selection::Remove(const PrimSelection& primSelection)
 {
-    return (!primPath.IsEmpty() && (_pathToState.erase(primPath) == 1));
+    if (primSelection.primPath.IsEmpty()) {
+        return false;
+    }
+
+    // Remove the specific selection
+    auto itSelection = std::find(
+        _pathToSelections[primSelection.primPath].begin(), 
+        _pathToSelections[primSelection.primPath].end(),
+        primSelection);
+    if (itSelection != _pathToSelections[primSelection.primPath].end()) {
+        _pathToSelections[primSelection.primPath].erase(itSelection);
+    }
+
+    // If no selections remain, remove the entry entirely
+    if (_pathToSelections[primSelection.primPath].empty()) {
+        _pathToSelections.erase(primSelection.primPath);
+    }
+
+    return true;
 }
 
 void
 Selection::Clear()
 {
-    _pathToState.clear();
+    _pathToSelections.clear();
 }
 
 void Selection::Replace(const PrimSelections& primSelections)
@@ -83,26 +95,32 @@ void Selection::Replace(const PrimSelections& primSelections)
         if (primSelection.primPath.IsEmpty()) {
             continue;
         }
-        _pathToState[primSelection.primPath].selectionSources.push_back(primSelection.selectionDataSource);
+        _pathToSelections[primSelection.primPath].push_back(primSelection);
     }
+}
+
+void Selection::Replace(const Selection& rhs)
+{
+    _pathToSelections = rhs._pathToSelections;
 }
 
 void Selection::RemoveHierarchy(const PXR_NS::SdfPath& primPath)
 {
-    auto it = _pathToState.lower_bound(primPath);
-    while (it != _pathToState.end() && it->first.HasPrefix(primPath)) {
-        it = _pathToState.erase(it);
+    auto it = _pathToSelections.lower_bound(primPath);
+    while (it != _pathToSelections.end() && it->first.HasPrefix(primPath)) {
+        it = _pathToSelections.erase(it);
     }
 }
 
 bool Selection::IsEmpty() const
 {
-    return _pathToState.empty();
+    return _pathToSelections.empty();
 }
 
 bool Selection::IsFullySelected(const SdfPath& primPath) const
 {
-    return _pathToState.find(primPath) != _pathToState.end();
+    return _pathToSelections.find(primPath) != _pathToSelections.end()
+        && !_pathToSelections.at(primPath).empty();
 }
 
 bool Selection::HasFullySelectedAncestorInclusive(const SdfPath& primPath, const SdfPath& topmostAncestor/* = SdfPath::AbsoluteRootPath()*/) const
@@ -110,12 +128,80 @@ bool Selection::HasFullySelectedAncestorInclusive(const SdfPath& primPath, const
     // FLOW_VIEWPORT_TODO  Prefix tree would be much higher performance
     // than iterating over the whole selection, especially for a large
     // selection.  PPT, 13-Sep-2023.
-    for(const auto& entry : _pathToState) {
+    for(const auto& entry : _pathToSelections) {
         if (primPath.HasPrefix(entry.first) && entry.first.HasPrefix(topmostAncestor)) {
             return true;
         }
     }
     return false;
+}
+
+bool Selection::HasDescendantInclusive(const PXR_NS::SdfPath& primPath) const
+{
+    // No entries?  No descendant
+    if (_pathToSelections.empty()) {
+        return false;
+    }
+
+    // At least one entry.  Skip all entries before argument.  The iterator
+    // points to an entry with matching or greater key.
+    auto it = _pathToSelections.lower_bound(primPath);
+
+    // Reached the end?  Last entry is strictly smaller than, so no descendants.
+    if (it == _pathToSelections.end()) {
+        return false;
+    }
+
+    // Not at the end.  Query is exactly in the map, or is prefix to what is in
+    // the map (i.e. map contents is a descendant)?  Return true.
+    return (it->first == primPath || it->first.HasPrefix(primPath));
+}
+
+bool 
+Selection::HasAncestorOrDescendantInclusive(const PXR_NS::SdfPath& primPath) const
+{
+    // Use std::map::lower_bound to accelerate prim path lookup. The map is
+    // lexically ordered on SdfPath, with shorter paths less than longer
+    // paths. Makes determining ancestors and descendants somewhat tricky, but
+    // efficient. A prefix tree would be an easier data structure to implement
+    // this functionality.
+
+    // No entries?  No ancestors or descendants.
+    if (_pathToSelections.empty()) {
+        return false;
+    }
+
+    // At least one entry.  Skip all entries before argument.  The iterator
+    // points to an entry with matching or greater key.
+    auto it = _pathToSelections.lower_bound(primPath);
+
+    // Reached the end?  Last entry is strictly smaller than, so no descendants
+    // in map.  Check if it's an ancestor.
+    if (it == _pathToSelections.end()) {
+        auto rit = _pathToSelections.rbegin();
+        return primPath.HasPrefix(rit->first);
+    }
+
+    // Not at the end.  Map entry has matching or greater key, so check 
+    // match, or if the map entry with greater key is a descendant (i.e. query
+    // is an ancestor).
+    if (it->first == primPath ||         // Query is in map
+        it->first.HasPrefix(primPath)) { // Query descendant in map
+            return true;
+    }
+
+    // Map entry is strictly greater and not a descendant.  For the map entry
+    // to be an ancestor of the query, it would have to be less than the query.
+    // Thus, if we're at the beginning, the map entry is unrelated to the query.
+    if (it == _pathToSelections.begin()) {
+        return false;
+    }
+
+    // Map entry still strictly greater and not a descendant.  Is the previous
+    // map entry (lower key) a prefix (ancestor) to the query (i.e. query is a
+    // descendant)?
+    it = std::prev(it);
+    return primPath.HasPrefix(it->first); // Ancestor in map
 }
 
 SdfPathVector Selection::FindFullySelectedAncestorsInclusive(const SdfPath& primPath, const SdfPath& topmostAncestor/* = SdfPath::AbsoluteRootPath()*/) const
@@ -124,7 +210,7 @@ SdfPathVector Selection::FindFullySelectedAncestorsInclusive(const SdfPath& prim
     // than iterating over the whole selection, especially for a large
     // selection.  PPT, 13-Sep-2023.
     SdfPathVector fullySelectedAncestors;
-    for(const auto& entry : _pathToState) {
+    for(const auto& entry : _pathToSelections) {
         if (primPath.HasPrefix(entry.first) && entry.first.HasPrefix(topmostAncestor)) {
             fullySelectedAncestors.push_back(entry.first);
         }
@@ -135,8 +221,8 @@ SdfPathVector Selection::FindFullySelectedAncestorsInclusive(const SdfPath& prim
 SdfPathVector Selection::GetFullySelectedPaths() const
 {
     SdfPathVector fullySelectedPaths;
-    fullySelectedPaths.reserve(_pathToState.size());
-    for(const auto& entry : _pathToState) {
+    fullySelectedPaths.reserve(_pathToSelections.size());
+    for(const auto& entry : _pathToSelections) {
         fullySelectedPaths.emplace_back(entry.first);
     }
     return fullySelectedPaths;
@@ -146,9 +232,22 @@ HdDataSourceBaseHandle Selection::GetVectorDataSource(
     const PXR_NS::SdfPath& primPath
 ) const
 {
-    auto it = _pathToState.find(primPath);
-    return (it != _pathToState.end()) ? 
-        it->second.GetVectorDataSource() : nullptr;
+    auto it = _pathToSelections.find(primPath);
+    if (it == _pathToSelections.end()) {
+        return nullptr;
+    }
+
+    std::vector<HdDataSourceBaseHandle> selectionDataSources;
+    for (const auto& selection : it->second) {
+        if (selection.instanceIndex.has_value()) {
+            selectionDataSources.push_back(createInstanceSelectionDataSource(selection.primPath, selection.instanceIndex.value()));
+        } else {
+            selectionDataSources.push_back(createFullySelectedDataSource());
+        }
+    }
+    return HdSelectionsSchema::BuildRetained(
+        selectionDataSources.size(), selectionDataSources.data()
+    );
 }
 
 }

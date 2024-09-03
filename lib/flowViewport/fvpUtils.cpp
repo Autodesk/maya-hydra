@@ -15,6 +15,7 @@
 
 #include "fvpUtils.h"
 
+#include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 
 namespace FVP_NS_DEF {
@@ -36,6 +37,21 @@ PXR_NS::HdDataSourceBaseHandle createFullySelectedDataSource()
 {
     PXR_NS::HdSelectionSchema::Builder selectionBuilder;
     selectionBuilder.SetFullySelected(PXR_NS::HdRetainedTypedSampledDataSource<bool>::New(true));
+    return PXR_NS::HdDataSourceBase::Cast(selectionBuilder.Build());
+}
+
+PXR_NS::HdDataSourceBaseHandle createInstanceSelectionDataSource(const PXR_NS::SdfPath& instancerPrimPath, int instanceIndex)
+{
+    PXR_NS::HdInstanceIndicesSchema::Builder instanceIndicesBuilder;
+    instanceIndicesBuilder.SetInstancer(PXR_NS::HdRetainedTypedSampledDataSource<PXR_NS::SdfPath>::New(instancerPrimPath));
+    instanceIndicesBuilder.SetInstanceIndices(PXR_NS::HdRetainedTypedSampledDataSource<PXR_NS::VtArray<int>>::New({instanceIndex}));
+    PXR_NS::HdSelectionSchema::Builder selectionBuilder;
+    // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
+    // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
+    // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
+    selectionBuilder.SetFullySelected(PXR_NS::HdRetainedTypedSampledDataSource<bool>::New(true));
+    auto instanceIndicesDataSource = PXR_NS::HdDataSourceBase::Cast(instanceIndicesBuilder.Build());
+    selectionBuilder.SetNestedInstanceIndices(PXR_NS::HdRetainedSmallVectorDataSource::New(1, &instanceIndicesDataSource));
     return PXR_NS::HdDataSourceBase::Cast(selectionBuilder.Build());
 }
 

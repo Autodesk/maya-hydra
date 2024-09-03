@@ -48,6 +48,10 @@ TEST(TestPathMapperRegistry, testRegistry)
     // Exercise the path mapper registry.
     auto& r = Fvp::PathMapperRegistry::Instance();
     
+    // For the duration of this test set a null fallback mapper.
+    auto fbm = r.GetFallbackMapper();
+    r.SetFallbackMapper(nullptr);
+
     auto dummy = TestPathMapper::create();
 
     // Can't register for an empty path.
@@ -106,4 +110,6 @@ TEST(TestPathMapperRegistry, testRegistry)
     for (const auto& h : registered) {
         ASSERT_TRUE(r.Unregister(h));
     }
+    r.SetFallbackMapper(fbm);
+    ASSERT_EQ(r.GetFallbackMapper(), fbm);
 }

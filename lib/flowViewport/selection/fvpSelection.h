@@ -49,12 +49,15 @@ public:
 
     // Returns true if the removal was successful, false otherwise.
     FVP_API
-    bool Remove(const PXR_NS::SdfPath& primPath);
+    bool Remove(const PrimSelection& primSelection);
 
-    // Replace the selection with the contents of the argument primPath vector.
+    // Replace the selection with the contents of the argument vector.
     // Any empty primPath in the argument will be skipped.
     FVP_API
     void Replace(const PrimSelections& primSelections);
+
+    FVP_API
+    void Replace(const Selection& selection);
 
     // Remove all entries from the selection.
     FVP_API
@@ -76,6 +79,16 @@ public:
     FVP_API
     bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath, const PXR_NS::SdfPath& topmostAncestor = PXR_NS::SdfPath::AbsoluteRootPath()) const;
 
+    // Returns true if the argument itself is selected, or a descendant of the
+    // argument.
+    FVP_API
+    bool HasDescendantInclusive(const PXR_NS::SdfPath& primPath) const;
+
+    // Returns true if the argument itself is selected, or an ancestor or
+    // descendant of the argument is selected.
+    FVP_API
+    bool HasAncestorOrDescendantInclusive(const PXR_NS::SdfPath& primPath) const;
+
     // Returns the paths to all fully selected ancestors of the prim up to the specified
     // topmost ancestor. If the prim is itself selected, its path will also be returned.
     // By default, the topmost ancestor is set to the absolute root path, so that all 
@@ -93,17 +106,10 @@ public:
     GetVectorDataSource(const PXR_NS::SdfPath& primPath) const;
 
 private:
-
-    struct _PrimSelectionState {
-        // Container data sources conforming to HdSelectionSchema
-        std::vector<PXR_NS::HdDataSourceBaseHandle> selectionSources;
-
-        PXR_NS::HdDataSourceBaseHandle GetVectorDataSource() const;
-    };
     
-    // Maps prim path to data sources to be returned by the vector data
+    // Maps prim path to selections to be returned by the vector data
     // source at locator selections.
-    std::map<PXR_NS::SdfPath, _PrimSelectionState> _pathToState;
+    std::map<PXR_NS::SdfPath, std::vector<PrimSelection>> _pathToSelections;
 };
 
 }
