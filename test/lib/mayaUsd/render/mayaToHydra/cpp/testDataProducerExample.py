@@ -63,7 +63,7 @@ class TestDataProducerExample(mtohUtils.MayaHydraBaseTestCase):
 
     def test_Pick(self):
         # Pick an exterior cube to ensure we don't pick a hidden one.
-        cmds.mayaHydraCppTest(self.cube222PathString(), f='TestUsdPicking.pick')
+        cmds.mayaHydraCppTest(self.cube222PathString(), f='TestUsdPicking.pickPrim')
 
     def test_Select(self):
         # Make a selection, ensure the Hydra selection changes.

@@ -44,7 +44,7 @@ class TestUsdNativeInstancePicking(mtohUtils.MayaHydraBaseTestCase):
             for instance in instances:
                 cmds.mayaHydraCppTest(
                     self.PICK_PATH + instance,
-                    f="TestUsdPicking.pick")
+                    f="TestUsdPicking.pickPrim")
     
     def test_NativeInstancePrototypes(self):
         with PluginLoaded('mayaHydraCppTests'):
@@ -60,7 +60,7 @@ class TestUsdNativeInstancePicking(mtohUtils.MayaHydraBaseTestCase):
                 cmds.mayaHydraCppTest(
                     self.PICK_PATH + prototype,
                     self.PICK_PATH + marker,
-                    f="TestUsdPicking.pickInstance")
+                    f="TestUsdPicking.pickInstanceWithMarker")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
