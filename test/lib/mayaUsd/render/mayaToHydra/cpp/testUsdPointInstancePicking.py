@@ -59,7 +59,7 @@ class TestUsdPointInstancePicking(mtohUtils.MayaHydraBaseTestCase):
                 cmds.mayaHydraCppTest(
                     self.PICK_PATH + "/ParentPointInstancer",
                     self.PICK_PATH + marker,
-                    f="TestUsdPointInstancePicking.pickPointInstance")
+                    f="TestUsdPicking.pickInstance")
 
     def test_PickInstances(self):
         with PluginLoaded('mayaHydraCppTests'):
@@ -82,7 +82,7 @@ class TestUsdPointInstancePicking(mtohUtils.MayaHydraBaseTestCase):
                 cmds.mayaHydraCppTest(
                     self.PICK_PATH + instance,
                     self.PICK_PATH + marker,
-                    f="TestUsdPointInstancePicking.pickPointInstance")
+                    f="TestUsdPicking.pickInstance")
 
     def test_PickPrototypes(self):
         with PluginLoaded('mayaHydraCppTests'):
@@ -106,7 +106,7 @@ class TestUsdPointInstancePicking(mtohUtils.MayaHydraBaseTestCase):
                 cmds.mayaHydraCppTest(
                     self.PICK_PATH + prototype,
                     self.PICK_PATH + marker,
-                    f="TestUsdPointInstancePicking.pickPointInstance")
+                    f="TestUsdPicking.pickInstance")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

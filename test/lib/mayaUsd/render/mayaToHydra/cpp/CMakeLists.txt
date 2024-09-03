@@ -40,7 +40,6 @@ target_sources(${TARGET_NAME}
         testPickHandlerRegistry.cpp
         testPicking.cpp
         testUsdAnim.cpp
-        testUsdPointInstancePicking.cpp
         testUsdPicking.cpp
         testNurbsSurfaces.cpp
         testPointInstancingWireframeHighlight.cpp
