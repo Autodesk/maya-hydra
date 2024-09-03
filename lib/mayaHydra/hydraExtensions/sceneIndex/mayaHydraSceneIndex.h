@@ -35,6 +35,7 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraMaterialDataSource.h>
 
 #include "flowViewport/sceneIndex/fvpPathInterface.h"
+#include <flowViewport/selection/fvpPathMapperFwd.h>
 
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
@@ -204,6 +205,7 @@ public:
     bool GetPlaybackRunning() const;
 
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override;
+    Fvp::PrimSelections UfePathToPrimSelectionsLit(const Ufe::Path& appPath) const;
 
     //Sdfpath of the maya default material
     SdfPath GetDefaultMaterialPath() const{return _mayaDefaultMaterialPath;}
@@ -354,6 +356,8 @@ private:
     SdfPath _rprimPath;
     SdfPath _sprimPath;
     SdfPath _materialPath;
+
+    const Fvp::PathMapperConstPtr _mayaPathMapper{};
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

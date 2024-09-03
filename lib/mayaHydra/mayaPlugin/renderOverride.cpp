@@ -46,6 +46,7 @@
 #include <flowViewport/selection/fvpSelection.h>
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h>
+#include <flowViewport/sceneIndex/fvpIsolateSelectSceneIndex.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
@@ -168,6 +169,16 @@ void replaceSelectionTask(PXR_NS::HdTaskSharedPtrVector* tasks)
     }
 
     *found = HdTaskSharedPtr(new Fvp::SelectionTask);
+}
+
+std::string getRenderingDestination(
+    const MHWRender::MFrameContext* frameContext
+)
+{
+    TF_AXIOM(frameContext);
+    MString viewportId;
+    frameContext->renderingDestination(viewportId);
+    return std::string(viewportId.asChar());
 }
 
 }
@@ -649,11 +660,17 @@ MStatus MtohRenderOverride::Render(
 
     //This code with strings comparison will go away when doing multi viewports
     MString panelName;
+    std::string panelNameStr;
     auto framecontext = getFrameContext();
     if (framecontext){
         framecontext->renderingDestination(panelName);
+        panelNameStr = std::string(panelName.asChar());
+
+        TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
+            .Msg("Rendering destination is %s\n", panelName.asChar());
+
         auto& manager = Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get();
-        if (false == manager.ModelPanelIsAlreadyRegistered(panelName.asChar())){
+        if (false == manager.ModelPanelIsAlreadyRegistered(panelNameStr)){
             //Get information from viewport
             std::string cameraName;
     
@@ -666,7 +683,7 @@ MStatus MtohRenderOverride::Render(
             }
     
             //Create a HydraViewportInformation 
-            const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(panelName.asChar()), cameraName);
+            const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelNameStr, cameraName);
             const bool dataProducerSceneIndicesAdded = manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
             //Update the selection since we have added data producer scene indices through manager.AddViewportInformation to the merging scene index
             if (dataProducerSceneIndicesAdded && _selectionSceneIndex){
@@ -691,13 +708,16 @@ MStatus MtohRenderOverride::Render(
         _mayaHydraSceneIndex->SetParams(delegateParams);
         _mayaHydraSceneIndex->PreFrame(drawContext);
         
+        auto& manager = Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get();
         if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle)){
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(true);//Prevent prim removal propagation to keep the current selection.
             //We need to recreate the filtering scene index chain after the merging scene index as there was a change such as in the BBox display style which has been turned on or off.
             _lastFilteringSceneIndexBeforeCustomFiltering = nullptr;//Release
+
+            TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
+                .Msg("Re-creating scene index chain to render %s\n", panelNameStr.c_str());
             _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
-            auto& manager = Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get();
-            manager.RemoveViewportInformation(std::string(panelName.asChar()));
+            manager.RemoveViewportInformation(panelNameStr);
             //Get information from viewport
             std::string cameraName;
             M3dView view;
@@ -707,9 +727,31 @@ MStatus MtohRenderOverride::Render(
                 MFnCamera viewCamera(dpath);
                 cameraName = viewCamera.name().asChar();
             }
-            const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(std::string(panelName.asChar()), cameraName);
+            const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelNameStr, cameraName);
             manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(false);//Allow prim removal propagation again.
+        }
+        else {
+            TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
+                .Msg("Re-using existing scene index chain to render %s\n", panelNameStr.c_str());
+
+            // Make sure the isolate selection scene index set to the proper
+            // isolate selection.  We currently have a single scene index tree,
+            // thus a single isolate select scene index is common to and
+            // provides prims to render all viewports.
+            auto isSi = manager.GetIsolateSelectSceneIndex();
+            auto isolateSelection = manager.GetOrCreateIsolateSelection(panelNameStr);
+            if (isSi->GetIsolateSelection() != isolateSelection) {
+                TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
+                    .Msg("Switching scene index to isolate selection %p\n", &*isolateSelection);
+                // Isolate select scene index is being switched to a different
+                // viewport, set its isolate selection.
+                isSi->SetViewport(panelNameStr, isolateSelection);
+            }
+            else {
+                TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
+                    .Msg("Re-using isolate selection %p\n", &*isolateSelection);
+            }
         }
     }
 
@@ -1119,9 +1161,21 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 {
     //This function is where happens the ordering of filtering scene indices that are after the merging scene index
     //We use as its input scene index : _inputSceneIndexOfFilteringSceneIndicesChain
+    auto viewportId = getRenderingDestination(getFrameContext());
+
+    // Add isolate select scene index.
+    auto& perVpDataMgr = Fvp::PerViewportDataManager::Get();
+    auto selection = perVpDataMgr.GetOrCreateIsolateSelection(viewportId);
+    auto isSi = Fvp::IsolateSelectSceneIndex::New(
+        viewportId, selection, _inputSceneIndexOfFilteringSceneIndicesChain);
+    // At time of writing we have a single selection scene index serving
+    // all viewports.
+    perVpDataMgr.SetIsolateSelectSceneIndex(isSi);
+    _lastFilteringSceneIndexBeforeCustomFiltering = isSi;
+
     // Add display style scene index
     _lastFilteringSceneIndexBeforeCustomFiltering = _displayStyleSceneIndex =
-            Fvp::DisplayStyleOverrideSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
+            Fvp::DisplayStyleOverrideSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
     _displayStyleSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims don't use global refinement
 
     // Add texture disabling Scene Index
