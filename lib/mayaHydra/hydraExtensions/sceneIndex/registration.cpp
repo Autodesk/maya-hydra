@@ -23,8 +23,11 @@
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/fvpUtils.h>
 
+#include <pxr/base/tf/diagnostic.h>
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
+#include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
+#include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/sceneIndex.h>
@@ -128,19 +131,43 @@ public:
         // 2) The second segment of the UFE path, with each UFE path component
         //    becoming an SdfPath component. If the last component is a number,
         //    then we are dealing with an instance selection.
-        SdfPath primPath = _sceneIndexPathPrefix;
         TF_AXIOM(appPath.nbSegments() == 2);
+        SdfPath primPath = _sceneIndexPathPrefix;
+        std::optional<int> instanceIndex = std::nullopt;
 
-        const auto& secondSegment = appPath.getSegments()[1];
-        for (const auto& pathComponent : secondSegment) {
-            auto targetChildPath = primPath.AppendChild(TfToken(pathComponent.string()));
+        auto secondSegment = appPath.getSegments()[1];
+        const auto lastComponentString = secondSegment.components().back().string();
+        const bool lastComponentIsNumeric = lastComponentString.find_first_not_of(digits) == std::string::npos;
+        if (lastComponentIsNumeric) {
+            instanceIndex = std::stoi(lastComponentString);
+            secondSegment.pop();
+        }
+
+        for (size_t iSecondSegment = 0; iSecondSegment < secondSegment.size(); iSecondSegment++) {
+            // Native instancing : if the current prim path points to a native instance, repath to the prototype
+            // before appending the following UFE components
+            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+            HdInstanceSchema instanceSchema = HdInstanceSchema::GetFromParent(prim.dataSource);
+            if (instanceSchema.IsDefined()) {
+                auto instancerPath = instanceSchema.GetInstancer()->GetTypedValue(0);
+                HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(instancerPath);
+                HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
+                auto prototypes = instancerTopologySchema.GetPrototypes()->GetTypedValue(0);
+                auto prototypeIndex = instanceSchema.GetPrototypeIndex()->GetTypedValue(0);
+                primPath = prototypes[prototypeIndex];
+                instanceIndex = prototypeIndex;
+            }
+
+            auto targetChildPath = primPath.AppendChild(TfToken(secondSegment.components()[iSecondSegment].string()));
             auto actualChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
             if (std::find(actualChildPaths.begin(), actualChildPaths.end(), targetChildPath) != actualChildPaths.end()) {
-                // Only append if the new path is valid
-                primPath = primPath.AppendChild(TfToken(pathComponent.string()));
-            } else {
-                // There is no prim corresponding to the converted path, stop appending
-                break;
+                // Append if the new path is valid
+                primPath = primPath.AppendChild(TfToken(secondSegment.components()[iSecondSegment].string()));
+            }
+            else {
+                // There is no prim corresponding to the converted path
+                TF_WARN("Could not convert UFE path %s to Hydra prims.", appPath.string().data());
+                return {};
             }
         }
 
@@ -153,14 +180,9 @@ public:
         //     primPath = primPath.GetParentPath();
         // }
 
-        std::optional<int> instanceIndex = std::nullopt;
-        const auto lastComponentString = secondSegment.components().back().string();
-        if (lastComponentString.find_first_not_of(digits) == std::string::npos) {
-            instanceIndex = std::stoi(lastComponentString);
-        }
         Fvp::PrimSelections primSelections({{primPath, instanceIndex}});
 
-        // Propagate selection to propagated prototypes
+        // Point instancing : propagate selection to propagated prototypes
         auto ancestorsRange = primPath.GetAncestorsRange();
         for (const auto& ancestorPath : ancestorsRange) {
             HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(ancestorPath);
