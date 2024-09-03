@@ -658,7 +658,7 @@ MStatus MtohRenderOverride::Render(
         }
     }
 
-    //This code with strings comparison will go away when doing multi viewports
+    //This code with strings comparison will go away if we have multiple render proxies when doing multi viewports
     MString panelName;
     std::string panelNameStr;
     auto framecontext = getFrameContext();
@@ -687,13 +687,18 @@ MStatus MtohRenderOverride::Render(
             const bool dataProducerSceneIndicesAdded = manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
             //Update the selection since we have added data producer scene indices through manager.AddViewportInformation to the merging scene index
             if (dataProducerSceneIndicesAdded && _selectionSceneIndex){
-                _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+                _needToReplaceSelection = true;
             }
             //Update the leadObjectTacker in case it could not find the current lead object which could be in a custom data producer scene index or a maya usd proxy shape scene index
             if (_leadObjectPathTracker){
                 _leadObjectPathTracker->updatePrimPaths();
             }
         }
+    }
+
+    if (_needToReplaceSelection){
+        _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+        _needToReplaceSelection = false;
     }
 
     const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
@@ -1051,11 +1056,11 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
     _inputSceneIndexOfFilteringSceneIndicesChain = _selectionSceneIndex;
 
-    _dirtyLeadObjectSceneIndex = MAYAHYDRA_NS_DEF::MhDirtyLeadObjectSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
+    _dirtyLeadObjectSceneIndex = MAYAHYDRA_NS::MhDirtyLeadObjectSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
     _inputSceneIndexOfFilteringSceneIndicesChain = _dirtyLeadObjectSceneIndex;
 
-    // Set the initial selection onto the selection scene index.
-    _selectionSceneIndex->ReplaceSelection(*Ufe::GlobalSelection::get());
+    // Set the initial selection onto the selection scene index later. 
+    _needToReplaceSelection = true;
 
     _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
     
