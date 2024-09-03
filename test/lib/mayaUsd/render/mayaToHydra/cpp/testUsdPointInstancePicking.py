@@ -106,7 +106,7 @@ class TestUsdPointInstancePicking(mtohUtils.MayaHydraBaseTestCase):
                 cmds.mayaHydraCppTest(
                     self.PICK_PATH + prototype,
                     self.PICK_PATH + marker,
-                    f="TestUsdPicking.pickInstanceWithMarker")
+                    f="TestUsdPicking.pickPrimWithMarker")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
