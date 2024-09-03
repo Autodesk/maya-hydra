@@ -51,10 +51,13 @@ public:
     FVP_API
     bool Remove(const PrimSelection& primSelection);
 
-    // Replace the selection with the contents of the argument primPath vector.
+    // Replace the selection with the contents of the argument vector.
     // Any empty primPath in the argument will be skipped.
     FVP_API
     void Replace(const PrimSelections& primSelections);
+
+    FVP_API
+    void Replace(const Selection& selection);
 
     // Remove all entries from the selection.
     FVP_API
@@ -75,6 +78,16 @@ public:
     // ancestor is set to the absolute root path, so that all ancestors are considered.
     FVP_API
     bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath, const PXR_NS::SdfPath& topmostAncestor = PXR_NS::SdfPath::AbsoluteRootPath()) const;
+
+    // Returns true if the argument itself is selected, or a descendant of the
+    // argument.
+    FVP_API
+    bool HasDescendantInclusive(const PXR_NS::SdfPath& primPath) const;
+
+    // Returns true if the argument itself is selected, or an ancestor or
+    // descendant of the argument is selected.
+    FVP_API
+    bool HasAncestorOrDescendantInclusive(const PXR_NS::SdfPath& primPath) const;
 
     // Returns the paths to all fully selected ancestors of the prim up to the specified
     // topmost ancestor. If the prim is itself selected, its path will also be returned.

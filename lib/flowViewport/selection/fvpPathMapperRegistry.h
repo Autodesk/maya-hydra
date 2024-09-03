@@ -39,8 +39,13 @@ namespace FVP_NS_DEF {
 /// - All entries are unique.
 /// - No entry is a prefix (ancestor) of another entry.
 ///
-/// Therefore, a fallback path mapping must be implemented outside the 
-/// application path to scene index path mapper.
+/// A fallback path mapper can be provided to implement a path mapping chain of
+/// responsibility, for an application's native data model paths.  This is
+/// useful as the path mapper uses plugin prim path prefixes to convert between
+/// a data model path to one (or more) scene index prim path(s).  The
+/// application data model has no plugin data model Hydra scene index prim path
+/// prefix, so the application data model should be made the fallback, if no
+/// other path mapper prefix matches.
 
 class PathMapperRegistry {
 public:
@@ -61,6 +66,14 @@ public:
     */
     FVP_API
     bool Unregister(const Ufe::Path& prefix);
+
+    //! Set a fallback path mapper.  If set, it will be returned by
+    //! GetMapper() if no mapper is registered for a given argument path.
+    //! A null pointer argument removes the fallback path mapper.
+    FVP_API
+    void SetFallbackMapper(const PathMapperConstPtr& pathMapper);
+    FVP_API
+    PathMapperConstPtr GetFallbackMapper() const;
 
     //! Get a path mapper for the argument application path.  This
     //! mapper has a prefix that is an ancestor of the argument path.  If no

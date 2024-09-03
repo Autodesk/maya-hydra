@@ -20,6 +20,10 @@
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/mixedUtils.h>
 
+#include <flowViewport/selection/fvpPathMapper.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
+#include <flowViewport/sceneIndex/fvpPathInterface.h>
+
 #include <pxr/imaging/hd/dataSourceLegacyPrim.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
@@ -33,6 +37,9 @@
 #include <maya/MMatrix.h>
 #include <maya/M3dView.h>
 #include <maya/MPoint.h>
+
+#include <ufe/path.h>
+#include <ufe/pathString.h>
 
 #include <gtest/gtest.h>
 
@@ -511,6 +518,33 @@ void assertSelectionHighlightCorrectness(
             EXPECT_EQ(getRefinedReprToken(currPrim), leafDisplayStyle);
         }
     }
+}
+
+Fvp::PrimSelections ufePathToPrimSelections(const Ufe::Path& appPath)
+{
+    Fvp::PrimSelections primSelections;
+
+    auto mapper = Fvp::PathMapperRegistry::Instance().GetMapper(appPath);
+        
+    if (!mapper) {
+        TF_WARN("No registered mapping for path %s, no prim path returned.", Ufe::PathString::string(appPath).c_str());
+    }
+    else {
+        primSelections = mapper->UfePathToPrimSelections(appPath);
+        if (primSelections.empty()) {
+            TF_WARN("Mapping for path %s returned no prim path.", Ufe::PathString::string(appPath).c_str());
+        }
+    }
+
+    return primSelections;
+}
+
+bool visibility(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
+{
+    auto prim = sceneIndex->GetPrim(primPath);
+    auto handle = HdVisibilitySchema::GetFromParent(prim.dataSource).GetVisibility();
+    // If there is no handle the prim is visible.
+    return (handle ? handle->GetTypedValue(0.0f) : true);
 }
 
 } // namespace MAYAHYDRA_NS_DEF

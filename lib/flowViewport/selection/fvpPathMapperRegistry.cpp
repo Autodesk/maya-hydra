@@ -25,6 +25,7 @@
 namespace {
 
 Ufe::Trie<Fvp::PathMapperConstPtr> mappers;
+Fvp::PathMapperConstPtr fallbackMapper{};
 
 }
 
@@ -56,10 +57,26 @@ bool PathMapperRegistry::Unregister(const Ufe::Path& prefix)
     return mappers.remove(prefix) != nullptr;
 }
 
+void PathMapperRegistry::SetFallbackMapper(
+    const PathMapperConstPtr& pathMapper
+)
+{
+    fallbackMapper = pathMapper;
+}
+
+PathMapperConstPtr PathMapperRegistry::GetFallbackMapper() const
+{
+    return fallbackMapper;
+}
+
 PathMapperConstPtr PathMapperRegistry::GetMapper(const Ufe::Path& path) const
 {
-    if (mappers.empty() || path.empty()) {
+    if (path.empty()) {
         return nullptr;
+    }
+
+    if (mappers.empty()) {
+        return fallbackMapper;
     }
 
     // We are looking for the closest ancestor of the argument.  Internal trie
@@ -72,7 +89,7 @@ PathMapperConstPtr PathMapperRegistry::GetMapper(const Ufe::Path& path) const
         // If we've reached a trie leaf node before the end of our path, there
         // is no trie node with data as ancestor of the path.
         if (!child) {
-            return nullptr;
+            return fallbackMapper;
         }
         trieNode = child;
 
@@ -83,7 +100,7 @@ PathMapperConstPtr PathMapperRegistry::GetMapper(const Ufe::Path& path) const
     }
     // We reached the end of the parent path without returning true, therefore
     // there are no ancestors.
-    return nullptr;
+    return fallbackMapper;
 }
 
 }

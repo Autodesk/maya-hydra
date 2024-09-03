@@ -20,6 +20,7 @@
 #include <mayaHydraLib/mayaHydra.h>
 
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpPathInterface.h>
 
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/tf/stringUtils.h>
@@ -29,6 +30,8 @@
 #include <maya/MStatus.h>
 #include <maya/MApiNamespace.h>
 
+#include <ufe/ufe.h>
+
 #include <QMouseEvent>
 #include <QWidget>
 
@@ -36,6 +39,10 @@
 #include <fstream>
 #include <functional>
 #include <limits>
+
+UFE_NS_DEF {
+class Path;
+}
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -482,6 +489,23 @@ void assertSelectionHighlightCorrectness(
     const PXR_NS::SdfPath& primPath,
     const std::string& selectionHighlightMirrorTag,
     const PXR_NS::TfToken& leafDisplayStyle);
+
+/**
+ * @brief Get the prim selections for a given application path.
+ *
+ * If an application path corresponds to a scene index prim, this function will
+ * return one or more prim selections for it.  If no such scene index prim
+ * exists, the return prim selections will be empty.
+ *
+ * @param[in] appPath The application path for which prim selections should be returned.
+ * @return Zero or more prim selections.
+ */
+Fvp::PrimSelections ufePathToPrimSelections(const Ufe::Path& appPath);
+
+/**
+ * @brief Return whether the prim is visible or not.
+ */
+bool visibility(const PXR_NS::HdSceneIndexBasePtr& sceneIndex, const PXR_NS::SdfPath& primPath);
 
 } // namespace MAYAHYDRA_NS_DEF
 
