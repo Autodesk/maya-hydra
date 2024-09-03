@@ -53,6 +53,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
+    cpp/testIsolateSelect.py
     cpp/testMayaSceneFlattening.py
     cpp/testMayaUsdUfeItems.py
     cpp/testMergingSceneIndex.py

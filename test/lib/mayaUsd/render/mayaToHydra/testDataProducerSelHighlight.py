@@ -29,7 +29,8 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
     pSphere2UfeItem = None
     pTorusUfeItem = None
     pPlaneUfeItem = None
-
+    shapeNode = "sample_usdShape"
+        
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     @property
     def IMAGE_DIFF_FAIL_PERCENT(self):
@@ -45,8 +46,7 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
                 "testWireframeSelectionHighlight",
                 "testSelectionHighlightMayaUsd.ma")
 
-        shapeNode = "sample_usdShape"
-        shapeStage = mayaUsdLib.GetPrim(shapeNode).GetStage()
+        shapeStage = mayaUsdLib.GetPrim(self.shapeNode).GetStage()
         
         #define ufe items
         sphere1Prim = shapeStage.GetPrimAtPath('/sample_usdShape/pSphere1')
@@ -150,6 +150,19 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         #Remove a non lead object
         ufeGlobalSel.remove(self.pSphere1UfeItem)
         self.assertSnapshotClose("Storm_S2AndTSelPAndS1Removed.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        
+    
+    #We want to check that when we select the maya usd proxy shape node it highlights all primitives from the stage
+    def test_MayaUsdNodesSelectionHighlighting(self):
+        
+        self.loadFileAndInitUfeVariables()
+
+        #Switch to HdStorm
+        self.setHdStormRenderer()
+        cmds.refresh()
+    
+        cmds.select(self.shapeNode)
+        self.assertSnapshotClose("selectMayaUsdNode.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

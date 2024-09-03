@@ -134,7 +134,7 @@ bool IsAMayaTransformAttributeName(const MString& attrName);
  * If so then we fill the outVal with the visibility value
  * 
  * @param[in] plug is a MPlug from an attribute.
- * @param[out] outVal wilml contain true or false if that was a maya visibility attribute 
+ * @param[out] outVal will contain true or false if that was a maya visibility attribute 
  *
  * @return true if this is a maya visibility attribute name, false otherwise.
  */

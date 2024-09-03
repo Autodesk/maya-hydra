@@ -277,8 +277,7 @@ PrimSelections SelectionSceneIndex::UfePathToPrimSelections(const Ufe::Path& app
 
         if (!mapper) {
             warnEmptyPath(appPath);
-        }
-        else {
+        } else {
             primSelections = mapper->UfePathToPrimSelections(appPath);
             if (primSelections.empty()) {
                 warnEmptyPath(appPath);

@@ -11,6 +11,7 @@ target_sources(${TARGET_NAME}
     fvpPathMapperFwd.cpp
     fvpPathMapperRegistry.cpp
     fvpPrefixPathMapper.cpp
+    fvpDataProducersNodeHashCodeToSdfPathRegistry.cpp
 )
 
 set(HEADERS
@@ -22,6 +23,7 @@ set(HEADERS
     fvpPathMapperFwd.h
     fvpPathMapperRegistry.h
     fvpPrefixPathMapper.h
+    fvpDataProducersNodeHashCodeToSdfPathRegistry.h
 )
 
 # -----------------------------------------------------------------------------
