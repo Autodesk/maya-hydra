@@ -168,7 +168,7 @@ public:
                     HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(primPath);
                     HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
                     auto instanceIndicesByPrototype = instancerTopologySchema.GetInstanceIndices();
-                    for (int iInstanceIndices = 0; iInstanceIndices < instanceIndicesByPrototype.GetNumElements(); iInstanceIndices++) {
+                    for (int iInstanceIndices = 0; static_cast<size_t>(iInstanceIndices) < instanceIndicesByPrototype.GetNumElements(); iInstanceIndices++) {
                         auto instanceIndices = instanceIndicesByPrototype.GetElement(iInstanceIndices)->GetTypedValue(0);
                         if (std::find(instanceIndices.begin(), instanceIndices.end(), std::stoi(lastComponentString)) != instanceIndices.end()) {
                             instanceSelection = {primPath, iInstanceIndices, {std::stoi(lastComponentString)}};
