@@ -19,4 +19,16 @@ def "cubeHierarchies"
         double3 xformOp:translate = (1.0, 0, 0)
         uniform token[] xformOpOrder = ["xformOp:translate"]
     }
+
+    def Xform "marker_cubes_1_baseCube"
+    {
+        double3 xformOp:translate = (-1, 0.5, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "marker_cubes_2_topCube"
+    {
+        double3 xformOp:translate = (1, 1.25, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
 }
