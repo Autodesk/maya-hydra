@@ -32,6 +32,8 @@ class Path;
 
 namespace FVP_NS_DEF {
 
+// Based on USD's HdInstanceIndicesSchema : 
+// https://github.com/PixarAnimationStudios/OpenUSD/blob/59992d2178afcebd89273759f2bddfe730e59aa8/pxr/imaging/hd/instanceIndicesSchema.h
 struct InstancesSelection {
     PXR_NS::SdfPath instancerPath;
     int prototypeIndex;
@@ -44,6 +46,8 @@ struct InstancesSelection {
     }
 };
 
+// Based on USD's HdSelectionSchema : 
+// https://github.com/PixarAnimationStudios/OpenUSD/blob/59992d2178afcebd89273759f2bddfe730e59aa8/pxr/imaging/hd/selectionSchema.h
 struct PrimSelection
 {
     PXR_NS::SdfPath primPath;
