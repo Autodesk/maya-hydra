@@ -33,6 +33,9 @@ class TestUsdNativeInstancePicking(mtohUtils.MayaHydraBaseTestCase):
     def setUp(self):
         super(TestUsdNativeInstancePicking, self).setUp()
         self.loadUsdScene()
+        cmds.select(clear=True)
+        cmds.setAttr('persp.translate', 0, 0, 15, type='float3')
+        cmds.setAttr('persp.rotate', 0, 0, 0, type='float3')
         cmds.refresh()
 
     def test_NativeInstances(self):
