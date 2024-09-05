@@ -46,6 +46,11 @@ enum SelectionHighlightsCollectionDirection {
     Bidirectional = Prototypes | InstancedBy
 };
 
+enum HighlightType {
+    Lead = 0,
+    Active = 1
+};
+
 /// \class WireframeSelectionHighlightSceneIndex
 ///
 /// Uses Hydra HdRepr to add wireframe representation to selected objects
@@ -170,17 +175,22 @@ private:
     const SelectionConstPtr   _selection;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 
-    // The following three data members (_selectionHighlightMirrorsByPrim, _selectionHighlightMirrorUseCounters and 
-    // _selectionHighlightUsersByPrim) hold the data required to properly manage the selection highlight mirror graph/hierarchy.
+    // The following three data members (_mirrorsByPrim, _mirrorUseCounters and 
+    // _highlightUsersByPrim) hold the data required to properly manage the selection highlight mirror graph/hierarchy.
     // A potential idea to support multiple wireframe colors for point instancer and instance selections could be to use
     // a different mirror hierarchy for each color; in such a case, we could wrap these data members in a struct, and have 
     // one instance of this new struct for each differently colored selection highlight mirror hierarchy.
 
+    struct SelectionHighlightHierarchy {
+    };
+
+    std::map<HighlightType, SelectionHighlightHierarchy> _highlightHierarchies;
+
     // Maps a prim's path to its required selection highlight mirror paths.
-    std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _selectionHighlightMirrorsByPrim;
+    std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _mirrorsByPrim;
 
     // "Ref-counting" of selection highlight mirror prims, which are shared across prim highlights.
-    std::unordered_map<PXR_NS::SdfPath, size_t, PXR_NS::SdfPath::Hash> _selectionHighlightMirrorUseCounters;
+    std::unordered_map<PXR_NS::SdfPath, size_t, PXR_NS::SdfPath::Hash> _mirrorUseCounters;
 
     // Tracks which prims contributes to using this prim's selection highlight (including itself).
     // Why? Suppose the following scenario : we have two selections that each would lead to highlighting the same prim.
@@ -190,7 +200,7 @@ private:
     // prim's selection highlight mirrors by one, or they could end up floating around in memory forever. However, 
     // we would have no way of knowing how many times this prim actually uses its selection highlight mirrors. 
     // Keeping track of which selected prims contribute to the prim's highlight solves this problem.
-    std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _selectionHighlightUsersByPrim;
+    std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _highlightUsersByPrim;
 };
 
 }
