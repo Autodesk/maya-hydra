@@ -42,6 +42,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testBackgroundColor.py
     testGrid.py
     testUsdTextureToggle.py
+    testUsdStageDefaultLighting.py
     # To be reenabled after investigation
     testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testPassingNormalsOnMayaNative.py
