@@ -11,7 +11,7 @@ jobs:
 
 #  clang_format_linter:
 #      timeout-minutes: 30
-#      runs-on: ubuntu-latest
+#      runs-on: ubuntu-22.04
 #      if: ${{ github.event.assignee.login == 'ecp-maya-devops-adsk' }}
 #      steps:
 #      # Feb 2024: Update from v3 to v4 which uses node20 (node16 is out of support).
@@ -24,7 +24,7 @@ jobs:
   # Wait for remote build to start and finish, report results
   build_preflight:
       timeout-minutes: 400
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-22.04
 #      needs: clang_format_linter
       # Start preflight by assigning pull-request to yourself.
       if: ${{ github.event.assignee.login == github.event.pull_request.user.login }}
