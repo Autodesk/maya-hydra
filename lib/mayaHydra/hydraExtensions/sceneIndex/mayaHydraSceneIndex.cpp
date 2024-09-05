@@ -784,26 +784,32 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
 
     // Not the best implementation performance-wise, as ufeToDagPath converts
     // the UFE path to a string, then does a Dag path lookup with the string.
-    constexpr bool isSprim = false; // Can't handle sprims as of 15-Aug-2023.
-
+    
     auto dagPath = UfeExtensions::ufeToDagPath(appPath);
-    SdfPath primPath = GetPrimPath(dagPath, isSprim);
-    TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
-        .Msg("    mapped to scene index path %s.\n", primPath.GetText());
-  
+    const bool isDomeLight = IsDagPathAnArnoldSkyDomeLight(dagPath);
+    const bool isSprim = isDomeLight;//we will look in sprims only for the sky dome light
+    MDagPath   shapeDagPath(dagPath);
+    shapeDagPath.extendToShape();
+
+    //For the sky dome light, we want to get it from the Sprims and we are using the dag path shape 
+    // as this is the dag path that gets translated to an Sprim in Hydra
+    SdfPath primPath = GetPrimPath((isDomeLight) ? shapeDagPath : dagPath, isSprim);
+    
     //Check if this maya node has a special SdfPath associated with it, this is for custom or maya usd data producers scene indices.
     //The class MhDataProducersMayaNodeToSdfPathRegistry does a mapping between Maya nodes and USD paths.
     //The maya nodes registered in this class are used by data producers as a parent to all
     //primitives. This class is used when the user selects one of these
     //maya nodes to return the matching SdfPath so that all prims child of this maya node are
     //highlighted.
-    MDagPath shapeDagPath(dagPath);
-    shapeDagPath.extendToShape();
+    
     const SdfPath matchingPath = FVP_NS::DataProducersNodeHashCodeToSdfPathRegistry::Instance().GetPath(MObjectHandle(shapeDagPath.node()).hashCode());
     if (! matchingPath.IsEmpty()) {
         primPath = matchingPath;
     }
  
+    TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
+        .Msg("    mapped to scene index path %s.\n", primPath.GetText());
+		
     return Fvp::PrimSelections({Fvp::PrimSelection{primPath}});
 }
 

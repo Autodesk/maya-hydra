@@ -50,6 +50,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFlowPluginsHierarchicalProperties.py
 	testCustomShadersNode.py
 	testMayaDefaultMaterial.py
+	testMayaLightingModes.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py

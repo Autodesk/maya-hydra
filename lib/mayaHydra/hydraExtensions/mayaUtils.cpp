@@ -184,4 +184,15 @@ MObject GetShadingGroupFromShader(const MObject& shader)
     return shadingGroup;
 }
 
+bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath) 
+{ 
+    static const std::string _aiSkyDomeLight("aiSkyDomeLight");
+
+    if (! dagPath.isValid()) return false;
+
+    const std::string fpName = dagPath.fullPathName().asChar();
+    return (fpName.find(_aiSkyDomeLight) != std::string::npos);
+}
+ 
+
 } // namespace MAYAHYDRA_NS_DEF

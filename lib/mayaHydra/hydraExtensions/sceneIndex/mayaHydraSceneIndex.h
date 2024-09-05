@@ -262,6 +262,9 @@ public:
 
     ///Create the default material from the "standardSurface1" maya material or create a fallback material if it cannot be found
     void CreateMayaDefaultMaterialData();
+
+    /// Get the maya default light path to be used in filtering scene indices to recognize the default light in primitives path
+    static const SdfPath& GetMayaDefaultLightPath() {return _mayaDefaultLightPath;}
     
 private:
     MayaHydraSceneIndex(
