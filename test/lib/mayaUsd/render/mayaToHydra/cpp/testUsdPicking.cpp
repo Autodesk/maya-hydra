@@ -18,6 +18,7 @@
 #include <maya/M3dView.h>
 #include <maya/MPoint.h>
 
+#include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 
@@ -26,21 +27,18 @@
 #include <ufe/observableSelection.h>
 #include <ufe/globalSelection.h>
 
+#include <vector>
+
 #include <gtest/gtest.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace MayaHydra;
 
-TEST(TestUsdPicking, pick)
-{
+void pick(const Ufe::Path& selectedPath, const Ufe::Path& markerPath, bool checkNestedInstanceIndices) {
     const auto& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     auto siRoot = sceneIndices.front();
-
-    auto [argc, argv] = getTestingArgs();
-    ASSERT_EQ(argc, 1);
-    const Ufe::Path selected(Ufe::PathString::path(argv[0]));
 
     // Maya selection API doesn't understand USD data, which can only be
     // represented through UFE, so use UFE API to interact with Maya selection.
@@ -53,27 +51,38 @@ TEST(TestUsdPicking, pick)
     const auto snSi = findSelectionSceneIndexInTree(siRoot);
     ASSERT_TRUE(snSi);
 
-    const auto sceneIndexPath = snSi->SceneIndexPath(selected);
+    const auto sceneIndexPaths = snSi->SceneIndexPaths(selectedPath);
+    ASSERT_FALSE(sceneIndexPaths.empty());
 
-    ASSERT_FALSE(sceneIndexPath.IsEmpty());
+    std::vector<std::pair<SdfPath, HdSceneIndexPrim>> prims;
+    for (const auto& sceneIndexPath : sceneIndexPaths) {
+        // The prim exists (has a data source).
+        const auto prim = siRoot->GetPrim(sceneIndexPath);
+        ASSERT_TRUE(prim.dataSource);
 
-    const auto prim = siRoot->GetPrim(sceneIndexPath);
-    ASSERT_TRUE(prim.dataSource);
+        // There is no selections data source on the prim.
+        auto dataSourceNames = prim.dataSource->GetNames();
+        ASSERT_EQ(std::find(dataSourceNames.begin(), dataSourceNames.end(), HdSelectionsSchemaTokens->selections), dataSourceNames.end());
+        
+        // Selection scene index says the prim is not selected.
+        ASSERT_FALSE(snSi->IsFullySelected(sceneIndexPath));
 
-    // There is no selections data source on the prim.
-    auto dataSourceNames = prim.dataSource->GetNames();
-    ASSERT_EQ(std::find(dataSourceNames.begin(), dataSourceNames.end(), HdSelectionsSchemaTokens->selections), dataSourceNames.end());
-
-    // Selection scene index says the prim is not selected.
-    ASSERT_FALSE(snSi->IsFullySelected(sceneIndexPath));
+        prims.emplace_back(sceneIndexPath, prim);
+    }
 
     //======================================================================
     // Perform a pick
     //======================================================================
 
+    const auto markerSceneIndexPath = snSi->SceneIndexPath(markerPath);
+    ASSERT_FALSE(markerSceneIndexPath.IsEmpty());
+
+    const auto markerPrim = siRoot->GetPrim(markerSceneIndexPath);
+    ASSERT_TRUE(markerPrim.dataSource);
+
     M3dView active3dView = M3dView::active3dView();
 
-    const auto primMouseCoords = getPrimMouseCoords(prim, active3dView);
+    const auto primMouseCoords = getPrimMouseCoords(markerPrim, active3dView);
 
     mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);
     active3dView.refresh();
@@ -85,32 +94,75 @@ TEST(TestUsdPicking, pick)
     // When picking on the boundary of multiple objects, one Hydra pick hit per
     // object is returned.  Therefore test that the expected selected path is
     // in the selection.
-    ASSERT_GE(sn->size(), 1u);
-    ASSERT_TRUE(sn->contains(selected));
+    ASSERT_EQ(sn->size(), 1u);
+    ASSERT_TRUE(sn->contains(selectedPath));
 
     //======================================================================
     // Test that the pick changed the Hydra selection
     //======================================================================
 
-    // On selection, the prim is given a selections data source.
-    dataSourceNames = prim.dataSource->GetNames();
-    ASSERT_NE(std::find(dataSourceNames.begin(), dataSourceNames.end(), HdSelectionsSchemaTokens->selections), dataSourceNames.end());
+    for (const auto& [sceneIndexPath, prim] : prims) {
+        // On selection, the prim is given a selections data source.
+        auto dataSourceNames = prim.dataSource->GetNames();
+        ASSERT_NE(std::find(dataSourceNames.begin(), dataSourceNames.end(), HdSelectionsSchemaTokens->selections), dataSourceNames.end());
 
-    auto snDataSource = prim.dataSource->Get(HdSelectionsSchemaTokens->selections);
-    ASSERT_TRUE(snDataSource);
-    auto selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
-    ASSERT_TRUE(selectionsSchema);
+        auto snDataSource = prim.dataSource->Get(HdSelectionsSchemaTokens->selections);
+        ASSERT_TRUE(snDataSource);
+        auto selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
+        ASSERT_TRUE(selectionsSchema);
 
-    // Only one selection in the selections schema.
-    ASSERT_EQ(selectionsSchema.GetNumElements(), 1u);
-    auto selectionSchema = selectionsSchema.GetElement(0);
+        // Only one selection in the selections schema.
+        ASSERT_EQ(selectionsSchema.GetNumElements(), 1u);
+        auto selectionSchema = selectionsSchema.GetElement(0);
 
-    // Prim is fully selected.
-    auto ds = selectionSchema.GetFullySelected();
-    ASSERT_TRUE(ds);
-    ASSERT_TRUE(ds->GetTypedValue(0.0f));
+        // Prim is fully selected.
+        auto fullySelectedDs = selectionSchema.GetFullySelected();
+        ASSERT_TRUE(fullySelectedDs);
+        ASSERT_TRUE(fullySelectedDs->GetTypedValue(0.0f));
 
-    // Selection scene index says the prim is selected.
-    ASSERT_TRUE(snSi->IsFullySelected(sceneIndexPath));
-    ASSERT_TRUE(snSi->HasFullySelectedAncestorInclusive(sceneIndexPath));
+        if (checkNestedInstanceIndices) {
+            // Prim has a nested instance index selection
+            auto nestedInstanceIndicesSchema = selectionSchema.GetNestedInstanceIndices();
+            ASSERT_TRUE(nestedInstanceIndicesSchema.IsDefined());
+            ASSERT_EQ(nestedInstanceIndicesSchema.GetNumElements(), 1u);
+            auto instanceIndicesSchema = nestedInstanceIndicesSchema.GetElement(0);
+            ASSERT_TRUE(instanceIndicesSchema.IsDefined());
+            ASSERT_TRUE(instanceIndicesSchema.GetInstanceIndices());
+            auto instanceIndices = instanceIndicesSchema.GetInstanceIndices()->GetTypedValue(0);
+            ASSERT_FALSE(instanceIndices.empty());
+        }
+
+        // Selection scene index says the prim is selected.
+        ASSERT_TRUE(snSi->IsFullySelected(sceneIndexPath));
+        ASSERT_TRUE(snSi->HasFullySelectedAncestorInclusive(sceneIndexPath));
+    }
+}
+
+TEST(TestUsdPicking, pickPrim)
+{
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_EQ(argc, 1);
+    const Ufe::Path selectedPath(Ufe::PathString::path(argv[0]));
+
+    pick(selectedPath, selectedPath, false);
+}
+
+TEST(TestUsdPicking, pickPrimWithMarker)
+{
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_EQ(argc, 2);
+    const Ufe::Path selectedPath(Ufe::PathString::path(argv[0]));
+    const Ufe::Path markerPath(Ufe::PathString::path(argv[1]));
+
+    pick(selectedPath, markerPath, false);
+}
+
+TEST(TestUsdPicking, pickInstanceWithMarker)
+{
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_EQ(argc, 2);
+    const Ufe::Path selectedPath(Ufe::PathString::path(argv[0]));
+    const Ufe::Path markerPath(Ufe::PathString::path(argv[1]));
+
+    pick(selectedPath, markerPath, true);
 }

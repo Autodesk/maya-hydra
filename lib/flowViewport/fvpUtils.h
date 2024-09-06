@@ -16,6 +16,7 @@
 #define FVP_UTILS_H
 
 #include <flowViewport/api.h>
+#include <flowViewport/sceneIndex/fvpPathInterface.h>
 
 #ifdef CODE_COVERAGE_WORKAROUND
 #include <pxr/imaging/hd/sceneIndex.h>
@@ -89,9 +90,7 @@ private:
     PXR_NS::TfToken _role;
 };
 
-PXR_NS::HdDataSourceBaseHandle FVP_API createFullySelectedDataSource();
-
-PXR_NS::HdDataSourceBaseHandle FVP_API createInstanceSelectionDataSource(const PXR_NS::SdfPath& instancerPrimPath, int instanceIndex);
+PXR_NS::HdDataSourceBaseHandle createSelectionDataSource(const PrimSelection& selection);
 
 } // namespace FVP_NS_DEF
 

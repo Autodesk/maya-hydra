@@ -64,7 +64,7 @@ class TestUsdPickKind(mtohUtils.MayaHydraBaseTestCase):
                 cmds.optionVar(sv=(kindOptionVar, kind))
                 cmds.mayaHydraCppTest(
                     self.PICK_PATH + selectedItem,
-                    f="TestUsdPicking.pick")
+                    f="TestUsdPicking.pickPrim")
 
             # Restore the USD selection kind back to its original value.
             cmds.optionVar(sv=(kindOptionVar, previousKind))
