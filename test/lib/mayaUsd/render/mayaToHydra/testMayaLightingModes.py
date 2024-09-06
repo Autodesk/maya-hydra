@@ -34,7 +34,7 @@ class TestMayaLightingfModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtoh
         # open the Maya scene
         testFile = mayaUtils.openTestScene(
                 "testMayaLightingModes",
-                "AllKindsOfLights.ma")
+                "AllKindsOfLights.ma", useTestSettings=False)
         cmds.refresh()
         
         #Lighting off
@@ -52,7 +52,7 @@ class TestMayaLightingfModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtoh
     def test_MayaActiveLightingMode(self):
         testFile = mayaUtils.openTestScene(
                 "testMayaLightingModes",
-                "AllKindsOfLights.ma")
+                "AllKindsOfLights.ma", useTestSettings=False)
         cmds.refresh()
         
         #Set active/selected lights only
