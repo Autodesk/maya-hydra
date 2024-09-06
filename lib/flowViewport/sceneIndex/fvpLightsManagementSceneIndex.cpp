@@ -130,7 +130,7 @@ HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) co
          case LightingMode::kSelectedLightsOnly: {
              const Ufe::GlobalSelection::Ptr& globalUfeSelection = Ufe::GlobalSelection::get();
              const Ufe::Selection&            ufeSelection = *globalUfeSelection;
-             if (0 == ufeSelection.size() > 0) {
+             if (0 == ufeSelection.size()) {
                  // Nothing is selected
                  _DisableLight(prim);
                  return prim;
