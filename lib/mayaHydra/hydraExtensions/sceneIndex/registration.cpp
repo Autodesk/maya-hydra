@@ -25,8 +25,11 @@
 #include <flowViewport/selection/fvpPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 
+#include <pxr/base/tf/diagnostic.h>
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
+#include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
+#include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/sceneIndexPlugin.h>
@@ -53,6 +56,8 @@
 #include <ufe/observer.h>
 #include <ufe/sceneNotification.h>
 #include <ufe/scene.h>
+
+#include <optional>
 
 namespace {
 
@@ -127,30 +132,62 @@ public:
         // 2) The second segment of the UFE path, with each UFE path component
         //    becoming an SdfPath component. If the last component is a number,
         //    then we are dealing with an instance selection.
-        SdfPath primPath = _sceneIndexPathPrefix;
         TF_AXIOM(appPath.nbSegments() == 2);
+        SdfPath primPath = _sceneIndexPathPrefix;
+        std::optional<Fvp::InstancesSelection> instanceSelection;
 
-        bool lastComponentIsNumeric = false;
-        const auto& secondSegment = appPath.getSegments()[1];
-        for (const auto& pathComponent : secondSegment) {
-            if (pathComponent.string().find_first_not_of(digits) == std::string::npos) {
-                // This should only occur on the last component, when we have an instance selection
-                if (TF_VERIFY(pathComponent == secondSegment.components().back())) {
-                    lastComponentIsNumeric = true;
-                }
-                continue;
-            }
-            primPath = primPath.AppendChild(TfToken(pathComponent.string()));
-        }
-
+        auto secondSegment = appPath.getSegments()[1];
         const auto lastComponentString = secondSegment.components().back().string();
-        std::optional<int> instanceIndex = std::nullopt;
-        if (lastComponentIsNumeric) {
-            instanceIndex = std::stoi(lastComponentString);
-        }
-        Fvp::PrimSelections primSelections({{primPath, instanceIndex}});
+        const bool lastComponentIsNumeric = lastComponentString.find_first_not_of(digits) == std::string::npos;
 
-        // Propagate selection to propagated prototypes
+        for (size_t iSecondSegment = 0; iSecondSegment < secondSegment.size(); iSecondSegment++) {
+            // Native instancing : if the current prim path points to a native instance, repath to the prototype
+            // before appending the following UFE components
+            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+            HdInstanceSchema instanceSchema = HdInstanceSchema::GetFromParent(prim.dataSource);
+            if (instanceSchema.IsDefined()) {
+                auto instancerPath = instanceSchema.GetInstancer()->GetTypedValue(0);
+                HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(instancerPath);
+                HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
+                auto prototypes = instancerTopologySchema.GetPrototypes()->GetTypedValue(0);
+                auto prototypeIndex = instanceSchema.GetPrototypeIndex()->GetTypedValue(0);
+                primPath = prototypes[prototypeIndex];
+                instanceSelection = {instancerPath, prototypeIndex, {instanceSchema.GetInstanceIndex()->GetTypedValue(0)}};
+            }
+
+            auto targetChildPath = primPath.AppendChild(TfToken(secondSegment.components()[iSecondSegment].string()));
+            auto actualChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
+            if (std::find(actualChildPaths.begin(), actualChildPaths.end(), targetChildPath) != actualChildPaths.end()) {
+                // Append if the new path is valid
+                primPath = primPath.AppendChild(TfToken(secondSegment.components()[iSecondSegment].string()));
+            }
+            else if (iSecondSegment == secondSegment.size() - 1) {
+                // Point instancing : instance selection. The path should end with a number corresponding to the selected instance,
+                // and the remainder of the path points to the point instancer.
+                if (TF_VERIFY(lastComponentIsNumeric, "Expected number as final UFE path component but got an invalid path instead.")) {
+                    HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(primPath);
+                    HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
+                    auto instanceIndicesByPrototype = instancerTopologySchema.GetInstanceIndices();
+                    for (int iInstanceIndices = 0; static_cast<size_t>(iInstanceIndices) < instanceIndicesByPrototype.GetNumElements(); iInstanceIndices++) {
+                        auto instanceIndices = instanceIndicesByPrototype.GetElement(iInstanceIndices)->GetTypedValue(0);
+                        if (std::find(instanceIndices.begin(), instanceIndices.end(), std::stoi(lastComponentString)) != instanceIndices.end()) {
+                            instanceSelection = {primPath, iInstanceIndices, {std::stoi(lastComponentString)}};
+                            break;
+                        }
+                    }
+                }
+            }
+            else {
+                // There is no prim corresponding to the converted path
+                TF_WARN("Could not convert UFE path %s to Hydra prims.", appPath.string().data());
+                return {};
+            }
+        }
+
+        Fvp::PrimSelection baseSelection = instanceSelection.has_value() ? Fvp::PrimSelection{primPath, {instanceSelection.value()}} : Fvp::PrimSelection{primPath};
+        Fvp::PrimSelections primSelections({baseSelection});
+
+        // Point instancing : propagate selection to propagated prototypes
         auto ancestorsRange = primPath.GetAncestorsRange();
         for (const auto& ancestorPath : ancestorsRange) {
             HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(ancestorPath);
@@ -174,7 +211,7 @@ public:
                     // for another instancer B will only mark the geometry-drawing instancer A as selected. This can be changed.
                     // For now (2024/05/28), this only affects selection highlighting.
                     if (propagatedPrim.primType != HdPrimTypeTokens->instancer) {
-                        primSelections.push_back({propagatedPrimPath, instanceIndex});
+                        primSelections.push_back({propagatedPrimPath, primSelections.front().nestedInstanceIndices});
                     }
                 }
             }

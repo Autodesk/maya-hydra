@@ -28,6 +28,7 @@
 
 #include <pxr/imaging/hdx/pickTask.h>
 #include <pxr/imaging/hd/geomSubsetSchema.h>
+#include <pxr/imaging/hd/primOriginSchema.h>
 #include <pxr/usd/kind/registry.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/modelAPI.h>
@@ -291,11 +292,26 @@ UsdPickHandler::HitPath resolveInstancePicking(HdRenderIndex& renderIndex, const
 
     if (instancerContext.instancePrimOrigin) {
         // Implicit prototype instancing (i.e. USD native instancing).
-        auto schema = HdPrimOriginSchema(instancerContext.instancePrimOrigin);
-        if (!TF_VERIFY(schema, "Cannot build prim origin schema for USD native instance.")) {
+        auto instanceOriginSchema = HdPrimOriginSchema(instancerContext.instancePrimOrigin);
+        if (!TF_VERIFY(instanceOriginSchema, "Cannot build instance prim origin schema for USD native instance.")) {
             return {SdfPath(), -1};
         }
-        return {schema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath), -1};
+        auto instanceOriginPath = instanceOriginSchema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath);
+
+        // EMSUSD-1220 : Native instances picking depends on the Point Instances pick mode. 
+        if (GetPointInstancesPickMode() != UsdPointInstancesPickMode::Prototypes) {
+            // "PointInstancer" and "Instances" pick modes : select the instanced prim
+            return {instanceOriginPath, -1};
+        }
+
+        // "Prototypes" pick mode : select the subprim in the prototype of the instanced prim
+        auto prototypePrim = renderIndex.GetTerminalSceneIndex()->GetPrim(pickHit.objectId);
+        auto prototypeOriginSchema = HdPrimOriginSchema::GetFromParent(prototypePrim.dataSource);
+        if (!TF_VERIFY(prototypeOriginSchema, "Cannot build prototype prim origin schema for USD native instance, falling back to selecting instance.")) {
+            return {instanceOriginPath, -1};
+        }
+        auto prototypeOriginPath = prototypeOriginSchema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath);
+        return {instanceOriginPath.AppendPath(prototypeOriginPath), -1};
     }
 
     // Explicit prototype instancing (i.e. USD point instancing).

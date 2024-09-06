@@ -33,15 +33,37 @@ class TestUsdNativeInstancePicking(mtohUtils.MayaHydraBaseTestCase):
     def setUp(self):
         super(TestUsdNativeInstancePicking, self).setUp()
         self.loadUsdScene()
+        cmds.select(clear=True)
+        cmds.setAttr('persp.translate', 0, 0, 15, type='float3')
+        cmds.setAttr('persp.rotate', 0, 0, 0, type='float3')
         cmds.refresh()
 
     def test_NativeInstances(self):
         with PluginLoaded('mayaHydraCppTests'):
+            cmds.optionVar(
+                    sv=('mayaUsd_PointInstancesPickMode', 'Instances'))
+            
             instances = ["/cubes_1", "/cubes_2"]
             for instance in instances:
                 cmds.mayaHydraCppTest(
                     self.PICK_PATH + instance,
-                    f="TestUsdPicking.pick")
+                    f="TestUsdPicking.pickPrim")
+    
+    def test_NativeInstancePrototypes(self):
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.optionVar(
+                    sv=('mayaUsd_PointInstancesPickMode', 'Prototypes'))
+
+            # In prototypes mode, picking an instance will select the most nested
+            # subprim of the prototype at the picked location.
+            markers = ["/marker_cubes_1_baseCube", "/marker_cubes_2_topCube"]
+            prototypes = ["/cubes_1/baseCube", "/cubes_2/topCube"]
+
+            for (marker, prototype) in zip(markers, prototypes):
+                cmds.mayaHydraCppTest(
+                    self.PICK_PATH + prototype,
+                    self.PICK_PATH + marker,
+                    f="TestUsdPicking.pickInstanceWithMarker")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

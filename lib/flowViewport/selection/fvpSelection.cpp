@@ -239,11 +239,7 @@ HdDataSourceBaseHandle Selection::GetVectorDataSource(
 
     std::vector<HdDataSourceBaseHandle> selectionDataSources;
     for (const auto& selection : it->second) {
-        if (selection.instanceIndex.has_value()) {
-            selectionDataSources.push_back(createInstanceSelectionDataSource(selection.primPath, selection.instanceIndex.value()));
-        } else {
-            selectionDataSources.push_back(createFullySelectedDataSource());
-        }
+        selectionDataSources.push_back(createSelectionDataSource(selection));
     }
     return HdSelectionsSchema::BuildRetained(
         selectionDataSources.size(), selectionDataSources.data()
