@@ -110,9 +110,6 @@ public:
 
     ~MayaHydraSceneIndex();
 
-    //Call this before the destructor is called.
-    void RemoveCallbacksAndDeleteAdapters();
-
     // ------------------------------------------------------------------------
     // Maya Hydra scene producer implementations
     // Propogate scene changes from Maya to Hydra

@@ -501,19 +501,6 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
 
 MayaHydraSceneIndex::~MayaHydraSceneIndex()
 {
-    // Unregister the fallback path mapper.
-    Fvp::PathMapperRegistry::Instance().SetFallbackMapper(nullptr);
-
-    //If you get a crash in a callback with a nullptr for _sceneIndex, 
-    // it may be due to the fact that the _sceneIndex pointer has been nulled as its ref count reached 0 but the destructor is still being called.
-    //You should call RemoveCallbacksAndDeleteAdapters(); before the destructor is called.
-
-    // Remove our pick handler from the pick handler registry.
-    TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Unregister(_rprimPath));
-}
-
-void MayaHydraSceneIndex::RemoveCallbacksAndDeleteAdapters()
-{
     //Remove global materials
     if (_mayaDefaultMaterialFallback.IsHolding<HdMaterialNetworkMap>()){
         //Remove the fallback material in case it was created
@@ -540,6 +527,12 @@ void MayaHydraSceneIndex::RemoveCallbacksAndDeleteAdapters()
     _materialAdapters.clear();
     _cameraAdapters.clear();
     _renderItemsAdaptersFast.clear();
+
+    // Unregister the fallback path mapper.
+    Fvp::PathMapperRegistry::Instance().SetFallbackMapper(nullptr);
+
+    // Remove our pick handler from the pick handler registry.
+    TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Unregister(_rprimPath));
 }
 
 void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation::MViewportScene& scene, MFrameContext::DisplayStyle ds)
