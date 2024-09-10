@@ -29,7 +29,7 @@ See Pixar's official github page for instructions on how to build USD: https://g
 
 |               |      ![](images/pxr.png)          |USD version used in Maya        
 |:------------: |:---------------:                  |:---------------:
-|  CommitID/Tags | [v22.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v22.11) or [v23.08](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.08) or [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11) |Maya 2024 = v22.11<br>Maya 2025 = v23.11<br>Maya PR = v23.11
+|  CommitID/Tags | [v22.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v22.11), [v23.08](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.08), [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11) or [v24.05](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.05) |Maya 2024 = v22.11<br>Maya 2025 = v23.11<br>Maya PR = v24.05
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
 
