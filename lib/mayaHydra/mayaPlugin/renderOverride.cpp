@@ -181,6 +181,20 @@ std::string getRenderingDestination(
     return std::string(viewportId.asChar());
 }
 
+inline Fvp::LightsManagementSceneIndex::LightingMode convertFromMayaLightingModeToFlowViewportLightMode(MFrameContext::LightingMode mayaLightingMode) 
+{ 
+    switch (mayaLightingMode) {
+        case MFrameContext::kLightDefault: return Fvp::LightsManagementSceneIndex::LightingMode::kDefaultLighting;
+        case MFrameContext::kAmbientLight:
+            TF_WARN("Ambient/Flat lighting mode is not supported");//Fall into next switch/case as we want to return kSceneLighting
+        case MFrameContext::kSceneLights: return Fvp::LightsManagementSceneIndex::LightingMode::kSceneLighting;
+        case MFrameContext::kSelectedLights:
+            return Fvp::LightsManagementSceneIndex::LightingMode::kSelectedLightsOnly;
+        case MFrameContext::kNoLighting: return Fvp::LightsManagementSceneIndex::LightingMode::kNoLighting;
+        default: return Fvp::LightsManagementSceneIndex::LightingMode::kSceneLighting;
+    }
+}
+
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -658,6 +672,8 @@ MStatus MtohRenderOverride::Render(
         }
     }
 
+    MFrameContext::LightingMode currentMayaLightingMode = MFrameContext::LightingMode::kSceneLights;
+
     //This code with strings comparison will go away if we have multiple render proxies when doing multi viewports
     MString panelName;
     std::string panelNameStr;
@@ -668,6 +684,8 @@ MStatus MtohRenderOverride::Render(
 
         TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
             .Msg("Rendering destination is %s\n", panelName.asChar());
+
+        currentMayaLightingMode = framecontext->getLightingMode();
 
         auto& manager = Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get();
         if (false == manager.ModelPanelIsAlreadyRegistered(panelNameStr)){
@@ -706,6 +724,12 @@ MStatus MtohRenderOverride::Render(
     delegateParams.displaySmoothMeshes = !(currentDisplayStyle & MHWRender::MFrameContext::kFlatShaded);
     
     const bool currentUseDefaultMaterial = (drawContext.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
+
+    if (_lightsManagementSceneIndex && _lightingMode != currentMayaLightingMode) {
+        _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(currentMayaLightingMode));
+        _lightingMode = currentMayaLightingMode;
+        _hasDefaultLighting = (MFrameContext::kLightDefault == _lightingMode);//Update default lighting
+    }
 
     if (_mayaHydraSceneIndex) {
         _mayaHydraSceneIndex->SetDefaultLightEnabled(_hasDefaultLighting);
@@ -1225,6 +1249,12 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _wireframeSelectionHighlightSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
     _lastFilteringSceneIndexBeforeCustomFiltering  = _wireframeSelectionHighlightSceneIndex;
     
+    TF_AXIOM(_mayaHydraSceneIndex);
+    Fvp::PathInterface* pathInterface = dynamic_cast<Fvp::PathInterface*>(&*mergingSceneIndex);
+    _lastFilteringSceneIndexBeforeCustomFiltering = _lightsManagementSceneIndex = Fvp::LightsManagementSceneIndex::New(
+        _lastFilteringSceneIndexBeforeCustomFiltering, *pathInterface, _mayaHydraSceneIndex->GetMayaDefaultLightPath());
+    _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(_lightingMode));
+
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);
 #endif

@@ -107,6 +107,36 @@ public:
     }
 };
 
+// For some dag paths we use the shape to translate it to an Hydra path
+bool _UseTheShapeDagPath(const MDagPath& dagpath) 
+{ 
+    bool extendToShape = false;
+
+    //So far we only have one case : the Arnold sky dome light
+    const bool isSkyDomeLight = MayaHydra::IsDagPathAnArnoldSkyDomeLight(dagpath);
+    if (isSkyDomeLight) {
+        extendToShape = true;
+    }
+
+    return extendToShape;
+}
+
+//Check if this dag path is registered in Sprims (such as the Arnold sky dome light)
+bool _IsDagPathRegisteredInHydraSPrims(const MDagPath& dagpath)
+{
+    bool isRegisteredInSPrims = false;
+    
+    //So far we only have one case : the Arnold sky dome light
+     
+    // The Arnold skydome light has its shape dag path registered as a Sprim in Hydra
+    const bool isSkyDomeLight = MayaHydra::IsDagPathAnArnoldSkyDomeLight(dagpath);
+    if (isSkyDomeLight) {
+        isRegisteredInSPrims = true;
+    }
+    
+    return isRegisteredInSPrims;
+}
+
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -777,26 +807,31 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
 
     // Not the best implementation performance-wise, as ufeToDagPath converts
     // the UFE path to a string, then does a Dag path lookup with the string.
-    constexpr bool isSprim = false; // Can't handle sprims as of 15-Aug-2023.
-
+    
     auto dagPath = UfeExtensions::ufeToDagPath(appPath);
-    SdfPath primPath = GetPrimPath(dagPath, isSprim);
-    TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
-        .Msg("    mapped to scene index path %s.\n", primPath.GetText());
-  
+    const bool extendToShape = _UseTheShapeDagPath(dagPath);//For Hydra some prims, we need to use the shape dag path not the transform, as this is what gets translated to an hydra path
+    const bool isSprim = _IsDagPathRegisteredInHydraSPrims(dagPath);
+
+    MDagPath   shapeDagPath(dagPath);
+    shapeDagPath.extendToShape();
+
+    SdfPath primPath = GetPrimPath((extendToShape) ? shapeDagPath : dagPath, isSprim);
+    
     //Check if this maya node has a special SdfPath associated with it, this is for custom or maya usd data producers scene indices.
     //The class MhDataProducersMayaNodeToSdfPathRegistry does a mapping between Maya nodes and USD paths.
     //The maya nodes registered in this class are used by data producers as a parent to all
     //primitives. This class is used when the user selects one of these
     //maya nodes to return the matching SdfPath so that all prims child of this maya node are
     //highlighted.
-    MDagPath shapeDagPath(dagPath);
-    shapeDagPath.extendToShape();
+    
     const SdfPath matchingPath = FVP_NS::DataProducersNodeHashCodeToSdfPathRegistry::Instance().GetPath(MObjectHandle(shapeDagPath.node()).hashCode());
     if (! matchingPath.IsEmpty()) {
         primPath = matchingPath;
     }
  
+    TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
+        .Msg("    mapped to scene index path %s.\n", primPath.GetText());
+		
     return Fvp::PrimSelections({Fvp::PrimSelection{primPath}});
 }
 

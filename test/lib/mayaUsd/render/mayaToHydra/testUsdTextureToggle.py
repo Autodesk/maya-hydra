@@ -32,7 +32,8 @@ class TestUsdTextureToggle(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
         # Open simple Maya scene
         testFile = mayaUtils.openTestScene(
                 "testUsdTextureToggle",
-                "testUsdTextureToggle.ma")
+                "testUsdTextureToggle.ma", useTestSettings=False)
+        cmds.grid(toggle=False)
         cmds.refresh()
     
     def setTextureMode(self, enabled):

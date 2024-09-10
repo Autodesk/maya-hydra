@@ -176,6 +176,15 @@ bool SetNodeAttribute(MObject node, std::string attrName, AttrType newValue)
  */
 MObject GetShadingGroupFromShader(const MObject& shader);
 
+/**
+ * @brief Get if this MDagPath is an Arnold sky dome light.
+ *
+ * @param[in] dagPath is a MDagPath
+ *
+ * @return true if the object is a sky dome light, false otherwise
+ */
+bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath);
+
 } // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRALIB_MAYA_UTILS_H
