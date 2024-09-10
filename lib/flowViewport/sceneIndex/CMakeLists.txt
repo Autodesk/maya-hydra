@@ -17,6 +17,7 @@ target_sources(${TARGET_NAME}
     fvpReprSelectorSceneIndex.cpp
     fvpBlockPrimRemovalPropagationSceneIndex.cpp
 	fvpDefaultMaterialSceneIndex.cpp
+    fvpLightsManagementSceneIndex.cpp
 )
 
 set(HEADERS
@@ -35,6 +36,7 @@ set(HEADERS
     fvpReprSelectorSceneIndex.h
     fvpBlockPrimRemovalPropagationSceneIndex.h
 	fvpDefaultMaterialSceneIndex.h
+    fvpLightsManagementSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------
