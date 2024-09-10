@@ -107,6 +107,36 @@ public:
     }
 };
 
+// For some dag paths we use the shape to translate it to an Hydra path
+bool _UseTheShapeDagPath(const MDagPath& dagpath) 
+{ 
+    bool extendToShape = false;
+
+    //So far we only have one case : the Arnold sky dome light
+    const bool isSkyDomeLight = MayaHydra::IsDagPathAnArnoldSkyDomeLight(dagpath);
+    if (isSkyDomeLight) {
+        extendToShape = true;
+    }
+
+    return extendToShape;
+}
+
+//Check if this dag path is registered in Sprims (such as the Arnold sky dome light)
+bool _IsDagPathRegisteredInHydraSPrims(const MDagPath& dagpath)
+{
+    bool isRegisteredInSPrims = false;
+    
+    //So far we only have one case : the Arnold sky dome light
+     
+    // The Arnold skydome light has its shape dag path registered as a Sprim in Hydra
+    const bool isSkyDomeLight = MayaHydra::IsDagPathAnArnoldSkyDomeLight(dagpath);
+    if (isSkyDomeLight) {
+        isRegisteredInSPrims = true;
+    }
+    
+    return isRegisteredInSPrims;
+}
+
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -786,14 +816,13 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
     // the UFE path to a string, then does a Dag path lookup with the string.
     
     auto dagPath = UfeExtensions::ufeToDagPath(appPath);
-    const bool isDomeLight = IsDagPathAnArnoldSkyDomeLight(dagPath);
-    const bool isSprim = isDomeLight;//we will look in sprims only for the sky dome light
+    const bool extendToShape = _UseTheShapeDagPath(dagPath);//For Hydra some prims, we need to use the shape dag path not the transform, as this is what gets translated to an hydra path
+    const bool isSprim = _IsDagPathRegisteredInHydraSPrims(dagPath);
+
     MDagPath   shapeDagPath(dagPath);
     shapeDagPath.extendToShape();
 
-    //For the sky dome light, we want to get it from the Sprims and we are using the dag path shape 
-    // as this is the dag path that gets translated to an Sprim in Hydra
-    SdfPath primPath = GetPrimPath((isDomeLight) ? shapeDagPath : dagPath, isSprim);
+    SdfPath primPath = GetPrimPath((extendToShape) ? shapeDagPath : dagPath, isSprim);
     
     //Check if this maya node has a special SdfPath associated with it, this is for custom or maya usd data producers scene indices.
     //The class MhDataProducersMayaNodeToSdfPathRegistry does a mapping between Maya nodes and USD paths.

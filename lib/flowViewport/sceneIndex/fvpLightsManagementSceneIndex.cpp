@@ -36,29 +36,16 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-bool _IsALight(const TfToken& primType)
-{
-    static const TfTokenVector & lightsToken = HdLightPrimTypeTokens();//Get all light tokens from USD
-    return lightsToken.end() != std::find(lightsToken.begin(), lightsToken.end(), primType);
-}
-
 void _DisableLight(HdSceneIndexPrim& prim)
 {
-    //We don't set the intensity to 0 as for domelights this makes disappear the geometry
     HdContainerDataSourceEditor editor(prim.dataSource);
-    editor.Set(
-        HdLightSchema::GetDefaultLocator().Append(HdLightTokens->ambient),
-        HdRetainedTypedSampledDataSource<float>::New(0.0f)
-    );
-    editor.Set(
-        HdLightSchema::GetDefaultLocator().Append(HdLightTokens->diffuse),
-        HdRetainedTypedSampledDataSource<float>::New(0.f)
-    );
-    editor.Set(
-        HdLightSchema::GetDefaultLocator().Append(HdLightTokens->specular),
-        HdRetainedTypedSampledDataSource<float>::New(0.f)
-    );
-
+    //We don't set the intensity to 0 as for domelights this makes the geometry disappear
+    for (const auto& t : { HdLightTokens->ambient, HdLightTokens->diffuse, HdLightTokens->specular }) {
+        editor.Set(
+            HdLightSchema::GetDefaultLocator().Append(t),
+            HdRetainedTypedSampledDataSource<float>::New(0.0f));
+    }
+    
     prim.dataSource = editor.Finish();
 }
 
@@ -91,7 +78,7 @@ void LightsManagementSceneIndex::_DirtyAllLightsPrims()
     HdSceneIndexObserver::DirtiedPrimEntries entries;
     for (const SdfPath& path : HdSceneIndexPrimView(GetInputSceneIndex())) {
         auto primType = GetInputSceneIndex()->GetPrim(path).primType;
-        if (_IsALight(primType)) {
+        if (HdPrimTypeIsLight(primType)) {
             entries.push_back({ path, HdLightSchema::GetDefaultLocator() });
         }
     }
@@ -107,7 +94,7 @@ HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) co
 {
     auto prim = GetInputSceneIndex()->GetPrim(primPath);
     auto primType = prim.primType;
-     if (! _IsALight(primType)) {
+     if (! HdPrimTypeIsLight(primType)) {
          return prim;//return any non light primitive
      }
      
@@ -125,12 +112,11 @@ HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) co
              if (! _IsDefaultLight(primPath)){
                  _DisableLight(prim);
              }
-             return prim;//This is also handled in renderOverride.cpp with the _hasDefaultLighting member
+             return prim;
          } break;
          case LightingMode::kSelectedLightsOnly: {
-             const Ufe::GlobalSelection::Ptr& globalUfeSelection = Ufe::GlobalSelection::get();
-             const Ufe::Selection&            ufeSelection = *globalUfeSelection;
-             if (0 == ufeSelection.size()) {
+             const Ufe::Selection& ufeSelection = *Ufe::GlobalSelection::get();
+             if (ufeSelection.empty()) {
                  // Nothing is selected
                  _DisableLight(prim);
                  return prim;

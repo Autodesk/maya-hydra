@@ -186,12 +186,12 @@ MObject GetShadingGroupFromShader(const MObject& shader)
 
 bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath) 
 { 
-    static const std::string _aiSkyDomeLight("aiSkyDomeLight");
+    static const MString _aiSkyDomeLight("aiSkyDomeLight");
 
     if (! dagPath.isValid()) return false;
-
-    const std::string fpName = dagPath.fullPathName().asChar();
-    return (fpName.find(_aiSkyDomeLight) != std::string::npos);
+    auto shapeDagPath = dagPath;
+    shapeDagPath.extendToShape();
+    return _aiSkyDomeLight == MFnDependencyNode(shapeDagPath.node()).typeName();
 }
  
 
