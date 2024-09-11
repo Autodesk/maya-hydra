@@ -19,11 +19,17 @@
 #include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 #include "flowViewport/fvpWireframeColorInterface.h"
+#include "wireframeHighlights/baseWireframeHighlightSi.h"
 
+#include <pxr/base/tf/smallVector.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
+#include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/imaging/hd/retainedSceneIndex.h>
+#include <pxr/imaging/hd/sceneIndexObserver.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
+#include <pxr/usd/sdf/path.h>
 
 #include <functional>
 #include <set>
@@ -201,6 +207,66 @@ private:
     // we would have no way of knowing how many times this prim actually uses its selection highlight mirrors. 
     // Keeping track of which selected prims contribute to the prim's highlight solves this problem.
     std::unordered_map<PXR_NS::SdfPath, PXR_NS::SdfPathSet, PXR_NS::SdfPath::Hash> _highlightUsersByPrim;
+
+    // Maps original prims to the selections that have a mirror version of it
+    // std::unordered_map<PXR_NS::SdfPath, std::set<std::pair<PXR_NS::SdfPath, int>>> sdfsdf;
+
+    // // Maps selections to their highlight prims
+    // std::unordered_map<std::pair<PXR_NS::SdfPath, int>, PXR_NS::SdfPathSet> sdf;
+
+    struct SelectionId
+    {
+        PXR_NS::SdfPath primPath;
+        size_t selectionIndex;
+
+        bool operator==(const SelectionId &other) const
+        { 
+            return primPath == other.primPath
+                && selectionIndex == other.selectionIndex;
+        }
+    };
+
+    struct SelectionIdHash
+    {
+        size_t operator()(const SelectionId& selectionId) const noexcept
+        {
+            size_t primPathHash = PXR_NS::SdfPath::Hash{}(selectionId.primPath);
+            return primPathHash ^ (1ULL << selectionId.selectionIndex);
+        }
+    };
+
+    std::unordered_map<PXR_NS::SdfPath, PXR_NS::TfSmallVector<PXR_NS::HdSceneIndexBaseRefPtr, 4>, PXR_NS::SdfPath::Hash> _selectionsToHighlights;
+
+    PXR_NS::HdMergingSceneIndexRefPtr _mergingSceneIndex;
+
+    PXR_NS::SdfPath _selectionHighlightsPrefix = PXR_NS::SdfPath("FlowViewportWireframeSelectionHighlights");
+
+    friend class _MergingSceneIndexObserver;
+    class _MergingSceneIndexObserver : public PXR_NS::HdSceneIndexObserver
+    {
+    public:
+        _MergingSceneIndexObserver(WireframeSelectionHighlightSceneIndex* owner)
+        : _owner(owner) {}
+
+        void PrimsAdded(
+                const HdSceneIndexBase &sender,
+                const AddedPrimEntries &entries) override;
+
+        void PrimsRemoved(
+                const HdSceneIndexBase &sender,
+                const RemovedPrimEntries &entries) override;
+
+        void PrimsDirtied(
+                const HdSceneIndexBase &sender,
+                const DirtiedPrimEntries &entries) override;
+
+        void PrimsRenamed(
+                const HdSceneIndexBase &sender,
+                const RenamedPrimEntries &entries) override;
+    private:
+        WireframeSelectionHighlightSceneIndex* _owner;
+    };
+    _MergingSceneIndexObserver _mergingSceneIndexObserver;
 };
 
 }

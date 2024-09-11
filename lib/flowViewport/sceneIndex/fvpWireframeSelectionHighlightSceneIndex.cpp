@@ -19,6 +19,11 @@
 #include "flowViewport/fvpUtils.h"
 
 #include "flowViewport/debugCodes.h"
+#include "fvpWireframeSelectionHighlightSceneIndex.h"
+#include "wireframeHighlights/meshWireframeHighlightSi.h"
+#include <pxr/imaging/hd/mergingSceneIndex.h>
+#include <pxr/imaging/hd/prefixingSceneIndex.h>
+#include <pxr/usd/sdf/path.h>
 
 #if PXR_VERSION >= 2403
 #include <pxr/imaging/hd/geomSubsetSchema.h>
@@ -329,24 +334,28 @@ WireframeSelectionHighlightSceneIndex(
     , InputSceneIndexUtils(inputSceneIndex)
     , _selection(selection)
     , _wireframeColorInterface(wireframeColorInterface)
+    , _mergingSceneIndexObserver(this)
 {
     TF_AXIOM(_wireframeColorInterface);
 
-    auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
-        if (prim.primType == HdPrimTypeTokens->instancer) {
-            _CreateSelectionHighlightsForInstancer(prim, primPath);
-        }
-        else if (prim.primType == HdPrimTypeTokens->mesh) {
-            _CreateSelectionHighlightsForMesh(prim, primPath);
-        }
-#if PXR_VERSION >= 2403
-        else if (prim.primType == HdPrimTypeTokens->geomSubset) {
-            _CreateSelectionHighlightsForGeomSubset(primPath);
-        }
-#endif
-        return true;
-    };
-    _ForEachPrimInHierarchy(SdfPath::AbsoluteRootPath(), operation);
+    _mergingSceneIndex = HdMergingSceneIndex::New();
+    _mergingSceneIndex->AddObserver(HdSceneIndexObserverPtr(&_mergingSceneIndexObserver));
+
+//     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
+//         if (prim.primType == HdPrimTypeTokens->instancer) {
+//             _CreateSelectionHighlightsForInstancer(prim, primPath);
+//         }
+//         else if (prim.primType == HdPrimTypeTokens->mesh) {
+//             _CreateSelectionHighlightsForMesh(prim, primPath);
+//         }
+// #if PXR_VERSION >= 2403
+//         else if (prim.primType == HdPrimTypeTokens->geomSubset) {
+//             _CreateSelectionHighlightsForGeomSubset(primPath);
+//         }
+// #endif
+//         return true;
+//     };
+//     _ForEachPrimInHierarchy(SdfPath::AbsoluteRootPath(), operation);
 }
 
 // Computes the mask to use for an instancer's selection highlight mirror
@@ -464,6 +473,12 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
     TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
         .Msg("WireframeSelectionHighlightSceneIndex::GetPrim(%s) called.\n", primPath.GetText());
 
+    if (primPath.HasPrefix(_selectionHighlightsPrefix)) {
+        return _mergingSceneIndex->GetPrim(primPath);
+    } else {
+        return GetInputSceneIndex()->GetPrim(primPath);
+    }
+
     if (_IsExcluded(primPath)) {
         return GetInputSceneIndex()->GetPrim(primPath);
     }
@@ -514,6 +529,15 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
 SdfPathVector
 WireframeSelectionHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath) const
 {
+    auto children = GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    if (primPath == SdfPath::AbsoluteRootPath()) {
+        children.push_back(_selectionHighlightsPrefix);
+        return children;
+    } else if (primPath.HasPrefix(_selectionHighlightsPrefix)) {
+        return _mergingSceneIndex->GetChildPrimPaths(primPath);
+    } else {
+        return children;
+    }
     // When within a selection highlight mirror hierarchy, query the corresponding original prim's children
     SdfPath selectionHighlightMirrorAncestor = _FindSelectionHighlightMirrorAncestor(primPath);
     if (!selectionHighlightMirrorAncestor.IsEmpty()) {
@@ -677,6 +701,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsAdded(
         .Msg("WireframeSelectionHighlightSceneIndex::_PrimsAdded() called.\n");
 
     _SendPrimsAdded(entries);
+    return;
     for (const auto& entry : entries) {
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
         if (prim.primType == HdPrimTypeTokens->instancer) {
@@ -700,6 +725,37 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
 {
     TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
         .Msg("WireframeSelectionHighlightSceneIndex::_PrimsDirtied() called.\n");
+
+    for (const auto& entry : entries) {
+        if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
+            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+
+            HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
+            bool isSelected = selectionsSchema.IsDefined() && selectionsSchema.GetNumElements() > 0;
+
+            if (!isSelected) {
+                auto potato = _selectionsToHighlights.find(entry.primPath);
+                if (potato != _selectionsToHighlights.end()) {
+                    for (const auto& si : potato->second) {
+                        _mergingSceneIndex->RemoveInputScene(si);
+                    }
+                }
+                _selectionsToHighlights.erase(entry.primPath);
+            }
+            else {
+                if (prim.primType == HdPrimTypeTokens->mesh) {
+                    SdfPath selectionPath = entry.primPath; // TODO : add selection index
+                    auto newSi = HdPrefixingSceneIndex::New(HdPrefixingSceneIndex::New(MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath), selectionPath), _selectionHighlightsPrefix);
+                    _selectionsToHighlights[entry.primPath].push_back(newSi);
+                    _mergingSceneIndex->AddInputScene(newSi, SdfPath::AbsoluteRootPath());
+                }
+            }
+        }
+    }
+
+
+    _SendPrimsDirtied(entries);
+    return;
 
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
     std::vector<SdfPath> selectionHighlightsToRebuild;
@@ -819,6 +875,9 @@ WireframeSelectionHighlightSceneIndex::_PrimsRemoved(
 {
     TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
         .Msg("WireframeSelectionHighlightSceneIndex::_PrimsRemoved() called.\n");
+
+    _SendPrimsRemoved(entries);
+    return;
 
     for (const auto& entry : entries) {
         // Collect and delete selection highlights for all prims rooted under the removed prim
@@ -1134,6 +1193,38 @@ WireframeSelectionHighlightSceneIndex::_CreateSelectionHighlightsForGeomSubset(c
     if (_selection->IsFullySelected(geomSubsetPath)) {
         _AddSelectionHighlightUser(geomSubsetPath.GetParentPath(), geomSubsetPath);
     }
+}
+
+void
+WireframeSelectionHighlightSceneIndex::_MergingSceneIndexObserver::PrimsAdded(
+        const HdSceneIndexBase &sender,
+        const AddedPrimEntries &entries)
+{
+    _owner->_SendPrimsAdded(entries);
+}
+
+void
+WireframeSelectionHighlightSceneIndex::_MergingSceneIndexObserver::PrimsRemoved(
+        const HdSceneIndexBase &sender,
+        const RemovedPrimEntries &entries)
+{
+    _owner->_SendPrimsRemoved(entries);
+}
+
+void
+WireframeSelectionHighlightSceneIndex::_MergingSceneIndexObserver::PrimsDirtied(
+        const HdSceneIndexBase &sender,
+        const DirtiedPrimEntries &entries)
+{
+    _owner->_SendPrimsDirtied(entries);
+}
+
+void
+WireframeSelectionHighlightSceneIndex::_MergingSceneIndexObserver::PrimsRenamed(
+    const HdSceneIndexBase &sender,
+    const HdSceneIndexObserver::RenamedPrimEntries &entries)
+{
+    _owner->_SendPrimsRenamed(entries);
 }
 
 }

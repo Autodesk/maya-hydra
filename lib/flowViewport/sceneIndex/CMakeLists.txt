@@ -54,3 +54,5 @@ install(FILES ${HEADERS}
     DESTINATION 
         ${CMAKE_INSTALL_PREFIX}/include/flowViewport/sceneIndex
 )
+
+add_subdirectory(wireframeHighlights)
