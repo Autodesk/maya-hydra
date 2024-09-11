@@ -334,11 +334,12 @@ WireframeSelectionHighlightSceneIndex(
     , InputSceneIndexUtils(inputSceneIndex)
     , _selection(selection)
     , _wireframeColorInterface(wireframeColorInterface)
+    , _mergingSceneIndex(HdMergingSceneIndex::New())
+    , _selectionHighlightsPrefix("/FlowViewportWireframeSelectionHighlights")
     , _mergingSceneIndexObserver(this)
 {
     TF_AXIOM(_wireframeColorInterface);
 
-    _mergingSceneIndex = HdMergingSceneIndex::New();
     _mergingSceneIndex->AddObserver(HdSceneIndexObserverPtr(&_mergingSceneIndexObserver));
 
 //     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
@@ -356,6 +357,11 @@ WireframeSelectionHighlightSceneIndex(
 //         return true;
 //     };
 //     _ForEachPrimInHierarchy(SdfPath::AbsoluteRootPath(), operation);
+}
+
+WireframeSelectionHighlightSceneIndex::~WireframeSelectionHighlightSceneIndex()
+{
+    _mergingSceneIndex.Reset();
 }
 
 // Computes the mask to use for an instancer's selection highlight mirror

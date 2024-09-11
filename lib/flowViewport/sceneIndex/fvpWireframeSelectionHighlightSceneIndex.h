@@ -77,6 +77,9 @@ public:
     );
 
     FVP_API
+    ~WireframeSelectionHighlightSceneIndex() override;
+
+    FVP_API
     static
     const PXR_NS::HdDataSourceLocator& ReprSelectorLocator();
 
@@ -239,7 +242,7 @@ private:
 
     PXR_NS::HdMergingSceneIndexRefPtr _mergingSceneIndex;
 
-    PXR_NS::SdfPath _selectionHighlightsPrefix = PXR_NS::SdfPath("FlowViewportWireframeSelectionHighlights");
+    PXR_NS::SdfPath _selectionHighlightsPrefix;
 
     friend class _MergingSceneIndexObserver;
     class _MergingSceneIndexObserver : public PXR_NS::HdSceneIndexObserver
