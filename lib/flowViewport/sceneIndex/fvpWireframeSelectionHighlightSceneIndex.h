@@ -20,6 +20,7 @@
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 #include "flowViewport/fvpWireframeColorInterface.h"
 #include "wireframeHighlights/baseWireframeHighlightSi.h"
+#include "wireframeHighlights/piInstancerWireframeHighlightSi.h"
 
 #include <pxr/base/tf/smallVector.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
@@ -45,13 +46,6 @@ class Selection;
 class WireframeSelectionHighlightSceneIndex;
 typedef PXR_NS::TfRefPtr<WireframeSelectionHighlightSceneIndex> WireframeSelectionHighlightSceneIndexRefPtr;
 typedef PXR_NS::TfRefPtr<const WireframeSelectionHighlightSceneIndex> WireframeSelectionHighlightSceneIndexConstRefPtr;
-
-enum SelectionHighlightsCollectionDirection {
-    None = 0,
-    Prototypes = 1 << 0,
-    InstancedBy = 1 << 1,
-    Bidirectional = Prototypes | InstancedBy
-};
 
 enum HighlightType {
     Lead = 0,

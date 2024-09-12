@@ -9,6 +9,7 @@
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
 
+#include <algorithm>
 #include <iostream>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -107,12 +108,21 @@ HdSceneIndexPrim PointInstancerWireframeHighlightSceneIndex::GetPrim(const SdfPa
 
 SdfPathVector PointInstancerWireframeHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath) const
 {
-    for (const auto& conservedPaths : _primPathsToConserve) {
-        if (conservedPaths.HasPrefix(primPath) || primPath.HasPrefix(conservedPaths)) {
-            return GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    if (_IsRelevantPath(primPath)) {
+        return GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    }
+
+    SdfPathVector originalChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    SdfPathVector prunedChildPaths;
+    for (const auto& originalChildPath : originalChildPaths) {
+        for (const auto& conservedPath : _primPathsToConserve) {
+            if (conservedPath.HasPrefix(originalChildPath)) {
+                prunedChildPaths.push_back(originalChildPath);
+                break;
+            }
         }
     }
-    return {};
+    return prunedChildPaths;
 }
 
 PointInstancerWireframeHighlightSceneIndex::PointInstancerWireframeHighlightSceneIndex(
@@ -126,7 +136,7 @@ PointInstancerWireframeHighlightSceneIndex::PointInstancerWireframeHighlightScen
     _selectionIndex(selectionIndex),
     _wireframeColorInterface(wireframeColorInterface)
 {
-
+    _CollectInstancingPaths(instancerPrimPath, SelectionHighlightsCollectionDirection::Bidirectional, _primPathsToConserve);
 }
 
 void PointInstancerWireframeHighlightSceneIndex::_PrimsAdded(

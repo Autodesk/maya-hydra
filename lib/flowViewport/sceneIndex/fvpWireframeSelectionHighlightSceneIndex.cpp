@@ -21,6 +21,7 @@
 #include "flowViewport/debugCodes.h"
 #include "fvpWireframeSelectionHighlightSceneIndex.h"
 #include "wireframeHighlights/meshWireframeHighlightSi.h"
+#include "wireframeHighlights/piInstancerWireframeHighlightSi.h"
 #include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
@@ -767,10 +768,10 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
                         wireframeHighlightSi = MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, _wireframeColorInterface);
                         wireframeHighlightSi->SetDisplayName("MeshWireframeHighlightSceneIndex");
                     }
-                    // else if (prim.primType == HdPrimTypeTokens->instancer) {
-                    //     wireframeHighlightSi = MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, _wireframeColorInterface));
-                    //     wireframeHighlightSi->SetDisplayName("MeshWireframeHighlightSceneIndex");
-                    // }
+                    else if (prim.primType == HdPrimTypeTokens->instancer) {
+                        wireframeHighlightSi = PointInstancerWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, iSelection, _wireframeColorInterface);
+                        wireframeHighlightSi->SetDisplayName("PointInstancerWireframeHighlightSceneIndex");
+                    }
 
                     if (wireframeHighlightSi) {
                         wireframeHighlightSi = HdPrefixingSceneIndex::New(wireframeHighlightSi, selectionPath);
