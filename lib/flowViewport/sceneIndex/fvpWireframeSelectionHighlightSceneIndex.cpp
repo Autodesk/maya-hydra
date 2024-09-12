@@ -43,6 +43,7 @@
 
 #include <unordered_set>
 #include <stack>
+#include <iostream>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -340,7 +341,8 @@ WireframeSelectionHighlightSceneIndex(
 {
     TF_AXIOM(_wireframeColorInterface);
 
-    _mergingSceneIndex->AddObserver(HdSceneIndexObserverPtr(&_mergingSceneIndexObserver));
+    _prefixingSceneIndex = HdPrefixingSceneIndex::New(_mergingSceneIndex, _selectionHighlightsPrefix);
+    _prefixingSceneIndex->AddObserver(HdSceneIndexObserverPtr(&_mergingSceneIndexObserver));
 
 //     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
 //         if (prim.primType == HdPrimTypeTokens->instancer) {
@@ -361,6 +363,7 @@ WireframeSelectionHighlightSceneIndex(
 
 WireframeSelectionHighlightSceneIndex::~WireframeSelectionHighlightSceneIndex()
 {
+    _prefixingSceneIndex.Reset();
     _mergingSceneIndex.Reset();
 }
 
@@ -480,7 +483,7 @@ WireframeSelectionHighlightSceneIndex::GetPrim(const SdfPath &primPath) const
         .Msg("WireframeSelectionHighlightSceneIndex::GetPrim(%s) called.\n", primPath.GetText());
 
     if (primPath.HasPrefix(_selectionHighlightsPrefix)) {
-        return _mergingSceneIndex->GetPrim(primPath);
+        return _prefixingSceneIndex->GetPrim(primPath);
     } else {
         return GetInputSceneIndex()->GetPrim(primPath);
     }
@@ -540,7 +543,7 @@ WireframeSelectionHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath
         children.push_back(_selectionHighlightsPrefix);
         return children;
     } else if (primPath.HasPrefix(_selectionHighlightsPrefix)) {
-        return _mergingSceneIndex->GetChildPrimPaths(primPath);
+        return _prefixingSceneIndex->GetChildPrimPaths(primPath);
     } else {
         return children;
     }
@@ -742,18 +745,22 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             if (!isSelected) {
                 auto potato = _selectionsToHighlights.find(entry.primPath);
                 if (potato != _selectionsToHighlights.end()) {
+                    std::cout << "Removing highlight SIs" << std::endl;
                     for (const auto& si : potato->second) {
+                        std::cout << "Removing " << si->GetDisplayName() << std::endl;
                         _mergingSceneIndex->RemoveInputScene(si);
                     }
                 }
+                std::cout << "Erasing" << std::endl;
                 _selectionsToHighlights.erase(entry.primPath);
             }
             else {
                 if (prim.primType == HdPrimTypeTokens->mesh) {
                     SdfPath selectionPath = entry.primPath; // TODO : add selection index
-                    auto newSi = HdPrefixingSceneIndex::New(HdPrefixingSceneIndex::New(MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath), selectionPath), _selectionHighlightsPrefix);
+                    auto newSi = HdPrefixingSceneIndex::New(MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath), selectionPath);
+                    newSi->SetDisplayName("MyWireframeSceneIndex");
                     _selectionsToHighlights[entry.primPath].push_back(newSi);
-                    _mergingSceneIndex->AddInputScene(newSi, SdfPath::AbsoluteRootPath());
+                    _mergingSceneIndex->AddInputScene(_selectionsToHighlights[entry.primPath].back(), SdfPath::AbsoluteRootPath());
                 }
             }
         }

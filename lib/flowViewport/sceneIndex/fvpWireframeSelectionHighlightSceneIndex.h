@@ -25,6 +25,7 @@
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/mergingSceneIndex.h>
+#include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
 #include <pxr/imaging/hd/sceneIndexObserver.h>
@@ -241,6 +242,7 @@ private:
     std::unordered_map<PXR_NS::SdfPath, PXR_NS::TfSmallVector<PXR_NS::HdSceneIndexBaseRefPtr, 4>, PXR_NS::SdfPath::Hash> _selectionsToHighlights;
 
     PXR_NS::HdMergingSceneIndexRefPtr _mergingSceneIndex;
+    PXR_NS::HdPrefixingSceneIndexRefPtr _prefixingSceneIndex;
 
     PXR_NS::SdfPath _selectionHighlightsPrefix;
 
