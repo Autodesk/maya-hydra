@@ -51,6 +51,8 @@ public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 };
 
+PXR_NS::HdContainerDataSourceHandle MakeWireframe(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color);
+
 }
 
 #endif // FVP_BASE_WIREFRAME_HIGHLIGHT_SCENE_INDEX_H

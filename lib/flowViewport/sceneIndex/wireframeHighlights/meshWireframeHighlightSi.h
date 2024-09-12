@@ -88,6 +88,9 @@ protected:
 
 private:
     PXR_NS::SdfPath _meshPrimPath;
+
+    FVP_API
+    PXR_NS::SdfPath _MeshNamePath() const;
 };
 
 }

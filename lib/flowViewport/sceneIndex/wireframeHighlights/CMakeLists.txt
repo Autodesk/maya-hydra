@@ -3,6 +3,7 @@
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME}
     PRIVATE
+    baseWireframeHighlightSi.cpp
     meshWireframeHighlightSi.cpp
 )
 
