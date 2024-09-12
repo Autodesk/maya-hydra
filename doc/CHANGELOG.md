@@ -1,5 +1,49 @@
 # Changelog
 
+## [v0.6.3] - 2024-09-10
+
+**Build:**
+* Support for controlled unit test disabling [#134](https://github.com/Autodesk/maya-hydra/pull/134)
+* Test single picking [#145](https://github.com/Autodesk/maya-hydra/pull/145)
+* Create a unit test for the shaded display mode with a texture image file [#151](https://github.com/Autodesk/maya-hydra/pull/151)
+* Update maya-hydra-preflight-launcher.yml [#166](https://github.com/Autodesk/maya-hydra/pull/166)
+ 
+**Flow Viewport Toolkit:**
+* Isolate select scene index, with command-based implementation [#164](https://github.com/Autodesk/maya-hydra/pull/164)
+ 
+**Miscellaneous:**
+* Added missing space in resource path for Mac/Linux [#137](https://github.com/Autodesk/maya-hydra/pull/137)
+* Added functionality for selection highlighting for point instancing of meshes [#132](https://github.com/Autodesk/maya-hydra/pull/132)
+* Added convenience mayaHydra.h include to api.h [#136](https://github.com/Autodesk/maya-hydra/pull/136)
+* Added code coverage crash workaround to prune textures scene index [#138](https://github.com/Autodesk/maya-hydra/pull/138)
+* Added support picking & selecting faces for Maya meshes in Hydra viewport [#139](https://github.com/Autodesk/maya-hydra/pull/139)
+* Handle hierarchical transform & visibility changes for plugin nodes [#141](https://github.com/Autodesk/maya-hydra/pull/141)
+* Added a flow viewport example that uses a custom GLSLFX shader for Storm [#142](https://github.com/Autodesk/maya-hydra/pull/142)
+* Added GeomSubsets picking filter + Fix multi-selection when single-picking [#143](https://github.com/Autodesk/maya-hydra/pull/143)
+* Added support to use face selection material during Default Material override [#146](https://github.com/Autodesk/maya-hydra/pull/146)
+* GeomSubsets wireframe highlighting [#148](https://github.com/Autodesk/maya-hydra/pull/148)
+* Implemented custom data provider picking and selection highlighting [#150](https://github.com/Autodesk/maya-hydra/pull/150)
+* Cmake changes pertaining to OneTBB update [#154](https://github.com/Autodesk/maya-hydra/pull/154)
+* Refactored Repr Selector Scene Index to send Dirty Notification [#153](https://github.com/Autodesk/maya-hydra/pull/153)
+* Added Maya command plugin to query build info [#163](https://github.com/Autodesk/maya-hydra/pull/163)
+* Added unit test for Default Lighting with UsdStage [#168](https://github.com/Autodesk/maya-hydra/pull/168)
+* Native instance prototypes picking/selection [#165](https://github.com/Autodesk/maya-hydra/pull/165)
+* Updated build.md [#155](https://github.com/Autodesk/maya-hydra/pull/155)
+* Added support for Maya lighting modes for USD and dome lights [#167](https://github.com/Autodesk/maya-hydra/pull/167)
+ 
+**Bugfix:**
+* Fixed aiSkyDomeLight bugs [#135](https://github.com/Autodesk/maya-hydra/pull/135)
+* Fixed texture mode toggle on USD data [#144](https://github.com/Autodesk/maya-hydra/pull/144)
+* Fixed Viewport Switch Crash [#156](https://github.com/Autodesk/maya-hydra/pull/156)
+* Fixed instances selections being all wiped on an instancer when only one is removed [#158](https://github.com/Autodesk/maya-hydra/pull/158)
+* Fixed manual lifetime management of MayaHydraSceneIndex's adapters [#161](https://github.com/Autodesk/maya-hydra/pull/161)
+* Fixed crash when traversing prototype prims without prototype roots for highlighting [#159](https://github.com/Autodesk/maya-hydra/pull/159)
+* Fixed issue when selecting the maya node of a scene producer scene index should highlight the prims [#162](https://github.com/Autodesk/maya-hydra/pull/162)
+* Fixed face selection shader to behave as an unlit shader [#147](https://github.com/Autodesk/maya-hydra/pull/147)
+ 
+**Documentation:**
+* Created security.md file [#152](https://github.com/Autodesk/maya-hydra/pull/152)
+
 ## [v0.6.2] - 2024-06-06
 
 **Build:**
