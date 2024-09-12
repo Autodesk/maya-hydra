@@ -691,7 +691,7 @@ MStatus MtohRenderOverride::Render(
             }
             //Update the leadObjectTacker in case it could not find the current lead object which could be in a custom data producer scene index or a maya usd proxy shape scene index
             if (_leadObjectPathTracker){
-                _leadObjectPathTracker->updatePrimPaths();
+                _leadObjectPathTracker->updatePrimSelections();
             }
         }
     }

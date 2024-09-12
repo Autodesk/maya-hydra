@@ -55,11 +55,11 @@ public:
     void setLeadObjectUfePath(const Ufe::Path& newLeadObjectUfePath);
 
     MAYAHYDRALIB_API
-    void updatePrimPaths(); // For example : this is called after the data producer scene indices are loaded
+    void updatePrimSelections(); // For example : this is called after the data producer scene indices are loaded
 
 private:
     const Fvp::PathInterface* const _pathInterface {nullptr};
-    PXR_NS::SdfPathVector           _leadObjectPrimPaths;
+    Fvp::PrimSelections             _leadObjectPrimSelections;
     Ufe::Observer::Ptr              _ufeSelectionObserver {nullptr};
     Ufe::Path                       _leadObjectUfePath;
     const MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex;

@@ -2,6 +2,7 @@
 #include "baseWireframeHighlightSi.h"
 #include <pxr/base/gf/vec4f.h>
 #include <pxr/imaging/hd/sceneIndex.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
 
@@ -13,9 +14,10 @@ namespace FVP_NS_DEF {
 
 HdSceneIndexBaseRefPtr MeshWireframeHighlightSceneIndex::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
-    const SdfPath& meshPrimPath)
+    const SdfPath& meshPrimPath,
+    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface)
 {
-    return TfCreateRefPtr(new MeshWireframeHighlightSceneIndex(inputSceneIndex, meshPrimPath));
+    return TfCreateRefPtr(new MeshWireframeHighlightSceneIndex(inputSceneIndex, meshPrimPath, wireframeColorInterface));
 }
 
 SdfPath MeshWireframeHighlightSceneIndex::_MeshNamePath() const
@@ -29,7 +31,7 @@ HdSceneIndexPrim MeshWireframeHighlightSceneIndex::GetPrim(const SdfPath &primPa
     if (primPath.HasPrefix(_MeshNamePath())) {
         std::cout << "Returning prim" << std::endl;
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath.ReplacePrefix(_MeshNamePath(), _meshPrimPath));
-        prim.dataSource = MakeWireframe(prim.dataSource, GfVec4f(1.0, 0, 0, 1.0));
+        prim.dataSource = MakeWireframe(prim.dataSource, _wireframeColorInterface->getWireframeColor(_meshPrimPath));
         return prim;
     }
     return {};
@@ -57,10 +59,12 @@ SdfPathVector MeshWireframeHighlightSceneIndex::GetChildPrimPaths(const SdfPath 
 
 MeshWireframeHighlightSceneIndex::MeshWireframeHighlightSceneIndex(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
-    const SdfPath& meshPrimPath
+    const SdfPath& meshPrimPath,
+    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
 ) : HdSingleInputFilteringSceneIndexBase(inputSceneIndex),
     InputSceneIndexUtils(inputSceneIndex),
-    _meshPrimPath(meshPrimPath)
+    _meshPrimPath(meshPrimPath),
+    _wireframeColorInterface(wireframeColorInterface)
 {
 
 }

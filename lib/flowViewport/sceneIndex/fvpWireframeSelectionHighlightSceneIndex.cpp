@@ -757,7 +757,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             else {
                 if (prim.primType == HdPrimTypeTokens->mesh) {
                     SdfPath selectionPath = entry.primPath; // TODO : add selection index
-                    auto newSi = HdPrefixingSceneIndex::New(MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath), selectionPath);
+                    auto newSi = HdPrefixingSceneIndex::New(MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, _wireframeColorInterface), selectionPath);
                     newSi->SetDisplayName("MyWireframeSceneIndex");
                     _selectionsToHighlights[entry.primPath].push_back(newSi);
                     _mergingSceneIndex->AddInputScene(_selectionsToHighlights[entry.primPath].back(), SdfPath::AbsoluteRootPath());

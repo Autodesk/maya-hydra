@@ -20,6 +20,7 @@
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 #include "flowViewport/fvpWireframeColorInterface.h"
 
+#include <pxr/base/gf/vec4f.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -54,7 +55,8 @@ public:
     FVP_API
     static PXR_NS::HdSceneIndexBaseRefPtr New(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
-        const PXR_NS::SdfPath& meshPrimPath
+        const PXR_NS::SdfPath& meshPrimPath,
+        const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
 
     FVP_API
@@ -68,7 +70,8 @@ protected:
     FVP_API
     MeshWireframeHighlightSceneIndex(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
-        const PXR_NS::SdfPath& meshPrimPath
+        const PXR_NS::SdfPath& meshPrimPath,
+        const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
 
     FVP_API
@@ -88,6 +91,7 @@ protected:
 
 private:
     PXR_NS::SdfPath _meshPrimPath;
+    const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 
     FVP_API
     PXR_NS::SdfPath _MeshNamePath() const;

@@ -81,9 +81,9 @@ MhLeadObjectPathTracker::MhLeadObjectPathTracker(const HdSceneIndexBaseRefPtr& s
         const Ufe::Selection& selection = *(ufeSelection);
         auto leadObjectSceneItem = selection.back();//get last selected
         _leadObjectUfePath = leadObjectSceneItem->path();
-        //_leadObjectPrimPaths can be empty with a valid _leadObjectUfePath when the lead object is in a data producer scene index not yet added to the merging scene index
-        //This is fixed at some point by calling updatePrimPaths()
-        _leadObjectPrimPaths = _pathInterface->SceneIndexPaths(_leadObjectUfePath);
+        //_leadObjectPrimSelections can be empty with a valid _leadObjectUfePath when the lead object is in a data producer scene index not yet added to the merging scene index
+        //This is fixed at some point by calling updatePrimSelections()
+        _leadObjectPrimSelections = _pathInterface->UfePathToPrimSelections(_leadObjectUfePath);
     }
 
    // Add ourself as an observer to the selection
@@ -99,10 +99,10 @@ MhLeadObjectPathTracker::~MhLeadObjectPathTracker()
 
 bool MhLeadObjectPathTracker::isLeadObjectPrim(const PXR_NS::SdfPath& primPath) const
 {
-    //_leadObjectPrimPaths can be hierarchy paths, so we need to check if the primPath is a prefix
+    //_leadObjectPrimSelections can be hierarchy paths, so we need to check if the primPath is a prefix
     //of a lead object prim path
-    for (const auto& leadObjectPrimPath : _leadObjectPrimPaths) {
-        if (primPath.HasPrefix(leadObjectPrimPath)) {
+    for (const auto& leadObjectPrimPath : _leadObjectPrimSelections) {
+        if (primPath.HasPrefix(leadObjectPrimPath.primPath)) {
             return true;
         }
     }
@@ -116,22 +116,22 @@ void MhLeadObjectPathTracker::setLeadObjectUfePath(const Ufe::Path& newLeadObjec
        return;
     }
     
-    auto oldLeadObjectPrimPaths = _leadObjectPrimPaths;
+    auto oldLeadObjectPrimSelections = _leadObjectPrimSelections;
 
     _leadObjectUfePath  = newLeadObjectUfePath;
-    _leadObjectPrimPaths = _pathInterface->SceneIndexPaths(_leadObjectUfePath);
+    _leadObjectPrimSelections = _pathInterface->UfePathToPrimSelections(_leadObjectUfePath);
 
     // Dirty the previous lead object
     if(_dirtyLeadObjectSceneIndex){
-        _dirtyLeadObjectSceneIndex->dirtyLeadObjectRelatedPrims(oldLeadObjectPrimPaths, _leadObjectPrimPaths);
+        _dirtyLeadObjectSceneIndex->dirtyLeadObjectRelatedSelections(oldLeadObjectPrimSelections, _leadObjectPrimSelections);
     }
 }
 
-void MhLeadObjectPathTracker::updatePrimPaths() 
+void MhLeadObjectPathTracker::updatePrimSelections() 
 { 
    // Update the lead object prim paths in case it was not valid yet
-    if ( (_leadObjectUfePath.size() > 0) && _leadObjectPrimPaths.empty()) {
-        _leadObjectPrimPaths = _pathInterface->SceneIndexPaths(_leadObjectUfePath);
+    if ( (_leadObjectUfePath.size() > 0) && _leadObjectPrimSelections.empty()) {
+        _leadObjectPrimSelections = _pathInterface->UfePathToPrimSelections(_leadObjectUfePath);
     }
 }
 
