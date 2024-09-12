@@ -21,9 +21,11 @@
 #include "flowViewport/debugCodes.h"
 #include "fvpWireframeSelectionHighlightSceneIndex.h"
 #include "wireframeHighlights/meshWireframeHighlightSi.h"
+#include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/usd/sdf/path.h>
+#include <string>
 
 #if PXR_VERSION >= 2403
 #include <pxr/imaging/hd/geomSubsetSchema.h>
@@ -740,9 +742,10 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
 
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
-            bool isSelected = selectionsSchema.IsDefined() && selectionsSchema.GetNumElements() > 0;
+            //bool isSelected = selectionsSchema.IsDefined() && selectionsSchema.GetNumElements() > 0;
 
-            if (!isSelected) {
+            // For now, wipe and rebuild selection every time. Support 
+            //if (!isSelected) {
                 auto potato = _selectionsToHighlights.find(entry.primPath);
                 if (potato != _selectionsToHighlights.end()) {
                     std::cout << "Removing highlight SIs" << std::endl;
@@ -753,16 +756,18 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
                 }
                 std::cout << "Erasing" << std::endl;
                 _selectionsToHighlights.erase(entry.primPath);
-            }
-            else {
-                if (prim.primType == HdPrimTypeTokens->mesh) {
-                    SdfPath selectionPath = entry.primPath; // TODO : add selection index
-                    auto newSi = HdPrefixingSceneIndex::New(MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, _wireframeColorInterface), selectionPath);
-                    newSi->SetDisplayName("MyWireframeSceneIndex");
-                    _selectionsToHighlights[entry.primPath].push_back(newSi);
-                    _mergingSceneIndex->AddInputScene(_selectionsToHighlights[entry.primPath].back(), SdfPath::AbsoluteRootPath());
+            //}
+            //else {
+                for (size_t iSelection = 0; iSelection < selectionsSchema.GetNumElements(); iSelection++) {
+                    if (prim.primType == HdPrimTypeTokens->mesh) {
+                        SdfPath selectionPath = entry.primPath.AppendPath(SdfPath("Selection_" + std::to_string(iSelection)));
+                        auto newSi = HdPrefixingSceneIndex::New(MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, _wireframeColorInterface), selectionPath);
+                        newSi->SetDisplayName("MyWireframeSceneIndex");
+                        _selectionsToHighlights[entry.primPath].push_back(newSi);
+                        _mergingSceneIndex->AddInputScene(_selectionsToHighlights[entry.primPath].back(), SdfPath::AbsoluteRootPath());
+                    }
                 }
-            }
+            //}
         }
     }
 
