@@ -57,7 +57,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
-    cpp/testIsolateSelect.py
     cpp/testMayaSceneFlattening.py
     cpp/testMayaUsdUfeItems.py
     cpp/testMergingSceneIndex.py
@@ -83,6 +82,12 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testSceneIndexDirtying.py
     cpp/testGeomSubsetsWireframeHighlight.py
 )
+
+if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
+        cpp/testIsolateSelect.py
+    )
+endif()
 
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.
 if(MayaUsd_FOUND)

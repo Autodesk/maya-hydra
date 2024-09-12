@@ -46,13 +46,16 @@
 #include <flowViewport/selection/fvpSelection.h>
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h>
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
 #include <flowViewport/sceneIndex/fvpIsolateSelectSceneIndex.h>
+#endif
 #include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -171,6 +174,7 @@ void replaceSelectionTask(PXR_NS::HdTaskSharedPtrVector* tasks)
     *found = HdTaskSharedPtr(new Fvp::SelectionTask);
 }
 
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
 std::string getRenderingDestination(
     const MHWRender::MFrameContext* frameContext
 )
@@ -180,6 +184,7 @@ std::string getRenderingDestination(
     frameContext->renderingDestination(viewportId);
     return std::string(viewportId.asChar());
 }
+#endif
 
 inline Fvp::LightsManagementSceneIndex::LightingMode convertFromMayaLightingModeToFlowViewportLightMode(MFrameContext::LightingMode mayaLightingMode) 
 { 
@@ -340,6 +345,12 @@ MtohRenderOverride::~MtohRenderOverride()
 
     if (_timerCallback)
         MMessage::removeCallback(_timerCallback);
+
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    if (_viewSelectedChangedCb) {
+        MMessage::removeCallback(_viewSelectedChangedCb);
+    }
+#endif
 
     constexpr bool fullReset = true;
     ClearHydraResources(fullReset);
@@ -764,6 +775,7 @@ MStatus MtohRenderOverride::Render(
             TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
                 .Msg("Re-using existing scene index chain to render %s\n", panelNameStr.c_str());
 
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
             // Make sure the isolate selection scene index set to the proper
             // isolate selection.  We currently have a single scene index tree,
             // thus a single isolate select scene index is common to and
@@ -778,9 +790,11 @@ MStatus MtohRenderOverride::Render(
                 isSi->SetViewport(panelNameStr, isolateSelection);
             }
             else {
+                // This case includes disabled (null pointer) isolate selection.
                 TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
-                    .Msg("Re-using isolate selection %p\n", &*isolateSelection);
+                    .Msg("Re-using isolate selection %p\n", (isolateSelection ? &*isolateSelection : (void*) 0));
             }
+#endif
         }
     }
 
@@ -1188,10 +1202,11 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 {
     //This function is where happens the ordering of filtering scene indices that are after the merging scene index
     //We use as its input scene index : _inputSceneIndexOfFilteringSceneIndicesChain
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
     auto viewportId = getRenderingDestination(getFrameContext());
 
     // Add isolate select scene index.
-    auto& perVpDataMgr = Fvp::PerViewportDataManager::Get();
+    auto& perVpDataMgr = Fvp::ViewportDataMgr::Get();
     auto selection = perVpDataMgr.GetOrCreateIsolateSelection(viewportId);
     auto isSi = Fvp::IsolateSelectSceneIndex::New(
         viewportId, selection, _inputSceneIndexOfFilteringSceneIndicesChain);
@@ -1199,6 +1214,9 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     // all viewports.
     perVpDataMgr.SetIsolateSelectSceneIndex(isSi);
     _lastFilteringSceneIndexBeforeCustomFiltering = isSi;
+#else
+    _lastFilteringSceneIndexBeforeCustomFiltering = _inputSceneIndexOfFilteringSceneIndicesChain;
+#endif    
 
     // Add display style scene index
     _lastFilteringSceneIndexBeforeCustomFiltering = _displayStyleSceneIndex =
@@ -1375,6 +1393,16 @@ MStatus MtohRenderOverride::setup(const MString& destination)
 
         _renderPanelCallbacks.emplace_back(destination, newCallbacks);
     }
+
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    if (!_viewSelectedChangedCb) {
+        _viewSelectedChangedCb = MUiMessage::add3dViewSelectedChangedCallback(
+            _ViewSelectedChangedCb, this, &status);
+        if (status != MStatus::kSuccess) {
+            return status;
+        }
+    }
+#endif
 
     auto* renderer = MHWRender::MRenderer::theRenderer();
     if (renderer == nullptr) {
@@ -1724,6 +1752,56 @@ void MtohRenderOverride::_RenderOverrideChangedCallback(
         instance->_RemovePanel(panelName);
     }
 }
+
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+/* static */
+void MtohRenderOverride::_ViewSelectedChangedCb(
+    const MString& viewName,
+    bool           viewSelectedObjectsChanged,
+    void*          /* data */
+)
+{
+    M3dView view;
+    if (!TF_VERIFY(M3dView::getM3dViewFromModelPanel(viewName, view) == MS::kSuccess, 
+                   "No view found for view name %.", viewName.asChar())) {
+        return;
+    }
+
+    // The M3dView returns the list of view selected objects as strings.
+    // If isolate select is turned off, we want to disable isolate selection.
+    // Otherwise, replace with what is in the M3dView.
+    auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
+    if (!view.viewSelected()) {
+        vpDataMgr.DisableIsolateSelection(viewName.asChar());
+        return;
+    }
+
+    // The M3dView returns the list of view selected objects as strings.
+    // Loop over the view selected objects and try to create UFE paths from
+    // them.  If there is more than one element to the MStringArray, this
+    // indicates Maya components.  Currently not supporting components,
+    // including the case where a single element holds components.
+    auto isolateSelection = std::make_shared<Fvp::Selection>();
+    const auto nbObjects = view.numViewSelectedObjects();
+    for (unsigned int i = 0; i < nbObjects; ++i) {
+        MStringArray objectStrings;
+        TF_VERIFY(view.viewSelectedObject(i, objectStrings) == MS::kSuccess);
+        if (objectStrings.length() > 1) {
+            std::ostringstream oss;
+            oss << objectStrings;
+            TF_WARN("Unimplemented isolate select on Maya components %s", oss.str().c_str());
+            continue;
+        }
+        auto path = Ufe::PathString::path(objectStrings[0].asChar());
+        auto primSelections = Fvp::ufePathToPrimSelections(path);
+        for (const auto& primSelection : primSelections) {
+            isolateSelection->Add(primSelection);
+        }
+    }
+
+    vpDataMgr.ReplaceIsolateSelection(viewName.asChar(), isolateSelection);
+}
+#endif
 
 // return true if we need to recreate the filtering scene indices chain because of a change, false otherwise.
 bool MtohRenderOverride::_NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle)

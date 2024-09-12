@@ -42,9 +42,17 @@
 
 #include "pxr/imaging/hd/selectionsSchema.h"
 
+#include <memory>               // std::shared_ptr
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
+
+/* static */
+SelectionPtr Selection::New()
+{
+    return std::make_shared<Selection>();
+}
 
 bool
 Selection::Add(const PrimSelection& primSelection)
