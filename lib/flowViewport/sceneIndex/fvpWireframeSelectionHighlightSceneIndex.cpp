@@ -24,6 +24,7 @@
 #include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
+#include <pxr/imaging/hd/sceneIndexObserver.h>
 #include <pxr/usd/sdf/path.h>
 #include <string>
 
@@ -759,11 +760,21 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             //}
             //else {
                 for (size_t iSelection = 0; iSelection < selectionsSchema.GetNumElements(); iSelection++) {
+                    SdfPath selectionPath = entry.primPath.AppendPath(SdfPath("Selection_" + std::to_string(iSelection)));
+                    HdSceneIndexBaseRefPtr wireframeHighlightSi = nullptr;
+
                     if (prim.primType == HdPrimTypeTokens->mesh) {
-                        SdfPath selectionPath = entry.primPath.AppendPath(SdfPath("Selection_" + std::to_string(iSelection)));
-                        auto newSi = HdPrefixingSceneIndex::New(MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, _wireframeColorInterface), selectionPath);
-                        newSi->SetDisplayName("MyWireframeSceneIndex");
-                        _selectionsToHighlights[entry.primPath].push_back(newSi);
+                        wireframeHighlightSi = MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, _wireframeColorInterface);
+                        wireframeHighlightSi->SetDisplayName("MeshWireframeHighlightSceneIndex");
+                    }
+                    // else if (prim.primType == HdPrimTypeTokens->instancer) {
+                    //     wireframeHighlightSi = MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, _wireframeColorInterface));
+                    //     wireframeHighlightSi->SetDisplayName("MeshWireframeHighlightSceneIndex");
+                    // }
+
+                    if (wireframeHighlightSi) {
+                        wireframeHighlightSi = HdPrefixingSceneIndex::New(wireframeHighlightSi, selectionPath);
+                        _selectionsToHighlights[entry.primPath].push_back(wireframeHighlightSi);
                         _mergingSceneIndex->AddInputScene(_selectionsToHighlights[entry.primPath].back(), SdfPath::AbsoluteRootPath());
                     }
                 }
