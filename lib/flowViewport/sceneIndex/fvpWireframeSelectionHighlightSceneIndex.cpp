@@ -751,9 +751,9 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
                 auto potato = _selectionsToHighlights.find(entry.primPath);
                 if (potato != _selectionsToHighlights.end()) {
                     std::cout << "Removing highlight SIs" << std::endl;
-                    for (const auto& si : potato->second) {
-                        std::cout << "Removing " << si->GetDisplayName() << std::endl;
-                        _mergingSceneIndex->RemoveInputScene(si);
+                    for (const auto& siEntry : potato->second) {
+                        std::cout << "Removing " << siEntry.second->GetDisplayName() << std::endl;
+                        _mergingSceneIndex->RemoveInputScene(siEntry.second);
                     }
                 }
                 std::cout << "Erasing" << std::endl;
@@ -775,11 +775,32 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
 
                     if (wireframeHighlightSi) {
                         wireframeHighlightSi = HdPrefixingSceneIndex::New(wireframeHighlightSi, selectionPath);
-                        _selectionsToHighlights[entry.primPath].push_back(wireframeHighlightSi);
-                        _mergingSceneIndex->AddInputScene(_selectionsToHighlights[entry.primPath].back(), SdfPath::AbsoluteRootPath());
+                        _selectionsToHighlights[entry.primPath][selectionPath] = wireframeHighlightSi;
+                        _mergingSceneIndex->AddInputScene(_selectionsToHighlights[entry.primPath][selectionPath], SdfPath::AbsoluteRootPath());
                     }
                 }
             //}
+
+            auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
+                // if ((prim.primType == HdPrimTypeTokens->instancer && !_IsPrototype(prim))
+                //     || prim.primType == HdPrimTypeTokens->mesh) {
+                if (prim.primType == HdPrimTypeTokens->mesh) {
+                    SdfPath selectionPath = entry.primPath.AppendPath(SdfPath("Selection_" + std::string("Indirect")));
+                    if (_selection->HasFullySelectedAncestorInclusive(primPath)) {
+                        if (_selectionsToHighlights[entry.primPath].find(selectionPath) == _selectionsToHighlights[entry.primPath].end()) {
+                            _selectionsToHighlights[entry.primPath][selectionPath] = HdPrefixingSceneIndex::New(MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, _wireframeColorInterface), selectionPath);
+                            _mergingSceneIndex->AddInputScene(_selectionsToHighlights[entry.primPath][selectionPath], SdfPath::AbsoluteRootPath());
+                        }
+                    } else {
+                        if (_selectionsToHighlights[entry.primPath].find(selectionPath) != _selectionsToHighlights[entry.primPath].end()) {
+                            _mergingSceneIndex->RemoveInputScene(_selectionsToHighlights[entry.primPath][selectionPath]);
+                            _selectionsToHighlights[entry.primPath].erase(selectionPath);
+                        }
+                    }
+                }
+                return true;
+            };
+            _ForEachPrimInHierarchy(entry.primPath, operation);
         }
     }
 

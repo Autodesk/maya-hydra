@@ -233,7 +233,7 @@ private:
         }
     };
 
-    std::unordered_map<PXR_NS::SdfPath, PXR_NS::TfSmallVector<PXR_NS::HdSceneIndexBaseRefPtr, 4>, PXR_NS::SdfPath::Hash> _selectionsToHighlights;
+    std::unordered_map<PXR_NS::SdfPath, std::unordered_map<PXR_NS::SdfPath, PXR_NS::HdSceneIndexBaseRefPtr, PXR_NS::SdfPath::Hash>, PXR_NS::SdfPath::Hash> _selectionsToHighlights;
 
     PXR_NS::HdMergingSceneIndexRefPtr _mergingSceneIndex;
     PXR_NS::HdPrefixingSceneIndexRefPtr _prefixingSceneIndex;
