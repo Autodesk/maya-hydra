@@ -34,7 +34,7 @@ namespace{
     // Support implicit surfaces from USD as well, not only meshes
     bool _IsDefaultMaterialCompliantPrimitive(const TfToken& primType) 
     { 
-        static VtArray<TfToken> const compliantPrimitives = { HdPrimTypeTokens->cone,
+        static std::set<TfToken> const compliantPrimitives = { HdPrimTypeTokens->cone,
                                                               HdPrimTypeTokens->cylinder,
                                                               HdPrimTypeTokens->cylinder_1,
                                                               HdPrimTypeTokens->cube,
