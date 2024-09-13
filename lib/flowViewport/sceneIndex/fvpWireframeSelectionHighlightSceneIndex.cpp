@@ -21,9 +21,11 @@
 #include "flowViewport/debugCodes.h"
 #include "fvpWireframeSelectionHighlightSceneIndex.h"
 #include "wireframeHighlights/meshWireframeHighlightSi.h"
+#include "wireframeHighlights/niInstanceWireframeHighlightSi.h"
 #include "wireframeHighlights/niPrototypeWireframeHighlightSi.h"
 #include "wireframeHighlights/piInstancerWireframeHighlightSi.h"
 #include <pxr/base/tf/token.h>
+#include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/sceneIndex.h>
@@ -779,7 +781,11 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
                         }
                     }
 
-                    if (prim.primType == HdPrimTypeTokens->mesh && !instancedBySchema.IsDefined()) {
+                    if (HdInstanceSchema::GetFromParent(prim.dataSource).IsDefined()) {
+                        wireframeHighlightSi = NiInstanceWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, iSelection, _wireframeColorInterface);
+                        wireframeHighlightSi->SetDisplayName("NiInstanceWireframeHighlightSceneIndex");
+                    }
+                    else if (prim.primType == HdPrimTypeTokens->mesh && !instancedBySchema.IsDefined()) {
                         wireframeHighlightSi = MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, _wireframeColorInterface);
                         wireframeHighlightSi->SetDisplayName("MeshWireframeHighlightSceneIndex");
                     }
