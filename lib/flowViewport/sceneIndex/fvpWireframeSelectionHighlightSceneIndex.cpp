@@ -803,7 +803,7 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
             auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
                 // if ((prim.primType == HdPrimTypeTokens->instancer && !_IsPrototype(prim))
                 //     || prim.primType == HdPrimTypeTokens->mesh) {
-                if (prim.primType == HdPrimTypeTokens->mesh) {
+                if (prim.primType == HdPrimTypeTokens->mesh && !HdInstancedBySchema(prim.dataSource).IsDefined()) {
                     SdfPath selectionPath = entry.primPath.AppendPath(SdfPath("Selection_" + std::string("Indirect")));
                     if (_selection->HasFullySelectedAncestorInclusive(primPath)) {
                         if (_selectionsToHighlights[entry.primPath].find(selectionPath) == _selectionsToHighlights[entry.primPath].end()) {

@@ -1,13 +1,21 @@
 #include "niPrototypeWireframeHighlightSi.h"
 #include "baseWireframeHighlightSi.h"
+#include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/gf/vec4f.h>
+#include <pxr/base/vt/array.h>
 #include <pxr/imaging/hd/dataSource.h>
+#include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
+#include <pxr/imaging/hd/instancerTopologySchema.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
+#include <pxr/imaging/hd/selectionSchema.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
+#include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
 
@@ -113,8 +121,30 @@ HdSceneIndexPrim NiPrototypeWireframeHighlightSceneIndex::GetPrim(const SdfPath 
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath.ReplacePrefix(_PrototypeSubprimNamePath(), _prototypeSubprimPath));
         if (prim.primType == HdPrimTypeTokens->mesh) {
             prim.dataSource = MakeWireframe(prim.dataSource, _wireframeColorInterface->getWireframeColor(_prototypeSubprimPath));// primPath? made relative?
+            
             HdContainerDataSourceEditor dsEditor(prim.dataSource);
+            
             dsEditor.Set(HdInstancedBySchema::GetDefaultLocator(), HdBlockDataSource::New());
+            dsEditor.Set(HdSelectionsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+
+            HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(GetInputSceneIndex()->GetPrim(_prototypeSubprimPath).dataSource);
+            HdSelectionSchema activeSelection = selectionsSchema.GetElement(_selectionIndex);
+            HdInstanceIndicesSchema instanceIndices = activeSelection.GetNestedInstanceIndices().GetElement(0);
+            auto instanceIndex = instanceIndices.GetInstanceIndices()->GetTypedValue(0).front();
+
+            HdInstancedBySchema instancedBySchema = HdInstancedBySchema::GetFromParent(prim.dataSource);
+            auto instancerPath = instancedBySchema.GetPaths()->GetTypedValue(0).front();
+            // Do it on every prim or only proto root?
+            HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(instancerPath);
+            HdPrimvarsSchema primvarsSchema = HdPrimvarsSchema::GetFromParent(instancerPrim.dataSource);
+            auto instanceTransformsSchema = primvarsSchema.GetPrimvar(HdInstancerTokens->instanceTransforms);
+            auto instanceTransforms = HdTypedSampledDataSource<VtArray<GfMatrix4d>>::Cast(instanceTransformsSchema.GetPrimvarValue());
+            auto instanceXform = instanceTransforms->GetTypedValue(0)[instanceIndex];
+
+            auto prototypeXform = HdXformSchema::GetFromParent(prim.dataSource).GetMatrix()->GetTypedValue(0);
+
+            dsEditor.Set(HdXformSchema::GetDefaultLocator().Append(HdXformSchemaTokens->matrix), HdRetainedTypedSampledDataSource<GfMatrix4d>::New(instanceXform * prototypeXform));
+
             prim.dataSource = dsEditor.Finish();
         }
         return prim;
