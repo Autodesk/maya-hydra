@@ -46,8 +46,7 @@ namespace{
                                                         #endif
                                                               UsdGeomTokens->Plane,
                                                               HdPrimTypeTokens->mesh};
-        return std::find(compliantPrimitives.cbegin(), compliantPrimitives.cend(), primType)
-            != compliantPrimitives.cend();
+        return compliantPrimitives.count(primType) == 1;
     }
 }
 
