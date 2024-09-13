@@ -43,7 +43,7 @@ MhWireframeColorInterfaceImp::MhWireframeColorInterfaceImp(const std::shared_ptr
     TF_AXIOM(_selection);
 }
 
-MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getSelectionState(const PXR_NS::SdfPath& primPath)const
+MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getSelectionState(const PXR_NS::SdfPath& primPath) const
 {
     if (_selection->HasFullySelectedAncestorInclusive(primPath)){
         return (_leadObjectPathTracker->isLeadObjectPrim(primPath)) ? kLead : kActive;
@@ -52,8 +52,31 @@ MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getS
     return kDormant;
 }
 
+MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getSelectionState(const Fvp::PrimSelection& primSelection) const
+{
+    if (_selection->HasFullySelectedAncestorInclusive(primSelection.primPath)){
+        return (_leadObjectPathTracker->isLeadObjectSelection(primSelection)) ? kLead : kActive;
+    }
+    
+    return kDormant;
+}
+
 GfVec4f MhWireframeColorInterfaceImp::getWireframeColor(const SdfPath& primPath) const { 
     SelectionState selState = _getSelectionState(primPath);
+    switch (selState) {
+        case kLead:
+            return _leadWireframeColor;
+        case kActive:
+            return _activeWireframeColor;
+        default:
+        break;
+    }
+
+    return _dormantWireframeColor;
+}
+
+GfVec4f MhWireframeColorInterfaceImp::getWireframeColor(const Fvp::PrimSelection& primSelection) const { 
+    SelectionState selState = _getSelectionState(primSelection);
     switch (selState) {
         case kLead:
             return _leadWireframeColor;

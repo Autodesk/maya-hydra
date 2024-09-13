@@ -101,12 +101,17 @@ bool MhLeadObjectPathTracker::isLeadObjectPrim(const PXR_NS::SdfPath& primPath) 
 {
     //_leadObjectPrimSelections can be hierarchy paths, so we need to check if the primPath is a prefix
     //of a lead object prim path
-    for (const auto& leadObjectPrimPath : _leadObjectPrimSelections) {
-        if (primPath.HasPrefix(leadObjectPrimPath.primPath)) {
+    for (const auto& leadObjectPrimSelection : _leadObjectPrimSelections) {
+        if (primPath.HasPrefix(leadObjectPrimSelection.primPath)) {
             return true;
         }
     }
     return false;
+}
+
+bool MhLeadObjectPathTracker::isLeadObjectSelection(const Fvp::PrimSelection& primSelection) const
+{
+    return std::find(_leadObjectPrimSelections.cbegin(), _leadObjectPrimSelections.cend(), primSelection) != _leadObjectPrimSelections.cend();
 }
 
 void MhLeadObjectPathTracker::setLeadObjectUfePath(const Ufe::Path& newLeadObjectUfePath)

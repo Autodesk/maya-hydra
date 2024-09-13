@@ -97,6 +97,28 @@ namespace {
 //         : VtArray<SdfPath>({SdfPath::AbsoluteRootPath()});
 // }
 
+Fvp::PrimSelection ConvertHydraToFvpSelection(const SdfPath& primPath, const HdSelectionSchema& selectionSchema) {
+    Fvp::PrimSelection primSelection;
+    primSelection.primPath = primPath;
+
+    HdInstanceIndicesVectorSchema nestedInstanceIndicesSchema = selectionSchema.GetNestedInstanceIndices();
+    std::cout << "nestedInstanceIndicesSchema.GetNumElements() = " << nestedInstanceIndicesSchema.GetNumElements() << std::endl;
+    for (size_t iNestedInstanceIndices = 0; iNestedInstanceIndices < nestedInstanceIndicesSchema.GetNumElements(); iNestedInstanceIndices++) {
+        std::cout << "iNestedInstanceIndices : " << iNestedInstanceIndices << std::endl;
+        HdInstanceIndicesSchema instanceIndicesSchema = nestedInstanceIndicesSchema.GetElement(iNestedInstanceIndices);
+        auto instanceIndices = instanceIndicesSchema.GetInstanceIndices()->GetTypedValue(0);
+        primSelection.nestedInstanceIndices.push_back(
+            {
+                instanceIndicesSchema.GetInstancer()->GetTypedValue(0),
+                instanceIndicesSchema.GetPrototypeIndex()->GetTypedValue(0),
+                std::vector<int>(instanceIndices.begin(), instanceIndices.end())
+            }
+        );
+    }
+
+    return primSelection;
+}
+
 }
 
 namespace FVP_NS_DEF {
@@ -120,7 +142,6 @@ HdSceneIndexPrim NiPrototypeWireframeHighlightSceneIndex::GetPrim(const SdfPath 
     if (primPath.HasPrefix(_PrototypeSubprimNamePath())) {
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath.ReplacePrefix(_PrototypeSubprimNamePath(), _prototypeSubprimPath));
         if (prim.primType == HdPrimTypeTokens->mesh) {
-            prim.dataSource = MakeWireframe(prim.dataSource, _wireframeColorInterface->getWireframeColor(_prototypeSubprimPath));// primPath? made relative?
             
             HdContainerDataSourceEditor dsEditor(prim.dataSource);
             
@@ -146,6 +167,12 @@ HdSceneIndexPrim NiPrototypeWireframeHighlightSceneIndex::GetPrim(const SdfPath 
             dsEditor.Set(HdXformSchema::GetDefaultLocator().Append(HdXformSchemaTokens->matrix), HdRetainedTypedSampledDataSource<GfMatrix4d>::New(instanceXform * prototypeXform));
 
             prim.dataSource = dsEditor.Finish();
+
+            std::cout << "ConvertHydraToFvpSelection" << std::endl;
+            Fvp::PrimSelection prototypeSelection = ConvertHydraToFvpSelection(_prototypeSubprimPath, activeSelection);
+            std::cout << "MakeWireframe" << std::endl;
+            prim.dataSource = MakeWireframe(prim.dataSource, _wireframeColorInterface->getWireframeColor(prototypeSelection));// primPath? made relative?
+            std::cout << "Done" << std::endl;
         }
         return prim;
     }
