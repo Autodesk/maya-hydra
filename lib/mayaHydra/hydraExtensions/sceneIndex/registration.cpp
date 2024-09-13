@@ -139,8 +139,9 @@ public:
         auto secondSegment = appPath.getSegments()[1];
         const auto lastComponentString = secondSegment.components().back().string();
         const bool lastComponentIsNumeric = lastComponentString.find_first_not_of(digits) == std::string::npos;
+        const size_t lastComponentIndex = secondSegment.size() - 1;
 
-        for (size_t iSecondSegment = 0; iSecondSegment < secondSegment.size(); iSecondSegment++) {
+        for (size_t iComponent = 0; iComponent < secondSegment.size(); iComponent++) {
             // Native instancing : if the current prim path points to a native instance, repath to the prototype
             // before appending the following UFE components
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
@@ -155,16 +156,20 @@ public:
                 instanceSelection = {instancerPath, prototypeIndex, {instanceSchema.GetInstanceIndex()->GetTypedValue(0)}};
             }
 
-            auto targetChildPath = primPath.AppendChild(TfToken(secondSegment.components()[iSecondSegment].string()));
+            auto targetChildPath = primPath.AppendChild(TfToken(secondSegment.components()[iComponent].string()));
             auto actualChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
             if (std::find(actualChildPaths.begin(), actualChildPaths.end(), targetChildPath) != actualChildPaths.end()) {
                 // Append if the new path is valid
-                primPath = primPath.AppendChild(TfToken(secondSegment.components()[iSecondSegment].string()));
+                primPath = targetChildPath;
             }
-            else if (iSecondSegment == secondSegment.size() - 1) {
-                // Point instancing : instance selection. The path should end with a number corresponding to the selected instance,
-                // and the remainder of the path points to the point instancer.
-                if (TF_VERIFY(lastComponentIsNumeric, "Expected number as final UFE path component but got an invalid path instead.")) {
+            else if (iComponent == lastComponentIndex) {
+                // If the last component is a number, we are dealing with an instance selection.
+                // But there are other cases like when you assign a USD Preview surface material to a usd prim, it has a shader prim in the material 
+                // which doesn't appear in the hydra hierarchy but is actually present and we end up in this case as well.
+                if (lastComponentIsNumeric) {
+                    // Point instancing : instance selection. The path should end with a number
+                    // corresponding to the selected instance,
+                    // and the remainder of the path points to the point instancer.
                     HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(primPath);
                     HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
                     auto instanceIndicesByPrototype = instancerTopologySchema.GetInstanceIndices();

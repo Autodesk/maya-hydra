@@ -22,6 +22,7 @@
 #include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/usd/usdGeom/tokens.h>
 
 namespace FVP_NS_DEF {
 
@@ -29,6 +30,23 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace{
     static const TfToken purposes[] = { HdMaterialBindingsSchemaTokens->allPurpose };
+
+    // Support implicit surfaces from USD as well, not only meshes
+    bool _IsDefaultMaterialCompliantPrimitive(const TfToken& primType) 
+    { 
+        static VtArray<TfToken> const compliantPrimitives = { HdPrimTypeTokens->cone,
+                                                              HdPrimTypeTokens->cylinder,
+                                                              HdPrimTypeTokens->cylinder_1,
+                                                              HdPrimTypeTokens->cube,
+                                                              HdPrimTypeTokens->sphere,
+                                                              UsdGeomTokens->TetMesh,   
+                                                              UsdGeomTokens->Plane,
+                                                              UsdGeomTokens->Capsule,
+                                                              UsdGeomTokens->Capsule_1,
+                                                              HdPrimTypeTokens->mesh};
+        return std::find(compliantPrimitives.cbegin(), compliantPrimitives.cend(), primType)
+            != compliantPrimitives.cend();
+    }
 }
 
 // static
@@ -68,7 +86,7 @@ HdSceneIndexPrim DefaultMaterialSceneIndex::GetPrim(const SdfPath& primPath) con
 bool DefaultMaterialSceneIndex::_ShouldWeApplyTheDefaultMaterial(const HdSceneIndexPrim& prim)const
 {
     // Only for meshes so far
-    if (HdPrimTypeTokens->mesh != prim.primType) {
+    if (! _IsDefaultMaterialCompliantPrimitive(prim.primType)) {
         return false;
     }
 
