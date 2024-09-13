@@ -38,11 +38,11 @@ namespace{
                                                               HdPrimTypeTokens->cylinder,
                                                               HdPrimTypeTokens->cylinder_1,
                                                               HdPrimTypeTokens->cube,
-                                                              HdPrimTypeTokens->sphere,
+                                                              HdPrimTypeTokens->sphere,   
+                                                              HdPrimTypeTokens->capsule,
+                                                              HdPrimTypeTokens->capsule_1,
                                                               UsdGeomTokens->TetMesh,   
                                                               UsdGeomTokens->Plane,
-                                                              UsdGeomTokens->Capsule,
-                                                              UsdGeomTokens->Capsule_1,
                                                               HdPrimTypeTokens->mesh};
         return std::find(compliantPrimitives.cbegin(), compliantPrimitives.cend(), primType)
             != compliantPrimitives.cend();

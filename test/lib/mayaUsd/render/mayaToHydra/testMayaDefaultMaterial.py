@@ -44,6 +44,19 @@ class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mto
             cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
             cmds.refresh()
             self.assertSnapshotClose("defaultMaterial" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
+
+    def test_MayaDefaultMaterialUsdPrims(self):
+        # open a Maya scene with usd prims (sphere, capsule, cube, cylinder ...)
+        testFile = mayaUtils.openTestScene(
+                "testDefaultMaterial",
+                "testMayaDefaultMaterial_Usd_proceduralShapes.ma", useTestSettings=False)
+        cmds.refresh()
+        
+        #Use Default Material
+        panel = mayaUtils.activeModelPanel()
+        cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
+        cmds.refresh()
+        self.assertSnapshotClose("defaultMaterialUsdPrims" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
