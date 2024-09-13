@@ -6,12 +6,14 @@ target_sources(${TARGET_NAME}
     baseWireframeHighlightSi.cpp
     meshWireframeHighlightSi.cpp
     piInstancerWireframeHighlightSi.cpp
+    niPrototypeWireframeHighlightSi.cpp
 )
 
 set(HEADERS
     baseWireframeHighlightSi.h
     meshWireframeHighlightSi.h
     piInstancerWireframeHighlightSi.h
+    niPrototypeWireframeHighlightSi.h
 )
 
 # -----------------------------------------------------------------------------

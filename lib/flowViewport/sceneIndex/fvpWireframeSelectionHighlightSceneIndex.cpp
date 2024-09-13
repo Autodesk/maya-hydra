@@ -21,10 +21,12 @@
 #include "flowViewport/debugCodes.h"
 #include "fvpWireframeSelectionHighlightSceneIndex.h"
 #include "wireframeHighlights/meshWireframeHighlightSi.h"
+#include "wireframeHighlights/niPrototypeWireframeHighlightSi.h"
 #include "wireframeHighlights/piInstancerWireframeHighlightSi.h"
 #include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
+#include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/sceneIndexObserver.h>
 #include <pxr/usd/sdf/path.h>
 #include <string>
@@ -764,13 +766,30 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
                     SdfPath selectionPath = entry.primPath.AppendPath(SdfPath("Selection_" + std::to_string(iSelection)));
                     HdSceneIndexBaseRefPtr wireframeHighlightSi = nullptr;
 
-                    if (prim.primType == HdPrimTypeTokens->mesh) {
+                    HdInstancedBySchema instancedBySchema = HdInstancedBySchema::GetFromParent(prim.dataSource);
+                    bool isInstancedNatively = false;
+                    if (instancedBySchema.IsDefined()) {
+                        for (const auto& instancerPath : instancedBySchema.GetPaths()->GetTypedValue(0)) {
+                            HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(instancerPath);
+                            HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
+                            if (instancerTopologySchema.GetInstanceLocations()) {
+                                isInstancedNatively = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (prim.primType == HdPrimTypeTokens->mesh && !instancedBySchema.IsDefined()) {
                         wireframeHighlightSi = MeshWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, _wireframeColorInterface);
                         wireframeHighlightSi->SetDisplayName("MeshWireframeHighlightSceneIndex");
                     }
                     else if (prim.primType == HdPrimTypeTokens->instancer) {
                         wireframeHighlightSi = PointInstancerWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, iSelection, _wireframeColorInterface);
                         wireframeHighlightSi->SetDisplayName("PointInstancerWireframeHighlightSceneIndex");
+                    }
+                    else if (prim.primType == HdPrimTypeTokens->mesh && isInstancedNatively) {
+                        wireframeHighlightSi = NiPrototypeWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, iSelection, _wireframeColorInterface);
+                        wireframeHighlightSi->SetDisplayName("NiPrototypeWireframeHighlightSceneIndex");
                     }
 
                     if (wireframeHighlightSi) {
