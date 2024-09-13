@@ -53,6 +53,12 @@ SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim, Fvp::Sele
     return instancingRelatedPaths;
 }
 
+bool _IsPrototype(const HdSceneIndexPrim& prim)
+{
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    return instancedBy.IsDefined();
+}
+
 bool _IsPrototypeSubPrim(const HdSceneIndexPrim& prim, const SdfPath& primPath)
 {
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
@@ -108,15 +114,18 @@ HdSceneIndexPrim PointInstancerWireframeHighlightSceneIndex::GetPrim(const SdfPa
 
 SdfPathVector PointInstancerWireframeHighlightSceneIndex::GetChildPrimPaths(const SdfPath &primPath) const
 {
-    if (_IsRelevantPath(primPath)) {
-        return GetInputSceneIndex()->GetChildPrimPaths(primPath);
-    }
-
     SdfPathVector originalChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
     SdfPathVector prunedChildPaths;
     for (const auto& originalChildPath : originalChildPaths) {
-        for (const auto& conservedPath : _primPathsToConserve) {
-            if (conservedPath.HasPrefix(originalChildPath)) {
+        for (const auto& instancerPath : _instancerPaths) {
+            if (instancerPath.HasPrefix(originalChildPath)) {
+                prunedChildPaths.push_back(originalChildPath);
+                break;
+            }
+        }
+
+        for (const auto& prototypePath : _prototypePaths) {
+            if (prototypePath.HasPrefix(originalChildPath) || originalChildPath.HasPrefix(prototypePath)) {
                 prunedChildPaths.push_back(originalChildPath);
                 break;
             }
@@ -136,7 +145,13 @@ PointInstancerWireframeHighlightSceneIndex::PointInstancerWireframeHighlightScen
     _selectionIndex(selectionIndex),
     _wireframeColorInterface(wireframeColorInterface)
 {
-    _CollectInstancingPaths(instancerPrimPath, SelectionHighlightsCollectionDirection::Bidirectional, _primPathsToConserve);
+    _CollectInstancingPaths(instancerPrimPath, SelectionHighlightsCollectionDirection::Bidirectional, _instancerPaths, _prototypePaths);
+
+    // std::cout << "_primPathsToConserve" << std::endl;
+    // for (const auto& path : _primPathsToConserve) {
+    //     std::cout << "--- " + path.GetString() << std::endl;
+    // }
+    // std::cout << std::endl;
 }
 
 void PointInstancerWireframeHighlightSceneIndex::_PrimsAdded(
@@ -154,7 +169,8 @@ void PointInstancerWireframeHighlightSceneIndex::_PrimsRemoved(
     for (const auto& entry : entries) {
         if (_IsRelevantPath(entry.primPath)) {
             prunedEntries.push_back(entry);
-            _primPathsToConserve.erase(entry.primPath);
+            _instancerPaths.erase(entry.primPath);
+            _prototypePaths.erase(entry.primPath);
         }
     }
     _SendPrimsRemoved(prunedEntries);
@@ -175,18 +191,35 @@ void PointInstancerWireframeHighlightSceneIndex::_PrimsDirtied(
     _SendPrimsDirtied(prunedEntries);
 }
 
-bool PointInstancerWireframeHighlightSceneIndex::_IsRelevantPath(const PXR_NS::SdfPath& primPath) const
+bool PointInstancerWireframeHighlightSceneIndex::_IsInstancerPath(const PXR_NS::SdfPath& primPath) const
 {
-    for (const auto& conservedPaths : _primPathsToConserve) {
-        if (primPath.HasPrefix(conservedPaths)) {
+    return _instancerPaths.find(primPath) != _instancerPaths.end();
+    // for (const auto& instancerPath : _instancerPaths) {
+    //     // Use direct path rather than prefix?
+    //     if (primPath.HasPrefix(instancerPath)) {
+    //         return true;
+    //     }
+    // }
+    // return false;
+}
+
+bool PointInstancerWireframeHighlightSceneIndex::_IsPrototypePath(const PXR_NS::SdfPath& primPath) const
+{
+    for (const auto& prototypePath : _prototypePaths) {
+        if (primPath.HasPrefix(prototypePath)) {
             return true;
         }
     }
     return false;
 }
 
+bool PointInstancerWireframeHighlightSceneIndex::_IsRelevantPath(const PXR_NS::SdfPath& primPath) const
+{
+    return _IsInstancerPath(primPath) || _IsPrototypePath(primPath);
+}
+
 void
-PointInstancerWireframeHighlightSceneIndex::_CollectInstancingPaths(const PXR_NS::SdfPath& primPath, SelectionHighlightsCollectionDirection direction, PXR_NS::SdfPathSet& outInstancingPaths) const
+PointInstancerWireframeHighlightSceneIndex::_CollectInstancingPaths(const PXR_NS::SdfPath& primPath, SelectionHighlightsCollectionDirection direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
 
@@ -197,16 +230,22 @@ PointInstancerWireframeHighlightSceneIndex::_CollectInstancingPaths(const PXR_NS
         HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
         auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
         for (const auto& protoRootPath : protoRootPaths) {
-            _CollectInstancingPaths(protoRootPath, direction, outInstancingPaths);
+            _CollectInstancingPaths(protoRootPath, direction, outInstancerPaths, outPrototypePaths);
         }
         return;
     }
     
-    
-    if (outInstancingPaths.find(primPath) != outInstancingPaths.end()) {
-        return;
+    if (_IsPrototype(prim)) {
+        if (outPrototypePaths.find(primPath) != outPrototypePaths.end()) {
+            return;
+        }
+        outPrototypePaths.insert(primPath);
+    } else {
+        if (outInstancerPaths.find(primPath) != outInstancerPaths.end()) {
+            return;
+        }
+        outInstancerPaths.insert(primPath);
     }
-    outInstancingPaths.insert(primPath);
 
     // Traverse the children of this prim to find the affected child prims, and process their instancing-related
     // paths so we can create selection highlight mirrors for these prims as well.
@@ -230,10 +269,10 @@ PointInstancerWireframeHighlightSceneIndex::_CollectInstancingPaths(const PXR_NS
     _ForEachPrimInHierarchy(primPath, operation);
 
     for (const auto& affectedPrototypePath : affectedPrototypePaths) {
-        _CollectInstancingPaths(affectedPrototypePath, SelectionHighlightsCollectionDirection::Prototypes, outInstancingPaths);
+        _CollectInstancingPaths(affectedPrototypePath, SelectionHighlightsCollectionDirection::Prototypes, outInstancerPaths, outPrototypePaths);
     }
     for (const auto& affectedInstancedByPath : affectedInstancedByPaths) {
-        _CollectInstancingPaths(affectedInstancedByPath, SelectionHighlightsCollectionDirection::InstancedBy, outInstancingPaths);
+        _CollectInstancingPaths(affectedInstancedByPath, SelectionHighlightsCollectionDirection::InstancedBy, outInstancerPaths, outPrototypePaths);
     }
 }
 

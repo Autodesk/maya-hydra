@@ -103,11 +103,14 @@ private:
     const size_t _selectionIndex;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 
-    PXR_NS::SdfPathSet _primPathsToConserve;
+    PXR_NS::SdfPathSet _instancerPaths;
+    PXR_NS::SdfPathSet _prototypePaths;
 
+    bool _IsInstancerPath(const PXR_NS::SdfPath& primPath) const;
+    bool _IsPrototypePath(const PXR_NS::SdfPath& primPath) const;
     bool _IsRelevantPath(const PXR_NS::SdfPath& primPath) const;
 
-    void _CollectInstancingPaths(const PXR_NS::SdfPath& primPath, SelectionHighlightsCollectionDirection direction, PXR_NS::SdfPathSet& outInstancingPaths) const;
+    void _CollectInstancingPaths(const PXR_NS::SdfPath& primPath, SelectionHighlightsCollectionDirection direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const;
     void _ForEachPrimInHierarchy(const PXR_NS::SdfPath& hierarchyRoot, const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation) const;
 };
 
