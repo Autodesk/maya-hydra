@@ -87,7 +87,6 @@ HdSceneIndexPrim DefaultMaterialSceneIndex::GetPrim(const SdfPath& primPath) con
 
 bool DefaultMaterialSceneIndex::_ShouldWeApplyTheDefaultMaterial(const HdSceneIndexPrim& prim)const
 {
-    // Only for meshes so far
     if (! _IsDefaultMaterialCompliantPrimitive(prim.primType)) {
         return false;
     }
