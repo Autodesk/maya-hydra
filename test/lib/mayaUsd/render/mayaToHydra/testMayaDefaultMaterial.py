@@ -52,6 +52,8 @@ class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mto
                 "testMayaDefaultMaterial_Usd_proceduralShapes.ma", useTestSettings=False)
         cmds.refresh()
         
+        #Cone and cylinder_1 are not supported on OSX with USD 24.05 so they are not in our test scene
+
         #Use Default Material
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)

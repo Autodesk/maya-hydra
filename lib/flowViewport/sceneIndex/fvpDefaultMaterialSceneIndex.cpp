@@ -41,7 +41,9 @@ namespace{
                                                               HdPrimTypeTokens->sphere,   
                                                               HdPrimTypeTokens->capsule,
                                                               HdPrimTypeTokens->capsule_1,
-                                                              UsdGeomTokens->TetMesh,   
+                                                        #if HD_API_VERSION >= 67 // USD 24.05+
+                                                              UsdGeomTokens->TetMesh,
+                                                        #endif
                                                               UsdGeomTokens->Plane,
                                                               HdPrimTypeTokens->mesh};
         return std::find(compliantPrimitives.cbegin(), compliantPrimitives.cend(), primType)

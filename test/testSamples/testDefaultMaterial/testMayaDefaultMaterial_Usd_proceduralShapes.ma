@@ -1,6 +1,6 @@
 //Maya ASCII 2025ff01 scene
 //Name: testMayaDefaultMaterial_Usd_proceduralShapes.ma
-//Last modified: Fri, Sep 13, 2024 02:22:47 PM
+//Last modified: Fri, Sep 13, 2024 03:37:53 PM
 //Codeset: 1252
 requires maya "2025ff01";
 requires -nodeType "mayaUsdLayerManager" -nodeType "mayaUsdProxyShape" -dataType "pxrUsdStageData"
@@ -11,17 +11,17 @@ fileInfo "product" "Maya 2025";
 fileInfo "version" "Preview Release";
 fileInfo "cutIdentifier" "202408120802-000000";
 fileInfo "osv" "Windows 10 Pro for Workstations v2009 (Build: 19045)";
-fileInfo "UUID" "0B720A3F-4364-9BF6-85A4-5B9848428336";
+fileInfo "UUID" "F157DEA9-4DAC-DE5E-9A06-818078973829";
 createNode transform -s -n "persp";
 	rename -uid "4975FE5E-427C-2FB3-3C49-1EB9CD480F40";
 	setAttr ".v" no;
-	setAttr ".t" -type "double3" 14.85435651410225 3.7423925158786542 -0.85804980057362146 ;
+	setAttr ".t" -type "double3" 12.015714714849539 2.9485077405670821 -2.1151628190282694 ;
 	setAttr ".r" -type "double3" -14.738352729602596 89.400000000000176 1.5186307539181139e-13 ;
 createNode camera -s -n "perspShape" -p "persp";
 	rename -uid "9BFA3717-411F-0613-7680-F4AF9AAFC882";
 	setAttr -k off ".v" no;
 	setAttr ".fl" 34.999999999999993;
-	setAttr ".coi" 15.308221012122909;
+	setAttr ".coi" 12.348428026820086;
 	setAttr ".imn" -type "string" "persp";
 	setAttr ".den" -type "string" "persp_depth";
 	setAttr ".man" -type "string" "persp_mask";
@@ -84,26 +84,25 @@ createNode mayaUsdProxyShape -n "stageShape1" -p "stage1";
 	setAttr -k off ".v";
 	setAttr ".covm[0]"  0 1 1;
 	setAttr ".cdvm[0]"  0 1 1;
-	setAttr ".oslid" -type "string" "anon:0000018FBAEA7CC0:anonymousLayer1-session.usda";
-	setAttr ".orlid" -type "string" "anon:0000018FBAEA7ED0:anonymousLayer1";
-	setAttr ".forceCompute" yes;
+	setAttr ".oslid" -type "string" "anon:0000026CBB695100:anonymousLayer1-session.usda";
+	setAttr ".orlid" -type "string" "anon:0000026CBB696FF0:anonymousLayer1";
 	setAttr ".usdStageLoadRules" -type "string" "/=all";
-	setAttr ".usdStageTargetLayer" -type "string" "anon:0000018FBAEA7ED0:anonymousLayer1";
+	setAttr ".usdStageTargetLayer" -type "string" "anon:0000026CBB696FF0:anonymousLayer1";
 createNode lightLinker -s -n "lightLinker1";
-	rename -uid "301AE22C-4FD4-F128-CF50-C298C55561A5";
+	rename -uid "8896A048-4BF6-98DA-0504-F6846504D8BF";
 	setAttr -s 2 ".lnk";
 	setAttr -s 2 ".slnk";
 createNode shapeEditorManager -n "shapeEditorManager";
-	rename -uid "19EA216A-450C-1BB9-58F9-499D00C17CE5";
+	rename -uid "A6196C92-49ED-F18F-B2A6-87B02D785758";
 createNode poseInterpolatorManager -n "poseInterpolatorManager";
-	rename -uid "AD99ADFD-4F8C-2294-5ACD-F9856253124B";
+	rename -uid "5EF3C2E7-4E0B-1DDA-E6D0-6E85D179E9E7";
 createNode displayLayerManager -n "layerManager";
-	rename -uid "2A9FA9C9-457C-654D-E035-E4894E7168ED";
+	rename -uid "24C2F0CE-4F63-FEB0-6375-E8932AF28045";
 createNode displayLayer -n "defaultLayer";
 	rename -uid "0795EDCE-43E0-D827-E088-5A911B9C2BB7";
 	setAttr ".ufem" -type "stringArray" 0  ;
 createNode renderLayerManager -n "renderLayerManager";
-	rename -uid "C4BF0ABC-4F82-75B1-6938-AA98CC3AE79E";
+	rename -uid "3C236D18-47AC-533C-9CBE-3FB7188BF32F";
 createNode renderLayer -n "defaultRenderLayer";
 	rename -uid "EE126284-4298-AFF9-4E00-01870AB0290C";
 	setAttr ".g" yes;
@@ -161,17 +160,15 @@ createNode nodeGraphEditorInfo -n "hyperShadePrimaryNodeEditorSavedTabsInfo";
 	setAttr ".tgi[0].vl" -type "double2" -44.047617297323995 -615.47616601936511 ;
 	setAttr ".tgi[0].vh" -type "double2" 604.76188073082676 44.047617297323995 ;
 createNode mayaUsdLayerManager -n "mayaUsdLayerManager1";
-	rename -uid "FC649665-47BF-2BC0-FA97-A5AAC32C5CE4";
+	rename -uid "C48BD6F1-4044-E097-7FAE-25A3371504B4";
 	setAttr -s 2 ".lyr";
-	setAttr ".lyr[0].id" -type "string" "anon:0000018FBAEA7CC0:anonymousLayer1-session.usda";
+	setAttr ".lyr[0].id" -type "string" "anon:0000026CBB695100:anonymousLayer1-session.usda";
 	setAttr ".lyr[0].fid" -type "string" "usda";
 	setAttr ".lyr[0].szd" -type "string" "";
 	setAttr ".lyr[0].ann" yes;
-	setAttr ".lyr[1].id" -type "string" "anon:0000018FBAEA7ED0:anonymousLayer1";
+	setAttr ".lyr[1].id" -type "string" "anon:0000026CBB696FF0:anonymousLayer1";
 	setAttr ".lyr[1].fid" -type "string" "sdf";
-	setAttr ".lyr[1].szd" -type "string" (
-		"#sdf 1.4.32\n\ndef Cone \"Cone1\"\n{\n    double3 xformOp:translate = (0, 0, 2.986111467530039)\n    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n}\n\ndef Capsule \"Capsule1\"\n{\n    double3 xformOp:translate = (0, 0, 5.434466383456315)\n    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n}\n\ndef Cube \"Cube1\"\n{\n    double3 xformOp:translate = (0, 0, -0.3567712978488311)\n    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n}\n\ndef Cylinder \"Cylinder1\"\n{\n    double3 xformOp:translate = (0, 0, -3.9647793803879945)\n    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n}\n\ndef Sphere \"Sphere1\"\n{\n    double3 xformOp:translate = (0, 0, -7.707703236684896)\n    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n}\n\ndef Capsule_1 \"Capsule_1\"\n{\n    double3 xformOp:translate = (0, 2.054106540666761, 5.139262386654992)\n    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n}\n\ndef Cylinder_1 \"Cylinder_1\"\n{\n    double3 xformOp:translate = (0, 2.314627064334016, -3.7449610857279594)\n    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n"
-		+ "}\n\n");
+	setAttr ".lyr[1].szd" -type "string" "#sdf 1.4.32\n\ndef Capsule \"Capsule1\"\n{\n    double3 xformOp:translate = (0, 0, 2.719868622630031)\n    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n}\n\ndef Cube \"Cube1\"\n{\n    double3 xformOp:translate = (0, 0, -0.3567712978488311)\n    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n}\n\ndef Cylinder \"Cylinder1\"\n{\n    double3 xformOp:translate = (0, 0, -3.9647793803879945)\n    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n}\n\ndef Sphere \"Sphere1\"\n{\n    double3 xformOp:translate = (0, 0, -7.707703236684896)\n    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n}\n\ndef Capsule_1 \"Capsule_1\"\n{\n    double3 xformOp:translate = (0, 2.054106540666761, 2.424664625828708)\n    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n}\n\n";
 	setAttr ".lyr[1].ann" yes;
 select -ne :time1;
 	setAttr ".o" 0;
