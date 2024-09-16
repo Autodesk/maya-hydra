@@ -24,6 +24,7 @@
 #include "wireframeHighlights/niInstanceWireframeHighlightSi.h"
 #include "wireframeHighlights/niPrototypeWireframeHighlightSi.h"
 #include "wireframeHighlights/piInstancerWireframeHighlightSi.h"
+#include "wireframeHighlights/piPrototypeWireframeHighlightSi.h"
 #include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/mergingSceneIndex.h>
@@ -770,13 +771,16 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
 
                     HdInstancedBySchema instancedBySchema = HdInstancedBySchema::GetFromParent(prim.dataSource);
                     bool isInstancedNatively = false;
+                    bool isInstancedPi = false;
                     if (instancedBySchema.IsDefined()) {
                         for (const auto& instancerPath : instancedBySchema.GetPaths()->GetTypedValue(0)) {
                             HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(instancerPath);
                             HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
                             if (instancerTopologySchema.GetInstanceLocations()) {
                                 isInstancedNatively = true;
-                                break;
+                            }
+                            else {
+                                isInstancedPi = true;
                             }
                         }
                     }
@@ -796,6 +800,10 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
                     else if (prim.primType == HdPrimTypeTokens->mesh && isInstancedNatively) {
                         wireframeHighlightSi = NiPrototypeWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, iSelection, _wireframeColorInterface);
                         wireframeHighlightSi->SetDisplayName("NiPrototypeWireframeHighlightSceneIndex");
+                    }
+                    else if (isInstancedPi) {
+                        wireframeHighlightSi = PiPrototypeWireframeHighlightSceneIndex::New(GetInputSceneIndex(), entry.primPath, iSelection, _wireframeColorInterface);
+                        wireframeHighlightSi->SetDisplayName("PiPrototypeWireframeHighlightSceneIndex");
                     }
 
                     if (wireframeHighlightSi) {
