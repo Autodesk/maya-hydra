@@ -241,6 +241,7 @@ void NiInstanceWireframeHighlightSceneIndex::_PrimsDirtied(
         if (entry.primPath.HasPrefix(_prototypePath)) {
             _SendPrimsDirtied({HdSceneIndexObserver::DirtiedPrimEntry(entry.primPath.ReplacePrefix(_prototypePath, _PrototypeNamePath()), entry.dirtyLocators)});
         }
+        // To propagate wireframe color change to prototype
         if (entry.primPath.HasPrefix(_instancePath)) {
             HdSceneIndexObserver::DirtiedPrimEntries propagatedEntries;
             std::stack<SdfPath> pathsToDirty({_PrototypeNamePath()});
