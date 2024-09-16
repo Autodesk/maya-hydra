@@ -78,6 +78,11 @@ SdfPath DagPathToSdfPath(
     const bool      stripNamespaces)
 {
     std::string name = dagPath.fullPathName().asChar();
+    if ( name.empty() ) {
+        MFnDependencyNode dep(dagPath.node());
+        TF_WARN("Empty fullpath name for DAG object : %s of type : %s", dep.name().asChar(), dep.typeName().asChar());
+        return SdfPath();
+    }
     SanitizeNameForSdfPath(name, stripNamespaces);
     SdfPath usdPath(name);
 
