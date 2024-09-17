@@ -133,14 +133,10 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
-    // For now this is required for the HdSt backed to use lights.
-    // putenv requires char* and I'm not willing to use const cast!
-    constexpr const char* envVarSet = "USDIMAGING_ENABLE_SCENE_LIGHTS=1";
-    const auto            envVarSize = strlen(envVarSet) + 1;
-    std::vector<char>     envVarData;
-    envVarData.resize(envVarSize);
-    snprintf(envVarData.data(), envVarSize, "%s", envVarSet);
-    putenv(envVarData.data());
+    // For now this is required for the HdSt backend to use lights.
+    putenv("USDIMAGING_ENABLE_SCENE_LIGHTS=1");
+    // Performance optimization: disable RENDER_SELECTED_EDGE_FROM_FACE feature that could trigger unnecessary running of gometry shader.
+    putenv("HDST_RENDER_SELECTED_EDGE_FROM_FACE=0");
 
     MFnPlugin plugin(obj, "Autodesk", PLUGIN_VERSION, "Any");
 
