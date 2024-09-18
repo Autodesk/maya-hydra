@@ -14,11 +14,7 @@ endif()
 # -----------------------------------------------------------------------------
 # add library
 # -----------------------------------------------------------------------------
-if(PXR_VERSION VERSION_LESS 2408)
-    add_library(${TARGET_NAME} SHARED api.h)
-else()
-    add_library(${TARGET_NAME} SHARED adskHydraSceneBrowserApi.h)
-endif()
+add_library(${TARGET_NAME} SHARED adskHydraSceneBrowserApi.h)
 
 # -----------------------------------------------------------------------------
 # setup sources
@@ -157,10 +153,17 @@ target_include_directories(${TARGET_NAME}
 # this avoids overlap between Qt macros and boost, and enforces using Q_ macros.
 set_target_properties(Qt6::Core PROPERTIES INTERFACE_COMPILE_DEFINITIONS QT_NO_KEYWORDS)
 
-target_compile_definitions(${TARGET_NAME} 
-    PRIVATE 
-        HDUI_EXPORTS
-)
+if(PXR_VERSION VERSION_LESS 2408)
+	target_compile_definitions(${TARGET_NAME} 
+		PRIVATE 
+			HDUI_EXPORT
+	)
+else()
+	target_compile_definitions(${TARGET_NAME} 
+		PRIVATE 
+			HDUI_EXPORTS
+	)
+endif()
 
 mayaHydra_compile_config(${TARGET_NAME}) # TODO : This will have to be changed when moving to a standalone repo.
 
