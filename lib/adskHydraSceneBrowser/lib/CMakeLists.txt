@@ -28,6 +28,11 @@ set(HEADERS
     sceneIndexObserverLoggingWidget.h
     sceneIndexTreeWidget.h
 )
+
+if(PXR_VERSION VERSION_GREATER_EQUAL 2408)
+    list(APPEND HEADERS api.h)
+endif()
+
 set(SOURCES
     dataSourceTreeWidget.cpp
     dataSourceValueTreeView.cpp
@@ -71,7 +76,9 @@ foreach(SOURCE IN ITEMS ${SOURCES})
     # from a QLatin1StringView constructed with a C string. To patch this in we do the following replacements:
     # "QVariant(someVariable.str().c_str())" -> "QVariant(QLatin1StringView(someVariable.str().c_str()))"
     # "QVariant(someVariable.str().data())" -> "QVariant(QLatin1StringView(someVariable.str().data()))"
-    string(REGEX REPLACE "QVariant\\(\(${IDENTIFIER_REGEX}\)\.str\\(\\)\.\(c_str|data\)\\(\\)\\)" "QVariant(QLatin1StringView(\\1.str().\\2()))" FILE_CONTENTS "${FILE_CONTENTS}")
+	if(PXR_VERSION VERSION_LESS 2408)
+		string(REGEX REPLACE "QVariant\\(\(${IDENTIFIER_REGEX}\)\.str\\(\\)\.\(c_str|data\)\\(\\)\\)" "QVariant(QLatin1StringView(\\1.str().\\2()))" FILE_CONTENTS "${FILE_CONTENTS}")
+	endif()
     
     # Some setExpanded() calls are wrapped inside a QTimer::singleShot() call in order to defer their execution.
     # This was done by Pixar in order to work around a crash in what appears to be some of their proprietary code
@@ -89,7 +96,9 @@ foreach(SOURCE IN ITEMS ${SOURCES})
     prepend_include(FILE_CONTENTS "#include <QString>")
 
     # Remove an unused lambda capture to fix a warning-treated-as-error on MacOS
-    string(REGEX REPLACE "\(\\[this, menu\), menuTreeWidget\(\\]\\(QTreeWidgetItem \\*item, int column\\)\)" "\\1\\2" FILE_CONTENTS "${FILE_CONTENTS}")
+	if(PXR_VERSION VERSION_LESS 2408)
+		string(REGEX REPLACE "\(\\[this, menu\), menuTreeWidget\(\\]\\(QTreeWidgetItem \\*item, int column\\)\)" "\\1\\2" FILE_CONTENTS "${FILE_CONTENTS}")
+	endif()
     
     file(WRITE "${PATCH_LOCATION}/${SOURCE}" "${FILE_CONTENTS}")
 endforeach()
@@ -103,11 +112,15 @@ foreach(HEADER IN ITEMS ${HEADERS})
     # Add DLL import/export support for Windows 
     # Insert 'HDUI_API' symbols for class declarations
     # Note: we assume class declarations are always followed by double colons
-    string(REGEX REPLACE "class (${IDENTIFIER_REGEX}[^\;]:)" "class HDUI_API \\1" FILE_CONTENTS "${FILE_CONTENTS}")
+	if(PXR_VERSION VERSION_LESS 2408)
+		string(REGEX REPLACE "class (${IDENTIFIER_REGEX}[^\;]:)" "class HDUI_API \\1" FILE_CONTENTS "${FILE_CONTENTS}")
+	endif()
     
-    # Patch in '#include <adskHydraSceneBrowserApi.h>' to have HDUI_API defined
-    prepend_include(FILE_CONTENTS "#include <adskHydraSceneBrowserApi.h>")
-    
+	if(PXR_VERSION VERSION_LESS 2408)
+		# Patch in '#include <adskHydraSceneBrowserApi.h>' to have HDUI_API defined
+		prepend_include(FILE_CONTENTS "#include <adskHydraSceneBrowserApi.h>")
+    endif()
+	
     file(WRITE "${PATCH_LOCATION}/${HEADER}" "${FILE_CONTENTS}")
 endforeach()
 
@@ -140,10 +153,17 @@ target_include_directories(${TARGET_NAME}
 # this avoids overlap between Qt macros and boost, and enforces using Q_ macros.
 set_target_properties(Qt6::Core PROPERTIES INTERFACE_COMPILE_DEFINITIONS QT_NO_KEYWORDS)
 
-target_compile_definitions(${TARGET_NAME} 
-    PRIVATE 
-        HDUI_EXPORT
-)
+if(PXR_VERSION VERSION_LESS 2408)
+	target_compile_definitions(${TARGET_NAME} 
+		PRIVATE 
+			HDUI_EXPORT
+	)
+else()
+	target_compile_definitions(${TARGET_NAME} 
+		PRIVATE 
+			HDUI_EXPORTS
+	)
+endif()
 
 mayaHydra_compile_config(${TARGET_NAME}) # TODO : This will have to be changed when moving to a standalone repo.
 
