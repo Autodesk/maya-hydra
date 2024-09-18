@@ -248,7 +248,11 @@ std::vector<UsdPickHandler::HitPath> resolveGeomSubsetsPicking(
             continue;
         }
 
-        HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema(childPrim.dataSource);
+        #if HD_API_VERSION >= 71 // USD 24.08+
+            HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema::GetFromParent(childPrim.dataSource);
+        #else
+            HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema(childPrim.dataSource);
+        #endif
         if (!geomSubsetSchema.IsDefined() || geomSubsetSchema.GetType()->GetTypedValue(0) != geomSubsetType) {
             continue;
         }
