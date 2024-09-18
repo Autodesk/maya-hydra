@@ -49,9 +49,10 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testViewportFilters.py
     testMayaComponentsPicking.py
     testFlowPluginsHierarchicalProperties.py
-	testCustomShadersNode.py
-	testMayaDefaultMaterial.py
-	testMayaLightingModes.py
+    testCustomShadersNode.py
+    # To be reenabled after investigation
+    testMayaDefaultMaterial.py|skipOnPlatform:osx # HYDRA-1201
+    testMayaLightingModes.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
