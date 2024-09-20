@@ -232,8 +232,11 @@ namespace {
     template<> inline SdfPath maybePrepend<MRenderItem>(
         const MRenderItem& ri, const SdfPath& inPath
         ) {
-        // Prepend Maya path, for organisation and readability.
+        // Prepend Maya path, for organization and readability.
         auto sdfDagPath = DagPathToSdfPath(ri.sourceDagPath(), false, false).MakeRelativePath(SdfPath::AbsoluteRootPath());
+        if (sdfDagPath.IsEmpty()){
+            return inPath;
+        }
         return sdfDagPath.AppendPath(inPath);
     }
 
