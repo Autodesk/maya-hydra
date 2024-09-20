@@ -20,6 +20,7 @@ import mtohUtils
 import mayaUtils
 from testUtils import PluginLoaded
 import platform
+import unittest
 
 class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -45,6 +46,7 @@ class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mto
             cmds.refresh()
             self.assertSnapshotClose("defaultMaterial" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
 
+    @unittest.skipUnless(platform.system() != "Darwin", 'This test is disabled on OSX as not all implicit surfaces are fully implemented on OSX.')
     def test_MayaDefaultMaterialUsdPrims(self):
         # open a Maya scene with usd prims (sphere, capsule, cube, cylinder ...)
         testFile = mayaUtils.openTestScene(
@@ -52,8 +54,6 @@ class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mto
                 "testMayaDefaultMaterial_Usd_proceduralShapes.ma", useTestSettings=False)
         cmds.refresh()
         
-        #Cone and cylinder_1 are not supported on OSX with USD 24.05 so they are not in our test scene
-
         #Use Default Material
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
