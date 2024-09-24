@@ -19,6 +19,7 @@ import fixturesUtils
 import mtohUtils
 import mayaUtils
 import platform
+import unittest
 
 class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -72,6 +73,7 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
         #self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     #Test usd lights (e.g., disk,distant,dome,etc.) with a maya native sphere and usd sphere.
+    @unittest.skipUnless(mayaUtils.mayaMajorVersion() > 2025, "HYDRA-1215: Re-enable for old Maya version later.")
     def test_USDLights(self):
         # Load a maya scene with a maya native sphere, usd sphere and some lights, with HdStorm already being the viewport renderer.
         # The sphere is not at the origin on purpose
