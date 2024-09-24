@@ -31,32 +31,28 @@ class TestUsdTextureToggle(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
     def setUp(self):
         # Open simple Maya scene
         testFile = mayaUtils.openTestScene(
-                "testUsdTextureToggle",
-                "testUsdTextureToggle.ma", useTestSettings=False)
-        cmds.grid(toggle=False)
+                "testUsdStageDefaultLighting",
+                "testUsdStageDefaultLighting.ma")
         cmds.refresh()
     
     def setTextureMode(self, enabled):
         cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, displayTextures=enabled)        
         cmds.refresh()
 
-    def test_UsdTextureToggleInitiallyOn(self):
-        self.setTextureMode(True)
-        self.setViewport2Renderer()
-        self.setHdStormRenderer()
-        self.assertSnapshotClose("usd_texture_on" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        
-        self.setTextureMode(False)
-        self.assertSnapshotClose("usd_texture_off" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+    def setCameraTransform(self, xtrans, ytrans, ztrans, xrot, yrot, zrot ):
+        #Move camera
+        cmds.setAttr('persp.translate', xtrans, ytrans, ztrans, type='float3')
+        cmds.setAttr('persp.rotate', xrot, yrot, zrot, type='float3')
 
-    def test_UsdTextureToggleInitiallyOff(self):
-        self.setTextureMode(False)
-        self.setViewport2Renderer()
-        self.setHdStormRenderer()
-        self.assertSnapshotClose("usd_texture_off" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        
+    def test_UsdStageDefaultLighting(self):
+        self.setHdStormRenderer()        
         self.setTextureMode(True)
-        self.assertSnapshotClose("usd_texture_on" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        self.setCameraTransform(-21, 7, 18, -20, -50, 0)
+        self.assertSnapshotClose("usdStageDefaultLighting_1" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        self.setCameraTransform(20, 12, 16, -30, 50, 0)
+        self.assertSnapshotClose("usdStageDefaultLighting_2" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

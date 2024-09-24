@@ -22,6 +22,7 @@
 #include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/usd/usdGeom/tokens.h>
 
 namespace FVP_NS_DEF {
 
@@ -29,6 +30,24 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace{
     static const TfToken purposes[] = { HdMaterialBindingsSchemaTokens->allPurpose };
+
+    // Support implicit surfaces from USD as well, not only meshes
+    bool _IsDefaultMaterialCompliantPrimitive(const TfToken& primType) 
+    { 
+        static std::set<TfToken> const compliantPrimitives = { HdPrimTypeTokens->cone,
+                                                              HdPrimTypeTokens->cylinder,
+                                                              HdPrimTypeTokens->cylinder_1,
+                                                              HdPrimTypeTokens->cube,
+                                                              HdPrimTypeTokens->sphere,   
+                                                              HdPrimTypeTokens->capsule,
+                                                              HdPrimTypeTokens->capsule_1,
+                                                        #if HD_API_VERSION >= 67 // USD 24.05+
+                                                              UsdGeomTokens->TetMesh,
+                                                        #endif
+                                                              UsdGeomTokens->Plane,
+                                                              HdPrimTypeTokens->mesh};
+        return compliantPrimitives.count(primType) == 1;
+    }
 }
 
 // static
@@ -67,8 +86,7 @@ HdSceneIndexPrim DefaultMaterialSceneIndex::GetPrim(const SdfPath& primPath) con
 
 bool DefaultMaterialSceneIndex::_ShouldWeApplyTheDefaultMaterial(const HdSceneIndexPrim& prim)const
 {
-    // Only for meshes so far
-    if (HdPrimTypeTokens->mesh != prim.primType) {
+    if (! _IsDefaultMaterialCompliantPrimitive(prim.primType)) {
         return false;
     }
 

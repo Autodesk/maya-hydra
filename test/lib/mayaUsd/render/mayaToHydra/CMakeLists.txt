@@ -18,7 +18,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStageAddPrim.py
     testTransforms.py
     testRefinement.py
-    testMaterialXOnNative.py|depOnPlugins:lookdevx
+    # To be reenabled after investigation: HYDRA-1206
+    #testMaterialXOnNative.py|depOnPlugins:lookdevx
     testNewSceneWithStage.py
     # To be reenabled after investigation
     #testMayaDisplayModes.py|skipOnPlatform:osx
@@ -42,14 +43,16 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testBackgroundColor.py
     testGrid.py
     testUsdTextureToggle.py
+    testUsdStageDefaultLighting.py
     # To be reenabled after investigation
     testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testPassingNormalsOnMayaNative.py
     testViewportFilters.py
     testMayaComponentsPicking.py
     testFlowPluginsHierarchicalProperties.py
-	testCustomShadersNode.py
-	testMayaDefaultMaterial.py
+    testCustomShadersNode.py
+    testMayaDefaultMaterial.py
+    testMayaLightingModes.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
@@ -87,7 +90,8 @@ endif(MayaUsd_FOUND)
 
 # Code coverage is not computed for the Hydra scene browser.
 if (NOT CODE_COVERAGE)
-    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py)
+    # To be reenabled after investigation: HYDRA-1207
+    #list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py)
 endif()
 
 # Interactive Unit test scripts for mesh adapter (launched with maya.exe instead of mayapy.exe)

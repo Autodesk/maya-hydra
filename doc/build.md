@@ -12,7 +12,7 @@ Before building the project, consult the following table to ensure you use the r
 |:---------------------:|:-------------------------:|:------------------------------------------------------------:|:---------------------------:|
 |    Operating System   |         Windows 10 <br> Windows 11 | High Sierra (10.13)<br>Mojave (10.14)<br>Catalina (10.15)<br>Big Sur (11.2.x)    |      Rocky Linux 8.6 / Linux® Red Hat® Enterprise 8.6 WS             |
 |   Compiler Requirement| Maya 2024 (VS 2022)<br>Maya 2025 (VS 2022) | Maya 2024 (Xcode 13.4 or higher)<br>Maya 2025 (Xcode 13.4 or higher) | Maya 2024 (gcc 11.2.1)<br>Maya 2025 (gcc 11.2.1) |
-| CMake Version (min/max) |        3.13...3.20      |                              3.13...3.20                     |           3.13...3.20       |
+| CMake Version (min/max) |        3.27.7...3.30      |                              3.27.7...3.30                     |           3.27.7...3.30       |
 |         Python        | 3.10.8, 3.11.4  |                       3.10.8, 3.11.4               |  3.10.8, 3.11.4   |
 |    Python Packages    | PyYAML, PySide, PyOpenGL        | PyYAML, PySide2, PyOpenGL              | PyYAML, PySide, PyOpenGL |
 |    Build generator    | Visual Studio, Ninja (Recommended)    |  XCode, Ninja (Recommended)                      |    Ninja (Recommended)      |
@@ -29,7 +29,7 @@ See Pixar's official github page for instructions on how to build USD: https://g
 
 |               |      ![](images/pxr.png)          |USD version used in Maya        
 |:------------: |:---------------:                  |:---------------:
-|  CommitID/Tags | [v22.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v22.11) or [v23.08](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.08) or [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11) |Maya 2024 = v22.11<br>Maya 2025 = v23.11<br>Maya PR = v23.11
+|  CommitID/Tags | [v22.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v22.11), [v23.08](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.08), [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11) or [v24.05](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.05) |Maya 2024 = v22.11<br>Maya 2025 = v23.11<br>Maya PR = v24.05
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
 

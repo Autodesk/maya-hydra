@@ -52,6 +52,7 @@
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
@@ -269,6 +270,8 @@ private:
     Fvp::SelectionPtr                         _selection;
     Fvp::WireframeSelectionHighlightSceneIndexRefPtr  _wireframeSelectionHighlightSceneIndex;
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
+    Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
+
     // Naming this identifier _ufeSelection clashes with UFE's selection.h
     // include guard and produces
     // "error C2351: obsolete C++ constructor initialization syntax"
@@ -318,6 +321,7 @@ private:
     int        _oldRefineLevel {0};
     bool       _useDefaultMaterial;
     bool       _xRayEnabled;
+    MFrameContext::LightingMode _lightingMode = MFrameContext::LightingMode::kSceneLights;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
