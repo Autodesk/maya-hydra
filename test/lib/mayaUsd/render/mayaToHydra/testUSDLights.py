@@ -19,6 +19,7 @@ import fixturesUtils
 import mtohUtils
 import mayaUtils
 import platform
+import unittest
 
 class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
