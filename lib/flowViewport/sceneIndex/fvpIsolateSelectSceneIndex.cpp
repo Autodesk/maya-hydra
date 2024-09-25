@@ -31,6 +31,12 @@ namespace {
 const HdContainerDataSourceHandle visOff =
     HdVisibilitySchema::BuildRetained(
         HdRetainedTypedSampledDataSource<bool>::New(false));
+
+bool disabled(const Fvp::SelectionConstPtr& a, const Fvp::SelectionConstPtr& b)
+{
+    return !a && !b;
+}
+
 }
 
 namespace FVP_NS_DEF {
@@ -75,11 +81,13 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
 
     auto inputPrim = GetInputSceneIndex()->GetPrim(primPath);
 
-    // If isolate selection is empty, everything is included.
-    if (_isolateSelection->IsEmpty()) {
+    // If there is no isolate selection, everything is included.
+    if (!_isolateSelection) {
         return inputPrim;
     }
 
+    // If isolate selection is empty, then nothing is included (everything
+    // is excluded), as desired.
     const bool included = 
         _isolateSelection->HasAncestorOrDescendantInclusive(primPath);
 
@@ -129,6 +137,10 @@ void IsolateSelectSceneIndex::AddIsolateSelection(const PrimSelections& primSele
     TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
         .Msg("IsolateSelectSceneIndex::AddIsolateSelection() called for viewport %s.\n", _viewportId.c_str());
 
+    if (!TF_VERIFY(_isolateSelection, "AddIsolateSelection() called for viewport %s while isolate selection is disabled", _viewportId.c_str())) {
+        return;
+    }
+
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
     for (const auto& primSelection : primSelections) {
         TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
@@ -144,6 +156,10 @@ void IsolateSelectSceneIndex::RemoveIsolateSelection(const PrimSelections& primS
 {
     TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
         .Msg("IsolateSelectSceneIndex::RemoveIsolateSelection() called for viewport %s.\n", _viewportId.c_str());
+
+    if (!TF_VERIFY(_isolateSelection, "RemoveIsolateSelection() called for viewport %s while isolate selection is disabled", _viewportId.c_str())) {
+        return;
+    }
 
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
     for (const auto& primSelection : primSelections) {
@@ -161,6 +177,10 @@ void IsolateSelectSceneIndex::ClearIsolateSelection()
     TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
         .Msg("IsolateSelectSceneIndex::ClearIsolateSelection() called for viewport %s.\n", _viewportId.c_str());
 
+    if (!TF_VERIFY(_isolateSelection, "ClearIsolateSelection() called for viewport %s while isolate selection is disabled", _viewportId.c_str())) {
+        return;
+    }
+
     auto isolateSelectPaths = _isolateSelection->GetFullySelectedPaths();
 
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
@@ -175,30 +195,53 @@ void IsolateSelectSceneIndex::ClearIsolateSelection()
     _SendPrimsDirtied(dirtiedEntries);
 }
 
-void IsolateSelectSceneIndex::ReplaceIsolateSelection(const SelectionConstPtr& isolateSelection)
+void IsolateSelectSceneIndex::ReplaceIsolateSelection(const SelectionConstPtr& newIsolateSelection)
 {
     TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
         .Msg("IsolateSelectSceneIndex::ReplaceIsolateSelection() called for viewport %s.\n", _viewportId.c_str());
 
-    _ReplaceIsolateSelection(isolateSelection);
-
-    _isolateSelection->Replace(*isolateSelection);
-}
-
-void IsolateSelectSceneIndex::_ReplaceIsolateSelection(const SelectionConstPtr& isolateSelection)
-{
-    // Keep paths in a set to minimize dirtying.  First clear old paths.
-    auto clearedPaths = _isolateSelection->GetFullySelectedPaths();
-    std::set<SdfPath> dirtyPaths(clearedPaths.begin(), clearedPaths.end());
-
-    // Then add new paths.
-    const auto& newPaths = isolateSelection->GetFullySelectedPaths();
-    for (const auto& primPath : newPaths) {
-        dirtyPaths.insert(primPath);
+    if (!TF_VERIFY(_isolateSelection, "ReplaceIsolateSelection() called for viewport %s while isolate selection is disabled", _viewportId.c_str())) {
+        return;
     }
 
-    // Finally, dirty all cleared and added prim paths.
+    if (!TF_VERIFY(newIsolateSelection, "ReplaceIsolateSelection() called for viewport %s with illegal null isolate selection pointer", _viewportId.c_str())) {
+        return;
+    }
+
+    _ReplaceIsolateSelection(newIsolateSelection);
+
+    _isolateSelection->Replace(*newIsolateSelection);
+}
+
+void IsolateSelectSceneIndex::_ReplaceIsolateSelection(const SelectionConstPtr& newIsolateSelection)
+{
+    // Trivial case of going from disabled to disabled is an early out.
+    if (disabled(_isolateSelection, newIsolateSelection)) {
+        return;
+    }
+
+    // If the old and new isolate selection are equal, nothing to do.  Only
+    // handling trivial case of empty isolate select (i.e. hide everything) for
+    // the moment.
+    if ((_isolateSelection && _isolateSelection->IsEmpty()) &&
+        (newIsolateSelection && newIsolateSelection->IsEmpty())) {
+        return;
+    }
+        
+    // Keep paths in a set to minimize dirtying.
+    std::set<SdfPath> dirtyPaths;
+
+    // First clear old paths.  If we were disabled do nothing.  If there were
+    // no selected paths the whole scene was invisible.
+    _InsertSelectedPaths(_isolateSelection, dirtyPaths);
+
+    // Then add new paths.  If we're disabled do nothing.  If there are no
+    // selected paths the whole scene is invisible.
+    _InsertSelectedPaths(newIsolateSelection, dirtyPaths);
+
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
+
+    // Dirty all cleared and added prim paths.
     for (const auto& primPath : dirtyPaths) {
         _DirtyVisibility(primPath, &dirtiedEntries);
     }
@@ -206,9 +249,25 @@ void IsolateSelectSceneIndex::_ReplaceIsolateSelection(const SelectionConstPtr& 
     _SendPrimsDirtied(dirtiedEntries);
 }
 
+void IsolateSelectSceneIndex::_InsertSelectedPaths(
+    const SelectionConstPtr& selection,
+    std::set<SdfPath>&       dirtyPaths
+)
+{
+    if (!selection) {
+        return;
+    }
+    const auto& paths = selection->IsEmpty() ? 
+        GetChildPrimPaths(SdfPath::AbsoluteRootPath()) :
+        selection->GetFullySelectedPaths();
+    for (const auto& primPath : paths) {
+        dirtyPaths.insert(primPath);
+    }
+}
+
 void IsolateSelectSceneIndex::SetViewport(
     const std::string&  viewportId,
-    const SelectionPtr& isolateSelection
+    const SelectionPtr& newIsolateSelection
 )
 {
     TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
@@ -216,18 +275,32 @@ void IsolateSelectSceneIndex::SetViewport(
     TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
         .Msg("    Old viewport was %s.\n", _viewportId.c_str());
     TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
-        .Msg("    Old selection is %p, new selection is %p.\n", &*_isolateSelection, &*isolateSelection);
+        .Msg("    Old selection is %p, new selection is %p.\n", (_isolateSelection ? &*_isolateSelection : (void*) 0), (newIsolateSelection ? &*newIsolateSelection : (void*) 0));
 
-    if ((isolateSelection == _isolateSelection) ||
+    if ((newIsolateSelection == _isolateSelection) &&
         (viewportId == _viewportId)) {
         TF_WARN("IsolateSelectSceneIndex::SetViewport() called with identical information, no operation performed.");
         return;
     }
 
-    _ReplaceIsolateSelection(isolateSelection);
+    // If the previous and new viewports both had isolate select disabled,
+    // no visibility to dirty.
+    if (disabled(_isolateSelection, newIsolateSelection)) {
+        _viewportId = viewportId;
+        return;
+    }
 
-    _isolateSelection = isolateSelection;
+    _ReplaceIsolateSelection(newIsolateSelection);
+
+    _isolateSelection = newIsolateSelection;
     _viewportId = viewportId;
+}
+
+void IsolateSelectSceneIndex::SetIsolateSelection(
+    const SelectionPtr& newIsolateSelection
+)
+{
+    _isolateSelection = newIsolateSelection;
 }
 
 SelectionPtr IsolateSelectSceneIndex::GetIsolateSelection() const

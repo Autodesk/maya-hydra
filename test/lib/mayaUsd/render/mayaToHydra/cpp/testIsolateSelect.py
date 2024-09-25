@@ -15,17 +15,56 @@
 
 import fixturesUtils
 import mtohUtils
-from testUtils import PluginLoaded
 import mayaUsd
 import mayaUsd_createStageWithNewLayer
 import maya.cmds as cmds
+import maya.mel as mel
 from pxr import UsdGeom
+
+def enableIsolateSelect(modelPanel):
+    # Surprisingly
+    # 
+    # cmds.isolateSelect('modelPanel1', state=1)
+    # 
+    # is insufficient to turn on isolate selection in a viewport, and we must
+    # use the MEL script used by the menu and Ctrl-1 hotkey.  This is because
+    # the viewport uses the selectionConnection command to filter the selection
+    # it receives and create its isolate selection, and the the
+    # mainListConnection, lockMainConnection and unlockMainConnection flags of
+    # the editor command to suspend changes to its selection connection.  See
+    # the documentation for more details.
+    cmds.setFocus(modelPanel)
+    mel.eval("enableIsolateSelect %s 1" % modelPanel)
+    
+def disableIsolateSelect(modelPanel):
+    cmds.setFocus(modelPanel)
+    mel.eval("enableIsolateSelect %s 0" % modelPanel)
 
 class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
     # Base class setUp() defines HdStorm as the renderer.
+
+    _pluginsToLoad = ['mayaHydraCppTests', 'mayaHydraFlowViewportAPILocator']
+    _pluginsToUnload = []
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestIsolateSelect, cls).setUpClass()
+        for p in cls._pluginsToLoad:
+            if not cmds.pluginInfo(p, q=True, loaded=True):
+                cls._pluginsToUnload.append(p)
+                cmds.loadPlugin(p, quiet=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestIsolateSelect, cls).tearDownClass()
+        # Clean out the scene to allow all plugins to unload cleanly.
+        cmds.file(new=True, force=True)
+        for p in reversed(cls._pluginsToUnload):
+            if p != 'mayaHydraFlowViewportAPILocator':
+                cmds.unloadPlugin(p)
 
     def setupScene(self):
         proxyShapePathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
@@ -34,16 +73,37 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
         stage.DefinePrim('/parent1', 'Xform')
         stage.DefinePrim('/parent2', 'Xform')
         
-        UsdGeom.Cylinder.Define(stage, "/parent1/cylinder1")
-        UsdGeom.Cone.Define(stage, "/parent2/cone1")
-        UsdGeom.Sphere.Define(stage, "/parent2/sphere1")
+        cylinder1 = UsdGeom.Cylinder.Define(stage, "/parent1/cylinder1")
+        cone1 = UsdGeom.Cone.Define(stage, "/parent2/cone1")
+        sphere1 = UsdGeom.Sphere.Define(stage, "/parent2/sphere1")
+
+        # Move objects around so that snapshot comparison is significant.
+
+        # Move USD objects.  Can also use undoable Maya cmds.move(), but using
+        # the USD APIs is simpler.
+        cylinder1.AddTranslateOp().Set(value=(0, 2, 0))
+        cone1.AddTranslateOp().Set(value=(2, 0, 0))
+        sphere1.AddTranslateOp().Set(value=(-2, 0, 0))
 
         cmds.polyTorus()
         cmds.polySphere()
+        cmds.move(2, 0, 0, r=True)
         cmds.polyCube()
+        cmds.move(-2, 0, 0, r=True)
         cmds.polyCone()
         cmds.group('pSphere1', 'pCube1')
+        cmds.move(0, 0, 2, r=True)
         cmds.group('pCone1')
+        cmds.move(0, 0, 2, r=True)
+
+        # Add a Hydra-only data producer.
+        cmds.createNode("MhFlowViewportAPILocator")
+        cmds.setAttr("MhFlowViewportAPILocator1.numCubesX", 2)
+        cmds.setAttr("MhFlowViewportAPILocator1.numCubesY", 2)
+        cmds.setAttr("MhFlowViewportAPILocator1.cubeHalfSize", 0.25)
+        cmds.setAttr("MhFlowViewportAPILocator1.cubesDeltaTrans", 1, 1, 1)
+
+        cmds.move(0, 0, 4, "transform1", r=True)
 
         cmds.refresh()
 
@@ -100,235 +160,215 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
 
     def test_isolateSelectSingleViewport(self):
         scene = self.setupScene()
-        with PluginLoaded('mayaHydraCppTests'):
-            # The default viewport is in the following panel.
-            vpPanel = 'modelPanel4'
 
-            #============================================================
-            # Add
-            #============================================================
+        # The default viewport is in the following panel.
+        modelPanel = 'modelPanel4'
 
-            # Add a single object to the isolate selection.  Only that object,
-            # its ancestors, and its descendants are visible.
-            cmds.mayaHydraCppTest(vpPanel, "|pTorus1", f="TestIsolateSelection.add")
+        cmds.select(clear=True)
+        enableIsolateSelect(modelPanel)
 
-            visible = ['|pTorus1', '|pTorus1|pTorusShape1']
-            notVisible = scene.copy()
-            for v in visible:
-                notVisible.remove(v)
+        #============================================================
+        # Add
+        #============================================================
 
-            self.assertVisibility(visible, notVisible)
+        # Add a single object to the isolate selection.  Only that object,
+        # its ancestors, and its descendants are visible.
+        cmds.mayaHydraCppTest(modelPanel, "|pTorus1", f="TestIsolateSelection.add")
 
-            # Add a USD object to the isolate selection.
-            cmds.mayaHydraCppTest(vpPanel, '|stage1|stageShape1,/parent2', f="TestIsolateSelection.add")
+        visible = ['|pTorus1', '|pTorus1|pTorusShape1']
+        notVisible = scene.copy()
+        for v in visible:
+            notVisible.remove(v)
 
-            for p in ['|stage1|stageShape1,/parent2',
-                      '|stage1|stageShape1,/parent2/cone1',
-                      '|stage1|stageShape1,/parent2/sphere1']:
-                visible.append(p)
-                notVisible.remove(p)
+        self.assertVisibility(visible, notVisible)
 
-            self.assertVisibility(visible, notVisible)
+        # Add a USD object to the isolate selection.
+        cmds.mayaHydraCppTest(modelPanel, '|stage1|stageShape1,/parent2', f="TestIsolateSelection.add")
 
-            #============================================================
-            # Remove
-            #============================================================
+        for p in ['|stage1|stageShape1,/parent2',
+                  '|stage1|stageShape1,/parent2/cone1',
+                  '|stage1|stageShape1,/parent2/sphere1']:
+            visible.append(p)
+            notVisible.remove(p)
 
-            # Remove the Maya object from the isolate selection.  Only the USD
-            # isolate selected objects are visible.
-            cmds.mayaHydraCppTest(vpPanel, "|pTorus1", f="TestIsolateSelection.remove")
+        self.assertVisibility(visible, notVisible)
 
-            visible.clear()
-            notVisible = scene.copy()
+        #============================================================
+        # Remove
+        #============================================================
 
-            for p in ['|stage1|stageShape1,/parent2',
-                      '|stage1|stageShape1,/parent2/cone1',
-                      '|stage1|stageShape1,/parent2/sphere1']:
-                visible.append(p)
-                notVisible.remove(p)
+        # Remove the Maya object from the isolate selection.  Only the USD
+        # isolate selected objects are visible.
+        cmds.mayaHydraCppTest(modelPanel, "|pTorus1", f="TestIsolateSelection.remove")
 
-            self.assertVisibility(visible, notVisible)
+        visible.clear()
+        notVisible = scene.copy()
 
-            # Remove the USD isolate selected object.  Everything is now visible.
-            cmds.mayaHydraCppTest(vpPanel, '|stage1|stageShape1,/parent2', f="TestIsolateSelection.remove")
+        for p in ['|stage1|stageShape1,/parent2',
+                  '|stage1|stageShape1,/parent2/cone1',
+                  '|stage1|stageShape1,/parent2/sphere1']:
+            visible.append(p)
+            notVisible.remove(p)
 
-            visible = scene.copy()
-            notVisible.clear()
+        self.assertVisibility(visible, notVisible)
 
-            self.assertVisibility(visible, notVisible)
+        # Remove the USD isolate selected object.  The isolate selection
+        # is empty, isolate selection is enabled, so nothing is now visible.
+        cmds.mayaHydraCppTest(modelPanel, '|stage1|stageShape1,/parent2', f="TestIsolateSelection.remove")
 
-            #============================================================
-            # Clear
-            #============================================================
+        visible.clear()
+        notVisible = scene.copy()
 
-            # Add an object back to the isolate selection.
-            cmds.mayaHydraCppTest(vpPanel, '|stage1|stageShape1,/parent1/cylinder1', f="TestIsolateSelection.add")
+        self.assertVisibility(visible, notVisible)
 
-            notVisible = scene.copy()
-            visible.clear()
+        #============================================================
+        # Clear
+        #============================================================
 
-            for p in ['|stage1|stageShape1,/parent1',
-                      '|stage1|stageShape1,/parent1/cylinder1']:
-                visible.append(p)
-                notVisible.remove(p)
+        # Add an object back to the isolate selection.
+        cmds.mayaHydraCppTest(modelPanel, '|stage1|stageShape1,/parent1/cylinder1', f="TestIsolateSelection.add")
 
-            self.assertVisibility(visible, notVisible)
+        notVisible = scene.copy()
+        visible.clear()
 
-            # Clear the isolate selection.
-            cmds.mayaHydraCppTest(vpPanel, f="TestIsolateSelection.clear")
+        for p in ['|stage1|stageShape1,/parent1',
+                  '|stage1|stageShape1,/parent1/cylinder1']:
+            visible.append(p)
+            notVisible.remove(p)
 
-            visible = scene.copy()
-            notVisible.clear()
+        self.assertVisibility(visible, notVisible)
 
-            self.assertVisibility(visible, notVisible)
+        # Clear the isolate selection.
+        cmds.mayaHydraCppTest(modelPanel, f="TestIsolateSelection.clear")
 
-            #============================================================
-            # Replace
-            #============================================================
+        visible.clear()
+        notVisible = scene.copy()
 
-            # Add an object back to the isolate selection.
-            cmds.mayaHydraCppTest(vpPanel, '|group2|pCone1', f="TestIsolateSelection.add")
+        self.assertVisibility(visible, notVisible)
 
-            notVisible = scene.copy()
-            visible.clear()
+        #============================================================
+        # Replace
+        #============================================================
 
-            for p in ['|group2', '|group2|pCone1', '|group2|pCone1|pConeShape1']:
-                visible.append(p)
-                notVisible.remove(p)
+        # Add an object back to the isolate selection.
+        cmds.mayaHydraCppTest(modelPanel, '|group2|pCone1', f="TestIsolateSelection.add")
 
-            self.assertVisibility(visible, notVisible)
+        notVisible = scene.copy()
+        visible.clear()
 
-            # Replace this isolate selection with a different one.
-            cmds.mayaHydraCppTest(vpPanel, '|group1|pCube1', '|stage1|stageShape1,/parent2/cone1', f="TestIsolateSelection.replace")
+        for p in ['|group2', '|group2|pCone1', '|group2|pCone1|pConeShape1']:
+            visible.append(p)
+            notVisible.remove(p)
 
-            visible.clear()
-            notVisible = scene.copy()
+        self.assertVisibility(visible, notVisible)
 
-            for p in ['|group1', '|group1|pCube1', '|group1|pCube1|pCubeShape1',
-                      '|stage1|stageShape1,/parent2',
-                      '|stage1|stageShape1,/parent2/cone1']:
-                visible.append(p)
-                notVisible.remove(p)
+        # Replace this isolate selection with a different one.
+        cmds.mayaHydraCppTest(modelPanel, '|group1|pCube1', '|stage1|stageShape1,/parent2/cone1', f="TestIsolateSelection.replace")
 
-            self.assertVisibility(visible, notVisible)
+        visible.clear()
+        notVisible = scene.copy()
 
-            # Clear the isolate selection to avoid affecting other tests.
-            cmds.mayaHydraCppTest(vpPanel, f="TestIsolateSelection.clear")
+        for p in ['|group1', '|group1|pCube1', '|group1|pCube1|pCubeShape1',
+                  '|stage1|stageShape1,/parent2',
+                  '|stage1|stageShape1,/parent2/cone1']:
+            visible.append(p)
+            notVisible.remove(p)
 
-    # To test multi-viewport behavior we would have wanted to test scene index
-    # prim visibility for each viewport, and demonstrate per-viewport
-    # visibility.  Unfortunately, tracing demonstrates that we can't obtain
-    # scene index prim visibility in one viewport before a draw is performed in
-    # another viewport.
+        self.assertVisibility(visible, notVisible)
+
+        # Disable the isolate selection to avoid affecting other tests.
+        disableIsolateSelect(modelPanel)
+
+    # A robust multi-viewport test would have tested scene index prim
+    # visibility for each viewport, and demonstrated per-viewport visibility.
+    # Unfortunately, tracing demonstrates that we can't obtain scene index prim
+    # visibility in one viewport before a draw is performed in another
+    # viewport.  Since visibility is according to the last viewport drawn, and
+    # don't know of way to control order of viewport draw, this testing
+    # strategy fails.
     #
-    # Since visibility is according to the last viewport drawn, and don't know
-    # of way to control order of viewport draw, this testing strategy fails.
-    # For example, consider drawing modelPanel4, then modelPanel1:
-    # 
-    #======================================================================
-    # Re-using existing scene index chain to render modelPanel4
-    # found isolate selection 0000022DD5557B30 for viewport ID modelPanel4
-    # Re-using isolate selection 0000022DD5557B30
-    # Rendering destination is modelPanel1
-    # Re-using existing scene index chain to render modelPanel1
-    # found isolate selection 0000022E05EC5740 for viewport ID modelPanel1
-    # Switching scene index to isolate selection 0000022E05EC5740
-    # IsolateSelectSceneIndex::SetViewport() called for new viewport modelPanel1.
-    #     Old viewport was modelPanel4.
-    #     Old selection is 0000022DD5557B30, new selection is 0000022E05EC5740.
-    #     modelPanel4: examining /MayaHydraViewportRenderer/rprims/Lighted/pSphere1 for isolate select dirtying.
-    # [...]
-    # [Dirtying to bring objects invisible in modelPanel4 into modelPanel1]
-    # [...]
-    # [Multiple GetPrim() calls for modelPanel1 which all succeed because the
-    # isolate selection for modelPanel1 is empty]
-    # IsolateSelectSceneIndex::GetPrim(/MayaHydraViewportRenderer/rprims/pCone1/pConeShape1/DormantPolyWire_58) called for viewport modelPanel1.
-    # [...]
-    # Rendering destination is modelPanel1
-    # Re-using existing scene index chain to render modelPanel1
-    # found isolate selection 0000022E05EC5740 for viewport ID modelPanel1
-    # Re-using isolate selection 0000022E05EC5740
-    #
-    # [For an unknown reason we switch back to rendering modelPanel4.]
-    # 
-    # Rendering destination is modelPanel4
-    # Re-using existing scene index chain to render modelPanel4
-    # found isolate selection 0000022DD5557B30 for viewport ID modelPanel4
-    # Switching scene index to isolate selection 0000022DD5557B30
-    # IsolateSelectSceneIndex::SetViewport() called for new viewport modelPanel4.
-    #     Old viewport was modelPanel1.
-    #     Old selection is 0000022E05EC5740, new selection is 0000022DD5557B30.
-    #======================================================================
-    # 
-    # And at this point if we ask for visibility we'll get the modelPanel4
-    # visibility, rather than the desired modelPanel1 visibility.
-    #
-    # We may have to resort to image comparison to test this.
-
+    # Unfortunately performing image comparisons is also not possible, as at
+    # time of writing playblast doesn't respect isolate select when using
+    # MayaHydra in a multi-viewport setting.  Therefore, the following test is
+    # weak and does not validate results.
     def test_isolateSelectMultiViewport(self):
         scene = self.setupScene()
-        with PluginLoaded('mayaHydraCppTests'):
             
-            # We start in single viewport mode.  Set an isolate selection there.
-            cmds.mayaHydraCppTest('modelPanel4', '|group1', '|stage1|stageShape1,/parent1/cylinder1', f="TestIsolateSelection.replace")
+        # We start in single viewport mode.  Set an isolate selection there.
+        cmds.select('|group1', '|stage1|stageShape1,/parent1/cylinder1')
+        enableIsolateSelect("modelPanel4")
 
-            notVisible = scene.copy()
-            visible = ['|group1',
-                       '|group1|pSphere1',
-                       '|group1|pSphere1|pSphereShape1',
-                       '|group1|pCube1',
-                       '|group1|pCube1|pCubeShape1',
-                       '|stage1|stageShape1,/parent1',
-                       '|stage1|stageShape1,/parent1/cylinder1']
-            for p in visible:
-                notVisible.remove(p)
+        notVisible = scene.copy()
+        visible = ['|group1',
+                   '|group1|pSphere1',
+                   '|group1|pSphere1|pSphereShape1',
+                   '|group1|pCube1',
+                   '|group1|pCube1|pCubeShape1',
+                   '|stage1|stageShape1,/parent1',
+                   '|stage1|stageShape1,/parent1/cylinder1']
+        for p in visible:
+            notVisible.remove(p)
 
-            self.assertVisibility(visible, notVisible)
+        cmds.refresh()
 
-            # Switch to four-up viewport mode.  Set the renderer in each new
-            # viewport to be Hydra Storm.  Viewport 4 is already set.
-            # Everything should be initially visible in viewports 1-3.
-            cmds.FourViewLayout()
-            visible = scene.copy()
-            notVisible.clear()
-            for i in range(1, 4):
-                cmds.setFocus('modelPanel'+str(i))
-                self.setHdStormRenderer()
-                # self.assertVisibility(visible, notVisible)
+        self.assertVisibility(visible, notVisible)
 
-            # Here we would set different isolate selections in each viewport.
+        # Move the camera closer for a view where objects fill in more of the
+        # viewport. FrameSelectedWithoutChildren() is good, but a manually
+        # chosen camera position is better.
+        cmds.setAttr("persp.translate", 4.9, 3.5, 5.7)
+        cmds.select(clear=1)
 
-            # As a final step clear the isolate selections to avoid affecting
-            # other tests.
-            for i in range(1, 5):
-                modelPanel = 'modelPanel'+str(i)
-                cmds.setFocus(modelPanel)
-                cmds.mayaHydraCppTest(modelPanel, f="TestIsolateSelection.clear")
+        cmds.refresh()
+
+        self.assertSnapshotClose("singleViewportIsolateSelectCylinder1.png", 0.1, 2)
+
+        # Switch to four-up viewport mode.  Set the renderer in each new
+        # viewport to be Hydra Storm.  Viewport 4 is already set.
+        cmds.FourViewLayout()
+        visible = scene.copy()
+        notVisible.clear()
+        for i in range(1, 4):
+            cmds.setFocus('modelPanel'+str(i))
+            self.setHdStormRenderer()
+
+        cmds.select('|pTorus1')
+
+        enableIsolateSelect("modelPanel1")
+
+        cmds.refresh()
+
+        # As a final step disable the isolate selections to avoid affecting
+        # other tests.
+        for i in range(1, 5):
+            disableIsolateSelect('modelPanel'+str(i))
 
     def test_isolateSelectMultipleStages(self):
         scene = self.setupMultiStageScene()
-        with PluginLoaded('mayaHydraCppTests'):
-            vpPanel = 'modelPanel4'
-            cmds.mayaHydraCppTest(
-                vpPanel, '|group1|pCube1', '|stage1|stageShape1,/parent2/cone1',
-                '|stage2|stageShape2,/parent1/cylinder1',
-                f="TestIsolateSelection.replace")
-            
-            visible = ['|group1', '|group1|pCube1', '|group1|pCube1|pCubeShape1',
-                       '|stage1|stageShape1,/parent2',
-                       '|stage1|stageShape1,/parent2/cone1',
-                       '|stage2|stageShape2,/parent1',
-                       '|stage2|stageShape2,/parent1/cylinder1']
-            notVisible = scene.copy()
 
-            for p in visible:
-                notVisible.remove(p)
+        modelPanel = 'modelPanel4'
 
-            self.assertVisibility(visible, notVisible)
+        cmds.select('|group1|pCube1', '|stage1|stageShape1,/parent2/cone1',
+            '|stage2|stageShape2,/parent1/cylinder1')
+        enableIsolateSelect(modelPanel)
 
-            # As a final step clear the isolate selection to avoid affecting
-            # other tests.
-            cmds.mayaHydraCppTest(vpPanel, f="TestIsolateSelection.clear")
+        visible = ['|group1', '|group1|pCube1', '|group1|pCube1|pCubeShape1',
+                   '|stage1|stageShape1,/parent2',
+                   '|stage1|stageShape1,/parent2/cone1',
+                   '|stage2|stageShape2,/parent1',
+                   '|stage2|stageShape2,/parent1/cylinder1']
+        notVisible = scene.copy()
+
+        for p in visible:
+            notVisible.remove(p)
+
+        cmds.refresh()
+
+        self.assertVisibility(visible, notVisible)
+
+        # As a final step disable the isolate selection to avoid affecting
+        # other tests.
+        disableIsolateSelect(modelPanel)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

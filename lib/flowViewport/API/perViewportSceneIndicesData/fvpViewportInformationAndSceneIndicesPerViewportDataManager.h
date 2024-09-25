@@ -63,6 +63,7 @@ public:
 
     SelectionPtr GetOrCreateIsolateSelection(const std::string& viewportId);
     SelectionPtr GetIsolateSelection(const std::string& viewportId) const;
+    void DisableIsolateSelection(const std::string& viewportId);
 
     void AddIsolateSelection(
         const std::string&    viewportId, 
@@ -73,8 +74,8 @@ public:
         const PrimSelections& primSelections
     );
     void ReplaceIsolateSelection(
-        const std::string&       viewportId, 
-        const SelectionConstPtr& selection
+        const std::string&  viewportId, 
+        const SelectionPtr& selection
     );
     void ClearIsolateSelection(const std::string& viewportId);
 
@@ -98,12 +99,16 @@ private:
         const ViewportInformationAndSceneIndicesPerViewportDataManager&
     ) = delete;
 
-    void _CheckAndSetViewport(const std::string& viewportId);
+    SelectionPtr _EnableIsolateSelection(const std::string& viewportId);
+    void _EnableIsolateSelectAndSetViewport(const std::string& viewportId);
 
     ///Hydra viewport information
     ViewportInformationAndSceneIndicesPerViewportDataVector     _viewportsInformationAndSceneIndicesPerViewportData;
     
-    // Isolate selection, keyed by viewportId.
+    // Isolate selection, keyed by viewportId.  A null selection pointer means
+    // isolate select for that viewport is disabled.  Disabling isolate select
+    // on a viewport clears its isolate selection, so that at next isolate
+    // select enable for that viewport its isolate selection is empty.
     std::map<std::string, SelectionPtr> _isolateSelection;
 
     // Isolate select scene index.
@@ -111,7 +116,7 @@ private:
 };
 
 // Convenience shorthand declaration.
-using PerViewportDataManager = ViewportInformationAndSceneIndicesPerViewportDataManager;
+using ViewportDataMgr = ViewportInformationAndSceneIndicesPerViewportDataManager;
 
 } //End of namespace FVP_NS_DEF
 

@@ -18,6 +18,7 @@
 
 #include <flowViewport/api.h>
 #include <flowViewport/selection/fvpPathMapperFwd.h>
+#include <flowViewport/sceneIndex/fvpPathInterface.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/usd/sdf/path.h>
@@ -91,6 +92,21 @@ private:
     friend class PXR_NS::TfSingleton<PathMapperRegistry>;
 };
     
+/**
+ * @brief Get the prim selections for a given application path.
+ *
+ * If an application path corresponds to a scene index prim, this function will
+ * return one or more prim selections for it.  If no such scene index prim
+ * exists, the returned prim selections will be empty.  It retrieves the
+ * appropriate path mapper from the path mapper registry and invokes it on the
+ * argument appPath.
+ *
+ * @param[in] appPath The application path for which prim selections should be returned.
+ * @return Zero or more prim selections.
+ */
+FVP_API
+PrimSelections ufePathToPrimSelections(const Ufe::Path& appPath);
+
 }
 
 #endif

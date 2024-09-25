@@ -51,7 +51,9 @@ typedef PXR_NS::TfRefPtr<const IsolateSelectSceneIndex> IsolateSelectSceneIndexC
 ///
 /// At time of writing a single isolate select scene index is used to service
 /// all viewports in the application, by switching the isolate selection on the
-/// isolate scene index using IsolateSelectSceneIndex::SetViewport().
+/// isolate scene index using IsolateSelectSceneIndex::SetViewport().  If a
+/// null pointer selection is passed to SetViewport(), the isolate select scene
+/// index is disabled and behaves as a pass-through.
 ///
 /// IsolateSelectSceneIndex::GetPrim() passes through prims that have an
 /// ancestor or descendant (including themselves) in the isolate selection.
@@ -132,7 +134,12 @@ public:
         const SelectionPtr& isolateSelection
     );
 
-    // Get viewport information for this scene index.
+    FVP_API
+    void SetIsolateSelection(const SelectionPtr& selection);
+
+    // Get viewport information for this scene index, respectively the viewport
+    // ID and the isolate selection.  A null isolate selection pointer means
+    // the isolate select scene index is disabled (pass-through).
     FVP_API
     std::string GetViewportId() const;
     FVP_API
@@ -170,6 +177,11 @@ private:
     ) const;
 
     void _ReplaceIsolateSelection(const SelectionConstPtr& selection);
+
+    void _InsertSelectedPaths(
+        const SelectionConstPtr&   selection,
+        std::set<PXR_NS::SdfPath>& dirtyPaths
+    );
 
     std::string  _viewportId;
 

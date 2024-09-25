@@ -20,6 +20,7 @@
 #include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 #include <flowViewport/sceneIndex/fvpIsolateSelectSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPathInterface.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/selection/fvpSelection.h>
 
 #include <ufe/path.h>
@@ -40,7 +41,7 @@ TEST(TestHydraPrim, isVisible)
     ASSERT_EQ(argc, 1);
     const Ufe::Path appPath(Ufe::PathString::path(argv[0]));
 
-    auto primSelections = ufePathToPrimSelections(appPath);
+    auto primSelections = Fvp::ufePathToPrimSelections(appPath);
 
     // If an application path maps to multiple prim selections, all prim
     // selections must be visible, else we fail.
@@ -63,7 +64,7 @@ TEST(TestHydraPrim, notVisible)
     ASSERT_EQ(argc, 1);
     const Ufe::Path appPath(Ufe::PathString::path(argv[0]));
 
-    auto primSelections = ufePathToPrimSelections(appPath);
+    auto primSelections = Fvp::ufePathToPrimSelections(appPath);
 
     // If an application path maps to multiple prim selections, all prim
     // selections must be invisible, else we fail.
@@ -84,9 +85,9 @@ TEST(TestIsolateSelection, add)
     const std::string viewportId(argv[0]);
     const Ufe::Path appPath(Ufe::PathString::path(argv[1]));
 
-    auto& perVpDataMgr = Fvp::PerViewportDataManager::Get();
-    auto primSelections = ufePathToPrimSelections(appPath);
-    perVpDataMgr.AddIsolateSelection(viewportId, primSelections);
+    auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
+    auto primSelections = Fvp::ufePathToPrimSelections(appPath);
+    vpDataMgr.AddIsolateSelection(viewportId, primSelections);
 }
 
 TEST(TestIsolateSelection, remove)
@@ -96,9 +97,9 @@ TEST(TestIsolateSelection, remove)
     const std::string viewportId(argv[0]);
     const Ufe::Path appPath(Ufe::PathString::path(argv[1]));
 
-    auto& perVpDataMgr = Fvp::PerViewportDataManager::Get();
-    auto primSelections = ufePathToPrimSelections(appPath);
-    perVpDataMgr.RemoveIsolateSelection(viewportId, primSelections);
+    auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
+    auto primSelections = Fvp::ufePathToPrimSelections(appPath);
+    vpDataMgr.RemoveIsolateSelection(viewportId, primSelections);
 }
 
 TEST(TestIsolateSelection, clear)
@@ -107,8 +108,8 @@ TEST(TestIsolateSelection, clear)
     ASSERT_EQ(argc, 1);
     const std::string viewportId(argv[0]);
 
-    auto& perVpDataMgr = Fvp::PerViewportDataManager::Get();
-    perVpDataMgr.ClearIsolateSelection(viewportId);
+    auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
+    vpDataMgr.ClearIsolateSelection(viewportId);
 }
 
 TEST(TestIsolateSelection, replace)
@@ -117,16 +118,42 @@ TEST(TestIsolateSelection, replace)
     ASSERT_GE(argc, 2);
     const std::string viewportId(argv[0]);
     
-    auto isolateSelect = std::make_shared<Fvp::Selection>();
+    // Use allocator from Flow Viewport Toolkit library.  Directly calling
+    //
+    // auto isolateSelect = std::make_shared<Fvp::Selection>();
+    //
+    // here will cause a crash on test exit, as the last reference to the
+    // isolate selection is in the isolate select scene index, which can be
+    // destroyed and rebuilt on redraw.  On Windows, if the DLL that performed
+    // the allocation of the shared_ptr has been unloaded from the process, the
+    // isolate selection destruction called by the shared_ptr destructor will
+    // crash.
+    //
+    // This is exactly our case, as our host mayaHydraCppTests DLL plugin is
+    // unloaded at program exit, but Maya performs additional redraws after the
+    // plugin unload, which cause the isolate selection shared_ptr to be
+    // destroyed, which causes a call to code in an unloaded DLL, which crashes.
+    auto isolateSelect = Fvp::Selection::New();
 
     for (int i=1; i < argc; ++i) {
         const Ufe::Path appPath(Ufe::PathString::path(argv[i]));
-        auto primSelections = ufePathToPrimSelections(appPath);
+        auto primSelections = Fvp::ufePathToPrimSelections(appPath);
         for (const auto& primSelection : primSelections) {
             isolateSelect->Add(primSelection);
         }
     }
 
-    auto& perVpDataMgr = Fvp::PerViewportDataManager::Get();
-    perVpDataMgr.ReplaceIsolateSelection(viewportId, isolateSelect);
+    auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
+    vpDataMgr.ReplaceIsolateSelection(viewportId, isolateSelect);
 }
+
+TEST(TestIsolateSelection, disable)
+{
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_EQ(argc, 1);
+    const std::string viewportId(argv[0]);
+
+    auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
+    vpDataMgr.DisableIsolateSelection(viewportId);
+}
+
