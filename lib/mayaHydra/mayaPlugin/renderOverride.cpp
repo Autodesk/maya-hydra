@@ -1763,7 +1763,7 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
 {
     M3dView view;
     if (!TF_VERIFY(M3dView::getM3dViewFromModelPanel(viewName, view) == MS::kSuccess, 
-                   "No view found for view name %.", viewName.asChar())) {
+                   "No view found for view name %s.", viewName.asChar())) {
         return;
     }
 
