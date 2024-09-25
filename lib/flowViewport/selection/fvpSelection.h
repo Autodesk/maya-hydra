@@ -43,6 +43,10 @@ class Selection
 {
 public:
 
+    // Create a reference-counted Selection.
+    FVP_API
+    static SelectionPtr New();
+
     // Add primPath to selection and return true if the argument is not empty.
     FVP_API
     bool Add(const PrimSelection& primSelection);

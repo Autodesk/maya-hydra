@@ -232,6 +232,12 @@ private:
         const MString& oldOverride,
         const MString& newOverride,
         void*          data);
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    static void _ViewSelectedChangedCb(
+        const MString& panelName,
+        bool           viewSelectedObjectsChanged,
+        void*          data);
+#endif
 
     MtohRendererDescription _rendererDesc;
 
@@ -241,6 +247,10 @@ private:
     MCallbackId                                  _timerCallback = 0;
     PanelCallbacksList                           _renderPanelCallbacks;
     const MtohRenderGlobals&                     _globals;
+
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    MCallbackId                                  _viewSelectedChangedCb{0};
+#endif
 
     std::mutex                            _lastRenderTimeMutex;
     std::chrono::system_clock::time_point _lastRenderTime;

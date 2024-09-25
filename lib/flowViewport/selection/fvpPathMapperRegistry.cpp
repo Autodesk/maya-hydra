@@ -20,6 +20,7 @@
 #include <pxr/base/tf/instantiateSingleton.h>
 
 #include <ufe/path.h>
+#include <ufe/pathString.h>
 #include <ufe/trie.imp.h>
 
 namespace {
@@ -101,6 +102,27 @@ PathMapperConstPtr PathMapperRegistry::GetMapper(const Ufe::Path& path) const
     // We reached the end of the parent path without returning true, therefore
     // there are no ancestors.
     return fallbackMapper;
+}
+
+Fvp::PrimSelections ufePathToPrimSelections(const Ufe::Path& appPath)
+{
+    PXR_NAMESPACE_USING_DIRECTIVE
+
+    Fvp::PrimSelections primSelections;
+
+    auto mapper = Fvp::PathMapperRegistry::Instance().GetMapper(appPath);
+        
+    if (!mapper) {
+        TF_WARN("No registered mapping for path %s, no prim path returned.", Ufe::PathString::string(appPath).c_str());
+    }
+    else {
+        primSelections = mapper->UfePathToPrimSelections(appPath);
+        if (primSelections.empty()) {
+            TF_WARN("Mapping for path %s returned no prim path.", Ufe::PathString::string(appPath).c_str());
+        }
+    }
+
+    return primSelections;
 }
 
 }
