@@ -17,6 +17,8 @@
 
 #include "flowViewport/api.h"
 
+#include "flowViewport/selection/fvpSelectionTypes.h"
+
 #include <ufe/ufe.h>
 
 #include <pxr/pxr.h>
@@ -31,37 +33,6 @@ class Path;
 }
 
 namespace FVP_NS_DEF {
-
-// Based on USD's HdInstanceIndicesSchema : 
-// https://github.com/PixarAnimationStudios/OpenUSD/blob/59992d2178afcebd89273759f2bddfe730e59aa8/pxr/imaging/hd/instanceIndicesSchema.h
-struct InstancesSelection {
-    PXR_NS::SdfPath instancerPath;
-    int prototypeIndex;
-    std::vector<int> instanceIndices;
-
-    inline bool operator==(const InstancesSelection &rhs) const {
-        return instancerPath == rhs.instancerPath
-            && prototypeIndex == rhs.prototypeIndex
-            && instanceIndices == rhs.instanceIndices;
-    }
-};
-
-// Based on USD's HdSelectionSchema : 
-// https://github.com/PixarAnimationStudios/OpenUSD/blob/59992d2178afcebd89273759f2bddfe730e59aa8/pxr/imaging/hd/selectionSchema.h
-struct PrimSelection
-{
-    PXR_NS::SdfPath primPath;
-    std::vector<InstancesSelection> nestedInstanceIndices;
-
-    inline bool operator==(const PrimSelection &rhs) const {
-        return primPath == rhs.primPath
-            && nestedInstanceIndices == rhs.nestedInstanceIndices;
-    }
-};
-
-// Using TfSmallVector to optimize for selections that map to a few prims,
-// which is likely going to be the bulk of use cases.
-using PrimSelections = PXR_NS::TfSmallVector<PrimSelection, 8>;
 
 /// \class PathInterface
 ///

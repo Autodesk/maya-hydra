@@ -7,6 +7,7 @@ target_sources(${TARGET_NAME}
     fvpSelectionFwd.cpp
     fvpSelectionTask.cpp
     fvpSelectionTracker.cpp
+    fvpSelectionTypes.cpp
     fvpPathMapper.cpp
     fvpPathMapperFwd.cpp
     fvpPathMapperRegistry.cpp
@@ -19,6 +20,7 @@ set(HEADERS
     fvpSelectionFwd.h
     fvpSelectionTask.h
     fvpSelectionTracker.h
+    fvpSelectionTypes.h
     fvpPathMapper.h
     fvpPathMapperFwd.h
     fvpPathMapperRegistry.h
