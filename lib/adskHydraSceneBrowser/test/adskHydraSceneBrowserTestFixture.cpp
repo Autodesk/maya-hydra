@@ -262,6 +262,7 @@ void AdskHydraSceneBrowserTestFixture::CompareValueContent(const pxr::VtValue& v
 #else
     if (value.IsHolding<pxr::SdfPathVector>()) {
         // Special case for SdfPathVector.
+        // See https://github.com/PixarAnimationStudios/OpenUSD/commit/1d19b1d
         pxr::SdfPathVector paths = value.Get<pxr::SdfPathVector>();
         for (pxr::SdfPath const& path : paths) {
             valueStream << path << "\n";
