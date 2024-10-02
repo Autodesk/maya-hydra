@@ -18,8 +18,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStageAddPrim.py
     testTransforms.py
     testRefinement.py
-    # To be reenabled after investigation: HYDRA-1206
-    #testMaterialXOnNative.py|depOnPlugins:lookdevx
+    testMaterialXOnNative.py|depOnPlugins:lookdevx
     testNewSceneWithStage.py
     # To be reenabled after investigation
     #testMayaDisplayModes.py|skipOnPlatform:osx
