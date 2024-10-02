@@ -257,6 +257,9 @@ void AdskHydraSceneBrowserTestFixture::CompareValueContent(const pxr::VtValue& v
     std::string actualValue = valueText.toStdString();
 
     std::ostringstream valueStream;
+#if PXR_VERSION < 2408
+    valueStream << value;
+#else
     if (value.IsHolding<pxr::SdfPathVector>()) {
         // Special case for SdfPathVector.
         pxr::SdfPathVector paths = value.Get<pxr::SdfPathVector>();
@@ -267,6 +270,7 @@ void AdskHydraSceneBrowserTestFixture::CompareValueContent(const pxr::VtValue& v
     else {
         valueStream << value;
     }
+#endif
     std::string expectedValue = valueStream.str();
 
     if (!MatchesFallbackTextOutput(expectedValue)) {
