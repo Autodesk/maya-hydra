@@ -100,7 +100,22 @@ void MayaUsdProxyShapeSceneIndex::_StageInvalidate(const MAYAUSDAPI_NS::ProxySta
 { 
     _usdImagingStageSceneIndex->SetStage(nullptr);
     _populated = false;
-    Populate(); 
+    // Simply mark populate as dirty and do not call
+    // Populate();
+    // here.  Doing so is incorrect for two reasons:
+    // - _StageInvalidate() is a callback called during Maya invalidation.
+    //   Populate() calls MayaUsdProxyShapeBase::getUsdStage(), which calls
+    //   MayaUsdProxyShapeBase::compute(), which should not be done during
+    //   dirty propagation.
+    // - Calling getUsdStage() through Populate() creates an invalidate
+    //   callback dependency between _StageInvalidate() and
+    //   the mayaUsd plugin MayaStagesSubject::onStageInvalidate().  During
+    //   getUsdStage(), MayaStagesSubject::setupListeners() is called, and it
+    //   depends on MayaStagesSubject::onStageInvalidate() being called first,
+    //   otherwise setupListeners() and therefore getUsdStage() will fail.
+    //
+    //   Invalidate callbacks should not have dependencies on one another ---
+    //   it should be possible to call them in random order.
 }
 
 void MayaUsdProxyShapeSceneIndex::_ObjectsChanged(
