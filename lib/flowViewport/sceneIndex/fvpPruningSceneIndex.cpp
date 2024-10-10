@@ -98,6 +98,8 @@ bool PruningSceneIndex::EnableFilter(const TfToken& pruningToken)
         return false;
     }
 
+    _prunedPathsByFilter[pruningToken] = SdfPathSet();
+
     HdSceneIndexObserver::RemovedPrimEntries prunedPrims;
 
     for (const SdfPath& primPath: HdSceneIndexPrimView(GetInputSceneIndex())) {
@@ -126,6 +128,8 @@ bool PruningSceneIndex::DisableFilter(const TfToken& pruningToken)
     for (const auto& primPath : _prunedPathsByFilter[pruningToken]) {
         unprunedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
     }
+
+    _prunedPathsByFilter.erase(pruningToken);
 
     if (!unprunedPrims.empty()) {
         _SendPrimsAdded(unprunedPrims);
