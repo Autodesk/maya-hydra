@@ -102,6 +102,7 @@
 #include <maya/MConditionMessage.h>
 #include <maya/MDGMessage.h>
 #include <maya/MDrawContext.h>
+#include <maya/MFrameContext.h>
 #include <maya/MEventMessage.h>
 #include <maya/MGlobal.h>
 #include <maya/MNodeMessage.h>
@@ -802,6 +803,13 @@ MStatus MtohRenderOverride::Render(
        _displayStyleSceneIndex->SetRefineLevel({true, delegateParams.refineLevel});
     }
 
+     auto objectExclusions = framecontext->objectTypeExclusions();
+     if (objectExclusions & MHWRender::MFrameContext::kExcludeMeshes) {
+        _pruningSceneIndex->EnableFilter(FvpPruningTokens->mesh);
+     } else {
+        _pruningSceneIndex->DisableFilter(FvpPruningTokens->mesh);
+     }
+
     // Toggle textures in the material network
     const unsigned int currentDisplayMode = drawContext.getDisplayStyle();
     bool isTextured = currentDisplayMode & MHWRender::MFrameContext::kTextured;
@@ -1088,8 +1096,9 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 
     //Put BlockPrimRemovalPropagationSceneIndex first as it can block/unblock the prim removal propagation on the whole scene indices chain
     _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
+    _pruningSceneIndex = Fvp::PruningSceneIndex::New(_blockPrimRemovalPropagationSceneIndex);
     _selection = std::make_shared<Fvp::Selection>();
-    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_blockPrimRemovalPropagationSceneIndex, _selection);
+    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_pruningSceneIndex, _selection);
     _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
     _inputSceneIndexOfFilteringSceneIndicesChain = _selectionSceneIndex;
 

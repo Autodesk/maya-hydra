@@ -17,7 +17,9 @@
 
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+#include "flowViewport/sceneIndex/fvpPathInterface.h"
 
+#include <pxr/base/tf/diagnosticLite.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hdsi/api.h>
@@ -48,7 +50,8 @@ typedef PXR_NS::TfRefPtr<const PruningSceneIndex> PruningSceneIndexConstRefPtr;
 
 class PruningSceneIndex :
     public PXR_NS::HdSingleInputFilteringSceneIndexBase
-    , public Fvp::InputSceneIndexUtils<PruningSceneIndex>
+    , public InputSceneIndexUtils<PruningSceneIndex>
+    , public PathInterface // As a workaround until we move to exclusively using PathMappers
 {
 public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
@@ -70,6 +73,14 @@ public:
 
     FVP_API
     bool DisableFilter(const PXR_NS::TfToken& filterToken);
+
+    FVP_API
+    PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override {
+        PXR_NAMESPACE_USING_DIRECTIVE;
+        const PathInterface* pathInterface = dynamic_cast<const PathInterface*>(&*GetInputSceneIndex());
+        TF_AXIOM(pathInterface);
+        return pathInterface->UfePathToPrimSelections(appPath);
+    }
 
 protected:
     FVP_API
