@@ -24,6 +24,7 @@
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/materialSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/tokens.h>
 
 #include <iostream>
 
@@ -39,7 +40,10 @@ namespace {
 
 bool _PrunePrim(const HdSceneIndexPrim& prim, const TfToken& pruningToken)
 {
-    return true;
+    if (pruningToken == FvpPruningTokens->mesh) {
+        return prim.primType == HdPrimTypeTokens->mesh;
+    }
+    return false;
 }
 
 } // namespace
@@ -114,21 +118,74 @@ void PruningSceneIndex::_PrimsAdded(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries)
 {
-// Catch prims to prune
+    HdSceneIndexObserver::AddedPrimEntries editedEntries;
+    for (const auto& addedEntry : entries) {
+        for (auto& filterEntry : _prunedPathsByFilter) {
+            if (_PrunePrim(GetInputSceneIndex()->GetPrim(addedEntry.primPath), filterEntry.first)) {
+                filterEntry.second.emplace(addedEntry.primPath);
+            } else {
+                editedEntries.emplace_back(addedEntry);
+            }
+        }
+    }
+    if (!editedEntries.empty()) {
+        _SendPrimsAdded(editedEntries);
+    }
 }
 
 void PruningSceneIndex::_PrimsRemoved(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries)
 {
-// Remove from map if it was pruned
+    HdSceneIndexObserver::RemovedPrimEntries editedEntries;
+    for (const auto& removedEntry : entries) {
+        for (auto& filterEntry : _prunedPathsByFilter) {
+            if (filterEntry.second.find(removedEntry.primPath) != filterEntry.second.end()) {
+                filterEntry.second.erase(removedEntry.primPath);
+            } else {
+                editedEntries.emplace_back(removedEntry);
+            }
+        }
+    }
+    if (!editedEntries.empty()) {
+        _SendPrimsRemoved(editedEntries);
+    }
 }
 
 void PruningSceneIndex::_PrimsDirtied(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
-// Check if prim pruning status should change
+    HdSceneIndexObserver::DirtiedPrimEntries editedEntries;
+    HdSceneIndexObserver::RemovedPrimEntries removedEntries;
+    HdSceneIndexObserver::AddedPrimEntries addedEntries;
+
+    for (const auto& dirtiedEntry : entries) {
+        for (const auto& filterEntry : _prunedPathsByFilter) {
+            HdSceneIndexPrim dirtiedPrim = GetInputSceneIndex()->GetPrim(dirtiedEntry.primPath);
+
+            bool isPruned = filterEntry.second.find(dirtiedEntry.primPath) != filterEntry.second.end();
+            bool shouldBePruned = _PrunePrim(dirtiedPrim, filterEntry.first);
+
+            if (!isPruned && shouldBePruned) {
+                removedEntries.emplace_back(dirtiedEntry.primPath);
+            } else if (isPruned && !shouldBePruned) {
+                addedEntries.emplace_back(dirtiedEntry.primPath, dirtiedPrim.primType);
+            } else {
+                editedEntries.emplace_back(dirtiedEntry);
+            }
+        }
+    }
+
+    if (!removedEntries.empty()) {
+        _SendPrimsRemoved(removedEntries);
+    }
+    if (!addedEntries.empty()) {
+        _SendPrimsAdded(addedEntries);
+    }
+    if (!editedEntries.empty()) {
+        _SendPrimsDirtied(editedEntries);
+    }
 }
 
 } // namespace FVP_NS_DEF
