@@ -25,6 +25,7 @@
 #include <pxr/imaging/hd/materialSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
+#include <pxr/usd/sdf/path.h>
 
 #include <iostream>
 
@@ -63,12 +64,31 @@ PruningSceneIndex::PruningSceneIndex(HdSceneIndexBaseRefPtr const &inputSceneInd
 
 HdSceneIndexPrim PruningSceneIndex::GetPrim(const SdfPath& primPath) const
 {
+    for (const auto& filterEntry : _prunedPathsByFilter) {
+        if (filterEntry.second.find(primPath) != filterEntry.second.end()) {
+            return {};
+        }
+    }
     return GetInputSceneIndex()->GetPrim(primPath);
 }
 
 SdfPathVector PruningSceneIndex::GetChildPrimPaths(const SdfPath& primPath) const
 {
-    return GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    SdfPathVector baseChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    SdfPathVector editedChildPaths;
+    for (const auto& baseChildPath : baseChildPaths) {
+        bool isPruned = false;
+        for (const auto& filterEntry : _prunedPathsByFilter) {
+            if (filterEntry.second.find(baseChildPath) != filterEntry.second.end()) {
+                isPruned = true;
+                break;
+            }
+        }
+        if (!isPruned) {
+            editedChildPaths.emplace_back(baseChildPath);
+        }
+    }
+    return editedChildPaths;
 }
 
 bool PruningSceneIndex::EnableFilter(const TfToken& pruningToken)
