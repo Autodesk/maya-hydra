@@ -14,9 +14,13 @@
 //
 
 #include "flowViewport/sceneIndex/fvpPruningSceneIndex.h"
+#include "fvpPruningSceneIndex.h"
 
 #include <pxr/base/tf/staticTokens.h>
+#include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/imaging/hd/sceneIndex.h>
+#include <pxr/imaging/hd/sceneIndexObserver.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/materialSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
@@ -26,6 +30,11 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
+
+bool _PrunePrim(const HdSceneIndexPrim& prim, const TfToken& filterToken)
+{
+    return true;
+}
 
 } // namespace
 
@@ -52,25 +61,68 @@ SdfPathVector PruningSceneIndex::GetChildPrimPaths(const SdfPath& primPath) cons
     return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
+bool PruningSceneIndex::EnableFilter(const TfToken& filterToken)
+{
+    if (_prunedPathsByFilter.find(filterToken) != _prunedPathsByFilter.end()) {
+        // Filter already enabled, no change needed.
+        return false;
+    }
+
+    HdSceneIndexObserver::RemovedPrimEntries prunedPrims;
+
+    for (const SdfPath& primPath: HdSceneIndexPrimView(GetInputSceneIndex())) {
+        if (_PrunePrim(GetInputSceneIndex()->GetPrim(primPath), filterToken)) {
+            _prunedPathsByFilter[filterToken].emplace(primPath);
+            prunedPrims.emplace_back(primPath);
+        }
+    }
+
+    if (!prunedPrims.empty()) {
+        _SendPrimsRemoved(prunedPrims);
+    }
+
+    return true;
+}
+
+bool PruningSceneIndex::DisableFilter(const TfToken& filterToken)
+{
+    if (_prunedPathsByFilter.find(filterToken) == _prunedPathsByFilter.end()) {
+        // Filter already disabled, no change needed.
+        return false;
+    }
+
+    HdSceneIndexObserver::AddedPrimEntries unprunedPrims;
+
+    for (const auto& primPath : _prunedPathsByFilter[filterToken]) {
+        unprunedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
+    }
+
+    if (!unprunedPrims.empty()) {
+        _SendPrimsAdded(unprunedPrims);
+    }
+
+    return true;
+}
+
 void PruningSceneIndex::_PrimsAdded(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries)
 {
-
+// Catch prims to prune
 }
 
 void PruningSceneIndex::_PrimsRemoved(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries)
 {
-
+// Remove from map if it was pruned
 }
 
 void PruningSceneIndex::_PrimsDirtied(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
-
+// Check if prim pruning status should change
 }
 
 } // namespace FVP_NS_DEF

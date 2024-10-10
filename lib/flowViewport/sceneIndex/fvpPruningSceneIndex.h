@@ -18,10 +18,13 @@
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 
+#include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hdsi/api.h>
 #include <pxr/imaging/hd/materialFilteringSceneIndexBase.h>
 #include <pxr/imaging/hd/materialNetworkInterface.h>
+#include <set>
+#include <unordered_map>
 
 namespace FVP_NS_DEF {
 
@@ -48,6 +51,12 @@ public:
     FVP_API
     PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath& primPath) const override;
 
+    FVP_API
+    bool EnableFilter(const PXR_NS::TfToken& filterToken);
+
+    FVP_API
+    bool DisableFilter(const PXR_NS::TfToken& filterToken);
+
 protected:
     FVP_API
     PruningSceneIndex(PXR_NS::HdSceneIndexBaseRefPtr const &inputSceneIndex);
@@ -66,6 +75,9 @@ protected:
     void _PrimsDirtied(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
+
+    // Maps a filtering token to the set of prim paths that have been pruned out by this token
+    std::map<PXR_NS::TfToken, PXR_NS::SdfPathSet> _prunedPathsByFilter;
 };
 
 } // namespace FVP_NS_DEF
