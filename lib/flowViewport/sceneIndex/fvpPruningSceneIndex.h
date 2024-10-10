@@ -26,6 +26,20 @@
 #include <set>
 #include <unordered_map>
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+// clang-format off
+#define FVP_PRUNING_TOKENS \
+    (mesh) \
+    (sphere) \
+    (cone) \
+    (cube)
+// clang-format on
+
+TF_DECLARE_PUBLIC_TOKENS(FvpPruningTokens, FVP_API, FVP_PRUNING_TOKENS);
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
 namespace FVP_NS_DEF {
 
 class PruningSceneIndex;

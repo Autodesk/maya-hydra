@@ -27,11 +27,17 @@
 
 #include <iostream>
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+TF_DEFINE_PUBLIC_TOKENS(FvpPruningTokens, FVP_PRUNING_TOKENS);
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-bool _PrunePrim(const HdSceneIndexPrim& prim, const TfToken& filterToken)
+bool _PrunePrim(const HdSceneIndexPrim& prim, const TfToken& pruningToken)
 {
     return true;
 }
@@ -61,9 +67,9 @@ SdfPathVector PruningSceneIndex::GetChildPrimPaths(const SdfPath& primPath) cons
     return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
-bool PruningSceneIndex::EnableFilter(const TfToken& filterToken)
+bool PruningSceneIndex::EnableFilter(const TfToken& pruningToken)
 {
-    if (_prunedPathsByFilter.find(filterToken) != _prunedPathsByFilter.end()) {
+    if (_prunedPathsByFilter.find(pruningToken) != _prunedPathsByFilter.end()) {
         // Filter already enabled, no change needed.
         return false;
     }
@@ -71,8 +77,8 @@ bool PruningSceneIndex::EnableFilter(const TfToken& filterToken)
     HdSceneIndexObserver::RemovedPrimEntries prunedPrims;
 
     for (const SdfPath& primPath: HdSceneIndexPrimView(GetInputSceneIndex())) {
-        if (_PrunePrim(GetInputSceneIndex()->GetPrim(primPath), filterToken)) {
-            _prunedPathsByFilter[filterToken].emplace(primPath);
+        if (_PrunePrim(GetInputSceneIndex()->GetPrim(primPath), pruningToken)) {
+            _prunedPathsByFilter[pruningToken].emplace(primPath);
             prunedPrims.emplace_back(primPath);
         }
     }
@@ -84,16 +90,16 @@ bool PruningSceneIndex::EnableFilter(const TfToken& filterToken)
     return true;
 }
 
-bool PruningSceneIndex::DisableFilter(const TfToken& filterToken)
+bool PruningSceneIndex::DisableFilter(const TfToken& pruningToken)
 {
-    if (_prunedPathsByFilter.find(filterToken) == _prunedPathsByFilter.end()) {
+    if (_prunedPathsByFilter.find(pruningToken) == _prunedPathsByFilter.end()) {
         // Filter already disabled, no change needed.
         return false;
     }
 
     HdSceneIndexObserver::AddedPrimEntries unprunedPrims;
 
-    for (const auto& primPath : _prunedPathsByFilter[filterToken]) {
+    for (const auto& primPath : _prunedPathsByFilter[pruningToken]) {
         unprunedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
     }
 
