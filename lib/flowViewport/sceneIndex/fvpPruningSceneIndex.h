@@ -70,10 +70,10 @@ public:
     PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath& primPath) const override;
 
     FVP_API
-    bool EnableFilter(const PXR_NS::TfToken& filterToken);
+    bool EnableFilter(const PXR_NS::TfToken& pruningToken);
 
     FVP_API
-    bool DisableFilter(const PXR_NS::TfToken& filterToken);
+    bool DisableFilter(const PXR_NS::TfToken& pruningToken);
 
     FVP_API
     void AddExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot);
@@ -104,6 +104,12 @@ protected:
     void _PrimsDirtied(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
+    
+    FVP_API
+    void _InsertEntry(const PXR_NS::SdfPath& primPath, const PXR_NS::TfToken& pruningToken);
+
+    FVP_API
+    void _RemoveEntry(const PXR_NS::SdfPath& primPath, const PXR_NS::TfToken& pruningToken);
 
     FVP_API
     bool _IsExcluded(const PXR_NS::SdfPath& primPath) const;
