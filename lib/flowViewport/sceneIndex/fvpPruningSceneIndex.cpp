@@ -39,6 +39,19 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
+template<typename Container>
+bool _HasAncestorInclusiveInContainer(const SdfPath& path, const Container& pathsContainer) {
+    SdfPath currPath = path;
+    while (!currPath.IsEmpty() && !currPath.IsAbsoluteRootPath()) {
+        if (pathsContainer.find(currPath) != pathsContainer.end()) {
+            return true;
+        } else {
+            currPath = currPath.GetParentPath();
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 namespace FVP_NS_DEF {
@@ -61,13 +74,7 @@ void PruningSceneIndex::AddExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot)
 
 bool PruningSceneIndex::_IsExcluded(const PXR_NS::SdfPath& primPath) const
 {
-    // TODO : Use parent-based approach
-    for (const auto& excludedSceneRoot : _excludedSceneRoots) {
-        if (primPath.HasPrefix(excludedSceneRoot)) {
-            return true;
-        }
-    }
-    return false;
+    return _HasAncestorInclusiveInContainer(primPath, _excludedSceneRoots);
 }
 
 bool PruningSceneIndex::_PrunePrim(const SdfPath& primPath, const HdSceneIndexPrim& prim, const TfToken& pruningToken) const
@@ -83,15 +90,7 @@ bool PruningSceneIndex::_PrunePrim(const SdfPath& primPath, const HdSceneIndexPr
 
 bool PruningSceneIndex::_IsAncestorPrunedInclusive(const SdfPath& primPath) const
 {
-    SdfPath currPath = primPath;
-    while (!currPath.IsEmpty() && !currPath.IsAbsoluteRootPath()) {
-        if (_filtersByPrunedPath.find(currPath) != _filtersByPrunedPath.end()) {
-            return true;
-        } else {
-            currPath = currPath.GetParentPath();
-        }
-    }
-    return false;
+    return _HasAncestorInclusiveInContainer(primPath, _filtersByPrunedPath);
 }
 
 HdSceneIndexPrim PruningSceneIndex::GetPrim(const SdfPath& primPath) const
