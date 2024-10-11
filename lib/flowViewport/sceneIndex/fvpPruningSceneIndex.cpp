@@ -27,6 +27,7 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/usd/sdf/path.h>
 
+#include <functional>
 #include <iostream>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -50,6 +51,46 @@ bool _HasAncestorInclusiveInContainer(const SdfPath& path, const Container& path
         }
     }
     return false;
+}
+
+bool _MeshesFilterHandler(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath, const HdSceneIndexPrim& prim)
+{
+    return prim.primType == HdPrimTypeTokens->mesh;
+}
+
+bool _CapsulesFilterHandler(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath, const HdSceneIndexPrim& prim)
+{
+    return prim.primType == HdPrimTypeTokens->capsule;
+}
+
+bool _ConesFilterHandler(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath, const HdSceneIndexPrim& prim)
+{
+    return prim.primType == HdPrimTypeTokens->cone;
+}
+
+bool _CubesFilterHandler(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath, const HdSceneIndexPrim& prim)
+{
+    return prim.primType == HdPrimTypeTokens->cube;
+}
+
+bool _CylindersFilterHandler(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath, const HdSceneIndexPrim& prim)
+{
+    return prim.primType == HdPrimTypeTokens->cylinder;
+}
+
+bool _SpheresFilterHandler(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath, const HdSceneIndexPrim& prim)
+{
+    return prim.primType == HdPrimTypeTokens->sphere;
+}
+
+bool _NurbsCurvesFilterHandler(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath, const HdSceneIndexPrim& prim)
+{
+    return prim.primType == HdPrimTypeTokens->nurbsCurves;
+}
+
+bool _NurbsPatchesFilterHandler(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath, const HdSceneIndexPrim& prim)
+{
+    return prim.primType == HdPrimTypeTokens->nurbsPatch;
 }
 
 } // namespace
@@ -82,10 +123,18 @@ bool PruningSceneIndex::_PrunePrim(const SdfPath& primPath, const HdSceneIndexPr
     if (_IsExcluded(primPath)) {
         return false;
     }
-    if (pruningToken == FvpPruningTokens->mesh) {
-        return prim.primType == HdPrimTypeTokens->mesh;
-    }
-    return false;
+    using FilterHandler = std::function<bool(const HdSceneIndexBaseRefPtr&, const SdfPath&, const HdSceneIndexPrim&)>;
+    static std::map<TfToken, FilterHandler> filterHandlers = {
+        { FvpPruningTokens->meshes, _MeshesFilterHandler },
+        { FvpPruningTokens->capsules, _CapsulesFilterHandler },
+        { FvpPruningTokens->cones, _ConesFilterHandler },
+        { FvpPruningTokens->cubes, _CubesFilterHandler },
+        { FvpPruningTokens->cylinders, _CylindersFilterHandler },
+        { FvpPruningTokens->spheres, _SpheresFilterHandler },
+        { FvpPruningTokens->nurbsCurves, _NurbsCurvesFilterHandler },
+        { FvpPruningTokens->nurbsPatches, _NurbsPatchesFilterHandler }
+    };
+    return filterHandlers[pruningToken](GetInputSceneIndex(), primPath, prim);
 }
 
 bool PruningSceneIndex::_IsAncestorPrunedInclusive(const SdfPath& primPath) const

@@ -39,8 +39,8 @@ PXR_NAMESPACE_OPEN_SCOPE
     (cubes) \
     (cylinders) \
     (spheres) \
-    (nurbsPatches) \
     (nurbsCurves) \
+    (nurbsPatches) \
 // clang-format on
 
 TF_DECLARE_PUBLIC_TOKENS(FvpPruningTokens, FVP_API, FVP_PRUNING_TOKENS);
