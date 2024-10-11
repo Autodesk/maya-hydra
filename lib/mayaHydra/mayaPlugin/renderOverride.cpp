@@ -114,6 +114,7 @@
 #include <maya/MUiMessage.h>
 #include <maya/MFnCamera.h>
 #include <maya/MFileIO.h>
+#include <maya/MTypes.h>
 
 #include <atomic>
 #include <chrono>
@@ -807,7 +808,7 @@ MStatus MtohRenderOverride::Render(
     {
         auto objectExclusions = framecontext->objectTypeExclusions();
 
-        TfTokenVector polygonFilters = { 
+        static TfTokenVector polygonFilters = { 
             FvpPruningTokens->meshes, 
             FvpPruningTokens->capsules, 
             FvpPruningTokens->cones, 
@@ -815,24 +816,20 @@ MStatus MtohRenderOverride::Render(
             FvpPruningTokens->cylinders, 
             FvpPruningTokens->spheres
         };
-        for (const auto& polygonFilter : polygonFilters) {
-            if (objectExclusions & MHWRender::MFrameContext::kExcludeMeshes) {
-                _pruningSceneIndex->EnableFilter(polygonFilter);
-            } else {
-                _pruningSceneIndex->DisableFilter(polygonFilter);
+        static std::map<MUint64, TfTokenVector> mayaFiltersToFvpPruningTokens = {
+            { MHWRender::MFrameContext::kExcludeMeshes, polygonFilters },
+            { MHWRender::MFrameContext::kExcludeNurbsCurves, {FvpPruningTokens->nurbsCurves} },
+            { MHWRender::MFrameContext::kExcludeNurbsSurfaces, {FvpPruningTokens->nurbsPatches} }
+        };
+
+        for (auto [mayaFilter, fvpPruningTokens] : mayaFiltersToFvpPruningTokens) {
+            for (const auto& fvpPruningToken : fvpPruningTokens) {
+                if (objectExclusions & mayaFilter) {
+                    _pruningSceneIndex->EnableFilter(fvpPruningToken);
+                } else {
+                    _pruningSceneIndex->DisableFilter(fvpPruningToken);
+                }
             }
-        }
-
-        if (objectExclusions & MHWRender::MFrameContext::kExcludeNurbsCurves) {
-            _pruningSceneIndex->EnableFilter(FvpPruningTokens->nurbsCurves);
-        } else {
-            _pruningSceneIndex->DisableFilter(FvpPruningTokens->nurbsCurves);
-        }
-
-        if (objectExclusions & MHWRender::MFrameContext::kExcludeNurbsSurfaces) {
-            _pruningSceneIndex->EnableFilter(FvpPruningTokens->nurbsPatches);
-        } else {
-            _pruningSceneIndex->DisableFilter(FvpPruningTokens->nurbsPatches);
         }
     }
 
