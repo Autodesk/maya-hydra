@@ -84,7 +84,7 @@ bool PruningSceneIndex::_PrunePrim(const SdfPath& primPath, const HdSceneIndexPr
 bool PruningSceneIndex::_IsAncestorPrunedInclusive(const SdfPath& primPath) const
 {
     SdfPath currPath = primPath;
-    while (!currPath.IsAbsoluteRootPath()) {
+    while (!currPath.IsEmpty() && !currPath.IsAbsoluteRootPath()) {
         if (_filtersByPrunedPath.find(currPath) != _filtersByPrunedPath.end()) {
             return true;
         } else {
@@ -179,13 +179,14 @@ void PruningSceneIndex::_PrimsAdded(
 {
     HdSceneIndexObserver::AddedPrimEntries editedEntries;
     for (const auto& addedEntry : entries) {
-        // We're executing the full loop for each filter, so too many notification sent
         for (auto& filterEntry : _prunedPathsByFilter) {
-            if (_PrunePrim(GetInputSceneIndex()->GetPrim(addedEntry.primPath), filterEntry.first)) {
+            if (_PrunePrim(addedEntry.primPath, GetInputSceneIndex()->GetPrim(addedEntry.primPath), filterEntry.first)) {
                 filterEntry.second.emplace(addedEntry.primPath);
-            } else {
-                editedEntries.emplace_back(addedEntry);
+                _filtersByPrunedPath[addedEntry.primPath].emplace(filterEntry.first);
             }
+        }
+        if (!_IsAncestorPrunedInclusive(addedEntry.primPath)) {
+            editedEntries.emplace_back(addedEntry);
         }
     }
     if (!editedEntries.empty()) {
@@ -199,13 +200,14 @@ void PruningSceneIndex::_PrimsRemoved(
 {
     HdSceneIndexObserver::RemovedPrimEntries editedEntries;
     for (const auto& removedEntry : entries) {
-        // We're executing the full loop for each filter, so too many notification sent
         for (auto& filterEntry : _prunedPathsByFilter) {
             if (filterEntry.second.find(removedEntry.primPath) != filterEntry.second.end()) {
                 filterEntry.second.erase(removedEntry.primPath);
-            } else {
-                editedEntries.emplace_back(removedEntry);
             }
+        }
+        _filtersByPrunedPath.erase(removedEntry.primPath);
+        if (!_IsAncestorPrunedInclusive(removedEntry.primPath)) {
+            editedEntries.emplace_back(removedEntry);
         }
     }
     if (!editedEntries.empty()) {
@@ -222,20 +224,34 @@ void PruningSceneIndex::_PrimsDirtied(
     HdSceneIndexObserver::AddedPrimEntries addedEntries;
 
     for (const auto& dirtiedEntry : entries) {
-        // We're executing the full loop for each filter, so too many notification sent
-        for (const auto& filterEntry : _prunedPathsByFilter) {
-            HdSceneIndexPrim dirtiedPrim = GetInputSceneIndex()->GetPrim(dirtiedEntry.primPath);
+        bool wasInitiallyPruned = _IsAncestorPrunedInclusive(dirtiedEntry.primPath);
+        HdSceneIndexPrim dirtiedPrim = GetInputSceneIndex()->GetPrim(dirtiedEntry.primPath);
+        for (auto& filterEntry : _prunedPathsByFilter) {
+            bool shouldBePruned = _PrunePrim(dirtiedEntry.primPath, dirtiedPrim, filterEntry.first);
 
-            bool isPruned = filterEntry.second.find(dirtiedEntry.primPath) != filterEntry.second.end();
-            bool shouldBePruned = _PrunePrim(dirtiedPrim, filterEntry.first);
-
-            if (!isPruned && shouldBePruned) {
-                removedEntries.emplace_back(dirtiedEntry.primPath);
-            } else if (isPruned && !shouldBePruned) {
-                addedEntries.emplace_back(dirtiedEntry.primPath, dirtiedPrim.primType);
+            if (shouldBePruned) {
+                filterEntry.second.emplace(dirtiedEntry.primPath);
+                _filtersByPrunedPath[dirtiedEntry.primPath].emplace(filterEntry.first);
             } else {
-                editedEntries.emplace_back(dirtiedEntry);
+                if (filterEntry.second.find(dirtiedEntry.primPath) != filterEntry.second.end()) {
+                    filterEntry.second.erase(dirtiedEntry.primPath);
+                }
+                if (_filtersByPrunedPath.find(dirtiedEntry.primPath) != _filtersByPrunedPath.end()) {
+                    _filtersByPrunedPath[dirtiedEntry.primPath].erase(filterEntry.first);
+                    if (_filtersByPrunedPath[dirtiedEntry.primPath].empty()) {
+                        _filtersByPrunedPath.erase(dirtiedEntry.primPath);
+                    }
+                }
             }
+
+        }
+        bool isNowPruned = _IsAncestorPrunedInclusive(dirtiedEntry.primPath);
+        if (!wasInitiallyPruned && isNowPruned) {
+            removedEntries.emplace_back(dirtiedEntry.primPath);
+        } else if (wasInitiallyPruned && !isNowPruned) {
+            addedEntries.emplace_back(dirtiedEntry.primPath, dirtiedPrim.primType);
+        } else {
+            editedEntries.emplace_back(dirtiedEntry);
         }
     }
 
