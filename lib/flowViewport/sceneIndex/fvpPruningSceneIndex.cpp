@@ -206,16 +206,19 @@ void PruningSceneIndex::_PrimsAdded(
         const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries)
 {
     HdSceneIndexObserver::AddedPrimEntries editedEntries;
+
     for (const auto& addedEntry : entries) {
         for (const auto& pruningToken : GetActiveFilters()) {
             if (_PrunePrim(addedEntry.primPath, GetInputSceneIndex()->GetPrim(addedEntry.primPath), pruningToken)) {
                 _InsertEntry(addedEntry.primPath, pruningToken);
             }
         }
+
         if (!_IsAncestorPrunedInclusive(addedEntry.primPath)) {
             editedEntries.emplace_back(addedEntry);
         }
     }
+
     if (!editedEntries.empty()) {
         _SendPrimsAdded(editedEntries);
     }
@@ -226,14 +229,17 @@ void PruningSceneIndex::_PrimsRemoved(
         const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries)
 {
     HdSceneIndexObserver::RemovedPrimEntries editedEntries;
+
     for (const auto& removedEntry : entries) {
-        for (const auto& pruningToken : GetActiveFilters()) {
-            _RemoveEntry(removedEntry.primPath, pruningToken);
-        }
         if (!_IsAncestorPrunedInclusive(removedEntry.primPath)) {
             editedEntries.emplace_back(removedEntry);
+        } else {
+            for (const auto& pruningToken : GetActiveFilters()) {
+                _RemoveEntry(removedEntry.primPath, pruningToken);
+            }
         }
     }
+
     if (!editedEntries.empty()) {
         _SendPrimsRemoved(editedEntries);
     }
@@ -249,7 +255,9 @@ void PruningSceneIndex::_PrimsDirtied(
 
     for (const auto& dirtiedEntry : entries) {
         bool wasInitiallyPruned = _IsAncestorPrunedInclusive(dirtiedEntry.primPath);
+
         HdSceneIndexPrim dirtiedPrim = GetInputSceneIndex()->GetPrim(dirtiedEntry.primPath);
+
         for (const auto& pruningToken : GetActiveFilters()) {
             if (_PrunePrim(dirtiedEntry.primPath, dirtiedPrim, pruningToken)) {
                 _InsertEntry(dirtiedEntry.primPath, pruningToken);
@@ -257,7 +265,9 @@ void PruningSceneIndex::_PrimsDirtied(
                 _RemoveEntry(dirtiedEntry.primPath, pruningToken);
             }
         }
+
         bool isNowPruned = _IsAncestorPrunedInclusive(dirtiedEntry.primPath);
+
         if (!wasInitiallyPruned && isNowPruned) {
             removedEntries.emplace_back(dirtiedEntry.primPath);
         } else if (wasInitiallyPruned && !isNowPruned) {
