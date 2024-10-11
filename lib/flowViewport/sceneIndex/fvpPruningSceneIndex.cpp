@@ -120,6 +120,9 @@ bool PruningSceneIndex::EnableFilter(const TfToken& pruningToken)
         return false;
     }
 
+    // Enable the filter
+    _prunedPathsByFilter[pruningToken] = SdfPathSet();
+
     HdSceneIndexObserver::RemovedPrimEntries prunedPrims;
 
     for (const SdfPath& primPath : HdSceneIndexPrimView(GetInputSceneIndex())) {
@@ -128,8 +131,7 @@ bool PruningSceneIndex::EnableFilter(const TfToken& pruningToken)
                 // Only send notification if it was not already pruned out, directly or indirectly
                 prunedPrims.emplace_back(primPath);
             }
-            _prunedPathsByFilter[pruningToken].emplace(primPath);
-            _filtersByPrunedPath[primPath].emplace(pruningToken);
+            _InsertEntry(primPath, pruningToken);
         }
     }
 
@@ -147,23 +149,19 @@ bool PruningSceneIndex::DisableFilter(const TfToken& pruningToken)
         return false;
     }
 
-    SdfPathSet prunedPaths = _prunedPathsByFilter[pruningToken];
-
-    _prunedPathsByFilter.erase(pruningToken);
-    for (const auto& primPath : prunedPaths) {
-        _filtersByPrunedPath[primPath].erase(pruningToken);
-        if (_filtersByPrunedPath[primPath].empty()) {
-            _filtersByPrunedPath.erase(primPath);
-        }
-    }
-
     HdSceneIndexObserver::AddedPrimEntries unprunedPrims;
+
+    SdfPathSet prunedPaths = _prunedPathsByFilter[pruningToken];
     for (const auto& primPath : prunedPaths) {
-        // If it's still pruned, avoid sending a notification
+        _RemoveEntry(primPath, pruningToken);
         if (!_IsAncestorPrunedInclusive(primPath)) {
+            // Only send notification if it was pruned and no longer is
             unprunedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
         }
     }
+
+    // Disable the filter
+    _prunedPathsByFilter.erase(pruningToken);
 
     if (!unprunedPrims.empty()) {
         _SendPrimsAdded(unprunedPrims);
