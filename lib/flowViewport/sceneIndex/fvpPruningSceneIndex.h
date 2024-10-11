@@ -41,8 +41,6 @@ PXR_NAMESPACE_OPEN_SCOPE
     (spheres) \
     (nurbsPatches) \
     (nurbsCurves) \
-    (lightGizmos) \
-    (cameraGizmos)
 // clang-format on
 
 TF_DECLARE_PUBLIC_TOKENS(FvpPruningTokens, FVP_API, FVP_PRUNING_TOKENS);
