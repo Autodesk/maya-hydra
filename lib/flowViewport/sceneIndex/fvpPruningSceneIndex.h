@@ -123,7 +123,7 @@ protected:
     FVP_API
     bool _IsAncestorPrunedInclusive(const PXR_NS::SdfPath& primPath) const;
 
-    // Maps a filtering token to the set of prim paths that have been pruned out by this token
+    // Maps a pruning token to the set of prim paths that have been pruned out by this token
     std::map<PXR_NS::TfToken, PXR_NS::SdfPathSet> _prunedPathsByFilter;
     std::map<PXR_NS::SdfPath, std::set<PXR_NS::TfToken>> _filtersByPrunedPath;
 
