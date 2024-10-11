@@ -39,14 +39,6 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-bool _PrunePrim(const HdSceneIndexPrim& prim, const TfToken& pruningToken)
-{
-    if (pruningToken == FvpPruningTokens->mesh) {
-        return prim.primType == HdPrimTypeTokens->mesh;
-    }
-    return false;
-}
-
 } // namespace
 
 namespace FVP_NS_DEF {
@@ -60,6 +52,32 @@ PruningSceneIndex::PruningSceneIndex(HdSceneIndexBaseRefPtr const &inputSceneInd
     HdSingleInputFilteringSceneIndexBase(inputSceneIndex), 
     InputSceneIndexUtils(inputSceneIndex)
 {
+}
+
+void PruningSceneIndex::AddExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot)
+{
+    _excludedSceneRoots.emplace(sceneRoot);
+}
+
+bool PruningSceneIndex::_IsExcluded(const PXR_NS::SdfPath& primPath) const
+{
+    for (const auto& excludedSceneRoot : _excludedSceneRoots) {
+        if (primPath.HasPrefix(excludedSceneRoot)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool PruningSceneIndex::_PrunePrim(const SdfPath& primPath, const HdSceneIndexPrim& prim, const TfToken& pruningToken) const
+{
+    if (_IsExcluded(primPath)) {
+        return false;
+    }
+    if (pruningToken == FvpPruningTokens->mesh) {
+        return prim.primType == HdPrimTypeTokens->mesh;
+    }
+    return false;
 }
 
 HdSceneIndexPrim PruningSceneIndex::GetPrim(const SdfPath& primPath) const
@@ -102,7 +120,7 @@ bool PruningSceneIndex::EnableFilter(const TfToken& pruningToken)
 
     HdSceneIndexObserver::RemovedPrimEntries prunedPrims;
 
-    for (const SdfPath& primPath: HdSceneIndexPrimView(GetInputSceneIndex())) {
+    for (const SdfPath& primPath : HdSceneIndexPrimView(GetInputSceneIndex())) {
         if (_PrunePrim(GetInputSceneIndex()->GetPrim(primPath), pruningToken)) {
             _prunedPathsByFilter[pruningToken].emplace(primPath);
             prunedPrims.emplace_back(primPath);
@@ -144,6 +162,7 @@ void PruningSceneIndex::_PrimsAdded(
 {
     HdSceneIndexObserver::AddedPrimEntries editedEntries;
     for (const auto& addedEntry : entries) {
+        // We're executing the full loop for each filter, so too many notification sent
         for (auto& filterEntry : _prunedPathsByFilter) {
             if (_PrunePrim(GetInputSceneIndex()->GetPrim(addedEntry.primPath), filterEntry.first)) {
                 filterEntry.second.emplace(addedEntry.primPath);
@@ -163,6 +182,7 @@ void PruningSceneIndex::_PrimsRemoved(
 {
     HdSceneIndexObserver::RemovedPrimEntries editedEntries;
     for (const auto& removedEntry : entries) {
+        // We're executing the full loop for each filter, so too many notification sent
         for (auto& filterEntry : _prunedPathsByFilter) {
             if (filterEntry.second.find(removedEntry.primPath) != filterEntry.second.end()) {
                 filterEntry.second.erase(removedEntry.primPath);
@@ -185,6 +205,7 @@ void PruningSceneIndex::_PrimsDirtied(
     HdSceneIndexObserver::AddedPrimEntries addedEntries;
 
     for (const auto& dirtiedEntry : entries) {
+        // We're executing the full loop for each filter, so too many notification sent
         for (const auto& filterEntry : _prunedPathsByFilter) {
             HdSceneIndexPrim dirtiedPrim = GetInputSceneIndex()->GetPrim(dirtiedEntry.primPath);
 

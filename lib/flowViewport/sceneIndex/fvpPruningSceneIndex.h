@@ -25,6 +25,7 @@
 #include <pxr/imaging/hdsi/api.h>
 #include <pxr/imaging/hd/materialFilteringSceneIndexBase.h>
 #include <pxr/imaging/hd/materialNetworkInterface.h>
+
 #include <set>
 #include <unordered_map>
 
@@ -75,6 +76,9 @@ public:
     bool DisableFilter(const PXR_NS::TfToken& filterToken);
 
     FVP_API
+    void AddExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot);
+
+    FVP_API
     PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override {
         PXR_NAMESPACE_USING_DIRECTIVE;
         const PathInterface* pathInterface = dynamic_cast<const PathInterface*>(&*GetInputSceneIndex());
@@ -101,8 +105,16 @@ protected:
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
 
+    FVP_API
+    bool _IsExcluded(const PXR_NS::SdfPath& primPath) const;
+
+    FVP_API
+    bool _PrunePrim(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSceneIndexPrim& prim, const PXR_NS::TfToken& pruningToken) const;
+
     // Maps a filtering token to the set of prim paths that have been pruned out by this token
     std::map<PXR_NS::TfToken, PXR_NS::SdfPathSet> _prunedPathsByFilter;
+
+    std::set<PXR_NS::SdfPath> _excludedSceneRoots;
 };
 
 } // namespace FVP_NS_DEF
