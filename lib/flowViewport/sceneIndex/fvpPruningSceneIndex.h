@@ -111,8 +111,12 @@ protected:
     FVP_API
     bool _PrunePrim(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSceneIndexPrim& prim, const PXR_NS::TfToken& pruningToken) const;
 
+    FVP_API
+    bool _IsAncestorPrunedInclusive(const PXR_NS::SdfPath& primPath) const;
+
     // Maps a filtering token to the set of prim paths that have been pruned out by this token
     std::map<PXR_NS::TfToken, PXR_NS::SdfPathSet> _prunedPathsByFilter;
+    std::map<PXR_NS::SdfPath, std::set<PXR_NS::TfToken>> _filtersByPrunedPath;
 
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
 };
