@@ -803,12 +803,38 @@ MStatus MtohRenderOverride::Render(
        _displayStyleSceneIndex->SetRefineLevel({true, delegateParams.refineLevel});
     }
 
-     auto objectExclusions = framecontext->objectTypeExclusions();
-     if (objectExclusions & MHWRender::MFrameContext::kExcludeMeshes) {
-        _pruningSceneIndex->EnableFilter(FvpPruningTokens->mesh);
-     } else {
-        _pruningSceneIndex->DisableFilter(FvpPruningTokens->mesh);
-     }
+    // Update "Show" menu filters
+    {
+        auto objectExclusions = framecontext->objectTypeExclusions();
+
+        TfTokenVector polygonFilters = { 
+            FvpPruningTokens->meshes, 
+            FvpPruningTokens->capsules, 
+            FvpPruningTokens->cones, 
+            FvpPruningTokens->cubes, 
+            FvpPruningTokens->cylinders, 
+            FvpPruningTokens->spheres
+        };
+        for (const auto& polygonFilter : polygonFilters) {
+            if (objectExclusions & MHWRender::MFrameContext::kExcludeMeshes) {
+                _pruningSceneIndex->EnableFilter(polygonFilter);
+            } else {
+                _pruningSceneIndex->DisableFilter(polygonFilter);
+            }
+        }
+
+        if (objectExclusions & MHWRender::MFrameContext::kExcludeNurbsCurves) {
+            _pruningSceneIndex->EnableFilter(FvpPruningTokens->nurbsCurves);
+        } else {
+            _pruningSceneIndex->DisableFilter(FvpPruningTokens->nurbsCurves);
+        }
+
+        if (objectExclusions & MHWRender::MFrameContext::kExcludeNurbsSurfaces) {
+            _pruningSceneIndex->EnableFilter(FvpPruningTokens->nurbsPatches);
+        } else {
+            _pruningSceneIndex->DisableFilter(FvpPruningTokens->nurbsPatches);
+        }
+    }
 
     // Toggle textures in the material network
     const unsigned int currentDisplayMode = drawContext.getDisplayStyle();
