@@ -33,10 +33,16 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 // clang-format off
 #define FVP_PRUNING_TOKENS \
-    (mesh) \
-    (sphere) \
-    (cone) \
-    (cube)
+    (meshes) \
+    (capsules) \
+    (cones) \
+    (cubes) \
+    (cylinders) \
+    (spheres) \
+    (nurbsPatches) \
+    (nurbsCurves) \
+    (lightGizmos) \
+    (cameraGizmos)
 // clang-format on
 
 TF_DECLARE_PUBLIC_TOKENS(FvpPruningTokens, FVP_API, FVP_PRUNING_TOKENS);
