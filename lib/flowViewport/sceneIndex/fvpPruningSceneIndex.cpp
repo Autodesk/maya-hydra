@@ -55,6 +55,8 @@ bool _HasAncestorInclusiveInContainer(const SdfPath& path, const Container& path
 
 bool _MeshesFilterHandler(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath, const HdSceneIndexPrim& prim)
 {
+    // Currently we just flat out remove any prim with a mesh type. If we were to add extra checks to make sure this is not
+    // a mesh prim that serves another purpose, we would add them here.
     return prim.primType == HdPrimTypeTokens->mesh;
 }
 
