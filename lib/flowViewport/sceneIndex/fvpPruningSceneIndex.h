@@ -76,6 +76,9 @@ public:
     bool DisableFilter(const PXR_NS::TfToken& pruningToken);
 
     FVP_API
+    std::set<PXR_NS::TfToken> GetActiveFilters();
+
+    FVP_API
     void AddExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot);
 
     FVP_API

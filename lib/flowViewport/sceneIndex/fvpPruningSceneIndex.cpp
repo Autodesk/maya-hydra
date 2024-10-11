@@ -172,6 +172,15 @@ bool PruningSceneIndex::DisableFilter(const TfToken& pruningToken)
     return true;
 }
 
+std::set<TfToken> PruningSceneIndex::GetActiveFilters()
+{
+    std::set<TfToken> pruningTokens;
+    for (const auto& filterEntry : _prunedPathsByFilter) {
+        pruningTokens.emplace(filterEntry.first);
+    }
+    return pruningTokens;
+}
+
 void PruningSceneIndex::_InsertEntry(const PXR_NS::SdfPath& primPath, const PXR_NS::TfToken& pruningToken)
 {
     _prunedPathsByFilter[pruningToken].emplace(primPath);
@@ -198,9 +207,9 @@ void PruningSceneIndex::_PrimsAdded(
 {
     HdSceneIndexObserver::AddedPrimEntries editedEntries;
     for (const auto& addedEntry : entries) {
-        for (auto& filterEntry : _prunedPathsByFilter) {
-            if (_PrunePrim(addedEntry.primPath, GetInputSceneIndex()->GetPrim(addedEntry.primPath), filterEntry.first)) {
-                _InsertEntry(addedEntry.primPath, filterEntry.first);
+        for (const auto& pruningToken : GetActiveFilters()) {
+            if (_PrunePrim(addedEntry.primPath, GetInputSceneIndex()->GetPrim(addedEntry.primPath), pruningToken)) {
+                _InsertEntry(addedEntry.primPath, pruningToken);
             }
         }
         if (!_IsAncestorPrunedInclusive(addedEntry.primPath)) {
@@ -218,8 +227,8 @@ void PruningSceneIndex::_PrimsRemoved(
 {
     HdSceneIndexObserver::RemovedPrimEntries editedEntries;
     for (const auto& removedEntry : entries) {
-        for (auto& filterEntry : _prunedPathsByFilter) {
-            _RemoveEntry(removedEntry.primPath, filterEntry.first);
+        for (const auto& pruningToken : GetActiveFilters()) {
+            _RemoveEntry(removedEntry.primPath, pruningToken);
         }
         if (!_IsAncestorPrunedInclusive(removedEntry.primPath)) {
             editedEntries.emplace_back(removedEntry);
@@ -241,11 +250,11 @@ void PruningSceneIndex::_PrimsDirtied(
     for (const auto& dirtiedEntry : entries) {
         bool wasInitiallyPruned = _IsAncestorPrunedInclusive(dirtiedEntry.primPath);
         HdSceneIndexPrim dirtiedPrim = GetInputSceneIndex()->GetPrim(dirtiedEntry.primPath);
-        for (auto& filterEntry : _prunedPathsByFilter) {
-            if (_PrunePrim(dirtiedEntry.primPath, dirtiedPrim, filterEntry.first)) {
-                _InsertEntry(dirtiedEntry.primPath, filterEntry.first);
+        for (const auto& pruningToken : GetActiveFilters()) {
+            if (_PrunePrim(dirtiedEntry.primPath, dirtiedPrim, pruningToken)) {
+                _InsertEntry(dirtiedEntry.primPath, pruningToken);
             } else {
-                _RemoveEntry(dirtiedEntry.primPath, filterEntry.first);
+                _RemoveEntry(dirtiedEntry.primPath, pruningToken);
             }
         }
         bool isNowPruned = _IsAncestorPrunedInclusive(dirtiedEntry.primPath);
