@@ -25,6 +25,7 @@
 
 //Hydra headers
 #include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/base/vt/array.h>
 
 namespace FVP_NS_DEF {
 
@@ -176,16 +177,39 @@ private:
         PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries* dirtiedEntries
     ) const;
 
-    void _ReplaceIsolateSelection(const SelectionConstPtr& selection);
+    void _DirtyIsolateSelection(const SelectionConstPtr& selection);
 
     void _InsertSelectedPaths(
         const SelectionConstPtr&   selection,
         std::set<PXR_NS::SdfPath>& dirtyPaths
     );
 
+    void _AddDependencies(const SelectionPtr& isolateSelection);
+
+    using Instancers = PXR_NS::TfSmallVector<PXR_NS::SdfPath, 8>;
+    using InstancerMask = PXR_NS::VtArray<bool>;
+    using InstancerMasks = std::map<PXR_NS::SdfPath, InstancerMask>;
+
+    // Collect all the instancers from the argument isolate selection.
+    Instancers _CollectInstancers(
+        const SelectionConstPtr& isolateSelection) const;
+
+    // Create the instance mask for each instancer.
+    InstancerMasks _CreateInstancerMasks(const Instancers& instancers, 
+        const SelectionConstPtr& isolateSelection) const;
+
+    // Dirty the instancer masks.
+    void _DirtyInstancerMasks(const InstancerMasks& instancerMasks);
+    void _AddDirtyInstancerMaskEntry(
+        const PXR_NS::SdfPath&                            primPath, 
+        PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries* dirtiedEntries
+    ) const;    
+
     std::string  _viewportId;
 
     SelectionPtr _isolateSelection{};
+
+    InstancerMasks _instancerMasks{};
 };
 
 }//end of namespace FVP_NS_DEF

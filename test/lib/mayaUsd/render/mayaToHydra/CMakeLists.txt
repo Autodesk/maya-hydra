@@ -81,9 +81,12 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testGeomSubsetsWireframeHighlight.py
 )
 
+# These two test files are identical, except for disabled tests.  See
+# HYDRA-1245.
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
         cpp/testIsolateSelect.py
+        cpp/testUsdNativeInstancingIsolateSelect.py
     )
 endif()
 

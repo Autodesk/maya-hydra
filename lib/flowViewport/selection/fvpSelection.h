@@ -18,7 +18,7 @@
 
 #include "flowViewport/api.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
-#include "flowViewport/sceneIndex/fvpPathInterface.h"
+#include "flowViewport/selection/fvpSelectionTypes.h"
 
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/usd/sdf/path.h>
@@ -42,6 +42,8 @@ namespace FVP_NS_DEF {
 class Selection
 {
 public:
+
+    using PrimSelectionsMap = std::map<PXR_NS::SdfPath, PrimSelections>;
 
     // Create a reference-counted Selection.
     FVP_API
@@ -109,11 +111,14 @@ public:
     PXR_NS::HdDataSourceBaseHandle
     GetVectorDataSource(const PXR_NS::SdfPath& primPath) const;
 
+    PrimSelectionsMap::const_iterator begin() const;
+    PrimSelectionsMap::const_iterator end() const;
+
 private:
     
     // Maps prim path to selections to be returned by the vector data
     // source at locator selections.
-    std::map<PXR_NS::SdfPath, std::vector<PrimSelection>> _pathToSelections;
+    PrimSelectionsMap _pathToSelections;
 };
 
 }

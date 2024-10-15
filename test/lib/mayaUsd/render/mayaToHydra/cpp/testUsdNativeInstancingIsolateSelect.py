@@ -42,10 +42,10 @@ def disableIsolateSelect(modelPanel):
     cmds.setFocus(modelPanel)
     mel.eval("enableIsolateSelect %s 0" % modelPanel)
 
-# This test is identical to the one in testUsdNativeInstancingIsolateSelect.py,
-# except for disabled tests.  See HYDRA-1245.
+# This test is identical to the one in testIsolateSelect.py, except for
+# disabled tests.  See HYDRA-1245.
 
-class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
+class TestUsdNativeInstancingIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -56,7 +56,7 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestIsolateSelect, cls).setUpClass()
+        super(TestUsdNativeInstancingIsolateSelect, cls).setUpClass()
         for p in cls._pluginsToLoad:
             if not cmds.pluginInfo(p, q=True, loaded=True):
                 cls._pluginsToUnload.append(p)
@@ -64,7 +64,7 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        super(TestIsolateSelect, cls).tearDownClass()
+        super(TestUsdNativeInstancingIsolateSelect, cls).tearDownClass()
         # Clean out the scene to allow all plugins to unload cleanly.
         cmds.file(new=True, force=True)
         for p in reversed(cls._pluginsToUnload):
@@ -176,7 +176,7 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
 
         self.assertVisibility(visible, notVisible)
 
-    def test_isolateSelectSingleViewport(self):
+    def _test_isolateSelectSingleViewport(self):
         scene = self.setupScene()
 
         # The default viewport is in the following panel.
@@ -309,7 +309,7 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
     # time of writing playblast doesn't respect isolate select when using
     # MayaHydra in a multi-viewport setting.  Therefore, the following test is
     # weak and does not validate results.
-    def test_isolateSelectMultiViewport(self):
+    def _test_isolateSelectMultiViewport(self):
         scene = self.setupScene()
             
         # We start in single viewport mode.  Set an isolate selection there.
@@ -361,7 +361,7 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
         for i in range(1, 5):
             disableIsolateSelect('modelPanel'+str(i))
 
-    def test_isolateSelectMultipleStages(self):
+    def _test_isolateSelectMultipleStages(self):
         scene = self.setupMultiStageScene()
 
         modelPanel = 'modelPanel4'
@@ -388,7 +388,7 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
         # other tests.
         disableIsolateSelect(modelPanel)
 
-    def _test_isolateSelectNativeInstancing(self):
+    def test_isolateSelectNativeInstancing(self):
 
         # Read in a scene with native instancing.
         usdScenePath = testUtils.getTestScene('testUsdNativeInstances', 'instancedCubeHierarchies.usda')
