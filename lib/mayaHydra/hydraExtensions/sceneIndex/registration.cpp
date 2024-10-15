@@ -417,8 +417,20 @@ MayaHydraSceneIndexRegistry::~MayaHydraSceneIndexRegistry()
         MSceneMessage::removeCallback(_AfterOpenCBId);
     }
     _AfterOpenCBId = 0;
+    _RemoveAllSceneIndexNodes();
     _registrationsByObjectHandle.clear();
     _registrations.clear();
+}
+
+void MayaHydraSceneIndexRegistry::_RemoveAllSceneIndexNodes()
+{
+    // Iterate over the map and collect the keys
+    for (const auto& pair : _registrationsByObjectHandle) {
+        MObjectHandle dagNodeHandle(pair.first);
+        if (dagNodeHandle.isValid()) {
+            _RemoveSceneIndexForNode(dagNodeHandle.object());
+        }
+    }
 }
 
 bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNode)

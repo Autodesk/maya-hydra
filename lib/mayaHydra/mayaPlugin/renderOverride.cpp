@@ -1140,9 +1140,10 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     if (fullReset){
         //Remove the data producer scene indices that apply to all viewports
         Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViewports();
-        //Remove the scene index registry
-        _sceneIndexRegistry.reset();
     }
+
+    // Remove the scene index registry
+    _sceneIndexRegistry.reset();
 
     #ifdef CODE_COVERAGE_WORKAROUND
         // Leak the Maya scene index, as its base class HdRetainedSceneIndex
