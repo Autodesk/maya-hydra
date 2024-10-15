@@ -294,5 +294,16 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(clear=True)
         self.checkFilter("nurbsPatches_USD", kExcludeNurbsSurfaces, 3)
 
+    def test_UsdLights(self):
+        def createUsdLight(stagePath):
+            lightName = cmds.directionalLight()
+            usdLightName = mayaUsd.lib.PrimUpdaterManager.duplicate(cmds.ls(lightName, long=True)[0], stagePath)
+            cmds.select(lightName)
+            cmds.delete()
+            cmds.select(usdLightName)
+        stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        self.stackInstances(functools.partial(createUsdLight, stagePath), 50, [0.005, 0, 0])
+        self.checkFilter("lights_USD", kExcludeLights, 2)
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
