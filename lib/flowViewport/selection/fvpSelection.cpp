@@ -72,17 +72,22 @@ bool Selection::Remove(const PrimSelection& primSelection)
         return false;
     }
 
+    auto found = _pathToSelections.find(primSelection.primPath);
+    if (found == _pathToSelections.end()) {
+        return false;
+    }
+    auto& primSelections = found->second;
+
     // Remove the specific selection
     auto itSelection = std::find(
-        _pathToSelections[primSelection.primPath].begin(), 
-        _pathToSelections[primSelection.primPath].end(),
-        primSelection);
-    if (itSelection != _pathToSelections[primSelection.primPath].end()) {
-        _pathToSelections[primSelection.primPath].erase(itSelection);
+        primSelections.begin(), primSelections.end(), primSelection);
+
+    if (itSelection != primSelections.end()) {
+        primSelections.erase(itSelection);
     }
 
     // If no selections remain, remove the entry entirely
-    if (_pathToSelections[primSelection.primPath].empty()) {
+    if (primSelections.empty()) {
         _pathToSelections.erase(primSelection.primPath);
     }
 
@@ -254,4 +259,14 @@ HdDataSourceBaseHandle Selection::GetVectorDataSource(
     );
 }
 
+Selection::PrimSelectionsMap::const_iterator Selection::begin() const
+{
+    return _pathToSelections.begin();
+}
+    
+Selection::PrimSelectionsMap::const_iterator Selection::end() const
+{
+    return _pathToSelections.end();
+}
+    
 }
