@@ -109,7 +109,7 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         cmds.modelEditor(activeViewport, edit=True, excludeObjectMask=oldMask)
 
     # --- Maya data ---
-    
+
     # TODO : Construction planes (not working in Hydra as of 2024-05-03)
 
     def test_Dimensions(self):
@@ -273,7 +273,7 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.refresh()
         self.checkFilter("polygons_USD", kExcludeMeshes, 10)
-    
+
     def test_UsdNurbsCurves(self):
         def createUsdCurve(stagePath):
             circleName = cmds.circle()
@@ -284,6 +284,15 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         self.stackInstances(functools.partial(createUsdCurve, stagePath), 50, [0, 0, 0.005])
         self.checkFilter("nurbsCurves_USD", kExcludeNurbsCurves, 2)
+
+    def test_UsdNurbsPatches(self):
+        stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        torusName = cmds.torus(sections=20, spans=10, heightRatio=0.5)
+        mayaUsd.lib.PrimUpdaterManager.duplicate(cmds.ls(torusName[0], long=True)[0], stagePath)
+        cmds.select(torusName)
+        cmds.delete()
+        cmds.select(clear=True)
+        self.checkFilter("nurbsPatches_USD", kExcludeNurbsSurfaces, 3)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
