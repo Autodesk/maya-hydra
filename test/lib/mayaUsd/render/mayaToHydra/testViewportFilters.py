@@ -14,8 +14,13 @@
 #
 import maya.cmds as cmds
 import fixturesUtils
+import functools
+import mayaUsd_createStageWithNewLayer
+import mayaUsd.lib
 import mayaUtils
 import mtohUtils
+import testUtils
+import usdUtils
 
 # Note : the order of the bit flags does not correspond to the order 
 # of the options in the "Show" -> "Viewport" UI.
@@ -103,6 +108,8 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         # Restore old mask
         cmds.modelEditor(activeViewport, edit=True, excludeObjectMask=oldMask)
 
+    # --- Maya data ---
+    
     # TODO : Construction planes (not working in Hydra as of 2024-05-03)
 
     def test_Dimensions(self):
@@ -221,6 +228,62 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         self.checkFilter("strokes", kExcludeStrokes, 4)
 
     # TODO : Texture Placements (not working in Hydra as of 2024-05-03)
+
+    # --- USD data ---
+
+    def test_UsdPolygons(self):
+        from pxr import UsdGeom
+
+        stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        stage = mayaUsd.lib.GetPrim(stagePath).GetStage()
+
+        capsuleName = "UsdCapsule"
+        capsuleXform = UsdGeom.Xform.Define(stage, "/" + capsuleName + "Xform")
+        capsuleXform.AddTranslateOp().Set(value=(6, 0, 0))
+        UsdGeom.Capsule.Define(stage, str(capsuleXform.GetPath()) + "/" + capsuleName)
+        cmds.select(clear=True)
+
+        coneName = "UsdCone"
+        coneXform = UsdGeom.Xform.Define(stage, "/" + coneName + "Xform")
+        coneXform.AddTranslateOp().Set(value=(2, 0, -2))
+        UsdGeom.Cone.Define(stage, str(coneXform.GetPath()) + "/" + coneName)
+        cmds.select(clear=True)
+
+        cubeName = "UsdCube"
+        cubeXform = UsdGeom.Xform.Define(stage, "/" + cubeName + "Xform")
+        cubeXform.AddTranslateOp().Set(value=(-3, 0, -3))
+        UsdGeom.Cube.Define(stage, str(cubeXform.GetPath()) + "/" + cubeName)
+        cmds.select(clear=True)
+
+        cylinderName = "UsdCylinder"
+        cylinderXform = UsdGeom.Xform.Define(stage, "/" + cylinderName + "Xform")
+        cylinderXform.AddTranslateOp().Set(value=(-2, 0, 2))
+        UsdGeom.Cylinder.Define(stage, str(cylinderXform.GetPath()) + "/" + cylinderName)
+        cmds.select(clear=True)
+
+        sphereName = "UsdSphere"
+        sphereXform = UsdGeom.Xform.Define(stage, "/" + sphereName + "Xform")
+        sphereXform.AddTranslateOp().Set(value=(0, 0, 6))
+        UsdGeom.Sphere.Define(stage, str(sphereXform.GetPath()) + "/" + sphereName)
+        cmds.select(clear=True)
+
+        cmds.polyTorus()
+        cmds.move(3, 0, 3)
+        cmds.select(clear=True)
+
+        cmds.refresh()
+        self.checkFilter("polygons_USD", kExcludeMeshes, 10)
+    
+    def test_UsdNurbsCurves(self):
+        def createUsdCurve(stagePath):
+            circleName = cmds.circle()
+            usdCircleName = mayaUsd.lib.PrimUpdaterManager.duplicate(cmds.ls(circleName[0], long=True)[0], stagePath)
+            cmds.select(circleName)
+            cmds.delete()
+            cmds.select(usdCircleName)
+        stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        self.stackInstances(functools.partial(createUsdCurve, stagePath), 50, [0, 0, 0.005])
+        self.checkFilter("nurbsCurves_USD", kExcludeNurbsCurves, 2)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
