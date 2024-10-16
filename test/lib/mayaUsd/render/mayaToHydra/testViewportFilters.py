@@ -22,6 +22,8 @@ import mtohUtils
 import testUtils
 import usdUtils
 
+from testUtils import PluginLoaded
+
 # Note : the order of the bit flags does not correspond to the order 
 # of the options in the "Show" -> "Viewport" UI.
 kExcludeNurbsCurves        = 1 << 0
@@ -315,6 +317,16 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         self.stackInstances(functools.partial(createUsdCamera, stagePath), 50, [0.005, 0, 0])
         self.checkFilter("cameras_USD", kExcludeCameras, 3)
+
+    # --- 3rd party data producers ---
+
+    def test_DataProducerPolygons(self):
+        with PluginLoaded('mayaHydraFlowViewportAPILocator'):
+            locator = cmds.createNode('MhFlowViewportAPILocator')
+            cmds.setAttr(locator + '.numCubesX', 2)
+            cmds.setAttr(locator + '.numCubesY', 2)
+            cmds.setAttr(locator + '.numCubesZ', 2)
+            self.checkFilter("polygons_DataProducer", kExcludeMeshes, 12)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
