@@ -305,5 +305,16 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         self.stackInstances(functools.partial(createUsdLight, stagePath), 50, [0.005, 0, 0])
         self.checkFilter("lights_USD", kExcludeLights, 2)
 
+    def test_UsdCameras(self):
+        def createUsdCamera(stagePath):
+            cameraName = cmds.camera()
+            usdCameraName = mayaUsd.lib.PrimUpdaterManager.duplicate(cmds.ls(cameraName[0], long=True)[0], stagePath)
+            cmds.select(cameraName)
+            cmds.delete()
+            cmds.select(usdCameraName)
+        stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        self.stackInstances(functools.partial(createUsdCamera, stagePath), 50, [0.005, 0, 0])
+        self.checkFilter("cameras_USD", kExcludeCameras, 3)
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
