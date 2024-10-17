@@ -205,6 +205,8 @@ private:
         PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries* dirtiedEntries
     ) const;    
 
+    bool _IsPointInstancer(const PXR_NS::SdfPath& primPath) const;
+
     std::string  _viewportId;
 
     SelectionPtr _isolateSelection{};

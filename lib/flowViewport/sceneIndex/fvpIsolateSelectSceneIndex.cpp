@@ -25,6 +25,9 @@
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
+#include <pxr/imaging/hd/tokens.h>
+
+#include <iostream>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -56,6 +59,24 @@ void append(Fvp::Selection& a, const Fvp::Selection& b)
     }
 }
 
+std::size_t getNbInstances(const HdInstancerTopologySchema& instancerTopologySchema)
+{
+    // No easy way to get the number of instances created by a point instancer.
+    // Count the total number of instances for all prototypes.  As per documentation
+    // https://github.com/PixarAnimationStudios/OpenUSD/blob/v24.08/pxr/imaging/hd/instancerTopologySchema.h
+    // the instance indices are a per-prototype array of instance index arrays,
+    // so counting the size of all instance index array gives the total number
+    // of instances.  For example, if instanceIndices = { [0,2], [1] },
+    // prototype 0 has two instances, and prototype 1 has one, for a total of 3.
+    std::size_t nbInstances{0};
+    auto instanceIndices = instancerTopologySchema.GetInstanceIndices();
+    for (std::size_t i = 0; i < instanceIndices.GetNumElements(); ++i) {
+        const auto& protoInstances = instanceIndices.GetElement(i)->GetTypedValue(0);
+        nbInstances += protoInstances.size();
+    }
+    return nbInstances;
+}
+
 Dependencies instancedPrim(
     const Fvp::IsolateSelectSceneIndex& si,
     const SdfPath&                      primPath
@@ -66,6 +87,49 @@ Dependencies instancedPrim(
     return (instanceSchema.IsDefined() ? Dependencies{{
                 instanceSchema.GetInstancer()->GetTypedValue(0)}} : 
         Dependencies());
+}
+
+void dumpSelection(
+    const Fvp::IsolateSelectSceneIndex& si,
+    const std::string&                  headerMsg,
+    const Fvp::SelectionConstPtr&       isolateSelection
+)
+{
+    std::cout << headerMsg << std::endl;
+
+    if (!isolateSelection) {
+        std::cout << "PPT: disabled (nullptr)." << std::endl;
+        return;
+    }
+
+    for (const auto& primSelectionsEntry : *isolateSelection) {
+        std::cout << "PPT:     primSelectionsEntry path:" << primSelectionsEntry.first.GetText() << std::endl;
+        std::cout << "PPT:     primSelectionsEntry PrimSelections:" << std::endl;
+        for (const auto& primSelection : primSelectionsEntry.second) {
+            std::cout << "PPT:         primPath: " 
+                      << primSelection.primPath.GetText() << std::endl;
+
+            HdSceneIndexPrim prim = si.GetInputSceneIndex()->GetPrim(primSelection.primPath);
+            HdInstanceSchema instanceSchema = HdInstanceSchema::GetFromParent(prim.dataSource);
+            if (instanceSchema.IsDefined()) {
+                std::cout << "PPT:         prim is instanced, instancer is ";
+                auto instancerPath = instanceSchema.GetInstancer()->GetTypedValue(0);
+                std::cout << instancerPath.GetText() << std::endl;
+                std::cout << "PPT:         prototype index is " << instanceSchema.GetPrototypeIndex()->GetTypedValue(0) << std::endl;
+                std::cout << "PPT:         instance index is " << instanceSchema.GetInstanceIndex()->GetTypedValue(0) << std::endl;
+            }
+
+            std::cout << "PPT:         nestedInstanceIndices: " << std::endl;
+            for (const auto& instancesSelection : primSelection.nestedInstanceIndices) {
+                std::cout << "PPT:             instancerPath: " << instancesSelection.instancerPath.GetText() << std::endl;
+                std::cout << "PPT:             prototypeIndex: " << instancesSelection.prototypeIndex << std::endl;
+                std::cout << "PPT:             instanceIndices: " << std::endl;
+                for (auto instanceIndex : instancesSelection.instanceIndices) {
+                    std::cout << "PPT:                 " << instanceIndex << std::endl;
+                }
+            }
+        }
+    }
 }
 
 }
@@ -119,6 +183,9 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
 
     auto instancerMask = _instancerMasks.find(primPath);
     if (instancerMask != _instancerMasks.end()) {
+        std::cout << "PPT: instancer " << primPath.GetText() 
+                  << " has its mask changed by isolate select." << std::endl;
+
         auto maskDs = HdRetainedTypedSampledDataSource<VtArray<bool>>::New(instancerMask->second);
 
         inputPrim.dataSource = HdContainerDataSourceEditor(inputPrim.dataSource)
@@ -332,6 +399,10 @@ void IsolateSelectSceneIndex::SetViewport(
         return;
     }
 
+    std::ostringstream oss;
+    oss << "PPT: SetViewport(" << viewportId << ") new selection:";
+    dumpSelection(*this, oss.str(), newIsolateSelection);
+
     // Add dependencies of the new isolate selection to protect them from being
     // marked as invisible.
     _AddDependencies(newIsolateSelection);
@@ -340,6 +411,11 @@ void IsolateSelectSceneIndex::SetViewport(
 
     // Collect all the instancers from the new isolate selection.
     auto instancers = _CollectInstancers(newIsolateSelection);
+
+    std::cout << "PPT: collected instancers are:" << std::endl;
+    for (const auto& instancer : instancers) {
+        std::cout << "PPT:     " << instancer.GetText() << std::endl;
+    }
 
     // Create the instance mask for each instancer.
     auto newInstancerMasks = _CreateInstancerMasks(instancers, newIsolateSelection);
@@ -420,8 +496,10 @@ void IsolateSelectSceneIndex::_AddDependencies(
     Selection dependencies;
     for (const auto& primSelectionsEntry : *isolateSelection) {
         for (const auto& primSelection : primSelectionsEntry.second) {
+            std::cout << "PPT: finding dependencies for " << primSelection.primPath.GetText() << std::endl;
             auto primDependencies = instancedPrim(*this, primSelection.primPath);
             for (const auto& dependencyPath : primDependencies) {
+                std::cout << "PPT:     adding dependency " << dependencyPath.GetText() << std::endl;
                 dependencies.Add(PrimSelection{dependencyPath});
             }
         }
@@ -440,8 +518,18 @@ IsolateSelectSceneIndex::_CollectInstancers(
         return {};
     }
 
+    std::cout << "PPT: in _CollectInstancers()" << std::endl;
     Instancers instancers;
     for (const auto& primSelectionsEntry : *isolateSelection) {
+        // If the prim itself is a point instancer, add it and continue.
+        if (_IsPointInstancer(primSelectionsEntry.first)) {
+            std::cout << "PPT:     " << primSelectionsEntry.first.GetText()
+                      << " is a point instancer, added to collected instancers."
+                      << std::endl;
+            instancers.emplace_back(primSelectionsEntry.first);
+            continue;
+        }
+
         for (const auto& primSelection : primSelectionsEntry.second) {
             auto prim = GetInputSceneIndex()->GetPrim(primSelection.primPath);
             auto instanceSchema = HdInstanceSchema::GetFromParent(prim.dataSource);
@@ -452,6 +540,39 @@ IsolateSelectSceneIndex::_CollectInstancers(
     }
 
     return instancers;
+}
+
+bool IsolateSelectSceneIndex::_IsPointInstancer(
+    const PXR_NS::SdfPath& primPath
+) const
+{
+    auto prim = GetInputSceneIndex()->GetPrim(primPath);
+
+    // If prim isn't an instancer, it can't be a point instancer.
+    if (prim.primType != HdPrimTypeTokens->instancer) {
+        return false;
+    }
+
+    std::cout << "PPT: in _IsPointInstancer(" << primPath.GetText() 
+              << "), it's an instancer." << std::endl;
+
+    HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
+
+    // Documentation
+    // https://github.com/PixarAnimationStudios/OpenUSD/blob/59992d2178afcebd89273759f2bddfe730e59aa8/pxr/imaging/hd/instancerTopologySchema.h#L86
+    // says that instanceLocations is only meaningful for native
+    // instancing, empty for point instancing.
+    auto instanceLocationsDs = instancerTopologySchema.GetInstanceLocations();
+    if (!instanceLocationsDs) {
+        std::cout << "PPT:     instanceLocation data source is null, it's a point instancer." << std::endl;
+        return true;
+    }
+
+    auto instanceLocations = instanceLocationsDs->GetTypedValue(0.0f);
+
+    std::cout << "PPT:     instanceLocations size is " << instanceLocations.size() << std::endl;
+        
+    return (instanceLocations.size() > 0);
 }
 
 IsolateSelectSceneIndex::InstancerMasks
@@ -472,7 +593,7 @@ IsolateSelectSceneIndex::_CreateInstancerMasks(
     InstancerMasks instancerMasks;
     for (const auto& instancerPath : instancers) {
         HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(instancerPath);
-        HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
+        auto instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
 
         // Documentation
         // https://github.com/PixarAnimationStudios/OpenUSD/blob/59992d2178afcebd89273759f2bddfe730e59aa8/pxr/imaging/hd/instancerTopologySchema.h#L86
@@ -480,15 +601,67 @@ IsolateSelectSceneIndex::_CreateInstancerMasks(
         // instancing, empty for point instancing.
         auto instanceLocationsDs = instancerTopologySchema.GetInstanceLocations();
         if (!instanceLocationsDs) {
+            std::cout << "PPT: setting mask for point instancer " << instancerPath.GetText() << std::endl;
+            auto primSelections = isolateSelection->GetPrimSelections(instancerPath);
+            std::cout << "PPT:     primSelections size is " << primSelections.size() << std::endl;
+
+            // If the instancer is in our list of collected instancers, it must
+            // have prim selections.
+            if (!TF_VERIFY(!primSelections.empty(), "Empty prim selections for instancer %s", instancerPath.GetText())) {
+                continue;
+            }
+
+            auto maskDs = instancerTopologySchema.GetMask();
+
+            if (!maskDs) {
+                std::cout << "PPT:     mask data source is null." << std::endl;
+            }
+            else {
+                auto mask = maskDs->GetTypedValue(0);
+                std::cout << "PPT:     mask size is " << mask.size() << std::endl;
+            }
+
+            std::set<int> visibleIndices;
+            for (const auto& primSelection : primSelections) {
+                for (const auto& instancesSelection : primSelection.nestedInstanceIndices) {
+                    // When will instancesSelection.instanceIndices have more
+                    // than one index?
+                    for (auto instanceIndex : instancesSelection.instanceIndices) {
+                        std::cout << "PPT:     instance " << instanceIndex << " is visible" 
+                                  << std::endl;
+                        visibleIndices.insert(instanceIndex);
+                    }
+                }
+            }
+
+            auto nbInstances = getNbInstances(instancerTopologySchema);
+
+            std::cout << "PPT:     " << instancerPath.GetText() << " has " << nbInstances 
+                      << " instances" << std::endl;
+
+            VtArray<bool> instanceMask(nbInstances);
+            for (int i=0; i < nbInstances; ++i) {
+                instanceMask[i] = (visibleIndices.count(i) > 0);
+            }
+
+            instancerMasks[instancerPath] = instanceMask;
             continue;
         }
 
         auto instanceLocations = instanceLocationsDs->GetTypedValue(0.0f);
 
+        std::cout << "PPT: instanceLocations for instancer " << instancerPath.GetText() << ":" << std::endl;
+        
         VtArray<bool> instanceMask(instanceLocations.size());
         std::size_t i=0;
         for (const auto& instanceLocation : instanceLocations) {
+            std::cout << "PPT:     " << instanceLocation.GetText();
+
             const bool included = isolateSelection->HasAncestorOrDescendantInclusive(instanceLocation);
+
+            std::cout << " is " << (included ? "INCLUDED in" : "EXCLUDED from")
+                      << " isolate select set" << std::endl;
+
             instanceMask[i] = included;
             ++i;
         }

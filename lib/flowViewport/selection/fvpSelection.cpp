@@ -259,6 +259,12 @@ HdDataSourceBaseHandle Selection::GetVectorDataSource(
     );
 }
 
+PrimSelections Selection::GetPrimSelections(const PXR_NS::SdfPath& primPath) const
+{
+    auto it = _pathToSelections.find(primPath);
+    return (it == _pathToSelections.end()) ? PrimSelections() : it->second;
+}
+
 Selection::PrimSelectionsMap::const_iterator Selection::begin() const
 {
     return _pathToSelections.begin();
