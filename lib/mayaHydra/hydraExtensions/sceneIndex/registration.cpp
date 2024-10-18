@@ -424,20 +424,9 @@ MayaHydraSceneIndexRegistry::~MayaHydraSceneIndexRegistry()
 
 void MayaHydraSceneIndexRegistry::_RemoveAllSceneIndexNodes()
 {
-    Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface
-        = Fvp::DataProducerSceneIndexInterface::get();
-        
     //Always take the first element and remove it until it is empty
     while (_registrationsByObjectHandle.begin() != _registrationsByObjectHandle.end()){
-        MObjectHandle dagNodeHandle (_registrationsByObjectHandle.begin()->first);
-        MayaHydraSceneIndexRegistrationPtr    registration(_registrationsByObjectHandle.begin()->second);
-        dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(
-            registration->rootSceneIndex);
-        _registrationsByObjectHandle.erase(dagNodeHandle);
-        _registrations.erase(registration->sceneIndexPathPrefix);
-#ifdef CODE_COVERAGE_WORKAROUND
-        Fvp::leakSceneIndex(registration->rootSceneIndex);
-#endif
+        _RemoveSceneIndexForNode(_registrationsByObjectHandle.begin()->first);
     }
 }
 
