@@ -1122,7 +1122,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     _initializationSucceeded = true;
 }
 
-//When fullReset is true, we remove the data producer scene indices that apply to all viewports and the scene index registry where the usd stages have been loaded.
+//When fullReset is true, we remove the data producer scene indices that apply to all viewports.
 //It means you are doing a full reset of hydra such as when doing "File New".
 //Use fullReset = false when you still want to see the previously registered data producer scene indices when using an hydra viewport.
 void MtohRenderOverride::ClearHydraResources(bool fullReset)
@@ -1140,9 +1140,10 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     if (fullReset){
         //Remove the data producer scene indices that apply to all viewports
         Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViewports();
-        //Remove the scene index registry
-        _sceneIndexRegistry.reset();
     }
+
+    // Remove the scene index registry
+    _sceneIndexRegistry.reset();
 
     #ifdef CODE_COVERAGE_WORKAROUND
         // Leak the Maya scene index, as its base class HdRetainedSceneIndex
