@@ -426,7 +426,7 @@ void MayaHydraSceneIndexRegistry::_RemoveAllSceneIndexNodes()
 {
     //Always take the first element and remove it until it is empty
     while (_registrationsByObjectHandle.begin() != _registrationsByObjectHandle.end()){
-        _RemoveSceneIndexForNode(_registrationsByObjectHandle.begin()->first);
+        _RemoveSceneIndexForNode(_registrationsByObjectHandle.begin()->first.object());
     }
 }
 
