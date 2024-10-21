@@ -808,7 +808,7 @@ MStatus MtohRenderOverride::Render(
     {
         auto objectExclusions = framecontext->objectTypeExclusions();
 
-        static TfTokenVector polygonFilters = { 
+        static const TfTokenVector polygonFilters = { 
             FvpPruningTokens->meshes, 
             FvpPruningTokens->capsules, 
             FvpPruningTokens->cones, 
@@ -816,7 +816,7 @@ MStatus MtohRenderOverride::Render(
             FvpPruningTokens->cylinders, 
             FvpPruningTokens->spheres
         };
-        static std::map<MUint64, TfTokenVector> mayaFiltersToFvpPruningTokens = {
+        static const std::map<MUint64, TfTokenVector> mayaFiltersToFvpPruningTokens = {
             { MHWRender::MFrameContext::kExcludeMeshes, polygonFilters },
             { MHWRender::MFrameContext::kExcludeNurbsCurves, {FvpPruningTokens->nurbsCurves} },
             { MHWRender::MFrameContext::kExcludeNurbsSurfaces, {FvpPruningTokens->nurbsPatches} }
@@ -1692,6 +1692,11 @@ bool MtohRenderOverride::select(
             outHits.clear();
         }
     }
+
+
+    // for (const auto& hit : outHits) {
+    //     std::cout << hit << std::endl;
+    // }
 
     //isOneMayaNodeInComponentsPickingMode will be true if one of the picked node is in components picking mode
     bool isOneMayaNodeInComponentsPickingMode = false;
