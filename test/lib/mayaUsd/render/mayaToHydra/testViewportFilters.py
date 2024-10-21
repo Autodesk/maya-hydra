@@ -269,19 +269,19 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         UsdGeom.Sphere.Define(stage, str(sphereXform.GetPath()) + "/" + sphereName)
         cmds.select(clear=True)
 
-        cmds.polyTorus()
+        torusName = cmds.polyTorus()
         cmds.move(3, 0, 3)
+        mayaUsd.lib.PrimUpdaterManager.duplicate(cmds.ls(torusName[0], long=True)[0], stagePath)
+        cmds.delete(torusName)
         cmds.select(clear=True)
 
-        cmds.refresh()
         self.checkFilter("polygons_USD", kExcludeMeshes, 10)
 
     def test_UsdNurbsCurves(self):
         def createUsdCurve(stagePath):
             circleName = cmds.circle()
             usdCircleName = mayaUsd.lib.PrimUpdaterManager.duplicate(cmds.ls(circleName[0], long=True)[0], stagePath)
-            cmds.select(circleName)
-            cmds.delete()
+            cmds.delete(circleName)
             cmds.select(usdCircleName)
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         self.stackInstances(functools.partial(createUsdCurve, stagePath), 50, [0, 0, 0.005])
@@ -291,8 +291,7 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         torusName = cmds.torus(sections=20, spans=10, heightRatio=0.5)
         mayaUsd.lib.PrimUpdaterManager.duplicate(cmds.ls(torusName[0], long=True)[0], stagePath)
-        cmds.select(torusName)
-        cmds.delete()
+        cmds.delete(torusName)
         cmds.select(clear=True)
         self.checkFilter("nurbsPatches_USD", kExcludeNurbsSurfaces, 3)
 
@@ -300,8 +299,7 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         def createUsdLight(stagePath):
             lightName = cmds.directionalLight()
             usdLightName = mayaUsd.lib.PrimUpdaterManager.duplicate(cmds.ls(lightName, long=True)[0], stagePath)
-            cmds.select(lightName)
-            cmds.delete()
+            cmds.delete(lightName)
             cmds.select(usdLightName)
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         self.stackInstances(functools.partial(createUsdLight, stagePath), 50, [0.005, 0, 0])
@@ -311,8 +309,7 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         def createUsdCamera(stagePath):
             cameraName = cmds.camera()
             usdCameraName = mayaUsd.lib.PrimUpdaterManager.duplicate(cmds.ls(cameraName[0], long=True)[0], stagePath)
-            cmds.select(cameraName)
-            cmds.delete()
+            cmds.delete(cameraName)
             cmds.select(usdCameraName)
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         self.stackInstances(functools.partial(createUsdCamera, stagePath), 50, [0.005, 0, 0])
