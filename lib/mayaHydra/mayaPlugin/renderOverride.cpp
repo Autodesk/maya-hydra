@@ -1693,11 +1693,6 @@ bool MtohRenderOverride::select(
         }
     }
 
-
-    // for (const auto& hit : outHits) {
-    //     std::cout << hit << std::endl;
-    // }
-
     //isOneMayaNodeInComponentsPickingMode will be true if one of the picked node is in components picking mode
     bool isOneMayaNodeInComponentsPickingMode = false;
     _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneMayaNodeInComponentsPickingMode);
