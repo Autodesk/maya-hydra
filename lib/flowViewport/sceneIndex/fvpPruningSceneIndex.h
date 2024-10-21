@@ -74,13 +74,9 @@ public:
     FVP_API
     void AddExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot);
 
-    // Enable a filter and prune out its matching prims
+    // Enable or disable a filter and send corresponding prim notifications
     FVP_API
-    bool EnableFilter(const PXR_NS::TfToken& pruningToken);
-
-    // Disable a filter and re-add its filtered prims
-    FVP_API
-    bool DisableFilter(const PXR_NS::TfToken& pruningToken);
+    void SetFilterStatus(const PXR_NS::TfToken& pruningToken, bool enabled);
 
     // Returns the tokens corresponding to the currently enabled filters.
     FVP_API
@@ -113,6 +109,12 @@ protected:
     void _PrimsDirtied(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
+
+    FVP_API
+    void _EnableFilter(const PXR_NS::TfToken& pruningToken);
+
+    FVP_API
+    void _DisableFilter(const PXR_NS::TfToken& pruningToken);
     
     FVP_API
     void _InsertEntry(const PXR_NS::SdfPath& primPath, const PXR_NS::TfToken& pruningToken);

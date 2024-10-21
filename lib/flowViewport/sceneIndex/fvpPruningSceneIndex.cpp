@@ -159,11 +159,20 @@ SdfPathVector PruningSceneIndex::GetChildPrimPaths(const SdfPath& primPath) cons
     return editedChildPaths;
 }
 
-bool PruningSceneIndex::EnableFilter(const TfToken& pruningToken)
+void PruningSceneIndex::SetFilterStatus(const TfToken& pruningToken, bool enabled)
+{
+    if (enabled) {
+        _EnableFilter(pruningToken);
+    } else {
+        _DisableFilter(pruningToken);
+    }
+}
+
+void PruningSceneIndex::_EnableFilter(const TfToken& pruningToken)
 {
     if (_prunedPathsByFilter.find(pruningToken) != _prunedPathsByFilter.end()) {
         // Filter already enabled, no change needed.
-        return false;
+        return;
     }
 
     // Enable the filter
@@ -185,15 +194,13 @@ bool PruningSceneIndex::EnableFilter(const TfToken& pruningToken)
     if (!prunedPrims.empty()) {
         _SendPrimsRemoved(prunedPrims);
     }
-
-    return true;
 }
 
-bool PruningSceneIndex::DisableFilter(const TfToken& pruningToken)
+void PruningSceneIndex::_DisableFilter(const TfToken& pruningToken)
 {
     if (_prunedPathsByFilter.find(pruningToken) == _prunedPathsByFilter.end()) {
         // Filter already disabled, no change needed.
-        return false;
+        return;
     }
 
     HdSceneIndexObserver::AddedPrimEntries unprunedPrims;
@@ -214,8 +221,6 @@ bool PruningSceneIndex::DisableFilter(const TfToken& pruningToken)
     if (!unprunedPrims.empty()) {
         _SendPrimsAdded(unprunedPrims);
     }
-
-    return true;
 }
 
 std::set<TfToken> PruningSceneIndex::GetActiveFilters()

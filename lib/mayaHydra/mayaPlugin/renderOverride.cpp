@@ -824,11 +824,7 @@ MStatus MtohRenderOverride::Render(
 
         for (auto [mayaFilter, fvpPruningTokens] : mayaFiltersToFvpPruningTokens) {
             for (const auto& fvpPruningToken : fvpPruningTokens) {
-                if (objectExclusions & mayaFilter) {
-                    _pruningSceneIndex->EnableFilter(fvpPruningToken);
-                } else {
-                    _pruningSceneIndex->DisableFilter(fvpPruningToken);
-                }
+                _pruningSceneIndex->SetFilterStatus(fvpPruningToken, objectExclusions & mayaFilter);
             }
         }
     }
