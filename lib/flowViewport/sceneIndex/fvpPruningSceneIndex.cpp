@@ -137,6 +137,10 @@ bool PruningSceneIndex::_IsAncestorPrunedInclusive(const SdfPath& primPath) cons
 HdSceneIndexPrim PruningSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     if (_filtersByPrunedPath.find(primPath) != _filtersByPrunedPath.end()) {
+        // Path is pruned out; return nothing. Note that we could also use
+        // _IsAncestorPrunedInclusive, but child paths of a pruned out prim
+        // should not be reachable in the first place due to GetChildPrimPaths 
+        // pruning them out as well.
         return {};
     }
     return GetInputSceneIndex()->GetPrim(primPath);
@@ -147,6 +151,7 @@ SdfPathVector PruningSceneIndex::GetChildPrimPaths(const SdfPath& primPath) cons
     SdfPathVector baseChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
     SdfPathVector editedChildPaths;
     for (const auto& baseChildPath : baseChildPaths) {
+        // Only keep child paths which are not pruned out.
         if (_filtersByPrunedPath.find(baseChildPath) == _filtersByPrunedPath.end()) {
             editedChildPaths.emplace_back(baseChildPath);
         }
@@ -168,10 +173,11 @@ bool PruningSceneIndex::EnableFilter(const TfToken& pruningToken)
 
     for (const SdfPath& primPath : HdSceneIndexPrimView(GetInputSceneIndex())) {
         if (_PrunePrim(primPath, GetInputSceneIndex()->GetPrim(primPath), pruningToken)) {
+            // Only send notification if it was not already pruned out, either directly or indirectly
             if (!_IsAncestorPrunedInclusive(primPath)) {
-                // Only send notification if it was not already pruned out, directly or indirectly
                 prunedPrims.emplace_back(primPath);
             }
+
             _InsertEntry(primPath, pruningToken);
         }
     }
@@ -195,8 +201,9 @@ bool PruningSceneIndex::DisableFilter(const TfToken& pruningToken)
     SdfPathSet prunedPaths = _prunedPathsByFilter[pruningToken];
     for (const auto& primPath : prunedPaths) {
         _RemoveEntry(primPath, pruningToken);
+
+        // Only send notification if it was pruned and no longer is
         if (!_IsAncestorPrunedInclusive(primPath)) {
-            // Only send notification if it was pruned and no longer is
             unprunedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
         }
     }
@@ -253,6 +260,7 @@ void PruningSceneIndex::_PrimsAdded(
             }
         }
 
+        // Only send notification if not pruned
         if (!_IsAncestorPrunedInclusive(addedEntry.primPath)) {
             editedEntries.emplace_back(addedEntry);
         }
@@ -271,8 +279,14 @@ void PruningSceneIndex::_PrimsRemoved(
 
     for (const auto& removedEntry : entries) {
         if (!_IsAncestorPrunedInclusive(removedEntry.primPath)) {
+            // Prim was not pruned; forward the notification
             editedEntries.emplace_back(removedEntry);
         } else {
+            // Prim was pruned; we have either already sent a PrimsRemoved
+            // notification from EnableFilter() or have prevented the original
+            // PrimsAdded notification from being forwarded in the first place.
+            // No need to send a PrimsRemoved notification for a prim that
+            // doesn't exist, just remove the pruning entry.
             for (const auto& pruningToken : GetActiveFilters()) {
                 _RemoveEntry(removedEntry.primPath, pruningToken);
             }
