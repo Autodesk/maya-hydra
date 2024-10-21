@@ -102,6 +102,7 @@
 #include <maya/MConditionMessage.h>
 #include <maya/MDGMessage.h>
 #include <maya/MDrawContext.h>
+#include <maya/MFrameContext.h>
 #include <maya/MEventMessage.h>
 #include <maya/MGlobal.h>
 #include <maya/MNodeMessage.h>
@@ -113,6 +114,7 @@
 #include <maya/MUiMessage.h>
 #include <maya/MFnCamera.h>
 #include <maya/MFileIO.h>
+#include <maya/MTypes.h>
 
 #include <atomic>
 #include <chrono>
@@ -802,6 +804,31 @@ MStatus MtohRenderOverride::Render(
        _displayStyleSceneIndex->SetRefineLevel({true, delegateParams.refineLevel});
     }
 
+    // Update "Show" menu filters
+    {
+        auto objectExclusions = framecontext->objectTypeExclusions();
+
+        static const TfTokenVector polygonFilters = { 
+            FvpPruningTokens->meshes, 
+            FvpPruningTokens->capsules, 
+            FvpPruningTokens->cones, 
+            FvpPruningTokens->cubes, 
+            FvpPruningTokens->cylinders, 
+            FvpPruningTokens->spheres
+        };
+        static const std::map<MUint64, TfTokenVector> mayaFiltersToFvpPruningTokens = {
+            { MHWRender::MFrameContext::kExcludeMeshes, polygonFilters },
+            { MHWRender::MFrameContext::kExcludeNurbsCurves, {FvpPruningTokens->nurbsCurves} },
+            { MHWRender::MFrameContext::kExcludeNurbsSurfaces, {FvpPruningTokens->nurbsPatches} }
+        };
+
+        for (auto [mayaFilter, fvpPruningTokens] : mayaFiltersToFvpPruningTokens) {
+            for (const auto& fvpPruningToken : fvpPruningTokens) {
+                _pruningSceneIndex->SetFilterStatus(fvpPruningToken, objectExclusions & mayaFilter);
+            }
+        }
+    }
+
     // Toggle textures in the material network
     const unsigned int currentDisplayMode = drawContext.getDisplayStyle();
     bool isTextured = currentDisplayMode & MHWRender::MFrameContext::kTextured;
@@ -1088,8 +1115,10 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 
     //Put BlockPrimRemovalPropagationSceneIndex first as it can block/unblock the prim removal propagation on the whole scene indices chain
     _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
+    _pruningSceneIndex = Fvp::PruningSceneIndex::New(_blockPrimRemovalPropagationSceneIndex);
+    _pruningSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya filtering is handled by VP2/OGS.
     _selection = std::make_shared<Fvp::Selection>();
-    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_blockPrimRemovalPropagationSceneIndex, _selection);
+    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_pruningSceneIndex, _selection);
     _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
     _inputSceneIndexOfFilteringSceneIndicesChain = _selectionSceneIndex;
 

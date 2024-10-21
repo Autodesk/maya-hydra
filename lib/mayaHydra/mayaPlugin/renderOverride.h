@@ -53,6 +53,7 @@
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
@@ -280,6 +281,7 @@ private:
     Fvp::SelectionPtr                         _selection;
     Fvp::WireframeSelectionHighlightSceneIndexRefPtr  _wireframeSelectionHighlightSceneIndex;
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
+    Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
 
     // Naming this identifier _ufeSelection clashes with UFE's selection.h
