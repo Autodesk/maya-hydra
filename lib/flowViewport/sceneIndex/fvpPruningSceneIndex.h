@@ -70,15 +70,19 @@ public:
     FVP_API
     PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath& primPath) const override;
 
+    // Add a path for which it and all prims under it will not be considered for filtering.
     FVP_API
     void AddExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot);
 
+    // Enable a filter and prune out its matching prims
     FVP_API
     bool EnableFilter(const PXR_NS::TfToken& pruningToken);
 
+    // Disable a filter and re-add its filtered prims
     FVP_API
     bool DisableFilter(const PXR_NS::TfToken& pruningToken);
 
+    // Returns the tokens corresponding to the currently enabled filters.
     FVP_API
     std::set<PXR_NS::TfToken> GetActiveFilters();
 
