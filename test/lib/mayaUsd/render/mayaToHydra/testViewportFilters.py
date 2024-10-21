@@ -243,38 +243,33 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         capsuleXform = UsdGeom.Xform.Define(stage, "/" + capsuleName + "Xform")
         capsuleXform.AddTranslateOp().Set(value=(6, 0, 0))
         UsdGeom.Capsule.Define(stage, str(capsuleXform.GetPath()) + "/" + capsuleName)
-        cmds.select(clear=True)
 
         coneName = "UsdCone"
         coneXform = UsdGeom.Xform.Define(stage, "/" + coneName + "Xform")
         coneXform.AddTranslateOp().Set(value=(2, 0, -2))
         UsdGeom.Cone.Define(stage, str(coneXform.GetPath()) + "/" + coneName)
-        cmds.select(clear=True)
 
         cubeName = "UsdCube"
         cubeXform = UsdGeom.Xform.Define(stage, "/" + cubeName + "Xform")
         cubeXform.AddTranslateOp().Set(value=(-3, 0, -3))
         UsdGeom.Cube.Define(stage, str(cubeXform.GetPath()) + "/" + cubeName)
-        cmds.select(clear=True)
 
         cylinderName = "UsdCylinder"
         cylinderXform = UsdGeom.Xform.Define(stage, "/" + cylinderName + "Xform")
         cylinderXform.AddTranslateOp().Set(value=(-2, 0, 2))
         UsdGeom.Cylinder.Define(stage, str(cylinderXform.GetPath()) + "/" + cylinderName)
-        cmds.select(clear=True)
 
         sphereName = "UsdSphere"
         sphereXform = UsdGeom.Xform.Define(stage, "/" + sphereName + "Xform")
         sphereXform.AddTranslateOp().Set(value=(0, 0, 6))
         UsdGeom.Sphere.Define(stage, str(sphereXform.GetPath()) + "/" + sphereName)
-        cmds.select(clear=True)
 
         torusName = cmds.polyTorus()
         cmds.move(3, 0, 3)
         mayaUsd.lib.PrimUpdaterManager.duplicate(cmds.ls(torusName[0], long=True)[0], stagePath)
         cmds.delete(torusName)
-        cmds.select(clear=True)
 
+        cmds.select(clear=True)
         self.checkFilter("polygons_USD", kExcludeMeshes, 10)
 
     def test_UsdNurbsCurves(self):
