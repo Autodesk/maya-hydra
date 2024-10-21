@@ -22,12 +22,9 @@
 #include <pxr/base/tf/diagnosticLite.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
-#include <pxr/imaging/hdsi/api.h>
-#include <pxr/imaging/hd/materialFilteringSceneIndexBase.h>
-#include <pxr/imaging/hd/materialNetworkInterface.h>
 
+#include <map>
 #include <set>
-#include <unordered_map>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -74,6 +71,9 @@ public:
     PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath& primPath) const override;
 
     FVP_API
+    void AddExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot);
+
+    FVP_API
     bool EnableFilter(const PXR_NS::TfToken& pruningToken);
 
     FVP_API
@@ -82,9 +82,7 @@ public:
     FVP_API
     std::set<PXR_NS::TfToken> GetActiveFilters();
 
-    FVP_API
-    void AddExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot);
-
+    // As a workaround until we move to exclusively using PathMappers
     FVP_API
     PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override {
         PXR_NAMESPACE_USING_DIRECTIVE;

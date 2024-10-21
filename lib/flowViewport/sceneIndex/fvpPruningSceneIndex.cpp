@@ -13,22 +13,12 @@
 // limitations under the License.
 //
 
-#include "flowViewport/sceneIndex/fvpPruningSceneIndex.h"
 #include "fvpPruningSceneIndex.h"
 
 #include <pxr/base/tf/staticTokens.h>
-#include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
-#include <pxr/imaging/hd/sceneIndex.h>
-#include <pxr/imaging/hd/sceneIndexObserver.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
-#include <pxr/imaging/hd/materialSchema.h>
-#include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
-#include <pxr/usd/sdf/path.h>
-
-#include <functional>
-#include <iostream>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
