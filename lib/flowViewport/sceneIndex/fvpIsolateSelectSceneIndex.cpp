@@ -20,6 +20,7 @@
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include "flowViewport/debugCodes.h"
+#include "flowViewport/fvpPrimUtils.h"
 
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
@@ -470,7 +471,7 @@ IsolateSelectSceneIndex::_CollectInstancers(
     Instancers instancers;
     for (const auto& primSelectionsEntry : *isolateSelection) {
         // If the prim itself is a point instancer, add it and continue.
-        if (_IsPointInstancer(primSelectionsEntry.first)) {
+        if (isPointInstancer(GetInputSceneIndex(), primSelectionsEntry.first)) {
             instancers.emplace_back(primSelectionsEntry.first);
             continue;
         }
@@ -485,33 +486,6 @@ IsolateSelectSceneIndex::_CollectInstancers(
     }
 
     return instancers;
-}
-
-bool IsolateSelectSceneIndex::_IsPointInstancer(
-    const PXR_NS::SdfPath& primPath
-) const
-{
-    auto prim = GetInputSceneIndex()->GetPrim(primPath);
-
-    // If prim isn't an instancer, it can't be a point instancer.
-    if (prim.primType != HdPrimTypeTokens->instancer) {
-        return false;
-    }
-
-    HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
-
-    // Documentation
-    // https://github.com/PixarAnimationStudios/OpenUSD/blob/59992d2178afcebd89273759f2bddfe730e59aa8/pxr/imaging/hd/instancerTopologySchema.h#L86
-    // says that instanceLocations is only meaningful for native
-    // instancing, empty for point instancing.
-    auto instanceLocationsDs = instancerTopologySchema.GetInstanceLocations();
-    if (!instanceLocationsDs) {
-        return true;
-    }
-
-    auto instanceLocations = instanceLocationsDs->GetTypedValue(0.0f);
-
-    return (instanceLocations.size() > 0);
 }
 
 IsolateSelectSceneIndex::InstancerMasks
@@ -575,10 +549,7 @@ IsolateSelectSceneIndex::_CreateInstancerMasks(
         VtArray<bool> instanceMask(instanceLocations.size());
         std::size_t i=0;
         for (const auto& instanceLocation : instanceLocations) {
-            const bool included = isolateSelection->HasAncestorOrDescendantInclusive(instanceLocation);
-
-            instanceMask[i] = included;
-            ++i;
+            instanceMask[i++] = isolateSelection->HasAncestorOrDescendantInclusive(instanceLocation);
         }
 
         instancerMasks[instancerPath] = instanceMask;
