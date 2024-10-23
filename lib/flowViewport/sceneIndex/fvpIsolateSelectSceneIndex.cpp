@@ -57,7 +57,15 @@ void append(Fvp::Selection& a, const Fvp::Selection& b)
     }
 }
 
-std::size_t getNbInstances(const HdInstancerTopologySchema& instancerTopologySchema)
+// Schema accessors were made const in USD 24.05 (specifically Hydra API
+// version 66).
+#if HD_API_VERSION >= 66
+#define CONST_SCHEMA const
+#else
+#define CONST_SCHEMA
+#endif
+
+std::size_t getNbInstances(CONST_SCHEMA HdInstancerTopologySchema& instancerTopologySchema)
 {
     // No easy way to get the number of instances created by a point instancer.
     // Count the total number of instances for all prototypes.  As per documentation
