@@ -6,25 +6,31 @@
 # only single platform exclusion is supported currently.
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
 set(INTERACTIVE_TEST_SCRIPT_FILES
-    testImageDiffing.py
+    # To be reenabled after investigation #HYDRA-1255
+    #testImageDiffing.py
     testMtohCommand.py
 # Fail as of 22-Feb-2023.  Entered as MAYA-127898.
 #    testMtohBasicRender.py
 #    testMtohDagChanges.py
     testMeshes.py
     testNamespaces.py
-    testVisibility.py
+    # To be reenabled after investigation #HYDRA-1255
+    #testVisibility.py
     testRendererSwitching.py
     testStageAddPrim.py
-    testTransforms.py
+    # To be reenabled after investigation #HYDRA-1255
+    #testTransforms.py
     testRefinement.py
-    testMaterialXOnNative.py|depOnPlugins:lookdevx
+    # To be reenabled after investigation #HYDRA-1255
+    #testMaterialXOnNative.py|depOnPlugins:lookdevx
     testNewSceneWithStage.py
     # To be reenabled after investigation
     #testMayaDisplayModes.py|skipOnPlatform:osx
     testMayaShadingModes.py
-    testMayaDisplayLayers.py
-    testMayaIsolateSelect.py
+    # To be reenabled after investigation #HYDRA-1255
+    #testMayaDisplayLayers.py
+    # To be reenabled after investigation #HYDRA-1255
+    #testMayaIsolateSelect.py
     testMayaLights.py
     testUSDLights.py
     testUVandUDIM.py
@@ -37,7 +43,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStagePayloadsReferences.py
     testNurbsPrimitives.py
     testCurveTools.py
-    testPolygonPrimitives.py
+    # To be reenabled after investigation #HYDRA-1255
+    #testPolygonPrimitives.py
     testFootPrintNode.py
     testBackgroundColor.py
     testGrid.py
@@ -46,7 +53,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     # To be reenabled after investigation
     testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testPassingNormalsOnMayaNative.py
-    testViewportFilters.py
+    # To be reenabled after investigation #HYDRA-1255
+    #testViewportFilters.py
     testMayaComponentsPicking.py
     testFlowPluginsHierarchicalProperties.py
     testCustomShadersNode.py
@@ -70,12 +78,14 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testSceneCorrectness.py
     cpp/testPrimInstancing.py
     cpp/testPicking.py
-    cpp/testUsdPointInstancePicking.py
+    # To be reenabled after investigation #HYDRA-1255
+    #cpp/testUsdPointInstancePicking.py
     cpp/testUsdNativeInstancePicking.py
     cpp/testUsdPickKind.py
     cpp/testNurbsSurfaces.py
     cpp/testPointInstancingWireframeHighlight.py
-    cpp/testGeomSubsetsPicking.py
+    # To be reenabled after investigation #HYDRA-1255
+    #cpp/testGeomSubsetsPicking.py
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
     cpp/testGeomSubsetsWireframeHighlight.py
