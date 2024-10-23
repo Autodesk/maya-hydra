@@ -3,7 +3,6 @@
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME}
     PRIVATE
-    fvpIsolateSelectSceneIndex.cpp
     fvpMergingSceneIndex.cpp
     fvpPathInterface.cpp
     fvpPathInterfaceSceneIndex.cpp
@@ -16,12 +15,18 @@ target_sources(${TARGET_NAME}
     fvpBBoxSceneIndex.cpp
     fvpReprSelectorSceneIndex.cpp
     fvpBlockPrimRemovalPropagationSceneIndex.cpp
-	fvpDefaultMaterialSceneIndex.cpp
+    fvpDefaultMaterialSceneIndex.cpp
     fvpLightsManagementSceneIndex.cpp
 )
 
+if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
+    target_sources(${TARGET_NAME}
+        PRIVATE
+        fvpIsolateSelectSceneIndex.cpp
+    )
+endif()
+
 set(HEADERS
-    fvpIsolateSelectSceneIndex.h
     fvpMergingSceneIndex.h
     fvpPathInterface.h
     fvpPathInterfaceSceneIndex.h
@@ -35,9 +40,15 @@ set(HEADERS
     fvpBBoxSceneIndex.h
     fvpReprSelectorSceneIndex.h
     fvpBlockPrimRemovalPropagationSceneIndex.h
-	fvpDefaultMaterialSceneIndex.h
+    fvpDefaultMaterialSceneIndex.h
     fvpLightsManagementSceneIndex.h
 )
+
+if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
+    list(APPEND HEADERS
+        fvpIsolateSelectSceneIndex.h
+    )
+endif()
 
 # -----------------------------------------------------------------------------
 # promoted headers
