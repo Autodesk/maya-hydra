@@ -22,6 +22,7 @@
 #include <flowViewport/sceneIndex/fvpPathInterface.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/selection/fvpSelection.h>
+#include <flowViewport/fvpPrimUtils.h>
 
 #include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
@@ -49,8 +50,47 @@ TEST(TestHydraPrim, isVisible)
     // If the prim is instanced, get the instancer, and determine if the
     // prim is being masked out by the instancer mask.
     if (!primSelections.empty()) {
+
         const auto& primSelection = primSelections[0];
         auto prim = siRoot->GetPrim(primSelection.primPath);
+
+        if (Fvp::isPointInstancer(prim)) {
+
+            // If the instancer has no nested instance indices, we want to know
+            // the visibility of the instancer itself.
+            if (primSelection.nestedInstanceIndices.empty()) {
+                ASSERT_TRUE(visibility(siRoot, primSelection.primPath));
+                return;
+            }
+
+            // Get the point instancer mask.  No mask means all visible.
+            HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
+            auto maskDs = instancerTopologySchema.GetMask();
+
+            if (!maskDs) {
+                // No mask data source means no mask, all visible.
+                return;
+            }
+
+            auto mask = maskDs->GetTypedValue(0.0f);
+
+            if (mask.empty()) {
+                // Empty mask means all visible.
+                return;
+            }
+
+            // Check if mask is true, i.e. visible.
+            for (const auto& instancesSelection : primSelection.nestedInstanceIndices) {
+                // When will instancesSelection.instanceIndices have more
+                // than one index?
+                for (auto instanceIndex : instancesSelection.instanceIndices) {
+                    ASSERT_TRUE(mask[instanceIndex]);
+                }
+            }
+
+            return;
+        }
+
         auto instanceSchema = HdInstanceSchema::GetFromParent(prim.dataSource);
         if (instanceSchema.IsDefined()) {
             auto instancerPath = instanceSchema.GetInstancer()->GetTypedValue(0);
@@ -126,8 +166,50 @@ TEST(TestHydraPrim, notVisible)
     // If the prim is instanced, get the instancer, and determine if the
     // prim is being masked out by the instancer mask.
     if (!primSelections.empty()) {
+
         const auto& primSelection = primSelections[0];
         auto prim = siRoot->GetPrim(primSelection.primPath);
+
+        if (Fvp::isPointInstancer(prim)) {
+
+            const bool instancerVisibility = visibility(siRoot, primSelection.primPath);
+
+            // If the instancer has no nested instance indices, we want to know
+            // the visibility of the instancer itself.
+            if (primSelection.nestedInstanceIndices.empty()) {
+                ASSERT_FALSE(instancerVisibility);
+                return;
+            }
+
+            // If the instancer is invisible, there is no point instancer mask,
+            // and all instances are invisible.
+            if (!instancerVisibility) {
+                return;
+            }
+
+            // Get the point instancer mask.  No mask means all visible.
+            HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
+            auto maskDs = instancerTopologySchema.GetMask();
+
+            // No mask data source means no mask, all visible.
+            ASSERT_TRUE(maskDs);
+
+            auto mask = maskDs->GetTypedValue(0.0f);
+
+            ASSERT_FALSE(mask.empty());
+
+            // Check if mask is false, i.e. invisible.
+            for (const auto& instancesSelection : primSelection.nestedInstanceIndices) {
+                // When will instancesSelection.instanceIndices have more
+                // than one index?
+                for (auto instanceIndex : instancesSelection.instanceIndices) {
+                    ASSERT_FALSE(mask[instanceIndex]);
+                }
+            }
+
+            return;
+        }
+
         auto instanceSchema = HdInstanceSchema::GetFromParent(prim.dataSource);
         if (instanceSchema.IsDefined()) {
             auto instancerPath = instanceSchema.GetInstancer()->GetTypedValue(0);

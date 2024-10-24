@@ -20,7 +20,6 @@ target_sources(${TARGET_NAME}
         testColorPreferences.cpp
         testCppFramework.cpp
         testHydraPrim.cpp
-        testIsolateSelect.cpp
         testMayaSceneFlattening.cpp
         testMayaUsdUfeItems.cpp
         testMergingSceneIndex.cpp
@@ -49,6 +48,13 @@ target_sources(${TARGET_NAME}
         testSceneIndexDirtying.cpp
         testGeomSubsetsWireframeHighlight.cpp
 )
+
+if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
+    target_sources(${TARGET_NAME}
+        PRIVATE
+        testIsolateSelect.cpp
+    )
+endif()
 
 # -----------------------------------------------------------------------------
 # compiler configuration

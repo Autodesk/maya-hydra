@@ -111,6 +111,9 @@ public:
     PXR_NS::HdDataSourceBaseHandle
     GetVectorDataSource(const PXR_NS::SdfPath& primPath) const;
 
+    FVP_API
+    PrimSelections GetPrimSelections(const PXR_NS::SdfPath& primPath) const;
+
     PrimSelectionsMap::const_iterator begin() const;
     PrimSelectionsMap::const_iterator end() const;
 
