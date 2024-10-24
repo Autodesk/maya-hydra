@@ -20,11 +20,13 @@
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include "flowViewport/debugCodes.h"
+#include "flowViewport/fvpPrimUtils.h"
 
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
+#include <pxr/imaging/hd/tokens.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -54,6 +56,32 @@ void append(Fvp::Selection& a, const Fvp::Selection& b)
             a.Add(primSelection);
         }
     }
+}
+
+// Schema accessors were made const in USD 24.05 (specifically Hydra API
+// version 66).
+#if HD_API_VERSION >= 66
+#define CONST_SCHEMA const
+#else
+#define CONST_SCHEMA
+#endif
+
+std::size_t getNbInstances(CONST_SCHEMA HdInstancerTopologySchema& instancerTopologySchema)
+{
+    // No easy way to get the number of instances created by a point instancer.
+    // Count the total number of instances for all prototypes.  As per documentation
+    // https://github.com/PixarAnimationStudios/OpenUSD/blob/v24.08/pxr/imaging/hd/instancerTopologySchema.h
+    // the instance indices are a per-prototype array of instance index arrays,
+    // so counting the size of all instance index array gives the total number
+    // of instances.  For example, if instanceIndices = { [0,2], [1] },
+    // prototype 0 has two instances, and prototype 1 has one, for a total of 3.
+    std::size_t nbInstances{0};
+    auto instanceIndices = instancerTopologySchema.GetInstanceIndices();
+    for (std::size_t i = 0; i < instanceIndices.GetNumElements(); ++i) {
+        const auto& protoInstances = instanceIndices.GetElement(i)->GetTypedValue(0);
+        nbInstances += protoInstances.size();
+    }
+    return nbInstances;
 }
 
 Dependencies instancedPrim(
@@ -442,6 +470,12 @@ IsolateSelectSceneIndex::_CollectInstancers(
 
     Instancers instancers;
     for (const auto& primSelectionsEntry : *isolateSelection) {
+        // If the prim itself is a point instancer, add it and continue.
+        if (isPointInstancer(GetInputSceneIndex(), primSelectionsEntry.first)) {
+            instancers.emplace_back(primSelectionsEntry.first);
+            continue;
+        }
+
         for (const auto& primSelection : primSelectionsEntry.second) {
             auto prim = GetInputSceneIndex()->GetPrim(primSelection.primPath);
             auto instanceSchema = HdInstanceSchema::GetFromParent(prim.dataSource);
@@ -472,7 +506,7 @@ IsolateSelectSceneIndex::_CreateInstancerMasks(
     InstancerMasks instancerMasks;
     for (const auto& instancerPath : instancers) {
         HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(instancerPath);
-        HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
+        auto instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
 
         // Documentation
         // https://github.com/PixarAnimationStudios/OpenUSD/blob/59992d2178afcebd89273759f2bddfe730e59aa8/pxr/imaging/hd/instancerTopologySchema.h#L86
@@ -480,6 +514,33 @@ IsolateSelectSceneIndex::_CreateInstancerMasks(
         // instancing, empty for point instancing.
         auto instanceLocationsDs = instancerTopologySchema.GetInstanceLocations();
         if (!instanceLocationsDs) {
+            auto primSelections = isolateSelection->GetPrimSelections(instancerPath);
+
+            // If the instancer is in our list of collected instancers, it must
+            // have prim selections.
+            if (!TF_VERIFY(!primSelections.empty(), "Empty prim selections for instancer %s", instancerPath.GetText())) {
+                continue;
+            }
+
+            std::set<int> visibleIndices;
+            for (const auto& primSelection : primSelections) {
+                for (const auto& instancesSelection : primSelection.nestedInstanceIndices) {
+                    // When will instancesSelection.instanceIndices have more
+                    // than one index?
+                    for (auto instanceIndex : instancesSelection.instanceIndices) {
+                        visibleIndices.insert(instanceIndex);
+                    }
+                }
+            }
+
+            auto nbInstances = getNbInstances(instancerTopologySchema);
+
+            VtArray<bool> instanceMask(nbInstances);
+            for (decltype(nbInstances) i=0; i < nbInstances; ++i) {
+                instanceMask[i] = (visibleIndices.count(i) > 0);
+            }
+
+            instancerMasks[instancerPath] = instanceMask;
             continue;
         }
 
@@ -488,9 +549,7 @@ IsolateSelectSceneIndex::_CreateInstancerMasks(
         VtArray<bool> instanceMask(instanceLocations.size());
         std::size_t i=0;
         for (const auto& instanceLocation : instanceLocations) {
-            const bool included = isolateSelection->HasAncestorOrDescendantInclusive(instanceLocation);
-            instanceMask[i] = included;
-            ++i;
+            instanceMask[i++] = isolateSelection->HasAncestorOrDescendantInclusive(instanceLocation);
         }
 
         instancerMasks[instancerPath] = instanceMask;

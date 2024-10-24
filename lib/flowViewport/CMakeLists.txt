@@ -9,6 +9,7 @@ target_sources(${TARGET_NAME}
     PRIVATE
         debugCodes.cpp
         fvpInstruments.cpp
+        fvpPrimUtils.cpp
         fvpUtils.cpp
         global.cpp
         tokens.cpp
@@ -18,6 +19,7 @@ set(HEADERS
     api.h
     debugCodes.h
     fvpInstruments.h
+    fvpPrimUtils.h
     fvpUtils.h
     global.h
     tokens.h
