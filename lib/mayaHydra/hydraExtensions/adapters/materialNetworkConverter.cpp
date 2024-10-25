@@ -428,7 +428,7 @@ public:
     }
 };
 
-class MayaHydraTransmissionMaterialAttrConverter : public MayaHydraComputedMaterialAttrConverter
+class MayaHydraStandardSurfaceTransmissionMaterialAttrConverter : public MayaHydraComputedMaterialAttrConverter
 {
 public:
     SdfValueTypeName GetType() override { return SdfValueTypeNames->Float; }
@@ -455,7 +455,7 @@ public:
                 return *fallback;
             }
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-                .Msg("MayaHydraTransmissionMaterialAttrConverter::GetValue(): "
+                .Msg("MayaHydraStandardSurfaceTransmissionMaterialAttrConverter::GetValue(): "
                      "No float plug found with name: transmission and no "
                      "fallback given");
             return VtValue();
@@ -476,6 +476,54 @@ public:
             fGeometryOpacity = (1.0f / 3.0f)
                 * (geometryOpacityR.UncheckedGet<float>() + geometryOpacityG.UncheckedGet<float>()
                    + geometryOpacityB.UncheckedGet<float>());
+        }
+
+        val *= fGeometryOpacity;
+
+        return VtValue(val);
+    }
+};
+
+class MayaHydraOpenPBRTransmissionMaterialAttrConverter : public MayaHydraComputedMaterialAttrConverter
+{
+public:
+    SdfValueTypeName GetType() override { return SdfValueTypeNames->Float; }
+
+    VtValue GetValue(
+        MFnDependencyNode&      node,
+        const TfToken&          paramName,
+        const SdfValueTypeName& type,
+        const VtValue*          fallback = nullptr,
+        MPlugArray*             outPlug = nullptr) override
+    {
+        VtValue transmission = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
+            node, "transmissionWeight", type, nullptr, outPlug);
+        // Combine transmission and Geometry Opacity
+        VtValue geometryOpacity = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
+            node, "geometryOpacity", type, nullptr, outPlug);
+
+        if (!transmission.IsHolding<float>()) {
+            if (fallback) {
+                return *fallback;
+            }
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
+                .Msg("MayaHydraOpenPBRTransmissionMaterialAttrConverter::GetValue(): "
+                     "No float plug found with name: transmission and no "
+                     "fallback given");
+            return VtValue();
+        }
+
+        float val = 1.0f - transmission.UncheckedGet<float>();
+        if (val < 1.0e-4f) {
+            // Clamp lower value as an opacity of 0.0 in hydra makes the object fully transparent,
+            // but in VP2 we still see the specular highlight if any, avoiding 0.0 leads to the same
+            // effect in hydra.
+            val = 1.0e-4f;
+        }
+
+        float fGeometryOpacity = 1.0f;
+        if (geometryOpacity.IsHolding<float>()) {
+            fGeometryOpacity = geometryOpacity.UncheckedGet<float>();
         }
 
         val *= fGeometryOpacity;
@@ -583,7 +631,35 @@ void MayaHydraMaterialNetworkConverter::initialize()
         MayaHydraAdapterTokens->coat, SdfValueTypeNames->Float);
     auto coatRoughnessConverter = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
         MayaHydraAdapterTokens->coatRoughness, SdfValueTypeNames->Float);
-    auto transmissionToOpacity = std::make_shared<MayaHydraTransmissionMaterialAttrConverter>();
+    auto transmissionToOpacity = std::make_shared<MayaHydraStandardSurfaceTransmissionMaterialAttrConverter>();
+
+    // OpenPBR surface:
+    auto openPBRBaseColorConverter = std::make_shared<MayaHydraScaledRemappingMaterialAttrConverter>(
+        MayaHydraAdapterTokens->baseColor,
+        MayaHydraAdapterTokens->baseWeight,
+        SdfValueTypeNames->Vector3f);
+    auto openPBREmissionColorConverter = std::make_shared<MayaHydraScaledRemappingMaterialAttrConverter>(
+        MayaHydraAdapterTokens->emissionColor,
+        MayaHydraAdapterTokens->emissionLuminance, // TODO: Use emissionWeight when it's available in Maya
+        SdfValueTypeNames->Vector3f);
+    auto openPBRSpecularColorConverter
+        = std::make_shared<MayaHydraScaledRemappingMaterialAttrConverter>(
+        MayaHydraAdapterTokens->specularColor,
+        MayaHydraAdapterTokens->specularWeight,
+        SdfValueTypeNames->Vector3f);
+    auto openPBRSpecularIORConverter = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
+        MayaHydraAdapterTokens->specularIOR, SdfValueTypeNames->Float);
+    auto openPBRSpecularRoughnessConverter
+        = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
+        MayaHydraAdapterTokens->specularRoughness, SdfValueTypeNames->Float);
+    auto openPBRMetallicConverter = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
+        MayaHydraAdapterTokens->baseMetalness, SdfValueTypeNames->Float);
+    auto openPBRCoatConverter = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
+        MayaHydraAdapterTokens->coatWeight, SdfValueTypeNames->Float);
+    auto openPBRCoatRoughnessConverter = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
+        MayaHydraAdapterTokens->coatRoughness, SdfValueTypeNames->Float);
+    auto openPBRTransmissionToOpacity
+        = std::make_shared<MayaHydraOpenPBRTransmissionMaterialAttrConverter>();
 
     auto fixedZeroFloat = std::make_shared<MayaHydraFixedMaterialAttrConverter>(0.0f);
     auto fixedOneFloat = std::make_shared<MayaHydraFixedMaterialAttrConverter>(1.0f);
@@ -656,6 +732,21 @@ void MayaHydraMaterialNetworkConverter::initialize()
                 { MayaHydraAdapterTokens->clearcoatRoughness, coatRoughnessConverter },
                 { MayaHydraAdapterTokens->opacity, transmissionToOpacity },
                 { MayaHydraAdapterTokens->metallic, metallicConverter },
+            } } },
+        { MayaHydraAdapterTokens->openPBRSurface,
+          { UsdImagingTokens->UsdPreviewSurface, // Maya OpenPBR surface shader translated to a
+                                                 // UsdPreviewSurface with the following
+                                                 // UsdPreviewSurface parameters mapped
+            {
+                { MayaHydraAdapterTokens->diffuseColor, openPBRBaseColorConverter },
+                { MayaHydraAdapterTokens->emissiveColor, openPBREmissionColorConverter },
+                { MayaHydraAdapterTokens->specularColor, openPBRSpecularColorConverter },
+                { MayaHydraAdapterTokens->ior, openPBRSpecularIORConverter },
+                { MayaHydraAdapterTokens->roughness, openPBRSpecularRoughnessConverter },
+                { MayaHydraAdapterTokens->clearcoat, openPBRCoatConverter },
+                { MayaHydraAdapterTokens->clearcoatRoughness, openPBRCoatRoughnessConverter },
+                { MayaHydraAdapterTokens->opacity, openPBRTransmissionToOpacity },
+                { MayaHydraAdapterTokens->metallic, openPBRMetallicConverter },
             } } },
         { MayaHydraAdapterTokens->file,
           { UsdImagingTokens->UsdUVTexture, // Maya file translated to a UsdUVTexture with the

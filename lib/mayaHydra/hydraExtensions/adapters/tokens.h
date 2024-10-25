@@ -34,6 +34,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (clearcoatRoughness)                      \
     (emissiveColor)                           \
     (specular)                                \
+    (specularWeight)                          \
     (specularColor)                           \
     (metallic)                                \
     (useSpecularWorkflow)                     \
@@ -45,19 +46,25 @@ PXR_NAMESPACE_OPEN_SCOPE
     (diffuseColor)                            \
     (displacement)                            \
     (base)                                    \
+    (baseWeight)                              \
     (baseColor)                               \
     (emission)                                \
+    (emissionWeight)                          \
+    (emissionLuminance)                       \
     (emissionColor)                           \
     (metalness)                               \
+    (baseMetalness)                           \
     (specularIOR)                             \
     (specularRoughness)                       \
     (coat)                                    \
+    (coatWeight)                              \
     (coatRoughness)                           \
     (transmission)                            \
     (lambert)                                 \
     (blinn)                                   \
     (phong)                                   \
     (standardSurface)                         \
+    (openPBRSurface)                          \
     (file)                                    \
     (place2dTexture)                          \
     (fileTextureName)                         \
