@@ -50,7 +50,6 @@ PXR_NAMESPACE_OPEN_SCOPE
     (baseColor)                               \
     (emission)                                \
     (emissionWeight)                          \
-    (emissionLuminance)                       \
     (emissionColor)                           \
     (metalness)                               \
     (baseMetalness)                           \
