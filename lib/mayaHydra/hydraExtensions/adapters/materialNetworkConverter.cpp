@@ -395,6 +395,38 @@ private:
     const VtValue _value;
 }; // namespace
 
+
+class MayaHydraOpenPBREmissionColorMaterialAttrConverter : public MayaHydraComputedMaterialAttrConverter
+{
+public:
+    SdfValueTypeName GetType() override { return SdfValueTypeNames->Vector3f; }
+
+    VtValue GetValue(
+        MFnDependencyNode&      node,
+        const TfToken&          paramName,
+        const SdfValueTypeName& type,
+        const VtValue*          fallback = nullptr,
+        MPlugArray*             outPlug = nullptr) override
+    {
+        GfVec3f emissionColorVec3f(1.0f, 1.0f, 1.0f);
+        VtValue emissionColor = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
+            node, "emissionColor", SdfValueTypeNames->Vector3f, fallback, outPlug);
+        if (emissionColor.IsHolding<GfVec3f>()) {
+            emissionColorVec3f = emissionColor.UncheckedGet<GfVec3f>();
+        }
+
+        // TODO: Use emissionWeight directly when it's available in Maya
+        float emissionWeightFloat = 0.0f;
+        VtValue emissionLuminance = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
+            node, "emissionLuminance", SdfValueTypeNames->Float, fallback, outPlug);
+        if (emissionLuminance.IsHolding<float>()) {
+            emissionWeightFloat = emissionLuminance.UncheckedGet<float>() / 1000.f;
+        }
+
+        return VtValue(emissionColorVec3f * emissionWeightFloat);
+    }
+};
+
 class MayaHydraCosinePowerMaterialAttrConverter : public MayaHydraComputedMaterialAttrConverter
 {
 public:
@@ -638,10 +670,7 @@ void MayaHydraMaterialNetworkConverter::initialize()
         MayaHydraAdapterTokens->baseColor,
         MayaHydraAdapterTokens->baseWeight,
         SdfValueTypeNames->Vector3f);
-    auto openPBREmissionColorConverter = std::make_shared<MayaHydraScaledRemappingMaterialAttrConverter>(
-        MayaHydraAdapterTokens->emissionColor,
-        MayaHydraAdapterTokens->emissionLuminance, // TODO: Use emissionWeight when it's available in Maya
-        SdfValueTypeNames->Vector3f);
+    auto openPBREmissionColorConverter = std::make_shared<MayaHydraOpenPBREmissionColorMaterialAttrConverter>();
     auto openPBRSpecularColorConverter
         = std::make_shared<MayaHydraScaledRemappingMaterialAttrConverter>(
         MayaHydraAdapterTokens->specularColor,
