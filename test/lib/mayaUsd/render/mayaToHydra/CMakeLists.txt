@@ -32,6 +32,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testLookThrough.py
     testObjectTemplate.py
     testStandardSurface.py
+    testOpenPBRSurface.py
     testFlowViewportAPI.py
     testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testStagePayloadsReferences.py
