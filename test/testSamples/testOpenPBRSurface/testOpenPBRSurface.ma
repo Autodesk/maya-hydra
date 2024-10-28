@@ -1,6 +1,6 @@
 //Maya ASCII 2025ff03 scene
-//Name: test.ma
-//Last modified: Mon, Oct 28, 2024 02:56:50 PM
+//Name: testOpenPBRSurface.ma
+//Last modified: Mon, Oct 28, 2024 05:24:34 PM
 //Codeset: 1252
 requires maya "2025ff03";
 currentUnit -l centimeter -a degree -t film;
@@ -9,7 +9,7 @@ fileInfo "product" "Maya 2025";
 fileInfo "version" "2025";
 fileInfo "cutIdentifier" "202409190603-cbdc5a7e54";
 fileInfo "osv" "Windows 10 Enterprise v2009 (Build: 19045)";
-fileInfo "UUID" "78E5BAE4-41BA-D919-115D-C0942986966A";
+fileInfo "UUID" "8A4B544B-4BFB-9F2B-9D23-6FAB9804569E";
 createNode transform -s -n "persp";
 	rename -uid "9AD27BE9-4CF8-CF4C-362E-BCB4F2E48401";
 	setAttr ".v" no;
@@ -85,20 +85,20 @@ createNode mesh -n "pPlaneShape1" -p "pPlane1";
 	setAttr ".covm[0]"  0 1 1;
 	setAttr ".cdvm[0]"  0 1 1;
 createNode lightLinker -s -n "lightLinker1";
-	rename -uid "9084F3A3-4C65-4B39-1C9F-F6A109A24CA1";
+	rename -uid "40790219-49AC-928F-D527-8DB1BA163ED9";
 	setAttr -s 3 ".lnk";
 	setAttr -s 3 ".slnk";
 createNode shapeEditorManager -n "shapeEditorManager";
-	rename -uid "7F4B4DFB-4290-9046-7A12-F6984DF52B3B";
+	rename -uid "FEEFB5F4-48E9-947B-E36D-B1B539A0C726";
 createNode poseInterpolatorManager -n "poseInterpolatorManager";
-	rename -uid "F1707296-4B43-7685-8891-D0A0FA14862C";
+	rename -uid "3C693171-49E4-D6C3-1C5D-B7848D3DB23A";
 createNode displayLayerManager -n "layerManager";
-	rename -uid "A9FFD3F8-4EC3-EE84-FF6B-BAA764EA2056";
+	rename -uid "FD6D43F6-41A9-8222-343C-C48D294510CB";
 createNode displayLayer -n "defaultLayer";
 	rename -uid "18EA210C-42D9-98FA-18D9-25B9A867D4A9";
 	setAttr ".ufem" -type "stringArray" 0  ;
 createNode renderLayerManager -n "renderLayerManager";
-	rename -uid "D6DF26A8-48CC-7648-70A5-DABE9C6556C1";
+	rename -uid "83A122FF-43F8-449B-E76D-5C9717213A3B";
 createNode renderLayer -n "defaultRenderLayer";
 	rename -uid "54FEC018-457B-1D8B-1954-20A24EA3B6E5";
 	setAttr ".g" yes;
@@ -107,6 +107,7 @@ createNode polyPlane -n "polyPlane1";
 	setAttr ".cuv" 2;
 createNode openPBRSurface -n "openPBRSurface1";
 	rename -uid "C54FB3D1-4D1C-0B71-5C95-89B4D292D2C0";
+	setAttr ".sr" 0.5;
 createNode shadingEngine -n "openPBRSurface1SG";
 	rename -uid "AAF73C1F-4966-3AB0-0ED3-F4BFAFA36FC5";
 	setAttr ".ihi" 0;
@@ -251,4 +252,4 @@ connectAttr "openPBRSurface1.msg" ":defaultShaderList1.s" -na;
 connectAttr "place2dTexture1.msg" ":defaultRenderUtilityList1.u" -na;
 connectAttr "defaultRenderLayer.msg" ":defaultRenderingList1.r" -na;
 connectAttr "file1.msg" ":defaultTextureList1.tx" -na;
-// End of test.ma
+// End of testOpenPBRSurface.ma
