@@ -24,7 +24,12 @@ class TestOpenPBRSurface(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtil
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.2
+    @property
+    def IMAGE_DIFF_FAIL_PERCENT(self):
+        # Use a larger tolerance for transparency on OSX
+        if platform.system() == "Darwin":
+            return 2
+        return 0.2
 
     #Test the translation from maya OpenPBR surface with a maya native plane to usd preview surface.
     def test_OpenPBRSurface(self):
