@@ -76,7 +76,7 @@ public:
 
     TfTokenVector GetNames() override
     {
-        TfTokenVector names = _inputSource->GetNames();
+        TfTokenVector names = _inputSource ? _inputSource->GetNames() : TfTokenVector();
         if (_selection->IsFullySelected(_primPath)) {
             names.push_back(HdSelectionsSchemaTokens->selections);
         }
@@ -89,7 +89,7 @@ public:
             return _selection->GetVectorDataSource(_primPath);
         }
 
-        return _inputSource->Get(name);
+        return _inputSource ? _inputSource->Get(name) : nullptr;
     }
 
 private:
@@ -132,7 +132,12 @@ SelectionSceneIndex::GetPrim(const SdfPath &primPath) const
         .Msg("SelectionSceneIndex::GetPrim() called.\n");
 
     HdSceneIndexPrim result = GetInputSceneIndex()->GetPrim(primPath);
-    if (!result.dataSource) {
+    // An empty data source can be taken to mean an invalid prim, but it can
+    // also be an ancestor in a path to an actual prim (see
+    // https://forum.aousd.org/t/representation-of-invalid-hdsceneindexprim/833/2
+    // ).  Such an ancestor prim can be selected, even if typeless, so add
+    // a selection data source in such a case.
+    if (!result.dataSource && !_selection->IsFullySelected(primPath)) {
         return result;
     }
     
