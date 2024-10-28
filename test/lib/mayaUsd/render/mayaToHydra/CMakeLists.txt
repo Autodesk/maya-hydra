@@ -15,6 +15,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNamespaces.py
     testVisibility.py
     testRendererSwitching.py
+    testSelectPrimWithoutDataSource.py
     testStageAddPrim.py
     testTransforms.py
     testRefinement.py
