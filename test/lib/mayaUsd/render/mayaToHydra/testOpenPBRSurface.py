@@ -18,6 +18,7 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 import mayaUtils
+import platform
 
 class TestOpenPBRSurface(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
