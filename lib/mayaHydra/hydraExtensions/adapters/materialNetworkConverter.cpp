@@ -420,7 +420,7 @@ public:
         VtValue emissionLuminance = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
             node, "emissionLuminance", SdfValueTypeNames->Float, fallback, outPlug);
         if (emissionLuminance.IsHolding<float>()) {
-            emissionWeightFloat = emissionLuminance.UncheckedGet<float>() / 1000.f;
+            emissionWeightFloat = emissionLuminance.UncheckedGet<float>() / 1000.f; // Map Luminance(0.0-1000.0) to Weight(0-1.0)
         }
 
         return VtValue(emissionColorVec3f * emissionWeightFloat);
@@ -501,16 +501,15 @@ public:
             val = 1.0e-4f;
         }
 
-        float fGeometryOpacity = 1.0f;
         if (geometryOpacityR.IsHolding<float>() && geometryOpacityG.IsHolding<float>()
             && geometryOpacityB.IsHolding<float>()) {
             // Take the average as there is only 1 parameter in hydra
-            fGeometryOpacity = (1.0f / 3.0f)
+            float fGeometryOpacity = (1.0f / 3.0f)
                 * (geometryOpacityR.UncheckedGet<float>() + geometryOpacityG.UncheckedGet<float>()
                    + geometryOpacityB.UncheckedGet<float>());
-        }
 
-        val *= fGeometryOpacity;
+            val *= fGeometryOpacity;
+        }
 
         return VtValue(val);
     }

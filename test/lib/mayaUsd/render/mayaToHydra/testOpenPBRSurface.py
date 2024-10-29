@@ -65,34 +65,34 @@ class TestOpenPBRSurface(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtil
         self.assertSnapshotClose("metalness" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Verify Specular
-        cmds.setAttr("openPBRSurface1.specularColor", 0.0,0.0,5.0, type = 'double3')
+        cmds.setAttr("openPBRSurface1.specularColor", 0.0,0.0,0.5, type = 'double3')
         cmds.refresh()
         self.assertSnapshotClose("specularColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        cmds.setAttr("openPBRSurface1.specularWeight", 0.5)
+        cmds.setAttr("openPBRSurface1.specularWeight", 0.2)
         cmds.refresh()
         self.assertSnapshotClose("specularWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        cmds.setAttr("openPBRSurface1.specularRoughness", 0.5)
+        cmds.setAttr("openPBRSurface1.specularRoughness", 0.7)
         cmds.refresh()
         self.assertSnapshotClose("specularRoughness" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.setAttr("openPBRSurface1.specularIOR", 0.5)
         cmds.refresh()
         self.assertSnapshotClose("specularIOR" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
+        #Verify Emission
+        cmds.setAttr("openPBRSurface1.emissionLuminance", 500.0)
+        cmds.refresh()
+        self.assertSnapshotClose("emissionLuminance" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        cmds.setAttr("openPBRSurface1.emissionColor", 0.0,0.5,0.0, type = 'double3')
+        cmds.refresh()
+        self.assertSnapshotClose("emissionColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
         #Verify Transmission
         cmds.setAttr("openPBRSurface1.transmissionWeight", 0.5)
         cmds.refresh()
         self.assertSnapshotClose("transmissionWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        cmds.setAttr("openPBRSurface1.geometryOpacity", 0.5)
+        cmds.setAttr("openPBRSurface1.geometryOpacity", 0.2)
         cmds.refresh()
         self.assertSnapshotClose("geometryOpacity" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
-        #Verify Emission
-        cmds.setAttr("openPBRSurface1.emissionColor", 0.0,0.5,0.0, type = 'double3')
-        cmds.refresh()
-        self.assertSnapshotClose("emissionColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        cmds.setAttr("openPBRSurface1.emissionLuminance", 500.0)
-        cmds.refresh()
-        self.assertSnapshotClose("emissionLuminance" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
+        
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
