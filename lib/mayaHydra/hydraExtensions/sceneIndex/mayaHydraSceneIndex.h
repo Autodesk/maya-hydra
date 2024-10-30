@@ -299,6 +299,12 @@ private:
         const SdfPath&          id,
         HdDirtyBits             dirtyBits,
         DirtyBitsToLocatorsFunc dirtyBitsToLocatorsFunc);
+
+#ifdef CODE_COVERAGE_WORKAROUND
+    friend class MtohRenderOverride;
+#endif
+    void _Destroy();
+
 private:
     // ------------------------------------------------------------------------
     // HdSceneIndexBase implementations

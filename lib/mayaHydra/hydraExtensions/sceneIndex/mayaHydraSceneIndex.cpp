@@ -534,6 +534,11 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
 
 MayaHydraSceneIndex::~MayaHydraSceneIndex()
 {
+    _Destroy();
+}
+
+void MayaHydraSceneIndex::_Destroy()
+{
     //Remove global materials
     if (_mayaDefaultMaterialFallback.IsHolding<HdMaterialNetworkMap>()){
         //Remove the fallback material in case it was created

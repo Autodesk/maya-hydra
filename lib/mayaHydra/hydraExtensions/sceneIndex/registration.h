@@ -61,6 +61,9 @@ struct MayaHydraSceneIndexRegistration
     MayaHydraInterpretRprimPath interpretRprimPathFn = nullptr;
 
     virtual void Update() = 0;
+#ifdef CODE_COVERAGE_WORKAROUND
+    virtual void Destroy() = 0;
+#endif
 };
 
 /**
