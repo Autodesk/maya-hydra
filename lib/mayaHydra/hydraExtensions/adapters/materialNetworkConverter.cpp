@@ -552,12 +552,10 @@ public:
             val = 1.0e-4f;
         }
 
-        float fGeometryOpacity = 1.0f;
         if (geometryOpacity.IsHolding<float>()) {
-            fGeometryOpacity = geometryOpacity.UncheckedGet<float>();
+            float fGeometryOpacity = geometryOpacity.UncheckedGet<float>();
+            val *= fGeometryOpacity;
         }
-
-        val *= fGeometryOpacity;
 
         return VtValue(val);
     }
