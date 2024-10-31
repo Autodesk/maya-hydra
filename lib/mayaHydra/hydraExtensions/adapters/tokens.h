@@ -56,6 +56,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (specularIOR)                             \
     (specularRoughness)                       \
     (coat)                                    \
+    (coatColor)                               \
     (coatWeight)                              \
     (coatRoughness)                           \
     (transmission)                            \

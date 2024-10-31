@@ -395,6 +395,74 @@ private:
     const VtValue _value;
 }; // namespace
 
+class MayaHydraMixedColorMaterialAttrConverter : public MayaHydraComputedMaterialAttrConverter
+{
+public:
+    MayaHydraMixedColorMaterialAttrConverter(
+        const TfToken&          remappedBaseColorName,
+        const TfToken&          remappedBaseWeightName,
+        const TfToken&          remappedCoatColorName,
+        const TfToken&          remappedCoatWeightName)
+        : _remappedBaseColorName(remappedBaseColorName)
+        , _remappedBaseWeightName(remappedBaseWeightName)
+        , _remappedCoatColorName(remappedCoatColorName)
+        , _remappedCoatWeightName(remappedCoatWeightName)
+    {
+    }
+
+    SdfValueTypeName GetType() override { return SdfValueTypeNames->Vector3f; }
+
+    VtValue GetValue(
+        MFnDependencyNode&      node,
+        const TfToken&          paramName,
+        const SdfValueTypeName& type,
+        const VtValue*          fallback = nullptr,
+        MPlugArray*             outPlug = nullptr) override
+    {
+        VtValue baseColor = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToScaledValue(
+            node,
+            _remappedBaseColorName.GetText(),
+            _remappedBaseWeightName.GetText(),
+            SdfValueTypeNames->Vector3f,
+            fallback,
+            outPlug);
+
+        // Mix baseColor with coat coatColor
+        if (baseColor.IsHolding<GfVec3f>()) {
+            VtValue coatWeight = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
+                node,
+                _remappedCoatWeightName.GetText(),
+                SdfValueTypeNames->Float,
+                fallback,
+                outPlug);
+            if (coatWeight.IsHolding<float>()) {
+                float coatWeightFloat = coatWeight.UncheckedGet<float>();
+                if (coatWeightFloat != 0.0f) {
+                    VtValue coatColor = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
+                        node,
+                        _remappedCoatColorName.GetText(),
+                        SdfValueTypeNames->Vector3f,
+                        fallback,
+                        outPlug);
+                    if (coatColor.IsHolding<GfVec3f>()) {
+                        GfVec3f baseColorVec3f = baseColor.UncheckedGet<GfVec3f>();
+                        GfVec3f coatColorVec3f = coatColor.UncheckedGet<GfVec3f>();
+                        GfVec3f coatAttenuationVec3f = GfLerp(coatWeightFloat, GfVec3f(1.0f, 1.0f, 1.0f), coatColorVec3f);
+                        return VtValue(GfCompMult(baseColorVec3f, coatAttenuationVec3f));
+                    }
+                }
+            }
+        }
+
+        return baseColor;
+    }
+
+ protected:
+    const TfToken& _remappedBaseColorName;
+    const TfToken& _remappedBaseWeightName;
+    const TfToken& _remappedCoatColorName;
+    const TfToken& _remappedCoatWeightName;
+};
 
 class MayaHydraOpenPBREmissionColorMaterialAttrConverter : public MayaHydraComputedMaterialAttrConverter
 {
@@ -423,8 +491,71 @@ public:
             emissionWeightFloat = emissionLuminance.UncheckedGet<float>() / 1000.f; // Map Luminance(0.0-1000.0) to Weight(0-1.0)
         }
 
-        return VtValue(emissionColorVec3f * emissionWeightFloat);
+        emissionColorVec3f *= emissionWeightFloat;
+
+        // Mix emissionColor with coat coatColor
+        VtValue coatWeight = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
+            node, "coatWeight", SdfValueTypeNames->Float, fallback, outPlug);
+        if (coatWeight.IsHolding<float>()) {
+            float coatWeightFloat = coatWeight.UncheckedGet<float>();
+            if (coatWeightFloat != 0.0f) {
+                VtValue coatColor = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
+                    node,
+                    "coatColor",
+                    SdfValueTypeNames->Vector3f,
+                    fallback,
+                    outPlug);
+                if (coatColor.IsHolding<GfVec3f>()) {
+                    GfVec3f coatColorVec3f = coatColor.UncheckedGet<GfVec3f>();
+                    GfVec3f coatAttenuationVec3f = GfLerp(coatWeightFloat, GfVec3f(1.0f, 1.0f, 1.0f), coatColorVec3f);
+                    return VtValue(GfCompMult(emissionColorVec3f, coatAttenuationVec3f));
+                }
+            }
+        }
+
+        return VtValue(emissionColorVec3f);
     }
+};
+
+class MayaHydraClearCoatMaterialAttrConverter
+    : public MayaHydraComputedMaterialAttrConverter
+{
+public:
+    MayaHydraClearCoatMaterialAttrConverter(
+        const TfToken& remappedCoatColorName,
+        const TfToken& remappedCoatWeightName)
+        : _remappedCoatColorName(remappedCoatColorName)
+        , _remappedCoatWeightName(remappedCoatWeightName)
+    {
+    }
+
+    SdfValueTypeName GetType() override { return SdfValueTypeNames->Float; }
+
+    VtValue GetValue(
+        MFnDependencyNode&      node,
+        const TfToken&          paramName,
+        const SdfValueTypeName& type,
+        const VtValue*          fallback = nullptr,
+        MPlugArray*             outPlug = nullptr) override
+    {
+        VtValue coatColor = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToScaledValue(
+            node,
+            _remappedCoatColorName.GetText(),
+            _remappedCoatWeightName.GetText(),
+            SdfValueTypeNames->Vector3f,
+            fallback,
+            outPlug);
+        if (coatColor.IsHolding<GfVec3f>()) {
+            GfVec3f coatColorVec3f = coatColor.UncheckedGet<GfVec3f>();
+            float   clearCoatFolat = (coatColorVec3f[0] + coatColorVec3f[1] + coatColorVec3f[2]) / 3.0f;
+            return VtValue(clearCoatFolat);
+        }
+        return VtValue(0.0f);
+    }
+
+protected:
+    const TfToken& _remappedCoatColorName;
+    const TfToken& _remappedCoatWeightName;
 };
 
 class MayaHydraCosinePowerMaterialAttrConverter : public MayaHydraComputedMaterialAttrConverter
@@ -638,14 +769,16 @@ void MayaHydraMaterialNetworkConverter::initialize()
     auto uvConverter = std::make_shared<MayaHydraUvAttrConverter>();
 
     // Standard surface:
-    auto baseColorConverter = std::make_shared<MayaHydraScaledRemappingMaterialAttrConverter>(
+    auto baseColorConverter = std::make_shared<MayaHydraMixedColorMaterialAttrConverter>(
         MayaHydraAdapterTokens->baseColor,
         MayaHydraAdapterTokens->base,
-        SdfValueTypeNames->Vector3f);
-    auto emissionColorConverter = std::make_shared<MayaHydraScaledRemappingMaterialAttrConverter>(
+        MayaHydraAdapterTokens->coatColor,
+        MayaHydraAdapterTokens->coat);
+    auto emissionColorConverter = std::make_shared<MayaHydraMixedColorMaterialAttrConverter>(
         MayaHydraAdapterTokens->emissionColor,
         MayaHydraAdapterTokens->emission,
-        SdfValueTypeNames->Vector3f);
+        MayaHydraAdapterTokens->coatColor,
+        MayaHydraAdapterTokens->coat);
     auto specularColorConverter = std::make_shared<MayaHydraScaledRemappingMaterialAttrConverter>(
         MayaHydraAdapterTokens->specularColor,
         MayaHydraAdapterTokens->specular,
@@ -656,17 +789,18 @@ void MayaHydraMaterialNetworkConverter::initialize()
         MayaHydraAdapterTokens->specularRoughness, SdfValueTypeNames->Float);
     auto metallicConverter = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
         MayaHydraAdapterTokens->metalness, SdfValueTypeNames->Float);
-    auto coatConverter = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
-        MayaHydraAdapterTokens->coat, SdfValueTypeNames->Float);
+    auto clearCoatConverter = std::make_shared<MayaHydraClearCoatMaterialAttrConverter>(
+        MayaHydraAdapterTokens->coatColor, MayaHydraAdapterTokens->coat);
     auto coatRoughnessConverter = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
         MayaHydraAdapterTokens->coatRoughness, SdfValueTypeNames->Float);
     auto transmissionToOpacity = std::make_shared<MayaHydraStandardSurfaceTransmissionMaterialAttrConverter>();
 
     // OpenPBR surface:
-    auto openPBRBaseColorConverter = std::make_shared<MayaHydraScaledRemappingMaterialAttrConverter>(
+    auto openPBRBaseColorConverter = std::make_shared<MayaHydraMixedColorMaterialAttrConverter>(
         MayaHydraAdapterTokens->baseColor,
         MayaHydraAdapterTokens->baseWeight,
-        SdfValueTypeNames->Vector3f);
+        MayaHydraAdapterTokens->coatColor,
+        MayaHydraAdapterTokens->coatWeight);
     auto openPBREmissionColorConverter = std::make_shared<MayaHydraOpenPBREmissionColorMaterialAttrConverter>();
     auto openPBRSpecularColorConverter
         = std::make_shared<MayaHydraScaledRemappingMaterialAttrConverter>(
@@ -680,8 +814,8 @@ void MayaHydraMaterialNetworkConverter::initialize()
         MayaHydraAdapterTokens->specularRoughness, SdfValueTypeNames->Float);
     auto openPBRMetallicConverter = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
         MayaHydraAdapterTokens->baseMetalness, SdfValueTypeNames->Float);
-    auto openPBRCoatConverter = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
-        MayaHydraAdapterTokens->coatWeight, SdfValueTypeNames->Float);
+    auto openPBRClearCoatConverter = std::make_shared<MayaHydraClearCoatMaterialAttrConverter>(
+        MayaHydraAdapterTokens->coatColor, MayaHydraAdapterTokens->coatWeight);
     auto openPBRCoatRoughnessConverter = std::make_shared<MayaHydraRemappingMaterialAttrConverter>(
         MayaHydraAdapterTokens->coatRoughness, SdfValueTypeNames->Float);
     auto openPBRTransmissionToOpacity
@@ -754,7 +888,7 @@ void MayaHydraMaterialNetworkConverter::initialize()
                 { MayaHydraAdapterTokens->specularColor, specularColorConverter },
                 { MayaHydraAdapterTokens->ior, specularIORConverter },
                 { MayaHydraAdapterTokens->roughness, specularRoughnessConverter },
-                { MayaHydraAdapterTokens->clearcoat, coatConverter },
+                { MayaHydraAdapterTokens->clearcoat, clearCoatConverter },
                 { MayaHydraAdapterTokens->clearcoatRoughness, coatRoughnessConverter },
                 { MayaHydraAdapterTokens->opacity, transmissionToOpacity },
                 { MayaHydraAdapterTokens->metallic, metallicConverter },
@@ -769,7 +903,7 @@ void MayaHydraMaterialNetworkConverter::initialize()
                 { MayaHydraAdapterTokens->specularColor, openPBRSpecularColorConverter },
                 { MayaHydraAdapterTokens->ior, openPBRSpecularIORConverter },
                 { MayaHydraAdapterTokens->roughness, openPBRSpecularRoughnessConverter },
-                { MayaHydraAdapterTokens->clearcoat, openPBRCoatConverter },
+                { MayaHydraAdapterTokens->clearcoat, openPBRClearCoatConverter },
                 { MayaHydraAdapterTokens->clearcoatRoughness, openPBRCoatRoughnessConverter },
                 { MayaHydraAdapterTokens->opacity, openPBRTransmissionToOpacity },
                 { MayaHydraAdapterTokens->metallic, openPBRMetallicConverter },
