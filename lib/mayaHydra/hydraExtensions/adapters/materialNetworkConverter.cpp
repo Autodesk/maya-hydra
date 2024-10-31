@@ -420,30 +420,19 @@ public:
         MPlugArray*             outPlug = nullptr) override
     {
         VtValue baseColor = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToScaledValue(
-            node,
-            _remappedBaseColorName.GetText(),
-            _remappedBaseWeightName.GetText(),
-            SdfValueTypeNames->Vector3f,
-            fallback,
-            outPlug);
+            node, _remappedBaseColorName.GetText(), _remappedBaseWeightName.GetText(), SdfValueTypeNames->Vector3f, fallback, outPlug);
 
         // Mix baseColor with coat coatColor
+        // Check coatColor section in
+        // https://github.com/AcademySoftwareFoundation/MaterialX/blob/main/libraries/bxdf/translation/standard_surface_to_usd.mtlx
         if (baseColor.IsHolding<GfVec3f>()) {
             VtValue coatWeight = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
-                node,
-                _remappedCoatWeightName.GetText(),
-                SdfValueTypeNames->Float,
-                fallback,
-                outPlug);
+                node, _remappedCoatWeightName.GetText(), SdfValueTypeNames->Float, fallback, outPlug);
             if (coatWeight.IsHolding<float>()) {
                 float coatWeightFloat = coatWeight.UncheckedGet<float>();
                 if (coatWeightFloat != 0.0f) {
                     VtValue coatColor = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
-                        node,
-                        _remappedCoatColorName.GetText(),
-                        SdfValueTypeNames->Vector3f,
-                        fallback,
-                        outPlug);
+                        node, _remappedCoatColorName.GetText(), SdfValueTypeNames->Vector3f, fallback, outPlug);
                     if (coatColor.IsHolding<GfVec3f>()) {
                         GfVec3f baseColorVec3f = baseColor.UncheckedGet<GfVec3f>();
                         GfVec3f coatColorVec3f = coatColor.UncheckedGet<GfVec3f>();
@@ -494,17 +483,15 @@ public:
         emissionColorVec3f *= emissionWeightFloat;
 
         // Mix emissionColor with coat coatColor
+        // Check coatColor section in
+        // https://github.com/AcademySoftwareFoundation/MaterialX/blob/main/libraries/bxdf/translation/standard_surface_to_usd.mtlx
         VtValue coatWeight = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
             node, "coatWeight", SdfValueTypeNames->Float, fallback, outPlug);
         if (coatWeight.IsHolding<float>()) {
             float coatWeightFloat = coatWeight.UncheckedGet<float>();
             if (coatWeightFloat != 0.0f) {
                 VtValue coatColor = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
-                    node,
-                    "coatColor",
-                    SdfValueTypeNames->Vector3f,
-                    fallback,
-                    outPlug);
+                    node, "coatColor", SdfValueTypeNames->Vector3f, fallback, outPlug);
                 if (coatColor.IsHolding<GfVec3f>()) {
                     GfVec3f coatColorVec3f = coatColor.UncheckedGet<GfVec3f>();
                     GfVec3f coatAttenuationVec3f = GfLerp(coatWeightFloat, GfVec3f(1.0f, 1.0f, 1.0f), coatColorVec3f);
@@ -539,14 +526,11 @@ public:
         MPlugArray*             outPlug = nullptr) override
     {
         VtValue coatColor = MayaHydraMaterialNetworkConverter::ConvertMayaAttrToScaledValue(
-            node,
-            _remappedCoatColorName.GetText(),
-            _remappedCoatWeightName.GetText(),
-            SdfValueTypeNames->Vector3f,
-            fallback,
-            outPlug);
+            node, _remappedCoatColorName.GetText(), _remappedCoatWeightName.GetText(), SdfValueTypeNames->Vector3f, fallback, outPlug);
         if (coatColor.IsHolding<GfVec3f>()) {
             GfVec3f coatColorVec3f = coatColor.UncheckedGet<GfVec3f>();
+            // Check the clearcoat section in
+            // https://github.com/AcademySoftwareFoundation/MaterialX/blob/main/libraries/bxdf/translation/standard_surface_to_usd.mtlx
             float   clearCoatFolat = (coatColorVec3f[0] + coatColorVec3f[1] + coatColorVec3f[2]) / 3.0f;
             return VtValue(clearCoatFolat);
         }
