@@ -90,9 +90,19 @@ class TestOpenPBRSurface(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtil
         cmds.setAttr("openPBRSurface1.transmissionWeight", 0.5)
         cmds.refresh()
         self.assertSnapshotClose("transmissionWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        #Verify Opacity
         cmds.setAttr("openPBRSurface1.geometryOpacity", 0.2)
         cmds.refresh()
         self.assertSnapshotClose("geometryOpacity" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        
+
+        #Verify Coat
+        cmds.setAttr("openPBRSurface1.coatWeight", 0.9)
+        cmds.refresh()
+        self.assertSnapshotClose("coatWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        cmds.setAttr("openPBRSurface1.coatColor", 0.0,0.0,0.0, type = 'double3')
+        cmds.refresh()
+        self.assertSnapshotClose("coatColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
