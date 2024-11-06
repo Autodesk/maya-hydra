@@ -1096,6 +1096,22 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     _dirtyLeadObjectSceneIndex = MAYAHYDRA_NS::MhDirtyLeadObjectSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
     _inputSceneIndexOfFilteringSceneIndicesChain = _dirtyLeadObjectSceneIndex;
 
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    // _InitHydraResources() is always called from Render(), so 
+    // getFrameContext() will be valid and non-null.
+    auto viewportId = getRenderingDestination(getFrameContext());
+
+    // Add isolate select scene index.
+    auto& perVpDataMgr = Fvp::ViewportDataMgr::Get();
+    auto selection = perVpDataMgr.GetOrCreateIsolateSelection(viewportId);
+    auto isSi = Fvp::IsolateSelectSceneIndex::New(
+        viewportId, selection, _inputSceneIndexOfFilteringSceneIndicesChain);
+    // At time of writing we have a single selection scene index serving
+    // all viewports.
+    perVpDataMgr.SetIsolateSelectSceneIndex(isSi);
+    _inputSceneIndexOfFilteringSceneIndicesChain = isSi;
+#endif
+
     // Set the initial selection onto the selection scene index later. 
     _needToReplaceSelection = true;
 
@@ -1203,21 +1219,7 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 {
     //This function is where happens the ordering of filtering scene indices that are after the merging scene index
     //We use as its input scene index : _inputSceneIndexOfFilteringSceneIndicesChain
-#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
-    auto viewportId = getRenderingDestination(getFrameContext());
-
-    // Add isolate select scene index.
-    auto& perVpDataMgr = Fvp::ViewportDataMgr::Get();
-    auto selection = perVpDataMgr.GetOrCreateIsolateSelection(viewportId);
-    auto isSi = Fvp::IsolateSelectSceneIndex::New(
-        viewportId, selection, _inputSceneIndexOfFilteringSceneIndicesChain);
-    // At time of writing we have a single selection scene index serving
-    // all viewports.
-    perVpDataMgr.SetIsolateSelectSceneIndex(isSi);
-    _lastFilteringSceneIndexBeforeCustomFiltering = isSi;
-#else
     _lastFilteringSceneIndexBeforeCustomFiltering = _inputSceneIndexOfFilteringSceneIndicesChain;
-#endif    
 
     // Add display style scene index
     _lastFilteringSceneIndexBeforeCustomFiltering = _displayStyleSceneIndex =
