@@ -58,6 +58,10 @@
 
 #include <optional>
 
+PXR_NAMESPACE_OPEN_SCOPE
+struct MayaUsdSceneIndexRegistration;
+PXR_NAMESPACE_CLOSE_SCOPE
+
 namespace {
 
 const std::string digits = "0123456789";
@@ -90,6 +94,9 @@ private:
         }
     }
 };
+
+class PathInterfaceSceneIndex;
+typedef TfRefPtr<PathInterfaceSceneIndex> PathInterfaceSceneIndexRefPtr;
 
 /// \class PathInterfaceSceneIndex
 ///
@@ -306,6 +313,14 @@ private:
     }
 
     ~PathInterfaceSceneIndex() {
+        Destroy();
+    }
+
+#ifdef CODE_COVERAGE_WORKAROUND
+    friend struct PXR_NS::MayaUsdSceneIndexRegistration;
+#endif
+
+    void Destroy() {
         // Unregister our path mapper.
         TF_AXIOM(Fvp::PathMapperRegistry::Instance().Unregister(
                      _sceneIndexAppPath));
@@ -339,6 +354,18 @@ struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
         auto proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(pluginSceneIndex);
         proxyShapeSceneIndex->UpdateTime();
     }
+
+#ifdef CODE_COVERAGE_WORKAROUND
+    void Destroy() override {
+        auto proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(pluginSceneIndex);
+        proxyShapeSceneIndex->_Destroy();
+
+        auto pathInterfaceSceneIndex = TfDynamic_cast<PathInterfaceSceneIndexRefPtr>(rootSceneIndex);
+        if (pathInterfaceSceneIndex) {
+            pathInterfaceSceneIndex->Destroy();
+        }
+    }
+#endif
 };
 
 // MayaHydraSceneIndexRegistration is used to register a scene index for
@@ -440,6 +467,7 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
         _registrationsByObjectHandle.erase(dagNodeHandle);
         _registrations.erase(registration->sceneIndexPathPrefix);
 #ifdef CODE_COVERAGE_WORKAROUND
+        registration->Destroy();
         Fvp::leakSceneIndex(registration->rootSceneIndex);
 #endif
         return true;

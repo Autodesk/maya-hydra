@@ -1008,7 +1008,13 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
 
 void MtohRenderOverride::_ClearMayaHydraSceneIndex()
 {
+#ifdef CODE_COVERAGE_WORKAROUND
+    // Leak the Maya scene index for code coverage, as its base class
+    // HdRetainedSceneIndex dtor crashes in Windows clang code coverage build.
+    _mayaHydraSceneIndex->_Destroy();
+#else
     _renderIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
+#endif
     _mayaHydraSceneIndex.Reset();
 }
 
@@ -1145,13 +1151,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     // Remove the scene index registry
     _sceneIndexRegistry.reset();
 
-    #ifdef CODE_COVERAGE_WORKAROUND
-        // Leak the Maya scene index, as its base class HdRetainedSceneIndex
-        // destructor crashes under Windows clang code coverage build.
-        _mayaHydraSceneIndex.Reset();
-    #else
-       _ClearMayaHydraSceneIndex();
-    #endif
+    _ClearMayaHydraSceneIndex();
 
     _displayStyleSceneIndex = nullptr;
     _pruneTexturesSceneIndex = nullptr;
