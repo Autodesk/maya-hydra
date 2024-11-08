@@ -90,6 +90,7 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
         cpp/testIsolateSelect.py
         cpp/testUsdNativeInstancingIsolateSelect.py
         cpp/testUsdPointInstancingIsolateSelect.py
+        cpp/testUsdPointInstancingIsolateSelectBBox.py
     )
 endif()
 
