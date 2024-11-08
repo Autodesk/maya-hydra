@@ -56,6 +56,11 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(
 
 MayaUsdProxyShapeSceneIndex::~MayaUsdProxyShapeSceneIndex()
 {
+    _Destroy();
+}
+
+void MayaUsdProxyShapeSceneIndex::_Destroy()
+{
     TfNotice::Revoke(_stageSetNoticeKey);
     TfNotice::Revoke(_stageInvalidateNoticeKey);
     TfNotice::Revoke(_objectsChangedNoticeKey);

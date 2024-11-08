@@ -99,6 +99,11 @@ public:
         _SendPrimsDirtied(entries);
     }
 
+#ifndef CODE_COVERAGE_WORKAROUND
+private:
+#endif
+    void _Destroy();
+
 private:
     void _ObjectsChanged(const MAYAUSDAPI_NS::ProxyStageObjectsChangedNotice& notice);
     void _StageSet(const MAYAUSDAPI_NS::ProxyStageSetNotice& notice);
