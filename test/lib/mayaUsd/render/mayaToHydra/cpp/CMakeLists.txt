@@ -46,6 +46,7 @@ target_sources(${TARGET_NAME}
         testGeomSubsetsPicking.cpp
         testSinglePicking.cpp
         testSceneIndexDirtying.cpp
+        testUsdStageInvalidate.cpp
         testGeomSubsetsWireframeHighlight.cpp
 )
 

@@ -80,6 +80,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testGeomSubsetsPicking.py
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
+    cpp/testUsdStageInvalidate.py
     cpp/testGeomSubsetsWireframeHighlight.py
 )
 
