@@ -103,6 +103,18 @@ void MayaUsdProxyShapeSceneIndex::_StageSet(const MAYAUSDAPI_NS::ProxyStageSetNo
 // In these cases we set the stage to null and start over.
 void MayaUsdProxyShapeSceneIndex::_StageInvalidate(const MAYAUSDAPI_NS::ProxyStageInvalidateNotice& notice) 
 { 
+    constexpr char const* INVALID_PROXY_SHAPE_MSG = 
+        "Stage invalidate notification for invalid proxy shape node at path %s";
+
+    if (!TF_VERIFY(_dagNodeHandle.isValid(), INVALID_PROXY_SHAPE_MSG, notice.GetProxyShapePath().data())) {
+        return;
+    }
+
+    // Is the notification for us?
+    if (notice.GetProxyShapeObj() != _dagNodeHandle.object()) {
+        return;
+    }
+
     _usdImagingStageSceneIndex->SetStage(nullptr);
     _populated = false;
     // Simply mark populate as dirty and do not call
