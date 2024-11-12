@@ -24,6 +24,7 @@ target_sources(${TARGET_NAME}
         testMayaUsdUfeItems.cpp
         testMergingSceneIndex.cpp
         testPathInterface.cpp
+        testPrimPath.cpp
         testSelectionSceneIndex.cpp
         testUtils.cpp
         testWireframeSelectionHighlightSceneIndex.cpp
@@ -46,6 +47,7 @@ target_sources(${TARGET_NAME}
         testGeomSubsetsPicking.cpp
         testSinglePicking.cpp
         testSceneIndexDirtying.cpp
+        testUsdStageInvalidate.cpp
         testGeomSubsetsWireframeHighlight.cpp
 )
 

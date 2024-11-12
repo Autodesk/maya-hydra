@@ -478,7 +478,10 @@ public:
 
     Fvp::PrimSelections 
     UfePathToPrimSelections(const Ufe::Path& appPath) const override {
-        return _piSi.UfePathToPrimSelectionsLit(appPath);
+        auto litPaths = _piSi.UfePathToPrimSelectionsLit(appPath);
+        auto unlitPaths = _piSi.UfePathToPrimSelections(appPath);
+        unlitPaths.insert(unlitPaths.end(), litPaths.begin(), litPaths.end());
+        return unlitPaths;
     }
 
 private:

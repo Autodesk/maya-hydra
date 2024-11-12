@@ -80,6 +80,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testGeomSubsetsPicking.py
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
+    cpp/testUsdStageInvalidate.py
     cpp/testGeomSubsetsWireframeHighlight.py
 )
 
@@ -88,6 +89,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
         cpp/testIsolateSelect.py
+        cpp/testIsolateSelectMayaSelectionHighlighting.py
         cpp/testUsdNativeInstancingIsolateSelect.py
         cpp/testUsdPointInstancingIsolateSelect.py
         cpp/testUsdPointInstancingIsolateSelectBBox.py
