@@ -185,6 +185,14 @@ MObject GetShadingGroupFromShader(const MObject& shader);
  */
 bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath);
 
+/**
+ * @brief Get the default material shading group node using the shadingEngine named "initialShadingGroup".
+ *
+ * @return a valid MObject if we succeeded finding the default material shading group or MObject::kNullObj otherwise
+ */
+
+MObject getDefaultMaterialShadingGroupNode();
+
 } // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRALIB_MAYA_UTILS_H

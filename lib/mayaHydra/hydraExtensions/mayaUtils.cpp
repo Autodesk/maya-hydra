@@ -25,6 +25,7 @@
 #include <maya/MSelectionList.h>
 #include <maya/MObjectArray.h>
 #include <maya/MFnAttribute.h>
+#include <maya/MItDependencyNodes.h>
 
 namespace
 {
@@ -193,6 +194,37 @@ bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath)
     shapeDagPath.extendToShape();
     return _aiSkyDomeLight == MFnDependencyNode(shapeDagPath.node()).typeName();
 }
- 
+
+
+MObject getDefaultMaterialShadingGroupNode()
+{
+    MStatus status;
+
+    // Iterate over all shading engines
+    MItDependencyNodes itDep(MFn::kShadingEngine, &status);
+    if (status != MStatus::kSuccess) {
+        MGlobal::displayError("Failed to create dependency node iterator.");
+        return MObject::kNullObj;
+    }
+
+    while (!itDep.isDone()) {
+        MObject           shadingEngine = itDep.item();
+        MFnDependencyNode shadingEngineFn(shadingEngine, &status);
+        if (status != MStatus::kSuccess) {
+            MGlobal::displayError("Failed to create dependency node function set.");
+            return MObject::kNullObj;
+        }
+
+        // Is this shading engine the default material ?
+        if (shadingEngineFn.name() == "initialShadingGroup") {
+            return shadingEngine;
+        }
+
+        itDep.next();
+    }
+
+    MGlobal::displayError("Failed to find the default material shader.");
+    return MObject::kNullObj;
+}
 
 } // namespace MAYAHYDRA_NS_DEF

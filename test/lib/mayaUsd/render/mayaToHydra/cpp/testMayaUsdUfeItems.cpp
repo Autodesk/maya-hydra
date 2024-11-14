@@ -19,8 +19,6 @@
 
 #include <pxr/imaging/hd/tokens.h>
 
-#include <maya/MViewport2Renderer.h>
-
 #include <gtest/gtest.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
