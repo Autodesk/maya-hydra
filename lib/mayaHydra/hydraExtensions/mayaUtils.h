@@ -29,7 +29,6 @@ namespace MAYAHYDRA_NS_DEF {
 
 // Names of color tables for indexed colors
 const std::string kActiveColorTableName = "active";
-const std::string kDormantColorTableName = "dormant";
 
 // Color names
 const std::string kLeadColorName = "lead";
@@ -119,30 +118,6 @@ MAYAHYDRALIB_API
 bool IsUfeItemFromMayaUsd(const MObject& obj, MStatus* returnStatus = nullptr);
 
 /**
- * @brief Is it a maya node transform attribute ?
- *
- * @param[in] attrName is an attribute's name.
- *
- * @return true if this is a maya transform attribute name, false otherwise.
- */
-MAYAHYDRALIB_API 
-bool IsAMayaTransformAttributeName(const MString& attrName);
-
-/**
- * @brief Is it a maya node visibility attribute ?
- *
- * If so then we fill the outVal with the visibility value
- * 
- * @param[in] plug is a MPlug from an attribute.
- * @param[out] outVal will contain true or false if that was a maya visibility attribute 
- *
- * @return true if this is a maya visibility attribute name, false otherwise.
- */
-
-//Is it a maya node visibility attribute ? 
-bool IsAMayaVisibilityAttribute(const MPlug& plug, bool& outVal);
-
-/**
  * @brief Set the value of a DG node attribute.
  *
  * @param[in] node The Maya node for which to modify the attribute
@@ -168,15 +143,6 @@ bool SetNodeAttribute(MObject node, std::string attrName, AttrType newValue)
 }
 
 /**
- * @brief Get the shading group MObject from a shader MObject.
- *
- * @param[in] shader is the MObject of the shader
- *
- * @return the MObject of the shading group
- */
-MObject GetShadingGroupFromShader(const MObject& shader);
-
-/**
  * @brief Get if this MDagPath is an Arnold sky dome light.
  *
  * @param[in] dagPath is a MDagPath
@@ -184,14 +150,6 @@ MObject GetShadingGroupFromShader(const MObject& shader);
  * @return true if the object is a sky dome light, false otherwise
  */
 bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath);
-
-/**
- * @brief Get the default material shading group node using the shadingEngine named "initialShadingGroup".
- *
- * @return a valid MObject if we succeeded finding the default material shading group or MObject::kNullObj otherwise
- */
-
-MObject getDefaultMaterialShadingGroupNode();
 
 } // namespace MAYAHYDRA_NS_DEF
 

@@ -28,6 +28,7 @@
 #include <maya/MObjectHandle.h>
 #include <maya/MPlug.h>
 #include <maya/MObjectArray.h>
+#include <maya/MMaterial.h>
 #include <maya/MSelectionList.h>
 #include <maya/MString.h>
 #include <maya/MGlobal.h>
@@ -774,7 +775,8 @@ void MayaHydraSceneIndex::CreateMayaDefaultMaterialData()
 { 
     bool defaultMaterialCreatedSuccessfully = false;
 
-    MObject defaultMaterialShadingGroupObj = getDefaultMaterialShadingGroupNode();
+    // Get the shading group of the default material
+    MObject defaultMaterialShadingGroupObj = MMaterial::defaultMaterial().shadingEngine();
     if (defaultMaterialShadingGroupObj != MObject::kNullObj) {
         defaultMaterialCreatedSuccessfully = _CreateMaterial(
             MayaHydraSceneIndex::_mayaDefaultMaterialPath, defaultMaterialShadingGroupObj);
