@@ -100,6 +100,10 @@ class MtohRenderOverride : public MHWRender::MRenderOverride,
 {
 public:
 
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    static constexpr char kNbViewSelectedChangedCalls[] = "MtohRenderOverride:NbViewSelectedChangedCalls";
+#endif
+
     MtohRenderOverride(const MtohRendererDescription& desc);
     ~MtohRenderOverride() override;
 
@@ -332,6 +336,9 @@ private:
     bool       _useDefaultMaterial;
     bool       _xRayEnabled;
     MFrameContext::LightingMode _lightingMode = MFrameContext::LightingMode::kSceneLights;
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    long int   _nbViewSelectedChangedCalls{0};
+#endif
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

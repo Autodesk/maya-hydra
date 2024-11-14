@@ -48,6 +48,7 @@
 #include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h>
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
 #include <flowViewport/sceneIndex/fvpIsolateSelectSceneIndex.h>
+#include <flowViewport/fvpInstruments.h>
 #endif
 #include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
@@ -332,6 +333,10 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
         std::lock_guard<std::mutex> lock(_allInstancesMutex);
         _allInstances.push_back(this);
     }
+
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    Fvp::Instruments::instance().set(kNbViewSelectedChangedCalls, VtValue(_nbViewSelectedChangedCalls));
+#endif
 }
 
 MtohRenderOverride::~MtohRenderOverride()
@@ -1761,9 +1766,26 @@ void MtohRenderOverride::_RenderOverrideChangedCallback(
 void MtohRenderOverride::_ViewSelectedChangedCb(
     const MString& viewName,
     bool           viewSelectedObjectsChanged,
-    void*          /* data */
+    void*          data
 )
 {
+    // For simplicity, we leave the view selected changed callback active even
+    // when Maya Hydra isn't the renderer, and early out.  Another option would
+    // be to add and remove the callback in _InitHydraResources() and
+    // ClearHydraResources().
+    auto* instance = reinterpret_cast<MtohRenderOverride*>(data);
+    if (!TF_VERIFY(instance)) {
+        return;
+    }
+    if (!instance->_initializationSucceeded) {
+        return;
+    }
+
+    auto& nbCalls = instance->_nbViewSelectedChangedCalls;
+    ++nbCalls;
+    Fvp::Instruments::instance().set(
+        kNbViewSelectedChangedCalls, VtValue(nbCalls));
+
     M3dView view;
     if (!TF_VERIFY(M3dView::getM3dViewFromModelPanel(viewName, view) == MS::kSuccess, 
                    "No view found for view name %s.", viewName.asChar())) {
