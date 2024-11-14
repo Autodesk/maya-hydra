@@ -69,7 +69,7 @@ TF_REGISTRY_FUNCTION(TfType)
     TfType::Define<MayaHydraAreaLightAdapter, TfType::Bases<MayaHydraLightAdapter>>();
 }
 
-TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, pointLight)
+TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, areaLight)
 {
     MayaHydraAdapterRegistry::RegisterLightAdapter(
         TfToken("areaLight"),

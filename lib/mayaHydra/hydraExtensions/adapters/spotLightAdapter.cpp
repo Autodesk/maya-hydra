@@ -155,7 +155,7 @@ TF_REGISTRY_FUNCTION(TfType)
     TfType::Define<MayaHydraSpotLightAdapter, TfType::Bases<MayaHydraLightAdapter>>();
 }
 
-TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, pointLight)
+TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, spotLight)
 {
     MayaHydraAdapterRegistry::RegisterLightAdapter(
         TfToken("spotLight"),
