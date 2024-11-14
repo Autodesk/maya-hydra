@@ -21,7 +21,6 @@
 #include <maya/MFrameContext.h>
 #include <maya/MObject.h>
 #include <maya/MSelectionList.h>
-#include <maya/MViewport2Renderer.h>
 #include <maya/MDrawContext.h>
 
 #include <mayaHydraLib/api.h>
@@ -257,7 +256,7 @@ public:
     /// Is using an environment variable to tell if we should pass normals to Hydra when using the render item and mesh adapters
     static bool passNormalsToHydra();
 
-    ///Create the default material from the "standardSurface1" maya material or create a fallback material if it cannot be found
+    ///Create the default hydra material from maya default material or create a fallback material if it cannot be found
     void CreateMayaDefaultMaterialData();
 
     /// Get the maya default light path to be used in filtering scene indices to recognize the default light in primitives path
@@ -342,7 +341,7 @@ private:
     static SdfPath _fallbackMaterial;
     /// _mayaDefaultMaterialPath is common to all scene indexes
     static SdfPath _mayaDefaultMaterialPath;
-    static VtValue _mayaDefaultMaterialFallback;//Used only if we cannot find the default material named standardSurface1
+    static VtValue _mayaDefaultMaterialFallback;//Used only if we cannot find the maya default material
 
     /// _mayaFacesSelectionMaterialPath is a path to a Hydra material used to display the faces selection on nodes when being in components selection mode
     static SdfPath _mayaFacesSelectionMaterialPath;

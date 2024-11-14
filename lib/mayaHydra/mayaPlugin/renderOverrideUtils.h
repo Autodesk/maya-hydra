@@ -20,8 +20,6 @@
 
 #include <pxr/pxr.h>
 
-#include <maya/MViewport2Renderer.h>
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 class MayaHydraPreRender : public MHWRender::MSceneRender
