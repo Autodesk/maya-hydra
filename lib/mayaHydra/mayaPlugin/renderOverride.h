@@ -66,10 +66,7 @@
 #include <pxr/pxr.h>
 
 #include <maya/MCallbackIdArray.h>
-#include <maya/MMessage.h>
-#include <maya/MObjectHandle.h>
 #include <maya/MString.h>
-#include <maya/MViewport2Renderer.h>
 
 #include <atomic>
 #include <chrono>

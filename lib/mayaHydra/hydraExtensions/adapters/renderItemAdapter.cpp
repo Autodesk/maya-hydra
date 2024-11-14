@@ -33,11 +33,7 @@
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
 #include <maya/MAnimControl.h>
-#include <maya/MDGContext.h>
 #include <maya/MDGContextGuard.h>
-#include <maya/MHWGeometry.h>
-#include <maya/MShaderManager.h>
-#include <maya/MViewport2Renderer.h>
 
 #include <functional>
 
