@@ -105,8 +105,6 @@ public:
     {
     }
 
-    void _CalculateLightParams(GlfSimpleLight& light) override { light.SetSpotCutoff(90.0f); }
-
     const TfToken& LightType() const override
     {
         const TfToken& defaultLightType = HdPrimTypeTokens->rectLight;
