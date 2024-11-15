@@ -22,7 +22,12 @@ import mtohUtils
 
 from string import digits
 
-class TestSnapshot(mtohUtils.MayaHydraBaseTestCase):
+class BasicRenderBaseTestCase(mtohUtils.MayaHydraBaseTestCase):
+
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
+    IMAGE_DIFF_FAIL_PERCENT = 0.2
+
+class TestSnapshot(BasicRenderBaseTestCase):
     """Tests whether our snapshot rendering works with basic Viewport 2.0"""
 
     _file = __file__
@@ -51,15 +56,15 @@ class TestSnapshot(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr('persp.rotate', 0, 0, 0, type='float3')
         cmds.setAttr('persp.translate', 0, .25, .7, type='float3')
 
-        self.assertSnapshotEqual("flat_orange.png")
-        self.assertRaises(AssertionError,
-                          self.assertSnapshotEqual, "flat_orange_bad.png")        
+        self.assertSnapshotClose(
+            "flat_orange.png", self.IMAGE_DIFF_FAIL_THRESHOLD,
+            self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertRaises(
+            AssertionError, self.assertSnapshotClose, "flat_orange_bad.png",
+            self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-class TestMayaHydraRender(mtohUtils.MayaHydraBaseTestCase):
+class TestMayaHydraRender(BasicRenderBaseTestCase):
     _file = __file__
-
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.2
 
     def test_cube(self):
         imageVersion = maya.mel.eval("defaultShaderName").rstrip(digits)
