@@ -9,8 +9,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testImageDiffing.py
     testMtohCommand.py
 # Fail as of 22-Feb-2023.  Entered as MAYA-127898.
-#    testMtohBasicRender.py
-#    testMtohDagChanges.py
+    testBasicRender.py
+    testDagChanges.py
     testMeshes.py
     testNamespaces.py
     testVisibility.py
