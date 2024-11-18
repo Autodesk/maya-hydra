@@ -165,8 +165,14 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     def assertNodeNameInIndex(self, nodeName):
         for rprim in self.getIndex():
             if nodeName in rprim:
-                return True
-        return False
+                return
+        raise AssertionError(nodeName + ' not in index')
+
+    def assertNodeNameNotInIndex(self, nodeName):
+        for rprim in self.getIndex():
+            if nodeName in rprim:
+                raise AssertionError(nodeName + ' in index')
+        return
 
     def trace(self, msg):
         sys.__stdout__.write(msg)
