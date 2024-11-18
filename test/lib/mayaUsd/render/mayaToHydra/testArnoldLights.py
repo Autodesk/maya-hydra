@@ -77,5 +77,13 @@ class TestArnoldLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.
         #Shadow OFF
         self.verifyLightingModes(False)
 
+    def test_ArnoldAreaLight(self):
+        testFile = mayaUtils.openTestScene(
+                "testArnoldLights",
+                "testArnoldAreaLight.ma")
+        self.assertSnapshotClose("aiAreaLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        cmds.refresh()
+        
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

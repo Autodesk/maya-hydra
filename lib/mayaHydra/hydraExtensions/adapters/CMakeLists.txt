@@ -7,6 +7,7 @@ target_sources(${TARGET_NAME}
         adapterDebugCodes.cpp
         adapterRegistry.cpp
         aiSkydomeLightAdapter.cpp
+		aiAreaLightAdapter.cpp
         areaLightAdapter.cpp
         cameraAdapter.cpp
         dagAdapter.cpp

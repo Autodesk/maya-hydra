@@ -237,7 +237,7 @@ TF_REGISTRY_FUNCTION(TfType)
     TfType::Define<MayaHydraNurbsCurveAdapter, TfType::Bases<MayaHydraShapeAdapter>>();
 }
 
-TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, mesh)
+TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, curve)
 {
     MayaHydraAdapterRegistry::RegisterShapeAdapter(
         TfToken("nurbsCurve"),
