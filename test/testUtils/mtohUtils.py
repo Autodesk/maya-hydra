@@ -50,6 +50,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     # Variables to be set in subclasses
     _file = None
     _requiredPlugins = []
+    _pluginsToUnload = []
 
     @classmethod
     def setUpClass(cls):
@@ -79,11 +80,13 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         if MAYAUSD_PLUGIN_NAME not in cls._requiredPlugins:
             cls._requiredPlugins.append(MAYAUSD_PLUGIN_NAME)
 
-        for pluginToLoad in cls._requiredPlugins:
+        for p in cls._requiredPlugins:
             # If a plugin fails to load, the entire test suite will be immediately aborted.
             # Note that in the case of mtoa, the plugin might load successfully but not
             # initialize properly, which means issues will only be caught in the actual tests.
-            cmds.loadPlugin(pluginToLoad)
+            if not cmds.pluginInfo(p, q=True, loaded=True):
+                cls._pluginsToUnload.append(p)
+                cmds.loadPlugin(p, quiet=True)
         
     def setUp(self):
         # Maya is not closed/reset between each test of a test suite,
@@ -94,6 +97,12 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
 
     @classmethod
     def tearDownClass(cls):
+        # Clean out the scene to allow all plugins to unload cleanly.
+        cmds.file(new=True, force=True)
+        for p in reversed(cls._pluginsToUnload):
+            if p != 'mayaHydraFlowViewportAPILocator':
+                cmds.unloadPlugin(p)
+
         if platform.system() == "Windows":
             # On Windows, ADPClientService can linger around after a test ends and Maya closes,
             # keeping a handle open into the temporary test directory that holds preferences,
