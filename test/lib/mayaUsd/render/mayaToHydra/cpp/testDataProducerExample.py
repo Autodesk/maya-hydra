@@ -21,31 +21,13 @@ class TestDataProducerExample(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    _pluginsToLoad = ['mayaHydraCppTests', 'mayaHydraFlowViewportAPILocator']
-    _pluginsToUnload = []
+    _requiredPlugins = ['mayaHydraCppTests', 'mayaHydraFlowViewportAPILocator']
 
     def createScene(self):
         self._locator = cmds.createNode('MhFlowViewportAPILocator')
         cmds.setAttr(self._locator + '.numCubesX', 3)
         cmds.setAttr(self._locator + '.numCubesY', 3)
         cmds.setAttr(self._locator + '.numCubesZ', 3)
-
-    @classmethod
-    def setUpClass(cls):
-        super(TestDataProducerExample, cls).setUpClass()
-        for p in cls._pluginsToLoad:
-            if not cmds.pluginInfo(p, q=True, loaded=True):
-                cls._pluginsToUnload.append(p)
-                cmds.loadPlugin(p, quiet=True)
-
-    @classmethod
-    def tearDownClass(cls):
-        super(TestDataProducerExample, cls).tearDownClass()
-        # Clean out the scene to allow all plugins to unload cleanly.
-        cmds.file(new=True, force=True)
-        for p in reversed(cls._pluginsToUnload):
-            if p != 'mayaHydraFlowViewportAPILocator':
-                cmds.unloadPlugin(p)
 
     def setUp(self):
         super(TestDataProducerExample, self).setUp()
