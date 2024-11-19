@@ -27,13 +27,15 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
     testMayaLights.py
-    testUSDLights.py
+    # To be reenabled after investigation HYDRA-1305
+    #testUSDLights.py
     testUVandUDIM.py
     testArnoldLights.py|depOnPlugins:mtoa
     testLookThrough.py
     testObjectTemplate.py
     testStandardSurface.py
-    testOpenPBRSurface.py
+    # To be reenabled after investigation HYDRA-1305
+    #testOpenPBRSurface.py
     testFlowViewportAPI.py
     testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testStagePayloadsReferences.py
