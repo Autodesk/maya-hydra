@@ -51,25 +51,7 @@ class TestUsdNativeInstancingIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
 
     # Base class setUp() defines HdStorm as the renderer.
 
-    _pluginsToLoad = ['mayaHydraCppTests', 'mayaHydraFlowViewportAPILocator']
-    _pluginsToUnload = []
-
-    @classmethod
-    def setUpClass(cls):
-        super(TestUsdNativeInstancingIsolateSelect, cls).setUpClass()
-        for p in cls._pluginsToLoad:
-            if not cmds.pluginInfo(p, q=True, loaded=True):
-                cls._pluginsToUnload.append(p)
-                cmds.loadPlugin(p, quiet=True)
-
-    @classmethod
-    def tearDownClass(cls):
-        super(TestUsdNativeInstancingIsolateSelect, cls).tearDownClass()
-        # Clean out the scene to allow all plugins to unload cleanly.
-        cmds.file(new=True, force=True)
-        for p in reversed(cls._pluginsToUnload):
-            if p != 'mayaHydraFlowViewportAPILocator':
-                cmds.unloadPlugin(p)
+    _requiredPlugins = ['mayaHydraCppTests', 'mayaHydraFlowViewportAPILocator']
 
     def setupScene(self):
         proxyShapePathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
