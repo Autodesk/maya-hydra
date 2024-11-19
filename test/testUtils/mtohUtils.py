@@ -52,6 +52,11 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     _requiredPlugins = []
     _pluginsToUnload = []
 
+    # Unloading mayaHydraFlowViewportAPILocator crashes Maya (HYDRA-1304).
+    # Unloading mtoa succeeds on Linux, but fails on Windows and macOS
+    # with "cannot be unloaded because it is still in use" error.
+    _pluginsCantUnload = ['mayaHydraFlowViewportAPILocator', 'mtoa']
+
     @classmethod
     def setUpClass(cls):
         if cls._file is None:
@@ -100,7 +105,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         # Clean out the scene to allow all plugins to unload cleanly.
         cmds.file(new=True, force=True)
         for p in reversed(cls._pluginsToUnload):
-            if p != 'mayaHydraFlowViewportAPILocator':
+            if p not in cls._pluginsCantUnload:
                 cmds.unloadPlugin(p)
 
         if platform.system() == "Windows":
