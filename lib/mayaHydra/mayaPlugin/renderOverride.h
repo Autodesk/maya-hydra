@@ -66,10 +66,7 @@
 #include <pxr/pxr.h>
 
 #include <maya/MCallbackIdArray.h>
-#include <maya/MMessage.h>
-#include <maya/MObjectHandle.h>
 #include <maya/MString.h>
-#include <maya/MViewport2Renderer.h>
 
 #include <atomic>
 #include <chrono>
@@ -99,6 +96,10 @@ class MtohRenderOverride : public MHWRender::MRenderOverride,
     public MayaHydra::PickContext
 {
 public:
+
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    static constexpr char kNbViewSelectedChangedCalls[] = "MtohRenderOverride:NbViewSelectedChangedCalls";
+#endif
 
     MtohRenderOverride(const MtohRendererDescription& desc);
     ~MtohRenderOverride() override;
@@ -232,6 +233,12 @@ private:
         const MString& oldOverride,
         const MString& newOverride,
         void*          data);
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    static void _ViewSelectedChangedCb(
+        const MString& panelName,
+        bool           viewSelectedObjectsChanged,
+        void*          data);
+#endif
 
     MtohRendererDescription _rendererDesc;
 
@@ -241,6 +248,10 @@ private:
     MCallbackId                                  _timerCallback = 0;
     PanelCallbacksList                           _renderPanelCallbacks;
     const MtohRenderGlobals&                     _globals;
+
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    MCallbackId                                  _viewSelectedChangedCb{0};
+#endif
 
     std::mutex                            _lastRenderTimeMutex;
     std::chrono::system_clock::time_point _lastRenderTime;
@@ -322,6 +333,9 @@ private:
     bool       _useDefaultMaterial;
     bool       _xRayEnabled;
     MFrameContext::LightingMode _lightingMode = MFrameContext::LightingMode::kSceneLights;
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    long int   _nbViewSelectedChangedCalls{0};
+#endif
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

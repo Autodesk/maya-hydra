@@ -9,17 +9,17 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testImageDiffing.py
     testMtohCommand.py
 # Fail as of 22-Feb-2023.  Entered as MAYA-127898.
-#    testMtohBasicRender.py
-#    testMtohDagChanges.py
+    testBasicRender.py
+    testDagChanges.py
     testMeshes.py
     testNamespaces.py
     testVisibility.py
     testRendererSwitching.py
+    testSelectPrimWithoutDataSource.py
     testStageAddPrim.py
     testTransforms.py
     testRefinement.py
-    # To be reenabled after investigation: HYDRA-1206
-    #testMaterialXOnNative.py|depOnPlugins:lookdevx
+    testMaterialXOnNative.py|depOnPlugins:lookdevx
     testNewSceneWithStage.py
     # To be reenabled after investigation
     #testMayaDisplayModes.py|skipOnPlatform:osx
@@ -27,12 +27,15 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
     testMayaLights.py
-    testUSDLights.py
+    # To be reenabled after investigation HYDRA-1305
+    #testUSDLights.py
     testUVandUDIM.py
     testArnoldLights.py|depOnPlugins:mtoa
     testLookThrough.py
     testObjectTemplate.py
     testStandardSurface.py
+    # To be reenabled after investigation HYDRA-1305
+    #testOpenPBRSurface.py
     testFlowViewportAPI.py
     testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testStagePayloadsReferences.py
@@ -56,7 +59,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
-    cpp/testIsolateSelect.py
     cpp/testMayaSceneFlattening.py
     cpp/testMayaUsdUfeItems.py
     cpp/testMergingSceneIndex.py
@@ -80,8 +82,22 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testGeomSubsetsPicking.py
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
+    cpp/testUsdStageInvalidate.py
     cpp/testGeomSubsetsWireframeHighlight.py
 )
+
+# These two test files are identical, except for disabled tests.  See
+# HYDRA-1245.
+if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
+        cpp/testIsolateSelect.py
+        cpp/testIsolateSelectSwitchToVP2.py
+        cpp/testIsolateSelectMayaSelectionHighlighting.py
+        cpp/testUsdNativeInstancingIsolateSelect.py
+        cpp/testUsdPointInstancingIsolateSelect.py
+        cpp/testUsdPointInstancingIsolateSelectBBox.py
+    )
+endif()
 
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.
 if(MayaUsd_FOUND)
@@ -90,8 +106,7 @@ endif(MayaUsd_FOUND)
 
 # Code coverage is not computed for the Hydra scene browser.
 if (NOT CODE_COVERAGE)
-    # To be reenabled after investigation: HYDRA-1207
-    #list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py)
 endif()
 
 # Interactive Unit test scripts for mesh adapter (launched with maya.exe instead of mayapy.exe)
@@ -183,6 +198,9 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
             # Maya uses a very old version of GLEW, so we need support for
             # pre-loading a newer version from elsewhere.
             "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
+
+            # Use standard surface as default for now
+            "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
     )
 
     # Add a ctest label to these tests for easy filtering.

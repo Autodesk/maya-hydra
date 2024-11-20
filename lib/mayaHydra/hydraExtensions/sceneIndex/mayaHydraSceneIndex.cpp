@@ -24,15 +24,12 @@
 #include <maya/MDagPath.h>
 #include <maya/MDagPathArray.h>
 #include <maya/MFnComponent.h>
-#include <maya/MFnMesh.h>
 #include <maya/MItDag.h>
-#include <maya/MMatrixArray.h>
 #include <maya/MObjectHandle.h>
 #include <maya/MPlug.h>
-#include <maya/MPlugArray.h>
-#include <maya/MProfiler.h>
+#include <maya/MObjectArray.h>
+#include <maya/MMaterial.h>
 #include <maya/MSelectionList.h>
-#include <maya/MShaderManager.h>
 #include <maya/MString.h>
 #include <maya/MGlobal.h>
 #include <maya/MItSelectionList.h>
@@ -163,7 +160,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 SdfPath MayaHydraSceneIndex::_fallbackMaterial;
 SdfPath MayaHydraSceneIndex::_mayaDefaultMaterialPath; // Common to all scene indexes
-VtValue MayaHydraSceneIndex::_mayaDefaultMaterialFallback;//Used only if we cannot find the default material named standardSurface1
+VtValue MayaHydraSceneIndex::_mayaDefaultMaterialFallback;//Used only if we cannot find the maya default material
 SdfPath MayaHydraSceneIndex::_mayaDefaultLightPath;           // Common to all scene indexes
 SdfPath MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath; // Common to all scene indexes
 
@@ -478,7 +475,10 @@ public:
 
     Fvp::PrimSelections 
     UfePathToPrimSelections(const Ufe::Path& appPath) const override {
-        return _piSi.UfePathToPrimSelectionsLit(appPath);
+        auto litPaths = _piSi.UfePathToPrimSelectionsLit(appPath);
+        auto unlitPaths = _piSi.UfePathToPrimSelections(appPath);
+        unlitPaths.insert(unlitPaths.end(), litPaths.begin(), litPaths.end());
+        return unlitPaths;
     }
 
 private:
@@ -533,6 +533,11 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
 }
 
 MayaHydraSceneIndex::~MayaHydraSceneIndex()
+{
+    _Destroy();
+}
+
+void MayaHydraSceneIndex::_Destroy()
 {
     //Remove global materials
     if (_mayaDefaultMaterialFallback.IsHolding<HdMaterialNetworkMap>()){
@@ -765,26 +770,21 @@ VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
     return ret.IsEmpty() ? MayaHydraMaterialAdapter::GetPreviewMaterialResource(id) : ret;
 }
 
-//Create the default material from the "standardSurface1" maya material or create a fallback material if it cannot be found
+//Create the default maya material or create a fallback material if it cannot be found
 void MayaHydraSceneIndex::CreateMayaDefaultMaterialData() 
 { 
-    // Try to get the standardSurface1 material
-    MObject defaultShaderObj;
-    GetDependNodeFromNodeName("standardSurface1", defaultShaderObj); // From mayautils.cpp
-    bool defaultMaterialSuccessfullyCreated = false;
-    if (MObjectHandle(defaultShaderObj).isValid()) {
-        //Get its shading group as it is what we use to create a material adapter
-        MObject defaultMaterialShadingGroupObj
-            = GetShadingGroupFromShader(defaultShaderObj); // From mayautils.cpp
-        if (MObjectHandle(defaultMaterialShadingGroupObj).isValid()) {
-            defaultMaterialSuccessfullyCreated = _CreateMaterial(MayaHydraSceneIndex::_mayaDefaultMaterialPath, defaultMaterialShadingGroupObj);
-        }
-    }
+    bool defaultMaterialCreatedSuccessfully = false;
 
-    if (! defaultMaterialSuccessfullyCreated){
-        TF_CODING_WARNING("standardSurface1 material and its shading group could not be retrieved, using a fallback material");
-        // In case we could not create the default material from the standardSurface1 material, we
-        // create a fallback material
+    // Get the shading group of the default material
+    MObject defaultMaterialShadingGroupObj = MMaterial::defaultMaterial().shadingEngine();
+    if (defaultMaterialShadingGroupObj != MObject::kNullObj) {
+        defaultMaterialCreatedSuccessfully = _CreateMaterial(
+            MayaHydraSceneIndex::_mayaDefaultMaterialPath, defaultMaterialShadingGroupObj);
+    }
+    
+    if (! defaultMaterialCreatedSuccessfully){
+        TF_CODING_WARNING("maya default material and its shading group could not be retrieved, using a fallback material");
+        
         _mayaDefaultMaterialFallback = MayaHydraSceneIndex::_CreateDefaultMaterialFallback();
 
         auto mayaHydraDefaultMaterialDataSource = MayaHydraMaterialDataSource::New(

@@ -17,6 +17,7 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 import usdUtils
+import mayaUsd
 
 import testUtils
 from testUtils import PluginLoaded
@@ -51,11 +52,24 @@ class TestUsdStageFromFile(mtohUtils.MayaHydraBaseTestCase):
 
             cmds.setAttr('cubeShape.filePath', usdScenePath, type="string")
 
+            cmds.refresh()
+
             populateCallsPost = cmds.mayaHydraInstruments("MayaUsdProxyShapeSceneIndex:NbPopulateCalls", q=True)
 
             self.assertEqual(populateCallsPre+1, populateCallsPost)
 
             cmds.mayaHydraCppTest(self.CONE_PATH, f="TestHydraPrim.fromAppPath")
+
+    def test_getStage(self):
+
+        # Any file will do.
+        usdScenePath = testUtils.getTestScene('testUsdNativeInstances', 'instancedCubeHierarchies.usda')
+
+        proxyShapePathStr = usdUtils.createStageFromFile(usdScenePath)
+
+        stage = mayaUsd.lib.GetPrim(proxyShapePathStr).GetStage()
+
+        self.assertIsNotNone(stage)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

@@ -257,7 +257,21 @@ void AdskHydraSceneBrowserTestFixture::CompareValueContent(const pxr::VtValue& v
     std::string actualValue = valueText.toStdString();
 
     std::ostringstream valueStream;
+#if PXR_VERSION < 2408
     valueStream << value;
+#else
+    if (value.IsHolding<pxr::SdfPathVector>()) {
+        // Special case for SdfPathVector.
+        // See https://github.com/PixarAnimationStudios/OpenUSD/commit/1d19b1d
+        pxr::SdfPathVector paths = value.Get<pxr::SdfPathVector>();
+        for (pxr::SdfPath const& path : paths) {
+            valueStream << path << "\n";
+        }
+    }
+    else {
+        valueStream << value;
+    }
+#endif
     std::string expectedValue = valueStream.str();
 
     if (!MatchesFallbackTextOutput(expectedValue)) {

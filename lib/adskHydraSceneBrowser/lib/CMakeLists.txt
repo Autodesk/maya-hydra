@@ -92,6 +92,13 @@ foreach(SOURCE IN ITEMS ${SOURCES})
     set(SET_EXPANDED_REPLACEMENT "setExpanded\(true\);")
     string(REGEX REPLACE "${SET_EXPANDED_REGEX}" "${SET_EXPANDED_REPLACEMENT}" FILE_CONTENTS "${FILE_CONTENTS}")
 
+    # Patch in support for VtArray<bool>.  Arbitrarily place it after support
+    # for VtArray<GfVec2f>.  For simplicity we run this on each file, even
+    # though it is relevant only for dataSourceValueTreeView.cpp
+    set(VTARRAY_TARGET_REGEX "return new Hdui_TypedArrayValueItemModel<GfVec2f>\\(value, parent\\);[\r\n\t ]+}")
+    set(VTARRAY_TARGET_REPLACEMENT "return new Hdui_TypedArrayValueItemModel<GfVec2f>(value, parent);\n    }\n\n    if (value.IsHolding<VtArray<bool>>()) {\n        return new Hdui_TypedArrayValueItemModel<bool>(value, parent);\n    }")
+    string(REGEX REPLACE "${VTARRAY_TARGET_REGEX}" "${VTARRAY_TARGET_REPLACEMENT}" FILE_CONTENTS "${FILE_CONTENTS}")
+
     # Patch in '#include <QString>' to make sure we can use QLatin1StringView
     prepend_include(FILE_CONTENTS "#include <QString>")
 

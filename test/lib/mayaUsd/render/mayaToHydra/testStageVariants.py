@@ -100,17 +100,20 @@ class TestStageVariants(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         self.assertSnapshotClose("oneCubeInstanceable.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         ufeGlobalSel.clear()
 
-        #Enable the following tests when HYDRA-820 is fixed
-        #modVariant.SetVariantSelection('TwoCubes')
-        #self.assertEqual(modVariant.GetVariantSelection(), 'TwoCubes')
-        #ufeGlobalSel.append(cubesItems)
-        #self.assertSnapshotClose("twoCubesInstanceable.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        #ufeGlobalSel.clear()
+        # At time of writing selection highlighting of native instanced prims
+        # does not work (HYDRA-1161).  Enable the following tests when 
+        # HYDRA-1161 is fixed.
+        return
+        modVariant.SetVariantSelection('TwoCubes')
+        self.assertEqual(modVariant.GetVariantSelection(), 'TwoCubes')
+        ufeGlobalSel.append(cubesItems)
+        self.assertSnapshotClose("twoCubesInstanceable.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        ufeGlobalSel.clear()
 
-        #modVariant.SetVariantSelection('ThreeCubes')
-        #self.assertEqual(modVariant.GetVariantSelection(), 'ThreeCubes')
-        #ufeGlobalSel.append(cubesItems) 
-        #self.assertSnapshotClose("threeCubesInstanceable.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        modVariant.SetVariantSelection('ThreeCubes')
+        self.assertEqual(modVariant.GetVariantSelection(), 'ThreeCubes')
+        ufeGlobalSel.append(cubesItems) 
+        self.assertSnapshotClose("threeCubesInstanceable.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

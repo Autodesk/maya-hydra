@@ -158,15 +158,38 @@ SelectionPtr ViewportInformationAndSceneIndicesPerViewportDataManager::GetOrCrea
     if (found != _isolateSelection.end()) {
         return found->second;
     }
-    auto selection = std::make_shared<Selection>();
-    _isolateSelection[viewportId] = selection;
-    return selection;
+    // Initially isolate selection is disabled.
+    _isolateSelection[viewportId] = nullptr;
+    return nullptr;
 }
 
 SelectionPtr ViewportInformationAndSceneIndicesPerViewportDataManager::GetIsolateSelection(const std::string& viewportId) const
 {
     auto found = _isolateSelection.find(viewportId);
     return (found != _isolateSelection.end()) ? found->second : nullptr;
+}
+
+void ViewportInformationAndSceneIndicesPerViewportDataManager::DisableIsolateSelection(
+    const std::string&  viewportId
+)
+{
+    _isolateSelection[viewportId] = nullptr;
+}
+
+SelectionPtr
+ViewportInformationAndSceneIndicesPerViewportDataManager::_EnableIsolateSelection(
+    const std::string&  viewportId
+)
+{
+    auto& is = _isolateSelection.at(viewportId);
+
+    // If the viewport didn't have an isolate selection because it was
+    // disabled, create it now.
+    if (!is) {
+        is = std::make_shared<Selection>();
+        _isolateSelection[viewportId] = is;
+    }
+    return is;
 }
 
 void ViewportInformationAndSceneIndicesPerViewportDataManager::AddIsolateSelection(
@@ -177,7 +200,8 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::AddIsolateSelecti
     if (!TF_VERIFY(_isolateSelectSceneIndex, "No isolate select scene index set.")) {
         return;
     }
-    _CheckAndSetViewport(viewportId);
+
+    _EnableIsolateSelectAndSetViewport(viewportId);
     _isolateSelectSceneIndex->AddIsolateSelection(primSelections);
 }
 
@@ -189,20 +213,21 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveIsolateSele
     if (!TF_VERIFY(_isolateSelectSceneIndex, "No isolate select scene index set.")) {
         return;
     }
-    _CheckAndSetViewport(viewportId);
+    _EnableIsolateSelectAndSetViewport(viewportId);
     _isolateSelectSceneIndex->RemoveIsolateSelection(primSelections);
 }
 
 void ViewportInformationAndSceneIndicesPerViewportDataManager::ReplaceIsolateSelection(
-    const std::string&       viewportId, 
-    const SelectionConstPtr& selection
+    const std::string&  viewportId, 
+    const SelectionPtr& isolateSelection
 )
 {
     if (!TF_VERIFY(_isolateSelectSceneIndex, "No isolate select scene index set.")) {
         return;
     }
-    _CheckAndSetViewport(viewportId);
-    _isolateSelectSceneIndex->ReplaceIsolateSelection(selection);
+
+    _isolateSelection[viewportId] = isolateSelection;
+    _isolateSelectSceneIndex->SetViewport(viewportId, isolateSelection);
 }
 
 void ViewportInformationAndSceneIndicesPerViewportDataManager::ClearIsolateSelection(const std::string& viewportId)
@@ -210,7 +235,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::ClearIsolateSelec
     if (!TF_VERIFY(_isolateSelectSceneIndex, "No isolate select scene index set.")) {
         return;
     }
-    _CheckAndSetViewport(viewportId);
+    _EnableIsolateSelectAndSetViewport(viewportId);
     _isolateSelectSceneIndex->ClearIsolateSelection();
 }
 
@@ -218,7 +243,10 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::SetIsolateSelectS
     const IsolateSelectSceneIndexRefPtr& sceneIndex
 )
 {
-    _isolateSelectSceneIndex = sceneIndex;    
+    _isolateSelectSceneIndex = sceneIndex;
+    // If we're resetting the isolate select scene index, we're starting anew,
+    // so clear out existing isolate selections.
+    _isolateSelection.clear();
 }
 
 IsolateSelectSceneIndexRefPtr
@@ -228,12 +256,22 @@ ViewportInformationAndSceneIndicesPerViewportDataManager::GetIsolateSelectSceneI
 }
 
 void 
-ViewportInformationAndSceneIndicesPerViewportDataManager::_CheckAndSetViewport(
+ViewportInformationAndSceneIndicesPerViewportDataManager::_EnableIsolateSelectAndSetViewport(
     const std::string& viewportId
 )
 {
+    const bool enabled{_isolateSelectSceneIndex->GetIsolateSelection()};
+    auto isolateSelection = _EnableIsolateSelection(viewportId);
+
+    // If the isolate select scene index is not set to the right viewport,
+    // do a viewport switch.
     if (_isolateSelectSceneIndex->GetViewportId() != viewportId) {
-        _isolateSelectSceneIndex->SetViewport(viewportId, _isolateSelection.at(viewportId));
+        _isolateSelectSceneIndex->SetViewport(viewportId, isolateSelection);
+    }
+    else if (!enabled) {
+        // Same viewport, so no viewport switch, but must move from disabled to
+        // enabled for that viewport.
+        _isolateSelectSceneIndex->SetIsolateSelection(isolateSelection);
     }
 }
 
@@ -288,6 +326,9 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveAllViewport
 #endif
 
     _viewportsInformationAndSceneIndicesPerViewportData.clear();//Delete all of them
+
+    _isolateSelection.clear();
+    _isolateSelectSceneIndex = nullptr;
 }
 
 } //End of namespace FVP_NS_DEF {

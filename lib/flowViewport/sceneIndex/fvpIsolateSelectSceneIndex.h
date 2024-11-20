@@ -25,6 +25,7 @@
 
 //Hydra headers
 #include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/base/vt/array.h>
 
 namespace FVP_NS_DEF {
 
@@ -51,7 +52,9 @@ typedef PXR_NS::TfRefPtr<const IsolateSelectSceneIndex> IsolateSelectSceneIndexC
 ///
 /// At time of writing a single isolate select scene index is used to service
 /// all viewports in the application, by switching the isolate selection on the
-/// isolate scene index using IsolateSelectSceneIndex::SetViewport().
+/// isolate scene index using IsolateSelectSceneIndex::SetViewport().  If a
+/// null pointer selection is passed to SetViewport(), the isolate select scene
+/// index is disabled and behaves as a pass-through.
 ///
 /// IsolateSelectSceneIndex::GetPrim() passes through prims that have an
 /// ancestor or descendant (including themselves) in the isolate selection.
@@ -132,7 +135,12 @@ public:
         const SelectionPtr& isolateSelection
     );
 
-    // Get viewport information for this scene index.
+    FVP_API
+    void SetIsolateSelection(const SelectionPtr& selection);
+
+    // Get viewport information for this scene index, respectively the viewport
+    // ID and the isolate selection.  A null isolate selection pointer means
+    // the isolate select scene index is disabled (pass-through).
     FVP_API
     std::string GetViewportId() const;
     FVP_API
@@ -169,11 +177,39 @@ private:
         PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries* dirtiedEntries
     ) const;
 
-    void _ReplaceIsolateSelection(const SelectionConstPtr& selection);
+    void _DirtyIsolateSelection(const SelectionConstPtr& selection);
+
+    void _InsertSelectedPaths(
+        const SelectionConstPtr&   selection,
+        std::set<PXR_NS::SdfPath>& dirtyPaths
+    );
+
+    void _AddDependencies(const SelectionPtr& isolateSelection);
+
+    using Instancers = PXR_NS::TfSmallVector<PXR_NS::SdfPath, 8>;
+    using InstancerMask = PXR_NS::VtArray<bool>;
+    using InstancerMasks = std::map<PXR_NS::SdfPath, InstancerMask>;
+
+    // Collect all the instancers from the argument isolate selection.
+    Instancers _CollectInstancers(
+        const SelectionConstPtr& isolateSelection) const;
+
+    // Create the instance mask for each instancer.
+    InstancerMasks _CreateInstancerMasks(const Instancers& instancers, 
+        const SelectionConstPtr& isolateSelection) const;
+
+    // Dirty the instancer masks.
+    void _DirtyInstancerMasks(const InstancerMasks& instancerMasks);
+    void _AddDirtyInstancerMaskEntry(
+        const PXR_NS::SdfPath&                            primPath, 
+        PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries* dirtiedEntries
+    ) const;    
 
     std::string  _viewportId;
 
     SelectionPtr _isolateSelection{};
+
+    InstancerMasks _instancerMasks{};
 };
 
 }//end of namespace FVP_NS_DEF

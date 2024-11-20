@@ -20,7 +20,8 @@
 
 #include <pxr/imaging/hd/tokens.h>
 
-#include <maya/MViewport2Renderer.h>
+#include <maya/MDagPath.h>
+#include <maya/MMatrix.h>
 
 #include <gtest/gtest.h>
 

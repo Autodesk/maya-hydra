@@ -69,6 +69,15 @@ namespace {
     std::vector<PXR_NS::MtohRenderOverride*> _renderOverrides;
 
     std::vector<MCallbackId> _pluginLoadingCallbackIds;
+
+    void setEnv(const std::string& name, const std::string& value)
+    {
+    #if defined(_WIN32)
+    _putenv_s(name.c_str(), value.c_str());
+    #else
+    setenv(name.c_str(), value.c_str(), 1);
+    #endif
+    }
 }
 
 void initialize()
@@ -133,14 +142,11 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
-    // For now this is required for the HdSt backed to use lights.
-    // putenv requires char* and I'm not willing to use const cast!
-    constexpr const char* envVarSet = "USDIMAGING_ENABLE_SCENE_LIGHTS=1";
-    const auto            envVarSize = strlen(envVarSet) + 1;
-    std::vector<char>     envVarData;
-    envVarData.resize(envVarSize);
-    snprintf(envVarData.data(), envVarSize, "%s", envVarSet);
-    putenv(envVarData.data());
+    // For now this is required for the HdSt backend to use lights.
+    setEnv("USDIMAGING_ENABLE_SCENE_LIGHTS", "1");
+
+    // Performance optimization: disable RENDER_SELECTED_EDGE_FROM_FACE feature that could trigger unnecessary running of gometry shader.
+    setEnv("HDST_RENDER_SELECTED_EDGE_FROM_FACE", "0");
 
     MFnPlugin plugin(obj, "Autodesk", PLUGIN_VERSION, "Any");
 

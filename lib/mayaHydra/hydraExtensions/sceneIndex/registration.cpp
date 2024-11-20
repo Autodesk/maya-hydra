@@ -28,7 +28,6 @@
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
 #include <pxr/imaging/hd/instanceSchema.h>
-#include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -58,6 +57,10 @@
 #include <ufe/scene.h>
 
 #include <optional>
+
+PXR_NAMESPACE_OPEN_SCOPE
+struct MayaUsdSceneIndexRegistration;
+PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace {
 
@@ -91,6 +94,9 @@ private:
         }
     }
 };
+
+class PathInterfaceSceneIndex;
+typedef TfRefPtr<PathInterfaceSceneIndex> PathInterfaceSceneIndexRefPtr;
 
 /// \class PathInterfaceSceneIndex
 ///
@@ -307,6 +313,14 @@ private:
     }
 
     ~PathInterfaceSceneIndex() {
+        Destroy();
+    }
+
+#ifdef CODE_COVERAGE_WORKAROUND
+    friend struct PXR_NS::MayaUsdSceneIndexRegistration;
+#endif
+
+    void Destroy() {
         // Unregister our path mapper.
         TF_AXIOM(Fvp::PathMapperRegistry::Instance().Unregister(
                      _sceneIndexAppPath));
@@ -340,6 +354,18 @@ struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
         auto proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(pluginSceneIndex);
         proxyShapeSceneIndex->UpdateTime();
     }
+
+#ifdef CODE_COVERAGE_WORKAROUND
+    void Destroy() override {
+        auto proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(pluginSceneIndex);
+        proxyShapeSceneIndex->_Destroy();
+
+        auto pathInterfaceSceneIndex = TfDynamic_cast<PathInterfaceSceneIndexRefPtr>(rootSceneIndex);
+        if (pathInterfaceSceneIndex) {
+            pathInterfaceSceneIndex->Destroy();
+        }
+    }
+#endif
 };
 
 // MayaHydraSceneIndexRegistration is used to register a scene index for
@@ -417,8 +443,17 @@ MayaHydraSceneIndexRegistry::~MayaHydraSceneIndexRegistry()
         MSceneMessage::removeCallback(_AfterOpenCBId);
     }
     _AfterOpenCBId = 0;
+    _RemoveAllSceneIndexNodes();
     _registrationsByObjectHandle.clear();
     _registrations.clear();
+}
+
+void MayaHydraSceneIndexRegistry::_RemoveAllSceneIndexNodes()
+{
+    //Always take the first element and remove it until it is empty
+    while (_registrationsByObjectHandle.begin() != _registrationsByObjectHandle.end()){
+        _RemoveSceneIndexForNode(_registrationsByObjectHandle.begin()->first.object());
+    }
 }
 
 bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNode)
@@ -432,6 +467,7 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
         _registrationsByObjectHandle.erase(dagNodeHandle);
         _registrations.erase(registration->sceneIndexPathPrefix);
 #ifdef CODE_COVERAGE_WORKAROUND
+        registration->Destroy();
         Fvp::leakSceneIndex(registration->rootSceneIndex);
 #endif
         return true;

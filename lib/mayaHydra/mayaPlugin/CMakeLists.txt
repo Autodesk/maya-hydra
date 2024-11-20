@@ -41,6 +41,13 @@ target_compile_definitions(${TARGET_NAME}
         $<$<BOOL:${IS_WINDOWS}>:_WIN32>
 )
 
+if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
+    target_compile_definitions(${TARGET_NAME}
+        PRIVATE
+            MAYA_HAS_VIEW_SELECTED_OBJECT_API=1
+    )
+endif()
+
 # -----------------------------------------------------------------------------
 # include directories
 # -----------------------------------------------------------------------------
