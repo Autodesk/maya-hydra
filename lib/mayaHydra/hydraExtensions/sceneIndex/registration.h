@@ -61,6 +61,9 @@ struct MayaHydraSceneIndexRegistration
     MayaHydraInterpretRprimPath interpretRprimPathFn = nullptr;
 
     virtual void Update() = 0;
+#ifdef CODE_COVERAGE_WORKAROUND
+    virtual void Destroy() = 0;
+#endif
 };
 
 /**
@@ -108,6 +111,7 @@ private:
     void _AppendNodeToProcessAfterOpenScene(const MObject& node) {_nodesToProcessAfterOpenScene.append(node);}
     //We need to check if some nodes that need to be processed were added to our array during a file load
     void _ProcessNodesAfterOpen();
+    void _RemoveAllSceneIndexNodes();
 
     const std::shared_ptr<Fvp::RenderIndexProxy> _renderIndexProxy;
 

@@ -112,7 +112,7 @@ TF_REGISTRY_FUNCTION(TfType)
     TfType::Define<MayaHydraDirectionalLightAdapter, TfType::Bases<MayaHydraLightAdapter>>();
 }
 
-TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, pointLight)
+TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, directionalLight)
 {
     MayaHydraAdapterRegistry::RegisterLightAdapter(
         TfToken("directionalLight"),

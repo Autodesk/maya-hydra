@@ -19,7 +19,9 @@ import mayaUsd
 import mayaUsd_createStageWithNewLayer
 import maya.cmds as cmds
 import maya.mel as mel
+import usdUtils
 from pxr import UsdGeom
+import testUtils
 
 def enableIsolateSelect(modelPanel):
     # Surprisingly
@@ -40,31 +42,16 @@ def disableIsolateSelect(modelPanel):
     cmds.setFocus(modelPanel)
     mel.eval("enableIsolateSelect %s 0" % modelPanel)
 
+# This test is identical to the one in testUsdNativeInstancingIsolateSelect.py,
+# except for disabled tests.  See HYDRA-1245.
+
 class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
     # Base class setUp() defines HdStorm as the renderer.
 
-    _pluginsToLoad = ['mayaHydraCppTests', 'mayaHydraFlowViewportAPILocator']
-    _pluginsToUnload = []
-
-    @classmethod
-    def setUpClass(cls):
-        super(TestIsolateSelect, cls).setUpClass()
-        for p in cls._pluginsToLoad:
-            if not cmds.pluginInfo(p, q=True, loaded=True):
-                cls._pluginsToUnload.append(p)
-                cmds.loadPlugin(p, quiet=True)
-
-    @classmethod
-    def tearDownClass(cls):
-        super(TestIsolateSelect, cls).tearDownClass()
-        # Clean out the scene to allow all plugins to unload cleanly.
-        cmds.file(new=True, force=True)
-        for p in reversed(cls._pluginsToUnload):
-            if p != 'mayaHydraFlowViewportAPILocator':
-                cmds.unloadPlugin(p)
+    _requiredPlugins = ['mayaHydraCppTests', 'mayaHydraFlowViewportAPILocator']
 
     def setupScene(self):
         proxyShapePathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
@@ -157,6 +144,19 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
     def assertVisibility(self, visible, notVisible):
         self.assertVisible(visible)
         self.assertNotVisible(notVisible)
+
+    def assertIsolateSelect(self, modelPanel, visible, scene):
+        cmds.select(*visible)
+        cmds.isolateSelect(modelPanel, loadSelected=True)
+
+        notVisible = scene.copy()
+
+        for p in visible:
+            notVisible.remove(p)
+
+        cmds.refresh()
+
+        self.assertVisibility(visible, notVisible)
 
     def test_isolateSelectSingleViewport(self):
         scene = self.setupScene()
@@ -368,6 +368,78 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
 
         # As a final step disable the isolate selection to avoid affecting
         # other tests.
+        disableIsolateSelect(modelPanel)
+
+    def _test_isolateSelectNativeInstancing(self):
+
+        # Read in a scene with native instancing.
+        usdScenePath = testUtils.getTestScene('testUsdNativeInstances', 'instancedCubeHierarchies.usda')
+
+        proxyShapePathStr = usdUtils.createStageFromFile(usdScenePath)
+
+        stage = mayaUsd.lib.GetPrim(proxyShapePathStr).GetStage()
+
+        # Add a non-instanced prim to the USD stage
+        UsdGeom.Cylinder.Define(stage, "/cylinder1")
+
+        # Add a Maya object.
+        cmds.polySphere()
+        cmds.move(0, 0, 2, r=True)
+
+        cube1Path = '|instancedCubeHierarchies|instancedCubeHierarchiesShape,/cubeHierarchies/cubes_1'
+        cube2Path = '|instancedCubeHierarchies|instancedCubeHierarchiesShape,/cubeHierarchies/cubes_2'
+        cylinderPath = '|instancedCubeHierarchies|instancedCubeHierarchiesShape,/cylinder1'
+        spherePath = '|pSphere1'
+
+        scene = [cube1Path, cube2Path, cylinderPath, spherePath]
+
+        cmds.select(clear=True)
+
+        # Isolate select not turned on, everything visible.
+        visible = scene
+        notVisible = []
+
+        cmds.refresh()
+
+        self.assertVisibility(visible, notVisible)
+
+        # Turn isolate select on, nothing selected, nothing visible.
+        visible = []
+        notVisible = scene
+
+        modelPanel = 'modelPanel4'
+        enableIsolateSelect(modelPanel)
+        
+        cmds.refresh()
+
+        self.assertVisibility(visible, notVisible)
+
+        # Select native instanced object, load it into isolate selection.
+        self.assertIsolateSelect(modelPanel, [cube1Path], scene)
+
+        # Select native instanced object and non-instanced USD object, load
+        # them into isolate selection.
+        self.assertIsolateSelect(modelPanel, [cube2Path, cylinderPath], scene)
+
+        # Select native instanced object and Maya object, load them into
+        # isolate selection.
+        cmds.select(cube2Path, spherePath)
+        # cmds.isolateSelect(modelPanel, loadSelected=True)
+        # does not work: the viewport keeps the previously-selected Maya object
+        # in the isolate selection.  The following command is called by the
+        # toggleAutoLoad MEL script, which is called by the UI.
+        cmds.editor(modelPanel, edit=True, updateMainConnection=True)
+
+        visible = [cube2Path, spherePath]
+        notVisible = scene.copy()
+
+        for p in visible:
+            notVisible.remove(p)
+
+        cmds.refresh()
+
+        self.assertVisibility(visible, notVisible)
+
         disableIsolateSelect(modelPanel)
 
 if __name__ == '__main__':

@@ -67,10 +67,7 @@
 #include <pxr/pxr.h>
 
 #include <maya/MCallbackIdArray.h>
-#include <maya/MMessage.h>
-#include <maya/MObjectHandle.h>
 #include <maya/MString.h>
-#include <maya/MViewport2Renderer.h>
 
 #include <atomic>
 #include <chrono>
@@ -100,6 +97,10 @@ class MtohRenderOverride : public MHWRender::MRenderOverride,
     public MayaHydra::PickContext
 {
 public:
+
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    static constexpr char kNbViewSelectedChangedCalls[] = "MtohRenderOverride:NbViewSelectedChangedCalls";
+#endif
 
     MtohRenderOverride(const MtohRendererDescription& desc);
     ~MtohRenderOverride() override;
@@ -334,6 +335,9 @@ private:
     bool       _useDefaultMaterial;
     bool       _xRayEnabled;
     MFrameContext::LightingMode _lightingMode = MFrameContext::LightingMode::kSceneLights;
+#ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+    long int   _nbViewSelectedChangedCalls{0};
+#endif
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
