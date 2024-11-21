@@ -21,6 +21,7 @@ import maya.cmds as cmds
 import maya.mel as mel
 import usdUtils
 from pxr import UsdGeom
+from pxr import Usd
 import testUtils
 
 def enableIsolateSelect(modelPanel):
@@ -52,6 +53,14 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
     # Base class setUp() defines HdStorm as the renderer.
 
     _requiredPlugins = ['mayaHydraCppTests', 'mayaHydraFlowViewportAPILocator']
+
+    imageVersion = None
+
+    @classmethod
+    def setUpClass(cls):
+        if Usd.GetVersion() >= (0, 24, 11):
+            cls.imageVersion = 'usd_2411+'
+        super(TestIsolateSelect, cls).setUpClass()
 
     def setupScene(self):
         proxyShapePathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
@@ -320,9 +329,9 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(clear=1)
 
         cmds.refresh()
-
-        self.assertSnapshotClose("singleViewportIsolateSelectCylinder1.png", 0.1, 2)
-
+        #Has a different version for usd 24.11+
+        self.assertSnapshotClose("singleViewportIsolateSelectCylinder1.png", 0.1, 2, self.imageVersion)
+        
         # Switch to four-up viewport mode.  Set the renderer in each new
         # viewport to be Hydra Storm.  Viewport 4 is already set.
         cmds.FourViewLayout()

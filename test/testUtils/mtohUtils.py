@@ -24,6 +24,7 @@ import mayaUtils
 import testUtils
 from imageUtils import ImageDiffingTestCase
 from testUtils import PluginLoaded
+from pxr import Usd
 
 import platform
 import subprocess
@@ -137,6 +138,23 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     def setBasicCam(self, dist=DEFAULT_CAM_DIST):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
         cmds.setAttr('persp.translate', dist, .75 * dist, dist, type='float3')
+
+    def modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11(self):
+        #For Usd 24.11+ set the default light intensity to PI instead of 1.0 to counter balance the changes in usd 24.11
+        #This can be called after the original setUp function which sets the default light to 1
+        if Usd.GetVersion() >= (0, 24, 11):
+            if maya.mel.eval("optionVar -exists defaultLightIntensity"):
+                maya.mel.eval("optionVar -fv defaultLightIntensity 3.1415")
+            if cmds.attributeQuery('defaultLightIntensity', node='hardwareRenderingGlobals', exists=True):
+                cmds.setAttr('hardwareRenderingGlobals.defaultLightIntensity', 3.1415)
+
+    def resetDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11(self):
+        #For Usd 24.11+ reset the default light intensity to 1 instead of PI to counter balance the changes in usd 24.11
+        if Usd.GetVersion() >= (0, 24, 11):
+            if maya.mel.eval("optionVar -exists defaultLightIntensity"):
+                maya.mel.eval("optionVar -fv defaultLightIntensity 1.0")
+            if cmds.attributeQuery('defaultLightIntensity', node='hardwareRenderingGlobals', exists=True):
+                cmds.setAttr('hardwareRenderingGlobals.defaultLightIntensity', 1.0)
 
     def makeCubeScene(self, camDist=DEFAULT_CAM_DIST):
         mayaUtils.openNewScene()

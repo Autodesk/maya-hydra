@@ -74,6 +74,9 @@ class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
         parentPrimA = stage.DefinePrim(parentA, 'Xform')
         childPrimCube = stage.DefinePrim(childCube, 'Cube')
         
+        #modify light intensity for usd 24.11+
+        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+
         self.verifySnapshot("usd_cube_untransformed.png")
 
         UsdGeom.XformCommonAPI(childPrimCube).SetScale((2, 1, 2))

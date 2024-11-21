@@ -24,6 +24,13 @@ class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
     IMAGEDIFF_FAIL_PERCENT = 0.1
 
+    #This function is called before each test is launched
+    def setUp(self):
+        #call parent function first
+        super(TestRefinement, self).setUp()
+        #modify light intensity for usd 24.11+
+        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+
     def verifySnapshot(self, imageName):
         cmds.refresh()
         self.assertSnapshotClose(imageName, 

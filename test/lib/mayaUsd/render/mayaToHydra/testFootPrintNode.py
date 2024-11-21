@@ -22,6 +22,7 @@ import mtohUtils
 import mayaUtils
 import maya.mel as mel
 from testUtils import PluginLoaded
+from pxr import Usd
 
 HD_STORM = "HdStormRendererPlugin"
 HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
@@ -32,6 +33,20 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.01
     IMAGE_DIFF_FAIL_PERCENT = 0.1
+    imageVersion = None
+
+    @classmethod
+    def setUpClass(cls):
+        if Usd.GetVersion() >= (0, 24, 11):
+            cls.imageVersion = 'usd_2411+'
+        super(TestFootPrintNode, cls).setUpClass()
+
+    #This function is called before each test is launched
+    def setUp(self):
+        #call parent function first
+        super(TestFootPrintNode, self).setUp()
+        #modify light intensity for usd 24.11+
+        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
 
     def tearDown(self):
         #is called after each test : finish by a File New command to check that it's not crashing when cleaning up everything'
@@ -240,7 +255,8 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
                 "testFootPrintNode",
                 "testFootPrintNodeSaved.ma")
             cmds.refresh()
-            self.assertSnapshotClose("loadingFootPrintScene.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            #using imageVersion as the color is different for this image under usd 24.11+
+            self.assertSnapshotClose("loadingFootPrintScene.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

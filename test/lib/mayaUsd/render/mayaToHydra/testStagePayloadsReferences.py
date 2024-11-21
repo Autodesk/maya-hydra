@@ -142,6 +142,7 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
     def test_UsdStagePayloadsFromScene(self):
         from mayaUsd import lib as mayaUsdLib
         self.loadUsdPayloadScene()
+        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
         self.assertSnapshotClose("payloadSceneLoadedPotA.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
        
         #Change the variant
@@ -159,9 +160,11 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
 
     def test_UsdStageReferences(self):
         self.setUpReferenceScene()
+        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
         self.assertSnapshotClose("referencesSceneCreated.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
         self.loadUsdReferencesScene()
+        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
         self.assertSnapshotClose("referencesSceneLoaded.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
 if __name__ == '__main__':

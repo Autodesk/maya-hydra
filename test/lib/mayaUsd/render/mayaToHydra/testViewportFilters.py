@@ -172,7 +172,10 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
             cmds.select([joint1, ikHandle], replace=True)
         self.stackInstances(ikHandleCreator, 50, [0, 0, 0.005])
         cmds.select(all=True)
+        #For this snapshot with usd 24.11+, we need to modify the default lighting and reset it after the snapshot
+        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
         self.checkFilter("ikHandles", kExcludeIkHandles, 5)
+        self.resetDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
 
     def test_Joints(self):
         def jointCreator():
@@ -218,7 +221,10 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
     def test_Strokes(self):
         mayaUtils.openTestScene("testViewportFilters", "strokes.ma")
         self.setHdStormRenderer()
+        #For this snapshot with usd 24.11+, we need to modify the default lighting and reset it after the snapshot
+        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
         self.checkFilter("strokes", kExcludeStrokes, 4)
+        self.resetDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
 
     # TODO : Texture Placements (not working in Hydra as of 2024-05-03)
 
