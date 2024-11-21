@@ -162,9 +162,11 @@ public:
                 instanceSelection = {instancerPath, prototypeIndex, {instanceSchema.GetInstanceIndex()->GetTypedValue(0)}};
             }
 
-            auto targetChildPath = primPath.AppendChild(TfToken(secondSegment.components()[iComponent].string()));
+            // SdfPath components cannot be numeric, as happens with point instance selections.
+            auto targetChildPath = ((iComponent == lastComponentIndex) && lastComponentIsNumeric) ? SdfPath() : 
+                primPath.AppendChild(TfToken(secondSegment.components()[iComponent].string()));
             auto actualChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
-            if (std::find(actualChildPaths.begin(), actualChildPaths.end(), targetChildPath) != actualChildPaths.end()) {
+            if (!targetChildPath.IsEmpty() && std::find(actualChildPaths.begin(), actualChildPaths.end(), targetChildPath) != actualChildPaths.end()) {
                 // Append if the new path is valid
                 primPath = targetChildPath;
             }
