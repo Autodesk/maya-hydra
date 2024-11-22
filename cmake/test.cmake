@@ -313,6 +313,8 @@ finally:
          "${CMAKE_INSTALL_PREFIX}/lib/usd")
     list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
          "${CMAKE_INSTALL_PREFIX}/lib/maya")
+    list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
+         "${CMAKE_INSTALL_PREFIX}/scripts")
 
     # mayaUsdPlugin
     if(DEFINED MAYAUSD_LOCATION)
