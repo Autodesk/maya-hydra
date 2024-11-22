@@ -112,9 +112,9 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         #Switch to bounding box display mode, we should keep the selected items and their color
         #For this snapshot and only for it, we need to modify the default lighting and reset it after the snapshot
         cmds.modelEditor(panel, edit=True, displayAppearance="boundingBox")
-        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.modifyDefaultLightIntensityByUsdVersion()
         self.assertSnapshotClose("Storm_BoundingBox_AllSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        self.resetDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.resetDefaultLightIntensityByUsdVersion()
 
         #Switch to wireframe on shaded display mode, we should keep the selected items and their color
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")

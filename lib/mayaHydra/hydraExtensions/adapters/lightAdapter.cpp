@@ -237,7 +237,7 @@ VtValue MayaHydraLightAdapter::GetLightParamValue(const TfToken& paramName)
         const auto color = light.color();
         return VtValue(GfVec3f(color.r, color.g, color.b));
     } else if (paramName == HdLightTokens->intensity) {
-        float intensity = light.intensity();
+        auto intensity = light.intensity();
 #if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
         if( LightType() == HdPrimTypeTokens->simpleLight){
             intensity /= M_PI;

@@ -21,7 +21,6 @@ import mayaUtils
 from testUtils import PluginLoaded
 import platform
 import unittest
-from pxr import Usd
 
 class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -33,9 +32,9 @@ class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mto
 
     @classmethod
     def setUpClass(cls):
-        if Usd.GetVersion() >= (0, 24, 11):
-            cls.imageVersion = 'usd_2411+'
         super(TestMayaDefaultMaterial, cls).setUpClass()
+        if cls._usdVersion >= (0, 24, 11):
+            cls.imageVersion = 'usd_2411+'
 
     def test_MayaDefaultMaterial(self):
 

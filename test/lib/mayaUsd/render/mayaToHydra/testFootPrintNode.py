@@ -22,7 +22,6 @@ import mtohUtils
 import mayaUtils
 import maya.mel as mel
 from testUtils import PluginLoaded
-from pxr import Usd
 
 HD_STORM = "HdStormRendererPlugin"
 HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
@@ -37,16 +36,16 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
 
     @classmethod
     def setUpClass(cls):
-        if Usd.GetVersion() >= (0, 24, 11):
-            cls.imageVersion = 'usd_2411+'
         super(TestFootPrintNode, cls).setUpClass()
+        if cls._usdVersion >= (0, 24, 11):
+            cls.imageVersion = 'usd_2411+'
 
     #This function is called before each test is launched
     def setUp(self):
         #call parent function first
         super(TestFootPrintNode, self).setUp()
         #modify light intensity for usd 24.11+
-        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.modifyDefaultLightIntensityByUsdVersion()
 
     def tearDown(self):
         #is called after each test : finish by a File New command to check that it's not crashing when cleaning up everything'

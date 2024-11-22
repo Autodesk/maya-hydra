@@ -21,7 +21,6 @@ import maya.cmds as cmds
 import maya.mel as mel
 import usdUtils
 from pxr import UsdGeom
-from pxr import Usd
 import testUtils
 
 def enableIsolateSelect(modelPanel):
@@ -58,9 +57,9 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
 
     @classmethod
     def setUpClass(cls):
-        if Usd.GetVersion() >= (0, 24, 11):
-            cls.imageVersion = 'usd_2411+'
         super(TestIsolateSelect, cls).setUpClass()
+        if cls._usdVersion >= (0, 24, 11):
+            cls.imageVersion = 'usd_2411+'
 
     def setupScene(self):
         proxyShapePathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()

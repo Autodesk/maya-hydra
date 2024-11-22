@@ -78,16 +78,16 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         # Check that updating a parent's visibility works after creation
         cmds.setAttr(locatorGrandParent + ".visibility", True)
         #Is needed with usd 24.11 to keep the same images
-        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.modifyDefaultLightIntensityByUsdVersion()
         self.assertSnapshotClose("authoring_locator_visibility_on.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        self.resetDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.resetDefaultLightIntensityByUsdVersion()
 
         # Check that changing the visibility on the shape itself works
         cmds.setAttr(locatorShape + ".visibility", False)
         self.assertSnapshotClose("authoring_locator_visibility_off.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         # Restore visibility
         #Is needed with usd 24.11 to keep the same images
-        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.modifyDefaultLightIntensityByUsdVersion()
         cmds.setAttr(locatorShape + ".visibility", True)
         self.assertSnapshotClose("authoring_locator_visibility_on.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
@@ -97,7 +97,7 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         # Change the shape's transform directly
         cmds.xform(cmds.listRelatives(locatorShape, parent=True)[0], translation=[-3,2,-1], rotation=[-15,10,-5], scale=[-2.5, 2.0, -1.5])
         self.assertSnapshotClose("authoring_locator_shapeTransformChanged.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        self.resetDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.resetDefaultLightIntensityByUsdVersion()
         
     def test_Authoring_UsdStage(self):
         self.setBasicCam(10)
@@ -105,7 +105,7 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         stageParent, stageShape = self.usdStageSetup()
 
         #Is needed with usd 24.11 to keep the same images
-        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.modifyDefaultLightIntensityByUsdVersion()
 
         # Hide/unhide parent
         cmds.select(clear=True)
@@ -132,7 +132,7 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         cmds.xform(cmds.listRelatives(stageShape, parent=True)[0], translation=[-3,2,-1], rotation=[-15,10,-5], scale=[-2.5, 2.0, -1.5])
         cmds.select(clear=True)
         self.assertSnapshotAndCompareVp2("usdStage_shapeTransformChanged.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        self.resetDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.resetDefaultLightIntensityByUsdVersion()
 
     def test_Playback_Locator(self):
         self.setBasicCam(10)
@@ -151,14 +151,14 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.currentTime(0)
         #Is needed with usd 24.11 to keep the same images
-        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.modifyDefaultLightIntensityByUsdVersion()
         self.assertSnapshotClose("locator_playback_initial.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         cmds.currentTime(2)
         self.assertSnapshotClose("locator_playback_translated.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         cmds.currentTime(7)
-        self.resetDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.resetDefaultLightIntensityByUsdVersion()
         self.assertSnapshotClose("locator_playback_hidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def test_Playback_UsdStage(self):
@@ -177,7 +177,7 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
         self.keyframeAttribute(stageParent, "translateX", 15)
 
         #Is needed with usd 24.11 to keep the same images
-        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.modifyDefaultLightIntensityByUsdVersion()
 
         cmds.currentTime(0)
         self.assertSnapshotClose("usdStage_playback_initial.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
@@ -198,14 +198,14 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.currentTime(7)
         self.assertSnapshotSilhouetteClose("usdStage_playback_hidden.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        self.resetDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.resetDefaultLightIntensityByUsdVersion()
 
     def test_UsdStageAnimatedPrim(self):
         self.setBasicCam(10)
 
         stageParent, stageTransform = self.usdStageAnimatedPrimSetup()
         #Is needed with usd 24.11 to keep the same images
-        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.modifyDefaultLightIntensityByUsdVersion()
 
         cmds.currentTime(0)
         self.keyframeAttribute(stageParent, "translateY", 0)
@@ -223,7 +223,7 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
             cmds.select(clear=True)
             self.assertSnapshotClose("usdStageAnimatedPrim_t" + str(time) + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-        self.resetDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.resetDefaultLightIntensityByUsdVersion()
 
         self.setViewport2Renderer()
         for time in checkedTimes:

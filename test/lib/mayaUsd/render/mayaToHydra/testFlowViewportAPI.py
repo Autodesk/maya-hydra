@@ -21,7 +21,6 @@ import fixturesUtils
 import mtohUtils
 import maya.mel as mel
 from testUtils import PluginLoaded
-from pxr import Usd
 
 def setRotateY(matrixAsAList, angle):
     ''' Sets the matrix as a list of values to be a Rotate about Y matrix (deg), and returns it'''
@@ -42,9 +41,9 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
     @classmethod
     def setUpClass(cls):
-        if Usd.GetVersion() >= (0, 24, 11):
-            cls.imageVersion = 'usd_2411+'
         super(TestFlowViewportAPI, cls).setUpClass()
+        if cls._usdVersion >= (0, 24, 11):
+            cls.imageVersion = 'usd_2411+'
 
     @classmethod
     def tearDownClass(cls):
@@ -56,7 +55,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
         #call parent function first
         super(TestFlowViewportAPI, self).setUp()
         #modify light intensity for usd 24.11+
-        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.modifyDefaultLightIntensityByUsdVersion()
 
     def setupScene(self):
         self.setHdStormRenderer()

@@ -48,7 +48,7 @@ class TestStageVariants(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         self.assertEqual(modVariant.GetVariantSelection(), 'OneCube')
 
         #modify light intensity for usd 24.11+
-        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.modifyDefaultLightIntensityByUsdVersion()
 
         #Select the USD Cubes to see the selection highlight
         cubesPath = ufe.Path([

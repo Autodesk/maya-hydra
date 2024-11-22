@@ -29,7 +29,7 @@ class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
         #call parent function first
         super(TestRefinement, self).setUp()
         #modify light intensity for usd 24.11+
-        self.modifyDefaultLightIntensityIfUsdGreaterOrEqualTo_24_11()
+        self.modifyDefaultLightIntensityByUsdVersion()
 
     def verifySnapshot(self, imageName):
         cmds.refresh()
