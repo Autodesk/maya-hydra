@@ -148,7 +148,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
 
     MRenderItem::CullMode cullMode = data._ri.cullMode();
     if (cullMode != _cullMode) {
-        // MRenderItem combined doubleSided with CullStyle together
+        //  MRenderItem uses CullNone to denote doubleSided
         if (IsDoubleSided(_cullMode) || IsDoubleSided(cullMode)) {
             dirtyBits |= HdChangeTracker::DirtyDoubleSided;
         }
