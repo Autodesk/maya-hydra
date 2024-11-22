@@ -64,6 +64,7 @@ MayaHydraRenderItemAdapter::MayaHydraRenderItemAdapter(
     , _primitive(ri.primitive())
     , _name(ri.name())
     , _fastId(fastId)
+    , _cullMode(ri.cullMode())
 {
     _InsertRprim(this);
 }
@@ -144,6 +145,16 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     const bool effectChanged    = data._flags & MVS::MVS_changedEffect;
 
     HdDirtyBits dirtyBits = 0;
+
+    MRenderItem::CullMode cullMode = data._ri.cullMode();
+    if (cullMode != _cullMode) {
+        // MRenderItem combined doubleSided with CullStyle together
+        if (IsDoubleSided(_cullMode) || IsDoubleSided(cullMode)) {
+            dirtyBits |= HdChangeTracker::DirtyDoubleSided;
+        }
+        dirtyBits |= HdChangeTracker::DirtyCullStyle;
+        _cullMode = cullMode;
+    }
 
     if (data._wireframeColor != _wireframeColor) {
         _wireframeColor = data._wireframeColor;
@@ -545,10 +556,16 @@ void MayaHydraRenderItemAdapter::SetPlaybackChanged()
 
 HdCullStyle MayaHydraRenderItemAdapter::GetCullStyle() const
 {
-    // HdCullStyleNothing means no culling, HdCullStyledontCare means : let the renderer choose
-    // between back or front faces culling. We don't want culling, since we want to see the
-    // backfaces being unlit with MayaHydraSceneDelegate::GetDoubleSided returning false.
-    return _isArnoldSkyDomeLightTriangleShape ? HdCullStyleFront : HdCullStyleNothing;
+    if (_isArnoldSkyDomeLightTriangleShape) {
+        return HdCullStyleFront;
+    }
+
+    switch (_cullMode) {
+    case MRenderItem::CullNone: return HdCullStyleNothing;
+    case MRenderItem::CullFront: return HdCullStyleFront;
+    case MRenderItem::CullBack: return HdCullStyleBack;
+    default: return HdCullStyleNothing;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////
