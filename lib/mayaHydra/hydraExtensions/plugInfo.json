@@ -86,11 +86,11 @@
                         "displayName": "Ai SkyDome Light in Hydra for Maya."
                     },
                     "MayaHydraAiAreaLightAdapter": {
-					            "bases": [
-						          "MayaHydraLightAdapter"
-					            ],
-					            "displayName": "arnold area lights in Hydra for Maya."
-					          },
+                      "bases": [
+                      "MayaHydraLightAdapter"
+                      ],
+                      "displayName": "arnold area lights in Hydra for Maya."
+                    },
                     "MayaHydraProxyAdapter": {
                         "bases": [
                             "MayaHydraDagAdapter"
