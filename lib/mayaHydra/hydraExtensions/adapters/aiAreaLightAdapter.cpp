@@ -94,13 +94,13 @@ void _dirtyParams(MObject& node, void* clientData)
 } // namespace
 
 /**
- * \brief aiAreaLightAdapter is used to handle the translation from a Maya area light to
+ * \brief MayaHydraAiAreaLightAdapter is used to handle the translation from a Maya area light to
  * hydra.
  */
-class aiAreaLightAdapter : public MayaHydraLightAdapter
+class MayaHydraAiAreaLightAdapter : public MayaHydraLightAdapter
 {
 public:
-    aiAreaLightAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag)
+    MayaHydraAiAreaLightAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag)
         : MayaHydraLightAdapter(mayaHydraSceneIndex, dag)
     {
     }
@@ -140,7 +140,7 @@ public:
     {
         TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET_LIGHT_PARAM_VALUE)
             .Msg(
-                "Called aiAreaLightAdapter::GetLightParamValue(%s) - %s\n",
+                "Called MayaHydraAiAreaLightAdapter::GetLightParamValue(%s) - %s\n",
                 paramName.GetText(),
                 GetDagPath().partialPathName().asChar());
 
@@ -305,15 +305,15 @@ public:
 
 TF_REGISTRY_FUNCTION(TfType)
 {
-    TfType::Define<aiAreaLightAdapter, TfType::Bases<MayaHydraLightAdapter>>();
+    TfType::Define<MayaHydraAiAreaLightAdapter, TfType::Bases<MayaHydraLightAdapter>>();
 }
 
-TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, aiAreaLight)
-{
+TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, aiAreaLightMayaHydra)
+{   
     MayaHydraAdapterRegistry::RegisterLightAdapter(
         TfToken("aiAreaLight"),
         [](MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag) -> MayaHydraLightAdapterPtr {
-            return MayaHydraLightAdapterPtr(new aiAreaLightAdapter(mayaHydraSceneIndex, dag));
+            return MayaHydraLightAdapterPtr(new MayaHydraAiAreaLightAdapter(mayaHydraSceneIndex, dag));
         });
 }
 
