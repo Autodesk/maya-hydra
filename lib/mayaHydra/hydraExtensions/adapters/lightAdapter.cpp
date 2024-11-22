@@ -154,7 +154,12 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
         MFnLight       mayaLight(GetDagPath());
         GlfSimpleLight light;
         const auto     color = mayaLight.color();
-        const auto     intensity = mayaLight.intensity();
+        auto     intensity   = mayaLight.intensity();
+#if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
+        if( LightType() == HdPrimTypeTokens->simpleLight){
+            intensity /= M_PI;
+        }
+#endif
         MPoint         pt(0.0, 0.0, 0.0, 1.0);
         const auto     inclusiveMatrix = GetDagPath().inclusiveMatrix();
         const auto     position = pt * inclusiveMatrix;
@@ -232,7 +237,13 @@ VtValue MayaHydraLightAdapter::GetLightParamValue(const TfToken& paramName)
         const auto color = light.color();
         return VtValue(GfVec3f(color.r, color.g, color.b));
     } else if (paramName == HdLightTokens->intensity) {
-        return VtValue(light.intensity());
+        auto intensity = light.intensity();
+#if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
+        if( LightType() == HdPrimTypeTokens->simpleLight){
+            intensity /= M_PI;
+        }
+#endif
+        return VtValue(intensity);
     } else if (paramName == HdLightTokens->exposure) {
         return VtValue(0.0f);
     } else if (paramName == HdLightTokens->normalize) {

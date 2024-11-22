@@ -32,6 +32,20 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.01
     IMAGE_DIFF_FAIL_PERCENT = 0.1
+    imageVersion = None
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestFootPrintNode, cls).setUpClass()
+        if cls._usdVersion >= (0, 24, 11):
+            cls.imageVersion = 'usd_2411+'
+
+    #This function is called before each test is launched
+    def setUp(self):
+        #call parent function first
+        super(TestFootPrintNode, self).setUp()
+        #modify light intensity for usd 24.11+
+        self.modifyDefaultLightIntensityByUsdVersion()
 
     def tearDown(self):
         #is called after each test : finish by a File New command to check that it's not crashing when cleaning up everything'
@@ -240,7 +254,8 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
                 "testFootPrintNode",
                 "testFootPrintNodeSaved.ma")
             cmds.refresh()
-            self.assertSnapshotClose("loadingFootPrintScene.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            #using imageVersion as the color is different for this image under usd 24.11+
+            self.assertSnapshotClose("loadingFootPrintScene.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

@@ -53,6 +53,14 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
 
     _requiredPlugins = ['mayaHydraCppTests', 'mayaHydraFlowViewportAPILocator']
 
+    imageVersion = None
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestIsolateSelect, cls).setUpClass()
+        if cls._usdVersion >= (0, 24, 11):
+            cls.imageVersion = 'usd_2411+'
+
     def setupScene(self):
         proxyShapePathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         stage = mayaUsd.lib.GetPrim(proxyShapePathStr).GetStage()
@@ -320,9 +328,9 @@ class TestIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(clear=1)
 
         cmds.refresh()
-
-        self.assertSnapshotClose("singleViewportIsolateSelectCylinder1.png", 0.1, 2)
-
+        #Has a different version for usd 24.11+
+        self.assertSnapshotClose("singleViewportIsolateSelectCylinder1.png", 0.1, 2, self.imageVersion)
+        
         # Switch to four-up viewport mode.  Set the renderer in each new
         # viewport to be Hydra Storm.  Viewport 4 is already set.
         cmds.FourViewLayout()

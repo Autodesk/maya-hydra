@@ -37,11 +37,25 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 2
+    imageVersion = None
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestFlowViewportAPI, cls).setUpClass()
+        if cls._usdVersion >= (0, 24, 11):
+            cls.imageVersion = 'usd_2411+'
 
     @classmethod
     def tearDownClass(cls):
         #Finish by a File New command to check that it's not crashing when cleaning up everything'
         cmds.file(new=True, force=True)
+
+    #This function is called before each test is launched
+    def setUp(self):
+        #call parent function first
+        super(TestFlowViewportAPI, self).setUp()
+        #modify light intensity for usd 24.11+
+        self.modifyDefaultLightIntensityByUsdVersion()
 
     def setupScene(self):
         self.setHdStormRenderer()
@@ -184,7 +198,7 @@ class TestFlowViewportAPI(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
             self.setHdStormRenderer()
             cmds.setAttr(sphereShape + '.subdivisionsAxis', 30) #Unfilter the prim
             cmds.refresh()
-            self.assertSnapshotClose("filter_VP2AndThenBackToStorm_MovedSphereUnFiltered.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("filter_VP2AndThenBackToStorm_MovedSphereUnFiltered.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
     
     #Test Cube grids parameters
     def test_CubeGrid(self):

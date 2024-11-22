@@ -144,7 +144,11 @@ TfToken GetOutputName(const HdMaterialNode& material, SdfValueTypeName type)
         auto addMatchingOutputs = [&](SdfValueTypeName matchingType) {
             for (const auto& outName : outputNames) {
                 auto* sdrInfo = sdrNode->GetShaderOutput(outName);
+#if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
+                if (sdrInfo && sdrInfo->GetTypeAsSdfType().GetSdfType() == matchingType) {
+#else
                 if (sdrInfo && sdrInfo->GetTypeAsSdfType().first == matchingType) {
+#endif
                     validOutputs.push_back(outName);
                 }
             }
@@ -1246,7 +1250,12 @@ const MayaHydraShaderParams& MayaHydraMaterialNetworkConverter::GetPreviewShader
                         continue;
                     }
                     _previewShaderParams.emplace_back(
-                        inputName, property->GetDefaultValue(), property->GetTypeAsSdfType().first);
+                        inputName, property->GetDefaultValue(), 
+#if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
+                        property->GetTypeAsSdfType().GetSdfType());
+#else
+                        property->GetTypeAsSdfType().first);
+#endif
                 }
                 std::sort(
                     _previewShaderParams.begin(),

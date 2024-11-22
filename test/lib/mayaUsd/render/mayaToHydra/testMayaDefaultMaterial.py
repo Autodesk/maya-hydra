@@ -28,6 +28,13 @@ class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mto
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1.5
+    imageVersion = None
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestMayaDefaultMaterial, cls).setUpClass()
+        if cls._usdVersion >= (0, 24, 11):
+            cls.imageVersion = 'usd_2411+'
 
     def test_MayaDefaultMaterial(self):
 
@@ -39,7 +46,8 @@ class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mto
             cmds.refresh()
             panel = mayaUtils.activeModelPanel()
             if platform.system() != "Darwin": #Don't do the image comparison on OSX the flow viewport cubes have a lighter pixel look
-                self.assertSnapshotClose("sceneLoaded" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
+                #This image compare has a special version for usd 24.11+
+                self.assertSnapshotClose("sceneLoaded" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
         
             #Use Default Material
             cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
