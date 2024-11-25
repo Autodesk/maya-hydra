@@ -64,7 +64,9 @@ MayaHydraRenderItemAdapter::MayaHydraRenderItemAdapter(
     , _primitive(ri.primitive())
     , _name(ri.name())
     , _fastId(fastId)
+#ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API
     , _cullMode(ri.cullMode())
+#endif
 {
     _InsertRprim(this);
 }
@@ -146,6 +148,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
 
     HdDirtyBits dirtyBits = 0;
 
+#ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API
     MRenderItem::CullMode cullMode = data._ri.cullMode();
     if (cullMode != _cullMode) {
         //  MRenderItem uses CullNone to denote doubleSided
@@ -155,6 +158,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         dirtyBits |= HdChangeTracker::DirtyCullStyle;
         _cullMode = cullMode;
     }
+#endif
 
     if (data._wireframeColor != _wireframeColor) {
         _wireframeColor = data._wireframeColor;
@@ -559,13 +563,16 @@ HdCullStyle MayaHydraRenderItemAdapter::GetCullStyle() const
     if (_isArnoldSkyDomeLightTriangleShape) {
         return HdCullStyleFront;
     }
-
+#ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API
     switch (_cullMode) {
     case MRenderItem::CullNone: return HdCullStyleNothing;
     case MRenderItem::CullFront: return HdCullStyleFront;
     case MRenderItem::CullBack: return HdCullStyleBack;
     default: return HdCullStyleNothing;
     }
+#else
+    return HdCullStyleNothing;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////
