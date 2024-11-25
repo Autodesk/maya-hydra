@@ -162,7 +162,7 @@ public:
                 instanceSelection = {instancerPath, prototypeIndex, {instanceSchema.GetInstanceIndex()->GetTypedValue(0)}};
             }
 
-            // SdfPath components cannot be numeric, as happens with point instance selections.
+            // SdfPath components cannot be numeric.  This happens with point instance selections.
             auto targetChildPath = ((iComponent == lastComponentIndex) && lastComponentIsNumeric) ? SdfPath() : 
                 primPath.AppendChild(TfToken(secondSegment.components()[iComponent].string()));
             auto actualChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
