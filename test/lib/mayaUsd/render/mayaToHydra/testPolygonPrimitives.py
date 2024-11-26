@@ -17,6 +17,7 @@ import fixturesUtils
 import mtohUtils
 
 import platform
+import os
 
 class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -25,10 +26,10 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1.5
 
-    def compareSnapshot(self, referenceFilename, cameraDistance=15):
+    def compareSnapshot(self, referenceFilename, cameraDistance=15, imageVersion=None):
         self.setBasicCam(cameraDistance)
         cmds.refresh()
-        self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
     def setupScene(self, polygonCreationCallable):
         self.setHdStormRenderer()
@@ -315,7 +316,10 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         self.compareSnapshot("sphericalHarmonics_modified.png")
 
         self.setupSuperShapeHelix(polyCreatorNodeName)
-        self.compareSnapshot("sphericalHarmonics_helix.png")
+        imageVersion = None
+        if(os.getenv('MAYA_HAS_RENDER_ITEM_CULL_MODE_API', 'NOT-FOUND') in ('1', 'TRUE')):
+            imageVersion = "RenderItemHasCullModeAPI"
+        self.compareSnapshot("sphericalHarmonics_helix.png", 15, imageVersion)
 
     def test_PolygonUltra(self):
         polyCreatorNodeName = self.setupScene(self.getSuperShapeCreationCallable("UltraShape"))
@@ -346,7 +350,10 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         self.compareSnapshot("ultra_modified.png")
 
         self.setupSuperShapeHelix(polyCreatorNodeName)
-        self.compareSnapshot("ultra_helix.png")
+        imageVersion = None
+        if(os.getenv('MAYA_HAS_RENDER_ITEM_CULL_MODE_API', 'NOT-FOUND') in ('1', 'TRUE')):
+            imageVersion = "RenderItemHasCullModeAPI"
+        self.compareSnapshot("ultra_helix.png", 15 , imageVersion)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
