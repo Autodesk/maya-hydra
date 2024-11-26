@@ -46,6 +46,11 @@ std::string kRenderItemTypeName = "renderItem";
 static constexpr const char* kPointSize = "pointSize";
 
 static const SdfPath kInvalidMaterial = SdfPath("InvalidMaterial");
+
+#ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API
+// Extract doubleSided attribute from CullMode as MRenderItem uses CullNone to denote doubleSided.
+static bool IsDoubleSided(MRenderItem::CullMode cullMode) { return cullMode == MRenderItem::CullNone; }
+#endif
 } // namespace
 
 using MayaHydraRenderItemAdapterPtr = std::shared_ptr<class MayaHydraRenderItemAdapter>;
@@ -81,7 +86,13 @@ public:
     virtual bool IsSupported() const override;
 
     MAYAHYDRALIB_API
-    bool GetDoubleSided() const override { return false; };
+    bool GetDoubleSided() const override { 
+#ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API
+        return IsDoubleSided(_cullMode);
+#else
+        return false;
+#endif
+    };
 
     MAYAHYDRALIB_API
     GfBBox3d GetBoundingBox()const override { return _bounds; }
@@ -209,6 +220,9 @@ private:
     bool                        _isHideOnPlayback = false;
     bool                        _isArnoldSkyDomeLightTriangleShape = false;
     GfBBox3d                    _bounds;//Bounding box
+#ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API
+    MRenderItem::CullMode       _cullMode = MRenderItem::CullNone;
+#endif
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
