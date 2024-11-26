@@ -41,6 +41,13 @@ set(HEADERS
     tokens.h
 )
 
+if (MAYA_HAS_RENDER_ITEM_CULL_MODE_API)
+    target_compile_definitions(${TARGET_NAME}
+        PRIVATE
+            MAYA_HAS_RENDER_ITEM_CULL_MODE_API=1
+    )
+endif()
+
 # -----------------------------------------------------------------------------
 # promoted headers
 # -----------------------------------------------------------------------------

@@ -24,6 +24,7 @@
 # MAYA_HAS_DISPLAY_LAYER_API Presence of MFnDisplayLayer
 # MAYA_HAS_NEW_DISPLAY_LAYER_MESSAGING_API Presence of MDisplayLayerMemberChangedFunction
 # MAYA_HAS_RENDER_ITEM_HIDE_ON_PLAYBACK_API Presence of MRenderItem has HideOnPlayback API
+# MAYA_HAS_RENDER_ITEM_CULL_MODE_API Presence of MRenderItem has CullMode API
 # MAYA_HAS_VIEW_SELECTED_OBJECT_API Presence of M3dView::viewSelectedObject
 # MAYA_LINUX_BUILT_WITH_CXX11_ABI Maya Linux was built with new cxx11 ABI.
 # MAYA_MACOSX_BUILT_WITH_UB2 Maya OSX was built with Universal Binary 2.
@@ -401,6 +402,15 @@ if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MHWGeometry.h")
     if(MAYA_HAS_API)
         set(MAYA_HAS_RENDER_ITEM_HIDE_ON_PLAYBACK_API TRUE CACHE INTERNAL "hasRenderItemHideOnPlaybackFunction")
         message(STATUS "MRenderItem has HideOnPlayback API")
+    endif()
+endif()
+
+set(MAYA_HAS_RENDER_ITEM_CULL_MODE_API FALSE CACHE INTERNAL "hasRenderItemCullModeFunction")
+if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MHWGeometry.h")
+    file(STRINGS ${MAYA_INCLUDE_DIR}/maya/MHWGeometry.h MAYA_HAS_API REGEX "cullMode")
+    if(MAYA_HAS_API)
+        set(MAYA_HAS_RENDER_ITEM_CULL_MODE_API TRUE CACHE INTERNAL "hasRenderItemCullModeFunction")
+        message(STATUS "MRenderItem has CullMode API")
     endif()
 endif()
 
