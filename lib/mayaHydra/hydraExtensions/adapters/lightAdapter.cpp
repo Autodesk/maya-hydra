@@ -154,12 +154,7 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
         MFnLight       mayaLight(GetDagPath());
         GlfSimpleLight light;
         const auto     color = mayaLight.color();
-        auto     intensity   = mayaLight.intensity();
-#if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
-        if( LightType() == HdPrimTypeTokens->simpleLight){
-            intensity /= M_PI;
-        }
-#endif
+        const auto     intensity = mayaLight.intensity();
         MPoint         pt(0.0, 0.0, 0.0, 1.0);
         const auto     inclusiveMatrix = GetDagPath().inclusiveMatrix();
         const auto     position = pt * inclusiveMatrix;
@@ -202,13 +197,13 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
     } else if (key == HdTokens->transform) {
         return VtValue(MayaHydraDagAdapter::GetTransform());
     } else if (key == HdLightTokens->shadowCollection) {
-        // Exclude prims that should not be lighted by only
-        // taking the primitives whose root path is GetMayaHydraSceneIndex()->GetLightedPrimsRootPath()
-        const SdfPath     lightedPrimsRootPath = GetMayaHydraSceneIndex()->GetLightedPrimsRootPath();
+        // Exclude prims that should not be lighted by only taking lighted paths
+        SdfPathVector lightedPaths;
+        GetMayaHydraSceneIndex()->GetLightedPrimPaths(lightedPaths);
         HdRprimCollection coll(
             HdTokens->geometry,
-            HdReprSelector(HdReprTokens->refined),
-            lightedPrimsRootPath);
+            HdReprSelector(HdReprTokens->refined));
+        coll.SetRootPaths(lightedPaths);
         return VtValue(coll);
     } else if (key == HdLightTokens->shadowParams) {
         HdxShadowParams shadowParams;
@@ -237,13 +232,7 @@ VtValue MayaHydraLightAdapter::GetLightParamValue(const TfToken& paramName)
         const auto color = light.color();
         return VtValue(GfVec3f(color.r, color.g, color.b));
     } else if (paramName == HdLightTokens->intensity) {
-        auto intensity = light.intensity();
-#if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
-        if( LightType() == HdPrimTypeTokens->simpleLight){
-            intensity /= M_PI;
-        }
-#endif
-        return VtValue(intensity);
+        return VtValue(light.intensity());
     } else if (paramName == HdLightTokens->exposure) {
         return VtValue(0.0f);
     } else if (paramName == HdLightTokens->normalize) {

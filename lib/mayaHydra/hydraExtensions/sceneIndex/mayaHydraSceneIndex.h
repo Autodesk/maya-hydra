@@ -192,8 +192,6 @@ public:
 
     SdfPath GetPrimPath(const MDagPath& dg, bool isSprim) const;
 
-    SdfPath GetLightedPrimsRootPath() const;
-
     SdfPath GetRprimPath() const { return _rprimPath; }
 
     bool IsHdSt() const { return _isHdSt; }
@@ -261,7 +259,10 @@ public:
 
     /// Get the maya default light path to be used in filtering scene indices to recognize the default light in primitives path
     static const SdfPath& GetMayaDefaultLightPath() {return _mayaDefaultLightPath;}
-    
+
+    /// Get all paths of all lighted prims
+    void GetLightedPrimPaths(SdfPathVector& lightedPrimPaths);
+
 private:
     MayaHydraSceneIndex(
         MayaHydraInitData& initData,
@@ -305,16 +306,6 @@ private:
     void _Destroy();
 
 private:
-    // ------------------------------------------------------------------------
-    // HdSceneIndexBase implementations
-    // TODO: Reuse the implementations from HdRetainedSceneIndex with usd 23.05+
-    struct _PrimEntry
-    {
-        HdSceneIndexPrim prim;
-    };
-    using _PrimEntryTable = SdfPathTable<_PrimEntry>;
-    _PrimEntryTable _entries;
-
     SdfPath _ID;
     MayaHydraParams _params;
 

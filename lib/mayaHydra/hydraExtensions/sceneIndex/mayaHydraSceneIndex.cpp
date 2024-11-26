@@ -210,8 +210,6 @@ namespace {
             || (light1.GetSpecular() != light2.GetSpecular());
     }
 
-    static const SdfPath lightedObjectsPath = SdfPath(std::string("Lighted"));
-
     template<class T> SdfPath toSdfPath(const T& src);
     template<> inline SdfPath toSdfPath<MDagPath>(const MDagPath& dag) {
         return DagPathToSdfPath(dag, false, false);
@@ -269,12 +267,6 @@ namespace {
         }
 
         mayaPath = maybePrepend(src, mayaPath);
-
-        if (shouldBeLighted(src)) {
-            // Use a specific prefix when it's not an object that needs to interact with lights and shadows to be able
-            // We filter the objects that don't have this prefix in lights HdLightTokens->shadowCollection parameter
-            mayaPath = lightedObjectsPath.AppendPath(mayaPath);
-        }
 
         return mayaPath;
     }
@@ -588,6 +580,8 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
         _isPlaybackRunning = playbackRunning;
     }
 
+    bool renderItemCollectionChanged = false;
+
     // First loop to get rid of removed items
     constexpr int kInvalidId = 0;
     for (size_t i = 0; i < scene.mRemovalCount; i++) {
@@ -597,6 +591,7 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
         MayaHydraRenderItemAdapterPtr ria = nullptr;
         if (_GetRenderItem(fastId, ria)) {
             _RemoveRenderItem(ria);
+            renderItemCollectionChanged = true;
         }
         assert(ria != nullptr);
     }
@@ -636,6 +631,8 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
             ria->SetIsRenderITemAnaiSkydomeLightTriangleShape(isRenderItem_aiSkyDomeLightTriangleShape(ri));
 
             _AddRenderItem(ria);
+
+            renderItemCollectionChanged = true;
         }
 
         SdfPath material;
@@ -664,6 +661,13 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
         ria->UpdateFromDelta(data);
         if (flags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
             ria->UpdateTransform(ri);
+        }
+
+        // Mark collection dirty for shadow casting
+        if (renderItemCollectionChanged) {
+            _MapAdapter<MayaHydraLightAdapter>(
+                [](MayaHydraLightAdapter* a) { a->MarkDirty(HdLight::DirtyCollection); },
+                _lightAdapters);
         }
     }
 }
@@ -853,7 +857,7 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelectionsLit(
         return {};
     }
 
-    SdfPath primPath = GetLightedPrimsRootPath().AppendPath(toSdfPath(UfeExtensions::ufeToDagPath(appPath)).MakeRelativePath(SdfPath::AbsoluteRootPath()));
+    SdfPath primPath = _rprimPath.AppendPath(toSdfPath(UfeExtensions::ufeToDagPath(appPath)).MakeRelativePath(SdfPath::AbsoluteRootPath()));
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg("    mapped to scene index path %s.\n", primPath.GetText());
 
@@ -1424,6 +1428,17 @@ void MayaHydraSceneIndex::_RemoveRenderItem(const MayaHydraRenderItemAdapterPtr&
     _renderItemsAdapters.erase(primPath);
 }
 
+void MayaHydraSceneIndex::GetLightedPrimPaths(SdfPathVector& lightedPrimPaths)
+{
+    _MapAdapter<MayaHydraRenderItemAdapter>(
+        [&](MayaHydraRenderItemAdapter* a) {
+            if (a->GetPrimitive() == MHWRender::MGeometry::Primitive::kTriangles) {
+                lightedPrimPaths.emplace_back(a->GetID());
+            }
+        },
+        _renderItemsAdapters);
+}
+
 bool MayaHydraSceneIndex::_GetRenderItemMaterial(
     const MRenderItem& ri,
     SdfPath& material,
@@ -1474,11 +1489,6 @@ SdfPath MayaHydraSceneIndex::GetPrimPath(const MDagPath& dg, bool isSprim) const
 GfInterval MayaHydraSceneIndex::GetCurrentTimeSamplingInterval() const
 {
     return GfInterval(_params.motionSampleStart, _params.motionSampleEnd);
-}
-
-SdfPath MayaHydraSceneIndex::GetLightedPrimsRootPath() const
-{
-    return _rprimPath.AppendPath(lightedObjectsPath);
 }
 
 void MayaHydraSceneIndex::RebuildAdapterOnIdle(const SdfPath& id, uint32_t flags)
