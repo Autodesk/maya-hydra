@@ -163,6 +163,12 @@ public:
     void SetLightsEnabled(const bool enabled) { _lightsEnabled = enabled; }
     bool GetLightsEnabled() const { return _lightsEnabled; }
 
+    // Enable or disable shadows
+    void SetShadowsEnabled(const bool enabled) { _shadowsEnabled = enabled; }
+
+    // Update ShadowCollection for lights
+    void UpdateLightsShadowCollection();
+
     // Enable or disable default lighting
     void SetDefaultLightEnabled(const bool enabled);
     bool GetDefaultLightEnabled() const { return _useMayaDefaultLight; }
@@ -347,6 +353,8 @@ private:
     bool _xRayEnabled = false;
     bool _isPlaybackRunning = false;
     bool _lightsEnabled = true;
+    bool _shadowsEnabled = true;
+    bool _renderCollectionChanged = false;
     bool _isHdSt = false;
 
     SdfPath _rprimPath;

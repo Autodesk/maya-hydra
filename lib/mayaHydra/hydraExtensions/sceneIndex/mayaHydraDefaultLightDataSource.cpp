@@ -63,12 +63,8 @@ public:
             // Hydra might crash when this is an empty VtValue.
         }
         else if (name == HdLightTokens->shadowCollection) {
-            // Exclude lines/points primitives from casting shadows by taking lighted paths
-            SdfPathVector lightedPaths;
-            _sceneIndex->GetLightedPrimPaths(lightedPaths);
-            HdRprimCollection coll(HdTokens->geometry, HdReprSelector(HdReprTokens->refined));
-            coll.SetRootPaths(lightedPaths);
-            v = VtValue(coll);
+            // Return nothing as shadow casting is disabled for default light
+            v = VtValue();
         }
         else if (name == HdLightTokens->shadowParams) {
             HdxShadowParams shadowParams;

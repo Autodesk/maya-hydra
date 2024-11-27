@@ -580,8 +580,6 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
         _isPlaybackRunning = playbackRunning;
     }
 
-    bool renderItemCollectionChanged = false;
-
     // First loop to get rid of removed items
     constexpr int kInvalidId = 0;
     for (size_t i = 0; i < scene.mRemovalCount; i++) {
@@ -591,7 +589,6 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
         MayaHydraRenderItemAdapterPtr ria = nullptr;
         if (_GetRenderItem(fastId, ria)) {
             _RemoveRenderItem(ria);
-            renderItemCollectionChanged = true;
         }
         assert(ria != nullptr);
     }
@@ -631,8 +628,6 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
             ria->SetIsRenderITemAnaiSkydomeLightTriangleShape(isRenderItem_aiSkyDomeLightTriangleShape(ri));
 
             _AddRenderItem(ria);
-
-            renderItemCollectionChanged = true;
         }
 
         SdfPath material;
@@ -661,13 +656,6 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
         ria->UpdateFromDelta(data);
         if (flags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
             ria->UpdateTransform(ri);
-        }
-
-        // Mark collection dirty for shadow casting
-        if (renderItemCollectionChanged) {
-            _MapAdapter<MayaHydraLightAdapter>(
-                [](MayaHydraLightAdapter* a) { a->MarkDirty(HdLight::DirtyCollection); },
-                _lightAdapters);
         }
     }
 }
@@ -973,6 +961,8 @@ LightDagPathMap MayaHydraSceneIndex::_GetGlobalLightPaths() const
 
 void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
 {
+    _renderCollectionChanged = false;
+
     const bool xRayEnabled = (context.getDisplayStyle() & MHWRender::MFrameContext::kXray);
     if (xRayEnabled != _xRayEnabled) {
         _xRayEnabled = xRayEnabled;
@@ -1190,6 +1180,8 @@ void MayaHydraSceneIndex::InsertPrim(
     // source and empty type.
     _AddPrimAncestors(id);
     AddPrims({ { id, typeId, dataSource } });
+
+    _renderCollectionChanged = true;
 }
 
 void MayaHydraSceneIndex::_AddPrimAncestors(const SdfPath& path)
@@ -1240,6 +1232,8 @@ void MayaHydraSceneIndex::_MarkPrimDirty(
 void MayaHydraSceneIndex::RemovePrim(const SdfPath& id)
 {
     RemovePrims({ id });
+
+    _renderCollectionChanged = true;
 }
 
 void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
@@ -1437,6 +1431,13 @@ void MayaHydraSceneIndex::GetLightedPrimPaths(SdfPathVector& lightedPrimPaths)
             }
         },
         _renderItemsAdapters);
+    _MapAdapter<MayaHydraDagAdapter>(
+        [&](MayaHydraDagAdapter* a) {
+            if (a->HasType(HdPrimTypeTokens->mesh)) {
+                lightedPrimPaths.emplace_back(a->GetID());
+            }
+        },
+        _shapeAdapters);
 }
 
 bool MayaHydraSceneIndex::_GetRenderItemMaterial(
@@ -1842,5 +1843,15 @@ VtValue MayaHydraSceneIndex::_CreateMayaFacesSelectionMaterial()
     networkMap.map.insert({ HdMaterialTerminalTokens->surface, std::move(network) });
     networkMap.terminals.push_back(MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath);
     return VtValue(networkMap);
+}
+
+void MayaHydraSceneIndex::UpdateLightsShadowCollection()
+{
+    // Mark shadowCollection as dirty if any render prim is added/removed
+    if (_renderCollectionChanged && _shadowsEnabled) {
+        _MapAdapter<MayaHydraLightAdapter>(
+            [](MayaHydraLightAdapter* a) { a->MarkDirty(HdLight::DirtyCollection); },
+            _lightAdapters);
+    }
 }
 PXR_NAMESPACE_CLOSE_SCOPE

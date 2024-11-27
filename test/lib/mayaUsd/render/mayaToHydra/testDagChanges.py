@@ -31,7 +31,7 @@ class DagChangesBaseTestCase(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_PERCENT = 0.2
 
     def rprimPath(self, mayaPath):
-        return '/MayaHydraViewportRenderer/rprims/Lighted' + mayaPath.replace('|', '/')
+        return '/MayaHydraViewportRenderer/rprims' + mayaPath.replace('|', '/')
 
 class TestDagChanges(DagChangesBaseTestCase):
     _file = __file__

@@ -176,7 +176,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         # Hydra call made is HdRenderIndex::GetRprimIds(), which sorts
         # according to std::less<SdfPath>, which will produce
         # lexicographically-ordered paths.
-        self.cubeRprim = self.getIndex()[0]
+        self.cubeRprim = self.getIndex()[1]
         cmds.select(clear=1)
         cmds.refresh()
         self.assertVisible(self.cubeRprim)
