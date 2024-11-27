@@ -15,6 +15,8 @@
 
 #include "testUtils.h"
 
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
+
 #include <maya/M3dView.h>
 #include <maya/MPoint.h>
 
@@ -51,7 +53,7 @@ void pick(const Ufe::Path& selectedPath, const Ufe::Path& markerPath, bool check
     const auto snSi = findSelectionSceneIndexInTree(siRoot);
     ASSERT_TRUE(snSi);
 
-    const auto sceneIndexPaths = snSi->SceneIndexPaths(selectedPath);
+    const auto sceneIndexPaths = Fvp::sceneIndexPaths(selectedPath);
     ASSERT_FALSE(sceneIndexPaths.empty());
 
     std::vector<std::pair<SdfPath, HdSceneIndexPrim>> prims;
@@ -74,7 +76,7 @@ void pick(const Ufe::Path& selectedPath, const Ufe::Path& markerPath, bool check
     // Perform a pick
     //======================================================================
 
-    const auto markerSceneIndexPath = snSi->SceneIndexPath(markerPath);
+    const auto markerSceneIndexPath = Fvp::sceneIndexPath(markerPath);
     ASSERT_FALSE(markerSceneIndexPath.IsEmpty());
 
     const auto markerPrim = siRoot->GetPrim(markerSceneIndexPath);

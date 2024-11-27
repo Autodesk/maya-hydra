@@ -4,7 +4,7 @@
 #include <mayaHydraLib/mayaHydra.h>
 
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
-#include <flowViewport/sceneIndex/fvpMergingSceneIndex.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include <pxr/imaging/hdx/selectionSceneIndexObserver.h>
 #include <pxr/imaging/hd/tokens.h>
@@ -140,10 +140,6 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndexDirty)
     ASSERT_EQ(ccHierarchy->children().size(), 2u);
 
     const auto& si = GetTerminalSceneIndices();
-    auto isFvpMergingSceneIndex = SceneIndexDisplayNamePred(
-        "Flow Viewport Merging Scene Index");
-    auto mergingSi = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
-        findSceneIndexInTree(si.front(), isFvpMergingSceneIndex));
     auto isFvpWireframeHighlightSceneIndex = SceneIndexDisplayNamePred(
         "Flow Viewport Wireframe Selection Highlight Scene Index");
     auto whSi = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(
@@ -173,8 +169,8 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndexDirty)
     sn->append(sphereItem);
 
     // Find the sphere in the Hydra scene index scene.
-    auto sphereSiPath = mergingSi->SceneIndexPath(spherePath);
-    auto cubeSiPath = mergingSi->SceneIndexPath(scParentPath + "cube");
+    auto sphereSiPath = Fvp::sceneIndexPath(spherePath);
+    auto cubeSiPath = Fvp::sceneIndexPath(scParentPath + "cube");
 
     // Sphere is selected.
     hdSn = ssio.GetSelection();
@@ -201,9 +197,9 @@ TEST(FlowViewport, wireframeSelectionHighlightSceneIndexDirty)
 
     sn->replaceWith(newSn);
 
-    auto ccSiPath = mergingSi->SceneIndexPath(ccParentPath);
-    auto coneSiPath = mergingSi->SceneIndexPath(ccParentPath + "cone");
-    auto cylinderSiPath = mergingSi->SceneIndexPath(ccParentPath + "cylinder");
+    auto ccSiPath = Fvp::sceneIndexPath(ccParentPath);
+    auto coneSiPath = Fvp::sceneIndexPath(ccParentPath + "cone");
+    auto cylinderSiPath = Fvp::sceneIndexPath(ccParentPath + "cylinder");
 
     // Cone and cylinder parent is selected.
     // Cone is not selected.
