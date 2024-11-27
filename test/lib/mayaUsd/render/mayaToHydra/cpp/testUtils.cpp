@@ -528,4 +528,9 @@ bool visibility(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
     return (handle ? handle->GetTypedValue(0.0f) : true);
 }
 
+bool contains(const PXR_NS::SdfPathVector& paths, const PXR_NS::SdfPath& path)
+{
+    return std::count(paths.begin(), paths.end(), path) > 0;
+}
+
 } // namespace MAYAHYDRA_NS_DEF

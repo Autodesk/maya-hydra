@@ -62,6 +62,8 @@
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
+#include <iostream>
+
 namespace
 {
 // Pick handler for the Maya scene index.  As the Maya pick handler and the
@@ -475,6 +477,8 @@ public:
 
     Fvp::PrimSelections 
     UfePathToPrimSelections(const Ufe::Path& appPath) const override {
+        std::cout << "PPT: in MayaPathMapper::UfePathToPrimSelections("
+                  << Ufe::PathString::string(appPath) << ")" << std::endl;
         auto litPaths = _piSi.UfePathToPrimSelectionsLit(appPath);
         auto unlitPaths = _piSi.UfePathToPrimSelections(appPath);
         unlitPaths.insert(unlitPaths.end(), litPaths.begin(), litPaths.end());
@@ -802,9 +806,14 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg("MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
 
+    std::cout << "PPT: in MayaHydraSceneIndex::UfePathToPrimSelections("
+              << Ufe::PathString::string(appPath) << ")" << std::endl;
+
     // We only handle Maya objects, so if the UFE path is not a Maya object,
     // early out with failure.
     if (appPath.runTimeId() != UfeExtensions::getMayaRunTimeId()) {
+        std::cout << "PPT:     early out, not a Maya run-time UFE path."
+                  << std::endl;
         return {};
     }
 
@@ -850,6 +859,13 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelectionsLit(
     // UfePathToPrimSelections() would allow factoring out into a single path
     // mapper for Usd and Maya (see registration.cpp).
     if (appPath.runTimeId() != UfeExtensions::getMayaRunTimeId()) {
+        return {};
+    }
+
+    // If the Maya node described by the appPath is in fact a path mapper
+    // registry entry, nothing to do, the path mapper for that entry will
+    // handle things.
+    if (Fvp::PathMapperRegistry::Instance().HasMapper(appPath)) {
         return {};
     }
 

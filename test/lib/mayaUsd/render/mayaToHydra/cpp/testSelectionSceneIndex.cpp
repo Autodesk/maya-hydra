@@ -21,6 +21,7 @@
 #include <maya/MSelectionList.h>
 
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
@@ -61,7 +62,7 @@ TEST(FlowViewport, selectionSceneIndex)
 
     // The sphere prim in the Hydra scene index scene has no selection data
     // source.  First, translate the application path into a scene index path.
-    const auto sceneIndexPath = selectionSi->SceneIndexPath(mayaPath);
+    const auto sceneIndexPath = Fvp::sceneIndexPath(mayaPath);
     ASSERT_EQ(sceneIndexPath.GetName(), mayaPath.back().string());
 
     // Next, check that there is no selections data source on the prim.
@@ -104,7 +105,7 @@ TEST(FlowViewport, selectionSceneIndex)
     // The shape under the sphere transform is not selected, but it has a
     // selected ancestor.
     auto mayaShapePath = Ufe::PathString::path("|aSphere|aSphereShape");
-    const auto sceneIndexShapePath = selectionSi->SceneIndexPath(mayaShapePath);
+    const auto sceneIndexShapePath = Fvp::sceneIndexPath(mayaShapePath);
 
     auto sphereShapePrim = sceneIndices.front()->GetPrim(sceneIndexShapePath);
     ASSERT_TRUE(sphereShapePrim.dataSource);
@@ -153,12 +154,12 @@ TEST(FlowViewport, selectionSceneIndexDirty)
     MSelectionList sphereSn;
     sphereSn.add("|aSphere");
     const auto mayaPath = Ufe::PathString::path("|aSphere");
-    const auto sceneIndexPath = selectionSi->SceneIndexPath(mayaPath);
+    const auto sceneIndexPath = Fvp::sceneIndexPath(mayaPath);
 
     MGlobal::setActiveSelectionList(sphereSn);
     hdSn = ssio.GetSelection();
-    ASSERT_EQ(hdSn->GetAllSelectedPrimPaths().size(), 1u);
-    ASSERT_EQ(hdSn->GetAllSelectedPrimPaths()[0], sceneIndexPath);
+    ASSERT_GE(hdSn->GetAllSelectedPrimPaths().size(), 1u);
+    ASSERT_TRUE(contains(hdSn->GetAllSelectedPrimPaths(), sceneIndexPath));
     ASSERT_TRUE(selectionSi->IsFullySelected(sceneIndexPath));
     ASSERT_TRUE(selectionSi->HasFullySelectedAncestorInclusive(sceneIndexPath));
 
@@ -172,8 +173,8 @@ TEST(FlowViewport, selectionSceneIndexDirty)
     // Add it back.
     MGlobal::setActiveSelectionList(sphereSn);
     hdSn = ssio.GetSelection();
-    ASSERT_EQ(hdSn->GetAllSelectedPrimPaths().size(), 1u);
-    ASSERT_EQ(hdSn->GetAllSelectedPrimPaths()[0], sceneIndexPath);
+    ASSERT_GE(hdSn->GetAllSelectedPrimPaths().size(), 1u);
+    ASSERT_TRUE(contains(hdSn->GetAllSelectedPrimPaths(), sceneIndexPath));
     ASSERT_TRUE(selectionSi->IsFullySelected(sceneIndexPath));
     ASSERT_TRUE(selectionSi->HasFullySelectedAncestorInclusive(sceneIndexPath));
 

@@ -16,8 +16,8 @@
 
 #include <mayaHydraLib/mayaHydra.h>
 
-#include <flowViewport/sceneIndex/fvpMergingSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
@@ -68,10 +68,6 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     ASSERT_FALSE(terminalSceneIndices.empty());
     SceneIndexInspector inspector(terminalSceneIndices.front());
 
-    auto isFvpMergingSceneIndexPredicate = SceneIndexDisplayNamePred("Flow Viewport Merging Scene Index");
-    auto fvpMergingSceneIndex = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
-        findSceneIndexInTree(terminalSceneIndices.front(), isFvpMergingSceneIndexPredicate));
-
     auto isFvpWireframeSelectionHighlightSceneIndex = SceneIndexDisplayNamePred(
         "Flow Viewport Wireframe Selection Highlight Scene Index");
     auto fvpWireframeSelectionHighlightSceneIndex = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(
@@ -113,7 +109,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     auto testInstancerDirectHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
         ufeSelection->replaceWith(instancerItem);
 
-        auto instancerPrimSelections = fvpMergingSceneIndex->UfePathToPrimSelections(instancerPath);
+        auto instancerPrimSelections = Fvp::ufePathToPrimSelections(instancerPath);
         ASSERT_EQ(instancerPrimSelections.size(), 1u);
         auto instancerPrimPath = instancerPrimSelections.front().primPath;
 
@@ -134,7 +130,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
     
     // Select point instancer ancestors
     auto testInstancerIndirectHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
-        auto instancerPrimPaths = fvpMergingSceneIndex->SceneIndexPaths(instancerPath);
+        auto instancerPrimPaths = Fvp::sceneIndexPaths(instancerPath);
         ASSERT_EQ(instancerPrimPaths.size(), 1u);
     
         // Validate scene structure
@@ -143,7 +139,7 @@ TEST(PointInstancingWireframeHighlight, pointInstancer)
         assertSelectionHighlightCorrectness(inspector.GetSceneIndex(), selectionHighlightPath, selectionHighlightMirrorTag, HdReprTokens->refinedWire);
     };
     auto testInstancerNoHighlightFn = [&](const Ufe::SceneItem::Ptr& instancerItem, const Ufe::Path& instancerPath) -> void {
-        auto instancerPrimPaths = fvpMergingSceneIndex->SceneIndexPaths(instancerPath);
+        auto instancerPrimPaths = Fvp::sceneIndexPaths(instancerPath);
         ASSERT_EQ(instancerPrimPaths.size(), 1u);
 
         // Ensure there is no selection highlight mirror for the prim
@@ -176,10 +172,6 @@ TEST(PointInstancingWireframeHighlight, instance)
     const SceneIndicesVector& terminalSceneIndices = GetTerminalSceneIndices();
     ASSERT_FALSE(terminalSceneIndices.empty());
     SceneIndexInspector inspector(terminalSceneIndices.front());
-
-    auto isFvpMergingSceneIndexPredicate = SceneIndexDisplayNamePred("Flow Viewport Merging Scene Index");
-    auto fvpMergingSceneIndex = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
-        findSceneIndexInTree(terminalSceneIndices.front(), isFvpMergingSceneIndexPredicate));
 
     auto isFvpWireframeSelectionHighlightSceneIndex = SceneIndexDisplayNamePred(
         "Flow Viewport Wireframe Selection Highlight Scene Index");
@@ -218,7 +210,7 @@ TEST(PointInstancingWireframeHighlight, instance)
     auto testInstanceHighlightFn = [&](const Ufe::SceneItem::Ptr& instanceItem, const Ufe::Path& instancePath) -> void {
         ufeSelection->replaceWith(instanceItem);
 
-        auto instancePrimSelections = fvpMergingSceneIndex->UfePathToPrimSelections(instancePath);
+        auto instancePrimSelections = Fvp::ufePathToPrimSelections(instancePath);
         ASSERT_EQ(instancePrimSelections.size(), 1u);
         auto instancerPrimPath = instancePrimSelections.front().primPath;
 
@@ -257,10 +249,6 @@ TEST(PointInstancingWireframeHighlight, prototype)
     ASSERT_FALSE(terminalSceneIndices.empty());
     SceneIndexInspector inspector(terminalSceneIndices.front());
 
-    auto isFvpMergingSceneIndexPredicate = SceneIndexDisplayNamePred("Flow Viewport Merging Scene Index");
-    auto fvpMergingSceneIndex = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
-        findSceneIndexInTree(terminalSceneIndices.front(), isFvpMergingSceneIndexPredicate));
-
     auto isFvpWireframeSelectionHighlightSceneIndex = SceneIndexDisplayNamePred(
         "Flow Viewport Wireframe Selection Highlight Scene Index");
     auto fvpWireframeSelectionHighlightSceneIndex = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(
@@ -298,7 +286,7 @@ TEST(PointInstancingWireframeHighlight, prototype)
     auto testPrototypeHighlightFn = [&](const Ufe::SceneItem::Ptr& prototypeItem, const Ufe::Path& prototypePath) -> void {
         ufeSelection->replaceWith(prototypeItem);
 
-        auto prototypePrimSelections = fvpMergingSceneIndex->UfePathToPrimSelections(prototypePath);
+        auto prototypePrimSelections = Fvp::ufePathToPrimSelections(prototypePath);
         // Original prim + 4 propagated prototypes
         EXPECT_EQ(prototypePrimSelections.size(), 1u + 4u);
 
@@ -327,10 +315,6 @@ TEST(PointInstancingWireframeHighlight, multiInstances)
     const SceneIndicesVector& terminalSceneIndices = GetTerminalSceneIndices();
     ASSERT_FALSE(terminalSceneIndices.empty());
     SceneIndexInspector inspector(terminalSceneIndices.front());
-
-    auto isFvpMergingSceneIndexPredicate = SceneIndexDisplayNamePred("Flow Viewport Merging Scene Index");
-    auto fvpMergingSceneIndex = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
-        findSceneIndexInTree(terminalSceneIndices.front(), isFvpMergingSceneIndexPredicate));
 
     auto isFvpWireframeSelectionHighlightSceneIndex = SceneIndexDisplayNamePred(
         "Flow Viewport Wireframe Selection Highlight Scene Index");
@@ -369,7 +353,7 @@ TEST(PointInstancingWireframeHighlight, multiInstances)
     ufeSelection->append(topInstancerFirstInstanceItem);
     ufeSelection->append(topInstancerSecondInstanceItem);
 
-    auto firstInstancePrimSelections = fvpMergingSceneIndex->UfePathToPrimSelections(topInstancerFirstInstancePath);
+    auto firstInstancePrimSelections = Fvp::ufePathToPrimSelections(topInstancerFirstInstancePath);
     ASSERT_EQ(firstInstancePrimSelections.size(), 1u);
     auto instancerPrimPath = firstInstancePrimSelections.front().primPath;
 

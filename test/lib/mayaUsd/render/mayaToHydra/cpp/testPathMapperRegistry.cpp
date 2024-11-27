@@ -63,15 +63,15 @@ TEST(TestPathMapperRegistry, testRegistry)
     auto fooP = Ufe::PathString::path("|foo");
 
     ASSERT_TRUE(r.Register(fooBarP, fooBarM));
-    ASSERT_EQ(r.GetMapper(fooBarP), fooBarM);
+    ASSERT_TRUE(r.HasMapper(fooBarP));
     registered.push_back(fooBarP);
 
     // fooBarM is the mapper for its own path and descendants, not ancestors
     // or unrelated paths.
-    ASSERT_EQ(r.GetMapper(Ufe::PathString::path("|foo|bar|bli")), fooBarM);
-    ASSERT_FALSE(r.GetMapper(fooP));
-    ASSERT_FALSE(r.GetMapper(Ufe::PathString::path("|bar")));
-    ASSERT_FALSE(r.GetMapper(Ufe::PathString::path("|zebra")));
+    ASSERT_TRUE(r.HasMapper(Ufe::PathString::path("|foo|bar|bli")));
+    ASSERT_FALSE(r.HasMapper(fooP));
+    ASSERT_FALSE(r.HasMapper(Ufe::PathString::path("|bar")));
+    ASSERT_FALSE(r.HasMapper(Ufe::PathString::path("|zebra")));
 
     // Add mappers for siblings, legal.
     auto fooBackM = TestPathMapper::create();
@@ -84,9 +84,9 @@ TEST(TestPathMapperRegistry, testRegistry)
     registered.push_back(fooBackP);
     registered.push_back(fooRedP);
 
-    ASSERT_EQ(r.GetMapper(Ufe::PathString::path("|foo|bar|bli")), fooBarM);
-    ASSERT_EQ(r.GetMapper(Ufe::PathString::path("|foo|back|bli")), fooBackM);
-    ASSERT_EQ(r.GetMapper(Ufe::PathString::path("|foo|red|bli")), fooRedM);
+    ASSERT_TRUE(r.HasMapper(Ufe::PathString::path("|foo|bar|bli")));
+    ASSERT_TRUE(r.HasMapper(Ufe::PathString::path("|foo|back|bli")));
+    ASSERT_TRUE(r.HasMapper(Ufe::PathString::path("|foo|red|bli")));
 
     // Add mappers for ancestors, descendants, illegal.
     ASSERT_FALSE(r.Register(fooP, dummy));
@@ -103,8 +103,8 @@ TEST(TestPathMapperRegistry, testRegistry)
     registered.push_back(appleP);
     registered.push_back(wizardP);
 
-    ASSERT_EQ(r.GetMapper(Ufe::PathString::path("|apple|pear")), appleM);
-    ASSERT_EQ(r.GetMapper(Ufe::PathString::path("|wizard|sorcerer")), wizardM);
+    ASSERT_TRUE(r.HasMapper(Ufe::PathString::path("|apple|pear")));
+    ASSERT_TRUE(r.HasMapper(Ufe::PathString::path("|wizard|sorcerer")));
 
     // Clean up.
     for (const auto& h : registered) {

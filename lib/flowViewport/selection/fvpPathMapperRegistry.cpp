@@ -34,6 +34,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_INSTANTIATE_SINGLETON(Fvp::PathMapperRegistry);
 PXR_NAMESPACE_CLOSE_SCOPE
 
+PXR_NAMESPACE_USING_DIRECTIVE
+
 namespace FVP_NS_DEF {
 
 /* static */
@@ -58,6 +60,17 @@ bool PathMapperRegistry::Unregister(const Ufe::Path& prefix)
     return mappers.remove(prefix) != nullptr;
 }
 
+bool PathMapperRegistry::Update(const Ufe::Path& oldPrefix, const Ufe::Path& newPrefix)
+{
+    auto mapper = GetMapper(oldPrefix);
+    if (!mapper) {
+        return false;
+    }
+    TF_AXIOM(Unregister(oldPrefix));
+    TF_AXIOM(Register(newPrefix, mapper));
+    return true;
+}
+
 void PathMapperRegistry::SetFallbackMapper(
     const PathMapperConstPtr& pathMapper
 )
@@ -70,14 +83,12 @@ PathMapperConstPtr PathMapperRegistry::GetFallbackMapper() const
     return fallbackMapper;
 }
 
-PathMapperConstPtr PathMapperRegistry::GetMapper(const Ufe::Path& path) const
+PathMapperConstPtr PathMapperRegistry::_GetMapper(const Ufe::Path& path) const
 {
-    if (path.empty()) {
-        return nullptr;
-    }
+    TF_AXIOM(!path.empty());
 
     if (mappers.empty()) {
-        return fallbackMapper;
+        return nullptr;
     }
 
     // We are looking for the closest ancestor of the argument.  Internal trie
@@ -90,7 +101,7 @@ PathMapperConstPtr PathMapperRegistry::GetMapper(const Ufe::Path& path) const
         // If we've reached a trie leaf node before the end of our path, there
         // is no trie node with data as ancestor of the path.
         if (!child) {
-            return fallbackMapper;
+            return nullptr;
         }
         trieNode = child;
 
@@ -101,16 +112,26 @@ PathMapperConstPtr PathMapperRegistry::GetMapper(const Ufe::Path& path) const
     }
     // We reached the end of the parent path without returning true, therefore
     // there are no ancestors.
-    return fallbackMapper;
+    return nullptr;
 }
 
-Fvp::PrimSelections ufePathToPrimSelections(const Ufe::Path& appPath)
+PathMapperConstPtr PathMapperRegistry::GetMapper(const Ufe::Path& path) const
 {
-    PXR_NAMESPACE_USING_DIRECTIVE
+    if (path.empty()) {
+        return nullptr;
+    }
 
-    Fvp::PrimSelections primSelections;
+    auto mapper = _GetMapper(path);
+    return mapper ? mapper : fallbackMapper;
+}
 
-    auto mapper = Fvp::PathMapperRegistry::Instance().GetMapper(appPath);
+PrimSelections PathMapperRegistry::UfePathToPrimSelections(
+    const Ufe::Path& appPath
+)
+{
+    PrimSelections primSelections;
+
+    auto mapper = GetMapper(appPath);
         
     if (!mapper) {
         TF_WARN("No registered mapping for path %s, no prim path returned.", Ufe::PathString::string(appPath).c_str());
@@ -118,11 +139,53 @@ Fvp::PrimSelections ufePathToPrimSelections(const Ufe::Path& appPath)
     else {
         primSelections = mapper->UfePathToPrimSelections(appPath);
         if (primSelections.empty()) {
-            TF_WARN("Mapping for path %s returned no prim path.", Ufe::PathString::string(appPath).c_str());
+
+            mapper = GetFallbackMapper();
+        
+            if (!mapper) {
+                TF_WARN("No registered fallback mapping, no prim path returned.");
+            }
+            else {
+                primSelections = mapper->UfePathToPrimSelections(appPath);
+                if (primSelections.empty()) {
+                    TF_WARN("Mapping for path %s returned no prim path.", Ufe::PathString::string(appPath).c_str());
+                }
+            }
         }
     }
 
     return primSelections;
+}
+
+bool PathMapperRegistry::HasMapper(const Ufe::Path& path) const
+{
+    return _GetMapper(path) != nullptr;
+}
+
+PrimSelections ufePathToPrimSelections(const Ufe::Path& appPath)
+{
+    return PathMapperRegistry::Instance().UfePathToPrimSelections(appPath);
+}
+
+SdfPathVector sceneIndexPaths(const Ufe::Path& appPath)
+{
+    auto primSelections = ufePathToPrimSelections(appPath);
+
+    SdfPathVector outVector;
+    outVector.reserve(primSelections.size());
+    for (const auto& primSelection : primSelections) {
+        outVector.emplace_back(primSelection.primPath);
+    }
+    return outVector;
+}
+
+SdfPath sceneIndexPath(const Ufe::Path& appPath)
+{
+    auto primSelections = ufePathToPrimSelections(appPath);
+    if (!TF_VERIFY(primSelections.size() <= 2u)) {
+        throw PrimPathsCountOutOfRangeException(0, 2, primSelections.size());
+    }
+    return primSelections.empty() ? SdfPath() : primSelections.front().primPath;
 }
 
 }

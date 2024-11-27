@@ -15,6 +15,8 @@
 
 #include "testUtils.h"
 
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
+
 #include <mayaHydraLib/hydraUtils.h>
 
 #include <ufe/path.h>
@@ -25,20 +27,6 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace MayaHydra;
-
-namespace {
-
-SdfPath fromAppPath(const Ufe::Path& appPath)
-{
-    auto siRoot = GetTerminalSceneIndices().front();
-
-    // Translate the application path into a scene index path using the
-    // selection scene index.
-    const auto snSi = findSelectionSceneIndexInTree(siRoot);
-    return snSi->SceneIndexPath(appPath);
-}
-
-}
 
 TEST(TestHydraPrim, fromAppPath)
 {
@@ -55,7 +43,7 @@ TEST(TestHydraPrim, fromAppPath)
     const auto snSi = findSelectionSceneIndexInTree(siRoot);
     ASSERT_TRUE(snSi);
 
-    const auto sceneIndexPath = snSi->SceneIndexPath(appPath);
+    const auto sceneIndexPath = Fvp::sceneIndexPath(appPath);
 
     ASSERT_FALSE(sceneIndexPath.IsEmpty());
 }
@@ -69,7 +57,7 @@ TEST(TestHydraPrim, isFound)
     ASSERT_EQ(argc, 1);
     const Ufe::Path appPath(Ufe::PathString::path(argv[0]));
 
-    const auto sceneIndexPath = fromAppPath(appPath);
+    const auto sceneIndexPath = Fvp::sceneIndexPath(appPath);
 
     ASSERT_TRUE(siRoot->GetPrim(sceneIndexPath).dataSource);
 }
@@ -83,7 +71,7 @@ TEST(TestHydraPrim, isNotFound)
     ASSERT_EQ(argc, 1);
     const Ufe::Path appPath(Ufe::PathString::path(argv[0]));
 
-    const auto sceneIndexPath = fromAppPath(appPath);
+    const auto sceneIndexPath = Fvp::sceneIndexPath(appPath);
 
     ASSERT_FALSE(siRoot->GetPrim(sceneIndexPath).dataSource);
 }
@@ -99,7 +87,7 @@ TEST(TestHydraPrim, translation)
     const GfVec3d expectedTranslation(
         std::stod(argv[1]), std::stod(argv[2]), std::stod(argv[3]));
 
-    const auto sceneIndexPath = fromAppPath(appPath);
+    const auto sceneIndexPath = Fvp::sceneIndexPath(appPath);
     const auto prim = siRoot->GetPrim(sceneIndexPath);
     GfMatrix4d m;
     ASSERT_TRUE(MayaHydra::GetXformMatrixFromPrim(prim, m));

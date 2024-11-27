@@ -220,6 +220,7 @@ class TestUsdPointInstancingIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
             # Native instanced USD object
             self.proxyShapePathStr + ',/cubeHierarchies/cubes_1',
             # Generated cube
+            self.cubeGenPath,
             self.cubeGenPath + ',/cube_0_0_0']
 
         self.assertIsolateSelect(modelPanel, visible, scene)

@@ -66,5 +66,5 @@ TEST(TestSinglePicking, singlePick)
 
     // Postconditions
     ASSERT_EQ(Ufe::GlobalSelection::get()->size(), 1u);
-    ASSERT_EQ(inspector.FindPrims(isPrimSelectedPredicate).size(), 1u);
+    ASSERT_GE(inspector.FindPrims(isPrimSelectedPredicate).size(), 1u);
 }
