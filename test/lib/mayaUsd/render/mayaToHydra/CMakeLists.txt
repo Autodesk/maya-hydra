@@ -164,6 +164,8 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_VP2_RENDER_DELEGATE})
             "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
 
             "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+
+            "MAYA_HAS_RENDER_ITEM_CULL_MODE_API=${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}"
     )
 
     # Assign a CTest label to these tests for easy filtering.
@@ -201,6 +203,8 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
 
             # Use standard surface as default for now
             "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
+
+            "MAYA_HAS_RENDER_ITEM_CULL_MODE_API=${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}"
     )
 
     # Add a ctest label to these tests for easy filtering.
