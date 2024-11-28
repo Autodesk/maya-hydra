@@ -159,6 +159,9 @@ PrimSelections PathMapperRegistry::UfePathToPrimSelections(
 
 bool PathMapperRegistry::HasMapper(const Ufe::Path& path) const
 {
+    if (path.empty()) {
+        return false;
+    }
     return _GetMapper(path) != nullptr;
 }
 
