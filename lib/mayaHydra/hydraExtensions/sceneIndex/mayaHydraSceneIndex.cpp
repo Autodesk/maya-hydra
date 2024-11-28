@@ -235,25 +235,6 @@ namespace {
         return sdfDagPath.AppendPath(inPath);
     }
 
-    ///Returns false if this object should not be lighted, true if it should be lighted
-    template<class T> bool shouldBeLighted(const T& src);
-    //Template specialization for MDagPath
-    template<> inline bool shouldBeLighted<MDagPath>(const MDagPath& dag) {
-        return (MFnDependencyNode(dag.node()).typeName().asChar() == TfToken("mesh"));
-    }
-    //Template specialization for MRenderItem
-    template<> inline bool shouldBeLighted<MRenderItem>(const MRenderItem& ri) {
-
-        //Special case to recognize the Arnold skydome light
-        if (isRenderItem_aiSkyDomeLightTriangleShape(ri)) {
-            return false;//Don't light the sky dome light shape
-        }
-
-        return (MHWRender::MGeometry::Primitive::kLines != ri.primitive()
-            && MHWRender::MGeometry::Primitive::kLineStrip != ri.primitive()
-            && MHWRender::MGeometry::Primitive::kPoints != ri.primitive());
-    }
-
     template<class T>
     SdfPath GetMayaPrimPath(const T& src)
     {
@@ -1424,19 +1405,13 @@ void MayaHydraSceneIndex::_RemoveRenderItem(const MayaHydraRenderItemAdapterPtr&
 
 void MayaHydraSceneIndex::GetLightedPrimPaths(SdfPathVector& lightedPrimPaths)
 {
-    _MapAdapter<MayaHydraRenderItemAdapter>(
-        [&](MayaHydraRenderItemAdapter* a) {
-            if (a->GetPrimitive() == MHWRender::MGeometry::Primitive::kTriangles) {
+    _MapAdapter<MayaHydraAdapter>(
+        [&](MayaHydraAdapter* a) {
+            if (a->WantBeLighted()) {
                 lightedPrimPaths.emplace_back(a->GetID());
             }
         },
-        _renderItemsAdapters);
-    _MapAdapter<MayaHydraDagAdapter>(
-        [&](MayaHydraDagAdapter* a) {
-            if (a->HasType(HdPrimTypeTokens->mesh)) {
-                lightedPrimPaths.emplace_back(a->GetID());
-            }
-        },
+        _renderItemsAdapters,
         _shapeAdapters);
 }
 

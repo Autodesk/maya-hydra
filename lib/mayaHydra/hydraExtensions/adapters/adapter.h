@@ -117,6 +117,8 @@ public:
     MAYAHYDRALIB_API
     virtual GfVec4f GetDisplayColor() const { return {1.f,1.f,1.f,1.f}; }
 
+    virtual bool WantBeLighted() const { return false; }
+
 protected:
     SdfPath                  _id;
     std::vector<MCallbackId> _callbacks;

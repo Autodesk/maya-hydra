@@ -575,6 +575,19 @@ HdCullStyle MayaHydraRenderItemAdapter::GetCullStyle() const
 #endif
 }
 
+bool MayaHydraRenderItemAdapter::WantBeLighted() const
+{
+    // Special case to recognize the Arnold skydome light
+    if ((_isArnoldSkyDomeLightTriangleShape)) {
+        return false; // Don't light the sky dome light shape
+    }
+
+    return (
+        MHWRender::MGeometry::Primitive::kLines != _primitive
+        && MHWRender::MGeometry::Primitive::kLineStrip != _primitive
+        && MHWRender::MGeometry::Primitive::kPoints != _primitive);
+}
+
 ///////////////////////////////////////////////////////////////////////
 // TF_REGISTRY
 ///////////////////////////////////////////////////////////////////////

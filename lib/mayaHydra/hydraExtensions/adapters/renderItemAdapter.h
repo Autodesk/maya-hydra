@@ -173,6 +173,8 @@ public:
     MAYAHYDRALIB_API
     virtual TfToken GetRenderTag() const override;
 
+    bool WantBeLighted() const override;
+
     MAYAHYDRALIB_API
     SdfPath& GetMaterial() { return _material; }
 
