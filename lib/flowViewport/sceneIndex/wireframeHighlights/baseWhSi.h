@@ -36,23 +36,18 @@ namespace FVP_NS_DEF {
 
 // Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
 // type in PXR_NS.
-class BaseWireframeHighlightSceneIndex;
-typedef PXR_NS::TfRefPtr<BaseWireframeHighlightSceneIndex> BaseWireframeHighlightSceneIndexRefPtr;
-typedef PXR_NS::TfRefPtr<const BaseWireframeHighlightSceneIndex> BaseWireframeHighlightSceneIndexConstRefPtr;
+class BaseWhSi;
+typedef PXR_NS::TfRefPtr<BaseWhSi> BaseWhSiRefPtr;
+typedef PXR_NS::TfRefPtr<const BaseWhSi> BaseWhSiConstRefPtr;
 
-struct SubScene {
-    std::map<PXR_NS::SdfPath, PXR_NS::HdSceneIndexPrim> prims;
-    std::map<PXR_NS::SdfPath, PXR_NS::SdfPathVector> childPaths;
-};
-
-/// \class BaseWireframeHighlightSceneIndex
+/// \class BaseWhSi
 ///
 /// Uses Hydra HdRepr to add wireframe representation to selected objects
 /// and their descendants.
 ///
-class BaseWireframeHighlightSceneIndex 
+class BaseWhSi 
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
-    , public Fvp::InputSceneIndexUtils<BaseWireframeHighlightSceneIndex>
+    , public Fvp::InputSceneIndexUtils<BaseWhSi>
 {
 public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;

@@ -15,6 +15,7 @@
 //
 
 #include "flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h"
+#include "flowViewport/sceneIndex/wireframeHighlights/piInstancerWhSi.h"
 #include "flowViewport/selection/fvpSelection.h"
 #include "flowViewport/fvpUtils.h"
 
@@ -23,6 +24,7 @@
 #include "wireframeHighlights/meshWireframeHighlightSi.h"
 #include "wireframeHighlights/niInstanceWireframeHighlightSi.h"
 #include "wireframeHighlights/niPrototypeWireframeHighlightSi.h"
+#include "wireframeHighlights/piInstancerWhSi.h"
 #include "wireframeHighlights/piInstancerWireframeHighlightSi.h"
 #include "wireframeHighlights/piPrototypeWireframeHighlightSi.h"
 #include <pxr/base/tf/token.h>
@@ -352,6 +354,7 @@ WireframeSelectionHighlightSceneIndex(
 
     _prefixingSceneIndex = HdPrefixingSceneIndex::New(_mergingSceneIndex, _selectionHighlightsPrefix);
     _prefixingSceneIndex->AddObserver(HdSceneIndexObserverPtr(&_mergingSceneIndexObserver));
+    _mergingSceneIndex->AddInputScene(PiInstancerWhSi::New(GetInputSceneIndex(), _wireframeColorInterface), SdfPath::AbsoluteRootPath());
 
 //     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
 //         if (prim.primType == HdPrimTypeTokens->instancer) {
@@ -747,7 +750,8 @@ WireframeSelectionHighlightSceneIndex::_PrimsDirtied(
 {
     TF_DEBUG(FVP_WIREFRAME_SELECTION_HIGHLIGHT_SCENE_INDEX)
         .Msg("WireframeSelectionHighlightSceneIndex::_PrimsDirtied() called.\n");
-
+    _SendPrimsDirtied(entries);
+    return;
     for (const auto& entry : entries) {
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
