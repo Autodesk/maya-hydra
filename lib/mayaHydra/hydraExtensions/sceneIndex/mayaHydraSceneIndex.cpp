@@ -1407,7 +1407,7 @@ void MayaHydraSceneIndex::GetLightedPrimPaths(SdfPathVector& lightedPrimPaths)
 {
     _MapAdapter<MayaHydraAdapter>(
         [&](MayaHydraAdapter* a) {
-            if (a->WantBeLighted()) {
+            if (a->Illuminated()) {
                 lightedPrimPaths.emplace_back(a->GetID());
             }
         },

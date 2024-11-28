@@ -80,7 +80,7 @@ public:
     MAYAHYDRALIB_API
     VtValue GetInstancePrimvar(const TfToken& key);
 
-    bool WantBeLighted() const override {return (MFnDependencyNode(_dagPath.node()).typeName().asChar() == TfToken("mesh")); }
+    bool Illuminated() const override { return (MFnDependencyNode(_dagPath.node()).typeName().asChar() == TfToken("mesh")); }
 
 protected:
     MAYAHYDRALIB_API

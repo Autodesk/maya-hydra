@@ -575,7 +575,7 @@ HdCullStyle MayaHydraRenderItemAdapter::GetCullStyle() const
 #endif
 }
 
-bool MayaHydraRenderItemAdapter::WantBeLighted() const
+bool MayaHydraRenderItemAdapter::Illuminated() const
 {
     // Special case to recognize the Arnold skydome light
     if ((_isArnoldSkyDomeLightTriangleShape)) {
