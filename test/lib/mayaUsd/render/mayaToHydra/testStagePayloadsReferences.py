@@ -63,6 +63,8 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         self.assertTrue(aPrim.HasAuthoredReferences())
         self.setHdStormRenderer()
 
+        self.setBasicCam(2)
+
     def setUpPayloadScene(self):
         mayaUtils.openNewScene()
         import mayaUsd_createStageWithNewLayer
@@ -90,6 +92,8 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         self.a = ufe.Hierarchy.createItem(aPath)
         self.b = ufe.Hierarchy.createItem(bPath)
  
+        self.setBasicCam(2)
+
         cmds.select(clear=True)
 
     def test_UsdStagePayloadsOnTheFly(self):
