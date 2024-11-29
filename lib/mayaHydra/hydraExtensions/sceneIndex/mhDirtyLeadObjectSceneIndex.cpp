@@ -18,6 +18,7 @@
 #include "mhDirtyLeadObjectSceneIndex.h"
 
 // Hydra headers
+#include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/usd/sdf/path.h>
@@ -71,6 +72,14 @@ void MhDirtyLeadObjectSceneIndex::_DirtyPrimSelectionRecursively(const Fvp::Prim
 
         for (const auto& childPath : GetChildPrimPaths(currPathToDirty)) {
             pathsToDirty.push(childPath);
+        }
+        
+        HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPathToDirty);
+        if (currPrim.primType == HdPrimTypeTokens->instancer) {
+            HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(currPrim.dataSource);
+            for (const auto& prototypePath : instancerTopology.GetPrototypes()->GetTypedValue(0)) {
+                pathsToDirty.push(prototypePath);
+            }
         }
     }
 }
