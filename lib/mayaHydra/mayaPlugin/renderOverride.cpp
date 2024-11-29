@@ -638,6 +638,11 @@ MStatus MtohRenderOverride::Render(
             }
         }
 
+        // Update shadow collection for lights
+        if (_mayaHydraSceneIndex) {
+            _mayaHydraSceneIndex->UpdateLightsShadowCollection();
+        }
+
         // Update plugin data producers
         for (auto& viewportData : Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetAllViewportInfoAndData()) {
             for (auto& dataProducer : viewportData.GetDataProducerSceneIndicesData()) {
@@ -970,6 +975,9 @@ MStatus MtohRenderOverride::Render(
         // Storm
         _taskController->SetEnableShadows(enableShadows);
         _taskController->SetShadowParams(shadowParams);
+        if (_mayaHydraSceneIndex) {
+            _mayaHydraSceneIndex->SetShadowsEnabled(enableShadows);
+        }
 
 #ifndef MAYAHYDRALIB_OIT_ENABLED
         // This is required for HdStorm to display transparency.
