@@ -134,9 +134,9 @@ class TestIsolateSelectMayaSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase
 
         cmds.mayaHydraCppTest('/MayaHydraViewportRenderer/rprims/pTorus1',
                               f='TestPrimPath.isVisible');
-        cmds.mayaHydraCppTest('/MayaHydraViewportRenderer/rprims/Lighted/pTorus1',
+        cmds.mayaHydraCppTest('/MayaHydraViewportRenderer/rprims/pTorus1',
                               f='TestPrimPath.isVisible');
-        cmds.mayaHydraCppTest('/MayaHydraViewportRenderer/rprims/Lighted/group1',
+        cmds.mayaHydraCppTest('/MayaHydraViewportRenderer/rprims/group1',
                               f='TestPrimPath.notVisible');
 
         cmds.select('|group1')
@@ -151,11 +151,11 @@ class TestIsolateSelectMayaSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase
         # prim existence, and must rather test for invisibility.
         cmds.mayaHydraCppTest('/MayaHydraViewportRenderer/rprims/pTorus1',
                               f='TestPrimPath.notVisible');
-        cmds.mayaHydraCppTest('/MayaHydraViewportRenderer/rprims/Lighted/pTorus1',
+        cmds.mayaHydraCppTest('/MayaHydraViewportRenderer/rprims/pTorus1',
                               f='TestPrimPath.notVisible');
         cmds.mayaHydraCppTest('/MayaHydraViewportRenderer/rprims/group1',
                               f='TestPrimPath.isVisible');
-        cmds.mayaHydraCppTest('/MayaHydraViewportRenderer/rprims/Lighted/group1',
+        cmds.mayaHydraCppTest('/MayaHydraViewportRenderer/rprims/group1',
                               f='TestPrimPath.isVisible');
 
         disableIsolateSelect(modelPanel)

@@ -202,13 +202,13 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
     } else if (key == HdTokens->transform) {
         return VtValue(MayaHydraDagAdapter::GetTransform());
     } else if (key == HdLightTokens->shadowCollection) {
-        // Exclude prims that should not be lighted by only
-        // taking the primitives whose root path is GetMayaHydraSceneIndex()->GetLightedPrimsRootPath()
-        const SdfPath     lightedPrimsRootPath = GetMayaHydraSceneIndex()->GetLightedPrimsRootPath();
+        // Exclude prims that should not be lighted by only taking lighted paths
+        SdfPathVector lightedPaths;
+        GetMayaHydraSceneIndex()->GetLightedPrimPaths(lightedPaths);
         HdRprimCollection coll(
             HdTokens->geometry,
-            HdReprSelector(HdReprTokens->refined),
-            lightedPrimsRootPath);
+            HdReprSelector(HdReprTokens->refined));
+        coll.SetRootPaths(lightedPaths);
         return VtValue(coll);
     } else if (key == HdLightTokens->shadowParams) {
         HdxShadowParams shadowParams;

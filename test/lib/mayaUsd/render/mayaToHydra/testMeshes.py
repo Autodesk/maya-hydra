@@ -81,8 +81,5 @@ class TestMeshes(mtohUtils.MayaHydraBaseTestCase):
         rprims = self.getIndex()
         self.assertEqual(2, len(rprims))
 
-        # Only the mesh rprim is a child of the "Lighted" hierarchy.
-        self.assertEqual(1, self.matchingRprims(rprims, 'Lighted'))
-
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
