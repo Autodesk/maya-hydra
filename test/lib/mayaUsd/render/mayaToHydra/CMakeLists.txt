@@ -27,7 +27,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
     testMayaLights.py
-    testUSDLights.py
+    testUSDLights.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testUVandUDIM.py
     testArnoldLights.py|depOnPlugins:mtoa
     testLookThrough.py
