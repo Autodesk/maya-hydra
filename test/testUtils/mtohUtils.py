@@ -35,13 +35,6 @@ HD_STORM = "HdStormRendererPlugin"
 HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
 MAYAUSD_PLUGIN_NAME = 'mayaUsdPlugin'
 
-def checkForPlugin(pluginName: str):
-    try:
-        cmds.loadPlugin(pluginName)
-    except:
-        return False
-    return True
-
 class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     '''Base class for mayaHydra unit tests.'''
 
@@ -60,7 +53,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     # Unloading mayaHydraFlowViewportAPILocator crashes Maya (HYDRA-1304).
     # Unloading mtoa succeeds on Linux, but fails on Windows and macOS
     # with "cannot be unloaded because it is still in use" error.
-    _pluginsCantUnload = ['mayaHydraFlowViewportAPILocator', 'mtoa']
+    # Unloading modelingToolkit fails with a
+    # "Dynamic unloading is not currently supported." error
+    _pluginsCantUnload = ['mayaHydraFlowViewportAPILocator', 'mtoa', 'modelingToolkit']
 
     @classmethod
     def setUpClass(cls):
@@ -106,7 +101,14 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         # so open a new file before each test to minimize leftovers
         # from previous tests.
         mayaUtils.openNewScene()
+        modified = cmds.file(query=True, modified=True)
+        assert not modified, 'Internal test framework error: scene left as modified by mayaUtils.openNewScene()'
+
         self.setHdStormRenderer()
+
+        # We've just opened a new scene, so we should not be modified.  Setting
+        # Storm should conceptually not change that status.
+        cmds.file(modified=False)
 
     @classmethod
     def tearDownClass(cls):

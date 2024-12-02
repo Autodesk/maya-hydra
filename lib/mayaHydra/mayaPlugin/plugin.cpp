@@ -33,6 +33,7 @@
 #include <maya/MFnPlugin.h>
 #include <maya/MGlobal.h>
 #include <maya/MSceneMessage.h>
+#include <maya/MCommandResult.h>
 
 #include <memory>
 #include <vector>
@@ -78,6 +79,44 @@ namespace {
     setenv(name.c_str(), value.c_str(), 1);
     #endif
     }
+
+class SceneModifiedGuard
+{
+public:
+
+    // Read modified state before
+    SceneModifiedGuard() : _wasModified(sceneModified())
+    {}
+
+    ~SceneModifiedGuard()
+    {
+        // If modified flag became true, clear it.
+        if (sceneModified() && !_wasModified) {
+            MGlobal::executeCommand("file -modified 0");
+        }
+    }
+
+private:
+
+    bool _wasModified{false};
+
+    // Scene modified query.
+    static bool sceneModified()
+    {
+        MCommandResult result;
+        auto status = MGlobal::executeCommand("file -query -modified", result);
+        if (status != MStatus::kSuccess) {
+            throw std::runtime_error("File modified query error in mayaHydra plugin load.");
+        }
+        int typedResult{0};
+        status = result.getResult(typedResult);
+        if (status != MStatus::kSuccess) {
+            throw std::runtime_error("Command result access error in mayaHydra plugin load.");
+        }
+        return (typedResult != 0);
+    }
+};
+
 }
 
 void initialize()
@@ -132,6 +171,8 @@ void beforePluginUnloadCallback( const MStringArray& strs, void* clientData )
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
+    SceneModifiedGuard guard;
+
     MString experimental("mayaHydra is experimental.");
     MGlobal::displayWarning(experimental);
 

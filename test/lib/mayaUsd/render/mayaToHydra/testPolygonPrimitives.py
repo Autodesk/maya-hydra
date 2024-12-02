@@ -26,6 +26,8 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1.5
 
+    _requiredPlugins = ['modelingToolkit']
+
     def compareSnapshot(self, referenceFilename, cameraDistance=15, imageVersion=None):
         self.setBasicCam(cameraDistance)
         cmds.refresh()

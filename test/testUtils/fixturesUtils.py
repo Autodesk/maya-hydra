@@ -19,9 +19,6 @@ import shutil
 import sys
 import unittest
 
-# Plugins that are bundled and loaded by default in a Maya installation
-DEFAULT_PLUGINS = ['ArubaTessellator', 'modelingToolkit']
-
 def _setUpClass(modulePathName, pluginName, initializeStandalone):
     '''
     Common code for setUpClass() and readOnlySetUpClass()
@@ -32,10 +29,10 @@ def _setUpClass(modulePathName, pluginName, initializeStandalone):
 
     if pluginName:
         import maya.cmds as cmds
+        wasModified = cmds.file(query=True, modified=True)
         cmds.loadPlugin(pluginName, quiet=True)
-
-    for defaultPlugin in DEFAULT_PLUGINS:
-        cmds.loadPlugin(defaultPlugin, quiet=True)
+        isModified = cmds.file(query=True, modified=True)
+        assert isModified == wasModified, ('Loading plugin %s modified the scene' % pluginName)
 
     realPath = os.path.realpath(modulePathName)
     return os.path.split(realPath)
