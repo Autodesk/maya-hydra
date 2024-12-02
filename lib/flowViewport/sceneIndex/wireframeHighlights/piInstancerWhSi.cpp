@@ -425,29 +425,6 @@ HdSceneIndexPrim PiInstancerWhSi::GetPrim(const SdfPath &primPath) const
 
 SdfPathVector PiInstancerWhSi::GetChildPrimPaths(const SdfPath &primPath) const
 {
-    // SdfPathVector childPaths;
-    // for (const auto& [selectedPrimPath, selection] : _primPathsToSelections) {
-    //     if (primPath != selectedPrimPath && selectedPrimPath.HasPrefix(primPath)) {
-    //         childPaths.emplace_back(selectedPrimPath.GetPrefixes()[primPath.GetPathElementCount()]);
-    //     }
-    // }
-    // if (!childPaths.empty()) {
-    //     return childPaths;
-    // }
-    
-
-    // auto selections = _primPathsToSelections.find(primPath);
-    // if (selections != _primPathsToSelections.end()) {
-    //     for (const auto& selection : selections->second) {
-    //         childPaths.emplace_back(selection.first.AppendChild(TfToken("Selection_" + std::to_string(selection.second))));
-    //     }
-    // }
-    // if (!childPaths.empty()) {
-    //     return childPaths;
-    // }
-    
-    //return _backingSceneIndex->GetChildPrimPaths(primPath);
-
     if (_selectionPaths.empty()) {
         return {};
     }
@@ -484,25 +461,6 @@ SdfPathVector PiInstancerWhSi::GetChildPrimPaths(const SdfPath &primPath) const
         }
     }
     return childPaths;
-
-    // SdfPathVector originalChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
-    // SdfPathVector prunedChildPaths;
-    // for (const auto& originalChildPath : originalChildPaths) {
-    //     for (const auto& instancerPath : _instancerPaths) {
-    //         if (instancerPath.HasPrefix(originalChildPath)) {
-    //             prunedChildPaths.push_back(originalChildPath);
-    //             break;
-    //         }
-    //     }
-
-    //     for (const auto& prototypePath : _prototypePaths) {
-    //         if (prototypePath.HasPrefix(originalChildPath) || originalChildPath.HasPrefix(prototypePath)) {
-    //             prunedChildPaths.push_back(originalChildPath);
-    //             break;
-    //         }
-    //     }
-    // }
-    // return prunedChildPaths;
 }
 
 PiInstancerWhSi::PiInstancerWhSi(
@@ -512,14 +470,6 @@ PiInstancerWhSi::PiInstancerWhSi(
     InputSceneIndexUtils(inputSceneIndex),
     _wireframeColorInterface(wireframeColorInterface)
 {
-    //_CollectInstancingPaths(instancerPrimPath, SelectionHighlightsCollectionDirection2::Bidirectional2, _instancerPaths, _prototypePaths);
-
-    // std::cout << "_primPathsToConserve" << std::endl;
-    // for (const auto& path : _primPathsToConserve) {
-    //     std::cout << "--- " + path.GetString() << std::endl;
-    // }
-    // std::cout << std::endl;
-
     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
         if (prim.primType == HdPrimTypeTokens->instancer) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
@@ -785,33 +735,6 @@ void PiInstancerWhSi::_DeleteSelectionHighlight(const SdfPath& primPath, size_t 
     // Send notifications
     _SendPrimsRemoved({selectionPath});
 }
-
-// bool PiInstancerWhSi::_IsInstancerPath(const PXR_NS::SdfPath& primPath) const
-// {
-//     return _instancerPaths.find(primPath) != _instancerPaths.end();
-//     // for (const auto& instancerPath : _instancerPaths) {
-//     //     // Use direct path rather than prefix?
-//     //     if (primPath.HasPrefix(instancerPath)) {
-//     //         return true;
-//     //     }
-//     // }
-//     // return false;
-// }
-
-// bool PiInstancerWhSi::_IsPrototypePath(const PXR_NS::SdfPath& primPath) const
-// {
-//     for (const auto& prototypePath : _prototypePaths) {
-//         if (primPath.HasPrefix(prototypePath)) {
-//             return true;
-//         }
-//     }
-//     return false;
-// }
-
-// bool PiInstancerWhSi::_IsRelevantPath(const PXR_NS::SdfPath& primPath) const
-// {
-//     return _IsInstancerPath(primPath) || _IsPrototypePath(primPath);
-// }
 
 void
 PiInstancerWhSi::_CollectInstancingPaths(const PXR_NS::SdfPath& primPath, SelectionHighlightsCollectionDirection2 direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const
