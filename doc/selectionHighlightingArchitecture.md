@@ -8,7 +8,7 @@ supports Hydra rendering in this repository as the Flow Viewport Toolkit (name
 subject to change).
 
 This document will describe the state of Flow Viewport Toolkit selection
-highlighting as of 31-May-2024.
+highlighting as of 5-Dec-2024.
 
 ## Behavior
 
@@ -73,7 +73,8 @@ provide the following services:
 - A way to translate the application's selection path(s) into Hydra paths and data sources:
     - So that the appropriate prims in Hydra can be dirtied on selection change.
     - So that selected prims in Hydra can have a data source added.
-  This is embodied in a **Path interface**.
+  This is embodied in a **Path Mapper**.  The plugin must therefore create
+  a path mapper and register it in the **Path Mapper Registry**.
 
 - A way for the plugin to query the Hydra version of the application
   selection:
@@ -85,20 +86,21 @@ provide the following services:
 ### Selection Change
 
 This
-[selection change code](../lib/flowViewport/sceneIndex/fvpSelectionSceneIndex.cpp#L152-L173)
-shows the use of the *Path Interface*, through the *UfePathToPrimSelections()* method,
-called on the input scene index.  The path interface allows the selection scene
-index to translate selected application paths to selected Hydra scene index
-paths.
+[selection change code](../lib/flowViewport/sceneIndex/fvpSelectionSceneIndex.cpp)
+shows the use of the *ufePathToPrimSelections()* utility function.  This
+utility accesses the **Path Mapper Registry** and retrieves a path mapper 
+that implements the translation of selected application paths to selected 
+Hydra scene index paths.  *ufePathToPrimSelections()* then invokes the 
+path mapper and returns the Hydra scene index paths.
 
 ### Wireframe Selection Highlighting
 
 This
-[wireframe selection highlighting code](../lib/flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.cpp#L462-L465)
+[wireframe selection highlighting code](../lib/flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.cpp)
 shows the use of the *Selection*, through the
-*HasFullySelectedAncestorInclusive()* method, called on the input selection.
+*IsFullySelected()* method, called on the input selection.
 The selection allows a selection highlighting filtering scene index to query
-selected prims.
+selected prims.  It can also query the *selections* data source on a prim to determine selection status.
 
 ## Design Option Discussion
 
@@ -108,12 +110,8 @@ selected prims.
   to them described as `SdfPath`.  This keeps plugins independent of any
   particular application's representation of selection.
 
-- **Plugins access the Hydra selection through the scene index tree**: although
-  the selection is conceptually a singleton, we will provide access to it for
-  scene index selection highlighting plugins through the scene index tree, by
-  adding a mixin interface to the plugins.  This avoids creating another object
-  to maintain and encapsulate the Hydra selection, since the selection scene
-  index is already performing this job.
+- **Plugins create and register a path mapper object** to translate application
+  selection paths to Hydra scene index prim selection paths.
 
 ## Implementation
 
@@ -161,15 +159,14 @@ graph BT;
         roSn-.->ph2;
     end
     snSi[Selection scene index]-->ph2;
-    fvpm[Flow Viewport merge]-->snSi;
+    dpm[Data producer merge]-->snSi;
     subgraph pd[Plugin data]
         p1[Plugin 1];
         p2[Plugin 2];
     end
-    fvpm-. Path .->p1;
-    p1-->fvpm;
-    p2-->fvpm;
-    snSi-. Path .->fvpm;
+    dpm-. Path .->p1;
+    p1-->dpm;
+    p2-->dpm;
     sn[/Selection/]-.->snSi;
 ```
 The plugin data and plugin highlighting subtrees are where plugins add their
@@ -186,10 +183,6 @@ The object modeling is the following:
 - **Selection scene index**: builtin provided by the Flow Viewport Toolkit.
     - Has a pointer to read and write the Hydra selection.
     - Translates the application selection to Hydra selection.
-- **Flow Viewport merging scene index**: builtin provided by the Flow Viewport
-  library.
-    - Receives data from data provider plugin scene indices.
-    - Forward path interface queries to plugin scene indices
 - **Plugin data scene index**: provided by plugin.
     - Injects plugin data into Hydra
 - **Plugin selection highlighting scene index**: provided by plugin.
@@ -199,14 +192,14 @@ The object modeling is the following:
     - Adds required geometry or data sources to implement selection
       highlighting
 
-### New Scene Index Mixin Interface Base Class
+### New Path Mapper Base Class
 
-The Flow Viewport Toolkit has a new mixin interface class:
+The Flow Viewport Toolkit has a new base class:
 
-- **Path Interface**: so that the builtin selection scene index can query
-  plugins to translate selected object application paths to selected Hydra
+- **PathMapper**: must be provided by data provider plugins so that Hydra
+  can translate selected object application paths to selected Hydra
   prim paths. The plugin provides the concrete implementation of this
-  interface.
+  base class, and registers it to the **path mapper registry***.
 
 ### Implementation Classes
 
@@ -216,8 +209,9 @@ The Flow Viewport Toolkit has a new mixin interface class:
     - Requires selected ancestor query from selection.
     - Dirties descendants on selection dirty.
 - **Render index proxy**:
-    - Provides encapsulated access to the builtin Flow Viewport merging scene
-      index.
+    - Provides encapsulated access to the data producer merging scene
+      index.  This is a standard Hydra merging scene index to which Flow
+      Viewport data producers are connected.
     - Other responsibilities to be determined, for future extension, possibly a
       [facade design pattern](https://en.wikipedia.org/wiki/Facade_pattern).
 
@@ -233,30 +227,20 @@ class Selection{
 +HasFullySelectedAncestorInclusive(SdfPath) bool
 }
 
-class PathInterface{
-+UfePathToPrimSelections(Ufe::Path) SdfPath
-}
-
 class SelectionSceneIndex
-class MergingSceneIndex
 class WireframeSelectionHighlightSceneIndex
 
 class RenderIndexProxy{
-+MergingSceneIndex mergingSceneIndex
++HdMergingSceneIndex mergingSceneIndex
 +InsertSceneIndex()
 +RemoveSceneIndex()
 }
 
 HdSingleInputFilteringSceneIndexBase <|-- SelectionSceneIndex
 
-HdMergingSceneIndex <|-- MergingSceneIndex
-PathInterface       <|-- MergingSceneIndex
-
 HdSingleInputFilteringSceneIndexBase <|-- WireframeSelectionHighlightSceneIndex
 
-RenderIndexProxy *-- MergingSceneIndex : Owns
-
-SelectionSceneIndex ..> MergingSceneIndex : Path
+RenderIndexProxy *-- HdMergingSceneIndex : Owns
 
 SelectionSceneIndex o-- Selection : Read / Write
 
@@ -270,11 +254,6 @@ WireframeSelectionHighlightSceneIndex o-- Selection : Read
   each selected path and inspect the selected path prefix.  This could be much
   improved (to amortized O(k), for a k-element path) through the use of a
   prefix trie, such as `Ufe::Trie`.
-
-- At time of writing, merging scene index path lookup is O(n), for n input
-  scene indices.  This could be improved by implementing a caching scheme based
-  on application path, as for a given application path prefix the same
-  input scene index will always provide the translation to scene index path.
 
 ## Limitations
 

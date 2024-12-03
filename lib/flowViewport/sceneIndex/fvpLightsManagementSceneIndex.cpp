@@ -57,11 +57,10 @@ void _DisableLight(HdSceneIndexPrim& prim)
 
 namespace FVP_NS_DEF {
 
-LightsManagementSceneIndex::LightsManagementSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const PathInterface& pathInterface, const SdfPath& defaultLightPath) 
+LightsManagementSceneIndex::LightsManagementSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const SdfPath& defaultLightPath) 
     : ParentClass(inputSceneIndex), 
     InputSceneIndexUtils(inputSceneIndex)
     ,_defaultLightPath(defaultLightPath)
-    , _pathInterface(pathInterface)
 {
 }
 
