@@ -107,7 +107,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         self.setHdStormRenderer()
 
         # We've just opened a new scene, so we should not be modified.  Setting
-        # Storm should conceptually not change that status.
+        # Storm as the renderer should conceptually not change that status, but
+        # unfortunately in automated tests it does (see setHdStormRender()
+        # method documentation).  Restore modified status to false.
         cmds.file(modified=False)
 
     @classmethod
@@ -133,6 +135,10 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         cmds.modelEditor(
             self.activeEditor, e=1,
             rendererOverrideName=HD_STORM_OVERRIDE)
+        # During automated tests, tracing demonstrates that the following call
+        # to refresh marks the scene as modified, with the modified node being
+        # defaultRenderGlobals.  This behavior cannot be reproduced in a
+        # non-automated interactive Maya.
         cmds.refresh(f=1)
         self.delegateId = cmds.mayaHydra(renderer=HD_STORM,
                                     sceneDelegateId="MayaHydraSceneDelegate")
