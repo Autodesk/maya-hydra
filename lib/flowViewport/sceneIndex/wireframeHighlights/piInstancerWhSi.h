@@ -19,6 +19,7 @@
 #include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 #include "flowViewport/fvpWireframeColorInterface.h"
+#include "flowViewport/sceneIndex/wireframeHighlights/baseWhSi.h"
 
 #include <pxr/base/gf/vec4f.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
@@ -50,26 +51,6 @@ enum SelectionHighlightsCollectionDirection2 {
     InstancedBy2 = 1 << 1,
     Bidirectional2 = Prototypes2 | InstancedBy2
 };
-
-using SelectionKey = std::pair<PXR_NS::SdfPath, size_t>;
-
-// struct SelectionKey {
-//     PXR_NS::SdfPath primPath;
-//     size_t selectionIndex;
-
-//     inline bool operator==(const SelectionKey &rhs) const {
-//         return primPath == rhs.primPath
-//             && selectionIndex == rhs.selectionIndex;
-//     }
-
-//     struct Hash {
-//         size_t operator()(const SelectionKey& selectionKey) const noexcept
-//         {
-//             size_t primPathHash = PXR_NS::SdfPath::Hash{}(selectionKey.primPath);
-//             return primPathHash ^ (1ULL << selectionKey.selectionIndex);
-//         }
-//     };
-// };
 
 struct SelectionData {
     PrimSelection _primSelection;
