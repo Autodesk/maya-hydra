@@ -123,10 +123,6 @@ Fvp::PrimSelection ConvertHydraToFvpSelection(const SdfPath& primPath, const HdS
     return primSelection;
 }
 
-SdfPath SelectionPathFromKey(const Fvp::SelectionKey& selectionKey) {
-    return selectionKey.first.AppendElementString("Selection_" + std::to_string(selectionKey.second));
-}
-
 class _RerootingSceneIndexPathDataSource : public HdPathDataSource
 {
 public:
