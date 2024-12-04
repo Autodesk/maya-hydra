@@ -135,10 +135,12 @@ SdfPathVector BaseWhSi::GetChildPrimPaths(const PXR_NS::SdfPath &primPath) const
 
         // To return the highlight sub-hierarchy paths
         auto selectionPath = primPath;
-        while (_selectionPaths.find(selectionPath) == _selectionPaths.end()) {
+        while (_selectionPaths.find(selectionPath) == _selectionPaths.end() && selectionPath.HasPrefix(_highlightHierarchyPrefix)) {
             selectionPath = selectionPath.GetParentPath();
         }
-        return GetHighlightChildPrimPaths(selectionPath, primPath);
+        if (_selectionPaths.find(selectionPath) != _selectionPaths.end()) {
+            return GetHighlightChildPrimPaths(selectionPath, primPath);
+        }
     }
     return childPaths;
 }
@@ -148,6 +150,7 @@ void BaseWhSi::_PrimsAdded(
     const HdSceneIndexObserver::AddedPrimEntries &entries)
 {
     _SendPrimsAdded(entries);
+    // TODO : Exclude paths
     ProcessAddedPrims(sender, entries);
 }
 
@@ -156,6 +159,7 @@ void BaseWhSi::_PrimsRemoved(
     const HdSceneIndexObserver::RemovedPrimEntries &entries)
 {
     _SendPrimsRemoved(entries);
+    // TODO : Exclude paths
     ProcessRemovedPrims(sender, entries);
 }
 
@@ -164,6 +168,7 @@ void BaseWhSi::_PrimsDirtied(
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
     _SendPrimsDirtied(entries);
+    // TODO : Exclude paths
     ProcessDirtiedPrims(sender, entries);
 }
 

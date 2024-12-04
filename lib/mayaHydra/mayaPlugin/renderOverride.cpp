@@ -1275,8 +1275,9 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     //_wireframeSelectionHighlightSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
     //_lastFilteringSceneIndexBeforeCustomFiltering  = _wireframeSelectionHighlightSceneIndex;
 
-    _piInstancerWhSi = Fvp::PiInstancerWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, SdfPath("/FlowViewportSelectionHighlights"), _wireframeColorInterfaceImp);
-    _lastFilteringSceneIndexBeforeCustomFiltering  = _piInstancerWhSi;
+    SdfPath highlightHierarchyPrefix = SdfPath("/FlowViewportSelectionHighlights");
+    _lastFilteringSceneIndexBeforeCustomFiltering = _piInstancerWhSi = Fvp::PiInstancerWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+    _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
     
     TF_AXIOM(_mayaHydraSceneIndex);
     Fvp::PathInterface* pathInterface = dynamic_cast<Fvp::PathInterface*>(&*mergingSceneIndex);
