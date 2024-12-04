@@ -40,7 +40,7 @@ class BaseWhSi;
 typedef PXR_NS::TfRefPtr<BaseWhSi> BaseWhSiRefPtr;
 typedef PXR_NS::TfRefPtr<const BaseWhSi> BaseWhSiConstRefPtr;
 
-using SelectionKey = std::pair<PXR_NS::SdfPath, size_t>;
+using SelectionKey = std::pair<PXR_NS::SdfPath, std::string>;
 
 // struct SelectionKey {
 //     PXR_NS::SdfPath primPath;

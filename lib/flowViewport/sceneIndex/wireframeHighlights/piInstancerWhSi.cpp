@@ -433,7 +433,7 @@ PiInstancerWhSi::PiInstancerWhSi(
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
             if (selectionsSchema.IsDefined()) {
                 for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
-                    _CreateSelectionHighlight(primPath, selectionId);
+                    _CreateSelectionHighlight(primPath, std::to_string(selectionId));
                 }
             }
         }
@@ -454,7 +454,7 @@ void PiInstancerWhSi::ProcessAddedPrims(
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
             if (selectionsSchema.IsDefined()) {
                 for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
-                    _CreateSelectionHighlight(entry.primPath, selectionId);
+                    _CreateSelectionHighlight(entry.primPath, std::to_string(selectionId));
                 }
                 // We just created the highlight, no need to add highlight prims
                 continue;
@@ -562,7 +562,7 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
                 HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
                 if (selectionsSchema.IsDefined()) {
                     for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
-                        _CreateSelectionHighlight(entry.primPath, selectionId);
+                        _CreateSelectionHighlight(entry.primPath, std::to_string(selectionId));
                     }
                 }
                 // We rebuilt the highlight, no need to do the rest
@@ -618,8 +618,13 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
     _SendPrimsDirtied(highlightEntries);
 }
 
-void PiInstancerWhSi::_CreateSelectionHighlight(const SdfPath& primPath, size_t selectionId)
+void PiInstancerWhSi::_CreateSelectionHighlight(const SdfPath& primPath, std::string selectionId)
 {
+    if (selectionId.empty() || selectionId.find_first_not_of("0123456789") != std::string::npos) {
+        // Selection ID is not a positive integer
+        return;
+    }
+
     // Collect paths
     SdfPathSet instancerPaths;
     SdfPathSet prototypePaths;
@@ -632,7 +637,7 @@ void PiInstancerWhSi::_CreateSelectionHighlight(const SdfPath& primPath, size_t 
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
     SelectionData selectionData;
-    selectionData._primSelection = ConvertHydraToFvpSelection(primPath, selectionsSchema.GetElement(selectionId));
+    selectionData._primSelection = ConvertHydraToFvpSelection(primPath, selectionsSchema.GetElement(std::stoul(selectionId)));
     selectionData._instancerPaths = instancerPaths;
     selectionData._prototypePaths = prototypePaths;
     _selections[selectionKey] = selectionData;
@@ -658,7 +663,7 @@ void PiInstancerWhSi::_CreateSelectionHighlight(const SdfPath& primPath, size_t 
     _SendPrimsAdded(addedPrims);
 }
 
-void PiInstancerWhSi::_DeleteSelectionHighlight(const SdfPath& primPath, size_t selectionId)
+void PiInstancerWhSi::_DeleteSelectionHighlight(const SdfPath& primPath, std::string selectionId)
 {
     // Collect paths
     SelectionKey selectionKey { primPath, selectionId };

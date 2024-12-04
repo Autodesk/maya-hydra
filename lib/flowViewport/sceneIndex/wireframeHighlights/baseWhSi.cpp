@@ -169,13 +169,13 @@ void BaseWhSi::_PrimsDirtied(
 
 SdfPath BaseWhSi::SelectionPathFromKey(const SelectionKey& selectionKey) const
 {
-    return selectionKey.first.ReplacePrefix(SdfPath::AbsoluteRootPath(), _highlightHierarchyPrefix).AppendElementString("Selection_" + std::to_string(selectionKey.second));
+    return selectionKey.first.ReplacePrefix(SdfPath::AbsoluteRootPath(), _highlightHierarchyPrefix).AppendElementString("Selection_" + selectionKey.second);
 }
 
 SelectionKey BaseWhSi::SelectionKeyFromPath(const SdfPath& selectionPath) const
 {
     auto selectedPrimPath = selectionPath.GetParentPath().ReplacePrefix(_highlightHierarchyPrefix, SdfPath::AbsoluteRootPath());
-    auto selectionId = std::stoul(selectionPath.GetElementString().substr(std::string("Selection_").size()));
+    auto selectionId = selectionPath.GetElementString().substr(std::string("Selection_").size());
     return SelectionKey(selectedPrimPath, selectionId);
 }
 
