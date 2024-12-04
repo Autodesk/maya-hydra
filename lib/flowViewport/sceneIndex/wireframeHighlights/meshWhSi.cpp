@@ -321,7 +321,10 @@ MeshWhSi::MeshWhSi(
             }
         }
         if (prim.primType == HdPrimTypeTokens->mesh) {
-            _meshPaths.emplace(primPath);
+            HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+            if (!instancedBy.IsDefined()) {
+                _meshPaths.emplace(primPath);
+            }
         }
         return true;
     };
@@ -344,11 +347,14 @@ void MeshWhSi::ProcessAddedPrims(
     for (const auto& entry : entries) {
         bool isMesh = false;
         bool isSelected = false;
-        if (entry.primType == HdPrimTypeTokens->mesh) {
-            _meshPaths.emplace(entry.primPath);
-            isMesh = true;
-        }
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+        if (entry.primType == HdPrimTypeTokens->mesh) {
+            HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+            if (!instancedBy.IsDefined()) {
+                _meshPaths.emplace(entry.primPath);
+                isMesh = true;
+            }
+        }
         HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
         if (selectionsSchema.IsDefined()) {
             for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
