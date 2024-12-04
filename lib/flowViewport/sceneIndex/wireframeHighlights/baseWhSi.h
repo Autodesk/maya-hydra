@@ -78,6 +78,9 @@ public:
     FVP_API
     PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath &primPath) const final;
 
+    FVP_API
+    void AddExcludedPath(const PXR_NS::SdfPath& path);
+
 protected:
     FVP_API
     BaseWhSi(
@@ -100,6 +103,9 @@ protected:
     void _PrimsDirtied(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) final;
+    
+    FVP_API
+    bool IsExcludedPath(const PXR_NS::SdfPath& path) const;
     
     FVP_API
     PXR_NS::SdfPath SelectionPathFromKey(const SelectionKey& selectionKey) const;
@@ -140,6 +146,7 @@ protected:
     std::set<PXR_NS::SdfPath> _selectionPaths;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _primPathsToSelections;
 
+    std::set<PXR_NS::SdfPath> _excludedPaths;
 };
 
 PXR_NS::HdContainerDataSourceHandle SetWireframeRepr(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color);

@@ -172,6 +172,20 @@ void BaseWhSi::_PrimsDirtied(
     ProcessDirtiedPrims(sender, entries);
 }
 
+void BaseWhSi::AddExcludedPath(const PXR_NS::SdfPath& path)
+{
+    _excludedPaths.emplace(path);
+}
+
+bool BaseWhSi::IsExcludedPath(const PXR_NS::SdfPath& path) const
+{
+    auto itExcludedPath = _excludedPaths.upper_bound(path);
+    if (itExcludedPath != _excludedPaths.begin() && path.HasPrefix(*std::prev(itExcludedPath))) {
+        return true;
+    }
+    return false;
+}
+
 SdfPath BaseWhSi::SelectionPathFromKey(const SelectionKey& selectionKey) const
 {
     return selectionKey.first.ReplacePrefix(SdfPath::AbsoluteRootPath(), _highlightHierarchyPrefix).AppendElementString("Highlight_" + selectionKey.second);
