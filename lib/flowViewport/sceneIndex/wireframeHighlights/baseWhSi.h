@@ -82,6 +82,7 @@ protected:
     FVP_API
     BaseWhSi(
         const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex,
+        const PXR_NS::SdfPath& highlightHierarchyPrefix,
         const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
 
@@ -101,16 +102,16 @@ protected:
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) final;
     
     FVP_API
-    PXR_NS::SdfPath SelectionPathFromKey(const SelectionKey& selectionKey);
+    PXR_NS::SdfPath SelectionPathFromKey(const SelectionKey& selectionKey) const;
 
     FVP_API
-    SelectionKey SelectionKeyFromPath(const PXR_NS::SdfPath& selectionPath);
+    SelectionKey SelectionKeyFromPath(const PXR_NS::SdfPath& selectionPath) const;
 
     FVP_API
-    void RegisterSelection(const SelectionKey& selectionKey);
+    PXR_NS::SdfPath RegisterSelection(const SelectionKey& selectionKey);
 
     FVP_API
-    void UnregisterSelection(const SelectionKey& selectionKey);
+    PXR_NS::SdfPath UnregisterSelection(const SelectionKey& selectionKey);
 
     FVP_API
     virtual PXR_NS::HdSceneIndexPrim GetHighlightPrim(const PXR_NS::SdfPath &selectionPath, const PXR_NS::SdfPath &fullPrimPath) const = 0;
@@ -121,22 +122,24 @@ protected:
     FVP_API
     virtual void ProcessAddedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
-        const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries) const = 0;
+        const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries) = 0;
     
     FVP_API
     virtual void ProcessRemovedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
-        const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries) const = 0;
+        const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries) = 0;
     
     FVP_API
     virtual void ProcessDirtiedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
-        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) const = 0;
+        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) = 0;
+
+    const PXR_NS::SdfPath _highlightHierarchyPrefix;
+    const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 
     std::set<PXR_NS::SdfPath> _selectionPaths;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _primPathsToSelections;
 
-    PXR_NS::SdfPath _highlightHierarchyPrefix;
 };
 
 PXR_NS::HdContainerDataSourceHandle SetWireframeRepr(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color);

@@ -1,6 +1,7 @@
 #include "baseWhSi.h"
 
 #include <flowViewport/fvpUtils.h>
+#include <iostream>
 
 #include <pxr/base/tf/staticTokens.h>
 #include <pxr/base/gf/vec3f.h>
@@ -83,6 +84,18 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
     return edited.Finish();
 }
 
+BaseWhSi::BaseWhSi(
+    const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex,
+    const PXR_NS::SdfPath& highlightHierarchyPrefix,
+    const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
+) : HdSingleInputFilteringSceneIndexBase(inputSceneIndex),
+    InputSceneIndexUtils(inputSceneIndex),
+    _highlightHierarchyPrefix(highlightHierarchyPrefix),
+    _wireframeColorInterface(wireframeColorInterface)
+{
+
+}
+
 HdSceneIndexPrim BaseWhSi::GetPrim(const PXR_NS::SdfPath &primPath) const
 {
     if (primPath.HasPrefix(_highlightHierarchyPrefix) && !_selectionPaths.empty()) {
@@ -102,6 +115,10 @@ HdSceneIndexPrim BaseWhSi::GetPrim(const PXR_NS::SdfPath &primPath) const
 SdfPathVector BaseWhSi::GetChildPrimPaths(const PXR_NS::SdfPath &primPath) const
 {
     SdfPathVector childPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    if (primPath == SdfPath::AbsoluteRootPath()) {
+        childPaths.emplace_back(_highlightHierarchyPrefix);
+        return childPaths;
+    }
     if (primPath.HasPrefix(_highlightHierarchyPrefix) && !_selectionPaths.empty()) {
         // To return the paths leading up to and including selection paths
         auto it = _selectionPaths.upper_bound(primPath);
@@ -150,36 +167,35 @@ void BaseWhSi::_PrimsDirtied(
     ProcessDirtiedPrims(sender, entries);
 }
 
-SdfPath BaseWhSi::SelectionPathFromKey(const SelectionKey& selectionKey) {
-    // TODO : Handle highlight hierarchy prefix
-    return selectionKey.first.AppendElementString("Selection_" + std::to_string(selectionKey.second));
+SdfPath BaseWhSi::SelectionPathFromKey(const SelectionKey& selectionKey) const
+{
+    return selectionKey.first.ReplacePrefix(SdfPath::AbsoluteRootPath(), _highlightHierarchyPrefix).AppendElementString("Selection_" + std::to_string(selectionKey.second));
 }
 
-SelectionKey BaseWhSi::SelectionKeyFromPath(const SdfPath& selectionPath)
+SelectionKey BaseWhSi::SelectionKeyFromPath(const SdfPath& selectionPath) const
 {
-    // TODO : Handle highlight hierarchy prefix
-    auto selectedPrimPath = selectionPath.GetParentPath();
+    auto selectedPrimPath = selectionPath.GetParentPath().ReplacePrefix(_highlightHierarchyPrefix, SdfPath::AbsoluteRootPath());
     auto selectionId = std::stoul(selectionPath.GetElementString().substr(std::string("Selection_").size()));
     return SelectionKey(selectedPrimPath, selectionId);
 }
 
-void BaseWhSi::RegisterSelection(const SelectionKey& selectionKey)
+SdfPath BaseWhSi::RegisterSelection(const SelectionKey& selectionKey)
 {
-    // TODO : Handle highlight hierarchy prefix
     _primPathsToSelections[selectionKey.first].emplace(selectionKey);
     SdfPath selectionPath = SelectionPathFromKey(selectionKey);
     _selectionPaths.emplace(selectionPath);
+    return selectionPath;
 }
 
-void BaseWhSi::UnregisterSelection(const SelectionKey& selectionKey)
+SdfPath BaseWhSi::UnregisterSelection(const SelectionKey& selectionKey)
 {
-    // TODO : Handle highlight hierarchy prefix
     _primPathsToSelections[selectionKey.first].erase(selectionKey);
     if (_primPathsToSelections[selectionKey.first].empty()) {
         _primPathsToSelections.erase(selectionKey.first);
     }
     SdfPath selectionPath = SelectionPathFromKey(selectionKey);
     _selectionPaths.erase(selectionPath);
+    return selectionPath;
 }
 
 }

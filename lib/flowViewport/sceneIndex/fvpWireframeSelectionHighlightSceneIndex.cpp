@@ -354,7 +354,7 @@ WireframeSelectionHighlightSceneIndex(
 
     _prefixingSceneIndex = HdPrefixingSceneIndex::New(_mergingSceneIndex, _selectionHighlightsPrefix);
     _prefixingSceneIndex->AddObserver(HdSceneIndexObserverPtr(&_mergingSceneIndexObserver));
-    _mergingSceneIndex->AddInputScene(PiInstancerWhSi::New(GetInputSceneIndex(), _wireframeColorInterface), SdfPath::AbsoluteRootPath());
+    //_mergingSceneIndex->AddInputScene(PiInstancerWhSi::New(GetInputSceneIndex(), _wireframeColorInterface), SdfPath::AbsoluteRootPath());
 
 //     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
 //         if (prim.primType == HdPrimTypeTokens->instancer) {

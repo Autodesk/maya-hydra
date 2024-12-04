@@ -1266,14 +1266,17 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
     _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false, _globals.delegateParams.refineLevel);
 
-    _wireframeSelectionHighlightSceneIndex = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection, _wireframeColorInterfaceImp));
-    _wireframeSelectionHighlightSceneIndex->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
-    
-    // At time of writing, wireframe selection highlighting of Maya native data
-    // is done by Maya at render item creation time, so avoid double wireframe
-    // selection highlighting.
-    _wireframeSelectionHighlightSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
-    _lastFilteringSceneIndexBeforeCustomFiltering  = _wireframeSelectionHighlightSceneIndex;
+    //_wireframeSelectionHighlightSceneIndex = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection, _wireframeColorInterfaceImp));
+    //_wireframeSelectionHighlightSceneIndex->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
+    //
+    //// At time of writing, wireframe selection highlighting of Maya native data
+    //// is done by Maya at render item creation time, so avoid double wireframe
+    //// selection highlighting.
+    //_wireframeSelectionHighlightSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
+    //_lastFilteringSceneIndexBeforeCustomFiltering  = _wireframeSelectionHighlightSceneIndex;
+
+    _piInstancerWhSi = Fvp::PiInstancerWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, SdfPath("/FlowViewportSelectionHighlights"), _wireframeColorInterfaceImp);
+    _lastFilteringSceneIndexBeforeCustomFiltering  = _piInstancerWhSi;
     
     TF_AXIOM(_mayaHydraSceneIndex);
     Fvp::PathInterface* pathInterface = dynamic_cast<Fvp::PathInterface*>(&*mergingSceneIndex);
@@ -1545,7 +1548,7 @@ void MtohRenderOverride::_PickByRegion(
     pickParams.viewMatrix.Set(viewMatrix.matrix);
     pickParams.projectionMatrix.Set(adjustedProjMatrix.matrix);
     pickParams.collection = _renderCollection;
-    pickParams.collection.SetExcludePaths(_wireframeSelectionHighlightSceneIndex->GetSelectionHighlightMirrorPaths());
+    //pickParams.collection.SetExcludePaths(_wireframeSelectionHighlightSceneIndex->GetSelectionHighlightMirrorPaths());
     pickParams.outHits = &outHits;
     
     if (geomSubsetsPickMode == GeomSubsetsPickModeTokens->Faces) {
@@ -1558,8 +1561,8 @@ void MtohRenderOverride::_PickByRegion(
         // Exclude selected Rprims to avoid self-snapping issue.
         pickParams.collection = _pointSnappingCollection;
         auto excludePaths = _selectionSceneIndex->GetFullySelectedPaths();
-        auto selectionHighlightPaths = _wireframeSelectionHighlightSceneIndex->GetSelectionHighlightMirrorPaths();
-        excludePaths.insert(excludePaths.end(), selectionHighlightPaths.begin(), selectionHighlightPaths.end());
+        //auto selectionHighlightPaths = _wireframeSelectionHighlightSceneIndex->GetSelectionHighlightMirrorPaths();
+        //excludePaths.insert(excludePaths.end(), selectionHighlightPaths.begin(), selectionHighlightPaths.end());
         pickParams.collection.SetExcludePaths(excludePaths);
     }
 

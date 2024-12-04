@@ -15,6 +15,7 @@
 #ifndef FVP_PI_INSTANCER_WH_SI_H
 #define FVP_PI_INSTANCER_WH_SI_H
 
+#include "baseWhSi.h"
 #include "flowViewport/api.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
@@ -64,56 +65,49 @@ struct SelectionData {
 /// and their descendants.
 ///
 class PiInstancerWhSi 
-    : public PXR_NS::HdSingleInputFilteringSceneIndexBase
-    , public Fvp::InputSceneIndexUtils<PiInstancerWhSi>
+    : public BaseWhSi
 {
 public:
-    using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
-
     FVP_API
     static PXR_NS::HdSceneIndexBaseRefPtr New(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
+        const PXR_NS::SdfPath& highlightHierarchyPrefix,
         const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
 
-    FVP_API
-    PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath &primPath) const override;
-
-    FVP_API
-    PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath &primPath) const override;
-
 protected:
-
     FVP_API
     PiInstancerWhSi(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
+        const PXR_NS::SdfPath& highlightHierarchyPrefix,
         const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
 
     FVP_API
-    void _PrimsAdded(
+    PXR_NS::HdSceneIndexPrim GetHighlightPrim(const PXR_NS::SdfPath &selectionPath, const PXR_NS::SdfPath &fullPrimPath) const override;
+
+    FVP_API
+    PXR_NS::SdfPathVector GetHighlightChildPrimPaths(const PXR_NS::SdfPath &selectionPath, const PXR_NS::SdfPath &fullPrimPath) const override;
+
+    FVP_API
+    void ProcessAddedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries) override;
 
     FVP_API
-    void _PrimsRemoved(
+    void ProcessRemovedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries) override;
 
     FVP_API
-    void _PrimsDirtied(
+    void ProcessDirtiedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
 
 private:
-    const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
-
     std::map<SelectionKey, SelectionData> _selections;
-    std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _primPathsToSelections;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _instancerPathsToSelections;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _prototypePathsToSelections;
-
-    std::set<PXR_NS::SdfPath> _selectionPaths;
 
     void _CreateSelectionHighlight(const PXR_NS::SdfPath& primPath, size_t selectionId);
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& primPath, size_t selectionId);
