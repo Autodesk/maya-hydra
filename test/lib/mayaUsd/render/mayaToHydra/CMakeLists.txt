@@ -36,7 +36,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testOpenPBRSurface.py
     testFlowViewportAPI.py
     testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-    testStagePayloadsReferences.py
+    #testStagePayloadsReferences.py #Disabled for usd 24.11 HYDRA-1317
     testNurbsPrimitives.py
     testCurveTools.py
     testPolygonPrimitives.py
@@ -48,7 +48,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     # To be reenabled after investigation
     testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testPassingNormalsOnMayaNative.py
-    testViewportFilters.py
+    #testViewportFilters.py #Disabled for usd 24.11 HYDRA-1317
     testMayaComponentsPicking.py
     testFlowPluginsHierarchicalProperties.py
     testCustomShadersNode.py
