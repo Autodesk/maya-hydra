@@ -343,7 +343,6 @@ void MeshWhSi::ProcessAddedPrims(
         bool isSelected = false;
         if (entry.primType == HdPrimTypeTokens->mesh) {
             _meshPaths.emplace(entry.primPath);
-            std::cout << "Emplaced mesh " << entry.primPath << std::endl;
             isMesh = true;
         }
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
@@ -352,7 +351,6 @@ void MeshWhSi::ProcessAddedPrims(
             for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
                 if (selectionsSchema.GetElement(selectionId).GetFullySelected()) {
                     _fullySelectedPaths.emplace(entry.primPath);
-                    std::cout << "Emplaced selected path " << entry.primPath << std::endl;
                     isSelected = true;
                 }
             }
@@ -420,20 +418,16 @@ void MeshWhSi::ProcessDirtiedPrims(
                 }
             }
             if (isFullySelected && _fullySelectedPaths.find(entry.primPath) == _fullySelectedPaths.end()) {
-                std::cout << "Dirtied and emplaced selected path " << entry.primPath << std::endl;
                 _fullySelectedPaths.emplace(entry.primPath);
                 auto itMesh = _meshPaths.lower_bound(entry.primPath);
                 while (itMesh != _meshPaths.end() && itMesh->HasPrefix(entry.primPath)) {
-                    std::cout << "Might create highlight" << std::endl;
                     if (_highlightedMeshPaths.find(*itMesh) == _highlightedMeshPaths.end()) {
-                        std::cout << "Creating highlight" << std::endl;
                         _CreateSelectionHighlight(*itMesh);
                     }
                     itMesh++;
                 }
             }
             else if (!isFullySelected && _fullySelectedPaths.find(entry.primPath) != _fullySelectedPaths.end()) {
-                std::cout << "Dirtied and erased selected path " << entry.primPath << std::endl;
                 _fullySelectedPaths.erase(entry.primPath);
                 auto itMesh = _meshPaths.lower_bound(entry.primPath);
                 while (itMesh != _meshPaths.end() && itMesh->HasPrefix(entry.primPath)) {
@@ -455,7 +449,6 @@ void MeshWhSi::ProcessDirtiedPrims(
 void MeshWhSi::_CreateSelectionHighlight(const SdfPath& primPath)
 {
     if (_highlightedMeshPaths.find(primPath) != _highlightedMeshPaths.end()) {
-        std::cout << "Creating highlight failed" << std::endl;
         return;
     }
 
@@ -468,7 +461,6 @@ void MeshWhSi::_CreateSelectionHighlight(const SdfPath& primPath)
     // Send notifications
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
     addedPrims.emplace_back(primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), GetInputSceneIndex()->GetPrim(primPath).primType);
-    std::cout << "Sending PrimsAdded for " << primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath) << std::endl;
     _SendPrimsAdded(addedPrims);
 }
 
