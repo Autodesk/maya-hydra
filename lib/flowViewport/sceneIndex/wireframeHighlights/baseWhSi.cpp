@@ -150,8 +150,13 @@ void BaseWhSi::_PrimsAdded(
     const HdSceneIndexObserver::AddedPrimEntries &entries)
 {
     _SendPrimsAdded(entries);
-    // TODO : Exclude paths
-    ProcessAddedPrims(sender, entries);
+    HdSceneIndexObserver::AddedPrimEntries filteredEntries;
+    for (const auto& entry : entries) {
+        if (!IsExcludedPath(entry.primPath)) {
+            filteredEntries.emplace_back(entry);
+        }
+    }
+    ProcessAddedPrims(sender, filteredEntries);
 }
 
 void BaseWhSi::_PrimsRemoved(
@@ -159,8 +164,13 @@ void BaseWhSi::_PrimsRemoved(
     const HdSceneIndexObserver::RemovedPrimEntries &entries)
 {
     _SendPrimsRemoved(entries);
-    // TODO : Exclude paths
-    ProcessRemovedPrims(sender, entries);
+    HdSceneIndexObserver::RemovedPrimEntries filteredEntries;
+    for (const auto& entry : entries) {
+        if (!IsExcludedPath(entry.primPath)) {
+            filteredEntries.emplace_back(entry);
+        }
+    }
+    ProcessRemovedPrims(sender, filteredEntries);
 }
 
 void BaseWhSi::_PrimsDirtied(
@@ -168,8 +178,13 @@ void BaseWhSi::_PrimsDirtied(
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
     _SendPrimsDirtied(entries);
-    // TODO : Exclude paths
-    ProcessDirtiedPrims(sender, entries);
+    HdSceneIndexObserver::DirtiedPrimEntries filteredEntries;
+    for (const auto& entry : entries) {
+        if (!IsExcludedPath(entry.primPath)) {
+            filteredEntries.emplace_back(entry);
+        }
+    }
+    ProcessDirtiedPrims(sender, filteredEntries);
 }
 
 void BaseWhSi::AddExcludedPath(const PXR_NS::SdfPath& path)
