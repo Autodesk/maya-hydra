@@ -66,7 +66,8 @@ def snapshot(outputPath, width=400, height=None):
 
 def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail, 
                 warn, warnpercent, hardwarn, perceptual):    
-    """ Returns the completed process instance after running idiff.
+    """ Returns the completed process instance after running idiff or None if
+        execution of process failed.
     
     imagePath1   -- First image to compare.
     imagePath2   -- Second image to compare.
@@ -118,9 +119,33 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail,
         sys.__stdout__.write("\nimage diffing with {0}".format(cmd))
         sys.__stdout__.flush()
 
-    # Run idiff command
-    proc = subprocess.run(cmd, shell=False, env=os.environ.copy(), stdout=subprocess.PIPE)
-    return proc
+    try:
+        # Run idiff command
+        #
+        # On some Windows 11 machines we were randomly getting a failure when
+        # launching the subprocess.run().
+        #   OSError: [WinError 50] The request is not supported
+        #
+        # The cause appeared to come from the subprocess.run() call where it
+        # was only capturing stdout. In subprocess the error occured when trying
+        # to duplicate the stderr handle.
+        #proc = subprocess.run(cmd, shell=False, env=os.environ.copy(), stdout=subprocess.PIPE)
+        # When using flag 'capture_output=True' to capture both (stdout/stderr) the
+        # random error disappeared.
+        proc = subprocess.run(cmd, capture_output=True, shell=False, env=os.environ.copy())
+    except OSError as e:
+        # If its not the random WinError 50 we re-raise it.
+        if '[WinError 50]' not in str(e):
+            raise
+
+        if verbose:
+            sys.__stdout__.write('\nimageDiff failed with: {0}'.format(str(e)))
+            sys.__stdout__.flush()
+    else:
+        # Successfully executed imageDiff.
+        return proc
+
+    return None # Running of imageDiff failed.
 
 def convertToSilhouette(imagePath):
     # 2024-06-13 : Tried to use oiiotool instead of PySide for this to be more efficient,
@@ -173,6 +198,9 @@ class ImageDiffingTestCase:
                             fail=fail, failpercent=failpercent, hardfail=hardfail,
                             warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, 
                             perceptual=perceptual)
+        if proc is None:
+            self.fail('Failed to execute imageDiff')
+
         #Enable undo again
         cmds.undoInfo(stateWithoutFlush=True)
         if proc.returncode not in (0, 1):
