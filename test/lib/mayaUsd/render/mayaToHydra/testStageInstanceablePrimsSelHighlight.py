@@ -46,6 +46,9 @@ class TestStageInstanceablePrimsSelHighlight(mtohUtils.MayaHydraBaseTestCase): #
         import usdUtils # usdUtils imports mayaUsd.ufe
         from mayaUsd import lib as mayaUsdLib
         
+        if self._usdVersion < (0, 24, 11): #This test is only working with usd 24.11+
+            return
+
         #Load a scene with a usd stage with 2 prims that have a Hierarchy
         #Cylinder1 is the parent of Sphere1
         testFile = mayaUtils.openTestScene(
