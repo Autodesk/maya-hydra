@@ -147,7 +147,7 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(
     const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
     const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
     const MObjectHandle&                   dagNodeHandle,
-    const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
+    const SdfPath&                         sceneIndexPathPrefix,
     const Ufe::Path&                       sceneIndexAppPath)
     : ParentClass(sceneIndexChainLastElement)
     , InputSceneIndexUtils(sceneIndexChainLastElement)
@@ -212,7 +212,7 @@ MayaUsdProxyShapeSceneIndexRefPtr MayaUsdProxyShapeSceneIndex::New(
     const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
     const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
     const MObjectHandle&                   dagNodeHandle,
-    const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
+    const SdfPath&                         sceneIndexPathPrefix,
     const Ufe::Path&                       sceneIndexAppPath)
 {
     return TfCreateRefPtr(new MayaUsdProxyShapeSceneIndex(proxyStage, sceneIndexChainLastElement, usdImagingStageSceneIndex, dagNodeHandle, sceneIndexPathPrefix, sceneIndexAppPath));

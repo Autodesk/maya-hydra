@@ -111,7 +111,23 @@ selected prims.  It can also query the *selections* data source on a prim to det
   particular application's representation of selection.
 
 - **Plugins create and register a path mapper object** to translate application
-  selection paths to Hydra scene index prim selection paths.
+  selection paths to Hydra scene index prim selection paths.  Application
+  paths are described through the Universal Front End API, with 
+  `Ufe::Path`, and Hydra scene index prim paths are described with OpenUSD
+  `SdfPath`.  A selection in the application must be translated to a
+  selection in the Hydra scene graph, using a path mapper.
+
+  For example, consider a USD stage rooted at application path
+  `|stage1|stageShape1`, and a USD prim `/Cube1` in that stage.  This is
+  described in the application by the `Ufe::Path` `|stage1|stageShape1,/Cube1`.
+  Its corresponding Hydra prim path might be 
+  `/MayaUsdProxyShape_PluginNode/mayaUsdProxyShape1/Cube1`.  A Hydra USD data 
+  producer plugin can register a path mapper that converts all `Ufe::Path` that
+  begin with path prefix `|stage1|stageShape1` to Hydra scene index
+  prim paths that begin with the `SdfPath` prefix
+  `/MayaUsdProxyShape_PluginNode/mayaUsdProxyShape1`, so that 
+  `|stage1|stageShape1,/Cube1` gets mapped into 
+  `/MayaUsdProxyShape_PluginNode/mayaUsdProxyShape1/Cube1`.
 
 ## Implementation
 
