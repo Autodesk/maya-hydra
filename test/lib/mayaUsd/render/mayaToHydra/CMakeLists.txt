@@ -19,7 +19,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStageAddPrim.py
     testTransforms.py
     testRefinement.py
-    testMaterialXOnNative.py|depOnPlugins:lookdevx
+    #testMaterialXOnNative.py|depOnPlugins:lookdevx HYDRA-1320 : disable this test until we get a new build of lookdevX
     testNewSceneWithStage.py
     # To be reenabled after investigation
     #testMayaDisplayModes.py|skipOnPlatform:osx
@@ -54,6 +54,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
     testMayaLightingModes.py
+    testStageInstanceablePrimsSelHighlight.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
