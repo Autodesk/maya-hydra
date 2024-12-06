@@ -1,13 +1,13 @@
-//Maya ASCII 2026ff02 scene
+//Maya ASCII 2025ff02 scene
 //Name: testInstanceablePrimsSelHighlight.ma
 //Last modified: Fri, Dec 06, 2024 11:34:05 AM
 //Codeset: 1252
-requires maya "2026ff02";
+requires maya "2025ff02";
 requires -nodeType "mayaUsdLayerManager" -nodeType "mayaUsdProxyShape" -dataType "pxrUsdStageData"
 		 "mayaUsdPlugin" "0.31.0";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";
-fileInfo "product" "Maya 2026";
+fileInfo "product" "Maya 2025";
 fileInfo "version" "Preview Release";
 fileInfo "cutIdentifier" "202412031025-000000";
 fileInfo "osv" "Windows 10 Enterprise v2009 (Build: 19045)";
