@@ -25,6 +25,37 @@
 // 
 //  createNode("MhCustomShaders")
 //
+// To use the custom shader into a usd file, please add to your file :
+/*
+def Scope "mtl"
+{
+    def Material "CustomGLSL"
+    {
+        token outputs:surface.connect = </mtl/CustomGLSL/CustomGLSLShader1.outputs:surface>
+
+        def Shader "CustomGLSLShader1"
+        {
+            uniform token info:id = "FVP_CustomBasicLightingShader"
+            token outputs:surface
+        }
+    }
+}
+
+You can also assign the material binding to a prim directly by adding  :
+
+def Mesh "Mesh1" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    uniform bool doubleSided = 1
+    float3[] extent = [(-1.0000002, -1, -1.0000005), (1, 1, 1.0000001)]
+    int[] faceVertexCounts = ...
+    int[] faceVertexIndices = ...
+    rel material:binding = </mtl/CustomGLSL>
+    point3f[] points = ...
+    ...
+}
+*/
 ////////////////////////////////////////////////////////////////////////
 
 //maya headers
