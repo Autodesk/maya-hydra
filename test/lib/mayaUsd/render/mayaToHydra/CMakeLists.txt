@@ -19,7 +19,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStageAddPrim.py
     testTransforms.py
     testRefinement.py
-    #testMaterialXOnNative.py|depOnPlugins:lookdevx HYDRA-1320 : disable this test until we get a new build of lookdevX
+    testMaterialXOnNative.py|depOnPlugins:lookdevx
     testNewSceneWithStage.py
     # To be reenabled after investigation
     #testMayaDisplayModes.py|skipOnPlatform:osx
@@ -36,7 +36,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testOpenPBRSurface.py
     testFlowViewportAPI.py
     testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-    #testStagePayloadsReferences.py #Disabled for usd 24.11 HYDRA-1317
+    testStagePayloadsReferences.py
     testNurbsPrimitives.py
     testCurveTools.py
     testPolygonPrimitives.py
@@ -48,7 +48,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     # To be reenabled after investigation
     testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testPassingNormalsOnMayaNative.py
-    #testViewportFilters.py #Disabled for usd 24.11 HYDRA-1317
+    testViewportFilters.py|depOnPlugins:mtoa
     testMayaComponentsPicking.py
     testFlowPluginsHierarchicalProperties.py
     testCustomShadersNode.py

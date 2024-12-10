@@ -117,6 +117,8 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         cmd.execute()
         self.assertTrue(prim.HasPayload())
         self.assertTrue(prim.IsLoaded())
+        #Is needed with usd 24.11 to keep the same images
+        self.modifyDefaultLightIntensityByUsdVersion()
         self.assertSnapshotClose("cubeLoaded.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         # Verify unload payload
@@ -142,6 +144,8 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         cmd.execute()
         self.assertTrue(prim.IsLoaded())
         self.assertSnapshotClose("cubeLoadWithDescendants.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        self.resetDefaultLightIntensityByUsdVersion()
 
     def test_UsdStagePayloadsFromScene(self):
         from mayaUsd import lib as mayaUsdLib
