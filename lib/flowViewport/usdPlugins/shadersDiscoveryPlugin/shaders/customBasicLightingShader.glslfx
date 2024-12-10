@@ -76,11 +76,15 @@ surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
     //vec2 st = HdGet_st().xy;//This doesn't work unless you add a texture node in the material network
 
     //Get the vertex colors from the prim vars of the quad primitive
-    vec3 vertexColors = HdGet_displayColor().rgb;
+	#ifdef HD_HAS_displayColor
+		vec3 vertexColors = HdGet_displayColor().rgb;
+	#else
+		vec3 vertexColors = vec3(1);
+	#endif
 
     vec3 ambientColor = vec3(0);//Hardcoded
     //Get the value of the custom color float3 parameter from the material, it is named "FVP_CustomColor"
-    vec3 diffuseColor = HdGet_FVP_CustomColor() *0.5 +  vertexColors*0.5;//Blend the custom color with the vertex colors
+    vec3 diffuseColor = HdGet_FVP_CustomColor() * vertexColors;//Blend the custom color with the vertex colors
     vec3 specularColor = vec3(1);//Hardcoded
     
     vec3 n = Neye;

@@ -608,6 +608,11 @@ void MhCustomShaders::addedToModelCb()
     //Data producer scene index interface is used to add the retained scene index to all viewports with all render delegates
     auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
     dataProducerSceneIndexInterface.addDataProducerSceneIndex(_retainedSceneIndex, noPrefix, (void*)&obj, FvpViewportAPITokens->allViewports,FvpViewportAPITokens->allRenderers);
+
+    //Update color
+    MPlug colorPlug(obj, mColor);
+    const double3& color = colorPlug.asMDataHandle().asDouble3();
+    UpdateColorInShader(color);
 }
 
 void MhCustomShaders::removedFromModelCb()
