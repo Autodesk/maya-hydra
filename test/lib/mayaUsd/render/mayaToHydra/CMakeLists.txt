@@ -51,7 +51,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testViewportFilters.py|depOnPlugins:mtoa
     testMayaComponentsPicking.py
     testFlowPluginsHierarchicalProperties.py
-    testCustomShadersNode.py
+    testCustomShadersNode.py|depOnPlugins:mtoa
     testMayaDefaultMaterial.py
     testMayaLightingModes.py
     testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
