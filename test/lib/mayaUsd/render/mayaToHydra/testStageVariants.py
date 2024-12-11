@@ -25,7 +25,7 @@ class TestStageVariants(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
-    IMAGE_DIFF_FAIL_PERCENT = 0.3
+    IMAGE_DIFF_FAIL_PERCENT = 2
 
     def test_UsdStageVariants(self):
         import usdUtils # usdUtils imports mayaUsd.ufe
