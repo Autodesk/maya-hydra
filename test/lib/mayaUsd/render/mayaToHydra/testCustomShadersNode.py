@@ -33,7 +33,15 @@ class TestCustomShadersNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohU
                 "testCustomShadersNode",
                 "testCustomShadersNode.ma")
             cmds.refresh()
-            self.assertSnapshotClose("testCustomShadersNode.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("testCustomShadersNodeDefaultLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+            # Switch the lighting mode to use all scene lights.
+            cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, displayLights = 'all')
+            self.assertSnapshotClose("testCustomShadersNodeUseAllLights.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+            #Remove the direct lighting to check if the dome light works fine
+            cmds.setAttr("pointLightShape1.intensity", 0);
+            self.assertSnapshotClose("testCustomShadersNodeDomeLightOnly.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
