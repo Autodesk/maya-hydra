@@ -27,7 +27,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
     testMayaLights.py
-    testUSDLights.py|skipOnPlatform:osx # HYDRA-1315 : Wire of DiskLight not showing on OSX
+    testUSDLights.py
     testUVandUDIM.py
     testArnoldLights.py|depOnPlugins:mtoa
     testLookThrough.py
