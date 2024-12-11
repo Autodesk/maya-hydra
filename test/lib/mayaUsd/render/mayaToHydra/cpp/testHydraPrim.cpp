@@ -20,7 +20,11 @@
 #include <ufe/path.h>
 #include <ufe/pathString.h>
 
+#include <pxr/imaging/hd/sceneIndexPrimView.h>
+
 #include <gtest/gtest.h>
+
+#include <regex>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -107,4 +111,30 @@ TEST(TestHydraPrim, translation)
 
     constexpr double epsilon{1e-7};
     ASSERT_TRUE(GfIsClose(primTranslation, expectedTranslation, epsilon));
+}
+
+TEST(TestHydraPrim, countPrims)
+{
+    const auto& sceneIndices = GetTerminalSceneIndices();
+    auto siRoot = sceneIndices.front();
+
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_EQ(argc, 2);
+    
+    const std::regex r{argv[0]};
+    std::smatch m;
+    const int expectedNbMatches{std::stoi(argv[1])};
+    int nbMatches{0};
+
+    for (const auto& primPath : 
+             HdSceneIndexPrimView(siRoot, SdfPath::AbsoluteRootPath())) {
+        // Can't match temporary string, see
+        // https://stackoverflow.com/questions/27391016
+        const std::string element = primPath.GetElementString();
+        if (std::regex_search(element, m, r)) {
+            ++nbMatches;
+        }
+    }
+
+    ASSERT_EQ(nbMatches, expectedNbMatches);
 }

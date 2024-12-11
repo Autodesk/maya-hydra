@@ -34,6 +34,8 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
     IMAGE_DIFF_FAIL_PERCENT = 0.1
     imageVersion = None
 
+    _requiredPlugins = ['mayaHydraCppTests']
+
     @classmethod
     def setUpClass(cls):
         super(TestFootPrintNode, cls).setUpClass()
@@ -256,6 +258,39 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
             cmds.refresh()
             #using imageVersion as the color is different for this image under usd 24.11+
             self.assertSnapshotClose("loadingFootPrintScene.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
+
+    # Test selection highlighting.  When the footprint node is selected, only
+    # its two Hydra scene index prims (heel and sole) should have a
+    # _SelectionHighlight mirror hierarchy, and no other prim.
+    def test_selectionHighlight(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            # Create a cube.
+            cmds.polyCube()
+
+            cmds.refresh()
+
+            # Create a footprint node.  It will be selected.
+            cmds.createNode('MhFootPrint')
+
+            cmds.refresh()
+
+            # Traverse the scene starting at the root, and count the number
+            # of _SelectionHighlight mirror hierarchies.  There should be 2,
+            # one for the heel and one for the sole of the footprint node.
+            cmds.mayaHydraCppTest('.*_SelectionHighlight', 2, f="TestHydraPrim.countPrims")
+
+    # Test picking.  Once picked, the footprint node must appear in the global
+    # selection.
+    def test_picking(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+
+            cmds.createNode('MhFootPrint')
+
+            cmds.refresh()
+
+            cmds.mayaHydraCppTest('|transform1|MhFootPrint1', f="TestUsdPicking.pickPrim")
+
+            self.assertEqual(['MhFootPrint1'], cmds.ls(sl=True))
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
