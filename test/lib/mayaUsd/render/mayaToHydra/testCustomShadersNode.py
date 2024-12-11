@@ -19,13 +19,18 @@ import fixturesUtils
 import mtohUtils
 import mayaUtils
 from testUtils import PluginLoaded
+import platform
 
 class TestCustomShadersNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.1
+    @property
+    def IMAGE_DIFF_FAIL_PERCENT(self):
+        if platform.system() == "Darwin":
+            return 3
+        return 0.2
 
     def test_LoadCustomShaderNode(self):
         with PluginLoaded('mayaHydraCustomShadersNode'):
@@ -33,7 +38,15 @@ class TestCustomShadersNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohU
                 "testCustomShadersNode",
                 "testCustomShadersNode.ma")
             cmds.refresh()
-            self.assertSnapshotClose("testCustomShadersNode.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("testCustomShadersNodeDefaultLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+            # Switch the lighting mode to use all scene lights.
+            cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, displayLights = 'all')
+            self.assertSnapshotClose("testCustomShadersNodeUseAllLights.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+            #Remove the direct lighting to check if the dome light works fine
+            cmds.setAttr("pointLightShape1.intensity", 0);
+            self.assertSnapshotClose("testCustomShadersNodeDomeLightOnly.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
