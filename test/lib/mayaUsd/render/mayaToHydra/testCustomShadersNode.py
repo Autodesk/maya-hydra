@@ -19,6 +19,7 @@ import fixturesUtils
 import mtohUtils
 import mayaUtils
 from testUtils import PluginLoaded
+import platform
 
 class TestCustomShadersNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
