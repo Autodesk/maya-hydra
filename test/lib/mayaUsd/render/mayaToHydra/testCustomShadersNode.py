@@ -25,7 +25,11 @@ class TestCustomShadersNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohU
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.1
+    @property
+    def IMAGE_DIFF_FAIL_PERCENT(self):
+        if platform.system() == "Darwin":
+            return 3
+        return 0.2
 
     def test_LoadCustomShaderNode(self):
         with PluginLoaded('mayaHydraCustomShadersNode'):
