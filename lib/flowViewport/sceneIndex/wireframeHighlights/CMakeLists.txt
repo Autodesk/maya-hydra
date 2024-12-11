@@ -11,6 +11,7 @@ target_sources(${TARGET_NAME}
     niPrototypeWireframeHighlightSi.cpp
     baseWhSi.cpp
     meshWhSi.cpp
+    niInstanceWhSi.cpp
     piInstancerWhSi.cpp
 )
 
@@ -23,6 +24,7 @@ set(HEADERS
     niPrototypeWireframeHighlightSi.h
     baseWhSi.h
     meshWhSi.h
+    niInstanceWhSi.h
     piInstancerWhSi.h
 )
 

@@ -1278,6 +1278,7 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     SdfPath highlightHierarchyPrefix = SdfPath("/FlowViewportSelectionHighlights");
     _lastFilteringSceneIndexBeforeCustomFiltering = _piInstancerWhSi = Fvp::PiInstancerWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
     _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+    _lastFilteringSceneIndexBeforeCustomFiltering = _niInstanceWhSi = Fvp::NiInstanceWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
     
     TF_AXIOM(_mayaHydraSceneIndex);
     Fvp::PathInterface* pathInterface = dynamic_cast<Fvp::PathInterface*>(&*mergingSceneIndex);
