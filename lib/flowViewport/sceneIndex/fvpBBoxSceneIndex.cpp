@@ -158,6 +158,7 @@ namespace
     ///
     class _BoundsPointsPrimvarValueDataSource final : public HdVec3fArrayDataSource
     {
+        inline static const GfVec3f _floatMaxVec3f {FLT_MAX};
     public:
         HD_DECLARE_DATASOURCE(_BoundsPointsPrimvarValueDataSource);
 
@@ -170,16 +171,18 @@ namespace
             HdExtentSchema extentSchema =
                 HdExtentSchema::GetFromParent(_primSource);
 
+            // Note: If the scene description doesn't provide the extents, Storm uses
+            // the default constructed GfRange3d which is [FLT_MAX, -FLT_MAX],
             GfVec3f exts[2] = { GfVec3f(0.0f), GfVec3f(0.0f) };
             bool extentMinFound = false;
             if (HdVec3dDataSourceHandle src = extentSchema.GetMin()) {
                 exts[0] = GfVec3f(src->GetTypedValue(shutterOffset));
-                extentMinFound = true;
+                extentMinFound = (exts[0] != _floatMaxVec3f);
             }
             bool extentMaxFound = false;
             if (HdVec3dDataSourceHandle src = extentSchema.GetMax()) {
                 exts[1] = GfVec3f(src->GetTypedValue(shutterOffset));
-                extentMaxFound = true;
+                extentMaxFound = (exts[1] != -_floatMaxVec3f);
             }
 
             if (!extentMinFound || !extentMaxFound) {
