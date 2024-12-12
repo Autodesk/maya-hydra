@@ -65,6 +65,16 @@ Fvp::PrimSelection ConvertHydraToFvpSelection(const SdfPath& primPath, const HdS
     return primSelection;
 }
 
+SdfPath _GetNativeInstancePrototypePath(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& nativeInstancePrimPath) {
+    HdSceneIndexPrim nativeInstancePrim = sceneIndex->GetPrim(nativeInstancePrimPath);
+    HdInstanceSchema instanceSchema = HdInstanceSchema::GetFromParent(nativeInstancePrim.dataSource);
+    auto instancerPath = instanceSchema.GetInstancer()->GetTypedValue(0);
+    HdSceneIndexPrim instancerPrim = sceneIndex->GetPrim(instancerPath);
+    HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
+    auto prototypePath = instancerTopologySchema.GetPrototypes()->GetTypedValue(0)[instanceSchema.GetPrototypeIndex()->GetTypedValue(0)];
+    return prototypePath;
+}
+
 class _RerootingSceneIndexPathDataSource : public HdPathDataSource
 {
 public:
@@ -457,9 +467,9 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
 {
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
+        HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             bool isFullySelected = false;
-            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
             if (selectionsSchema.IsDefined()) {
                 for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
@@ -484,7 +494,7 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
                 while (itInstance != _instancePaths.end() && itInstance->HasPrefix(entry.primPath)) {
                     if (_highlightedInstancePaths.find(*itInstance) != _highlightedInstancePaths.end()) {
                         auto itSelectedParentPath = _fullySelectedPaths.upper_bound(*itInstance);
-                        if (itSelectedParentPath == _fullySelectedPaths.begin() && !itInstance->HasPrefix(*std::prev(itSelectedParentPath))) {
+                        if (itSelectedParentPath == _fullySelectedPaths.begin() || !itInstance->HasPrefix(*std::prev(itSelectedParentPath))) {
                             // No selected parent.
                             _DeleteSelectionHighlight(*itInstance);
                         }
@@ -514,6 +524,16 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
         //     // No need to dirty in this case since we'll have removed and re-added prims, skip to next entries
         //     continue;
         // }
+
+        if (_highlightedInstancePaths.find(entry.primPath) != _highlightedInstancePaths.end()) {
+            auto selectionPath = SelectionPathFromKey(SelectionKey(entry.primPath, ""));
+            auto dirtyOperation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
+                highlightEntries.emplace_back(primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath), entry.dirtyLocators);
+                return true;
+            };
+            auto prototypePath = _GetNativeInstancePrototypePath(GetInputSceneIndex(), entry.primPath);
+            _ForEachPrimInHierarchy(prototypePath, dirtyOperation);
+        }
         
         // TODO : if Instance schema/dataSource is dirtied
 
