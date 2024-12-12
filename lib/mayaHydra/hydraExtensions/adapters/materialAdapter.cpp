@@ -263,7 +263,10 @@ private:
         }
 
         // Construct a MaterialX document
-        auto mtlxDocStr = mtlxDocPlug.asString();
+        const MString mtlxDocStr = mtlxDocPlug.asString();
+        if (0 == mtlxDocStr.length()) {
+            return false;
+        }
         auto mtlxDoc = MaterialX::createDocument();
         MaterialX::readFromXmlString(mtlxDoc, mtlxDocStr.asChar());
 
