@@ -55,6 +55,7 @@
 #include <flowViewport/sceneIndex/wireframeHighlights/piInstancerWhSi.h>
 #include <flowViewport/sceneIndex/wireframeHighlights/meshWhSi.h>
 #include <flowViewport/sceneIndex/wireframeHighlights/niInstanceWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/niPrototypeWhSi.h>
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
@@ -287,6 +288,7 @@ private:
     HdSceneIndexBaseRefPtr _piInstancerWhSi;
     HdSceneIndexBaseRefPtr _meshWhSi;
     HdSceneIndexBaseRefPtr _niInstanceWhSi;
+    HdSceneIndexBaseRefPtr _niPrototypeWhSi;
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
 
