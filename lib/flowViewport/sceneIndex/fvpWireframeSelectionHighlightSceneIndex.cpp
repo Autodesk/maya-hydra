@@ -333,6 +333,11 @@ WireframeSelectionHighlightSceneIndex(
     TF_AXIOM(_wireframeColorInterface);
 
     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
+
+        if (_IsExcluded(primPath)) {
+            return true;
+        }
+
         if (prim.primType == HdPrimTypeTokens->instancer) {
             _CreateSelectionHighlightsForInstancer(prim, primPath);
         }
@@ -682,6 +687,11 @@ WireframeSelectionHighlightSceneIndex::_PrimsAdded(
 
     _SendPrimsAdded(entries);
     for (const auto& entry : entries) {
+
+        if (_IsExcluded(entry.primPath)) {
+            continue;
+        }
+
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
         if (prim.primType == HdPrimTypeTokens->instancer) {
             _CreateSelectionHighlightsForInstancer(prim, entry.primPath);

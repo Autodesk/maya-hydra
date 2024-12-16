@@ -526,6 +526,10 @@ void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContex
 
             if (hasDirection && !hasPosition) {
 
+#if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
+                intensity /= M_PI;//Is a HdPrimTypeTokens->simpleLight
+#endif
+
                 // Note for devs : if you update more parameters in the default light, don't forget
                 // to update MtohDefaultLightDelegate::SetDefaultLight and MayaHydraSceneIndex::SetDefaultLight, currently there are only 3 :
                 // position, diffuse, specular
@@ -634,6 +638,11 @@ MStatus MtohRenderOverride::Render(
                 _mayaHydraSceneIndex->HandleCompleteViewportScene(
                     scene, static_cast<MFrameContext::DisplayStyle>(drawContext.getDisplayStyle()));
             }
+        }
+
+        // Update shadow collection for lights
+        if (_mayaHydraSceneIndex) {
+            _mayaHydraSceneIndex->UpdateLightsShadowCollection();
         }
 
         // Update plugin data producers
@@ -993,6 +1002,9 @@ MStatus MtohRenderOverride::Render(
         // Storm
         _taskController->SetEnableShadows(enableShadows);
         _taskController->SetShadowParams(shadowParams);
+        if (_mayaHydraSceneIndex) {
+            _mayaHydraSceneIndex->SetShadowsEnabled(enableShadows);
+        }
 
 #ifndef MAYAHYDRALIB_OIT_ENABLED
         // This is required for HdStorm to display transparency.

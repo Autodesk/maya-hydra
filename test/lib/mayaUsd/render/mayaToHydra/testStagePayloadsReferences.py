@@ -63,6 +63,8 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         self.assertTrue(aPrim.HasAuthoredReferences())
         self.setHdStormRenderer()
 
+        self.setBasicCam(2)
+
     def setUpPayloadScene(self):
         mayaUtils.openNewScene()
         import mayaUsd_createStageWithNewLayer
@@ -90,6 +92,8 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         self.a = ufe.Hierarchy.createItem(aPath)
         self.b = ufe.Hierarchy.createItem(bPath)
  
+        self.setBasicCam(2)
+
         cmds.select(clear=True)
 
     def test_UsdStagePayloadsOnTheFly(self):
@@ -113,6 +117,8 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         cmd.execute()
         self.assertTrue(prim.HasPayload())
         self.assertTrue(prim.IsLoaded())
+        #Is needed with usd 24.11 to keep the same images
+        self.modifyDefaultLightIntensityByUsdVersion()
         self.assertSnapshotClose("cubeLoaded.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         # Verify unload payload
@@ -139,9 +145,12 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
         self.assertTrue(prim.IsLoaded())
         self.assertSnapshotClose("cubeLoadWithDescendants.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
+        self.resetDefaultLightIntensityByUsdVersion()
+
     def test_UsdStagePayloadsFromScene(self):
         from mayaUsd import lib as mayaUsdLib
         self.loadUsdPayloadScene()
+        self.modifyDefaultLightIntensityByUsdVersion()
         self.assertSnapshotClose("payloadSceneLoadedPotA.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
        
         #Change the variant
@@ -159,9 +168,11 @@ class TestUsdStagePayloadsAndReferences(mtohUtils.MayaHydraBaseTestCase): #Subcl
 
     def test_UsdStageReferences(self):
         self.setUpReferenceScene()
+        self.modifyDefaultLightIntensityByUsdVersion()
         self.assertSnapshotClose("referencesSceneCreated.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
         self.loadUsdReferencesScene()
+        self.modifyDefaultLightIntensityByUsdVersion()
         self.assertSnapshotClose("referencesSceneLoaded.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
 if __name__ == '__main__':

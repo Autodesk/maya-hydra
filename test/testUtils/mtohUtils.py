@@ -24,10 +24,12 @@ import mayaUtils
 import testUtils
 from imageUtils import ImageDiffingTestCase
 from testUtils import PluginLoaded
+from pxr import Usd
 
 import platform
 import subprocess
 import sys
+import math
 
 HD_STORM = "HdStormRendererPlugin"
 HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
@@ -51,6 +53,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     _file = None
     _requiredPlugins = []
     _pluginsToUnload = []
+
+    #The OpenUSD version
+    _usdVersion = None
 
     # Unloading mayaHydraFlowViewportAPILocator crashes Maya (HYDRA-1304).
     # Unloading mtoa succeeds on Linux, but fails on Windows and macOS
@@ -92,6 +97,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             if not cmds.pluginInfo(p, q=True, loaded=True):
                 cls._pluginsToUnload.append(p)
                 cmds.loadPlugin(p, quiet=True)
+
+        #Set the usd version
+        cls._usdVersion = Usd.GetVersion()
         
     def setUp(self):
         # Maya is not closed/reset between each test of a test suite,
@@ -138,6 +146,25 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
         cmds.setAttr('persp.translate', dist, .75 * dist, dist, type='float3')
 
+    def setMayaDefaultLightIntensity(self, intensity):
+        if maya.mel.eval("optionVar -exists defaultLightIntensity"):
+            maya.mel.eval("optionVar -fv defaultLightIntensity {}".format(intensity))
+        if cmds.attributeQuery('defaultLightIntensity', node='hardwareRenderingGlobals', exists=True):
+            cmds.setAttr('hardwareRenderingGlobals.defaultLightIntensity', intensity)
+
+    def modifyDefaultLightIntensityByUsdVersion(self):
+        #Add any new case here
+        if self._usdVersion >= (0, 24, 11):
+            #For Usd 24.11+ set the default light intensity to PI instead of 1.0 to counter balance the changes in usd 24.11
+            #The original setUp() function sets the default light to 1.0
+            self.setMayaDefaultLightIntensity(math.pi)
+        
+    def resetDefaultLightIntensityByUsdVersion(self):
+        #Add any case for here
+        if self._usdVersion >= (0, 24, 11):
+            #For Usd 24.11+ reset the default light intensity to 1 instead of PI to counter balance the changes in usd 24.11
+            self.setMayaDefaultLightIntensity(1.0)
+
     def makeCubeScene(self, camDist=DEFAULT_CAM_DIST):
         mayaUtils.openNewScene()
         self.cubeTrans = cmds.polyCube()[0]
@@ -149,7 +176,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         # Hydra call made is HdRenderIndex::GetRprimIds(), which sorts
         # according to std::less<SdfPath>, which will produce
         # lexicographically-ordered paths.
-        self.cubeRprim = self.getIndex()[0]
+        self.cubeRprim = self.getIndex()[1]
         cmds.select(clear=1)
         cmds.refresh()
         self.assertVisible(self.cubeRprim)

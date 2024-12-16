@@ -27,15 +27,13 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
     testMayaLights.py
-    # To be reenabled after investigation HYDRA-1305
-    #testUSDLights.py
+    testUSDLights.py
     testUVandUDIM.py
     testArnoldLights.py|depOnPlugins:mtoa
     testLookThrough.py
     testObjectTemplate.py
     testStandardSurface.py
-    # To be reenabled after investigation HYDRA-1305
-    #testOpenPBRSurface.py
+    testOpenPBRSurface.py
     testFlowViewportAPI.py
     testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testStagePayloadsReferences.py
@@ -50,12 +48,13 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     # To be reenabled after investigation
     testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testPassingNormalsOnMayaNative.py
-    testViewportFilters.py
+    testViewportFilters.py|depOnPlugins:mtoa
     testMayaComponentsPicking.py
     testFlowPluginsHierarchicalProperties.py
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
     testMayaLightingModes.py
+    testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
@@ -164,6 +163,8 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_VP2_RENDER_DELEGATE})
             "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
 
             "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+
+            "MAYA_HAS_RENDER_ITEM_CULL_MODE_API=${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}"
     )
 
     # Assign a CTest label to these tests for easy filtering.
@@ -201,6 +202,8 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
 
             # Use standard surface as default for now
             "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
+
+            "MAYA_HAS_RENDER_ITEM_CULL_MODE_API=${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}"
     )
 
     # Add a ctest label to these tests for easy filtering.

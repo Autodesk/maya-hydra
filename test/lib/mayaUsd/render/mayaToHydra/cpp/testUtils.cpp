@@ -32,6 +32,9 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
+#if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
+    #include <pxr/imaging/hd/extComputationSchema.h>
+#endif
 
 #include <maya/MGlobal.h>
 #include <maya/MMatrix.h>
@@ -240,7 +243,11 @@ void SceneIndexInspector::_WriteLeafDataSource(
             = "SampledDataSource -> " + sampledDataSource->GetValue(0).GetTypeName();
     } else if (
         auto extComputationCallbackDataSource
+#if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
+        = HdExtComputationCpuCallbackDataSource::Cast(dataSource)) {
+#else
         = HdExtComputationCallbackDataSource::Cast(dataSource)) {
+#endif
         dataSourceDescription = "ExtComputationCallbackDataSource";
     } else {
         dataSourceDescription = "Unidentified data source type";
