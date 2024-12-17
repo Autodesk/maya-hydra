@@ -100,8 +100,12 @@ Dependencies instancedPrim(
 bool isGeomSubset(const HdSceneIndexPrim& prim) {
     // HYDRA-1339: PiPrototypePropagatingSceneIndex removes GeomSubset type
     // from Hydra prims
+#if PXR_VERSION >= 2403
     return (prim.primType == HdPrimTypeTokens->geomSubset) ||
         HdGeomSubsetSchema::GetFromParent(prim.dataSource).IsDefined();
+#else
+    return false;
+#endif
 }
 
 }
