@@ -26,7 +26,7 @@ Before building the project, consult the following table to ensure you use the r
 #### 2. Download and Build Pixar USD 
 
 See Pixar's official github page for instructions on how to build USD: https://github.com/PixarAnimationStudios/USD.<BR> 
-If you want to <B>be able to import usd data in maya through [MayaUSD](https://github.com/Autodesk/maya-usd), you have to rebuild MayaHydra with the same version used by MayaUSD </B>which is a customized version of OpenUSD, these versions are :
+If you want to <B>be able to import usd data in maya through [MayaUSD](https://github.com/Autodesk/maya-usd) and use a hydra render delegate in the viewport, you have to rebuild MayaHydra with the same version used by MayaUSD </B>which is a customized version of OpenUSD, these versions are :
 
 |               |      ![](images/pxr.png)          | USD version used in Maya | USD source for MayaUSD / MayaHydra |
 |:------------: |:---------------:                  |:------------------------:|:-------------------------:|

@@ -1,11 +1,11 @@
 This is a Flow viewport toolkit example. 
 The Flow viewport toolkit has been developed to :
-- create Hydra primitives directly without the need to create OpenUSD data or Maya geometry 
-- add custom Hydra filtering scene indices to MayaHydra to modify the Hydra primitives in the viewport
+- create hydra primitives directly without the need to create OpenUSD data or Maya geometry 
+- add custom hydra filtering scene indices to MayaHydra to modify the hydra primitives in the viewport
 
-This project shows how to create Hydra mesh primitives directly without the need of importing usd data or create Maya geometry.
-- It creates a grid of cubes which are Hydra mesh primitives, the grid has parameters which can be modified in the Maya node.
-- It shows how to use Hydra instancing as an option for the created cubes.
-- It deals with MayaHydra selection picking so the user can do selection picking on the Hydra cubes in the viewport.
-- It adds a Hydra filtering scene index to MayaHydra that hides mesh primitives that have more vertices than a certain number.
+This project shows how to create hydra mesh primitives directly without the need of importing usd data or create Maya geometry.
+- It creates a grid of cubes which are hydra mesh primitives, the grid has parameters which can be modified in the Maya node.
+- It shows how to use hydra instancing as an option for the created cubes.
+- It deals with MayaHydra selection picking so the user can do selection picking on the hydra cubes in the viewport.
+- It adds a hydra filtering scene index to MayaHydra that hides mesh primitives that have more vertices than a certain number.
 

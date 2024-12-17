@@ -1,7 +1,7 @@
 This is a Flow viewport toolkit example. 
 The Flow viewport toolkit has been developed to :
-- create Hydra primitives directly without the need to create OpenUSD data or Maya geometry 
-- add custom Hydra filtering scene indices to MayaHydra to modify the Hydra primitives in the viewport
+- create hydra primitives directly without the need to create OpenUSD data or Maya geometry 
+- add custom hydra filtering scene indices to MayaHydra to modify the hydra primitives in the viewport
 
-This project is a Maya node that creates a Hydra primitive and applies to it the custom GLSL shader for Hydra Storm that is created and registered in OpenUSD/Hydra by the project 
+This project is a Maya node that creates a Hydra primitive and applies to it the custom GLSL shader for Hydra Storm that is created and registered in OpenUSD/hydra by the project 
 https://github.com/Autodesk/maya-hydra/tree/dev/lib/flowViewport/usdPlugins/shadersDiscoveryPlugin
