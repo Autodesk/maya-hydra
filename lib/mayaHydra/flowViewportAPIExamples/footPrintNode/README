@@ -1,0 +1,9 @@
+This is a Flow viewport toolkit example. 
+The Flow viewport toolkit has been developed to :
+- create Hydra primitives directly without the need to create OpenUSD data or Maya geometry 
+- add custom Hydra filtering scene indices to MayaHydra to modify the Hydra primitives in the viewport
+
+This project is similar to the Maya devkit sample named FootPrint node. Except that it doesn't create maya geometry but directly Hydra primitives using the Flow viewport toolkit.
+It also deals with MayaHydra selection picking so the user can do selection picking on the Footprint node in the viewport.
+
+
