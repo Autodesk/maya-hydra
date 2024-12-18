@@ -38,7 +38,7 @@ namespace FVP_NS_DEF
     {
      public:
 
-         ///Interface accessor
+        ///Interface accessor
         static FVP_API FilteringSceneIndexInterface& get();
 
         /**
