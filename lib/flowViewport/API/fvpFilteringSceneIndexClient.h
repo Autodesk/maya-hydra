@@ -62,9 +62,6 @@ namespace FVP_NS_DEF
         *                  node deleted/undeleted and we remove/add automatically your filtering scene indices from the viewport. Meaning if the maya node is visible your filtering
         *                  scene indices are applied to the scene, if the node is not visible (or deleted) your filtering scene indices are removed from the scene.
         *                  If it is a nullptr, your filtering scene indices will stay applied to the viewport(s) until you remove them.
-        * 
-        *  @param[in]      inputArgs is a container data source handle to deal with the possibility to send custom data from our Hydra viewport plugin for the creation of your scene index.
-        *                  This parameter is currently not used by the Hydra viewport plugin but is left for possible future use.
         */
         FilteringSceneIndexClient(const std::string& displayName, const Category category, const std::string& rendererNames, void* dccNode):
             _displayName{displayName}, _category{category}, _rendererNames{rendererNames}, _dccNode{dccNode}
@@ -122,6 +119,10 @@ namespace FVP_NS_DEF
         */
         void* getDccNode() const {return _dccNode;}
         
+        /**
+         *  @brief  Equal operator.
+         *  @return true if the FilteringSceneIndexClient are identical.
+         */
         bool operator == (const FilteringSceneIndexClient& other)const 
         {
             return _displayName == other._displayName &&

@@ -30,6 +30,9 @@ namespace FVP_NS_DEF
     class VersionInterface
     {
      public:
+        /**
+        *  @brief      Get the VersionInterface instance.
+        */
          static FVP_API VersionInterface& Get();
 
         /**

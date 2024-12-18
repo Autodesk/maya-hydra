@@ -24,10 +24,15 @@
 
 #include <memory>
 
-//Is the forward declaration of the FilteringSceneIndexClient class and FilteringSceneIndexClientPtr
+/**
+ * Is the forward declaration of the FilteringSceneIndexClient class and
+ * FilteringSceneIndexClientPtr to avoid including the whole class definition.
+ */
 namespace FVP_NS_DEF
 {
     class FilteringSceneIndexClient;
+
+    /// Shared pointer to FilteringSceneIndexClient
     using FilteringSceneIndexClientPtr = std::shared_ptr<FilteringSceneIndexClient>;
     
 }//end of namespace
