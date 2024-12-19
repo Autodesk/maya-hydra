@@ -10,6 +10,7 @@ target_sources(${TARGET_NAME}
     niInstanceWireframeHighlightSi.cpp
     niPrototypeWireframeHighlightSi.cpp
     baseWhSi.cpp
+    geomSubsetWhSi.cpp
     meshWhSi.cpp
     niInstanceWhSi.cpp
     niPrototypeWhSi.cpp
@@ -24,6 +25,7 @@ set(HEADERS
     niInstanceWireframeHighlightSi.h
     niPrototypeWireframeHighlightSi.h
     baseWhSi.h
+    geomSubsetWhSi.h
     meshWhSi.h
     niInstanceWhSi.h
     niPrototypeWhSi.h
