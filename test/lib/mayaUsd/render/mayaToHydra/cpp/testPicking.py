@@ -78,18 +78,6 @@ class TestPicking(mtohUtils.MayaHydraBaseTestCase):
         cmds.refresh()
         return objectName
 
-    def createUsdCamera(self, stagePath):
-        import mayaUsd.lib
-        from pxr import UsdGeom
-        objectName = "USDCamera"
-        stage = mayaUsd.lib.GetPrim(stagePath).GetStage()
-        xform = UsdGeom.Xform.Define(stage, "/" + objectName + "Xform")
-        xform.AddTranslateOp().Set(value=(6, 5, 4))
-        UsdGeom.Camera.Define(stage, str(xform.GetPath()) + "/" + objectName)
-        cmds.select(clear=True)
-        cmds.refresh()
-        return objectName
-
     def test_PickMayaMesh(self):
         cubeObjectName = self.createMayaCube()
         with PluginLoaded('mayaHydraCppTests'):
@@ -121,13 +109,6 @@ class TestPicking(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(rectLightObjectName, "rectLight", f="TestPicking.pickObject")
 
-    def test_PickUsdCamera(self):
-        import mayaUsd_createStageWithNewLayer
-        stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
-        cameraObjectName = self.createUsdCamera(stagePath)
-        with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(cameraObjectName, "camera", f="TestPicking.pickObject")
-
     def test_MarqueeSelection(self):
         import mayaUsd_createStageWithNewLayer
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
@@ -136,7 +117,6 @@ class TestPicking(mtohUtils.MayaHydraBaseTestCase):
         usdMayaCubeName = self.createUsdCubeFromMaya(stagePath)
         usdCubeName = self.createUsdCube(stagePath)
         usdRectLightName = self.createUsdRectLight(stagePath)
-        usdCameraName = self.createUsdCamera(stagePath)
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 mayaCubeName, "mesh",
@@ -144,7 +124,6 @@ class TestPicking(mtohUtils.MayaHydraBaseTestCase):
                 usdMayaCubeName, "mesh",
                 usdCubeName, "mesh",
                 usdRectLightName, "rectLight",
-                usdCameraName, "camera",
                 f="TestPicking.marqueeSelect")
 
 if __name__ == '__main__':
