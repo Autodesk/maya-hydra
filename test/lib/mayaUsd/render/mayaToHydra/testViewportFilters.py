@@ -92,7 +92,9 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
 
     def compareSnapshot(self, referenceFilename, cameraDistance):
         self.setBasicCam(cameraDistance)
-        self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        # Compare silhouettes to only check for whether the objects to filter are visible or not, 
+        # independently of their visual look since it can vary between versions.
+        self.assertSnapshotSilhouetteClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def checkFilter(self, name, exclusionMask, cameraDistance=15):
         activeViewport = mayaUtils.activeModelPanel()
