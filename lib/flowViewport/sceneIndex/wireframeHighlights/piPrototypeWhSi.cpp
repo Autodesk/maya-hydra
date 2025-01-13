@@ -33,6 +33,67 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
+// Returns all paths related to instancing for this prim; this is analogous to getting the edges
+// connected to the given vertex (in this case a prim) of an instancing graph.
+SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim, Fvp::SelectionHighlightsCollectionDirection3 direction)
+{
+    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    
+    SdfPathVector instancingRelatedPaths;
+
+    if ((direction & Fvp::SelectionHighlightsCollectionDirection3::Prototypes3)
+        && instancerTopology.IsDefined()) {
+        auto protoPaths = instancerTopology.GetPrototypes()->GetTypedValue(0);
+        for (const auto& protoPath : protoPaths) {
+            instancingRelatedPaths.push_back(protoPath);
+        }
+    }
+
+    if ((direction & Fvp::SelectionHighlightsCollectionDirection3::InstancedBy3)
+        && instancedBy.IsDefined()) {
+        auto instancerPaths = instancedBy.GetPaths()->GetTypedValue(0);
+        for (const auto& instancerPath : instancerPaths) {
+            instancingRelatedPaths.push_back(instancerPath);
+        }
+
+        // Having a prototype root is not a hard requirement (a single prim being instanced
+        // does not need to specify itself as its own prototype root).
+        if (instancedBy.GetPrototypeRoots()) {
+            auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
+            for (const auto& protoRootPath : protoRootPaths) {
+                instancingRelatedPaths.push_back(protoRootPath);
+            }
+        }
+    }
+
+    return instancingRelatedPaths;
+}
+
+bool _IsPrototype(const HdSceneIndexPrim& prim)
+{
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    return instancedBy.IsDefined();
+}
+
+bool _IsPrototypeSubPrim(const HdSceneIndexPrim& prim, const SdfPath& primPath)
+{
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    if (!instancedBy.IsDefined()) {
+        return false;
+    }
+    if (!instancedBy.GetPrototypeRoots()) {
+        return false;
+    }
+    auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
+    for (const auto& protoRootPath : protoRootPaths) {
+        if (protoRootPath == primPath) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // We consider prototypes that have child prims to be different hierarchies,
 // separate from each other and from the "root" hierarchy.
 VtArray<SdfPath> _GetHierarchyRoots(const HdSceneIndexPrim& prim)
@@ -301,6 +362,23 @@ HdSceneIndexBaseRefPtr PiPrototypeWhSi::New(
 
 HdSceneIndexPrim PiPrototypeWhSi::GetHighlightPrim(const SdfPath &selectionPath, const SdfPath &fullPrimPath) const
 {
+    // SelectionKey selectionKey = SelectionKeyFromPath(selectionPath);
+    // auto primSelection = _selections.at(selectionKey)._primSelection;
+
+    // auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
+    // HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
+    // prim.dataSource = _RerootingSceneIndexContainerDataSource::New(SdfPath::AbsoluteRootPath(), selectionPath, prim.dataSource);
+    // if (prim.primType == HdPrimTypeTokens->mesh) {
+    //     prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(primSelection));
+    // }
+    // if (prim.primType == HdPrimTypeTokens->instancer && originalPath == selectionKey.first) {
+    //     HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
+    //     HdSelectionSchema activeSelection = selectionsSchema.GetElement(std::stoul(selectionKey.second));
+    //     prim.dataSource = _GetSelectionHighlightInstancerDataSource(prim.dataSource, activeSelection);
+    // }
+    // return prim;
+
+
     SelectionKey selectionKey = SelectionKeyFromPath(selectionPath);
     auto primSelection = _selections.at(selectionKey)._primSelection;
 
@@ -313,22 +391,37 @@ HdSceneIndexPrim PiPrototypeWhSi::GetHighlightPrim(const SdfPath &selectionPath,
     if (prim.primType == HdPrimTypeTokens->instancer && originalPath == selectionKey.first) {
         HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
         HdSelectionSchema activeSelection = selectionsSchema.GetElement(std::stoul(selectionKey.second));
-        prim.dataSource = _GetSelectionHighlightInstancerDataSource(prim.dataSource, activeSelection);
+        //prim.dataSource = _GetSelectionHighlightInstancerDataSource(prim.dataSource, activeSelection);
     }
     return prim;
 };
 
 SdfPathVector PiPrototypeWhSi::GetHighlightChildPrimPaths(const SdfPath &selectionPath, const SdfPath &fullPrimPath) const
 {
-    if (fullPrimPath == selectionPath) {
-        // Return only the prototype prim we're interested in
-        return {_selectionPathsToPrototypePaths.at(selectionPath)};
-    }
+    // if (fullPrimPath == selectionPath) {
+    //     // Return only the prototype prim we're interested in
+    //     return {_selectionPathsToPrototypePaths.at(selectionPath)};
+    // }
+    // SdfPathVector childPaths;
+    // auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, _selectionPathsToPrototypePrefixes.at(selectionPath));
+    // auto originalChildPaths = GetInputSceneIndex()->GetChildPrimPaths(originalPath);
+    // for (const auto& originalChildPath : originalChildPaths) {
+    //     childPaths.emplace_back(originalChildPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath));
+    // }
+    // return childPaths;
+
+
     SdfPathVector childPaths;
-    auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, _selectionPathsToPrototypePrefixes.at(selectionPath));
+    auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
     auto originalChildPaths = GetInputSceneIndex()->GetChildPrimPaths(originalPath);
     for (const auto& originalChildPath : originalChildPaths) {
-        childPaths.emplace_back(originalChildPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath));
+        auto itInstancer = _instancerPathsToSelections.upper_bound(originalChildPath);
+        bool isInstancerRelevantPath = (itInstancer != _instancerPathsToSelections.end() && itInstancer->first.HasPrefix(originalChildPath)) || (itInstancer != _instancerPathsToSelections.begin() && originalChildPath.HasPrefix((--itInstancer)->first));
+        auto itPrototype = _prototypePathsToSelections.upper_bound(originalChildPath);
+        bool isPrototypeRelevantPath = (itPrototype != _prototypePathsToSelections.end() && itPrototype->first.HasPrefix(originalChildPath)) || (itPrototype != _prototypePathsToSelections.begin() && originalChildPath.HasPrefix((--itPrototype)->first));
+        if (isInstancerRelevantPath || isPrototypeRelevantPath) {
+            childPaths.emplace_back(originalChildPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
+        }
     }
     return childPaths;
 }
@@ -359,6 +452,37 @@ void PiPrototypeWhSi::ProcessAddedPrims(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::AddedPrimEntries &entries)
 {
+    // HdSceneIndexObserver::AddedPrimEntries highlightEntries;
+    // for (const auto& entry : entries) {
+    //     if (_IsPointInstancePrototype(GetInputSceneIndex(), entry.primPath)) {
+    //         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+    //         HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
+    //         if (selectionsSchema.IsDefined()) {
+    //             for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
+    //                 _CreateSelectionHighlight(entry.primPath, std::to_string(selectionId));
+    //             }
+    //             // We just created the highlight, no need to add highlight prims
+    //             continue;
+    //         }
+    //     }
+
+    //     auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
+    //     if (itPrototype != _prototypePathsToSelections.begin()) {
+    //         --itPrototype;
+    //         if (entry.primPath.HasPrefix(itPrototype->first)) {
+    //             for (const auto& selectionKey : itPrototype->second) {
+    //                 auto selectionPath = SelectionPathFromKey(selectionKey);
+    //                 highlightEntries.emplace_back(entry.primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath), entry.primType);
+    //             }
+    //         }
+    //     }
+    // }
+    // _SendPrimsAdded(highlightEntries);
+
+
+
+
+
     HdSceneIndexObserver::AddedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         if (_IsPointInstancePrototype(GetInputSceneIndex(), entry.primPath)) {
@@ -373,13 +497,24 @@ void PiPrototypeWhSi::ProcessAddedPrims(
             }
         }
 
+        auto itInstancer = _instancerPathsToSelections.upper_bound(entry.primPath);
+        if (itInstancer != _instancerPathsToSelections.begin()) {
+            --itInstancer;
+            if (entry.primPath.HasPrefix(itInstancer->first)) {
+                for (const auto& selectionKey : itInstancer->second) {
+                    auto selectionPath = SelectionPathFromKey(selectionKey);
+                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.primType);
+                }
+            }
+        }
+
         auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
         if (itPrototype != _prototypePathsToSelections.begin()) {
             --itPrototype;
             if (entry.primPath.HasPrefix(itPrototype->first)) {
                 for (const auto& selectionKey : itPrototype->second) {
                     auto selectionPath = SelectionPathFromKey(selectionKey);
-                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath), entry.primType);
+                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.primType);
                 }
             }
         }
@@ -391,12 +526,57 @@ void PiPrototypeWhSi::ProcessRemovedPrims(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::RemovedPrimEntries &entries)
 {
+    //HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
+    //for (const auto& entry : entries) {
+    //    auto itSelectedPrim = _primPathsToSelections.lower_bound(entry.primPath);
+    //    if (itSelectedPrim != _primPathsToSelections.end()) {
+    //        if (itSelectedPrim->first.HasPrefix(entry.primPath)) {
+    //            for (const auto& selectionKey : itSelectedPrim->second) {
+    //                _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
+    //            }
+    //        }
+    //    }
+
+    //    auto itPrototypeParentRemoval = _prototypePathsToSelections.lower_bound(entry.primPath);
+    //    if (itPrototypeParentRemoval != _prototypePathsToSelections.end()) {
+    //        if (itPrototypeParentRemoval->first.HasPrefix(entry.primPath)) {
+    //            for (const auto& selectionKey : itPrototypeParentRemoval->second) {
+    //                _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
+    //            }
+    //        }
+    //    }
+
+    //    auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
+    //    if (itPrototype != _prototypePathsToSelections.begin()) {
+    //        --itPrototype;
+    //        if (entry.primPath.HasPrefix(itPrototype->first)) {
+    //            for (const auto& selectionKey : itPrototype->second) {
+    //                auto selectionPath = SelectionPathFromKey(selectionKey);
+    //                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath));
+    //            }
+    //        }
+    //    }
+    //}
+    //_SendPrimsRemoved(highlightEntries);
+
+
+
+
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         auto itSelectedPrim = _primPathsToSelections.lower_bound(entry.primPath);
         if (itSelectedPrim != _primPathsToSelections.end()) {
             if (itSelectedPrim->first.HasPrefix(entry.primPath)) {
                 for (const auto& selectionKey : itSelectedPrim->second) {
+                    _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
+                }
+            }
+        }
+
+        auto itInstancerParentRemoval = _instancerPathsToSelections.lower_bound(entry.primPath);
+        if (itInstancerParentRemoval != _instancerPathsToSelections.end()) {
+            if (itInstancerParentRemoval->first.HasPrefix(entry.primPath)) {
+                for (const auto& selectionKey : itInstancerParentRemoval->second) {
                     _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
                 }
             }
@@ -411,13 +591,24 @@ void PiPrototypeWhSi::ProcessRemovedPrims(
             }
         }
 
+        auto itInstancer = _instancerPathsToSelections.upper_bound(entry.primPath);
+        if (itInstancer != _instancerPathsToSelections.begin()) {
+            --itInstancer;
+            if (entry.primPath.HasPrefix(itInstancer->first)) {
+                for (const auto& selectionKey : itInstancer->second) {
+                    auto selectionPath = SelectionPathFromKey(selectionKey);
+                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
+                }
+            }
+        }
+
         auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
         if (itPrototype != _prototypePathsToSelections.begin()) {
             --itPrototype;
             if (entry.primPath.HasPrefix(itPrototype->first)) {
                 for (const auto& selectionKey : itPrototype->second) {
                     auto selectionPath = SelectionPathFromKey(selectionKey);
-                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath));
+                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
                 }
             }
         }
@@ -430,28 +621,98 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
+    //for (const auto& entry : entries) {
+    //    if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
+    //        HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+    //        //std::cout << "PiPrototypeWhSi::ProcessDirtiedPrims before _IsNativePrototype" << std::endl;
+    //        if (_IsPointInstancePrototype(GetInputSceneIndex(), entry.primPath)) {
+    //            //std::cout << "PiPrototypeWhSi::ProcessDirtiedPrims after _IsNativePrototype" << std::endl;
+    //            auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
+    //            if (existingSelectionKeys != _primPathsToSelections.end()) {
+    //                auto selectionKeysToDelete = existingSelectionKeys->second;
+    //                for (const auto& selectionKey : selectionKeysToDelete) {
+    //                    _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
+    //                }
+    //            }
+    //            HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
+    //            if (selectionsSchema.IsDefined()) {
+    //                for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
+    //                    //std::cout << "PiPrototypeWhSi::ProcessDirtiedPrims before _CreateSelectionHighlight" << std::endl;
+    //                    _CreateSelectionHighlight(entry.primPath, std::to_string(selectionId));
+    //                }
+    //            }
+    //            // We rebuilt the highlight, no need to do the rest
+    //            continue;
+    //        }
+    //    }
+//
+    //    // Propagate notifications if this prim is a relevant prototype or a subprim of one
+    //    auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
+    //    if (itPrototype != _prototypePathsToSelections.begin()) {
+    //        --itPrototype;
+    //        if (entry.primPath.HasPrefix(itPrototype->first)) {
+    //            for (const auto& selectionKey : itPrototype->second) {
+    //                auto selectionPath = SelectionPathFromKey(selectionKey);
+    //                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
+    //            }
+    //        }
+    //    }
+    //}
+    //_SendPrimsDirtied(highlightEntries);
+
+
+    //HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
-            //std::cout << "PiPrototypeWhSi::ProcessDirtiedPrims before _IsNativePrototype" << std::endl;
             if (_IsPointInstancePrototype(GetInputSceneIndex(), entry.primPath)) {
-                //std::cout << "PiPrototypeWhSi::ProcessDirtiedPrims after _IsNativePrototype" << std::endl;
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
-                    auto selectionKeysToDelete = existingSelectionKeys->second;
-                    for (const auto& selectionKey : selectionKeysToDelete) {
+                    for (const auto& selectionKey : existingSelectionKeys->second) {
                         _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
                     }
                 }
                 HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
                 if (selectionsSchema.IsDefined()) {
                     for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
-                        //std::cout << "PiPrototypeWhSi::ProcessDirtiedPrims before _CreateSelectionHighlight" << std::endl;
                         _CreateSelectionHighlight(entry.primPath, std::to_string(selectionId));
                     }
                 }
                 // We rebuilt the highlight, no need to do the rest
                 continue;
+            }
+        }
+
+        if ((_instancerPathsToSelections.find(entry.primPath) != _instancerPathsToSelections.end() || _prototypePathsToSelections.find(entry.primPath) != _prototypePathsToSelections.end()) 
+            && entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator())) {
+            // Instancing topology was changed : rebuild the highlights, since we don't know exactly how it was changed
+            auto instancerSelectionKeysToRebuild = _instancerPathsToSelections.find(entry.primPath);
+            if (instancerSelectionKeysToRebuild != _instancerPathsToSelections.end()) {
+                for (const auto& selectionKey : instancerSelectionKeysToRebuild->second) {
+                    _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
+                    _CreateSelectionHighlight(selectionKey.first, selectionKey.second);
+                }
+            }
+            auto prototypeSelectionKeysToRebuild = _prototypePathsToSelections.find(entry.primPath);
+            if (prototypeSelectionKeysToRebuild != _prototypePathsToSelections.end()) {
+                for (const auto& selectionKey : prototypeSelectionKeysToRebuild->second) {
+                    _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
+                    _CreateSelectionHighlight(selectionKey.first, selectionKey.second);
+                }
+            }
+            // No need to dirty in this case since we'll have removed and re-added prims, skip to next entries
+            continue;
+        }
+
+        // Propagate notifications if this prim is a relevant instancer or a subprim of one
+        auto itInstancer = _instancerPathsToSelections.upper_bound(entry.primPath);
+        if (itInstancer != _instancerPathsToSelections.begin()) {
+            --itInstancer;
+            if (entry.primPath.HasPrefix(itInstancer->first)) {
+                for (const auto& selectionKey : itInstancer->second) {
+                    auto selectionPath = SelectionPathFromKey(selectionKey);
+                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
+                }
             }
         }
 
@@ -474,27 +735,68 @@ void PiPrototypeWhSi::_CreateSelectionHighlight(const PXR_NS::SdfPath& prototype
 {
     // Setup data structures
     //std::cout << "_CreateSelectionHighlight(prototypePath, selectionId)" << std::endl;
+    //SelectionKey selectionKey { prototypePath, selectionId };
+    //SdfPath selectionPath = RegisterSelection(selectionKey);
+
+    //_prototypePathsToSelections[prototypePath].emplace(selectionKey);
+    //_selectionPathsToPrototypePrefixes.emplace(selectionPath, prototypePath.GetParentPath());
+    //_selectionPathsToPrototypePaths.emplace(selectionPath, prototypePath);
+
+    // Send notifications
+    //HdSceneIndexObserver::AddedPrimEntries addedPrims;
+    //auto operation = [&addedPrims, prototypePath, selectionPath](const pxr::SdfPath& primPath, const pxr::HdSceneIndexPrim& prim) -> bool {
+    //    addedPrims.emplace_back(primPath.ReplacePrefix(prototypePath.GetParentPath(), selectionPath), prim.primType);
+    //    return true;
+    //};
+    //_ForEachPrimInHierarchy(prototypePath, operation);
+//
+    //// Send notifications
+    //for (const auto& prim : addedPrims) {
+    //    std::cout << prim.primPath << std::endl;
+    //    if (prim.primPath.GetString().find("FlowViewportSelectionHighlights/FlowViewportSelectionHighlights") != std::string::npos) {
+    //        std::cout << "WRONG" << std::endl;
+    //    }
+    //}
+    //_SendPrimsAdded(addedPrims);
+
+
+
+
+
+    // Collect paths
+    SdfPathSet instancerPaths;
+    SdfPathSet prototypePaths;
+    _CollectInstancingPaths(prototypePath, SelectionHighlightsCollectionDirection3::Bidirectional3, instancerPaths, prototypePaths);
+
+    // Setup data structures
     SelectionKey selectionKey { prototypePath, selectionId };
     SdfPath selectionPath = RegisterSelection(selectionKey);
 
-    _prototypePathsToSelections[prototypePath].emplace(selectionKey);
-    _selectionPathsToPrototypePrefixes.emplace(selectionPath, prototypePath.GetParentPath());
-    _selectionPathsToPrototypePaths.emplace(selectionPath, prototypePath);
+    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(prototypePath);
+    HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
+    SelectionData2 selectionData;
+    selectionData._primSelection = ConvertHydraToFvpSelection(prototypePath, selectionsSchema.GetElement(std::stoul(selectionId)));
+    selectionData._instancerPaths = instancerPaths;
+    selectionData._prototypePaths = prototypePaths;
+    _selections[selectionKey] = selectionData;
+    for (const auto& instancerPath : instancerPaths) {
+        _instancerPathsToSelections[instancerPath].emplace(selectionKey);
+    }
+    for (const auto& prototypePath : prototypePaths) {
+        _prototypePathsToSelections[prototypePath].emplace(selectionKey);
+    }
 
     // Send notifications
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
-    auto operation = [&addedPrims, prototypePath, selectionPath](const pxr::SdfPath& primPath, const pxr::HdSceneIndexPrim& prim) -> bool {
-        addedPrims.emplace_back(primPath.ReplacePrefix(prototypePath.GetParentPath(), selectionPath), prim.primType);
+    auto operation = [&addedPrims, selectionPath](const pxr::SdfPath& primPath, const pxr::HdSceneIndexPrim& prim) -> bool {
+        addedPrims.emplace_back(primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), prim.primType);
         return true;
     };
-    _ForEachPrimInHierarchy(prototypePath, operation);
-
-    // Send notifications
-    for (const auto& prim : addedPrims) {
-        std::cout << prim.primPath << std::endl;
-        if (prim.primPath.GetString().find("FlowViewportSelectionHighlights/FlowViewportSelectionHighlights") != std::string::npos) {
-            std::cout << "WRONG" << std::endl;
-        }
+    for (const auto& instancerPath : instancerPaths) {
+        _ForEachPrimInHierarchy(instancerPath, operation);
+    }
+    for (const auto& prototypePath : prototypePaths) {
+        _ForEachPrimInHierarchy(prototypePath, operation);
     }
     _SendPrimsAdded(addedPrims);
 }
@@ -502,15 +804,44 @@ void PiPrototypeWhSi::_CreateSelectionHighlight(const PXR_NS::SdfPath& prototype
 void PiPrototypeWhSi::_DeleteSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId)
 {
     // Erase from data structures
+    //SelectionKey selectionKey { prototypePath, selectionId };
+    //SdfPath selectionPath = UnregisterSelection(selectionKey);
+    //auto prototypePrefix = _selectionPathsToPrototypePrefixes.at(selectionPath);
+    //auto itPrototypePath = _prototypePathsToSelections.upper_bound(prototypePrefix);
+    //if (itPrototypePath != _prototypePathsToSelections.end()) {
+    //    itPrototypePath->second.erase(selectionKey);
+    //}
+    //_selectionPathsToPrototypePrefixes.erase(selectionPath);
+    //_selectionPathsToPrototypePaths.erase(selectionPath);
+//
+    //// Send notifications
+    //_SendPrimsRemoved({selectionPath});
+
+
+
+
+    // Collect paths
     SelectionKey selectionKey { prototypePath, selectionId };
-    SdfPath selectionPath = UnregisterSelection(selectionKey);
-    auto prototypePrefix = _selectionPathsToPrototypePrefixes.at(selectionPath);
-    auto itPrototypePath = _prototypePathsToSelections.upper_bound(prototypePrefix);
-    if (itPrototypePath != _prototypePathsToSelections.end()) {
-        itPrototypePath->second.erase(selectionKey);
+    if (_selections.find(selectionKey) == _selections.end()) {
+        return;
     }
-    _selectionPathsToPrototypePrefixes.erase(selectionPath);
-    _selectionPathsToPrototypePaths.erase(selectionPath);
+    SelectionData2 selectionData = _selections.at(selectionKey);
+
+    // Erase from data structures
+    SdfPath selectionPath = UnregisterSelection(selectionKey);
+    _selections.erase(selectionKey);
+    for (const auto& instancerPath : selectionData._instancerPaths) {
+        _instancerPathsToSelections[instancerPath].erase(selectionKey);
+        if (_instancerPathsToSelections[instancerPath].empty()) {
+            _instancerPathsToSelections.erase(instancerPath);
+        }
+    }
+    for (const auto& prototypePath : selectionData._prototypePaths) {
+        _prototypePathsToSelections[prototypePath].erase(selectionKey);
+        if (_prototypePathsToSelections[prototypePath].empty()) {
+            _prototypePathsToSelections.erase(prototypePath);
+        }
+    }
 
     // Send notifications
     _SendPrimsRemoved({selectionPath});
@@ -542,6 +873,64 @@ PiPrototypeWhSi::_ForEachPrimInHierarchy(
             itPrim.SkipDescendants();
             continue;
         }
+    }
+}
+
+void
+PiPrototypeWhSi::_CollectInstancingPaths(const PXR_NS::SdfPath& primPath, SelectionHighlightsCollectionDirection3 direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const
+{
+    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+
+    // If this is a prototype sub-prim, redirect the call to the prototype root, so that the prototype root
+    // becomes the actual selection highlight mirror. The instancing-related paths will be processed as part
+    // of the children traversal later down this method.
+    if (_IsPrototypeSubPrim(prim, primPath)) {
+        HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+        auto protoRootPaths = instancedBy.GetPrototypeRoots()->GetTypedValue(0);
+        for (const auto& protoRootPath : protoRootPaths) {
+            _CollectInstancingPaths(protoRootPath, direction, outInstancerPaths, outPrototypePaths);
+        }
+        return;
+    }
+    
+    if (_IsPrototype(prim)) {
+        if (outPrototypePaths.find(primPath) != outPrototypePaths.end()) {
+            return;
+        }
+        outPrototypePaths.insert(primPath);
+    } else {
+        if (outInstancerPaths.find(primPath) != outInstancerPaths.end()) {
+            return;
+        }
+        outInstancerPaths.insert(primPath);
+    }
+
+    // Traverse the children of this prim to find the affected child prims, and process their instancing-related
+    // paths so we can create selection highlight mirrors for these prims as well.
+    SdfPathVector affectedPrototypePaths;
+    SdfPathVector affectedInstancedByPaths;
+    auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
+        if (prim.primType == HdPrimTypeTokens->instancer || prim.primType == HdPrimTypeTokens->mesh) {
+            if (direction & SelectionHighlightsCollectionDirection3::Prototypes3) {
+                auto prototypePaths = _GetInstancingRelatedPaths(prim, SelectionHighlightsCollectionDirection3::Prototypes3);
+                affectedPrototypePaths.insert(affectedPrototypePaths.end(), prototypePaths.begin(), prototypePaths.end());
+            }
+            if (direction & SelectionHighlightsCollectionDirection3::InstancedBy3) {
+                auto instancedByPaths = _GetInstancingRelatedPaths(prim, SelectionHighlightsCollectionDirection3::InstancedBy3);
+                affectedInstancedByPaths.insert(affectedInstancedByPaths.end(), instancedByPaths.begin(), instancedByPaths.end());
+            }
+            // We hit an instancing-related prim, don't process its children (nested instancing will be processed through the instancing-related paths).
+            return false;
+        }
+        return true;
+    };
+    _ForEachPrimInHierarchy(primPath, operation);
+
+    for (const auto& affectedPrototypePath : affectedPrototypePaths) {
+        _CollectInstancingPaths(affectedPrototypePath, SelectionHighlightsCollectionDirection3::Prototypes3, outInstancerPaths, outPrototypePaths);
+    }
+    for (const auto& affectedInstancedByPath : affectedInstancedByPaths) {
+        _CollectInstancingPaths(affectedInstancedByPath, SelectionHighlightsCollectionDirection3::InstancedBy3, outInstancerPaths, outPrototypePaths);
     }
 }
 

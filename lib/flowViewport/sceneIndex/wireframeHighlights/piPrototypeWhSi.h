@@ -40,6 +40,12 @@
 
 namespace FVP_NS_DEF {
 
+struct SelectionData2 {
+    PrimSelection _primSelection;
+    PXR_NS::SdfPathSet _instancerPaths;
+    PXR_NS::SdfPathSet _prototypePaths;
+};
+
 enum SelectionHighlightsCollectionDirection3 {
     None3 = 0,
     Prototypes3 = 1 << 0,
@@ -102,7 +108,8 @@ private:
     //std::map<SelectionKey, SelectionData> _selections;
     std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _selectionPathsToPrototypePrefixes;
     std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _selectionPathsToPrototypePaths;
-    std::set<PXR_NS::SdfPath, size_t> _prototypePathsSelectionsCount;
+
+    std::map<SelectionKey, SelectionData2> _selections;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _prototypePathsToSelections;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _instancerPathsToSelections;
 
