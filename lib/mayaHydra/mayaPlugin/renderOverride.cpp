@@ -1831,14 +1831,49 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
         return;
     }
 
+    auto found = instance->_isolateSelectState.find(viewName.asChar());
+    if (found == instance->_isolateSelectState.end()) {
+        found = instance->_isolateSelectState.insert(found, VpIsolateSelectStates::value_type(viewName.asChar(), IsolateSelectState::IsolateSelectOff));
+    }
+
     // The M3dView returns the list of view selected objects as strings.
     // If isolate select is turned off, we want to disable isolate selection.
     // Otherwise, replace with what is in the M3dView.
     auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
     if (!view.viewSelected()) {
         vpDataMgr.DisableIsolateSelection(viewName.asChar());
+        found->second = IsolateSelectState::IsolateSelectOff;
         return;
     }
+
+    // Deal with IsolateSelectState changes.  The messages we receive are
+    // viewSelectedObjectsChanged true or false.
+    //
+    // State transitions:
+    // 
+    // off: message false --> go to pendingObjects, do not notify.
+    // off: message true --> illegal, warn, do not notify.
+    // 
+    // pendingObjects: message false --> illegal, warn, do not notify.
+    // pendingObjects: message true --> notify, go to on.
+    // 
+    // on: message false --> go to off, notify.
+    // on: message true --> stay on, notify.
+
+    if (found->second == IsolateSelectState::IsolateSelectOff) {
+        if (TF_VERIFY(!viewSelectedObjectsChanged)) {
+            found->second = IsolateSelectState::IsolateSelectPendingObjects;
+        }
+        return;
+    }
+    else if (found->second == IsolateSelectState::IsolateSelectPendingObjects) {
+        if (!TF_VERIFY(viewSelectedObjectsChanged)) {
+            return;
+        }
+        found->second = IsolateSelectState::IsolateSelectOn;
+    }
+    
+    TF_VERIFY(found->second == IsolateSelectState::IsolateSelectOn);
 
     // The M3dView returns the list of view selected objects as strings.
     // Loop over the view selected objects and try to create UFE paths from

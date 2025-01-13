@@ -74,6 +74,7 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include <map>
 
 #include <ufe/ufe.h>
 UFE_NS_DEF {
@@ -338,6 +339,21 @@ private:
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
     long int   _nbViewSelectedChangedCalls{0};
 #endif
+
+    // Maya has an awkward notification mechanism for isolate select,
+    // with a view selected objects changed boolean that indicates
+    // whether the state has changed (false), or the isolate selected
+    // objects have changed (true).  When changing a viewport from
+    // isolate select off to on, two notifications are therefore sent,
+    // first false (state change), then true (objects set).  To avoid
+    // double dirtying in Hydra, we track the following isolate select
+    // states per viewport:
+    // 
+    enum class IsolateSelectState {IsolateSelectOff, IsolateSelectPendingObjects,
+				   IsolateSelectOn};
+
+    using VpIsolateSelectStates = std::map<std::string, IsolateSelectState>;
+    VpIsolateSelectStates _isolateSelectState;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
