@@ -15,6 +15,7 @@ target_sources(${TARGET_NAME}
     niInstanceWhSi.cpp
     niPrototypeWhSi.cpp
     piInstancerWhSi.cpp
+    piPrototypeWhSi.cpp
 )
 
 set(HEADERS
@@ -30,6 +31,7 @@ set(HEADERS
     niInstanceWhSi.h
     niPrototypeWhSi.h
     piInstancerWhSi.h
+    piPrototypeWhSi.h
 )
 
 # -----------------------------------------------------------------------------
