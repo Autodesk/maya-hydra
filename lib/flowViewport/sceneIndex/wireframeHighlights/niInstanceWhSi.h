@@ -109,8 +109,6 @@ private:
     void _ForEachPrimInHierarchy(const PXR_NS::SdfPath& hierarchyRoot, const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation) const;
 };
 
-PXR_NS::HdContainerDataSourceHandle MakeWireframe2(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color);
-
 }
 
 #endif // FVP_NI_INSTANCE_WH_SI_H

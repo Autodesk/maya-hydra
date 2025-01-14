@@ -424,39 +424,6 @@ const HdDataSourceLocator primvarsOverrideWireframeColorLocator(
 
 namespace FVP_NS_DEF {
 
-//We want to set the displayStyle of the selected prim to refinedWireOnSurf only if the displayStyle of the prim is refined (meaning shaded)
-HdContainerDataSourceHandle MakeWireframe2(const HdContainerDataSourceHandle& dataSource, const GfVec4f& color)
-{
-    //Always edit its override wireframe color
-    auto edited = HdContainerDataSourceEditor(dataSource);
-    edited.Set(primvarsOverrideWireframeColorLocator,
-                        Fvp::PrimvarDataSource::New(
-                            HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{color}),
-                            HdPrimvarSchemaTokens->constant,
-                            HdPrimvarSchemaTokens->color));
-    
-    //Is the prim in refined displayStyle (meaning shaded) ?
-    if (HdLegacyDisplayStyleSchema styleSchema =
-            HdLegacyDisplayStyleSchema::GetFromParent(dataSource)) {
-
-        if (HdTokenArrayDataSourceHandle ds =
-                styleSchema.GetReprSelector()) {
-            VtArray<TfToken> ar = ds->GetTypedValue(0.0f);
-            TfToken refinedToken = ar[0];
-            if(HdReprTokens->refined == refinedToken){
-                //Is in refined display style, apply the wire on top of shaded reprselector
-                return HdOverlayContainerDataSource::New({ edited.Finish(), refinedWireDisplayStyleDataSource});
-            }
-        }else{
-            //No reprSelector found, assume it's in the Collection that we have set HdReprTokens->refined
-            return HdOverlayContainerDataSource::New({ edited.Finish(), refinedWireDisplayStyleDataSource});
-        }
-    }
-
-    //For the other case, we are only updating the wireframe color assuming we are already drawing lines
-    return edited.Finish();
-}
-
 HdSceneIndexBaseRefPtr PiInstancerWhSi::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
     const SdfPath& highlightHierarchyPrefix,
