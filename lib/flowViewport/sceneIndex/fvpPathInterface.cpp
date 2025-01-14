@@ -28,8 +28,8 @@ PathInterface::~PathInterface() {}
 SdfPath PathInterface::SceneIndexPath(const Ufe::Path& appPath) const
 {
     auto primSelections = UfePathToPrimSelections(appPath);
-    if (!TF_VERIFY(primSelections.size() <= 1u)) {
-        throw PrimPathsCountOutOfRangeException(0, 1, primSelections.size());
+    if (!TF_VERIFY(primSelections.size() <= 2u)) {
+        throw PrimPathsCountOutOfRangeException(0, 2, primSelections.size());
     }
     return primSelections.empty() ? SdfPath() : primSelections.front().primPath;
 }

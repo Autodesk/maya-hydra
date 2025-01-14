@@ -15,6 +15,8 @@
 
 #include "testUtils.h"
 
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
+
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 
@@ -54,7 +56,7 @@ TEST(TestSelection, fullySelectedPaths)
 
     const Ufe::Path selected(Ufe::PathString::path(argv[0]));
 
-    const auto sceneIndexPath = snSi->SceneIndexPath(selected);
+    const auto sceneIndexPath = Fvp::sceneIndexPath(selected);
 
     ASSERT_FALSE(sceneIndexPath.IsEmpty());
 

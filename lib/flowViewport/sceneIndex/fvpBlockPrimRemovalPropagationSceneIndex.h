@@ -71,7 +71,11 @@ public:
     //from PathInterface
     FVP_API
     PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override{
-        return _pathInterface->UfePathToPrimSelections(appPath);
+        PXR_NAMESPACE_USING_DIRECTIVE
+
+        TF_FATAL_ERROR("Illegal call to deprecated %s", TF_FUNC_NAME().data());
+
+        return PrimSelections();
     }
 
 protected:
