@@ -86,9 +86,10 @@ public:
     FVP_API
     PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override {
         PXR_NAMESPACE_USING_DIRECTIVE;
-        const PathInterface* pathInterface = dynamic_cast<const PathInterface*>(&*GetInputSceneIndex());
-        TF_AXIOM(pathInterface);
-        return pathInterface->UfePathToPrimSelections(appPath);
+
+        TF_FATAL_ERROR("Illegal call to deprecated %s", TF_FUNC_NAME().data());
+
+        return PrimSelections();
     }
 
 protected:
