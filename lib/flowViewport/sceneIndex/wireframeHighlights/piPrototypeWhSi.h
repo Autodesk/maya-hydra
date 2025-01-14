@@ -121,9 +121,6 @@ private:
 
     void _CreateSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);
-
-    void _CollectInstancingPaths(const PXR_NS::SdfPath& primPath, SelectionHighlightsCollectionDirection3 direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const;
-    void _ForEachPrimInHierarchy(const PXR_NS::SdfPath& hierarchyRoot, const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation) const;
 };
 
 }

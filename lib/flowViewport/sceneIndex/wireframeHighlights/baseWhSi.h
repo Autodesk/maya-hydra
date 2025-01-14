@@ -60,6 +60,13 @@ using SelectionKey = std::pair<PXR_NS::SdfPath, std::string>;
 //     };
 // };
 
+enum SelectionHighlightsCollectionDirection2 {
+    None2 = 0,
+    Prototypes2 = 1 << 0,
+    InstancedBy2 = 1 << 1,
+    Bidirectional2 = Prototypes2 | InstancedBy2
+};
+
 /// \class BaseWhSi
 ///
 /// Uses Hydra HdRepr to add wireframe representation to selected objects
@@ -139,6 +146,12 @@ protected:
     virtual void ProcessDirtiedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) = 0;
+    
+    FVP_API
+    void ForEachPrimInHierarchy(const PXR_NS::SdfPath& hierarchyRoot, const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation) const;
+    
+    FVP_API
+    void CollectInstancingPaths(const PXR_NS::SdfPath& primPath, SelectionHighlightsCollectionDirection2 direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const;
 
     const PXR_NS::SdfPath _highlightHierarchyPrefix;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;

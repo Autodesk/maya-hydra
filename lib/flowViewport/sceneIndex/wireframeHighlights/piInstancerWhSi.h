@@ -45,13 +45,6 @@ class PiInstancerWhSi;
 typedef PXR_NS::TfRefPtr<PiInstancerWhSi> PiInstancerWhSiRefPtr;
 typedef PXR_NS::TfRefPtr<const PiInstancerWhSi> PiInstancerWhSiConstRefPtr;
 
-enum SelectionHighlightsCollectionDirection2 {
-    None2 = 0,
-    Prototypes2 = 1 << 0,
-    InstancedBy2 = 1 << 1,
-    Bidirectional2 = Prototypes2 | InstancedBy2
-};
-
 struct SelectionData {
     PrimSelection _primSelection;
     PXR_NS::SdfPathSet _instancerPaths;
@@ -110,9 +103,6 @@ private:
 
     void _CreateSelectionHighlight(const PXR_NS::SdfPath& primPath, std::string selectionId);
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& primPath, std::string selectionId);
-
-    void _CollectInstancingPaths(const PXR_NS::SdfPath& primPath, SelectionHighlightsCollectionDirection2 direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const;
-    void _ForEachPrimInHierarchy(const PXR_NS::SdfPath& hierarchyRoot, const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation) const;
 };
 
 }

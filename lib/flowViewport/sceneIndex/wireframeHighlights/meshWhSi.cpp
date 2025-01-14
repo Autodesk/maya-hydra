@@ -328,7 +328,7 @@ MeshWhSi::MeshWhSi(
         }
         return true;
     };
-    _ForEachPrimInHierarchy(SdfPath::AbsoluteRootPath(), operation);
+    ForEachPrimInHierarchy(SdfPath::AbsoluteRootPath(), operation);
 
     for (const auto& meshPath : _meshPaths) {
         auto itSelectedParentPath = _fullySelectedPaths.upper_bound(meshPath);
@@ -487,35 +487,6 @@ void MeshWhSi::_DeleteSelectionHighlight(const SdfPath& primPath)
 
     // Send notifications
     _SendPrimsRemoved({selectionPath});
-}
-
-void
-MeshWhSi::_ForEachPrimInHierarchy(
-    const PXR_NS::SdfPath& hierarchyRoot, 
-    const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation
-) const
-{
-    HdSceneIndexPrimView hierarchyView(GetInputSceneIndex(), hierarchyRoot);
-    for (auto itPrim = hierarchyView.begin(); itPrim != hierarchyView.end(); ++itPrim) {
-        const SdfPath& currPath = *itPrim;
-
-        HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPath);
-
-        // If the current prim is not part of the same hierarchy we are traversing, skip it and its descendents.
-        VtArray<SdfPath> primRoots = _GetHierarchyRoots(currPrim);
-        bool sharesHierarchy = std::find_if(primRoots.begin(), primRoots.end(), [hierarchyRoot](const auto& primRoot) -> bool {
-            return hierarchyRoot.HasPrefix(primRoot);
-        }) != primRoots.end();
-        if (!sharesHierarchy) {
-            itPrim.SkipDescendants();
-            continue;
-        }
-
-        if (!operation(currPath, currPrim)) {
-            itPrim.SkipDescendants();
-            continue;
-        }
-    }
 }
 
 }

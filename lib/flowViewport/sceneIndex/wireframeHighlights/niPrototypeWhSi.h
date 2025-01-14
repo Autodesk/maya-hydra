@@ -105,9 +105,6 @@ private:
 
     void _CreateSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);
-
-
-    void _ForEachPrimInHierarchy(const PXR_NS::SdfPath& hierarchyRoot, const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation) const;
 };
 
 }
