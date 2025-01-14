@@ -33,38 +33,6 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-// We consider prototypes that have child prims to be different hierarchies,
-// separate from each other and from the "root" hierarchy.
-VtArray<SdfPath> _GetHierarchyRoots(const HdSceneIndexPrim& prim)
-{
-    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() 
-        ? instancedBy.GetPrototypeRoots()->GetTypedValue(0) 
-        : VtArray<SdfPath>({SdfPath::AbsoluteRootPath()});
-}
-
-// Fvp::PrimSelection ConvertHydraToFvpSelection(const SdfPath& primPath, const HdSelectionSchema& selectionSchema) {
-//     Fvp::PrimSelection primSelection;
-//     primSelection.primPath = primPath;
-
-//     HdInstanceIndicesVectorSchema nestedInstanceIndicesSchema = selectionSchema.GetNestedInstanceIndices();
-//     //std::cout << "nestedInstanceIndicesSchema.GetNumElements() = " << nestedInstanceIndicesSchema.GetNumElements() << std::endl;
-//     for (size_t iNestedInstanceIndices = 0; iNestedInstanceIndices < nestedInstanceIndicesSchema.GetNumElements(); iNestedInstanceIndices++) {
-//         //std::cout << "iNestedInstanceIndices : " << iNestedInstanceIndices << std::endl;
-//         HdInstanceIndicesSchema instanceIndicesSchema = nestedInstanceIndicesSchema.GetElement(iNestedInstanceIndices);
-//         auto instanceIndices = instanceIndicesSchema.GetInstanceIndices()->GetTypedValue(0);
-//         primSelection.nestedInstanceIndices.push_back(
-//             {
-//                 instanceIndicesSchema.GetInstancer()->GetTypedValue(0),
-//                 instanceIndicesSchema.GetPrototypeIndex()->GetTypedValue(0),
-//                 std::vector<int>(instanceIndices.begin(), instanceIndices.end())
-//             }
-//         );
-//     }
-
-//     return primSelection;
-// }
-
 class _RerootingSceneIndexPathDataSource : public HdPathDataSource
 {
 public:

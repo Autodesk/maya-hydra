@@ -164,6 +164,8 @@ protected:
 
 PXR_NS::HdContainerDataSourceHandle SetWireframeRepr(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color);
 
+Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
+
 }
 
 #endif // FVP_BASE_WH_SI_H

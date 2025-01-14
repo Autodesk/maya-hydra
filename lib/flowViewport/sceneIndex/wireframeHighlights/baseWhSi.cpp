@@ -156,6 +156,26 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
     return edited.Finish();
 }
 
+Fvp::PrimSelection ConvertHydraToFvpSelection(const SdfPath& primPath, const HdSelectionSchema& selectionSchema) {
+    Fvp::PrimSelection primSelection;
+    primSelection.primPath = primPath;
+
+    HdInstanceIndicesVectorSchema nestedInstanceIndicesSchema = selectionSchema.GetNestedInstanceIndices();
+    for (size_t iNestedInstanceIndices = 0; iNestedInstanceIndices < nestedInstanceIndicesSchema.GetNumElements(); iNestedInstanceIndices++) {
+        HdInstanceIndicesSchema instanceIndicesSchema = nestedInstanceIndicesSchema.GetElement(iNestedInstanceIndices);
+        auto instanceIndices = instanceIndicesSchema.GetInstanceIndices()->GetTypedValue(0);
+        primSelection.nestedInstanceIndices.push_back(
+            {
+                instanceIndicesSchema.GetInstancer()->GetTypedValue(0),
+                instanceIndicesSchema.GetPrototypeIndex()->GetTypedValue(0),
+                std::vector<int>(instanceIndices.begin(), instanceIndices.end())
+            }
+        );
+    }
+
+    return primSelection;
+}
+
 BaseWhSi::BaseWhSi(
     const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex,
     const PXR_NS::SdfPath& highlightHierarchyPrefix,
