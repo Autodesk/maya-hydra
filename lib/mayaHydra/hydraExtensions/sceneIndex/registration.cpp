@@ -261,13 +261,8 @@ private:
                     _pi.SetSceneIndexAppPath(newPath);
 
                     // Update our entry in the path mapper registry.
-                    auto mapper = Fvp::PathMapperRegistry::Instance().GetMapper(
-                        oldPath);
-                    TF_AXIOM(mapper);
-                    TF_AXIOM(Fvp::PathMapperRegistry::Instance().Unregister(
-                                 oldPath));
-                    TF_AXIOM(Fvp::PathMapperRegistry::Instance().Register(
-                                 newPath, mapper));
+                    TF_AXIOM(Fvp::PathMapperRegistry::Instance().Update(
+                                 oldPath, newPath));
                 }
             }
         }

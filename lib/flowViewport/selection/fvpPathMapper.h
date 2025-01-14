@@ -40,6 +40,10 @@ namespace FVP_NS_DEF {
 
 class PathMapper : public PathInterface
 {
+public:
+
+    using PathInterface::UfePathToPrimSelections;
+
 protected:
 
     FVP_API

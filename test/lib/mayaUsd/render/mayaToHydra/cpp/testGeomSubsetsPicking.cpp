@@ -15,6 +15,8 @@
 
 #include "testUtils.h"
 
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
+
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
@@ -97,10 +99,7 @@ void testPicking(const Ufe::Path& clickMarkerUfePath, const Ufe::Path& selectedO
     auto ufeSelection = Ufe::GlobalSelection::get();
     ASSERT_TRUE(ufeSelection->empty());
 
-    const auto selectionSceneIndex = findSelectionSceneIndexInTree(inspector.GetSceneIndex());
-    ASSERT_TRUE(selectionSceneIndex);
-
-    const auto selectedObjectSceneIndexPaths = selectionSceneIndex->SceneIndexPaths(selectedObjectUfePath);
+    const auto selectedObjectSceneIndexPaths = Fvp::sceneIndexPaths(selectedObjectUfePath);
 
     for (const auto& selectedObjectSceneIndexPath : selectedObjectSceneIndexPaths) {
         HdSceneIndexPrim selectedObjectSceneIndexPrim = inspector.GetSceneIndex()->GetPrim(selectedObjectSceneIndexPath);
@@ -110,7 +109,7 @@ void testPicking(const Ufe::Path& clickMarkerUfePath, const Ufe::Path& selectedO
 
     // Picking
     M3dView active3dView = M3dView::active3dView();
-    const auto clickMarkerSceneIndexPath = selectionSceneIndex->SceneIndexPath(clickMarkerUfePath);
+    const auto clickMarkerSceneIndexPath = Fvp::sceneIndexPath(clickMarkerUfePath);
     auto primMouseCoords = getPrimMouseCoords(inspector.GetSceneIndex()->GetPrim(clickMarkerSceneIndexPath), active3dView);
 
     mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), primMouseCoords);

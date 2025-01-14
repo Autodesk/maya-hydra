@@ -269,25 +269,10 @@ bool SelectionSceneIndex::HasFullySelectedAncestorInclusive(const SdfPath& primP
 
 PrimSelections SelectionSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) const
 {
-    auto primSelections = _inputSceneIndexPathInterface->UfePathToPrimSelections(appPath);
+    auto primSelections = ufePathToPrimSelections(appPath);
 
     if (primSelections.empty()) {
-        // Path interface of input scene index didn't provide information.
-        // Try path mapper registry.
-        auto mapper = Fvp::PathMapperRegistry::Instance().GetMapper(appPath);
-        
-        auto warnEmptyPath = [](const Ufe::Path& appPath) {
-            TF_WARN("SelectionSceneIndex::UfePathToPrimSelections(%s) returned no path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
-        };
-
-        if (!mapper) {
-            warnEmptyPath(appPath);
-        } else {
-            primSelections = mapper->UfePathToPrimSelections(appPath);
-            if (primSelections.empty()) {
-                warnEmptyPath(appPath);
-            }
-        }
+        TF_WARN("SelectionSceneIndex::UfePathToPrimSelections(%s) returned no path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
     }
 
     return primSelections;

@@ -36,26 +36,8 @@ MergingSceneIndex::MergingSceneIndex() : HdMergingSceneIndex()
 
 PrimSelections MergingSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) const
 {
-    // FLOW_VIEWPORT_TODO  May be able to use a caching scheme for app path to
-    // scene index path conversion using the run-time ID of the UFE path, as it
-    // is likely that the input scene index that provided a previous answer
-    // will do so again.  To be determined if the following direct approach has
-    // a measurable performance impact.  PPT, 18-Sep-2023.
+    TF_FATAL_ERROR("Illegal call to deprecated %s", TF_FUNC_NAME().data());
 
-    // Iterate over input scene indices and ask them to convert the path if
-    // they support the path interface.
-    auto inputScenes = GetInputScenes();
-    for (const auto& inputScene : inputScenes) {
-        // Unfortunate that we have to dynamic cast, as soon as we add an input
-        // scene we know whether it supports the PathInterface or not.
-        auto pathInterface = dynamic_cast<const PathInterface*>(&*inputScene);
-        if (pathInterface) {
-            auto primSelections = pathInterface->UfePathToPrimSelections(appPath);
-            if (!primSelections.empty()) {
-                return primSelections;
-            }
-        }
-    }
     return PrimSelections();
 }
 

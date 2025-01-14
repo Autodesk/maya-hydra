@@ -31,12 +31,19 @@
 namespace MAYAHYDRA_NS_DEF {
 
 /// \class MhWireframeColorInterfaceImp
-/// An implementation for maya of the WireframeColorInterface to get the wireframe color from a prim for selection highlighting
+///
+/// An implementation for maya of the WireframeColorInterface to get the
+/// wireframe color from a prim for selection highlighting.  The 
+/// lead object path tracker is not owned by this class, which allows it to
+/// be destroyed by its owner and thus stop observing the scene at the proper
+/// point in Hydra cleanup.  Otherwise, observation occurs after Hydra
+/// resources are cleaned up.
+
 class MhWireframeColorInterfaceImp : public Fvp::WireframeColorInterface
 {
 public:
     MAYAHYDRALIB_API
-    MhWireframeColorInterfaceImp(const std::shared_ptr<Fvp::Selection>& selection, const std::shared_ptr<MhLeadObjectPathTracker>& _leadObjectPathTracker);
+    MhWireframeColorInterfaceImp(const std::shared_ptr<Fvp::Selection>& selection, const std::weak_ptr<MhLeadObjectPathTracker>& leadObjectPathTracker);
 
     //Get the wireframe color of a primitive for selection highlighting, 
     // this checks if the prim is selected or not and if it is selected, 
@@ -55,7 +62,7 @@ private:
     PXR_NS::GfVec4f _dormantWireframeColor;
 
     const Fvp::SelectionPtr    _selection;
-    const std::shared_ptr<MhLeadObjectPathTracker> _leadObjectPathTracker;
+    const std::weak_ptr<MhLeadObjectPathTracker> _leadObjectPathTracker;
 };
 
 }//end of namespace MAYAHYDRA_NS_DEF

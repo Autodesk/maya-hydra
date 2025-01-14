@@ -16,8 +16,8 @@
 
 #include <mayaHydraLib/mayaHydra.h>
 
-#include <flowViewport/sceneIndex/fvpMergingSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
@@ -66,10 +66,6 @@ void testGeomSubsetHighlight(const Ufe::Path& geomSubsetPath)
     ASSERT_FALSE(terminalSceneIndices.empty());
     SceneIndexInspector inspector(terminalSceneIndices.front());
 
-    auto isFvpMergingSceneIndexPredicate = SceneIndexDisplayNamePred("Flow Viewport Merging Scene Index");
-    auto fvpMergingSceneIndex = TfDynamic_cast<Fvp::MergingSceneIndexRefPtr>(
-        findSceneIndexInTree(terminalSceneIndices.front(), isFvpMergingSceneIndexPredicate));
-
     auto isFvpWireframeSelectionHighlightSceneIndex = SceneIndexDisplayNamePred(
         "Flow Viewport Wireframe Selection Highlight Scene Index");
     auto fvpWireframeSelectionHighlightSceneIndex = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(
@@ -97,7 +93,7 @@ void testGeomSubsetHighlight(const Ufe::Path& geomSubsetPath)
 
     // Validate scene structure and data source values
     ASSERT_FALSE(inspector.FindPrims(findMeshPrimsPredicate).empty());
-    auto geomSubsetPrimSelections = fvpMergingSceneIndex->UfePathToPrimSelections(geomSubsetPath);
+    auto geomSubsetPrimSelections = Fvp::ufePathToPrimSelections(geomSubsetPath);
     for (size_t iSelection = 0; iSelection < geomSubsetPrimSelections.size(); iSelection++) {
         const auto& meshPath = geomSubsetPrimSelections[iSelection].primPath.GetParentPath();
         auto meshHighlightPath = fvpWireframeSelectionHighlightSceneIndex->GetSelectionHighlightPath(meshPath);

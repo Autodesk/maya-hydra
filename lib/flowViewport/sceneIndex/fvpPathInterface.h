@@ -43,7 +43,7 @@ namespace FVP_NS_DEF {
 ///
 class PathInterface
 {
-public:
+protected:
 
     //! Return the prim path(s) corresponding to the argument application path,
     //! as well as their associated selection data source(s).
@@ -52,19 +52,6 @@ public:
     FVP_API
     virtual PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const = 0;
 
-    //! Return the prim path corresponding to the argument application path,
-    //! for when an application path maps to at most a single prim path.
-    //! If no such path exists, an empty SdfPath should be returned.
-    //! \return Scene index path.
-    FVP_API
-    PXR_NS::SdfPath SceneIndexPath(const Ufe::Path& appPath) const;
-
-    //! Return the prim paths corresponding to the argument application path.
-    //! If no such paths exist, an empty SdfPathVector should be returned.
-    //! \return Scene index paths.
-    FVP_API
-    PXR_NS::SdfPathVector SceneIndexPaths(const Ufe::Path& appPath) const;
-
 protected:
 
     FVP_API
@@ -72,6 +59,19 @@ protected:
 
     FVP_API
     virtual ~PathInterface();
+
+private:
+
+    //! Return the prim path corresponding to the argument application path,
+    //! for when an application path maps to at most a single prim path.
+    //! If no such path exists, an empty SdfPath should be returned.
+    //! \return Scene index path.
+    PXR_NS::SdfPath SceneIndexPath(const Ufe::Path& appPath) const;
+
+    //! Return the prim paths corresponding to the argument application path.
+    //! If no such paths exist, an empty SdfPathVector should be returned.
+    //! \return Scene index paths.
+    PXR_NS::SdfPathVector SceneIndexPaths(const Ufe::Path& appPath) const;
 };
 
 class PrimPathsCountOutOfRangeException : public std::out_of_range

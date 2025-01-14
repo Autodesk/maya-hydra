@@ -16,6 +16,7 @@
 #include "testUtils.h"
 
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include <ufe/pathString.h>
 
@@ -29,7 +30,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-SdfPath getArgSceneIndexPath(const Fvp::SelectionSceneIndexRefPtr& snSi)
+SdfPath getArgSceneIndexPath()
 {
     // Object path string is in command line arguments.
     auto [argc, argv] = getTestingArgs();
@@ -38,7 +39,7 @@ SdfPath getArgSceneIndexPath(const Fvp::SelectionSceneIndexRefPtr& snSi)
     const auto mayaPath = Ufe::PathString::path(argv[0]);
 
     // Translate the application path into a scene index path.
-    return snSi->SceneIndexPath(mayaPath);
+    return Fvp::sceneIndexPath(mayaPath);
 }
 
 Fvp::SelectionSceneIndexRefPtr getSelectionSceneIndex()
@@ -67,7 +68,7 @@ TEST(TestPathInterface, testSelected)
     
     // Selected object path string is in command line arguments.
     // Get it and translate it into a scene index path.
-    const auto sceneIndexPath = getArgSceneIndexPath(snSi);
+    const auto sceneIndexPath = getArgSceneIndexPath();
 
     // Confirm the object is selected in scene index scene.
     ASSERT_TRUE(snSi->IsFullySelected(sceneIndexPath));
@@ -80,7 +81,7 @@ TEST(TestPathInterface, testUnselected)
     
     // Unselected object path string is in command line arguments.
     // Get it and translate it into a scene index path.
-    const auto sceneIndexPath = getArgSceneIndexPath(snSi);
+    const auto sceneIndexPath = getArgSceneIndexPath();
 
     // Confirm the object is not selected in scene index scene.
     ASSERT_FALSE(snSi->IsFullySelected(sceneIndexPath));
