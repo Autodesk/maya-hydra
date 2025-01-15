@@ -95,8 +95,8 @@ private:
     std::set<PXR_NS::SdfPath> _meshPaths;
     std::set<PXR_NS::SdfPath> _highlightedMeshPaths;
 
-    void _CreateSelectionHighlight(const PXR_NS::SdfPath& primPath);
-    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& primPath);
+    void _CreateSelectionHighlight(const PXR_NS::SdfPath& meshPath);
+    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& meshPath);
 };
 
 }

@@ -261,37 +261,37 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
     _SendPrimsDirtied(highlightEntries);
 }
 
-void GeomSubsetWhSi::_CreateSelectionHighlight(const SdfPath& primPath)
+void GeomSubsetWhSi::_CreateSelectionHighlight(const SdfPath& geomSubsetPath)
 {
-    if (_highlightedGeomSubsetPaths.find(primPath) != _highlightedGeomSubsetPaths.end()) {
+    if (_highlightedGeomSubsetPaths.find(geomSubsetPath) != _highlightedGeomSubsetPaths.end()) {
         return;
     }
 
     // Setup data structures
-    SelectionKey selectionKey { primPath, "" };
+    SelectionKey selectionKey { geomSubsetPath, "" };
     SdfPath selectionPath = RegisterSelection(selectionKey);
 
-    _highlightedGeomSubsetPaths.emplace(primPath);
+    _highlightedGeomSubsetPaths.emplace(geomSubsetPath);
 
     // Send notifications
-    auto originalMeshPath = primPath.GetParentPath();
+    auto originalMeshPath = geomSubsetPath.GetParentPath();
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
     addedPrims.emplace_back(originalMeshPath.ReplacePrefix(originalMeshPath.GetParentPath(), selectionPath), GetInputSceneIndex()->GetPrim(originalMeshPath).primType);
     //addedPrims.emplace_back(primPath.ReplacePrefix(originalMeshPath.GetParentPath(), selectionPath), GetInputSceneIndex()->GetPrim(primPath).primType);
     _SendPrimsAdded(addedPrims);
 }
 
-void GeomSubsetWhSi::_DeleteSelectionHighlight(const SdfPath& primPath)
+void GeomSubsetWhSi::_DeleteSelectionHighlight(const SdfPath& geomSubsetPath)
 {
-    if (_highlightedGeomSubsetPaths.find(primPath) == _highlightedGeomSubsetPaths.end()) {
+    if (_highlightedGeomSubsetPaths.find(geomSubsetPath) == _highlightedGeomSubsetPaths.end()) {
         return;
     }
 
     // Erase from data structures
-    SelectionKey selectionKey { primPath, "" };
+    SelectionKey selectionKey { geomSubsetPath, "" };
     SdfPath selectionPath = UnregisterSelection(selectionKey);
     
-    _highlightedGeomSubsetPaths.erase(primPath);
+    _highlightedGeomSubsetPaths.erase(geomSubsetPath);
 
     // Send notifications
     _SendPrimsRemoved({selectionPath});

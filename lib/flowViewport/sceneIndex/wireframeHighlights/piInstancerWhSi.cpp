@@ -361,7 +361,6 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
 void PiInstancerWhSi::_CreateSelectionHighlight(const SdfPath& instancerPath, std::string selectionId)
 {
     if (selectionId.empty() || selectionId.find_first_not_of("0123456789") != std::string::npos) {
-        // Selection ID is not a positive integer
         return;
     }
 

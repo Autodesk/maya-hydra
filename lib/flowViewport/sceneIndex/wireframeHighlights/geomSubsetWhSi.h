@@ -95,8 +95,8 @@ private:
     std::set<PXR_NS::SdfPath> _geomSubsetPaths;
     std::set<PXR_NS::SdfPath> _highlightedGeomSubsetPaths;
 
-    void _CreateSelectionHighlight(const PXR_NS::SdfPath& primPath);
-    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& primPath);
+    void _CreateSelectionHighlight(const PXR_NS::SdfPath& geomSubsetPath);
+    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& geomSubsetPath);
 };
 
 }

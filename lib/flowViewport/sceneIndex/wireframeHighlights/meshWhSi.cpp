@@ -225,35 +225,35 @@ void MeshWhSi::ProcessDirtiedPrims(
     _SendPrimsDirtied(highlightEntries);
 }
 
-void MeshWhSi::_CreateSelectionHighlight(const SdfPath& primPath)
+void MeshWhSi::_CreateSelectionHighlight(const SdfPath& meshPath)
 {
-    if (_highlightedMeshPaths.find(primPath) != _highlightedMeshPaths.end()) {
+    if (_highlightedMeshPaths.find(meshPath) != _highlightedMeshPaths.end()) {
         return;
     }
 
     // Setup data structures
-    SelectionKey selectionKey { primPath, "" };
+    SelectionKey selectionKey { meshPath, "" };
     SdfPath selectionPath = RegisterSelection(selectionKey);
 
-    _highlightedMeshPaths.emplace(primPath);
+    _highlightedMeshPaths.emplace(meshPath);
 
     // Send notifications
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
-    addedPrims.emplace_back(primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), GetInputSceneIndex()->GetPrim(primPath).primType);
+    addedPrims.emplace_back(meshPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), GetInputSceneIndex()->GetPrim(meshPath).primType);
     _SendPrimsAdded(addedPrims);
 }
 
-void MeshWhSi::_DeleteSelectionHighlight(const SdfPath& primPath)
+void MeshWhSi::_DeleteSelectionHighlight(const SdfPath& meshPath)
 {
-    if (_highlightedMeshPaths.find(primPath) == _highlightedMeshPaths.end()) {
+    if (_highlightedMeshPaths.find(meshPath) == _highlightedMeshPaths.end()) {
         return;
     }
 
     // Erase from data structures
-    SelectionKey selectionKey { primPath, "" };
+    SelectionKey selectionKey { meshPath, "" };
     SdfPath selectionPath = UnregisterSelection(selectionKey);
     
-    _highlightedMeshPaths.erase(primPath);
+    _highlightedMeshPaths.erase(meshPath);
 
     // Send notifications
     _SendPrimsRemoved({selectionPath});

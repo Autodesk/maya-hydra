@@ -310,6 +310,10 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
 
 void NiInstanceWhSi::_CreateSelectionHighlight(const SdfPath& instancePath)
 {
+    if (_highlightedInstancePaths.find(instancePath) != _highlightedInstancePaths.end()) {
+        return;
+    }
+
     // Setup data structures
     SelectionKey selectionKey { instancePath, "" };
     SdfPath selectionPath = RegisterSelection(selectionKey);
@@ -338,6 +342,10 @@ void NiInstanceWhSi::_CreateSelectionHighlight(const SdfPath& instancePath)
 
 void NiInstanceWhSi::_DeleteSelectionHighlight(const SdfPath& instancePath)
 {
+    if (_highlightedInstancePaths.find(instancePath) == _highlightedInstancePaths.end()) {
+        return;
+    }
+
     // Erase from data structures
     SelectionKey selectionKey { instancePath, "" };
     SdfPath selectionPath = UnregisterSelection(selectionKey);
