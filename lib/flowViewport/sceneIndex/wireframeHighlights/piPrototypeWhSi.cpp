@@ -60,18 +60,12 @@ HdSceneIndexBaseRefPtr PiPrototypeWhSi::New(
 HdSceneIndexPrim PiPrototypeWhSi::GetHighlightPrim(const SdfPath &selectionPath, const SdfPath &fullPrimPath) const
 {
     SelectionKey selectionKey = SelectionKeyFromPath(selectionPath);
-    auto primSelection = _selections.at(selectionKey)._primSelection;
 
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
     prim.dataSource = RepathingContainerDataSource::New(SdfPath::AbsoluteRootPath(), selectionPath, prim.dataSource);
     if (prim.primType == HdPrimTypeTokens->mesh) {
-        prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(primSelection));
-    }
-    if (prim.primType == HdPrimTypeTokens->instancer && originalPath == selectionKey.first) {
-        HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
-        HdSelectionSchema activeSelection = selectionsSchema.GetElement(std::stoul(selectionKey.second));
-        //prim.dataSource = _GetSelectionHighlightInstancerDataSource(prim.dataSource, activeSelection);
+        prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(selectionKey.first));
     }
     return prim;
 };
@@ -133,6 +127,7 @@ void PiPrototypeWhSi::ProcessAddedPrims(
             }
         }
 
+        // Propagate added prims notifications for prims rooted under a relevant instancer
         auto itInstancer = _instancerPathsToSelections.upper_bound(entry.primPath);
         if (itInstancer != _instancerPathsToSelections.begin()) {
             --itInstancer;
@@ -144,6 +139,7 @@ void PiPrototypeWhSi::ProcessAddedPrims(
             }
         }
 
+        // Propagate added prims notifications for prims rooted under a relevant prototype
         auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
         if (itPrototype != _prototypePathsToSelections.begin()) {
             --itPrototype;
@@ -164,6 +160,7 @@ void PiPrototypeWhSi::ProcessRemovedPrims(
 {
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
+        // If a parent of one the selected prims was removed, delete the selection highlight
         auto itSelectedPrim = _primPathsToSelections.lower_bound(entry.primPath);
         if (itSelectedPrim != _primPathsToSelections.end()) {
             if (itSelectedPrim->first.HasPrefix(entry.primPath)) {
@@ -173,6 +170,7 @@ void PiPrototypeWhSi::ProcessRemovedPrims(
             }
         }
 
+        // If an instancer was removed, delete the selection highlights which depended on it
         auto itInstancerParentRemoval = _instancerPathsToSelections.lower_bound(entry.primPath);
         if (itInstancerParentRemoval != _instancerPathsToSelections.end()) {
             if (itInstancerParentRemoval->first.HasPrefix(entry.primPath)) {
@@ -182,6 +180,7 @@ void PiPrototypeWhSi::ProcessRemovedPrims(
             }
         }
 
+        // If a prototype was removed, delete the selection highlights which depended on it
         auto itPrototypeParentRemoval = _prototypePathsToSelections.lower_bound(entry.primPath);
         if (itPrototypeParentRemoval != _prototypePathsToSelections.end()) {
             if (itPrototypeParentRemoval->first.HasPrefix(entry.primPath)) {
@@ -191,6 +190,7 @@ void PiPrototypeWhSi::ProcessRemovedPrims(
             }
         }
 
+        // Propagate removed prims notifications for prims rooted under a relevant instancer
         auto itInstancer = _instancerPathsToSelections.upper_bound(entry.primPath);
         if (itInstancer != _instancerPathsToSelections.begin()) {
             --itInstancer;
@@ -202,6 +202,7 @@ void PiPrototypeWhSi::ProcessRemovedPrims(
             }
         }
 
+        // Propagate removed prims notifications for prims rooted under a relevant prototype
         auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
         if (itPrototype != _prototypePathsToSelections.begin()) {
             --itPrototype;
