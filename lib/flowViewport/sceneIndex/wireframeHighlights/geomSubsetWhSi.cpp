@@ -180,7 +180,6 @@ void GeomSubsetWhSi::ProcessAddedPrims(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::AddedPrimEntries &entries)
 {
-    // no-op? what instancing related stuff we need to port over from fvpWireframeSelectionHighlightSceneIndex.cpp::PrimsAdded?
     HdSceneIndexObserver::AddedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
