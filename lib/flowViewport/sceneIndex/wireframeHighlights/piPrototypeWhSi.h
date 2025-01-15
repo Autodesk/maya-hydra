@@ -40,19 +40,6 @@
 
 namespace FVP_NS_DEF {
 
-struct SelectionData2 {
-    PrimSelection _primSelection;
-    PXR_NS::SdfPathSet _instancerPaths;
-    PXR_NS::SdfPathSet _prototypePaths;
-};
-
-enum SelectionHighlightsCollectionDirection3 {
-    None3 = 0,
-    Prototypes3 = 1 << 0,
-    InstancedBy3 = 1 << 1,
-    Bidirectional3 = Prototypes3 | InstancedBy3
-};
-
 // Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
 // type in PXR_NS.
 class PiPrototypeWhSi;
@@ -105,9 +92,15 @@ protected:
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
 
 private:
-    std::map<SelectionKey, SelectionData2> _selections;
-    std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _prototypePathsToSelections;
+    struct SelectionData {
+        PrimSelection _primSelection;
+        PXR_NS::SdfPathSet _instancerPaths;
+        PXR_NS::SdfPathSet _prototypePaths;
+    };
+
+    std::map<SelectionKey, SelectionData> _selections;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _instancerPathsToSelections;
+    std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _prototypePathsToSelections;
 
     void _CreateSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);

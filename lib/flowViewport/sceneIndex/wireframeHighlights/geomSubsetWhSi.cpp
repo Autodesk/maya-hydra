@@ -153,17 +153,6 @@ SdfPathVector GeomSubsetWhSi::GetHighlightChildPrimPaths(const SdfPath &selectio
         return {originalMeshPath.ReplacePrefix(originalMeshPath.GetParentPath(), selectionPath)};
     }
     return {};
-    SdfPathVector childPaths;
-    auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, originalMeshPath.GetParentPath());
-    auto originalChildPaths = GetInputSceneIndex()->GetChildPrimPaths(originalPath);
-    for (const auto& originalChildPath : originalChildPaths) {
-        auto itPath = _highlightedGeomSubsetPaths.upper_bound(originalChildPath);
-        bool isRelevantPath = (itPath != _highlightedGeomSubsetPaths.end() && itPath->HasPrefix(originalChildPath)) || (itPath != _highlightedGeomSubsetPaths.begin() && originalChildPath.HasPrefix(*std::prev(itPath)));
-        if (isRelevantPath) {
-            childPaths.emplace_back(originalChildPath.ReplacePrefix(originalMeshPath.GetParentPath(), selectionPath));
-        }
-    }
-    return childPaths;
 }
 
 GeomSubsetWhSi::GeomSubsetWhSi(
@@ -234,15 +223,19 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
     for (const auto& entry : entries) {
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+
+            HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+            if (instancedBy.IsDefined()) {
+                continue;
+            }
+
             if (prim.primType == HdPrimTypeTokens->geomSubset) {
                 bool isSelected = _IsSelected(prim);
                 bool isMeshSelected = _IsSelected(GetInputSceneIndex()->GetPrim(entry.primPath.GetParentPath()));
                 if (isSelected && _highlightedGeomSubsetPaths.find(entry.primPath) == _highlightedGeomSubsetPaths.end() && !isMeshSelected) {
-                    std::cout << "Create on GeomSubset newly selected and parent mesh not" << std::endl;
                     _CreateSelectionHighlight(entry.primPath);
                 }
                 else if (!isSelected && _highlightedGeomSubsetPaths.find(entry.primPath) != _highlightedGeomSubsetPaths.end()) {
-                    std::cout << "Delete on GeomSubset newly unselected" << std::endl;
                     _DeleteSelectionHighlight(entry.primPath);
                 }
             }
@@ -253,11 +246,9 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
                     if (prim.primType == HdPrimTypeTokens->geomSubset) {
                         if (_IsSelected(prim)) {
                             if (!isMeshSelected && _highlightedGeomSubsetPaths.find(primPath) == _highlightedGeomSubsetPaths.end()) {
-                                std::cout << "Create on Mesh newly unselected but GeomSubset selected" << std::endl;
                                 _CreateSelectionHighlight(primPath);
                             }
                             else if (isMeshSelected && _highlightedGeomSubsetPaths.find(primPath) != _highlightedGeomSubsetPaths.end()) {
-                                std::cout << "Delete on Mesh newly selected but GeomSubset also selected" << std::endl;
                                 _DeleteSelectionHighlight(primPath);
                             }
                         }

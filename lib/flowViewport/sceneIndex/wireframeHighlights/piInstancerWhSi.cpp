@@ -105,28 +105,6 @@ _GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& ori
     return editedDataSource.Finish();
 }
 
-//Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
-TF_DEFINE_PRIVATE_TOKENS(
-     _primVarsTokens,
- 
-     (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
- );
-
-const HdRetainedContainerDataSourceHandle refinedWireDisplayStyleDataSource
-    = HdRetainedContainerDataSource::New(
-        HdLegacyDisplayStyleSchemaTokens->displayStyle,
-        HdRetainedContainerDataSource::New(
-            HdLegacyDisplayStyleSchemaTokens->reprSelector,
-            HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
-                { HdReprTokens->refinedWire, TfToken(), TfToken() })));
-
-const HdDataSourceLocator reprSelectorLocator(
-        HdLegacyDisplayStyleSchemaTokens->displayStyle,
-        HdLegacyDisplayStyleSchemaTokens->reprSelector);
-
-const HdDataSourceLocator primvarsOverrideWireframeColorLocator(
-        HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor));
-
 }
 
 namespace FVP_NS_DEF {
@@ -151,6 +129,7 @@ HdSceneIndexPrim PiInstancerWhSi::GetHighlightPrim(const SdfPath &selectionPath,
         prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(primSelection));
     }
     if (prim.primType == HdPrimTypeTokens->instancer && originalPath == selectionKey.first) {
+        // Adjust the instancer mask to only show selected instances
         HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
         HdSelectionSchema activeSelection = selectionsSchema.GetElement(std::stoul(selectionKey.second));
         prim.dataSource = _GetSelectionHighlightInstancerDataSource(prim.dataSource, activeSelection);
@@ -200,7 +179,6 @@ void PiInstancerWhSi::ProcessAddedPrims(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::AddedPrimEntries &entries)
 {
-    // no-op? what instancing related stuff we need to port over from fvpWireframeSelectionHighlightSceneIndex.cpp::PrimsAdded?
     HdSceneIndexObserver::AddedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         if (entry.primType == HdPrimTypeTokens->instancer) {
@@ -215,6 +193,7 @@ void PiInstancerWhSi::ProcessAddedPrims(
             }
         }
 
+        // Propagate added prims notifications for prims rooted under a relevant instancer
         auto itInstancer = _instancerPathsToSelections.upper_bound(entry.primPath);
         if (itInstancer != _instancerPathsToSelections.begin()) {
             --itInstancer;
@@ -226,6 +205,7 @@ void PiInstancerWhSi::ProcessAddedPrims(
             }
         }
 
+        // Propagate added prims notifications for prims rooted under a relevant prototype
         auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
         if (itPrototype != _prototypePathsToSelections.begin()) {
             --itPrototype;
@@ -246,6 +226,7 @@ void PiInstancerWhSi::ProcessRemovedPrims(
 {
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
+        // If a parent of one the selected prims was removed, delete the selection highlight
         auto itSelectedPrim = _primPathsToSelections.lower_bound(entry.primPath);
         if (itSelectedPrim != _primPathsToSelections.end()) {
             if (itSelectedPrim->first.HasPrefix(entry.primPath)) {
@@ -255,6 +236,7 @@ void PiInstancerWhSi::ProcessRemovedPrims(
             }
         }
 
+        // If an instancer was removed, delete the selection highlights which depended on it
         auto itInstancerParentRemoval = _instancerPathsToSelections.lower_bound(entry.primPath);
         if (itInstancerParentRemoval != _instancerPathsToSelections.end()) {
             if (itInstancerParentRemoval->first.HasPrefix(entry.primPath)) {
@@ -264,6 +246,7 @@ void PiInstancerWhSi::ProcessRemovedPrims(
             }
         }
 
+        // If a prototype was removed, delete the selection highlights which depended on it
         auto itPrototypeParentRemoval = _prototypePathsToSelections.lower_bound(entry.primPath);
         if (itPrototypeParentRemoval != _prototypePathsToSelections.end()) {
             if (itPrototypeParentRemoval->first.HasPrefix(entry.primPath)) {
@@ -273,6 +256,7 @@ void PiInstancerWhSi::ProcessRemovedPrims(
             }
         }
 
+        // Propagate removed prims notifications for prims rooted under a relevant instancer
         auto itInstancer = _instancerPathsToSelections.upper_bound(entry.primPath);
         if (itInstancer != _instancerPathsToSelections.begin()) {
             --itInstancer;
@@ -284,6 +268,7 @@ void PiInstancerWhSi::ProcessRemovedPrims(
             }
         }
 
+        // Propagate removed prims notifications for prims rooted under a relevant prototype
         auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
         if (itPrototype != _prototypePathsToSelections.begin()) {
             --itPrototype;
@@ -307,6 +292,7 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
             if (prim.primType == HdPrimTypeTokens->instancer) {
+                // Selection changed on the instancer; rebuild the highlight
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
                     for (const auto& selectionKey : existingSelectionKeys->second) {
@@ -372,7 +358,7 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
     _SendPrimsDirtied(highlightEntries);
 }
 
-void PiInstancerWhSi::_CreateSelectionHighlight(const SdfPath& primPath, std::string selectionId)
+void PiInstancerWhSi::_CreateSelectionHighlight(const SdfPath& instancerPath, std::string selectionId)
 {
     if (selectionId.empty() || selectionId.find_first_not_of("0123456789") != std::string::npos) {
         // Selection ID is not a positive integer
@@ -382,16 +368,16 @@ void PiInstancerWhSi::_CreateSelectionHighlight(const SdfPath& primPath, std::st
     // Collect paths
     SdfPathSet instancerPaths;
     SdfPathSet prototypePaths;
-    CollectInstancingPaths(primPath, SelectionHighlightsCollectionDirection2::Bidirectional2, instancerPaths, prototypePaths);
+    CollectInstancingPaths(instancerPath, SelectionHighlightsCollectionDirection2::Bidirectional2, instancerPaths, prototypePaths);
 
     // Setup data structures
-    SelectionKey selectionKey { primPath, selectionId };
+    SelectionKey selectionKey { instancerPath, selectionId };
     SdfPath selectionPath = RegisterSelection(selectionKey);
 
-    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(instancerPath);
     HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
     SelectionData selectionData;
-    selectionData._primSelection = ConvertHydraToFvpSelection(primPath, selectionsSchema.GetElement(std::stoul(selectionId)));
+    selectionData._primSelection = ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(std::stoul(selectionId)));
     selectionData._instancerPaths = instancerPaths;
     selectionData._prototypePaths = prototypePaths;
     _selections[selectionKey] = selectionData;
@@ -417,10 +403,10 @@ void PiInstancerWhSi::_CreateSelectionHighlight(const SdfPath& primPath, std::st
     _SendPrimsAdded(addedPrims);
 }
 
-void PiInstancerWhSi::_DeleteSelectionHighlight(const SdfPath& primPath, std::string selectionId)
+void PiInstancerWhSi::_DeleteSelectionHighlight(const SdfPath& instancerPath, std::string selectionId)
 {
     // Collect paths
-    SelectionKey selectionKey { primPath, selectionId };
+    SelectionKey selectionKey { instancerPath, selectionId };
     if (_selections.find(selectionKey) == _selections.end()) {
         return;
     }

@@ -45,12 +45,6 @@ class PiInstancerWhSi;
 typedef PXR_NS::TfRefPtr<PiInstancerWhSi> PiInstancerWhSiRefPtr;
 typedef PXR_NS::TfRefPtr<const PiInstancerWhSi> PiInstancerWhSiConstRefPtr;
 
-struct SelectionData {
-    PrimSelection _primSelection;
-    PXR_NS::SdfPathSet _instancerPaths;
-    PXR_NS::SdfPathSet _prototypePaths;
-};
-
 /// \class PiInstancerWhSi
 ///
 /// Uses Hydra HdRepr to add wireframe representation to selected objects
@@ -97,12 +91,18 @@ protected:
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
 
 private:
+    struct SelectionData {
+        PrimSelection _primSelection;
+        PXR_NS::SdfPathSet _instancerPaths;
+        PXR_NS::SdfPathSet _prototypePaths;
+    };
+
     std::map<SelectionKey, SelectionData> _selections;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _instancerPathsToSelections;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _prototypePathsToSelections;
 
-    void _CreateSelectionHighlight(const PXR_NS::SdfPath& primPath, std::string selectionId);
-    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& primPath, std::string selectionId);
+    void _CreateSelectionHighlight(const PXR_NS::SdfPath& instancerPath, std::string selectionId);
+    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& instancerPath, std::string selectionId);
 };
 
 }

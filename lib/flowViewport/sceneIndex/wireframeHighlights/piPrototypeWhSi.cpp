@@ -226,6 +226,7 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
             if (_IsPointInstancePrototype(GetInputSceneIndex(), entry.primPath)) {
+                // Selection changed on the prototype; rebuild the highlight
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
                     for (const auto& selectionKey : existingSelectionKeys->second) {
@@ -293,6 +294,11 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
 
 void PiPrototypeWhSi::_CreateSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId)
 {
+    if (selectionId.empty() || selectionId.find_first_not_of("0123456789") != std::string::npos) {
+        // Selection ID is not a positive integer
+        return;
+    }
+    
     // Collect paths
     SdfPathSet instancerPaths;
     SdfPathSet prototypePaths;
@@ -304,7 +310,7 @@ void PiPrototypeWhSi::_CreateSelectionHighlight(const PXR_NS::SdfPath& prototype
 
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(prototypePath);
     HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
-    SelectionData2 selectionData;
+    SelectionData selectionData;
     selectionData._primSelection = ConvertHydraToFvpSelection(prototypePath, selectionsSchema.GetElement(std::stoul(selectionId)));
     selectionData._instancerPaths = instancerPaths;
     selectionData._prototypePaths = prototypePaths;
@@ -338,7 +344,7 @@ void PiPrototypeWhSi::_DeleteSelectionHighlight(const PXR_NS::SdfPath& prototype
     if (_selections.find(selectionKey) == _selections.end()) {
         return;
     }
-    SelectionData2 selectionData = _selections.at(selectionKey);
+    SelectionData selectionData = _selections.at(selectionKey);
 
     // Erase from data structures
     SdfPath selectionPath = UnregisterSelection(selectionKey);
