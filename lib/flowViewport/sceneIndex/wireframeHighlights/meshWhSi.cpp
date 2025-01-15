@@ -210,7 +210,7 @@ void MeshWhSi::ProcessDirtiedPrims(
                 while (itMesh != _meshPaths.end() && itMesh->HasPrefix(entry.primPath)) {
                     if (_highlightedMeshPaths.find(*itMesh) != _highlightedMeshPaths.end()) {
                         auto itSelectedParentPath = _fullySelectedPaths.upper_bound(*itMesh);
-                        if (itSelectedParentPath == _fullySelectedPaths.begin() && !itMesh->HasPrefix(*std::prev(itSelectedParentPath))) {
+                        if (itSelectedParentPath == _fullySelectedPaths.begin() || !itMesh->HasPrefix(*std::prev(itSelectedParentPath))) {
                             // No selected parent.
                             _DeleteSelectionHighlight(*itMesh);
                         }
