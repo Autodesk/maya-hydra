@@ -110,7 +110,6 @@ void MeshWhSi::ProcessAddedPrims(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::AddedPrimEntries &entries)
 {
-    // no-op? what instancing related stuff we need to port over from fvpWireframeSelectionHighlightSceneIndex.cpp::PrimsAdded?
     HdSceneIndexObserver::AddedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         bool isMesh = false;
@@ -170,7 +169,7 @@ void MeshWhSi::ProcessRemovedPrims(
         auto itSelectedPath = _fullySelectedPaths.lower_bound(entry.primPath);
         while (itSelectedPath != _fullySelectedPaths.end() && itSelectedPath->HasPrefix(entry.primPath)) {
             itSelectedPath = _fullySelectedPaths.erase(itSelectedPath);
-            // Child mesh highlights will have already been delete above, since deleting a selected parent
+            // Child mesh highlights will have already been deleted above, since deleting a selected parent
             // implies deleting child meshes.
         }
     }
@@ -194,6 +193,7 @@ void MeshWhSi::ProcessDirtiedPrims(
                     }
                 }
             }
+            // Newly selected path : create selection highlights for all meshes not yet highlighted under it.
             if (isFullySelected && _fullySelectedPaths.find(entry.primPath) == _fullySelectedPaths.end()) {
                 _fullySelectedPaths.emplace(entry.primPath);
                 auto itMesh = _meshPaths.lower_bound(entry.primPath);
@@ -204,6 +204,8 @@ void MeshWhSi::ProcessDirtiedPrims(
                     itMesh++;
                 }
             }
+            // Newly unselected path : delete selection highlights for all meshes under it if no other prim
+            // that is a parent of that mesh is selected.
             else if (!isFullySelected && _fullySelectedPaths.find(entry.primPath) != _fullySelectedPaths.end()) {
                 _fullySelectedPaths.erase(entry.primPath);
                 auto itMesh = _meshPaths.lower_bound(entry.primPath);

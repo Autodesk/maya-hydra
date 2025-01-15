@@ -94,10 +94,6 @@ private:
     std::set<PXR_NS::SdfPath> _fullySelectedPaths;
     std::set<PXR_NS::SdfPath> _meshPaths;
     std::set<PXR_NS::SdfPath> _highlightedMeshPaths;
-    //std::map<SelectionKey, SelectionData> _selections;
-    //std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _primPathsToSelections;
-
-    //std::set<PXR_NS::SdfPath> _selectionPaths;
 
     void _CreateSelectionHighlight(const PXR_NS::SdfPath& primPath);
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& primPath);
