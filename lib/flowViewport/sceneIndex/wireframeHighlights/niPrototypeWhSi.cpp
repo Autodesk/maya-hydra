@@ -33,16 +33,6 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-SdfPath _GetNativeInstancePrototypePath(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& nativeInstancePrimPath) {
-    HdSceneIndexPrim nativeInstancePrim = sceneIndex->GetPrim(nativeInstancePrimPath);
-    HdInstanceSchema instanceSchema = HdInstanceSchema::GetFromParent(nativeInstancePrim.dataSource);
-    auto instancerPath = instanceSchema.GetInstancer()->GetTypedValue(0);
-    HdSceneIndexPrim instancerPrim = sceneIndex->GetPrim(instancerPath);
-    HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
-    auto prototypePath = instancerTopologySchema.GetPrototypes()->GetTypedValue(0)[instanceSchema.GetPrototypeIndex()->GetTypedValue(0)];
-    return prototypePath;
-}
-
 bool _IsNativePrototype(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath) {
     HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
     HdInstancedBySchema instancedBySchema = HdInstancedBySchema::GetFromParent(prim.dataSource);
@@ -77,13 +67,13 @@ HdSceneIndexPrim NiPrototypeWhSi::GetHighlightPrim(const SdfPath &selectionPath,
     prim.dataSource = RepathingContainerDataSource::New(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath, prim.dataSource);
     HdContainerDataSourceEditor dsEditor(prim.dataSource);
 
-    HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
-    HdSelectionSchema activeSelection = selectionsSchema.GetElement(std::stoul(selectionKey.second));
+    HdSelectionsSchema activeSelectionsSchema = HdSelectionsSchema::GetFromParent(GetInputSceneIndex()->GetPrim(selectionKey.first).dataSource);
+    HdSelectionSchema activeSelection = activeSelectionsSchema.GetElement(std::stoul(selectionKey.second));
+
     HdInstanceIndicesSchema instanceIndices = activeSelection.GetNestedInstanceIndices().GetElement(0);
     auto instanceIndex = instanceIndices.GetInstanceIndices()->GetTypedValue(0).front();
     HdInstancedBySchema instancedBySchema = HdInstancedBySchema::GetFromParent(prim.dataSource);
     auto instancerPath = instancedBySchema.GetPaths()->GetTypedValue(0).front();
-    //// Do it on every prim or only proto root?
     HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(instancerPath);
     HdPrimvarsSchema primvarsSchema = HdPrimvarsSchema::GetFromParent(instancerPrim.dataSource);
     auto instanceTransformsSchema = primvarsSchema.GetPrimvar(HdInstancerTokens->instanceTransforms);
@@ -96,7 +86,7 @@ HdSceneIndexPrim NiPrototypeWhSi::GetHighlightPrim(const SdfPath &selectionPath,
 
     prim.dataSource = dsEditor.Finish();
     if (prim.primType == HdPrimTypeTokens->mesh) {
-        prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(ConvertHydraToFvpSelection(originalPath, activeSelection)));
+        prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(ConvertHydraToFvpSelection(selectionKey.first, activeSelection)));
     }
     return prim;
 };
