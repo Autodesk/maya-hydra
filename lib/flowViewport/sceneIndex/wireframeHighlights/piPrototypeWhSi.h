@@ -105,19 +105,9 @@ protected:
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
 
 private:
-    //std::map<SelectionKey, SelectionData> _selections;
-    std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _selectionPathsToPrototypePrefixes;
-    std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _selectionPathsToPrototypePaths;
-
     std::map<SelectionKey, SelectionData2> _selections;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _prototypePathsToSelections;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _instancerPathsToSelections;
-
-
-    //std::map<PXR_NS::SdfPath, PXR_NS::SdfPathSet> _prototypePathsToSelectionPaths;
-    //std::set<PXR_NS::SdfPath> _fullySelectedPaths;
-    //std::set<PXR_NS::SdfPath> _instancePaths;
-    //std::set<PXR_NS::SdfPath> _highlightedInstancePaths;
 
     void _CreateSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);

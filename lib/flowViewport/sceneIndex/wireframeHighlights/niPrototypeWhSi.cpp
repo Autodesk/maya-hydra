@@ -216,9 +216,7 @@ void NiPrototypeWhSi::ProcessDirtiedPrims(
     for (const auto& entry : entries) {
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
-            std::cout << "NiPrototypeWhSi::ProcessDirtiedPrims before _IsNativePrototype" << std::endl;
             if (_IsNativePrototype(GetInputSceneIndex(), entry.primPath)) {
-                std::cout << "NiPrototypeWhSi::ProcessDirtiedPrims after _IsNativePrototype" << std::endl;
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
                     auto selectionKeysToDelete = existingSelectionKeys->second;
@@ -229,7 +227,6 @@ void NiPrototypeWhSi::ProcessDirtiedPrims(
                 HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
                 if (selectionsSchema.IsDefined()) {
                     for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
-                        std::cout << "NiPrototypeWhSi::ProcessDirtiedPrims before _CreateSelectionHighlight" << std::endl;
                         _CreateSelectionHighlight(entry.primPath, std::to_string(selectionId));
                     }
                 }
@@ -256,7 +253,6 @@ void NiPrototypeWhSi::ProcessDirtiedPrims(
 void NiPrototypeWhSi::_CreateSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId)
 {
     // Setup data structures
-    std::cout << "_CreateSelectionHighlight(prototypePath, selectionId)" << std::endl;
     SelectionKey selectionKey { prototypePath, selectionId };
     SdfPath selectionPath = RegisterSelection(selectionKey);
 

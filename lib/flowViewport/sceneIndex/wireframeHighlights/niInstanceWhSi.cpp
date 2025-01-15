@@ -58,7 +58,6 @@ HdSceneIndexBaseRefPtr NiInstanceWhSi::New(
 HdSceneIndexPrim NiInstanceWhSi::GetHighlightPrim(const SdfPath &selectionPath, const SdfPath &fullPrimPath) const
 {
     SelectionKey selectionKey = SelectionKeyFromPath(selectionPath);
-
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, _selectionPathsToPrototypePrefixes.at(selectionPath));
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
     prim.dataSource = RepathingContainerDataSource::New(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath, prim.dataSource);
@@ -79,12 +78,17 @@ HdSceneIndexPrim NiInstanceWhSi::GetHighlightPrim(const SdfPath &selectionPath, 
 
 SdfPathVector NiInstanceWhSi::GetHighlightChildPrimPaths(const SdfPath &selectionPath, const SdfPath &fullPrimPath) const
 {
-    // TODO : Return only prototype path, not siblings of prototype path
+    SelectionKey selectionKey = SelectionKeyFromPath(selectionPath);
+    SdfPath prototypePath = _GetNativeInstancePrototypePath(GetInputSceneIndex(), selectionKey.first);
+
     SdfPathVector childPaths;
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, _selectionPathsToPrototypePrefixes.at(selectionPath));
     auto originalChildPaths = GetInputSceneIndex()->GetChildPrimPaths(originalPath);
     for (const auto& originalChildPath : originalChildPaths) {
-        childPaths.emplace_back(originalChildPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath));
+        // Only return paths under and including the selected instance's prototype
+        if (originalChildPath.HasPrefix(prototypePath)) {
+            childPaths.emplace_back(originalChildPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath));
+        }
     }
     return childPaths;
 }
@@ -109,7 +113,6 @@ NiInstanceWhSi::NiInstanceWhSi(
         }
         HdInstanceSchema instance = HdInstanceSchema::GetFromParent(prim.dataSource);
         if (instance.IsDefined()) {
-            std::cout << "_instancePaths.emplace from NiInstanceWhSi()" << std::endl;
             _instancePaths.emplace(primPath);
         }
         return true;
@@ -135,7 +138,6 @@ void NiInstanceWhSi::ProcessAddedPrims(
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
         HdInstanceSchema instance = HdInstanceSchema::GetFromParent(prim.dataSource);
         if (instance.IsDefined()) {
-            std::cout << "_instancePaths.emplace from ProcessAddedPrims" << std::endl;
             _instancePaths.emplace(entry.primPath);
             isInstance = true;
         }
@@ -195,7 +197,7 @@ void NiInstanceWhSi::ProcessRemovedPrims(
         auto itSelectedPath = _fullySelectedPaths.lower_bound(entry.primPath);
         while (itSelectedPath != _fullySelectedPaths.end() && itSelectedPath->HasPrefix(entry.primPath)) {
             itSelectedPath = _fullySelectedPaths.erase(itSelectedPath);
-            // Child instance highlights will have already been delete above, since deleting a selected parent
+            // Child instance highlights will have already been deleted above, since deleting a selected parent
             // implies deleting child instances.
         }
 
@@ -247,6 +249,7 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
                     }
                 }
             }
+            // Newly selected path : create selection highlights for all instances not yet highlighted under it.
             if (isFullySelected && _fullySelectedPaths.find(entry.primPath) == _fullySelectedPaths.end()) {
                 _fullySelectedPaths.emplace(entry.primPath);
                 auto itInstance = _instancePaths.lower_bound(entry.primPath);
@@ -257,6 +260,8 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
                     itInstance++;
                 }
             }
+            // Newly unselected path : delete selection highlights for all instances under it if no other prim
+            // that is a parent of that instance is selected.
             else if (!isFullySelected && _fullySelectedPaths.find(entry.primPath) != _fullySelectedPaths.end()) {
                 _fullySelectedPaths.erase(entry.primPath);
                 auto itInstance = _instancePaths.lower_bound(entry.primPath);
@@ -273,28 +278,13 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
             }
         }
 
-        // if ((_instancerPathsToSelections.find(entry.primPath) != _instancerPathsToSelections.end() || _prototypePathsToSelections.find(entry.primPath) != _prototypePathsToSelections.end()) 
-        //     && entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->prototypes))) {
-        //     // Instancing topology was changed : rebuild the highlights, since we don't know exactly how it was changed
-        //     auto instancerSelectionKeysToRebuild = _instancerPathsToSelections.find(entry.primPath);
-        //     if (instancerSelectionKeysToRebuild != _instancerPathsToSelections.end()) {
-        //         for (const auto& selectionKey : instancerSelectionKeysToRebuild->second) {
-        //             _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
-        //             _CreateSelectionHighlight(selectionKey.first, selectionKey.second);
-        //         }
-        //     }
-        //     auto prototypeSelectionKeysToRebuild = _prototypePathsToSelections.find(entry.primPath);
-        //     if (prototypeSelectionKeysToRebuild != _prototypePathsToSelections.end()) {
-        //         for (const auto& selectionKey : prototypeSelectionKeysToRebuild->second) {
-        //             _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
-        //             _CreateSelectionHighlight(selectionKey.first, selectionKey.second);
-        //         }
-        //     }
-        //     // No need to dirty in this case since we'll have removed and re-added prims, skip to next entries
-        //     continue;
-        // }
-
         if (_highlightedInstancePaths.find(entry.primPath) != _highlightedInstancePaths.end()) {
+            // If instance structure was dirtied, rebuild the highlight
+            if (entry.dirtyLocators.Intersects(HdInstanceSchema::GetDefaultLocator())) {
+                _DeleteSelectionHighlight(entry.primPath);
+                _CreateSelectionHighlight(entry.primPath);
+            }
+            // Dirty prototype prims (to update highlight color)
             auto selectionPath = SelectionPathFromKey(SelectionKey(entry.primPath, ""));
             auto dirtyOperation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
                 highlightEntries.emplace_back(primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath), entry.dirtyLocators);
@@ -304,9 +294,7 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
             ForEachPrimInHierarchy(prototypePath, dirtyOperation);
         }
         
-        // TODO : if Instance schema/dataSource is dirtied
-
-        // Propagate notifications if this prim is a relevant prototype or a subprim of one
+        // Propagate notifications to the prototype highlight if the dirtied prim is a relevant prototype or a subprim of one
         auto itPrototype = _prototypePathsToSelectionPaths.upper_bound(entry.primPath);
         if (itPrototype != _prototypePathsToSelectionPaths.begin()) {
             --itPrototype;
@@ -322,7 +310,6 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
 
 void NiInstanceWhSi::_CreateSelectionHighlight(const SdfPath& instancePath)
 {
-    std::cout << "_CreateSelectionHighlight for " << instancePath << std::endl;
     // Setup data structures
     SelectionKey selectionKey { instancePath, "" };
     SdfPath selectionPath = RegisterSelection(selectionKey);
