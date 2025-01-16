@@ -109,7 +109,8 @@ _GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& ori
 
 bool _IsPointInstancer(const HdSceneIndexPrim& prim) {
     HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
-    return prim.primType == HdPrimTypeTokens->instancer && instancerTopology.IsDefined() && !instancerTopology.GetInstanceLocations();
+    HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+    return prim.primType == HdPrimTypeTokens->instancer && instancerTopology.IsDefined() && !instancerTopology.GetInstanceLocations() && !instancedBy.IsDefined();
 }
 
 }
