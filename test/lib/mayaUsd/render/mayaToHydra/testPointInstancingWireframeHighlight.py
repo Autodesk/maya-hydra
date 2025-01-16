@@ -32,14 +32,15 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         import usdUtils
         usdScenePath = testUtils.getTestScene('testPointInstancingWireframeHighlight', 'NestedAndComposedPointInstancers.usda')
         usdUtils.createStageFromFile(usdScenePath)
-        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
-        cmds.setAttr('persp.translate', 10, 10, 10, type='float3')
 
     def setUp(self):
         super(TestPointInstancingWireframeHighlight, self).setUp()
         self.loadUsdScene()
 
     def test_PointInstancerSelection(self):
+        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
+        cmds.setAttr('persp.translate', 10, 10, 10, type='float3')
+
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
@@ -82,6 +83,9 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("rootSelection_all.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def test_InstanceSelection(self):
+        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
+        cmds.setAttr('persp.translate', 5, 10, 5, type='float3')
+
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
@@ -101,6 +105,9 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
 
     def test_PrototypeSelection(self):
+        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
+        cmds.setAttr('persp.translate', 10, 10, 10, type='float3')
+
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
@@ -119,6 +126,9 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("prototype_parentSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
             
     def test_MultiInstancesSelection(self):
+        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
+        cmds.setAttr('persp.translate', 5, 10, 5, type='float3')
+
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
