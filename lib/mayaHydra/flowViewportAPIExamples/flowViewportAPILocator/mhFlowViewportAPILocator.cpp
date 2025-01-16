@@ -422,6 +422,7 @@ public:
     // Returns the locator parent of the cube.
     MhFlowViewportAPILocator* locator() const { return _locator; }
 
+#if (MAYA_API_VERSION >= 20250000) // With Maya 2025 or later
     // Unimplemented defaults.  These should preferably be in UFE.
     // PPT, 6-Jun-2024.
     Ufe::Value getMetadata(const std::string& key) const override { return {}; }
@@ -430,6 +431,7 @@ public:
     Ufe::Value getGroupMetadata(const std::string& group, const std::string& key) const override { return {}; }
     UndoableCommandPtr setGroupMetadataCmd(const std::string& group, const std::string& key, const Ufe::Value& value) override { return nullptr; }
     UndoableCommandPtr clearGroupMetadataCmd(const std::string& group, const std::string& key) override { return nullptr; }
+#endif
 
 private:
 
