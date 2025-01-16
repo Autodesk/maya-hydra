@@ -57,12 +57,13 @@ HdSceneIndexPrim MeshWhSi::GetHighlightPrim(const SdfPath &selectionPath, const 
 
 SdfPathVector MeshWhSi::GetHighlightChildPrimPaths(const SdfPath &selectionPath, const SdfPath &fullPrimPath) const
 {
+    SelectionKey selectionKey = SelectionKeyFromPath(selectionPath);
+
     SdfPathVector childPaths;
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
     auto originalChildPaths = GetInputSceneIndex()->GetChildPrimPaths(originalPath);
     for (const auto& originalChildPath : originalChildPaths) {
-        auto itPath = _highlightedMeshPaths.upper_bound(originalChildPath);
-        bool isRelevantPath = (itPath != _highlightedMeshPaths.end() && itPath->HasPrefix(originalChildPath)) || (itPath != _highlightedMeshPaths.begin() && originalChildPath.HasPrefix(*std::prev(itPath)));
+        bool isRelevantPath = originalChildPath.HasPrefix(selectionKey.first) || selectionKey.first.HasPrefix(originalChildPath);
         if (isRelevantPath) {
             childPaths.emplace_back(originalChildPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
         }
@@ -219,6 +220,16 @@ void MeshWhSi::ProcessDirtiedPrims(
                     }
                     itMesh++;
                 }
+            }
+        }
+
+        // Propagate changes to the mesh and its children (needed for wireframe color updates)
+        auto itHighlightedMesh = _highlightedMeshPaths.upper_bound(entry.primPath);
+        if (itHighlightedMesh != _highlightedMeshPaths.begin()) {
+            --itHighlightedMesh;
+            if (entry.primPath.HasPrefix(*itHighlightedMesh)) {
+                auto selectionPath = SelectionPathFromKey(SelectionKey(*itHighlightedMesh, ""));
+                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
             }
         }
     }
