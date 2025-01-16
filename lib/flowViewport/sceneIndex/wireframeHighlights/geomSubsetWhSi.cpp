@@ -200,12 +200,12 @@ void GeomSubsetWhSi::ProcessRemovedPrims(
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         std::set<SdfPath> highlightedGeomSubsetPathsToDelete;
-        auto itGeomSubset = _highlightedGeomSubsetPaths.lower_bound(entry.primPath);
-        while (itGeomSubset != _highlightedGeomSubsetPaths.end() && itGeomSubset->HasPrefix(entry.primPath)) {
-            if (_highlightedGeomSubsetPaths.find(*itGeomSubset) != _highlightedGeomSubsetPaths.end()) {
-                highlightedGeomSubsetPathsToDelete.emplace(*itGeomSubset);
+        auto itGeomSubsetSelections = _primPathsToSelections.lower_bound(entry.primPath);
+        while (itGeomSubsetSelections != _primPathsToSelections.end() && itGeomSubsetSelections->first.HasPrefix(entry.primPath)) {
+            if (_primPathsToSelections.find(itGeomSubsetSelections->first) != _primPathsToSelections.end()) {
+                highlightedGeomSubsetPathsToDelete.emplace(itGeomSubsetSelections->first);
             }
-            itGeomSubset++;
+            itGeomSubsetSelections++;
         }
         for (const auto& highlightedGeomSubsetPathToDelete : highlightedGeomSubsetPathsToDelete) {
             _DeleteSelectionHighlight(highlightedGeomSubsetPathToDelete);
@@ -231,10 +231,10 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
             if (prim.primType == HdPrimTypeTokens->geomSubset) {
                 bool isSelected = _IsSelected(prim);
                 bool isMeshSelected = _IsSelected(GetInputSceneIndex()->GetPrim(entry.primPath.GetParentPath()));
-                if (isSelected && _highlightedGeomSubsetPaths.find(entry.primPath) == _highlightedGeomSubsetPaths.end() && !isMeshSelected) {
+                if (isSelected && _primPathsToSelections.find(entry.primPath) == _primPathsToSelections.end() && !isMeshSelected) {
                     _CreateSelectionHighlight(entry.primPath);
                 }
-                else if (!isSelected && _highlightedGeomSubsetPaths.find(entry.primPath) != _highlightedGeomSubsetPaths.end()) {
+                else if (!isSelected && _primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end()) {
                     _DeleteSelectionHighlight(entry.primPath);
                 }
             }
@@ -244,10 +244,10 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
                 auto operation = [this, isMeshSelected](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
                     if (prim.primType == HdPrimTypeTokens->geomSubset) {
                         if (_IsSelected(prim)) {
-                            if (!isMeshSelected && _highlightedGeomSubsetPaths.find(primPath) == _highlightedGeomSubsetPaths.end()) {
+                            if (!isMeshSelected && _primPathsToSelections.find(primPath) == _primPathsToSelections.end()) {
                                 _CreateSelectionHighlight(primPath);
                             }
-                            else if (isMeshSelected && _highlightedGeomSubsetPaths.find(primPath) != _highlightedGeomSubsetPaths.end()) {
+                            else if (isMeshSelected && _primPathsToSelections.find(primPath) != _primPathsToSelections.end()) {
                                 _DeleteSelectionHighlight(primPath);
                             }
                         }
@@ -263,15 +263,13 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
 
 void GeomSubsetWhSi::_CreateSelectionHighlight(const SdfPath& geomSubsetPath)
 {
-    if (_highlightedGeomSubsetPaths.find(geomSubsetPath) != _highlightedGeomSubsetPaths.end()) {
+    if (_primPathsToSelections.find(geomSubsetPath) != _primPathsToSelections.end()) {
         return;
     }
 
     // Setup data structures
     SelectionKey selectionKey { geomSubsetPath, "" };
     SdfPath selectionPath = RegisterSelection(selectionKey);
-
-    _highlightedGeomSubsetPaths.emplace(geomSubsetPath);
 
     // Send notifications
     auto originalMeshPath = geomSubsetPath.GetParentPath();
@@ -283,7 +281,7 @@ void GeomSubsetWhSi::_CreateSelectionHighlight(const SdfPath& geomSubsetPath)
 
 void GeomSubsetWhSi::_DeleteSelectionHighlight(const SdfPath& geomSubsetPath)
 {
-    if (_highlightedGeomSubsetPaths.find(geomSubsetPath) == _highlightedGeomSubsetPaths.end()) {
+    if (_primPathsToSelections.find(geomSubsetPath) == _primPathsToSelections.end()) {
         return;
     }
 
@@ -291,8 +289,6 @@ void GeomSubsetWhSi::_DeleteSelectionHighlight(const SdfPath& geomSubsetPath)
     SelectionKey selectionKey { geomSubsetPath, "" };
     SdfPath selectionPath = UnregisterSelection(selectionKey);
     
-    _highlightedGeomSubsetPaths.erase(geomSubsetPath);
-
     // Send notifications
     _SendPrimsRemoved({selectionPath});
 }

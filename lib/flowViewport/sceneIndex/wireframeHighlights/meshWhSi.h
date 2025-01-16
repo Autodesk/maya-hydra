@@ -95,8 +95,6 @@ protected:
 
 private:
     std::set<PXR_NS::SdfPath> _meshPaths;
-    // TODO : Redundant with _primPathsToSelections
-    std::set<PXR_NS::SdfPath> _highlightedMeshPaths;
 
     void _CreateSelectionHighlight(const PXR_NS::SdfPath& meshPath);
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& meshPath);

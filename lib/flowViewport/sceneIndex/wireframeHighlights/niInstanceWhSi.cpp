@@ -186,7 +186,7 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
 {
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
-        if (_highlightedInstancePaths.find(entry.primPath) != _highlightedInstancePaths.end()) {
+        if (_primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end()) {
             // If instance structure was dirtied, rebuild the highlight
             if (entry.dirtyLocators.Intersects(HdInstanceSchema::GetDefaultLocator())) {
                 _DeleteSelectionHighlight(entry.primPath);
@@ -234,7 +234,7 @@ void NiInstanceWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath,
 
 void NiInstanceWhSi::_CreateSelectionHighlight(const SdfPath& instancePath)
 {
-    if (_highlightedInstancePaths.find(instancePath) != _highlightedInstancePaths.end()) {
+    if (_primPathsToSelections.find(instancePath) != _primPathsToSelections.end()) {
         return;
     }
 
@@ -250,7 +250,6 @@ void NiInstanceWhSi::_CreateSelectionHighlight(const SdfPath& instancePath)
     auto prototypePath = instancerTopology.GetPrototypes()->GetTypedValue(0)[instance.GetPrototypeIndex()->GetTypedValue(0)];
     _prototypePathsToSelectionPaths[prototypePath].emplace(selectionPath);
     _selectionPathsToPrototypePrefixes.emplace(selectionPath, prototypePath.GetParentPath());
-    _highlightedInstancePaths.emplace(instancePath);
 
     // Send notifications
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
@@ -266,7 +265,7 @@ void NiInstanceWhSi::_CreateSelectionHighlight(const SdfPath& instancePath)
 
 void NiInstanceWhSi::_DeleteSelectionHighlight(const SdfPath& instancePath)
 {
-    if (_highlightedInstancePaths.find(instancePath) == _highlightedInstancePaths.end()) {
+    if (_primPathsToSelections.find(instancePath) == _primPathsToSelections.end()) {
         return;
     }
 
@@ -279,7 +278,6 @@ void NiInstanceWhSi::_DeleteSelectionHighlight(const SdfPath& instancePath)
         itPrototypePath->second.erase(selectionPath);
     }
     _selectionPathsToPrototypePrefixes.erase(selectionPath);
-    _highlightedInstancePaths.erase(instancePath);
 
     // Send notifications
     _SendPrimsRemoved({selectionPath});

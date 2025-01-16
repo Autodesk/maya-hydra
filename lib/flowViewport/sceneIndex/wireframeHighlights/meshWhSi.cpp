@@ -137,12 +137,14 @@ void MeshWhSi::ProcessDirtiedPrims(
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         // Propagate changes to the mesh and its children (needed for wireframe color updates)
-        auto itHighlightedMesh = _highlightedMeshPaths.upper_bound(entry.primPath);
-        if (itHighlightedMesh != _highlightedMeshPaths.begin()) {
-            --itHighlightedMesh;
-            if (entry.primPath.HasPrefix(*itHighlightedMesh)) {
-                auto selectionPath = SelectionPathFromKey(SelectionKey(*itHighlightedMesh, ""));
-                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
+        auto itMeshHighlights = _primPathsToSelections.upper_bound(entry.primPath);
+        if (itMeshHighlights != _primPathsToSelections.begin()) {
+            --itMeshHighlights;
+            if (entry.primPath.HasPrefix(itMeshHighlights->first)) {
+                for (const auto& selectionKey : itMeshHighlights->second) {
+                    auto selectionPath = SelectionPathFromKey(selectionKey);
+                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
+                }
             }
         }
     }
@@ -167,15 +169,13 @@ void MeshWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool 
 
 void MeshWhSi::_CreateSelectionHighlight(const SdfPath& meshPath)
 {
-    if (_highlightedMeshPaths.find(meshPath) != _highlightedMeshPaths.end()) {
+    if (_primPathsToSelections.find(meshPath) != _primPathsToSelections.end()) {
         return;
     }
 
     // Setup data structures
     SelectionKey selectionKey { meshPath, "" };
     SdfPath selectionPath = RegisterSelection(selectionKey);
-
-    _highlightedMeshPaths.emplace(meshPath);
 
     // Send notifications
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
@@ -185,7 +185,7 @@ void MeshWhSi::_CreateSelectionHighlight(const SdfPath& meshPath)
 
 void MeshWhSi::_DeleteSelectionHighlight(const SdfPath& meshPath)
 {
-    if (_highlightedMeshPaths.find(meshPath) == _highlightedMeshPaths.end()) {
+    if (_primPathsToSelections.find(meshPath) == _primPathsToSelections.end()) {
         return;
     }
 
@@ -193,8 +193,6 @@ void MeshWhSi::_DeleteSelectionHighlight(const SdfPath& meshPath)
     SelectionKey selectionKey { meshPath, "" };
     SdfPath selectionPath = UnregisterSelection(selectionKey);
     
-    _highlightedMeshPaths.erase(meshPath);
-
     // Send notifications
     _SendPrimsRemoved({selectionPath});
 }
