@@ -135,7 +135,7 @@ HdSceneIndexPrim PiInstancerWhSi::GetHighlightPrim(const SdfPath &selectionPath,
     if (prim.primType == HdPrimTypeTokens->mesh) {
         prim.dataSource = SetWireframeRepr(prim.dataSource, primSelection.nestedInstanceIndices.empty() ? _wireframeColorInterface->getWireframeColor(selectionKey.first) : _wireframeColorInterface->getWireframeColor(primSelection));
     }
-    if (_IsPointInstancer(prim) && originalPath == selectionKey.first) {
+    if (_IsPointInstancer(prim) && originalPath == selectionKey.first && selectionKey.second != kFullHighlight) {
         // Adjust the instancer mask to only show selected instances
         HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
         HdSelectionSchema activeSelection = selectionsSchema.GetElement(std::stoul(selectionKey.second));
