@@ -69,14 +69,10 @@ class GlobalSelectionChangedObs : public Ufe::Observer
 }
 namespace MAYAHYDRA_NS_DEF {
 
-MhLeadObjectPathTracker::MhLeadObjectPathTracker(const HdSceneIndexBaseRefPtr& sceneIndexWithPathInterface, 
-                                            MhDirtyLeadObjectSceneIndexRefPtr& dirtyLeadObjectSceneIndex) 
-    : _pathInterface(dynamic_cast<const Fvp::PathInterface*>(&*sceneIndexWithPathInterface))
-    , _ufeSelectionObserver (std::make_shared<GlobalSelectionChangedObs>(*this))
+MhLeadObjectPathTracker::MhLeadObjectPathTracker(MhDirtyLeadObjectSceneIndexRefPtr& dirtyLeadObjectSceneIndex) 
+    : _ufeSelectionObserver (std::make_shared<GlobalSelectionChangedObs>(*this))
     , _dirtyLeadObjectSceneIndex(dirtyLeadObjectSceneIndex)
 {
-    TF_AXIOM(_pathInterface);
-
     const Ufe::GlobalSelection::Ptr& ufeSelection = Ufe::GlobalSelection::get();
     if (ufeSelection->size() > 0){
         const Ufe::Selection& selection = *(ufeSelection);

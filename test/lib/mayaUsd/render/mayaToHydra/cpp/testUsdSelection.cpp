@@ -22,8 +22,6 @@
 
 #include <gtest/gtest.h>
 
-#include <iostream>
-
 using namespace MAYAHYDRA_NS;
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -54,14 +52,14 @@ Fvp::SelectionSceneIndexRefPtr getSelectionSceneIndex()
 
 }
 
-TEST(TestPathInterface, testSceneIndices)
+TEST(TestUsdSelection, testSceneIndices)
 {
     const auto& sceneIndices = GetTerminalSceneIndices();
     auto childPrims = sceneIndices.front()->GetChildPrimPaths(SdfPath("/MayaUsdProxyShape_PluginNode"));
     ASSERT_EQ(childPrims.size(), 3u);
 }
 
-TEST(TestPathInterface, testSelected)
+TEST(TestUsdSelection, testSelected)
 {
     // Get the Flow Viewport selection scene index.
     auto snSi = getSelectionSceneIndex();
@@ -74,7 +72,7 @@ TEST(TestPathInterface, testSelected)
     ASSERT_TRUE(snSi->IsFullySelected(sceneIndexPath));
 }
 
-TEST(TestPathInterface, testUnselected)
+TEST(TestUsdSelection, testUnselected)
 {
     // Get the Flow Viewport selection scene index.
     auto snSi = getSelectionSceneIndex();

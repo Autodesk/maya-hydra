@@ -19,9 +19,9 @@
 //Local headers
 #include "flowViewport/api.h"
 
-#include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
-#include "flowViewport/sceneIndex/fvpPathInterface.h" // For PrimSelections
+#include "flowViewport/selection/fvpSelectionFwd.h"
+#include "flowViewport/selection/fvpSelectionTypes.h" // For PrimSelections
 
 //Hydra headers
 #include <pxr/imaging/hd/filteringSceneIndex.h>

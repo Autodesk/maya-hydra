@@ -1283,9 +1283,8 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 
     const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
 
-    auto mergingSceneIndex = _renderIndexProxy->GetMergingSceneIndex();
     if(! _leadObjectPathTracker){
-        _leadObjectPathTracker = std::make_shared<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker>(mergingSceneIndex, _dirtyLeadObjectSceneIndex);
+        _leadObjectPathTracker = std::make_shared<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker>(_dirtyLeadObjectSceneIndex);
     }
     
     if (! _wireframeColorInterfaceImp){
@@ -1317,9 +1316,8 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _lastFilteringSceneIndexBeforeCustomFiltering  = _wireframeSelectionHighlightSceneIndex;
     
     TF_AXIOM(_mayaHydraSceneIndex);
-    Fvp::PathInterface* pathInterface = dynamic_cast<Fvp::PathInterface*>(&*mergingSceneIndex);
     _lastFilteringSceneIndexBeforeCustomFiltering = _lightsManagementSceneIndex = Fvp::LightsManagementSceneIndex::New(
-        _lastFilteringSceneIndexBeforeCustomFiltering, *pathInterface, _mayaHydraSceneIndex->GetMayaDefaultLightPath());
+        _lastFilteringSceneIndexBeforeCustomFiltering, _mayaHydraSceneIndex->GetMayaDefaultLightPath());
     _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(_lightingMode));
 
 #ifdef CODE_COVERAGE_WORKAROUND

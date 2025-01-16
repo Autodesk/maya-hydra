@@ -17,7 +17,6 @@
 
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
-#include "flowViewport/sceneIndex/fvpPathInterface.h"
 
 #include <pxr/base/tf/diagnosticLite.h>
 #include <pxr/base/tf/token.h>
@@ -53,7 +52,6 @@ typedef PXR_NS::TfRefPtr<const PruningSceneIndex> PruningSceneIndexConstRefPtr;
 class PruningSceneIndex :
     public PXR_NS::HdSingleInputFilteringSceneIndexBase
     , public InputSceneIndexUtils<PruningSceneIndex>
-    , public PathInterface // As a workaround until we move to exclusively using PathMappers
 {
 public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
@@ -81,16 +79,6 @@ public:
     // Returns the tokens corresponding to the currently enabled filters.
     FVP_API
     std::set<PXR_NS::TfToken> GetActiveFilters();
-
-    // As a workaround until we move to exclusively using PathMappers
-    FVP_API
-    PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override {
-        PXR_NAMESPACE_USING_DIRECTIVE;
-
-        TF_FATAL_ERROR("Illegal call to deprecated %s", TF_FUNC_NAME().data());
-
-        return PrimSelections();
-    }
 
 protected:
     FVP_API

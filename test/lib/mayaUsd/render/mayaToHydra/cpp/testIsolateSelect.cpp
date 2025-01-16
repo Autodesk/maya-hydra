@@ -19,7 +19,6 @@
 
 #include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 #include <flowViewport/sceneIndex/fvpIsolateSelectSceneIndex.h>
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/selection/fvpSelection.h>
 #include <flowViewport/fvpPrimUtils.h>

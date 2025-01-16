@@ -22,8 +22,8 @@ target_sources(${TARGET_NAME}
         testHydraPrim.cpp
         testMayaSceneFlattening.cpp
         testMayaUsdUfeItems.cpp
-        # testMergingSceneIndex.cpp
-        testPathInterface.cpp
+        testDataProducerMergingSceneIndex.cpp
+        testUsdSelection.cpp
         testPrimPath.cpp
         testSelectionSceneIndex.cpp
         testUtils.cpp

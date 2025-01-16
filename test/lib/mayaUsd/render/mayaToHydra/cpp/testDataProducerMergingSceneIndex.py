@@ -26,11 +26,14 @@ class TestMergingSceneIndex(mtohUtils.MayaHydraBaseTestCase):
         cmds.polySphere(name="aSphere")
         cmds.refresh()
 
-    def test_mergingSceneIndex(self):
+    def test_dataProducerMergingSceneIndex(self):
+        # The data producer merging scene index is not a special type.  It
+        # is a standard HdMergingSceneIndex, but its function is to merge
+        # Hydra data producer input.
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(f="FlowViewport.mergingSceneIndex")
-            cmds.mayaHydraCppTest(f="FlowViewport.mergingSceneIndexAddRemove")
+            cmds.mayaHydraCppTest(f="FlowViewport.dataProducerMergingSceneIndex")
+            cmds.mayaHydraCppTest(f="FlowViewport.dataProducerMergingSceneIndexAddRemove")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

@@ -20,7 +20,6 @@
 #include <mayaHydraLib/mayaHydra.h>
 
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
 
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/tf/stringUtils.h>

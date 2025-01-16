@@ -20,7 +20,6 @@
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
-#include "flowViewport/sceneIndex/fvpPathInterface.h"
 
 //Hydra headers
 #include <pxr/imaging/hd/filteringSceneIndex.h>
@@ -36,7 +35,7 @@ typedef PXR_NS::TfRefPtr<const BlockPrimRemovalPropagationSceneIndex> BlockPrimR
 /// A filtering scene index that blocks prim removal propagation. Example usage is : we are re-creating
 /// the filtering scene index chain hierarchy and don't want the PrimRemoval to propagate to the linked 
 /// scene index.
-class BlockPrimRemovalPropagationSceneIndex : public PXR_NS::HdSingleInputFilteringSceneIndexBase, public PathInterface //As a temp workaround we subclass PathInterface
+class BlockPrimRemovalPropagationSceneIndex : public PXR_NS::HdSingleInputFilteringSceneIndexBase
     , public Fvp::InputSceneIndexUtils<BlockPrimRemovalPropagationSceneIndex>
 {
 public:
@@ -68,16 +67,6 @@ public:
     FVP_API
     void setPrimRemovalBlocked(bool blockPrimRemoval) { _blockPrimRemoval = blockPrimRemoval; }
 
-    //from PathInterface
-    FVP_API
-    PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override{
-        PXR_NAMESPACE_USING_DIRECTIVE
-
-        TF_FATAL_ERROR("Illegal call to deprecated %s", TF_FUNC_NAME().data());
-
-        return PrimSelections();
-    }
-
 protected:
     FVP_API
     BlockPrimRemovalPropagationSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex);
@@ -97,7 +86,6 @@ protected:
     void _PrimsRemoved(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& entries)override;
 
     bool _blockPrimRemoval {false};
-    const PathInterface* _pathInterface {nullptr};
 };
 
 }//end of namespace FVP_NS_DEF
