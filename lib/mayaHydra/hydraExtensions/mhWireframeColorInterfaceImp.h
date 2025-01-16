@@ -23,7 +23,6 @@
 //Flow viewport headers
 #include <flowViewport/fvpWireframeColorInterface.h>
 #include <flowViewport/selection/fvpSelectionFwd.h>
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
 
 //Hydra headers
 #include <pxr/imaging/hd/sceneIndex.h>

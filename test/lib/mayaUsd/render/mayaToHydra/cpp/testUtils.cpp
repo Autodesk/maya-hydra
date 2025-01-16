@@ -22,7 +22,6 @@
 
 #include <flowViewport/selection/fvpPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
 
 #include <pxr/imaging/hd/dataSourceLegacyPrim.h>
 #include <pxr/imaging/hd/instancedBySchema.h>

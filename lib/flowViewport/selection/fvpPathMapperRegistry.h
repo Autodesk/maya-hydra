@@ -18,7 +18,7 @@
 
 #include <flowViewport/api.h>
 #include <flowViewport/selection/fvpPathMapperFwd.h>
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
+#include <flowViewport/selection/fvpSelectionTypes.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/usd/sdf/path.h>
