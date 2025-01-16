@@ -30,6 +30,7 @@ class TestPrimInstancing(mtohUtils.MayaHydraBaseTestCase):
         usdUtils.createStageFromFile(usdScenePath)
         self.setHdStormRenderer()
         cmds.refresh()
+        cmds.select(clear=True)
 
     def test_UsdPrimInstancing(self):
         self.loadUsdScene()
