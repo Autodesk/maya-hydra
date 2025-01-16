@@ -23,7 +23,7 @@ import ufe
 
 from testUtils import PluginLoaded
 
-class TestPathInterface(mtohUtils.MayaHydraBaseTestCase):
+class TestUsdSelection(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -64,7 +64,7 @@ class TestPathInterface(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.refresh()
 
-    def test_PathInterface(self):
+    def test_UsdSelection(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
 
@@ -74,7 +74,7 @@ class TestPathInterface(mtohUtils.MayaHydraBaseTestCase):
 
             # Confirm that the number of scene indices under the top-level 
             # prim representing the plugin matches the number of proxy shapes.
-            cmds.mayaHydraCppTest(f="TestPathInterface.testSceneIndices")
+            cmds.mayaHydraCppTest(f="TestUsdSelection.testSceneIndices")
 
             #------------------------------------------------------------------
             # Test that selection works for multiple proxy shapes.
@@ -86,7 +86,7 @@ class TestPathInterface(mtohUtils.MayaHydraBaseTestCase):
                 cmds.select(self.cubeAppPath(selected))
                 self.assertEqual(self.cubeAppPath(selected), cmds.ls(sl=True, ufe=True)[0])
                 for i in range(3):
-                    cmds.mayaHydraCppTest(self.cubeAppPath(i), f="TestPathInterface.testSelected" if i==selected else "TestPathInterface.testUnselected")
+                    cmds.mayaHydraCppTest(self.cubeAppPath(i), f="TestUsdSelection.testSelected" if i==selected else "TestUsdSelection.testUnselected")
 
             #------------------------------------------------------------------
             # Test that selection works after proxy shape rename.
@@ -100,7 +100,7 @@ class TestPathInterface(mtohUtils.MayaHydraBaseTestCase):
             cmds.select(self.cubeAppPath(0))
             self.assertEqual(self.cubeAppPath(0), cmds.ls(sl=True, ufe=True)[0])
             
-            cmds.mayaHydraCppTest(self.cubeAppPath(0), f="TestPathInterface.testSelected")
+            cmds.mayaHydraCppTest(self.cubeAppPath(0), f="TestUsdSelection.testSelected")
 
             #------------------------------------------------------------------
             # Test that selection works after proxy shape reparent.
@@ -112,7 +112,7 @@ class TestPathInterface(mtohUtils.MayaHydraBaseTestCase):
             cmds.select(self.cubeAppPath(0))
             self.assertEqual(self.cubeAppPath(0), cmds.ls(sl=True, ufe=True)[0])
 
-            cmds.mayaHydraCppTest(self.cubeAppPath(0), f="TestPathInterface.testSelected")
+            cmds.mayaHydraCppTest(self.cubeAppPath(0), f="TestUsdSelection.testSelected")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

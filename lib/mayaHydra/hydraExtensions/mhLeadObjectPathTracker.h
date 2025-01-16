@@ -20,9 +20,6 @@
 #include "mayaHydraLib/api.h"
 #include "mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h"
 
-//Flow viewport headers
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
-
 //ufe
 #include <ufe/observer.h>
 #include <ufe/path.h>
@@ -40,7 +37,7 @@ class MhLeadObjectPathTracker
 {
 public:
     MAYAHYDRALIB_API
-    MhLeadObjectPathTracker(const PXR_NS::HdSceneIndexBaseRefPtr& sceneIndexWithPathInterface, MhDirtyLeadObjectSceneIndexRefPtr& dirtyPreviousLeadObjectSceneIndex);
+    MhLeadObjectPathTracker(MhDirtyLeadObjectSceneIndexRefPtr& dirtyPreviousLeadObjectSceneIndex);
 
     MAYAHYDRALIB_API
     ~MhLeadObjectPathTracker();
@@ -58,7 +55,6 @@ public:
     void updatePrimPaths(); // For example : this is called after the data producer scene indices are loaded
 
 private:
-    const Fvp::PathInterface* const _pathInterface {nullptr};
     PXR_NS::SdfPathVector           _leadObjectPrimPaths;
     Ufe::Observer::Ptr              _ufeSelectionObserver {nullptr};
     Ufe::Path                       _leadObjectUfePath;

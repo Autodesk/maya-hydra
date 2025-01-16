@@ -8,7 +8,6 @@
 set(INTERACTIVE_TEST_SCRIPT_FILES
     testImageDiffing.py
     testMtohCommand.py
-# Fail as of 22-Feb-2023.  Entered as MAYA-127898.
     testBasicRender.py
     testDagChanges.py
     testMeshes.py
@@ -61,8 +60,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testDataProducerExample.py
     cpp/testMayaSceneFlattening.py
     cpp/testMayaUsdUfeItems.py
-    cpp/testMergingSceneIndex.py
-    cpp/testPathInterface.py
+    cpp/testDataProducerMergingSceneIndex.py
+    cpp/testUsdSelection.py
     cpp/testPathMapperRegistry.py
     cpp/testPickHandlerRegistry.py
     cpp/testSelectionSceneIndex.py

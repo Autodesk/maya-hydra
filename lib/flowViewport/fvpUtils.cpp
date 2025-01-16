@@ -14,7 +14,6 @@
 //
 
 #include "fvpUtils.h"
-#include "sceneIndex/fvpPathInterface.h"
 
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/selectionSchema.h>

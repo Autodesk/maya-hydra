@@ -38,9 +38,9 @@
 
 //Local headers
 #include "flowViewport/sceneIndex/fvpRenderIndexProxy.h"
-#include "flowViewport/sceneIndex/fvpMergingSceneIndex.h"
 
 //Hydra headers
+#include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/renderIndex.h>
 #include <pxr/imaging/hd/renderDelegate.h>
@@ -68,11 +68,11 @@ _GetInputScene(const HdPrefixingSceneIndexRefPtr &prefixingScene)
 namespace FVP_NS_DEF {
 
 RenderIndexProxy::RenderIndexProxy(PXR_NS::HdRenderIndex* renderIndex) :
-    _renderIndex(renderIndex), _mergingSceneIndex(MergingSceneIndex::New())
+    _renderIndex(renderIndex), _mergingSceneIndex(PXR_NS::HdMergingSceneIndex::New())
 {
     TF_AXIOM(_renderIndex);
     TF_AXIOM(_mergingSceneIndex);
-    _mergingSceneIndex->SetDisplayName("Flow Viewport Merging Scene Index");
+    _mergingSceneIndex->SetDisplayName("Data Producer Merging Scene Index");
 }
 
 void RenderIndexProxy::InsertSceneIndex(

@@ -448,10 +448,7 @@ public:
 
     Fvp::PrimSelections 
     UfePathToPrimSelections(const Ufe::Path& appPath) const override {
-        auto litPaths = _piSi.UfePathToPrimSelectionsLit(appPath);
-        auto unlitPaths = _piSi.UfePathToPrimSelections(appPath);
-        unlitPaths.insert(unlitPaths.end(), litPaths.begin(), litPaths.end());
-        return unlitPaths;
+        return _piSi.UfePathToPrimSelections(appPath);
     }
 
 private:
@@ -823,6 +820,13 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelectionsLit(
     // UfePathToPrimSelections() would allow factoring out into a single path
     // mapper for Usd and Maya (see registration.cpp).
     if (appPath.runTimeId() != UfeExtensions::getMayaRunTimeId()) {
+        return {};
+    }
+
+    // If the Maya node described by the appPath is in fact a path mapper
+    // registry entry, nothing to do, the path mapper for that entry will
+    // handle things.
+    if (Fvp::PathMapperRegistry::Instance().HasMapper(appPath)) {
         return {};
     }
 

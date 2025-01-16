@@ -19,7 +19,6 @@
 //Local headers
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
-#include "flowViewport/sceneIndex/fvpPathInterface.h"
 
 //Hydra headers
 #include <pxr/base/tf/declarePtrs.h>
@@ -43,8 +42,8 @@ public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
     FVP_API
-    static LightsManagementSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const PathInterface& pathInterface, const PXR_NS::SdfPath& defaultLightPath){
-        return PXR_NS::TfCreateRefPtr(new LightsManagementSceneIndex(inputSceneIndex, pathInterface, defaultLightPath));
+    static LightsManagementSceneIndexRefPtr New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const PXR_NS::SdfPath& defaultLightPath){
+        return PXR_NS::TfCreateRefPtr(new LightsManagementSceneIndex(inputSceneIndex, defaultLightPath));
     }
 
     // From HdSceneIndexBase
@@ -74,7 +73,7 @@ public:
     
 protected:
     
-    LightsManagementSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const PathInterface& pathInterface, const PXR_NS::SdfPath& defaultLightPath);
+    LightsManagementSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const PXR_NS::SdfPath& defaultLightPath);
 
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override{
@@ -95,7 +94,6 @@ protected:
 
     LightingMode _lightingMode = LightingMode::kSceneLighting;
     PXR_NS::SdfPath _defaultLightPath;
-    const PathInterface& _pathInterface;
 };
 
 }//end of namespace FVP_NS_DEF

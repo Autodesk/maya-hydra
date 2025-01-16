@@ -18,7 +18,7 @@
 
 #include <flowViewport/api.h>
 #include <flowViewport/selection/fvpPathMapperFwd.h>
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
+#include <flowViewport/selection/fvpSelectionTypes.h>
 
 #include <pxr/usd/sdf/path.h>
 
@@ -38,12 +38,27 @@ namespace FVP_NS_DEF {
 /// path is converted to a path to a Hydra scene index prim that must be
 /// highlighted.
 
-class PathMapper : public PathInterface
+class PathMapper
 {
+public:
+
+    //! Return the prim path(s) corresponding to the argument application path,
+    //! as well as their associated selection data source(s).
+    //! If no such selected path exists, an empty container should be returned.
+    //! \return Selected prim paths and their associated selection data sources.
+    FVP_API
+    virtual PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const = 0;
+
 protected:
 
     FVP_API
     PathMapper() = default;
+};
+
+class PrimPathsCountOutOfRangeException : public std::out_of_range
+{
+public:
+    PrimPathsCountOutOfRangeException(size_t min, size_t max, size_t actual);
 };
 
 }

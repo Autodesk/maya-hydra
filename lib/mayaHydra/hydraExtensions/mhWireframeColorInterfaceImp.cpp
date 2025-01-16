@@ -33,7 +33,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace MAYAHYDRA_NS_DEF {
 
 MhWireframeColorInterfaceImp::MhWireframeColorInterfaceImp(const std::shared_ptr<Fvp::Selection>& selection
-                                                         , const std::shared_ptr<MhLeadObjectPathTracker>& leadObjectPathTracker) 
+                                                         , const std::weak_ptr<MhLeadObjectPathTracker>& leadObjectPathTracker) 
     : _activeWireframeColor (getPreferencesColor(FvpColorPreferencesTokens->wireframeSelectionSecondary))
     , _leadWireframeColor (getPreferencesColor(FvpColorPreferencesTokens->wireframeSelection))
     , _dormantWireframeColor (getPreferencesColor(FvpColorPreferencesTokens->polymeshDormant))
@@ -46,7 +46,12 @@ MhWireframeColorInterfaceImp::MhWireframeColorInterfaceImp(const std::shared_ptr
 MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getSelectionState(const PXR_NS::SdfPath& primPath)const
 {
     if (_selection->HasFullySelectedAncestorInclusive(primPath)){
-        return (_leadObjectPathTracker->isLeadObjectPrim(primPath)) ? kLead : kActive;
+        auto pt = _leadObjectPathTracker.lock();
+        if (!pt) {
+            TF_WARN("Illegal access to path tracker in %s, wireframe color will be incorrect.", TF_FUNC_NAME().data());
+            return kDormant;
+        }
+        return (pt->isLeadObjectPrim(primPath)) ? kLead : kActive;
     }
     
     return kDormant;

@@ -55,6 +55,9 @@ namespace FVP_NS_DEF
             ///_rendererName is the Hydra viewport renderer name (example : "GL" for Storm or "Arnold" for the Arnold render delegate)
             std::string _rendererName;
 
+            /**
+             *  @brief  Assignment operator.
+             */
             ViewportInformation& operator = (const ViewportInformation& other){
                 _viewportId = other._viewportId;
                 _cameraName = other._cameraName;
@@ -62,12 +65,20 @@ namespace FVP_NS_DEF
                 return *this;
             }
             
+            /**
+             *  @brief  Equal operator.
+             *  @return true if the ViewportInformation are identical.
+             */
             bool operator ==(const ViewportInformation& other)const{
                 return  _viewportId == other._viewportId &&
                         _cameraName == other._cameraName &&
                         _rendererName == other._rendererName;
             }
 
+            /**
+             *  @brief  lower than operator for containers ordering.
+             *  @return true if the ViewportInformation sent as a parameter is considered as lower.
+             */
             bool operator <(const ViewportInformation& other) const{ //to be used in std::set
                 auto a = {_viewportId, _cameraName, _rendererName};
                 auto b = {other._viewportId, other._cameraName, other._rendererName};

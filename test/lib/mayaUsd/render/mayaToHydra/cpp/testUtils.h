@@ -20,7 +20,6 @@
 #include <mayaHydraLib/mayaHydra.h>
 
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
 
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/tf/stringUtils.h>
@@ -494,6 +493,11 @@ void assertSelectionHighlightCorrectness(
  * @brief Return whether the prim is visible or not.
  */
 bool visibility(const PXR_NS::HdSceneIndexBasePtr& sceneIndex, const PXR_NS::SdfPath& primPath);
+
+/**
+ * @brief Return whether argument path vector contains the argument path.
+ */
+bool contains(const PXR_NS::SdfPathVector& paths, const PXR_NS::SdfPath& path);
 
 } // namespace MAYAHYDRA_NS_DEF
 
