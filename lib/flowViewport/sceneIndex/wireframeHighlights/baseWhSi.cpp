@@ -362,7 +362,22 @@ BaseWhSi::BaseWhSi(
     _highlightHierarchyPrefix(highlightHierarchyPrefix),
     _wireframeColorInterface(wireframeColorInterface)
 {
-
+    auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
+        if (IsExcludedPath(primPath)) {
+            return false;
+        }
+        HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
+        if (selectionsSchema.IsDefined()) {
+            for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
+                if (selectionsSchema.GetElement(selectionId).GetFullySelected() && !selectionsSchema.GetElement(selectionId).GetNestedInstanceIndices()) {
+                    _fullySelectedPaths.emplace(primPath);
+                    break;
+                }
+            }
+        }
+        return true;
+    };
+    ForEachPrimInHierarchy(SdfPath::AbsoluteRootPath(), operation);
 }
 
 HdSceneIndexPrim BaseWhSi::GetPrim(const PXR_NS::SdfPath &primPath) const
@@ -423,6 +438,16 @@ void BaseWhSi::_PrimsAdded(
     for (const auto& entry : entries) {
         if (!IsExcludedPath(entry.primPath)) {
             filteredEntries.emplace_back(entry);
+            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+            HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
+            if (selectionsSchema.IsDefined()) {
+                for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
+                    if (selectionsSchema.GetElement(selectionId).GetFullySelected() && !selectionsSchema.GetElement(selectionId).GetNestedInstanceIndices()) {
+                        _fullySelectedPaths.emplace(entry.primPath);
+                        break;
+                    }
+                }
+            }
         }
     }
     ProcessAddedPrims(sender, filteredEntries);
@@ -437,6 +462,10 @@ void BaseWhSi::_PrimsRemoved(
     for (const auto& entry : entries) {
         if (!IsExcludedPath(entry.primPath)) {
             filteredEntries.emplace_back(entry);
+            auto itFullySelectedPath = _fullySelectedPaths.lower_bound(entry.primPath);
+            while (itFullySelectedPath != _fullySelectedPaths.end() && itFullySelectedPath->HasPrefix(entry.primPath)) {
+                itFullySelectedPath = _fullySelectedPaths.erase(itFullySelectedPath);
+            }
         }
     }
     ProcessRemovedPrims(sender, filteredEntries);
@@ -448,12 +477,48 @@ void BaseWhSi::_PrimsDirtied(
 {
     _SendPrimsDirtied(entries);
     HdSceneIndexObserver::DirtiedPrimEntries filteredEntries;
+    std::vector<SdfPath> selectionChangePaths;
     for (const auto& entry : entries) {
         if (!IsExcludedPath(entry.primPath)) {
             filteredEntries.emplace_back(entry);
+            if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
+                HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+                bool wasFullySelected = _fullySelectedPaths.find(entry.primPath) != _fullySelectedPaths.end();
+                bool isFullySelected = false;
+                HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
+                if (selectionsSchema.IsDefined()) {
+                    for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements() && !isFullySelected; selectionId++) {
+                        if (selectionsSchema.GetElement(selectionId).GetFullySelected() && !selectionsSchema.GetElement(selectionId).GetNestedInstanceIndices()) {
+                            isFullySelected = true;
+                        }
+                    }
+                }
+                if (isFullySelected) {
+                    _fullySelectedPaths.emplace(entry.primPath);
+                } else {
+                    _fullySelectedPaths.erase(entry.primPath);
+                }
+                if (wasFullySelected != isFullySelected) {
+                    selectionChangePaths.push_back(entry.primPath);
+                }
+            }
         }
     }
+    for (const auto& selectionChangePath : selectionChangePaths) {
+        ProcessFullySelectedChange(selectionChangePath, _fullySelectedPaths.find(selectionChangePath) != _fullySelectedPaths.end());
+    }
     ProcessDirtiedPrims(sender, filteredEntries);
+}
+
+void BaseWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)
+{
+
+}
+
+bool BaseWhSi::HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath)
+{
+    auto itFullySelectedPath = _fullySelectedPaths.upper_bound(primPath);
+    return itFullySelectedPath != _fullySelectedPaths.begin() && primPath.HasPrefix(*std::prev(itFullySelectedPath));
 }
 
 void BaseWhSi::AddExcludedPath(const PXR_NS::SdfPath& path)

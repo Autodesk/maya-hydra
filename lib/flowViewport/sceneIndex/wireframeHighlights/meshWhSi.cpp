@@ -81,30 +81,18 @@ MeshWhSi::MeshWhSi(
         if (IsExcludedPath(primPath)) {
             return false;
         }
-        HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
-        if (selectionsSchema.IsDefined()) {
-            for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
-                if (selectionsSchema.GetElement(selectionId).GetFullySelected()) {
-                    _fullySelectedPaths.emplace(primPath);
-                }
-            }
-        }
         if (prim.primType == HdPrimTypeTokens->mesh) {
             HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
             if (!instancedBy.IsDefined()) {
                 _meshPaths.emplace(primPath);
+                if (HasFullySelectedAncestorInclusive(primPath)) {
+                    _CreateSelectionHighlight(primPath);
+                }
             }
         }
         return true;
     };
     ForEachPrimInHierarchy(SdfPath::AbsoluteRootPath(), operation);
-
-    for (const auto& meshPath : _meshPaths) {
-        auto itSelectedParentPath = _fullySelectedPaths.upper_bound(meshPath);
-        if (itSelectedParentPath != _fullySelectedPaths.begin() && meshPath.HasPrefix(*std::prev(itSelectedParentPath))) {
-            _CreateSelectionHighlight(meshPath);
-        }
-    }
 }
 
 void MeshWhSi::ProcessAddedPrims(
@@ -113,40 +101,14 @@ void MeshWhSi::ProcessAddedPrims(
 {
     HdSceneIndexObserver::AddedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
-        bool isMesh = false;
-        bool isSelected = false;
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
         if (entry.primType == HdPrimTypeTokens->mesh) {
             HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
             if (!instancedBy.IsDefined()) {
                 _meshPaths.emplace(entry.primPath);
-                isMesh = true;
-            }
-        }
-        HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
-        if (selectionsSchema.IsDefined()) {
-            for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
-                if (selectionsSchema.GetElement(selectionId).GetFullySelected()) {
-                    _fullySelectedPaths.emplace(entry.primPath);
-                    isSelected = true;
-                }
-            }
-        }
-        if (isMesh) {
-            auto itSelectedParent = _fullySelectedPaths.upper_bound(entry.primPath);
-            if (itSelectedParent != _fullySelectedPaths.begin() && entry.primPath.HasPrefix(*std::prev(itSelectedParent))) {
-                if (_highlightedMeshPaths.find(entry.primPath) == _highlightedMeshPaths.end()) {
+                if (HasFullySelectedAncestorInclusive(entry.primPath)) {
                     _CreateSelectionHighlight(entry.primPath);
                 }
-            }
-        }
-        if (isSelected) {
-            auto itMeshChild = _meshPaths.lower_bound(entry.primPath);
-            while (itMeshChild != _meshPaths.end() && itMeshChild->HasPrefix(entry.primPath)) {
-                if (_highlightedMeshPaths.find(*itMeshChild) == _highlightedMeshPaths.end()) {
-                    _CreateSelectionHighlight(*itMeshChild);
-                }
-                itMeshChild++;
             }
         }
     }
@@ -161,17 +123,8 @@ void MeshWhSi::ProcessRemovedPrims(
     for (const auto& entry : entries) {
         auto itMesh = _meshPaths.lower_bound(entry.primPath);
         while (itMesh != _meshPaths.end() && itMesh->HasPrefix(entry.primPath)) {
-            if (_highlightedMeshPaths.find(*itMesh) != _highlightedMeshPaths.end()) {
-                _DeleteSelectionHighlight(*itMesh);
-            }
+            _DeleteSelectionHighlight(*itMesh);
             itMesh = _meshPaths.erase(itMesh);
-        }
-
-        auto itSelectedPath = _fullySelectedPaths.lower_bound(entry.primPath);
-        while (itSelectedPath != _fullySelectedPaths.end() && itSelectedPath->HasPrefix(entry.primPath)) {
-            itSelectedPath = _fullySelectedPaths.erase(itSelectedPath);
-            // Child mesh highlights will have already been deleted above, since deleting a selected parent
-            // implies deleting child meshes.
         }
     }
     _SendPrimsRemoved(highlightEntries);
@@ -183,46 +136,6 @@ void MeshWhSi::ProcessDirtiedPrims(
 {
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
-        if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
-            bool isFullySelected = false;
-            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
-            HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
-            if (selectionsSchema.IsDefined()) {
-                for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
-                    if (selectionsSchema.GetElement(selectionId).GetFullySelected()) {
-                        isFullySelected = true;
-                    }
-                }
-            }
-            // Newly selected path : create selection highlights for all meshes not yet highlighted under it.
-            if (isFullySelected && _fullySelectedPaths.find(entry.primPath) == _fullySelectedPaths.end()) {
-                _fullySelectedPaths.emplace(entry.primPath);
-                auto itMesh = _meshPaths.lower_bound(entry.primPath);
-                while (itMesh != _meshPaths.end() && itMesh->HasPrefix(entry.primPath)) {
-                    if (_highlightedMeshPaths.find(*itMesh) == _highlightedMeshPaths.end()) {
-                        _CreateSelectionHighlight(*itMesh);
-                    }
-                    itMesh++;
-                }
-            }
-            // Newly unselected path : delete selection highlights for all meshes under it if no other prim
-            // that is a parent of that mesh is selected.
-            else if (!isFullySelected && _fullySelectedPaths.find(entry.primPath) != _fullySelectedPaths.end()) {
-                _fullySelectedPaths.erase(entry.primPath);
-                auto itMesh = _meshPaths.lower_bound(entry.primPath);
-                while (itMesh != _meshPaths.end() && itMesh->HasPrefix(entry.primPath)) {
-                    if (_highlightedMeshPaths.find(*itMesh) != _highlightedMeshPaths.end()) {
-                        auto itSelectedParentPath = _fullySelectedPaths.upper_bound(*itMesh);
-                        if (itSelectedParentPath == _fullySelectedPaths.begin() || !itMesh->HasPrefix(*std::prev(itSelectedParentPath))) {
-                            // No selected parent.
-                            _DeleteSelectionHighlight(*itMesh);
-                        }
-                    }
-                    itMesh++;
-                }
-            }
-        }
-
         // Propagate changes to the mesh and its children (needed for wireframe color updates)
         auto itHighlightedMesh = _highlightedMeshPaths.upper_bound(entry.primPath);
         if (itHighlightedMesh != _highlightedMeshPaths.begin()) {
@@ -234,6 +147,22 @@ void MeshWhSi::ProcessDirtiedPrims(
         }
     }
     _SendPrimsDirtied(highlightEntries);
+}
+
+void MeshWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)
+{
+    if (isFullySelected) {
+        for (auto itMesh = _meshPaths.lower_bound(primPath); itMesh != _meshPaths.end() && itMesh->HasPrefix(primPath); itMesh++) {
+            _CreateSelectionHighlight(*itMesh);
+        }
+    }
+    else {
+        for (auto itMesh = _meshPaths.lower_bound(primPath); itMesh != _meshPaths.end() && itMesh->HasPrefix(primPath); itMesh++) {
+            if (!HasFullySelectedAncestorInclusive(*itMesh)) {
+                _DeleteSelectionHighlight(*itMesh);
+            }
+        }
+    }
 }
 
 void MeshWhSi::_CreateSelectionHighlight(const SdfPath& meshPath)

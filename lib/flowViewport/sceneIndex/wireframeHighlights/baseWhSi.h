@@ -25,6 +25,7 @@
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
 #include <pxr/imaging/hd/sceneIndex.h>
+#include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/usd/sdf/path.h>
 
@@ -174,6 +175,12 @@ protected:
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) = 0;
     
     FVP_API
+    virtual void ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected);
+
+    FVP_API
+    bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath);
+    
+    FVP_API
     void ForEachPrimInHierarchy(const PXR_NS::SdfPath& hierarchyRoot, const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation) const;
     
     FVP_API
@@ -184,6 +191,8 @@ protected:
 
     std::set<PXR_NS::SdfPath> _selectionPaths;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _primPathsToSelections;
+
+    std::set<PXR_NS::SdfPath> _fullySelectedPaths;
 
     std::set<PXR_NS::SdfPath> _excludedPaths;
 };

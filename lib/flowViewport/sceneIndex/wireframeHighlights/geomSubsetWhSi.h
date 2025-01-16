@@ -91,8 +91,8 @@ protected:
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
 
 private:
-    std::set<PXR_NS::SdfPath> _fullySelectedPaths;
     std::set<PXR_NS::SdfPath> _geomSubsetPaths;
+    // TODO : Redundant with _primPathsToSelections
     std::set<PXR_NS::SdfPath> _highlightedGeomSubsetPaths;
 
     void _CreateSelectionHighlight(const PXR_NS::SdfPath& geomSubsetPath);

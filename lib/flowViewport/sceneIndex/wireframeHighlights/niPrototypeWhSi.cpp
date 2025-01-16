@@ -166,6 +166,7 @@ void NiPrototypeWhSi::ProcessRemovedPrims(
 {
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
+        // If a parent of one the selected prims was removed, delete the selection highlight
         auto itSelectedPrim = _primPathsToSelections.lower_bound(entry.primPath);
         if (itSelectedPrim != _primPathsToSelections.end()) {
             if (itSelectedPrim->first.HasPrefix(entry.primPath)) {
@@ -175,6 +176,7 @@ void NiPrototypeWhSi::ProcessRemovedPrims(
             }
         }
 
+        // If a prototype was removed, delete the selection highlights which depended on it
         auto itPrototypeParentRemoval = _prototypePathsToSelections.lower_bound(entry.primPath);
         if (itPrototypeParentRemoval != _prototypePathsToSelections.end()) {
             if (itPrototypeParentRemoval->first.HasPrefix(entry.primPath)) {
@@ -184,6 +186,7 @@ void NiPrototypeWhSi::ProcessRemovedPrims(
             }
         }
 
+        // Propagate removed prototype subprims
         auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
         if (itPrototype != _prototypePathsToSelections.begin()) {
             --itPrototype;

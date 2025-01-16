@@ -95,12 +95,15 @@ protected:
     void ProcessDirtiedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
+    
+    FVP_API
+    void ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected) override;
 
 private:
     std::map<PXR_NS::SdfPath, PXR_NS::SdfPathSet> _prototypePathsToSelectionPaths;
     std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _selectionPathsToPrototypePrefixes;
-    std::set<PXR_NS::SdfPath> _fullySelectedPaths;
     std::set<PXR_NS::SdfPath> _instancePaths;
+    // TODO : Redundant with _primPathsToSelections
     std::set<PXR_NS::SdfPath> _highlightedInstancePaths;
 
     void _CreateSelectionHighlight(const PXR_NS::SdfPath& instancePath);
