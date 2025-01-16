@@ -30,6 +30,8 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
+const std::string kFullHighlight = "Full";
+
 // Computes the mask to use for an instancer's selection highlight
 // based on the instancer's topology and the selection.
 VtBoolArray
@@ -105,6 +107,11 @@ _GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& ori
     return editedDataSource.Finish();
 }
 
+bool _IsPointInstancer(const HdSceneIndexPrim& prim) {
+    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
+    return prim.primType == HdPrimTypeTokens->instancer && instancerTopology.IsDefined() && !instancerTopology.GetInstanceLocations();
+}
+
 }
 
 namespace FVP_NS_DEF {
@@ -126,9 +133,9 @@ HdSceneIndexPrim PiInstancerWhSi::GetHighlightPrim(const SdfPath &selectionPath,
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
     prim.dataSource = RepathingContainerDataSource::New(SdfPath::AbsoluteRootPath(), selectionPath, prim.dataSource);
     if (prim.primType == HdPrimTypeTokens->mesh) {
-        prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(primSelection));
+        prim.dataSource = SetWireframeRepr(prim.dataSource, primSelection.nestedInstanceIndices.empty() ? _wireframeColorInterface->getWireframeColor(selectionKey.first) : _wireframeColorInterface->getWireframeColor(primSelection));
     }
-    if (prim.primType == HdPrimTypeTokens->instancer && originalPath == selectionKey.first) {
+    if (_IsPointInstancer(prim) && originalPath == selectionKey.first) {
         // Adjust the instancer mask to only show selected instances
         HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
         HdSelectionSchema activeSelection = selectionsSchema.GetElement(std::stoul(selectionKey.second));
@@ -161,10 +168,13 @@ PiInstancerWhSi::PiInstancerWhSi(
 ) : BaseWhSi(inputSceneIndex, highlightHierarchyPrefix, wireframeColorInterface)
 {
     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
-        if (prim.primType == HdPrimTypeTokens->instancer) {
-            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+        if (_IsPointInstancer(prim)) {
+            _pointInstancerPaths.emplace(primPath);
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
-            if (selectionsSchema.IsDefined()) {
+            if (HasFullySelectedAncestorInclusive(primPath)) {
+                _CreateSelectionHighlight(primPath, kFullHighlight);
+            }
+            else if (selectionsSchema.IsDefined()) {
                 for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
                     _CreateSelectionHighlight(primPath, std::to_string(selectionId));
                 }
@@ -181,10 +191,16 @@ void PiInstancerWhSi::ProcessAddedPrims(
 {
     HdSceneIndexObserver::AddedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
-        if (entry.primType == HdPrimTypeTokens->instancer) {
-            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+        HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+        if (_IsPointInstancer(prim)) {
+            _pointInstancerPaths.emplace(entry.primPath);
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
-            if (selectionsSchema.IsDefined()) {
+            if (HasFullySelectedAncestorInclusive(entry.primPath)) {
+                _CreateSelectionHighlight(entry.primPath, kFullHighlight);
+                // We just created the highlight, no need to add highlight prims
+                continue;
+            }
+            else if (selectionsSchema.IsDefined()) {
                 for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
                     _CreateSelectionHighlight(entry.primPath, std::to_string(selectionId));
                 }
@@ -226,6 +242,11 @@ void PiInstancerWhSi::ProcessRemovedPrims(
 {
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
+        auto itPointInstancer = _pointInstancerPaths.lower_bound(entry.primPath);
+        while (itPointInstancer != _pointInstancerPaths.end() && itPointInstancer->HasPrefix(entry.primPath)) {
+            itPointInstancer = _pointInstancerPaths.erase(itPointInstancer);
+        }
+
         // If a parent of one the selected prims was removed, delete the selection highlight
         auto itSelectedPrim = _primPathsToSelections.lower_bound(entry.primPath);
         if (itSelectedPrim != _primPathsToSelections.end()) {
@@ -291,7 +312,7 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
     for (const auto& entry : entries) {
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
-            if (prim.primType == HdPrimTypeTokens->instancer) {
+            if (_IsPointInstancer(prim)) {
                 // Selection changed on the instancer; rebuild the highlight
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
@@ -300,13 +321,18 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
                     }
                 }
                 HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
-                if (selectionsSchema.IsDefined()) {
+                if (HasFullySelectedAncestorInclusive(entry.primPath)) {
+                    _CreateSelectionHighlight(entry.primPath, kFullHighlight);
+                    // We rebuilt the highlight, no need to do the rest
+                    continue;
+                }
+                else if (selectionsSchema.IsDefined()) {
                     for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
                         _CreateSelectionHighlight(entry.primPath, std::to_string(selectionId));
                     }
+                    // We rebuilt the highlight, no need to do the rest
+                    continue;
                 }
-                // We rebuilt the highlight, no need to do the rest
-                continue;
             }
         }
 
@@ -358,9 +384,39 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
     _SendPrimsDirtied(highlightEntries);
 }
 
+void PiInstancerWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)
+{
+    if (isFullySelected) {
+        for (auto itPointInstancer = _pointInstancerPaths.lower_bound(primPath); itPointInstancer != _pointInstancerPaths.end() && itPointInstancer->HasPrefix(primPath); itPointInstancer++) {
+            auto existingSelectionKeys = _primPathsToSelections.find(*itPointInstancer);
+            if (existingSelectionKeys != _primPathsToSelections.end()) {
+                for (const auto& selectionKey : existingSelectionKeys->second) {
+                    _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
+                }
+            }
+            _CreateSelectionHighlight(*itPointInstancer, kFullHighlight);
+        }
+    }
+    else {
+        for (auto itPointInstancer = _pointInstancerPaths.lower_bound(primPath); itPointInstancer != _pointInstancerPaths.end() && itPointInstancer->HasPrefix(primPath); itPointInstancer++) {
+            if (!HasFullySelectedAncestorInclusive(*itPointInstancer)) {
+                _DeleteSelectionHighlight(*itPointInstancer, kFullHighlight);
+            }
+            HdSceneIndexPrim pointInstancerPrim = GetInputSceneIndex()->GetPrim(*itPointInstancer);
+            HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(pointInstancerPrim.dataSource);
+            if (selectionsSchema.IsDefined()) {
+                for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
+                    _CreateSelectionHighlight(*itPointInstancer, std::to_string(selectionId));
+                }
+            }
+        }
+    }
+}
+
 void PiInstancerWhSi::_CreateSelectionHighlight(const SdfPath& instancerPath, std::string selectionId)
 {
-    if (selectionId.empty() || selectionId.find_first_not_of("0123456789") != std::string::npos) {
+    SelectionKey selectionKey { instancerPath, selectionId };
+    if (_selections.find(selectionKey) != _selections.end()) {
         return;
     }
 
@@ -370,13 +426,12 @@ void PiInstancerWhSi::_CreateSelectionHighlight(const SdfPath& instancerPath, st
     CollectInstancingPaths(instancerPath, SelectionHighlightsCollectionDirection2::Bidirectional2, instancerPaths, prototypePaths);
 
     // Setup data structures
-    SelectionKey selectionKey { instancerPath, selectionId };
     SdfPath selectionPath = RegisterSelection(selectionKey);
 
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(instancerPath);
     HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
     SelectionData selectionData;
-    selectionData._primSelection = ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(std::stoul(selectionId)));
+    selectionData._primSelection = selectionId == kFullHighlight ? PrimSelection {instancerPath} : ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(std::stoul(selectionId)));
     selectionData._instancerPaths = instancerPaths;
     selectionData._prototypePaths = prototypePaths;
     _selections[selectionKey] = selectionData;

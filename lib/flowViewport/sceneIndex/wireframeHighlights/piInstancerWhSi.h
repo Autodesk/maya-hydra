@@ -89,6 +89,9 @@ protected:
     void ProcessDirtiedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
+    
+    FVP_API
+    void ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected) override;
 
 private:
     struct SelectionData {
@@ -97,6 +100,7 @@ private:
         PXR_NS::SdfPathSet _prototypePaths;
     };
 
+    std::set<PXR_NS::SdfPath> _pointInstancerPaths;
     std::map<SelectionKey, SelectionData> _selections;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _instancerPathsToSelections;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _prototypePathsToSelections;
