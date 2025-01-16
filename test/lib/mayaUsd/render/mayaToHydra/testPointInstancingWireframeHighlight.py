@@ -1,0 +1,140 @@
+# Copyright 2024 Autodesk
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+import maya.cmds as cmds
+import fixturesUtils
+import mtohUtils
+import testUtils
+import ufe
+from testUtils import PluginLoaded
+
+class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
+    # MayaHydraBaseTestCase.setUpClass requirement.
+    _file = __file__
+
+    _stagePathSegment = "|NestedAndComposedPointInstancers|NestedAndComposedPointInstancersShape"
+
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.05
+    IMAGE_DIFF_FAIL_PERCENT = 1
+
+    def loadUsdScene(self):
+        import usdUtils
+        usdScenePath = testUtils.getTestScene('testPointInstancingWireframeHighlight', 'NestedAndComposedPointInstancers.usda')
+        usdUtils.createStageFromFile(usdScenePath)
+        self.setBasicCam(10)
+
+    def setUp(self):
+        super(TestPointInstancingWireframeHighlight, self).setUp()
+        self.loadUsdScene()
+
+    def test_PointInstancerSelection(self):
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        topInstancerPath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer"
+        secondInstancerPath = self._stagePathSegment + "," + "/Root/SecondInstancer"
+        thirdInstancerPath = self._stagePathSegment + "," + "/Root/ThirdInstancer"
+        fourthInstancerPath = self._stagePathSegment + "," + "/Root/FourthInstancer"
+
+        topInstancerItem = ufe.Hierarchy.createItem(ufe.PathString.path(topInstancerPath))
+        secondInstancerItem = ufe.Hierarchy.createItem(ufe.PathString.path(secondInstancerPath))
+        thirdInstancerItem = ufe.Hierarchy.createItem(ufe.PathString.path(thirdInstancerPath))
+        fourthInstancerItem = ufe.Hierarchy.createItem(ufe.PathString.path(fourthInstancerPath))
+
+        sn.clear()
+        sn.append(topInstancerItem)
+        self.assertSnapshotClose("directSelection_topInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.clear()
+        sn.append(secondInstancerItem)
+        self.assertSnapshotClose("directSelection_secondInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.clear()
+        sn.append(thirdInstancerItem)
+        self.assertSnapshotClose("directSelection_thirdInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.clear()
+        sn.append(fourthInstancerItem)
+        self.assertSnapshotClose("directSelection_fourthInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        topInstancerParentPath = self._stagePathSegment + "," + "/Root/TopInstancerXform"
+        topInstancerParentItem = ufe.Hierarchy.createItem(ufe.PathString.path(topInstancerParentPath))
+        sn.clear()
+        sn.append(topInstancerParentItem)
+        self.assertSnapshotClose("parentSelection_topInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        rootPath = self._stagePathSegment + "," + "/Root"
+        rootItem = ufe.Hierarchy.createItem(ufe.PathString.path(rootPath))
+        sn.clear()
+        sn.append(rootItem)
+        self.assertSnapshotClose("rootSelection_all.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+    def test_InstanceSelection(self):
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        topInstancerFirstInstancePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/0"
+        secondInstancerSecondInstancePath = self._stagePathSegment + "," + "/Root/SecondInstancer/1"
+
+        topInstancerFirstInstanceItem = ufe.Hierarchy.createItem(ufe.PathString.path(topInstancerFirstInstancePath))
+        secondInstancerSecondInstanceItem = ufe.Hierarchy.createItem(ufe.PathString.path(secondInstancerSecondInstancePath))
+
+        sn.clear()
+        sn.append(topInstancerFirstInstanceItem)
+        self.assertSnapshotClose("topInstancerFirstInstance.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.clear()
+        sn.append(secondInstancerSecondInstanceItem)
+        self.assertSnapshotClose("secondInstancerSecondInstance.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+
+    def test_PrototypeSelection(self):
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        prototypePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube/Geom/Cube"
+        prototypeParentPath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube"
+
+        prototypeItem = ufe.Hierarchy.createItem(ufe.PathString.path(prototypePath))
+        prototypeParentItem = ufe.Hierarchy.createItem(ufe.PathString.path(prototypeParentPath))
+
+        sn.clear()
+        sn.append(prototypeItem)
+        self.assertSnapshotClose("prototype_directSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.clear()
+        sn.append(prototypeParentItem)
+        self.assertSnapshotClose("prototype_parentSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            
+    def test_MultiInstancesSelection(self):
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        topInstancerFirstInstancePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/0"
+        topInstancerSecondInstancePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/1"
+
+        topInstancerFirstInstanceItem = ufe.Hierarchy.createItem(ufe.PathString.path(topInstancerFirstInstancePath))
+        topInstancerSecondInstanceItem = ufe.Hierarchy.createItem(ufe.PathString.path(topInstancerSecondInstancePath))
+
+        sn.clear()
+        sn.append(topInstancerFirstInstanceItem)
+        sn.append(topInstancerSecondInstanceItem)
+        self.assertSnapshotClose("multiInstances_both.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.clear()
+        sn.remove(topInstancerFirstInstanceItem)
+        self.assertSnapshotClose("multiInstances_single.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+if __name__ == '__main__':
+    fixturesUtils.runTests(globals())

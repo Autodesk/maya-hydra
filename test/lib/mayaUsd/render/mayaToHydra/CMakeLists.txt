@@ -56,6 +56,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
     testMayaLightingModes.py
+    testPointInstancingWireframeHighlight.py
+    testGeomSubsetsWireframeHighlight.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
@@ -78,12 +80,10 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testUsdNativeInstancePicking.py
     cpp/testUsdPickKind.py
     cpp/testNurbsSurfaces.py
-    cpp/testPointInstancingWireframeHighlight.py
     cpp/testGeomSubsetsPicking.py
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
     cpp/testUsdStageInvalidate.py
-    cpp/testGeomSubsetsWireframeHighlight.py
 )
 
 # These two test files are identical, except for disabled tests.  See
