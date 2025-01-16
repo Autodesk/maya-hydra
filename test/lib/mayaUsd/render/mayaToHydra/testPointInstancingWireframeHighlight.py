@@ -32,7 +32,8 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         import usdUtils
         usdScenePath = testUtils.getTestScene('testPointInstancingWireframeHighlight', 'NestedAndComposedPointInstancers.usda')
         usdUtils.createStageFromFile(usdScenePath)
-        self.setBasicCam(10)
+        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
+        cmds.setAttr('persp.translate', 10, 10, 10, type='float3')
 
     def setUp(self):
         super(TestPointInstancingWireframeHighlight, self).setUp()
@@ -129,12 +130,10 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(topInstancerFirstInstanceItem)
+        self.assertSnapshotClose("multiInstances_single.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
         sn.append(topInstancerSecondInstanceItem)
         self.assertSnapshotClose("multiInstances_both.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
-        sn.clear()
-        sn.remove(topInstancerFirstInstanceItem)
-        self.assertSnapshotClose("multiInstances_single.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
