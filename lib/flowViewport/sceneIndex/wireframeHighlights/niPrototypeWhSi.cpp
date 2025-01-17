@@ -235,7 +235,7 @@ void NiPrototypeWhSi::ProcessDirtiedPrims(
             if (entry.primPath.HasPrefix(itPrototype->first)) {
                 for (const auto& selectionKey : itPrototype->second) {
                     auto selectionPath = SelectionPathFromKey(selectionKey);
-                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
+                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath), entry.dirtyLocators);
                 }
             }
         }
