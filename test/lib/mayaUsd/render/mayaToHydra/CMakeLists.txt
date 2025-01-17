@@ -58,6 +58,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaLightingModes.py
     testPointInstancingWireframeHighlight.py
     testGeomSubsetsWireframeHighlight.py
+    testNativeInstancingWireframeHighlight.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
