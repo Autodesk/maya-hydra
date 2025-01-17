@@ -124,8 +124,28 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn.clear()
         sn.append(prototypeParentItem)
         self.assertSnapshotClose("prototype_parentSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-            
-    def test_MultiInstancesSelection(self):
+    
+    def test_PointInstancerWireframeColorChange(self):
+        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
+        cmds.setAttr('persp.translate', 10, 10, 10, type='float3')
+
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        topInstancerPath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer"
+        secondInstancerPath = self._stagePathSegment + "," + "/Root/SecondInstancer"
+
+        topInstancerItem = ufe.Hierarchy.createItem(ufe.PathString.path(topInstancerPath))
+        secondInstancerItem = ufe.Hierarchy.createItem(ufe.PathString.path(secondInstancerPath))
+
+        sn.clear()
+        sn.append(topInstancerItem)
+        self.assertSnapshotClose("pointInstancerWireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.append(secondInstancerItem)
+        self.assertSnapshotClose("pointInstancerWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+    
+    def test_InstanceWireframeColorChange(self):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
         cmds.setAttr('persp.translate', 5, 10, 5, type='float3')
 
@@ -140,10 +160,30 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(topInstancerFirstInstanceItem)
-        self.assertSnapshotClose("multiInstances_single.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("instanceWireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         sn.append(topInstancerSecondInstanceItem)
-        self.assertSnapshotClose("multiInstances_both.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("instanceWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+    
+    def test_PrototypeWireframeColorChange(self):
+        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
+        cmds.setAttr('persp.translate', 10, 10, 10, type='float3')
+
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        cubePrototypePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube/Geom/Cube"
+        pyramidPrototypePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/BluePyramid/Geom/Pyramid"
+
+        cubePrototypeItem = ufe.Hierarchy.createItem(ufe.PathString.path(cubePrototypePath))
+        pyramidPrototypeItem = ufe.Hierarchy.createItem(ufe.PathString.path(pyramidPrototypePath))
+
+        sn.clear()
+        sn.append(cubePrototypeItem)
+        self.assertSnapshotClose("prototypeWireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.append(pyramidPrototypeItem)
+        self.assertSnapshotClose("prototypeWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
