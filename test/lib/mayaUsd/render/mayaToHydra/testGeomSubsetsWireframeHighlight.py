@@ -70,6 +70,27 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn.clear()
         sn.append(sphereGeomSubsetItem)
         self.assertSnapshotClose("instancedGeomSubsetHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+    
+    def test_MeshAndGeomSubsetSelection(self):
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        cubeMeshPath = self._stageUfePathSegment + "," + self._cubeMeshUfePathSegment
+        cubeMeshItem = ufe.Hierarchy.createItem(ufe.PathString.path(cubeMeshPath))
+
+        cubeGeomSubsetPath = self._stageUfePathSegment + "," + self._cubeMeshUfePathSegment + "/" + self._cubeUpperHalfName
+        cubeGeomSubsetItem = ufe.Hierarchy.createItem(ufe.PathString.path(cubeGeomSubsetPath))
+
+        sn.clear()
+        sn.append(cubeGeomSubsetItem)
+        sn.append(cubeMeshItem)
+        self.assertSnapshotClose("geomSubsetThenMeshSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.clear()
+        sn.append(cubeMeshItem)
+        sn.append(cubeGeomSubsetItem)
+        # HYDRA-XYZ : If a mesh and one of its geomSubsets are both selected, the mesh's wireframe color overpowers the geomSubset's
+        self.assertSnapshotClose("meshThenGeomSubsetSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
