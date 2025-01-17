@@ -89,6 +89,9 @@ protected:
     void ProcessDirtiedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
+    
+    FVP_API
+    void ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected) override;
 
 private:
     std::set<PXR_NS::SdfPath> _geomSubsetPaths;

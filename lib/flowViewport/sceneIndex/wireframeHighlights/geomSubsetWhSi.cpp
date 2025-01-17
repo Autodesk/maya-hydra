@@ -90,7 +90,7 @@ GeomSubsetWhSi::GeomSubsetWhSi(
         }
         if (prim.primType == HdPrimTypeTokens->geomSubset) {
             HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-            if (!instancedBy.IsDefined() && _IsSelected(prim) && !_IsSelected(GetInputSceneIndex()->GetPrim(primPath.GetParentPath()))) {
+            if (!instancedBy.IsDefined() && _IsSelected(prim)) {
                 _CreateSelectionHighlight(primPath);
             }
         }
@@ -108,7 +108,7 @@ void GeomSubsetWhSi::ProcessAddedPrims(
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
         if (prim.primType == HdPrimTypeTokens->geomSubset) {
             HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-            if (!instancedBy.IsDefined() && _IsSelected(prim) && !_IsSelected(GetInputSceneIndex()->GetPrim(entry.primPath.GetParentPath()))) {
+            if (!instancedBy.IsDefined() && _IsSelected(prim)) {
                 _CreateSelectionHighlight(entry.primPath);
             }
         }
@@ -143,44 +143,6 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
 {
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
-        if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
-            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
-
-            HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-            if (instancedBy.IsDefined()) {
-                continue;
-            }
-
-            if (prim.primType == HdPrimTypeTokens->geomSubset) {
-                bool isSelected = _IsSelected(prim);
-                bool isMeshSelected = _IsSelected(GetInputSceneIndex()->GetPrim(entry.primPath.GetParentPath()));
-                if (isSelected && _primPathsToSelections.find(entry.primPath) == _primPathsToSelections.end() && !isMeshSelected) {
-                    _CreateSelectionHighlight(entry.primPath);
-                }
-                else if (!isSelected && _primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end()) {
-                    _DeleteSelectionHighlight(entry.primPath);
-                }
-            }
-
-            if (prim.primType == HdPrimTypeTokens->mesh) {
-                bool isMeshSelected = _IsSelected(prim);
-                auto operation = [this, isMeshSelected](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
-                    if (prim.primType == HdPrimTypeTokens->geomSubset) {
-                        if (_IsSelected(prim)) {
-                            if (!isMeshSelected && _primPathsToSelections.find(primPath) == _primPathsToSelections.end()) {
-                                _CreateSelectionHighlight(primPath);
-                            }
-                            else if (isMeshSelected && _primPathsToSelections.find(primPath) != _primPathsToSelections.end()) {
-                                _DeleteSelectionHighlight(primPath);
-                            }
-                        }
-                    }
-                    return true;
-                };
-                ForEachPrimInHierarchy(entry.primPath, operation);
-            }
-        }
-
         if (_primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end()) {
             // Dirty prototype prim (to update highlight color)
             auto selectionPath = SelectionPathFromKey(SelectionKey(entry.primPath, ""));
@@ -189,6 +151,21 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
         }
     }
     _SendPrimsDirtied(highlightEntries);
+}
+
+void GeomSubsetWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)
+{
+    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+    if (prim.primType == HdPrimTypeTokens->geomSubset) {
+        HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
+        if (!instancedBy.IsDefined()) {
+            if (isFullySelected) {
+                _CreateSelectionHighlight(primPath);
+            } else {
+                _DeleteSelectionHighlight(primPath);
+            }
+        }
+    }
 }
 
 void GeomSubsetWhSi::_CreateSelectionHighlight(const SdfPath& geomSubsetPath)
@@ -205,7 +182,6 @@ void GeomSubsetWhSi::_CreateSelectionHighlight(const SdfPath& geomSubsetPath)
     auto originalMeshPath = geomSubsetPath.GetParentPath();
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
     addedPrims.emplace_back(originalMeshPath.ReplacePrefix(originalMeshPath.GetParentPath(), selectionPath), GetInputSceneIndex()->GetPrim(originalMeshPath).primType);
-    //addedPrims.emplace_back(primPath.ReplacePrefix(originalMeshPath.GetParentPath(), selectionPath), GetInputSceneIndex()->GetPrim(primPath).primType);
     _SendPrimsAdded(addedPrims);
 }
 
