@@ -59,6 +59,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testPointInstancingWireframeHighlight.py
     testGeomSubsetsWireframeHighlight.py
     testNativeInstancingWireframeHighlight.py
+    testMeshWireframeHighlight.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
