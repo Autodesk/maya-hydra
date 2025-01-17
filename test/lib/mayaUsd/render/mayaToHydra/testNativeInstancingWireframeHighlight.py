@@ -75,6 +75,45 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn.clear()
         sn.append(topCubeItem)
         self.assertSnapshotClose("prototypeSelection_topCube.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+    
+    def test_InstanceWireframeColorChange(self):
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        firstInstancePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_1"
+        secondInstancePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_2"
+
+        firstInstanceItem = ufe.Hierarchy.createItem(ufe.PathString.path(firstInstancePath))
+        secondInstanceItem = ufe.Hierarchy.createItem(ufe.PathString.path(secondInstancePath))
+
+        sn.clear()
+        sn.append(firstInstanceItem)
+        self.assertSnapshotClose("instanceWireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.append(secondInstanceItem)
+        self.assertSnapshotClose("instanceWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+    
+    def test_PrototypeWireframeColorChange(self):
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        firstBaseCubePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_1/baseCube"
+        firstTopCubePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_1/topCube"
+        secondTopCubePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_2/topCube"
+
+        firstBaseCubeItem = ufe.Hierarchy.createItem(ufe.PathString.path(firstBaseCubePath))
+        firstTopCubeItem = ufe.Hierarchy.createItem(ufe.PathString.path(firstTopCubePath))
+        secondTopCubeItem = ufe.Hierarchy.createItem(ufe.PathString.path(secondTopCubePath))
+
+        sn.clear()
+        sn.append(firstBaseCubeItem)
+        self.assertSnapshotClose("prototypeWireframeColorChange_firstBaseCubeItem.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.append(firstTopCubeItem)
+        self.assertSnapshotClose("prototypeWireframeColorChange_firstTopCubeItem.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.append(secondTopCubeItem)
+        self.assertSnapshotClose("prototypeWireframeColorChange_secondTopCubeItem.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
