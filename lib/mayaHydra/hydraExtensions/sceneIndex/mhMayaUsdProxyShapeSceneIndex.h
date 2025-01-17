@@ -25,6 +25,7 @@
 
 // Flow Viewport Toolkit headers.
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+#include <flowViewport/selection/fvpPathMapper.h>
 
 //Usd/Hydra headers
 #include <pxr/base/tf/declarePtrs.h>
@@ -35,9 +36,8 @@
 //Maya headers
 #include <maya/MObjectHandle.h>
 
-UFE_NS_DEF {
-class Path;
-}
+#include <ufe/observer.h>
+#include <ufe/path.h>
 
 #include <memory>
 
@@ -69,7 +69,8 @@ public:
         const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
         const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
         const MObjectHandle&                   dagNodeHandle,
-        const PXR_NS::SdfPath&                 prefix
+        const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
+        const Ufe::Path&                       sceneIndexAppPath
     );
 
     // From HdSceneIndexBase
@@ -80,13 +81,21 @@ public:
                                 const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
                                 const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
                                 const MObjectHandle&                   dagNodeHandle,
-                                const PXR_NS::SdfPath&                 prefix);
+                                const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
+                                const Ufe::Path&                       sceneIndexAppPath);
 
     virtual ~MayaUsdProxyShapeSceneIndex();
 
     void Populate();
     void UpdateTime();
     static Ufe::Path InterpretRprimPath(const HdSceneIndexBaseRefPtr& sceneIndex,const SdfPath& path);
+
+    Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
+
+    const Ufe::Path& GetSceneIndexAppPath() const { return _sceneIndexAppPath; }
+    void SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath) { 
+        _sceneIndexAppPath = sceneIndexAppPath;
+    }
 
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const HdSceneIndexBase& sender, const HdSceneIndexObserver::AddedPrimEntries& entries) override{
@@ -120,7 +129,12 @@ private:
     TfNotice::Key                   _stageInvalidateNoticeKey;
     TfNotice::Key                   _objectsChangedNoticeKey;
     long int                        _nbPopulateCalls{0};
-    PXR_NS::SdfPath                 _prefix;
+
+    // Path mapper support.
+    const SdfPath                   _sceneIndexPathPrefix;
+    Ufe::Path                       _sceneIndexAppPath;
+    const Ufe::Observer::Ptr        _appSceneObserver{};
+    const Fvp::PathMapperConstPtr   _usdPathMapper{};
 };
 
 } // namespace MAYAHYDRA_NS_DEF

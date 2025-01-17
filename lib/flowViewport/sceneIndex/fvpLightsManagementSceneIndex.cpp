@@ -17,6 +17,8 @@
 //Local headers
 #include "fvpLightsManagementSceneIndex.h"
 
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
+
 //USD/Hydra headers
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -55,11 +57,10 @@ void _DisableLight(HdSceneIndexPrim& prim)
 
 namespace FVP_NS_DEF {
 
-LightsManagementSceneIndex::LightsManagementSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const PathInterface& pathInterface, const SdfPath& defaultLightPath) 
+LightsManagementSceneIndex::LightsManagementSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const SdfPath& defaultLightPath) 
     : ParentClass(inputSceneIndex), 
     InputSceneIndexUtils(inputSceneIndex)
     ,_defaultLightPath(defaultLightPath)
-    , _pathInterface(pathInterface)
 {
 }
 
@@ -125,7 +126,7 @@ HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) co
              //Convert ufe selection to SdfPath
              SdfPathVector selectedLightsSdfPath;
              for (const auto& snItem : ufeSelection) {
-                 auto primSelections = _pathInterface.UfePathToPrimSelections(snItem->path());
+                 auto primSelections = ufePathToPrimSelections(snItem->path());
                  for (const auto& primSelection : primSelections) {
                      selectedLightsSdfPath.push_back(primSelection.primPath);
                  }

@@ -19,25 +19,12 @@
 #include "mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndex.h"
 
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
-#include <flowViewport/sceneIndex/fvpPathInterfaceSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/fvpUtils.h>
-#include <flowViewport/selection/fvpPathMapper.h>
-#include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include <pxr/base/tf/diagnostic.h>
-#include <pxr/imaging/hd/dataSourceTypeDefs.h>
-#include <pxr/imaging/hd/instanceSchema.h>
-#include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
-#include <pxr/imaging/hd/retainedDataSource.h>
-#include <pxr/imaging/hd/sceneIndexPlugin.h>
-#include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
-#include <pxr/imaging/hd/selectionSchema.h>
-#include <pxr/imaging/hd/selectionsSchema.h>
-#include <pxr/imaging/hd/renderDelegate.h>
-#include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
-#include <pxr/usd/sdf/path.h>
 
 #include <mayaUsdAPI/proxyStage.h>
 
@@ -52,294 +39,12 @@
 
 #include <ufeExtensions/Global.h>
 
-#include <ufe/observer.h>
-#include <ufe/sceneNotification.h>
-#include <ufe/scene.h>
-
 #include <optional>
-
-PXR_NAMESPACE_OPEN_SCOPE
-struct MayaUsdSceneIndexRegistration;
-PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace {
 
-const std::string digits = "0123456789";
-
-// Pixar macros won't work without PXR_NS.
-PXR_NAMESPACE_USING_DIRECTIVE
-using namespace Ufe;
-
-// UFE Observer that unpacks SceneCompositeNotification's.  Belongs in UFE
-// itself.
-class SceneObserver : public Observer
-{
-public:
-    SceneObserver() = default;
-
-    virtual void handleOp(const SceneCompositeNotification::Op& op) = 0;
-
-private:
-    void operator()(const Notification& notification) override 
-    {
-        const auto& sceneChanged = notification.staticCast<SceneChanged>();
-        
-        if (SceneChanged::SceneCompositeNotification == sceneChanged.opType()) {
-            const auto& compNotification = notification.staticCast<SceneCompositeNotification>();
-            for(const auto& op : compNotification) {
-                handleOp(op);
-            }
-        } else {
-            handleOp(sceneChanged);
-        }
-    }
-};
-
-class PathInterfaceSceneIndex;
-typedef TfRefPtr<PathInterfaceSceneIndex> PathInterfaceSceneIndexRefPtr;
-
-/// \class PathInterfaceSceneIndex
-///
-/// Implement the path interface for plugin scene indices.
-///
-/// FLOW_VIEWPORT_TODO  The following is USD-specific, generalize to all data
-/// models.  PPT, 22-Sep-2023.
-
-class PathInterfaceSceneIndex : public Fvp::PathInterfaceSceneIndexBase
-{
-public:
-
-    static HdSceneIndexBaseRefPtr New(
-        const HdSceneIndexBaseRefPtr& inputSceneIndex,
-        const SdfPath&                sceneIndexPathPrefix,
-        const Ufe::Path&              sceneIndexAppPath
-    )
-    {
-        return TfCreateRefPtr(new PathInterfaceSceneIndex(
-            inputSceneIndex, sceneIndexPathPrefix, sceneIndexAppPath));
-    }
-
-    Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override
-    {
-        // We only handle USD objects, so if the UFE path is not a USD object,
-        // early out with failure.
-        if (appPath.runTimeId() != UfeExtensions::getUsdRunTimeId()) {
-            return {};
-        }
-
-        // If the data model object application path does not match the path we
-        // translate, return an empty path.
-        if (!appPath.startsWith(_sceneIndexAppPath)) {
-            return {};
-        }
-
-        // The scene index path is composed of 2 parts, in order:
-        // 1) The scene index path prefix, which is fixed on construction.
-        // 2) The second segment of the UFE path, with each UFE path component
-        //    becoming an SdfPath component. If the last component is a number,
-        //    then we are dealing with an instance selection.
-        TF_AXIOM(appPath.nbSegments() == 2);
-        SdfPath primPath = _sceneIndexPathPrefix;
-        std::optional<Fvp::InstancesSelection> instanceSelection;
-
-        auto secondSegment = appPath.getSegments()[1];
-        const auto lastComponentString = secondSegment.components().back().string();
-        const bool lastComponentIsNumeric = lastComponentString.find_first_not_of(digits) == std::string::npos;
-        const size_t lastComponentIndex = secondSegment.size() - 1;
-
-        for (size_t iComponent = 0; iComponent < secondSegment.size(); iComponent++) {
-            // Native instancing : if the current prim path points to a native instance, repath to the prototype
-            // before appending the following UFE components
-            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-            HdInstanceSchema instanceSchema = HdInstanceSchema::GetFromParent(prim.dataSource);
-            if (instanceSchema.IsDefined()) {
-                auto instancerPath = instanceSchema.GetInstancer()->GetTypedValue(0);
-                HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(instancerPath);
-                HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
-                auto prototypes = instancerTopologySchema.GetPrototypes()->GetTypedValue(0);
-                auto prototypeIndex = instanceSchema.GetPrototypeIndex()->GetTypedValue(0);
-                primPath = prototypes[prototypeIndex];
-                instanceSelection = {instancerPath, prototypeIndex, {instanceSchema.GetInstanceIndex()->GetTypedValue(0)}};
-            }
-
-            // SdfPath components cannot be numeric.  This happens with point instance selections.
-            auto targetChildPath = ((iComponent == lastComponentIndex) && lastComponentIsNumeric) ? SdfPath() : 
-                primPath.AppendChild(TfToken(secondSegment.components()[iComponent].string()));
-            auto actualChildPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
-            if (!targetChildPath.IsEmpty() && std::find(actualChildPaths.begin(), actualChildPaths.end(), targetChildPath) != actualChildPaths.end()) {
-                // Append if the new path is valid
-                primPath = targetChildPath;
-            }
-            else if (iComponent == lastComponentIndex) {
-                // If the last component is a number, we are dealing with an instance selection.
-                // But there are other cases like when you assign a USD Preview surface material to a usd prim, it has a shader prim in the material 
-                // which doesn't appear in the hydra hierarchy but is actually present and we end up in this case as well.
-                if (lastComponentIsNumeric) {
-                    // Point instancing : instance selection. The path should end with a number
-                    // corresponding to the selected instance,
-                    // and the remainder of the path points to the point instancer.
-                    HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(primPath);
-                    HdInstancerTopologySchema instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
-                    auto instanceIndicesByPrototype = instancerTopologySchema.GetInstanceIndices();
-                    for (int iInstanceIndices = 0; static_cast<size_t>(iInstanceIndices) < instanceIndicesByPrototype.GetNumElements(); iInstanceIndices++) {
-                        auto instanceIndices = instanceIndicesByPrototype.GetElement(iInstanceIndices)->GetTypedValue(0);
-                        if (std::find(instanceIndices.begin(), instanceIndices.end(), std::stoi(lastComponentString)) != instanceIndices.end()) {
-                            instanceSelection = {primPath, iInstanceIndices, {std::stoi(lastComponentString)}};
-                            break;
-                        }
-                    }
-                }
-            }
-            else {
-                // There is no prim corresponding to the converted path
-                TF_WARN("Could not convert UFE path %s to Hydra prims.", appPath.string().data());
-                return {};
-            }
-        }
-
-        Fvp::PrimSelection baseSelection = instanceSelection.has_value() ? Fvp::PrimSelection{primPath, {instanceSelection.value()}} : Fvp::PrimSelection{primPath};
-        Fvp::PrimSelections primSelections({baseSelection});
-
-        // Point instancing : propagate selection to propagated prototypes
-        auto ancestorsRange = primPath.GetAncestorsRange();
-        for (const auto& ancestorPath : ancestorsRange) {
-            HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(ancestorPath);
-            UsdImagingUsdPrimInfoSchema usdPrimInfo = UsdImagingUsdPrimInfoSchema::GetFromParent(currPrim.dataSource);
-            if (!usdPrimInfo.IsDefined()) {
-                continue;
-            }
-            auto propagatedProtosDataSource = usdPrimInfo.GetPiPropagatedPrototypes();
-            if (!propagatedProtosDataSource) {
-                continue;
-            }
-            auto propagatedProtoNames = propagatedProtosDataSource->GetNames();
-            for (const auto& propagatedProtoName : propagatedProtoNames) {
-                auto propagatedProtoPathDataSource = HdTypedSampledDataSource<SdfPath>::Cast(propagatedProtosDataSource->Get(propagatedProtoName));
-                if (propagatedProtoPathDataSource) {
-                    SdfPath propagatedProtoPath = propagatedProtoPathDataSource->GetTypedValue(0);
-                    SdfPath propagatedPrimPath = primPath.ReplacePrefix(ancestorPath, propagatedProtoPath);
-                    HdSceneIndexPrim propagatedPrim = GetInputSceneIndex()->GetPrim(propagatedPrimPath);
-                    // This check controls which types of prims have their selection data source propagated. Currently we skip
-                    // instancers so that selecting an instancer A that is both drawing geometry but also prototyped and propagated
-                    // for another instancer B will only mark the geometry-drawing instancer A as selected. This can be changed.
-                    // For now (2024/05/28), this only affects selection highlighting.
-                    if (propagatedPrim.primType != HdPrimTypeTokens->instancer) {
-                        primSelections.push_back({propagatedPrimPath, primSelections.front().nestedInstanceIndices});
-                    }
-                }
-            }
-            break; // We found propagated prototypes, exit now to avoid propagating selection to prototypes of other parents 
-        }
-
-        return primSelections;
-    }
-
-    const Ufe::Path& GetSceneIndexAppPath() const { return _sceneIndexAppPath; }
-    void SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath) { 
-        _sceneIndexAppPath = sceneIndexAppPath;
-    }
-
-private:
-
-    class PathInterfaceSceneObserver : public SceneObserver
-    {
-    public:
-        PathInterfaceSceneObserver(PathInterfaceSceneIndex& pi)
-        : SceneObserver(), _pi(pi)
-        {}
-
-    private:
-    
-        void handleOp(const SceneCompositeNotification::Op& op) override {
-            if (op.opType == SceneChanged::ObjectPathChange &&
-                ((op.subOpType == ObjectPathChange::ObjectReparent) ||
-                 (op.subOpType == ObjectPathChange::ObjectRename))) {
-                const auto& siPath = _pi.GetSceneIndexAppPath();
-                if (siPath.startsWith(op.path)) {
-                    const auto oldPath = siPath;
-                    auto newPath = oldPath.reparent(op.path, op.item->path());
-                    _pi.SetSceneIndexAppPath(newPath);
-
-                    // Update our entry in the path mapper registry.
-                    auto mapper = Fvp::PathMapperRegistry::Instance().GetMapper(
-                        oldPath);
-                    TF_AXIOM(mapper);
-                    TF_AXIOM(Fvp::PathMapperRegistry::Instance().Unregister(
-                                 oldPath));
-                    TF_AXIOM(Fvp::PathMapperRegistry::Instance().Register(
-                                 newPath, mapper));
-                }
-            }
-        }
-    
-        PathInterfaceSceneIndex& _pi;
-    };
-
-    class UsdPathMapper : public Fvp::PathMapper
-    {
-    public:
-        UsdPathMapper(const PathInterfaceSceneIndex& piSi) : _piSi(piSi) {}
-    
-        Fvp::PrimSelections 
-        UfePathToPrimSelections(const Ufe::Path& appPath) const override {
-            return _piSi.UfePathToPrimSelections(appPath);
-        }
-    
-    private:
-        // Non-owning reference to prevent ownership cycle.
-        const PathInterfaceSceneIndex& _piSi;
-    };
-
-    PathInterfaceSceneIndex(
-        const HdSceneIndexBaseRefPtr& inputSceneIndex,
-        const SdfPath&                sceneIndexPathPrefix,
-        const Ufe::Path&              sceneIndexAppPath
-
-    ) : PathInterfaceSceneIndexBase(inputSceneIndex)
-      , _sceneIndexPathPrefix(sceneIndexPathPrefix)
-      , _appSceneObserver(std::make_shared<PathInterfaceSceneObserver>(*this))
-      , _sceneIndexAppPath(sceneIndexAppPath)
-      , _usdPathMapper(std::make_shared<UsdPathMapper>(*this))
-    {
-        // The gateway node (proxy shape) is a Maya node, so the scene index
-        // path must be a single segment.
-        TF_AXIOM(sceneIndexAppPath.nbSegments() == 1);
-
-        // Observe the scene to be informed of path changes to the gateway node
-        // (proxy shape) that corresponds to our scene index data producer.
-        Scene::instance().addObserver(_appSceneObserver);
-
-        // Register a mapper in the path mapper registry.
-        TF_AXIOM(Fvp::PathMapperRegistry::Instance().Register(
-                     _sceneIndexAppPath, _usdPathMapper));
-    }
-
-    ~PathInterfaceSceneIndex() {
-        Destroy();
-    }
-
-#ifdef CODE_COVERAGE_WORKAROUND
-    friend struct PXR_NS::MayaUsdSceneIndexRegistration;
-#endif
-
-    void Destroy() {
-        // Unregister our path mapper.
-        TF_AXIOM(Fvp::PathMapperRegistry::Instance().Unregister(
-                     _sceneIndexAppPath));
-
-        // Ufe::Subject has automatic cleanup of stale observers, but this can
-        // be problematic on application exit if the library of the observer is
-        // cleaned up before that of the subject, so simply stop observing.
-        Scene::instance().removeObserver(_appSceneObserver);
-    }
-
-    const SdfPath       _sceneIndexPathPrefix;
-    const Observer::Ptr _appSceneObserver;
-    Ufe::Path           _sceneIndexAppPath;
-    const Fvp::PathMapperConstPtr _usdPathMapper;
-};
-
 constexpr char kMayaUsdProxyShapeNode[] = { "mayaUsdProxyShape" };
+
 } // namespace
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -361,11 +66,6 @@ struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
     void Destroy() override {
         auto proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(pluginSceneIndex);
         proxyShapeSceneIndex->_Destroy();
-
-        auto pathInterfaceSceneIndex = TfDynamic_cast<PathInterfaceSceneIndexRefPtr>(rootSceneIndex);
-        if (pathInterfaceSceneIndex) {
-            pathInterfaceSceneIndex->Destroy();
-        }
     }
 #endif
 };
@@ -513,12 +213,10 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     UsdImagingStageSceneIndexRefPtr stageSceneIndex = nullptr;
 
     // We are explicitly adding a prefixing scene index just downstream (after)
-    // the MayaUsdProxyShapeSceneIndex.  We don't want to automatically add an
-    // additional prefixing scene index to the PathInterfaceSceneIndex (which
-    // is downstream of the prefixing stream index), which would double the
-    // prefix.  But to register a mapping from the maya node to the prefix SdfPath, we give send 
-    // registration->sceneIndexPathPrefix to .addUsdStageSceneIndex but it will be used only to
-    // register the mapping.
+    // the MayaUsdProxyShapeSceneIndex.  To register a mapping from the Maya
+    // node to the prefix SdfPath, we give send 
+    // registration->sceneIndexPathPrefix to .addUsdStageSceneIndex but it will
+    // be used only to register the mapping.
     PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr dataProducerSceneIndexData  = 
         Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageSceneIndex(createInfo, finalSceneIndex, stageSceneIndex, 
                                                                              registration->sceneIndexPathPrefix, (void*)&dagNode);
@@ -530,7 +228,7 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     // contains Maya data, it cannot be added by the Flow Viewport API.
     // Pass in the scene index prefix for the proxy shape scene index, so it
     // can register a pick handler.
-    auto mayaUsdProxyShapeSceneIndex = MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode), registration->sceneIndexPathPrefix);
+    auto mayaUsdProxyShapeSceneIndex = MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode), registration->sceneIndexPathPrefix, Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath)));
     registration->pluginSceneIndex = mayaUsdProxyShapeSceneIndex;
     registration->interpretRprimPathFn = &(MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::InterpretRprimPath);
     mayaUsdProxyShapeSceneIndex->Populate();
@@ -541,15 +239,7 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
         registration->pluginSceneIndex,
         registration->sceneIndexPathPrefix);
 
-    // Add the PathInterfaceSceneIndex which must be the last scene index, it 
-    // is used by selection highlighting.  The scene index prefix is passed in
-    // not to add in a prefix, which is done explicitly by the prefixing scene
-    // index above.  Rather, it is so the path interface scene index can build
-    // the scene index path from an application path.
-    registration->rootSceneIndex = PathInterfaceSceneIndex::New(
-        pfsi,
-        registration->sceneIndexPathPrefix,
-        Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath)));
+    registration->rootSceneIndex = pfsi;
 
     //Set the chain back into the dataProducerSceneIndexData in both members
     dataProducerSceneIndexData->SetDataProducerSceneIndex(registration->rootSceneIndex);

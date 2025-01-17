@@ -21,6 +21,7 @@
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
 #include <flowViewport/selection/fvpSelection.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 //ufe
 #include <ufe/globalSelection.h>
@@ -68,14 +69,10 @@ class GlobalSelectionChangedObs : public Ufe::Observer
 }
 namespace MAYAHYDRA_NS_DEF {
 
-MhLeadObjectPathTracker::MhLeadObjectPathTracker(const HdSceneIndexBaseRefPtr& sceneIndexWithPathInterface, 
-                                            MhDirtyLeadObjectSceneIndexRefPtr& dirtyLeadObjectSceneIndex) 
-    : _pathInterface(dynamic_cast<const Fvp::PathInterface*>(&*sceneIndexWithPathInterface))
-    , _ufeSelectionObserver (std::make_shared<GlobalSelectionChangedObs>(*this))
+MhLeadObjectPathTracker::MhLeadObjectPathTracker(MhDirtyLeadObjectSceneIndexRefPtr& dirtyLeadObjectSceneIndex) 
+    : _ufeSelectionObserver (std::make_shared<GlobalSelectionChangedObs>(*this))
     , _dirtyLeadObjectSceneIndex(dirtyLeadObjectSceneIndex)
 {
-    TF_AXIOM(_pathInterface);
-
     const Ufe::GlobalSelection::Ptr& ufeSelection = Ufe::GlobalSelection::get();
     if (ufeSelection->size() > 0){
         const Ufe::Selection& selection = *(ufeSelection);
@@ -83,7 +80,7 @@ MhLeadObjectPathTracker::MhLeadObjectPathTracker(const HdSceneIndexBaseRefPtr& s
         _leadObjectUfePath = leadObjectSceneItem->path();
         //_leadObjectPrimPaths can be empty with a valid _leadObjectUfePath when the lead object is in a data producer scene index not yet added to the merging scene index
         //This is fixed at some point by calling updatePrimPaths()
-        _leadObjectPrimPaths = _pathInterface->SceneIndexPaths(_leadObjectUfePath);
+        _leadObjectPrimPaths = Fvp::sceneIndexPaths(_leadObjectUfePath);
     }
 
    // Add ourself as an observer to the selection
@@ -119,7 +116,7 @@ void MhLeadObjectPathTracker::setLeadObjectUfePath(const Ufe::Path& newLeadObjec
     auto oldLeadObjectPrimPaths = _leadObjectPrimPaths;
 
     _leadObjectUfePath  = newLeadObjectUfePath;
-    _leadObjectPrimPaths = _pathInterface->SceneIndexPaths(_leadObjectUfePath);
+    _leadObjectPrimPaths = Fvp::sceneIndexPaths(_leadObjectUfePath);
 
     // Dirty the previous lead object
     if(_dirtyLeadObjectSceneIndex){
@@ -131,7 +128,7 @@ void MhLeadObjectPathTracker::updatePrimPaths()
 { 
    // Update the lead object prim paths in case it was not valid yet
     if ( (_leadObjectUfePath.size() > 0) && _leadObjectPrimPaths.empty()) {
-        _leadObjectPrimPaths = _pathInterface->SceneIndexPaths(_leadObjectUfePath);
+        _leadObjectPrimPaths = Fvp::sceneIndexPaths(_leadObjectUfePath);
     }
 }
 

@@ -186,9 +186,6 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     // For now this is required for the HdSt backend to use lights.
     setEnv("USDIMAGING_ENABLE_SCENE_LIGHTS", "1");
 
-    // Performance optimization: disable RENDER_SELECTED_EDGE_FROM_FACE feature that could trigger unnecessary running of gometry shader.
-    setEnv("HDST_RENDER_SELECTED_EDGE_FROM_FACE", "0");
-
     MFnPlugin plugin(obj, "Autodesk", PLUGIN_VERSION, "Any");
 
     if (!plugin.registerCommand(

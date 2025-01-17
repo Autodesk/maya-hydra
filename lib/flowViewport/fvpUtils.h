@@ -16,7 +16,7 @@
 #define FVP_UTILS_H
 
 #include <flowViewport/api.h>
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
+#include <flowViewport/selection/fvpSelectionTypes.h>
 
 #ifdef CODE_COVERAGE_WORKAROUND
 #include <pxr/imaging/hd/sceneIndex.h>

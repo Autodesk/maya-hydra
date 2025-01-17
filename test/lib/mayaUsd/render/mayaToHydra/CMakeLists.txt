@@ -8,7 +8,6 @@
 set(INTERACTIVE_TEST_SCRIPT_FILES
     testImageDiffing.py
     testMtohCommand.py
-# Fail as of 22-Feb-2023.  Entered as MAYA-127898.
     testBasicRender.py
     testDagChanges.py
     testMeshes.py
@@ -27,15 +26,13 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
     testMayaLights.py
-    # To be reenabled after investigation HYDRA-1305
-    #testUSDLights.py
+    testUSDLights.py
     testUVandUDIM.py
     testArnoldLights.py|depOnPlugins:mtoa
     testLookThrough.py
     testObjectTemplate.py
     testStandardSurface.py
-    # To be reenabled after investigation HYDRA-1305
-    #testOpenPBRSurface.py
+    testOpenPBRSurface.py
     testFlowViewportAPI.py
     testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testStagePayloadsReferences.py
@@ -50,20 +47,22 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     # To be reenabled after investigation
     testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testPassingNormalsOnMayaNative.py
-    testViewportFilters.py
+    testViewportFilters.py|depOnPlugins:mtoa
     testMayaComponentsPicking.py
     testFlowPluginsHierarchicalProperties.py
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
     testMayaLightingModes.py
     testSceneModified.py
+    testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
+    testIsolateSelectWithGeomSubset.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
     cpp/testMayaSceneFlattening.py
     cpp/testMayaUsdUfeItems.py
-    cpp/testMergingSceneIndex.py
-    cpp/testPathInterface.py
+    cpp/testDataProducerMergingSceneIndex.py
+    cpp/testUsdSelection.py
     cpp/testPathMapperRegistry.py
     cpp/testPickHandlerRegistry.py
     cpp/testSelectionSceneIndex.py

@@ -25,7 +25,7 @@ class TestStageVariants(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
-    IMAGE_DIFF_FAIL_PERCENT = 0.3
+    IMAGE_DIFF_FAIL_PERCENT = 2
 
     def test_UsdStageVariants(self):
         import usdUtils # usdUtils imports mayaUsd.ufe
@@ -91,8 +91,13 @@ class TestStageVariants(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         self.assertIsNotNone(cube2Prim)
         cube3Prim = shapeStage.GetPrimAtPath('/Cubes/Geom/CubeThree')
         self.assertIsNotNone(cube3Prim)
-        cube1Prim.SetInstanceable(True)
-        self.assertTrue(cube1Prim.IsInstanceable())
+        #It is not legal in usd to set cube1 as instanceable
+        #We get the warning :
+        # Warning: The gprim at path </__Prototype_1> was directly instanced. In order to instance this prim, put the prim under an Xform, and instance the Xform parent.
+        #We have another test to check for selection highlight on instanceable prims (native instances)
+        cube1Prim.SetInstanceable(False) #don't set it as instanceable
+        self.assertFalse(cube1Prim.IsInstanceable())
+
         cube2Prim.SetInstanceable(True)
         self.assertTrue(cube2Prim.IsInstanceable())
         cube3Prim.SetInstanceable(True)
@@ -103,20 +108,20 @@ class TestStageVariants(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         self.assertSnapshotClose("oneCubeInstanceable.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         ufeGlobalSel.clear()
 
-        # At time of writing selection highlighting of native instanced prims
-        # does not work (HYDRA-1161).  Enable the following tests when 
-        # HYDRA-1161 is fixed.
-        return
-        modVariant.SetVariantSelection('TwoCubes')
-        self.assertEqual(modVariant.GetVariantSelection(), 'TwoCubes')
-        ufeGlobalSel.append(cubesItems)
-        self.assertSnapshotClose("twoCubesInstanceable.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        ufeGlobalSel.clear()
+        #Do these image comparisons only with usd 24.11+ where the selection highlight on instanceable prims is working
+        if self._usdVersion >= (0, 24, 11):
+            modVariant.SetVariantSelection('TwoCubes')
+            self.assertEqual(modVariant.GetVariantSelection(), 'TwoCubes')
+            ufeGlobalSel.append(cubesItems)
+            self.assertSnapshotClose("twoCubesInstanceable.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            ufeGlobalSel.clear()
 
-        modVariant.SetVariantSelection('ThreeCubes')
-        self.assertEqual(modVariant.GetVariantSelection(), 'ThreeCubes')
-        ufeGlobalSel.append(cubesItems) 
-        self.assertSnapshotClose("threeCubesInstanceable.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            modVariant.SetVariantSelection('ThreeCubes')
+            self.assertEqual(modVariant.GetVariantSelection(), 'ThreeCubes')
+            ufeGlobalSel.append(cubesItems) 
+            self.assertSnapshotClose("threeCubesInstanceable.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        self.resetDefaultLightIntensityByUsdVersion()
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

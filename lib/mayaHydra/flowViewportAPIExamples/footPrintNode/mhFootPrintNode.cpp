@@ -42,6 +42,14 @@
 #include <maya/MGlobal.h>
 #include <maya/MFnDagNode.h>
 #include <maya/MModelMessage.h>
+#include <maya/MDagPath.h>
+#include <maya/MSelectionList.h>
+#include <maya/MPointArray.h>
+
+// MayaHydra headers.
+#include <mayaHydraLib/pick/mhPickHandler.h>
+#include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
+#include <ufeExtensions/Global.h>
 
 //Flow viewport headers
 #include <flowViewport/API/fvpVersionInterface.h>
@@ -50,6 +58,7 @@
 //Hydra headers
 #include <pxr/base/vt/array.h>
 #include <pxr/base/gf/vec3f.h>
+#include <pxr/imaging/hdx/pickTask.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -63,6 +72,40 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace {
 void nodeAddedToModel(MObject& node, void* clientData);
 void nodeRemovedFromModel(MObject& node, void* clientData);
+
+// Pick handler for the footprint node.
+
+class FootPrintPickHandler : public MayaHydra::PickHandler {
+public:
+
+    FootPrintPickHandler(MObject& footPrintObj) : _footPrintObj(footPrintObj) {}
+
+    bool handlePickHit(
+        const Input& pickInput, Output& pickOutput
+    ) const override
+    {
+        // Foot print parts are not selectable individually: only the complete
+        // Maya shape object is selectable.
+        //
+        // Conceptually we could append a picked Maya object either to the
+        // classic Maya MSelectionList selection or to the "MayaSelectTool"
+        // named UFE selection (which provides input for the global selection).
+        // However, the Maya select context filters out Maya items added to the
+        // "MayaSelectTool" named UFE selection, so add to the MSelectionList.
+        MDagPath dagPath;
+        TF_AXIOM(MDagPath::getAPathTo(_footPrintObj, dagPath) == MS::kSuccess);
+        pickOutput.mayaSelection.add(dagPath);
+        const auto& wsPt = pickInput.pickHit.worldSpaceHitPoint;
+        pickOutput.mayaWorldSpaceHitPts.append(wsPt[0], wsPt[1], wsPt[2]);
+
+        return true;
+    }
+
+private:
+
+    MObject _footPrintObj;
+};
+
 }
 
 //---------------------------------------------------------------------------
@@ -131,6 +174,8 @@ private:
 
     MCallbackId _nodeAddedToModelCbId{0};
     MCallbackId _nodeRemovedFromModelCbId{0};
+
+    SdfPath _pathPrefix;
 };
 
 namespace 
@@ -409,7 +454,8 @@ namespace {
         //Trigger a call to compute so that everything is initialized
         MhFootPrint* footPrintInstance = reinterpret_cast<MhFootPrint*>(clientData);
         footPrintInstance->updateFootPrintPrims();
-        footPrintInstance->addedToModelCb();
+        // No need to call footPrintInstance->addedToModelCb(), as reading the
+        // file will add the node to the model.
     }
 }
 
@@ -552,7 +598,7 @@ void* MhFootPrint::creator()
 
 void MhFootPrint::addedToModelCb()
 {
-    static const SdfPath noPrefix = SdfPath::AbsoluteRootPath();
+    _pathPrefix = SdfPath(TfStringPrintf("/MhFootPrint_%p", this));
 
     //Add the callback when an attribute of this node changes
     MObject obj = thisMObject();
@@ -560,11 +606,22 @@ void MhFootPrint::addedToModelCb()
 
     //Data producer scene index interface is used to add the retained scene index to all viewports with all render delegates
     auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-    dataProducerSceneIndexInterface.addDataProducerSceneIndex(_retainedSceneIndex, noPrefix, (void*)&obj, FvpViewportAPITokens->allViewports,FvpViewportAPITokens->allRenderers);
+    dataProducerSceneIndexInterface.addDataProducerSceneIndex(_retainedSceneIndex, _pathPrefix, (void*)&obj);
+
+    // Register a pick handler for our prefix with the pick handler registry.
+    auto pickHandler = std::make_shared<FootPrintPickHandler>(obj);
+    TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Register(_pathPrefix, pickHandler));
+
+    // No need for a path mapper: the parts of the footprint are not selectable
+    // individually, only the Maya shape, so the built-in Maya path mapper does
+    // the job of path mapping for the footprint node.
 }
 
 void MhFootPrint::removedFromModelCb()
 {
+    // Unregister our pick handler.
+    TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Unregister(_pathPrefix));
+
     //Remove the callback
     if (_cbAttributeChangedId){
         CHECK_MSTATUS(MMessage::removeCallback(_cbAttributeChangedId));

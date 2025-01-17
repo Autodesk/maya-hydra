@@ -20,7 +20,6 @@
 //Local headers
 #include "fvpViewportInformationAndSceneIndicesPerViewportData.h"
 #include "flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h"
-#include "flowViewport/sceneIndex/fvpPathInterface.h"
 #include "flowViewport/sceneIndex/fvpIsolateSelectSceneIndex.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
 

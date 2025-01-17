@@ -19,6 +19,7 @@ import fixturesUtils
 import mtohUtils
 import mayaUtils
 import platform
+import os
 
 class TestOpenPBRSurface(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -97,12 +98,15 @@ class TestOpenPBRSurface(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtil
         self.assertSnapshotClose("geometryOpacity" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Verify Coat
+        imageVersion = None
+        if(os.getenv('MAYA_HAS_RENDER_ITEM_CULL_MODE_API', 'NOT-FOUND') in ('1', 'TRUE')):
+            imageVersion = "RenderItemHasCullModeAPI"
         cmds.setAttr("openPBRSurface1.coatWeight", 0.9)
         cmds.refresh()
-        self.assertSnapshotClose("coatWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("coatWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
         cmds.setAttr("openPBRSurface1.coatColor", 0.0,0.0,0.0, type = 'double3')
         cmds.refresh()
-        self.assertSnapshotClose("coatColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("coatColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

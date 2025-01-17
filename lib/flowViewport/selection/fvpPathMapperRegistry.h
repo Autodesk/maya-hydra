@@ -18,7 +18,7 @@
 
 #include <flowViewport/api.h>
 #include <flowViewport/selection/fvpPathMapperFwd.h>
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
+#include <flowViewport/selection/fvpSelectionTypes.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/usd/sdf/path.h>
@@ -68,21 +68,40 @@ public:
     FVP_API
     bool Unregister(const Ufe::Path& prefix);
 
+    //! Update path mapper with new prefix.
+    /*!
+      \return False if old prefix was not found in the registry, true otherwise.
+    */
+    FVP_API
+    bool Update(const Ufe::Path& oldPrefix, const Ufe::Path& newPrefix);
+
     //! Set a fallback path mapper.  If set, it will be returned by
     //! GetMapper() if no mapper is registered for a given argument path.
+    //! The fallback mapper is also invoked by UfePathToPrimSelections()
+    //! if the prefix-registered mapper returns an empty result.
     //! A null pointer argument removes the fallback path mapper.
     FVP_API
     void SetFallbackMapper(const PathMapperConstPtr& pathMapper);
     FVP_API
     PathMapperConstPtr GetFallbackMapper() const;
 
+    FVP_API
+    PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath);
+
+    //! Testing interface
+    FVP_API
+    bool HasMapper(const Ufe::Path& path) const;
+
+private:
+
+    //! Calls _GetMapper().  If no path mapper is found, returns the
+    //! fallback path mapper.
+    PathMapperConstPtr GetMapper(const Ufe::Path& path) const;
+
     //! Get a path mapper for the argument application path.  This
     //! mapper has a prefix that is an ancestor of the argument path.  If no
     //! path mapper is found, returns a null pointer.
-    FVP_API
-    PathMapperConstPtr GetMapper(const Ufe::Path& path) const;
-
-private:
+    PathMapperConstPtr _GetMapper(const Ufe::Path& path) const;
 
     PathMapperRegistry() = default;
     ~PathMapperRegistry() = default;
@@ -106,6 +125,28 @@ private:
  */
 FVP_API
 PrimSelections ufePathToPrimSelections(const Ufe::Path& appPath);
+
+/**
+ * @brief Get the prim paths for a given application path.
+ *
+ * Calls ufePathToPrimSelections, then extracts the Hydra prim paths.
+ *
+ * @param[in] appPath The application path for which prim selections should be returned.
+ * @return Zero or more prim paths.
+ */
+FVP_API
+PXR_NS::SdfPathVector sceneIndexPaths(const Ufe::Path& appPath);
+
+/**
+ * @brief Get the first prim path for a given application path.
+ *
+ * Calls ufePathToPrimSelections, then extracts the first Hydra prim path.
+ *
+ * @param[in] appPath The application path for which prim selections should be returned.
+ * @return A prim path, empty if no prim path corresponds to the argument.
+ */
+FVP_API
+PXR_NS::SdfPath sceneIndexPath(const Ufe::Path& appPath);
 
 }
 

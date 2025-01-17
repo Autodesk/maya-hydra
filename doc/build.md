@@ -12,7 +12,7 @@ Before building the project, consult the following table to ensure you use the r
 |:---------------------:|:-------------------------:|:------------------------------------------------------------:|:---------------------------:|
 |    Operating System   |         Windows 10 <br> Windows 11 | High Sierra (10.13)<br>Mojave (10.14)<br>Catalina (10.15)<br>Big Sur (11.2.x)    |      Rocky Linux 8.6 / Linux® Red Hat® Enterprise 8.6 WS             |
 |   Compiler Requirement| Maya 2024 (VS 2022)<br>Maya 2025 (VS 2022) | Maya 2024 (Xcode 13.4 or higher)<br>Maya 2025 (Xcode 13.4 or higher) | Maya 2024 (gcc 11.2.1)<br>Maya 2025 (gcc 11.2.1) |
-| CMake Version (min/max) |        3.13...3.30      |                              3.13...3.30                     |           3.13...3.30       |
+| CMake Version (min/max) |        3.14...3.30      |                              3.14...3.30                     |           3.14...3.30       |
 |         Python        | 3.10.8, 3.11.4  |                       3.10.8, 3.11.4               |  3.10.8, 3.11.4   |
 |    Python Packages    | PyYAML, PySide, PyOpenGL        | PyYAML, PySide2, PyOpenGL              | PyYAML, PySide, PyOpenGL |
 |    Build generator    | Visual Studio, Ninja (Recommended)    |  XCode, Ninja (Recommended)                      |    Ninja (Recommended)      |
@@ -25,11 +25,12 @@ Before building the project, consult the following table to ensure you use the r
 
 #### 2. Download and Build Pixar USD 
 
-See Pixar's official github page for instructions on how to build USD: https://github.com/PixarAnimationStudios/USD. Pixar has removed support for building Maya USD libraries/plug-ins in their github repository and ```build_usd.py```.
+See Pixar's official github page for instructions on how to build USD: https://github.com/PixarAnimationStudios/USD.<BR> 
+If you want to <B>be able to import usd data in maya through [MayaUSD](https://github.com/Autodesk/maya-usd) and use a hydra render delegate in the viewport, you have to rebuild MayaHydra with the same version used by MayaUSD </B>which is a customized version of OpenUSD, these versions are :
 
-|               |      ![](images/pxr.png)          |USD version used in Maya        
-|:------------: |:---------------:                  |:---------------:
-|  CommitID/Tags | [v22.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v22.11), [v23.08](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.08), [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11) or [v24.05](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.05) |Maya 2024 = v22.11<br>Maya 2025 = v23.11<br>Maya PR = v24.05
+|               |      ![](images/pxr.png)          | USD version used in Maya | USD source for MayaUSD / MayaHydra |
+|:------------: |:---------------:                  |:------------------------:|:-------------------------:|
+|  CommitID/Tags | [v22.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v22.11)<BR>[v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11)<BR>[v24.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.11) |Maya 2024 = v22.11<br>Maya 2025 = v23.11<br>Maya PR = v24.11| [v22.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v22.11-MayaUsd-Public)<br>[v23.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v23.11-MayaUsd-Public)<br>[v24.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v24.11-MayaUsd-Public) |
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
 
@@ -37,7 +38,7 @@ For additional information on building Pixar USD, see the ***Additional Build In
 
 #### 3. Download and Build MayaUSD 
 
-Starting from Maya 2025, the project requires MayaUSD to build.  This enables more features for USD stages when using a Hydra render delegate, such as: hide/delete the stage when the proxy shape node is hidden/deleted, or applying a transform on the proxy shape node will apply it on the stage. 
+Starting from Maya 2025, the project requires [MayaUSD](https://github.com/Autodesk/maya-usd) to build.  This enables more features for USD stages when using a hydra render delegate, such as: hide/delete the stage when the proxy shape node is hidden/deleted, or applying a transform on the proxy shape node will apply it on the stage. 
 
 To build MayaUSD, see the github page https://github.com/Autodesk/maya-usd/blob/dev/doc/build.md
 
@@ -47,7 +48,7 @@ The Universal Front End (UFE) is a DCC-agnostic component that allows Maya to br
 
 | Ufe Version                | Maya Version                                           | Ufe Docs (external) |
 |----------------------------|--------------------------------------------------------|:-------------------:|
-| v4.0.0<br>v4.1.0<br>v4.2.0<br>v4.2.0            | Maya 2024<br>Maya 2024.1<br>Maya 2024.2<br>Maya 2025                                                | https://help.autodesk.com/view/MAYADEV/2025/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
+| v4.0.0<br>v4.1.0<br>v4.2.0<br>v4.2.0<br>v6.0.0            | Maya 2024<br>Maya 2024.1<br>Maya 2024.2<br>Maya 2025<br>Maya PR                                                | https://help.autodesk.com/view/MAYADEV/2025/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
 
 To build the project with UFE support, you will need to use the headers and libraries included in the ***Maya Devkit***:
 
@@ -65,9 +66,14 @@ cd maya-hydra
 
 | Location      | Description                                                                                   |
 |-------------  |---------------------------------------------------------------------------------------------  |
-| lib/mayaHydra/mayaPlugin | Contains Maya plugin definition and render override registration  |
-| lib/mayaHydra/hydraExtensions | Contains extensions to and mechanism needed to interface with hydra classes |
-| lib/mayaHydra/ufeExtensions | Contains extensions to translate paths between UFE, USD SdfPath and Maya DAGPath |
+| [lib/adskHydraSceneBrowser](https://github.com/Autodesk/maya-hydra/tree/dev/lib/adskHydraSceneBrowser)| Contains the hydra scene browser to help you debugging the scene indices and usd data |
+| [lib/flowViewport](https://github.com/Autodesk/maya-hydra/tree/dev/lib/flowViewport)| Contains the [Flow Viewport Toolkit](https://github.com/Autodesk/maya-hydra/blob/dev/doc/flowViewportToolkit.md) to add hydra primitives scene indices or add filtering scene indices to the viewport.<BR>What you retrieve in this folder is <B>the code that is not maya dependent and could be re-used by another hydra project</B>|
+| [lib/mayaHydra/](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra)| Contains code that is dependent from Maya |
+| [lib/mayaHydra/flowViewportAPIExamples](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples) | Contains samples on how to use the [Flow Viewport Toolkit](https://github.com/Autodesk/maya-hydra/blob/dev/doc/flowViewportToolkit.md) to add hydra primitives scene indices or add filtering scene indices to the viewport|
+| [lib/mayaHydra/hydraExtensions](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/hydraExtensions) | Contains extensions and mechanisms needed to interface with hydra classes |
+| [lib/mayaHydra/mayaPlugin](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/mayaPlugin) | Contains MayaHydra plugin definition and render override registration  |
+| [lib/mayaHydra/ufeExtensions](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/ufeExtensions) | Contains extensions to translate paths between UFE, USD SdfPath and Maya DAGPath |
+
 
 #### 6. How To Use build.py Script
 
