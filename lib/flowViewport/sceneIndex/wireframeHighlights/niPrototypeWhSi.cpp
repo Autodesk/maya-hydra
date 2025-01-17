@@ -113,8 +113,10 @@ NiPrototypeWhSi::NiPrototypeWhSi(
 ) : BaseWhSi(inputSceneIndex, highlightHierarchyPrefix, wireframeColorInterface)
 {
     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
+        if (IsExcludedPath(primPath)) {
+            return false;
+        }
         if (_IsNativePrototype(GetInputSceneIndex(), primPath)) {
-            // TODO : Handle path exclusions
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
             if (selectionsSchema.IsDefined()) {

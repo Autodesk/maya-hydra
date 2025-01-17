@@ -169,6 +169,9 @@ PiInstancerWhSi::PiInstancerWhSi(
 ) : BaseWhSi(inputSceneIndex, highlightHierarchyPrefix, wireframeColorInterface)
 {
     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
+        if (IsExcludedPath(primPath)) {
+            return false;
+        }
         if (_IsPointInstancer(prim)) {
             _pointInstancerPaths.emplace(primPath);
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
