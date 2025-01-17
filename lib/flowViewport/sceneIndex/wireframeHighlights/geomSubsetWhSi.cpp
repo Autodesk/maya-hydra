@@ -180,6 +180,13 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
                 ForEachPrimInHierarchy(entry.primPath, operation);
             }
         }
+
+        if (_primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end()) {
+            // Dirty prototype prim (to update highlight color)
+            auto selectionPath = SelectionPathFromKey(SelectionKey(entry.primPath, ""));
+            auto originalMeshPath = entry.primPath.GetParentPath();
+            highlightEntries.emplace_back(originalMeshPath.ReplacePrefix(originalMeshPath.GetParentPath(), selectionPath), entry.dirtyLocators);
+        }
     }
     _SendPrimsDirtied(highlightEntries);
 }
