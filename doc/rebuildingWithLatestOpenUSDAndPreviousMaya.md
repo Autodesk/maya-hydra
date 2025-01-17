@@ -1,6 +1,12 @@
 # Building with the latest version of OpenUSD and with a previous version of Maya such as 2024
 
 Let's take as an example, you want to rebuild MayaHydra in <b>Maya 2024</b> and <b>OpenUSD 24.11</b> under Windows.<br>
+
+Please be aware that <b>Maya 2024 is not officially supported </b>since we have added a few features to Maya API in newer versions of Maya.
+What is known to be unsupported in Maya 2024 :
+- The cull mode from Maya geometries.
+- Isolate select will not function correctly.
+
 With Maya 2024 the OpenUSD version used by default was 22.11 which was compiled with Python 3.10.8.
 
 ## Rebuilding OpenUSD
