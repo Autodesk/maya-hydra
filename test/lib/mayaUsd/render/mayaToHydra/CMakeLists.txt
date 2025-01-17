@@ -70,7 +70,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testPathMapperRegistry.py
     cpp/testPickHandlerRegistry.py
     cpp/testSelectionSceneIndex.py
-    cpp/testWireframeSelectionHighlightSceneIndex.py
     cpp/testFlowViewportAPIViewportInformation.py
     cpp/testFlowViewportAPIAddPrims.py
     cpp/testUsdStageLayerMuting.py

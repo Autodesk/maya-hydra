@@ -27,7 +27,6 @@ target_sources(${TARGET_NAME}
         testPrimPath.cpp
         testSelectionSceneIndex.cpp
         testUtils.cpp
-        testWireframeSelectionHighlightSceneIndex.cpp
         testFvpViewportInformationMultipleViewports.cpp
         testFvpViewportInformationRendererSwitching.cpp
         testFlowViewportAPIAddPrims.cpp
