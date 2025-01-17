@@ -145,6 +145,12 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     // For now this is required for the HdSt backend to use lights.
     setEnv("USDIMAGING_ENABLE_SCENE_LIGHTS", "1");
 
+    // Set dome light textures maximum resolution default to 1024.  A proper
+    // solution with a Hydra preferences category in the Maya
+    // preferences UI is preferable, but at time of writing is not in
+    // scope.  PPT, 17-Jan-2025.
+    MGlobal::executeCommand("if (!`optionVar -exists HdStormRendererPlugin__domeLightTexturesMaxResolution`) { optionVar -iv HdStormRendererPlugin__domeLightTexturesMaxResolution 1024; }");
+
     MFnPlugin plugin(obj, "Autodesk", PLUGIN_VERSION, "Any");
 
     if (!plugin.registerCommand(
