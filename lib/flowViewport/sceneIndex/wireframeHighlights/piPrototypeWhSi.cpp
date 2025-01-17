@@ -309,6 +309,11 @@ void PiPrototypeWhSi::_CreateSelectionHighlight(const PXR_NS::SdfPath& prototype
         return;
     }
 
+    SelectionKey selectionKey { prototypePath, selectionId };
+    if (_selections.find(selectionKey) != _selections.end()) {
+        return;
+    }
+
     // Collect paths
     SdfPathSet instancerPaths;
     SdfPathSet prototypePaths;
