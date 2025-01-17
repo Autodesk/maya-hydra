@@ -55,11 +55,14 @@ class GeomSubsetWhSi
 {
 public:
     FVP_API
-    static PXR_NS::HdSceneIndexBaseRefPtr New(
+    static GeomSubsetWhSiRefPtr New(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
         const PXR_NS::SdfPath& highlightHierarchyPrefix,
         const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
+
+    FVP_API
+    ~GeomSubsetWhSi() override = default;
 
 protected:
     FVP_API

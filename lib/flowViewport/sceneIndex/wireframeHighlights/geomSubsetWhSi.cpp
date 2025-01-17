@@ -43,7 +43,7 @@ bool _IsSelected(const HdSceneIndexPrim& prim)
 
 namespace FVP_NS_DEF {
 
-HdSceneIndexBaseRefPtr GeomSubsetWhSi::New(
+GeomSubsetWhSiRefPtr GeomSubsetWhSi::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
     const SdfPath& highlightHierarchyPrefix,
     const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface)

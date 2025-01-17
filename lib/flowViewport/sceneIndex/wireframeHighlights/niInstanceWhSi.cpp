@@ -47,7 +47,7 @@ SdfPath _GetNativeInstancePrototypePath(const HdSceneIndexBaseRefPtr& sceneIndex
 
 namespace FVP_NS_DEF {
 
-HdSceneIndexBaseRefPtr NiInstanceWhSi::New(
+NiInstanceWhSiRefPtr NiInstanceWhSi::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
     const SdfPath& highlightHierarchyPrefix,
     const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface)

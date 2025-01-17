@@ -56,11 +56,14 @@ class PiPrototypeWhSi
 {
 public:
     FVP_API
-    static PXR_NS::HdSceneIndexBaseRefPtr New(
+    static PiPrototypeWhSiRefPtr New(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
         const PXR_NS::SdfPath& highlightHierarchyPrefix,
         const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
+
+    FVP_API
+    ~PiPrototypeWhSi() override = default;
 
 protected:
     FVP_API

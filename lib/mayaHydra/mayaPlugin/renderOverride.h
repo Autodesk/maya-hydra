@@ -52,8 +52,8 @@
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
-#include <flowViewport/sceneIndex/wireframeHighlights/meshWhSi.h>
 #include <flowViewport/sceneIndex/wireframeHighlights/geomSubsetWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/meshWhSi.h>
 #include <flowViewport/sceneIndex/wireframeHighlights/niInstanceWhSi.h>
 #include <flowViewport/sceneIndex/wireframeHighlights/niPrototypeWhSi.h>
 #include <flowViewport/sceneIndex/wireframeHighlights/piInstancerWhSi.h>
@@ -287,8 +287,8 @@ private:
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
     Fvp::SelectionPtr                         _selection;
     Fvp::WireframeSelectionHighlightSceneIndexRefPtr  _wireframeSelectionHighlightSceneIndex;
-    Fvp::MeshWhSiRefPtr _meshWhSi;
     Fvp::GeomSubsetWhSiRefPtr _geomSubsetWhSi;
+    Fvp::MeshWhSiRefPtr _meshWhSi;
     Fvp::NiInstanceWhSiRefPtr _niInstanceWhSi;
     Fvp::NiPrototypeWhSiRefPtr _niPrototypeWhSi;
     Fvp::PiInstancerWhSiRefPtr _piInstancerWhSi;

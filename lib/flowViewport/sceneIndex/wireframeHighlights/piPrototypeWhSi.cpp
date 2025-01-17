@@ -49,7 +49,7 @@ bool _IsPointInstancePrototype(const HdSceneIndexBaseRefPtr& sceneIndex, const S
 
 namespace FVP_NS_DEF {
 
-HdSceneIndexBaseRefPtr PiPrototypeWhSi::New(
+PiPrototypeWhSiRefPtr PiPrototypeWhSi::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
     const SdfPath& highlightHierarchyPrefix,
     const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface)
@@ -320,7 +320,6 @@ void PiPrototypeWhSi::_CreateSelectionHighlight(const PXR_NS::SdfPath& prototype
     CollectInstancingPaths(prototypePath, SelectionHighlightsCollectionDirection2::Bidirectional2, instancerPaths, prototypePaths);
 
     // Setup data structures
-    SelectionKey selectionKey { prototypePath, selectionId };
     SdfPath selectionPath = RegisterSelection(selectionKey);
 
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(prototypePath);

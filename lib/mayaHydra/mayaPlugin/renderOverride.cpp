@@ -1278,12 +1278,12 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     // Setup selection highlight scene indices
     {
         SdfPath highlightHierarchyPrefix = SdfPath("/FlowViewportSelectionHighlights");
-
-        _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _meshWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
         
         _lastFilteringSceneIndexBeforeCustomFiltering = _geomSubsetWhSi = Fvp::GeomSubsetWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _geomSubsetWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+
+        _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _meshWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
         
         _lastFilteringSceneIndexBeforeCustomFiltering = _niInstanceWhSi = Fvp::NiInstanceWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _niInstanceWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
