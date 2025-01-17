@@ -1,6 +1,6 @@
 # Building with the latest version of OpenUSD and with a previous version of Maya such as 2024
 
-Let's take as an example, you want to rebuild MayaHydra in <b>Maya 2024</b> and <b>OpenUSD 24.11</b> under Windows.<br>
+Let's take as an example rebuilding MayaHydra in <b>Maya 2024</b> and <b>OpenUSD 24.11</b> under Windows.<br>
 
 Please be aware that <b>Maya 2024 is not officially supported </b>since we have added a few features to Maya API in newer versions of Maya.
 What is known to be unsupported in Maya 2024 :
@@ -21,8 +21,8 @@ If OpenUSD was not built with the same version of Python as the one used in your
 
 So for Maya 2024, we need to rebuild OpenUSD with Python 3.10.8.<br>
 To do so, you need to clone the OpenUSD repository and checkout the version used by MayaUsd and MayaHydra which is [v24.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v24.11-MayaUsd-Public).<br>
-As an example is given a Windows batch file to rebuild OpenUSD with Python 3.10.8 which is provided by mayapy.exe in the Maya/bin folder:<br><br>
-But first, you may need to install Python modules for this version of Python if it's not yet installed (this, not only to rebuild OpenUSD but MayaUsd also), they are : <br>
+As an example here is a Windows batch file to rebuild OpenUSD with Python 3.10.8 which is provided by mayapy.exe in the Maya/bin folder:<br><br>
+First, to rebuild both OpenUSD and MayaUsd, you may need to install the following Python modules for this version of Python: <br>
 PyOpenGL==3.1.0, PySide6, jinja2 and pybind11.<br>
 We are assuming that Maya 2024 is installed in its default folder such as C:\Program Files\Autodesk\Maya2024.<br>
 ```
@@ -36,7 +36,7 @@ To rebuild OpenUSD see the following Windows batch file as an example :
 ```
 rem rebuild OpenUSD with Python 3.10.8 for maya 2024
 
-rem I had to install in mayapy.exe the modules : PyOpenGL==3.1.0, PySide6 and pybind11.
+rem The following modules may need to be installed in mayapy.exe: PyOpenGL==3.1.0, PySide6 and pybind11.
 
 set openusd_maya_location=C:/Program^ Files/Autodesk/Maya2024
 set openusd_python_include=%openusd_maya_location%/include/Python310/Python
@@ -46,7 +46,7 @@ set openusd_python_lib=%openusd_maya_location%/lib/python310.lib
 rem our destination folder for the build
 set destination_folder="D:/USD-24.11-Python3.10.8"
 
-rem rebuylding OpenUSD with Python 3.10.8 in release with debug info configuration, if you want to use release only, please change the build-variant
+rem rebuilding OpenUSD with Python 3.10.8 in release with debug info configuration, if you want to use release only, please change the build-variant
 "%openusd_python_exe%" ".\build_scripts\build_usd.py" "%destination_folder%" ^
 	--build-variant=relwithdebuginfo ^
 	--build-python-info "%openusd_python_exe%" "%openusd_python_include%" "%openusd_python_lib%" 3.10.8 ^
@@ -87,7 +87,7 @@ set PATH=%PATH:C:\Users\%username%\AppData\Local\Programs\Python\Python311\Scrip
 set PATH=%PATH:C:\Users\%username%\AppData\Local\Programs\Python\Python311;=%
 set PATH=%PATH:C:\Users\%username%\AppData\Local\Programs\Python\Python311\=%
 
-rem Add OpenUSD bon and lib path to the Windows PATH
+rem Add OpenUSD bin and lib path to the Windows PATH
 set PATH=%mayausd_pixar_usd_location%\bin;%mayausd_pixar_usd_location%\lib;%PATH%
 
 rem Set necessary environment variables for the build process
@@ -123,15 +123,15 @@ set PYTHONPATH=
 ```
 
 Note : <br>
-In my case, I had an issue when rebuilding MayaUsd which was : https://github.com/PixarAnimationStudios/OpenUSD/issues/3310 <br>
-So I removed "OpenGL::GL" from the cmake file :<br>
+You may have the following issue when rebuilding MayaUsd: https://github.com/PixarAnimationStudios/OpenUSD/issues/3310 <br>
+In this case remove "OpenGL::GL" from the cmake file :<br>
 D:/USD-24.11-Python3.10.8/cmake/pxrTargets.cmake <br>
-And when rebuilding MayaUsd, I had to manually add the link to "OpenGL32.lib" to the MayaUsd project under Visual Studio in order to link correctly.
+When rebuilding MayaUsd, manually add the link to "OpenGL32.lib" to the MayaUsd project under Visual Studio in order to link correctly.
 
 
 ## Rebuilding MayaHydra
 
-Now you have OpenUSD and MayaUsd rebuilt with the same version of Python as Maya 2024, you can rebuild MayaHydra.<br>
+OpenUSD and MayaUsd are now rebuilt with the same version of Python as Maya 2024.  MayaHydra can now be built.<br>
 Which under Windows can be made through the follow batch file (adjust it to your custom folders):<br>
 ```
 rem global options to build MayaHydra
