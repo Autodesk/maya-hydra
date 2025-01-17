@@ -49,7 +49,7 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.setBasicCam(5)
         cmds.refresh()
 
-    def test_SimpleGeomSubsetHighlight(self):
+    def test_SimpleGeomSubset(self):
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
@@ -60,7 +60,7 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn.append(cubeGeomSubsetItem)
         self.assertSnapshotClose("simpleGeomSubsetHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-    def test_InstancedGeomSubsetHighlight(self):
+    def test_InstancedGeomSubset(self):
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
@@ -70,6 +70,23 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn.clear()
         sn.append(sphereGeomSubsetItem)
         self.assertSnapshotClose("instancedGeomSubsetHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+    
+    def test_WireframeColorChange(self):
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        cubeGeomSubsetPath = self._stageUfePathSegment + "," + self._cubeMeshUfePathSegment + "/" + self._cubeUpperHalfName
+        cubeGeomSubsetItem = ufe.Hierarchy.createItem(ufe.PathString.path(cubeGeomSubsetPath))
+
+        sphereGeomSubsetPath = self._stageUfePathSegment + "," + self._sphereMeshUfePathSegment + "/" + self._sphereUpperHalfName
+        sphereGeomSubsetItem = ufe.Hierarchy.createItem(ufe.PathString.path(sphereGeomSubsetPath))
+
+        sn.clear()
+        sn.append(cubeGeomSubsetItem)
+        self.assertSnapshotClose("wireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.append(sphereGeomSubsetItem)
+        self.assertSnapshotClose("wireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
     def test_MeshAndGeomSubsetSelection(self):
         sn = ufe.GlobalSelection.get()
