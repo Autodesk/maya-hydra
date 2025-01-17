@@ -1275,13 +1275,28 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     //_wireframeSelectionHighlightSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
     //_lastFilteringSceneIndexBeforeCustomFiltering  = _wireframeSelectionHighlightSceneIndex;
 
-    SdfPath highlightHierarchyPrefix = SdfPath("/FlowViewportSelectionHighlights");
-    _lastFilteringSceneIndexBeforeCustomFiltering = _piInstancerWhSi = Fvp::PiInstancerWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-    _lastFilteringSceneIndexBeforeCustomFiltering = _piPrototypeWhSi = Fvp::PiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-    _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-    _lastFilteringSceneIndexBeforeCustomFiltering = _niInstanceWhSi = Fvp::NiInstanceWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-    _lastFilteringSceneIndexBeforeCustomFiltering = _niPrototypeWhSi = Fvp::NiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-    _lastFilteringSceneIndexBeforeCustomFiltering = _geomSubsetWhSi = Fvp::GeomSubsetWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+    // Setup selection highlight scene indices
+    {
+        SdfPath highlightHierarchyPrefix = SdfPath("/FlowViewportSelectionHighlights");
+
+        _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _meshWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+        
+        _lastFilteringSceneIndexBeforeCustomFiltering = _geomSubsetWhSi = Fvp::GeomSubsetWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _geomSubsetWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+        
+        _lastFilteringSceneIndexBeforeCustomFiltering = _niInstanceWhSi = Fvp::NiInstanceWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _niInstanceWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+        
+        _lastFilteringSceneIndexBeforeCustomFiltering = _niPrototypeWhSi = Fvp::NiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _niPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+
+        _lastFilteringSceneIndexBeforeCustomFiltering = _piInstancerWhSi = Fvp::PiInstancerWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _piInstancerWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+
+        _lastFilteringSceneIndexBeforeCustomFiltering = _piPrototypeWhSi = Fvp::PiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _piPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+    }
     
     TF_AXIOM(_mayaHydraSceneIndex);
     Fvp::PathInterface* pathInterface = dynamic_cast<Fvp::PathInterface*>(&*mergingSceneIndex);
