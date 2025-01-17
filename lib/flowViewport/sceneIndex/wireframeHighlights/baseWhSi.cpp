@@ -446,6 +446,8 @@ BaseWhSi::BaseWhSi(
     _highlightHierarchyPrefix(highlightHierarchyPrefix),
     _wireframeColorInterface(wireframeColorInterface)
 {
+    _excludedPaths.emplace(_highlightHierarchyPrefix);
+
     auto operation = [this](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
         if (IsExcludedPath(primPath)) {
             return false;
