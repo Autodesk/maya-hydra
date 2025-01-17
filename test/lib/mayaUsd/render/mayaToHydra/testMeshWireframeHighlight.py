@@ -57,6 +57,23 @@ class TestMeshWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn.clear()
         sn.append(parentItem)
         self.assertSnapshotClose("meshSelection_parent.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+    
+    def test_WireframeColorChange(self):
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        baseCubePath = self._stagePathSegment + "," + "/parent/baseCube"
+        topCubePath = self._stagePathSegment + "," + "/parent/topCube"
+
+        baseCubeItem = ufe.Hierarchy.createItem(ufe.PathString.path(baseCubePath))
+        topCubeItem = ufe.Hierarchy.createItem(ufe.PathString.path(topCubePath))
+
+        sn.clear()
+        sn.append(baseCubeItem)
+        self.assertSnapshotClose("wireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.append(topCubeItem)
+        self.assertSnapshotClose("wireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
