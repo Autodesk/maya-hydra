@@ -39,83 +39,6 @@ bool _IsSelected(const HdSceneIndexPrim& prim)
     return selectionsSchema.IsDefined() && selectionsSchema.GetNumElements() > 0;
 }
 
-// Edits the mesh topology to only only contain its selected GeomSubsets
-HdContainerDataSourceHandle
-_TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, const HdContainerDataSourceHandle& geomSubsetRootDataSource)
-{
-    HdMeshSchema meshSchema = HdMeshSchema::GetFromParent(meshRootDataSource);
-    if (!meshSchema.IsDefined()) {
-        return meshRootDataSource;
-    }
-    HdMeshTopologySchema meshTopologySchema = meshSchema.GetTopology();
-    if (!meshTopologySchema.IsDefined()) {
-        return meshRootDataSource;
-    }
-    HdDataSourceLocator pointsValueLocator = HdDataSourceLocator(HdPrimvarsSchemaTokens->primvars, HdPrimvarsSchemaTokens->points, HdPrimvarSchemaTokens->primvarValue);
-    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, pointsValueLocator));
-    if (!pointsValueDataSource) {
-        return meshRootDataSource;
-    }
-
-    // Collect faces to keep based on the GeomSubset
-    std::unordered_set<int> faceIndicesToKeep;
-    #if HD_API_VERSION >= 71 // USD 24.08+
-        HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema::GetFromParent(geomSubsetRootDataSource);
-    #else
-        HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema(geomSubsetRootDataSource);
-    #endif
-    if (!geomSubsetSchema.IsDefined() || geomSubsetSchema.GetType()->GetTypedValue(0) != HdGeomSubsetSchemaTokens->typeFaceSet) {
-        return meshRootDataSource;
-    }
-    VtArray<int> faceIndices = geomSubsetSchema.GetIndices()->GetTypedValue(0);
-    for (const auto& faceIndex : faceIndices) {
-        faceIndicesToKeep.insert(faceIndex);
-    }
-    if (faceIndicesToKeep.empty()) {
-        return meshRootDataSource;
-    }
-
-    // Edit the mesh topology
-    HdContainerDataSourceEditor dataSourceEditor = HdContainerDataSourceEditor(meshRootDataSource);
-    VtArray<int> originalFaceVertexCounts = meshTopologySchema.GetFaceVertexCounts()->GetTypedValue(0);
-    VtArray<int> originalFaceVertexIndices = meshTopologySchema.GetFaceVertexIndices()->GetTypedValue(0);
-    VtArray<int> trimmedFaceVertexCounts;
-    VtArray<int> trimmedFaceVertexIndices;
-    int maxVertexIndex = 0;
-    size_t iFaceCounts = 0;
-    size_t iFaceIndices = 0;
-    while (iFaceCounts < originalFaceVertexCounts.size() && iFaceIndices < originalFaceVertexIndices.size()) {
-        int currFaceCount = originalFaceVertexCounts[iFaceCounts];
-
-        if (faceIndicesToKeep.find(iFaceCounts) != faceIndicesToKeep.end()) {
-            trimmedFaceVertexCounts.push_back(currFaceCount);
-            for (int faceIndicesOffset = 0; faceIndicesOffset < currFaceCount; faceIndicesOffset++) {
-                int vertexIndex = originalFaceVertexIndices[iFaceIndices + faceIndicesOffset];
-                trimmedFaceVertexIndices.push_back(vertexIndex);
-                if (vertexIndex > maxVertexIndex) {
-                    maxVertexIndex = vertexIndex;
-                }
-            }
-        }
-
-        iFaceCounts++;
-        iFaceIndices += currFaceCount;
-    }
-    auto faceVertexCountsLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexCounts);
-    auto faceVertexIndicesLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexIndices);
-    
-    dataSourceEditor.Set(faceVertexCountsLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexCounts));
-    dataSourceEditor.Set(faceVertexIndicesLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexIndices));
-
-    // We reduce the points primvar so that it has only the exact number of points required by the trimmed topology;
-    // this avoids a warning from USD.
-    VtArray<GfVec3f> points = pointsValueDataSource->GetTypedValue(0);
-    points.resize(maxVertexIndex + 1);
-    dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
-
-    return dataSourceEditor.Finish();
-}
-
 }
 
 namespace FVP_NS_DEF {
@@ -139,7 +62,7 @@ HdSceneIndexPrim GeomSubsetWhSi::GetHighlightPrim(const SdfPath &selectionPath, 
     if (prim.primType == HdPrimTypeTokens->mesh) {
         prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(selectionKey.first));
         if (originalPath == selectionKey.first.GetParentPath()) {
-            prim.dataSource = _TrimMeshForGeomSubset(prim.dataSource, GetInputSceneIndex()->GetPrim(selectionKey.first).dataSource);
+            prim.dataSource = TrimMeshForGeomSubset(prim.dataSource, GetInputSceneIndex()->GetPrim(selectionKey.first).dataSource);
         }
     }
     return prim;

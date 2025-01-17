@@ -199,6 +199,9 @@ protected:
 
 PXR_NS::HdContainerDataSourceHandle SetWireframeRepr(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color);
 
+PXR_NS::HdContainerDataSourceHandle
+TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, const PXR_NS::HdContainerDataSourceHandle& geomSubsetRootDataSource);
+
 Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
 
 }

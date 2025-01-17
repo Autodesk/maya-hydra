@@ -60,18 +60,25 @@ HdSceneIndexBaseRefPtr PiPrototypeWhSi::New(
 HdSceneIndexPrim PiPrototypeWhSi::GetHighlightPrim(const SdfPath &selectionPath, const SdfPath &fullPrimPath) const
 {
     SelectionKey selectionKey = SelectionKeyFromPath(selectionPath);
+    HdSceneIndexPrim originalPrototypePrim = GetInputSceneIndex()->GetPrim(selectionKey.first);
 
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
-    prim.dataSource = RepathingContainerDataSource::New(SdfPath::AbsoluteRootPath(), selectionPath, prim.dataSource);
     if (prim.primType == HdPrimTypeTokens->mesh) {
         prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(selectionKey.first));
+        if (originalPrototypePrim.primType == HdPrimTypeTokens->geomSubset && originalPath == selectionKey.first.GetParentPath()) {
+            prim.dataSource = TrimMeshForGeomSubset(prim.dataSource, originalPrototypePrim.dataSource);
+        }
     }
+    prim.dataSource = RepathingContainerDataSource::New(SdfPath::AbsoluteRootPath(), selectionPath, prim.dataSource);
     return prim;
 };
 
 SdfPathVector PiPrototypeWhSi::GetHighlightChildPrimPaths(const SdfPath &selectionPath, const SdfPath &fullPrimPath) const
 {
+    SelectionKey selectionKey = SelectionKeyFromPath(selectionPath);
+    HdSceneIndexPrim originalPrototypePrim = GetInputSceneIndex()->GetPrim(selectionKey.first);
+
     SdfPathVector childPaths;
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
     auto originalChildPaths = GetInputSceneIndex()->GetChildPrimPaths(originalPath);
@@ -80,7 +87,9 @@ SdfPathVector PiPrototypeWhSi::GetHighlightChildPrimPaths(const SdfPath &selecti
         bool isInstancerRelevantPath = (itInstancer != _instancerPathsToSelections.end() && itInstancer->first.HasPrefix(originalChildPath)) || (itInstancer != _instancerPathsToSelections.begin() && originalChildPath.HasPrefix((--itInstancer)->first));
         auto itPrototype = _prototypePathsToSelections.upper_bound(originalChildPath);
         bool isPrototypeRelevantPath = (itPrototype != _prototypePathsToSelections.end() && itPrototype->first.HasPrefix(originalChildPath)) || (itPrototype != _prototypePathsToSelections.begin() && originalChildPath.HasPrefix((--itPrototype)->first));
-        if (isInstancerRelevantPath || isPrototypeRelevantPath) {
+        bool isRelevantPath = isInstancerRelevantPath || isPrototypeRelevantPath;
+        bool isSelectedGeomSubsetPrototypePath = originalPrototypePrim.primType == HdPrimTypeTokens->geomSubset && originalChildPath == selectionKey.first;
+        if (isRelevantPath && !isSelectedGeomSubsetPrototypePath) {
             childPaths.emplace_back(originalChildPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
         }
     }
@@ -297,7 +306,7 @@ void PiPrototypeWhSi::_CreateSelectionHighlight(const PXR_NS::SdfPath& prototype
     if (selectionId.empty() || selectionId.find_first_not_of("0123456789") != std::string::npos) {
         return;
     }
-    
+
     // Collect paths
     SdfPathSet instancerPaths;
     SdfPathSet prototypePaths;
