@@ -255,7 +255,8 @@ void PiInstancerWhSi::ProcessRemovedPrims(
         auto itSelectedPrim = _primPathsToSelections.lower_bound(entry.primPath);
         if (itSelectedPrim != _primPathsToSelections.end()) {
             if (itSelectedPrim->first.HasPrefix(entry.primPath)) {
-                for (const auto& selectionKey : itSelectedPrim->second) {
+                const auto selectionKeysToDelete = itSelectedPrim->second;
+                for (const auto& selectionKey : selectionKeysToDelete) {
                     _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
                 }
             }
@@ -265,7 +266,8 @@ void PiInstancerWhSi::ProcessRemovedPrims(
         auto itInstancerParentRemoval = _instancerPathsToSelections.lower_bound(entry.primPath);
         if (itInstancerParentRemoval != _instancerPathsToSelections.end()) {
             if (itInstancerParentRemoval->first.HasPrefix(entry.primPath)) {
-                for (const auto& selectionKey : itInstancerParentRemoval->second) {
+                const auto selectionKeysToDelete = itInstancerParentRemoval->second;
+                for (const auto& selectionKey : selectionKeysToDelete) {
                     _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
                 }
             }
@@ -275,7 +277,8 @@ void PiInstancerWhSi::ProcessRemovedPrims(
         auto itPrototypeParentRemoval = _prototypePathsToSelections.lower_bound(entry.primPath);
         if (itPrototypeParentRemoval != _prototypePathsToSelections.end()) {
             if (itPrototypeParentRemoval->first.HasPrefix(entry.primPath)) {
-                for (const auto& selectionKey : itPrototypeParentRemoval->second) {
+                const auto selectionKeysToDelete = itPrototypeParentRemoval->second;
+                for (const auto& selectionKey : selectionKeysToDelete) {
                     _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
                 }
             }
@@ -320,7 +323,8 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
                 // Selection changed on the instancer; rebuild the highlight
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
-                    for (const auto& selectionKey : existingSelectionKeys->second) {
+                    const auto selectionKeysToDelete = existingSelectionKeys->second;
+                    for (const auto& selectionKey : selectionKeysToDelete) {
                         _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
                     }
                 }
@@ -345,14 +349,16 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
             // Instancing topology was changed : rebuild the highlights, since we don't know exactly how it was changed
             auto instancerSelectionKeysToRebuild = _instancerPathsToSelections.find(entry.primPath);
             if (instancerSelectionKeysToRebuild != _instancerPathsToSelections.end()) {
-                for (const auto& selectionKey : instancerSelectionKeysToRebuild->second) {
+                const auto selectionKeysToRebuild = instancerSelectionKeysToRebuild->second;
+                for (const auto& selectionKey : selectionKeysToRebuild) {
                     _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
                     _CreateSelectionHighlight(selectionKey.first, selectionKey.second);
                 }
             }
             auto prototypeSelectionKeysToRebuild = _prototypePathsToSelections.find(entry.primPath);
             if (prototypeSelectionKeysToRebuild != _prototypePathsToSelections.end()) {
-                for (const auto& selectionKey : prototypeSelectionKeysToRebuild->second) {
+                const auto selectionKeysToRebuild = prototypeSelectionKeysToRebuild->second;
+                for (const auto& selectionKey : selectionKeysToRebuild) {
                     _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
                     _CreateSelectionHighlight(selectionKey.first, selectionKey.second);
                 }
@@ -394,7 +400,8 @@ void PiInstancerWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath
         for (auto itPointInstancer = _pointInstancerPaths.lower_bound(primPath); itPointInstancer != _pointInstancerPaths.end() && itPointInstancer->HasPrefix(primPath); itPointInstancer++) {
             auto existingSelectionKeys = _primPathsToSelections.find(*itPointInstancer);
             if (existingSelectionKeys != _primPathsToSelections.end()) {
-                for (const auto& selectionKey : existingSelectionKeys->second) {
+                const auto selectionKeysToDelete = existingSelectionKeys->second;
+                for (const auto& selectionKey : selectionKeysToDelete) {
                     _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
                 }
             }
@@ -405,12 +412,12 @@ void PiInstancerWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath
         for (auto itPointInstancer = _pointInstancerPaths.lower_bound(primPath); itPointInstancer != _pointInstancerPaths.end() && itPointInstancer->HasPrefix(primPath); itPointInstancer++) {
             if (!HasFullySelectedAncestorInclusive(*itPointInstancer)) {
                 _DeleteSelectionHighlight(*itPointInstancer, kFullHighlight);
-            }
-            HdSceneIndexPrim pointInstancerPrim = GetInputSceneIndex()->GetPrim(*itPointInstancer);
-            HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(pointInstancerPrim.dataSource);
-            if (selectionsSchema.IsDefined()) {
-                for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
-                    _CreateSelectionHighlight(*itPointInstancer, std::to_string(selectionId));
+                HdSceneIndexPrim pointInstancerPrim = GetInputSceneIndex()->GetPrim(*itPointInstancer);
+                HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(pointInstancerPrim.dataSource);
+                if (selectionsSchema.IsDefined()) {
+                    for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
+                        _CreateSelectionHighlight(*itPointInstancer, std::to_string(selectionId));
+                    }
                 }
             }
         }

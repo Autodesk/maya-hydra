@@ -160,7 +160,8 @@ void NiInstanceWhSi::ProcessRemovedPrims(
         auto itPrototypeParentRemoval = _prototypePathsToSelectionPaths.lower_bound(entry.primPath);
         if (itPrototypeParentRemoval != _prototypePathsToSelectionPaths.end()) {
             if (itPrototypeParentRemoval->first.HasPrefix(entry.primPath)) {
-                for (const auto& selectionPath : itPrototypeParentRemoval->second) {
+                const auto selectionPathsToDelete = itPrototypeParentRemoval->second;
+                for (const auto& selectionPath : selectionPathsToDelete) {
                     _DeleteSelectionHighlight(SelectionKeyFromPath(selectionPath).first);
                 }
             }

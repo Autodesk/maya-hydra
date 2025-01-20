@@ -172,7 +172,8 @@ void NiPrototypeWhSi::ProcessRemovedPrims(
         auto itSelectedPrim = _primPathsToSelections.lower_bound(entry.primPath);
         if (itSelectedPrim != _primPathsToSelections.end()) {
             if (itSelectedPrim->first.HasPrefix(entry.primPath)) {
-                for (const auto& selectionKey : itSelectedPrim->second) {
+                const auto selectionKeysToDelete = itSelectedPrim->second;
+                for (const auto& selectionKey : selectionKeysToDelete) {
                     _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
                 }
             }
@@ -182,7 +183,8 @@ void NiPrototypeWhSi::ProcessRemovedPrims(
         auto itPrototypeParentRemoval = _prototypePathsToSelections.lower_bound(entry.primPath);
         if (itPrototypeParentRemoval != _prototypePathsToSelections.end()) {
             if (itPrototypeParentRemoval->first.HasPrefix(entry.primPath)) {
-                for (const auto& selectionKey : itPrototypeParentRemoval->second) {
+                const auto selectionKeysToDelete = itPrototypeParentRemoval->second;
+                for (const auto& selectionKey : selectionKeysToDelete) {
                     _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
                 }
             }
@@ -214,7 +216,7 @@ void NiPrototypeWhSi::ProcessDirtiedPrims(
             if (_IsNativePrototype(GetInputSceneIndex(), entry.primPath)) {
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
-                    auto selectionKeysToDelete = existingSelectionKeys->second;
+                    const auto selectionKeysToDelete = existingSelectionKeys->second;
                     for (const auto& selectionKey : selectionKeysToDelete) {
                         _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
                     }
