@@ -27,10 +27,6 @@ typedef PXR_NS::TfRefPtr<PiPrototypeWhSi> PiPrototypeWhSiRefPtr;
 typedef PXR_NS::TfRefPtr<const PiPrototypeWhSi> PiPrototypeWhSiConstRefPtr;
 
 /// \class PiPrototypeWhSi
-///
-/// Uses Hydra HdRepr to add wireframe representation to selected objects
-/// and their descendants.
-///
 class PiPrototypeWhSi 
     : public BaseWhSi
 {
