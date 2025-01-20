@@ -287,7 +287,9 @@ private:
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
     Fvp::SelectionPtr                         _selection;
     SdfPath                                   _highlightHierarchyPrefix{"/FlowViewportSelectionHighlights"};
+#if PXR_VERSION >= 2403
     Fvp::GeomSubsetWhSiRefPtr                 _geomSubsetWhSi;
+#endif
     Fvp::MeshWhSiRefPtr                       _meshWhSi;
     Fvp::NiInstanceWhSiRefPtr                 _niInstanceWhSi;
     Fvp::NiPrototypeWhSiRefPtr                _niPrototypeWhSi;

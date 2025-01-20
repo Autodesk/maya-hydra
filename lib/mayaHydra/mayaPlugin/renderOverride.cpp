@@ -1311,8 +1311,10 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         //// is done by Maya at render item creation time, so avoid double wireframe
         //// selection highlighting by excluding MAYA_NATIVE_ROOT.
         
+#if PXR_VERSION >= 2403
         _lastFilteringSceneIndexBeforeCustomFiltering = _geomSubsetWhSi = Fvp::GeomSubsetWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _geomSubsetWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+#endif
 
         _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _meshWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
