@@ -27,6 +27,12 @@ typedef PXR_NS::TfRefPtr<PiInstancerWhSi> PiInstancerWhSiRefPtr;
 typedef PXR_NS::TfRefPtr<const PiInstancerWhSi> PiInstancerWhSiConstRefPtr;
 
 /// \class PiInstancerWhSi
+///
+/// Wireframe selection highlight scene index for point instancer prims.
+/// This scene index handles highlights for both point instancers as a whole
+/// as well as individual point instances, as the selections for both of these
+/// occur on the instancer prims.
+///
 class PiInstancerWhSi 
     : public BaseWhSi
 {

@@ -117,7 +117,6 @@ typedef PXR_NS::TfRefPtr<const BaseWhSi> BaseWhSiConstRefPtr;
 /// stops being so. This is useful for handling selection highlights for when a 
 /// parent prim is selected/deselected.
 /// 
-
 class BaseWhSi 
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
     , public Fvp::InputSceneIndexUtils<BaseWhSi>

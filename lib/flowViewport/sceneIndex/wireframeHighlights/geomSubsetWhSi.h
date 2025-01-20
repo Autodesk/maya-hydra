@@ -29,6 +29,9 @@ typedef PXR_NS::TfRefPtr<GeomSubsetWhSi> GeomSubsetWhSiRefPtr;
 typedef PXR_NS::TfRefPtr<const GeomSubsetWhSi> GeomSubsetWhSiConstRefPtr;
 
 /// \class GeomSubsetWhSi
+///
+/// Wireframe selection highlight scene index for geomSubset prims.
+///
 class GeomSubsetWhSi 
     : public BaseWhSi
 {

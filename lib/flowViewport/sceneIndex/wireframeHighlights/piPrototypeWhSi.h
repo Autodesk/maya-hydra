@@ -27,6 +27,9 @@ typedef PXR_NS::TfRefPtr<PiPrototypeWhSi> PiPrototypeWhSiRefPtr;
 typedef PXR_NS::TfRefPtr<const PiPrototypeWhSi> PiPrototypeWhSiConstRefPtr;
 
 /// \class PiPrototypeWhSi
+///
+/// Wireframe selection highlight scene index for point instance prototypes.
+///
 class PiPrototypeWhSi 
     : public BaseWhSi
 {

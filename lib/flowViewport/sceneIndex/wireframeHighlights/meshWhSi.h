@@ -27,6 +27,9 @@ typedef PXR_NS::TfRefPtr<MeshWhSi> MeshWhSiRefPtr;
 typedef PXR_NS::TfRefPtr<const MeshWhSi> MeshWhSiConstRefPtr;
 
 /// \class MeshWhSi
+///
+/// Wireframe selection highlight scene index for mesh prims.
+///
 class MeshWhSi 
     : public BaseWhSi
 {

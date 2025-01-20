@@ -26,6 +26,9 @@ typedef PXR_NS::TfRefPtr<NiInstanceWhSi> NiInstanceWhSiRefPtr;
 typedef PXR_NS::TfRefPtr<const NiInstanceWhSi> NiInstanceWhSiConstRefPtr;
 
 /// \class NiInstanceWhSi
+///
+/// Wireframe selection highlight scene index for native instances.
+///
 class NiInstanceWhSi 
     : public BaseWhSi
 {

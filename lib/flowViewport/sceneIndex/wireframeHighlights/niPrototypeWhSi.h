@@ -27,6 +27,9 @@ typedef PXR_NS::TfRefPtr<NiPrototypeWhSi> NiPrototypeWhSiRefPtr;
 typedef PXR_NS::TfRefPtr<const NiPrototypeWhSi> NiPrototypeWhSiConstRefPtr;
 
 /// \class NiPrototypeWhSi
+///
+/// Wireframe selection highlight scene index for native instance prototypes.
+///
 class NiPrototypeWhSi 
     : public BaseWhSi
 {
