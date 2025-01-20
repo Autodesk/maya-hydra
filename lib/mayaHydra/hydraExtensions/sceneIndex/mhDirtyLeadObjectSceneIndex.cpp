@@ -74,7 +74,6 @@ void MhDirtyLeadObjectSceneIndex::_DirtyPrimSelectionRecursively(const Fvp::Prim
             pathsToDirty.push(childPath);
         }
         
-        // TODO : Move to point instance highlight scene indices
         HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPathToDirty);
         if (currPrim.primType == HdPrimTypeTokens->instancer) {
             HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(currPrim.dataSource);
