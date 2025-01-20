@@ -32,7 +32,6 @@
 
 #include <functional>
 #include <set>
-#include <unordered_map>
 
 namespace FVP_NS_DEF {
 
@@ -62,44 +61,70 @@ private:
     PXR_NS::HdContainerDataSourceHandle const _inputDataSource;
 };
 
+using SelectionKey = std::pair<PXR_NS::SdfPath, std::string>;
+
+enum InstancingPathsCollectionDirection {
+    None = 0,
+    Prototypes = 1 << 0,
+    InstancedBy = 1 << 1,
+    Bidirectional = Prototypes | InstancedBy
+};
+
 // Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
 // type in PXR_NS.
 class BaseWhSi;
 typedef PXR_NS::TfRefPtr<BaseWhSi> BaseWhSiRefPtr;
 typedef PXR_NS::TfRefPtr<const BaseWhSi> BaseWhSiConstRefPtr;
 
-using SelectionKey = std::pair<PXR_NS::SdfPath, std::string>;
-
-// struct SelectionKey {
-//     PXR_NS::SdfPath primPath;
-//     size_t selectionIndex;
-
-//     inline bool operator==(const SelectionKey &rhs) const {
-//         return primPath == rhs.primPath
-//             && selectionIndex == rhs.selectionIndex;
-//     }
-
-//     struct Hash {
-//         size_t operator()(const SelectionKey& selectionKey) const noexcept
-//         {
-//             size_t primPathHash = PXR_NS::SdfPath::Hash{}(selectionKey.primPath);
-//             return primPathHash ^ (1ULL << selectionKey.selectionIndex);
-//         }
-//     };
-// };
-
-enum SelectionHighlightsCollectionDirection2 {
-    None2 = 0,
-    Prototypes2 = 1 << 0,
-    InstancedBy2 = 1 << 1,
-    Bidirectional2 = Prototypes2 | InstancedBy2
-};
-
 /// \class BaseWhSi
 ///
-/// Uses Hydra HdRepr to add wireframe representation to selected objects
-/// and their descendants.
+/// Base class for wireframe selection highlighting scene indices.
 ///
+/// A selection highlight is composed of four parts :
+/// 1. A highlight hierarchy prefix (SdfPath)
+/// 2. A prim path (SdfPath)
+/// 3. A selection identifier (string)
+/// 4. The selection highlight sub-hierarchy (Hydra prims)
+///
+/// Which are represented in Hydra as follows :
+/// <highlightHierarchyPrefix>
+/// |__<primPath>
+///    |__Highlight_<selectionIdentifier>
+///       |__<selectionHighlightSubHierarchy>
+///
+/// The BaseWhSi class is responsible for composing the four parts
+/// together; derived classes only need to register and unregister
+/// selection highlights as needed (through unique pairs composed of 
+/// a prim path + a selection identifier), and handle the processing 
+/// of their selection highlight sub-hierarchies.
+///
+/// To do this, the BaseWhSi class overrides the typical HdSceneIndex
+/// methods (GetPrim, GetChildPrimPaths, _PrimsAdded, _PrimsRemoved,
+/// _PrimsDirtied), but does not allow for derived classes to override
+/// them in turn. Instead, analogous, but more specialized abstract methods
+/// must be implemented by the derived classes. These are :
+///
+/// 1. GetHighlightPrim & GetHighlightChildPrimPaths
+/// These methods are implemented by the derived scene index to return the 
+/// selection highlight sub-hierarchies. This allows derived scene indices to
+/// focus only on handling their specific flavor of selection highlighting.
+/// These methods will be automatically called by BaseWhSi::GetPrim and
+/// BaseWhSi::GetChildPrimPaths.
+///
+/// 2. ProcessAddedPrims, ProcessRemovedPrims & ProcessDirtiedPrims
+/// These are essentialy the same as the typical _PrimsAdded, _PrimsRemoved,
+/// & _PrimsDirtied. The only difference is that the BaseWhSi class will
+/// not forward notifications for excluded paths. Having these separate methods
+/// also allows the BaseWhSi to do some of its own processing beforehand, which
+/// allows it to provide this next, optional method :
+
+/// 3. ProcessFullySelectedChange
+/// This is an optional method that can be overriden by derived classes if desired.
+/// This method will be called whenever a prim becomes fully selected, or when it
+/// stops being so. This is useful for handling selection highlights for when a 
+/// parent prim is selected/deselected.
+/// 
+
 class BaseWhSi 
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
     , public Fvp::InputSceneIndexUtils<BaseWhSi>
@@ -148,9 +173,13 @@ protected:
     FVP_API
     SelectionKey SelectionKeyFromPath(const PXR_NS::SdfPath& selectionPath) const;
 
+    // Registers a selection highlight and returns the path to the parent prim of
+    // the selection highlight sub-hierarchy.
     FVP_API
     PXR_NS::SdfPath RegisterSelection(const SelectionKey& selectionKey);
 
+    // Unegisters a selection highlight and returns the path to the parent prim of
+    // the selection highlight sub-hierarchy.
     FVP_API
     PXR_NS::SdfPath UnregisterSelection(const SelectionKey& selectionKey);
 
@@ -175,32 +204,42 @@ protected:
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) = 0;
     
+    // Optional helper method that can be overriden by derived classes;
+    // this can help with handling highlights for when a parent prim is selected/deselected.
     FVP_API
     virtual void ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected);
 
+    // Returns whether or not this prim or one of its parents is fully selected.
     FVP_API
     bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath);
     
+    // Executes a given operation on a prim and all its descendants within the same hierarchy
+    // (prototypes are considered separate hierarchies). When running the operation on a given
+    // prim returns false, the prim's descendants are skipped.
     FVP_API
     void ForEachPrimInHierarchy(const PXR_NS::SdfPath& hierarchyRoot, const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation) const;
     
+    // Collect the paths to the instancers and prototypes of the instancing graph/network that the given prim is a part of.
+    // The direction parameter allows for specifying whether to only collect instancers, prototypes, or both.
     FVP_API
-    void CollectInstancingPaths(const PXR_NS::SdfPath& primPath, SelectionHighlightsCollectionDirection2 direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const;
+    void CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPathsCollectionDirection direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const;
 
     const PXR_NS::SdfPath _highlightHierarchyPrefix;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 
-    std::set<PXR_NS::SdfPath> _selectionPaths;
-    std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _primPathsToSelections;
+    std::set<PXR_NS::SdfPath> _excludedPaths;
 
     std::set<PXR_NS::SdfPath> _fullySelectedPaths;
 
-    std::set<PXR_NS::SdfPath> _excludedPaths;
+    std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _primPathsToSelections;
+    std::set<PXR_NS::SdfPath> _selectionPaths;
 };
 
+// Make the given prim be drawn as a wireframe of the given color.
 PXR_NS::HdContainerDataSourceHandle SetWireframeRepr(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color);
 
 #if PXR_VERSION >= 2403
+// Edit the given mesh data source such that its topology matches the given geomSubset.
 PXR_NS::HdContainerDataSourceHandle
 TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, const PXR_NS::HdContainerDataSourceHandle& geomSubsetRootDataSource);
 #endif

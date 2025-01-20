@@ -345,7 +345,7 @@ void PiPrototypeWhSi::_CreateSelectionHighlight(const PXR_NS::SdfPath& prototype
     // Collect paths
     SdfPathSet instancerPaths;
     SdfPathSet prototypePaths;
-    CollectInstancingPaths(prototypePath, SelectionHighlightsCollectionDirection2::Bidirectional2, instancerPaths, prototypePaths);
+    CollectInstancingPaths(prototypePath, InstancingPathsCollectionDirection::Bidirectional, instancerPaths, prototypePaths);
 
     // Setup data structures
     SdfPath selectionPath = RegisterSelection(selectionKey);

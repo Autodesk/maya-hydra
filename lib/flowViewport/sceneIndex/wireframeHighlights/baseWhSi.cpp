@@ -16,7 +16,6 @@
 #include "baseWhSi.h"
 
 #include <flowViewport/fvpUtils.h>
-#include <iostream>
 
 #include <pxr/base/tf/staticTokens.h>
 #include <pxr/base/gf/vec3f.h>
@@ -68,14 +67,14 @@ const HdDataSourceLocator primvarsOverrideWireframeColorLocator(
 
 // Returns all paths related to instancing for this prim; this is analogous to getting the edges
 // connected to the given vertex (in this case a prim) of an instancing graph.
-SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim, Fvp::SelectionHighlightsCollectionDirection2 direction)
+SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim, Fvp::InstancingPathsCollectionDirection direction)
 {
     HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
     
     SdfPathVector instancingRelatedPaths;
 
-    if ((direction & Fvp::SelectionHighlightsCollectionDirection2::Prototypes2)
+    if ((direction & Fvp::InstancingPathsCollectionDirection::Prototypes)
         && instancerTopology.IsDefined()) {
         auto protoPaths = instancerTopology.GetPrototypes()->GetTypedValue(0);
         for (const auto& protoPath : protoPaths) {
@@ -83,7 +82,7 @@ SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim, Fvp::Sele
         }
     }
 
-    if ((direction & Fvp::SelectionHighlightsCollectionDirection2::InstancedBy2)
+    if ((direction & Fvp::InstancingPathsCollectionDirection::InstancedBy)
         && instancedBy.IsDefined()) {
         auto instancerPaths = instancedBy.GetPaths()->GetTypedValue(0);
         for (const auto& instancerPath : instancerPaths) {
@@ -624,7 +623,7 @@ void BaseWhSi::_PrimsDirtied(
 
 void BaseWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)
 {
-
+    // no-op, can be overriden by derived classes
 }
 
 bool BaseWhSi::HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath)
@@ -708,7 +707,7 @@ BaseWhSi::ForEachPrimInHierarchy(
 }
 
 void
-BaseWhSi::CollectInstancingPaths(const PXR_NS::SdfPath& primPath, SelectionHighlightsCollectionDirection2 direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const
+BaseWhSi::CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPathsCollectionDirection direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
 
@@ -742,12 +741,12 @@ BaseWhSi::CollectInstancingPaths(const PXR_NS::SdfPath& primPath, SelectionHighl
     SdfPathVector affectedInstancedByPaths;
     auto operation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
         if (prim.primType == HdPrimTypeTokens->instancer || prim.primType == HdPrimTypeTokens->mesh) {
-            if (direction & SelectionHighlightsCollectionDirection2::Prototypes2) {
-                auto prototypePaths = _GetInstancingRelatedPaths(prim, SelectionHighlightsCollectionDirection2::Prototypes2);
+            if (direction & InstancingPathsCollectionDirection::Prototypes) {
+                auto prototypePaths = _GetInstancingRelatedPaths(prim, InstancingPathsCollectionDirection::Prototypes);
                 affectedPrototypePaths.insert(affectedPrototypePaths.end(), prototypePaths.begin(), prototypePaths.end());
             }
-            if (direction & SelectionHighlightsCollectionDirection2::InstancedBy2) {
-                auto instancedByPaths = _GetInstancingRelatedPaths(prim, SelectionHighlightsCollectionDirection2::InstancedBy2);
+            if (direction & InstancingPathsCollectionDirection::InstancedBy) {
+                auto instancedByPaths = _GetInstancingRelatedPaths(prim, InstancingPathsCollectionDirection::InstancedBy);
                 affectedInstancedByPaths.insert(affectedInstancedByPaths.end(), instancedByPaths.begin(), instancedByPaths.end());
             }
             // We hit an instancing-related prim, don't process its children (nested instancing will be processed through the instancing-related paths).
@@ -758,10 +757,10 @@ BaseWhSi::CollectInstancingPaths(const PXR_NS::SdfPath& primPath, SelectionHighl
     ForEachPrimInHierarchy(primPath, operation);
 
     for (const auto& affectedPrototypePath : affectedPrototypePaths) {
-        CollectInstancingPaths(affectedPrototypePath, SelectionHighlightsCollectionDirection2::Prototypes2, outInstancerPaths, outPrototypePaths);
+        CollectInstancingPaths(affectedPrototypePath, InstancingPathsCollectionDirection::Prototypes, outInstancerPaths, outPrototypePaths);
     }
     for (const auto& affectedInstancedByPath : affectedInstancedByPaths) {
-        CollectInstancingPaths(affectedInstancedByPath, SelectionHighlightsCollectionDirection2::InstancedBy2, outInstancerPaths, outPrototypePaths);
+        CollectInstancingPaths(affectedInstancedByPath, InstancingPathsCollectionDirection::InstancedBy, outInstancerPaths, outPrototypePaths);
     }
 }
 
