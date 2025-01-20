@@ -134,16 +134,29 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         topInstancerPath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer"
         secondInstancerPath = self._stagePathSegment + "," + "/Root/SecondInstancer"
+        thirdInstancerPath = self._stagePathSegment + "," + "/Root/ThirdInstancer"
+        fourthInstancerPath = self._stagePathSegment + "," + "/Root/FourthInstancer"
 
         topInstancerItem = ufe.Hierarchy.createItem(ufe.PathString.path(topInstancerPath))
         secondInstancerItem = ufe.Hierarchy.createItem(ufe.PathString.path(secondInstancerPath))
+        thirdInstancerItem = ufe.Hierarchy.createItem(ufe.PathString.path(thirdInstancerPath))
+        fourthInstancerItem = ufe.Hierarchy.createItem(ufe.PathString.path(fourthInstancerPath))
 
         sn.clear()
         sn.append(topInstancerItem)
-        self.assertSnapshotClose("pointInstancerWireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("pointInstancerWireframeColorChange_1.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         sn.append(secondInstancerItem)
-        self.assertSnapshotClose("pointInstancerWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("pointInstancerWireframeColorChange_2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.append(thirdInstancerItem)
+        self.assertSnapshotClose("pointInstancerWireframeColorChange_3.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.append(fourthInstancerItem)
+        self.assertSnapshotClose("pointInstancerWireframeColorChange_4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        sn.remove(fourthInstancerItem)
+        self.assertSnapshotClose("pointInstancerWireframeColorChange_5.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
     def test_InstanceWireframeColorChange(self):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
