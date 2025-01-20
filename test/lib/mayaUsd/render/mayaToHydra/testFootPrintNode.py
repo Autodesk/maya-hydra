@@ -21,6 +21,8 @@ import fixturesUtils
 import mtohUtils
 import mayaUtils
 import maya.mel as mel
+import platform
+import unittest
 from testUtils import PluginLoaded
 
 HD_STORM = "HdStormRendererPlugin"
@@ -261,7 +263,8 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
 
     # Test selection highlighting.  When the footprint node is selected, only
     # its two Hydra scene index prims (heel and sole) should have a
-    # _SelectionHighlight mirror hierarchy, and no other prim.
+    # selection highlight, and no other prim.
+    @unittest.skipIf(platform.system() == "Darwin", "HYDRA-1127 : refinedWire not working on OSX")
     def test_selectionHighlight(self):
         with PluginLoaded('mayaHydraFootPrintNode'):
             # Create a footprint node.  It will be selected.
