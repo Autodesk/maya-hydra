@@ -19,11 +19,6 @@
 
 namespace FVP_NS_DEF {
 
-struct NativeInstanceSelectionData {
-    PrimSelection _primSelection;
-    PXR_NS::SdfPath _prototypePath;
-};
-
 // Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
 // type in PXR_NS.
 class NiInstanceWhSi;
