@@ -1,4 +1,4 @@
-// Copyright 2023 Autodesk
+// Copyright 2025 Autodesk
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+
 #ifndef FVP_BASE_WH_SI_H
 #define FVP_BASE_WH_SI_H
 
@@ -199,8 +200,10 @@ protected:
 
 PXR_NS::HdContainerDataSourceHandle SetWireframeRepr(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color);
 
+#if PXR_VERSION >= 2403
 PXR_NS::HdContainerDataSourceHandle
 TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, const PXR_NS::HdContainerDataSourceHandle& geomSubsetRootDataSource);
+#endif
 
 Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
 

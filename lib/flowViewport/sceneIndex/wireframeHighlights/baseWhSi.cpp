@@ -1,3 +1,18 @@
+// Copyright 2025 Autodesk
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 #include "baseWhSi.h"
 
 #include <flowViewport/fvpUtils.h>
@@ -23,6 +38,8 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/pxr.h>
+
+#include <unordered_set>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -255,6 +272,7 @@ private:
     HdPathArrayDataSourceHandle const _inputDataSource;
 };
 
+#if PXR_VERSION >= 2403
 // Edits the mesh topology to only only contain its selected GeomSubsets
 HdContainerDataSourceHandle
 _TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, const HdContainerDataSourceHandle& geomSubsetRootDataSource)
@@ -331,6 +349,7 @@ _TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, co
 
     return dataSourceEditor.Finish();
 }
+#endif
 
 }
 
@@ -411,17 +430,24 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
     return edited.Finish();
 }
 
+#if PXR_VERSION >= 2403
 HdContainerDataSourceHandle
 TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, const HdContainerDataSourceHandle& geomSubsetRootDataSource)
 {
     return _TrimMeshForGeomSubset(meshRootDataSource, geomSubsetRootDataSource);
 }
+#endif
 
 Fvp::PrimSelection ConvertHydraToFvpSelection(const SdfPath& primPath, const HdSelectionSchema& selectionSchema) {
     Fvp::PrimSelection primSelection;
     primSelection.primPath = primPath;
 
-    HdInstanceIndicesVectorSchema nestedInstanceIndicesSchema = selectionSchema.GetNestedInstanceIndices();
+    auto nestedInstanceIndicesSchema = 
+#if HD_API_VERSION < 66
+    const_cast<HdSelectionSchema&>(selectionSchema).GetNestedInstanceIndices();
+#else
+    selectionSchema.GetNestedInstanceIndices();
+#endif
     for (size_t iNestedInstanceIndices = 0; iNestedInstanceIndices < nestedInstanceIndicesSchema.GetNumElements(); iNestedInstanceIndices++) {
         HdInstanceIndicesSchema instanceIndicesSchema = nestedInstanceIndicesSchema.GetElement(iNestedInstanceIndices);
         auto instanceIndices = instanceIndicesSchema.GetInstanceIndices()->GetTypedValue(0);

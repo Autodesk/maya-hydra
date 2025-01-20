@@ -1,4 +1,4 @@
-// Copyright 2023 Autodesk
+// Copyright 2025 Autodesk
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+
 #ifndef FVP_GEOM_SUBSET_WH_SI_H
 #define FVP_GEOM_SUBSET_WH_SI_H
 
@@ -32,6 +33,8 @@
 #include <functional>
 #include <set>
 #include <unordered_map>
+
+#if PXR_VERSION >= 2403
 
 // Each WhSi handles the highlighting for all selections for a given type of prim. i.e. instancer and instance selections both occur on the same instancer prim, therefore
 //these two types of selection should be handled by the same scene index. Why? Because the selections can change order unpredictably, so two separate scene indices would have
@@ -104,5 +107,7 @@ private:
 };
 
 }
+
+#endif // #if PXR_VERSION >= 2403
 
 #endif // FVP_GEOM_SUBSET_WH_SI_H

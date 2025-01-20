@@ -1,3 +1,18 @@
+// Copyright 2025 Autodesk
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 #include "piPrototypeWhSi.h"
 #include <flowViewport/fvpUtils.h>
 #include "baseWhSi.h"
@@ -65,9 +80,11 @@ HdSceneIndexPrim PiPrototypeWhSi::GetHighlightPrim(const SdfPath &selectionPath,
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
     if (prim.primType == HdPrimTypeTokens->mesh) {
         prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(selectionKey.first));
+#if PXR_VERSION >= 2403
         if (originalPrototypePrim.primType == HdPrimTypeTokens->geomSubset && originalPath == selectionKey.first.GetParentPath()) {
             prim.dataSource = TrimMeshForGeomSubset(prim.dataSource, originalPrototypePrim.dataSource);
         }
+#endif
     }
     prim.dataSource = RepathingContainerDataSource::New(SdfPath::AbsoluteRootPath(), selectionPath, prim.dataSource);
     return prim;
@@ -87,9 +104,15 @@ SdfPathVector PiPrototypeWhSi::GetHighlightChildPrimPaths(const SdfPath &selecti
         auto itPrototype = _prototypePathsToSelections.upper_bound(originalChildPath);
         bool isPrototypeRelevantPath = (itPrototype != _prototypePathsToSelections.end() && itPrototype->first.HasPrefix(originalChildPath)) || (itPrototype != _prototypePathsToSelections.begin() && originalChildPath.HasPrefix((--itPrototype)->first));
         bool isRelevantPath = isInstancerRelevantPath || isPrototypeRelevantPath;
-        bool isSelectedGeomSubsetPrototypePath = originalPrototypePrim.primType == HdPrimTypeTokens->geomSubset && originalChildPath == selectionKey.first;
-        if (isRelevantPath && !isSelectedGeomSubsetPrototypePath) {
+        if (isRelevantPath) {
+#if PXR_VERSION >= 2403
+            bool isSelectedGeomSubsetPrototypePath = originalPrototypePrim.primType == HdPrimTypeTokens->geomSubset && originalChildPath == selectionKey.first;
+            if (!isSelectedGeomSubsetPrototypePath) {
+                childPaths.emplace_back(originalChildPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
+            }
+#else
             childPaths.emplace_back(originalChildPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
+#endif
         }
     }
     return childPaths;

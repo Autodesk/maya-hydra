@@ -1,3 +1,18 @@
+// Copyright 2025 Autodesk
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 #include "piInstancerWhSi.h"
 #include <flowViewport/fvpUtils.h>
 #include "baseWhSi.h"
@@ -34,7 +49,7 @@ const std::string kFullHighlight = "Full";
 // Computes the mask to use for an instancer's selection highlight
 // based on the instancer's topology and the selection.
 VtBoolArray
-_GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionSchema& selection)
+_GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, HdSelectionSchema& selection)
 {
     // Schema getters were made const in USD 24.05 (specifically Hydra API version 66).
     // We work around this for previous versions by const casting.
@@ -90,7 +105,7 @@ _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTop
 // Returns the overall data source for an instancer's selection highlight.
 // This replaces the mask data source.
 HdContainerDataSourceHandle
-_GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& originalDataSource, const HdSelectionSchema& selection)
+_GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& originalDataSource, HdSelectionSchema& selection)
 {
     HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(originalDataSource);
 
