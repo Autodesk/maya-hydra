@@ -30,6 +30,21 @@ typedef PXR_NS::TfRefPtr<const PiPrototypeWhSi> PiPrototypeWhSiConstRefPtr;
 ///
 /// Wireframe selection highlight scene index for point instance prototypes.
 ///
+/// A selection's sub-hierarchy contains the parent prims of the prototype,
+/// the prototype itself, and its children, as well as the parent prims of each
+/// of the prototype's instancers, the instancers themselves, and their children.
+///
+/// Highlight_<selectionIdentifier>
+/// |__<pointInstancer1Parents>
+/// |  |__<pointInstancer1>
+/// |     |__<pointInstancer1Children>
+/// |     |__<prototypeParents>
+/// |        |__<prototype>
+/// |           |__<prototypeChildren>
+/// |__<pointInstancer2Parents>
+///    |__<pointInstancer2>
+///       |__<pointInstancer2Children>
+///
 class PiPrototypeWhSi 
     : public BaseWhSi
 {

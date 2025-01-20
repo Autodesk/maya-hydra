@@ -30,6 +30,12 @@ typedef PXR_NS::TfRefPtr<const NiPrototypeWhSi> NiPrototypeWhSiConstRefPtr;
 ///
 /// Wireframe selection highlight scene index for native instance prototypes.
 ///
+/// A selection's sub-hierarchy contains the prototype prim and its children.
+///
+/// Highlight_<selectionIdentifier>
+/// |__<prototypePrim>
+///    |__<prototypeChildren>
+///
 class NiPrototypeWhSi 
     : public BaseWhSi
 {

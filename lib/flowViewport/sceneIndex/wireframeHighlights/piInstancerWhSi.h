@@ -33,6 +33,23 @@ typedef PXR_NS::TfRefPtr<const PiInstancerWhSi> PiInstancerWhSiConstRefPtr;
 /// as well as individual point instances, as the selections for both of these
 /// occur on the instancer prims.
 ///
+/// A selection's sub-hierarchy contains the parent prims of the instancer,
+/// the instancer itself, and its children, as well as the parent prims of each
+/// of the instancer's prototypes, the prototypes themselves, and their children.
+///
+/// Highlight_<selectionIdentifier>
+/// |__<pointInstancerParents>
+/// |  |__<pointInstancer>
+/// |     |__<pointInstancerChildren>
+/// |     |__<prototype1Parents>
+/// |        |__<prototype1>
+/// |           |__<prototype1Children>
+/// |__<prototype2Parents>
+///    |__<prototype2>
+///       |__<prototype2Children>
+///
+/// Specific instance selections are handled by applying a mask on the instancer highlight.
+///
 class PiInstancerWhSi 
     : public BaseWhSi
 {

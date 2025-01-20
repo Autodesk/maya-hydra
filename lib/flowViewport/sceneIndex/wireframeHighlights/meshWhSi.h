@@ -30,6 +30,14 @@ typedef PXR_NS::TfRefPtr<const MeshWhSi> MeshWhSiConstRefPtr;
 ///
 /// Wireframe selection highlight scene index for mesh prims.
 ///
+/// A selection's sub-hierarchy contains the parent prims
+/// of the selected mesh, the mesh itself, and its children.
+///
+/// Highlight_<selectionIdentifier>
+/// |__<meshParents>
+///    |__<meshPrim>
+///       |__<meshChildren>
+///
 class MeshWhSi 
     : public BaseWhSi
 {

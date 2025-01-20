@@ -32,6 +32,12 @@ typedef PXR_NS::TfRefPtr<const GeomSubsetWhSi> GeomSubsetWhSiConstRefPtr;
 ///
 /// Wireframe selection highlight scene index for geomSubset prims.
 ///
+/// A selection's sub-hierarchy contains only the parent mesh of
+/// the selected geomSubset, trimmed to fit the geomSubset.
+///
+/// Highlight_<selectionIdentifier>
+/// |__<trimmedParentMesh>
+///
 class GeomSubsetWhSi 
     : public BaseWhSi
 {
