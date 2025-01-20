@@ -67,7 +67,6 @@
 #include <pxr/imaging/hd/rendererPlugin.h>
 #include <pxr/imaging/hd/rprimCollection.h>
 #include <pxr/imaging/hd/pluginRenderDelegateUniqueHandle.h>
-#include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hdSt/renderDelegate.h>
 #include <pxr/imaging/hdx/taskController.h>
 #include <pxr/pxr.h>
