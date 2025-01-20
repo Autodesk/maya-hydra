@@ -57,6 +57,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testGeomSubsetsWireframeHighlight.py
     testNativeInstancingWireframeHighlight.py
     testMeshWireframeHighlight.py
+    testSceneModified.py
     testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
     testIsolateSelectWithGeomSubset.py
     cpp/testColorPreferences.py

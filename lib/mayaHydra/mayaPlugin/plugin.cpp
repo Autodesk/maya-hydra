@@ -33,6 +33,7 @@
 #include <maya/MFnPlugin.h>
 #include <maya/MGlobal.h>
 #include <maya/MSceneMessage.h>
+#include <maya/MCommandResult.h>
 
 #include <memory>
 #include <vector>
@@ -78,6 +79,44 @@ namespace {
     setenv(name.c_str(), value.c_str(), 1);
     #endif
     }
+
+class SceneModifiedGuard
+{
+public:
+
+    // Read modified state before
+    SceneModifiedGuard() : _wasModified(sceneModified())
+    {}
+
+    ~SceneModifiedGuard()
+    {
+        // If modified flag became true, clear it.
+        if (sceneModified() && !_wasModified) {
+            MGlobal::executeCommand("file -modified 0");
+        }
+    }
+
+private:
+
+    bool _wasModified{false};
+
+    // Scene modified query.
+    static bool sceneModified()
+    {
+        MCommandResult result;
+        auto status = MGlobal::executeCommand("file -query -modified", result);
+        if (status != MStatus::kSuccess) {
+            throw std::runtime_error("File modified query error in mayaHydra plugin load.");
+        }
+        int typedResult{0};
+        status = result.getResult(typedResult);
+        if (status != MStatus::kSuccess) {
+            throw std::runtime_error("Command result access error in mayaHydra plugin load.");
+        }
+        return (typedResult != 0);
+    }
+};
+
 }
 
 void initialize()
@@ -132,6 +171,8 @@ void beforePluginUnloadCallback( const MStringArray& strs, void* clientData )
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
+    SceneModifiedGuard guard;
+
     MString experimental("mayaHydra is experimental.");
     MGlobal::displayWarning(experimental);
 
@@ -144,6 +185,12 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
     // For now this is required for the HdSt backend to use lights.
     setEnv("USDIMAGING_ENABLE_SCENE_LIGHTS", "1");
+
+    // Set dome light textures maximum resolution default to 1024.  A proper
+    // solution with a Hydra preferences category in the Maya
+    // preferences UI is preferable, but at time of writing is not in
+    // scope.  PPT, 17-Jan-2025.
+    MGlobal::executeCommand("if (!`optionVar -exists HdStormRendererPlugin__domeLightTexturesMaxResolution`) { optionVar -iv HdStormRendererPlugin__domeLightTexturesMaxResolution 1024; }");
 
     MFnPlugin plugin(obj, "Autodesk", PLUGIN_VERSION, "Any");
 
