@@ -50,6 +50,9 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         cmds.refresh()
 
     def test_SimpleGeomSubset(self):
+        if self._usdVersion < (0, 24, 3):
+            self.skipTest("Skipping test, USD version used does not support Hydra GeomSubset prims")
+        
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
@@ -61,6 +64,9 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("simpleGeomSubsetHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def test_InstancedGeomSubset(self):
+        if self._usdVersion < (0, 24, 3):
+            self.skipTest("Skipping test, USD version used does not support Hydra GeomSubset prims")
+        
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
@@ -72,6 +78,9 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("instancedGeomSubsetHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
     def test_WireframeColorChange(self):
+        if self._usdVersion < (0, 24, 3):
+            self.skipTest("Skipping test, USD version used does not support Hydra GeomSubset prims")
+        
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
@@ -89,6 +98,9 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("wireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
     def test_MeshAndGeomSubsetSelection(self):
+        if self._usdVersion < (0, 24, 3):
+            self.skipTest("Skipping test, USD version used does not support Hydra GeomSubset prims")
+        
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
