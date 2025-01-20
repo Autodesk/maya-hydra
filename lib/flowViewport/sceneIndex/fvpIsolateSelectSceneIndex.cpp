@@ -492,11 +492,13 @@ void IsolateSelectSceneIndex::_DirtyVisibilityRecursive(
     }
 
     for (const auto& childPath : GetChildPrimPaths(primPath)) {
+#if PXR_VERSION >= 2403
         // Recursing down to set visibility on a geomSubset child is wasteful.
         auto childPrim = GetInputSceneIndex()->GetPrim(childPath);
         if (childPrim.primType == HdPrimTypeTokens->geomSubset) {
             continue;
         }
+#endif
         _DirtyVisibilityRecursive(childPath, dirtiedEntries);
     }
 }
