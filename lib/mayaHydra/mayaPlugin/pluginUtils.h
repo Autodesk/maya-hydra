@@ -48,7 +48,7 @@ struct MtohRendererDescription
 
 using MtohRendererDescriptionVector = std::vector<MtohRendererDescription>;
 
-/// Map from MtohRendererDescription::rendererName to it's a HdRenderSettingDescriptorList
+/// Map from MtohRendererDescription::rendererName to its HdRenderSettingDescriptorList
 using MtohRendererSettings
     = std::unordered_map<pxr::TfToken, pxr::HdRenderSettingDescriptorList, pxr::TfToken::HashFunctor>;
 

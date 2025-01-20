@@ -43,61 +43,6 @@ mayaSeparator = "|"
 HD_STORM = "HdStormRendererPlugin"
 HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
 
-def loadPlugin(pluginName):
-    """ 
-        Load all given plugins created or needed by maya-ufe-plugin 
-        Args:
-            pluginName (str): The plugin name to load
-        Returns:
-            True if all plugins are loaded. False if a plugin failed to load
-    """
-    try:
-        if not isPluginLoaded(pluginName):
-            cmds.loadPlugin( pluginName, quiet = True )
-        return True
-    except:
-        print(sys.exc_info()[1])
-        print("Unable to load %s" % pluginName)
-        return False
-            
-def isPluginLoaded(pluginName):
-    """ 
-        Verifies that the given plugin is loaded
-        Args:
-            pluginName (str): The plugin name to verify
-        Returns:
-            True if the plugin is loaded. False if a plugin failed to load
-    """
-    return cmds.pluginInfo( pluginName, loaded=True, query=True)
-    
-def isMayaUsdPluginLoaded():
-    """ 
-        Load plugins needed by UFE tests.
-        Returns:
-            True if plugins loaded successfully. False if a plugin failed to load
-    """
-    # Load the mayaUsdPlugin first.
-    if not loadPlugin("mayaUsdPlugin"):
-        return False
-
-    # Load the UFE support plugin, for ufeSelectCmd support.  If this plugin
-    # isn't included in the distribution of Maya (e.g. Maya 2019 or 2020), use
-    # fallback test plugin.
-    if not (loadPlugin("ufeSupport") or loadPlugin("ufeTestCmdsPlugin")):
-        return False
-
-    # The renderSetup Python plugin registers a file new callback to Maya.  On
-    # test application exit (in TbaseApp::cleanUp()), a file new is done and
-    # thus the file new callback is invoked.  Unfortunately, this occurs after
-    # the Python interpreter has been finalized, which causes a crash.  Since
-    # renderSetup is not needed for mayaUsd tests, unload it.
-    rs = 'renderSetup'
-    if cmds.pluginInfo(rs, q=True, loaded=True):
-        unloaded = cmds.unloadPlugin(rs)
-        return (unloaded[0] == rs)
-    
-    return True
-
 def createUfePathSegment(mayaPath):
     """
         Create a UFE path from a given maya path and return the first segment.
@@ -152,6 +97,8 @@ def openNewScene(useTestSettings=True):
     cmds.file(new=True, force=True)
     if useTestSettings:
         applyTestSettings()
+        # As this conceptually opens a new scene, set the file to unmodified.
+        cmds.file(modified=False)
 
 def openTestScene(*args, useTestSettings=True):
     filePath = testUtils.getTestScene(*args)
