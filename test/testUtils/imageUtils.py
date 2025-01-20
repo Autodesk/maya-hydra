@@ -204,10 +204,7 @@ class ImageDiffingTestCase:
         #Enable undo again
         cmds.undoInfo(stateWithoutFlush=True)
         if proc.returncode not in (0, 1):
-            #self.fail(str(proc.stdout))
-            #import shutil
-            #shutil.copy(imagePath2, imagePath1)
-            pass
+            self.fail(str(proc.stdout))
         return proc.returncode
     
     def assertImagesEqual(self, imagePath1, imagePath2):

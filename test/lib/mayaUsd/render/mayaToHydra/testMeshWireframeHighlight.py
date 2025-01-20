@@ -19,9 +19,6 @@ import mtohUtils
 import ufe
 import testUtils
 import maya.cmds as cmds
-import maya.mel as mel
-
-from string import digits
 
 class TestMeshWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -47,11 +44,6 @@ class TestMeshWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
-        defaultShaderName = mel.eval("defaultShaderName").rstrip(digits)
-        import sys
-        sys.__stdout__.write("\nDefault shader name : {0}\n".format(defaultShaderName))
-        sys.__stdout__.flush()
-
         baseCubePath = self._stagePathSegment + "," + "/parent/baseCube"
         parentPath = self._stagePathSegment + "," + "/parent"
 
@@ -69,11 +61,6 @@ class TestMeshWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     def test_WireframeColorChange(self):
         sn = ufe.GlobalSelection.get()
         sn.clear()
-
-        defaultShaderName = mel.eval("defaultShaderName").rstrip(digits)
-        import sys
-        sys.__stdout__.write("\nDefault shader name : {0}\n".format(defaultShaderName))
-        sys.__stdout__.flush()
 
         baseCubePath = self._stagePathSegment + "," + "/parent/baseCube"
         topCubePath = self._stagePathSegment + "," + "/parent/topCube"

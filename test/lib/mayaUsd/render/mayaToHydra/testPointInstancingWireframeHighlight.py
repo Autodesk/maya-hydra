@@ -19,10 +19,6 @@ import testUtils
 import ufe
 from testUtils import PluginLoaded
 
-import maya.mel as mel
-
-from string import digits
-
 class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
@@ -47,11 +43,6 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn = ufe.GlobalSelection.get()
         sn.clear()
-
-        defaultShaderName = mel.eval("defaultShaderName").rstrip(digits)
-        import sys
-        sys.__stdout__.write("\nDefault shader name : {0}\n".format(defaultShaderName))
-        sys.__stdout__.flush()
 
         topInstancerPath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer"
         secondInstancerPath = self._stagePathSegment + "," + "/Root/SecondInstancer"
@@ -98,11 +89,6 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
-        defaultShaderName = mel.eval("defaultShaderName").rstrip(digits)
-        import sys
-        sys.__stdout__.write("\nDefault shader name : {0}\n".format(defaultShaderName))
-        sys.__stdout__.flush()
-
         topInstancerFirstInstancePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/0"
         secondInstancerSecondInstancePath = self._stagePathSegment + "," + "/Root/SecondInstancer/1"
 
@@ -125,11 +111,6 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
-        defaultShaderName = mel.eval("defaultShaderName").rstrip(digits)
-        import sys
-        sys.__stdout__.write("\nDefault shader name : {0}\n".format(defaultShaderName))
-        sys.__stdout__.flush()
-
         prototypePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube/Geom/Cube"
         prototypeParentPath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube"
 
@@ -151,11 +132,6 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
-        defaultShaderName = mel.eval("defaultShaderName").rstrip(digits)
-        import sys
-        sys.__stdout__.write("\nDefault shader name : {0}\n".format(defaultShaderName))
-        sys.__stdout__.flush()
-
         topInstancerPath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer"
         secondInstancerPath = self._stagePathSegment + "," + "/Root/SecondInstancer"
 
@@ -176,11 +152,6 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
-        defaultShaderName = mel.eval("defaultShaderName").rstrip(digits)
-        import sys
-        sys.__stdout__.write("\nDefault shader name : {0}\n".format(defaultShaderName))
-        sys.__stdout__.flush()
-
         topInstancerFirstInstancePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/0"
         topInstancerSecondInstancePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/1"
 
@@ -200,11 +171,6 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn = ufe.GlobalSelection.get()
         sn.clear()
-
-        defaultShaderName = mel.eval("defaultShaderName").rstrip(digits)
-        import sys
-        sys.__stdout__.write("\nDefault shader name : {0}\n".format(defaultShaderName))
-        sys.__stdout__.flush()
 
         cubePrototypePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube/Geom/Cube"
         pyramidPrototypePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/BluePyramid/Geom/Pyramid"
