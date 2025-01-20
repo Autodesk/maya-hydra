@@ -15,30 +15,22 @@
 
 #include "testUtils.h"
 
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
+
 #include <mayaHydraLib/hydraUtils.h>
 
 #include <ufe/path.h>
 #include <ufe/pathString.h>
 
+#include <pxr/imaging/hd/sceneIndexPrimView.h>
+
 #include <gtest/gtest.h>
+
+#include <regex>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace MayaHydra;
-
-namespace {
-
-SdfPath fromAppPath(const Ufe::Path& appPath)
-{
-    auto siRoot = GetTerminalSceneIndices().front();
-
-    // Translate the application path into a scene index path using the
-    // selection scene index.
-    const auto snSi = findSelectionSceneIndexInTree(siRoot);
-    return snSi->SceneIndexPath(appPath);
-}
-
-}
 
 TEST(TestHydraPrim, fromAppPath)
 {
@@ -55,7 +47,7 @@ TEST(TestHydraPrim, fromAppPath)
     const auto snSi = findSelectionSceneIndexInTree(siRoot);
     ASSERT_TRUE(snSi);
 
-    const auto sceneIndexPath = snSi->SceneIndexPath(appPath);
+    const auto sceneIndexPath = Fvp::sceneIndexPath(appPath);
 
     ASSERT_FALSE(sceneIndexPath.IsEmpty());
 }
@@ -69,7 +61,7 @@ TEST(TestHydraPrim, isFound)
     ASSERT_EQ(argc, 1);
     const Ufe::Path appPath(Ufe::PathString::path(argv[0]));
 
-    const auto sceneIndexPath = fromAppPath(appPath);
+    const auto sceneIndexPath = Fvp::sceneIndexPath(appPath);
 
     ASSERT_TRUE(siRoot->GetPrim(sceneIndexPath).dataSource);
 }
@@ -83,7 +75,7 @@ TEST(TestHydraPrim, isNotFound)
     ASSERT_EQ(argc, 1);
     const Ufe::Path appPath(Ufe::PathString::path(argv[0]));
 
-    const auto sceneIndexPath = fromAppPath(appPath);
+    const auto sceneIndexPath = Fvp::sceneIndexPath(appPath);
 
     ASSERT_FALSE(siRoot->GetPrim(sceneIndexPath).dataSource);
 }
@@ -99,7 +91,7 @@ TEST(TestHydraPrim, translation)
     const GfVec3d expectedTranslation(
         std::stod(argv[1]), std::stod(argv[2]), std::stod(argv[3]));
 
-    const auto sceneIndexPath = fromAppPath(appPath);
+    const auto sceneIndexPath = Fvp::sceneIndexPath(appPath);
     const auto prim = siRoot->GetPrim(sceneIndexPath);
     GfMatrix4d m;
     ASSERT_TRUE(MayaHydra::GetXformMatrixFromPrim(prim, m));
@@ -107,4 +99,30 @@ TEST(TestHydraPrim, translation)
 
     constexpr double epsilon{1e-7};
     ASSERT_TRUE(GfIsClose(primTranslation, expectedTranslation, epsilon));
+}
+
+TEST(TestHydraPrim, countPrims)
+{
+    const auto& sceneIndices = GetTerminalSceneIndices();
+    auto siRoot = sceneIndices.front();
+
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_EQ(argc, 2);
+    
+    const std::regex r{argv[0]};
+    std::smatch m;
+    const int expectedNbMatches{std::stoi(argv[1])};
+    int nbMatches{0};
+
+    for (const auto& primPath : 
+             HdSceneIndexPrimView(siRoot, SdfPath::AbsoluteRootPath())) {
+        // Can't match temporary string, see
+        // https://stackoverflow.com/questions/27391016
+        const std::string element = primPath.GetElementString();
+        if (std::regex_search(element, m, r)) {
+            ++nbMatches;
+        }
+    }
+
+    ASSERT_EQ(nbMatches, expectedNbMatches);
 }

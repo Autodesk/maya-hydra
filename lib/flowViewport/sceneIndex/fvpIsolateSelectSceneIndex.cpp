@@ -26,6 +26,7 @@
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
+#include <pxr/imaging/hd/geomSubsetSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -96,6 +97,17 @@ Dependencies instancedPrim(
         Dependencies());
 }
 
+bool isGeomSubset(const HdSceneIndexPrim& prim) {
+    // HYDRA-1339: PiPrototypePropagatingSceneIndex removes GeomSubset type
+    // from Hydra prims
+#if PXR_VERSION >= 2403
+    return (prim.primType == HdPrimTypeTokens->geomSubset) ||
+        HdGeomSubsetSchema::GetFromParent(prim.dataSource).IsDefined();
+#else
+    return false;
+#endif
+}
+
 }
 
 namespace FVP_NS_DEF {
@@ -164,7 +176,9 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
     TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
         .Msg("    prim path %s is %s isolate select set", primPath.GetText(), (included ? "INCLUDED in" : "EXCLUDED from"));
 
-    if (!included) {
+    // HYDRA-1242: setting visibility on GeomSubset prim causes hang in Hydra
+    // Storm.
+    if (!included && !isGeomSubset(inputPrim)) {
         inputPrim.dataSource = HdContainerDataSourceEditor(inputPrim.dataSource)
             .Set(HdVisibilitySchema::GetDefaultLocator(), visOff)
             .Finish();
@@ -425,6 +439,14 @@ void IsolateSelectSceneIndex::_DirtyVisibilityRecursive(
 {
     TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
         .Msg("            %s: marking %s visibility locator dirty.\n", _viewportId.c_str(), primPath.GetText());
+
+    auto prim = GetInputSceneIndex()->GetPrim(primPath);
+
+    // GeomSubset visibility must not be set (see GetPrim()), so no need to
+    // dirty it.
+    if (isGeomSubset(prim)) {
+      return;
+    }
 
     dirtiedEntries->emplace_back(
         primPath, HdVisibilitySchema::GetDefaultLocator());

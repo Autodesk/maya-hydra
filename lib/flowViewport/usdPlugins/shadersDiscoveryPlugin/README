@@ -1,5 +1,43 @@
+This project shows how to define and register in OpenUSD a custom GLSL shader for Hydra Storm.
+You can retrieve a Maya plugin sample that creates a Hydra primitive and applies to it this custom GLSL shader for Hydra Storm :
+https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples/customShadersNode
+
 This is a pure usd plugin that is a shaders discovery plugin.
 The shaders defined in shadersDef.usda will be loaded by usd/hydra and available for use in a material network in any Hydra plugin.
 
 You can add the plugInfo.json file path in the environment variable PXR_PLUGINPATH_NAME or use another .json file to load it
-so USD/Hydra loads it at startup.
+so USD/Hydra loads it at startup. By default if this project is present in the install folder, it is loaded by Usd.
+
+How to use this custom GLSL shader on usd primitives :
+------------------------------------------------------
+
+To use the FVP_CustomBasicLightingShader GLSLFX shader into a usd file, just add this definition to your file :
+
+def Scope "mtl"
+{
+    def Material "CustomGLSL"
+    {
+        token outputs:surface.connect = </mtl/CustomGLSL/CustomGLSLShader1.outputs:surface>
+
+        def Shader "CustomGLSLShader1"
+        {
+            uniform token info:id = "FVP_CustomBasicLightingShader"
+            token outputs:surface
+        }
+    }
+}
+
+You can also assign the material binding to a prim directly by adding  :
+
+def Mesh "Mesh1" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    uniform bool doubleSided = 1
+    float3[] extent = [(-1.0000002, -1, -1.0000005), (1, 1, 1.0000001)]
+    int[] faceVertexCounts = ...
+    int[] faceVertexIndices = ...
+    rel material:binding = </mtl/CustomGLSL>
+    point3f[] points = ...
+    ...
+}

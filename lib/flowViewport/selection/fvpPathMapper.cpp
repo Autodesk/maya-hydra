@@ -15,3 +15,14 @@
 //
 
 #include <flowViewport/selection/fvpPathMapper.h>
+
+namespace FVP_NS_DEF {
+
+PrimPathsCountOutOfRangeException::PrimPathsCountOutOfRangeException(size_t min, size_t max, size_t actual)
+    : std::out_of_range("Prim paths count out of range, expected [" 
+        + std::to_string(min) + "," + std::to_string(max) 
+        + "] but got " + std::to_string(actual))
+{
+}
+
+}

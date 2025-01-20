@@ -16,12 +16,11 @@
 #include "testUtils.h"
 
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 #include <ufe/pathString.h>
 
 #include <gtest/gtest.h>
-
-#include <iostream>
 
 using namespace MAYAHYDRA_NS;
 
@@ -29,7 +28,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-SdfPath getArgSceneIndexPath(const Fvp::SelectionSceneIndexRefPtr& snSi)
+SdfPath getArgSceneIndexPath()
 {
     // Object path string is in command line arguments.
     auto [argc, argv] = getTestingArgs();
@@ -38,7 +37,7 @@ SdfPath getArgSceneIndexPath(const Fvp::SelectionSceneIndexRefPtr& snSi)
     const auto mayaPath = Ufe::PathString::path(argv[0]);
 
     // Translate the application path into a scene index path.
-    return snSi->SceneIndexPath(mayaPath);
+    return Fvp::sceneIndexPath(mayaPath);
 }
 
 Fvp::SelectionSceneIndexRefPtr getSelectionSceneIndex()
@@ -53,34 +52,34 @@ Fvp::SelectionSceneIndexRefPtr getSelectionSceneIndex()
 
 }
 
-TEST(TestPathInterface, testSceneIndices)
+TEST(TestUsdSelection, testSceneIndices)
 {
     const auto& sceneIndices = GetTerminalSceneIndices();
     auto childPrims = sceneIndices.front()->GetChildPrimPaths(SdfPath("/MayaUsdProxyShape_PluginNode"));
     ASSERT_EQ(childPrims.size(), 3u);
 }
 
-TEST(TestPathInterface, testSelected)
+TEST(TestUsdSelection, testSelected)
 {
     // Get the Flow Viewport selection scene index.
     auto snSi = getSelectionSceneIndex();
     
     // Selected object path string is in command line arguments.
     // Get it and translate it into a scene index path.
-    const auto sceneIndexPath = getArgSceneIndexPath(snSi);
+    const auto sceneIndexPath = getArgSceneIndexPath();
 
     // Confirm the object is selected in scene index scene.
     ASSERT_TRUE(snSi->IsFullySelected(sceneIndexPath));
 }
 
-TEST(TestPathInterface, testUnselected)
+TEST(TestUsdSelection, testUnselected)
 {
     // Get the Flow Viewport selection scene index.
     auto snSi = getSelectionSceneIndex();
     
     // Unselected object path string is in command line arguments.
     // Get it and translate it into a scene index path.
-    const auto sceneIndexPath = getArgSceneIndexPath(snSi);
+    const auto sceneIndexPath = getArgSceneIndexPath();
 
     // Confirm the object is not selected in scene index scene.
     ASSERT_FALSE(snSi->IsFullySelected(sceneIndexPath));

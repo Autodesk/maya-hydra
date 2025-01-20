@@ -22,7 +22,6 @@
 
 #include <flowViewport/selection/fvpPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
 
 #include <pxr/imaging/hd/dataSourceLegacyPrim.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
@@ -32,6 +31,9 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
+#if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
+    #include <pxr/imaging/hd/extComputationSchema.h>
+#endif
 
 #include <maya/MGlobal.h>
 #include <maya/MMatrix.h>
@@ -240,7 +242,11 @@ void SceneIndexInspector::_WriteLeafDataSource(
             = "SampledDataSource -> " + sampledDataSource->GetValue(0).GetTypeName();
     } else if (
         auto extComputationCallbackDataSource
+#if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
+        = HdExtComputationCpuCallbackDataSource::Cast(dataSource)) {
+#else
         = HdExtComputationCallbackDataSource::Cast(dataSource)) {
+#endif
         dataSourceDescription = "ExtComputationCallbackDataSource";
     } else {
         dataSourceDescription = "Unidentified data source type";
@@ -463,6 +469,11 @@ bool visibility(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
     auto handle = HdVisibilitySchema::GetFromParent(prim.dataSource).GetVisibility();
     // If there is no handle the prim is visible.
     return (handle ? handle->GetTypedValue(0.0f) : true);
+}
+
+bool contains(const PXR_NS::SdfPathVector& paths, const PXR_NS::SdfPath& path)
+{
+    return std::find(paths.begin(), paths.end(), path) != paths.end();
 }
 
 } // namespace MAYAHYDRA_NS_DEF

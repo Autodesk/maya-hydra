@@ -1,0 +1,56 @@
+#usda 1.0
+
+over "root"
+{
+    over "geo"
+    {
+        over "proxy"
+        {
+            over "rubiks01_top_plastic_01" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </root/mtl/rubiksCube_proxy>
+            }
+
+            over "rubiks01_mid_plastic_01" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </root/mtl/rubiksCube_proxy>
+            }
+
+            over "rubiks01_bot_plastic_01" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </root/mtl/rubiksCube_proxy>
+            }
+        }
+
+        over "render"
+        {
+            over "rubiks01_top_plastic_01" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </root/mtl/rubiksCube_proxy>
+            }
+
+            over "rubiks01_mid_plastic_01" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </root/mtl/rubiksCube_proxy>
+            }
+
+            over "rubiks01_bot_plastic_01" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </root/mtl/rubiksCube_proxy>
+            }
+        }
+    }
+}
+

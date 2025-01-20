@@ -37,7 +37,6 @@
 //
 
 #include "flowViewport/sceneIndex/fvpSelectionSceneIndex.h"
-#include "flowViewport/sceneIndex/fvpPathInterface.h"
 #include "flowViewport/selection/fvpSelection.h"
 #include <flowViewport/selection/fvpPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
@@ -117,12 +116,9 @@ SelectionSceneIndex(
   : HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
   , InputSceneIndexUtils(inputSceneIndex)
   , _selection(selection)
-  , _inputSceneIndexPathInterface(dynamic_cast<const PathInterface*>(&*inputSceneIndex))
 {
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::SelectionSceneIndex() called.\n");
-
-    TF_AXIOM(_inputSceneIndexPathInterface);
 }
 
 HdSceneIndexPrim
@@ -163,7 +159,7 @@ SelectionSceneIndex::AddSelection(const Ufe::Path& appPath)
         .Msg("SelectionSceneIndex::AddSelection(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
 
     // Call our input scene index to convert the application path to scene index paths and selection data sources.
-    auto primSelections = UfePathToPrimSelections(appPath);
+    auto primSelections = _UfePathToPrimSelections(appPath);
 
     for (const auto& primSelection : primSelections) {
         TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
@@ -185,7 +181,7 @@ void SelectionSceneIndex::RemoveSelection(const Ufe::Path& appPath)
         .Msg("SelectionSceneIndex::RemoveSelection(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
 
     // Call our input scene index to convert the application path to scene index paths and selection data sources.
-    auto primSelections = UfePathToPrimSelections(appPath);
+    auto primSelections = _UfePathToPrimSelections(appPath);
 
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrims;
     for (const auto& primSelection : primSelections) {
@@ -239,7 +235,7 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
     sceneIndexSn.reserve(selection.size());
     for (const auto& snItem : selection) {
         // Call our input scene index to convert the application path to scene index paths and selection data sources.
-        auto primSelections = UfePathToPrimSelections(snItem->path());
+        auto primSelections = _UfePathToPrimSelections(snItem->path());
 
         if (primSelections.empty()) {
             continue;
@@ -267,27 +263,12 @@ bool SelectionSceneIndex::HasFullySelectedAncestorInclusive(const SdfPath& primP
     return _selection->HasFullySelectedAncestorInclusive(primPath);
 }
 
-PrimSelections SelectionSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) const
+PrimSelections SelectionSceneIndex::_UfePathToPrimSelections(const Ufe::Path& appPath) const
 {
-    auto primSelections = _inputSceneIndexPathInterface->UfePathToPrimSelections(appPath);
+    auto primSelections = ufePathToPrimSelections(appPath);
 
     if (primSelections.empty()) {
-        // Path interface of input scene index didn't provide information.
-        // Try path mapper registry.
-        auto mapper = Fvp::PathMapperRegistry::Instance().GetMapper(appPath);
-        
-        auto warnEmptyPath = [](const Ufe::Path& appPath) {
-            TF_WARN("SelectionSceneIndex::UfePathToPrimSelections(%s) returned no path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
-        };
-
-        if (!mapper) {
-            warnEmptyPath(appPath);
-        } else {
-            primSelections = mapper->UfePathToPrimSelections(appPath);
-            if (primSelections.empty()) {
-                warnEmptyPath(appPath);
-            }
-        }
+        TF_WARN("SelectionSceneIndex::_UfePathToPrimSelections(%s) returned no path, Hydra selection will be incorrect", Ufe::PathString::string(appPath).c_str());
     }
 
     return primSelections;

@@ -33,8 +33,8 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraDefaultLightDataSource.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraMaterialDataSource.h>
 
-#include "flowViewport/sceneIndex/fvpPathInterface.h"
 #include <flowViewport/selection/fvpPathMapperFwd.h>
+#include <flowViewport/selection/fvpSelectionTypes.h>
 
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
@@ -49,10 +49,16 @@
 #include <pxr/imaging/hd/retainedSceneIndex.h>
 #include "pxr/imaging/hd/dirtyBitsTranslator.h"
 
+#include <ufe/ufe.h>
+
 #include <unordered_map>
 
 namespace FVP_NS_DEF {
 class RenderIndexProxy;
+}
+
+UFE_NS_DEF {
+class Path;
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -91,7 +97,7 @@ TF_DECLARE_WEAK_AND_REF_PTRS(MayaHydraSceneIndex);
 /**
  * \brief MayaHydraSceneIndex is a scene index to produce the hydra scene from Maya native scene.
  */
-class MAYAHYDRALIB_API MayaHydraSceneIndex : public HdRetainedSceneIndex, public Fvp::PathInterface
+class MAYAHYDRALIB_API MayaHydraSceneIndex : public HdRetainedSceneIndex
 {
 public:
     enum RebuildFlags : uint32_t
@@ -163,6 +169,12 @@ public:
     void SetLightsEnabled(const bool enabled) { _lightsEnabled = enabled; }
     bool GetLightsEnabled() const { return _lightsEnabled; }
 
+    // Enable or disable shadows
+    void SetShadowsEnabled(const bool enabled) { _shadowsEnabled = enabled; }
+
+    // Update ShadowCollection for lights
+    void UpdateLightsShadowCollection();
+
     // Enable or disable default lighting
     void SetDefaultLightEnabled(const bool enabled);
     bool GetDefaultLightEnabled() const { return _useMayaDefaultLight; }
@@ -192,15 +204,13 @@ public:
 
     SdfPath GetPrimPath(const MDagPath& dg, bool isSprim) const;
 
-    SdfPath GetLightedPrimsRootPath() const;
-
     SdfPath GetRprimPath() const { return _rprimPath; }
 
     bool IsHdSt() const { return _isHdSt; }
 
     bool GetPlaybackRunning() const;
 
-    Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override;
+    Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
     Fvp::PrimSelections UfePathToPrimSelectionsLit(const Ufe::Path& appPath) const;
 
     //Sdfpath of the maya default material
@@ -261,7 +271,10 @@ public:
 
     /// Get the maya default light path to be used in filtering scene indices to recognize the default light in primitives path
     static const SdfPath& GetMayaDefaultLightPath() {return _mayaDefaultLightPath;}
-    
+
+    /// Get all paths of all lighted prims
+    void GetLightedPrimPaths(SdfPathVector& lightedPrimPaths);
+
 private:
     MayaHydraSceneIndex(
         MayaHydraInitData& initData,
@@ -305,16 +318,6 @@ private:
     void _Destroy();
 
 private:
-    // ------------------------------------------------------------------------
-    // HdSceneIndexBase implementations
-    // TODO: Reuse the implementations from HdRetainedSceneIndex with usd 23.05+
-    struct _PrimEntry
-    {
-        HdSceneIndexPrim prim;
-    };
-    using _PrimEntryTable = SdfPathTable<_PrimEntry>;
-    _PrimEntryTable _entries;
-
     SdfPath _ID;
     MayaHydraParams _params;
 
@@ -356,6 +359,8 @@ private:
     bool _xRayEnabled = false;
     bool _isPlaybackRunning = false;
     bool _lightsEnabled = true;
+    bool _shadowsEnabled = true;
+    bool _renderCollectionChanged = false;
     bool _isHdSt = false;
 
     SdfPath _rprimPath;
