@@ -18,7 +18,7 @@
 
 //Local headers
 #include "flowViewport/api.h"
-#include "sceneIndex/fvpPathInterface.h"
+#include "flowViewport/selection/fvpSelectionTypes.h"
 
 //Hydra headers
 #include <pxr/usd/sdf/path.h>

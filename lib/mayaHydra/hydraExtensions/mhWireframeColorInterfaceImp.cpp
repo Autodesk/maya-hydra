@@ -60,7 +60,12 @@ MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getS
 MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getSelectionState(const Fvp::PrimSelection& primSelection) const
 {
     if (_selection->HasFullySelectedAncestorInclusive(primSelection.primPath)){
-        return (_leadObjectPathTracker->isLeadObjectSelection(primSelection)) ? kLead : kActive;
+        auto pt = _leadObjectPathTracker.lock();
+        if (!pt) {
+            TF_WARN("Illegal access to path tracker in %s, wireframe color will be incorrect.", TF_FUNC_NAME().data());
+            return kDormant;
+        }
+        return (pt->isLeadObjectSelection(primSelection)) ? kLead : kActive;
     }
     
     return kDormant;

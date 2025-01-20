@@ -20,8 +20,8 @@
 #include "mayaHydraLib/api.h"
 
 // Flow Viewport Toolkit headers.
-#include "flowViewport/sceneIndex/fvpPathInterface.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+#include "flowViewport/selection/fvpSelectionTypes.h"
 
 //Usd/Hydra headers
 #include <pxr/imaging/hd/filteringSceneIndex.h>
