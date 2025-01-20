@@ -457,69 +457,6 @@ QPoint getPrimMouseCoords(const HdSceneIndexPrim& prim, M3dView& view)
     return QPoint(viewportX, view.portHeight() - viewportY);
 }
 
-// This method takes in a path to a prim in a selection highlight hierarchy and ensures that 
-// the selection highlight graph is structured properly, and that the leaf mesh prims have
-// the proper display style.
-void assertSelectionHighlightCorrectness(
-    const HdSceneIndexBaseRefPtr& sceneIndex,
-    const SdfPath& primPath,
-    const std::string& selectionHighlightMirrorTag,
-    const TfToken& leafDisplayStyle)
-{
-    auto getHierarchyRoots = [](const HdSceneIndexPrim& prim) -> VtArray<SdfPath> {
-        HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-        return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() 
-            ? instancedBy.GetPrototypeRoots()->GetTypedValue(0) 
-            : VtArray<SdfPath>({SdfPath::AbsoluteRootPath()});
-    };
-    auto getRefinedReprToken = [](const HdSceneIndexPrim& prim) -> TfToken {
-        HdLegacyDisplayStyleSchema displayStyle = HdLegacyDisplayStyleSchema::GetFromParent(prim.dataSource);
-        if (!displayStyle.IsDefined() || !displayStyle.GetReprSelector()) {
-            return {};
-        }
-        auto reprSelectors = displayStyle.GetReprSelector()->GetTypedValue(0);
-        EXPECT_EQ(reprSelectors.size(), 3u); // refined, unrefined, points
-        return reprSelectors.empty() ? TfToken() : reprSelectors.front();
-    };
-    
-    HdSceneIndexPrimView primView(sceneIndex, primPath);
-    for (auto itPrim = primView.begin(); itPrim != primView.end(); ++itPrim) {
-        const SdfPath& currPath = *itPrim;
-        HdSceneIndexPrim currPrim = sceneIndex->GetPrim(currPath);
-
-        // Same check as in WireframeSelectionHighlightSceneIndex::_ForEachPrimInHierarchy
-        VtArray<SdfPath> currPrimRoots = getHierarchyRoots(currPrim);
-        bool sharesHierarchy = std::find_if(currPrimRoots.begin(), currPrimRoots.end(), [primPath](const auto& currPrimRoot) -> bool {
-            return primPath.HasPrefix(currPrimRoot);
-        }) != currPrimRoots.end();
-        if (!sharesHierarchy) {
-            itPrim.SkipDescendants();
-            continue;
-        }
-
-        if (currPrim.primType == HdPrimTypeTokens->instancer) {
-            HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(currPrim.dataSource);
-            ASSERT_TRUE(instancerTopology.IsDefined());
-            ASSERT_NE(instancerTopology.GetPrototypes(), nullptr);
-            auto prototypePaths = instancerTopology.GetPrototypes()->GetTypedValue(0);
-            EXPECT_GE(prototypePaths.size(), 1u);
-            for (const auto& prototypePath : prototypePaths) {
-                auto prototypeName = prototypePath.GetElementString();
-                // Ensure prototype is a selection highlight mirror
-                ASSERT_GT(prototypeName.size(), selectionHighlightMirrorTag.size());
-                EXPECT_EQ(prototypeName.substr(prototypeName.size() - selectionHighlightMirrorTag.size()), selectionHighlightMirrorTag);
-                assertSelectionHighlightCorrectness(sceneIndex, prototypePath, selectionHighlightMirrorTag, leafDisplayStyle);
-            }
-            itPrim.SkipDescendants();
-            continue;
-        }
-
-        if (currPrim.primType == HdPrimTypeTokens->mesh) {
-            EXPECT_EQ(getRefinedReprToken(currPrim), leafDisplayStyle);
-        }
-    }
-}
-
 bool visibility(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)
 {
     auto prim = sceneIndex->GetPrim(primPath);

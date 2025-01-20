@@ -1,7 +1,6 @@
 #include "geomSubsetWhSi.h"
 #include <flowViewport/fvpUtils.h>
 #include "baseWhSi.h"
-#include "baseWireframeHighlightSi.h"
 #include <pxr/base/gf/vec4f.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/geomSubsetSchema.h>

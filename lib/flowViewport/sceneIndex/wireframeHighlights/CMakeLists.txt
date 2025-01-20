@@ -3,12 +3,6 @@
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME}
     PRIVATE
-    baseWireframeHighlightSi.cpp
-    meshWireframeHighlightSi.cpp
-    piInstancerWireframeHighlightSi.cpp
-    piPrototypeWireframeHighlightSi.cpp
-    niInstanceWireframeHighlightSi.cpp
-    niPrototypeWireframeHighlightSi.cpp
     baseWhSi.cpp
     geomSubsetWhSi.cpp
     meshWhSi.cpp
@@ -19,12 +13,6 @@ target_sources(${TARGET_NAME}
 )
 
 set(HEADERS
-    baseWireframeHighlightSi.h
-    meshWireframeHighlightSi.h
-    piInstancerWireframeHighlightSi.h
-    piPrototypeWireframeHighlightSi.h
-    niInstanceWireframeHighlightSi.h
-    niPrototypeWireframeHighlightSi.h
     baseWhSi.h
     geomSubsetWhSi.h
     meshWhSi.h

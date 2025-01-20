@@ -10,7 +10,6 @@ target_sources(${TARGET_NAME}
     fvpRenderIndexProxy.cpp
     fvpSceneIndexUtils.cpp
     fvpSelectionSceneIndex.cpp
-    fvpWireframeSelectionHighlightSceneIndex.cpp
     fvpDisplayStyleOverrideSceneIndex.cpp
     fvpPruneTexturesSceneIndex.cpp
     fvpBBoxSceneIndex.cpp
@@ -29,7 +28,6 @@ set(HEADERS
     fvpRenderIndexProxyFwd.h
     fvpSceneIndexUtils.h
     fvpSelectionSceneIndex.h
-    fvpWireframeSelectionHighlightSceneIndex.h
     fvpDisplayStyleOverrideSceneIndex.h
     fvpPruneTexturesSceneIndex.h
     fvpBBoxSceneIndex.h

@@ -44,7 +44,6 @@
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/selection/fvpSelectionTask.h>
 #include <flowViewport/selection/fvpSelection.h>
-#include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h>
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
 #include <flowViewport/sceneIndex/fvpIsolateSelectSceneIndex.h>
@@ -1266,35 +1265,28 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
     _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false, _globals.delegateParams.refineLevel);
 
-    //_wireframeSelectionHighlightSceneIndex = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection, _wireframeColorInterfaceImp));
-    //_wireframeSelectionHighlightSceneIndex->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
-    //
-    //// At time of writing, wireframe selection highlighting of Maya native data
-    //// is done by Maya at render item creation time, so avoid double wireframe
-    //// selection highlighting.
-    //_wireframeSelectionHighlightSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
-    //_lastFilteringSceneIndexBeforeCustomFiltering  = _wireframeSelectionHighlightSceneIndex;
-
     // Setup selection highlight scene indices
     {
-        SdfPath highlightHierarchyPrefix = SdfPath("/FlowViewportSelectionHighlights");
+        //// At time of writing, wireframe selection highlighting of Maya native data
+        //// is done by Maya at render item creation time, so avoid double wireframe
+        //// selection highlighting by excluding MAYA_NATIVE_ROOT.
         
-        _lastFilteringSceneIndexBeforeCustomFiltering = _geomSubsetWhSi = Fvp::GeomSubsetWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _lastFilteringSceneIndexBeforeCustomFiltering = _geomSubsetWhSi = Fvp::GeomSubsetWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _geomSubsetWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
 
-        _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _meshWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
         
-        _lastFilteringSceneIndexBeforeCustomFiltering = _niInstanceWhSi = Fvp::NiInstanceWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _lastFilteringSceneIndexBeforeCustomFiltering = _niInstanceWhSi = Fvp::NiInstanceWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _niInstanceWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
         
-        _lastFilteringSceneIndexBeforeCustomFiltering = _niPrototypeWhSi = Fvp::NiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _lastFilteringSceneIndexBeforeCustomFiltering = _niPrototypeWhSi = Fvp::NiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _niPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
 
-        _lastFilteringSceneIndexBeforeCustomFiltering = _piInstancerWhSi = Fvp::PiInstancerWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _lastFilteringSceneIndexBeforeCustomFiltering = _piInstancerWhSi = Fvp::PiInstancerWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _piInstancerWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
 
-        _lastFilteringSceneIndexBeforeCustomFiltering = _piPrototypeWhSi = Fvp::PiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _lastFilteringSceneIndexBeforeCustomFiltering = _piPrototypeWhSi = Fvp::PiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _piPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
     }
     
@@ -1568,7 +1560,7 @@ void MtohRenderOverride::_PickByRegion(
     pickParams.viewMatrix.Set(viewMatrix.matrix);
     pickParams.projectionMatrix.Set(adjustedProjMatrix.matrix);
     pickParams.collection = _renderCollection;
-    //pickParams.collection.SetExcludePaths(_wireframeSelectionHighlightSceneIndex->GetSelectionHighlightMirrorPaths());
+    pickParams.collection.SetExcludePaths({_highlightHierarchyPrefix});
     pickParams.outHits = &outHits;
     
     if (geomSubsetsPickMode == GeomSubsetsPickModeTokens->Faces) {
@@ -1581,8 +1573,7 @@ void MtohRenderOverride::_PickByRegion(
         // Exclude selected Rprims to avoid self-snapping issue.
         pickParams.collection = _pointSnappingCollection;
         auto excludePaths = _selectionSceneIndex->GetFullySelectedPaths();
-        //auto selectionHighlightPaths = _wireframeSelectionHighlightSceneIndex->GetSelectionHighlightMirrorPaths();
-        //excludePaths.insert(excludePaths.end(), selectionHighlightPaths.begin(), selectionHighlightPaths.end());
+        excludePaths.push_back(_highlightHierarchyPrefix);
         pickParams.collection.SetExcludePaths(excludePaths);
     }
 
