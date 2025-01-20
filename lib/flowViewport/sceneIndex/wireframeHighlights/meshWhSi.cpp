@@ -171,7 +171,11 @@ void MeshWhSi::_CreateSelectionHighlight(const SdfPath& meshPath)
 
     // Send notifications
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
-    addedPrims.emplace_back(meshPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), GetInputSceneIndex()->GetPrim(meshPath).primType);
+    auto operation = [&addedPrims, selectionPath](const pxr::SdfPath& primPath, const pxr::HdSceneIndexPrim& prim) -> bool {
+        addedPrims.emplace_back(primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), prim.primType);
+        return true;
+    };
+    ForEachPrimInHierarchy(meshPath, operation);
     _SendPrimsAdded(addedPrims);
 }
 

@@ -268,8 +268,6 @@ void NiPrototypeWhSi::_CreateSelectionHighlight(const PXR_NS::SdfPath& prototype
         return true;
     };
     ForEachPrimInHierarchy(prototypePath, operation);
-
-    // Send notifications
     _SendPrimsAdded(addedPrims);
 }
 

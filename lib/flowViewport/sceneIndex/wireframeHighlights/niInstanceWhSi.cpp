@@ -253,8 +253,6 @@ void NiInstanceWhSi::_CreateSelectionHighlight(const SdfPath& instancePath)
         return true;
     };
     ForEachPrimInHierarchy(prototypePath, operation);
-
-    // Send notifications
     _SendPrimsAdded(addedPrims);
 }
 
