@@ -16,29 +16,13 @@
 #define FVP_NI_INSTANCE_WH_SI_H
 
 #include "baseWhSi.h"
-#include "flowViewport/api.h"
-#include "flowViewport/selection/fvpSelectionFwd.h"
-#include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
-#include "flowViewport/fvpWireframeColorInterface.h"
-#include "flowViewport/sceneIndex/wireframeHighlights/baseWhSi.h"
-
-#include <pxr/base/gf/vec4f.h>
-#include <pxr/imaging/hd/filteringSceneIndex.h>
-#include <pxr/imaging/hd/instancerTopologySchema.h>
-#include <pxr/imaging/hd/retainedDataSource.h>
-#include <pxr/imaging/hd/retainedSceneIndex.h>
-#include <pxr/imaging/hd/selectionsSchema.h>
-#include <pxr/usd/sdf/path.h>
-
-#include <functional>
-#include <set>
-#include <unordered_map>
-
-// Each WhSi handles the highlighting for all selections for a given type of prim. i.e. instancer and instance selections both occur on the same instancer prim, therefore
-//these two types of selection should be handled by the same scene index. Why? Because the selections can change order unpredictably, so two separate scene indices would have
-// to account for this. Actually this can totally be done without using the same scene index so forget it.
 
 namespace FVP_NS_DEF {
+
+struct NativeInstanceSelectionData {
+    PrimSelection _primSelection;
+    PXR_NS::SdfPath _prototypePath;
+};
 
 // Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
 // type in PXR_NS.
@@ -46,16 +30,7 @@ class NiInstanceWhSi;
 typedef PXR_NS::TfRefPtr<NiInstanceWhSi> NiInstanceWhSiRefPtr;
 typedef PXR_NS::TfRefPtr<const NiInstanceWhSi> NiInstanceWhSiConstRefPtr;
 
-struct NativeInstanceSelectionData {
-    PrimSelection _primSelection;
-    PXR_NS::SdfPath _prototypePath;
-};
-
 /// \class NiInstanceWhSi
-///
-/// Uses Hydra HdRepr to add wireframe representation to selected objects
-/// and their descendants.
-///
 class NiInstanceWhSi 
     : public BaseWhSi
 {
@@ -103,9 +78,9 @@ protected:
     void ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected) override;
 
 private:
+    std::set<PXR_NS::SdfPath> _instancePaths;
     std::map<PXR_NS::SdfPath, PXR_NS::SdfPathSet> _prototypePathsToSelectionPaths;
     std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _selectionPathsToPrototypePrefixes;
-    std::set<PXR_NS::SdfPath> _instancePaths;
 
     void _CreateSelectionHighlight(const PXR_NS::SdfPath& instancePath);
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& instancePath);

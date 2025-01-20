@@ -16,19 +16,12 @@
 #ifndef FVP_BASE_WH_SI_H
 #define FVP_BASE_WH_SI_H
 
-#include "flowViewport/api.h"
-#include "flowViewport/selection/fvpSelectionFwd.h"
-#include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
-#include "flowViewport/fvpWireframeColorInterface.h"
+#include <flowViewport/api.h>
+#include <flowViewport/fvpWireframeColorInterface.h>
+#include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
-#include <pxr/imaging/hd/instancerTopologySchema.h>
-#include <pxr/imaging/hd/retainedDataSource.h>
-#include <pxr/imaging/hd/retainedSceneIndex.h>
-#include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/selectionSchema.h>
-#include <pxr/imaging/hd/selectionsSchema.h>
-#include <pxr/usd/sdf/path.h>
 
 #include <functional>
 #include <set>

@@ -14,34 +14,14 @@
 //
 
 #include "niInstanceWhSi.h"
-#include <flowViewport/fvpUtils.h>
-#include "baseWhSi.h"
-#include <pxr/base/gf/vec4f.h>
+
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
-#include <pxr/imaging/hd/dataSource.h>
-#include <pxr/imaging/hd/instanceIndicesSchema.h>
-#include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
+#include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
-#include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
-#include <pxr/imaging/hd/sceneIndex.h>
-#include <pxr/imaging/hd/overlayContainerDataSource.h>
-#include <pxr/imaging/hd/primvarsSchema.h>
-#include <pxr/imaging/hd/sceneIndexObserver.h>
-#include <pxr/imaging/hd/sceneIndexPrimView.h>
-#include <pxr/imaging/hd/selectionSchema.h>
-#include <pxr/imaging/hd/selectionsSchema.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/xformSchema.h>
-#include <pxr/pxr.h>
-#include <pxr/usd/sdf/path.h>
-#include <pxr/usd/sdf/pathTable.h>
-
-#include <algorithm>
-#include <iostream>
-#include <iterator>
-#include <string>
-#include <utility>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

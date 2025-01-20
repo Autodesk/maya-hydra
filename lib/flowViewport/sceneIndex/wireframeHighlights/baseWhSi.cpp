@@ -17,26 +17,23 @@
 
 #include <flowViewport/fvpUtils.h>
 
-#include <pxr/base/tf/staticTokens.h>
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/staticTokens.h>
+#include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/geomSubsetSchema.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
-#include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
-#include <pxr/imaging/hd/containerDataSourceEditor.h>
-#include <pxr/imaging/hd/sceneIndex.h>
+#include <pxr/imaging/hd/primvarSchema.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
-#include <pxr/imaging/hd/primvarsSchema.h>
-#include <pxr/pxr.h>
 
 #include <unordered_set>
 
