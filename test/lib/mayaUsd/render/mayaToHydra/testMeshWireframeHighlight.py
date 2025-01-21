@@ -26,8 +26,8 @@ class TestMeshWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
     _stagePathSegment = "|cubesHierarchy|cubesHierarchyShape"
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.1
-    IMAGE_DIFF_FAIL_PERCENT = 0.3
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.05
+    IMAGE_DIFF_FAIL_PERCENT = 1
 
     def loadUsdScene(self):
         import usdUtils
