@@ -113,6 +113,7 @@ void MeshWhSi::ProcessRemovedPrims(
 {
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
+        // Delete all selection highlights for meshes rooted under the removed prim
         auto itMesh = _meshPaths.lower_bound(entry.primPath);
         while (itMesh != _meshPaths.end() && itMesh->HasPrefix(entry.primPath)) {
             _DeleteSelectionHighlight(*itMesh);
@@ -128,7 +129,7 @@ void MeshWhSi::ProcessDirtiedPrims(
 {
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
-        // Propagate changes to the mesh and its children (needed for wireframe color updates)
+        // Propagate changes to the mesh and its children
         auto itMeshHighlights = _primPathsToSelections.upper_bound(entry.primPath);
         if (itMeshHighlights != _primPathsToSelections.begin()) {
             --itMeshHighlights;

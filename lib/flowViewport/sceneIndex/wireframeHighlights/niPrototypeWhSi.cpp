@@ -214,6 +214,7 @@ void NiPrototypeWhSi::ProcessDirtiedPrims(
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
             if (_IsNativePrototype(GetInputSceneIndex(), entry.primPath)) {
+                // Selection changed on the prototype; rebuild the highlights
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
                     const auto selectionKeysToDelete = existingSelectionKeys->second;

@@ -114,6 +114,7 @@ void GeomSubsetWhSi::ProcessRemovedPrims(
 {
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
+        // Delete all selection highlights for geomSubsets rooted under the removed prim
         std::set<SdfPath> highlightedGeomSubsetPathsToDelete;
         auto itGeomSubsetSelections = _primPathsToSelections.lower_bound(entry.primPath);
         while (itGeomSubsetSelections != _primPathsToSelections.end() && itGeomSubsetSelections->first.HasPrefix(entry.primPath)) {
@@ -135,8 +136,8 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
 {
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
+        // Forward dirty notifications to the highlight mesh
         if (_primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end()) {
-            // Dirty prototype prim (to update highlight color)
             auto selectionPath = SelectionPathFromKey(SelectionKey(entry.primPath, ""));
             auto originalMeshPath = entry.primPath.GetParentPath();
             highlightEntries.emplace_back(originalMeshPath.ReplacePrefix(originalMeshPath.GetParentPath(), selectionPath), entry.dirtyLocators);

@@ -144,6 +144,7 @@ void NiInstanceWhSi::ProcessRemovedPrims(
 {
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
+        // Delete all selection highlights for instances rooted under the removed prim
         auto itInstance = _instancePaths.lower_bound(entry.primPath);
         while (itInstance != _instancePaths.end() && itInstance->HasPrefix(entry.primPath)) {
             _DeleteSelectionHighlight(*itInstance);
@@ -181,20 +182,11 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
 {
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
-        if (_primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end()) {
-            // If instance structure was dirtied, rebuild the highlight
-            if (entry.dirtyLocators.Intersects(HdInstanceSchema::GetDefaultLocator())) {
-                _DeleteSelectionHighlight(entry.primPath);
-                _CreateSelectionHighlight(entry.primPath);
-            }
-            // Dirty prototype prims (to update highlight color)
-            auto selectionPath = SelectionPathFromKey(SelectionKey(entry.primPath, ""));
-            auto dirtyOperation = [&](const SdfPath& primPath, const HdSceneIndexPrim& prim) -> bool {
-                highlightEntries.emplace_back(primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath), entry.dirtyLocators);
-                return true;
-            };
-            auto prototypePath = _GetNativeInstancePrototypePath(GetInputSceneIndex(), entry.primPath);
-            ForEachPrimInHierarchy(prototypePath, dirtyOperation);
+        // If instance structure was dirtied, rebuild the highlight
+        if (_primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end()
+            && entry.dirtyLocators.Intersects(HdInstanceSchema::GetDefaultLocator())) {
+            _DeleteSelectionHighlight(entry.primPath);
+            _CreateSelectionHighlight(entry.primPath);
         }
         
         // Propagate notifications to the prototype highlight if the dirtied prim is a relevant prototype or a subprim of one

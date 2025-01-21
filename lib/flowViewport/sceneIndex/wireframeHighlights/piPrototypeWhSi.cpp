@@ -242,7 +242,7 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
             if (_IsPointInstancePrototype(GetInputSceneIndex(), entry.primPath)) {
-                // Selection changed on the prototype; rebuild the highlight
+                // Selection changed on the prototype; rebuild the highlights
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
                     const auto selectionKeysToDelete = existingSelectionKeys->second;

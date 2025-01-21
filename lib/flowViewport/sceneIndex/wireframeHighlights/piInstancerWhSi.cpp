@@ -247,6 +247,7 @@ void PiInstancerWhSi::ProcessRemovedPrims(
 {
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
+        // Delete all selection highlights for point instancers rooted under the removed prim
         auto itPointInstancer = _pointInstancerPaths.lower_bound(entry.primPath);
         while (itPointInstancer != _pointInstancerPaths.end() && itPointInstancer->HasPrefix(entry.primPath)) {
             itPointInstancer = _pointInstancerPaths.erase(itPointInstancer);
@@ -321,7 +322,7 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
             if (_IsPointInstancer(prim)) {
-                // Selection changed on the instancer; rebuild the highlight
+                // Selection changed on the instancer; rebuild the highlights
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
                     const auto selectionKeysToDelete = existingSelectionKeys->second;
