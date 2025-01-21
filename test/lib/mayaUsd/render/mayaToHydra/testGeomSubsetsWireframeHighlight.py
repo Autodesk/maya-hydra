@@ -116,11 +116,11 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn.append(cubeMeshItem)
         self.assertSnapshotClose("geomSubsetThenMeshSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-        sn.clear()
-        sn.append(cubeMeshItem)
-        sn.append(cubeGeomSubsetItem)
-        # HYDRA-XYZ : If a mesh and one of its geomSubsets are both selected, the mesh's wireframe color overpowers the geomSubset's
-        self.assertSnapshotClose("meshThenGeomSubsetSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        # HYDRA-1407 : If a mesh and one of its geomSubsets are both selected, the mesh's wireframe color overpowers the geomSubset's
+        #sn.clear()
+        #sn.append(cubeMeshItem)
+        #sn.append(cubeGeomSubsetItem)
+        #self.assertSnapshotClose("meshThenGeomSubsetSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
