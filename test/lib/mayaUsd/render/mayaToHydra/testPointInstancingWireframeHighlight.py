@@ -113,8 +113,8 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
-        prototypePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube/Geom/Cube"
-        prototypeParentPath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube"
+        prototypePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/Cube/Geom/Cube"
+        prototypeParentPath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/Cube"
 
         prototypeItem = ufe.Hierarchy.createItem(ufe.PathString.path(prototypePath))
         prototypeParentItem = ufe.Hierarchy.createItem(ufe.PathString.path(prototypeParentPath))
@@ -187,8 +187,8 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
-        cubePrototypePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube/Geom/Cube"
-        pyramidPrototypePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/BluePyramid/Geom/Pyramid"
+        cubePrototypePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/Cube/Geom/Cube"
+        pyramidPrototypePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/Pyramid/Geom/Pyramid"
 
         cubePrototypeItem = ufe.Hierarchy.createItem(ufe.PathString.path(cubePrototypePath))
         pyramidPrototypeItem = ufe.Hierarchy.createItem(ufe.PathString.path(pyramidPrototypePath))
