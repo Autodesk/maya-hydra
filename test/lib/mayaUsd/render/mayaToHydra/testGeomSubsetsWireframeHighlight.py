@@ -47,6 +47,7 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         cmds.optionVar(
                 sv=('mayaHydra_GeomSubsetsPickMode', 'Faces'))
         self.setBasicCam(5)
+        self.modifyDefaultLightIntensityByUsdVersion()
         cmds.refresh()
 
     def test_SimpleGeomSubset(self):

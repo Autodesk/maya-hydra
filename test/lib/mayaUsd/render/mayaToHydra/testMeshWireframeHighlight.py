@@ -33,12 +33,14 @@ class TestMeshWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         import usdUtils
         usdScenePath = testUtils.getTestScene('testMeshWireframeHighlight', 'cubesHierarchy.usda')
         usdUtils.createStageFromFile(usdScenePath)
-        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
-        cmds.setAttr('persp.translate', 2, 2, 2, type='float3')
 
     def setUp(self):
         super(TestMeshWireframeHighlight, self).setUp()
         self.loadUsdScene()
+        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
+        cmds.setAttr('persp.translate', 2, 2, 2, type='float3')
+        self.modifyDefaultLightIntensityByUsdVersion()
+        cmds.refresh()
 
     def test_MeshSelection(self):
         sn = ufe.GlobalSelection.get()

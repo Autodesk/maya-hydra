@@ -33,12 +33,14 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         import usdUtils
         usdScenePath = testUtils.getTestScene('testNativeInstancingWireframeHighlight', 'instancedCubeHierarchies.usda')
         usdUtils.createStageFromFile(usdScenePath)
-        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
-        cmds.setAttr('persp.translate', 3, 3, 3, type='float3')
 
     def setUp(self):
         super(TestNativeInstancingWireframeHighlight, self).setUp()
         self.loadUsdScene()
+        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
+        cmds.setAttr('persp.translate', 3, 3, 3, type='float3')
+        self.modifyDefaultLightIntensityByUsdVersion()
+        cmds.refresh()
 
     def test_InstanceSelection(self):
         sn = ufe.GlobalSelection.get()

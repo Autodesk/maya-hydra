@@ -36,6 +36,8 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     def setUp(self):
         super(TestPointInstancingWireframeHighlight, self).setUp()
         self.loadUsdScene()
+        self.modifyDefaultLightIntensityByUsdVersion()
+        cmds.refresh()
 
     def test_PointInstancerSelection(self):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
