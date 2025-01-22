@@ -174,6 +174,7 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::DisableIsolateSel
 )
 {
     _isolateSelection[viewportId] = nullptr;
+    _isolateSelectSceneIndex->SetViewport(viewportId, nullptr);
 }
 
 SelectionPtr
