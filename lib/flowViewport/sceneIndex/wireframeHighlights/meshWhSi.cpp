@@ -20,10 +20,6 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace {
-
-}
-
 namespace FVP_NS_DEF {
 
 MeshWhSiRefPtr MeshWhSi::New(
