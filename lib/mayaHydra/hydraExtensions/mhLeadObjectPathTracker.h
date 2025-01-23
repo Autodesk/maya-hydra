@@ -46,10 +46,10 @@ public:
     ~MhLeadObjectPathTracker();
 
     MAYAHYDRALIB_API
-    bool isLeadObjectPrim(const PXR_NS::SdfPath& primPath) const;
+    bool isLeadObject(const PXR_NS::SdfPath& primPath) const;
 
     MAYAHYDRALIB_API
-    bool isLeadObjectSelection(const Fvp::PrimSelection& primSelection) const;
+    bool isLeadObject(const Fvp::PrimSelection& primSelection) const;
     
     MAYAHYDRALIB_API
     Ufe::Path getLeadObjectUfePath() const {return _leadObjectUfePath;}

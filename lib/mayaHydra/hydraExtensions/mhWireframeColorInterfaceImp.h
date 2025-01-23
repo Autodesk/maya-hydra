@@ -56,6 +56,8 @@ public:
 private:
     enum SelectionState {kLead, kActive, kDormant};
 
+    PXR_NS::GfVec4f _getWireframeColor(const SelectionState& selectionState) const;
+
     SelectionState _getSelectionState(const PXR_NS::SdfPath& primPath) const;
     SelectionState _getSelectionState(const Fvp::PrimSelection& primSelection) const;
 
