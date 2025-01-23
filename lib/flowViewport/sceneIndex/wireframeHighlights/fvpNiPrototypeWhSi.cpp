@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-#include "niPrototypeWhSi.h"
+#include "fvpNiPrototypeWhSi.h"
 
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/instancedBySchema.h>

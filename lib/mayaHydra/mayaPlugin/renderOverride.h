@@ -51,12 +51,12 @@
 #include <flowViewport/sceneIndex/fvpDefaultMaterialSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
-#include <flowViewport/sceneIndex/wireframeHighlights/geomSubsetWhSi.h>
-#include <flowViewport/sceneIndex/wireframeHighlights/meshWhSi.h>
-#include <flowViewport/sceneIndex/wireframeHighlights/niInstanceWhSi.h>
-#include <flowViewport/sceneIndex/wireframeHighlights/niPrototypeWhSi.h>
-#include <flowViewport/sceneIndex/wireframeHighlights/piInstancerWhSi.h>
-#include <flowViewport/sceneIndex/wireframeHighlights/piPrototypeWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpGeomSubsetWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpMeshWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpNiInstanceWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpNiPrototypeWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpPiInstancerWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpPiPrototypeWhSi.h>
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 

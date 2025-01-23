@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-#include "meshWhSi.h"
+#include "fvpMeshWhSi.h"
 
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/tokens.h>

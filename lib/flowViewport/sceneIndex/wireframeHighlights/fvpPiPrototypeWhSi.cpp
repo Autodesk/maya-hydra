@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-#include "piPrototypeWhSi.h"
+#include "fvpPiPrototypeWhSi.h"
 
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>

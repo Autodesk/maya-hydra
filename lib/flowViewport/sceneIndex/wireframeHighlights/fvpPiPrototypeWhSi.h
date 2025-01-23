@@ -13,48 +13,59 @@
 // limitations under the License.
 //
 
-#ifndef FVP_GEOM_SUBSET_WH_SI_H
-#define FVP_GEOM_SUBSET_WH_SI_H
+#ifndef FVP_PI_PROTOTYPE_WH_SI_H
+#define FVP_PI_PROTOTYPE_WH_SI_H
 
-#include "baseWhSi.h"
-
-#if PXR_VERSION >= 2403
+#include "fvpBaseWhSi.h"
 
 namespace FVP_NS_DEF {
 
 // Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
 // type in PXR_NS.
-class GeomSubsetWhSi;
-typedef PXR_NS::TfRefPtr<GeomSubsetWhSi> GeomSubsetWhSiRefPtr;
-typedef PXR_NS::TfRefPtr<const GeomSubsetWhSi> GeomSubsetWhSiConstRefPtr;
+class PiPrototypeWhSi;
+typedef PXR_NS::TfRefPtr<PiPrototypeWhSi> PiPrototypeWhSiRefPtr;
+typedef PXR_NS::TfRefPtr<const PiPrototypeWhSi> PiPrototypeWhSiConstRefPtr;
 
-/// \class GeomSubsetWhSi
+/// \class PiPrototypeWhSi
 ///
-/// Wireframe selection highlight scene index for geomSubset prims.
+/// Wireframe selection highlight scene index for point instance prototypes.
 ///
-/// A selection's sub-hierarchy contains only the parent mesh of
-/// the selected geomSubset, trimmed to fit the geomSubset.
+/// A selection's sub-hierarchy contains the parent prims of the prototype,
+/// the prototype itself, and its children, as well as the parent prims of each
+/// of the prototype's instancers, the instancers themselves, and their children.
 ///
 /// Highlight_<selectionIdentifier>
-/// |__<trimmedParentMesh>
+/// |__<pointInstancer1Parents>
+/// |  |__<pointInstancer1>
+/// |     |__<pointInstancer1Children>
+/// |     |__<prototypeParents>
+/// |        |__<prototype>
+/// |           |__<prototypeChildren>
+/// |__<pointInstancer2Parents>
+///    |__<pointInstancer2>
+///       |__<pointInstancer2Children>
 ///
-class GeomSubsetWhSi 
+/// While very similar to PiInstancerWhSi, this class only cares about direct prototype
+/// selections (it does not create highlights for when a prototype's parent is selected). 
+/// This class also needs to handle geomSubsets, as they can be selected prototypes.
+///
+class PiPrototypeWhSi 
     : public BaseWhSi
 {
 public:
     FVP_API
-    static GeomSubsetWhSiRefPtr New(
+    static PiPrototypeWhSiRefPtr New(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
         const PXR_NS::SdfPath& highlightHierarchyPrefix,
         const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
 
     FVP_API
-    ~GeomSubsetWhSi() override = default;
+    ~PiPrototypeWhSi() override = default;
 
 protected:
     FVP_API
-    GeomSubsetWhSi(
+    PiPrototypeWhSi(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
         const PXR_NS::SdfPath& highlightHierarchyPrefix,
         const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
@@ -80,19 +91,22 @@ protected:
     void ProcessDirtiedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
-    
-    FVP_API
-    void ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected) override;
 
 private:
-    std::set<PXR_NS::SdfPath> _geomSubsetPaths;
+    struct SelectionData {
+        PrimSelection _primSelection;
+        PXR_NS::SdfPathSet _instancerPaths;
+        PXR_NS::SdfPathSet _prototypePaths;
+    };
 
-    void _CreateSelectionHighlight(const PXR_NS::SdfPath& geomSubsetPath);
-    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& geomSubsetPath);
+    std::map<SelectionKey, SelectionData> _selections;
+    std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _instancerPathsToSelections;
+    std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _prototypePathsToSelections;
+
+    void _CreateSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);
+    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);
 };
 
 }
 
-#endif // #if PXR_VERSION >= 2403
-
-#endif // FVP_GEOM_SUBSET_WH_SI_H
+#endif // FVP_PI_PROTOTYPE_WH_SI_H

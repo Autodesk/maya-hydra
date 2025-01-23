@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-#include "piInstancerWhSi.h"
+#include "fvpPiInstancerWhSi.h"
 
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>

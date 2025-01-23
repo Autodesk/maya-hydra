@@ -12,60 +12,47 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+#ifndef FVP_NI_INSTANCE_WH_SI_H
+#define FVP_NI_INSTANCE_WH_SI_H
 
-#ifndef FVP_PI_PROTOTYPE_WH_SI_H
-#define FVP_PI_PROTOTYPE_WH_SI_H
-
-#include "baseWhSi.h"
+#include "fvpBaseWhSi.h"
 
 namespace FVP_NS_DEF {
 
 // Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
 // type in PXR_NS.
-class PiPrototypeWhSi;
-typedef PXR_NS::TfRefPtr<PiPrototypeWhSi> PiPrototypeWhSiRefPtr;
-typedef PXR_NS::TfRefPtr<const PiPrototypeWhSi> PiPrototypeWhSiConstRefPtr;
+class NiInstanceWhSi;
+typedef PXR_NS::TfRefPtr<NiInstanceWhSi> NiInstanceWhSiRefPtr;
+typedef PXR_NS::TfRefPtr<const NiInstanceWhSi> NiInstanceWhSiConstRefPtr;
 
-/// \class PiPrototypeWhSi
+/// \class NiInstanceWhSi
 ///
-/// Wireframe selection highlight scene index for point instance prototypes.
+/// Wireframe selection highlight scene index for native instances.
 ///
-/// A selection's sub-hierarchy contains the parent prims of the prototype,
-/// the prototype itself, and its children, as well as the parent prims of each
-/// of the prototype's instancers, the instancers themselves, and their children.
+/// A selection's sub-hierarchy contains the instance's prototype's root prim,
+/// and its children.
 ///
 /// Highlight_<selectionIdentifier>
-/// |__<pointInstancer1Parents>
-/// |  |__<pointInstancer1>
-/// |     |__<pointInstancer1Children>
-/// |     |__<prototypeParents>
-/// |        |__<prototype>
-/// |           |__<prototypeChildren>
-/// |__<pointInstancer2Parents>
-///    |__<pointInstancer2>
-///       |__<pointInstancer2Children>
+/// |__<prototypeRootPrim>
+///    |__<prototypeChildren>
 ///
-/// While very similar to PiInstancerWhSi, this class only cares about direct prototype
-/// selections (it does not create highlights for when a prototype's parent is selected). 
-/// This class also needs to handle geomSubsets, as they can be selected prototypes.
-///
-class PiPrototypeWhSi 
+class NiInstanceWhSi 
     : public BaseWhSi
 {
 public:
     FVP_API
-    static PiPrototypeWhSiRefPtr New(
+    static NiInstanceWhSiRefPtr New(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
         const PXR_NS::SdfPath& highlightHierarchyPrefix,
         const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
 
     FVP_API
-    ~PiPrototypeWhSi() override = default;
+    ~NiInstanceWhSi() override = default;
 
 protected:
     FVP_API
-    PiPrototypeWhSi(
+    NiInstanceWhSi(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
         const PXR_NS::SdfPath& highlightHierarchyPrefix,
         const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
@@ -91,22 +78,19 @@ protected:
     void ProcessDirtiedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
+    
+    FVP_API
+    void ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected) override;
 
 private:
-    struct SelectionData {
-        PrimSelection _primSelection;
-        PXR_NS::SdfPathSet _instancerPaths;
-        PXR_NS::SdfPathSet _prototypePaths;
-    };
+    std::set<PXR_NS::SdfPath> _instancePaths;
+    std::map<PXR_NS::SdfPath, PXR_NS::SdfPathSet> _prototypePathsToSelectionPaths;
+    std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _selectionPathsToPrototypePrefixes;
 
-    std::map<SelectionKey, SelectionData> _selections;
-    std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _instancerPathsToSelections;
-    std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _prototypePathsToSelections;
-
-    void _CreateSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);
-    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);
+    void _CreateSelectionHighlight(const PXR_NS::SdfPath& instancePath);
+    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& instancePath);
 };
 
 }
 
-#endif // FVP_PI_PROTOTYPE_WH_SI_H
+#endif // FVP_NI_INSTANCE_WH_SI_H

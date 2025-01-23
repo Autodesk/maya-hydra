@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-#include "baseWhSi.h"
+#include "fvpBaseWhSi.h"
 
 #include <flowViewport/fvpUtils.h>
 

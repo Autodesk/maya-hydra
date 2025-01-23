@@ -3,23 +3,23 @@
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME}
     PRIVATE
-    baseWhSi.cpp
-    geomSubsetWhSi.cpp
-    meshWhSi.cpp
-    niInstanceWhSi.cpp
-    niPrototypeWhSi.cpp
-    piInstancerWhSi.cpp
-    piPrototypeWhSi.cpp
+    fvpBaseWhSi.cpp
+    fvpGeomSubsetWhSi.cpp
+    fvpMeshWhSi.cpp
+    fvpNiInstanceWhSi.cpp
+    fvpNiPrototypeWhSi.cpp
+    fvpPiInstancerWhSi.cpp
+    fvpPiPrototypeWhSi.cpp
 )
 
 set(HEADERS
-    baseWhSi.h
-    geomSubsetWhSi.h
-    meshWhSi.h
-    niInstanceWhSi.h
-    niPrototypeWhSi.h
-    piInstancerWhSi.h
-    piPrototypeWhSi.h
+    fvpBaseWhSi.h
+    fvpGeomSubsetWhSi.h
+    fvpMeshWhSi.h
+    fvpNiInstanceWhSi.h
+    fvpNiPrototypeWhSi.h
+    fvpPiInstancerWhSi.h
+    fvpPiPrototypeWhSi.h
 )
 
 # -----------------------------------------------------------------------------

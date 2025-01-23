@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-#include "geomSubsetWhSi.h"
+#include "fvpGeomSubsetWhSi.h"
 
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>

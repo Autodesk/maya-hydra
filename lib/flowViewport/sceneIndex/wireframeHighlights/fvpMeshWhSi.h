@@ -13,46 +13,48 @@
 // limitations under the License.
 //
 
-#ifndef FVP_NI_PROTOTYPE_WH_SI_H
-#define FVP_NI_PROTOTYPE_WH_SI_H
+#ifndef FVP_MESH_WH_SI_H
+#define FVP_MESH_WH_SI_H
 
-#include "baseWhSi.h"
+#include "fvpBaseWhSi.h"
 
 namespace FVP_NS_DEF {
 
 // Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
 // type in PXR_NS.
-class NiPrototypeWhSi;
-typedef PXR_NS::TfRefPtr<NiPrototypeWhSi> NiPrototypeWhSiRefPtr;
-typedef PXR_NS::TfRefPtr<const NiPrototypeWhSi> NiPrototypeWhSiConstRefPtr;
+class MeshWhSi;
+typedef PXR_NS::TfRefPtr<MeshWhSi> MeshWhSiRefPtr;
+typedef PXR_NS::TfRefPtr<const MeshWhSi> MeshWhSiConstRefPtr;
 
-/// \class NiPrototypeWhSi
+/// \class MeshWhSi
 ///
-/// Wireframe selection highlight scene index for native instance prototypes.
+/// Wireframe selection highlight scene index for mesh prims.
 ///
-/// A selection's sub-hierarchy contains the prototype prim and its children.
+/// A selection's sub-hierarchy contains the parent prims
+/// of the selected mesh, the mesh itself, and its children.
 ///
 /// Highlight_<selectionIdentifier>
-/// |__<prototypePrim>
-///    |__<prototypeChildren>
+/// |__<meshParents>
+///    |__<meshPrim>
+///       |__<meshChildren>
 ///
-class NiPrototypeWhSi 
+class MeshWhSi 
     : public BaseWhSi
 {
 public:
     FVP_API
-    static NiPrototypeWhSiRefPtr New(
+    static MeshWhSiRefPtr New(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
         const PXR_NS::SdfPath& highlightHierarchyPrefix,
         const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
     );
 
     FVP_API
-    ~NiPrototypeWhSi() override = default;
+    ~MeshWhSi() override = default;
 
 protected:
     FVP_API
-    NiPrototypeWhSi(
+    MeshWhSi(
         const PXR_NS::HdSceneIndexBaseRefPtr&   inputSceneIndex,
         const PXR_NS::SdfPath& highlightHierarchyPrefix,
         const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface
@@ -78,16 +80,17 @@ protected:
     void ProcessDirtiedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
+    
+    FVP_API
+    void ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected) override;
 
 private:
-    std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _selectionPathsToPrototypePrefixes;
-    std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _selectionPathsToPrototypePaths;
-    std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _prototypePathsToSelections;
+    std::set<PXR_NS::SdfPath> _meshPaths;
 
-    void _CreateSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);
-    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId);
+    void _CreateSelectionHighlight(const PXR_NS::SdfPath& meshPath);
+    void _DeleteSelectionHighlight(const PXR_NS::SdfPath& meshPath);
 };
 
 }
 
-#endif // FVP_NI_PROTOTYPE_WH_SI_H
+#endif // FVP_MESH_WH_SI_H
