@@ -169,8 +169,6 @@ graph BT;
     ph1[Plugin highlighting 1]-->hm;
     subgraph ph[Plugin highlighting]
         ph2[Plugin highlighting 2]-->ph1;
-        roSn[/Read-only Selection/]-.->ph1;
-        roSn-.->ph2;
     end
     snSi[Selection scene index]-->ph2;
     dpm[Data producer merge]-->snSi;
