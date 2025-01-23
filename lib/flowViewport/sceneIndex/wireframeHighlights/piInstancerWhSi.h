@@ -50,6 +50,9 @@ typedef PXR_NS::TfRefPtr<const PiInstancerWhSi> PiInstancerWhSiConstRefPtr;
 ///
 /// Specific instance selections are handled by applying a mask on the instancer highlight.
 ///
+/// While very similar to PiPrototypeWhSi, this class also needs to create highlights when 
+/// a parent of an instancer is selected, which is why the _pointInstancerPaths set exists.
+///
 class PiInstancerWhSi 
     : public BaseWhSi
 {

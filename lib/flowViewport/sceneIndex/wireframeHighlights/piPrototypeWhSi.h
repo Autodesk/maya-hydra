@@ -45,6 +45,10 @@ typedef PXR_NS::TfRefPtr<const PiPrototypeWhSi> PiPrototypeWhSiConstRefPtr;
 ///    |__<pointInstancer2>
 ///       |__<pointInstancer2Children>
 ///
+/// While very similar to PiInstancerWhSi, this class only cares about direct prototype
+/// selections (it does not create highlights for when a prototype's parent is selected). 
+/// This class also needs to handle geomSubsets, as they can be selected prototypes.
+///
 class PiPrototypeWhSi 
     : public BaseWhSi
 {
