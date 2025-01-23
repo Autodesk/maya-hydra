@@ -193,17 +193,16 @@ The object modeling is the following:
 - **Selection**: builtin provided by the Flow Viewport Toolkit.
     - Encapsulates the Hydra selection as scene index paths and selection data sources.
     - Is used by the selection scene index.
-    - May be used by selection highlighting scene indices.
 - **Selection scene index**: builtin provided by the Flow Viewport Toolkit.
     - Has a pointer to read and write the Hydra selection.
     - Translates the application selection to Hydra selection.
 - **Plugin data scene index**: provided by plugin.
     - Injects plugin data into Hydra
-- **Plugin selection highlighting scene index**: provided by plugin.
-    - May have a pointer to a read-only view of the Hydra selection
-    - Processes dirty selection notifications to dirty the appropriate prim(s)
-      in plugin data, including hierarchical selection highlighting
-    - Adds required geometry or data sources to implement selection
+- **Plugin selection highlighting scene indices**: provided by plugin.
+    - Process dirty selection notifications to create corresponding
+      wireframe highlights for plugin data, including hierarchical 
+      selection highlighting
+    - Add required geometry or data sources to implement selection
       highlighting
 
 ### New Path Mapper Base Class
