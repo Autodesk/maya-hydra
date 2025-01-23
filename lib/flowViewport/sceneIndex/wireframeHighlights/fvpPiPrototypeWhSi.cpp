@@ -27,8 +27,16 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-bool _IsPointInstancePrototype(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath) {
+const std::set<TfToken> kSupportedPrimTypes = {
+    HdPrimTypeTokens->mesh,
+    HdPrimTypeTokens->geomSubset
+};
+
+bool _IsSupportedPointInstancePrototype(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath) {
     HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
+    if (kSupportedPrimTypes.find(prim.primType) == kSupportedPrimTypes.cend()) {
+        return false;
+    }
     HdInstancedBySchema instancedBySchema = HdInstancedBySchema::GetFromParent(prim.dataSource);
     if (!instancedBySchema.IsDefined()) {
         return false;
@@ -108,7 +116,7 @@ PiPrototypeWhSi::PiPrototypeWhSi(
         if (IsExcludedPath(primPath)) {
             return false;
         }
-        if (_IsPointInstancePrototype(GetInputSceneIndex(), primPath)) {
+        if (_IsSupportedPointInstancePrototype(GetInputSceneIndex(), primPath)) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
             if (selectionsSchema.IsDefined()) {
@@ -128,7 +136,7 @@ void PiPrototypeWhSi::ProcessAddedPrims(
 {
     HdSceneIndexObserver::AddedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
-        if (_IsPointInstancePrototype(GetInputSceneIndex(), entry.primPath)) {
+        if (_IsSupportedPointInstancePrototype(GetInputSceneIndex(), entry.primPath)) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
             HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
             if (selectionsSchema.IsDefined()) {
@@ -241,7 +249,7 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
     for (const auto& entry : entries) {
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
-            if (_IsPointInstancePrototype(GetInputSceneIndex(), entry.primPath)) {
+            if (_IsSupportedPointInstancePrototype(GetInputSceneIndex(), entry.primPath)) {
                 // Selection changed on the prototype; rebuild the highlights
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
