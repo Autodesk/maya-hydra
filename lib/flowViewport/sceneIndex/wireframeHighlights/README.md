@@ -4,6 +4,7 @@
 The selection highlight framework is designed to fit the following requirements :
 - Each selection highlight must be able to have its own color
 - Selection highlights should not pollute the original scene index hierarchy
+- A single prim may have multiple independent selection highlights
 
 ## <u>Brief overview</u>
 The logic for wireframe highlighting is split up across multiple scene indices, 
