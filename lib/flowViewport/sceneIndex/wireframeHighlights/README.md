@@ -8,11 +8,9 @@ independent of each other. See the BaseWhSi.h doc comment for an explanation on 
 selection highlights are structured.
 
 Note that sets & maps keyed by SdfPaths are heavily used in order to accelerate 
-finding the children and/or parents of paths among a given collection of independent 
-paths (independent meaning no two paths in the collection have a parent/child 
-relationship). Generally speaking, lower_bound will be used to find children of a given 
-path (or the path itself), while upper_bound followed by an iterator decrement will 
-be used to find a parent of a path.
+finding the children and/or parents of paths among a given collection of paths
+by leveraging SdfPaths' lexicographical ordering. Utility methods FindSelfOrFirstChild 
+and FindSelfOrFirstParent are provided in fvpUtils.h to make this process less tedious.
 
 ## <u>Testing</u>
 Highlighting tests use image-based tests, as we don't care all that much about how the 
