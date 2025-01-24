@@ -29,7 +29,9 @@ namespace {
 
 const std::set<TfToken> kSupportedPrimTypes = {
     HdPrimTypeTokens->mesh,
-    HdPrimTypeTokens->geomSubset
+#if PXR_VERSION >= 2403
+    HdPrimTypeTokens->geomSubset,
+#endif
 };
 
 bool _IsSupportedPointInstancePrototype(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath) {
