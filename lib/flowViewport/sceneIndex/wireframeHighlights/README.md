@@ -1,5 +1,10 @@
 # Flow Viewport wireframe selection highlighting scene indices
 
+## <u>Requirements</u>
+The selection highlight framework is designed to fit the following requirements :
+- Each selection highlight must be able to have its own color
+- Selection highlights should not pollute the original scene index hierarchy
+
 ## <u>Brief overview</u>
 The logic for wireframe highlighting is split up across multiple scene indices, 
 each dedicated to handling highlights for a specific type of prim. The common 
