@@ -625,15 +625,7 @@ void BaseWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool 
 
 bool BaseWhSi::HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath)
 {
-    SdfPath currPath = primPath;
-    while (!currPath.IsEmpty() && !currPath.IsAbsoluteRootPath()) {
-        if (_fullySelectedPaths.find(currPath) != _fullySelectedPaths.end()) {
-            return true;
-        } else {
-            currPath = currPath.GetParentPath();
-        }
-    }
-    return false;
+    return FindSelfOrFirstParent(primPath, _fullySelectedPaths) != _fullySelectedPaths.end();
 }
 
 void BaseWhSi::AddExcludedPath(const PXR_NS::SdfPath& path)
