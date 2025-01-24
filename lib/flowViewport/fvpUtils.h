@@ -100,11 +100,6 @@ auto FindSelfOrFirstParent(const PXR_NS::SdfPath& path, const PathContainer& con
         if (foundIt != container.cend()) {
             return foundIt;
         }
-        else if (currPath.IsAbsoluteRootPath()) {
-            // We've reached the limit. Calling GetParentPath on the
-            // AbsoluteRootPath is not reliable; return now.
-            return container.cend();
-        }
         else {
             currPath = currPath.GetParentPath();
         }
