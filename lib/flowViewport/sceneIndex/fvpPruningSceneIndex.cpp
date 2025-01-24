@@ -15,6 +15,8 @@
 
 #include "fvpPruningSceneIndex.h"
 
+#include <flowViewport/fvpUtils.h>
+
 #include <pxr/base/tf/staticTokens.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
@@ -29,19 +31,6 @@ PXR_NAMESPACE_CLOSE_SCOPE
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
-
-template<typename Container>
-bool _HasAncestorInclusiveInContainer(const SdfPath& path, const Container& pathsContainer) {
-    SdfPath currPath = path;
-    while (!currPath.IsEmpty() && !currPath.IsAbsoluteRootPath()) {
-        if (pathsContainer.find(currPath) != pathsContainer.end()) {
-            return true;
-        } else {
-            currPath = currPath.GetParentPath();
-        }
-    }
-    return false;
-}
 
 bool _MeshesFilterHandler(const HdSceneIndexBaseRefPtr& sceneIndex, const SdfPath& primPath, const HdSceneIndexPrim& prim)
 {
@@ -107,7 +96,7 @@ void PruningSceneIndex::AddExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot)
 
 bool PruningSceneIndex::_IsExcluded(const PXR_NS::SdfPath& primPath) const
 {
-    return _HasAncestorInclusiveInContainer(primPath, _excludedSceneRoots);
+    return FindSelfOrFirstParent(primPath, _excludedSceneRoots) != _excludedSceneRoots.end();
 }
 
 bool PruningSceneIndex::_PrunePrim(const SdfPath& primPath, const HdSceneIndexPrim& prim, const TfToken& pruningToken) const
@@ -131,7 +120,7 @@ bool PruningSceneIndex::_PrunePrim(const SdfPath& primPath, const HdSceneIndexPr
 
 bool PruningSceneIndex::_IsAncestorPrunedInclusive(const SdfPath& primPath) const
 {
-    return _HasAncestorInclusiveInContainer(primPath, _filtersByPrunedPath);
+    return FindSelfOrFirstParent(primPath, _filtersByPrunedPath) != _filtersByPrunedPath.end();
 }
 
 HdSceneIndexPrim PruningSceneIndex::GetPrim(const SdfPath& primPath) const
