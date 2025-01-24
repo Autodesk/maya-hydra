@@ -491,8 +491,8 @@ BaseWhSi::BaseWhSi(
 HdSceneIndexPrim BaseWhSi::GetPrim(const PXR_NS::SdfPath &primPath) const
 {
     if (primPath.HasPrefix(_highlightHierarchyPrefix) && !_selectionPaths.empty()) {
-        auto it = _selectionPaths.upper_bound(primPath);
-        bool isHighlightPrim = it != _selectionPaths.begin() && primPath.HasPrefix(*std::prev(it)) && primPath != *std::prev(it);
+        auto it = FindSelfOrFirstParent(primPath, _selectionPaths);
+        bool isHighlightPrim = it != _selectionPaths.end() && *it != primPath;
         if (isHighlightPrim) {
             auto selectionPath = primPath;
             while (_selectionPaths.find(selectionPath) == _selectionPaths.end()) {
@@ -570,7 +570,7 @@ void BaseWhSi::_PrimsRemoved(
     for (const auto& entry : entries) {
         if (!IsExcludedPath(entry.primPath)) {
             filteredEntries.emplace_back(entry);
-            auto itFullySelectedPath = _fullySelectedPaths.lower_bound(entry.primPath);
+            auto itFullySelectedPath = FindSelfOrFirstChild(entry.primPath, _fullySelectedPaths);
             while (itFullySelectedPath != _fullySelectedPaths.end() && itFullySelectedPath->HasPrefix(entry.primPath)) {
                 itFullySelectedPath = _fullySelectedPaths.erase(itFullySelectedPath);
             }
@@ -643,11 +643,7 @@ void BaseWhSi::AddExcludedPath(const PXR_NS::SdfPath& path)
 
 bool BaseWhSi::IsExcludedPath(const PXR_NS::SdfPath& path) const
 {
-    auto itExcludedPath = _excludedPaths.upper_bound(path);
-    if (itExcludedPath != _excludedPaths.begin() && path.HasPrefix(*std::prev(itExcludedPath))) {
-        return true;
-    }
-    return false;
+    return FindSelfOrFirstParent(path, _excludedPaths) != _excludedPaths.end();
 }
 
 SdfPath BaseWhSi::SelectionPathFromKey(const SelectionKey& selectionKey) const

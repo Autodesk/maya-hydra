@@ -115,7 +115,7 @@ void GeomSubsetWhSi::ProcessRemovedPrims(
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         // Delete all selection highlights for geomSubsets rooted under the removed prim
-        auto itGeomSubset = _geomSubsetPaths.lower_bound(entry.primPath);
+        auto itGeomSubset = FindSelfOrFirstChild(entry.primPath, _geomSubsetPaths);
         while (itGeomSubset != _geomSubsetPaths.end() && itGeomSubset->HasPrefix(entry.primPath)) {
             _DeleteSelectionHighlight(*itGeomSubset);
             itGeomSubset = _geomSubsetPaths.erase(itGeomSubset);

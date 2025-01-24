@@ -152,10 +152,12 @@ SdfPathVector PiInstancerWhSi::GetHighlightChildPrimPaths(const SdfPath &selecti
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
     auto originalChildPaths = GetInputSceneIndex()->GetChildPrimPaths(originalPath);
     for (const auto& originalChildPath : originalChildPaths) {
-        auto itInstancer = _instancerPathsToSelections.upper_bound(originalChildPath);
-        bool isInstancerRelevantPath = (itInstancer != _instancerPathsToSelections.end() && itInstancer->first.HasPrefix(originalChildPath)) || (itInstancer != _instancerPathsToSelections.begin() && originalChildPath.HasPrefix((--itInstancer)->first));
-        auto itPrototype = _prototypePathsToSelections.upper_bound(originalChildPath);
-        bool isPrototypeRelevantPath = (itPrototype != _prototypePathsToSelections.end() && itPrototype->first.HasPrefix(originalChildPath)) || (itPrototype != _prototypePathsToSelections.begin() && originalChildPath.HasPrefix((--itPrototype)->first));
+        bool isInstancerRelevantPath = 
+            FindSelfOrFirstParent(originalChildPath, _instancerPathsToSelections) != _instancerPathsToSelections.end()
+            || FindSelfOrFirstChild(originalChildPath, _instancerPathsToSelections) != _instancerPathsToSelections.end();
+        bool isPrototypeRelevantPath = 
+            FindSelfOrFirstParent(originalChildPath, _prototypePathsToSelections) != _prototypePathsToSelections.end()
+            || FindSelfOrFirstChild(originalChildPath, _prototypePathsToSelections) != _prototypePathsToSelections.end();
         if (isInstancerRelevantPath || isPrototypeRelevantPath) {
             childPaths.emplace_back(originalChildPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
         }
@@ -215,26 +217,20 @@ void PiInstancerWhSi::ProcessAddedPrims(
         }
 
         // Propagate added prims notifications for prims rooted under a relevant instancer
-        auto itInstancer = _instancerPathsToSelections.upper_bound(entry.primPath);
-        if (itInstancer != _instancerPathsToSelections.begin()) {
-            --itInstancer;
-            if (entry.primPath.HasPrefix(itInstancer->first)) {
-                for (const auto& selectionKey : itInstancer->second) {
-                    auto selectionPath = SelectionPathFromKey(selectionKey);
-                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.primType);
-                }
+        auto itInstancer = FindSelfOrFirstParent(entry.primPath, _instancerPathsToSelections);
+        if (itInstancer != _instancerPathsToSelections.end()) {
+            for (const auto& selectionKey : itInstancer->second) {
+                auto selectionPath = SelectionPathFromKey(selectionKey);
+                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.primType);
             }
         }
 
         // Propagate added prims notifications for prims rooted under a relevant prototype
-        auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
-        if (itPrototype != _prototypePathsToSelections.begin()) {
-            --itPrototype;
-            if (entry.primPath.HasPrefix(itPrototype->first)) {
-                for (const auto& selectionKey : itPrototype->second) {
-                    auto selectionPath = SelectionPathFromKey(selectionKey);
-                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.primType);
-                }
+        auto itPrototype = FindSelfOrFirstParent(entry.primPath, _prototypePathsToSelections);
+        if (itPrototype != _prototypePathsToSelections.end()) {
+            for (const auto& selectionKey : itPrototype->second) {
+                auto selectionPath = SelectionPathFromKey(selectionKey);
+                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.primType);
             }
         }
     }
@@ -248,65 +244,53 @@ void PiInstancerWhSi::ProcessRemovedPrims(
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         // Delete all selection highlights for point instancers rooted under the removed prim
-        auto itPointInstancer = _pointInstancerPaths.lower_bound(entry.primPath);
+        auto itPointInstancer = FindSelfOrFirstChild(entry.primPath, _pointInstancerPaths);
         while (itPointInstancer != _pointInstancerPaths.end() && itPointInstancer->HasPrefix(entry.primPath)) {
             itPointInstancer = _pointInstancerPaths.erase(itPointInstancer);
         }
 
         // If a parent of one the selected prims was removed, delete the selection highlight
-        auto itSelectedPrim = _primPathsToSelections.lower_bound(entry.primPath);
+        auto itSelectedPrim = FindSelfOrFirstChild(entry.primPath, _primPathsToSelections);
         if (itSelectedPrim != _primPathsToSelections.end()) {
-            if (itSelectedPrim->first.HasPrefix(entry.primPath)) {
-                const auto selectionKeysToDelete = itSelectedPrim->second;
-                for (const auto& selectionKey : selectionKeysToDelete) {
-                    _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
-                }
+            const auto selectionKeysToDelete = itSelectedPrim->second;
+            for (const auto& selectionKey : selectionKeysToDelete) {
+                _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
             }
         }
 
         // If an instancer was removed, delete the selection highlights which depended on it
-        auto itInstancerParentRemoval = _instancerPathsToSelections.lower_bound(entry.primPath);
+        auto itInstancerParentRemoval = FindSelfOrFirstChild(entry.primPath, _instancerPathsToSelections);
         if (itInstancerParentRemoval != _instancerPathsToSelections.end()) {
-            if (itInstancerParentRemoval->first.HasPrefix(entry.primPath)) {
-                const auto selectionKeysToDelete = itInstancerParentRemoval->second;
-                for (const auto& selectionKey : selectionKeysToDelete) {
-                    _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
-                }
+            const auto selectionKeysToDelete = itInstancerParentRemoval->second;
+            for (const auto& selectionKey : selectionKeysToDelete) {
+                _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
             }
         }
 
         // If a prototype was removed, delete the selection highlights which depended on it
-        auto itPrototypeParentRemoval = _prototypePathsToSelections.lower_bound(entry.primPath);
+        auto itPrototypeParentRemoval = FindSelfOrFirstChild(entry.primPath, _prototypePathsToSelections);
         if (itPrototypeParentRemoval != _prototypePathsToSelections.end()) {
-            if (itPrototypeParentRemoval->first.HasPrefix(entry.primPath)) {
-                const auto selectionKeysToDelete = itPrototypeParentRemoval->second;
-                for (const auto& selectionKey : selectionKeysToDelete) {
-                    _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
-                }
+            const auto selectionKeysToDelete = itPrototypeParentRemoval->second;
+            for (const auto& selectionKey : selectionKeysToDelete) {
+                _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
             }
         }
 
         // Propagate removed prims notifications for prims rooted under a relevant instancer
-        auto itInstancer = _instancerPathsToSelections.upper_bound(entry.primPath);
-        if (itInstancer != _instancerPathsToSelections.begin()) {
-            --itInstancer;
-            if (entry.primPath.HasPrefix(itInstancer->first)) {
-                for (const auto& selectionKey : itInstancer->second) {
-                    auto selectionPath = SelectionPathFromKey(selectionKey);
-                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
-                }
+        auto itInstancer = FindSelfOrFirstParent(entry.primPath, _instancerPathsToSelections);
+        if (itInstancer != _instancerPathsToSelections.end()) {
+            for (const auto& selectionKey : itInstancer->second) {
+                auto selectionPath = SelectionPathFromKey(selectionKey);
+                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
             }
         }
 
         // Propagate removed prims notifications for prims rooted under a relevant prototype
-        auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
-        if (itPrototype != _prototypePathsToSelections.begin()) {
-            --itPrototype;
-            if (entry.primPath.HasPrefix(itPrototype->first)) {
-                for (const auto& selectionKey : itPrototype->second) {
-                    auto selectionPath = SelectionPathFromKey(selectionKey);
-                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
-                }
+        auto itPrototype = FindSelfOrFirstParent(entry.primPath, _prototypePathsToSelections);
+        if (itPrototype != _prototypePathsToSelections.end()) {
+            for (const auto& selectionKey : itPrototype->second) {
+                auto selectionPath = SelectionPathFromKey(selectionKey);
+                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
             }
         }
     }
@@ -370,26 +354,20 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
         }
 
         // Propagate notifications if this prim is a relevant instancer or a subprim of one
-        auto itInstancer = _instancerPathsToSelections.upper_bound(entry.primPath);
-        if (itInstancer != _instancerPathsToSelections.begin()) {
-            --itInstancer;
-            if (entry.primPath.HasPrefix(itInstancer->first)) {
-                for (const auto& selectionKey : itInstancer->second) {
-                    auto selectionPath = SelectionPathFromKey(selectionKey);
-                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
-                }
+        auto itInstancer = FindSelfOrFirstParent(entry.primPath, _instancerPathsToSelections);
+        if (itInstancer != _instancerPathsToSelections.end()) {
+            for (const auto& selectionKey : itInstancer->second) {
+                auto selectionPath = SelectionPathFromKey(selectionKey);
+                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
             }
         }
 
         // Propagate notifications if this prim is a relevant prototype or a subprim of one
-        auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
-        if (itPrototype != _prototypePathsToSelections.begin()) {
-            --itPrototype;
-            if (entry.primPath.HasPrefix(itPrototype->first)) {
-                for (const auto& selectionKey : itPrototype->second) {
-                    auto selectionPath = SelectionPathFromKey(selectionKey);
-                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
-                }
+        auto itPrototype = FindSelfOrFirstParent(entry.primPath, _prototypePathsToSelections);
+        if (itPrototype != _prototypePathsToSelections.end()) {
+            for (const auto& selectionKey : itPrototype->second) {
+                auto selectionPath = SelectionPathFromKey(selectionKey);
+                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
             }
         }
     }
@@ -399,7 +377,7 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
 void PiInstancerWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)
 {
     if (isFullySelected) {
-        for (auto itPointInstancer = _pointInstancerPaths.lower_bound(primPath); itPointInstancer != _pointInstancerPaths.end() && itPointInstancer->HasPrefix(primPath); itPointInstancer++) {
+        for (auto itPointInstancer = FindSelfOrFirstChild(primPath, _pointInstancerPaths); itPointInstancer != _pointInstancerPaths.end() && itPointInstancer->HasPrefix(primPath); itPointInstancer++) {
             auto existingSelectionKeys = _primPathsToSelections.find(*itPointInstancer);
             if (existingSelectionKeys != _primPathsToSelections.end()) {
                 const auto selectionKeysToDelete = existingSelectionKeys->second;
@@ -411,7 +389,7 @@ void PiInstancerWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath
         }
     }
     else {
-        for (auto itPointInstancer = _pointInstancerPaths.lower_bound(primPath); itPointInstancer != _pointInstancerPaths.end() && itPointInstancer->HasPrefix(primPath); itPointInstancer++) {
+        for (auto itPointInstancer = FindSelfOrFirstChild(primPath, _pointInstancerPaths); itPointInstancer != _pointInstancerPaths.end() && itPointInstancer->HasPrefix(primPath); itPointInstancer++) {
             if (!HasFullySelectedAncestorInclusive(*itPointInstancer)) {
                 _DeleteSelectionHighlight(*itPointInstancer, kFullHighlight);
                 HdSceneIndexPrim pointInstancerPrim = GetInputSceneIndex()->GetPrim(*itPointInstancer);

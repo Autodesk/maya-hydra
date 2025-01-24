@@ -148,14 +148,11 @@ void NiPrototypeWhSi::ProcessAddedPrims(
             }
         }
 
-        auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
-        if (itPrototype != _prototypePathsToSelections.begin()) {
-            --itPrototype;
-            if (entry.primPath.HasPrefix(itPrototype->first)) {
-                for (const auto& selectionKey : itPrototype->second) {
-                    auto selectionPath = SelectionPathFromKey(selectionKey);
-                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath), entry.primType);
-                }
+        auto itPrototype = FindSelfOrFirstParent(entry.primPath, _prototypePathsToSelections);
+        if (itPrototype != _prototypePathsToSelections.end()) {
+            for (const auto& selectionKey : itPrototype->second) {
+                auto selectionPath = SelectionPathFromKey(selectionKey);
+                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath), entry.primType);
             }
         }
     }
@@ -169,36 +166,29 @@ void NiPrototypeWhSi::ProcessRemovedPrims(
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         // If a parent of one the selected prims was removed, delete the selection highlight
-        auto itSelectedPrim = _primPathsToSelections.lower_bound(entry.primPath);
+        auto itSelectedPrim = FindSelfOrFirstChild(entry.primPath, _primPathsToSelections);
         if (itSelectedPrim != _primPathsToSelections.end()) {
-            if (itSelectedPrim->first.HasPrefix(entry.primPath)) {
-                const auto selectionKeysToDelete = itSelectedPrim->second;
-                for (const auto& selectionKey : selectionKeysToDelete) {
-                    _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
-                }
+            const auto selectionKeysToDelete = itSelectedPrim->second;
+            for (const auto& selectionKey : selectionKeysToDelete) {
+                _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
             }
         }
 
         // If a prototype was removed, delete the selection highlights which depended on it
-        auto itPrototypeParentRemoval = _prototypePathsToSelections.lower_bound(entry.primPath);
+        auto itPrototypeParentRemoval = FindSelfOrFirstChild(entry.primPath, _prototypePathsToSelections);
         if (itPrototypeParentRemoval != _prototypePathsToSelections.end()) {
-            if (itPrototypeParentRemoval->first.HasPrefix(entry.primPath)) {
-                const auto selectionKeysToDelete = itPrototypeParentRemoval->second;
-                for (const auto& selectionKey : selectionKeysToDelete) {
-                    _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
-                }
+            const auto selectionKeysToDelete = itPrototypeParentRemoval->second;
+            for (const auto& selectionKey : selectionKeysToDelete) {
+                _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
             }
         }
 
         // Propagate removed prototype subprims
-        auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
-        if (itPrototype != _prototypePathsToSelections.begin()) {
-            --itPrototype;
-            if (entry.primPath.HasPrefix(itPrototype->first)) {
-                for (const auto& selectionKey : itPrototype->second) {
-                    auto selectionPath = SelectionPathFromKey(selectionKey);
-                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath));
-                }
+        auto itPrototype = FindSelfOrFirstParent(entry.primPath, _prototypePathsToSelections);
+        if (itPrototype != _prototypePathsToSelections.end()) {
+            for (const auto& selectionKey : itPrototype->second) {
+                auto selectionPath = SelectionPathFromKey(selectionKey);
+                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath));
             }
         }
     }
@@ -234,14 +224,11 @@ void NiPrototypeWhSi::ProcessDirtiedPrims(
         }
 
         // Propagate notifications if this prim is a relevant prototype or a subprim of one
-        auto itPrototype = _prototypePathsToSelections.upper_bound(entry.primPath);
-        if (itPrototype != _prototypePathsToSelections.begin()) {
-            --itPrototype;
-            if (entry.primPath.HasPrefix(itPrototype->first)) {
-                for (const auto& selectionKey : itPrototype->second) {
-                    auto selectionPath = SelectionPathFromKey(selectionKey);
-                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath), entry.dirtyLocators);
-                }
+        auto itPrototype = FindSelfOrFirstParent(entry.primPath, _prototypePathsToSelections);
+        if (itPrototype != _prototypePathsToSelections.end()) {
+            for (const auto& selectionKey : itPrototype->second) {
+                auto selectionPath = SelectionPathFromKey(selectionKey);
+                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath), entry.dirtyLocators);
             }
         }
     }

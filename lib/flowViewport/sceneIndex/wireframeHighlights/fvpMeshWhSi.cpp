@@ -110,7 +110,7 @@ void MeshWhSi::ProcessRemovedPrims(
     HdSceneIndexObserver::RemovedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         // Delete all selection highlights for meshes rooted under the removed prim
-        auto itMesh = _meshPaths.lower_bound(entry.primPath);
+        auto itMesh = FindSelfOrFirstChild(entry.primPath, _meshPaths);
         while (itMesh != _meshPaths.end() && itMesh->HasPrefix(entry.primPath)) {
             _DeleteSelectionHighlight(*itMesh);
             itMesh = _meshPaths.erase(itMesh);
@@ -126,14 +126,11 @@ void MeshWhSi::ProcessDirtiedPrims(
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         // Propagate changes to the mesh and its children
-        auto itMeshHighlights = _primPathsToSelections.upper_bound(entry.primPath);
-        if (itMeshHighlights != _primPathsToSelections.begin()) {
-            --itMeshHighlights;
-            if (entry.primPath.HasPrefix(itMeshHighlights->first)) {
-                for (const auto& selectionKey : itMeshHighlights->second) {
-                    auto selectionPath = SelectionPathFromKey(selectionKey);
-                    highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
-                }
+        auto itMeshHighlights = FindSelfOrFirstParent(entry.primPath, _primPathsToSelections);
+        if (itMeshHighlights != _primPathsToSelections.end()) {
+            for (const auto& selectionKey : itMeshHighlights->second) {
+                auto selectionPath = SelectionPathFromKey(selectionKey);
+                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
             }
         }
     }
@@ -143,12 +140,12 @@ void MeshWhSi::ProcessDirtiedPrims(
 void MeshWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)
 {
     if (isFullySelected) {
-        for (auto itMesh = _meshPaths.lower_bound(primPath); itMesh != _meshPaths.end() && itMesh->HasPrefix(primPath); itMesh++) {
+        for (auto itMesh = FindSelfOrFirstChild(primPath, _meshPaths); itMesh != _meshPaths.end() && itMesh->HasPrefix(primPath); itMesh++) {
             _CreateSelectionHighlight(*itMesh);
         }
     }
     else {
-        for (auto itMesh = _meshPaths.lower_bound(primPath); itMesh != _meshPaths.end() && itMesh->HasPrefix(primPath); itMesh++) {
+        for (auto itMesh = FindSelfOrFirstChild(primPath, _meshPaths); itMesh != _meshPaths.end() && itMesh->HasPrefix(primPath); itMesh++) {
             if (!HasFullySelectedAncestorInclusive(*itMesh)) {
                 _DeleteSelectionHighlight(*itMesh);
             }

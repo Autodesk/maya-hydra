@@ -17,6 +17,7 @@
 #define FVP_BASE_WH_SI_H
 
 #include <flowViewport/api.h>
+#include <flowViewport/fvpUtils.h>
 #include <flowViewport/fvpWireframeColorInterface.h>
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 
