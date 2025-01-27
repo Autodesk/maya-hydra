@@ -21,6 +21,7 @@
 
 // Flow Viewport Toolkit headers.
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+#include "flowViewport/selection/fvpSelectionTypes.h"
 
 //Usd/Hydra headers
 #include <pxr/imaging/hd/filteringSceneIndex.h>
@@ -59,7 +60,7 @@ public:
     ~MhDirtyLeadObjectSceneIndex() override = default;
 
     MAYAHYDRALIB_API
-    void dirtyLeadObjectRelatedPrims(const PXR_NS::SdfPathVector& previousLeadObjectPrimPaths, const PXR_NS::SdfPathVector& currentLeadObjectPrimPaths);
+    void dirtyLeadObjectRelatedSelections(const Fvp::PrimSelections& previousLeadObjectPrimSelections, const Fvp::PrimSelections& currentLeadObjectPrimSelections);
 
 protected:
     
@@ -83,7 +84,7 @@ protected:
     }
 
     MAYAHYDRALIB_API
-    void _AddDirtyPathRecursively(const PXR_NS::SdfPath& path, PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& inoutDirtiedPrimEntries)const;
+    void _DirtyPrimSelectionRecursively(const Fvp::PrimSelection& primSelection, PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& inoutDirtiedPrimEntries)const;
 };
 
 } // namespace MAYAHYDRA_NS_DEF

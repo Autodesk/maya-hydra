@@ -2,7 +2,6 @@
 (
     defaultPrim = "Root"
     metersPerUnit = 0.01
-    upAxis = "Z"
 )
 
 def Xform "Root"
@@ -17,13 +16,6 @@ def Xform "Root"
             references = @./UpperHalfGeomSubsetCube.usda@
         )
         {
-            over "CubeUpperHalf" (
-                prepend apiSchemas = ["MaterialBindingAPI"]
-            )
-            {
-                uniform token familyName = "materialBind"
-                rel material:binding = </mtl/GeomSubsetMaterial>
-            }
         }
     }
 
@@ -36,13 +28,6 @@ def Xform "Root"
             references = @./UpperHalfGeomSubsetSphere.usda@
         )
         {
-            over "SphereUpperHalf" (
-                prepend apiSchemas = ["MaterialBindingAPI"]
-            )
-            {
-                uniform token familyName = "materialBind"
-                rel material:binding = </mtl/GeomSubsetMaterial>
-            }
         }
     }
 
@@ -79,18 +64,3 @@ def Xform "Root"
         uniform token[] xformOpOrder = ["xformOp:translate"]
     }
 }
-
-def Scope "mtl"
-{
-    def Material "GeomSubsetMaterial"
-    {
-        token outputs:surface.connect = </mtl/GeomSubsetMaterial/GeomSubsetMaterial.outputs:surface>
-
-        def Shader "GeomSubsetMaterial"
-        {
-            uniform token info:id = "UsdPreviewSurface"
-            token outputs:surface
-        }
-    }
-}
-

@@ -27,25 +27,19 @@ def Xform "Root"
                         point3f[] positions = [(1, 0, 0), (-1, 0, 0)]
                         int[] protoIndices = [0, 1]
                         rel prototypes = [
-                            </Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/RedCube>,
-                            </Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/BluePyramid>,
+                            </Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/Cube>,
+                            </Root/TopInstancerXform/TopInstancer/prototypes/NestedInstancerXform/NestedInstancer/prototypes/Pyramid>,
                         ]
 
                         def "prototypes"
                         {
-                            def "RedCube" (
+                            def "Cube" (
                                 prepend references = @./CubeModel.usda@
-                                variants = {
-                                    string shadingVariant = "Red"
-                                }
                             )
                             {
                             }
-                            def "BluePyramid" (
+                            def "Pyramid" (
                                 prepend references = @./PyramidModel.usda@
-                                variants = {
-                                    string shadingVariant = "Blue"
-                                }
                             )
                             {
                             }

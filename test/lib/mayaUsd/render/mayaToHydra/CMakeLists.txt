@@ -53,6 +53,10 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
     testMayaLightingModes.py
+    testPointInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    testGeomSubsetsWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    testNativeInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    testMeshWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testSceneModified.py
     testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
     testIsolateSelectWithGeomSubset.py
@@ -66,7 +70,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testPathMapperRegistry.py
     cpp/testPickHandlerRegistry.py
     cpp/testSelectionSceneIndex.py
-    cpp/testWireframeSelectionHighlightSceneIndex.py
     cpp/testFlowViewportAPIViewportInformation.py
     cpp/testFlowViewportAPIAddPrims.py
     cpp/testUsdStageLayerMuting.py
@@ -78,12 +81,10 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testUsdNativeInstancePicking.py
     cpp/testUsdPickKind.py
     cpp/testNurbsSurfaces.py
-    cpp/testPointInstancingWireframeHighlight.py
     cpp/testGeomSubsetsPicking.py
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
     cpp/testUsdStageInvalidate.py
-    cpp/testGeomSubsetsWireframeHighlight.py
 )
 
 # These two test files are identical, except for disabled tests.  See

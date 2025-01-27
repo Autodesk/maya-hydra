@@ -18,8 +18,12 @@
 #include "mhDirtyLeadObjectSceneIndex.h"
 
 // Hydra headers
+#include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/usd/sdf/path.h>
+
+#include <stack>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -40,15 +44,15 @@ namespace {
                                                          };
 }
 
-void MhDirtyLeadObjectSceneIndex::dirtyLeadObjectRelatedPrims(const SdfPathVector& previousLeadObjectPrimPaths, const SdfPathVector& currentLeadObjectPrimPaths)
+void MhDirtyLeadObjectSceneIndex::dirtyLeadObjectRelatedSelections(const Fvp::PrimSelections& previousLeadObjectPrimSelections, const Fvp::PrimSelections& currentLeadObjectPrimSelections)
 {
     // Each SdfPath could be a hierarchy path, so we need to get the children prim paths
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrimEntries;
-    for (const auto& previousLeadObjectPrimPath : previousLeadObjectPrimPaths) {
-        _AddDirtyPathRecursively(previousLeadObjectPrimPath, dirtiedPrimEntries);
+    for (const auto& previousLeadObjectPrimSelection : previousLeadObjectPrimSelections) {
+        _DirtyPrimSelectionRecursively(previousLeadObjectPrimSelection, dirtiedPrimEntries);
     }
-    for (const auto& currentLeadObjectPrimPath : currentLeadObjectPrimPaths) {
-        _AddDirtyPathRecursively(currentLeadObjectPrimPath, dirtiedPrimEntries);
+    for (const auto& currentLeadObjectPrimSelection : currentLeadObjectPrimSelections) {
+        _DirtyPrimSelectionRecursively(currentLeadObjectPrimSelection, dirtiedPrimEntries);
     }
 
     if (! dirtiedPrimEntries.empty()){
@@ -56,14 +60,27 @@ void MhDirtyLeadObjectSceneIndex::dirtyLeadObjectRelatedPrims(const SdfPathVecto
     }
 }
 
-void MhDirtyLeadObjectSceneIndex::_AddDirtyPathRecursively(const SdfPath& path, HdSceneIndexObserver::DirtiedPrimEntries& inoutDirtiedPrimEntries)const
+void MhDirtyLeadObjectSceneIndex::_DirtyPrimSelectionRecursively(const Fvp::PrimSelection& primSelection, HdSceneIndexObserver::DirtiedPrimEntries& inoutDirtiedPrimEntries)const
 {
     //path can be a hierachy of prim paths so we need to get all children prim paths
-    inoutDirtiedPrimEntries.emplace_back(path, primvarsColorsLocatorSet);
+    std::stack<SdfPath> pathsToDirty({primSelection.primPath});
+    while (!pathsToDirty.empty()) {
+        auto currPathToDirty = pathsToDirty.top();
+        pathsToDirty.pop();
 
-    auto childPrimPathsArray = GetChildPrimPaths(path);
-    for (const auto& childPath : childPrimPathsArray) {
-        _AddDirtyPathRecursively(childPath, inoutDirtiedPrimEntries);
+        inoutDirtiedPrimEntries.emplace_back(currPathToDirty, primvarsColorsLocatorSet);
+
+        for (const auto& childPath : GetChildPrimPaths(currPathToDirty)) {
+            pathsToDirty.push(childPath);
+        }
+        
+        HdSceneIndexPrim currPrim = GetInputSceneIndex()->GetPrim(currPathToDirty);
+        if (currPrim.primType == HdPrimTypeTokens->instancer) {
+            HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(currPrim.dataSource);
+            for (const auto& prototypePath : instancerTopology.GetPrototypes()->GetTypedValue(0)) {
+                pathsToDirty.push(prototypePath);
+            }
+        }
     }
 }
 
