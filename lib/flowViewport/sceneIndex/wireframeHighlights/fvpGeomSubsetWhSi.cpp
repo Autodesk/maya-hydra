@@ -107,20 +107,7 @@ HdSceneIndexPrim GeomSubsetWhSi::GetHighlightPrim(const SdfPath &selectionPath, 
         prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(selectionKey.first));
         if (originalPath == originalMeshPath) {
             HdSceneIndexPrim geomSubsetPrim = GetInputSceneIndex()->GetPrim(selectionKey.first);
-
-            // Compute the normals and then trim the mesh
-            // (normals must be computed before trimming so that they follow the original mesh's topology)
-            prim.dataSource = ComputeNormals(prim.dataSource);
-            prim.dataSource = TrimMeshForGeomSubset(prim.dataSource, geomSubsetPrim.dataSource);
-
-            // Force the displacement
-            prim.dataSource = ForceDisplacement(prim.dataSource, GetMaterialDisplacementValue(geomSubsetPrim.dataSource));
-
-            // Setup the dependency so that material updates also dirty the points & normals primvars,
-            // and then block materials to prevent them from re-applying displacement
-            // (the dependency must be added before we block the materials, otherwise we can't know which material was assigned to the geomSubset)
-            prim.dataSource = AddDependency(prim.dataSource, TfToken("Fvp_WhSi_MaterialToPrimvars"), GetMaterialPath(geomSubsetPrim.dataSource), HdMaterialSchema::GetDefaultLocator(), HdPrimvarsSchema::GetDefaultLocator());
-            prim.dataSource = BlockMaterials(prim.dataSource);
+            prim.dataSource = MakeGeomSubsetHighlight(prim.dataSource, geomSubsetPrim.dataSource);
         }
     }
     return prim;

@@ -977,4 +977,28 @@ BaseWhSi::GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle
     return displacementValue;
 }
 
+PXR_NS::HdContainerDataSourceHandle
+BaseWhSi::MakeGeomSubsetHighlight(
+    const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource,
+    const PXR_NS::HdContainerDataSourceHandle& geomSubsetRootDataSource) const
+{
+    HdContainerDataSourceHandle editedMeshRootDataSource = meshRootDataSource;
+
+    // Compute the normals and then trim the mesh
+    // (normals must be computed before trimming so that they follow the original mesh's topology)
+    editedMeshRootDataSource = ComputeNormals(editedMeshRootDataSource);
+    editedMeshRootDataSource = TrimMeshForGeomSubset(editedMeshRootDataSource, geomSubsetRootDataSource);
+
+    // Force the displacement
+    editedMeshRootDataSource = ForceDisplacement(editedMeshRootDataSource, GetMaterialDisplacementValue(geomSubsetRootDataSource));
+
+    // Setup the dependency so that material updates also dirty the points & normals primvars,
+    // and then block materials to prevent them from re-applying displacement
+    // (the dependency must be added before we block the materials, otherwise we can't know which material was assigned to the geomSubset)
+    editedMeshRootDataSource = AddDependency(editedMeshRootDataSource, TfToken("Fvp_WhSi_MaterialToPrimvars"), GetMaterialPath(geomSubsetRootDataSource), HdMaterialSchema::GetDefaultLocator(), HdPrimvarsSchema::GetDefaultLocator());
+    editedMeshRootDataSource = BlockMaterials(editedMeshRootDataSource);
+
+    return editedMeshRootDataSource;
+}
+
 }
