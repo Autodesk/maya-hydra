@@ -50,10 +50,16 @@ public:
     MAYAHYDRALIB_API
     PXR_NS::GfVec4f getWireframeColor(const PXR_NS::SdfPath& primPath) const override;
 
+    MAYAHYDRALIB_API
+    PXR_NS::GfVec4f getWireframeColor(const Fvp::PrimSelection& primSelection) const override;
+
 private:
     enum SelectionState {kLead, kActive, kDormant};
 
-    SelectionState _getSelectionState(const PXR_NS::SdfPath& primPath)const;
+    PXR_NS::GfVec4f _getWireframeColor(const SelectionState& selectionState) const;
+
+    SelectionState _getSelectionState(const PXR_NS::SdfPath& primPath) const;
+    SelectionState _getSelectionState(const Fvp::PrimSelection& primSelection) const;
 
     //Colors used by wireframe selection highlighting
     PXR_NS::GfVec4f _activeWireframeColor;

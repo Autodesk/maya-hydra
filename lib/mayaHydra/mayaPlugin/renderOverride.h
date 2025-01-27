@@ -51,7 +51,12 @@
 #include <flowViewport/sceneIndex/fvpDefaultMaterialSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
-#include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpGeomSubsetWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpMeshWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpNiInstanceWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpNiPrototypeWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpPiInstancerWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpPiPrototypeWhSi.h>
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 
@@ -281,7 +286,15 @@ private:
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
     Fvp::SelectionPtr                         _selection;
-    Fvp::WireframeSelectionHighlightSceneIndexRefPtr  _wireframeSelectionHighlightSceneIndex;
+    SdfPath                                   _highlightHierarchyPrefix{"/FlowViewportSelectionHighlights"};
+#if PXR_VERSION >= 2403
+    Fvp::GeomSubsetWhSiRefPtr                 _geomSubsetWhSi;
+#endif
+    Fvp::MeshWhSiRefPtr                       _meshWhSi;
+    Fvp::NiInstanceWhSiRefPtr                 _niInstanceWhSi;
+    Fvp::NiPrototypeWhSiRefPtr                _niPrototypeWhSi;
+    Fvp::PiInstancerWhSiRefPtr                _piInstancerWhSi;
+    Fvp::PiPrototypeWhSiRefPtr                _piPrototypeWhSi;
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;

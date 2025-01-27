@@ -7,7 +7,6 @@ target_sources(${TARGET_NAME}
     fvpRenderIndexProxy.cpp
     fvpSceneIndexUtils.cpp
     fvpSelectionSceneIndex.cpp
-    fvpWireframeSelectionHighlightSceneIndex.cpp
     fvpDisplayStyleOverrideSceneIndex.cpp
     fvpPruneTexturesSceneIndex.cpp
     fvpPruningSceneIndex.cpp
@@ -24,7 +23,6 @@ set(HEADERS
     fvpRenderIndexProxyFwd.h
     fvpSceneIndexUtils.h
     fvpSelectionSceneIndex.h
-    fvpWireframeSelectionHighlightSceneIndex.h
     fvpDisplayStyleOverrideSceneIndex.h
     fvpPruneTexturesSceneIndex.h
     fvpPruningSceneIndex.h
@@ -52,3 +50,5 @@ install(FILES ${HEADERS}
     DESTINATION 
         ${CMAKE_INSTALL_PREFIX}/include/flowViewport/sceneIndex
 )
+
+add_subdirectory(wireframeHighlights)
