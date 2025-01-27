@@ -14,35 +14,10 @@
 //
 
 #include "fvpGeomSubsetWhSi.h"
-#include "fvpBaseWhSi.h"
 
-#include <pxr/base/tf/token.h>
-#include <pxr/imaging/hd/dataSourceTypeDefs.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
-#include <pxr/imaging/hd/primvarSchema.h>
-#include <pxr/imaging/hd/primvarsSchema.h>
-#include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
-
-#include <pxr/imaging/hd/materialBindingsSchema.h>
-#include <pxr/imaging/hd/materialSchema.h>
-#include <pxr/imaging/hd/dataSourceMaterialNetworkInterface.h>
-#include <pxr/imaging/hd/vertexAdjacency.h>
-#include <pxr/imaging/pxOsd/tokens.h>
-#include <pxr/imaging/hd/meshTopology.h>
-#include <pxr/imaging/hd/smoothNormals.h>
-
-#include <pxr/imaging/hd/meshSchema.h>
-#include <pxr/imaging/hd/meshTopologySchema.h>
-#include <pxr/imaging/hd/overlayContainerDataSource.h>
-#include <pxr/imaging/hd/containerDataSourceEditor.h>
-
-#include <pxr/imaging/hd/dependenciesSchema.h>
-#include <pxr/imaging/hd/materialBindingsSchema.h>
-#include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
-
-#include <iostream>
 
 #if PXR_VERSION >= 2403
 
@@ -54,33 +29,6 @@ bool _IsSelected(const HdSceneIndexPrim& prim)
 {
     HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
     return selectionsSchema.IsDefined() && selectionsSchema.GetNumElements() > 0;
-}
-
-/// Given a material prim path data source, returns a dependency of primvars
-/// on material of that given prim.
-HdContainerDataSourceHandle
-_ComputePrimvarsToMaterialDependency(const SdfPath &materialPrimPath)
-{
-    HdDependencySchema::Builder builder;
-
-    builder.SetDependedOnPrimPath(
-        HdRetainedTypedSampledDataSource<SdfPath>::New(
-            materialPrimPath));
-
-    static HdLocatorDataSourceHandle dependedOnLocatorDataSource =
-        HdRetainedTypedSampledDataSource<HdDataSourceLocator>::New(
-            HdMaterialSchema::GetDefaultLocator());
-    builder.SetDependedOnDataSourceLocator(dependedOnLocatorDataSource);
-
-    static HdLocatorDataSourceHandle affectedLocatorDataSource =
-        HdRetainedTypedSampledDataSource<HdDataSourceLocator>::New(
-            HdPrimvarsSchema::GetDefaultLocator());
-    builder.SetAffectedDataSourceLocator(affectedLocatorDataSource);
-
-    return
-        HdRetainedContainerDataSource::New(
-            TfToken("FvpWhSi_MaterialToPrimvars"),
-            builder.Build());
 }
 
 }
@@ -187,11 +135,6 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
         if (_primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end()) {
             auto selectionPath = SelectionPathFromKey(SelectionKey(entry.primPath, ""));
             auto originalMeshPath = entry.primPath.GetParentPath();
-            //std::cout << originalMeshPath << std::endl;
-            //TODO: Need to store and keep track/update mapping of material paths and geomsubsets associations
-            // to catch material dirty notifs and dirty points primvarValue
-            //auto dirtyLocators = entry.dirtyLocators;
-            //if (dirtyLocators.Intersects(HdMaterialSchema::GetDefaultLocator()))
             highlightEntries.emplace_back(originalMeshPath.ReplacePrefix(originalMeshPath.GetParentPath(), selectionPath), entry.dirtyLocators);
         }
     }

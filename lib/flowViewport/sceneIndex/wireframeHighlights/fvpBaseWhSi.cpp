@@ -19,16 +19,17 @@
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/staticTokens.h>
-#include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
-#include <pxr/imaging/hd/dataSource.h>
-#include <pxr/imaging/hd/dataSourceLocator.h>
+#include <pxr/imaging/hd/dataSourceMaterialNetworkInterface.h>
+#include <pxr/imaging/hd/dependenciesSchema.h>
 #include <pxr/imaging/hd/geomSubsetSchema.h>
-#include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
+#include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
+#include <pxr/imaging/hd/materialBindingsSchema.h>
+#include <pxr/imaging/hd/materialSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/meshTopology.h>
 #include <pxr/imaging/hd/meshTopologySchema.h>
@@ -38,20 +39,12 @@
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
+#include <pxr/imaging/hd/smoothNormals.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/vertexAdjacency.h>
 #include <pxr/imaging/pxOsd/tokens.h>
-#include <pxr/imaging/hd/smoothNormals.h>
-
-#include <pxr/imaging/hd/dependenciesSchema.h>
-#include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
-
-#include <pxr/imaging/hd/dataSourceMaterialNetworkInterface.h>
-#include <pxr/imaging/hd/materialSchema.h>
 #include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
-
-#include <iostream>
 
 #include <unordered_set>
 
