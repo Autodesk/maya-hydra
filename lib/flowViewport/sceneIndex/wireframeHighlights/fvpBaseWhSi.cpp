@@ -19,8 +19,12 @@
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/staticTokens.h>
+#include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
+#include <pxr/imaging/hd/dataSource.h>
+#include <pxr/imaging/hd/dataSourceLocator.h>
 #include <pxr/imaging/hd/geomSubsetSchema.h>
+#include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
@@ -45,6 +49,7 @@
 
 #include <pxr/imaging/hd/dataSourceMaterialNetworkInterface.h>
 #include <pxr/imaging/hd/materialSchema.h>
+#include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
 
 #include <iostream>
 
@@ -612,6 +617,47 @@ PXR_NS::HdContainerDataSourceHandle AddDependency(
 
     HdContainerDataSourceEditor dataSourceEditor(primDataSource);
     dataSourceEditor.Overlay(HdDependenciesSchema::GetDefaultLocator(), dependencyDataSource);
+    return dataSourceEditor.Finish();
+}
+
+PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
+    const PXR_NS::HdContainerDataSourceHandle& primDataSource, 
+    const PXR_NS::SdfPath& srcPrefix, 
+    const PXR_NS::SdfPath& dstPrefix)
+{
+    static const std::set<HdDataSourceLocator> kInstancingDataSourceLocators = {
+        HdInstancerTopologySchema::GetDefaultLocator(),
+        HdInstancedBySchema::GetDefaultLocator(),
+        HdInstanceSchema::GetDefaultLocator(),
+        UsdImagingUsdPrimInfoSchema::GetDefaultLocator().Append(UsdImagingUsdPrimInfoSchemaTokens->piPropagatedPrototypes),
+        UsdImagingUsdPrimInfoSchema::GetDefaultLocator().Append(UsdImagingUsdPrimInfoSchemaTokens->niPrototypePath),
+    };
+
+    HdContainerDataSourceEditor dataSourceEditor(primDataSource);
+    for (const auto& instancingDataSourceLocator : kInstancingDataSourceLocators) {
+        auto instancingDataSource = HdContainerDataSource::Get(primDataSource, instancingDataSourceLocator);
+        
+        if (auto containerDataSource = HdContainerDataSource::Cast(instancingDataSource)) {
+            dataSourceEditor.Set(
+                instancingDataSourceLocator,
+                RepathingContainerDataSource::New(srcPrefix, dstPrefix, containerDataSource)
+            );
+        }
+
+        if (auto pathDataSource = HdTypedSampledDataSource<SdfPath>::Cast(instancingDataSource)) {
+            dataSourceEditor.Set(
+                instancingDataSourceLocator,
+                _RerootingSceneIndexPathDataSource::New(srcPrefix, dstPrefix, pathDataSource)
+            );
+        }
+
+        if (auto pathArrayDataSource = HdTypedSampledDataSource<VtArray<SdfPath>>::Cast(instancingDataSource)) {
+            dataSourceEditor.Set(
+                instancingDataSourceLocator,
+                _RerootingSceneIndexPathArrayDataSource::New(srcPrefix, dstPrefix, pathArrayDataSource)
+            );
+        }
+    }
     return dataSourceEditor.Finish();
 }
 

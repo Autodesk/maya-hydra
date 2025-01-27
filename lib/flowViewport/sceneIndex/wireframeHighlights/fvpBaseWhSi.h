@@ -263,6 +263,8 @@ PXR_NS::HdContainerDataSourceHandle AddDependency(
     const PXR_NS::HdDataSourceLocator& dependedOnDataSourceLocator,
     const PXR_NS::HdDataSourceLocator& affectedDataSourceLocator);
 
+PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(const PXR_NS::HdContainerDataSourceHandle& primDataSource, const PXR_NS::SdfPath& srcPrefix, const PXR_NS::SdfPath& dstPrefix);
+
 Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
 
 }
