@@ -14,10 +14,34 @@
 //
 
 #include "fvpGeomSubsetWhSi.h"
+#include "fvpBaseWhSi.h"
 
+#include <pxr/base/tf/token.h>
+#include <pxr/imaging/hd/dataSourceTypeDefs.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
+#include <pxr/imaging/hd/primvarSchema.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
+
+#include <pxr/imaging/hd/materialBindingsSchema.h>
+#include <pxr/imaging/hd/materialSchema.h>
+#include <pxr/imaging/hd/dataSourceMaterialNetworkInterface.h>
+#include <pxr/imaging/hd/vertexAdjacency.h>
+#include <pxr/imaging/pxOsd/tokens.h>
+#include <pxr/imaging/hd/meshTopology.h>
+#include <pxr/imaging/hd/smoothNormals.h>
+
+#include <pxr/imaging/hd/meshSchema.h>
+#include <pxr/imaging/hd/meshTopologySchema.h>
+#include <pxr/imaging/hd/overlayContainerDataSource.h>
+#include <pxr/imaging/hd/containerDataSourceEditor.h>
+
+#include <pxr/imaging/hd/dependenciesSchema.h>
+#include <pxr/imaging/hd/materialBindingsSchema.h>
+#include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
+
+#include <iostream>
 
 #if PXR_VERSION >= 2403
 
@@ -50,10 +74,13 @@ HdSceneIndexPrim GeomSubsetWhSi::GetHighlightPrim(const SdfPath &selectionPath, 
 
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, originalMeshPath.GetParentPath());
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
-    prim.dataSource = RepathingContainerDataSource::New(originalMeshPath.GetParentPath(), selectionPath, prim.dataSource);
+    //prim.dataSource = RepathingContainerDataSource::New(originalMeshPath.GetParentPath(), selectionPath, prim.dataSource);
     if (prim.primType == HdPrimTypeTokens->mesh) {
         prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(selectionKey.first));
-        if (originalPath == selectionKey.first.GetParentPath()) {
+        if (originalPath == originalMeshPath) {            
+            prim.dataSource = ComputeNormals(prim.dataSource);
+            // TODO : update displacement when displacement is dirtied.
+            prim.dataSource = ForceDisplacement(prim.dataSource, GetMaterialDisplacementValue(GetInputSceneIndex()->GetPrim(selectionKey.first).dataSource));
             prim.dataSource = TrimMeshForGeomSubset(prim.dataSource, GetInputSceneIndex()->GetPrim(selectionKey.first).dataSource);
         }
     }
@@ -134,6 +161,11 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
         if (_primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end()) {
             auto selectionPath = SelectionPathFromKey(SelectionKey(entry.primPath, ""));
             auto originalMeshPath = entry.primPath.GetParentPath();
+            //std::cout << originalMeshPath << std::endl;
+            //TODO: Need to store and keep track/update mapping of material paths and geomsubsets associations
+            // to catch material dirty notifs and dirty points primvarValue
+            //auto dirtyLocators = entry.dirtyLocators;
+            //if (dirtyLocators.Intersects(HdMaterialSchema::GetDefaultLocator()))
             highlightEntries.emplace_back(originalMeshPath.ReplacePrefix(originalMeshPath.GetParentPath(), selectionPath), entry.dirtyLocators);
         }
     }

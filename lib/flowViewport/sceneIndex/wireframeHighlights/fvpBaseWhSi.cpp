@@ -26,6 +26,7 @@
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
+#include <pxr/imaging/hd/meshTopology.h>
 #include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/primvarSchema.h>
@@ -34,6 +35,18 @@
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/vertexAdjacency.h>
+#include <pxr/imaging/pxOsd/tokens.h>
+#include <pxr/imaging/hd/smoothNormals.h>
+
+#include <pxr/imaging/hd/dependenciesSchema.h>
+#include <pxr/imaging/hd/materialBindingsSchema.h>
+#include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
+
+#include <pxr/imaging/hd/dataSourceMaterialNetworkInterface.h>
+#include <pxr/imaging/hd/materialSchema.h>
+
+#include <iostream>
 
 #include <unordered_set>
 
@@ -61,6 +74,20 @@ const HdDataSourceLocator reprSelectorLocator(
 
 const HdDataSourceLocator primvarsOverrideWireframeColorLocator(
         HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor));
+
+const HdDataSourceLocator pointsValueLocator = HdDataSourceLocator(
+    HdPrimvarsSchemaTokens->primvars,
+    HdPrimvarsSchemaTokens->points,
+    HdPrimvarSchemaTokens->primvarValue);
+
+const HdDataSourceLocator normalsPrimvarLocator = HdDataSourceLocator(
+    HdPrimvarsSchemaTokens->primvars,
+    HdPrimvarsSchemaTokens->normals);
+
+const HdDataSourceLocator normalsValueLocator = HdDataSourceLocator(
+    HdPrimvarsSchemaTokens->primvars,
+    HdPrimvarsSchemaTokens->normals,
+    HdPrimvarSchemaTokens->primvarValue);
 
 // Returns all paths related to instancing for this prim; this is analogous to getting the edges
 // connected to the given vertex (in this case a prim) of an instancing graph.
@@ -268,6 +295,7 @@ private:
     HdPathArrayDataSourceHandle const _inputDataSource;
 };
 
+//TODO :: Move to FVP namespace
 #if PXR_VERSION >= 2403
 // Edits the mesh topology to only only contain its selected GeomSubsets
 HdContainerDataSourceHandle
@@ -281,7 +309,6 @@ _TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, co
     if (!meshTopologySchema.IsDefined()) {
         return meshRootDataSource;
     }
-    HdDataSourceLocator pointsValueLocator = HdDataSourceLocator(HdPrimvarsSchemaTokens->primvars, HdPrimvarsSchemaTokens->points, HdPrimvarSchemaTokens->primvarValue);
     auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, pointsValueLocator));
     if (!pointsValueDataSource) {
         return meshRootDataSource;
@@ -337,11 +364,18 @@ _TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, co
     dataSourceEditor.Set(faceVertexCountsLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexCounts));
     dataSourceEditor.Set(faceVertexIndicesLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexIndices));
 
-    // We reduce the points primvar so that it has only the exact number of points required by the trimmed topology;
+    // We reduce the points and normals primvars so that they have only the exact number of elements required by the trimmed topology;
     // this avoids a warning from USD.
     VtArray<GfVec3f> points = pointsValueDataSource->GetTypedValue(0);
     points.resize(maxVertexIndex + 1);
     dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
+
+    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, normalsValueLocator));
+    if (normalsValueDataSource) {
+        auto normals = normalsValueDataSource->GetTypedValue(0);
+        normals.resize(maxVertexIndex + 1);
+        dataSourceEditor.Set(normalsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(normals));
+    }
 
     return dataSourceEditor.Finish();
 }
@@ -433,6 +467,103 @@ TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, con
     return _TrimMeshForGeomSubset(meshRootDataSource, geomSubsetRootDataSource);
 }
 #endif
+
+PXR_NS::HdContainerDataSourceHandle ComputeNormals(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource)
+{
+    // Check if normals are already present
+    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, normalsValueLocator));
+    if (normalsValueDataSource) {
+        return meshRootDataSource;
+    }
+
+    // Get required schemas/dataSources
+    HdMeshSchema meshSchema = HdMeshSchema::GetFromParent(meshRootDataSource);
+    if (!meshSchema.IsDefined()) {
+        return meshRootDataSource;
+    }
+    HdMeshTopologySchema meshTopologySchema = meshSchema.GetTopology();
+    if (!meshTopologySchema.IsDefined()) {
+        return meshRootDataSource;
+    }
+    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, pointsValueLocator));
+    if (!pointsValueDataSource) {
+        return meshRootDataSource;
+    }
+
+    // Setup topology
+    TfToken subdivScheme = PxOsdOpenSubdivTokens->none;
+    if (HdTokenDataSourceHandle subdivSchemeDataSource = meshSchema.GetSubdivisionScheme()) {
+        subdivScheme = subdivSchemeDataSource->GetTypedValue(0.0f);
+    }
+    VtIntArray holeIndices;
+    if (HdIntArrayDataSourceHandle holeIndicesDataSource = meshTopologySchema.GetHoleIndices()) {
+        holeIndices = holeIndicesDataSource->GetTypedValue(0.0f);
+    }
+    TfToken orientation = PxOsdOpenSubdivTokens->rightHanded;
+    if (HdTokenDataSourceHandle orientationDataSource = meshTopologySchema.GetOrientation()) {
+        orientation = orientationDataSource->GetTypedValue(0.0f);
+    }
+    HdMeshTopology meshTopology(
+        subdivScheme, 
+        orientation, 
+        meshTopologySchema.GetFaceVertexCounts()->GetTypedValue(0), 
+        meshTopologySchema.GetFaceVertexIndices()->GetTypedValue(0), 
+        holeIndices);
+    Hd_VertexAdjacency adjacency;
+    adjacency.BuildAdjacencyTable(&meshTopology);
+
+    // Compute normals
+    auto points = pointsValueDataSource->GetTypedValue(0);
+    auto normals = Hd_SmoothNormals::ComputeSmoothNormals(
+        &adjacency, static_cast<int>(points.size()), points.cdata());
+
+    // Apply normals
+    auto normalsDataSource = HdPrimvarSchema::Builder()
+        .SetInterpolation(HdPrimvarSchema::BuildInterpolationDataSource(HdPrimvarSchemaTokens->vertex))
+        .SetRole(HdPrimvarSchema::BuildRoleDataSource(HdPrimvarSchemaTokens->normal))
+        .SetPrimvarValue(HdRetainedTypedSampledDataSource<decltype(normals)>::New(normals))
+        .Build();
+    HdDataSourceLocator normalsPrimvarLocator = HdDataSourceLocator(HdPrimvarsSchemaTokens->primvars, HdPrimvarsSchemaTokens->normals);
+    HdContainerDataSourceEditor dataSourceEditor(meshRootDataSource);
+    dataSourceEditor.Set(normalsPrimvarLocator, normalsDataSource);
+    return dataSourceEditor.Finish();
+}
+
+PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, float displacement)
+{
+    std::cout << "displacement = " << displacement << std::endl;
+    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, pointsValueLocator));
+    if (!pointsValueDataSource) {
+        return meshRootDataSource;
+    }
+    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, normalsValueLocator));
+    if (!normalsValueDataSource) {
+        return meshRootDataSource;
+    }
+
+    auto points = pointsValueDataSource->GetTypedValue(0);
+    auto normals = normalsValueDataSource->GetTypedValue(0);
+
+    if (points.size() > normals.size()) {
+        return meshRootDataSource;
+    }
+
+    // Compute displacement
+    for (size_t iPoint = 0; iPoint < points.size(); iPoint++) {
+        points[iPoint] += normals[iPoint] * displacement;
+    }
+
+    // Apply displaced points
+    HdContainerDataSourceEditor dataSourceEditor(meshRootDataSource);
+    dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
+    
+    // Block materials to prevent displacement from being re-applied
+    dataSourceEditor.Set(HdDependenciesSchema::GetDefaultLocator(), HdBlockDataSource::New());
+    dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+    dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+    
+    return dataSourceEditor.Finish();
+}
 
 Fvp::PrimSelection ConvertHydraToFvpSelection(const SdfPath& primPath, const HdSelectionSchema& selectionSchema) {
     Fvp::PrimSelection primSelection;
@@ -754,6 +885,59 @@ BaseWhSi::CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPath
     for (const auto& affectedInstancedByPath : affectedInstancedByPaths) {
         CollectInstancingPaths(affectedInstancedByPath, InstancingPathsCollectionDirection::InstancedBy, outInstancerPaths, outPrototypePaths);
     }
+}
+
+float 
+BaseWhSi::GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle& primDataSource) const
+{
+    float displacementValue = 0.f;
+
+    if (!primDataSource) {
+        return displacementValue;
+    }
+
+    // Step 1: Access the material data source
+    HdMaterialBindingsSchema materialBindingsSchema = HdMaterialBindingsSchema::GetFromParent(primDataSource);
+    if (!materialBindingsSchema.IsDefined()) {
+        return displacementValue;
+    }
+
+    // Step 2: Get the material path
+    HdMaterialBindingSchema materialBindingSchema = materialBindingsSchema.GetMaterialBinding();
+    if (!materialBindingSchema) {
+        return displacementValue;
+    }
+
+    HdPathDataSourceHandle bindingPathDs = materialBindingSchema.GetPath();
+    if (!bindingPathDs) {
+        return displacementValue;
+    }
+
+    const SdfPath materialPath = bindingPathDs->GetTypedValue(0.0f);
+
+    // Step 3: Retrieve the material
+    HdSceneIndexPrim materialPrim = GetInputSceneIndex()->GetPrim(materialPath);
+    if (!materialPrim.dataSource || (materialPrim.primType != HdPrimTypeTokens->material) ){
+        return displacementValue;
+    }
+
+    HdMaterialSchema materialSchema = HdMaterialSchema::GetFromParent(materialPrim.dataSource);
+    if (!materialSchema.IsDefined()) {
+        return displacementValue;
+    }
+
+    // Step 4: Look for the displacement value
+    HdDataSourceMaterialNetworkInterface materialNetworkInterface(
+        materialPath, materialSchema.GetMaterialNetwork().GetContainer(), primDataSource);
+
+    for (auto nodeName : materialNetworkInterface.GetNodeNames()) {
+        VtValue paramValue = materialNetworkInterface.GetNodeParameterValue(nodeName, HdMaterialTerminalTokens->displacement);
+        if (paramValue.IsHolding<float>()) {
+            return paramValue.UncheckedGet<float>();
+        }
+    }
+
+    return displacementValue;
 }
 
 }

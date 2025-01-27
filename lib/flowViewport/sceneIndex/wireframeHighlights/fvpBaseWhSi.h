@@ -217,6 +217,10 @@ protected:
     FVP_API
     void CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPathsCollectionDirection direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const;
 
+    // Return the displacement value from the given prim data source's assigned material
+    FVP_API
+    float GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle& primDataSource) const;
+
     const PXR_NS::SdfPath _highlightHierarchyPrefix;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 
@@ -236,6 +240,10 @@ PXR_NS::HdContainerDataSourceHandle SetWireframeRepr(const PXR_NS::HdContainerDa
 PXR_NS::HdContainerDataSourceHandle
 TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, const PXR_NS::HdContainerDataSourceHandle& geomSubsetRootDataSource);
 #endif
+
+PXR_NS::HdContainerDataSourceHandle ComputeNormals(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource);
+
+PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, float displacement);
 
 Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
 
