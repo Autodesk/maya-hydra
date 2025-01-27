@@ -55,6 +55,33 @@ bool _IsSelected(const HdSceneIndexPrim& prim)
     return selectionsSchema.IsDefined() && selectionsSchema.GetNumElements() > 0;
 }
 
+/// Given a material prim path data source, returns a dependency of primvars
+/// on material of that given prim.
+HdContainerDataSourceHandle
+_ComputePrimvarsToMaterialDependency(const SdfPath &materialPrimPath)
+{
+    HdDependencySchema::Builder builder;
+
+    builder.SetDependedOnPrimPath(
+        HdRetainedTypedSampledDataSource<SdfPath>::New(
+            materialPrimPath));
+
+    static HdLocatorDataSourceHandle dependedOnLocatorDataSource =
+        HdRetainedTypedSampledDataSource<HdDataSourceLocator>::New(
+            HdMaterialSchema::GetDefaultLocator());
+    builder.SetDependedOnDataSourceLocator(dependedOnLocatorDataSource);
+
+    static HdLocatorDataSourceHandle affectedLocatorDataSource =
+        HdRetainedTypedSampledDataSource<HdDataSourceLocator>::New(
+            HdPrimvarsSchema::GetDefaultLocator());
+    builder.SetAffectedDataSourceLocator(affectedLocatorDataSource);
+
+    return
+        HdRetainedContainerDataSource::New(
+            TfToken("FvpWhSi_MaterialToPrimvars"),
+            builder.Build());
+}
+
 }
 
 namespace FVP_NS_DEF {
@@ -77,11 +104,17 @@ HdSceneIndexPrim GeomSubsetWhSi::GetHighlightPrim(const SdfPath &selectionPath, 
     //prim.dataSource = RepathingContainerDataSource::New(originalMeshPath.GetParentPath(), selectionPath, prim.dataSource);
     if (prim.primType == HdPrimTypeTokens->mesh) {
         prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(selectionKey.first));
-        if (originalPath == originalMeshPath) {            
+        if (originalPath == originalMeshPath) {
+            HdSceneIndexPrim geomSubsetPrim = GetInputSceneIndex()->GetPrim(selectionKey.first);
             prim.dataSource = ComputeNormals(prim.dataSource);
-            // TODO : update displacement when displacement is dirtied.
-            prim.dataSource = ForceDisplacement(prim.dataSource, GetMaterialDisplacementValue(GetInputSceneIndex()->GetPrim(selectionKey.first).dataSource));
-            prim.dataSource = TrimMeshForGeomSubset(prim.dataSource, GetInputSceneIndex()->GetPrim(selectionKey.first).dataSource);
+            prim.dataSource = ForceDisplacement(prim.dataSource, GetMaterialDisplacementValue(geomSubsetPrim.dataSource));
+            prim.dataSource = TrimMeshForGeomSubset(prim.dataSource, geomSubsetPrim.dataSource);
+
+            HdContainerDataSourceEditor dsEditor(prim.dataSource);
+            dsEditor.Overlay(HdDependenciesSchema::GetDefaultLocator(), _ComputePrimvarsToMaterialDependency(GetMaterialPath(geomSubsetPrim.dataSource)));
+            prim.dataSource = dsEditor.Finish();
+            prim.dataSource = BlockMaterials(prim.dataSource);
+
         }
     }
     return prim;

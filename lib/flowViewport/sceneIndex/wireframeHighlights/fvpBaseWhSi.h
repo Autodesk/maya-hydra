@@ -245,6 +245,10 @@ PXR_NS::HdContainerDataSourceHandle ComputeNormals(const PXR_NS::HdContainerData
 
 PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, float displacement);
 
+PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
+
+PXR_NS::HdContainerDataSourceHandle BlockMaterials(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
+
 Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
 
 }

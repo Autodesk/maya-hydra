@@ -531,7 +531,6 @@ PXR_NS::HdContainerDataSourceHandle ComputeNormals(const PXR_NS::HdContainerData
 
 PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, float displacement)
 {
-    std::cout << "displacement = " << displacement << std::endl;
     auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, pointsValueLocator));
     if (!pointsValueDataSource) {
         return meshRootDataSource;
@@ -555,13 +554,40 @@ PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerD
 
     // Apply displaced points
     HdContainerDataSourceEditor dataSourceEditor(meshRootDataSource);
-    dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
-    
-    // Block materials to prevent displacement from being re-applied
-    dataSourceEditor.Set(HdDependenciesSchema::GetDefaultLocator(), HdBlockDataSource::New());
+    dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));    
+    return dataSourceEditor.Finish();
+}
+
+
+SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource)
+{
+    if (!primDataSource) {
+        return {};
+    }
+
+    HdMaterialBindingsSchema materialBindingsSchema = HdMaterialBindingsSchema::GetFromParent(primDataSource);
+    if (!materialBindingsSchema.IsDefined()) {
+        return {};
+    }
+
+    HdMaterialBindingSchema materialBindingSchema = materialBindingsSchema.GetMaterialBinding();
+    if (!materialBindingSchema) {
+        return {};
+    }
+
+    HdPathDataSourceHandle bindingPathDataSource = materialBindingSchema.GetPath();
+    if (!bindingPathDataSource) {
+        return {};
+    }
+
+    return bindingPathDataSource->GetTypedValue(0);
+}
+
+PXR_NS::HdContainerDataSourceHandle BlockMaterials(const PXR_NS::HdContainerDataSourceHandle& primDataSource)
+{
+    HdContainerDataSourceEditor dataSourceEditor(primDataSource);
     dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
     dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-    
     return dataSourceEditor.Finish();
 }
 
@@ -896,26 +922,13 @@ BaseWhSi::GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle
         return displacementValue;
     }
 
-    // Step 1: Access the material data source
-    HdMaterialBindingsSchema materialBindingsSchema = HdMaterialBindingsSchema::GetFromParent(primDataSource);
-    if (!materialBindingsSchema.IsDefined()) {
+    // Step 1: Get the material path
+    const SdfPath materialPath = GetMaterialPath(primDataSource);
+    if (materialPath.IsEmpty()) {
         return displacementValue;
     }
 
-    // Step 2: Get the material path
-    HdMaterialBindingSchema materialBindingSchema = materialBindingsSchema.GetMaterialBinding();
-    if (!materialBindingSchema) {
-        return displacementValue;
-    }
-
-    HdPathDataSourceHandle bindingPathDs = materialBindingSchema.GetPath();
-    if (!bindingPathDs) {
-        return displacementValue;
-    }
-
-    const SdfPath materialPath = bindingPathDs->GetTypedValue(0.0f);
-
-    // Step 3: Retrieve the material
+    // Step 2: Retrieve the material
     HdSceneIndexPrim materialPrim = GetInputSceneIndex()->GetPrim(materialPath);
     if (!materialPrim.dataSource || (materialPrim.primType != HdPrimTypeTokens->material) ){
         return displacementValue;
@@ -926,7 +939,7 @@ BaseWhSi::GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle
         return displacementValue;
     }
 
-    // Step 4: Look for the displacement value
+    // Step 3: Look for the displacement value
     HdDataSourceMaterialNetworkInterface materialNetworkInterface(
         materialPath, materialSchema.GetMaterialNetwork().GetContainer(), primDataSource);
 
