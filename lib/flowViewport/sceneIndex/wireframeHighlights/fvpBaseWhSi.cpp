@@ -591,6 +591,30 @@ PXR_NS::HdContainerDataSourceHandle BlockMaterials(const PXR_NS::HdContainerData
     return dataSourceEditor.Finish();
 }
 
+PXR_NS::HdContainerDataSourceHandle AddDependency(
+    const PXR_NS::HdContainerDataSourceHandle& primDataSource,
+    const PXR_NS::TfToken& dependencyToken,
+    const PXR_NS::SdfPath& dependedOnPrimPath,
+    const PXR_NS::HdDataSourceLocator& dependedOnDataSourceLocator,
+    const PXR_NS::HdDataSourceLocator& affectedDataSourceLocator)
+{
+    HdDependencySchema::Builder builder;
+
+    if (!dependedOnPrimPath.IsEmpty()) {
+        builder.SetDependedOnPrimPath(HdRetainedTypedSampledDataSource<SdfPath>::New(dependedOnPrimPath));
+    }
+
+    builder.SetDependedOnDataSourceLocator(HdRetainedTypedSampledDataSource<HdDataSourceLocator>::New(dependedOnDataSourceLocator));
+
+    builder.SetAffectedDataSourceLocator(HdRetainedTypedSampledDataSource<HdDataSourceLocator>::New(affectedDataSourceLocator));
+
+    auto dependencyDataSource = HdRetainedContainerDataSource::New(dependencyToken, builder.Build());
+
+    HdContainerDataSourceEditor dataSourceEditor(primDataSource);
+    dataSourceEditor.Overlay(HdDependenciesSchema::GetDefaultLocator(), dependencyDataSource);
+    return dataSourceEditor.Finish();
+}
+
 Fvp::PrimSelection ConvertHydraToFvpSelection(const SdfPath& primPath, const HdSelectionSchema& selectionSchema) {
     Fvp::PrimSelection primSelection;
     primSelection.primPath = primPath;

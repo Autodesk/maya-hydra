@@ -21,6 +21,7 @@
 #include <flowViewport/fvpWireframeColorInterface.h>
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 
+#include <pxr/imaging/hd/dataSourceLocator.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 
@@ -248,6 +249,13 @@ PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerD
 PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
 
 PXR_NS::HdContainerDataSourceHandle BlockMaterials(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
+
+PXR_NS::HdContainerDataSourceHandle AddDependency(
+    const PXR_NS::HdContainerDataSourceHandle& primDataSource,
+    const PXR_NS::TfToken& dependencyToken,
+    const PXR_NS::SdfPath& dependedOnPrimPath,
+    const PXR_NS::HdDataSourceLocator& dependedOnDataSourceLocator,
+    const PXR_NS::HdDataSourceLocator& affectedDataSourceLocator);
 
 Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
 
