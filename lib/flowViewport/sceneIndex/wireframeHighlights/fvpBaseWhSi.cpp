@@ -469,7 +469,7 @@ TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, con
 }
 #endif
 
-PXR_NS::HdContainerDataSourceHandle ComputeNormals(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource)
+PXR_NS::HdContainerDataSourceHandle ComputeSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource)
 {
     // Check if normals are already present
     auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, normalsValueLocator));
@@ -556,6 +556,11 @@ PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerD
     // Apply displaced points
     HdContainerDataSourceEditor dataSourceEditor(meshRootDataSource);
     dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
+
+    // Block materials to prevent displacement from being re-applied
+    dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+    dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+
     return dataSourceEditor.Finish();
 }
 
@@ -589,14 +594,10 @@ PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSour
         }
         dataSourceEditor.Set(normalsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(normals));
     }
-    
-    // Prevent further scaling by setting the xform to the identity
-    dataSourceEditor.Set(HdXformSchema::GetDefaultLocator(),
-        HdXformSchema::Builder()
-            .SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(GfMatrix4d(1)))
-            .SetResetXformStack(HdRetainedTypedSampledDataSource<bool>::New(true))
-            .Build()
-    );
+
+    // Set xform to the identity to prevent scaling from being re-applied
+    dataSourceEditor.Set(HdXformSchema::GetDefaultLocator().Append(HdXformSchemaTokens->matrix), HdRetainedTypedSampledDataSource<GfMatrix4d>::New(GfMatrix4d(1)));
+
     return dataSourceEditor.Finish();
 }
 
@@ -622,14 +623,6 @@ SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSourc
     }
 
     return bindingPathDataSource->GetTypedValue(0);
-}
-
-PXR_NS::HdContainerDataSourceHandle BlockMaterials(const PXR_NS::HdContainerDataSourceHandle& primDataSource)
-{
-    HdContainerDataSourceEditor dataSourceEditor(primDataSource);
-    dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-    dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-    return dataSourceEditor.Finish();
 }
 
 PXR_NS::HdContainerDataSourceHandle AddDependency(
@@ -1019,30 +1012,28 @@ BaseWhSi::CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPath
     }
 }
 
-float 
+VtValue 
 BaseWhSi::GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle& primDataSource) const
 {
-    float displacementValue = 0.f;
-
     if (!primDataSource) {
-        return displacementValue;
+        return {};
     }
 
     // Step 1: Get the material path
     const SdfPath materialPath = GetMaterialPath(primDataSource);
     if (materialPath.IsEmpty()) {
-        return displacementValue;
+        return {};
     }
 
     // Step 2: Retrieve the material
     HdSceneIndexPrim materialPrim = GetInputSceneIndex()->GetPrim(materialPath);
     if (!materialPrim.dataSource || (materialPrim.primType != HdPrimTypeTokens->material) ){
-        return displacementValue;
+        return {};
     }
 
     HdMaterialSchema materialSchema = HdMaterialSchema::GetFromParent(materialPrim.dataSource);
     if (!materialSchema.IsDefined()) {
-        return displacementValue;
+        return {};
     }
 
     // Step 3: Look for the displacement value
@@ -1052,11 +1043,11 @@ BaseWhSi::GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle
     for (auto nodeName : materialNetworkInterface.GetNodeNames()) {
         VtValue paramValue = materialNetworkInterface.GetNodeParameterValue(nodeName, HdMaterialTerminalTokens->displacement);
         if (paramValue.IsHolding<float>()) {
-            return paramValue.UncheckedGet<float>();
+            return paramValue;
         }
     }
 
-    return displacementValue;
+    return {};
 }
 
 PXR_NS::HdContainerDataSourceHandle
@@ -1066,22 +1057,27 @@ BaseWhSi::MakeGeomSubsetHighlight(
 {
     HdContainerDataSourceHandle editedMeshRootDataSource = meshRootDataSource;
 
-    // Manually apply the displacement on the mesh. We need to do this before trimming the mesh;
-    // otherwise Storm will compute normals and displacement based on the trimmed mesh, which gives
-    // incorrect results. Providing the normals primvar is not sufficient to fix this, so we must
-    // do everything manually, including scaling.
-    editedMeshRootDataSource = ComputeNormals(editedMeshRootDataSource);
-    editedMeshRootDataSource = ForceScale(editedMeshRootDataSource);
-    editedMeshRootDataSource = ForceDisplacement(editedMeshRootDataSource, GetMaterialDisplacementValue(geomSubsetRootDataSource));
+    VtValue displacementValue = GetMaterialDisplacementValue(geomSubsetRootDataSource);
+    if (displacementValue.IsHolding<float>()) {
+        // Manually apply the displacement on the mesh. We need to do this before trimming the mesh;
+        // otherwise Storm will compute normals and displacement based on the trimmed mesh, which gives
+        // incorrect results. Providing the normals primvar is not sufficient to fix this, so we must
+        // do everything manually, including scaling.
+        editedMeshRootDataSource = ComputeSmoothNormals(editedMeshRootDataSource);
+        editedMeshRootDataSource = ForceScale(editedMeshRootDataSource);
+        editedMeshRootDataSource = ForceDisplacement(editedMeshRootDataSource, displacementValue.UncheckedGet<float>());
 
-    // Trim the displaced mesh
+        // Setup a dependency so that material updates dirty the points & normals primvars
+        editedMeshRootDataSource = AddDependency(
+            editedMeshRootDataSource, 
+            TfToken("Fvp_WhSi_MaterialToPrimvars"), 
+            GetMaterialPath(geomSubsetRootDataSource), 
+            HdMaterialSchema::GetDefaultLocator(), 
+            HdPrimvarsSchema::GetDefaultLocator());
+    }
+
+    // Trim the mesh to fit the geomSubset
     editedMeshRootDataSource = TrimMeshForGeomSubset(editedMeshRootDataSource, geomSubsetRootDataSource);
-
-    // Setup the dependency so that material updates also dirty the points & normals primvars,
-    // and then block materials to prevent them from re-applying displacement
-    // (the dependency must be added before we block the materials, otherwise we can't know which material was assigned to the geomSubset)
-    editedMeshRootDataSource = AddDependency(editedMeshRootDataSource, TfToken("Fvp_WhSi_MaterialToPrimvars"), GetMaterialPath(geomSubsetRootDataSource), HdMaterialSchema::GetDefaultLocator(), HdPrimvarsSchema::GetDefaultLocator());
-    editedMeshRootDataSource = BlockMaterials(editedMeshRootDataSource);
 
     return editedMeshRootDataSource;
 }

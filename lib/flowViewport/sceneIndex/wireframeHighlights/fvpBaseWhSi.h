@@ -21,6 +21,7 @@
 #include <flowViewport/fvpWireframeColorInterface.h>
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 
+#include <pxr/base/vt/value.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 
@@ -219,7 +220,7 @@ protected:
 
     // Return the displacement value from the given prim data source's assigned material
     FVP_API
-    float GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle& primDataSource) const;
+    PXR_NS::VtValue GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle& primDataSource) const;
 
     // Given a mesh and geomSubset data sources, edits and returns the mesh data source to fit the given geomSubset
     FVP_API
@@ -241,22 +242,32 @@ protected:
 // Make the given prim be drawn as a wireframe of the given color.
 PXR_NS::HdContainerDataSourceHandle SetWireframeRepr(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color);
 
+// Repath instancing-related data sources by replacing srcPrefix with dstPrefix.
+// Mainly used to setup selection highlight instancers and instances.
+PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
+    const PXR_NS::HdContainerDataSourceHandle& primDataSource,
+    const PXR_NS::SdfPath& srcPrefix,
+    const PXR_NS::SdfPath& dstPrefix);
+
 #if PXR_VERSION >= 2403
 // Edit the given mesh data source such that its topology matches the given geomSubset.
 PXR_NS::HdContainerDataSourceHandle
 TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, const PXR_NS::HdContainerDataSourceHandle& geomSubsetRootDataSource);
 #endif
 
-PXR_NS::HdContainerDataSourceHandle ComputeNormals(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource);
-
-PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, float displacement);
-
-PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource);
-
+// Get the path to the prim's bound material.
 PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
 
-PXR_NS::HdContainerDataSourceHandle BlockMaterials(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
+// Computes and adds the normals primvar with smooth normals. If normals are already present, does nothing.
+PXR_NS::HdContainerDataSourceHandle ComputeSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource);
 
+// Manually apply scaling on the prim.
+PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource);
+
+// Manually apply displacement on the prim.
+PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, float displacement);
+
+// Add an entry to the __dependencies data source
 PXR_NS::HdContainerDataSourceHandle AddDependency(
     const PXR_NS::HdContainerDataSourceHandle& primDataSource,
     const PXR_NS::TfToken& dependencyToken,
@@ -264,8 +275,7 @@ PXR_NS::HdContainerDataSourceHandle AddDependency(
     const PXR_NS::HdDataSourceLocator& dependedOnDataSourceLocator,
     const PXR_NS::HdDataSourceLocator& affectedDataSourceLocator);
 
-PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(const PXR_NS::HdContainerDataSourceHandle& primDataSource, const PXR_NS::SdfPath& srcPrefix, const PXR_NS::SdfPath& dstPrefix);
-
+// Return a Fvp::PrimSelection equivalent to the given Hydra selection
 Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
 
 }
