@@ -17,7 +17,9 @@
 
 #include <flowViewport/fvpUtils.h>
 
+#include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/gf/vec3f.h>
+#include <pxr/base/gf/vec4f.h>
 #include <pxr/base/tf/staticTokens.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/dataSourceMaterialNetworkInterface.h>
@@ -42,6 +44,7 @@
 #include <pxr/imaging/hd/smoothNormals.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/vertexAdjacency.h>
+#include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/imaging/pxOsd/tokens.h>
 #include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
 #include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
@@ -552,10 +555,50 @@ PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerD
 
     // Apply displaced points
     HdContainerDataSourceEditor dataSourceEditor(meshRootDataSource);
-    dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));    
+    dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
     return dataSourceEditor.Finish();
 }
 
+PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource)
+{
+    auto xformSchema = HdXformSchema::GetFromParent(meshRootDataSource);
+    if (!xformSchema.IsDefined() || !xformSchema.GetMatrix()) {
+        return meshRootDataSource;
+    }
+    GfMatrix4d xformMatrix = xformSchema.GetMatrix()->GetTypedValue(0);
+
+    HdContainerDataSourceEditor dataSourceEditor(meshRootDataSource);
+
+    // Scale points
+    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, pointsValueLocator));
+    if (pointsValueDataSource) {
+        auto points = pointsValueDataSource->GetTypedValue(0);
+        for (size_t iPoint = 0; iPoint < points.size(); iPoint++) {
+            points[iPoint] = GfVec3f(xformMatrix.Transform(points[iPoint]));
+        }
+        dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
+    }
+
+    // Scale normals
+    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, normalsValueLocator));
+    if (normalsValueDataSource) {
+        auto normals = normalsValueDataSource->GetTypedValue(0);
+        for (size_t iNormal = 0; iNormal < normals.size(); iNormal++) {
+            normals[iNormal] = GfVec3f(xformMatrix.GetInverse().GetTranspose().TransformDir(normals[iNormal]));
+            normals[iNormal].Normalize();
+        }
+        dataSourceEditor.Set(normalsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(normals));
+    }
+    
+    // Prevent further scaling by setting the xform to the identity
+    dataSourceEditor.Set(HdXformSchema::GetDefaultLocator(),
+        HdXformSchema::Builder()
+            .SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(GfMatrix4d(1)))
+            .SetResetXformStack(HdRetainedTypedSampledDataSource<bool>::New(true))
+            .Build()
+    );
+    return dataSourceEditor.Finish();
+}
 
 SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource)
 {
@@ -1023,13 +1066,16 @@ BaseWhSi::MakeGeomSubsetHighlight(
 {
     HdContainerDataSourceHandle editedMeshRootDataSource = meshRootDataSource;
 
-    // Compute the normals and then trim the mesh
-    // (normals must be computed before trimming so that they follow the original mesh's topology)
+    // Manually apply the displacement on the mesh. We need to do this before trimming the mesh;
+    // otherwise Storm will compute normals and displacement based on the trimmed mesh, which gives
+    // incorrect results. Providing the normals primvar is not sufficient to fix this, so we must
+    // do everything manually, including scaling.
     editedMeshRootDataSource = ComputeNormals(editedMeshRootDataSource);
-    editedMeshRootDataSource = TrimMeshForGeomSubset(editedMeshRootDataSource, geomSubsetRootDataSource);
-
-    // Force the displacement
+    editedMeshRootDataSource = ForceScale(editedMeshRootDataSource);
     editedMeshRootDataSource = ForceDisplacement(editedMeshRootDataSource, GetMaterialDisplacementValue(geomSubsetRootDataSource));
+
+    // Trim the displaced mesh
+    editedMeshRootDataSource = TrimMeshForGeomSubset(editedMeshRootDataSource, geomSubsetRootDataSource);
 
     // Setup the dependency so that material updates also dirty the points & normals primvars,
     // and then block materials to prevent them from re-applying displacement
