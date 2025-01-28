@@ -54,11 +54,13 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
-//Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
 TF_DEFINE_PRIVATE_TOKENS(
-     _primVarsTokens,
- 
-     (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
+    _tokens,
+
+    // Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
+    (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
+
+    (fvpWhSiMaterialToPrimvars)
  );
 
 const HdRetainedContainerDataSourceHandle refinedWireDisplayStyleDataSource
@@ -74,7 +76,7 @@ const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->reprSelector);
 
 const HdDataSourceLocator primvarsOverrideWireframeColorLocator(
-        HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor));
+        HdPrimvarsSchema::GetDefaultLocator().Append(_tokens->overrideWireframeColor));
 
 const HdDataSourceLocator pointsValueLocator = HdDataSourceLocator(
     HdPrimvarsSchemaTokens->primvars,
@@ -1059,7 +1061,7 @@ BaseWhSi::MakeGeomSubsetHighlight(
         // Setup a dependency so that material updates dirty the points & normals primvars
         editedMeshPrimDataSource = AddDependency(
             editedMeshPrimDataSource, 
-            TfToken("Fvp_WhSi_MaterialToPrimvars"), 
+            _tokens->fvpWhSiMaterialToPrimvars, 
             GetMaterialPath(geomSubsetPrimDataSource), 
             HdMaterialSchema::GetDefaultLocator(), 
             HdPrimvarsSchema::GetDefaultLocator());
