@@ -225,8 +225,8 @@ protected:
     // Given a mesh and geomSubset data sources, edits and returns the mesh data source to fit the given geomSubset
     FVP_API
     PXR_NS::HdContainerDataSourceHandle MakeGeomSubsetHighlight(
-        const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource,
-        const PXR_NS::HdContainerDataSourceHandle& geomSubsetRootDataSource) const;
+        const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource,
+        const PXR_NS::HdContainerDataSourceHandle& geomSubsetPrimDataSource) const;
 
     const PXR_NS::SdfPath _highlightHierarchyPrefix;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
@@ -258,17 +258,17 @@ PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primD
 #if PXR_VERSION >= 2403
 // Edit the given mesh data source such that its topology matches the given geomSubset.
 PXR_NS::HdContainerDataSourceHandle
-TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, const PXR_NS::HdContainerDataSourceHandle& geomSubsetRootDataSource);
+TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource, const PXR_NS::HdContainerDataSourceHandle& geomSubsetPrimDataSource);
 #endif
 
 // Computes and adds the normals primvar with smooth normals. If normals are already present, does nothing.
-PXR_NS::HdContainerDataSourceHandle ComputeSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource);
+PXR_NS::HdContainerDataSourceHandle ComputeSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource);
 
 // Manually apply scaling on the prim.
-PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource);
+PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource);
 
 // Manually apply displacement on the prim.
-PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, float displacement);
+PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource, float displacement);
 
 // Add an entry to the __dependencies data source
 PXR_NS::HdContainerDataSourceHandle AddDependency(

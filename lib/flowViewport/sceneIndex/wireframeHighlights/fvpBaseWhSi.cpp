@@ -467,41 +467,41 @@ SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSourc
 
 #if PXR_VERSION >= 2403
 HdContainerDataSourceHandle
-TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, const HdContainerDataSourceHandle& geomSubsetRootDataSource)
+TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshPrimDataSource, const HdContainerDataSourceHandle& geomSubsetPrimDataSource)
 {
-    HdMeshSchema meshSchema = HdMeshSchema::GetFromParent(meshRootDataSource);
+    HdMeshSchema meshSchema = HdMeshSchema::GetFromParent(meshPrimDataSource);
     if (!meshSchema.IsDefined()) {
-        return meshRootDataSource;
+        return meshPrimDataSource;
     }
     HdMeshTopologySchema meshTopologySchema = meshSchema.GetTopology();
     if (!meshTopologySchema.IsDefined()) {
-        return meshRootDataSource;
+        return meshPrimDataSource;
     }
-    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, pointsValueLocator));
+    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, pointsValueLocator));
     if (!pointsValueDataSource) {
-        return meshRootDataSource;
+        return meshPrimDataSource;
     }
 
     // Collect faces to keep based on the GeomSubset
     std::unordered_set<int> faceIndicesToKeep;
     #if HD_API_VERSION >= 71 // USD 24.08+
-        HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema::GetFromParent(geomSubsetRootDataSource);
+        HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema::GetFromParent(geomSubsetPrimDataSource);
     #else
-        HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema(geomSubsetRootDataSource);
+        HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema(geomSubsetPrimDataSource);
     #endif
     if (!geomSubsetSchema.IsDefined() || geomSubsetSchema.GetType()->GetTypedValue(0) != HdGeomSubsetSchemaTokens->typeFaceSet) {
-        return meshRootDataSource;
+        return meshPrimDataSource;
     }
     VtArray<int> faceIndices = geomSubsetSchema.GetIndices()->GetTypedValue(0);
     for (const auto& faceIndex : faceIndices) {
         faceIndicesToKeep.insert(faceIndex);
     }
     if (faceIndicesToKeep.empty()) {
-        return meshRootDataSource;
+        return meshPrimDataSource;
     }
 
     // Edit the mesh topology
-    HdContainerDataSourceEditor dataSourceEditor = HdContainerDataSourceEditor(meshRootDataSource);
+    HdContainerDataSourceEditor dataSourceEditor = HdContainerDataSourceEditor(meshPrimDataSource);
     VtArray<int> originalFaceVertexCounts = meshTopologySchema.GetFaceVertexCounts()->GetTypedValue(0);
     VtArray<int> originalFaceVertexIndices = meshTopologySchema.GetFaceVertexIndices()->GetTypedValue(0);
     VtArray<int> trimmedFaceVertexCounts;
@@ -538,7 +538,7 @@ TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, con
     points.resize(maxVertexIndex + 1);
     dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
 
-    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, normalsValueLocator));
+    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, normalsValueLocator));
     if (normalsValueDataSource) {
         auto normals = normalsValueDataSource->GetTypedValue(0);
         normals.resize(maxVertexIndex + 1);
@@ -549,26 +549,26 @@ TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, con
 }
 #endif
 
-PXR_NS::HdContainerDataSourceHandle ComputeSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource)
+PXR_NS::HdContainerDataSourceHandle ComputeSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource)
 {
     // Check if normals are already present
-    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, normalsValueLocator));
+    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, normalsValueLocator));
     if (normalsValueDataSource) {
-        return meshRootDataSource;
+        return meshPrimDataSource;
     }
 
     // Get required schemas/dataSources
-    HdMeshSchema meshSchema = HdMeshSchema::GetFromParent(meshRootDataSource);
+    HdMeshSchema meshSchema = HdMeshSchema::GetFromParent(meshPrimDataSource);
     if (!meshSchema.IsDefined()) {
-        return meshRootDataSource;
+        return meshPrimDataSource;
     }
     HdMeshTopologySchema meshTopologySchema = meshSchema.GetTopology();
     if (!meshTopologySchema.IsDefined()) {
-        return meshRootDataSource;
+        return meshPrimDataSource;
     }
-    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, pointsValueLocator));
+    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, pointsValueLocator));
     if (!pointsValueDataSource) {
-        return meshRootDataSource;
+        return meshPrimDataSource;
     }
 
     // Setup topology
@@ -604,23 +604,23 @@ PXR_NS::HdContainerDataSourceHandle ComputeSmoothNormals(const PXR_NS::HdContain
         .SetRole(HdPrimvarSchema::BuildRoleDataSource(HdPrimvarSchemaTokens->normal))
         .SetPrimvarValue(HdRetainedTypedSampledDataSource<decltype(normals)>::New(normals))
         .Build();
-    HdContainerDataSourceEditor dataSourceEditor(meshRootDataSource);
+    HdContainerDataSourceEditor dataSourceEditor(meshPrimDataSource);
     dataSourceEditor.Set(normalsPrimvarLocator, normalsPrimvarDataSource);
     return dataSourceEditor.Finish();
 }
 
-PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource)
+PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource)
 {
-    auto xformSchema = HdXformSchema::GetFromParent(meshRootDataSource);
+    auto xformSchema = HdXformSchema::GetFromParent(meshPrimDataSource);
     if (!xformSchema.IsDefined() || !xformSchema.GetMatrix()) {
-        return meshRootDataSource;
+        return meshPrimDataSource;
     }
     GfMatrix4d xformMatrix = xformSchema.GetMatrix()->GetTypedValue(0);
 
-    HdContainerDataSourceEditor dataSourceEditor(meshRootDataSource);
+    HdContainerDataSourceEditor dataSourceEditor(meshPrimDataSource);
 
     // Scale points
-    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, pointsValueLocator));
+    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, pointsValueLocator));
     if (pointsValueDataSource) {
         auto points = pointsValueDataSource->GetTypedValue(0);
         for (size_t iPoint = 0; iPoint < points.size(); iPoint++) {
@@ -630,7 +630,7 @@ PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSour
     }
 
     // Scale normals
-    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, normalsValueLocator));
+    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, normalsValueLocator));
     if (normalsValueDataSource) {
         auto normals = normalsValueDataSource->GetTypedValue(0);
         for (size_t iNormal = 0; iNormal < normals.size(); iNormal++) {
@@ -646,22 +646,22 @@ PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSour
     return dataSourceEditor.Finish();
 }
 
-PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, float displacement)
+PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource, float displacement)
 {
-    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, pointsValueLocator));
+    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, pointsValueLocator));
     if (!pointsValueDataSource) {
-        return meshRootDataSource;
+        return meshPrimDataSource;
     }
-    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, normalsValueLocator));
+    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, normalsValueLocator));
     if (!normalsValueDataSource) {
-        return meshRootDataSource;
+        return meshPrimDataSource;
     }
 
     auto points = pointsValueDataSource->GetTypedValue(0);
     auto normals = normalsValueDataSource->GetTypedValue(0);
 
     if (points.size() > normals.size()) {
-        return meshRootDataSource;
+        return meshPrimDataSource;
     }
 
     // Compute displacement
@@ -670,7 +670,7 @@ PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerD
     }
 
     // Apply displaced points
-    HdContainerDataSourceEditor dataSourceEditor(meshRootDataSource);
+    HdContainerDataSourceEditor dataSourceEditor(meshPrimDataSource);
     dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
 
     // Block materials to prevent displacement from being re-applied
@@ -1041,34 +1041,34 @@ BaseWhSi::GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle
 
 PXR_NS::HdContainerDataSourceHandle
 BaseWhSi::MakeGeomSubsetHighlight(
-    const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource,
-    const PXR_NS::HdContainerDataSourceHandle& geomSubsetRootDataSource) const
+    const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource,
+    const PXR_NS::HdContainerDataSourceHandle& geomSubsetPrimDataSource) const
 {
-    HdContainerDataSourceHandle editedMeshRootDataSource = meshRootDataSource;
+    HdContainerDataSourceHandle editedMeshPrimDataSource = meshPrimDataSource;
 
-    VtValue displacementValue = GetMaterialDisplacementValue(geomSubsetRootDataSource);
+    VtValue displacementValue = GetMaterialDisplacementValue(geomSubsetPrimDataSource);
     if (displacementValue.IsHolding<float>()) {
         // Manually apply the displacement on the mesh. We need to do this before trimming the mesh;
         // otherwise Storm will compute normals and displacement based on the trimmed mesh, which gives
         // incorrect results. Providing the normals primvar is not sufficient to fix this, so we must
         // do everything manually, including scaling.
-        editedMeshRootDataSource = ComputeSmoothNormals(editedMeshRootDataSource);
-        editedMeshRootDataSource = ForceScale(editedMeshRootDataSource);
-        editedMeshRootDataSource = ForceDisplacement(editedMeshRootDataSource, displacementValue.UncheckedGet<float>());
+        editedMeshPrimDataSource = ComputeSmoothNormals(editedMeshPrimDataSource);
+        editedMeshPrimDataSource = ForceScale(editedMeshPrimDataSource);
+        editedMeshPrimDataSource = ForceDisplacement(editedMeshPrimDataSource, displacementValue.UncheckedGet<float>());
 
         // Setup a dependency so that material updates dirty the points & normals primvars
-        editedMeshRootDataSource = AddDependency(
-            editedMeshRootDataSource, 
+        editedMeshPrimDataSource = AddDependency(
+            editedMeshPrimDataSource, 
             TfToken("Fvp_WhSi_MaterialToPrimvars"), 
-            GetMaterialPath(geomSubsetRootDataSource), 
+            GetMaterialPath(geomSubsetPrimDataSource), 
             HdMaterialSchema::GetDefaultLocator(), 
             HdPrimvarsSchema::GetDefaultLocator());
     }
 
     // Trim the mesh to fit the geomSubset
-    editedMeshRootDataSource = TrimMeshForGeomSubset(editedMeshRootDataSource, geomSubsetRootDataSource);
+    editedMeshPrimDataSource = TrimMeshForGeomSubset(editedMeshPrimDataSource, geomSubsetPrimDataSource);
 
-    return editedMeshRootDataSource;
+    return editedMeshPrimDataSource;
 }
 
 }
