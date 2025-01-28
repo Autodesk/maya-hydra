@@ -298,51 +298,73 @@ private:
     HdPathArrayDataSourceHandle const _inputDataSource;
 };
 
+// Copied over from USD's rerootingSceneIndex.cpp
+class _RerootingSceneIndexContainerDataSource : public HdContainerDataSource
+{
+public:
+    HD_DECLARE_DATASOURCE(_RerootingSceneIndexContainerDataSource)
+
+    _RerootingSceneIndexContainerDataSource(
+        const SdfPath &srcPrefix,
+        const SdfPath &dstPrefix,
+        HdContainerDataSourceHandle const &inputDataSource)
+      : _srcPrefix(srcPrefix)
+      , _dstPrefix(dstPrefix)
+      , _inputDataSource(inputDataSource)
+    {
+    }
+
+    TfTokenVector GetNames() override
+    {
+        if (!_inputDataSource) {
+            return {};
+        }
+
+        return _inputDataSource->GetNames();
+    }
+
+    HdDataSourceBaseHandle Get(const TfToken& name) override
+    {
+        if (!_inputDataSource) {
+            return nullptr;
+        }
+
+        // wrap child containers so that we can wrap their children
+        HdDataSourceBaseHandle const childSource = _inputDataSource->Get(name);
+        if (!childSource) {
+            return nullptr;
+        }
+
+        if (auto childContainer =
+                HdContainerDataSource::Cast(childSource)) {
+            return New(_srcPrefix, _dstPrefix, std::move(childContainer));
+        }
+
+        if (auto childPathDataSource =
+                HdTypedSampledDataSource<SdfPath>::Cast(childSource)) {
+            return _RerootingSceneIndexPathDataSource::New(
+                _srcPrefix, _dstPrefix, childPathDataSource);
+        }
+
+        if (auto childPathArrayDataSource =
+                HdTypedSampledDataSource<VtArray<SdfPath>>::Cast(
+                    childSource)) {
+            return _RerootingSceneIndexPathArrayDataSource::New(
+                _srcPrefix, _dstPrefix, childPathArrayDataSource);
+        }
+
+        return childSource;
+    }
+
+private:
+    const SdfPath _srcPrefix;
+    const SdfPath _dstPrefix;
+    HdContainerDataSourceHandle const _inputDataSource;
+};
+
 }
 
 namespace FVP_NS_DEF {
-
-TfTokenVector RepathingContainerDataSource::GetNames()
-{
-    if (!_inputDataSource) {
-        return {};
-    }
-
-    return _inputDataSource->GetNames();
-}
-
-HdDataSourceBaseHandle RepathingContainerDataSource::Get(const TfToken& name)
-{
-    if (!_inputDataSource) {
-        return nullptr;
-    }
-
-    // wrap child containers so that we can wrap their children
-    HdDataSourceBaseHandle const childSource = _inputDataSource->Get(name);
-    if (!childSource) {
-        return nullptr;
-    }
-
-    if (auto childContainer =
-            HdContainerDataSource::Cast(childSource)) {
-        return New(_srcPrefix, _dstPrefix, std::move(childContainer));
-    }
-
-    if (auto childPathDataSource =
-            HdTypedSampledDataSource<SdfPath>::Cast(childSource)) {
-        return _RerootingSceneIndexPathDataSource::New(
-            _srcPrefix, _dstPrefix, childPathDataSource);
-    }
-
-    if (auto childPathArrayDataSource =
-            HdTypedSampledDataSource<VtArray<SdfPath>>::Cast(
-                childSource)) {
-        return _RerootingSceneIndexPathArrayDataSource::New(
-            _srcPrefix, _dstPrefix, childPathArrayDataSource);
-    }
-
-    return childSource;
-}
 
 //We want to set the displayStyle of the selected prim to refinedWireOnSurf only if the displayStyle of the prim is refined (meaning shaded)
 HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& dataSource, const GfVec4f& color)
@@ -422,7 +444,7 @@ PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
         if (auto containerDataSource = HdContainerDataSource::Cast(instancingDataSource)) {
             dataSourceEditor.Set(
                 instancingDataSourceLocator,
-                RepathingContainerDataSource::New(srcPrefix, dstPrefix, containerDataSource)
+                _RerootingSceneIndexContainerDataSource::New(srcPrefix, dstPrefix, containerDataSource)
             );
         }
 

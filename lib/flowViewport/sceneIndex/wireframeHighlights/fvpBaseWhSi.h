@@ -30,32 +30,6 @@
 
 namespace FVP_NS_DEF {
 
-// Essentially a port of USD's _RerootingSceneIndexContainerDataSource in rerootingSceneIndex.cpp
-class RepathingContainerDataSource : public PXR_NS::HdContainerDataSource
-{
-public:
-    HD_DECLARE_DATASOURCE(RepathingContainerDataSource)
-
-    RepathingContainerDataSource(
-        const PXR_NS::SdfPath &srcPrefix,
-        const PXR_NS::SdfPath &dstPrefix,
-        PXR_NS::HdContainerDataSourceHandle const &inputDataSource)
-      : _srcPrefix(srcPrefix)
-      , _dstPrefix(dstPrefix)
-      , _inputDataSource(inputDataSource)
-    {
-    }
-
-    PXR_NS::TfTokenVector GetNames() override;
-
-    PXR_NS::HdDataSourceBaseHandle Get(const PXR_NS::TfToken& name) override;
-
-private:
-    const PXR_NS::SdfPath _srcPrefix;
-    const PXR_NS::SdfPath _dstPrefix;
-    PXR_NS::HdContainerDataSourceHandle const _inputDataSource;
-};
-
 using SelectionKey = std::pair<PXR_NS::SdfPath, std::string>;
 
 enum InstancingPathsCollectionDirection {
