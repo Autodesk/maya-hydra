@@ -46,7 +46,9 @@
 #include <pxr/imaging/hd/vertexAdjacency.h>
 #include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/imaging/pxOsd/tokens.h>
+#if PXR_VERSION >= 2403
 #include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
+#endif
 #include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
 
 #include <unordered_set>
@@ -699,7 +701,9 @@ PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerD
 
     // Block materials to prevent displacement from being re-applied
     dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+#if PXR_VERSION >= 2403
     dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+#endif
 
     return dataSourceEditor.Finish();
 }
