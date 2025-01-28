@@ -242,6 +242,9 @@ protected:
 // Make the given prim be drawn as a wireframe of the given color.
 PXR_NS::HdContainerDataSourceHandle SetWireframeRepr(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color);
 
+// Return a Fvp::PrimSelection equivalent to the given Hydra selection
+Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
+
 // Repath instancing-related data sources by replacing srcPrefix with dstPrefix.
 // Mainly used to setup selection highlight instancers and instances.
 PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
@@ -249,14 +252,14 @@ PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
     const PXR_NS::SdfPath& srcPrefix,
     const PXR_NS::SdfPath& dstPrefix);
 
+// Get the path to the prim's bound material.
+PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
+
 #if PXR_VERSION >= 2403
 // Edit the given mesh data source such that its topology matches the given geomSubset.
 PXR_NS::HdContainerDataSourceHandle
 TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, const PXR_NS::HdContainerDataSourceHandle& geomSubsetRootDataSource);
 #endif
-
-// Get the path to the prim's bound material.
-PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
 
 // Computes and adds the normals primvar with smooth normals. If normals are already present, does nothing.
 PXR_NS::HdContainerDataSourceHandle ComputeSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource);
@@ -274,9 +277,6 @@ PXR_NS::HdContainerDataSourceHandle AddDependency(
     const PXR_NS::SdfPath& dependedOnPrimPath,
     const PXR_NS::HdDataSourceLocator& dependedOnDataSourceLocator,
     const PXR_NS::HdDataSourceLocator& affectedDataSourceLocator);
-
-// Return a Fvp::PrimSelection equivalent to the given Hydra selection
-Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
 
 }
 

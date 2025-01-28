@@ -461,6 +461,96 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
     return edited.Finish();
 }
 
+Fvp::PrimSelection ConvertHydraToFvpSelection(const SdfPath& primPath, const HdSelectionSchema& selectionSchema) {
+    Fvp::PrimSelection primSelection;
+    primSelection.primPath = primPath;
+
+    auto nestedInstanceIndicesSchema = 
+#if HD_API_VERSION < 66
+    const_cast<HdSelectionSchema&>(selectionSchema).GetNestedInstanceIndices();
+#else
+    selectionSchema.GetNestedInstanceIndices();
+#endif
+    for (size_t iNestedInstanceIndices = 0; iNestedInstanceIndices < nestedInstanceIndicesSchema.GetNumElements(); iNestedInstanceIndices++) {
+        HdInstanceIndicesSchema instanceIndicesSchema = nestedInstanceIndicesSchema.GetElement(iNestedInstanceIndices);
+        auto instanceIndices = instanceIndicesSchema.GetInstanceIndices()->GetTypedValue(0);
+        primSelection.nestedInstanceIndices.push_back(
+            {
+                instanceIndicesSchema.GetInstancer()->GetTypedValue(0),
+                instanceIndicesSchema.GetPrototypeIndex()->GetTypedValue(0),
+                std::vector<int>(instanceIndices.begin(), instanceIndices.end())
+            }
+        );
+    }
+
+    return primSelection;
+}
+
+PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
+    const PXR_NS::HdContainerDataSourceHandle& primDataSource, 
+    const PXR_NS::SdfPath& srcPrefix, 
+    const PXR_NS::SdfPath& dstPrefix)
+{
+    static const std::set<HdDataSourceLocator> kInstancingDataSourceLocators = {
+        HdInstancerTopologySchema::GetDefaultLocator(),
+        HdInstancedBySchema::GetDefaultLocator(),
+        HdInstanceSchema::GetDefaultLocator(),
+        UsdImagingUsdPrimInfoSchema::GetDefaultLocator().Append(UsdImagingUsdPrimInfoSchemaTokens->piPropagatedPrototypes),
+        UsdImagingUsdPrimInfoSchema::GetDefaultLocator().Append(UsdImagingUsdPrimInfoSchemaTokens->niPrototypePath),
+    };
+
+    HdContainerDataSourceEditor dataSourceEditor(primDataSource);
+    for (const auto& instancingDataSourceLocator : kInstancingDataSourceLocators) {
+        auto instancingDataSource = HdContainerDataSource::Get(primDataSource, instancingDataSourceLocator);
+        
+        if (auto containerDataSource = HdContainerDataSource::Cast(instancingDataSource)) {
+            dataSourceEditor.Set(
+                instancingDataSourceLocator,
+                RepathingContainerDataSource::New(srcPrefix, dstPrefix, containerDataSource)
+            );
+        }
+
+        if (auto pathDataSource = HdTypedSampledDataSource<SdfPath>::Cast(instancingDataSource)) {
+            dataSourceEditor.Set(
+                instancingDataSourceLocator,
+                _RerootingSceneIndexPathDataSource::New(srcPrefix, dstPrefix, pathDataSource)
+            );
+        }
+
+        if (auto pathArrayDataSource = HdTypedSampledDataSource<VtArray<SdfPath>>::Cast(instancingDataSource)) {
+            dataSourceEditor.Set(
+                instancingDataSourceLocator,
+                _RerootingSceneIndexPathArrayDataSource::New(srcPrefix, dstPrefix, pathArrayDataSource)
+            );
+        }
+    }
+    return dataSourceEditor.Finish();
+}
+
+SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource)
+{
+    if (!primDataSource) {
+        return {};
+    }
+
+    HdMaterialBindingsSchema materialBindingsSchema = HdMaterialBindingsSchema::GetFromParent(primDataSource);
+    if (!materialBindingsSchema.IsDefined()) {
+        return {};
+    }
+
+    HdMaterialBindingSchema materialBindingSchema = materialBindingsSchema.GetMaterialBinding();
+    if (!materialBindingSchema) {
+        return {};
+    }
+
+    HdPathDataSourceHandle bindingPathDataSource = materialBindingSchema.GetPath();
+    if (!bindingPathDataSource) {
+        return {};
+    }
+
+    return bindingPathDataSource->GetTypedValue(0);
+}
+
 #if PXR_VERSION >= 2403
 HdContainerDataSourceHandle
 TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, const HdContainerDataSourceHandle& geomSubsetRootDataSource)
@@ -519,48 +609,13 @@ PXR_NS::HdContainerDataSourceHandle ComputeSmoothNormals(const PXR_NS::HdContain
         &adjacency, static_cast<int>(points.size()), points.cdata());
 
     // Apply normals
-    auto normalsDataSource = HdPrimvarSchema::Builder()
+    auto normalsPrimvarDataSource = HdPrimvarSchema::Builder()
         .SetInterpolation(HdPrimvarSchema::BuildInterpolationDataSource(HdPrimvarSchemaTokens->vertex))
         .SetRole(HdPrimvarSchema::BuildRoleDataSource(HdPrimvarSchemaTokens->normal))
         .SetPrimvarValue(HdRetainedTypedSampledDataSource<decltype(normals)>::New(normals))
         .Build();
-    HdDataSourceLocator normalsPrimvarLocator = HdDataSourceLocator(HdPrimvarsSchemaTokens->primvars, HdPrimvarsSchemaTokens->normals);
     HdContainerDataSourceEditor dataSourceEditor(meshRootDataSource);
-    dataSourceEditor.Set(normalsPrimvarLocator, normalsDataSource);
-    return dataSourceEditor.Finish();
-}
-
-PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, float displacement)
-{
-    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, pointsValueLocator));
-    if (!pointsValueDataSource) {
-        return meshRootDataSource;
-    }
-    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, normalsValueLocator));
-    if (!normalsValueDataSource) {
-        return meshRootDataSource;
-    }
-
-    auto points = pointsValueDataSource->GetTypedValue(0);
-    auto normals = normalsValueDataSource->GetTypedValue(0);
-
-    if (points.size() > normals.size()) {
-        return meshRootDataSource;
-    }
-
-    // Compute displacement
-    for (size_t iPoint = 0; iPoint < points.size(); iPoint++) {
-        points[iPoint] += normals[iPoint] * displacement;
-    }
-
-    // Apply displaced points
-    HdContainerDataSourceEditor dataSourceEditor(meshRootDataSource);
-    dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
-
-    // Block materials to prevent displacement from being re-applied
-    dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-    dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-
+    dataSourceEditor.Set(normalsPrimvarLocator, normalsPrimvarDataSource);
     return dataSourceEditor.Finish();
 }
 
@@ -601,28 +656,38 @@ PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSour
     return dataSourceEditor.Finish();
 }
 
-SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource)
+PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, float displacement)
 {
-    if (!primDataSource) {
-        return {};
+    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, pointsValueLocator));
+    if (!pointsValueDataSource) {
+        return meshRootDataSource;
+    }
+    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, normalsValueLocator));
+    if (!normalsValueDataSource) {
+        return meshRootDataSource;
     }
 
-    HdMaterialBindingsSchema materialBindingsSchema = HdMaterialBindingsSchema::GetFromParent(primDataSource);
-    if (!materialBindingsSchema.IsDefined()) {
-        return {};
+    auto points = pointsValueDataSource->GetTypedValue(0);
+    auto normals = normalsValueDataSource->GetTypedValue(0);
+
+    if (points.size() > normals.size()) {
+        return meshRootDataSource;
     }
 
-    HdMaterialBindingSchema materialBindingSchema = materialBindingsSchema.GetMaterialBinding();
-    if (!materialBindingSchema) {
-        return {};
+    // Compute displacement
+    for (size_t iPoint = 0; iPoint < points.size(); iPoint++) {
+        points[iPoint] += normals[iPoint] * displacement;
     }
 
-    HdPathDataSourceHandle bindingPathDataSource = materialBindingSchema.GetPath();
-    if (!bindingPathDataSource) {
-        return {};
-    }
+    // Apply displaced points
+    HdContainerDataSourceEditor dataSourceEditor(meshRootDataSource);
+    dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
 
-    return bindingPathDataSource->GetTypedValue(0);
+    // Block materials to prevent displacement from being re-applied
+    dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+    dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+
+    return dataSourceEditor.Finish();
 }
 
 PXR_NS::HdContainerDataSourceHandle AddDependency(
@@ -647,72 +712,6 @@ PXR_NS::HdContainerDataSourceHandle AddDependency(
     HdContainerDataSourceEditor dataSourceEditor(primDataSource);
     dataSourceEditor.Overlay(HdDependenciesSchema::GetDefaultLocator(), dependencyDataSource);
     return dataSourceEditor.Finish();
-}
-
-PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
-    const PXR_NS::HdContainerDataSourceHandle& primDataSource, 
-    const PXR_NS::SdfPath& srcPrefix, 
-    const PXR_NS::SdfPath& dstPrefix)
-{
-    static const std::set<HdDataSourceLocator> kInstancingDataSourceLocators = {
-        HdInstancerTopologySchema::GetDefaultLocator(),
-        HdInstancedBySchema::GetDefaultLocator(),
-        HdInstanceSchema::GetDefaultLocator(),
-        UsdImagingUsdPrimInfoSchema::GetDefaultLocator().Append(UsdImagingUsdPrimInfoSchemaTokens->piPropagatedPrototypes),
-        UsdImagingUsdPrimInfoSchema::GetDefaultLocator().Append(UsdImagingUsdPrimInfoSchemaTokens->niPrototypePath),
-    };
-
-    HdContainerDataSourceEditor dataSourceEditor(primDataSource);
-    for (const auto& instancingDataSourceLocator : kInstancingDataSourceLocators) {
-        auto instancingDataSource = HdContainerDataSource::Get(primDataSource, instancingDataSourceLocator);
-        
-        if (auto containerDataSource = HdContainerDataSource::Cast(instancingDataSource)) {
-            dataSourceEditor.Set(
-                instancingDataSourceLocator,
-                RepathingContainerDataSource::New(srcPrefix, dstPrefix, containerDataSource)
-            );
-        }
-
-        if (auto pathDataSource = HdTypedSampledDataSource<SdfPath>::Cast(instancingDataSource)) {
-            dataSourceEditor.Set(
-                instancingDataSourceLocator,
-                _RerootingSceneIndexPathDataSource::New(srcPrefix, dstPrefix, pathDataSource)
-            );
-        }
-
-        if (auto pathArrayDataSource = HdTypedSampledDataSource<VtArray<SdfPath>>::Cast(instancingDataSource)) {
-            dataSourceEditor.Set(
-                instancingDataSourceLocator,
-                _RerootingSceneIndexPathArrayDataSource::New(srcPrefix, dstPrefix, pathArrayDataSource)
-            );
-        }
-    }
-    return dataSourceEditor.Finish();
-}
-
-Fvp::PrimSelection ConvertHydraToFvpSelection(const SdfPath& primPath, const HdSelectionSchema& selectionSchema) {
-    Fvp::PrimSelection primSelection;
-    primSelection.primPath = primPath;
-
-    auto nestedInstanceIndicesSchema = 
-#if HD_API_VERSION < 66
-    const_cast<HdSelectionSchema&>(selectionSchema).GetNestedInstanceIndices();
-#else
-    selectionSchema.GetNestedInstanceIndices();
-#endif
-    for (size_t iNestedInstanceIndices = 0; iNestedInstanceIndices < nestedInstanceIndicesSchema.GetNumElements(); iNestedInstanceIndices++) {
-        HdInstanceIndicesSchema instanceIndicesSchema = nestedInstanceIndicesSchema.GetElement(iNestedInstanceIndices);
-        auto instanceIndices = instanceIndicesSchema.GetInstanceIndices()->GetTypedValue(0);
-        primSelection.nestedInstanceIndices.push_back(
-            {
-                instanceIndicesSchema.GetInstancer()->GetTypedValue(0),
-                instanceIndicesSchema.GetPrototypeIndex()->GetTypedValue(0),
-                std::vector<int>(instanceIndices.begin(), instanceIndices.end())
-            }
-        );
-    }
-
-    return primSelection;
 }
 
 BaseWhSi::BaseWhSi(
