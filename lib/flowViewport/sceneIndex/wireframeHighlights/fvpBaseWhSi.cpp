@@ -1063,6 +1063,7 @@ BaseWhSi::GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle
     return {};
 }
 
+#if PXR_VERSION >= 2403
 PXR_NS::HdContainerDataSourceHandle
 BaseWhSi::MakeGeomSubsetHighlight(
     const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource,
@@ -1094,5 +1095,6 @@ BaseWhSi::MakeGeomSubsetHighlight(
 
     return editedMeshPrimDataSource;
 }
+#endif
 
 }

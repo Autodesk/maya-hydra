@@ -196,11 +196,13 @@ protected:
     FVP_API
     PXR_NS::VtValue GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle& primDataSource) const;
 
+#if PXR_VERSION >= 2403
     // Given a mesh and geomSubset data sources, edits and returns the mesh data source to fit the given geomSubset
     FVP_API
     PXR_NS::HdContainerDataSourceHandle MakeGeomSubsetHighlight(
         const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource,
         const PXR_NS::HdContainerDataSourceHandle& geomSubsetPrimDataSource) const;
+#endif
 
     const PXR_NS::SdfPath _highlightHierarchyPrefix;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
