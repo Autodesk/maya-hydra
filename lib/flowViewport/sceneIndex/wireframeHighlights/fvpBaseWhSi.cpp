@@ -1054,8 +1054,13 @@ BaseWhSi::GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle
     }
 
     // Step 3: Look for the displacement value
+#if PXR_VERSION < 2403
+    HdDataSourceMaterialNetworkInterface materialNetworkInterface(
+        materialPath, materialSchema.GetMaterialNetwork(), primDataSource);
+#else
     HdDataSourceMaterialNetworkInterface materialNetworkInterface(
         materialPath, materialSchema.GetMaterialNetwork().GetContainer(), primDataSource);
+#endif
 
     for (auto nodeName : materialNetworkInterface.GetNodeNames()) {
         VtValue paramValue = materialNetworkInterface.GetNodeParameterValue(nodeName, HdMaterialTerminalTokens->displacement);
