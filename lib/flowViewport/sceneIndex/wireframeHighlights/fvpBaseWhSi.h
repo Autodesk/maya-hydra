@@ -192,10 +192,6 @@ protected:
     FVP_API
     void CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPathsCollectionDirection direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const;
 
-    // Return the displacement value from the given prim data source's assigned material
-    FVP_API
-    PXR_NS::VtValue GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle& primDataSource) const;
-
 #if PXR_VERSION >= 2403
     // Given a mesh and geomSubset data sources, edits and returns the mesh data source to fit the given geomSubset
     FVP_API
@@ -218,9 +214,6 @@ protected:
 // Make the given prim be drawn as a wireframe of the given color.
 PXR_NS::HdContainerDataSourceHandle SetWireframeRepr(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color);
 
-// Return a Fvp::PrimSelection equivalent to the given Hydra selection
-Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
-
 // Repath instancing-related data sources by replacing srcPrefix with dstPrefix.
 // Mainly used to setup selection highlight instancers and instances.
 PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
@@ -228,31 +221,17 @@ PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
     const PXR_NS::SdfPath& srcPrefix,
     const PXR_NS::SdfPath& dstPrefix);
 
-// Get the path to the prim's bound material.
-PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
-
 #if PXR_VERSION >= 2403
 // Edit the given mesh data source such that its topology matches the given geomSubset.
 PXR_NS::HdContainerDataSourceHandle
 TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource, const PXR_NS::HdContainerDataSourceHandle& geomSubsetPrimDataSource);
 #endif
 
-// Computes and adds the normals primvar with smooth normals. If normals are already present, does nothing.
-PXR_NS::HdContainerDataSourceHandle AddSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource);
-
 // Manually apply scaling on the prim.
 PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource);
 
 // Manually apply displacement on the prim.
 PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource, float displacement);
-
-// Add an entry to the __dependencies data source
-PXR_NS::HdContainerDataSourceHandle AddDependency(
-    const PXR_NS::HdContainerDataSourceHandle& primDataSource,
-    const PXR_NS::TfToken& dependencyToken,
-    const PXR_NS::SdfPath& dependedOnPrimPath,
-    const PXR_NS::HdDataSourceLocator& dependedOnDataSourceLocator,
-    const PXR_NS::HdDataSourceLocator& affectedDataSourceLocator);
 
 }
 

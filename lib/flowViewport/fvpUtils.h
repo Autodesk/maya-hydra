@@ -15,6 +15,7 @@
 #ifndef FVP_UTILS_H
 #define FVP_UTILS_H
 
+#include <pxr/imaging/hd/sceneIndexObserver.h>
 #include <flowViewport/api.h>
 #include <flowViewport/selection/fvpSelectionTypes.h>
 
@@ -24,6 +25,7 @@
 
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 
 namespace FVP_NS_DEF {
@@ -124,6 +126,26 @@ auto FindSelfOrFirstChild(const PXR_NS::SdfPath& path, const std::map<PXR_NS::Sd
     }
     return pathMap.cend();
 }
+
+// Return a Fvp::PrimSelection equivalent to the given Hydra selection
+Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
+
+// Get the path to the prim's bound material.
+PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
+
+// Return the displacement value from the given prim data source's assigned material
+PXR_NS::VtValue GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle& primDataSource, const PXR_NS::HdSceneIndexBase& sceneIndex);
+
+// Computes and adds the normals primvar with smooth normals. If normals are already present, does nothing.
+PXR_NS::HdContainerDataSourceHandle AddSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource);
+
+// Add an entry to the __dependencies data source
+PXR_NS::HdContainerDataSourceHandle AddDependency(
+    const PXR_NS::HdContainerDataSourceHandle& primDataSource,
+    const PXR_NS::TfToken& dependencyToken,
+    const PXR_NS::SdfPath& dependedOnPrimPath,
+    const PXR_NS::HdDataSourceLocator& dependedOnDataSourceLocator,
+    const PXR_NS::HdDataSourceLocator& affectedDataSourceLocator);
 
 } // namespace FVP_NS_DEF
 

@@ -22,8 +22,6 @@
 #include <pxr/base/gf/vec4f.h>
 #include <pxr/base/tf/staticTokens.h>
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
-#include <pxr/imaging/hd/dataSourceMaterialNetworkInterface.h>
-#include <pxr/imaging/hd/dependenciesSchema.h>
 #include <pxr/imaging/hd/geomSubsetSchema.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
@@ -39,13 +37,9 @@
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
-#include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
-#include <pxr/imaging/hd/smoothNormals.h>
 #include <pxr/imaging/hd/tokens.h>
-#include <pxr/imaging/hd/vertexAdjacency.h>
 #include <pxr/imaging/hd/xformSchema.h>
-#include <pxr/imaging/pxOsd/tokens.h>
 #if PXR_VERSION >= 2403
 #include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
 #endif
@@ -84,10 +78,6 @@ const HdDataSourceLocator pointsValueLocator = HdDataSourceLocator(
     HdPrimvarsSchemaTokens->primvars,
     HdPrimvarsSchemaTokens->points,
     HdPrimvarSchemaTokens->primvarValue);
-
-const HdDataSourceLocator normalsPrimvarLocator = HdDataSourceLocator(
-    HdPrimvarsSchemaTokens->primvars,
-    HdPrimvarsSchemaTokens->normals);
 
 const HdDataSourceLocator normalsValueLocator = HdDataSourceLocator(
     HdPrimvarsSchemaTokens->primvars,
@@ -401,31 +391,6 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
     return edited.Finish();
 }
 
-Fvp::PrimSelection ConvertHydraToFvpSelection(const SdfPath& primPath, const HdSelectionSchema& selectionSchema) {
-    Fvp::PrimSelection primSelection;
-    primSelection.primPath = primPath;
-
-    auto nestedInstanceIndicesSchema = 
-#if HD_API_VERSION < 66
-    const_cast<HdSelectionSchema&>(selectionSchema).GetNestedInstanceIndices();
-#else
-    selectionSchema.GetNestedInstanceIndices();
-#endif
-    for (size_t iNestedInstanceIndices = 0; iNestedInstanceIndices < nestedInstanceIndicesSchema.GetNumElements(); iNestedInstanceIndices++) {
-        HdInstanceIndicesSchema instanceIndicesSchema = nestedInstanceIndicesSchema.GetElement(iNestedInstanceIndices);
-        auto instanceIndices = instanceIndicesSchema.GetInstanceIndices()->GetTypedValue(0);
-        primSelection.nestedInstanceIndices.push_back(
-            {
-                instanceIndicesSchema.GetInstancer()->GetTypedValue(0),
-                instanceIndicesSchema.GetPrototypeIndex()->GetTypedValue(0),
-                std::vector<int>(instanceIndices.begin(), instanceIndices.end())
-            }
-        );
-    }
-
-    return primSelection;
-}
-
 PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
     const PXR_NS::HdContainerDataSourceHandle& primDataSource, 
     const PXR_NS::SdfPath& srcPrefix, 
@@ -465,30 +430,6 @@ PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
         }
     }
     return dataSourceEditor.Finish();
-}
-
-SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource)
-{
-    if (!primDataSource) {
-        return {};
-    }
-
-    HdMaterialBindingsSchema materialBindingsSchema = HdMaterialBindingsSchema::GetFromParent(primDataSource);
-    if (!materialBindingsSchema.IsDefined()) {
-        return {};
-    }
-
-    HdMaterialBindingSchema materialBindingSchema = materialBindingsSchema.GetMaterialBinding();
-    if (!materialBindingSchema) {
-        return {};
-    }
-
-    HdPathDataSourceHandle bindingPathDataSource = materialBindingSchema.GetPath();
-    if (!bindingPathDataSource) {
-        return {};
-    }
-
-    return bindingPathDataSource->GetTypedValue(0);
 }
 
 #if PXR_VERSION >= 2403
@@ -575,66 +516,6 @@ TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshPrimDataSource, con
 }
 #endif
 
-PXR_NS::HdContainerDataSourceHandle AddSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource)
-{
-    // Check if normals are already present
-    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, normalsValueLocator));
-    if (normalsValueDataSource) {
-        return meshPrimDataSource;
-    }
-
-    // Get required schemas/dataSources
-    HdMeshSchema meshSchema = HdMeshSchema::GetFromParent(meshPrimDataSource);
-    if (!meshSchema.IsDefined()) {
-        return meshPrimDataSource;
-    }
-    HdMeshTopologySchema meshTopologySchema = meshSchema.GetTopology();
-    if (!meshTopologySchema.IsDefined()) {
-        return meshPrimDataSource;
-    }
-    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, pointsValueLocator));
-    if (!pointsValueDataSource) {
-        return meshPrimDataSource;
-    }
-
-    // Setup topology
-    TfToken subdivScheme = PxOsdOpenSubdivTokens->none;
-    if (HdTokenDataSourceHandle subdivSchemeDataSource = meshSchema.GetSubdivisionScheme()) {
-        subdivScheme = subdivSchemeDataSource->GetTypedValue(0.0f);
-    }
-    VtIntArray holeIndices;
-    if (HdIntArrayDataSourceHandle holeIndicesDataSource = meshTopologySchema.GetHoleIndices()) {
-        holeIndices = holeIndicesDataSource->GetTypedValue(0.0f);
-    }
-    TfToken orientation = PxOsdOpenSubdivTokens->rightHanded;
-    if (HdTokenDataSourceHandle orientationDataSource = meshTopologySchema.GetOrientation()) {
-        orientation = orientationDataSource->GetTypedValue(0.0f);
-    }
-    HdMeshTopology meshTopology(
-        subdivScheme, 
-        orientation, 
-        meshTopologySchema.GetFaceVertexCounts()->GetTypedValue(0), 
-        meshTopologySchema.GetFaceVertexIndices()->GetTypedValue(0), 
-        holeIndices);
-    Hd_VertexAdjacency adjacency;
-    adjacency.BuildAdjacencyTable(&meshTopology);
-
-    // Compute normals
-    auto points = pointsValueDataSource->GetTypedValue(0);
-    auto normals = Hd_SmoothNormals::ComputeSmoothNormals(
-        &adjacency, static_cast<int>(points.size()), points.cdata());
-
-    // Apply normals
-    auto normalsPrimvarDataSource = HdPrimvarSchema::Builder()
-        .SetInterpolation(HdPrimvarSchema::BuildInterpolationDataSource(HdPrimvarSchemaTokens->vertex))
-        .SetRole(HdPrimvarSchema::BuildRoleDataSource(HdPrimvarSchemaTokens->normal))
-        .SetPrimvarValue(HdRetainedTypedSampledDataSource<decltype(normals)>::New(normals))
-        .Build();
-    HdContainerDataSourceEditor dataSourceEditor(meshPrimDataSource);
-    dataSourceEditor.Set(normalsPrimvarLocator, normalsPrimvarDataSource);
-    return dataSourceEditor.Finish();
-}
-
 PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource)
 {
     auto xformSchema = HdXformSchema::GetFromParent(meshPrimDataSource);
@@ -706,30 +587,6 @@ PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerD
     dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
 #endif
 
-    return dataSourceEditor.Finish();
-}
-
-PXR_NS::HdContainerDataSourceHandle AddDependency(
-    const PXR_NS::HdContainerDataSourceHandle& primDataSource,
-    const PXR_NS::TfToken& dependencyToken,
-    const PXR_NS::SdfPath& dependedOnPrimPath,
-    const PXR_NS::HdDataSourceLocator& dependedOnDataSourceLocator,
-    const PXR_NS::HdDataSourceLocator& affectedDataSourceLocator)
-{
-    HdDependencySchema::Builder builder;
-
-    if (!dependedOnPrimPath.IsEmpty()) {
-        builder.SetDependedOnPrimPath(HdRetainedTypedSampledDataSource<SdfPath>::New(dependedOnPrimPath));
-    }
-
-    builder.SetDependedOnDataSourceLocator(HdRetainedTypedSampledDataSource<HdDataSourceLocator>::New(dependedOnDataSourceLocator));
-
-    builder.SetAffectedDataSourceLocator(HdRetainedTypedSampledDataSource<HdDataSourceLocator>::New(affectedDataSourceLocator));
-
-    auto dependencyDataSource = HdRetainedContainerDataSource::New(dependencyToken, builder.Build());
-
-    HdContainerDataSourceEditor dataSourceEditor(primDataSource);
-    dataSourceEditor.Overlay(HdDependenciesSchema::GetDefaultLocator(), dependencyDataSource);
     return dataSourceEditor.Finish();
 }
 
@@ -1030,49 +887,6 @@ BaseWhSi::CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPath
     }
 }
 
-VtValue 
-BaseWhSi::GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle& primDataSource) const
-{
-    if (!primDataSource) {
-        return {};
-    }
-
-    // Step 1: Get the material path
-    const SdfPath materialPath = GetMaterialPath(primDataSource);
-    if (materialPath.IsEmpty()) {
-        return {};
-    }
-
-    // Step 2: Retrieve the material
-    HdSceneIndexPrim materialPrim = GetInputSceneIndex()->GetPrim(materialPath);
-    if (!materialPrim.dataSource || (materialPrim.primType != HdPrimTypeTokens->material) ){
-        return {};
-    }
-
-    HdMaterialSchema materialSchema = HdMaterialSchema::GetFromParent(materialPrim.dataSource);
-    if (!materialSchema.IsDefined()) {
-        return {};
-    }
-
-    // Step 3: Look for the displacement value
-#if PXR_VERSION < 2403
-    HdDataSourceMaterialNetworkInterface materialNetworkInterface(
-        materialPath, materialSchema.GetMaterialNetwork(), primDataSource);
-#else
-    HdDataSourceMaterialNetworkInterface materialNetworkInterface(
-        materialPath, materialSchema.GetMaterialNetwork().GetContainer(), primDataSource);
-#endif
-
-    for (auto nodeName : materialNetworkInterface.GetNodeNames()) {
-        VtValue paramValue = materialNetworkInterface.GetNodeParameterValue(nodeName, HdMaterialTerminalTokens->displacement);
-        if (paramValue.IsHolding<float>()) {
-            return paramValue;
-        }
-    }
-
-    return {};
-}
-
 #if PXR_VERSION >= 2403
 PXR_NS::HdContainerDataSourceHandle
 BaseWhSi::MakeGeomSubsetHighlight(
@@ -1081,7 +895,7 @@ BaseWhSi::MakeGeomSubsetHighlight(
 {
     HdContainerDataSourceHandle editedMeshPrimDataSource = meshPrimDataSource;
 
-    VtValue displacementValue = GetMaterialDisplacementValue(geomSubsetPrimDataSource);
+    VtValue displacementValue = GetMaterialDisplacementValue(geomSubsetPrimDataSource, *GetInputSceneIndex());
     if (displacementValue.IsHolding<float>()) {
         // Manually apply the displacement on the mesh. We need to do this before trimming the mesh;
         // otherwise Storm will compute normals and displacement based on the trimmed mesh, which gives
