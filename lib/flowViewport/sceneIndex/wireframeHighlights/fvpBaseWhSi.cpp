@@ -659,8 +659,9 @@ PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSour
     auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, normalsValueLocator));
     if (normalsValueDataSource) {
         auto normals = normalsValueDataSource->GetTypedValue(0);
+        auto xformMatrixInversedTransposed = xformMatrix.GetInverse().GetTranspose();
         for (size_t iNormal = 0; iNormal < normals.size(); iNormal++) {
-            normals[iNormal] = GfVec3f(xformMatrix.GetInverse().GetTranspose().TransformDir(normals[iNormal]));
+            normals[iNormal] = GfVec3f(xformMatrixInversedTransposed.TransformDir(normals[iNormal]));
             normals[iNormal].Normalize();
         }
         dataSourceEditor.Set(normalsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(normals));
