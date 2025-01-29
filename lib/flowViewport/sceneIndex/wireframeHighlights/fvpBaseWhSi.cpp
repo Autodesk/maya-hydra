@@ -575,7 +575,7 @@ TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshPrimDataSource, con
 }
 #endif
 
-PXR_NS::HdContainerDataSourceHandle ComputeSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource)
+PXR_NS::HdContainerDataSourceHandle AddSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource)
 {
     // Check if normals are already present
     auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, normalsValueLocator));
@@ -1086,7 +1086,7 @@ BaseWhSi::MakeGeomSubsetHighlight(
         // otherwise Storm will compute normals and displacement based on the trimmed mesh, which gives
         // incorrect results. Providing the normals primvar is not sufficient to fix this, so we must
         // do everything manually, including scaling.
-        editedMeshPrimDataSource = ComputeSmoothNormals(editedMeshPrimDataSource);
+        editedMeshPrimDataSource = AddSmoothNormals(editedMeshPrimDataSource);
         editedMeshPrimDataSource = ForceScale(editedMeshPrimDataSource);
         editedMeshPrimDataSource = ForceDisplacement(editedMeshPrimDataSource, displacementValue.UncheckedGet<float>());
 

@@ -238,7 +238,7 @@ TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSou
 #endif
 
 // Computes and adds the normals primvar with smooth normals. If normals are already present, does nothing.
-PXR_NS::HdContainerDataSourceHandle ComputeSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource);
+PXR_NS::HdContainerDataSourceHandle AddSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource);
 
 // Manually apply scaling on the prim.
 PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource);
