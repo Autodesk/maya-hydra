@@ -895,7 +895,18 @@ BaseWhSi::MakeGeomSubsetHighlight(
 {
     HdContainerDataSourceHandle editedMeshPrimDataSource = meshPrimDataSource;
 
-    VtValue displacementValue = GetMaterialDisplacementValue(geomSubsetPrimDataSource, *GetInputSceneIndex());
+    // If the geomSubset has a material, apply it to the highlight mesh
+    if (!GetMaterialPath(geomSubsetPrimDataSource).IsEmpty()) {
+        HdContainerDataSourceEditor dataSourceEditor(editedMeshPrimDataSource);
+        dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, HdMaterialBindingsSchema::GetDefaultLocator()));
+#if PXR_VERSION >= 2403
+        dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator()));
+#endif
+        editedMeshPrimDataSource = dataSourceEditor.Finish();
+    }
+
+    // If the material has a displacement, apply it
+    VtValue displacementValue = GetMaterialDisplacementValue(editedMeshPrimDataSource, *GetInputSceneIndex());
     if (displacementValue.IsHolding<float>()) {
         // Manually apply the displacement on the mesh. We need to do this before trimming the mesh;
         // otherwise Storm will compute normals and displacement based on the trimmed mesh, which gives
