@@ -28,6 +28,7 @@
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/geomSubsetSchema.h>
 #include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/lightSchema.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -464,13 +465,20 @@ void IsolateSelectSceneIndex::_DirtyVisibilityRecursive(
     // relevant for materials
     auto prim = GetInputSceneIndex()->GetPrim(primPath);
     if (prim.primType == HdPrimTypeTokens->material) {
-      return;
+        return;
+    }
+
+    // If the prim is a light, early out: setting its visibility to false means
+    // it won't contribute lighting to the scene, not what we want.
+    auto lightSchema = HdLightSchema::GetFromParent(prim.dataSource);
+    if (lightSchema.IsDefined()) {
+        return;
     }
 
     // GeomSubset visibility must not be set (see GetPrim()), so no need to
     // dirty it.
     if (isGeomSubset(prim)) {
-      return;
+        return;
     }
 
     TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
