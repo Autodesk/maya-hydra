@@ -68,16 +68,14 @@ struct MayaHydraInitData
     MayaHydraInitData(
         TfToken            nameIn,
         HdEngine&          engineIn,
-        HdRenderIndex*     renderIndexIn,
-        HdRendererPlugin*  rendererPluginIn,
-        HdxTaskController* taskControllerIn,
+        HdRenderIndex&     renderIndexIn,
+        HdRendererPlugin&  rendererPluginIn,
         const SdfPath&     delegateIDIn,
         bool               isHdStIn)
         : name(nameIn)
         , engine(engineIn)
         , renderIndex(renderIndexIn)
         , rendererPlugin(rendererPluginIn)
-        , taskController(taskControllerIn)
         , delegateID(delegateIDIn)
         , isHdSt(isHdStIn)
     {
@@ -85,9 +83,8 @@ struct MayaHydraInitData
 
     TfToken            name;
     HdEngine&          engine;
-    HdRenderIndex*     renderIndex;
-    HdRendererPlugin*  rendererPlugin;
-    HdxTaskController* taskController;
+    HdRenderIndex&     renderIndex;
+    HdRendererPlugin&  rendererPlugin;
     SdfPath            delegateID;
     bool               isHdSt;
 };
@@ -196,7 +193,7 @@ public:
 
     HdChangeTracker& GetChangeTracker();
 
-    HdRenderIndex& GetRenderIndex() { return *_renderIndex; }
+    HdRenderIndex& GetRenderIndex() { return _renderIndex; }
 
     SdfPath GetDelegateID(TfToken name);
 
@@ -321,7 +318,7 @@ private:
     SdfPath _ID;
     MayaHydraParams _params;
 
-    HdRenderIndex* _renderIndex = nullptr;
+    HdRenderIndex& _renderIndex;
 
     // Adapters
     AdapterMap<MayaHydraLightAdapterPtr> _lightAdapters;

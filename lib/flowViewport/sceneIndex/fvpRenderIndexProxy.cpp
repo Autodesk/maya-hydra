@@ -67,10 +67,9 @@ _GetInputScene(const HdPrefixingSceneIndexRefPtr &prefixingScene)
 
 namespace FVP_NS_DEF {
 
-RenderIndexProxy::RenderIndexProxy(PXR_NS::HdRenderIndex* renderIndex) :
+RenderIndexProxy::RenderIndexProxy(PXR_NS::HdRenderIndex& renderIndex) :
     _renderIndex(renderIndex), _mergingSceneIndex(PXR_NS::HdMergingSceneIndex::New())
 {
-    TF_AXIOM(_renderIndex);
     TF_AXIOM(_mergingSceneIndex);
     _mergingSceneIndex->SetDisplayName("Data Producer Merging Scene Index");
 }
@@ -134,7 +133,7 @@ HdSceneIndexBaseRefPtr RenderIndexProxy::GetMergingSceneIndex() const
     return _mergingSceneIndex;
 }
 
-HdRenderIndex* RenderIndexProxy::GetRenderIndex() const 
+HdRenderIndex& RenderIndexProxy::GetRenderIndex() const 
 { 
     return _renderIndex;
 }
@@ -143,10 +142,7 @@ std::string RenderIndexProxy::GetRendererDisplayName() const
 {
     static std::string empty;
 
-    if (! _renderIndex){
-        return empty;
-    }
-    auto rd = _renderIndex->GetRenderDelegate();
+    auto rd = _renderIndex.GetRenderDelegate();
     if (! rd){
         return empty;
     }

@@ -922,7 +922,7 @@ bool MayaHydraSceneIndex::AddPickHitToSelectionList(
 
 HdChangeTracker& MayaHydraSceneIndex::GetChangeTracker()
 {
-    return _renderIndex->GetChangeTracker();
+    return _renderIndex.GetChangeTracker();
 }
 
 SdfPath MayaHydraSceneIndex::GetDelegateID(TfToken name)

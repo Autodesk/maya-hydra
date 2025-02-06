@@ -84,9 +84,8 @@ void FilteringSceneIndicesChainManager::destroyFilteringSceneIndicesChain(Viewpo
 
     auto renderIndexProxy = viewportInformationAndSceneIndicesPerViewportData.GetRenderIndexProxy();
     TF_AXIOM(renderIndexProxy);
-    auto renderIndex = renderIndexProxy->GetRenderIndex();
-    TF_AXIOM(renderIndex);
-    renderIndex->RemoveSceneIndex(lastSceneIndex);//Remove the whole chain from the render index
+    auto& renderIndex = renderIndexProxy->GetRenderIndex();
+    renderIndex.RemoveSceneIndex(lastSceneIndex);//Remove the whole chain from the render index
 
     //Remove a ref on it which should cascade the same on its references
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -120,8 +119,8 @@ void FilteringSceneIndicesChainManager::updateFilteringSceneIndicesChain(const s
         destroyFilteringSceneIndicesChain(viewportInformationAndSceneIndicesPerViewportData);
         createFilteringSceneIndicesChain(viewportInformationAndSceneIndicesPerViewportData);
         const auto& lastSceneIndex = viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndex();
-        TF_AXIOM(lastSceneIndex && renderIndexProxy && renderIndexProxy->GetRenderIndex());
-        renderIndexProxy->GetRenderIndex()->InsertSceneIndex(lastSceneIndex, SdfPath::AbsoluteRootPath());
+        TF_AXIOM(lastSceneIndex && renderIndexProxy);
+        renderIndexProxy->GetRenderIndex().InsertSceneIndex(lastSceneIndex, SdfPath::AbsoluteRootPath());
     }
 }
 

@@ -279,6 +279,8 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     if (auto* renderer = MHWRender::MRenderer::theRenderer()) {
         for (unsigned int i = 0; i < _renderOverrides.size(); i++) {
             renderer->deregisterOverride(_renderOverrides[i]);
+            // Using delete because we cannot use smart pointers in the static _renderOverrides
+            // vector, see declaration of _renderOverrides for explanation
             delete _renderOverrides[i];
         }
     }
