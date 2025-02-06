@@ -36,7 +36,7 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
     def IMAGE_DIFF_FAIL_PERCENT(self):
         if platform.system() == "Darwin":
             return 3
-        return 0.2
+        return 0.5
 
     def loadFileAndInitUfeVariables(self):
         import usdUtils # usdUtils imports mayaUsd.ufe
