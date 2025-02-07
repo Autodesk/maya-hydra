@@ -69,13 +69,11 @@ struct MayaHydraInitData
         TfToken            nameIn,
         HdEngine&          engineIn,
         HdRenderIndex&     renderIndexIn,
-        HdRendererPlugin&  rendererPluginIn,
         const SdfPath&     delegateIDIn,
         bool               isHdStIn)
         : name(nameIn)
         , engine(engineIn)
         , renderIndex(renderIndexIn)
-        , rendererPlugin(rendererPluginIn)
         , delegateID(delegateIDIn)
         , isHdSt(isHdStIn)
     {
@@ -84,7 +82,6 @@ struct MayaHydraInitData
     TfToken            name;
     HdEngine&          engine;
     HdRenderIndex&     renderIndex;
-    HdRendererPlugin&  rendererPlugin;
     SdfPath            delegateID;
     bool               isHdSt;
 };
