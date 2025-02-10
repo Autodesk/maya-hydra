@@ -92,9 +92,8 @@ bool ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInform
     const HdSceneIndexBaseRefPtr lastFilteringSceneIndex  = FilteringSceneIndicesChainManager::get().createFilteringSceneIndicesChain(*newElement, 
                                                                                                                                 inputSceneIndexForCustomFiltering);
     //Insert the last filtering scene index into the render index
-    auto renderIndex = renderIndexProxy->GetRenderIndex();
-    TF_AXIOM(renderIndex);
-    renderIndex->InsertSceneIndex(lastFilteringSceneIndex, SdfPath::AbsoluteRootPath());
+    auto& renderIndex = renderIndexProxy->GetRenderIndex();
+    renderIndex.InsertSceneIndex(lastFilteringSceneIndex, SdfPath::AbsoluteRootPath());
 
     return dataProducerSceneIndicesAdded;
 }
@@ -113,10 +112,10 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveViewportInf
 
         if(renderIndexProxy){
             //Destroy the custom filtering scene indices chain
-            auto renderIndex = renderIndexProxy->GetRenderIndex();
+            auto& renderIndex = renderIndexProxy->GetRenderIndex();
             const auto& filteringSceneIndex = findResult->GetLastFilteringSceneIndex();
-            if (renderIndex && filteringSceneIndex){
-                renderIndex->RemoveSceneIndex(filteringSceneIndex);//Remove the whole chain from the render index
+            if (filteringSceneIndex){
+                renderIndex.RemoveSceneIndex(filteringSceneIndex);//Remove the whole chain from the render index
             }
         }
             
@@ -314,10 +313,10 @@ void ViewportInformationAndSceneIndicesPerViewportDataManager::RemoveAllViewport
 
         if(renderIndexProxy){
             //Destroy the custom filtering scene indices chain
-            auto renderIndex = renderIndexProxy->GetRenderIndex();
+            auto& renderIndex = renderIndexProxy->GetRenderIndex();
             const auto& filteringSceneIndex = viewportInfoAndData.GetLastFilteringSceneIndex();
-            if (renderIndex && filteringSceneIndex){
-                renderIndex->RemoveSceneIndex(filteringSceneIndex);//Remove the whole chain from the render index
+            if (filteringSceneIndex){
+                renderIndex.RemoveSceneIndex(filteringSceneIndex);//Remove the whole chain from the render index
             }
         }
     }

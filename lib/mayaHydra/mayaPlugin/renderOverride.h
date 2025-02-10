@@ -250,7 +250,7 @@ private:
     MtohRendererDescription _rendererDesc;
 
     std::shared_ptr<MayaHydraSceneIndexRegistry> _sceneIndexRegistry;
-    std::vector<MHWRender::MRenderOperation*>    _operations;
+    std::vector<std::unique_ptr<MHWRender::MRenderOperation>>    _operations;
     MCallbackIdArray                             _callbacks;
     MCallbackId                                  _timerCallback = 0;
     PanelCallbacksList                           _renderPanelCallbacks;
@@ -273,7 +273,7 @@ private:
     HdDriver                                  _hgiDriver;
     HdEngine                                  _engine;
     HdRendererPlugin*                         _rendererPlugin = nullptr;
-    HdxTaskController*                        _taskController = nullptr;
+    std::unique_ptr<HdxTaskController>        _taskController;
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
     Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
     HdSceneIndexBaseRefPtr                    _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
