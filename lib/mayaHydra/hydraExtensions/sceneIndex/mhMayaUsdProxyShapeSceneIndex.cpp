@@ -133,6 +133,8 @@ public:
         return _psSi.UfePathToPrimSelections(appPath);
     }
 
+    std::string Name() const override { return "UsdPathMapper"; }
+
 private:
     // Non-owning reference to prevent ownership cycle.
     const MayaUsdProxyShapeSceneIndex& _psSi;
@@ -331,16 +333,17 @@ Fvp::PrimSelections MayaUsdProxyShapeSceneIndex::UfePathToPrimSelections(
     const Ufe::Path& appPath
 ) const
 {
-    // We only handle USD objects, so if the UFE path is not a USD object,
-    // early out with failure.
-    if (appPath.runTimeId() != UfeExtensions::getUsdRunTimeId()) {
-        return {};
-    }
-
     // If the data model object application path does not match the path we
     // translate, return an empty path.
     if (!appPath.startsWith(_sceneIndexAppPath)) {
         return {};
+    }
+
+    // If the application path is our prefix, just return the
+    // corresponding scene index path.
+    if (appPath == _sceneIndexAppPath) {
+        return Fvp::PrimSelections{Fvp::PrimSelection{
+                _sceneIndexPathPrefix}};
     }
 
     // The scene index path is composed of 2 parts, in order:
