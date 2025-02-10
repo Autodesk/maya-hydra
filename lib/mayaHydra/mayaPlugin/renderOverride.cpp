@@ -361,9 +361,8 @@ MtohRenderOverride::~MtohRenderOverride()
     constexpr bool fullReset = true;
     ClearHydraResources(fullReset);
 
-    for (auto operation : _operations) {
-        delete operation;
-    }
+    _operations.clear();
+    
     MMessage::removeCallbacks(_callbacks);
     _callbacks.clear();
     for (auto& panelAndCallbacks : _renderPanelCallbacks) {
@@ -1083,12 +1082,13 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
         return;
     GetMayaHydraLibInterface().RegisterTerminalSceneIndex(_renderIndex->GetTerminalSceneIndex());
 
-    _taskController = new HdxTaskController(
+    _taskController = std::make_unique<HdxTaskController>(
         _renderIndex,
         _ID.AppendChild(TfToken(TfStringPrintf(
             "_UsdImaging_%s_%p",
             TfMakeValidIdentifier(_rendererDesc.rendererName.GetText()).c_str(),
-            this))));
+            this)))
+    );
     _taskController->SetEnableShadows(true);
     // Initialize the AOV system to render color for Storm
     if (_isUsingHdSt) {
@@ -1098,9 +1098,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     MayaHydraInitData mhInitData(
         TfToken("MayaHydraSceneIndex"),
         _engine,
-        _renderIndex,
-        _rendererPlugin,
-        _taskController,
+        *_renderIndex,
         MAYA_NATIVE_ROOT,
         _isUsingHdSt
     );
@@ -1112,7 +1110,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     // - Maya scene producer, which needs the render index proxy to insert
     //   itself.
 
-    _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(_renderIndex);
+    _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(*_renderIndex);
 
     _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, !_hasDefaultLighting);
     TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
@@ -1228,10 +1226,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     // invalid.
     _engine.ClearTaskContextData();
 
-    if (_taskController != nullptr) {
-        delete _taskController;
-        _taskController = nullptr;
-    }
+    _taskController.reset();
 
     if (_renderIndex != nullptr) {
         GetMayaHydraLibInterface().UnregisterTerminalSceneIndex(_renderIndex->GetTerminalSceneIndex());
@@ -1474,25 +1469,24 @@ MStatus MtohRenderOverride::setup(const MString& destination)
     }
 
     if (_operations.empty()) {
-        // Clear and draw pre scene elelments (grid not pushed into hydra)
-        _operations.push_back(new MayaHydraPreRender("HydraRenderOverride_PreScene"));
+        // Clear and draw pre scene elements (grid not pushed into hydra)
+        _operations.push_back(std::make_unique<MayaHydraPreRender>("HydraRenderOverride_PreScene"));
 
         // The main hydra render
-        // For the data server, This also invokes scene update then sync scene delegate after scene
-        // update
-        _operations.push_back(new MayaHydraRender("HydraRenderOverride_DataServer", this));
+        // For the data server, This also invokes scene update then sync scene delegate after scene update
+        _operations.push_back(std::make_unique<MayaHydraRender>("HydraRenderOverride_DataServer", this));
 
         // Draw post scene elements (cameras, CVs, shapes not pushed into hydra)
-        _operations.push_back(new MayaHydraPostRender("HydraRenderOverride_PostScene"));
+        _operations.push_back(std::make_unique<MayaHydraPostRender>("HydraRenderOverride_PostScene"));
 
         // Draw HUD elements
-        _operations.push_back(new MHWRender::MHUDRender());
+        _operations.push_back(std::make_unique<MHWRender::MHUDRender>());
 
         // Set final buffer options
-        auto* presentTarget = new MHWRender::MPresentTarget("HydraRenderOverride_Present");
+        auto presentTarget = std::make_unique<MHWRender::MPresentTarget>("HydraRenderOverride_Present");
         presentTarget->setPresentDepth(true);
         presentTarget->setTargetBackBuffer(MHWRender::MPresentTarget::kCenterBuffer);
-        _operations.push_back(presentTarget);
+        _operations.push_back(std::move(presentTarget));
     }
 
     return MS::kSuccess;
@@ -1513,7 +1507,7 @@ bool MtohRenderOverride::startOperationIterator()
 MHWRender::MRenderOperation* MtohRenderOverride::renderOperation()
 {
     if (_currentOperation >= 0 && _currentOperation < static_cast<int>(_operations.size())) {
-        return _operations[_currentOperation];
+        return _operations[_currentOperation].get();
     }
     return nullptr;
 }
