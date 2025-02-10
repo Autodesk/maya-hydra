@@ -48,6 +48,7 @@ USD proxies in Viewport 2.0? Some potential reasons include:
 - Isolate select and object filtering (Show Menu) for Maya geometry, USD prims and any other Hydra prims
 - Picking and selection highlighting of geo and geomsubset prims including prototypes and instances
 - [Light weight interface](./doc/flowViewportToolkit.md) to integrate custom Scene Index Filter plugins
+- Supported display modes: Bounding Box, Wireframe on shaded, Wireframe, Usd Default Material, Textured, All Lights
 
 ## Known Limitations
 
@@ -65,7 +66,7 @@ USD proxies in Viewport 2.0? Some potential reasons include:
   - Maya's volume and ambient light
 - Current limitations with USD:
   - Maya layers don't show effect
-  - Viewport display modes are like Xray, wireframe or default shading are not supported yet
+  - Not supported viewport display modes: Xray, Flat Shading
   - Gprims currently don't cast shadows in Storm
 
 ## Limitations with Storm
