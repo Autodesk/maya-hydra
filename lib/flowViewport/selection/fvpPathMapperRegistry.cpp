@@ -127,7 +127,7 @@ PathMapperConstPtr PathMapperRegistry::GetMapper(const Ufe::Path& path) const
 
 PrimSelections PathMapperRegistry::UfePathToPrimSelections(
     const Ufe::Path& appPath
-)
+) const
 {
     if (appPath.empty()) {
         return {};

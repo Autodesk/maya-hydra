@@ -451,6 +451,8 @@ public:
         return _piSi.UfePathToPrimSelections(appPath);
     }
 
+    std::string Name() const { return "MayaPathMapper"; }
+
 private:
     // Non-owning reference to prevent ownership cycle.
     const MayaHydraSceneIndex& _piSi;
@@ -788,20 +790,15 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
     MDagPath   shapeDagPath(dagPath);
     shapeDagPath.extendToShape();
 
+    // Check if this Maya node has a special path mapper associated with it.
+    Ufe::Path shapeAppPath{UfeExtensions::dagPathToUfePathSegment(shapeDagPath)};
+    const auto& pmr = Fvp::PathMapperRegistry::Instance();
+    if (pmr.HasMapper(shapeAppPath)) {
+        return pmr.UfePathToPrimSelections(shapeAppPath);
+    }
+
     SdfPath primPath = GetPrimPath((extendToShape) ? shapeDagPath : dagPath, isSprim);
     
-    //Check if this maya node has a special SdfPath associated with it, this is for custom or maya usd data producers scene indices.
-    //The class MhDataProducersMayaNodeToSdfPathRegistry does a mapping between Maya nodes and USD paths.
-    //The maya nodes registered in this class are used by data producers as a parent to all
-    //primitives. This class is used when the user selects one of these
-    //maya nodes to return the matching SdfPath so that all prims child of this maya node are
-    //highlighted.
-    
-    const SdfPath matchingPath = FVP_NS::DataProducersNodeHashCodeToSdfPathRegistry::Instance().GetPath(MObjectHandle(shapeDagPath.node()).hashCode());
-    if (! matchingPath.IsEmpty()) {
-        primPath = matchingPath;
-    }
- 
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg("    mapped to scene index path %s.\n", primPath.GetText());
 		

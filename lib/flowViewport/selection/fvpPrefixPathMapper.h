@@ -1,5 +1,5 @@
 //
-// Copyright 2024 Autodesk
+// Copyright 2025 Autodesk
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@
 #include <flowViewport/api.h>
 #include <flowViewport/selection/fvpPathMapper.h>
 
-#include <ufe/rtid.h>
 #include <ufe/path.h>
 
 namespace FVP_NS_DEF {
@@ -28,8 +27,6 @@ namespace FVP_NS_DEF {
 ///
 /// This simple path handler performs application path to scene index path
 /// mapping by substituting a scene index prefix for an application path prefix.
-/// The prefix mapper applies only to application paths of a specific UFE run
-/// time.
 ///
 
 class PrefixPathMapper : public PathMapper
@@ -38,7 +35,6 @@ public:
 
     FVP_API
     PrefixPathMapper(
-        Ufe::Rtid              rtid,
         const Ufe::Path&       appPathPrefix, 
         const PXR_NS::SdfPath& sceneIndexPathPrefix
     );
@@ -46,9 +42,11 @@ public:
     FVP_API
     PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override;
 
+    FVP_API
+    virtual std::string Name() const;
+
 private:
 
-    const Ufe::Rtid       _rtid{0}; // 0 is invalid
     const Ufe::Path       _appPathPrefix;
     const PXR_NS::SdfPath _sceneIndexPathPrefix;
 };

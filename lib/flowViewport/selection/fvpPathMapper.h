@@ -49,6 +49,11 @@ public:
     FVP_API
     virtual PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const = 0;
 
+    //! Return the path mapper's name.  Intended for debugging.
+    //! \return Path mapper name.
+    FVP_API
+    virtual std::string Name() const = 0;
+
 protected:
 
     FVP_API

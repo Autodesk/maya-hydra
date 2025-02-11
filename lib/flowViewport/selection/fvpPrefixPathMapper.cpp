@@ -17,44 +17,50 @@
 #include <flowViewport/selection/fvpPrefixPathMapper.h>
 #include <flowViewport/fvpUtils.h>
 
+#include <ufe/pathString.h>
+
 // Need Pixar namespace for TF_ diagnostics macros.
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
 PrefixPathMapper::PrefixPathMapper(
-    Ufe::Rtid              rtid,
     const Ufe::Path&       appPathPrefix, 
     const PXR_NS::SdfPath& sceneIndexPathPrefix
-) : _rtid(rtid), _appPathPrefix(appPathPrefix), 
+) : _appPathPrefix(appPathPrefix), 
     _sceneIndexPathPrefix(sceneIndexPathPrefix)
 {}
 
 PrimSelections PrefixPathMapper::UfePathToPrimSelections(const Ufe::Path& appPath) const
 {
-    // We only handle scene items from our assigned run time ID.
-    if (appPath.runTimeId() != _rtid) {
-        return {};
-    }
-
     // If the data model object application path does not match the path we
     // translate, return an empty path.
     if (!appPath.startsWith(_appPathPrefix)) {
         return {};
     }
 
-    // The scene index path is composed of 2 parts, in order:
+    // The scene index path is composed of 2 parts, the second of which is 
+    // optional:
     // 1) The scene index path prefix, which is fixed on construction.
     // 2) The second segment of the UFE path, with each UFE path component
     //    becoming an SdfPath component.
     PXR_NS::SdfPath primPath = _sceneIndexPathPrefix;
-    TF_AXIOM(appPath.nbSegments() == 2);
-    const auto& secondSegment = appPath.getSegments()[1];
-    for (const auto& pathComponent : secondSegment) {
-        primPath = primPath.AppendChild(TfToken(pathComponent.string()));
+    if (appPath.nbSegments() == 2) {
+        const auto& secondSegment = appPath.getSegments()[1];
+        for (const auto& pathComponent : secondSegment) {
+            primPath = primPath.AppendChild(TfToken(pathComponent.string()));
+        }
     }
 
     return PrimSelections{PrimSelection{primPath}};
+}
+
+std::string PrefixPathMapper::Name() const
+{
+    std::ostringstream oss;
+    oss << "PrefixPathMapper " << Ufe::PathString::string(_appPathPrefix)
+        << " --> " << _sceneIndexPathPrefix.GetText() << std::endl;
+    return oss.str();
 }
 
 }

@@ -54,6 +54,8 @@
 //Flow viewport headers
 #include <flowViewport/API/fvpVersionInterface.h>
 #include <flowViewport/API/fvpDataProducerSceneIndexInterface.h>
+#include <flowViewport/selection/fvpPrefixPathMapper.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
 
 //Hydra headers
 #include <pxr/base/vt/array.h>
@@ -138,6 +140,8 @@ public:
     // Callback when the footprint node is removed from model (delete)
     void removedFromModelCb();
 
+    Ufe::Path getUfePath() const;
+
     //Attributes
     static MObject     mSize;
     static MObject     mWorldS;
@@ -176,6 +180,7 @@ private:
     MCallbackId _nodeRemovedFromModelCbId{0};
 
     SdfPath _pathPrefix;
+    Ufe::Path _appPath{};
 };
 
 namespace 
@@ -596,6 +601,13 @@ void* MhFootPrint::creator()
     return new MhFootPrint();
 }
 
+Ufe::Path MhFootPrint::getUfePath() const
+{
+    MDagPath dagPath;
+    TF_AXIOM(MDagPath::getAPathTo(thisMObject(), dagPath) == MS::kSuccess);
+    return Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath));
+}
+
 void MhFootPrint::addedToModelCb()
 {
     _pathPrefix = SdfPath(TfStringPrintf("/MhFootPrint_%p", this));
@@ -612,13 +624,20 @@ void MhFootPrint::addedToModelCb()
     auto pickHandler = std::make_shared<FootPrintPickHandler>(obj);
     TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Register(_pathPrefix, pickHandler));
 
-    // No need for a path mapper: the parts of the footprint are not selectable
-    // individually, only the Maya shape, so the built-in Maya path mapper does
-    // the job of path mapping for the footprint node.
+    // Register a path mapper to map application UFE paths to scene index paths,
+    // for selection highlighting.
+    _appPath = getUfePath();
+    auto pathMapper = std::make_shared<Fvp::PrefixPathMapper>(_appPath, _pathPrefix);
+    TF_AXIOM(Fvp::PathMapperRegistry::Instance().Register(_appPath, pathMapper));
 }
 
 void MhFootPrint::removedFromModelCb()
 {
+    // Unregister our path mapper.  Use stored UFE path, as at this point
+    // our locator node is no longer in the Maya scene, so we cannot obtain
+    // an MDagPath for it.
+    TF_AXIOM(Fvp::PathMapperRegistry::Instance().Unregister(_appPath));
+
     // Unregister our pick handler.
     TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Unregister(_pathPrefix));
 
