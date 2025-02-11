@@ -86,7 +86,7 @@ public:
     PathMapperConstPtr GetFallbackMapper() const;
 
     FVP_API
-    PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath);
+    PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
 
     //! Testing interface
     FVP_API
