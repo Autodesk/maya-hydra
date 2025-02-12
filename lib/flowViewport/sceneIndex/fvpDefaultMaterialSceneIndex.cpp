@@ -41,6 +41,7 @@ namespace{
                                                               HdPrimTypeTokens->sphere,   
                                                               HdPrimTypeTokens->capsule,
                                                               HdPrimTypeTokens->capsule_1,
+                                                              HdPrimTypeTokens->geomSubset,
                                                         #if HD_API_VERSION >= 67 // USD 24.05+
                                                               UsdGeomTokens->TetMesh,
                                                         #endif
