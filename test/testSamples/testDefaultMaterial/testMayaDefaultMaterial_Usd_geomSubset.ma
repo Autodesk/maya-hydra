@@ -1,15 +1,15 @@
-//Maya ASCII 2026 scene
+//Maya ASCII 2025ff01 scene
 //Name: testMayaDefaultMaterial_Usd_geomSubset.ma
 //Last modified: Thu, Feb 13, 2025 03:21:31 PM
 //Codeset: 1252
-requires maya "2026";
+requires maya "2025ff01";
 requires -nodeType "mayaUsdLayerManager" -nodeType "mayaUsdProxyShape" -dataType "pxrUsdStageData"
 		 "mayaUsdPlugin" "0.32.0";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";
-fileInfo "product" "Maya 2026";
-fileInfo "version" "2026";
-fileInfo "cutIdentifier" "202502051355-7a6f20bf07";
+fileInfo "product" "Maya 2025";
+fileInfo "version" "Preview Release";
+fileInfo "cutIdentifier" "202408120802-000000";
 fileInfo "osv" "Windows 11 Enterprise v2009 (Build: 22631)";
 fileInfo "UUID" "1B7C3BD1-4183-C846-FC3C-748AFCA44CFB";
 createNode transform -s -n "persp";
@@ -84,12 +84,12 @@ createNode mayaUsdProxyShape -n "cube_geomsubset_materialShape" -p "cube_geomsub
 	setAttr -k off ".v";
 	setAttr ".covm[0]"  0 1 1;
 	setAttr ".cdvm[0]"  0 1 1;
-	setAttr ".fp" -type "string" "C:/Users/cossetr/OneDrive - Autodesk/Desktop/HYDRA-1368/cube_geomsubset_material.usda";
+	setAttr ".fp" -type "string" "./cube_geomsubset_material.usda";
 	setAttr ".pp" -type "string" "";
 	setAttr ".epp" -type "string" "";
 	setAttr ".forceCompute" yes;
 	setAttr ".usdStageLoadRules" -type "string" "/=all";
-	setAttr ".usdStageTargetLayer" -type "string" "C:/Users/cossetr/OneDrive - Autodesk/Desktop/HYDRA-1368/cube_geomsubset_material.usda";
+	setAttr ".usdStageTargetLayer" -type "string" "./cube_geomsubset_material.usda";
 createNode lightLinker -s -n "lightLinker1";
 	rename -uid "C1A0F10E-44DB-87F3-29A5-33ACFD02A4E1";
 	setAttr -s 2 ".lnk";
