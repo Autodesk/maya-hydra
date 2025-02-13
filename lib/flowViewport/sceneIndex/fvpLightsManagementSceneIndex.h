@@ -71,9 +71,27 @@ public:
     FVP_API
     LightingMode GetLightingMode()const {return _lightingMode;}
     
-protected:
+    //Setter and getter of _allLightsAreDisabled
+    FVP_API
+    void SetAllLightsAreDisabled(bool allLightsAreDisabled)
+    {
+        if (_allLightsAreDisabled == allLightsAreDisabled) {
+            return;
+        }
+        _allLightsAreDisabled = allLightsAreDisabled;
+        _DirtyAllLightsPrims();
+    }
+
+    FVP_API
+    bool GetAllLightsAreDisabled() const { return _allLightsAreDisabled; }
     
-    LightsManagementSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const PXR_NS::SdfPath& defaultLightPath);
+    FVP_API
+    void SetDisabledLightsPrims(const std::set<PXR_NS::SdfPath>& activeLightsPrims);
+    
+private:
+    LightsManagementSceneIndex(
+        const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex,
+        const PXR_NS::SdfPath&                defaultLightPath);
 
     //From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override{
@@ -89,11 +107,14 @@ protected:
         _SendPrimsDirtied(entries);
     }
 
-    void _DirtyAllLightsPrims();
+    
     bool _IsDefaultLight(const PXR_NS::SdfPath& primPath)const;
+    void _DirtyAllLightsPrims();
 
     LightingMode _lightingMode = LightingMode::kSceneLighting;
     PXR_NS::SdfPath _defaultLightPath;
+    bool            _allLightsAreDisabled = false;
+    std::set<PXR_NS::SdfPath> _disabledLightsPrims;
 };
 
 }//end of namespace FVP_NS_DEF

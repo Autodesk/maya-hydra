@@ -107,31 +107,14 @@ public:
 // For some dag paths we use the shape to translate it to an Hydra path
 bool _UseTheShapeDagPath(const MDagPath& dagpath) 
 { 
-    bool extendToShape = false;
-
-    //So far we only have one case : the Arnold sky dome light
-    const bool isSkyDomeLight = MayaHydra::IsDagPathAnArnoldSkyDomeLight(dagpath);
-    if (isSkyDomeLight) {
-        extendToShape = true;
-    }
-
-    return extendToShape;
+    //Only for lights Dag path
+    return MayaHydra::IsDagPathALight(dagpath);
 }
 
 //Check if this dag path is registered in Sprims (such as the Arnold sky dome light)
 bool _IsDagPathRegisteredInHydraSPrims(const MDagPath& dagpath)
 {
-    bool isRegisteredInSPrims = false;
-    
-    //So far we only have one case : the Arnold sky dome light
-     
-    // The Arnold skydome light has its shape dag path registered as a Sprim in Hydra
-    const bool isSkyDomeLight = MayaHydra::IsDagPathAnArnoldSkyDomeLight(dagpath);
-    if (isSkyDomeLight) {
-        isRegisteredInSPrims = true;
-    }
-    
-    return isRegisteredInSPrims;
+    return MAYAHYDRA_NS_DEF::IsDagPathALight(dagpath);
 }
 
 }
@@ -1072,7 +1055,7 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
 
     if ((!status || numLights == 0) && (0 == globalLightPaths.size())) {
         _MapAdapter<MayaHydraLightAdapter>(
-            [](MayaHydraLightAdapter* a) { a->SetLightingOn(false); },
+            [](MayaHydraLightAdapter* a) { a->RemovePrim(); },
             _lightAdapters); // Turn off all lights
         return;
     }
@@ -1115,21 +1098,27 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         }
     }
 
-    // Turn on active lights, turn off non-active lights
-    _MapAdapter<MayaHydraLightAdapter>(
-        [&](MayaHydraLightAdapter* a) {
-            auto lgtAdapter = activeLightPaths.find(a->GetDagPath().fullPathName().asChar());
-            if (lgtAdapter != activeLightPaths.end()) {
-                a->SetLightingOn(true);
-                activeLightPaths.erase(lgtAdapter);
-            } else {
-                // Skip dome light as maya numberOfActiveLights API doesn't count active dome light
-                if (a->LightType() != HdPrimTypeTokens->domeLight) {
-                    a->SetLightingOn(false);
+    if (_lightsManagementSceneIndex) {
+        std::set<SdfPath> disabledLights;
+
+        // Store disabled lights to pass them to the lights managment scene index
+        _MapAdapter<MayaHydraLightAdapter>(
+            [&](MayaHydraLightAdapter* a) {
+                auto lgtAdapter = activeLightPaths.find(a->GetDagPath().fullPathName().asChar());
+                if (lgtAdapter != activeLightPaths.end()) {
+                    activeLightPaths.erase(lgtAdapter);
+                } else {
+                    // Skip dome lights as maya numberOfActiveLights API doesn't count active dome
+                    // lights
+                    if (a->LightType() != HdPrimTypeTokens->domeLight) {
+                        disabledLights.insert(a->GetID());
+                    }
                 }
-            }
-        },
-        _lightAdapters);
+            },
+            _lightAdapters);
+
+        _lightsManagementSceneIndex->SetDisabledLightsPrims(disabledLights);
+    }
 }
 
 bool MayaHydraSceneIndex::GetPlaybackRunning() const
@@ -1645,10 +1634,10 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
     }
 
     // Custom lights don't have MFn::kLight.
-    if (GetLightsEnabled()) {
-        if (CreateLightAdapter(dag))
-            return;
+    if (CreateLightAdapter(dag)) {
+        return;
     }
+
     if (CreateCameraAdapter(dag)) {
         return;
     }
@@ -1830,4 +1819,11 @@ void MayaHydraSceneIndex::UpdateLightsShadowCollection()
             _lightAdapters);
     }
 }
+
+void MayaHydraSceneIndex::SetLightsManagementSceneIndex(const Fvp::LightsManagementSceneIndexRefPtr lightsManagementSceneIndex)
+{
+    _lightsManagementSceneIndex = lightsManagementSceneIndex;
+}
+
+
 PXR_NAMESPACE_CLOSE_SCOPE
