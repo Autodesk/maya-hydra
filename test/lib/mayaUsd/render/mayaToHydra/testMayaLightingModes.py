@@ -81,6 +81,10 @@ class TestMayaLightingModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohU
         cmds.refresh()
         self.assertSnapshotClose("dirLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
+        cmds.select("areaLight1", replace=True)
+        cmds.refresh()
+        self.assertSnapshotClose("areaLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
         cmds.select("|stage1|stageShape1,/SphereLight1", replace=True)
         cmds.select("pointLight1", add=True)
         cmds.select("aiSkyDomeLight1", add=True)
