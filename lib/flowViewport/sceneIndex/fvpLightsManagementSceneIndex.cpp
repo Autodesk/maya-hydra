@@ -63,6 +63,7 @@ void _DisableLight(HdSceneIndexPrim& prim)
 
     if (isSimpleLight) {
         // A simple light contains in its params a GlfSimpleLight which needs to be disabled
+        // by setting its diffuse, specular and ambient to 0
         GlfSimpleLight simpleLight
             = _GetLightData<GlfSimpleLight>(prim.dataSource, HdTokens->params);
         simpleLight.SetDiffuse(GfVec4f(0.0f));
@@ -85,6 +86,35 @@ void _DisableLight(HdSceneIndexPrim& prim)
     prim.dataSource = editor.Finish();
 }
 
+bool _IsPrimOrAncestorSelected(const SdfPath& primPath)
+{
+    const Ufe::Selection& ufeSelection = *Ufe::GlobalSelection::get();
+    if (ufeSelection.empty()) {
+        return false;
+    }
+
+    // Convert UFE selection to SdfPath
+    SdfPathVector selectedSdfPath;
+    for (const auto& snItem : ufeSelection) {
+        auto primSelections = Fvp::ufePathToPrimSelections(snItem->path());
+        for (const auto& primSelection : primSelections) {
+            selectedSdfPath.push_back(primSelection.primPath);
+        }
+    }
+
+    if (std::find(selectedSdfPath.cbegin(), selectedSdfPath.cend(), primPath)
+        != selectedSdfPath.cend()) {
+        return true;
+    }
+
+    for (const auto& selectedPath : selectedSdfPath) {
+        if (primPath.HasPrefix(selectedPath)) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 } // end of anonymous namespace
 
@@ -160,27 +190,8 @@ HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) co
             break;
 
         case LightingMode::kSelectedLightsOnly: {
-            const Ufe::Selection& ufeSelection = *Ufe::GlobalSelection::get();
-            if (ufeSelection.empty()) {
-                // Nothing is selected
-                _DisableLight(prim);
-                break;
-            }
-
-            // Convert UFE selection to SdfPath
-            SdfPathVector selectedLightsSdfPath;
-            for (const auto& snItem : ufeSelection) {
-                auto primSelections = ufePathToPrimSelections(snItem->path());
-                for (const auto& primSelection : primSelections) {
-                    selectedLightsSdfPath.push_back(primSelection.primPath);
-                }
-            }
-
-            const bool isSelected
-                = std::find(selectedLightsSdfPath.begin(), selectedLightsSdfPath.end(), primPath)
-                != selectedLightsSdfPath.end();
-
-            if (!isSelected) {
+            const bool shouldBeUsedForLigthing = _IsPrimOrAncestorSelected(primPath);
+            if (! shouldBeUsedForLigthing) {
                 _DisableLight(prim);
             }
             break;

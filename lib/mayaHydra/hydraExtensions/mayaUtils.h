@@ -143,6 +143,15 @@ bool SetNodeAttribute(MObject node, std::string attrName, AttrType newValue)
 }
 
 /**
+ * @brief Get if this MDagPath is an Arnold sky dome light.
+ *
+ * @param[in] dagPath is a MDagPath
+ *
+ * @return true if the object is an Arnold sky dome light, false otherwise
+ */
+bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath);
+
+/**
  * @brief Get if this MDagPath is a light.
  *
  * @param[in] dagPath is a MDagPath

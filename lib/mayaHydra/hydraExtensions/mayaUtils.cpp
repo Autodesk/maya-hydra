@@ -108,6 +108,18 @@ MStatus GetObjectsFromNodeNames(const MStringArray& nodeNames, MObjectArray & ou
     return MS::kSuccess;
 }
 
+bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath)
+{
+    static const MString _aiSkyDomeLight("aiSkyDomeLight");
+    
+    if (!dagPath.isValid()) {
+        return false;
+    }
+    auto shapeDagPath = dagPath;
+    shapeDagPath.extendToShape();
+    return _aiSkyDomeLight == MFnDependencyNode(shapeDagPath.node()).typeName();
+}
+
 bool IsDagPathALight(const MDagPath& dagPath)
 {
     static const MString _lightString("Light");

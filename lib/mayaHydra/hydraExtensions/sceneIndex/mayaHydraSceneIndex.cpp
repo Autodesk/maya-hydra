@@ -107,8 +107,8 @@ public:
 // For some dag paths we use the shape to translate it to an Hydra path
 bool _UseTheShapeDagPath(const MDagPath& dagpath) 
 { 
-    //Only for lights Dag path
-    return MayaHydra::IsDagPathALight(dagpath);
+    //Only for the Arnold skydome light
+    return MAYAHYDRA_NS_DEF::IsDagPathAnArnoldSkyDomeLight(dagpath);
 }
 
 //Check if this dag path is registered in Sprims (such as the Arnold sky dome light)
