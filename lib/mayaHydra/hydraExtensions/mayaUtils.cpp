@@ -129,7 +129,7 @@ bool IsDagPathALight(const MDagPath& dagPath)
     auto shapeDagPath = dagPath;
     shapeDagPath.extendToShape();
     const MString typeName = MFnDependencyNode(shapeDagPath.node()).typeName();
-    return (typeName.indexW(_lightString) != -1);//Does the typenamr contains "Light"
+    return (typeName.indexW(_lightString) != -1);//Does the typename contains "Light"
 }
 
 } // namespace MAYAHYDRA_NS_DEF

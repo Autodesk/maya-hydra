@@ -48,7 +48,7 @@ namespace FVP_NS_DEF
         *  @brief      Callback function to append a scene index.
         *
         *               This callback function gets called for you to append a scene index to a Hydra viewport scene index, like a filtering scene index. 
-        *               A typical case is when a new Hydra viewport is created, after some internal managment of this scene index, we call this function so you can append one scene index 
+        *               A typical case is when a new Hydra viewport is created, after some internal management of this scene index, we call this function so you can append one scene index 
         *               or a chain of scene indices and return the last element of the chain.
         *               The returned value of this function is the last custom scene index of a a chain that you want to append to this scene index, 
         *               or just return the input scene index passed if you don't want to append any scene index.
@@ -71,7 +71,7 @@ namespace FVP_NS_DEF
         *  @brief      Callback function to append a scene index.
         *
         *               This callback function gets called for you to append a scene index to a Hydra viewport scene index, like a filtering scene index. 
-        *               A typical case is when a new Hydra viewport is created, after some internal managment of this scene index, we call this function so you can append one scene index 
+        *               A typical case is when a new Hydra viewport is created, after some internal management of this scene index, we call this function so you can append one scene index 
         *               or a chain of scene indices and return the last element of the chain.
         *               The returned value of this function is the last custom scene index of a a chain that you want to append to this scene index, 
         *               or just return the input scene index passed if you don't want to append any scene index.

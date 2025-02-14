@@ -165,11 +165,6 @@ HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) co
         return prim; // Return any non-light primitive
     }
 
-    if (_allLightsAreDisabled) {
-        _DisableLight(prim);
-        return prim;
-    }
-
     // This is a light
     switch (_lightingMode) {
         case LightingMode::kNoLighting: 

@@ -1101,7 +1101,7 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
     if (_lightsManagementSceneIndex) {
         std::set<SdfPath> disabledLights;
 
-        // Store disabled lights to pass them to the lights managment scene index
+        // Store disabled lights to pass them to the lights management scene index
         _MapAdapter<MayaHydraLightAdapter>(
             [&](MayaHydraLightAdapter* a) {
                 auto lgtAdapter = activeLightPaths.find(a->GetDagPath().fullPathName().asChar());

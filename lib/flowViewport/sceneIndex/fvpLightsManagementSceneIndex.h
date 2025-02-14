@@ -71,20 +71,6 @@ public:
     FVP_API
     LightingMode GetLightingMode()const {return _lightingMode;}
     
-    //Setter and getter of _allLightsAreDisabled
-    FVP_API
-    void SetAllLightsAreDisabled(bool allLightsAreDisabled)
-    {
-        if (_allLightsAreDisabled == allLightsAreDisabled) {
-            return;
-        }
-        _allLightsAreDisabled = allLightsAreDisabled;
-        _DirtyAllLightsPrims();
-    }
-
-    FVP_API
-    bool GetAllLightsAreDisabled() const { return _allLightsAreDisabled; }
-    
     FVP_API
     void SetDisabledLightsPrims(const std::set<PXR_NS::SdfPath>& activeLightsPrims);
     
@@ -113,7 +99,6 @@ private:
 
     LightingMode _lightingMode = LightingMode::kSceneLighting;
     PXR_NS::SdfPath _defaultLightPath;
-    bool            _allLightsAreDisabled = false;
     std::set<PXR_NS::SdfPath> _disabledLightsPrims;
 };
 
