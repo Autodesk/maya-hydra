@@ -70,6 +70,8 @@ class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mto
 
     def test_MayaDefaultMaterialGeomSubset(self):
         # open a Maya scene with usd cube with different materials on some faces (geomSubset)
+        if self._usdVersion < (0, 24, 3):
+            self.skipTest("Skipping test, USD version used does not support Hydra GeomSubset prims")
         testFile = mayaUtils.openTestScene(
                 "testDefaultMaterial",
                 "testMayaDefaultMaterial_Usd_geomSubset.ma", useTestSettings=False)

@@ -41,7 +41,9 @@ namespace{
                                                               HdPrimTypeTokens->sphere,   
                                                               HdPrimTypeTokens->capsule,
                                                               HdPrimTypeTokens->capsule_1,
+                                                        #if PXR_VERSION >= 2403 // USD 24.03+
                                                               HdPrimTypeTokens->geomSubset,
+                                                        #endif
                                                         #if HD_API_VERSION >= 67 // USD 24.05+
                                                               UsdGeomTokens->TetMesh,
                                                         #endif
