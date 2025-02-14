@@ -584,6 +584,12 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
 
         auto& ri = *scene.mItems[i];
 
+        // ProxyGeometryItems are a special type of dummy render item created internally by Maya
+        // to implement and handle MPxDrawOverride. We do not need to translate these to Hydra.
+        if (ri.name() == "ProxyGeometryItem") {
+            continue;
+        }
+
         // Meshes can optionally be handled by the mesh adapter, rather than by
         // render items.
         if (filterMesh(ri)) {
