@@ -102,8 +102,8 @@ bool _IsPrimOrAncestorSelected(const SdfPath& primPath)
         }
     }
 
-    if (std::find(selectedSdfPath.cbegin(), selectedSdfPath.cend(), primPath)
-        != selectedSdfPath.cend()) {
+    if (std::find(selectedSdfPath.begin(), selectedSdfPath.end(), primPath)
+        != selectedSdfPath.end()) {
         return true;
     }
 
