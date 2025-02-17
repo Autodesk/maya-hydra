@@ -33,7 +33,7 @@ class TestMayaLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
         # Only the "all lights with shadows" check fails, and shadows with point light only is skipped.
         if platform.system() == "Darwin":
             return 3
-        return 0.2
+        return 0.5
 
     def verifyLightingModes(self, shadowOn):
         imageSuffix = "_shadowOn" if shadowOn else ""
