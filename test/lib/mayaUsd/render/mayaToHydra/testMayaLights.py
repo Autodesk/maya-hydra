@@ -33,7 +33,7 @@ class TestMayaLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
         # Only the "all lights with shadows" check fails, and shadows with point light only is skipped.
         if platform.system() == "Darwin":
             return 3
-        if mayaMajorVersion() == 2025:
+        if mayaUtils.mayaMajorVersion() == 2025:
             return 2 #There are more pixels different in maya 2025 for this test
         return 0.2
 
