@@ -105,3 +105,22 @@ The API contains examples which are Maya projects on how to filter and add primi
 | [lib/mayaHydra/flowViewportAPIExamples/customShadersNode](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples/customShadersNode) | Is a Maya node which creates an Hydra primitive and applies the custom GLSL shader for Hydra Storm |
 | [lib/mayaHydra/flowViewportAPIExamples/flowViewportAPILocator](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples/flowViewportAPILocator) | Is a Maya node which creates Hydra primitives to display a grid of cubes and applies a filtering scene index to remove primitives with more than a certain number of vertices.<BR>This example shows how to create a Hydra mesh primitive, how to use Hydra instancing and deal with selection picking from MayaHydra|
 | [lib/mayaHydra/flowViewportAPIExamples/footPrintNode](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/flowViewportAPIExamples/footPrintNode) | Is a Maya node showing how to convert the Maya FootPrint node which is part of the samples from the Maya devkit. It shows how to create Hydra mesh primitives and deal with selection picking from MayaHydra|
+
+## Note on performance and scene indices
+When you add custom Hydra primitives through a scene index or add filtering scene indices, you should be aware that the performance of the viewport can be impacted. 
+It is usually better not to add too many scene indices. <BR>
+As an example, if you want to add 1 000 custom primitives, you should create a single scene index and create all the custom primitives in it. <B>You should avoid having 1 scene index per primitive</B>.<BR>
+A test we did was to create 10 000 Flow viewport API locator nodes which for each node creates 1 scene index for adding the grid of cubes and 1 filtering scene index to hide primitives with more than 10 000 vertices.<BR>
+As a result, we had 20 000 scene indices and the performance was impacted. The viewport was not responding any more. <BR>
+
+Here is an example on performance and scene indices : we created N Flow viewportAPI locator nodes in Maya's VP2, measure the time when switching to Hydra Storm :
+
+| N Nodes       | One scene index per node              |One scene index for all nodes                                                                                  |
+|-------------  |--------------------------             |-----------------------------  |
+|100            | 100 scene indices, time : <B>0.18</B> sec         | 1 scene index, time : <B>0.04</B> sec|
+|1 000           | 1 000 scene indices, time : <B>181.5</B> sec        | 1 scene index, time : <B>0.06</B> sec|
+|10 000          | 10 000 scene indices, time : <B>Aborted after 1 Hour</B> | 1 scene index, time : <B>0.27</B> sec|
+
+## Note on UFE implementation and scene index
+A potential issue is that if a plugin both implements [UFE](https://git.autodesk.com/media-and-entertainment/ufe) and registers a custom Hydra scene index to add Hydra primitives using the Flow viewport toolkit, items that are represented in both will get added twice to the viewport, once by MayaHydra converting the UFE item, and once by the plugin through its custom scene index.<BR>
+So please keep in mind to only implement one or the other.

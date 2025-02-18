@@ -67,6 +67,19 @@ class TestMayaDefaultMaterial(mtohUtils.MayaHydraBaseTestCase): #Subclassing mto
         cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
         cmds.refresh()
         self.assertSnapshotClose("defaultMaterialUsdPrims" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-    
+
+    def test_MayaDefaultMaterialGeomSubset(self):
+        # open a Maya scene with usd cube with different materials on some faces (geomSubset)
+        testFile = mayaUtils.openTestScene(
+                "testDefaultMaterial",
+                "testMayaDefaultMaterial_Usd_geomSubset.ma", useTestSettings=False)
+        cmds.refresh()
+
+        #Use Default Material
+        panel = mayaUtils.activeModelPanel()
+        cmds.modelEditor(panel, edit=True, useDefaultMaterial=True)
+        cmds.refresh()
+        self.assertSnapshotClose("defaultMaterialGeomSubsetUsdPrims.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
