@@ -35,7 +35,7 @@ class TestMayaLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
             return 3
         if mayaMajorVersion() == 2025:
             return 2 #There are more pixels different in maya 2025 for this test
-    return 0.2
+        return 0.2
 
 
     def verifyLightingModes(self, shadowOn):
