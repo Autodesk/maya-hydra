@@ -72,7 +72,7 @@ public:
     LightingMode GetLightingMode()const {return _lightingMode;}
     
     FVP_API
-    void SetDisabledLightsPrims(const std::set<PXR_NS::SdfPath>& activeLightsPrims);
+    void SetDisabledLightsPrims(const std::set<PXR_NS::SdfPath>& disabledLightsPrims);
     
 private:
     LightsManagementSceneIndex(
