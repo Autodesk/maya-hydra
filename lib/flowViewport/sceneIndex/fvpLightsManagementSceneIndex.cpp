@@ -197,10 +197,10 @@ HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) co
 }
 
 void LightsManagementSceneIndex::SetDisabledLightsPrims(
-    const std::set<PXR_NS::SdfPath>& activeLightsPrims)
+    const std::set<PXR_NS::SdfPath>& disabledLightsPrims)
 {
-    if (_disabledLightsPrims != activeLightsPrims) {
-        _disabledLightsPrims = activeLightsPrims;
+    if (_disabledLightsPrims != disabledLightsPrims) {
+        _disabledLightsPrims = disabledLightsPrims;
         _DirtyAllLightsPrims();
     }
 }
