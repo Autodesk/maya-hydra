@@ -949,7 +949,7 @@ void MhFlowViewportAPILocator::addedToModelCb()
     // for selection highlighting.
     _appPath = getUfePath();
     auto pathMapper = std::make_shared<Fvp::PrefixPathMapper>(
-        ufeRunTimeId, _appPath, _pathPrefix);
+        _appPath, _pathPrefix);
     TF_AXIOM(Fvp::PathMapperRegistry::Instance().Register(_appPath, pathMapper));
 }
 

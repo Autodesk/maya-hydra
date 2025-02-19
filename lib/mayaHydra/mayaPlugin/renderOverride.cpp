@@ -44,7 +44,6 @@
 #include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/selection/fvpSelectionTask.h>
 #include <flowViewport/selection/fvpSelection.h>
-#include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h>
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
 #include <flowViewport/sceneIndex/fvpIsolateSelectSceneIndex.h>
@@ -362,9 +361,8 @@ MtohRenderOverride::~MtohRenderOverride()
     constexpr bool fullReset = true;
     ClearHydraResources(fullReset);
 
-    for (auto operation : _operations) {
-        delete operation;
-    }
+    _operations.clear();
+    
     MMessage::removeCallbacks(_callbacks);
     _callbacks.clear();
     for (auto& panelAndCallbacks : _renderPanelCallbacks) {
@@ -736,7 +734,7 @@ MStatus MtohRenderOverride::Render(
             }
             //Update the leadObjectTacker in case it could not find the current lead object which could be in a custom data producer scene index or a maya usd proxy shape scene index
             if (_leadObjectPathTracker){
-                _leadObjectPathTracker->updatePrimPaths();
+                _leadObjectPathTracker->updatePrimSelections();
             }
         }
     }
@@ -1084,12 +1082,13 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
         return;
     GetMayaHydraLibInterface().RegisterTerminalSceneIndex(_renderIndex->GetTerminalSceneIndex());
 
-    _taskController = new HdxTaskController(
+    _taskController = std::make_unique<HdxTaskController>(
         _renderIndex,
         _ID.AppendChild(TfToken(TfStringPrintf(
             "_UsdImaging_%s_%p",
             TfMakeValidIdentifier(_rendererDesc.rendererName.GetText()).c_str(),
-            this))));
+            this)))
+    );
     _taskController->SetEnableShadows(true);
     // Initialize the AOV system to render color for Storm
     if (_isUsingHdSt) {
@@ -1099,9 +1098,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     MayaHydraInitData mhInitData(
         TfToken("MayaHydraSceneIndex"),
         _engine,
-        _renderIndex,
-        _rendererPlugin,
-        _taskController,
+        *_renderIndex,
         MAYA_NATIVE_ROOT,
         _isUsingHdSt
     );
@@ -1113,7 +1110,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     // - Maya scene producer, which needs the render index proxy to insert
     //   itself.
 
-    _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(_renderIndex);
+    _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(*_renderIndex);
 
     _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, !_hasDefaultLighting);
     TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
@@ -1229,10 +1226,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     // invalid.
     _engine.ClearTaskContextData();
 
-    if (_taskController != nullptr) {
-        delete _taskController;
-        _taskController = nullptr;
-    }
+    _taskController.reset();
 
     if (_renderIndex != nullptr) {
         GetMayaHydraLibInterface().UnregisterTerminalSceneIndex(_renderIndex->GetTerminalSceneIndex());
@@ -1283,9 +1277,8 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 
     const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
 
-    auto mergingSceneIndex = _renderIndexProxy->GetMergingSceneIndex();
     if(! _leadObjectPathTracker){
-        _leadObjectPathTracker = std::make_shared<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker>(mergingSceneIndex, _dirtyLeadObjectSceneIndex);
+        _leadObjectPathTracker = std::make_shared<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker>(_dirtyLeadObjectSceneIndex);
     }
     
     if (! _wireframeColorInterfaceImp){
@@ -1307,19 +1300,36 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
     _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false, _globals.delegateParams.refineLevel);
 
-    _wireframeSelectionHighlightSceneIndex = TfDynamic_cast<Fvp::WireframeSelectionHighlightSceneIndexRefPtr>(Fvp::WireframeSelectionHighlightSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, _selection, _wireframeColorInterfaceImp));
-    _wireframeSelectionHighlightSceneIndex->SetDisplayName("Flow Viewport Wireframe Selection Highlight Scene Index");
-    
-    // At time of writing, wireframe selection highlighting of Maya native data
-    // is done by Maya at render item creation time, so avoid double wireframe
-    // selection highlighting.
-    _wireframeSelectionHighlightSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
-    _lastFilteringSceneIndexBeforeCustomFiltering  = _wireframeSelectionHighlightSceneIndex;
+    // Setup selection highlight scene indices
+    {
+        //// At time of writing, wireframe selection highlighting of Maya native data
+        //// is done by Maya at render item creation time, so avoid double wireframe
+        //// selection highlighting by excluding MAYA_NATIVE_ROOT.
+        
+#if PXR_VERSION >= 2403
+        _lastFilteringSceneIndexBeforeCustomFiltering = _geomSubsetWhSi = Fvp::GeomSubsetWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _geomSubsetWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+#endif
+
+        _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _meshWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+        
+        _lastFilteringSceneIndexBeforeCustomFiltering = _niInstanceWhSi = Fvp::NiInstanceWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _niInstanceWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+        
+        _lastFilteringSceneIndexBeforeCustomFiltering = _niPrototypeWhSi = Fvp::NiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _niPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+
+        _lastFilteringSceneIndexBeforeCustomFiltering = _piInstancerWhSi = Fvp::PiInstancerWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _piInstancerWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+
+        _lastFilteringSceneIndexBeforeCustomFiltering = _piPrototypeWhSi = Fvp::PiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _piPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+    }
     
     TF_AXIOM(_mayaHydraSceneIndex);
-    Fvp::PathInterface* pathInterface = dynamic_cast<Fvp::PathInterface*>(&*mergingSceneIndex);
     _lastFilteringSceneIndexBeforeCustomFiltering = _lightsManagementSceneIndex = Fvp::LightsManagementSceneIndex::New(
-        _lastFilteringSceneIndexBeforeCustomFiltering, *pathInterface, _mayaHydraSceneIndex->GetMayaDefaultLightPath());
+        _lastFilteringSceneIndexBeforeCustomFiltering, _mayaHydraSceneIndex->GetMayaDefaultLightPath());
     _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(_lightingMode));
 
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -1459,25 +1469,24 @@ MStatus MtohRenderOverride::setup(const MString& destination)
     }
 
     if (_operations.empty()) {
-        // Clear and draw pre scene elelments (grid not pushed into hydra)
-        _operations.push_back(new MayaHydraPreRender("HydraRenderOverride_PreScene"));
+        // Clear and draw pre scene elements (grid not pushed into hydra)
+        _operations.push_back(std::make_unique<MayaHydraPreRender>("HydraRenderOverride_PreScene"));
 
         // The main hydra render
-        // For the data server, This also invokes scene update then sync scene delegate after scene
-        // update
-        _operations.push_back(new MayaHydraRender("HydraRenderOverride_DataServer", this));
+        // For the data server, This also invokes scene update then sync scene delegate after scene update
+        _operations.push_back(std::make_unique<MayaHydraRender>("HydraRenderOverride_DataServer", this));
 
         // Draw post scene elements (cameras, CVs, shapes not pushed into hydra)
-        _operations.push_back(new MayaHydraPostRender("HydraRenderOverride_PostScene"));
+        _operations.push_back(std::make_unique<MayaHydraPostRender>("HydraRenderOverride_PostScene"));
 
         // Draw HUD elements
-        _operations.push_back(new MHWRender::MHUDRender());
+        _operations.push_back(std::make_unique<MHWRender::MHUDRender>());
 
         // Set final buffer options
-        auto* presentTarget = new MHWRender::MPresentTarget("HydraRenderOverride_Present");
+        auto presentTarget = std::make_unique<MHWRender::MPresentTarget>("HydraRenderOverride_Present");
         presentTarget->setPresentDepth(true);
         presentTarget->setTargetBackBuffer(MHWRender::MPresentTarget::kCenterBuffer);
-        _operations.push_back(presentTarget);
+        _operations.push_back(std::move(presentTarget));
     }
 
     return MS::kSuccess;
@@ -1498,7 +1507,7 @@ bool MtohRenderOverride::startOperationIterator()
 MHWRender::MRenderOperation* MtohRenderOverride::renderOperation()
 {
     if (_currentOperation >= 0 && _currentOperation < static_cast<int>(_operations.size())) {
-        return _operations[_currentOperation];
+        return _operations[_currentOperation].get();
     }
     return nullptr;
 }
@@ -1586,7 +1595,7 @@ void MtohRenderOverride::_PickByRegion(
     pickParams.viewMatrix.Set(viewMatrix.matrix);
     pickParams.projectionMatrix.Set(adjustedProjMatrix.matrix);
     pickParams.collection = _renderCollection;
-    pickParams.collection.SetExcludePaths(_wireframeSelectionHighlightSceneIndex->GetSelectionHighlightMirrorPaths());
+    pickParams.collection.SetExcludePaths({_highlightHierarchyPrefix});
     pickParams.outHits = &outHits;
     
     if (geomSubsetsPickMode == GeomSubsetsPickModeTokens->Faces) {
@@ -1599,8 +1608,7 @@ void MtohRenderOverride::_PickByRegion(
         // Exclude selected Rprims to avoid self-snapping issue.
         pickParams.collection = _pointSnappingCollection;
         auto excludePaths = _selectionSceneIndex->GetFullySelectedPaths();
-        auto selectionHighlightPaths = _wireframeSelectionHighlightSceneIndex->GetSelectionHighlightMirrorPaths();
-        excludePaths.insert(excludePaths.end(), selectionHighlightPaths.begin(), selectionHighlightPaths.end());
+        excludePaths.push_back(_highlightHierarchyPrefix);
         pickParams.collection.SetExcludePaths(excludePaths);
     }
 
@@ -1833,14 +1841,49 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
         return;
     }
 
+    auto found = instance->_isolateSelectState.find(viewName.asChar());
+    if (found == instance->_isolateSelectState.end()) {
+        found = instance->_isolateSelectState.insert(found, VpIsolateSelectStates::value_type(viewName.asChar(), IsolateSelectState::IsolateSelectOff));
+    }
+
     // The M3dView returns the list of view selected objects as strings.
     // If isolate select is turned off, we want to disable isolate selection.
     // Otherwise, replace with what is in the M3dView.
     auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
     if (!view.viewSelected()) {
         vpDataMgr.DisableIsolateSelection(viewName.asChar());
+        found->second = IsolateSelectState::IsolateSelectOff;
         return;
     }
+
+    // Deal with IsolateSelectState changes.  The messages we receive are
+    // viewSelectedObjectsChanged true or false.
+    //
+    // State transitions:
+    // 
+    // off: message false --> go to pendingObjects, do not notify.
+    // off: message true --> illegal, warn, do not notify.
+    // 
+    // pendingObjects: message false --> illegal, warn, do not notify.
+    // pendingObjects: message true --> notify, go to on.
+    // 
+    // on: message false --> go to off, notify.
+    // on: message true --> stay on, notify.
+
+    if (found->second == IsolateSelectState::IsolateSelectOff) {
+        if (TF_VERIFY(!viewSelectedObjectsChanged)) {
+            found->second = IsolateSelectState::IsolateSelectPendingObjects;
+        }
+        return;
+    }
+    else if (found->second == IsolateSelectState::IsolateSelectPendingObjects) {
+        if (!TF_VERIFY(viewSelectedObjectsChanged)) {
+            return;
+        }
+        found->second = IsolateSelectState::IsolateSelectOn;
+    }
+    
+    TF_VERIFY(found->second == IsolateSelectState::IsolateSelectOn);
 
     // The M3dView returns the list of view selected objects as strings.
     // Loop over the view selected objects and try to create UFE paths from

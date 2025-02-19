@@ -43,7 +43,7 @@ MhWireframeColorInterfaceImp::MhWireframeColorInterfaceImp(const std::shared_ptr
     TF_AXIOM(_selection);
 }
 
-MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getSelectionState(const PXR_NS::SdfPath& primPath)const
+MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getSelectionState(const PXR_NS::SdfPath& primPath) const
 {
     if (_selection->HasFullySelectedAncestorInclusive(primPath)){
         auto pt = _leadObjectPathTracker.lock();
@@ -51,24 +51,46 @@ MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getS
             TF_WARN("Illegal access to path tracker in %s, wireframe color will be incorrect.", TF_FUNC_NAME().data());
             return kDormant;
         }
-        return (pt->isLeadObjectPrim(primPath)) ? kLead : kActive;
+        return (pt->isLeadObject(primPath)) ? kLead : kActive;
     }
     
     return kDormant;
 }
 
-GfVec4f MhWireframeColorInterfaceImp::getWireframeColor(const SdfPath& primPath) const { 
-    SelectionState selState = _getSelectionState(primPath);
-    switch (selState) {
+MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getSelectionState(const Fvp::PrimSelection& primSelection) const
+{
+    if (_selection->HasFullySelectedAncestorInclusive(primSelection.primPath)){
+        auto pt = _leadObjectPathTracker.lock();
+        if (!pt) {
+            TF_WARN("Illegal access to path tracker in %s, wireframe color will be incorrect.", TF_FUNC_NAME().data());
+            return kDormant;
+        }
+        return (pt->isLeadObject(primSelection)) ? kLead : kActive;
+    }
+    
+    return kDormant;
+}
+
+GfVec4f MhWireframeColorInterfaceImp::_getWireframeColor(const SelectionState& selectionState) const
+{
+    switch (selectionState) {
         case kLead:
             return _leadWireframeColor;
         case kActive:
             return _activeWireframeColor;
         default:
-        break;
+            break;
     }
 
     return _dormantWireframeColor;
+}
+
+GfVec4f MhWireframeColorInterfaceImp::getWireframeColor(const SdfPath& primPath) const { 
+    return _getWireframeColor(_getSelectionState(primPath));
+}
+
+GfVec4f MhWireframeColorInterfaceImp::getWireframeColor(const Fvp::PrimSelection& primSelection) const { 
+    return _getWireframeColor(_getSelectionState(primSelection));
 }
 
 }//End of MAYAHYDRA_NS_DEF

@@ -69,22 +69,18 @@ class GlobalSelectionChangedObs : public Ufe::Observer
 }
 namespace MAYAHYDRA_NS_DEF {
 
-MhLeadObjectPathTracker::MhLeadObjectPathTracker(const HdSceneIndexBaseRefPtr& sceneIndexWithPathInterface, 
-                                            MhDirtyLeadObjectSceneIndexRefPtr& dirtyLeadObjectSceneIndex) 
-    : _pathInterface(dynamic_cast<const Fvp::PathInterface*>(&*sceneIndexWithPathInterface))
-    , _ufeSelectionObserver (std::make_shared<GlobalSelectionChangedObs>(*this))
+MhLeadObjectPathTracker::MhLeadObjectPathTracker(MhDirtyLeadObjectSceneIndexRefPtr& dirtyLeadObjectSceneIndex) 
+    : _ufeSelectionObserver (std::make_shared<GlobalSelectionChangedObs>(*this))
     , _dirtyLeadObjectSceneIndex(dirtyLeadObjectSceneIndex)
 {
-    TF_AXIOM(_pathInterface);
-
     const Ufe::GlobalSelection::Ptr& ufeSelection = Ufe::GlobalSelection::get();
     if (ufeSelection->size() > 0){
         const Ufe::Selection& selection = *(ufeSelection);
         auto leadObjectSceneItem = selection.back();//get last selected
         _leadObjectUfePath = leadObjectSceneItem->path();
-        //_leadObjectPrimPaths can be empty with a valid _leadObjectUfePath when the lead object is in a data producer scene index not yet added to the merging scene index
-        //This is fixed at some point by calling updatePrimPaths()
-        _leadObjectPrimPaths = Fvp::sceneIndexPaths(_leadObjectUfePath);
+        //_leadObjectPrimSelections can be empty with a valid _leadObjectUfePath when the lead object is in a data producer scene index not yet added to the merging scene index
+        //This is fixed at some point by calling updatePrimSelections()
+        _leadObjectPrimSelections = Fvp::ufePathToPrimSelections(_leadObjectUfePath);
     }
 
    // Add ourself as an observer to the selection
@@ -98,16 +94,21 @@ MhLeadObjectPathTracker::~MhLeadObjectPathTracker()
     _ufeSelectionObserver = nullptr;
 }
 
-bool MhLeadObjectPathTracker::isLeadObjectPrim(const PXR_NS::SdfPath& primPath) const
+bool MhLeadObjectPathTracker::isLeadObject(const PXR_NS::SdfPath& primPath) const
 {
-    //_leadObjectPrimPaths can be hierarchy paths, so we need to check if the primPath is a prefix
+    //_leadObjectPrimSelections can be hierarchy paths, so we need to check if the primPath is a prefix
     //of a lead object prim path
-    for (const auto& leadObjectPrimPath : _leadObjectPrimPaths) {
-        if (primPath.HasPrefix(leadObjectPrimPath)) {
+    for (const auto& leadObjectPrimSelection : _leadObjectPrimSelections) {
+        if (primPath.HasPrefix(leadObjectPrimSelection.primPath)) {
             return true;
         }
     }
     return false;
+}
+
+bool MhLeadObjectPathTracker::isLeadObject(const Fvp::PrimSelection& primSelection) const
+{
+    return std::find(_leadObjectPrimSelections.cbegin(), _leadObjectPrimSelections.cend(), primSelection) != _leadObjectPrimSelections.cend();
 }
 
 void MhLeadObjectPathTracker::setLeadObjectUfePath(const Ufe::Path& newLeadObjectUfePath)
@@ -117,22 +118,22 @@ void MhLeadObjectPathTracker::setLeadObjectUfePath(const Ufe::Path& newLeadObjec
        return;
     }
     
-    auto oldLeadObjectPrimPaths = _leadObjectPrimPaths;
+    auto oldLeadObjectPrimSelections = _leadObjectPrimSelections;
 
     _leadObjectUfePath  = newLeadObjectUfePath;
-    _leadObjectPrimPaths = Fvp::sceneIndexPaths(_leadObjectUfePath);
+    _leadObjectPrimSelections = Fvp::ufePathToPrimSelections(_leadObjectUfePath);
 
     // Dirty the previous lead object
     if(_dirtyLeadObjectSceneIndex){
-        _dirtyLeadObjectSceneIndex->dirtyLeadObjectRelatedPrims(oldLeadObjectPrimPaths, _leadObjectPrimPaths);
+        _dirtyLeadObjectSceneIndex->dirtyLeadObjectRelatedSelections(oldLeadObjectPrimSelections, _leadObjectPrimSelections);
     }
 }
 
-void MhLeadObjectPathTracker::updatePrimPaths() 
+void MhLeadObjectPathTracker::updatePrimSelections() 
 { 
    // Update the lead object prim paths in case it was not valid yet
-    if ( (_leadObjectUfePath.size() > 0) && _leadObjectPrimPaths.empty()) {
-        _leadObjectPrimPaths = Fvp::sceneIndexPaths(_leadObjectUfePath);
+    if ( (_leadObjectUfePath.size() > 0) && _leadObjectPrimSelections.empty()) {
+        _leadObjectPrimSelections = Fvp::ufePathToPrimSelections(_leadObjectUfePath);
     }
 }
 

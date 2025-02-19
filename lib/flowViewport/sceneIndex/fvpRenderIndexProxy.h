@@ -68,7 +68,7 @@ class RenderIndexProxy
 public:
 
     FVP_API
-    RenderIndexProxy(PXR_NS::HdRenderIndex* renderIndex);
+    RenderIndexProxy(PXR_NS::HdRenderIndex& renderIndex);
 
     FVP_API
     void InsertSceneIndex(
@@ -88,7 +88,7 @@ public:
 
     ///Get the render index
     FVP_API
-    PXR_NS::HdRenderIndex*          GetRenderIndex() const;
+    PXR_NS::HdRenderIndex&          GetRenderIndex() const;
     
     ///Get the render delegate display name
     FVP_API
@@ -96,7 +96,7 @@ public:
 
 private:
 
-    PXR_NS::HdRenderIndex* const      _renderIndex{nullptr};
+    PXR_NS::HdRenderIndex&            _renderIndex;
     PXR_NS::HdMergingSceneIndexRefPtr _mergingSceneIndex;
 };
 

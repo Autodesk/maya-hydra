@@ -18,7 +18,7 @@
 
 #include <flowViewport/api.h>
 #include <flowViewport/selection/fvpPathMapperFwd.h>
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
+#include <flowViewport/selection/fvpSelectionTypes.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/usd/sdf/path.h>
@@ -86,7 +86,7 @@ public:
     PathMapperConstPtr GetFallbackMapper() const;
 
     FVP_API
-    PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath);
+    PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
 
     //! Testing interface
     FVP_API

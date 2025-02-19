@@ -35,13 +35,6 @@ HD_STORM = "HdStormRendererPlugin"
 HD_STORM_OVERRIDE = "mayaHydraRenderOverride_" + HD_STORM
 MAYAUSD_PLUGIN_NAME = 'mayaUsdPlugin'
 
-def checkForPlugin(pluginName: str):
-    try:
-        cmds.loadPlugin(pluginName)
-    except:
-        return False
-    return True
-
 class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     '''Base class for mayaHydra unit tests.'''
 
@@ -60,7 +53,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     # Unloading mayaHydraFlowViewportAPILocator crashes Maya (HYDRA-1304).
     # Unloading mtoa succeeds on Linux, but fails on Windows and macOS
     # with "cannot be unloaded because it is still in use" error.
-    _pluginsCantUnload = ['mayaHydraFlowViewportAPILocator', 'mtoa']
+    # Unloading modelingToolkit fails with a
+    # "Dynamic unloading is not currently supported." error
+    _pluginsCantUnload = ['mayaHydraFlowViewportAPILocator', 'mtoa', 'modelingToolkit']
 
     @classmethod
     def setUpClass(cls):
@@ -106,7 +101,16 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         # so open a new file before each test to minimize leftovers
         # from previous tests.
         mayaUtils.openNewScene()
+        modified = cmds.file(query=True, modified=True)
+        assert not modified, 'Internal test framework error: scene left as modified by mayaUtils.openNewScene()'
+
         self.setHdStormRenderer()
+
+        # We've just opened a new scene, so we should not be modified.  Setting
+        # Storm as the renderer should conceptually not change that status, but
+        # unfortunately in automated tests it does (see setHdStormRender()
+        # method documentation).  Restore modified status to false.
+        cmds.file(modified=False)
 
     @classmethod
     def tearDownClass(cls):
@@ -131,6 +135,10 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         cmds.modelEditor(
             self.activeEditor, e=1,
             rendererOverrideName=HD_STORM_OVERRIDE)
+        # During automated tests, tracing demonstrates that the following call
+        # to refresh marks the scene as modified, with the modified node being
+        # defaultRenderGlobals.  This behavior cannot be reproduced in a
+        # non-automated interactive Maya.
         cmds.refresh(f=1)
         self.delegateId = cmds.mayaHydra(renderer=HD_STORM,
                                     sceneDelegateId="MayaHydraSceneDelegate")

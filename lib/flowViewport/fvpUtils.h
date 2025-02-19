@@ -16,7 +16,7 @@
 #define FVP_UTILS_H
 
 #include <flowViewport/api.h>
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
+#include <flowViewport/selection/fvpSelectionTypes.h>
 
 #ifdef CODE_COVERAGE_WORKAROUND
 #include <pxr/imaging/hd/sceneIndex.h>
@@ -91,6 +91,39 @@ private:
 };
 
 PXR_NS::HdDataSourceBaseHandle createSelectionDataSource(const PrimSelection& selection);
+
+template<typename PathContainer>
+auto FindSelfOrFirstParent(const PXR_NS::SdfPath& path, const PathContainer& container) -> decltype(container.cend()) {
+    PXR_NS::SdfPath currPath = path;
+    while (!currPath.IsEmpty()) {
+        auto foundIt = container.find(currPath);
+        if (foundIt != container.cend()) {
+            return foundIt;
+        }
+        else {
+            currPath = currPath.GetParentPath();
+        }
+    }
+    return container.cend();
+}
+
+inline
+auto FindSelfOrFirstChild(const PXR_NS::SdfPath& path, const std::set<PXR_NS::SdfPath>& pathSet) -> decltype(pathSet.cend()) {
+    auto itPath = pathSet.lower_bound(path);
+    if (itPath != pathSet.cend() && itPath->HasPrefix(path)) {
+        return itPath;
+    }
+    return pathSet.cend();
+}
+
+template<typename MapValueType>
+auto FindSelfOrFirstChild(const PXR_NS::SdfPath& path, const std::map<PXR_NS::SdfPath, MapValueType>& pathMap) -> decltype(pathMap.cend()) {
+    auto itPath = pathMap.lower_bound(path);
+    if (itPath != pathMap.cend() && itPath->first.HasPrefix(path)) {
+        return itPath;
+    }
+    return pathMap.cend();
+}
 
 } // namespace FVP_NS_DEF
 

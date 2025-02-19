@@ -26,7 +26,9 @@
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
+#include <pxr/imaging/hd/geomSubsetSchema.h>
 #include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/lightSchema.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -96,6 +98,29 @@ Dependencies instancedPrim(
         Dependencies());
 }
 
+bool isGeomSubset(const HdSceneIndexPrim& prim) {
+    // HYDRA-1339: PiPrototypePropagatingSceneIndex removes GeomSubset type
+    // from Hydra prims
+#if PXR_VERSION >= 2403
+    return (prim.primType == HdPrimTypeTokens->geomSubset) ||
+        HdGeomSubsetSchema::GetFromParent(prim.dataSource).IsDefined();
+#else
+    return false;
+#endif
+}
+
+HdContainerDataSourceHandle setInstancerMaskDataSource(
+    const HdSceneIndexPrim& inputPrim,
+    const VtArray<bool>&    instanceMask
+)
+{
+    auto maskDs = HdRetainedTypedSampledDataSource<VtArray<bool>>::New(instanceMask);
+
+    return HdContainerDataSourceEditor(inputPrim.dataSource)
+        .Set(instancerMaskLocator, maskDs)
+        .Finish();
+}
+
 }
 
 namespace FVP_NS_DEF {
@@ -147,11 +172,8 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
 
     auto instancerMask = _instancerMasks.find(primPath);
     if (instancerMask != _instancerMasks.end()) {
-        auto maskDs = HdRetainedTypedSampledDataSource<VtArray<bool>>::New(instancerMask->second);
-
-        inputPrim.dataSource = HdContainerDataSourceEditor(inputPrim.dataSource)
-            .Set(instancerMaskLocator, maskDs)
-            .Finish();
+        inputPrim.dataSource = 
+            setInstancerMaskDataSource(inputPrim, instancerMask->second);
 
         return inputPrim;
     }
@@ -164,7 +186,23 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
     TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
         .Msg("    prim path %s is %s isolate select set", primPath.GetText(), (included ? "INCLUDED in" : "EXCLUDED from"));
 
-    if (!included) {
+    // HYDRA-1242: setting visibility on GeomSubset prim causes hang in Hydra
+    // Storm.
+    if (!included && !isGeomSubset(inputPrim)) {
+        // If an instancer is not included, none of its instances are, so set
+        // an instance mask that is entirely false.
+        if (inputPrim.primType == HdPrimTypeTokens->instancer) {
+            auto instancerTopologySchema = HdInstancerTopologySchema::GetFromParent(inputPrim.dataSource);
+            const auto nbInstances = getNbInstances(instancerTopologySchema);
+            VtArray<bool> instanceMask(nbInstances, false);
+
+            inputPrim.dataSource = setInstancerMaskDataSource(inputPrim, instanceMask);
+        }
+
+        // Unclear whether instancers need their visibility off.  As of OpenUSD
+        // 0.24.11, Hydra Storm seems to ignore visibility for instancers, but
+        // there seems to be no harm in setting it false.
+
         inputPrim.dataSource = HdContainerDataSourceEditor(inputPrim.dataSource)
             .Set(HdVisibilitySchema::GetDefaultLocator(), visOff)
             .Finish();
@@ -423,13 +461,52 @@ void IsolateSelectSceneIndex::_DirtyVisibilityRecursive(
     HdSceneIndexObserver::DirtiedPrimEntries* dirtiedEntries
 ) const
 {
+    // If the prim is a material, early out: visibility is not
+    // relevant for materials
+    auto prim = GetInputSceneIndex()->GetPrim(primPath);
+    if (prim.primType == HdPrimTypeTokens->material) {
+        return;
+    }
+
+    // If the prim is a light, early out: setting its visibility to false means
+    // it won't contribute lighting to the scene, not what we want.
+    auto lightSchema = HdLightSchema::GetFromParent(prim.dataSource);
+    if (lightSchema.IsDefined()) {
+        return;
+    }
+
+    // GeomSubset visibility must not be set (see GetPrim()), so no need to
+    // dirty it.
+    if (isGeomSubset(prim)) {
+        return;
+    }
+
     TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
         .Msg("            %s: marking %s visibility locator dirty.\n", _viewportId.c_str(), primPath.GetText());
+
+    // Unclear whether instancers need their visibility off.  As of OpenUSD
+    // 0.24.11, Hydra Storm seems to ignore visibility for instancers, but
+    // there seems to be no harm in setting it false.
 
     dirtiedEntries->emplace_back(
         primPath, HdVisibilitySchema::GetDefaultLocator());
 
+    // If the prim is an instancer, set its mask dirty, but don't recurse, as
+    // the hierarchy beneath an instancer is its prototypes, whose visibility
+    // is managed by the instancer mask data source.
+    if (prim.primType == HdPrimTypeTokens->instancer) {
+        _AddDirtyInstancerMaskEntry(primPath, dirtiedEntries);
+        return;
+    }
+
     for (const auto& childPath : GetChildPrimPaths(primPath)) {
+#if PXR_VERSION >= 2403
+        // Recursing down to set visibility on a geomSubset child is wasteful.
+        auto childPrim = GetInputSceneIndex()->GetPrim(childPath);
+        if (childPrim.primType == HdPrimTypeTokens->geomSubset) {
+            continue;
+        }
+#endif
         _DirtyVisibilityRecursive(childPath, dirtiedEntries);
     }
 }

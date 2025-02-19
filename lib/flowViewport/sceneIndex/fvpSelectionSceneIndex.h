@@ -39,9 +39,9 @@
 #define FVP_SELECTION_SCENE_INDEX_H
 
 #include "flowViewport/api.h"
-#include "flowViewport/selection/fvpSelectionFwd.h"
-#include "flowViewport/sceneIndex/fvpPathInterface.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+#include "flowViewport/selection/fvpSelectionFwd.h"
+#include "flowViewport/selection/fvpSelectionTypes.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
@@ -56,7 +56,6 @@ class Selection;
 
 namespace FVP_NS_DEF {
 
-class PathInterface;
 class Selection;
 
 // Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
@@ -72,7 +71,6 @@ typedef PXR_NS::TfRefPtr<const SelectionSceneIndex> SelectionSceneIndexConstRefP
 ///
 class SelectionSceneIndex final
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
-    , public PathInterface
     , public Fvp::InputSceneIndexUtils<SelectionSceneIndex>
 {
 public:
@@ -113,13 +111,6 @@ public:
     FVP_API
     bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath) const;
 
-    //! Path interface override.  Forwards the call to the input scene index, 
-    //! and warns about empty return paths.
-    //@{
-    FVP_API
-    PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override;
-    //@}
-
     FVP_API
     PXR_NS::SdfPathVector GetFullySelectedPaths() const;
 
@@ -142,9 +133,9 @@ private:
         const PXR_NS::HdSceneIndexBaseRefPtr &inputSceneIndex,
         const std::shared_ptr<Selection>&     selection);
 
-    const SelectionPtr         _selection;
+    PrimSelections _UfePathToPrimSelections(const Ufe::Path& appPath) const;
 
-    const PathInterface* const _inputSceneIndexPathInterface;
+    const SelectionPtr         _selection;
 };
 
 }

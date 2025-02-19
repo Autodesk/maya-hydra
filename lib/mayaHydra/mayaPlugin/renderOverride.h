@@ -51,7 +51,12 @@
 #include <flowViewport/sceneIndex/fvpDefaultMaterialSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
-#include <flowViewport/sceneIndex/fvpWireframeSelectionHighlightSceneIndex.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpGeomSubsetWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpMeshWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpNiInstanceWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpNiPrototypeWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpPiInstancerWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpPiPrototypeWhSi.h>
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 
@@ -74,6 +79,7 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include <map>
 
 #include <ufe/ufe.h>
 UFE_NS_DEF {
@@ -244,7 +250,7 @@ private:
     MtohRendererDescription _rendererDesc;
 
     std::shared_ptr<MayaHydraSceneIndexRegistry> _sceneIndexRegistry;
-    std::vector<MHWRender::MRenderOperation*>    _operations;
+    std::vector<std::unique_ptr<MHWRender::MRenderOperation>>    _operations;
     MCallbackIdArray                             _callbacks;
     MCallbackId                                  _timerCallback = 0;
     PanelCallbacksList                           _renderPanelCallbacks;
@@ -267,7 +273,7 @@ private:
     HdDriver                                  _hgiDriver;
     HdEngine                                  _engine;
     HdRendererPlugin*                         _rendererPlugin = nullptr;
-    HdxTaskController*                        _taskController = nullptr;
+    std::unique_ptr<HdxTaskController>        _taskController;
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
     Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
     HdSceneIndexBaseRefPtr                    _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
@@ -280,7 +286,15 @@ private:
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
     Fvp::SelectionPtr                         _selection;
-    Fvp::WireframeSelectionHighlightSceneIndexRefPtr  _wireframeSelectionHighlightSceneIndex;
+    SdfPath                                   _highlightHierarchyPrefix{"/FlowViewportSelectionHighlights"};
+#if PXR_VERSION >= 2403
+    Fvp::GeomSubsetWhSiRefPtr                 _geomSubsetWhSi;
+#endif
+    Fvp::MeshWhSiRefPtr                       _meshWhSi;
+    Fvp::NiInstanceWhSiRefPtr                 _niInstanceWhSi;
+    Fvp::NiPrototypeWhSiRefPtr                _niPrototypeWhSi;
+    Fvp::PiInstancerWhSiRefPtr                _piInstancerWhSi;
+    Fvp::PiPrototypeWhSiRefPtr                _piPrototypeWhSi;
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
@@ -338,6 +352,21 @@ private:
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
     long int   _nbViewSelectedChangedCalls{0};
 #endif
+
+    // Maya has an awkward notification mechanism for isolate select,
+    // with a view selected objects changed boolean that indicates
+    // whether the state has changed (false), or the isolate selected
+    // objects have changed (true).  When changing a viewport from
+    // isolate select off to on, two notifications are therefore sent,
+    // first false (state change), then true (objects set).  To avoid
+    // double dirtying in Hydra, we track the following isolate select
+    // states per viewport:
+    // 
+    enum class IsolateSelectState {IsolateSelectOff, IsolateSelectPendingObjects,
+				   IsolateSelectOn};
+
+    using VpIsolateSelectStates = std::map<std::string, IsolateSelectState>;
+    VpIsolateSelectStates _isolateSelectState;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

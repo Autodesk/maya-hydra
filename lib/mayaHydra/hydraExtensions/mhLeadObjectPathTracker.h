@@ -21,7 +21,7 @@
 #include "mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h"
 
 //Flow viewport headers
-#include <flowViewport/sceneIndex/fvpPathInterface.h>
+#include "flowViewport/selection/fvpSelectionTypes.h"
 
 //ufe
 #include <ufe/observer.h>
@@ -40,13 +40,16 @@ class MhLeadObjectPathTracker
 {
 public:
     MAYAHYDRALIB_API
-    MhLeadObjectPathTracker(const PXR_NS::HdSceneIndexBaseRefPtr& sceneIndexWithPathInterface, MhDirtyLeadObjectSceneIndexRefPtr& dirtyPreviousLeadObjectSceneIndex);
+    MhLeadObjectPathTracker(MhDirtyLeadObjectSceneIndexRefPtr& dirtyPreviousLeadObjectSceneIndex);
 
     MAYAHYDRALIB_API
     ~MhLeadObjectPathTracker();
 
     MAYAHYDRALIB_API
-    bool isLeadObjectPrim(const PXR_NS::SdfPath& primPath) const;
+    bool isLeadObject(const PXR_NS::SdfPath& primPath) const;
+
+    MAYAHYDRALIB_API
+    bool isLeadObject(const Fvp::PrimSelection& primSelection) const;
     
     MAYAHYDRALIB_API
     Ufe::Path getLeadObjectUfePath() const {return _leadObjectUfePath;}
@@ -55,11 +58,10 @@ public:
     void setLeadObjectUfePath(const Ufe::Path& newLeadObjectUfePath);
 
     MAYAHYDRALIB_API
-    void updatePrimPaths(); // For example : this is called after the data producer scene indices are loaded
+    void updatePrimSelections(); // For example : this is called after the data producer scene indices are loaded
 
 private:
-    const Fvp::PathInterface* const _pathInterface {nullptr};
-    PXR_NS::SdfPathVector           _leadObjectPrimPaths;
+    Fvp::PrimSelections             _leadObjectPrimSelections;
     Ufe::Observer::Ptr              _ufeSelectionObserver {nullptr};
     Ufe::Path                       _leadObjectUfePath;
     const MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex;

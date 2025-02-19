@@ -33,8 +33,8 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraDefaultLightDataSource.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraMaterialDataSource.h>
 
-#include "flowViewport/sceneIndex/fvpPathInterface.h"
 #include <flowViewport/selection/fvpPathMapperFwd.h>
+#include <flowViewport/selection/fvpSelectionTypes.h>
 
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
@@ -49,10 +49,16 @@
 #include <pxr/imaging/hd/retainedSceneIndex.h>
 #include "pxr/imaging/hd/dirtyBitsTranslator.h"
 
+#include <ufe/ufe.h>
+
 #include <unordered_map>
 
 namespace FVP_NS_DEF {
 class RenderIndexProxy;
+}
+
+UFE_NS_DEF {
+class Path;
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -62,16 +68,12 @@ struct MayaHydraInitData
     MayaHydraInitData(
         TfToken            nameIn,
         HdEngine&          engineIn,
-        HdRenderIndex*     renderIndexIn,
-        HdRendererPlugin*  rendererPluginIn,
-        HdxTaskController* taskControllerIn,
+        HdRenderIndex&     renderIndexIn,
         const SdfPath&     delegateIDIn,
         bool               isHdStIn)
         : name(nameIn)
         , engine(engineIn)
         , renderIndex(renderIndexIn)
-        , rendererPlugin(rendererPluginIn)
-        , taskController(taskControllerIn)
         , delegateID(delegateIDIn)
         , isHdSt(isHdStIn)
     {
@@ -79,9 +81,7 @@ struct MayaHydraInitData
 
     TfToken            name;
     HdEngine&          engine;
-    HdRenderIndex*     renderIndex;
-    HdRendererPlugin*  rendererPlugin;
-    HdxTaskController* taskController;
+    HdRenderIndex&     renderIndex;
     SdfPath            delegateID;
     bool               isHdSt;
 };
@@ -91,7 +91,7 @@ TF_DECLARE_WEAK_AND_REF_PTRS(MayaHydraSceneIndex);
 /**
  * \brief MayaHydraSceneIndex is a scene index to produce the hydra scene from Maya native scene.
  */
-class MAYAHYDRALIB_API MayaHydraSceneIndex : public HdRetainedSceneIndex, public Fvp::PathInterface
+class MAYAHYDRALIB_API MayaHydraSceneIndex : public HdRetainedSceneIndex
 {
 public:
     enum RebuildFlags : uint32_t
@@ -190,7 +190,7 @@ public:
 
     HdChangeTracker& GetChangeTracker();
 
-    HdRenderIndex& GetRenderIndex() { return *_renderIndex; }
+    HdRenderIndex& GetRenderIndex() { return _renderIndex; }
 
     SdfPath GetDelegateID(TfToken name);
 
@@ -204,7 +204,7 @@ public:
 
     bool GetPlaybackRunning() const;
 
-    Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override;
+    Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
     Fvp::PrimSelections UfePathToPrimSelectionsLit(const Ufe::Path& appPath) const;
 
     //Sdfpath of the maya default material
@@ -315,7 +315,7 @@ private:
     SdfPath _ID;
     MayaHydraParams _params;
 
-    HdRenderIndex* _renderIndex = nullptr;
+    HdRenderIndex& _renderIndex;
 
     // Adapters
     AdapterMap<MayaHydraLightAdapterPtr> _lightAdapters;

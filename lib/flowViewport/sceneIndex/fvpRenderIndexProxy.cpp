@@ -38,9 +38,9 @@
 
 //Local headers
 #include "flowViewport/sceneIndex/fvpRenderIndexProxy.h"
-#include "flowViewport/sceneIndex/fvpMergingSceneIndex.h"
 
 //Hydra headers
+#include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/prefixingSceneIndex.h>
 #include <pxr/imaging/hd/renderIndex.h>
 #include <pxr/imaging/hd/renderDelegate.h>
@@ -67,12 +67,11 @@ _GetInputScene(const HdPrefixingSceneIndexRefPtr &prefixingScene)
 
 namespace FVP_NS_DEF {
 
-RenderIndexProxy::RenderIndexProxy(PXR_NS::HdRenderIndex* renderIndex) :
-    _renderIndex(renderIndex), _mergingSceneIndex(MergingSceneIndex::New())
+RenderIndexProxy::RenderIndexProxy(PXR_NS::HdRenderIndex& renderIndex) :
+    _renderIndex(renderIndex), _mergingSceneIndex(PXR_NS::HdMergingSceneIndex::New())
 {
-    TF_AXIOM(_renderIndex);
     TF_AXIOM(_mergingSceneIndex);
-    _mergingSceneIndex->SetDisplayName("Flow Viewport Merging Scene Index");
+    _mergingSceneIndex->SetDisplayName("Data Producer Merging Scene Index");
 }
 
 void RenderIndexProxy::InsertSceneIndex(
@@ -134,7 +133,7 @@ HdSceneIndexBaseRefPtr RenderIndexProxy::GetMergingSceneIndex() const
     return _mergingSceneIndex;
 }
 
-HdRenderIndex* RenderIndexProxy::GetRenderIndex() const 
+HdRenderIndex& RenderIndexProxy::GetRenderIndex() const 
 { 
     return _renderIndex;
 }
@@ -143,10 +142,7 @@ std::string RenderIndexProxy::GetRendererDisplayName() const
 {
     static std::string empty;
 
-    if (! _renderIndex){
-        return empty;
-    }
-    auto rd = _renderIndex->GetRenderDelegate();
+    auto rd = _renderIndex.GetRenderDelegate();
     if (! rd){
         return empty;
     }
