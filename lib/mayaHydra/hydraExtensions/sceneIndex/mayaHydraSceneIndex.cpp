@@ -778,10 +778,13 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
     shapeDagPath.extendToShape();
 
     // Check if this Maya node has a special path mapper associated with it.
-    const Ufe::Path shapeAppPath { UfeExtensions::dagPathToUfePathSegment(shapeDagPath) };
-    const auto&     pmr = Fvp::PathMapperRegistry::Instance();
-    if (pmr.HasMapper(shapeAppPath)) {
-        return pmr.UfePathToPrimSelections(shapeAppPath);
+    const Ufe::PathSegment seg = UfeExtensions::dagPathToUfePathSegment(shapeDagPath);
+    if (!seg.empty()) { 
+        const Ufe::Path shapeAppPath { seg };
+        const auto&     pmr = Fvp::PathMapperRegistry::Instance();
+        if (pmr.HasMapper(shapeAppPath)) {
+            return pmr.UfePathToPrimSelections(shapeAppPath);
+        }
     }
 
     const SdfPath primPath = GetPrimPath((extendToShape) ? shapeDagPath : dagPath, isSprim);
