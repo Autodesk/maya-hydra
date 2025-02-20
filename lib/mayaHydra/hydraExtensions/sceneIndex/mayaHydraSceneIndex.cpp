@@ -755,7 +755,9 @@ void MayaHydraSceneIndex::CreateMayaDefaultMaterialData()
 Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) const
 {
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
-        .Msg("MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
+        .Msg(
+            "MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& %s) called.\n",
+            Ufe::PathString::string(appPath).c_str());
 
     // We only handle Maya objects, so if the UFE path is not a Maya object,
     // early out with failure.
@@ -765,28 +767,31 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
 
     // Not the best implementation performance-wise, as ufeToDagPath converts
     // the UFE path to a string, then does a Dag path lookup with the string.
-    
-    auto dagPath = UfeExtensions::ufeToDagPath(appPath);
-    const bool extendToShape = _UseTheShapeDagPath(dagPath);//For Hydra some prims, we need to use the shape dag path not the transform, as this is what gets translated to an hydra path
+
+    auto       dagPath = UfeExtensions::ufeToDagPath(appPath);
+    const bool extendToShape = _UseTheShapeDagPath(
+        dagPath); // For Hydra some prims, we need to use the shape dag path not the transform, as
+                  // this is what gets translated to an hydra path
     const bool isSprim = _IsDagPathRegisteredInHydraSPrims(dagPath);
 
-    MDagPath   shapeDagPath(dagPath);
+    MDagPath shapeDagPath(dagPath);
     shapeDagPath.extendToShape();
 
     // Check if this Maya node has a special path mapper associated with it.
-    Ufe::Path shapeAppPath{UfeExtensions::dagPathToUfePathSegment(shapeDagPath)};
-    const auto& pmr = Fvp::PathMapperRegistry::Instance();
+    const Ufe::Path shapeAppPath { UfeExtensions::dagPathToUfePathSegment(shapeDagPath) };
+    const auto&     pmr = Fvp::PathMapperRegistry::Instance();
     if (pmr.HasMapper(shapeAppPath)) {
         return pmr.UfePathToPrimSelections(shapeAppPath);
     }
 
-    SdfPath primPath = GetPrimPath((extendToShape) ? shapeDagPath : dagPath, isSprim);
-    
+    const SdfPath primPath = GetPrimPath((extendToShape) ? shapeDagPath : dagPath, isSprim);
+
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg("    mapped to scene index path %s.\n", primPath.GetText());
-		
-    return Fvp::PrimSelections({Fvp::PrimSelection{primPath}});
+
+    return Fvp::PrimSelections({ Fvp::PrimSelection { primPath } });
 }
+
 
 Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelectionsLit(
     const Ufe::Path& appPath
