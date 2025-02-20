@@ -23,10 +23,10 @@ The best bug reports include a detailed way to predictably reproduce the issue, 
 
 ## Contributing Code
 
-The _Hydra for Maya_ project accepts and greatly appreciates contributions. The project follows the [fork & pull](https://help.github.com/articles/using-pull-requests/#fork--pull) model for accepting contributions.
+The _Hydra for Maya_ project accepts and greatly appreciates contributions. The project follows the [fork & pull](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork) model for accepting contributions.
 
 When contributing code, please also include appropriate tests as part of the pull request, and follow the same comment and coding style as the rest of the project. Take a look through the existing code for examples of the testing and style practices the project follows.
 
-All development should happen against the "develop" branch of the repository. Please make sure the base branch of your pull request is set to the "develop" branch when filing your pull request.
+All development should happen against the "dev" branch of the repository. Please make sure the base branch of your pull request is set to the "dev" branch when filing your pull request.
 
 It is highly recommended that an issue be logged on GitHub before any work is started.  This will allow for early feedback from other developers and avoid multiple parallel efforts.
