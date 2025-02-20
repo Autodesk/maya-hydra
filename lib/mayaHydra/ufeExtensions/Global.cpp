@@ -108,7 +108,13 @@ Ufe::PathSegment sdfPathToUfePathSegment(const SdfPath& usdPath, Ufe::Rtid rtid,
 
 Ufe::PathSegment dagPathToUfePathSegment(const MDagPath& dagPath)
 {
+    static const Ufe::Rtid mayaRtid(getMayaRunTimeId());
+
     MStatus status;
+    if (!dagPath.isValid() || 0 == dagPath.length(&status)) {
+        return Ufe::PathSegment("", mayaRtid, '|');
+    }
+
     // The Ufe path includes a prepended "world" that the dag path doesn't have
     size_t                       numUfeComponents = dagPath.length(&status) + 1;
     Ufe::PathSegment::Components components;
@@ -116,7 +122,7 @@ Ufe::PathSegment dagPathToUfePathSegment(const MDagPath& dagPath)
     components[0] = Ufe::PathComponent("world");
     MDagPath path = dagPath; // make an editable copy
 
-    Ufe::Rtid mayaRtid(getMayaRunTimeId());
+    
     // Pop nodes off the path string one by one, adding them to the correct
     // position in the components vector as we go. Use i>0 as the stopping
     // condition because we've already written to element 0 of the components

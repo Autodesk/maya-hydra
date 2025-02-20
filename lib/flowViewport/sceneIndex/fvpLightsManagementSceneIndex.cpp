@@ -27,11 +27,9 @@
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/light.h>
 #include <pxr/imaging/hd/lightSchema.h>
+#include <pxr/imaging/hd/selectionSchema.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/glf/simpleLight.h>
-
-//ufe
-#include <ufe/globalSelection.h>
-#include <ufe/observableSelection.h>
 
 //std
 #include <array>
@@ -86,31 +84,27 @@ void _DisableLight(HdSceneIndexPrim& prim)
     prim.dataSource = editor.Finish();
 }
 
-bool _IsPrimOrAncestorSelected(const SdfPath& primPath)
+bool _IsPrimOrAncestorSelected(const SdfPath& primPath,  const HdSceneIndexPrim& prim, const HdSceneIndexBaseRefPtr& sceneIndex)
 {
-    const Ufe::Selection& ufeSelection = *Ufe::GlobalSelection::get();
-    if (ufeSelection.empty()) {
-        return false;
-    }
+    TF_AXIOM(sceneIndex);
 
-    // Convert UFE selection to SdfPath
-    SdfPathVector selectedSdfPath;
-    for (const auto& snItem : ufeSelection) {
-        auto primSelections = Fvp::ufePathToPrimSelections(snItem->path());
-        for (const auto& primSelection : primSelections) {
-            selectedSdfPath.push_back(primSelection.primPath);
+    if (prim.dataSource){
+        HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
+        if (selectionsSchema.IsDefined()) {
+            for (size_t selectionId = 0;
+                 selectionId < selectionsSchema.GetNumElements(); ++selectionId) {
+                if (selectionsSchema.GetElement(selectionId).GetFullySelected()
+                    && !selectionsSchema.GetElement(selectionId).GetNestedInstanceIndices()) {
+                    return true;//Is selected
+                }
+            }
         }
     }
 
-    if (std::find(selectedSdfPath.begin(), selectedSdfPath.end(), primPath)
-        != selectedSdfPath.end()) {
-        return true;
-    }
-
-    for (const auto& selectedPath : selectedSdfPath) {
-        if (primPath.HasPrefix(selectedPath)) {
-            return true;
-        }
+    //Recurse with parent path
+    const SdfPath parentPath = primPath.GetParentPath();
+    if (parentPath != SdfPath::AbsoluteRootPath()) {
+        return _IsPrimOrAncestorSelected(parentPath, sceneIndex->GetPrim(parentPath), sceneIndex);
     }
 
     return false;
@@ -185,7 +179,8 @@ HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) co
             break;
 
         case LightingMode::kSelectedLightsOnly: {
-            const bool shouldBeUsedForLigthing = _IsPrimOrAncestorSelected(primPath);
+            const bool shouldBeUsedForLigthing
+                = _IsPrimOrAncestorSelected(primPath, prim, GetInputSceneIndex());
             if (! shouldBeUsedForLigthing) {
                 _DisableLight(prim);
             }
