@@ -1,13 +1,24 @@
 # Code Coverage For Windows
 
-Maya-hydra has support for obtaining code coverage on Windows platforms.
+## Table of contents
 
-The support uses two main tools: Clang for the compilation of maya-hydra and the LLVM toolset for the parsing of code coverage
-information and the generation of a code coverage report.
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+- [Documentation References](#documentation-references)
+- [Building the Coverage Variant](#building-the-coverage-variant)
+- [Running Tests and Getting Raw Coverage Information](#running-tests-and-getting-raw-coverage-information)
+- [Parsing Coverage Information and Generating a Report](#parsing-coverage-information-and-generating-a-report)
+- [Viewing Results](#viewing-results)
+
+## Introduction
+
+maya-hydra has support for obtaining code coverage on Windows platforms.
+
+The support uses two main tools: Clang for the compilation of maya-hydra and the LLVM toolset for the parsing of code coverage information and the generation of a code coverage report.
 
 ## Prerequisites
 
-To install Clang and the LLVM toolset, you can install an optional module with Visual Studio.  Refer to these instructions: [Install Clang and LLVM Toolset](https://learn.microsoft.com/en-us/cpp/build/clang-support-msbuild?view=msvc-170)
+To install Clang and the LLVM toolset, you can install an optional module with Visual Studio. Refer to these instructions: [Install Clang and LLVM Toolset](https://learn.microsoft.com/en-us/cpp/build/clang-support-msbuild?view=msvc-170)
 
 > Note: On Windows, all commands must be executed in a `x64 Native Tools Command Prompt for VS 2022` command line
 
@@ -17,9 +28,9 @@ To install Clang and the LLVM toolset, you can install an optional module with V
 
 ## Building the Coverage Variant
 
-The maya-hydra build has a Coverage variant that can be used with the following stages: clean,build,install,test (note that the test stage depends on the install stage).  Clang is used with code coverage instrumentation flags enabled (-fprofile-instr-generate -fcoverage-mapping) so that when tests are run after a successful install stage, code coverage data files will be generated.  Refer to the [build documentation](./build.md) for more details.
+The maya-hydra build has a Coverage variant that can be used with the following stages: `clean,build,install,test` (note that the `test` stage depends on the `install` stage). Clang is used with code coverage instrumentation flags enabled (`-fprofile-instr-generate -fcoverage-mapping`) so that when tests are run after a successful `install` stage, code coverage data files will be generated. Refer to the [build documentation](./build.md) for more details.
 
-To build the coverage variant you can run:
+Here is the command to build the Coverage variant:
 
 ```
 python build.py
@@ -32,18 +43,17 @@ python build.py
     --build-args="-DPYTHON_INCLUDE_DIR=<python_include_dir>,-DPython_EXECUTABLE=<python_executable>,-DPYTHON_LIBRARIES=<python_libraries>,-DCMAKE_WANT_MATERIALX_BUILD=ON,-DCMAKE_PREFIX_PATH=<cmake_prefix_path>" ^
     <workspace_location>
 ```
-
 The `--build-coverage` flag indicates that the variant to be built is the Coverage variant.
 
 At time of writing (February 26th, 2024), only the Ninja code generator is supported.  In particular, the Visual Studio generator is known not to output code coverage data.
 
 ## Running Tests and Getting Raw Coverage Information
 
-To run tests and generate code coverage information using the Coverage build, run the same command as in [the previous section](#building-the-coverage-variant), but replace `--stages=clean,configure,build,install` with `--stages=test`.
+To run tests and generate code coverage information using the Coverage build, run the same `build.py` command as in [the previous section](#building-the-coverage-variant), but replace `--stages=clean,configure,build,install` with `--stages=test`.
 
 After running tests, the raw coverage information files will be generated in `<workspace_location>\build\Coverage\test\lib\mayaUsd\render\mayaToHydra\<test_subfolders>`. These files have a `.profraw` file extension.
 
-## Parsing Coverage Information and Report
+## Parsing Coverage Information and Generating a Report
 
 To parse the coverage information, two tools from the LLVM toolset are used: `llvm-profdata merge` and `llvm-cov show`.
 - `llvm-profdata merge`: Parses and merges all of the raw coverage information files (`.profraw`) into a single file with a `.profdata` extension.
