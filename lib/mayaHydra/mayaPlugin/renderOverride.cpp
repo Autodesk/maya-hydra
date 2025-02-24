@@ -56,6 +56,7 @@
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
+#include <flowViewport/imageWriter/fvpImageBufferWriter.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -669,6 +670,14 @@ MStatus MtohRenderOverride::Render(
 
         _engine.Execute(_renderIndex, &tasks);
 
+        const auto fileName = Fvp::ImageBufferWriter::GetFileName();
+        if (!fileName.empty()) {
+            if (!Fvp::ImageBufferWriter::Write(_fileWriterArgs, fileName)) {
+                TF_RUNTIME_ERROR("Failed to write image to %s",
+                                 fileName.c_str());
+            }
+        }
+
         // HdTaskController will query all of the tasks it can for IsConverged.
         // This includes HdRenderPass::IsConverged and HdRenderBuffer::IsConverged (via colorizer).
         //
@@ -1095,6 +1104,12 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
         _taskController->SetRenderOutputs({ HdAovTokens->color });
     }
 
+    // As per https://stackoverflow.com/questions/9982681
+    // an initializer_list cannot be used in a ternary operator.
+    _fileWriterArgs = _hgi ? VtDictionary{
+      {{"hgi", VtValue(_hgi.get())}, {"engine", VtValue(&_engine)}}} :
+      VtDictionary{{{"taskController", VtValue(_taskController)}}}; 
+
     MayaHydraInitData mhInitData(
         TfToken("MayaHydraSceneIndex"),
         _engine,
@@ -1226,6 +1241,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     // invalid.
     _engine.ClearTaskContextData();
 
+    _fileWriterArgs.clear();
     _taskController.reset();
 
     if (_renderIndex != nullptr) {

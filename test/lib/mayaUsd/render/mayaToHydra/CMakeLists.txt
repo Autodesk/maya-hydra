@@ -85,6 +85,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
     cpp/testUsdStageInvalidate.py
+    cpp/testWriteFile.py
 )
 
 # These two test files are identical, except for disabled tests.  See
