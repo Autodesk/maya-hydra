@@ -35,6 +35,7 @@
 
 #include <flowViewport/selection/fvpPathMapperFwd.h>
 #include <flowViewport/selection/fvpSelectionTypes.h>
+#include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
@@ -159,10 +160,6 @@ public:
     // Update viewport info to camera
     SdfPath SetCameraViewport(const MDagPath& camPath, const GfVec4d& viewport);
 
-    // Enable or disable lighting
-    void SetLightsEnabled(const bool enabled) { _lightsEnabled = enabled; }
-    bool GetLightsEnabled() const { return _lightsEnabled; }
-
     // Enable or disable shadows
     void SetShadowsEnabled(const bool enabled) { _shadowsEnabled = enabled; }
 
@@ -269,6 +266,9 @@ public:
     /// Get all paths of all lighted prims
     void GetLightedPrimPaths(SdfPathVector& lightedPrimPaths);
 
+    void SetLightsManagementSceneIndex(
+        const Fvp::LightsManagementSceneIndexRefPtr lightsManagementSceneIndex);//Can be a nullptr
+    
 private:
     MayaHydraSceneIndex(
         MayaHydraInitData& initData,
@@ -352,7 +352,6 @@ private:
 
     bool _xRayEnabled = false;
     bool _isPlaybackRunning = false;
-    bool _lightsEnabled = true;
     bool _shadowsEnabled = true;
     bool _renderCollectionChanged = false;
     bool _isHdSt = false;
@@ -362,6 +361,8 @@ private:
     SdfPath _materialPath;
 
     const Fvp::PathMapperConstPtr _mayaPathMapper{};
+
+    Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex { nullptr };
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

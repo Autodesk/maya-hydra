@@ -369,14 +369,4 @@ bool MayaHydraLightAdapter::_GetVisibility() const
     return false;
 }
 
-void MayaHydraLightAdapter::SetLightingOn(bool isLightingOn)
-{
-    if (_isLightingOn != isLightingOn) {
-        _isLightingOn = isLightingOn;
-
-        RemovePrim();
-        Populate();
-    }
-}
-
 PXR_NAMESPACE_CLOSE_SCOPE

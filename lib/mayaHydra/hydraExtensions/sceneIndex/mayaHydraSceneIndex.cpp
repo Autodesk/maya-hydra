@@ -107,31 +107,14 @@ public:
 // For some dag paths we use the shape to translate it to an Hydra path
 bool _UseTheShapeDagPath(const MDagPath& dagpath) 
 { 
-    bool extendToShape = false;
-
-    //So far we only have one case : the Arnold sky dome light
-    const bool isSkyDomeLight = MayaHydra::IsDagPathAnArnoldSkyDomeLight(dagpath);
-    if (isSkyDomeLight) {
-        extendToShape = true;
-    }
-
-    return extendToShape;
+    //Only for the Arnold skydome light
+    return MAYAHYDRA_NS_DEF::IsDagPathAnArnoldSkyDomeLight(dagpath);
 }
 
 //Check if this dag path is registered in Sprims (such as the Arnold sky dome light)
 bool _IsDagPathRegisteredInHydraSPrims(const MDagPath& dagpath)
 {
-    bool isRegisteredInSPrims = false;
-    
-    //So far we only have one case : the Arnold sky dome light
-     
-    // The Arnold skydome light has its shape dag path registered as a Sprim in Hydra
-    const bool isSkyDomeLight = MayaHydra::IsDagPathAnArnoldSkyDomeLight(dagpath);
-    if (isSkyDomeLight) {
-        isRegisteredInSPrims = true;
-    }
-    
-    return isRegisteredInSPrims;
+    return MAYAHYDRA_NS_DEF::IsDagPathALight(dagpath);
 }
 
 }
@@ -778,7 +761,9 @@ void MayaHydraSceneIndex::CreateMayaDefaultMaterialData()
 Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) const
 {
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
-        .Msg("MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& %s) called.\n", Ufe::PathString::string(appPath).c_str());
+        .Msg(
+            "MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path& %s) called.\n",
+            Ufe::PathString::string(appPath).c_str());
 
     // We only handle Maya objects, so if the UFE path is not a Maya object,
     // early out with failure.
@@ -788,28 +773,34 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
 
     // Not the best implementation performance-wise, as ufeToDagPath converts
     // the UFE path to a string, then does a Dag path lookup with the string.
-    
-    auto dagPath = UfeExtensions::ufeToDagPath(appPath);
-    const bool extendToShape = _UseTheShapeDagPath(dagPath);//For Hydra some prims, we need to use the shape dag path not the transform, as this is what gets translated to an hydra path
+
+    auto       dagPath = UfeExtensions::ufeToDagPath(appPath);
+    const bool extendToShape = _UseTheShapeDagPath(
+        dagPath); // For Hydra some prims, we need to use the shape dag path not the transform, as
+                  // this is what gets translated to an hydra path
     const bool isSprim = _IsDagPathRegisteredInHydraSPrims(dagPath);
 
-    MDagPath   shapeDagPath(dagPath);
+    MDagPath shapeDagPath(dagPath);
     shapeDagPath.extendToShape();
 
     // Check if this Maya node has a special path mapper associated with it.
-    Ufe::Path shapeAppPath{UfeExtensions::dagPathToUfePathSegment(shapeDagPath)};
-    const auto& pmr = Fvp::PathMapperRegistry::Instance();
-    if (pmr.HasMapper(shapeAppPath)) {
-        return pmr.UfePathToPrimSelections(shapeAppPath);
+    const Ufe::PathSegment seg = UfeExtensions::dagPathToUfePathSegment(shapeDagPath);
+    if (!seg.empty()) { 
+        const Ufe::Path shapeAppPath { seg };
+        const auto&     pmr = Fvp::PathMapperRegistry::Instance();
+        if (pmr.HasMapper(shapeAppPath)) {
+            return pmr.UfePathToPrimSelections(shapeAppPath);
+        }
     }
 
-    SdfPath primPath = GetPrimPath((extendToShape) ? shapeDagPath : dagPath, isSprim);
-    
+    const SdfPath primPath = GetPrimPath((extendToShape) ? shapeDagPath : dagPath, isSprim);
+
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg("    mapped to scene index path %s.\n", primPath.GetText());
-		
-    return Fvp::PrimSelections({Fvp::PrimSelection{primPath}});
+
+    return Fvp::PrimSelections({ Fvp::PrimSelection { primPath } });
 }
+
 
 Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelectionsLit(
     const Ufe::Path& appPath
@@ -1078,7 +1069,7 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
 
     if ((!status || numLights == 0) && (0 == globalLightPaths.size())) {
         _MapAdapter<MayaHydraLightAdapter>(
-            [](MayaHydraLightAdapter* a) { a->SetLightingOn(false); },
+            [](MayaHydraLightAdapter* a) { a->RemovePrim(); },
             _lightAdapters); // Turn off all lights
         return;
     }
@@ -1121,21 +1112,27 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         }
     }
 
-    // Turn on active lights, turn off non-active lights
-    _MapAdapter<MayaHydraLightAdapter>(
-        [&](MayaHydraLightAdapter* a) {
-            auto lgtAdapter = activeLightPaths.find(a->GetDagPath().fullPathName().asChar());
-            if (lgtAdapter != activeLightPaths.end()) {
-                a->SetLightingOn(true);
-                activeLightPaths.erase(lgtAdapter);
-            } else {
-                // Skip dome light as maya numberOfActiveLights API doesn't count active dome light
-                if (a->LightType() != HdPrimTypeTokens->domeLight) {
-                    a->SetLightingOn(false);
+    if (_lightsManagementSceneIndex) {
+        std::set<SdfPath> disabledLights;
+
+        // Store disabled lights to pass them to the lights management scene index
+        _MapAdapter<MayaHydraLightAdapter>(
+            [&](MayaHydraLightAdapter* a) {
+                auto lgtAdapter = activeLightPaths.find(a->GetDagPath().fullPathName().asChar());
+                if (lgtAdapter != activeLightPaths.end()) {
+                    activeLightPaths.erase(lgtAdapter);
+                } else {
+                    // Skip dome lights as maya numberOfActiveLights API doesn't count active dome
+                    // lights
+                    if (a->LightType() != HdPrimTypeTokens->domeLight) {
+                        disabledLights.insert(a->GetID());
+                    }
                 }
-            }
-        },
-        _lightAdapters);
+            },
+            _lightAdapters);
+
+        _lightsManagementSceneIndex->SetDisabledLightsPrims(disabledLights);
+    }
 }
 
 bool MayaHydraSceneIndex::GetPlaybackRunning() const
@@ -1651,10 +1648,10 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
     }
 
     // Custom lights don't have MFn::kLight.
-    if (GetLightsEnabled()) {
-        if (CreateLightAdapter(dag))
-            return;
+    if (CreateLightAdapter(dag)) {
+        return;
     }
+
     if (CreateCameraAdapter(dag)) {
         return;
     }
@@ -1836,4 +1833,11 @@ void MayaHydraSceneIndex::UpdateLightsShadowCollection()
             _lightAdapters);
     }
 }
+
+void MayaHydraSceneIndex::SetLightsManagementSceneIndex(const Fvp::LightsManagementSceneIndexRefPtr lightsManagementSceneIndex)
+{
+    _lightsManagementSceneIndex = lightsManagementSceneIndex;
+}
+
+
 PXR_NAMESPACE_CLOSE_SCOPE

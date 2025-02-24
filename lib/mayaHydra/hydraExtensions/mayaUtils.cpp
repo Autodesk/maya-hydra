@@ -108,14 +108,28 @@ MStatus GetObjectsFromNodeNames(const MStringArray& nodeNames, MObjectArray & ou
     return MS::kSuccess;
 }
 
-bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath) 
-{ 
+bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath)
+{
     static const MString _aiSkyDomeLight("aiSkyDomeLight");
-
-    if (! dagPath.isValid()) return false;
+    
+    if (!dagPath.isValid()) {
+        return false;
+    }
     auto shapeDagPath = dagPath;
     shapeDagPath.extendToShape();
     return _aiSkyDomeLight == MFnDependencyNode(shapeDagPath.node()).typeName();
+}
+
+bool IsDagPathALight(const MDagPath& dagPath)
+{
+    static const MString _lightString("Light");
+
+    if (!dagPath.isValid())
+        return false;
+    auto shapeDagPath = dagPath;
+    shapeDagPath.extendToShape();
+    const MString typeName = MFnDependencyNode(shapeDagPath.node()).typeName();
+    return (typeName.indexW(_lightString) != -1);//Does the typename contains "Light"
 }
 
 } // namespace MAYAHYDRA_NS_DEF

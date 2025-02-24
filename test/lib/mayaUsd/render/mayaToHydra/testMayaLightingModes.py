@@ -22,7 +22,7 @@ from testUtils import PluginLoaded
 
 import platform
 
-class TestMayaLightingfModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
+class TestMayaLightingModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
     _requiredPlugins = ['mtoa']
@@ -60,21 +60,36 @@ class TestMayaLightingfModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtoh
         cmds.select(clear=True)
         cmds.refresh()
         self.assertSnapshotClose("selLights_None.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
         cmds.select("|stage1|stageShape1,/SphereLight1", replace=True)
         cmds.refresh()
         self.assertSnapshotClose("sphereLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
         cmds.select("pointLight1", replace=True)
         cmds.refresh()
         self.assertSnapshotClose("pointLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
         cmds.select("aiSkyDomeLight1", replace=True)
         cmds.refresh()
         self.assertSnapshotClose("domeLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        
+
+        cmds.select("spotLight1", replace=True)
+        cmds.refresh()
+        self.assertSnapshotClose("spotLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        cmds.select("directionalLight1", replace=True)
+        cmds.refresh()
+        self.assertSnapshotClose("dirLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        cmds.select("areaLight1", replace=True)
+        cmds.refresh()
+        self.assertSnapshotClose("areaLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
         cmds.select("|stage1|stageShape1,/SphereLight1", replace=True)
         cmds.select("pointLight1", add=True)
         cmds.select("aiSkyDomeLight1", add=True)
         cmds.refresh()
-        self.assertSnapshotClose("allLightsSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("someLightsSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

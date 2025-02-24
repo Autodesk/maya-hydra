@@ -67,9 +67,7 @@ public:
     virtual void CreateCallbacks() override;
     MAYAHYDRALIB_API
     void SetShadowProjectionMatrix(const GfMatrix4d& matrix);
-    MAYAHYDRALIB_API
-    void SetLightingOn(bool isLightingOn);
-
+    
 protected:
     MAYAHYDRALIB_API
     virtual void _CalculateLightParams(GlfSimpleLight& light) { }
