@@ -53,7 +53,7 @@ TEST(TestWriteFile, setImageSize)
     auto renderer = MHWRender::MRenderer::theRenderer();
     ASSERT_NE(renderer, nullptr);
 
-    renderer->setOutputTargetOverrideSize(unsigned int(width), unsigned int(height));
+    renderer->setOutputTargetOverrideSize(static_cast<unsigned int>(width), static_cast<unsigned int>(height));
 }
 
 TEST(TestWriteFile, unsetImageSize)
