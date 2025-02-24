@@ -52,7 +52,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFlowPluginsHierarchicalProperties.py
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
-    testMayaLightingModes.py
+    testMayaLightingModes.py|depOnPlugins:mtoa
     testPointInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testGeomSubsetsWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testNativeInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX

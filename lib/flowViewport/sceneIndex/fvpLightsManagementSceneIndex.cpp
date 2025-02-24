@@ -27,28 +27,87 @@
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/light.h>
 #include <pxr/imaging/hd/lightSchema.h>
+#include <pxr/imaging/hd/selectionSchema.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/glf/simpleLight.h>
 
-//ufe
-#include <ufe/globalSelection.h>
-#include <ufe/observableSelection.h>
+//std
+#include <array>
 
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
+// Helper function to extract a value from a light data source.
+template <typename T>
+T _GetLightData(const HdContainerDataSourceHandle& primDataSource, const TfToken& name)
+{
+    if (auto lightSchema = HdLightSchema::GetFromParent(primDataSource)) {
+        if (auto dataSource
+            = HdTypedSampledDataSource<T>::Cast(lightSchema.GetContainer()->Get(name))) {
+            return dataSource->GetTypedValue(0.0f);
+        }
+    }
+
+    return {};
+}
+
 void _DisableLight(HdSceneIndexPrim& prim)
 {
     HdContainerDataSourceEditor editor(prim.dataSource);
-    //We don't set the intensity to 0 as for domelights this makes the geometry disappear
-    for (const auto& t : { HdLightTokens->ambient, HdLightTokens->diffuse, HdLightTokens->specular }) {
+
+    const bool isSimpleLight = prim.primType == HdPrimTypeTokens->simpleLight;
+
+    if (isSimpleLight) {
+        // A simple light contains in its params a GlfSimpleLight which needs to be disabled
+        // by setting its diffuse, specular and ambient to 0
+        GlfSimpleLight simpleLight
+            = _GetLightData<GlfSimpleLight>(prim.dataSource, HdTokens->params);
+        simpleLight.SetDiffuse(GfVec4f(0.0f));
+        simpleLight.SetSpecular(GfVec4f(0.0f));
+        simpleLight.SetAmbient(GfVec4f(0.0f));
         editor.Set(
-            HdLightSchema::GetDefaultLocator().Append(t),
-            HdRetainedTypedSampledDataSource<float>::New(0.0f));
+            HdLightSchema::GetDefaultLocator().Append(HdTokens->params),
+            HdRetainedTypedSampledDataSource<GlfSimpleLight>::New(simpleLight));
+    } else {
+        // We don't set the intensity to 0 as for domelights this makes the geometry disappear
+        static const std::array<TfToken, 3> lightTokens
+            = { HdLightTokens->ambient, HdLightTokens->diffuse, HdLightTokens->specular };
+        for (const auto& token : lightTokens) {
+            editor.Set(
+                HdLightSchema::GetDefaultLocator().Append(token),
+                HdRetainedTypedSampledDataSource<float>::New(0.0f));
+        }
     }
-    
+
     prim.dataSource = editor.Finish();
+}
+
+bool _IsPrimOrAncestorSelected(const SdfPath& primPath,  const HdSceneIndexPrim& prim, const HdSceneIndexBaseRefPtr& sceneIndex)
+{
+    TF_AXIOM(sceneIndex);
+
+    if (prim.dataSource){
+        HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
+        if (selectionsSchema.IsDefined()) {
+            for (size_t selectionId = 0;
+                 selectionId < selectionsSchema.GetNumElements(); ++selectionId) {
+                if (selectionsSchema.GetElement(selectionId).GetFullySelected()
+                    && !selectionsSchema.GetElement(selectionId).GetNestedInstanceIndices()) {
+                    return true;//Is selected
+                }
+            }
+        }
+    }
+
+    //Recurse with parent path
+    const SdfPath parentPath = primPath.GetParentPath();
+    if (parentPath != SdfPath::AbsoluteRootPath()) {
+        return _IsPrimOrAncestorSelected(parentPath, sceneIndex->GetPrim(parentPath), sceneIndex);
+    }
+
+    return false;
 }
 
 } // end of anonymous namespace
@@ -91,60 +150,55 @@ bool LightsManagementSceneIndex::_IsDefaultLight(const SdfPath& primPath)const
     return primPath == _defaultLightPath;
 }
 
-HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) const 
+HdSceneIndexPrim LightsManagementSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     auto prim = GetInputSceneIndex()->GetPrim(primPath);
     auto primType = prim.primType;
-     if (! HdPrimTypeIsLight(primType)) {
-         return prim;//return any non light primitive
-     }
-     
-     //This is a light
-     switch (_lightingMode) {
-         case LightingMode::kNoLighting: {
-             _DisableLight(prim);
-             return prim;
-         } break;
-         default:
-         case LightingMode::kSceneLighting: {
-             return prim;
-         } break;
-         case LightingMode::kDefaultLighting: {
-             if (! _IsDefaultLight(primPath)){
-                 _DisableLight(prim);
-             }
-             return prim;
-         } break;
-         case LightingMode::kSelectedLightsOnly: {
-             const Ufe::Selection& ufeSelection = *Ufe::GlobalSelection::get();
-             if (ufeSelection.empty()) {
-                 // Nothing is selected
-                 _DisableLight(prim);
-                 return prim;
-             }
-             
-             //Convert ufe selection to SdfPath
-             SdfPathVector selectedLightsSdfPath;
-             for (const auto& snItem : ufeSelection) {
-                 auto primSelections = ufePathToPrimSelections(snItem->path());
-                 for (const auto& primSelection : primSelections) {
-                     selectedLightsSdfPath.push_back(primSelection.primPath);
-                 }
-             }
-             const bool isSelected = selectedLightsSdfPath.end()
-                 != std::find(selectedLightsSdfPath.begin(),
-                              selectedLightsSdfPath.end(),
-                              primPath);
 
-             if (! isSelected) {
-                 _DisableLight(prim);
-             }
+    if (!HdPrimTypeIsLight(primType)) {
+        return prim; // Return any non-light primitive
+    }
 
-             return prim;
-         } break;
-     }
+    // This is a light
+    switch (_lightingMode) {
+        case LightingMode::kNoLighting: 
+            _DisableLight(prim); 
+            break;
 
-     return prim;
+        case LightingMode::kSceneLighting:
+            //Disable non active lights from maya native data
+            if (_disabledLightsPrims.find(primPath) != _disabledLightsPrims.end()) {
+                _DisableLight(prim);
+            }
+            break;
+
+        case LightingMode::kDefaultLighting:
+            if (!_IsDefaultLight(primPath)) {
+                _DisableLight(prim);
+            }
+            break;
+
+        case LightingMode::kSelectedLightsOnly: {
+            const bool shouldBeUsedForLigthing
+                = _IsPrimOrAncestorSelected(primPath, prim, GetInputSceneIndex());
+            if (! shouldBeUsedForLigthing) {
+                _DisableLight(prim);
+            }
+            break;
+        }
+    }
+
+    return prim;
 }
+
+void LightsManagementSceneIndex::SetDisabledLightsPrims(
+    const std::set<PXR_NS::SdfPath>& disabledLightsPrims)
+{
+    if (_disabledLightsPrims != disabledLightsPrims) {
+        _disabledLightsPrims = disabledLightsPrims;
+        _DirtyAllLightsPrims();
+    }
+}
+
 
 }//end of namespace FVP_NS_DEF

@@ -765,6 +765,7 @@ MStatus MtohRenderOverride::Render(
         auto& manager = Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get();
         if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle)){
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(true);//Prevent prim removal propagation to keep the current selection.
+            _mayaHydraSceneIndex->SetLightsManagementSceneIndex(nullptr);
             //We need to recreate the filtering scene index chain after the merging scene index as there was a change such as in the BBox display style which has been turned on or off.
             _lastFilteringSceneIndexBeforeCustomFiltering = nullptr;//Release
 
@@ -1331,6 +1332,7 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _lastFilteringSceneIndexBeforeCustomFiltering = _lightsManagementSceneIndex = Fvp::LightsManagementSceneIndex::New(
         _lastFilteringSceneIndexBeforeCustomFiltering, _mayaHydraSceneIndex->GetMayaDefaultLightPath());
     _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(_lightingMode));
+    _mayaHydraSceneIndex->SetLightsManagementSceneIndex(_lightsManagementSceneIndex);
 
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);
