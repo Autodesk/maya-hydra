@@ -37,7 +37,14 @@ namespace FVP_NS_DEF {
 /// \class ImageBufferWriter
 ///
 /// Base class for writing Hydra images to files.
-
+///
+/// The dictionary of arguments passed to methods of this class determines
+/// what kind of buffer is read:
+/// - For hardware texture buffers, the dictionary must contain an Hgi*,
+///   with key "hgi", and an HdEngine*, with key "engine".
+/// - For software render buffers, the dictionary must contain
+///   an HdxTaskController*, with key "taskController".
+///
 class ImageBufferWriter
 {
 public:
