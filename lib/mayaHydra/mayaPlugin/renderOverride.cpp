@@ -1108,7 +1108,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     // an initializer_list cannot be used in a ternary operator.
     _fileWriterArgs = _hgi ? VtDictionary{
       {{"hgi", VtValue(_hgi.get())}, {"engine", VtValue(&_engine)}}} :
-      VtDictionary{{{"taskController", VtValue(_taskController)}}}; 
+      VtDictionary{{{"taskController", VtValue(_taskController.get())}}}; 
 
     MayaHydraInitData mhInitData(
         TfToken("MayaHydraSceneIndex"),
