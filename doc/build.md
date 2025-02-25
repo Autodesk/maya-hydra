@@ -16,7 +16,7 @@ Before building the project, consult the following table to ensure you use the r
 |         Python        | 3.10.8, 3.11.4  |                       3.10.8, 3.11.4               |  3.10.8, 3.11.4   |
 |    Python Packages    | PyYAML, PySide, PyOpenGL        | PyYAML, PySide2, PyOpenGL              | PyYAML, PySide, PyOpenGL |
 |    Build generator    | Visual Studio, Ninja (Recommended)    |  XCode, Ninja (Recommended)                      |    Ninja (Recommended)      |
-|    Command processor  | Visual Studio x64 2022 command prompt  |                     bash                |             bash            |
+|    Command processor  | x64 Native Tools Command Prompt for VS 2022 |                     bash                |             bash            |
 | Supported Maya Version|  2024, 2025, PR   |                   2024, 2025, PR                    |   2024, 2025, PR    |
 
 |        Optional       | ![](images/windows.png)   |                            ![](images/mac.png)               |   ![](images/linux.png)     |
@@ -248,5 +248,7 @@ Examples:
 set MAYA_MODULE_PATH=C:\workspace\install\RelWithDebInfo
 export MAYA_MODULE_PATH=/usr/local/workspace/install/RelWithDebInfo
 ```
+>Note: In order to load `mayaHydra.mod`, Maya needs to be able to locate and load `mayaUSD.mod` first. Consider adjusting `MAYA_MODULE_PATH` to also contain the path to the `mayaUSD.mod` if needed.
+
 The MAYA_MODULE_PATH environment variable can also be set through the Maya.env file.
 Once MAYA_MODULE_PATH is set, run maya and go to ```Windows -> Setting/Preferences -> Plug-in Manager``` to load the plugins.
