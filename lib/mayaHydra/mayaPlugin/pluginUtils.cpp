@@ -85,14 +85,13 @@ MtohInitializeRenderPlugins()
             // Null it out to make any possible usage later obv, wrong!
             delegate = nullptr;
 
-            std::shared_ptr<pxr::UsdImagingGLEngine> _engine;
             store.first.emplace_back(
                 renderer,
                 TfToken(TfStringPrintf(
                     "%s%s", MayaHydra::MTOH_RENDER_OVERRIDE_PREFIX, renderer.GetText())),
                 TfToken(TfStringPrintf(
                     "(Technology Preview) Hydra %s",
-                    _engine->GetRendererDisplayName(pluginDesc.id).c_str())));
+                    PXR_NS::UsdImagingGLEngine::GetRendererDisplayName(pluginDesc.id).c_str())));
             MtohRenderGlobals::BuildOptionsMenu(store.first.back(), rendererSettingDescriptors);
         }
 

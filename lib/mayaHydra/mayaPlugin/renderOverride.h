@@ -276,6 +276,7 @@ private:
     std::unique_ptr<HdxTaskController>        _taskController;
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
     Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
+    VtDictionary                              _fileWriterArgs{};
     HdSceneIndexBaseRefPtr                    _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
     HdSceneIndexBaseRefPtr                    _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
     Fvp::DisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
