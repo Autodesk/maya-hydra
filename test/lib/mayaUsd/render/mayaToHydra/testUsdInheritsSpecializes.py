@@ -18,6 +18,7 @@ import fixturesUtils
 import mtohUtils
 import testUtils
 import usdUtils
+import mayaUtils
 
 class TestUsdInheritsSpecializes(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -27,6 +28,13 @@ class TestUsdInheritsSpecializes(mtohUtils.MayaHydraBaseTestCase):
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 2
+
+    @property
+    def imageFileName(self):
+        # Same image snapshot for both inherits and specializes test.
+        # Fallback material change in USD 24.11, Maya 2025 uses USD 23.11.
+        return 'inherits_2025.png' if mayaUtils.mayaMajorVersion() == 2025 \
+            else 'inherits.png'
 
     def loadUsdScene(self, fileName):
 
@@ -42,7 +50,7 @@ class TestUsdInheritsSpecializes(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.refresh()
 
-        self.assertSnapshotClose('inherits.png', self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose(self.imageFileName, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def test_Specializes(self):
 
@@ -51,7 +59,7 @@ class TestUsdInheritsSpecializes(mtohUtils.MayaHydraBaseTestCase):
         cmds.refresh()
 
         # Same snapshot as inherits.
-        self.assertSnapshotClose('inherits.png', self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose(self.imageFileName, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
