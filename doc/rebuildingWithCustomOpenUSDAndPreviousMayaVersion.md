@@ -1,9 +1,7 @@
-# Building with the latest version of OpenUSD and with a previous version of Maya such as 2024
+# Example guide on how to build with latest version of openUSD and previous version of Maya such as 2024
 
-Let's take as an example rebuilding MayaHydra in <b>Maya 2024</b> and <b>OpenUSD 24.11</b> under Windows.<br>
-
-Please be aware that <b>Maya 2024 is not officially supported </b>since we have added a few features to Maya API in newer versions of Maya.
-Known limitations when using MayaHydra in Maya 2024 :
+Please be aware that <b>Maya 2024 is not officially supported </b>since we have added new features to Maya API in newer versions of Maya.<br>
+The known limitations when using MayaHydra in Maya 2024 are :
 - The cull mode from Maya geometries does not work.
 - Isolate select does not function correctly with USD stages.
 - using LookdevX to author new MaterialX materials won't work, but loading a usd stage with MaterialX materials saved in the stage will work.
