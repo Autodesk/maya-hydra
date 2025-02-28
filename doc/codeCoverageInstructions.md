@@ -38,11 +38,14 @@ python build.py
     --generator=Ninja ^
     --stages=clean,configure,build,install ^
     --maya-location <maya_location> ^
+    --mayausd-location <mayausd_location> ^
     --pxrusd-location <pxrusd_location> ^
     --devkit-location <devkit_location> ^
     --build-args="-DPYTHON_INCLUDE_DIR=<python_include_dir>,-DPython_EXECUTABLE=<python_executable>,-DPYTHON_LIBRARIES=<python_libraries>,-DCMAKE_WANT_MATERIALX_BUILD=ON,-DCMAKE_PREFIX_PATH=<cmake_prefix_path>" ^
     <workspace_location>
 ```
+> Note: Some tests might also require `--mtoa-location` or `--lookdevx-location` to succeed.
+
 The `--build-coverage` flag indicates that the variant to be built is the Coverage variant.
 
 At time of writing (February 26th, 2024), only the Ninja code generator is supported.  In particular, the Visual Studio generator is known not to output code coverage data.
@@ -84,9 +87,9 @@ llvm-cov show ^
     -object="<workspace_dir>\install\Coverage\lib\flowViewport.dll" ^
     -show-branches=count ^
     -show-regions ^
-    --ignore-filename-regex='artifactory\\.*' ^
-    -format=html 
-    -output-dir=<output_dir_name>'
+    -ignore-filename-regex="artifactory\\.*" ^
+    -format=html ^
+    -output-dir=<output_dir_name>
 ```
 Notes:
 - `-instr-profile` refers to the previously generated profdata file
