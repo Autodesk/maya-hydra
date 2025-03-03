@@ -18,7 +18,6 @@ import fixturesUtils
 import mtohUtils
 import testUtils
 import usdUtils
-import mayaUtils
 
 class TestUsdInheritsSpecializes(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -32,9 +31,11 @@ class TestUsdInheritsSpecializes(mtohUtils.MayaHydraBaseTestCase):
     @property
     def imageFileName(self):
         # Same image snapshot for both inherits and specializes test.
-        # Fallback material change in USD 24.11, Maya 2025 uses USD 23.11.
-        return 'inherits_2025.png' if mayaUtils.mayaMajorVersion() == 2025 \
-            else 'inherits.png'
+        return 'inherits.png'
+
+    def setUp(self):
+        super(TestUsdInheritsSpecializes, self).setUp()
+        self.modifyDefaultLightIntensityByUsdVersion()
 
     def loadUsdScene(self, fileName):
 
