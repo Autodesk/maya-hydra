@@ -61,6 +61,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
     testIsolateSelectWithGeomSubset.py
     testMayaReference.py
+    testUsdInheritsSpecializes.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
