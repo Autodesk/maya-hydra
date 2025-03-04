@@ -14,16 +14,6 @@
 # MAYA_LIGHTAPI_VERSION Maya light API version (1 or 2 or 3)
 #
 # Cache variables:
-# MAYA_HAS_DEFAULT_MATERIAL_API Presence of a default material API on MRenderItem.
-# MAYA_NEW_POINT_SNAPPING_SUPPORT Presence of point new snapping support.
-# MAYA_HAS_CRASH_DETECTION Presence of isInCrashHandler API
-# MAYA_ENABLE_NEW_PRIM_DELETE Enable new delete behaviour for delete command
-# MAYA_HAS_DISPLAY_STYLE_ALL_VIEWPORTS Presence of MFrameContext::getDisplayStyleOfAllViewports.
-# MAYA_ARRAY_ITERATOR_DIFFERENCE_TYPE_SUPPORT Presence of maya array iterator difference_type trait
-# MAYA_HAS_GET_MEMBER_PATHS Presence of MFnSet::getMemberPaths
-# MAYA_HAS_DISPLAY_LAYER_API Presence of MFnDisplayLayer
-# MAYA_HAS_NEW_DISPLAY_LAYER_MESSAGING_API Presence of MDisplayLayerMemberChangedFunction
-# MAYA_HAS_RENDER_ITEM_HIDE_ON_PLAYBACK_API Presence of MRenderItem has HideOnPlayback API
 # MAYA_HAS_RENDER_ITEM_CULL_MODE_API Presence of MRenderItem has CullMode API
 # MAYA_HAS_VIEW_SELECTED_OBJECT_API Presence of M3dView::viewSelectedObject
 # MAYA_LINUX_BUILT_WITH_CXX11_ABI Maya Linux was built with new cxx11 ABI.
@@ -321,89 +311,6 @@ if (MAYA_OGSDEVICES_LIBRARY)
     endif()
 endif()
 message(STATUS "Using Maya Light API Version ${MAYA_LIGHTAPI_VERSION}")
-
-set(MAYA_HAS_DEFAULT_MATERIAL_API FALSE CACHE INTERNAL "setDefaultMaterialHandling")
-if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MHWGeometry.h")
-    file(STRINGS ${MAYA_INCLUDE_DIR}/maya/MHWGeometry.h MAYA_HAS_API REGEX "setDefaultMaterialHandling")
-    if(MAYA_HAS_API)
-        set(MAYA_HAS_DEFAULT_MATERIAL_API TRUE CACHE INTERNAL "setDefaultMaterialHandling")
-        message(STATUS "Maya has setDefaultMaterialHandling API")
-    endif()
-endif()
-
-set(MAYA_NEW_POINT_SNAPPING_SUPPORT FALSE CACHE INTERNAL "snapToActive")
-if (MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MSelectionContext.h")
-    file(STRINGS ${MAYA_INCLUDE_DIR}/maya/MSelectionContext.h MAYA_HAS_API REGEX "snapToActive")
-    if(MAYA_HAS_API)
-        set(MAYA_NEW_POINT_SNAPPING_SUPPORT TRUE CACHE INTERNAL "snapToActive")
-        message(STATUS "Maya has new point snapping API")
-    endif()
-endif()
-
-set(MAYA_HAS_CRASH_DETECTION FALSE CACHE INTERNAL "isInCrashHandler")
-if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MGlobal.h")
-    file(STRINGS ${MAYA_INCLUDE_DIR}/maya/MGlobal.h MAYA_HAS_API REGEX "isInCrashHandler")
-    if(MAYA_HAS_API)
-        set(MAYA_HAS_CRASH_DETECTION TRUE CACHE INTERNAL "isInCrashHandler")
-        message(STATUS "Maya has isInCrashHandler API")
-    endif()
-endif()
-
-set(MAYA_ENABLE_NEW_PRIM_DELETE FALSE CACHE INTERNAL "enableNewPrimDelete")
-if (MAYA_API_VERSION VERSION_GREATER_EQUAL 20230000)
-    set(MAYA_ENABLE_NEW_PRIM_DELETE TRUE CACHE INTERNAL "enableNewPrimDelete")
-endif()
-
-set(MAYA_HAS_DISPLAY_STYLE_ALL_VIEWPORTS FALSE CACHE INTERNAL "DisplayStyleOfAllViewports")
-if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MFrameContext.h")
-    file(STRINGS ${MAYA_INCLUDE_DIR}/maya/MFrameContext.h MAYA_HAS_API REGEX "getDisplayStyleOfAllViewports")
-    if(MAYA_HAS_API)
-        set(MAYA_HAS_DISPLAY_STYLE_ALL_VIEWPORTS TRUE CACHE INTERNAL "DisplayStyleOfAllViewports")
-        message(STATUS "Maya has getDisplayStyleOfAllViewports API")
-    endif()
-endif()
-
-set(MAYA_ARRAY_ITERATOR_DIFFERENCE_TYPE_SUPPORT FALSE CACHE INTERNAL "hasArrayIteratorDifferenceType")
-if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MArrayIteratorTemplate.h")
-    file(STRINGS ${MAYA_INCLUDE_DIR}/maya/MArrayIteratorTemplate.h MAYA_HAS_API REGEX "difference_type")
-    if(MAYA_HAS_API)
-        set(MAYA_ARRAY_ITERATOR_DIFFERENCE_TYPE_SUPPORT TRUE CACHE INTERNAL "hasArrayIteratorDifferenceType")
-        message(STATUS "Maya array iterator has difference_type trait")
-    endif()
-endif()
-
-set(MAYA_HAS_GET_MEMBER_PATHS FALSE CACHE INTERNAL "hasGetMemberPaths")
-if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MFnSet.h")
-    file(STRINGS ${MAYA_INCLUDE_DIR}/maya/MFnSet.h MAYA_HAS_API REGEX "getMemberPaths")
-    if(MAYA_HAS_API)
-        set(MAYA_HAS_GET_MEMBER_PATHS TRUE CACHE INTERNAL "hasGetMemberPaths")
-        message(STATUS "MFnSet has getMemberPaths function")
-    endif()
-endif()
-
-set(MAYA_HAS_DISPLAY_LAYER_API FALSE CACHE INTERNAL "hasDisplayLayerAPI")
-if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MFnDisplayLayer.h")
-    set(MAYA_HAS_DISPLAY_LAYER_API TRUE CACHE INTERNAL "hasDisplayLayerAPI")
-    message(STATUS "MFnDisplayLayer exists")
-endif()
-
-set(MAYA_HAS_NEW_DISPLAY_LAYER_MESSAGING_API FALSE CACHE INTERNAL "hasDisplayLayerMemberChangedFunction")
-if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MDisplayLayerMessage.h")
-    file(STRINGS ${MAYA_INCLUDE_DIR}/maya/MDisplayLayerMessage.h MAYA_HAS_API REGEX "MDisplayLayerMemberChangedFunction")
-    if(MAYA_HAS_API)
-        set(MAYA_HAS_NEW_DISPLAY_LAYER_MESSAGING_API TRUE CACHE INTERNAL "hasDisplayLayerMemberChangedFunction")
-        message(STATUS "MDisplayLayerMessage has MDisplayLayerMemberChangedFunction")
-    endif()
-endif()
-
-set(MAYA_HAS_RENDER_ITEM_HIDE_ON_PLAYBACK_API FALSE CACHE INTERNAL "hasRenderItemHideOnPlaybackFunction")
-if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MHWGeometry.h")
-    file(STRINGS ${MAYA_INCLUDE_DIR}/maya/MHWGeometry.h MAYA_HAS_API REGEX "isHideOnPlayback")
-    if(MAYA_HAS_API)
-        set(MAYA_HAS_RENDER_ITEM_HIDE_ON_PLAYBACK_API TRUE CACHE INTERNAL "hasRenderItemHideOnPlaybackFunction")
-        message(STATUS "MRenderItem has HideOnPlayback API")
-    endif()
-endif()
 
 set(MAYA_HAS_RENDER_ITEM_CULL_MODE_API FALSE CACHE INTERNAL "hasRenderItemCullModeFunction")
 if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MHWGeometry.h")

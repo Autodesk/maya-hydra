@@ -193,6 +193,9 @@ Run the script with the ```--help``` parameter to see all the possible flags and
 
 Unit tests can be run by setting ```--stages=test``` or by simply calling `ctest` directly from the build directory.
 
+# Rebuilding with the latest version of OpenUSD and with a previous version of Maya
+Please see [Rebuilding with the latest OpenUSD version and with a previous version of Maya](./rebuildingWithLatestOpenUSDAndPreviousMaya.md)
+
 # Additional Build Instruction
 
 ##### Python:
