@@ -516,80 +516,6 @@ TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshPrimDataSource, con
 }
 #endif
 
-PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource)
-{
-    auto xformSchema = HdXformSchema::GetFromParent(meshPrimDataSource);
-    if (!xformSchema.IsDefined() || !xformSchema.GetMatrix()) {
-        return meshPrimDataSource;
-    }
-    GfMatrix4d xformMatrix = xformSchema.GetMatrix()->GetTypedValue(0);
-
-    HdContainerDataSourceEditor dataSourceEditor(meshPrimDataSource);
-
-    // Scale points
-    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, pointsValueLocator));
-    if (pointsValueDataSource) {
-        auto points = pointsValueDataSource->GetTypedValue(0);
-        for (size_t iPoint = 0; iPoint < points.size(); iPoint++) {
-            points[iPoint] = GfVec3f(xformMatrix.Transform(points[iPoint]));
-        }
-        dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
-    }
-
-    // Scale normals
-    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, normalsValueLocator));
-    if (normalsValueDataSource) {
-        auto normals = normalsValueDataSource->GetTypedValue(0);
-        auto xformMatrixInversedTransposed = xformMatrix.GetInverse().GetTranspose();
-        for (size_t iNormal = 0; iNormal < normals.size(); iNormal++) {
-            normals[iNormal] = GfVec3f(xformMatrixInversedTransposed.TransformDir(normals[iNormal]));
-            normals[iNormal].Normalize();
-        }
-        dataSourceEditor.Set(normalsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(normals));
-    }
-
-    // Set xform to the identity to prevent scaling from being re-applied
-    dataSourceEditor.Set(HdXformSchema::GetDefaultLocator().Append(HdXformSchemaTokens->matrix), HdRetainedTypedSampledDataSource<GfMatrix4d>::New(GfMatrix4d(1)));
-
-    return dataSourceEditor.Finish();
-}
-
-PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource, float displacement)
-{
-    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, pointsValueLocator));
-    if (!pointsValueDataSource) {
-        return meshPrimDataSource;
-    }
-    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, normalsValueLocator));
-    if (!normalsValueDataSource) {
-        return meshPrimDataSource;
-    }
-
-    auto points = pointsValueDataSource->GetTypedValue(0);
-    auto normals = normalsValueDataSource->GetTypedValue(0);
-
-    if (points.size() > normals.size()) {
-        return meshPrimDataSource;
-    }
-
-    // Compute displacement
-    for (size_t iPoint = 0; iPoint < points.size(); iPoint++) {
-        points[iPoint] += normals[iPoint] * displacement;
-    }
-
-    // Apply displaced points
-    HdContainerDataSourceEditor dataSourceEditor(meshPrimDataSource);
-    dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
-
-    // Block materials to prevent displacement from being re-applied
-    dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-#if PXR_VERSION >= 2403
-    dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-#endif
-
-    return dataSourceEditor.Finish();
-}
-
 BaseWhSi::BaseWhSi(
     const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex,
     const PXR_NS::SdfPath& highlightHierarchyPrefix,
@@ -903,26 +829,6 @@ BaseWhSi::MakeGeomSubsetHighlight(
         dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator()));
 #endif
         editedMeshPrimDataSource = dataSourceEditor.Finish();
-    }
-
-    // If the material has a displacement, apply it
-    VtValue displacementValue = GetMaterialDisplacementValue(editedMeshPrimDataSource, *GetInputSceneIndex());
-    if (displacementValue.IsHolding<float>()) {
-        // Manually apply the displacement on the mesh. We need to do this before trimming the mesh;
-        // otherwise Storm will compute normals and displacement based on the trimmed mesh, which gives
-        // incorrect results. Providing the normals primvar is not sufficient to fix this, so we must
-        // do everything manually, including scaling.
-        editedMeshPrimDataSource = AddSmoothNormals(editedMeshPrimDataSource);
-        editedMeshPrimDataSource = ForceScale(editedMeshPrimDataSource);
-        editedMeshPrimDataSource = ForceDisplacement(editedMeshPrimDataSource, displacementValue.UncheckedGet<float>());
-
-        // Setup a dependency so that material updates dirty the points & normals primvars
-        editedMeshPrimDataSource = AddDependency(
-            editedMeshPrimDataSource, 
-            _tokens->fvpWhSiMaterialToPrimvars, 
-            GetMaterialPath(geomSubsetPrimDataSource), 
-            HdMaterialSchema::GetDefaultLocator(), 
-            HdPrimvarsSchema::GetDefaultLocator());
     }
 
     // Trim the mesh to fit the geomSubset

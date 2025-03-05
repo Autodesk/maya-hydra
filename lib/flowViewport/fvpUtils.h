@@ -133,20 +133,6 @@ Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, c
 // Get the path to the prim's bound material.
 PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
 
-// Return the displacement value from the given prim data source's assigned material
-PXR_NS::VtValue GetMaterialDisplacementValue(const PXR_NS::HdContainerDataSourceHandle& primDataSource, const PXR_NS::HdSceneIndexBase& sceneIndex);
-
-// Computes and adds the normals primvar with smooth normals. If normals are already present, does nothing.
-PXR_NS::HdContainerDataSourceHandle AddSmoothNormals(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource);
-
-// Add an entry to the __dependencies data source
-PXR_NS::HdContainerDataSourceHandle AddDependency(
-    const PXR_NS::HdContainerDataSourceHandle& primDataSource,
-    const PXR_NS::TfToken& dependencyToken,
-    const PXR_NS::SdfPath& dependedOnPrimPath,
-    const PXR_NS::HdDataSourceLocator& dependedOnDataSourceLocator,
-    const PXR_NS::HdDataSourceLocator& affectedDataSourceLocator);
-
 } // namespace FVP_NS_DEF
 
 #endif // FVP_UTILS_H

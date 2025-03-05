@@ -227,12 +227,6 @@ PXR_NS::HdContainerDataSourceHandle
 TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource, const PXR_NS::HdContainerDataSourceHandle& geomSubsetPrimDataSource);
 #endif
 
-// Manually apply scaling on the prim.
-PXR_NS::HdContainerDataSourceHandle ForceScale(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource);
-
-// Manually apply displacement on the prim.
-PXR_NS::HdContainerDataSourceHandle ForceDisplacement(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource, float displacement);
-
 }
 
 #endif // FVP_BASE_WH_SI_H

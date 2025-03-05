@@ -233,8 +233,8 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
 {
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
+        HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
-            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
             if (_IsSupportedPointInstancePrototype(GetInputSceneIndex(), entry.primPath)) {
                 // Selection changed on the prototype; rebuild the highlights
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
@@ -292,7 +292,11 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
         if (itPrototype != _prototypePathsToSelections.end()) {
             for (const auto& selectionKey : itPrototype->second) {
                 auto selectionPath = SelectionPathFromKey(selectionKey);
-                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
+                auto dirtiedPath = entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath);
+                if (prim.primType == HdPrimTypeTokens->geomSubset && entry.primPath == selectionKey.first) {
+                    dirtiedPath = dirtiedPath.GetParentPath();
+                }
+                highlightEntries.emplace_back(dirtiedPath, entry.dirtyLocators);
             }
         }
     }
