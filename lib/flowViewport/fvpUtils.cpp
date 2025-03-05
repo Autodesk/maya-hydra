@@ -21,24 +21,6 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace {
-
-const HdDataSourceLocator pointsValueLocator = HdDataSourceLocator(
-    HdPrimvarsSchemaTokens->primvars,
-    HdPrimvarsSchemaTokens->points,
-    HdPrimvarSchemaTokens->primvarValue);
-
-const HdDataSourceLocator normalsPrimvarLocator = HdDataSourceLocator(
-    HdPrimvarsSchemaTokens->primvars,
-    HdPrimvarsSchemaTokens->normals);
-
-const HdDataSourceLocator normalsValueLocator = HdDataSourceLocator(
-    HdPrimvarsSchemaTokens->primvars,
-    HdPrimvarsSchemaTokens->normals,
-    HdPrimvarSchemaTokens->primvarValue);
-
-}
-
 namespace FVP_NS_DEF {
 
 #ifdef CODE_COVERAGE_WORKAROUND
