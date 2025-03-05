@@ -15,19 +15,9 @@
 
 #include "fvpUtils.h"
 
-#include <pxr/imaging/hd/containerDataSourceEditor.h>
-#include <pxr/imaging/hd/dataSourceMaterialNetworkInterface.h>
-#include <pxr/imaging/hd/dependenciesSchema.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
-#include <pxr/imaging/hd/materialSchema.h>
-#include <pxr/imaging/hd/meshSchema.h>
-#include <pxr/imaging/hd/meshTopology.h>
-#include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/selectionSchema.h>
-#include <pxr/imaging/hd/smoothNormals.h>
-#include <pxr/imaging/hd/vertexAdjacency.h>
-#include <pxr/imaging/pxOsd/tokens.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

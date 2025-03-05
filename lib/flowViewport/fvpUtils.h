@@ -15,7 +15,6 @@
 #ifndef FVP_UTILS_H
 #define FVP_UTILS_H
 
-#include <pxr/imaging/hd/sceneIndexObserver.h>
 #include <flowViewport/api.h>
 #include <flowViewport/selection/fvpSelectionTypes.h>
 

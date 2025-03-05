@@ -21,7 +21,6 @@
 #include <flowViewport/fvpWireframeColorInterface.h>
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 
-#include <pxr/base/vt/value.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 
