@@ -50,8 +50,6 @@ TF_DEFINE_PRIVATE_TOKENS(
 
     // Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
     (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
-
-    (fvpWhSiMaterialToPrimvars)
  );
 
 const HdRetainedContainerDataSourceHandle refinedWireDisplayStyleDataSource
