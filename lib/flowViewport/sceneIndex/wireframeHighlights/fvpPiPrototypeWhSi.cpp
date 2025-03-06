@@ -293,9 +293,11 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
             for (const auto& selectionKey : itPrototype->second) {
                 auto selectionPath = SelectionPathFromKey(selectionKey);
                 auto dirtiedPath = entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath);
+#if PXR_VERSION >= 2403
                 if (prim.primType == HdPrimTypeTokens->geomSubset && entry.primPath == selectionKey.first) {
                     dirtiedPath = dirtiedPath.GetParentPath();
                 }
+#endif
                 highlightEntries.emplace_back(dirtiedPath, entry.dirtyLocators);
             }
         }
