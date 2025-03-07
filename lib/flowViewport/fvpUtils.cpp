@@ -16,7 +16,10 @@
 #include "fvpUtils.h"
 
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
+#include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/selectionSchema.h>
+
+PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
@@ -54,6 +57,55 @@ PXR_NS::HdDataSourceBaseHandle createSelectionDataSource(const Fvp::PrimSelectio
         selectionBuilder.SetNestedInstanceIndices(PXR_NS::HdRetainedSmallVectorDataSource::New(instanceIndicesDataSources.size(), instanceIndicesDataSources.data()));
     }
     return PXR_NS::HdDataSourceBase::Cast(selectionBuilder.Build());
+}
+
+Fvp::PrimSelection ConvertHydraToFvpSelection(const SdfPath& primPath, const HdSelectionSchema& selectionSchema) {
+    Fvp::PrimSelection primSelection;
+    primSelection.primPath = primPath;
+
+    auto nestedInstanceIndicesSchema = 
+#if HD_API_VERSION < 66
+    const_cast<HdSelectionSchema&>(selectionSchema).GetNestedInstanceIndices();
+#else
+    selectionSchema.GetNestedInstanceIndices();
+#endif
+    for (size_t iNestedInstanceIndices = 0; iNestedInstanceIndices < nestedInstanceIndicesSchema.GetNumElements(); iNestedInstanceIndices++) {
+        HdInstanceIndicesSchema instanceIndicesSchema = nestedInstanceIndicesSchema.GetElement(iNestedInstanceIndices);
+        auto instanceIndices = instanceIndicesSchema.GetInstanceIndices()->GetTypedValue(0);
+        primSelection.nestedInstanceIndices.push_back(
+            {
+                instanceIndicesSchema.GetInstancer()->GetTypedValue(0),
+                instanceIndicesSchema.GetPrototypeIndex()->GetTypedValue(0),
+                std::vector<int>(instanceIndices.begin(), instanceIndices.end())
+            }
+        );
+    }
+
+    return primSelection;
+}
+
+SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource)
+{
+    if (!primDataSource) {
+        return {};
+    }
+
+    HdMaterialBindingsSchema materialBindingsSchema = HdMaterialBindingsSchema::GetFromParent(primDataSource);
+    if (!materialBindingsSchema.IsDefined()) {
+        return {};
+    }
+
+    HdMaterialBindingSchema materialBindingSchema = materialBindingsSchema.GetMaterialBinding();
+    if (!materialBindingSchema) {
+        return {};
+    }
+
+    HdPathDataSourceHandle bindingPathDataSource = materialBindingSchema.GetPath();
+    if (!bindingPathDataSource) {
+        return {};
+    }
+
+    return bindingPathDataSource->GetTypedValue(0);
 }
 
 } // namespace FVP_NS_DEF

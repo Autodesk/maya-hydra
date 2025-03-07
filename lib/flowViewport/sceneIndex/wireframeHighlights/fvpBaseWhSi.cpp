@@ -24,27 +24,32 @@
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
+#include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
+#include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
-#include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
+#if PXR_VERSION >= 2403
+#include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
+#endif
+#include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
 
 #include <unordered_set>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
-//Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
 TF_DEFINE_PRIVATE_TOKENS(
-     _primVarsTokens,
- 
-     (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
+    _tokens,
+
+    // Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
+    (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
  );
 
 const HdRetainedContainerDataSourceHandle refinedWireDisplayStyleDataSource
@@ -60,7 +65,17 @@ const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->reprSelector);
 
 const HdDataSourceLocator primvarsOverrideWireframeColorLocator(
-        HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor));
+        HdPrimvarsSchema::GetDefaultLocator().Append(_tokens->overrideWireframeColor));
+
+const HdDataSourceLocator pointsValueLocator = HdDataSourceLocator(
+    HdPrimvarsSchemaTokens->primvars,
+    HdPrimvarsSchemaTokens->points,
+    HdPrimvarSchemaTokens->primvarValue);
+
+const HdDataSourceLocator normalsValueLocator = HdDataSourceLocator(
+    HdPrimvarsSchemaTokens->primvars,
+    HdPrimvarsSchemaTokens->normals,
+    HdPrimvarSchemaTokens->primvarValue);
 
 // Returns all paths related to instancing for this prim; this is analogous to getting the edges
 // connected to the given vertex (in this case a prim) of an instancing graph.
@@ -268,130 +283,73 @@ private:
     HdPathArrayDataSourceHandle const _inputDataSource;
 };
 
-#if PXR_VERSION >= 2403
-// Edits the mesh topology to only only contain its selected GeomSubsets
-HdContainerDataSourceHandle
-_TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, const HdContainerDataSourceHandle& geomSubsetRootDataSource)
+// Copied over from USD's rerootingSceneIndex.cpp
+class _RerootingSceneIndexContainerDataSource : public HdContainerDataSource
 {
-    HdMeshSchema meshSchema = HdMeshSchema::GetFromParent(meshRootDataSource);
-    if (!meshSchema.IsDefined()) {
-        return meshRootDataSource;
-    }
-    HdMeshTopologySchema meshTopologySchema = meshSchema.GetTopology();
-    if (!meshTopologySchema.IsDefined()) {
-        return meshRootDataSource;
-    }
-    HdDataSourceLocator pointsValueLocator = HdDataSourceLocator(HdPrimvarsSchemaTokens->primvars, HdPrimvarsSchemaTokens->points, HdPrimvarSchemaTokens->primvarValue);
-    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshRootDataSource, pointsValueLocator));
-    if (!pointsValueDataSource) {
-        return meshRootDataSource;
+public:
+    HD_DECLARE_DATASOURCE(_RerootingSceneIndexContainerDataSource)
+
+    _RerootingSceneIndexContainerDataSource(
+        const SdfPath &srcPrefix,
+        const SdfPath &dstPrefix,
+        HdContainerDataSourceHandle const &inputDataSource)
+      : _srcPrefix(srcPrefix)
+      , _dstPrefix(dstPrefix)
+      , _inputDataSource(inputDataSource)
+    {
     }
 
-    // Collect faces to keep based on the GeomSubset
-    std::unordered_set<int> faceIndicesToKeep;
-    #if HD_API_VERSION >= 71 // USD 24.08+
-        HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema::GetFromParent(geomSubsetRootDataSource);
-    #else
-        HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema(geomSubsetRootDataSource);
-    #endif
-    if (!geomSubsetSchema.IsDefined() || geomSubsetSchema.GetType()->GetTypedValue(0) != HdGeomSubsetSchemaTokens->typeFaceSet) {
-        return meshRootDataSource;
-    }
-    VtArray<int> faceIndices = geomSubsetSchema.GetIndices()->GetTypedValue(0);
-    for (const auto& faceIndex : faceIndices) {
-        faceIndicesToKeep.insert(faceIndex);
-    }
-    if (faceIndicesToKeep.empty()) {
-        return meshRootDataSource;
-    }
-
-    // Edit the mesh topology
-    HdContainerDataSourceEditor dataSourceEditor = HdContainerDataSourceEditor(meshRootDataSource);
-    VtArray<int> originalFaceVertexCounts = meshTopologySchema.GetFaceVertexCounts()->GetTypedValue(0);
-    VtArray<int> originalFaceVertexIndices = meshTopologySchema.GetFaceVertexIndices()->GetTypedValue(0);
-    VtArray<int> trimmedFaceVertexCounts;
-    VtArray<int> trimmedFaceVertexIndices;
-    int maxVertexIndex = 0;
-    size_t iFaceCounts = 0;
-    size_t iFaceIndices = 0;
-    while (iFaceCounts < originalFaceVertexCounts.size() && iFaceIndices < originalFaceVertexIndices.size()) {
-        int currFaceCount = originalFaceVertexCounts[iFaceCounts];
-
-        if (faceIndicesToKeep.find(iFaceCounts) != faceIndicesToKeep.end()) {
-            trimmedFaceVertexCounts.push_back(currFaceCount);
-            for (int faceIndicesOffset = 0; faceIndicesOffset < currFaceCount; faceIndicesOffset++) {
-                int vertexIndex = originalFaceVertexIndices[iFaceIndices + faceIndicesOffset];
-                trimmedFaceVertexIndices.push_back(vertexIndex);
-                if (vertexIndex > maxVertexIndex) {
-                    maxVertexIndex = vertexIndex;
-                }
-            }
+    TfTokenVector GetNames() override
+    {
+        if (!_inputDataSource) {
+            return {};
         }
 
-        iFaceCounts++;
-        iFaceIndices += currFaceCount;
+        return _inputDataSource->GetNames();
     }
-    auto faceVertexCountsLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexCounts);
-    auto faceVertexIndicesLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexIndices);
-    
-    dataSourceEditor.Set(faceVertexCountsLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexCounts));
-    dataSourceEditor.Set(faceVertexIndicesLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexIndices));
 
-    // We reduce the points primvar so that it has only the exact number of points required by the trimmed topology;
-    // this avoids a warning from USD.
-    VtArray<GfVec3f> points = pointsValueDataSource->GetTypedValue(0);
-    points.resize(maxVertexIndex + 1);
-    dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
+    HdDataSourceBaseHandle Get(const TfToken& name) override
+    {
+        if (!_inputDataSource) {
+            return nullptr;
+        }
 
-    return dataSourceEditor.Finish();
-}
-#endif
+        // wrap child containers so that we can wrap their children
+        HdDataSourceBaseHandle const childSource = _inputDataSource->Get(name);
+        if (!childSource) {
+            return nullptr;
+        }
+
+        if (auto childContainer =
+                HdContainerDataSource::Cast(childSource)) {
+            return New(_srcPrefix, _dstPrefix, std::move(childContainer));
+        }
+
+        if (auto childPathDataSource =
+                HdTypedSampledDataSource<SdfPath>::Cast(childSource)) {
+            return _RerootingSceneIndexPathDataSource::New(
+                _srcPrefix, _dstPrefix, childPathDataSource);
+        }
+
+        if (auto childPathArrayDataSource =
+                HdTypedSampledDataSource<VtArray<SdfPath>>::Cast(
+                    childSource)) {
+            return _RerootingSceneIndexPathArrayDataSource::New(
+                _srcPrefix, _dstPrefix, childPathArrayDataSource);
+        }
+
+        return childSource;
+    }
+
+private:
+    const SdfPath _srcPrefix;
+    const SdfPath _dstPrefix;
+    HdContainerDataSourceHandle const _inputDataSource;
+};
 
 }
 
 namespace FVP_NS_DEF {
-
-TfTokenVector RepathingContainerDataSource::GetNames()
-{
-    if (!_inputDataSource) {
-        return {};
-    }
-
-    return _inputDataSource->GetNames();
-}
-
-HdDataSourceBaseHandle RepathingContainerDataSource::Get(const TfToken& name)
-{
-    if (!_inputDataSource) {
-        return nullptr;
-    }
-
-    // wrap child containers so that we can wrap their children
-    HdDataSourceBaseHandle const childSource = _inputDataSource->Get(name);
-    if (!childSource) {
-        return nullptr;
-    }
-
-    if (auto childContainer =
-            HdContainerDataSource::Cast(childSource)) {
-        return New(_srcPrefix, _dstPrefix, std::move(childContainer));
-    }
-
-    if (auto childPathDataSource =
-            HdTypedSampledDataSource<SdfPath>::Cast(childSource)) {
-        return _RerootingSceneIndexPathDataSource::New(
-            _srcPrefix, _dstPrefix, childPathDataSource);
-    }
-
-    if (auto childPathArrayDataSource =
-            HdTypedSampledDataSource<VtArray<SdfPath>>::Cast(
-                childSource)) {
-        return _RerootingSceneIndexPathArrayDataSource::New(
-            _srcPrefix, _dstPrefix, childPathArrayDataSource);
-    }
-
-    return childSource;
-}
 
 //We want to set the displayStyle of the selected prim to refinedWireOnSurf only if the displayStyle of the prim is refined (meaning shaded)
 HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& dataSource, const GfVec4f& color)
@@ -426,38 +384,130 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
     return edited.Finish();
 }
 
+PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
+    const PXR_NS::HdContainerDataSourceHandle& primDataSource, 
+    const PXR_NS::SdfPath& srcPrefix, 
+    const PXR_NS::SdfPath& dstPrefix)
+{
+    static const std::set<HdDataSourceLocator> kInstancingDataSourceLocators = {
+        HdInstancerTopologySchema::GetDefaultLocator(),
+        HdInstancedBySchema::GetDefaultLocator(),
+        HdInstanceSchema::GetDefaultLocator(),
+        UsdImagingUsdPrimInfoSchema::GetDefaultLocator().Append(UsdImagingUsdPrimInfoSchemaTokens->piPropagatedPrototypes),
+        UsdImagingUsdPrimInfoSchema::GetDefaultLocator().Append(UsdImagingUsdPrimInfoSchemaTokens->niPrototypePath),
+    };
+
+    HdContainerDataSourceEditor dataSourceEditor(primDataSource);
+    for (const auto& instancingDataSourceLocator : kInstancingDataSourceLocators) {
+        auto instancingDataSource = HdContainerDataSource::Get(primDataSource, instancingDataSourceLocator);
+        
+        if (auto containerDataSource = HdContainerDataSource::Cast(instancingDataSource)) {
+            dataSourceEditor.Set(
+                instancingDataSourceLocator,
+                _RerootingSceneIndexContainerDataSource::New(srcPrefix, dstPrefix, containerDataSource)
+            );
+        }
+
+        if (auto pathDataSource = HdTypedSampledDataSource<SdfPath>::Cast(instancingDataSource)) {
+            dataSourceEditor.Set(
+                instancingDataSourceLocator,
+                _RerootingSceneIndexPathDataSource::New(srcPrefix, dstPrefix, pathDataSource)
+            );
+        }
+
+        if (auto pathArrayDataSource = HdTypedSampledDataSource<VtArray<SdfPath>>::Cast(instancingDataSource)) {
+            dataSourceEditor.Set(
+                instancingDataSourceLocator,
+                _RerootingSceneIndexPathArrayDataSource::New(srcPrefix, dstPrefix, pathArrayDataSource)
+            );
+        }
+    }
+    return dataSourceEditor.Finish();
+}
+
 #if PXR_VERSION >= 2403
 HdContainerDataSourceHandle
-TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshRootDataSource, const HdContainerDataSourceHandle& geomSubsetRootDataSource)
+TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshPrimDataSource, const HdContainerDataSourceHandle& geomSubsetPrimDataSource)
 {
-    return _TrimMeshForGeomSubset(meshRootDataSource, geomSubsetRootDataSource);
-}
-#endif
-
-Fvp::PrimSelection ConvertHydraToFvpSelection(const SdfPath& primPath, const HdSelectionSchema& selectionSchema) {
-    Fvp::PrimSelection primSelection;
-    primSelection.primPath = primPath;
-
-    auto nestedInstanceIndicesSchema = 
-#if HD_API_VERSION < 66
-    const_cast<HdSelectionSchema&>(selectionSchema).GetNestedInstanceIndices();
-#else
-    selectionSchema.GetNestedInstanceIndices();
-#endif
-    for (size_t iNestedInstanceIndices = 0; iNestedInstanceIndices < nestedInstanceIndicesSchema.GetNumElements(); iNestedInstanceIndices++) {
-        HdInstanceIndicesSchema instanceIndicesSchema = nestedInstanceIndicesSchema.GetElement(iNestedInstanceIndices);
-        auto instanceIndices = instanceIndicesSchema.GetInstanceIndices()->GetTypedValue(0);
-        primSelection.nestedInstanceIndices.push_back(
-            {
-                instanceIndicesSchema.GetInstancer()->GetTypedValue(0),
-                instanceIndicesSchema.GetPrototypeIndex()->GetTypedValue(0),
-                std::vector<int>(instanceIndices.begin(), instanceIndices.end())
-            }
-        );
+    HdMeshSchema meshSchema = HdMeshSchema::GetFromParent(meshPrimDataSource);
+    if (!meshSchema.IsDefined()) {
+        return meshPrimDataSource;
+    }
+    HdMeshTopologySchema meshTopologySchema = meshSchema.GetTopology();
+    if (!meshTopologySchema.IsDefined()) {
+        return meshPrimDataSource;
+    }
+    auto pointsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, pointsValueLocator));
+    if (!pointsValueDataSource) {
+        return meshPrimDataSource;
     }
 
-    return primSelection;
+    // Collect faces to keep based on the GeomSubset
+    std::unordered_set<int> faceIndicesToKeep;
+    #if HD_API_VERSION >= 71 // USD 24.08+
+        HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema::GetFromParent(geomSubsetPrimDataSource);
+    #else
+        HdGeomSubsetSchema geomSubsetSchema = HdGeomSubsetSchema(geomSubsetPrimDataSource);
+    #endif
+    if (!geomSubsetSchema.IsDefined() || geomSubsetSchema.GetType()->GetTypedValue(0) != HdGeomSubsetSchemaTokens->typeFaceSet) {
+        return meshPrimDataSource;
+    }
+    VtArray<int> faceIndices = geomSubsetSchema.GetIndices()->GetTypedValue(0);
+    for (const auto& faceIndex : faceIndices) {
+        faceIndicesToKeep.insert(faceIndex);
+    }
+    if (faceIndicesToKeep.empty()) {
+        return meshPrimDataSource;
+    }
+
+    // Edit the mesh topology
+    HdContainerDataSourceEditor dataSourceEditor = HdContainerDataSourceEditor(meshPrimDataSource);
+    VtArray<int> originalFaceVertexCounts = meshTopologySchema.GetFaceVertexCounts()->GetTypedValue(0);
+    VtArray<int> originalFaceVertexIndices = meshTopologySchema.GetFaceVertexIndices()->GetTypedValue(0);
+    VtArray<int> trimmedFaceVertexCounts;
+    VtArray<int> trimmedFaceVertexIndices;
+    int maxVertexIndex = 0;
+    size_t iFaceCounts = 0;
+    size_t iFaceIndices = 0;
+    while (iFaceCounts < originalFaceVertexCounts.size() && iFaceIndices < originalFaceVertexIndices.size()) {
+        int currFaceCount = originalFaceVertexCounts[iFaceCounts];
+
+        if (faceIndicesToKeep.find(iFaceCounts) != faceIndicesToKeep.end()) {
+            trimmedFaceVertexCounts.push_back(currFaceCount);
+            for (int faceIndicesOffset = 0; faceIndicesOffset < currFaceCount; faceIndicesOffset++) {
+                int vertexIndex = originalFaceVertexIndices[iFaceIndices + faceIndicesOffset];
+                trimmedFaceVertexIndices.push_back(vertexIndex);
+                if (vertexIndex > maxVertexIndex) {
+                    maxVertexIndex = vertexIndex;
+                }
+            }
+        }
+
+        iFaceCounts++;
+        iFaceIndices += currFaceCount;
+    }
+    auto faceVertexCountsLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexCounts);
+    auto faceVertexIndicesLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexIndices);
+    
+    dataSourceEditor.Set(faceVertexCountsLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexCounts));
+    dataSourceEditor.Set(faceVertexIndicesLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexIndices));
+
+    // We reduce the points and normals primvars so that they have only the exact number of elements required by the trimmed topology;
+    // this avoids a warning from USD.
+    VtArray<GfVec3f> points = pointsValueDataSource->GetTypedValue(0);
+    points.resize(maxVertexIndex + 1);
+    dataSourceEditor.Set(pointsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(points));
+
+    auto normalsValueDataSource = HdTypedSampledDataSource<VtArray<GfVec3f>>::Cast(HdContainerDataSource::Get(meshPrimDataSource, normalsValueLocator));
+    if (normalsValueDataSource) {
+        auto normals = normalsValueDataSource->GetTypedValue(0);
+        normals.resize(maxVertexIndex + 1);
+        dataSourceEditor.Set(normalsValueLocator, HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>::New(normals));
+    }
+
+    return dataSourceEditor.Finish();
 }
+#endif
 
 BaseWhSi::BaseWhSi(
     const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex,
@@ -755,5 +805,30 @@ BaseWhSi::CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPath
         CollectInstancingPaths(affectedInstancedByPath, InstancingPathsCollectionDirection::InstancedBy, outInstancerPaths, outPrototypePaths);
     }
 }
+
+#if PXR_VERSION >= 2403
+PXR_NS::HdContainerDataSourceHandle
+BaseWhSi::MakeGeomSubsetHighlight(
+    const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource,
+    const PXR_NS::HdContainerDataSourceHandle& geomSubsetPrimDataSource) const
+{
+    HdContainerDataSourceHandle editedMeshPrimDataSource = meshPrimDataSource;
+
+    // If the geomSubset has a material, apply it to the highlight mesh
+    if (!GetMaterialPath(geomSubsetPrimDataSource).IsEmpty()) {
+        HdContainerDataSourceEditor dataSourceEditor(editedMeshPrimDataSource);
+        dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, HdMaterialBindingsSchema::GetDefaultLocator()));
+#if PXR_VERSION >= 2403
+        dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator()));
+#endif
+        editedMeshPrimDataSource = dataSourceEditor.Finish();
+    }
+
+    // Trim the mesh to fit the geomSubset
+    editedMeshPrimDataSource = TrimMeshForGeomSubset(editedMeshPrimDataSource, geomSubsetPrimDataSource);
+
+    return editedMeshPrimDataSource;
+}
+#endif
 
 }

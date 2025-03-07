@@ -24,6 +24,7 @@
 
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 
 namespace FVP_NS_DEF {
@@ -124,6 +125,12 @@ auto FindSelfOrFirstChild(const PXR_NS::SdfPath& path, const std::map<PXR_NS::Sd
     }
     return pathMap.cend();
 }
+
+// Return a Fvp::PrimSelection equivalent to the given Hydra selection
+Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
+
+// Get the path to the prim's bound material.
+PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
 
 } // namespace FVP_NS_DEF
 
