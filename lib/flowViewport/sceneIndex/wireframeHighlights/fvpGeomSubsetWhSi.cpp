@@ -50,13 +50,14 @@ HdSceneIndexPrim GeomSubsetWhSi::GetHighlightPrim(const SdfPath &selectionPath, 
 
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, originalMeshPath.GetParentPath());
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
-    prim.dataSource = RepathingContainerDataSource::New(originalMeshPath.GetParentPath(), selectionPath, prim.dataSource);
     if (prim.primType == HdPrimTypeTokens->mesh) {
         prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(selectionKey.first));
-        if (originalPath == selectionKey.first.GetParentPath()) {
-            prim.dataSource = TrimMeshForGeomSubset(prim.dataSource, GetInputSceneIndex()->GetPrim(selectionKey.first).dataSource);
+        if (originalPath == originalMeshPath) {
+            HdSceneIndexPrim geomSubsetPrim = GetInputSceneIndex()->GetPrim(selectionKey.first);
+            prim.dataSource = MakeGeomSubsetHighlight(prim.dataSource, geomSubsetPrim.dataSource);
         }
     }
+    prim.dataSource = RepathInstancingDataSources(prim.dataSource, originalMeshPath.GetParentPath(), selectionPath);
     return prim;
 };
 

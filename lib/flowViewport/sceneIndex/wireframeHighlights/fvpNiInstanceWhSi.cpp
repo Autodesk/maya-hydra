@@ -52,10 +52,11 @@ NiInstanceWhSiRefPtr NiInstanceWhSi::New(
 HdSceneIndexPrim NiInstanceWhSi::GetHighlightPrim(const SdfPath &selectionPath, const SdfPath &fullPrimPath) const
 {
     SelectionKey selectionKey = SelectionKeyFromPath(selectionPath);
+
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, _selectionPathsToPrototypePrefixes.at(selectionPath));
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
-    prim.dataSource = RepathingContainerDataSource::New(_selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath, prim.dataSource);
     HdContainerDataSourceEditor dsEditor(prim.dataSource);
+
     dsEditor.Set(HdInstancedBySchema::GetDefaultLocator(), HdBlockDataSource::New());
 
     HdSceneIndexPrim instancePrim = GetInputSceneIndex()->GetPrim(selectionKey.first);
@@ -67,6 +68,7 @@ HdSceneIndexPrim NiInstanceWhSi::GetHighlightPrim(const SdfPath &selectionPath, 
     if (prim.primType == HdPrimTypeTokens->mesh) {
         prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(selectionKey.first));
     }
+    prim.dataSource = RepathInstancingDataSources(prim.dataSource, _selectionPathsToPrototypePrefixes.at(selectionPath), selectionPath);
     return prim;
 };
 

@@ -25,7 +25,8 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    _stageUfePathSegment = "|GeomSubsetsWireframeHighlightTestScene|GeomSubsetsWireframeHighlightTestSceneShape"
+    _baseStageFilename = "GeomSubsetsWireframeHighlightTestScene.usda"
+    _baseStageUfePathSegment = "|GeomSubsetsWireframeHighlightTestScene|GeomSubsetsWireframeHighlightTestSceneShape"
 
     _cubeMeshUfePathSegment = "/Root/CubeMeshXform/CubeMesh"
     _sphereMeshUfePathSegment = "/Root/SphereMeshXform/SphereMesh"
@@ -33,16 +34,16 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     _cubeUpperHalfName = "CubeUpperHalf"
     _sphereUpperHalfName = "SphereUpperHalf"
 
+    _displacementStageFilename = "GeomSubsetWireframeHighlightDisplacementTestScene.usda"
+    _displacementStageUfePathSegment = "|GeomSubsetWireframeHighlightDisplacementTestScene|GeomSubsetWireframeHighlightDisplacementTestSceneShape"
+    _displacementGeomSubsetUfePathSegment = "/Torus/GeomSubset"
+    
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1
 
-    def loadUsdScene(self):
-        usdScenePath = testUtils.getTestScene('testGeomSubsetsWireframeHighlight', 'GeomSubsetsWireframeHighlightTestScene.usda')
+    def loadUsdScene(self, stageFilename):
+        usdScenePath = testUtils.getTestScene('testGeomSubsetsWireframeHighlight', stageFilename)
         usdUtils.createStageFromFile(usdScenePath)
-
-    def setUp(self):
-        super(TestGeomSubsetsWireframeHighlight, self).setUp()
-        self.loadUsdScene()
         cmds.select(clear=True)
         cmds.optionVar(
                 sv=('mayaHydra_GeomSubsetsPickMode', 'Faces'))
@@ -54,10 +55,12 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         if self._usdVersion < (0, 24, 3):
             self.skipTest("Skipping test, USD version used does not support Hydra GeomSubset prims")
         
+        self.loadUsdScene(self._baseStageFilename)
+        
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
-        cubeGeomSubsetPath = self._stageUfePathSegment + "," + self._cubeMeshUfePathSegment + "/" + self._cubeUpperHalfName
+        cubeGeomSubsetPath = self._baseStageUfePathSegment + "," + self._cubeMeshUfePathSegment + "/" + self._cubeUpperHalfName
         cubeGeomSubsetItem = ufe.Hierarchy.createItem(ufe.PathString.path(cubeGeomSubsetPath))
 
         sn.clear()
@@ -68,10 +71,12 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         if self._usdVersion < (0, 24, 3):
             self.skipTest("Skipping test, USD version used does not support Hydra GeomSubset prims")
         
+        self.loadUsdScene(self._baseStageFilename)
+
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
-        sphereGeomSubsetPath = self._stageUfePathSegment + "," + self._sphereMeshUfePathSegment + "/" + self._sphereUpperHalfName
+        sphereGeomSubsetPath = self._baseStageUfePathSegment + "," + self._sphereMeshUfePathSegment + "/" + self._sphereUpperHalfName
         sphereGeomSubsetItem = ufe.Hierarchy.createItem(ufe.PathString.path(sphereGeomSubsetPath))
 
         sn.clear()
@@ -81,14 +86,16 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     def test_WireframeColorChange(self):
         if self._usdVersion < (0, 24, 3):
             self.skipTest("Skipping test, USD version used does not support Hydra GeomSubset prims")
+
+        self.loadUsdScene(self._baseStageFilename)
         
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
-        cubeGeomSubsetPath = self._stageUfePathSegment + "," + self._cubeMeshUfePathSegment + "/" + self._cubeUpperHalfName
+        cubeGeomSubsetPath = self._baseStageUfePathSegment + "," + self._cubeMeshUfePathSegment + "/" + self._cubeUpperHalfName
         cubeGeomSubsetItem = ufe.Hierarchy.createItem(ufe.PathString.path(cubeGeomSubsetPath))
 
-        sphereGeomSubsetPath = self._stageUfePathSegment + "," + self._sphereMeshUfePathSegment + "/" + self._sphereUpperHalfName
+        sphereGeomSubsetPath = self._baseStageUfePathSegment + "," + self._sphereMeshUfePathSegment + "/" + self._sphereUpperHalfName
         sphereGeomSubsetItem = ufe.Hierarchy.createItem(ufe.PathString.path(sphereGeomSubsetPath))
 
         sn.clear()
@@ -102,13 +109,15 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         if self._usdVersion < (0, 24, 3):
             self.skipTest("Skipping test, USD version used does not support Hydra GeomSubset prims")
         
+        self.loadUsdScene(self._baseStageFilename)
+        
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
-        cubeMeshPath = self._stageUfePathSegment + "," + self._cubeMeshUfePathSegment
+        cubeMeshPath = self._baseStageUfePathSegment + "," + self._cubeMeshUfePathSegment
         cubeMeshItem = ufe.Hierarchy.createItem(ufe.PathString.path(cubeMeshPath))
 
-        cubeGeomSubsetPath = self._stageUfePathSegment + "," + self._cubeMeshUfePathSegment + "/" + self._cubeUpperHalfName
+        cubeGeomSubsetPath = self._baseStageUfePathSegment + "," + self._cubeMeshUfePathSegment + "/" + self._cubeUpperHalfName
         cubeGeomSubsetItem = ufe.Hierarchy.createItem(ufe.PathString.path(cubeGeomSubsetPath))
 
         sn.clear()
@@ -121,6 +130,21 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         #sn.append(cubeMeshItem)
         #sn.append(cubeGeomSubsetItem)
         #self.assertSnapshotClose("meshThenGeomSubsetSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+    
+    def test_Displacement(self):
+        if self._usdVersion < (0, 24, 3):
+            self.skipTest("Skipping test, USD version used does not support Hydra GeomSubset prims")
+        
+        self.loadUsdScene(self._displacementStageFilename)
+        self.setBasicCam(8)
+        
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        geomSubsetPath = self._displacementStageUfePathSegment + "," + self._displacementGeomSubsetUfePathSegment
+        geomSubsetItem = ufe.Hierarchy.createItem(ufe.PathString.path(geomSubsetPath))
+        sn.append(geomSubsetItem)
+        self.assertSnapshotClose("displacement.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

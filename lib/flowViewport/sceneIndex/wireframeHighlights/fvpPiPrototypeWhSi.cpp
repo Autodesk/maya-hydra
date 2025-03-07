@@ -72,11 +72,11 @@ HdSceneIndexPrim PiPrototypeWhSi::GetHighlightPrim(const SdfPath &selectionPath,
         prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(selectionKey.first));
 #if PXR_VERSION >= 2403
         if (originalPrototypePrim.primType == HdPrimTypeTokens->geomSubset && originalPath == selectionKey.first.GetParentPath()) {
-            prim.dataSource = TrimMeshForGeomSubset(prim.dataSource, originalPrototypePrim.dataSource);
+            prim.dataSource = MakeGeomSubsetHighlight(prim.dataSource, originalPrototypePrim.dataSource);
         }
 #endif
     }
-    prim.dataSource = RepathingContainerDataSource::New(SdfPath::AbsoluteRootPath(), selectionPath, prim.dataSource);
+    prim.dataSource = RepathInstancingDataSources(prim.dataSource, SdfPath::AbsoluteRootPath(), selectionPath);
     return prim;
 };
 
@@ -233,8 +233,8 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
 {
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
+        HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
-            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
             if (_IsSupportedPointInstancePrototype(GetInputSceneIndex(), entry.primPath)) {
                 // Selection changed on the prototype; rebuild the highlights
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
@@ -292,7 +292,13 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
         if (itPrototype != _prototypePathsToSelections.end()) {
             for (const auto& selectionKey : itPrototype->second) {
                 auto selectionPath = SelectionPathFromKey(selectionKey);
-                highlightEntries.emplace_back(entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), entry.dirtyLocators);
+                auto dirtiedPath = entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath);
+#if PXR_VERSION >= 2403
+                if (prim.primType == HdPrimTypeTokens->geomSubset && entry.primPath == selectionKey.first) {
+                    dirtiedPath = dirtiedPath.GetParentPath();
+                }
+#endif
+                highlightEntries.emplace_back(dirtiedPath, entry.dirtyLocators);
             }
         }
     }

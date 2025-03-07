@@ -29,32 +29,6 @@
 
 namespace FVP_NS_DEF {
 
-// Essentially a port of USD's _RerootingSceneIndexContainerDataSource in rerootingSceneIndex.cpp
-class RepathingContainerDataSource : public PXR_NS::HdContainerDataSource
-{
-public:
-    HD_DECLARE_DATASOURCE(RepathingContainerDataSource)
-
-    RepathingContainerDataSource(
-        const PXR_NS::SdfPath &srcPrefix,
-        const PXR_NS::SdfPath &dstPrefix,
-        PXR_NS::HdContainerDataSourceHandle const &inputDataSource)
-      : _srcPrefix(srcPrefix)
-      , _dstPrefix(dstPrefix)
-      , _inputDataSource(inputDataSource)
-    {
-    }
-
-    PXR_NS::TfTokenVector GetNames() override;
-
-    PXR_NS::HdDataSourceBaseHandle Get(const PXR_NS::TfToken& name) override;
-
-private:
-    const PXR_NS::SdfPath _srcPrefix;
-    const PXR_NS::SdfPath _dstPrefix;
-    PXR_NS::HdContainerDataSourceHandle const _inputDataSource;
-};
-
 using SelectionKey = std::pair<PXR_NS::SdfPath, std::string>;
 
 enum InstancingPathsCollectionDirection {
@@ -217,6 +191,14 @@ protected:
     FVP_API
     void CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPathsCollectionDirection direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const;
 
+#if PXR_VERSION >= 2403
+    // Given a mesh and geomSubset data sources, edits and returns the mesh data source to fit the given geomSubset
+    FVP_API
+    PXR_NS::HdContainerDataSourceHandle MakeGeomSubsetHighlight(
+        const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource,
+        const PXR_NS::HdContainerDataSourceHandle& geomSubsetPrimDataSource) const;
+#endif
+
     const PXR_NS::SdfPath _highlightHierarchyPrefix;
     const std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 
@@ -231,13 +213,18 @@ protected:
 // Make the given prim be drawn as a wireframe of the given color.
 PXR_NS::HdContainerDataSourceHandle SetWireframeRepr(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color);
 
+// Repath instancing-related data sources by replacing srcPrefix with dstPrefix.
+// Mainly used to setup selection highlight instancers and instances.
+PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
+    const PXR_NS::HdContainerDataSourceHandle& primDataSource,
+    const PXR_NS::SdfPath& srcPrefix,
+    const PXR_NS::SdfPath& dstPrefix);
+
 #if PXR_VERSION >= 2403
 // Edit the given mesh data source such that its topology matches the given geomSubset.
 PXR_NS::HdContainerDataSourceHandle
-TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshRootDataSource, const PXR_NS::HdContainerDataSourceHandle& geomSubsetRootDataSource);
+TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource, const PXR_NS::HdContainerDataSourceHandle& geomSubsetPrimDataSource);
 #endif
-
-Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, const PXR_NS::HdSelectionSchema& selectionSchema);
 
 }
 
