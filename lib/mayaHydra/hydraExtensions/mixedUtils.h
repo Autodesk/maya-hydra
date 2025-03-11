@@ -251,6 +251,12 @@ PXR_NS::GfVec4f getPreferencesColor(const PXR_NS::TfToken& token);
 MAYAHYDRALIB_API
 PXR_NS::TfToken GetGeomSubsetsPickMode();
 
+/**
+ * @brief Retrieves whether or not to use the ViewportToolbox.
+ */
+MAYAHYDRALIB_API
+bool UseViewportToolbox();
+
 } // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRALIB_MIXED_UTILS_H
