@@ -58,6 +58,15 @@
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
 
+#if VIEWPORT_TOOLBOX
+#include <AGP/ViewportToolbox/ViewportEngine/RenderIndexProxy.h>
+#include <AGP/ViewportToolbox/ViewportEngine/ViewportEngine.h>
+#include <AGP/ViewportToolbox/ViewportEngine/FramePass.h>
+#include <AGP/ViewportToolbox/RenderTasks/Resources.h>
+#include <AGP/ViewportToolbox/ViewportEngine/VisualStyle.h>
+#include <AGP/ViewportToolbox/Plugins/xRayModeSceneIndex.h>
+#endif
+
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/type.h>
