@@ -60,6 +60,11 @@
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 
+#if VIEWPORT_TOOLBOX
+#include <AGP/ViewportToolbox/ViewportEngine/RenderIndexProxy.h>
+#include <AGP/ViewportToolbox/ViewportEngine/FramePass.h>
+#endif
+
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
 #include <pxr/imaging/hd/engine.h>
@@ -276,6 +281,10 @@ private:
     std::unique_ptr<HdxTaskController>        _taskController;
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
     Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
+#if VIEWPORT_TOOLBOX
+    agp::ViewportToolbox::RenderIndexProxyPtr _beautyRenderer;
+    agp::ViewportToolbox::FramePassPtr _beautyFramePass;
+#endif
     VtDictionary                              _fileWriterArgs{};
     HdSceneIndexBaseRefPtr                    _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
     HdSceneIndexBaseRefPtr                    _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
