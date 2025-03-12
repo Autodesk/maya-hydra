@@ -58,7 +58,7 @@
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
 
-#if VIEWPORT_TOOLBOX
+#ifdef VIEWPORT_TOOLBOX
 #include <AGP/ViewportToolbox/ViewportEngine/RenderIndexProxy.h>
 #include <AGP/ViewportToolbox/ViewportEngine/ViewportEngine.h>
 #include <AGP/ViewportToolbox/ViewportEngine/FramePass.h>
@@ -388,7 +388,7 @@ MtohRenderOverride::~MtohRenderOverride()
 
 HdRenderDelegate* MtohRenderOverride::_GetRenderDelegate()
 {
-#if VIEWPORT_TOOLBOX
+#ifdef VIEWPORT_TOOLBOX
     return _beautyRenderer && _beautyRenderer->RenderIndex() ? _beautyRenderer->RenderIndex()->GetRenderDelegate() : nullptr;
 #else
     return _renderIndex ? _renderIndex->GetRenderDelegate() : nullptr;
@@ -397,7 +397,7 @@ HdRenderDelegate* MtohRenderOverride::_GetRenderDelegate()
 
 HdRenderDelegate* MtohRenderOverride::_GetRenderDelegate() const
 {
-#if VIEWPORT_TOOLBOX
+#ifdef VIEWPORT_TOOLBOX
     return _beautyRenderer && _beautyRenderer->RenderIndex() ? _beautyRenderer->RenderIndex()->GetRenderDelegate() : nullptr;
 #else
     return _renderIndex ? _renderIndex->GetRenderDelegate() : nullptr;
@@ -1971,7 +1971,7 @@ MtohRenderOverride::sceneIndexRegistry() const
 
 HdRenderIndex* MtohRenderOverride::renderIndex() const
 {
-#if VIEWPORT_TOOLBOX
+#ifdef VIEWPORT_TOOLBOX
     return _beautyRenderer ? _beautyRenderer->RenderIndex() : nullptr;
 #else
     return _renderIndex;

@@ -60,7 +60,7 @@
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 
-#if VIEWPORT_TOOLBOX
+#ifdef VIEWPORT_TOOLBOX
 #include <AGP/ViewportToolbox/ViewportEngine/RenderIndexProxy.h>
 #include <AGP/ViewportToolbox/ViewportEngine/FramePass.h>
 #endif
@@ -277,7 +277,7 @@ private:
     /// are destructed last. Hgi may be used during engine/delegate destruction.
     HgiUniquePtr                              _hgi;
     HdDriver                                  _hgiDriver;
-#if VIEWPORT_TOOLBOX
+#ifdef VIEWPORT_TOOLBOX
     agp::ViewportToolbox::RenderIndexProxyPtr _beautyRenderer;
     agp::ViewportToolbox::FramePassPtr _beautyFramePass;
 #else
