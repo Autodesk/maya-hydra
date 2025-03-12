@@ -600,6 +600,7 @@ MStatus MtohRenderOverride::Render(
     // }
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER).Msg("MtohRenderOverride::Render()\n");
     auto renderFrame = [&](bool markTime = false) {
+#ifndef VIEWPORT_TOOLBOX
         HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
 
         // For playblasting, a glReadPixels is going to occur sometime after we return.
@@ -628,32 +629,39 @@ MStatus MtohRenderOverride::Render(
                 TF_WARN("HdxProgressiveTask not found");
             }
         }
+#endif
 
-        // MAYA-114630
-        // https://github.com/PixarAnimationStudios/USD/commit/fc63eaef29
-        // removed backing, and restoring of GL_FRAMEBUFFER state.
-        // At the same time HdxColorizeSelectionTask modifies the frame buffer state
-        // Manually backup and restore the state of the frame buffer for now.
-        MayaHydraGLBackup backup;
-        if (_backupFrameBufferWorkaround) {
-            HdTaskSharedPtr backupTask(new MayaHydraBackupGLStateTask(backup));
-            HdTaskSharedPtr restoreTask(new MayaHydraRestoreGLStateTask(backup));
-            tasks.reserve(tasks.size() + 2);
-            for (auto it = tasks.begin(); it != tasks.end(); it++) {
-                if (std::dynamic_pointer_cast<HdxColorizeSelectionTask>(*it)) {
-                    tasks.insert(it, backupTask);
-                    tasks.insert(it + 2, restoreTask);
-                    break;
+        auto editTasks = [&_backupFrameBufferWorkaround=_backupFrameBufferWorkaround](HdTaskSharedPtrVector& tasksToEdit) -> void {
+            // MAYA-114630
+            // https://github.com/PixarAnimationStudios/USD/commit/fc63eaef29
+            // removed backing, and restoring of GL_FRAMEBUFFER state.
+            // At the same time HdxColorizeSelectionTask modifies the frame buffer state
+            // Manually backup and restore the state of the frame buffer for now.
+            MayaHydraGLBackup backup;
+            if (_backupFrameBufferWorkaround) {
+                HdTaskSharedPtr backupTask(new MayaHydraBackupGLStateTask(backup));
+                HdTaskSharedPtr restoreTask(new MayaHydraRestoreGLStateTask(backup));
+                tasksToEdit.reserve(tasksToEdit.size() + 2);
+                for (auto it = tasksToEdit.begin(); it != tasksToEdit.end(); it++) {
+                    if (std::dynamic_pointer_cast<HdxColorizeSelectionTask>(*it)) {
+                        tasksToEdit.insert(it, backupTask);
+                        tasksToEdit.insert(it + 2, restoreTask);
+                        break;
+                    }
                 }
             }
-        }
 
-        // Replace the existing HdxTaskController selection task (Storm) or
-        // colorize selection task (non-Storm) with our selection task by
-        // editing the task list, since HdxTaskController is not configurable.
-        // As the existence of either task depends on AOV support, they may not
-        // be present, so we may have nothing to replace.  PPT, 11-Aug-2023.
-        replaceSelectionTask(&tasks);
+            // Replace the existing HdxTaskController selection task (Storm) or
+            // colorize selection task (non-Storm) with our selection task by
+            // editing the task list, since HdxTaskController is not configurable.
+            // As the existence of either task depends on AOV support, they may not
+            // be present, so we may have nothing to replace.  PPT, 11-Aug-2023.
+            replaceSelectionTask(&tasksToEdit);
+        };
+
+#ifndef VIEWPORT_TOOLBOX
+        editTasks(tasks);
+#endif
 
         if (scene.changed()) {
             if (_mayaHydraSceneIndex) {
@@ -691,7 +699,14 @@ MStatus MtohRenderOverride::Render(
             Fvp::FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(rendererNamesToUpdate);
         }
 
+#ifdef VIEWPORT_TOOLBOX
+        _beautyFramePass->params().backgroundColor = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
+        HdTaskSharedPtrVector beautyTasks = _beautyFramePass->GetRenderTasks();
+        editTasks(beautyTasks);
+        _beautyFramePass->Render(beautyTasks);
+#else
         _engine.Execute(_renderIndex, &tasks);
+#endif
 
         const auto fileName = Fvp::ImageBufferWriter::GetFileName();
         if (!fileName.empty()) {
@@ -704,7 +719,12 @@ MStatus MtohRenderOverride::Render(
         // HdTaskController will query all of the tasks it can for IsConverged.
         // This includes HdRenderPass::IsConverged and HdRenderBuffer::IsConverged (via colorizer).
         //
-        _isConverged = _taskController->IsConverged();
+        _isConverged = 
+#ifdef VIEWPORT_TOOLBOX
+            _beautyFramePass->IsConverged();
+#else
+            _taskController->IsConverged();
+#endif
         if (markTime) {
             std::lock_guard<std::mutex> lock(_lastRenderTimeMutex);
             _lastRenderTime = std::chrono::system_clock::now();
