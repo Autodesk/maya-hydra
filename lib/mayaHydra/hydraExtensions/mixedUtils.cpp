@@ -30,13 +30,9 @@
 #include <maya/MPlugArray.h>
 #include <maya/MRenderUtil.h>
 
-#include <pxr/base/tf/envSetting.h>
-
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
-
-TF_DEFINE_ENV_SETTING(MAYA_HYDRA_USE_VIEWPORT_TOOLBOX, false, "Use ViewportToolbox for rendering.");
 
 TfToken GetFileTexturePath(const MFnDependencyNode& fileNode)
 {
@@ -230,12 +226,6 @@ PXR_NS::TfToken GetGeomSubsetsPickMode()
     }
 
     return GeomSubsetsPickModeTokens->None;
-}
-
-bool UseViewportToolbox()
-{
-    static const bool useViewportToolbox = TfGetEnvSetting(MAYA_HYDRA_USE_VIEWPORT_TOOLBOX);
-    return useViewportToolbox;
 }
 
 } // namespace MAYAHYDRA_NS_DEF
