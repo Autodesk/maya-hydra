@@ -942,17 +942,30 @@ MStatus MtohRenderOverride::Render(
         _oldRefineLevel = delegateParams.refineLevel;
     }
 
+#ifdef VIEWPORT_TOOLBOX
+    _beautyFramePass->params().enableLighting = true;
+    _beautyFramePass->params().enableSceneMaterials = true;
+#else
     HdxRenderTaskParams params;
     params.enableLighting = true;
     params.enableSceneMaterials = true;
+#endif
 
     PXR_NS::GfVec4f wireframeSelectionColor;
     if (Fvp::ColorPreferences::getInstance().getColor(
             FvpColorPreferencesTokens->wireframeSelection, wireframeSelectionColor)) {
+#ifdef VIEWPORT_TOOLBOX
+        _beautyFramePass->params().wireframeColor = wireframeSelectionColor;
+#else
         params.wireframeColor = wireframeSelectionColor;
+#endif
     }
 
+#ifdef VIEWPORT_TOOLBOX
+    _beautyFramePass->params().cullStyle = HdCullStyleBackUnlessDoubleSided;
+#else
     params.cullStyle = HdCullStyleBackUnlessDoubleSided;
+#endif
 
     int width = 0;
     int height = 0;
@@ -961,18 +974,23 @@ MStatus MtohRenderOverride::Render(
     bool vpDirty;
     if ((vpDirty = (width != _viewport[2] || height != _viewport[3]))) {
         _viewport = GfVec4d(0, 0, width, height);
+#ifdef VIEWPORT_TOOLBOX
+        _beautyFramePass->params().renderBufferSize = GfVec2i(width, height);
+#else
         _taskController->SetRenderViewport(_viewport);
+#endif
     }
 
     // Set Purpose tags
     SetRenderPurposeTags(delegateParams);
 
     // Set MSAA as per Maya AntiAliasing settings
+    bool isMultiSampled = framecontext->getPostEffectEnabled(MHWRender::MFrameContext::kAntiAliasing);
+#ifdef VIEWPORT_TOOLBOX
+    _beautyFramePass->params().enableMultisampling = isMultiSampled;
+#else
     if (_isUsingHdSt)
     {  
-        // Maya's MSAA toggle settings
-        bool isMultiSampled = framecontext->getPostEffectEnabled(MHWRender::MFrameContext::kAntiAliasing);
-
         // Set MSAA on Color Buffer
         HdAovDescriptor colorAovDesc = _taskController->GetRenderOutputSettings(HdAovTokens->color);
         colorAovDesc.multiSampled = isMultiSampled;
@@ -983,12 +1001,21 @@ MStatus MtohRenderOverride::Render(
         depthAovDesc.multiSampled = isMultiSampled;        
         _taskController->SetRenderOutputSettings(HdAovTokens->depth, depthAovDesc);
     }
+#endif
 
-    _taskController->SetFreeCameraMatrices(
-        GetGfMatrixFromMaya(
-            drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx)),
-        GetGfMatrixFromMaya(
-            drawContext.getMatrix(MHWRender::MFrameContext::kProjectionMtx)));
+#ifdef VIEWPORT_TOOLBOX
+    // Disable color correction to let Maya take care of it
+    _beautyFramePass->params().enableColorCorrection = false;
+#endif
+
+    auto viewMatrix = GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx));
+    auto projectionMatrix = GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kProjectionMtx));
+#ifdef VIEWPORT_TOOLBOX
+    _beautyFramePass->params().viewInfo.viewMatrix = viewMatrix;
+    _beautyFramePass->params().viewInfo.projectionMatrix = projectionMatrix;
+#else
+    _taskController->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
+#endif
 
     if (delegateParams.motionSamplesEnabled()) {
         MStatus  status;
@@ -999,9 +1026,12 @@ MStatus MtohRenderOverride::Render(
             bool isMayaCamera = ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId();
             if (isMayaCamera) {
                 if (_mayaHydraSceneIndex) {
-                    params.camera = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
+                    SdfPath cameraPath = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
+#ifndef VIEWPORT_TOOLBOX
+                    params.camera = cameraPath;
+#endif
                     if (vpDirty)
-                        _mayaHydraSceneIndex->MarkSprimDirty(params.camera, HdCamera::DirtyParams);
+                        _mayaHydraSceneIndex->MarkSprimDirty(cameraPath, HdCamera::DirtyParams);
                 }
             }
         } else {
@@ -1013,21 +1043,35 @@ MStatus MtohRenderOverride::Render(
         }
     }
 
+#ifndef VIEWPORT_TOOLBOX
     _taskController->SetRenderParams(params);
     if (!params.camera.IsEmpty())
         _taskController->SetCameraPath(params.camera);
+#endif
 
     // Default color in usdview.
+#ifdef VIEWPORT_TOOLBOX
+    _beautyFramePass->params().selectionColor = _globals.colorSelectionHighlightColor;
+    _beautyFramePass->params().enableSelection = _globals.colorSelectionHighlight;
+#else
     _taskController->SetSelectionColor(_globals.colorSelectionHighlightColor);
     _taskController->SetEnableSelection(_globals.colorSelectionHighlight);
+#endif
 
+#ifndef VIEWPORT_TOOLBOX
     if (_globals.outlineSelectionWidth != 0.f) {
         _taskController->SetSelectionOutlineRadius(_globals.outlineSelectionWidth);
         _taskController->SetSelectionEnableOutline(true);
-    } else
+    } else {
         _taskController->SetSelectionEnableOutline(false);
+    }
+#endif
 
+#ifdef VIEWPORT_TOOLBOX
+    _beautyFramePass->params().collection = _renderCollection;
+#else
     _taskController->SetCollection(_renderCollection);
+#endif
 
     // Update all registered plugin before render.
     for (auto& entry : _sceneIndexRegistry->GetRegistrations()) {
@@ -1051,8 +1095,13 @@ MStatus MtohRenderOverride::Render(
 
         // The light & shadow parameters currently (19.11-20.08) are only used for tasks specific to
         // Storm
+#ifdef VIEWPORT_TOOLBOX
+        _beautyFramePass->SetEnableShadows(enableShadows);
+        _beautyFramePass->SetShadowParams(shadowParams);
+#else
         _taskController->SetEnableShadows(enableShadows);
         _taskController->SetShadowParams(shadowParams);
+#endif
         if (_mayaHydraSceneIndex) {
             _mayaHydraSceneIndex->SetShadowsEnabled(enableShadows);
         }
@@ -1098,7 +1147,11 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
         mhRenderTags.push_back(HdRenderTagTokens->proxy);
     if (delegateParams.guidePurpose)
         mhRenderTags.push_back(HdRenderTagTokens->guide);
+#ifdef VIEWPORT_TOOLBOX
+    _beautyFramePass->params().renderTags = mhRenderTags;
+#else
     _taskController->SetRenderTags(mhRenderTags);
+#endif
 }
 
 void MtohRenderOverride::_ClearMayaHydraSceneIndex()
@@ -1121,6 +1174,20 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     _initializationAttempted = true;
 
     GlfContextCaps::InitInstance();
+
+#ifdef VIEWPORT_TOOLBOX
+    agp::ViewportToolbox::RendererDescriptor beautyRendererDescriptor;
+    beautyRendererDescriptor.hgiDriver    = &_hgiDriver;
+    beautyRendererDescriptor.rendererName = _rendererDesc.rendererName;
+    agp::ViewportToolbox::ViewportEngine::CreateRenderer(_beautyRenderer, beautyRendererDescriptor);
+
+    agp::ViewportToolbox::FramePassDescriptor beautyFramePassDescriptor;
+    beautyFramePassDescriptor.renderIndex = _beautyRenderer->RenderIndex();
+    beautyFramePassDescriptor.uid         = pxr::SdfPath("/beautyPass");
+    _beautyFramePass = agp::ViewportToolbox::ViewportEngine::CreateFramePass(beautyFramePassDescriptor);
+
+    GetMayaHydraLibInterface().RegisterTerminalSceneIndex(_beautyRenderer->RenderIndex()->GetTerminalSceneIndex());
+#else
     _rendererPlugin
         = HdRendererPluginRegistry::GetInstance().GetRendererPlugin(_rendererDesc.rendererName);
     if (!_rendererPlugin)
@@ -1143,10 +1210,16 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
             this)))
     );
     _taskController->SetEnableShadows(true);
-    // Initialize the AOV system to render color for Storm
+#endif
+
+    // Initialize the AOV system to render color
+#ifdef VIEWPORT_TOOLBOX
+    _beautyFramePass->params().visualizeAOV = HdAovTokens->color;
+#else
     if (_isUsingHdSt) {
         _taskController->SetRenderOutputs({ HdAovTokens->color });
     }
+#endif
 
     // As per https://stackoverflow.com/questions/9982681
     // an initializer_list cannot be used in a ternary operator.
@@ -1156,7 +1229,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 
     MayaHydraInitData mhInitData(
         TfToken("MayaHydraSceneIndex"),
-        *_renderIndex,
+        *renderIndex(),
         MAYA_NATIVE_ROOT,
         _isUsingHdSt
     );
@@ -1168,13 +1241,17 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     // - Maya scene producer, which needs the render index proxy to insert
     //   itself.
 
-    _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(*_renderIndex);
+    _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(*renderIndex());
 
     _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, !_hasDefaultLighting);
     TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
     
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
+#ifdef VIEWPORT_TOOLBOX
+    _beautyFramePass->SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
+#else
     _engine.SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
+#endif
 
     _mayaHydraSceneIndex->Populate();
     //Add the scene index as an input scene index of the merging scene index
@@ -1234,7 +1311,12 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
             { _rendererDesc.rendererName, filterRenderer, fallbackToUserDefaults });
         _globals.ApplySettings(renderDelegate, _rendererDesc.rendererName);
     }
-    auto tasks = _taskController->GetRenderingTasks();
+    auto tasks = 
+#ifdef VIEWPORT_TOOLBOX
+    _beautyFramePass->GetRenderTasks();
+#else
+    _taskController->GetRenderingTasks();
+#endif
     for (auto task : tasks) {
         if (std::dynamic_pointer_cast<HdxColorizeSelectionTask>(task)) {
             _backupFrameBufferWorkaround = true;
@@ -1280,11 +1362,18 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _leadObjectPathTracker.reset();
     _oldDisplayStyle = 0;
     _oldRefineLevel = 0;
+
+#ifdef VIEWPORT_TOOLBOX
+    if (_beautyRenderer && _beautyRenderer->RenderIndex()) {
+        GetMayaHydraLibInterface().UnregisterTerminalSceneIndex(_beautyRenderer->RenderIndex()->GetTerminalSceneIndex());
+    }
+    _beautyFramePass.reset();
+    _beautyRenderer.reset();
+#else
     // Cleanup internal context data that keep references to data that is now
     // invalid.
     _engine.ClearTaskContextData();
 
-    _fileWriterArgs.clear();
     _taskController.reset();
 
     if (_renderIndex != nullptr) {
@@ -1302,6 +1391,9 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
         HdRendererPluginRegistry::GetInstance().ReleasePlugin(_rendererPlugin);
         _rendererPlugin = nullptr;
     }
+#endif
+
+    _fileWriterArgs.clear();
 
     //Decrease ref count on the render index proxy which owns the merging scene index at the end of this function as some previous calls may likely use it to remove some scene indices
     _renderIndexProxy.reset();
@@ -1673,10 +1765,14 @@ void MtohRenderOverride::_PickByRegion(
     }
 
     // Execute picking tasks.
+#ifdef VIEWPORT_TOOLBOX
+    _beautyFramePass->Pick(pickParams);
+#else
     HdTaskSharedPtrVector pickingTasks = _taskController->GetPickingTasks();
     VtValue               pickParamsValue(pickParams);
     _engine.SetTaskContextData(HdxPickTokens->pickParams, pickParamsValue);
     _engine.Execute(_taskController->GetRenderIndex(), &pickingTasks);
+#endif
 }
 
 bool MtohRenderOverride::select(
