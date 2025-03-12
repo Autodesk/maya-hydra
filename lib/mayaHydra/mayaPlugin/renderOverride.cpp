@@ -388,7 +388,20 @@ MtohRenderOverride::~MtohRenderOverride()
 
 HdRenderDelegate* MtohRenderOverride::_GetRenderDelegate()
 {
+#if VIEWPORT_TOOLBOX
+    return _beautyRenderer && _beautyRenderer->RenderIndex() ? _beautyRenderer->RenderIndex()->GetRenderDelegate() : nullptr;
+#else
     return _renderIndex ? _renderIndex->GetRenderDelegate() : nullptr;
+#endif
+}
+
+HdRenderDelegate* MtohRenderOverride::_GetRenderDelegate() const
+{
+#if VIEWPORT_TOOLBOX
+    return _beautyRenderer && _beautyRenderer->RenderIndex() ? _beautyRenderer->RenderIndex()->GetRenderDelegate() : nullptr;
+#else
+    return _renderIndex ? _renderIndex->GetRenderDelegate() : nullptr;
+#endif
 }
 
 void MtohRenderOverride::UpdateRenderGlobals(
@@ -431,9 +444,10 @@ VtValue MtohRenderOverride::_GetUsedGPUMemory() const
 {
     // Currently, only Storm is the known/tested renderer that provides GPU stats
     // via the Render Delegate.
-    if (_isUsingHdSt && _renderDelegate)
+    HdRenderDelegate* renderDelegate = _GetRenderDelegate();
+    if (_isUsingHdSt && renderDelegate)
     {
-        VtDictionary hdStRenderStat = _renderDelegate->GetRenderStats();
+        VtDictionary hdStRenderStat = renderDelegate->GetRenderStats();
         return hdStRenderStat[HdPerfTokens->gpuMemoryUsed.GetString()];
     }
     return VtValue();
@@ -469,7 +483,7 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
         return SdfPathVector();
     }
 
-    auto* renderIndex = instance->_renderIndex;
+    auto* renderIndex = instance->renderIndex();
     if (!renderIndex) {
         return SdfPathVector();
     }
@@ -1957,7 +1971,11 @@ MtohRenderOverride::sceneIndexRegistry() const
 
 HdRenderIndex* MtohRenderOverride::renderIndex() const
 {
+#if VIEWPORT_TOOLBOX
+    return _beautyRenderer ? _beautyRenderer->RenderIndex() : nullptr;
+#else
     return _renderIndex;
+#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

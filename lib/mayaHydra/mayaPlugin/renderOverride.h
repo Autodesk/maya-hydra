@@ -183,6 +183,7 @@ private:
     void              _RemovePanel(MString panelName);
     void              _DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext);
     HdRenderDelegate* _GetRenderDelegate();   
+    HdRenderDelegate* _GetRenderDelegate() const;
     void              _ClearMayaHydraSceneIndex();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void              _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
@@ -276,15 +277,17 @@ private:
     /// are destructed last. Hgi may be used during engine/delegate destruction.
     HgiUniquePtr                              _hgi;
     HdDriver                                  _hgiDriver;
+#if VIEWPORT_TOOLBOX
+    agp::ViewportToolbox::RenderIndexProxyPtr _beautyRenderer;
+    agp::ViewportToolbox::FramePassPtr _beautyFramePass;
+#else
     HdEngine                                  _engine;
     HdRendererPlugin*                         _rendererPlugin = nullptr;
     std::unique_ptr<HdxTaskController>        _taskController;
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
-    Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
-#if VIEWPORT_TOOLBOX
-    agp::ViewportToolbox::RenderIndexProxyPtr _beautyRenderer;
-    agp::ViewportToolbox::FramePassPtr _beautyFramePass;
+    HdRenderIndex*                            _renderIndex = nullptr;
 #endif
+    Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
     VtDictionary                              _fileWriterArgs{};
     HdSceneIndexBaseRefPtr                    _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
     HdSceneIndexBaseRefPtr                    _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
@@ -292,7 +295,6 @@ private:
     Fvp::PruneTexturesSceneIndexRefPtr        _pruneTexturesSceneIndex;
     Fvp::ReprSelectorSceneIndexRefPtr         _reprSelectorSceneIndex;
     Fvp::DefaultMaterialSceneIndexRefPtr      _defaultMaterialSceneIndex;
-    HdRenderIndex*                            _renderIndex = nullptr;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
     Fvp::SelectionPtr                         _selection;
