@@ -1113,7 +1113,6 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 
     MayaHydraInitData mhInitData(
         TfToken("MayaHydraSceneIndex"),
-        _engine,
         *_renderIndex,
         MAYA_NATIVE_ROOT,
         _isUsingHdSt
