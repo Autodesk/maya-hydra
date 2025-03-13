@@ -945,8 +945,8 @@ MStatus MtohRenderOverride::Render(
     }
 
 #ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->params().enableLighting = true;
-    _beautyFramePass->params().enableSceneMaterials = true;
+    _beautyFramePass->params().renderParams.enableLighting = true;
+    _beautyFramePass->params().renderParams.enableSceneMaterials = true;
 #else
     HdxRenderTaskParams params;
     params.enableLighting = true;
@@ -957,14 +957,14 @@ MStatus MtohRenderOverride::Render(
     if (Fvp::ColorPreferences::getInstance().getColor(
             FvpColorPreferencesTokens->wireframeSelection, wireframeSelectionColor)) {
 #ifdef VIEWPORT_TOOLBOX
-        _beautyFramePass->params().wireframeColor = wireframeSelectionColor;
+        _beautyFramePass->params().renderParams.wireframeColor = wireframeSelectionColor;
 #else
         params.wireframeColor = wireframeSelectionColor;
 #endif
     }
 
 #ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->params().cullStyle = HdCullStyleBackUnlessDoubleSided;
+    _beautyFramePass->params().renderParams.cullStyle = HdCullStyleBackUnlessDoubleSided;
 #else
     params.cullStyle = HdCullStyleBackUnlessDoubleSided;
 #endif
@@ -978,6 +978,7 @@ MStatus MtohRenderOverride::Render(
         _viewport = GfVec4d(0, 0, width, height);
 #ifdef VIEWPORT_TOOLBOX
         _beautyFramePass->params().renderBufferSize = GfVec2i(width, height);
+        _beautyFramePass->params().viewInfo.viewport = {{0,0}, {width, height}};
 #else
         _taskController->SetRenderViewport(_viewport);
 #endif
@@ -1029,7 +1030,9 @@ MStatus MtohRenderOverride::Render(
             if (isMayaCamera) {
                 if (_mayaHydraSceneIndex) {
                     SdfPath cameraPath = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
-#ifndef VIEWPORT_TOOLBOX
+#ifdef VIEWPORT_TOOLBOX
+                    _beautyFramePass->params().renderParams.camera = cameraPath;
+#else
                     params.camera = cameraPath;
 #endif
                     if (vpDirty)
