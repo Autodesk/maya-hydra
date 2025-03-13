@@ -708,6 +708,7 @@ MStatus MtohRenderOverride::Render(
         _engine.Execute(_renderIndex, &tasks);
 #endif
 
+#ifndef VIEWPORT_TOOLBOX
         const auto fileName = Fvp::ImageBufferWriter::GetFileName();
         if (!fileName.empty()) {
             if (!Fvp::ImageBufferWriter::Write(_fileWriterArgs, fileName)) {
@@ -715,6 +716,7 @@ MStatus MtohRenderOverride::Render(
                                  fileName.c_str());
             }
         }
+#endif
 
         // HdTaskController will query all of the tasks it can for IsConverged.
         // This includes HdRenderPass::IsConverged and HdRenderBuffer::IsConverged (via colorizer).
@@ -1223,9 +1225,11 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 
     // As per https://stackoverflow.com/questions/9982681
     // an initializer_list cannot be used in a ternary operator.
+#ifndef VIEWPORT_TOOLBOX
     _fileWriterArgs = _hgi ? VtDictionary{
       {{"hgi", VtValue(_hgi.get())}, {"engine", VtValue(&_engine)}}} :
       VtDictionary{{{"taskController", VtValue(_taskController.get())}}}; 
+#endif
 
     MayaHydraInitData mhInitData(
         TfToken("MayaHydraSceneIndex"),
