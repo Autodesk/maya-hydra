@@ -96,18 +96,23 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         # independently of their visual look since it can vary between versions.
         self.assertSnapshotSilhouetteClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-    def checkFilter(self, name, exclusionMask, cameraDistance=15):
+    def checkFilter(self, name, exclusionMask, cameraDistance=15, postFix=""):
         activeViewport = mayaUtils.activeModelPanel()
         oldMask = cmds.modelEditor(activeViewport, query=True, excludeObjectMask=True)
 
         # Should start by being included
         self.assertEqual(oldMask & exclusionMask, 0)
-        self.compareSnapshot(name + "_included.png", cameraDistance)
+        self.compareSnapshot(name + "_included" + postFix + ".png", cameraDistance)
 
         # Exclude and ensure the items are no longer displayed
-        newMask = oldMask | exclusionMask
-        cmds.modelEditor(activeViewport, edit=True, excludeObjectMask=newMask)
-        self.compareSnapshot(name + "_excluded.png", cameraDistance)
+        if (postFix == ""):
+            #We do this only when there is no postFix.
+            #There is a non empty postFix name for usd lights only, and the viewport filters for usd 
+            #lights are broken in the latest version of Maya and MayaUSD, this is logged.
+            #So we skip that exclude test in this case.
+            newMask = oldMask | exclusionMask
+            cmds.modelEditor(activeViewport, edit=True, excludeObjectMask=newMask)
+            self.compareSnapshot(name + "_excluded.png", cameraDistance)
 
         # Restore old mask
         cmds.modelEditor(activeViewport, edit=True, excludeObjectMask=oldMask)
@@ -306,7 +311,9 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
             cmds.select(usdLightName)
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         self.stackInstances(functools.partial(createUsdLight, stagePath), 50, [0.005, 0, 0])
-        self.checkFilter("lights_USD", kExcludeLights, 2)
+        #if mayaUtils.ufeSupportFixLevel() >= 9, the usd lights gizmo changed so we must use an updated image which has "_ufe_fl9" as a postfix.
+        postFix = "_ufe_fl9" if mayaUtils.ufeSupportFixLevel() >= 9 else ""
+        self.checkFilter("lights_USD", kExcludeLights, 2, postFix)
 
     # --- 3rd party data producers ---
 
