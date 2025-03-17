@@ -1225,6 +1225,9 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 #endif
 
 #ifdef VIEWPORT_TOOLBOX
+    // Note that if there are multiple passes and they share render buffers,
+    // the resulting image will depend on when the image writing code is 
+    // called, rather than which frame pass is passed as an argument.
     _fileWriterArgs = VtDictionary{{"framePass", VtValue(_beautyFramePass.get())}};
     if (_hgi) {
         _fileWriterArgs.SetValueAtPath("hgi", VtValue(_hgi.get()));
