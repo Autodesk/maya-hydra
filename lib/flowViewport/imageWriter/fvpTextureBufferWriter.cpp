@@ -16,6 +16,10 @@
 
 #include <flowViewport/imageWriter/fvpTextureBufferWriter.h>
 
+#ifdef VIEWPORT_TOOLBOX
+#include <AGP/ViewportToolbox/ViewportEngine/FramePass.h>
+#endif
+
 #include <pxr/imaging/hd/engine.h>
 #include <pxr/imaging/hdx/types.h>
 #include <pxr/base/vt/value.h>
@@ -25,32 +29,25 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-template<typename T>
-T* getPtr(const VtDictionary& args, const char* key)
-{
-    auto found = args.find(key);
-    if (found == args.end() || 
-	!found->second.IsHolding<T*>()) {
-        return nullptr;
-    }
-
-    return found->second.Get<T*>();
-}
-
 HgiTextureHandle getTextureHandle(
     const VtDictionary& args,
     const TfToken&      aovToken
 )
 {
-    auto engine = getPtr<HdEngine>(args, "engine");
-    if (!engine) {
-        return {};
+#ifdef VIEWPORT_TOOLBOX
+    auto framePass = Fvp::ImageBufferWriter::GetPtr<agp::ViewportToolbox::FramePass>(args, "framePass");
+    if (framePass) {
+        return framePass ? framePass->GetRenderTexture(aovToken) : HgiTextureHandle();
     }
-
-    VtValue aov;
-    return (engine->GetTaskContextData(aovToken, &aov) &&
-	    aov.IsHolding<HgiTextureHandle>()) ?
-      aov.Get<HgiTextureHandle>() : HgiTextureHandle();
+#else
+    auto engine = Fvp::ImageBufferWriter::GetPtr<HdEngine>(args, "engine");
+    if (engine) {
+        VtValue aov;
+        return (engine->GetTaskContextData(aovToken, &aov) && aov.IsHolding<HgiTextureHandle>()) ? 
+            aov.Get<HgiTextureHandle>() : HgiTextureHandle();
+    }
+#endif
+    return {};
 }
 
 }
@@ -62,7 +59,7 @@ TextureBufferWriter::TextureBufferWriter(
     const TfToken&      aov
 ) : ImageBufferWriter(), 
     _textureHandle(getTextureHandle(args, aov)),
-    _hgi(getPtr<Hgi>(args, "hgi"))
+    _hgi(Fvp::ImageBufferWriter::GetPtr<Hgi>(args, "hgi"))
 {}
 
 unsigned int TextureBufferWriter::Dim(unsigned int i) const

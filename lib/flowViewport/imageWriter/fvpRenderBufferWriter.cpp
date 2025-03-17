@@ -16,6 +16,10 @@
 
 #include <flowViewport/imageWriter/fvpRenderBufferWriter.h>
 
+#ifdef VIEWPORT_TOOLBOX
+#include <AGP/ViewportToolbox/ViewportEngine/FramePass.h>
+#endif
+
 #include <pxr/imaging/hdSt/hioConversions.h>
 #include <pxr/imaging/hdx/taskController.h>
 #include <pxr/imaging/hd/renderBuffer.h>
@@ -30,13 +34,18 @@ HdRenderBuffer* getRenderBuffer(
     const PXR_NS::TfToken& aovToken
 )
 {
-    auto found = args.find("taskController");
-    if (found == args.end() || !found->second.IsHolding<HdxTaskController*>()) {
-        return nullptr;
+#ifdef VIEWPORT_TOOLBOX
+    auto framePass = Fvp::ImageBufferWriter::GetPtr<agp::ViewportToolbox::FramePass>(args, "framePass");
+    if (framePass) {
+        return framePass ? framePass->GetRenderBuffer(aovToken) : nullptr;
     }
-
-    auto taskController = found->second.Get<HdxTaskController*>();
-    return taskController ? taskController->GetRenderOutput(aovToken) : nullptr;
+#else
+    auto taskController = Fvp::ImageBufferWriter::GetPtr<HdxTaskController>(args, "taskController");
+    if (taskController) {
+        return taskController ? taskController->GetRenderOutput(aovToken) : nullptr;
+    }
+#endif
+    return nullptr;
 }
 
 }
