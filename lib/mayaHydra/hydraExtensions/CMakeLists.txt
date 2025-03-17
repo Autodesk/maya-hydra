@@ -59,7 +59,6 @@ target_include_directories(${TARGET_NAME}
             PRIVATE
                 $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
                 $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSD_INCLUDE_DIR}>
-                $<$<BOOL:${BUILD_WITH_VIEWPORT_TOOLBOX}>:${VIEWPORTTOOLBOX_INCLUDE_DIR}>
 )
 
 target_compile_definitions(${TARGET_NAME}
@@ -128,8 +127,6 @@ target_link_libraries(${TARGET_NAME}
         ${PYTHON_LIBRARIES} 
         $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSDAPI_LIBRARY}>
-        $<$<BOOL:${BUILD_WITH_VIEWPORT_TOOLBOX}>:${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_LIB}>
-        $<$<BOOL:${BUILD_WITH_VIEWPORT_TOOLBOX}>:${VIEWPORTTOOLBOX_VISUALSTYLES_LIB}>
 )
 
 # -----------------------------------------------------------------------------
@@ -203,16 +200,6 @@ if(IS_WINDOWS)
         install(FILES $<TARGET_PDB_FILE:${TARGET_NAME}> 
                 DESTINATION ${CMAKE_INSTALL_PREFIX}/lib OPTIONAL)
     endif()
-endif()
-
-if (BUILD_WITH_VIEWPORT_TOOLBOX AND IS_WINDOWS)
-    install(
-        FILES 
-            ${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH}/agp_viewport_toolbox.dll
-            ${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH}/agp_viewport_toolbox.pdb
-        DESTINATION 
-            ${CMAKE_INSTALL_PREFIX}/lib
-    )
 endif()
 
 # -----------------------------------------------------------------------------

@@ -55,7 +55,6 @@ target_include_directories(${TARGET_NAME}
     PRIVATE
         $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSD_INCLUDE_DIR}>
-        $<$<BOOL:${BUILD_WITH_VIEWPORT_TOOLBOX}>:${VIEWPORTTOOLBOX_INCLUDE_DIR}>
 )
 
 if(DEFINED MAYAUSD_VERSION)
@@ -84,8 +83,6 @@ target_link_libraries(${TARGET_NAME}
         flowViewport
         $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSDAPI_LIBRARY}>
-        $<$<BOOL:${BUILD_WITH_VIEWPORT_TOOLBOX}>:${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_LIB}>
-        $<$<BOOL:${BUILD_WITH_VIEWPORT_TOOLBOX}>:${VIEWPORTTOOLBOX_VISUALSTYLES_LIB}>
 )
 
 # -----------------------------------------------------------------------------
