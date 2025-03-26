@@ -115,8 +115,6 @@ message(STATUS "   PYTHON_INCLUDE_DIRS = ${PYTHON_INCLUDE_DIRS}")
 message(STATUS "   PYTHON_LIBRARIES    = ${PYTHON_LIBRARIES}")
 message(STATUS "   Python_EXECUTABLE   = ${Python_EXECUTABLE}")
 
-find_package(Vulkan REQUIRED)
-
 find_package(USD 0.22.11 REQUIRED)
 if (CMAKE_WANT_MATERIALX_BUILD)
     # Requires at least USD 22.11 for hdMtlx module and USD must have been built with MaterialX:
