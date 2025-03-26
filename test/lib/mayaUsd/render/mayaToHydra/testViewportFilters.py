@@ -105,14 +105,9 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         self.compareSnapshot(name + "_included" + postFix + ".png", cameraDistance)
 
         # Exclude and ensure the items are no longer displayed
-        if (postFix == ""):
-            #We do this only when there is no postFix.
-            #There is a non empty postFix name for usd lights only, and the viewport filters for usd 
-            #lights are broken in the latest version of Maya and MayaUSD, this is logged.
-            #So we skip that exclude test in this case.
-            newMask = oldMask | exclusionMask
-            cmds.modelEditor(activeViewport, edit=True, excludeObjectMask=newMask)
-            self.compareSnapshot(name + "_excluded.png", cameraDistance)
+        newMask = oldMask | exclusionMask
+        cmds.modelEditor(activeViewport, edit=True, excludeObjectMask=newMask)
+        self.compareSnapshot(name + "_excluded.png", cameraDistance)
 
         # Restore old mask
         cmds.modelEditor(activeViewport, edit=True, excludeObjectMask=oldMask)
