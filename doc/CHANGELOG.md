@@ -1,5 +1,81 @@
 # Changelog
 
+## [v0.7.0] - 2025-03-26
+
+**Build:**
+* Support compilation with usd 24.08 [#172](https://github.com/Autodesk/maya-hydra/pull/172)
+* Disable testMayaDefaultMaterial on Mac [#173](https://github.com/Autodesk/maya-hydra/pull/173)
+* Disable two cases to satisfy USD 24.08 [#174](https://github.com/Autodesk/maya-hydra/pull/174)
+* Re-enable case testMayaDefaultMaterial [#175](https://github.com/Autodesk/maya-hydra/pull/175)
+* Disable testUSDLights for old Maya temporarily to unblock 2025 cut update jobs [#176](https://github.com/Autodesk/maya-hydra/pull/176)
+* Revert cmake_minimum_required change change [#178](https://github.com/Autodesk/maya-hydra/pull/178)
+* Re-enable the testMaterialXOnNative case after for new lookdevX with usd 24.08 [#181](https://github.com/Autodesk/maya-hydra/pull/181)
+* Hydra-1215 - rebaseline testUSDLights as MayaUSD added new light gizmos for usd lights [#183](https://github.com/Autodesk/maya-hydra/pull/183)
+* Disable failed cases related to cut update temporarily [#191](https://github.com/Autodesk/maya-hydra/pull/191)
+* Re-instated BasicRender and DagChanges unit tests [#203](https://github.com/Autodesk/maya-hydra/pull/203)
+* Refactored test case plugin loading and unloading [#204](https://github.com/Autodesk/maya-hydra/pull/204)
+* Disable two tests to make cut update job happy [#205](https://github.com/Autodesk/maya-hydra/pull/205)
+* Prepare code and unit test for usd 24.11 [#206](https://github.com/Autodesk/maya-hydra/pull/206)
+* Updated baseline images for more reliable error detection [#214](https://github.com/Autodesk/maya-hydra/pull/214)
+* Re-eanble testUSDLights and testOpenPBRSurface with new baselines [#213](https://github.com/Autodesk/maya-hydra/pull/213)
+* Disable failing tests with usd 24.11 [#217](https://github.com/Autodesk/maya-hydra/pull/217)
+* Add a unit test for selection highlight of usd instancea… [#218](https://github.com/Autodesk/maya-hydra/pull/218)
+* Fix for random test failure on Windows 11 [#219](https://github.com/Autodesk/maya-hydra/pull/219)
+* Disable testStageInstanceablePrimsSelHighlight on Mac [#220](https://github.com/Autodesk/maya-hydra/pull/220)
+* Re-enable 2 failing tests now that selection highlight o… [#221](https://github.com/Autodesk/maya-hydra/pull/221)
+* Re-enable tests with mtoa and lookdevX builds compatible… [#223](https://github.com/Autodesk/maya-hydra/pull/223)
+* Exclude light gizmo impact for usdLight test [#225](https://github.com/Autodesk/maya-hydra/pull/225)
+* Increase the image comparison threshold [#227](https://github.com/Autodesk/maya-hydra/pull/227)
+* Selection highlighting, picking of MhFootPrint node, with test [#228](https://github.com/Autodesk/maya-hydra/pull/228)
+
+**Features:**
+* Connect isolate select to Maya UI, and empty isolate selection correctness [#177](https://github.com/Autodesk/maya-hydra/pull/177)
+* Native instancing isolate select support, with test [#186](https://github.com/Autodesk/maya-hydra/pull/186)
+* Add support for display of VtArray<bool> to Hydra scene browser [#187](https://github.com/Autodesk/maya-hydra/pull/187)
+* Support translation of openPBR [#193](https://github.com/Autodesk/maya-hydra/pull/193)
+* Support Arnold area light nodes in maya hydra [#202](https://github.com/Autodesk/maya-hydra/pull/202)
+* Remove lighted prefix from hydra scene hierarchy [#211](https://github.com/Autodesk/maya-hydra/pull/211)
+* Support dome lights in the GLSL shader and add a unit te… [#229](https://github.com/Autodesk/maya-hydra/pull/229)
+* Change specular Color to have an update when changing th… [#232](https://github.com/Autodesk/maya-hydra/pull/232)
+* Viewport filters for Hydra data [#189](https://github.com/Autodesk/maya-hydra/pull/189)
+
+**Flow Viewport Toolkit:**
+* Disconnected Fvp::PathInterface in code base, replaced with path mapper [#215](https://github.com/Autodesk/maya-hydra/pull/215)
+
+**Miscellaneous:**
+* Set HDST_RENDER_SELECTED_EDGE_FROM_FACE as 0 by default [#171](https://github.com/Autodesk/maya-hydra/pull/171)
+* Merge v0.6.3 to dev [#188](https://github.com/Autodesk/maya-hydra/pull/188)
+* Tremblp/hydra 1235/isolate select point instancing [#190](https://github.com/Autodesk/maya-hydra/pull/190)
+* Remove the geometry shader optimization env var [#222](https://github.com/Autodesk/maya-hydra/pull/222)
+* Remove call to path interface from pruning scene index [#235](https://github.com/Autodesk/maya-hydra/pull/235)
+
+**Bugfix:**
+* Fix Bifrost graphs can't be displayed in Hydra viewport [#170](https://github.com/Autodesk/maya-hydra/pull/170)
+* Fix Linux warning as error build break [#179](https://github.com/Autodesk/maya-hydra/pull/179)
+* Fix putenv not working on linux/mac [#180](https://github.com/Autodesk/maya-hydra/pull/180)
+* Fix and re-enable case testSceneBrowser [#182](https://github.com/Autodesk/maya-hydra/pull/182)
+* Remove incorrect Populate() on invalidate [#184](https://github.com/Autodesk/maya-hydra/pull/184)
+* Fix crash when switching to another render delegate [#185](https://github.com/Autodesk/maya-hydra/pull/185)
+* Fix and reenable failed cases [#192](https://github.com/Autodesk/maya-hydra/pull/192)
+* Select prim without data source must not crash [#194](https://github.com/Autodesk/maya-hydra/pull/194)
+* Fix translation of coat parameters from standardsurface and openpbrsuface [#195](https://github.com/Autodesk/maya-hydra/pull/195)
+* Added cleanup code such that all code coverage run tests pass [#196](https://github.com/Autodesk/maya-hydra/pull/196)
+* Moved isolate select scene index creation to avoid losing isolate sel… [#197](https://github.com/Autodesk/maya-hydra/pull/197)
+* Fixed selection highlighting removed on Maya object by isolate select [#198](https://github.com/Autodesk/maya-hydra/pull/198)
+* Each stage should only respond to its own stage invalidation notices [#199](https://github.com/Autodesk/maya-hydra/pull/199)
+* Disable mayaHydra isolate select when VP2 is the viewport renderer [#200](https://github.com/Autodesk/maya-hydra/pull/200)
+* Fix default maya material is not picked up correctly [#201](https://github.com/Autodesk/maya-hydra/pull/201)
+* Added missing path to MAYA_SCRIPT_PATH [#208](https://github.com/Autodesk/maya-hydra/pull/208)
+* Fix error with aiAreaLight at hydra startup [#209](https://github.com/Autodesk/maya-hydra/pull/209)
+* Avoid attempting to add a numeric component to an SdfPath [#207](https://github.com/Autodesk/maya-hydra/pull/207)
+* Fix doubleSided and CullStyle for MRenderItem [#210](https://github.com/Autodesk/maya-hydra/pull/210)
+* Various fixes for the custom GLSLFX shader [#224](https://github.com/Autodesk/maya-hydra/pull/224)
+* Fix a freeze with Mtx openpbr deletion [#230](https://github.com/Autodesk/maya-hydra/pull/230)
+* Fix when no extent attribute is provided in a prim in th… [#231](https://github.com/Autodesk/maya-hydra/pull/231)
+
+**Documentation:**
+* Update documentation [#233](https://github.com/Autodesk/maya-hydra/pull/233)
+
 ## [v0.6.3] - 2024-09-10
 
 **Build:**
