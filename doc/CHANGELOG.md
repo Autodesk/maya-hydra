@@ -28,7 +28,6 @@
 * Increase the image comparison threshold [#227](https://github.com/Autodesk/maya-hydra/pull/227)
 * Selection highlighting, picking of MhFootPrint node, with test [#228](https://github.com/Autodesk/maya-hydra/pull/228)
 
-
 **Features:**
 * Connect isolate select to Maya UI, and empty isolate selection correctness [#177](https://github.com/Autodesk/maya-hydra/pull/177)
 * Native instancing isolate select support, with test [#186](https://github.com/Autodesk/maya-hydra/pull/186)
