@@ -512,7 +512,7 @@ def BuildAndInstall(context, buildArgs, stages):
                              .format(mayaUsdLocation=context.mayaUsdLocation))
         
         if context.mtoaLocation:
-            extraArgs.append('-DMTOAUSD_LOCATION="{mtoaLocation}"' 
+            extraArgs.append('-DMTOA_LOCATION="{mtoaLocation}"' 
                              .format(mtoaLocation=context.mtoaLocation))
         
         if context.lookdevxLocation:
