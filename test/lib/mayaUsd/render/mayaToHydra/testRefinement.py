@@ -16,13 +16,20 @@ import maya.cmds as cmds
 
 import fixturesUtils
 import mtohUtils
+import platform
 import testUtils
 
 class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
-    IMAGEDIFF_FAIL_PERCENT = 0.1
+
+    @property
+    def IMAGEDIFF_FAIL_PERCENT(self):
+        # basisCurves are slightly thinner on OSX
+        if platform.system() == "Darwin":
+            return 1
+        return 0.1
 
     #This function is called before each test is launched
     def setUp(self):
