@@ -1324,11 +1324,25 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
             { _rendererDesc.rendererName, filterRenderer, fallbackToUserDefaults });
         _globals.ApplySettings(renderDelegate, _rendererDesc.rendererName);
     }
-    auto tasks = 
+
 #ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->GetRenderTasks();
+    // We need to setup the viewport and matrices to avoid warnings
+    // when calling GetRenderTasks; they will get updated when 
+    // actual rendering occurs anyway.
+    int width = 0;
+    int height = 0;
+    drawContext.getRenderTargetSize(width, height);
+    _beautyFramePass->params().renderBufferSize = GfVec2i(width, height);
+    _beautyFramePass->params().viewInfo.viewport = {{0,0}, {width, height}};
+
+    auto viewMatrix = GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx));
+    auto projectionMatrix = GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kProjectionMtx));
+    _beautyFramePass->params().viewInfo.viewMatrix = viewMatrix;
+    _beautyFramePass->params().viewInfo.projectionMatrix = projectionMatrix;
+
+    auto tasks = _beautyFramePass->GetRenderTasks();
 #else
-    _taskController->GetRenderingTasks();
+    auto tasks = _taskController->GetRenderingTasks();
 #endif
     for (auto task : tasks) {
         if (std::dynamic_pointer_cast<HdxColorizeSelectionTask>(task)) {
