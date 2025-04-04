@@ -38,6 +38,16 @@ struct _StyleInfo
     HdDataSourceBaseHandle refineLevelDs;
 };
 
+const std::set<TfToken> kSupportedPrimTypes = {
+    HdPrimTypeTokens->mesh,
+    HdPrimTypeTokens->basisCurves,
+};
+
+bool _IsSupportedPrimType(const TfToken& primType)
+{
+    return kSupportedPrimTypes.find(primType) != kSupportedPrimTypes.cend();
+}
+
 /// Data source for locator displayStyle.
 class _DisplayStyleDataSource : public HdContainerDataSource
 {
@@ -102,7 +112,7 @@ DisplayStyleOverrideSceneIndex::GetPrim(
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     if (prim.dataSource) {
-        if (!isExcluded(primPath) && prim.primType == HdPrimTypeTokens->mesh) {
+        if (!isExcluded(primPath) && _IsSupportedPrimType(prim.primType)) {
             prim.dataSource =
                 HdOverlayContainerDataSource::New(
                     _overlayDs, prim.dataSource);
