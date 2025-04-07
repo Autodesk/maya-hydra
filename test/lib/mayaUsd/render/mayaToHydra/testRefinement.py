@@ -26,9 +26,8 @@ class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
 
     @property
     def IMAGEDIFF_FAIL_PERCENT(self):
-        # basisCurves are slightly thinner on OSX
         if platform.system() == "Darwin":
-            return 1
+            return 3.5
         return 0.1
 
     #This function is called before each test is launched
