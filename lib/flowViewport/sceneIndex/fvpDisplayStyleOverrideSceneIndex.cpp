@@ -28,15 +28,23 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace DisplayStyleSceneIndex_Impl
 {
 
-using OptionalInt = DisplayStyleOverrideSceneIndex::OptionalInt;
-
 struct _StyleInfo
 {
-    OptionalInt refineLevel;
+    std::optional<int> refineLevel;
     /// Retained data source storing refineLevel (or null ptr if empty optional
     /// value) to avoid allocating a data source for every prim.
     HdDataSourceBaseHandle refineLevelDs;
 };
+
+const std::set<TfToken> kSupportedPrimTypes = {
+    HdPrimTypeTokens->mesh,
+    HdPrimTypeTokens->basisCurves,
+};
+
+bool _IsSupportedPrimType(const TfToken& primType)
+{
+    return kSupportedPrimTypes.find(primType) != kSupportedPrimTypes.cend();
+}
 
 /// Data source for locator displayStyle.
 class _DisplayStyleDataSource : public HdContainerDataSource
@@ -102,7 +110,7 @@ DisplayStyleOverrideSceneIndex::GetPrim(
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     if (prim.dataSource) {
-        if (!isExcluded(primPath) && prim.primType == HdPrimTypeTokens->mesh) {
+        if (!isExcluded(primPath) && _IsSupportedPrimType(prim.primType)) {
             prim.dataSource =
                 HdOverlayContainerDataSource::New(
                     _overlayDs, prim.dataSource);
@@ -120,7 +128,7 @@ DisplayStyleOverrideSceneIndex::GetChildPrimPaths(
 
 void
 DisplayStyleOverrideSceneIndex::SetRefineLevel(
-    const OptionalInt &refineLevel)
+    const std::optional<int> &refineLevel)
 {
     if (refineLevel == _styleInfo->refineLevel) {
         return;
@@ -208,24 +216,6 @@ bool DisplayStyleOverrideSceneIndex::isExcluded(
         }
     }
     return false;
-}
-
-bool operator==(
-    const DisplayStyleOverrideSceneIndex::OptionalInt &a,
-    const DisplayStyleOverrideSceneIndex::OptionalInt &b)
-{
-    if (a.hasValue == false && b.hasValue == false) {
-        return true;
-    }
-
-    return a.hasValue == b.hasValue && a.value == b.value;
-}
-
-bool operator!=(
-    const DisplayStyleOverrideSceneIndex::OptionalInt &a,
-    const DisplayStyleOverrideSceneIndex::OptionalInt &b)
-{
-    return !(a == b);
 }
 
 } //end of namespace FVP_NS_DEF

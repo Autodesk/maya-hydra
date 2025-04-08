@@ -823,7 +823,7 @@ MStatus MtohRenderOverride::Render(
     }
 
     if (_displayStyleSceneIndex) {
-       _displayStyleSceneIndex->SetRefineLevel({true, delegateParams.refineLevel});
+       _displayStyleSceneIndex->SetRefineLevel(delegateParams.refineLevel);
     }
 
     // Update "Show" menu filters
