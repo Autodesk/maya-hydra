@@ -57,16 +57,6 @@ public:
     FVP_API
     PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath &primPath) const override;
 
-    /// A replacement for std::optional<int> that is not available until C++17.
-    struct OptionalInt
-    {
-        bool hasValue = false;
-        int value = 0;
-
-        operator bool() const { return hasValue; }
-        int operator*() const { return value; }
-    };
-
     /// Sets the refine level (at data source locator displayStyle:refineLevel)
     /// for every prim in the input scene inedx.
     ///
@@ -74,7 +64,7 @@ public:
     /// returned for the data source locator.
     ///
     FVP_API
-    void SetRefineLevel(const OptionalInt &refineLevel);
+    void SetRefineLevel(const std::optional<int> &refineLevel);
 
     FVP_API
     void addExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot);
@@ -112,16 +102,6 @@ private:
     /// Prim overlay data source.
     PXR_NS::HdContainerDataSourceHandle const _overlayDs;
 };
-
-HDSI_API
-bool operator==(
-    const DisplayStyleOverrideSceneIndex::OptionalInt &a,
-    const DisplayStyleOverrideSceneIndex::OptionalInt &b);
-
-HDSI_API
-bool operator!=(
-    const DisplayStyleOverrideSceneIndex::OptionalInt &a,
-    const DisplayStyleOverrideSceneIndex::OptionalInt &b);
 
 } //end of namespace FVP_NS_DEF
 
