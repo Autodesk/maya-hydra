@@ -46,7 +46,7 @@ To build MayaUSD, see the github page https://github.com/Autodesk/maya-usd/blob/
 
 The Universal Front End (UFE) is a DCC-agnostic component that allows Maya to browse and edit data in multiple data models. This allows Maya to edit pipeline data such as USD. UFE comes installed as a built-in component with Maya 2019 and later. UFE is developed as a separate binary component, and therefore versioned separately from Maya.
 
-| Ufe Version | Maya Version | Ufe Docs (external) |
+| UFE Version | Maya Version | UFE Docs (external) |
 |-|-|:-:|
 | v4.2.0<br>v6.0.0 | Maya 2025<br>Maya 2026 | https://help.autodesk.com/view/MAYADEV/2025/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
 
