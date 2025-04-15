@@ -8,33 +8,33 @@ The simplest way to build the project is by running the supplied **build.py** sc
 
 Before building the project, consult the following table to ensure you use the recommended version of compiler, operating system, cmake, etc. 
 
-|        Required       | ![](images/windows.png)   |                            ![](images/mac.png)               |   ![](images/linux.png)     |
-|:---------------------:|:-------------------------:|:------------------------------------------------------------:|:---------------------------:|
-|    Operating System   |         Windows 10 <br> Windows 11 | High Sierra (10.13)<br>Mojave (10.14)<br>Catalina (10.15)<br>Big Sur (11.2.x)    |      Rocky Linux 8.6 / Linux® Red Hat® Enterprise 8.6 WS             |
-|   Compiler Requirement| Maya 2024 (VS 2022)<br>Maya 2025 (VS 2022) | Maya 2024 (Xcode 13.4 or higher)<br>Maya 2025 (Xcode 13.4 or higher) | Maya 2024 (gcc 11.2.1)<br>Maya 2025 (gcc 11.2.1) |
-| CMake Version (min/max) |        3.14...3.30      |                              3.14...3.30                     |           3.14...3.30       |
-|         Python        | 3.10.8, 3.11.4  |                       3.10.8, 3.11.4               |  3.10.8, 3.11.4   |
-|    Python Packages    | PyYAML, PySide, PyOpenGL        | PyYAML, PySide2, PyOpenGL              | PyYAML, PySide, PyOpenGL |
-|    Build generator    | Visual Studio, Ninja (Recommended)    |  XCode, Ninja (Recommended)                      |    Ninja (Recommended)      |
-|    Command processor  | x64 Native Tools Command Prompt for VS 2022 |                     bash                |             bash            |
-| Supported Maya Version|  2024, 2025, PR   |                   2024, 2025, PR                    |   2024, 2025, PR    |
+| Required | ![](images/windows.png) | ![](images/mac.png) | ![](images/linux.png) |
+|:-:|:-:|:-:|:-:|
+| Operating System | Windows 10 <br> Windows 11 | High Sierra (10.13)<br>Mojave (10.14)<br>Catalina (10.15)<br>Big Sur (11.2.x) | Rocky Linux 8.6 / Linux® Red Hat® Enterprise 8.6 WS |
+| Compiler Requirement| Maya 2025 (VS 2022)<br>Maya 2026 (VS 2022) | Maya 2025 (Xcode 13.4 or higher)<br>Maya 2026 (Xcode 13.4 or higher) | Maya 2025 (gcc 11.2.1)<br>Maya 2026 (gcc 11.2.1) |
+| CMake Version (min/max) | 3.14...3.30 | 3.14...3.30 | 3.14...3.30 |
+| Python | 3.11.4, 3.11.9 | 3.11.4, 3.11.9 | 3.11.4, 3.11.9 |
+| Python Packages | PyYAML, PySide, PyOpenGL | PyYAML, PySide2, PyOpenGL | PyYAML, PySide, PyOpenGL |
+| Build generator | Visual Studio, Ninja (Recommended) | XCode, Ninja (Recommended) | Ninja (Recommended) |
+| Command processor | x64 Native Tools Command Prompt for VS 2022 | bash | bash |
+| Supported Maya Version | 2025, 2026 | 2025, 2026 | 2025, 2026 |
 
-|        Optional       | ![](images/windows.png)   |                            ![](images/mac.png)               |   ![](images/linux.png)     |
+>Note: Maya 2024 is not officially supported. For more details about building for Maya 2024, [see this example.](./rebuildingWithCustomOpenUSDAndPreviousMayaVersion.md)
 
-***NOTE:*** Visit the online Maya developer help document under ***Setting up your build environment*** for additional compiler requirements on different platforms.
+>Note: Visit the online Maya developer help document under ***Setting up your build environment*** for additional compiler requirements on different platforms.
 
 #### 2. Download and Build Pixar USD 
 
 See Pixar's official github page for instructions on how to build USD: https://github.com/PixarAnimationStudios/USD.<BR> 
 If you want to <B>be able to import usd data in maya through [MayaUSD](https://github.com/Autodesk/maya-usd) and use a hydra render delegate in the viewport, you have to rebuild MayaHydra with the same version used by MayaUSD </B>which is a customized version of OpenUSD, these versions are :
 
-|               |      ![](images/pxr.png)          | USD version used in Maya | USD source for MayaUSD / MayaHydra |
-|:------------: |:---------------:                  |:------------------------:|:-------------------------:|
-|  CommitID/Tags | [v22.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v22.11)<BR>[v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11)<BR>[v24.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.11) |Maya 2024 = v22.11<br>Maya 2025 = v23.11<br>Maya PR = v24.11| [v22.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v22.11-MayaUsd-Public)<br>[v23.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v23.11-MayaUsd-Public)<br>[v24.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v24.11-MayaUsd-Public) |
+| | ![](images/pxr.png) | USD version used in Maya | USD source for MayaUSD / MayaHydra |
+|:-: |:-: |:-:|:-:|
+| CommitID/Tags | [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11)<BR>[v24.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.11) | Maya 2025 = v23.11<br>Maya 2026 = v24.11 | [v23.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v23.11-MayaUsd-Public)<br>[v24.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v24.11-MayaUsd-Public) |
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
 
-***NOTE:*** Make sure that you don't have an older USD locations in your ```PATH``` and ```PYTHONPATH``` environment settings. ```PATH``` and ```PYTHONPATH``` are automatically adjusted inside the project to point to the correct USD location. See ```cmake/usd.cmake```.
+>NOTE: Make sure that you don't have an older USD locations in your ```PATH``` and ```PYTHONPATH``` environment settings. ```PATH``` and ```PYTHONPATH``` are automatically adjusted inside the project to point to the correct USD location. See ```cmake/usd.cmake```.
 
 #### 3. Download and Build MayaUSD 
 
@@ -46,9 +46,9 @@ To build MayaUSD, see the github page https://github.com/Autodesk/maya-usd/blob/
 
 The Universal Front End (UFE) is a DCC-agnostic component that allows Maya to browse and edit data in multiple data models. This allows Maya to edit pipeline data such as USD. UFE comes installed as a built-in component with Maya 2019 and later. UFE is developed as a separate binary component, and therefore versioned separately from Maya.
 
-| Ufe Version                | Maya Version                                           | Ufe Docs (external) |
-|----------------------------|--------------------------------------------------------|:-------------------:|
-| v4.0.0<br>v4.1.0<br>v4.2.0<br>v4.2.0<br>v6.0.0            | Maya 2024<br>Maya 2024.1<br>Maya 2024.2<br>Maya 2025<br>Maya PR                                                | https://help.autodesk.com/view/MAYADEV/2025/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
+| UFE Version | Maya Version | UFE Docs (external) |
+|-|-|:-:|
+| v4.2.0<br>v6.0.0 | Maya 2025<br>Maya 2026 | https://help.autodesk.com/view/MAYADEV/2025/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
 
 To build the project with UFE support, you will need to use the headers and libraries included in the ***Maya Devkit***:
 
