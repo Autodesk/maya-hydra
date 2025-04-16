@@ -61,8 +61,8 @@
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 
 #ifdef VIEWPORT_TOOLBOX
-#include <AGP/ViewportToolbox/ViewportEngine/RenderIndexProxy.h>
-#include <AGP/ViewportToolbox/ViewportEngine/FramePass.h>
+#include <hvt/engine/renderIndexProxy.h>
+#include <hvt/engine/framePass.h>
 #endif
 
 #include <pxr/base/tf/singleton.h>
@@ -278,8 +278,8 @@ private:
     HgiUniquePtr                              _hgi;
     HdDriver                                  _hgiDriver;
 #ifdef VIEWPORT_TOOLBOX
-    agp::ViewportToolbox::RenderIndexProxyPtr _beautyRenderer;
-    agp::ViewportToolbox::FramePassPtr _beautyFramePass;
+    hvt::RenderIndexProxyPtr _beautyRenderer;
+    hvt::FramePassPtr _beautyFramePass;
 #else
     HdEngine                                  _engine;
     HdRendererPlugin*                         _rendererPlugin = nullptr;

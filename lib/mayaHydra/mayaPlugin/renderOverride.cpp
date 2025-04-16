@@ -59,12 +59,9 @@
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
 
 #ifdef VIEWPORT_TOOLBOX
-#include <AGP/ViewportToolbox/ViewportEngine/RenderIndexProxy.h>
-#include <AGP/ViewportToolbox/ViewportEngine/ViewportEngine.h>
-#include <AGP/ViewportToolbox/ViewportEngine/FramePass.h>
-#include <AGP/ViewportToolbox/RenderTasks/Resources.h>
-#include <AGP/ViewportToolbox/ViewportEngine/VisualStyle.h>
-#include <AGP/ViewportToolbox/Plugins/xRayModeSceneIndex.h>
+#include <hvt/engine/renderIndexProxy.h>
+#include <hvt/engine/viewportEngine.h>
+#include <hvt/engine/framePass.h>
 #endif
 
 #include <pxr/base/plug/plugin.h>
@@ -866,7 +863,7 @@ MStatus MtohRenderOverride::Render(
     }
 
     if (_displayStyleSceneIndex) {
-       _displayStyleSceneIndex->SetRefineLevel({true, delegateParams.refineLevel});
+       _displayStyleSceneIndex->SetRefineLevel(delegateParams.refineLevel);
     }
 
     // Update "Show" menu filters
@@ -1179,15 +1176,15 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     GlfContextCaps::InitInstance();
 
 #ifdef VIEWPORT_TOOLBOX
-    agp::ViewportToolbox::RendererDescriptor beautyRendererDescriptor;
+    hvt::RendererDescriptor beautyRendererDescriptor;
     beautyRendererDescriptor.hgiDriver    = &_hgiDriver;
     beautyRendererDescriptor.rendererName = _rendererDesc.rendererName;
-    agp::ViewportToolbox::ViewportEngine::CreateRenderer(_beautyRenderer, beautyRendererDescriptor);
+    hvt::ViewportEngine::CreateRenderer(_beautyRenderer, beautyRendererDescriptor);
 
-    agp::ViewportToolbox::FramePassDescriptor beautyFramePassDescriptor;
+    hvt::FramePassDescriptor beautyFramePassDescriptor;
     beautyFramePassDescriptor.renderIndex = _beautyRenderer->RenderIndex();
     beautyFramePassDescriptor.uid         = pxr::SdfPath("/beautyPass");
-    _beautyFramePass = agp::ViewportToolbox::ViewportEngine::CreateFramePass(beautyFramePassDescriptor);
+    _beautyFramePass = hvt::ViewportEngine::CreateFramePass(beautyFramePassDescriptor);
 
     GetMayaHydraLibInterface().RegisterTerminalSceneIndex(_beautyRenderer->RenderIndex()->GetTerminalSceneIndex());
 #else

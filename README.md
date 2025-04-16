@@ -42,6 +42,14 @@ USD proxies in Viewport 2.0? Some potential reasons include:
 - HdStorm is extensible: you can create plugins for custom objects, which then allows
   them to be displayed not just in Maya, but any Hydra-enabled application
 
+## Supported Functionality
+- Rendering of Maya geometry nodes and animation playback
+- Full support of MaterialX with Storm
+- Isolate select and object filtering (Show Menu) for Maya geometry, USD prims and any other Hydra prims
+- Picking and selection highlighting of geo and geomsubset prims including prototypes and instances
+- [Light weight interface](./doc/flowViewportToolkit.md) to integrate custom Scene Index Filter plugins
+- Supported display modes: Bounding Box, Wireframe on shaded, Wireframe, Usd Default Material, Textured, All Lights
+
 ## Known Limitations
 
 - Limited Maya material support:
@@ -50,7 +58,6 @@ USD proxies in Viewport 2.0? Some potential reasons include:
 - Hydra shading differs from Maya's Viewport 2.0
 - Animation Ghosting has the wrong shading
 - Backface Culling
-- Isolate Select only functions with Maya nodes
 - Following Maya node types are not rendered:
   - Bifrost
   - nParticles
@@ -59,15 +66,13 @@ USD proxies in Viewport 2.0? Some potential reasons include:
   - Maya's volume and ambient light
 - Current limitations with USD:
   - Maya layers don't show effect
-  - Viewport display modes like Xray, wireframe or default shading are not supported yet
+  - Not supported viewport display modes: Xray, Flat Shading
   - Gprims currently don't cast shadows in Storm
-  - No material bindings on GeomSubsets (Hydra v2 limitation)
 
 ## Limitations with Storm
 - Screen space effects like depth of field and motion blur or Hardware Fog are not supported
 - Limited shadow quality of lights
 - Long loading times and low viewport performance with MaterialX materials with Storm
-
 
 ## Detailed Documentation
 

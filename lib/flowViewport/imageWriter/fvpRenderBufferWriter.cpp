@@ -17,7 +17,7 @@
 #include <flowViewport/imageWriter/fvpRenderBufferWriter.h>
 
 #ifdef VIEWPORT_TOOLBOX
-#include <AGP/ViewportToolbox/ViewportEngine/FramePass.h>
+#include <hvt/engine/framePass.h>
 #endif
 
 #include <pxr/imaging/hdSt/hioConversions.h>
@@ -35,7 +35,7 @@ HdRenderBuffer* getRenderBuffer(
 )
 {
 #ifdef VIEWPORT_TOOLBOX
-    auto framePass = Fvp::ImageBufferWriter::GetPtr<agp::ViewportToolbox::FramePass>(args, "framePass");
+    auto framePass = Fvp::ImageBufferWriter::GetPtr<hvt::FramePass>(args, "framePass");
     if (framePass) {
         return framePass ? framePass->GetRenderBuffer(aovToken) : nullptr;
     }
