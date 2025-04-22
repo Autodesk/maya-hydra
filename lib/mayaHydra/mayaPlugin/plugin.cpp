@@ -21,6 +21,7 @@
 #include "renderOverride.h"
 #include "viewCommand.h"
 #include "pluginBuildInfoCommand.h"
+#include "hydraRenderCmd.h"
 
 #include <mayaHydraLib/adapters/adapter.h>
 
@@ -208,6 +209,16 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     return ret;
     }
 
+    // *** FIXME ***  Have a single templated function for all 3 commands. 
+    if (!plugin.registerCommand(
+            HydraRenderCmd::name, HydraRenderCmd::creator, HydraRenderCmd::createSyntax)) {
+        ret = MS::kFailure;
+        std::ostringstream msg;
+        msg << "Error registering " << HydraRenderCmd::name << " command!";
+        ret.perror(msg.str().c_str());
+        return ret;
+    }
+
     if (auto* renderer = MHWRender::MRenderer::theRenderer()) {
         for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {
             auto    mtohRenderer = std::make_unique<PXR_NS::MtohRenderOverride>(desc);
@@ -289,6 +300,13 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 
     // Clear any registered callbacks
     MGlobal::executeCommand("callbacks -cc -owner mayaHydra;");
+
+    if (!plugin.deregisterCommand(HydraRenderCmd::name)) {
+        ret = MS::kFailure;
+        std::ostringstream msg;
+        msg << "Error deregistering " << HydraRenderCmd::name << " command!";
+        ret.perror(msg.str().c_str());
+    }
 
     if (!plugin.deregisterCommand(MtohViewCmd::name)) {
         ret = MS::kFailure;

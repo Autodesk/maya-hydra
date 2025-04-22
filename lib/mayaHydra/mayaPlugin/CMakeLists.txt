@@ -7,7 +7,9 @@ add_library(${TARGET_NAME} SHARED)
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME} 
     PRIVATE
+        batchRenderer.cpp
         colorNotFoundException.cpp
+        hydraRenderCmd.cpp
         mayaColorPreferencesTranslator.cpp
         plugin.cpp
         pluginDebugCodes.cpp

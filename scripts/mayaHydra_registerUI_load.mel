@@ -19,4 +19,9 @@ global proc mayaHydra_registerUI_load()
 {
     source "mayaHydra_GeomSubsetsPickMode.mel";
     mayaHydra_GeomSubsetsPickMode_SetupUI();
+
+    source "mayaHydra_create_globals_tab_Storm.mel";
+    source "mayaHydra_render_Storm.mel";
+    source "mayaHydra_register_renderer_Storm.mel";
+    registerHydraStormRenderer();
 }

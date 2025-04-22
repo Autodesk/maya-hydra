@@ -1,0 +1,58 @@
+// Description: This procedure is called during command
+// line renders.
+//
+global proc hydraStormCmdRender(string $option)
+{
+    print "PPT: hydraStormCmdRender() called.";
+    return;
+
+    string $cmd = "hydraRender -renderer Storm ";
+    $cmd += $option;
+
+    evalEcho $cmd;
+}
+
+// Description: *** fill this in ***
+//
+global proc hydraStormBatchRender(string $option)
+{
+    print "PPT: hydraStormBatchRender() called.";
+    return;
+
+    string $cmd = "hydraRender -renderer Storm ";
+    $cmd += $option;
+
+    evalEcho $cmd;
+}
+
+// Description: *** fill this in ***
+//
+global proc string hydraStormRender(int $width, int $height, int $doShadows,
+        int $doGlowPass, string $camera, string $option)
+{
+    print "PPT: hydraStormBatchRender() called.";
+
+    string $result = "";
+    return $result;
+
+    if (!objExists($camera)) {
+        $nonMayaCamExists = python("import maya.internal.ufeSupport.utils as ufeUtils; ufeUtils.isPathStringValidNonMayaObject('''" + $camera + "''')");
+        if ($nonMayaCamExists) {
+            error("Non-Maya Ufe cameras are not supported for hydraRender command.");
+        }
+    }
+
+    $result  = `eval hydraRender -renderer Storm
+            -camera $camera -cf -width $width -height $height $option`;
+
+    return $result;
+}
+
+// Description: This script returns the Hydra-specific command line arguments
+// to the 'Render' executable on batch render from interactive mode.
+//
+global proc string hydraStormBatchRenderOptionsString()
+{
+	return "";
+	return " -r interBatch ";
+}
