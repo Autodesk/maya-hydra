@@ -56,6 +56,7 @@ class TestMayaLightingModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohU
         cmds.refresh()
         
         #Set active/selected lights only
+        cmds.modelEditor('modelPanel4', edit=True, shadows=True)
         cmds.modelEditor('modelPanel4', edit=True, displayLights='active')
         cmds.select(clear=True)
         cmds.refresh()
