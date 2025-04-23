@@ -62,6 +62,7 @@
 #include <hvt/engine/renderIndexProxy.h>
 #include <hvt/engine/viewportEngine.h>
 #include <hvt/engine/framePass.h>
+#include <hvt/engine/framePassUtils.h>
 #endif
 
 #include <pxr/base/plug/plugin.h>
@@ -697,10 +698,43 @@ MStatus MtohRenderOverride::Render(
         }
 
 #ifdef VIEWPORT_TOOLBOX
-        _beautyFramePass->params().backgroundColor = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
-        HdTaskSharedPtrVector beautyTasks = _beautyFramePass->GetRenderTasks();
-        editTasks(beautyTasks);
-        _beautyFramePass->Render(beautyTasks);
+        if (_useSinglePass) {
+            _beautyFramePass->params().backgroundColor = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
+            HdTaskSharedPtrVector beautyTasks = _beautyFramePass->GetRenderTasks();
+            editTasks(beautyTasks);
+            _beautyFramePass->Render(beautyTasks);
+        } else {
+            // Beauty pass
+            _beautyFramePass->params().enablePresentation = false;
+            _beautyFramePass->params().backgroundColor = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
+            HdTaskSharedPtrVector beautyTasks = _beautyFramePass->GetRenderTasks();
+            editTasks(beautyTasks);
+            _beautyFramePass->Render(beautyTasks);
+
+            // Get buffers
+            std::shared_ptr<pxr::HdRenderBuffer> colorBuffer =
+                hvt::CreateRenderBufferProxy(_beautyFramePass, pxr::HdAovTokens->color);
+
+            std::shared_ptr<pxr::HdRenderBuffer> depthBuffer =
+                hvt::CreateRenderBufferProxy(_beautyFramePass, pxr::HdAovTokens->depth);
+
+            const std::vector<std::pair<pxr::TfToken const&, pxr::HdRenderBuffer*>> inputAOVs = {
+                { pxr::HdAovTokens->color, colorBuffer.get() },
+                { pxr::HdAovTokens->depth, depthBuffer.get() }
+            };
+
+            // Secondary graphics pass
+            // FIXME : Very rough hack just to prove that we can render selection highlighting separately from the scene
+            _secondaryGfxRenderer->RenderIndex()->InsertSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering, SdfPath::AbsoluteRootPath());
+
+            _secondaryGfxFramePass->params().backgroundColor = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
+            _secondaryGfxFramePass->params().clearBackground = false;
+            HdTaskSharedPtrVector secondaryGfxTasks = _secondaryGfxFramePass->GetRenderTasks(inputAOVs);
+            editTasks(secondaryGfxTasks);
+            _secondaryGfxFramePass->Render(secondaryGfxTasks);
+
+            _secondaryGfxRenderer->RenderIndex()->RemoveSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);
+        }
 #else
         _engine.Execute(_renderIndex, &tasks);
 #endif
@@ -718,7 +752,7 @@ MStatus MtohRenderOverride::Render(
         //
         _isConverged = 
 #ifdef VIEWPORT_TOOLBOX
-            _beautyFramePass->IsConverged();
+            _beautyFramePass->IsConverged() && _secondaryGfxFramePass->IsConverged();
 #else
             _taskController->IsConverged();
 #endif
@@ -942,6 +976,8 @@ MStatus MtohRenderOverride::Render(
 #ifdef VIEWPORT_TOOLBOX
     _beautyFramePass->params().renderParams.enableLighting = true;
     _beautyFramePass->params().renderParams.enableSceneMaterials = true;
+    _secondaryGfxFramePass->params().renderParams.enableLighting = true;
+    _secondaryGfxFramePass->params().renderParams.enableSceneMaterials = true;
 #else
     HdxRenderTaskParams params;
     params.enableLighting = true;
@@ -953,6 +989,7 @@ MStatus MtohRenderOverride::Render(
             FvpColorPreferencesTokens->wireframeSelection, wireframeSelectionColor)) {
 #ifdef VIEWPORT_TOOLBOX
         _beautyFramePass->params().renderParams.wireframeColor = wireframeSelectionColor;
+        _secondaryGfxFramePass->params().renderParams.wireframeColor = wireframeSelectionColor;
 #else
         params.wireframeColor = wireframeSelectionColor;
 #endif
@@ -960,6 +997,7 @@ MStatus MtohRenderOverride::Render(
 
 #ifdef VIEWPORT_TOOLBOX
     _beautyFramePass->params().renderParams.cullStyle = HdCullStyleBackUnlessDoubleSided;
+    _secondaryGfxFramePass->params().renderParams.cullStyle = HdCullStyleBackUnlessDoubleSided;
 #else
     params.cullStyle = HdCullStyleBackUnlessDoubleSided;
 #endif
@@ -974,6 +1012,8 @@ MStatus MtohRenderOverride::Render(
 #ifdef VIEWPORT_TOOLBOX
         _beautyFramePass->params().renderBufferSize = GfVec2i(width, height);
         _beautyFramePass->params().viewInfo.viewport = {{0,0}, {width, height}};
+        _secondaryGfxFramePass->params().renderBufferSize = GfVec2i(width, height);
+        _secondaryGfxFramePass->params().viewInfo.viewport = {{0,0}, {width, height}};
 #else
         _taskController->SetRenderViewport(_viewport);
 #endif
@@ -986,6 +1026,7 @@ MStatus MtohRenderOverride::Render(
     bool isMultiSampled = framecontext->getPostEffectEnabled(MHWRender::MFrameContext::kAntiAliasing);
 #ifdef VIEWPORT_TOOLBOX
     _beautyFramePass->params().enableMultisampling = isMultiSampled;
+    _secondaryGfxFramePass->params().enableMultisampling = isMultiSampled;
 #else
     if (_isUsingHdSt)
     {  
@@ -1004,6 +1045,7 @@ MStatus MtohRenderOverride::Render(
 #ifdef VIEWPORT_TOOLBOX
     // Disable color correction to let Maya take care of it
     _beautyFramePass->params().enableColorCorrection = false;
+    _secondaryGfxFramePass->params().enableColorCorrection = false;
 #endif
 
     auto viewMatrix = GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx));
@@ -1011,6 +1053,8 @@ MStatus MtohRenderOverride::Render(
 #ifdef VIEWPORT_TOOLBOX
     _beautyFramePass->params().viewInfo.viewMatrix = viewMatrix;
     _beautyFramePass->params().viewInfo.projectionMatrix = projectionMatrix;
+    _secondaryGfxFramePass->params().viewInfo.viewMatrix = viewMatrix;
+    _secondaryGfxFramePass->params().viewInfo.projectionMatrix = projectionMatrix;
 #else
     _taskController->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
 #endif
@@ -1027,6 +1071,7 @@ MStatus MtohRenderOverride::Render(
                     SdfPath cameraPath = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
 #ifdef VIEWPORT_TOOLBOX
                     _beautyFramePass->params().renderParams.camera = cameraPath;
+                    _secondaryGfxFramePass->params().renderParams.camera = cameraPath;
 #else
                     params.camera = cameraPath;
 #endif
@@ -1053,6 +1098,8 @@ MStatus MtohRenderOverride::Render(
 #ifdef VIEWPORT_TOOLBOX
     _beautyFramePass->params().selectionColor = _globals.colorSelectionHighlightColor;
     _beautyFramePass->params().enableSelection = _globals.colorSelectionHighlight;
+    _secondaryGfxFramePass->params().selectionColor = _globals.colorSelectionHighlightColor;
+    _secondaryGfxFramePass->params().enableSelection = _globals.colorSelectionHighlight;
 #else
     _taskController->SetSelectionColor(_globals.colorSelectionHighlightColor);
     _taskController->SetEnableSelection(_globals.colorSelectionHighlight);
@@ -1068,7 +1115,16 @@ MStatus MtohRenderOverride::Render(
 #endif
 
 #ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->params().collection = _renderCollection;
+    if (_useSinglePass) {
+        _beautyFramePass->params().collection = _renderCollection;
+    } else {
+        auto sceneItemsCollection = _renderCollection;
+        sceneItemsCollection.SetExcludePaths({_highlightHierarchyPrefix});
+        _beautyFramePass->params().collection = sceneItemsCollection;
+        auto secondaryGfxCollection = _renderCollection;
+        secondaryGfxCollection.SetRootPaths({_highlightHierarchyPrefix});
+        _secondaryGfxFramePass->params().collection = secondaryGfxCollection;
+    }
 #else
     _taskController->SetCollection(_renderCollection);
 #endif
@@ -1098,6 +1154,8 @@ MStatus MtohRenderOverride::Render(
 #ifdef VIEWPORT_TOOLBOX
         _beautyFramePass->SetEnableShadows(enableShadows);
         _beautyFramePass->SetShadowParams(shadowParams);
+        _secondaryGfxFramePass->SetEnableShadows(enableShadows);
+        _secondaryGfxFramePass->SetShadowParams(shadowParams);
 #else
         _taskController->SetEnableShadows(enableShadows);
         _taskController->SetShadowParams(shadowParams);
@@ -1149,6 +1207,7 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
         mhRenderTags.push_back(HdRenderTagTokens->guide);
 #ifdef VIEWPORT_TOOLBOX
     _beautyFramePass->params().renderTags = mhRenderTags;
+    _secondaryGfxFramePass->params().renderTags = mhRenderTags;
 #else
     _taskController->SetRenderTags(mhRenderTags);
 #endif
@@ -1186,6 +1245,18 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     beautyFramePassDescriptor.uid         = pxr::SdfPath("/beautyPass");
     _beautyFramePass = hvt::ViewportEngine::CreateFramePass(beautyFramePassDescriptor);
 
+    hvt::RendererDescriptor secondaryGfxRendererDescriptor;
+    secondaryGfxRendererDescriptor.hgiDriver    = &_hgiDriver;
+    secondaryGfxRendererDescriptor.rendererName = "HdStormRendererPlugin";
+    hvt::ViewportEngine::CreateRenderer(_secondaryGfxRenderer, secondaryGfxRendererDescriptor);
+
+    hvt::FramePassDescriptor secondaryGfxFramePassDescriptor;
+    secondaryGfxFramePassDescriptor.renderIndex = _secondaryGfxRenderer->RenderIndex();
+    secondaryGfxFramePassDescriptor.uid          = pxr::SdfPath("/secondaryGfxPass");
+    _secondaryGfxFramePass = hvt::ViewportEngine::CreateFramePass(secondaryGfxFramePassDescriptor);
+
+    _useSinglePass = beautyRendererDescriptor.rendererName == secondaryGfxRendererDescriptor.rendererName;
+
     GetMayaHydraLibInterface().RegisterTerminalSceneIndex(_beautyRenderer->RenderIndex()->GetTerminalSceneIndex());
 #else
     _rendererPlugin
@@ -1215,6 +1286,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     // Initialize the AOV system to render color
 #ifdef VIEWPORT_TOOLBOX
     _beautyFramePass->params().visualizeAOV = HdAovTokens->color;
+    _secondaryGfxFramePass->params().visualizeAOV = HdAovTokens->color;
 #else
     if (_isUsingHdSt) {
         _taskController->SetRenderOutputs({ HdAovTokens->color });
@@ -1259,6 +1331,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
 #ifdef VIEWPORT_TOOLBOX
     _beautyFramePass->SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
+    _secondaryGfxFramePass->SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
 #else
     _engine.SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
 #endif
@@ -1393,6 +1466,8 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     }
     _beautyFramePass.reset();
     _beautyRenderer.reset();
+    _secondaryGfxFramePass.reset();
+    _secondaryGfxRenderer.reset();
 #else
     // Cleanup internal context data that keep references to data that is now
     // invalid.

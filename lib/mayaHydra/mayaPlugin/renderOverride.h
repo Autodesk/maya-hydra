@@ -280,6 +280,9 @@ private:
 #ifdef VIEWPORT_TOOLBOX
     hvt::RenderIndexProxyPtr _beautyRenderer;
     hvt::FramePassPtr _beautyFramePass;
+    hvt::RenderIndexProxyPtr _secondaryGfxRenderer;
+    hvt::FramePassPtr _secondaryGfxFramePass;
+    bool _useSinglePass{false};
 #else
     HdEngine                                  _engine;
     HdRendererPlugin*                         _rendererPlugin = nullptr;
