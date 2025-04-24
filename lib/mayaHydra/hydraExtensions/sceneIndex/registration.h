@@ -87,7 +87,7 @@ public:
 
     static constexpr Ufe::Rtid kInvalidUfeRtid = 0;
     MAYAHYDRALIB_API
-    MayaHydraSceneIndexRegistry(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy);
+    MayaHydraSceneIndexRegistry(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy, bool interactive=true);
 
     MAYAHYDRALIB_API
     ~MayaHydraSceneIndexRegistry();
@@ -130,6 +130,9 @@ private:
     };
     std::unordered_map<MObjectHandle, MayaHydraSceneIndexRegistrationPtr, _HashObjectHandle>
         _registrationsByObjectHandle;
+
+    // Is rendering being done in an interactive or batch context?
+    bool _interactive{true};
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

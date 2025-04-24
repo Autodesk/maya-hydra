@@ -665,7 +665,8 @@ void BatchRenderer::_InitHydraResources()
     _renderIndexProxy->InsertSceneIndex(_mayaHydraSceneIndex, SdfPath::AbsoluteRootPath());
     
     if (!_sceneIndexRegistry) {
-        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy));
+        constexpr bool interactive = false;
+        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy, interactive));
     }
     
     //Create internal scene indices chain
