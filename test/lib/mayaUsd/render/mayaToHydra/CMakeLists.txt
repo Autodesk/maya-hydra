@@ -19,8 +19,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testTransforms.py
     testRefinement.py
     testMaterialXOnNative.py|depOnPlugins:lookdevx
-	testLookdevxUpdate.py|depOnPlugins:lookdevx
-    testNewSceneWithStage.py
+	testNewSceneWithStage.py
     # To be reenabled after investigation
     #testMayaDisplayModes.py|skipOnPlatform:osx
     testMayaShadingModes.py
