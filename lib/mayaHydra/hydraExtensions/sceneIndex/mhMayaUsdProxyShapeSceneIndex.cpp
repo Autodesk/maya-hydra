@@ -280,10 +280,10 @@ void MayaUsdProxyShapeSceneIndex::_StageInvalidate(const MAYAUSDAPI_NS::ProxySta
 void MayaUsdProxyShapeSceneIndex::_ObjectsChanged(
     const MAYAUSDAPI_NS::ProxyStageObjectsChangedNotice& notice)
 {
-    _PopulateAndApplyPendingChanges();
+    PopulateAndApplyPendingChanges();
 }
 
-void MayaUsdProxyShapeSceneIndex::_PopulateAndApplyPendingChanges() 
+void MayaUsdProxyShapeSceneIndex::PopulateAndApplyPendingChanges() 
 { 
     Populate();
     _usdImagingStageSceneIndex->ApplyPendingUpdates();
@@ -447,6 +447,13 @@ Fvp::PrimSelections MayaUsdProxyShapeSceneIndex::UfePathToPrimSelections(
     // Now have primSelections in the namespace of this scene index.  Need to
     // account for the prefix, which is added downstream of this scene index.
     return addPrefix(_sceneIndexPathPrefix, primSelections);
+}
+
+bool MayaUsdProxyShapeSceneIndex::HasPendingUpdates() const
+{
+    //When we receive a stage invalidate we remove the stage and set populate to false
+    //We need to re-populate to see the changes
+    return (false == _populated);
 }
 
 } // namespace MAYAHYDRA_NS_DEF
