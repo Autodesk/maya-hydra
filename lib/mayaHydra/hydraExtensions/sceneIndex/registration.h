@@ -99,6 +99,11 @@ public:
     MAYAHYDRALIB_API
     const Registrations& GetRegistrations() const;
 
+    // When in a MayaUsd proxy shape node, some stages become invalid, we need to apply the updates.
+    // it's not automatic as we are called from a compute function of a node and we may have recursion which are not allowed
+    MAYAHYDRALIB_API
+    void ApplyPendingUpdates();
+
 private:
     void
     _AddSceneIndexForNode(MObject& dagNode); // dagNode non-const because of callback registration

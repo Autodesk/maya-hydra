@@ -652,6 +652,9 @@ MStatus MtohRenderOverride::Render(
             }
         }
 
+        //Apply any pending update from MayaUsd proxy shape nodes
+        _sceneIndexRegistry->ApplyPendingUpdates();
+
         // Update plugin filtering scene indices
         std::string rendererNamesToUpdate;
         for (auto& sceneFilteringSceneIndexData : Fvp::FilteringSceneIndexInterfaceImp::get().getSceneFilteringSceneIndicesData()) {
