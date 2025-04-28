@@ -1,5 +1,47 @@
 # Changelog
 
+## [v0.7.1] - 2025-04-28
+
+**Build:**
+* Added Maya file reference test [#256](https://github.com/Autodesk/maya-hydra/pull/256)
+* Added USD inherits / specializes test [#257](https://github.com/Autodesk/maya-hydra/pull/257)
+
+**Flow Viewport Toolkit:**
+* Disconnected Fvp::PathInterface in code base, replaced with path mapper [#215](https://github.com/Autodesk/maya-hydra/pull/215)
+* Selection highlighting rework [#240](https://github.com/Autodesk/maya-hydra/pull/240)
+
+**Miscellaneous:**
+* Remove call to path interface from pruning scene index [#235](https://github.com/Autodesk/maya-hydra/pull/235)
+* Remove deprecated path interface code [#236](https://github.com/Autodesk/maya-hydra/pull/236)
+* Fixed hang on exit of isolate select with geom subsets, with test [#234](https://github.com/Autodesk/maya-hydra/pull/234)
+* Loading mayaHydra should not set scene as modified [#216](https://github.com/Autodesk/maya-hydra/pull/216)
+* If not present initialize HdStormRendererPlugin__domeLightTexturesMax… [#238](https://github.com/Autodesk/maya-hydra/pull/238)
+* Reduced dirty notifications for isolate select [#239](https://github.com/Autodesk/maya-hydra/pull/239)
+* Set dev version to 0.7.1 [#241](https://github.com/Autodesk/maya-hydra/pull/241)
+* Tremblp/hydra 1413/isolate select keep lighting [#243](https://github.com/Autodesk/maya-hydra/pull/243)
+* Unblock submodule update job [#244](https://github.com/Autodesk/maya-hydra/pull/244)
+* Lanierd/hydra 685 [#245](https://github.com/Autodesk/maya-hydra/pull/245)
+* Replace DataProducersNodeHashCodeToSdfPathRegistry with path mapping [#247](https://github.com/Autodesk/maya-hydra/pull/247)
+* Rename CMake project to "maya-hydra" [#248](https://github.com/Autodesk/maya-hydra/pull/248)
+* Avoid translating a specific type of internal dummy render items to Hydra [#251](https://github.com/Autodesk/maya-hydra/pull/251)
+* Apply default material on geomSubset [#250](https://github.com/Autodesk/maya-hydra/pull/250)
+* Use LightsManagement scene index instead of removing the… [#249](https://github.com/Autodesk/maya-hydra/pull/249)
+* , Update documentation [#253](https://github.com/Autodesk/maya-hydra/pull/253)
+* Image file writing, with test [#255](https://github.com/Autodesk/maya-hydra/pull/255)
+* Tweak coverage instructions [#258](https://github.com/Autodesk/maya-hydra/pull/258)
+* Support displacement on GeomSubset wireframe highlights [#242](https://github.com/Autodesk/maya-hydra/pull/242)
+* With the usd lights change where ufe provides a custom g… [#260](https://github.com/Autodesk/maya-hydra/pull/260)
+* Bjorn siegert adsk patch 1 [#246](https://github.com/Autodesk/maya-hydra/pull/246)
+* Re-enable an image comparison in test viewport filters [#261](https://github.com/Autodesk/maya-hydra/pull/261)
+* Update changelog for v0.7.0 [#262](https://github.com/Autodesk/maya-hydra/pull/262)
+* Fix --mtoa-location build.py flag [#263](https://github.com/Autodesk/maya-hydra/pull/263)
+* Fix basisCurves refinement [#264](https://github.com/Autodesk/maya-hydra/pull/264)
+* Add Maya 2026 to the documentation [#265](https://github.com/Autodesk/maya-hydra/pull/265)
+
+**Documentation:**
+* Add notes about scene index and performance and another about impleme… [#252](https://github.com/Autodesk/maya-hydra/pull/252)
+* Lanierd/hydra 1328 [#259](https://github.com/Autodesk/maya-hydra/pull/259)
+
 ## [v0.7.0] - 2025-03-26
 
 **Build:**
