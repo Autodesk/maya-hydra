@@ -36,7 +36,7 @@
 **Documentation:**
 * Update readme [#246](https://github.com/Autodesk/maya-hydra/pull/246)
 * Add notes about scene index and performance and another about implementing UFE and Custom scene indices [#252](https://github.com/Autodesk/maya-hydra/pull/252)
-* Update documentation [#253]()
+* Update documentation [#253](https://github.com/Autodesk/maya-hydra/pull/253)
 * Tweak coverage instructions [#258](https://github.com/Autodesk/maya-hydra/pull/258)
 * Add some documentation about recompiling with previous versions of Maya and a custom/recent version of OpenUSD [#259](https://github.com/Autodesk/maya-hydra/pull/259)
 * Update changelog for v0.7.0 [#262](https://github.com/Autodesk/maya-hydra/pull/262)
