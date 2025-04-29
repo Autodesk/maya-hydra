@@ -18,7 +18,7 @@
 * If not present initialize HdStormRendererPlugin__domeLightTexturesMax… [#238](https://github.com/Autodesk/maya-hydra/pull/238)
 * Reduced dirty notifications for isolate select [#239](https://github.com/Autodesk/maya-hydra/pull/239)
 * Set dev version to 0.7.1 [#241](https://github.com/Autodesk/maya-hydra/pull/241)
-* Tremblp/hydra 1413/isolate select keep lighting [#243](https://github.com/Autodesk/maya-hydra/pull/243)
+* Isolate select does not change lighting in scene [#243](https://github.com/Autodesk/maya-hydra/pull/243)
 * Unblock submodule update job [#244](https://github.com/Autodesk/maya-hydra/pull/244)
 * Remove any direct call to "delete" [#245](https://github.com/Autodesk/maya-hydra/pull/245)
 * Replace DataProducersNodeHashCodeToSdfPathRegistry with path mapping [#247](https://github.com/Autodesk/maya-hydra/pull/247)
