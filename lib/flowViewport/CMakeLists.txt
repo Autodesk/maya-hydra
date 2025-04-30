@@ -111,8 +111,8 @@ endif()
 if (BUILD_WITH_VIEWPORT_TOOLBOX AND IS_WINDOWS)
     install(
         FILES 
-            ${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH}/agp_viewport_toolbox.dll
-            ${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH}/agp_viewport_toolbox.pdb
+            ${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH}/hvt.dll
+            ${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH}/hvt.pdb
         DESTINATION 
             ${CMAKE_INSTALL_PREFIX}/lib
     )
