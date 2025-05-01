@@ -507,10 +507,6 @@ def BuildAndInstall(context, buildArgs, stages):
             extraArgs.append('-DMAYA_LOCATION="{mayaLocation}"'
                              .format(mayaLocation=context.mayaLocation))
         
-        if context.viewportToolboxLocation:
-            extraArgs.append('-DVIEWPORTTOOLBOX_LOCATION="{viewportToolboxLocation}"'
-                             .format(viewportToolboxLocation=context.viewportToolboxLocation))
-        
         if context.mayaUsdLocation:
             extraArgs.append('-DMAYAUSD_LOCATION="{mayaUsdLocation}"'
                              .format(mayaUsdLocation=context.mayaUsdLocation))
@@ -589,9 +585,6 @@ parser.add_argument("--install-location", type=str,
 
 parser.add_argument("--maya-location", type=str,
                     help="Directory where Maya is installed.")
-
-parser.add_argument("--viewporttoolbox-location", type=str,
-                    help="Directory where ViewportToolbox is installed.")
 
 parser.add_argument("--mayausd-location", type=str,
                     help="Directory where MayaUsd is installed.")
@@ -724,10 +717,6 @@ class InstallContext:
         # Maya Location
         self.mayaLocation = (os.path.abspath(args.maya_location)
                                 if args.maya_location else None)
-        
-        # ViewportToolbox Location
-        self.viewportToolboxLocation = (os.path.abspath(args.viewporttoolbox_location).replace("\\","/")
-                                if args.viewporttoolbox_location else None)
 
         # MayaUsd Location
         self.mayaUsdLocation = (os.path.abspath(args.mayausd_location).replace("\\","/")

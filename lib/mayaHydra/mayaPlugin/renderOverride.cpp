@@ -59,10 +59,11 @@
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
 
 #ifdef VIEWPORT_TOOLBOX
-#include <hvt/engine/renderIndexProxy.h>
-#include <hvt/engine/viewportEngine.h>
 #include <hvt/engine/framePass.h>
 #include <hvt/engine/framePassUtils.h>
+#include <hvt/engine/renderIndexProxy.h>
+#include <hvt/engine/taskCreationHelpers.h>
+#include <hvt/engine/viewportEngine.h>
 #endif
 
 #include <pxr/base/plug/plugin.h>
@@ -1244,6 +1245,23 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     beautyFramePassDescriptor.renderIndex = _beautyRenderer->RenderIndex();
     beautyFramePassDescriptor.uid         = pxr::SdfPath("/beautyPass");
     _beautyFramePass = hvt::ViewportEngine::CreateFramePass(beautyFramePassDescriptor);
+
+    // Add the 'SkyDome' task to the frame pass.
+    {
+        // Get the first render task path.
+        auto renderTasks = _beautyFramePass->GetTaskManager()->GetTasks(hvt::TaskFlagsBits::kRenderTaskBit);
+        pxr::SdfPath firstRenderTaskPath = renderTasks[0]->GetId();
+
+        // Define a getter for the layer settings.
+        const auto getLayerSettings = [&]() -> hvt::BasicLayerParams const* {
+            return &_beautyFramePass->params();
+        };
+
+        // Create the SkyDomeTask and insert it before the first existing render task.
+        hvt::CreateSkyDomeTask(_beautyFramePass->GetTaskManager(),
+            _beautyFramePass->GetRenderBufferAccessor(), getLayerSettings, firstRenderTaskPath,
+            hvt::TaskManager::InsertionOrder::insertBefore);
+    }
 
     hvt::RendererDescriptor secondaryGfxRendererDescriptor;
     secondaryGfxRendererDescriptor.hgiDriver    = &_hgiDriver;

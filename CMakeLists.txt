@@ -152,7 +152,7 @@ endif()
 if (ENABLE_VIEWPORT_TOOLBOX)
     set(VIEWPORTTOOLBOX_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/lib/hydra-viewport-toolbox/include")
     set(VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_LIB hvt)
-    set(VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH "${CMAKE_BINARY_DIR}/lib/hydra-viewport-toolbox/source")
+    set(VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH "${CMAKE_BINARY_DIR}/lib/hydra-viewport-toolbox/bin")
     set(BUILD_WITH_VIEWPORT_TOOLBOX TRUE)
 endif()
 
