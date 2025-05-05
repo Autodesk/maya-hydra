@@ -12,10 +12,4 @@ def "displacedCubeScene"
         float3 xformOp:scale = (2, 1, 0.5)
         uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
     }
-
-    def Xform "displacedCubeMarker"
-    {
-        double3 xformOp:translate = (-1, 0.5, 0)
-        uniform token[] xformOpOrder = ["xformOp:translate"]
-    }
 }
