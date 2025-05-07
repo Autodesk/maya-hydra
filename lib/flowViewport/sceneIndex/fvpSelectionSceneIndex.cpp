@@ -233,6 +233,12 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
 
     PrimSelections sceneIndexSn;
     sceneIndexSn.reserve(selection.size());
+
+    // When selecting point instances, the primSelection.primPath
+    // below will always point to the same point instancer, so there
+    // is no point in adding multiple, identical dirty entries.
+    std::set<SdfPath> uniqueEntries;
+
     for (const auto& snItem : selection) {
         // Call our input scene index to convert the application path to scene index paths and selection data sources.
         auto primSelections = _UfePathToPrimSelections(snItem->path());
@@ -245,8 +251,13 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
             sceneIndexSn.emplace_back(primSelection);
             TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
                 .Msg("    Adding %s to the Hydra selection.\n", primSelection.primPath.GetText());
-            entries.emplace_back(primSelection.primPath, selectionsSchemaDefaultLocator);
+            // entries.emplace_back(primSelection.primPath, selectionsSchemaDefaultLocator);
+            uniqueEntries.insert(primSelection.primPath);
         }
+    }
+
+    for (const auto& uniqueEntry : uniqueEntries) {
+        entries.emplace_back(uniqueEntry, selectionsSchemaDefaultLocator);
     }
 
     _selection->Replace(sceneIndexSn);

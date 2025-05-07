@@ -42,6 +42,8 @@
 
 #include <unordered_set>
 
+#include <iostream>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
@@ -633,11 +635,23 @@ void BaseWhSi::_PrimsDirtied(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
+// #define BASEWHSI_TRACE
+#ifdef BASEWHSI_TRACE
+    std::cout << "PPT: entering " << GetDisplayName() << "::_PrimsDirtied()"
+              << std::endl;
+#endif
     _SendPrimsDirtied(entries);
     HdSceneIndexObserver::DirtiedPrimEntries filteredEntries;
     std::vector<SdfPath> selectionChangePaths;
+#ifdef BASEWHSI_TRACE
+    std::cout << "PPT:     number of dirtied entries is " << entries.size() << std::endl;
+#endif
     for (const auto& entry : entries) {
         if (!IsExcludedPath(entry.primPath)) {
+#if 0
+            std::cout << "PPT:     entry " << entry.primPath.GetText() 
+                      << " included" << std::endl;
+#endif
             filteredEntries.emplace_back(entry);
             if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
                 HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
@@ -645,8 +659,21 @@ void BaseWhSi::_PrimsDirtied(
                 bool isFullySelected = false;
                 HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
                 if (selectionsSchema.IsDefined()) {
+#ifdef BASEWHSI_TRACE
+                    std::cout << "PPT:     entry " << entry.primPath.GetText() 
+                              << " has selections schema defined." << std::endl;
+                    std::cout << "PPT:     number of elements in selections schema is  " << selectionsSchema.GetNumElements() << std::endl;
+#endif
                     for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements() && !isFullySelected; selectionId++) {
+#ifdef BASEWHSI_TRACE
+                        std::cout << "PPT:         checking element " 
+                                  << selectionId << std::endl;
+#endif
                         if (selectionsSchema.GetElement(selectionId).GetFullySelected() && !selectionsSchema.GetElement(selectionId).GetNestedInstanceIndices()) {
+#ifdef BASEWHSI_TRACE
+                            std::cout << "PPT:         isFullySelected set true"
+                                      << std::endl;
+#endif
                             isFullySelected = true;
                         }
                     }
@@ -654,6 +681,10 @@ void BaseWhSi::_PrimsDirtied(
                 if (isFullySelected) {
                     _fullySelectedPaths.emplace(entry.primPath);
                 } else {
+#ifdef BASEWHSI_TRACE
+                    std::cout << "PPT:     isFullySelected is false" 
+                              << std::endl;
+#endif
                     _fullySelectedPaths.erase(entry.primPath);
                 }
                 if (wasFullySelected != isFullySelected) {
@@ -666,6 +697,10 @@ void BaseWhSi::_PrimsDirtied(
         ProcessFullySelectedChange(selectionChangePath, _fullySelectedPaths.find(selectionChangePath) != _fullySelectedPaths.end());
     }
     ProcessDirtiedPrims(sender, filteredEntries);
+#ifdef BASEWHSI_TRACE
+    std::cout << "PPT: exiting " << GetDisplayName() << "::_PrimsDirtied()"
+              << std::endl;
+#endif
 }
 
 void BaseWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)
