@@ -236,7 +236,7 @@ std::vector<UsdPickHandler::HitPath> resolveGeomSubsetsPicking(
     const TfToken& geomSubsetType, 
     int componentIndex)
 {
-    if (componentIndex < 0 || sceneIndex->GetPrim(basePrimPath).primType != HdPrimTypeTokens->mesh) {
+    if (componentIndex < 0) {
         return {};
     }
 
