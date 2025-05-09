@@ -1326,33 +1326,25 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         //// is done by Maya at render item creation time, so avoid double wireframe
         //// selection highlighting by excluding MAYA_NATIVE_ROOT.
         
-#if 1
 #if PXR_VERSION >= 2403
         _lastFilteringSceneIndexBeforeCustomFiltering = _geomSubsetWhSi = Fvp::GeomSubsetWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _geomSubsetWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-        _geomSubsetWhSi->SetDisplayName("GSWfH");
 #endif
 
         _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _meshWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-        _meshWhSi->SetDisplayName("MWfH");
         
         _lastFilteringSceneIndexBeforeCustomFiltering = _niInstanceWhSi = Fvp::NiInstanceWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _niInstanceWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-        _niInstanceWhSi->SetDisplayName("NiIWfH");
         
         _lastFilteringSceneIndexBeforeCustomFiltering = _niPrototypeWhSi = Fvp::NiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _niPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-        _niPrototypeWhSi->SetDisplayName("NiPWfH");
 
         _lastFilteringSceneIndexBeforeCustomFiltering = _piInstancerWhSi = Fvp::PiInstancerWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _piInstancerWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-        _piInstancerWhSi->SetDisplayName("PiIWfH");
-#endif
 
         _lastFilteringSceneIndexBeforeCustomFiltering = _piPrototypeWhSi = Fvp::PiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _piPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-        _piPrototypeWhSi->SetDisplayName("PiPWfH");
     }
     
     TF_AXIOM(_mayaHydraSceneIndex);
