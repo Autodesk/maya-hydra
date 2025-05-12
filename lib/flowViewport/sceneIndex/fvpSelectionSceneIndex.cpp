@@ -251,7 +251,6 @@ void SelectionSceneIndex::ReplaceSelection(const Ufe::Selection& selection)
             sceneIndexSn.emplace_back(primSelection);
             TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
                 .Msg("    Adding %s to the Hydra selection.\n", primSelection.primPath.GetText());
-            // entries.emplace_back(primSelection.primPath, selectionsSchemaDefaultLocator);
             uniqueEntries.insert(primSelection.primPath);
         }
     }
