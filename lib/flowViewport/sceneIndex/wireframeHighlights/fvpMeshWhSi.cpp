@@ -164,13 +164,10 @@ void MeshWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool 
         }
     }
 
-    if (_wireframeOnShadedEnabled)
-    {
-        // When the selection state of a mesh prim changes, we need to send a signal to update primvars/overrideWireframeColor.
-        // overrideWireframeColor only exists when wireframe on shaded is enabled.
-        // The handling of the lead selection vs active selection highlight is done elsewhere in MhDirtyLeadObjectSceneIndex.
-        _SendPrimsDirtied({ { primPath, { primvarsOverrideWireframeColorLocator } } });
-    }
+    // When the selection state of a mesh prim changes, we need to send a signal to update primvars/overrideWireframeColor.
+    // overrideWireframeColor only exists when wireframe is enabled.
+    // The handling of the lead selection vs active selection highlight is done elsewhere in MhDirtyLeadObjectSceneIndex.
+    _SendPrimsDirtied({ { primPath, { primvarsOverrideWireframeColorLocator } } });
 }
 
 void MeshWhSi::_CreateSelectionHighlight(const SdfPath& meshPath)

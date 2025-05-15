@@ -877,7 +877,6 @@ MStatus MtohRenderOverride::Render(
     // Hydra supports Wireframe and WireframeOnSurfaceRefined repr for wireframe on shaded mode.
     // Refinement level for Hydra is set in Hydra Render Globals    
     const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
-    _meshWhSi->SetWireframeOnShadedEnabled(wireOnShadedMode != MFrameContext::WireOnShadedMode::kWireFrameOnShadedNone);
     if ( (_reprSelectorSceneIndex && (currentDisplayStyle != _oldDisplayStyle) ) || (delegateParams.refineLevel != _oldRefineLevel)){
         if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) && 
             ((currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded) || 
