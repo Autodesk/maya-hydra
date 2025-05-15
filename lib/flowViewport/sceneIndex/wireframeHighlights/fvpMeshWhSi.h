@@ -52,6 +52,9 @@ public:
     FVP_API
     ~MeshWhSi() override = default;
 
+    FVP_API
+    void SetWireframeOnShadedEnabled(bool enabled) { _wireframeOnShadedEnabled = enabled; }
+
 protected:
     FVP_API
     MeshWhSi(
@@ -86,6 +89,7 @@ protected:
 
 private:
     std::set<PXR_NS::SdfPath> _meshPaths;
+    bool _wireframeOnShadedEnabled = false;
 
     void _CreateSelectionHighlight(const PXR_NS::SdfPath& meshPath);
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& meshPath);
