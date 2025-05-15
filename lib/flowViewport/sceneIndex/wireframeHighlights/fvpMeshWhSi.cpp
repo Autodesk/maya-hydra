@@ -22,6 +22,18 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
+// Copied from fvpMeshWhSi.cpp
+namespace {
+    TF_DEFINE_PRIVATE_TOKENS(
+        _tokens,
+        // Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
+        (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
+    );
+
+    const HdDataSourceLocator primvarsOverrideWireframeColorLocator(
+        HdPrimvarsSchema::GetDefaultLocator().Append(_tokens->overrideWireframeColor));
+}
+
 MeshWhSiRefPtr MeshWhSi::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
     const SdfPath& highlightHierarchyPrefix,
@@ -151,6 +163,10 @@ void MeshWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool 
             }
         }
     }
+
+    // When the selection state of a mesh prim changes, we need to send a signal to update primvars/overrideWireframeColor
+    // The handling of the lead selection vs active selection highlight is done in MhDirtyLeadObjectSceneIndex
+    _SendPrimsDirtied({ { primPath, { primvarsOverrideWireframeColorLocator } } });
 }
 
 void MeshWhSi::_CreateSelectionHighlight(const SdfPath& meshPath)
