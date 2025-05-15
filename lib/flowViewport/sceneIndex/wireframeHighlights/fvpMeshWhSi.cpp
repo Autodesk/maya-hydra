@@ -22,7 +22,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
-// Copied from fvpMeshWhSi.cpp
+// Copied from fvpBaseWhSi.cpp
 namespace {
     TF_DEFINE_PRIVATE_TOKENS(
         _tokens,
