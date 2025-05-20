@@ -173,7 +173,7 @@ namespace
 
             // Note: If the scene description doesn't provide the extents, Storm uses
             // the default constructed GfRange3d which is [FLT_MAX, -FLT_MAX],
-            GfVec3f exts[2] = { GfVec3f(1.0f), GfVec3f(-1.0f) };
+            GfVec3f exts[2] = { GfVec3f(0.5f), GfVec3f(-0.5f) };
             if (HdVec3dDataSourceHandle src = extentSchema.GetMin()) {
                 auto minExt = GfVec3f(src->GetTypedValue(shutterOffset));
                 if (minExt != _floatMaxVec3f) {

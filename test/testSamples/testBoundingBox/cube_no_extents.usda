@@ -8,7 +8,7 @@
 
 def Mesh "Cube1"
 {
-    vector3f xformOp:translate = ( 0, 0, 0 )
+    vector3f xformOp:translate = ( 1, 2, 2 )
     uniform token[] xformOpOrder = ["xformOp:translate"]
 
     int[] faceVertexCounts = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
