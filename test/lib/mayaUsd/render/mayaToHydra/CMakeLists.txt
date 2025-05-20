@@ -19,8 +19,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testTransforms.py
     testRefinement.py
 	testNewSceneWithStage.py
-    # To be reenabled after investigation
-    #testMayaDisplayModes.py|skipOnPlatform:osx
     testMayaShadingModes.py
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
@@ -33,6 +31,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testViewportFilters.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa
 	testBifrostGraphUpdate.py|depOnPlugins:bifrost
+	#End of tests that have a dependency on other plugins
     testLookThrough.py
     testObjectTemplate.py
     testStandardSurface.py
@@ -64,6 +63,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMeshWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
 	testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+	testMayaDisplayModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
