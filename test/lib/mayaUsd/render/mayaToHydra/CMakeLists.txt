@@ -18,7 +18,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStageAddPrim.py
     testTransforms.py
     testRefinement.py
-    testMaterialXOnNative.py|depOnPlugins:lookdevx
 	testNewSceneWithStage.py
     # To be reenabled after investigation
     #testMayaDisplayModes.py|skipOnPlatform:osx
@@ -28,13 +27,17 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaLights.py
     testUSDLights.py
     testUVandUDIM.py
+	#Tests that have a dependency on other plugins
+	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
+	testViewportFilters.py|depOnPlugins:mtoa
+	testMayaLightingModes.py|depOnPlugins:mtoa
+	testBifrostGraphUpdate.py|depOnPlugins:bifrost
     testLookThrough.py
     testObjectTemplate.py
     testStandardSurface.py
     testOpenPBRSurface.py
     testFlowViewportAPI.py
-    testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testStagePayloadsReferences.py
     testNurbsPrimitives.py
     testCurveTools.py
@@ -44,24 +47,24 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testGrid.py
     testUsdTextureToggle.py
     testUsdStageDefaultLighting.py
-    # To be reenabled after investigation
-    testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testPassingNormalsOnMayaNative.py
-    testViewportFilters.py|depOnPlugins:mtoa
     testMayaComponentsPicking.py
     testFlowPluginsHierarchicalProperties.py
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
-    testMayaLightingModes.py|depOnPlugins:mtoa
+	testSceneModified.py
+    testIsolateSelectWithGeomSubset.py
+    testMayaReference.py
+    testUsdInheritsSpecializes.py
+	#Disabled tests on OSX
+	testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testPointInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testGeomSubsetsWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testNativeInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testMeshWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-    testSceneModified.py
     testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
-    testIsolateSelectWithGeomSubset.py
-    testMayaReference.py
-    testUsdInheritsSpecializes.py
+	testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
@@ -87,6 +90,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
     cpp/testUsdStageInvalidate.py
+	#CPP tests disabled on OSX
     cpp/testWriteFile.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
 )
 
