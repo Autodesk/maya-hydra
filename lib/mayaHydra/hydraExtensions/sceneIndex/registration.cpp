@@ -303,4 +303,18 @@ void MayaHydraSceneIndexRegistry::_ProcessNodesAfterOpen()
     _nodesToProcessAfterOpenScene.clear();
 }
 
+void MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
+{
+    for (auto& reg : _registrations) {
+        auto& registration = reg.second;
+        if (registration->pluginSceneIndex) {
+            MayaUsdProxyShapeSceneIndexRefPtr proxyShapeSceneIndex
+                = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(registration->pluginSceneIndex);
+            if (proxyShapeSceneIndex && proxyShapeSceneIndex->HasPendingUpdates()) {
+                proxyShapeSceneIndex->PopulateAndApplyPendingChanges();
+            }
+        }
+    }
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE

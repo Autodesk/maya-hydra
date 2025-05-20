@@ -78,7 +78,7 @@ HdSceneIndexPrim NiPrototypeWhSi::GetHighlightPrim(const SdfPath &selectionPath,
     auto instanceTransforms = HdTypedSampledDataSource<VtArray<GfMatrix4d>>::Cast(instanceTransformsSchema.GetPrimvarValue());
     auto instanceXform = instanceTransforms->GetTypedValue(0)[instanceIndex];
     auto prototypeXform = HdXformSchema::GetFromParent(prim.dataSource).GetMatrix()->GetTypedValue(0);
-    dsEditor.Set(HdXformSchema::GetDefaultLocator().Append(HdXformSchemaTokens->matrix), HdRetainedTypedSampledDataSource<GfMatrix4d>::New(instanceXform * prototypeXform));    
+    dsEditor.Set(HdXformSchema::GetDefaultLocator().Append(HdXformSchemaTokens->matrix), HdRetainedTypedSampledDataSource<GfMatrix4d>::New(prototypeXform * instanceXform));
 
     dsEditor.Set(HdInstancedBySchema::GetDefaultLocator(), HdBlockDataSource::New());
 

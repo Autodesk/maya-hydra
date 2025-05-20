@@ -363,6 +363,8 @@ private:
     const Fvp::PathMapperConstPtr _mayaPathMapper{};
 
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex { nullptr };
+
+    bool _unregisterPickHandler{false};
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

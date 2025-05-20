@@ -75,6 +75,12 @@ public:
 
     virtual ~MayaUsdProxyShapeSceneIndexBase();
 
+    // When we receive a stage invalidate we remove the stage and set populate to false
+    // We need to re-populate to see the changes
+    //HasPendingUpdates() is true when this is the case
+    bool HasPendingUpdates() const;
+    void PopulateAndApplyPendingChanges();
+
     void Populate();
     void UpdateTime();
     static Ufe::Path InterpretRprimPath(const HdSceneIndexBaseRefPtr& sceneIndex,const SdfPath& path);
@@ -109,7 +115,6 @@ private:
     void _ObjectsChanged(const MAYAUSDAPI_NS::ProxyStageObjectsChangedNotice& notice);
     void _StageSet(const MAYAUSDAPI_NS::ProxyStageSetNotice& notice);
     void _StageInvalidate(const MAYAUSDAPI_NS::ProxyStageInvalidateNotice& notice);
-    void _PopulateAndApplyPendingChanges();
 
 private:
 

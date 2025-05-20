@@ -127,10 +127,10 @@ void MayaUsdProxyShapeSceneIndexBase::_StageInvalidate(const MAYAUSDAPI_NS::Prox
 void MayaUsdProxyShapeSceneIndexBase::_ObjectsChanged(
     const MAYAUSDAPI_NS::ProxyStageObjectsChangedNotice& notice)
 {
-    _PopulateAndApplyPendingChanges();
+    PopulateAndApplyPendingChanges();
 }
 
-void MayaUsdProxyShapeSceneIndexBase::_PopulateAndApplyPendingChanges() 
+void MayaUsdProxyShapeSceneIndexBase::PopulateAndApplyPendingChanges() 
 { 
     Populate();
     _usdImagingStageSceneIndex->ApplyPendingUpdates();
@@ -174,6 +174,13 @@ HdSceneIndexPrim MayaUsdProxyShapeSceneIndexBase::GetPrim(const SdfPath& primPat
 SdfPathVector MayaUsdProxyShapeSceneIndexBase::GetChildPrimPaths(const SdfPath& primPath) const
 {
     return GetInputSceneIndex()->GetChildPrimPaths(primPath);
+}
+
+bool MayaUsdProxyShapeSceneIndexBase::HasPendingUpdates() const
+{
+    //When we receive a stage invalidate we remove the stage and set populate to false
+    //We need to re-populate to see the changes
+    return (false == _populated);
 }
 
 } // namespace MAYAHYDRA_NS_DEF
