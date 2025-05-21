@@ -63,8 +63,9 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testNativeInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testMeshWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testStageInstanceablePrimsSelHighlight.py|skipOnPlatform:osx # HYDRA-1315 : Wire not showing on OSX
-	  testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
-	  testMayaDisplayModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+	testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+	#HYDRA-1660 re-enable testMayaDisplayModes
+	#testMayaDisplayModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
