@@ -173,21 +173,18 @@ namespace
 
             // Note: If the scene description doesn't provide the extents, Storm uses
             // the default constructed GfRange3d which is [FLT_MAX, -FLT_MAX],
-            GfVec3f exts[2] = { GfVec3f(0.0f), GfVec3f(0.0f) };
-            bool extentMinFound = false;
+            GfVec3f exts[2] = { GfVec3f(0.5f), GfVec3f(-0.5f) };
             if (HdVec3dDataSourceHandle src = extentSchema.GetMin()) {
-                exts[0] = GfVec3f(src->GetTypedValue(shutterOffset));
-                extentMinFound = (exts[0] != _floatMaxVec3f);
+                auto minExt = GfVec3f(src->GetTypedValue(shutterOffset));
+                if (minExt != _floatMaxVec3f) {
+                    exts[0] = minExt;
+                }
             }
-            bool extentMaxFound = false;
             if (HdVec3dDataSourceHandle src = extentSchema.GetMax()) {
-                exts[1] = GfVec3f(src->GetTypedValue(shutterOffset));
-                extentMaxFound = (exts[1] != -_floatMaxVec3f);
-            }
-
-            if (!extentMinFound || !extentMaxFound) {
-                // If extent is not given, no bounding box will be displayed
-                return VtVec3fArray();
+                auto maxExt = GfVec3f(src->GetTypedValue(shutterOffset));
+                if (maxExt != -_floatMaxVec3f) {
+                    exts[1] = maxExt;
+                }
             }
 
             /// Compute 8 points on box.
