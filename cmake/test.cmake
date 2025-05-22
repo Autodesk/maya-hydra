@@ -367,13 +367,29 @@ finally:
         list(APPEND MAYAUSD_VARNAME_PATH
              "${LOOKDEVX_LOCATION}/plug-ins")
         list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
-             "${LOOKDEVX_LOCATION}/AEtemplate")
+             "${LOOKDEVX_LOCATION}/scripts") #Contains some AE templates files
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH
-             "${LOOKDEVX_LOCATION}/scripts")
+             "${LOOKDEVX_LOCATION}/scripts")#Contains some python scripts
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH
              "${LOOKDEVX_LOCATION}/python")
         list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
              "${LOOKDEVX_LOCATION}/plug-ins")
+    endif()
+
+    # bifrost
+    if(DEFINED BIFROST_LOCATION)
+        list(APPEND MAYAUSD_VARNAME_PATH
+             "${BIFROST_LOCATION}/bin")
+        list(APPEND MAYAUSD_VARNAME_PATH
+             "${BIFROST_LOCATION}/plug-ins")
+        list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
+             "${BIFROST_LOCATION}/scripts")#Contains some AE templates files
+        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
+             "${BIFROST_LOCATION}/scripts")#Contains some python scripts
+        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
+             "${BIFROST_LOCATION}/python")
+        list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
+             "${BIFROST_LOCATION}/plug-ins")
     endif()
 
     if(IS_WINDOWS AND DEFINED ENV{PYTHONHOME})
