@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import sys
+sys.path.append(r'C:\Users\cossetr\source\hydra1\maya-hydra\test\testUtils') # To allow running the test inside maya
+
 import maya.cmds as cmds
 import maya.mel
 
