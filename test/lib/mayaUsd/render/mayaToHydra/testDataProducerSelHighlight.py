@@ -21,6 +21,7 @@ import mayaUtils
 import ufe
 import platform
 
+
 class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
@@ -122,8 +123,8 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         self.assertSnapshotClose("Storm_WireOnShaded_AllSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def impl_LeadAndActiveColorsSelectionHighlighting(self, img_version:str):
-        print(f'TESTING VARIANT: {img_version}')
         # Select objects to check if the lead / active selection highlight colors work
+        # TODO fix bug in imageUtils.py assertSnapshotClose with image path?
         ufeGlobalSel =  ufe.GlobalSelection.get()
         ufeGlobalSel.clear()
         ufeGlobalSel.append(self.pSphere1UfeItem)
@@ -156,8 +157,8 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         self.impl_LeadAndActiveColorsSelectionHighlighting("smoothShaded")
 
         #Switch to wireframe display mode
-        #cmds.modelEditor(panel, edit=True, displayAppearance="wireframe")
-        #self.impl_LeadAndActiveColorsSelectionHighlighting("wireframe")
+        cmds.modelEditor(panel, edit=True, displayAppearance="wireframe")
+        self.impl_LeadAndActiveColorsSelectionHighlighting("wireframe")
 
         #Switch to wireframe on shaded display mode
         #cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
