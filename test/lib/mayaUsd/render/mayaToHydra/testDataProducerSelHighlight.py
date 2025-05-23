@@ -123,26 +123,34 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         self.assertSnapshotClose("Storm_WireOnShaded_AllSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def impl_LeadAndActiveColorsSelectionHighlighting(self, img_version:str):
+        def assertSnapshotCloseImpl(img_name:str):
+            self.assertSnapshotClose(img_name, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion=img_version)
+
         # Select objects to check if the lead / active selection highlight colors work
         # TODO fix bug in imageUtils.py assertSnapshotClose with image path?
         ufeGlobalSel =  ufe.GlobalSelection.get()
         ufeGlobalSel.clear()
+        assertSnapshotCloseImpl("Storm_0_NoSelected.png")
         ufeGlobalSel.append(self.pSphere1UfeItem)
-        self.assertSnapshotClose("Storm_1_S1Selected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion=img_version)
+        assertSnapshotCloseImpl("Storm_1_S1Selected.png")
         ufeGlobalSel.append(self.pSphere2UfeItem)
-        self.assertSnapshotClose("Storm_2_S2Selected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion=img_version)
+        assertSnapshotCloseImpl("Storm_2_S2Selected.png")
         ufeGlobalSel.append(self.pTorusUfeItem)
-        self.assertSnapshotClose("Storm_3_TSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion=img_version)
+        assertSnapshotCloseImpl("Storm_3_TSelected.png")
         ufeGlobalSel.append(self.pPlaneUfeItem)
-        self.assertSnapshotClose("Storm_4_PSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion=img_version)
+        assertSnapshotCloseImpl("Storm_4_PSelected.png")
 
         #Remove the lead object
         ufeGlobalSel.remove(self.pPlaneUfeItem)
-        self.assertSnapshotClose("Storm_5_PRemoved.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion=img_version)
+        assertSnapshotCloseImpl("Storm_5_PRemoved.png")
 
         #Remove a non lead object
         ufeGlobalSel.remove(self.pSphere1UfeItem)
-        self.assertSnapshotClose("Storm_6_S1Removed.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion=img_version)
+        assertSnapshotCloseImpl("Storm_6_S1Removed.png")
+
+        # De-select everything
+        ufeGlobalSel.clear()
+        assertSnapshotCloseImpl("Storm_0_NoSelected.png")
 
     def test_LeadAndActiveColorsSelectionHighlighting(self):
         
@@ -161,9 +169,9 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         self.impl_LeadAndActiveColorsSelectionHighlighting("wireframe")
 
         #Switch to wireframe on shaded display mode
-        #cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
-        #cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
-        #self.impl_LeadAndActiveColorsSelectionHighlighting("wireframeOnShaded")
+        cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
+        cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
+        self.impl_LeadAndActiveColorsSelectionHighlighting("wireframeOnShaded")
     
     #We want to check that when we select the maya usd proxy shape node it highlights all primitives from the stage
     def aaatest_MayaUsdNodesSelectionHighlighting(self):
