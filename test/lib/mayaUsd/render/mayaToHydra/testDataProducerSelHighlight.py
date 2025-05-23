@@ -82,7 +82,7 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         self.assertIsNotNone(self.pPlaneUfeItem)
         
 
-    def aaatest_UsdKeepSelectionHighlighting(self):
+    def test_UsdKeepSelectionHighlighting(self):
         
         self.loadFileAndInitUfeVariables()
 
@@ -173,7 +173,7 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         self.impl_LeadAndActiveColorsSelectionHighlighting("wireframeOnShaded")
     
     #We want to check that when we select the maya usd proxy shape node it highlights all primitives from the stage
-    def aaatest_MayaUsdNodesSelectionHighlighting(self):
+    def test_MayaUsdNodesSelectionHighlighting(self):
         
         self.loadFileAndInitUfeVariables()
 
