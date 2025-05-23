@@ -48,6 +48,7 @@ def snapshot(outputPath, width=400, height=None):
     # if given relative path, make it relative to current dir (the test
     # temp base), rather than the workspace dir
     outputPath = os.path.abspath(outputPath)
+    os.makedirs(os.path.dirname(outputPath), exist_ok=True)
 
     # save the old output image format
     oldFormat = cmds.getAttr("defaultRenderGlobals.imageFormat")
@@ -211,8 +212,11 @@ class ImageDiffingTestCase:
         self.assertImagesClose(imagePath1, imagePath2, fail=None, failpercent=None)
     
     def assertSnapshotClose(self, refImagePath, fail, failpercent, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
-        snapImagePath = os.path.join(self.getSnapshotDir(), os.path.basename(refImagePath))
+                warn=None, warnpercent=None, hardwarn=None, perceptual=False, *, imageVersion=None):
+        if imageVersion is not None:
+            snapImagePath = os.path.join(self.getSnapshotDir(), imageVersion, os.path.basename(refImagePath))
+        else:
+            snapImagePath = os.path.join(self.getSnapshotDir(), os.path.basename(refImagePath))
         snapshot(snapImagePath)
         
         return self.assertImagesClose(refImagePath, snapImagePath, 

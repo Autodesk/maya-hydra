@@ -254,7 +254,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                 warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         refImagePath = self.resolveRefImage(refImage, imageVersion)
         super(MayaHydraBaseTestCase, self).assertSnapshotClose(refImagePath, fail, failpercent, hardfail,
-                            warn, warnpercent, hardwarn, perceptual)
+                            warn, warnpercent, hardwarn, perceptual, imageVersion=imageVersion)
 
     def assertSnapshotEqual(self, refImage, imageVersion=None):
         '''Use of this method is discouraged, as renders can vary slightly between renderer architectures.'''

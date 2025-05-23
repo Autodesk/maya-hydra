@@ -122,12 +122,11 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
         self.assertSnapshotClose("Storm_WireOnShaded_AllSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-    def impl_LeadAndActiveColorsSelectionHighlighting(self, img_version:str):
+    def impl_LeadAndActiveColorsSelectionHighlighting(self, imageVersion:str):
         def assertSnapshotCloseImpl(img_name:str):
-            self.assertSnapshotClose(img_name, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion=img_version)
+            self.assertSnapshotClose(img_name, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion=imageVersion)
 
         # Select objects to check if the lead / active selection highlight colors work
-        # TODO fix bug in imageUtils.py assertSnapshotClose with image path?
         ufeGlobalSel =  ufe.GlobalSelection.get()
         ufeGlobalSel.clear()
         assertSnapshotCloseImpl("Storm_0_NoSelected.png")
