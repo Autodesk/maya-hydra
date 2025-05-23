@@ -14,7 +14,7 @@
 //
 
 #include "fvpMeshWhSi.h"
-
+#include <flowViewport/tokens.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/tokens.h>
 
@@ -22,17 +22,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
-// Copied from fvpBaseWhSi.cpp
-namespace {
-    TF_DEFINE_PRIVATE_TOKENS(
-        _tokens,
-        // Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
-        (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
-    );
-
-    const HdDataSourceLocator primvarsOverrideWireframeColorLocator(
-        HdPrimvarsSchema::GetDefaultLocator().Append(_tokens->overrideWireframeColor));
-}
+DEFINE_PRIVATE_OVERRIDEWIREFRAMECOLOR_TOKEN
 
 MeshWhSiRefPtr MeshWhSi::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
