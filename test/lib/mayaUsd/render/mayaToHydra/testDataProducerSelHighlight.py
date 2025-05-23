@@ -21,7 +21,6 @@ import mayaUtils
 import ufe
 import platform
 
-
 class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
