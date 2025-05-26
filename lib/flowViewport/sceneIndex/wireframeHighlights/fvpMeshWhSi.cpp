@@ -14,13 +14,15 @@
 //
 
 #include "fvpMeshWhSi.h"
-
+#include <flowViewport/tokens.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/tokens.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
+
+DEFINE_PRIVATE_OVERRIDEWIREFRAMECOLOR_TOKEN
 
 MeshWhSiRefPtr MeshWhSi::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
@@ -151,6 +153,12 @@ void MeshWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool 
             }
         }
     }
+
+    // When the selection state of a mesh prim changes, we need to send a signal to update primvars/overrideWireframeColor.
+    // overrideWireframeColor only exists when wireframe is enabled.
+    // We assume that dirtying overrideWireframeColor even if it doesn't exist is less expensive than to check if it exists.
+    // The handling of the lead selection vs active selection highlight is done elsewhere in MhDirtyLeadObjectSceneIndex.
+    _SendPrimsDirtied({ { primPath, { primvarsOverrideWireframeColorLocator } } });
 }
 
 void MeshWhSi::_CreateSelectionHighlight(const SdfPath& meshPath)
