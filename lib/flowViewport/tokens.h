@@ -61,4 +61,14 @@ PXR_NAMESPACE_CLOSE_SCOPE
 //
 // PPT, 18-Sep-2023.
 
+// Define a token to Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color.
+// Works in HdStorm to override the wireframe color.
+// FLOW_VIEWPORT_TODO: figure out how to define this publicly without using a macro
+#define DEFINE_PRIVATE_OVERRIDEWIREFRAMECOLOR_TOKEN \
+namespace {\
+    TF_DEFINE_PRIVATE_TOKENS(_tokens, (overrideWireframeColor));\
+    const HdDataSourceLocator primvarsOverrideWireframeColorLocator(\
+        HdPrimvarsSchema::GetDefaultLocator().Append(_tokens->overrideWireframeColor));\
+}
+
 #endif //FVP_TOKENS_H

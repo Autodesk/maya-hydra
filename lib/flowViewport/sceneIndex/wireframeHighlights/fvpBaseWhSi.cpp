@@ -16,6 +16,7 @@
 #include "fvpBaseWhSi.h"
 
 #include <flowViewport/fvpUtils.h>
+#include <flowViewport/tokens.h>
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/staticTokens.h>
@@ -44,13 +45,9 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace {
-TF_DEFINE_PRIVATE_TOKENS(
-    _tokens,
+DEFINE_PRIVATE_OVERRIDEWIREFRAMECOLOR_TOKEN
 
-    // Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
-    (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
- );
+namespace {
 
 const HdRetainedContainerDataSourceHandle refinedWireDisplayStyleDataSource
     = HdRetainedContainerDataSource::New(
@@ -63,9 +60,6 @@ const HdRetainedContainerDataSourceHandle refinedWireDisplayStyleDataSource
 const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
         HdLegacyDisplayStyleSchemaTokens->reprSelector);
-
-const HdDataSourceLocator primvarsOverrideWireframeColorLocator(
-        HdPrimvarsSchema::GetDefaultLocator().Append(_tokens->overrideWireframeColor));
 
 const HdDataSourceLocator pointsValueLocator = HdDataSourceLocator(
     HdPrimvarsSchemaTokens->primvars,

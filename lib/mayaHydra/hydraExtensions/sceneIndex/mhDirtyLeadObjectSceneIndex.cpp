@@ -17,6 +17,8 @@
 //Local headers
 #include "mhDirtyLeadObjectSceneIndex.h"
 
+#include <flowViewport/tokens.h>
+
 // Hydra headers
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/tokens.h>
@@ -31,18 +33,11 @@ PXR_NAMESPACE_USING_DIRECTIVE
 // path when a change in the lead object selection has happened.
 namespace MAYAHYDRA_NS_DEF {
 
-namespace {
-    //Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
-    TF_DEFINE_PRIVATE_TOKENS(
-         _primVarsTokens,
- 
-         (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
-     );
+DEFINE_PRIVATE_OVERRIDEWIREFRAMECOLOR_TOKEN
 
-    const HdDataSourceLocatorSet primvarsColorsLocatorSet{  HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),
+static const HdDataSourceLocatorSet primvarsColorsLocatorSet{ primvarsOverrideWireframeColorLocator,
                                                             HdPrimvarsSchema::GetDefaultLocator().Append(HdTokens->displayColor)
                                                          };
-}
 
 void MhDirtyLeadObjectSceneIndex::dirtyLeadObjectRelatedSelections(const Fvp::PrimSelections& previousLeadObjectPrimSelections, const Fvp::PrimSelections& currentLeadObjectPrimSelections)
 {
