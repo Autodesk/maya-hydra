@@ -365,8 +365,6 @@ finally:
         list(APPEND MAYAUSD_VARNAME_PATH
              "${LOOKDEVX_LOCATION}/bin")
         list(APPEND MAYAUSD_VARNAME_PATH
-             "${LOOKDEVX_LOCATION}/thirdparty/bin")
-        list(APPEND MAYAUSD_VARNAME_PATH
              "${LOOKDEVX_LOCATION}/plug-ins")
         list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
              "${LOOKDEVX_LOCATION}/scripts") #Contains some AE templates files
@@ -388,6 +386,8 @@ finally:
     if(DEFINED BIFROST_LOCATION)
         list(APPEND MAYAUSD_VARNAME_PATH
              "${BIFROST_LOCATION}/bin")
+        list(APPEND MAYAUSD_VARNAME_PATH
+             "${LOOKDEVX_LOCATION}/thirdparty/bin")
         list(APPEND MAYAUSD_VARNAME_PATH
              "${BIFROST_LOCATION}/plug-ins")
         list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
