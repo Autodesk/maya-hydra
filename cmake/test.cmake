@@ -385,6 +385,10 @@ finally:
     
     if(DEFINED BIFROST_LOCATION)
         list(APPEND MAYAUSD_VARNAME_PATH
+             "${BIFROST_LOCATION}/../vnn/bin")
+        list(APPEND MAYAUSD_VARNAME_PATH
+             "${BIFROST_LOCATION}/../vnn/thirdparty/bin")
+        list(APPEND MAYAUSD_VARNAME_PATH
              "${BIFROST_LOCATION}/bin")
         list(APPEND MAYAUSD_VARNAME_PATH
              "${LOOKDEVX_LOCATION}/thirdparty/bin")
@@ -392,6 +396,8 @@ finally:
              "${BIFROST_LOCATION}/plug-ins")
         list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
              "${BIFROST_LOCATION}/scripts")#Contains some AE templates files
+        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
+             "${BIFROST_LOCATION}/python/site-packages/bifrost")#Contains some python scripts
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH
              "${BIFROST_LOCATION}/scripts")#Contains some python scripts
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH
