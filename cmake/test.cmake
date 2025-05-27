@@ -365,6 +365,8 @@ finally:
         list(APPEND MAYAUSD_VARNAME_PATH
              "${LOOKDEVX_LOCATION}/bin")
         list(APPEND MAYAUSD_VARNAME_PATH
+             "${LOOKDEVX_LOCATION}/thirdparty/bin")
+        list(APPEND MAYAUSD_VARNAME_PATH
              "${LOOKDEVX_LOCATION}/plug-ins")
         list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
              "${LOOKDEVX_LOCATION}/scripts") #Contains some AE templates files
@@ -376,26 +378,13 @@ finally:
              "${LOOKDEVX_LOCATION}/plug-ins")
     endif()
 
-    # bifrost
-    # Debug Print all subfolders from BIFROST_LOCATION
-    if(DEFINED BIFROST_LOCATION)
-        file(GLOB subdirs LIST_DIRECTORIES true "${BIFROST_LOCATION}/*")
-        foreach(subdir ${subdirs})
-            if(IS_DIRECTORY "${subdir}")
-                message(STATUS "BIFROST subfolder: ${subdir}")
-            endif()
-        endforeach()
-
-        # Check if ${BIFROST_LOCATION}/plug-ins exists
-        if(IS_DIRECTORY "${BIFROST_LOCATION}/plug-ins")
-            message(STATUS "${BIFROST_LOCATION}/plug-ins exists.")
-        else()
-            message(WARNING "${BIFROST_LOCATION}/plug-ins does not exist.")
-        endif()
+    # Check if ${BIFROST_LOCATION}/plug-ins exists
+    if(IS_DIRECTORY "${BIFROST_LOCATION}/plug-ins")
+        message(STATUS "${BIFROST_LOCATION}/plug-ins exists.")
     else()
-        message(WARNING "BIFROST_LOCATION is not defined.")
+        message(WARNING "${BIFROST_LOCATION}/plug-ins does not exist.")
     endif()
-
+    
     if(DEFINED BIFROST_LOCATION)
         list(APPEND MAYAUSD_VARNAME_PATH
              "${BIFROST_LOCATION}/bin")
