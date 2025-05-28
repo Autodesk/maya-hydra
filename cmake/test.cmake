@@ -390,12 +390,10 @@ finally:
             file(WRITE "${BIFROST_MOD}" "${BIFROST_CONTENTS}")
             if(EXISTS "${BIFROST_MOD}")
                 message(STATUS "bifrost.mod was successfully written at: ${BIFROST_MOD}")
+                list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH "${BIFROST_LOCATION}/..") #Add the common location for bifrost and vnn .mod files
             else()
                 message(FATAL_ERROR "Failed to write bifrost.mod at: ${BIFROST_MOD}")
             endif()
-            list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH "${BIFROST_MOD}")
-            message(STATUS "MAYAUSD_VARNAME_MAYA_MODULE_PATH after bifrost.mod: ${MAYAUSD_VARNAME_MAYA_MODULE_PATH}")
-
         else()
             message(FATAL_ERROR "bifrost.template does not exist at: ${BIFROST_LOCATION}/../bifrost.template")
         endif()
@@ -413,9 +411,6 @@ finally:
             else()
                 message(FATAL_ERROR "Failed to write vnn.mod at: ${VNN_MOD}")
             endif()
-            list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH "${VNN_MOD}")
-            message(STATUS "MAYAUSD_VARNAME_MAYA_MODULE_PATH after vnn.mod: ${MAYAUSD_VARNAME_MAYA_MODULE_PATH}")
-
         else()
             message(FATAL_ERROR "vnn.template does not exist at: ${BIFROST_LOCATION}/../vnn.template")
         endif()
