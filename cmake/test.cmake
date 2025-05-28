@@ -379,14 +379,15 @@ finally:
     if(DEFINED BIFROST_LOCATION)
         #The bifrost package contains 2 template files that are used to generate the bifrost.mod and vnn.mod files
         #These files are used to set the environment variables for Bifrost and VNN plugins in Maya.
-        #Create the bifrost.mod and vnn.mod files in the parent directory of Bifrost location
+        #Create the bifrost.mod and vnn.mod files in the parent directory of Bifrost location by replacing <BIFROST_DIR> with bifrost and 
+        # <PLUGIN_DIR> with vnn in the bifrost.template and vnn.template files respectively.
         # Check if bifrost.template exists
         if(EXISTS "${BIFROST_LOCATION}/../bifrost.template")
             set(BIFROST_TEMPLATE "${BIFROST_LOCATION}/../bifrost.template")
             set(BIFROST_MOD      "${BIFROST_LOCATION}/../bifrost.mod")
             file(READ "${BIFROST_TEMPLATE}" BIFROST_CONTENTS)
             string(REPLACE "<BIFROST_DIR>" "bifrost" BIFROST_CONTENTS "${BIFROST_CONTENTS}")
-            message(STATUS "bifrost.mod content after replacement:\n${BIFROST_CONTENTS}")
+            #message(STATUS "bifrost.mod content after replacement:\n${BIFROST_CONTENTS}")
             file(WRITE "${BIFROST_MOD}" "${BIFROST_CONTENTS}")
             if(EXISTS "${BIFROST_MOD}")
                 message(STATUS "bifrost.mod was successfully written at: ${BIFROST_MOD}")
@@ -404,7 +405,7 @@ finally:
             set(VNN_MOD      "${BIFROST_LOCATION}/../vnn.mod")
             file(READ "${VNN_TEMPLATE}" VNN_CONTENTS)
             string(REPLACE "<PLUGIN_DIR>" "vnn" VNN_CONTENTS "${VNN_CONTENTS}")
-            message(STATUS "vnn.mod content after replacement:\n${VNN_CONTENTS}")
+            #message(STATUS "vnn.mod content after replacement:\n${VNN_CONTENTS}")
             file(WRITE "${VNN_MOD}" "${VNN_CONTENTS}")
             if(EXISTS "${VNN_MOD}")
                 message(STATUS "vnn.mod was successfully written at: ${VNN_MOD}")
@@ -414,27 +415,6 @@ finally:
         else()
             message(FATAL_ERROR "vnn.template does not exist at: ${BIFROST_LOCATION}/../vnn.template")
         endif()
-
-        #list(APPEND MAYAUSD_VARNAME_PATH
-        #     "${BIFROST_LOCATION}/../vnn/bin")
-        #list(APPEND MAYAUSD_VARNAME_PATH
-        #     "${BIFROST_LOCATION}/../vnn/thirdparty/bin")
-        #list(APPEND MAYAUSD_VARNAME_PATH
-        #     "${BIFROST_LOCATION}/bin")
-        #list(APPEND MAYAUSD_VARNAME_PATH
-        #     "${BIFROST_LOCATION}/thirdparty/bin")
-        #list(APPEND MAYAUSD_VARNAME_PATH
-        #     "${BIFROST_LOCATION}/plug-ins")
-        #list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
-        #     "${BIFROST_LOCATION}/scripts")#Contains some AE templates files
-        #list(APPEND MAYAUSD_VARNAME_PYTHONPATH
-        #     "${BIFROST_LOCATION}/python/site-packages/bifrost")#Contains some python scripts
-        #list(APPEND MAYAUSD_VARNAME_PYTHONPATH
-        #     "${BIFROST_LOCATION}/scripts")#Contains some python scripts
-        #list(APPEND MAYAUSD_VARNAME_PYTHONPATH
-        #     "${BIFROST_LOCATION}/python")
-        #list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
-        #     "${BIFROST_LOCATION}/plug-ins")
     endif()
 
     if(IS_WINDOWS AND DEFINED ENV{PYTHONHOME})
