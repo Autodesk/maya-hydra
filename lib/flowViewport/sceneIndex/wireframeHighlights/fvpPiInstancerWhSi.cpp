@@ -57,26 +57,26 @@ _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTop
         selections.IsDefined() ? VtBoolArray(nbInstances, false) : 
         (originalMask.empty() ? VtBoolArray(nbInstances, true) : originalMask);
 
-    // Don't quite know what to do with this yet.  PPT, 22-May-2025.
-#if 0
-    // Instancer is expected to be marked "fully selected" even if only certain instances are selected,
-    // based on USD's _AddToSelection function in selectionSceneIndexObserver.cpp :
-    // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
-    if (!selection.GetFullySelected() || !selection.GetFullySelected()->GetTypedValue(0)) {
-        return originalMask;
-    }
-    if (!selection.GetNestedInstanceIndices()) {
-        // We have a selection that has no instances, which means the whole instancer is selected :
-        // this overrides any instances selection.
-        return originalMask;
-    }
-#endif
-
     // Loop over all selections.
     const auto nbSelections = selections.GetNumElements();
     for (size_t snNdx = 0; snNdx < nbSelections; ++snNdx) {
         const auto sn = selections.GetElement(snNdx);
+        // Instancer is expected to be marked "fully selected" even if only
+        // certain instances are selected, based on USD's _AddToSelection
+        // function in selectionSceneIndexObserver.cpp :
+        // https://github.com/PixarAnimationStudios/OpenUSD/blob/f7b8a021ce3d13f91a0211acf8a64a8b780524df/pxr/imaging/hdx/selectionSceneIndexObserver.cpp#L212-L251
+        const auto fullySelected = sn.GetFullySelected();
+        if (!fullySelected || !fullySelected->GetTypedValue(0)) {
+            return originalMask;
+        }
+
         const auto nestedInstanceIndices = sn.GetNestedInstanceIndices();
+        if (!nestedInstanceIndices) {
+            // We have a selection that has no instances, which means the whole
+            // instancer is selected : this overrides any instances selection.
+            return originalMask;
+        }
+
         for (size_t iInstanceIndices = 0; iInstanceIndices < nestedInstanceIndices.GetNumElements(); iInstanceIndices++) {
             auto instanceIndices = nestedInstanceIndices.GetElement(0);
             for (const auto& instanceIndex : instanceIndices.GetInstanceIndices()->GetTypedValue(0)) {
