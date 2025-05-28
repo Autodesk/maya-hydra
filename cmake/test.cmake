@@ -376,34 +376,46 @@ finally:
              "${LOOKDEVX_LOCATION}/plug-ins")
     endif()
 
-    # Check if ${BIFROST_LOCATION}/plug-ins exists
-    if(IS_DIRECTORY "${BIFROST_LOCATION}/plug-ins")
-        message(STATUS "${BIFROST_LOCATION}/plug-ins exists.")
-    else()
-        message(WARNING "${BIFROST_LOCATION}/plug-ins does not exist.")
-    endif()
-    
     if(DEFINED BIFROST_LOCATION)
-        list(APPEND MAYAUSD_VARNAME_PATH
-             "${BIFROST_LOCATION}/../vnn/bin")
-        list(APPEND MAYAUSD_VARNAME_PATH
-             "${BIFROST_LOCATION}/../vnn/thirdparty/bin")
-        list(APPEND MAYAUSD_VARNAME_PATH
-             "${BIFROST_LOCATION}/bin")
-        list(APPEND MAYAUSD_VARNAME_PATH
-             "${LOOKDEVX_LOCATION}/thirdparty/bin")
-        list(APPEND MAYAUSD_VARNAME_PATH
-             "${BIFROST_LOCATION}/plug-ins")
-        list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
-             "${BIFROST_LOCATION}/scripts")#Contains some AE templates files
-        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
-             "${BIFROST_LOCATION}/python/site-packages/bifrost")#Contains some python scripts
-        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
-             "${BIFROST_LOCATION}/scripts")#Contains some python scripts
-        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
-             "${BIFROST_LOCATION}/python")
-        list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
-             "${BIFROST_LOCATION}/plug-ins")
+        #The bifrost package contains 2 template files that are used to generate the bifrost.mod and vnn.mod files
+        #These files are used to set the environment variables for Bifrost and VNN plugins in Maya.
+        #Create the bifrost.mod and vnn.mod files in the parent directory of Bifrost location
+        set(BIFROST_TEMPLATE "${BIFROST_LOCATION}/../bifrost.template")
+        set(BIFROST_MOD      "${BIFROST_LOCATION}/../bifrost.mod")
+        file(READ "${BIFROST_TEMPLATE}" BIFROST_CONTENTS)
+        string(REPLACE "<BIFROST_DIR>" "bifrost" BIFROST_CONTENTS "${BIFROST_CONTENTS}")
+        file(WRITE "${BIFROST_MOD}" "${BIFROST_CONTENTS}")
+        # Add the Bifrost mod file to the MAYA_MODULE_PATH so that Maya can find it.
+        list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH "${BIFROST_LOCATION}/../bifrost.mod")
+
+        set(VNN_TEMPLATE "${BIFROST_LOCATION}/../vnn.template")
+        set(VNN_MOD      "${BIFROST_LOCATION}/../vnn.mod")
+        file(READ "${VNN_TEMPLATE}" VNN_CONTENTS)
+        string(REPLACE "<PLUGIN_DIR>" "vnn" VNN_CONTENTS "${VNN_CONTENTS}")
+        file(WRITE "${VNN_MOD}" "${VNN_CONTENTS}")
+        # Add the VNN mod file to the MAYA_MODULE_PATH so that Maya can find it.
+        list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH "${BIFROST_LOCATION}/../vnn.mod")
+
+        #list(APPEND MAYAUSD_VARNAME_PATH
+        #     "${BIFROST_LOCATION}/../vnn/bin")
+        #list(APPEND MAYAUSD_VARNAME_PATH
+        #     "${BIFROST_LOCATION}/../vnn/thirdparty/bin")
+        #list(APPEND MAYAUSD_VARNAME_PATH
+        #     "${BIFROST_LOCATION}/bin")
+        #list(APPEND MAYAUSD_VARNAME_PATH
+        #     "${BIFROST_LOCATION}/thirdparty/bin")
+        #list(APPEND MAYAUSD_VARNAME_PATH
+        #     "${BIFROST_LOCATION}/plug-ins")
+        #list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
+        #     "${BIFROST_LOCATION}/scripts")#Contains some AE templates files
+        #list(APPEND MAYAUSD_VARNAME_PYTHONPATH
+        #     "${BIFROST_LOCATION}/python/site-packages/bifrost")#Contains some python scripts
+        #list(APPEND MAYAUSD_VARNAME_PYTHONPATH
+        #     "${BIFROST_LOCATION}/scripts")#Contains some python scripts
+        #list(APPEND MAYAUSD_VARNAME_PYTHONPATH
+        #     "${BIFROST_LOCATION}/python")
+        #list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
+        #     "${BIFROST_LOCATION}/plug-ins")
     endif()
 
     if(IS_WINDOWS AND DEFINED ENV{PYTHONHOME})
