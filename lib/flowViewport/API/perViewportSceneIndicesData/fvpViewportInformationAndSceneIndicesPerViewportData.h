@@ -76,7 +76,13 @@ private:
     void _AddAllDataProducerSceneIndexToMergingSCeneIndex();
 };
 
-using ViewportInformationAndSceneIndicesPerViewportDataVector = std::vector<ViewportInformationAndSceneIndicesPerViewportData>;
+// Use std::list container that does not reallocate on adding an element.  Use
+// of std::vector means that adding to the container with e.g. emplace_back can
+// reallocate, which means calling the
+// ViewportInformationAndSceneIndicesPerViewportData destructor for each
+// element in the container.  This causes the scene to be emptied for all
+// viewports.
+using ViewportInformationAndSceneIndicesPerViewportDataVector = std::list<ViewportInformationAndSceneIndicesPerViewportData>;
 
 } //End of namespace FVP_NS_DEF
 

@@ -128,7 +128,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 // Remove this once the code has been moved to the MayaHydra namespace.
 using namespace MayaHydra;
 
-TF_DEFINE_ENV_SETTING(MAYA_HYDRA_USE_MESH_ADAPTER, false,
+TF_DEFINE_ENV_SETTING(MAYA_HYDRA_USE_MESH_ADAPTER, true,
     "Use mesh adapter instead of MRenderItem for Maya meshes.");
 
 TF_DEFINE_ENV_SETTING(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA, true,
