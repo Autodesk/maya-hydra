@@ -43,6 +43,8 @@
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/mergingSceneIndex.h>
 
+#include <map>
+
 PXR_NAMESPACE_OPEN_SCOPE
 class HdRenderIndex;
 PXR_NAMESPACE_CLOSE_SCOPE
@@ -74,7 +76,7 @@ public:
     void InsertSceneIndex(
         const PXR_NS::HdSceneIndexBaseRefPtr& inputScene,
         const PXR_NS::SdfPath&                scenePathPrefix,
-        bool                                  needsPrefixing = true);
+        bool                                  needsPrefixing = false);
 
     FVP_API
     void RemoveSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr &inputScene);
@@ -94,10 +96,15 @@ public:
     FVP_API
     std::string GetRendererDisplayName() const;
 
+    FVP_API
+    std::set<PXR_NS::SdfPath> GetSceneRoots() const;
+
 private:
 
     PXR_NS::HdRenderIndex&            _renderIndex;
     PXR_NS::HdMergingSceneIndexRefPtr _mergingSceneIndex;
+
+    std::map<PXR_NS::HdSceneIndexBaseRefPtr, PXR_NS::SdfPath> _sceneRoots;
 };
 
 }//End of namespace FVP_NS_DEF

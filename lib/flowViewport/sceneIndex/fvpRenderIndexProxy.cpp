@@ -77,7 +77,7 @@ RenderIndexProxy::RenderIndexProxy(PXR_NS::HdRenderIndex& renderIndex) :
 void RenderIndexProxy::InsertSceneIndex(
     const PXR_NS::HdSceneIndexBaseRefPtr& inputScene,
     const PXR_NS::SdfPath&                scenePathPrefix,
-    bool                                  needsPrefixing /* = true */
+    bool                                  needsPrefixing /* = false */
 )
 {
     // Copy-pasted and adapted from USD 0.23.08
@@ -88,7 +88,9 @@ void RenderIndexProxy::InsertSceneIndex(
         resolvedScene = HdPrefixingSceneIndex::New(inputScene, scenePathPrefix);
     }
 
-    _mergingSceneIndex->AddInputScene(resolvedScene, scenePathPrefix);
+    _mergingSceneIndex->AddInputScene(resolvedScene, needsPrefixing ? scenePathPrefix : SdfPath::AbsoluteRootPath());
+
+    _sceneRoots[inputScene] = scenePathPrefix;
 }
     
 void RenderIndexProxy::RemoveSceneIndex(
@@ -116,12 +118,20 @@ void RenderIndexProxy::RemoveSceneIndex(
     for (const auto& resolvedScene : resolvedScenes) {
         if (inputScene == resolvedScene) {
             _mergingSceneIndex->RemoveInputScene(resolvedScene);
+            const auto& it = _sceneRoots.find(inputScene);
+            if (it != _sceneRoots.cend()) {
+                _sceneRoots.erase(it);
+            }
             return;
         }
         if (HdPrefixingSceneIndexRefPtr const prefixingScene =
                 TfDynamic_cast<HdPrefixingSceneIndexRefPtr>(resolvedScene)) {
             if (inputScene == _GetInputScene(prefixingScene)) {
                 _mergingSceneIndex->RemoveInputScene(resolvedScene);
+                const auto& it = _sceneRoots.find(inputScene);
+                if (it != _sceneRoots.cend()) {
+                    _sceneRoots.erase(it);
+                }
                 return;
             }
         }
@@ -148,6 +158,15 @@ std::string RenderIndexProxy::GetRendererDisplayName() const
     }
     
     return rd->GetRendererDisplayName();
+}
+
+std::set<PXR_NS::SdfPath> RenderIndexProxy::GetSceneRoots() const
+{ 
+    std::set<PXR_NS::SdfPath> sceneRoot;
+    for (auto& it = _sceneRoots.cbegin(); it != _sceneRoots.cend(); it++) {
+        sceneRoot.emplace(it->second);
+    }
+    return sceneRoot;
 }
 
 }//end of namespace FVP_NS_DEF

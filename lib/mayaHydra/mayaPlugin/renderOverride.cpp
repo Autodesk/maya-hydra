@@ -140,6 +140,14 @@ namespace {
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
+TF_DEFINE_ENV_SETTING(MAYA_HYDRA_MERGE_PASSES_WITH_SAME_RENDERER, true, "Merge passes with same renderer into a single pass.");
+
+bool mergePassesWithSameRenderer()
+{
+    static const bool merge = TfGetEnvSetting(MAYA_HYDRA_MERGE_PASSES_WITH_SAME_RENDERER);
+    return merge;
+}
+
 const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaHydraViewportRenderer");
 
 inline bool areDifferentForOneOfTheseBits(unsigned int val1, unsigned int val2, unsigned int bitsToTest)
@@ -725,16 +733,11 @@ MStatus MtohRenderOverride::Render(
             };
 
             // Secondary graphics pass
-            // FIXME : Very rough hack just to prove that we can render selection highlighting separately from the scene
-            _secondaryGfxRenderer->RenderIndex()->InsertSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering, SdfPath::AbsoluteRootPath());
-
             _secondaryGfxFramePass->params().backgroundColor = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
             _secondaryGfxFramePass->params().clearBackground = false;
             HdTaskSharedPtrVector secondaryGfxTasks = _secondaryGfxFramePass->GetRenderTasks(inputAOVs);
             editTasks(secondaryGfxTasks);
             _secondaryGfxFramePass->Render(secondaryGfxTasks);
-
-            _secondaryGfxRenderer->RenderIndex()->RemoveSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);
         }
 #else
         _engine.Execute(_renderIndex, &tasks);
@@ -811,7 +814,8 @@ MStatus MtohRenderOverride::Render(
     
             //Create a HydraViewportInformation 
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelNameStr, cameraName);
-            const bool dataProducerSceneIndicesAdded = manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
+            const bool dataProducerSceneIndicesAdded = manager.AddViewportInformation(
+                hydraViewportInformation, _renderIndexProxy, _GetPassFilteringSceneIndex(_beautyFramePassFilteringFn));
             //Update the selection since we have added data producer scene indices through manager.AddViewportInformation to the merging scene index
             if (dataProducerSceneIndicesAdded && _selectionSceneIndex){
                 _needToReplaceSelection = true;
@@ -850,8 +854,6 @@ MStatus MtohRenderOverride::Render(
         if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle)){
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(true);//Prevent prim removal propagation to keep the current selection.
             _mayaHydraSceneIndex->SetLightsManagementSceneIndex(nullptr);
-            //We need to recreate the filtering scene index chain after the merging scene index as there was a change such as in the BBox display style which has been turned on or off.
-            _lastFilteringSceneIndexBeforeCustomFiltering = nullptr;//Release
 
             TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
                 .Msg("Re-creating scene index chain to render %s\n", panelNameStr.c_str());
@@ -867,7 +869,8 @@ MStatus MtohRenderOverride::Render(
                 cameraName = viewCamera.name().asChar();
             }
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelNameStr, cameraName);
-            manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
+            manager.AddViewportInformation(
+                hydraViewportInformation, _renderIndexProxy, _GetPassFilteringSceneIndex(_beautyFramePassFilteringFn));
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(false);//Allow prim removal propagation again.
         }
         else {
@@ -1116,15 +1119,9 @@ MStatus MtohRenderOverride::Render(
 #endif
 
 #ifdef VIEWPORT_TOOLBOX
-    if (_useSinglePass) {
-        _beautyFramePass->params().collection = _renderCollection;
-    } else {
-        auto sceneItemsCollection = _renderCollection;
-        sceneItemsCollection.SetExcludePaths({_highlightHierarchyPrefix});
-        _beautyFramePass->params().collection = sceneItemsCollection;
-        auto secondaryGfxCollection = _renderCollection;
-        secondaryGfxCollection.SetRootPaths({_highlightHierarchyPrefix});
-        _secondaryGfxFramePass->params().collection = secondaryGfxCollection;
+    _beautyFramePass->params().collection = _renderCollection;
+    if (!_useSinglePass) {
+        _secondaryGfxFramePass->params().collection = _renderCollection;
     }
 #else
     _taskController->SetCollection(_renderCollection);
@@ -1245,6 +1242,11 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     beautyFramePassDescriptor.renderIndex = _beautyRenderer->RenderIndex();
     beautyFramePassDescriptor.uid         = pxr::SdfPath("/beautyPass");
     _beautyFramePass = hvt::ViewportEngine::CreateFramePass(beautyFramePassDescriptor);
+    _beautyFramePassFilteringFn = [&](const PXR_NS::SdfPath& primPath) {
+        // Use Path based filtering by default
+        std::set<PXR_NS::SdfPath> filteringSceneRoots = { _highlightHierarchyPrefix };
+        return Fvp::FindSelfOrFirstParent(primPath, filteringSceneRoots) != filteringSceneRoots.end();
+    };
 
     // Add the 'SkyDome' task to the frame pass.
     {
@@ -1272,8 +1274,13 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     secondaryGfxFramePassDescriptor.renderIndex = _secondaryGfxRenderer->RenderIndex();
     secondaryGfxFramePassDescriptor.uid          = pxr::SdfPath("/secondaryGfxPass");
     _secondaryGfxFramePass = hvt::ViewportEngine::CreateFramePass(secondaryGfxFramePassDescriptor);
+    _secondaryGfxFramePassFilteringFn = [&](const PXR_NS::SdfPath& primPath) {
+        // Use Path based filtering by default
+        std::set<PXR_NS::SdfPath> filteringSceneRoots = _renderIndexProxy->GetSceneRoots();
+        return Fvp::FindSelfOrFirstParent(primPath, filteringSceneRoots) != filteringSceneRoots.end();
+    };
 
-    _useSinglePass = beautyRendererDescriptor.rendererName == secondaryGfxRendererDescriptor.rendererName;
+    _useSinglePass = mergePassesWithSameRenderer() && beautyRendererDescriptor.rendererName == secondaryGfxRendererDescriptor.rendererName;
 
     GetMayaHydraLibInterface().RegisterTerminalSceneIndex(_beautyRenderer->RenderIndex()->GetTerminalSceneIndex());
 #else
@@ -1356,7 +1363,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 
     _mayaHydraSceneIndex->Populate();
     //Add the scene index as an input scene index of the merging scene index
-    _renderIndexProxy->InsertSceneIndex(_mayaHydraSceneIndex, SdfPath::AbsoluteRootPath());
+    _renderIndexProxy->InsertSceneIndex(_mayaHydraSceneIndex, MAYA_NATIVE_ROOT);
     
     if (!_sceneIndexRegistry) {
         _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy));
@@ -1523,8 +1530,31 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     PickHandlerRegistry::Instance().SetPickContext(nullptr);
 }
 
+HdSceneIndexBaseRefPtr MtohRenderOverride::_GetPassFilteringSceneIndex(
+    const Fvp::PassFilteringSceneIndex::FilteringOutFn& filteringFn)
+{
+#ifdef VIEWPORT_TOOLBOX
+    if (!_useSinglePass) {
+        auto passFilteringSceneIndex = Fvp::PassFilteringSceneIndex::New(
+            _lastFilteringSceneIndexBeforeCustomFiltering, filteringFn);
+        return passFilteringSceneIndex;
+    }
+#endif
+    return _lastFilteringSceneIndexBeforeCustomFiltering;
+}
+
 void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext)
 {
+#ifdef VIEWPORT_TOOLBOX
+    if (!_useSinglePass) {
+        _secondaryGfxRenderer->RenderIndex()->RemoveSceneIndex(
+            _lastFilteringSceneIndexBeforeCustomFiltering);
+    }
+#endif
+    // We need to recreate the filtering scene index chain after the merging scene index as there
+    // was a change such as in the BBox display style which has been turned on or off.
+    _lastFilteringSceneIndexBeforeCustomFiltering = nullptr; // Release
+
     //This function is where happens the ordering of filtering scene indices that are after the merging scene index
     //We use as its input scene index : _inputSceneIndexOfFilteringSceneIndicesChain
     _lastFilteringSceneIndexBeforeCustomFiltering = _inputSceneIndexOfFilteringSceneIndicesChain;
@@ -1604,6 +1634,16 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);
 #endif
+
+#ifdef VIEWPORT_TOOLBOX
+    // Secondary graphics pass
+    if (!_useSinglePass) {
+        _secondaryGfxRenderer->RenderIndex()->InsertSceneIndex(
+            _GetPassFilteringSceneIndex(_secondaryGfxFramePassFilteringFn),
+            SdfPath::AbsoluteRootPath());
+    }
+#endif
+
 }
 
 void MtohRenderOverride::_RemovePanel(MString panelName)

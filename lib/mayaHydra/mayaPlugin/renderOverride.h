@@ -59,6 +59,7 @@
 #include <flowViewport/sceneIndex/wireframeHighlights/fvpPiPrototypeWhSi.h>
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpPassFilteringSceneIndex.h>
 
 #ifdef VIEWPORT_TOOLBOX
 #include <hvt/engine/renderIndexProxy.h>
@@ -187,6 +188,7 @@ private:
     void              _ClearMayaHydraSceneIndex();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void              _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
+    HdSceneIndexBaseRefPtr _GetPassFilteringSceneIndex(const Fvp::PassFilteringSceneIndex::FilteringOutFn& filteringFn);
     VtValue           _GetUsedGPUMemory() const;
 
     void _PickByRegion(
@@ -280,8 +282,10 @@ private:
 #ifdef VIEWPORT_TOOLBOX
     hvt::RenderIndexProxyPtr _beautyRenderer;
     hvt::FramePassPtr _beautyFramePass;
+    Fvp::PassFilteringSceneIndex::FilteringOutFn _beautyFramePassFilteringFn;
     hvt::RenderIndexProxyPtr _secondaryGfxRenderer;
     hvt::FramePassPtr _secondaryGfxFramePass;
+    Fvp::PassFilteringSceneIndex::FilteringOutFn _secondaryGfxFramePassFilteringFn;
     bool _useSinglePass{false};
 #else
     HdEngine                                  _engine;
