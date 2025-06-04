@@ -18,7 +18,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testStageAddPrim.py
     testTransforms.py
     testRefinement.py
-    # Disabled 2025-06-04 due to plugin loading issues
+    # HYDRA-1695 : Disabled 2025-06-04 due to plugin loading issues
     #testMaterialXOnNative.py|depOnPlugins:lookdevx
     testNewSceneWithStage.py
     # To be reenabled after investigation
