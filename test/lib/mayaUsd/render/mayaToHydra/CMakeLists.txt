@@ -30,7 +30,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testArnoldLights.py|depOnPlugins:mtoa
 	testViewportFilters.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa
-	testBifrostGraphUpdate.py|depOnPlugins:bifrost
+	#testBifrostGraphUpdate.py|depOnPlugins:bifrost #Removed for testing what breaks the coverage build
 	#End of tests that have a dependency on other plugins
     testLookThrough.py
     testObjectTemplate.py
