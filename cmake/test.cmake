@@ -377,43 +377,14 @@ finally:
     endif()
 
     if(DEFINED BIFROST_LOCATION)
-        #The bifrost package contains 2 template files that are used to generate the bifrost.mod and vnn.mod files
-        #These files are used to set the environment variables for Bifrost and VNN plugins in Maya.
-        #Create the bifrost.mod and vnn.mod files in the parent directory of Bifrost location by replacing <BIFROST_DIR> with bifrost and 
-        # <PLUGIN_DIR> with vnn in the bifrost.template and vnn.template files respectively.
-        # Check if bifrost.template exists
-        if(EXISTS "${BIFROST_LOCATION}/../bifrost.template")
-            set(BIFROST_TEMPLATE "${BIFROST_LOCATION}/../bifrost.template")
-            set(BIFROST_MOD      "${BIFROST_LOCATION}/../bifrost.mod")
-            file(READ "${BIFROST_TEMPLATE}" BIFROST_CONTENTS)
-            string(REPLACE "<BIFROST_DIR>" "bifrost" BIFROST_CONTENTS "${BIFROST_CONTENTS}")
-            #message(STATUS "bifrost.mod content after replacement:\n${BIFROST_CONTENTS}")
-            file(WRITE "${BIFROST_MOD}" "${BIFROST_CONTENTS}")
-            if(EXISTS "${BIFROST_MOD}")
-                message(STATUS "bifrost.mod was successfully written at: ${BIFROST_MOD}")
-                list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH "${BIFROST_LOCATION}/..") #Add the common location for bifrost and vnn .mod files
-            else()
-                message(FATAL_ERROR "Failed to write bifrost.mod at: ${BIFROST_MOD}")
-            endif()
-        else()
-            message(FATAL_ERROR "bifrost.template does not exist at: ${BIFROST_LOCATION}/../bifrost.template")
-        endif()
-
-        # Check if vnn.template exists
-        if(EXISTS "${BIFROST_LOCATION}/../vnn.template")
-            set(VNN_TEMPLATE "${BIFROST_LOCATION}/../vnn.template")
-            set(VNN_MOD      "${BIFROST_LOCATION}/../vnn.mod")
-            file(READ "${VNN_TEMPLATE}" VNN_CONTENTS)
-            string(REPLACE "<PLUGIN_DIR>" "vnn" VNN_CONTENTS "${VNN_CONTENTS}")
-            #message(STATUS "vnn.mod content after replacement:\n${VNN_CONTENTS}")
-            file(WRITE "${VNN_MOD}" "${VNN_CONTENTS}")
-            if(EXISTS "${VNN_MOD}")
-                message(STATUS "vnn.mod was successfully written at: ${VNN_MOD}")
-            else()
-                message(FATAL_ERROR "Failed to write vnn.mod at: ${VNN_MOD}")
-            endif()
-        else()
-            message(FATAL_ERROR "vnn.template does not exist at: ${BIFROST_LOCATION}/../vnn.template")
+        #The bifrost package contains 2 template files that should have been converted by ecg maya hydra to bifrost.mod and vnn.mod files 
+        #These .mod files are used to set the environment for Bifrost and VNN plugins in Maya.
+		set(BIFROST_MOD "${BIFROST_LOCATION}/bifrost.mod")
+		if(EXISTS "${BIFROST_MOD}")
+			message(STATUS "bifrost.mod exists at: ${BIFROST_MOD}")
+			list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH "${BIFROST_LOCATION}") #Add the common location for bifrost and vnn .mod files to maya mod files
+		else()
+			message(FATAL_ERROR "Failed to write bifrost.mod at: ${BIFROST_MOD}")
         endif()
     endif()
 
