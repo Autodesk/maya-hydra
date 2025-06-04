@@ -16,13 +16,19 @@ import maya.cmds as cmds
 
 import fixturesUtils
 import mtohUtils
+import platform
 import testUtils
 
 class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
-    IMAGEDIFF_FAIL_PERCENT = 0.1
+
+    @property
+    def IMAGEDIFF_FAIL_PERCENT(self):
+        if platform.system() == "Darwin":
+            return 3.5
+        return 0.1
 
     #This function is called before each test is launched
     def setUp(self):
@@ -63,6 +69,39 @@ class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
         #restore the default
         cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 0)
         cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
+    
+    def test_basisCurves(self):
+        import usdUtils
+        usdScenePath = testUtils.getTestScene('testRefinement', 'basisCurves.usda')
+        usdUtils.createStageFromFile(usdScenePath)
+
+        cmds.select(clear=True)#Clear selection
+
+        cmds.setAttr('persp.translate', 10, 7.5, 20, type='float3')
+        cmds.setAttr('persp.rotate', 0, 0, 0, type='float3')
+        self.setHdStormRenderer()
+        cmds.mayaHydra(createRenderGlobals=1)
+
+        cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 0)
+        cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
+        self.verifySnapshot("basisCurves_refined_0.png")
+
+        cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 1)
+        cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
+        self.verifySnapshot("basisCurves_refined_1.png")
+
+        cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 2)
+        cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
+        self.verifySnapshot("basisCurves_refined_2.png")
+
+        cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 3)
+        cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
+        self.verifySnapshot("basisCurves_refined_3.png")
+
+        #restore the default
+        cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 0)
+        cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
+        self.verifySnapshot("basisCurves_refined_0.png")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

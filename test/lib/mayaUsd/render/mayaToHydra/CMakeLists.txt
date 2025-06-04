@@ -63,6 +63,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testIsolateSelectWithGeomSubset.py
     testMayaReference.py
     testUsdInheritsSpecializes.py
+    testBoundingBox.py
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py

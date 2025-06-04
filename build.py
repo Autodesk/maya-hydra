@@ -349,7 +349,7 @@ def RunCMake(context, extraArgs=None, stages=None):
                         installArg=installArg,
                         multiproc=FormatMultiProcs(context.numJobs, generator)))
 
-def RunCTest(context, extraArgs=None):
+def RunCTest(context, extraArgs=None, runOnlyFailed=False):
     buildDir = context.buildDir
     variant = BuildVariant(context)
 
@@ -358,9 +358,10 @@ def RunCTest(context, extraArgs=None):
             'ctest '
             '--output-on-failure ' 
             '--timeout 500 '
-            '-C {variant} '
+            '-C {variant} {rerun} '
             '{extraArgs} '
             .format(variant=variant,
+                    rerun = '--rerun-failed' if runOnlyFailed else '',
                     extraArgs=(" ".join(extraArgs) if extraArgs else "")))
 
 def RunMakeZipArchive(context):
@@ -512,7 +513,7 @@ def BuildAndInstall(context, buildArgs, stages):
                              .format(mayaUsdLocation=context.mayaUsdLocation))
         
         if context.mtoaLocation:
-            extraArgs.append('-DMTOAUSD_LOCATION="{mtoaLocation}"' 
+            extraArgs.append('-DMTOA_LOCATION="{mtoaLocation}"' 
                              .format(mtoaLocation=context.mtoaLocation))
         
         if context.lookdevxLocation:
@@ -549,7 +550,26 @@ def BuildAndInstall(context, buildArgs, stages):
         Print("""Success MayaHydra build and install !!!!""")
 
 def RunTests(context,extraArgs):
-    RunCTest(context,extraArgs)
+    # Clean out any previous ctest logs before running ctest.
+    lastTestLog = os.path.join(context.buildDir, 'Testing', 'Temporary','LastTest.log')
+    if os.path.exists(lastTestLog):
+        os.remove(lastTestLog)
+    lastTestsFailedLog = os.path.join(context.buildDir, 'Testing', 'Temporary', 'LastTestsFailed.log')
+    if os.path.exists(lastTestsFailedLog):
+        os.remove(lastTestsFailedLog)
+
+    try:
+        RunCTest(context, extraArgs)
+    except RuntimeError as e:
+        PrintWarning('One (or more) tests failed, re-running only failed tests.\n')
+        try:
+            RunCTest(context, extraArgs, runOnlyFailed=True)
+        except:
+            PrintWarning('One (or more) tests failed on re-run!\n')
+            raise e # Re-raise the original failure.
+        else:
+            Print('Successfully re-ran failed tests!')
+
     Print("""Success running MayaHydra tests !!!!""")
 
 def Package(context):

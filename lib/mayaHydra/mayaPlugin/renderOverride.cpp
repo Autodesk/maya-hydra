@@ -652,6 +652,9 @@ MStatus MtohRenderOverride::Render(
             }
         }
 
+        //Apply any pending update from MayaUsd proxy shape nodes
+        _sceneIndexRegistry->ApplyPendingUpdates();
+
         // Update plugin filtering scene indices
         std::string rendererNamesToUpdate;
         for (auto& sceneFilteringSceneIndexData : Fvp::FilteringSceneIndexInterfaceImp::get().getSceneFilteringSceneIndicesData()) {
@@ -823,7 +826,7 @@ MStatus MtohRenderOverride::Render(
     }
 
     if (_displayStyleSceneIndex) {
-       _displayStyleSceneIndex->SetRefineLevel({true, delegateParams.refineLevel});
+       _displayStyleSceneIndex->SetRefineLevel(delegateParams.refineLevel);
     }
 
     // Update "Show" menu filters
