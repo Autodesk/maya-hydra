@@ -104,8 +104,10 @@ public:
 
     static MayaHydraSceneIndexRefPtr New(
         MayaHydraInitData& initData,
-        bool lightEnabled) {
-        return TfCreateRefPtr(new MayaHydraSceneIndex(initData, lightEnabled));
+        bool lightEnabled,
+        bool interactive
+    ) {
+        return TfCreateRefPtr(new MayaHydraSceneIndex(initData, lightEnabled, interactive));
     }
 
     ~MayaHydraSceneIndex();
@@ -272,7 +274,9 @@ public:
 private:
     MayaHydraSceneIndex(
         MayaHydraInitData& initData,
-        bool lightEnabled);
+        bool lightEnabled, 
+        bool interactive
+    );
 
     template <typename AdapterPtr, typename Map>
     AdapterPtr _CreateAdapter(
@@ -365,6 +369,8 @@ private:
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex { nullptr };
 
     bool _unregisterPickHandler{false};
+
+    bool _interactive{true};
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

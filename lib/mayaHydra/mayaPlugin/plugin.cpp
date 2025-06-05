@@ -123,20 +123,28 @@ private:
 void initialize()
 {
     Fvp::InitializationParams fvpInitParams;
-    fvpInitParams.colorPreferencesNotificationProvider
-        = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
-    fvpInitParams.colorPreferencesTranslator
-        = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+    if (MGlobal::mayaState() != MGlobal::kBatch) {
+        // MayaColorPreferencesTranslator ctor will throw an exception
+        // on construction in batch mode, as 
+        // MayaHydra::getRGBAColorPreferenceValue() fails because
+        // the Maya displayRGBColor command is unavailable in batch mode.
+        fvpInitParams.colorPreferencesNotificationProvider
+            = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+        fvpInitParams.colorPreferencesTranslator
+            = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+    }
     Fvp::initialize(fvpInitParams);
 }
 
 void finalize()
 {
     Fvp::InitializationParams fvpInitParams;
-    fvpInitParams.colorPreferencesNotificationProvider
-        = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
-    fvpInitParams.colorPreferencesTranslator
-        = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+    if (MGlobal::mayaState() != MGlobal::kBatch) {
+        fvpInitParams.colorPreferencesNotificationProvider
+            = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+        fvpInitParams.colorPreferencesTranslator
+            = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+    }
     Fvp::finalize(fvpInitParams);
     MayaHydra::MayaColorPreferencesTranslator::deleteInstance();
 }

@@ -1131,7 +1131,8 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 
     _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(*_renderIndex);
 
-    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, !_hasDefaultLighting);
+    constexpr bool interactive = true;
+    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, !_hasDefaultLighting, interactive);
     TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
     
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);

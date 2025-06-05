@@ -447,7 +447,9 @@ MStatus BatchRenderer::Render(
         auto cameraName{inputParams.ufeCameraPath.back().string()};
     
         const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelName, cameraName);
-        TF_AXIOM(manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering));
+        // The following returns true only if there are non-Maya data producers
+        // added.
+        manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
     }
 
     if (_needToReplaceSelection){
@@ -477,11 +479,9 @@ MStatus BatchRenderer::Render(
     params.enableLighting = true;
     params.enableSceneMaterials = true;
 
-    PXR_NS::GfVec4f wireframeSelectionColor;
-    if (Fvp::ColorPreferences::getInstance().getColor(
-            FvpColorPreferencesTokens->wireframeSelection, wireframeSelectionColor)) {
-        params.wireframeColor = wireframeSelectionColor;
-    }
+    // Do not set params.wireframeColor, as this implies reading the
+    // FvpColorPreferencesTokens->wireframeSelection from the
+    // Fvp::ColorPreferences instance, which is unavailable in batch mode.
 
     params.cullStyle = HdCullStyleBackUnlessDoubleSided;
 
@@ -658,7 +658,8 @@ void BatchRenderer::_InitHydraResources()
 
     _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(*_renderIndex);
 
-    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, !_hasDefaultLighting);
+    constexpr bool interactive = false;
+    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, !_hasDefaultLighting, interactive);
     TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
     
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);

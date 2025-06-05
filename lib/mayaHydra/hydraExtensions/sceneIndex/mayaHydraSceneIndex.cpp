@@ -445,7 +445,9 @@ private:
 
 MayaHydraSceneIndex::MayaHydraSceneIndex(
     MayaHydraInitData& initData,
-    bool lightEnabled)
+    bool /* lightEnabled */,
+    bool interactive
+)
     : _ID(initData.delegateID.AppendChild(
         TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this))))
     , _renderIndex(initData.renderIndex)
@@ -454,6 +456,7 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
     , _sprimPath(initData.delegateID.AppendPath(SdfPath(std::string("sprims"))))
     , _materialPath(initData.delegateID.AppendPath(SdfPath(std::string("materials"))))
     , _mayaPathMapper(std::make_shared<MayaPathMapper>(*this))
+    , _interactive(interactive)
 {
     static std::once_flag once;
     std::call_once(once, []() {
@@ -477,7 +480,9 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
     //Always add the mayaHydraFacesSelectionMaterialDataSource to display faces selection
     // Always Create the material since it will update the color from the preferences if it has
     // changed.
-    _mayaFacesSelectionMaterial = MayaHydraSceneIndex::_CreateMayaFacesSelectionMaterial();
+    if (_interactive) {
+        _mayaFacesSelectionMaterial = MayaHydraSceneIndex::_CreateMayaFacesSelectionMaterial();
+    }
 
     auto mayaHydraFacesSelectionMaterialDataSource = MayaHydraMaterialDataSource::New(
         _mayaFacesSelectionMaterialPath, HdPrimTypeTokens->material, this);
