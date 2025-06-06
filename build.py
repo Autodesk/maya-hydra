@@ -519,6 +519,10 @@ def BuildAndInstall(context, buildArgs, stages):
         if context.lookdevxLocation:
             extraArgs.append('-DLOOKDEVX_LOCATION="{lookdevxLocation}"' 
                              .format(lookdevxLocation=context.lookdevxLocation))
+        
+        if context.bifrostLocation:
+            extraArgs.append('-DBIFROST_LOCATION="{bifrostLocation}"' 
+                             .format(bifrostLocation=context.bifrostLocation))
 
         if context.pxrUsdLocation:
             extraArgs.append('-DPXR_USD_LOCATION="{pxrUsdLocation}"'
@@ -614,6 +618,9 @@ parser.add_argument("--mtoa-location", type=str,
 
 parser.add_argument("--lookdevx-location", type=str,
                     help="Directory where LookdevX is installed.")
+
+parser.add_argument("--bifrost-location", type=str,
+                    help="Directory where Bifrost is installed.")
                     
 parser.add_argument("--pxrusd-location", type=str,
                     help="Directory where Pixar USD is installed.")
@@ -749,6 +756,10 @@ class InstallContext:
         # LookdevX Location
         self.lookdevxLocation = (os.path.abspath(args.lookdevx_location).replace("\\","/")
                                 if args.lookdevx_location else None)
+        
+        # Bifrost Location
+        self.bifrostLocation = (os.path.abspath(args.bifrost_location).replace("\\","/")
+                                if args.bifrost_location else None)
         
         # PXR USD Location
         self.pxrUsdLocation = (os.path.abspath(args.pxrusd_location)

@@ -367,13 +367,25 @@ finally:
         list(APPEND MAYAUSD_VARNAME_PATH
              "${LOOKDEVX_LOCATION}/plug-ins")
         list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
-             "${LOOKDEVX_LOCATION}/AEtemplate")
+             "${LOOKDEVX_LOCATION}/scripts") #Contains some AE templates files
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH
-             "${LOOKDEVX_LOCATION}/scripts")
+             "${LOOKDEVX_LOCATION}/scripts")#Contains some python scripts
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH
              "${LOOKDEVX_LOCATION}/python")
         list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
              "${LOOKDEVX_LOCATION}/plug-ins")
+    endif()
+
+    if(DEFINED BIFROST_LOCATION)
+        #The bifrost package contains 2 template files that should have been converted by ecg maya hydra to bifrost.mod and vnn.mod files 
+        #These .mod files are used to set the environment for Bifrost and VNN plugins in Maya.
+		set(BIFROST_MOD "${BIFROST_LOCATION}/bifrost.mod")
+		if(EXISTS "${BIFROST_MOD}")
+			message(STATUS "bifrost.mod exists at: ${BIFROST_MOD}")
+			list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH "${BIFROST_LOCATION}") #Add the common location for bifrost and vnn .mod files to maya mod files
+		else()
+			message(FATAL_ERROR "Could not find bifrost.mod at: ${BIFROST_MOD}")
+        endif()
     endif()
 
     if(IS_WINDOWS AND DEFINED ENV{PYTHONHOME})
