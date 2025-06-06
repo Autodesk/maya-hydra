@@ -384,7 +384,7 @@ finally:
 			message(STATUS "bifrost.mod exists at: ${BIFROST_MOD}")
 			list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH "${BIFROST_LOCATION}") #Add the common location for bifrost and vnn .mod files to maya mod files
 		else()
-			message(FATAL_ERROR "Failed to write bifrost.mod at: ${BIFROST_MOD}")
+			message(FATAL_ERROR "Could not find bifrost.mod at: ${BIFROST_MOD}")
         endif()
     endif()
 
