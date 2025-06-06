@@ -17,23 +17,24 @@
 //Local headers
 #include "fvpViewportInformationAndSceneIndicesPerViewportData.h"
 #include "flowViewport/API/interfacesImp/fvpInformationInterfaceImp.h"
-#include "flowViewport/sceneIndex/fvpRenderIndexProxy.h"
 #include "flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h"
 #include "flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h"
 
 //Hydra headers
 #include <pxr/imaging/hd/renderIndex.h>
+#include <pxr/imaging/hd/renderDelegate.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
 ViewportInformationAndSceneIndicesPerViewportData::ViewportInformationAndSceneIndicesPerViewportData(const InformationInterface::ViewportInformation& viewportInformation, 
-                                                                                                    const Fvp::RenderIndexProxyPtr& renderIndexProxy)
-    : _viewportInformation(viewportInformation), _renderIndexProxy(renderIndexProxy)
+                                                                                                    PXR_NS::HdRenderIndex* renderIndex,
+                                                                                                    const Fvp::DataProducerMergingSceneIndexProxyPtr& dataProducerMergingSceneIndexProxy)
+    : _viewportInformation(viewportInformation), _renderIndex(renderIndex), _dataProducerMergingSceneIndexProxy(dataProducerMergingSceneIndexProxy)
 {
-    if (_renderIndexProxy){
-        _viewportInformation._rendererName = _renderIndexProxy->GetRendererDisplayName();
+    if (_renderIndex && _renderIndex->GetRenderDelegate()) {
+        _viewportInformation._rendererName = _renderIndex->GetRenderDelegate()->GetRendererDisplayName();
     }
 }
 
@@ -49,11 +50,11 @@ void ViewportInformationAndSceneIndicesPerViewportData::RemoveViewportDataProduc
     auto findResult = std::find_if(_dataProducerSceneIndicesData.begin(), _dataProducerSceneIndicesData.end(),
         [&customDataProducerSceneIndex](const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSIData) { return dataProducerSIData->GetDataProducerSceneIndex() == customDataProducerSceneIndex;});
     if (findResult != _dataProducerSceneIndicesData.end()) {
-        // Remove the data producer scene index from the merging scene index through the render proxy
-        if (_renderIndexProxy){
+        // Remove the data producer scene index from the merging scene index
+        if (_dataProducerMergingSceneIndexProxy) {
             const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData = (*findResult);
             if (dataProducerSceneIndexData && dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain()) {
-                    _renderIndexProxy->RemoveSceneIndex(
+                _dataProducerMergingSceneIndexProxy->RemoveSceneIndex(
                         dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain());
             } else {
                 TF_CODING_ERROR(
@@ -69,7 +70,7 @@ void ViewportInformationAndSceneIndicesPerViewportData::RemoveViewportDataProduc
 
 void ViewportInformationAndSceneIndicesPerViewportData::_AddAllDataProducerSceneIndexToMergingSCeneIndex()
 {
-    if( nullptr == _renderIndexProxy){
+    if (nullptr == _dataProducerMergingSceneIndexProxy) {
         return;
     }
 
@@ -77,7 +78,7 @@ void ViewportInformationAndSceneIndicesPerViewportData::_AddAllDataProducerScene
     for (const auto& dataProducerSceneIndexData : _dataProducerSceneIndicesData){
         // Add the data producer scene index to the merging scene index
         if (dataProducerSceneIndexData && dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain()) {
-            _renderIndexProxy->InsertSceneIndex(dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain(), dataProducerSceneIndexData->GetPrefix());
+            _dataProducerMergingSceneIndexProxy->InsertSceneIndex(dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain(), dataProducerSceneIndexData->GetPrefix());
         }
     }
 }

@@ -42,10 +42,6 @@ UFE_NS_DEF {
 class Path;
 }
 
-namespace FVP_NS_DEF {
-class RenderIndexProxy;
-}
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 using MayaHydraSelectionObserverPtr = std::shared_ptr<class MayaHydraSelectionObserver>;
@@ -87,7 +83,7 @@ public:
 
     static constexpr Ufe::Rtid kInvalidUfeRtid = 0;
     MAYAHYDRALIB_API
-    MayaHydraSceneIndexRegistry(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy);
+    MayaHydraSceneIndexRegistry(const HdSceneIndexBaseRefPtr& dataProducerMergingSceneIndex);
 
     MAYAHYDRALIB_API
     ~MayaHydraSceneIndexRegistry();
@@ -113,7 +109,7 @@ private:
     void _ProcessNodesAfterOpen();
     void _RemoveAllSceneIndexNodes();
 
-    const std::shared_ptr<Fvp::RenderIndexProxy> _renderIndexProxy;
+    HdSceneIndexBaseRefPtr _dataProducerMergingSceneIndex;
 
     MCallbackIdArray _DGCallbackIds;
     MCallbackId _AfterOpenCBId {0};

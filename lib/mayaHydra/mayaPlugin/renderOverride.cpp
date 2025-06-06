@@ -41,7 +41,6 @@
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
 #include <flowViewport/debugCodes.h>
-#include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/selection/fvpSelectionTask.h>
 #include <flowViewport/selection/fvpSelection.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h>
@@ -52,7 +51,6 @@
 #include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
-#include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
@@ -815,7 +813,7 @@ MStatus MtohRenderOverride::Render(
             //Create a HydraViewportInformation 
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelNameStr, cameraName);
             const bool dataProducerSceneIndicesAdded = manager.AddViewportInformation(
-                hydraViewportInformation, _renderIndexProxy, _GetPassFilteringSceneIndex(_beautyFramePassFilteringFn));
+                hydraViewportInformation, renderIndex(), _dataProducerMergingSceneIndexProxy, _GetPassFilteringSceneIndex(_beautyFramePassFilteringFn));
             //Update the selection since we have added data producer scene indices through manager.AddViewportInformation to the merging scene index
             if (dataProducerSceneIndicesAdded && _selectionSceneIndex){
                 _needToReplaceSelection = true;
@@ -870,7 +868,7 @@ MStatus MtohRenderOverride::Render(
             }
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelNameStr, cameraName);
             manager.AddViewportInformation(
-                hydraViewportInformation, _renderIndexProxy, _GetPassFilteringSceneIndex(_beautyFramePassFilteringFn));
+                hydraViewportInformation, renderIndex(), _dataProducerMergingSceneIndexProxy, _GetPassFilteringSceneIndex(_beautyFramePassFilteringFn));
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(false);//Allow prim removal propagation again.
         }
         else {
@@ -1218,7 +1216,7 @@ void MtohRenderOverride::_ClearMayaHydraSceneIndex()
     // HdRetainedSceneIndex dtor crashes in Windows clang code coverage build.
     _mayaHydraSceneIndex->_Destroy();
 #else
-    _renderIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
+    _dataProducerMergingSceneIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
 #endif
     _mayaHydraSceneIndex.Reset();
 }
@@ -1276,7 +1274,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     _secondaryGfxFramePass = hvt::ViewportEngine::CreateFramePass(secondaryGfxFramePassDescriptor);
     _secondaryGfxFramePassFilteringFn = [&](const PXR_NS::SdfPath& primPath) {
         // Use Path based filtering by default
-        std::set<PXR_NS::SdfPath> filteringSceneRoots = _renderIndexProxy->GetSceneRoots();
+        std::set<PXR_NS::SdfPath> filteringSceneRoots = _dataProducerMergingSceneIndexProxy->GetSceneRoots();
         return Fvp::FindSelfOrFirstParent(primPath, filteringSceneRoots) != filteringSceneRoots.end();
     };
 
@@ -1341,14 +1339,14 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
         _isUsingHdSt
     );
 
-    // Render index proxy sets up the Flow Viewport merging scene index, must
+    // Data producer mering scene index sets up the Flow Viewport merging scene index, must
     // be created first, as it is required for:
     // - Selection scene index, which uses the Flow Viewport merging scene
     //   index as input.
     // - Maya scene producer, which needs the render index proxy to insert
     //   itself.
 
-    _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(*renderIndex());
+    _dataProducerMergingSceneIndexProxy = std::make_shared<Fvp::DataProducerMergingSceneIndexProxy>();
 
     _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, !_hasDefaultLighting);
     TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
@@ -1363,10 +1361,10 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 
     _mayaHydraSceneIndex->Populate();
     //Add the scene index as an input scene index of the merging scene index
-    _renderIndexProxy->InsertSceneIndex(_mayaHydraSceneIndex, MAYA_NATIVE_ROOT);
+    _dataProducerMergingSceneIndexProxy->InsertSceneIndex(_mayaHydraSceneIndex, MAYA_NATIVE_ROOT);
     
     if (!_sceneIndexRegistry) {
-        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy));
+        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_dataProducerMergingSceneIndexProxy->GetMergingSceneIndex()));
     }
     
     // We provide the pick context for pick handlers, so set the pick handler
@@ -1374,7 +1372,7 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     PickHandlerRegistry::Instance().SetPickContext(this);
 
     //Create internal scene indices chain
-    _inputSceneIndexOfFilteringSceneIndicesChain = _renderIndexProxy->GetMergingSceneIndex();
+    _inputSceneIndexOfFilteringSceneIndicesChain = _dataProducerMergingSceneIndexProxy->GetMergingSceneIndex();
 
     //Put BlockPrimRemovalPropagationSceneIndex first as it can block/unblock the prim removal propagation on the whole scene indices chain
     _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
@@ -1520,7 +1518,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _fileWriterArgs.clear();
 
     //Decrease ref count on the render index proxy which owns the merging scene index at the end of this function as some previous calls may likely use it to remove some scene indices
-    _renderIndexProxy.reset();
+    _dataProducerMergingSceneIndexProxy.reset();
 
     _viewport = GfVec4d(0, 0, 0, 0);
     _initializationSucceeded = false;

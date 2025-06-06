@@ -54,10 +54,6 @@
 
 #include <unordered_map>
 
-namespace FVP_NS_DEF {
-class RenderIndexProxy;
-}
-
 UFE_NS_DEF {
 class Path;
 }

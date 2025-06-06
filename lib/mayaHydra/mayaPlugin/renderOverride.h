@@ -42,7 +42,7 @@
 #include <mayaHydraLib/pick/mhPickHandlerFwd.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
 
-#include <flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h>
+#include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
 #include <flowViewport/selection/fvpSelectionTracker.h>
 #include <flowViewport/selection/fvpSelectionFwd.h>
@@ -294,7 +294,7 @@ private:
     HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
     HdRenderIndex*                            _renderIndex = nullptr;
 #endif
-    Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
+    Fvp::DataProducerMergingSceneIndexProxyPtr _dataProducerMergingSceneIndexProxy { nullptr };
     VtDictionary                              _fileWriterArgs{};
     HdSceneIndexBaseRefPtr                    _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
     HdSceneIndexBaseRefPtr                    _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
