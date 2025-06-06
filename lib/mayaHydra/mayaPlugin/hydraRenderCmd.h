@@ -18,11 +18,11 @@
 
 #include <mayaHydraLib/mayaHydra.h>
 
-#include "batchRenderer.h"
-
 #include <maya/MPxCommand.h>
 
 namespace MAYAHYDRA_NS_DEF {
+
+class BatchRenderer;
 
 class HydraRenderCmd : public MPxCommand
 {
@@ -31,6 +31,8 @@ public:
     static MSyntax createSyntax();
 
     static const MString name;
+
+    ~HydraRenderCmd();
 
     MStatus doIt(const MArgList& args) override;
 
@@ -43,7 +45,7 @@ private:
     bool render();
     bool hydraRender();
 
-    BatchRenderer _batchRenderer;
+    std::unique_ptr<BatchRenderer> _batchRenderer;
 };
 
 }

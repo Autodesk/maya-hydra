@@ -1,5 +1,5 @@
 //
-// Copyright 2023 Autodesk, Inc. All rights reserved.
+// Copyright 2025 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 #include "hydraRenderCmd.h"
 
 #include "pluginUtils.h"
+#include "batchRenderer.h"
 
 #include <ufeExtensions/Global.h>
 
@@ -89,11 +90,9 @@ MSyntax HydraRenderCmd::createSyntax()
 }
 
 HydraRenderCmd::HydraRenderCmd() 
-    : _batchRenderer(MtohRendererDescription(
-          TfToken("HdStormRendererPlugin"),
-          TfToken("mayaHydraRenderOverride_HdStormRendererPlugin"),
-          TfToken("(Technology Preview) Hydra GL)")))
 {}
+
+HydraRenderCmd::~HydraRenderCmd() = default;
 
 bool HydraRenderCmd::parseDatabase(const MArgDatabase& db)
 {
@@ -223,7 +222,7 @@ bool HydraRenderCmd::hydraRender()
         TfScoped guard(resetFileName);
         Fvp::ImageBufferWriter::SetFileName(imageName.asChar());
     
-        if (_batchRenderer.Render(inputParams, scene) != MS::kSuccess) {
+        if (_batchRenderer->Render(inputParams, scene) != MS::kSuccess) {
             return false;
         }
     }
@@ -243,6 +242,21 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
       return MS::kFailure;
     }
 
+    // By default the renderer is Hydra Storm.
+    TfToken rendererName("HdStormRendererPlugin");
+    if (db.isFlagSet(_renderer)) {
+        MString rn;
+        CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_renderer, 0, rn));
+
+        rendererName = TfToken(rn.asChar());
+    }
+
+    // Create the batch renderer.  The second and third arguments of
+    // the renderer description are the unused override name and
+    // display name, respectively.
+    _batchRenderer = std::make_unique<BatchRenderer>(
+        MtohRendererDescription(rendererName, {}, {}));
+
     // Initialize Hydra renderer.
     if (initialize()) {
         if (render()) {
@@ -253,17 +267,6 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
     return MS::kFailure;
 
 #if 0
-    TfToken renderDelegateName;
-    if (db.isFlagSet(_rendererId)) {
-        MString id;
-        CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_rendererId, 0, id));
-
-        // Passing 'mayaHydra' as the renderer adresses all renderers
-        if (id != "mayaHydra") {
-            renderDelegateName = TfToken(id.asChar());
-        }
-    }
-
     if (db.isFlagSet(_hdGPUMem)) {
         appendToResult(MtohRenderOverride::GetUsedGPUMemory());
     } if (db.isFlagSet(_currentProcessMemory)) {
