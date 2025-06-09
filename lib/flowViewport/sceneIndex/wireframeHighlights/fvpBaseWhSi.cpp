@@ -814,7 +814,7 @@ BaseWhSi::MakeGeomSubsetHighlight(
     if (!GetMaterialPath(geomSubsetPrimDataSource).IsEmpty()) {
         HdContainerDataSourceEditor dataSourceEditor(editedMeshPrimDataSource);
         dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, HdMaterialBindingsSchema::GetDefaultLocator()));
-#if PXR_VERSION >= 2511
+#if PXR_VERSION >= 2505
         dataSourceEditor.Set(UsdImagingMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, UsdImagingMaterialBindingsSchema::GetDefaultLocator()));
 #elif PXR_VERSION >= 2403
         dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator()));
