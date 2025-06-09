@@ -17,7 +17,7 @@ Before building the project, consult the following table to ensure you use the r
 | Python Packages | PyYAML, PySide, PyOpenGL | PyYAML, PySide2, PyOpenGL | PyYAML, PySide, PyOpenGL |
 | Build generator | Visual Studio, Ninja (Recommended) | XCode, Ninja (Recommended) | Ninja (Recommended) |
 | Command processor | x64 Native Tools Command Prompt for VS 2022 | bash | bash |
-| Supported Maya Version | 2025, 2026 | 2025, 2026 | 2025, 2026 |
+| Supported Maya Version | 2025, 2026, PR | 2025, 2026, PR | 2025, 2026, PR |
 
 >Note: Maya 2024 is not officially supported. For more details about building for Maya 2024, [see this example.](./rebuildingWithCustomOpenUSDAndPreviousMayaVersion.md)
 
@@ -30,7 +30,7 @@ If you want to <B>be able to import usd data in maya through [MayaUSD](https://g
 
 | | ![](images/pxr.png) | USD version used in Maya | USD source for MayaUSD / MayaHydra |
 |:-: |:-: |:-:|:-:|
-| CommitID/Tags | [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11)<BR>[v24.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.11) | Maya 2025 = v23.11<br>Maya 2026 = v24.11 | [v23.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v23.11-MayaUsd-Public)<br>[v24.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v24.11-MayaUsd-Public) |
+| CommitID/Tags | [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11)<BR>[v24.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.11)<BR>[v25.05](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v25.05) | Maya 2025 = v23.11<br>Maya 2026 = v24.11<br>Maya PR = v25.05 | [v23.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v23.11-MayaUsd-Public)<br>[v24.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v24.11-MayaUsd-Public)<br>[v25.05-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v25.05-MayaUsd-Public) |
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
 
@@ -48,7 +48,7 @@ The Universal Front End (UFE) is a DCC-agnostic component that allows Maya to br
 
 | UFE Version | Maya Version | UFE Docs (external) |
 |-|-|:-:|
-| v4.2.0<br>v6.0.0 | Maya 2025<br>Maya 2026 | https://help.autodesk.com/view/MAYADEV/2025/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
+| v4.2.0<br>v6.0.0<br>vTBD | Maya 2025<br>Maya 2026<br>Maya PR | https://help.autodesk.com/view/MAYADEV/2025/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
 
 To build the project with UFE support, you will need to use the headers and libraries included in the ***Maya Devkit***:
 
