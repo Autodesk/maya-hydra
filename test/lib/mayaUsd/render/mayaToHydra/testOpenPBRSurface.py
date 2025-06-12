@@ -35,6 +35,11 @@ class TestOpenPBRSurface(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtil
 
     #Test the translation from maya OpenPBR surface with a maya native plane to usd preview surface.
     def test_OpenPBRSurface(self):
+        def assertSnapshotCloseImpl(img_name:str, image_version: str | None = None):
+            self.assertSnapshotClose(f'{img_name}.png', self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion=image_version)
+
+        image_version = 'USD2505+' if self._usdVersion >= (0, 25, 5) else None
+
         # Load a maya scene with a maya native plane, which has autodesk OpenPBR surface as material
         testFile = mayaUtils.openTestScene(
                 "testOpenPBRSurface",
@@ -45,68 +50,67 @@ class TestOpenPBRSurface(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtil
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, displayTextures=True)
         cmds.refresh()
-        self.assertSnapshotClose("default" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("default")
 
         #Disconnect the texture
         cmds.disconnectAttr("file1.outColor", "openPBRSurface1.baseColor")
         cmds.refresh()
-        self.assertSnapshotClose("default_noTexture" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("default_noTexture")
 
         #Verify Base
         cmds.setAttr("openPBRSurface1.baseColor", 0.5,0.0,0.0, type = 'double3')
         cmds.refresh()
-        self.assertSnapshotClose("baseColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("baseColor")
         cmds.setAttr("openPBRSurface1.baseWeight", 0.5)
         cmds.refresh()
-        self.assertSnapshotClose("baseWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("baseWeight")
 
         #Verify Metalness
         cmds.setAttr("openPBRSurface1.baseMetalness", 0.5)
         cmds.refresh()
-        self.assertSnapshotClose("metalness" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("metalness")
 
         #Verify Specular
         cmds.setAttr("openPBRSurface1.specularColor", 0.0,0.0,0.5, type = 'double3')
         cmds.refresh()
-        self.assertSnapshotClose("specularColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("specularColor")
         cmds.setAttr("openPBRSurface1.specularWeight", 0.2)
         cmds.refresh()
-        self.assertSnapshotClose("specularWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("specularWeight")
         cmds.setAttr("openPBRSurface1.specularRoughness", 0.7)
         cmds.refresh()
-        self.assertSnapshotClose("specularRoughness" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("specularRoughness")
         cmds.setAttr("openPBRSurface1.specularIOR", 0.5)
         cmds.refresh()
-        self.assertSnapshotClose("specularIOR" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("specularIOR")
 
         #Verify Emission
         cmds.setAttr("openPBRSurface1.emissionLuminance", 500.0)
         cmds.refresh()
-        self.assertSnapshotClose("emissionLuminance" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("emissionLuminance")
         cmds.setAttr("openPBRSurface1.emissionColor", 0.0,0.5,0.0, type = 'double3')
         cmds.refresh()
-        self.assertSnapshotClose("emissionColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("emissionColor")
 
         #Verify Transmission
         cmds.setAttr("openPBRSurface1.transmissionWeight", 0.5)
         cmds.refresh()
-        self.assertSnapshotClose("transmissionWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("transmissionWeight", image_version)
 
         #Verify Opacity
         cmds.setAttr("openPBRSurface1.geometryOpacity", 0.2)
         cmds.refresh()
-        self.assertSnapshotClose("geometryOpacity" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("geometryOpacity", image_version)
 
         #Verify Coat
-        imageVersion = None
         if(os.getenv('MAYA_HAS_RENDER_ITEM_CULL_MODE_API', 'NOT-FOUND') in ('1', 'TRUE')):
-            imageVersion = "RenderItemHasCullModeAPI"
+            image_version = "RenderItemHasCullModeAPI"
         cmds.setAttr("openPBRSurface1.coatWeight", 0.9)
         cmds.refresh()
-        self.assertSnapshotClose("coatWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+        assertSnapshotCloseImpl("coatWeight", image_version)
         cmds.setAttr("openPBRSurface1.coatColor", 0.0,0.0,0.0, type = 'double3')
         cmds.refresh()
-        self.assertSnapshotClose("coatColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+        assertSnapshotCloseImpl("coatColor", image_version)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

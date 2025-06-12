@@ -137,7 +137,7 @@ HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
         //Edit the cull style
         edited.Set(HdLegacyDisplayStyleSchema::GetCullStyleLocator(),
                         HdRetainedTypedSampledDataSource<TfToken>::New(HdCullStyleTokens->nothing));//No culling
-        prim.dataSource = HdOverlayContainerDataSource::New({ edited.Finish(), _wireframeTypeDataSource});
+        prim.dataSource = HdOverlayContainerDataSource::New({ _wireframeTypeDataSource, edited.Finish() });
     }
     return prim;
 }

@@ -34,6 +34,11 @@ class TestStandardSurface(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
 
     #Test the translation from maya standard surface with a maya native plane to usd preview surface.
     def test_StandardSurface(self):
+        def assertSnapshotCloseImpl(img_name:str, image_version: str | None = None):
+            self.assertSnapshotClose(f'{img_name}.png', self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion=image_version)
+
+        image_version = 'USD2505+' if self._usdVersion >= (0, 25, 5) else None
+
         # Load a maya scene with a maya native plane, which has autodesk standard surface as material
         testFile = mayaUtils.openTestScene(
                 "testStandardSurface",
@@ -44,65 +49,65 @@ class TestStandardSurface(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUti
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, displayTextures=True)
         cmds.refresh()
-        self.assertSnapshotClose("default" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("default")
 
         #Disconnect the texture
         cmds.disconnectAttr("file1.outColor", "standardSurface1.baseColor")
         cmds.refresh()
-        self.assertSnapshotClose("default_noTexture" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("default_noTexture")
 
         #Verify Base
         cmds.setAttr("standardSurface1.baseColor", 0.5,0.0,0.0, type = 'double3')
         cmds.refresh()
-        self.assertSnapshotClose("baseColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("baseColor")
         cmds.setAttr("standardSurface1.base", 0.5)
         cmds.refresh()
-        self.assertSnapshotClose("baseWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("baseWeight")
 
         #Verify Metalness
         cmds.setAttr("standardSurface1.metalness", 0.5)
         cmds.refresh()
-        self.assertSnapshotClose("metalness" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("metalness")
 
         #Verify Specular
         cmds.setAttr("standardSurface1.specularColor", 0.0,0.0,0.5, type = 'double3')
         cmds.refresh()
-        self.assertSnapshotClose("specularColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("specularColor")
         cmds.setAttr("standardSurface1.specular", 0.2)
         cmds.refresh()
-        self.assertSnapshotClose("specularWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("specularWeight")
         cmds.setAttr("standardSurface1.specularRoughness", 0.7)
         cmds.refresh()
-        self.assertSnapshotClose("specularRoughness" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("specularRoughness")
         cmds.setAttr("standardSurface1.specularIOR", 0.5)
         cmds.refresh()
-        self.assertSnapshotClose("specularIOR" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("specularIOR")
 
         #Verify Emission
         cmds.setAttr("standardSurface1.emission", 0.5)
         cmds.refresh()
-        self.assertSnapshotClose("emissionWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("emissionWeight")
         cmds.setAttr("standardSurface1.emissionColor", 0.0,0.5,0.0, type = 'double3')
         cmds.refresh()
-        self.assertSnapshotClose("emissionColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("emissionColor")
 
         #Verify Transmission
         cmds.setAttr("standardSurface1.transmission", 0.5)
         cmds.refresh()
-        self.assertSnapshotClose("transmissionWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("transmissionWeight", image_version)
         
         #Verify Opacity
         cmds.setAttr("standardSurface1.opacity", 0.2,0.2,0.2, type = 'double3')
         cmds.refresh()
-        self.assertSnapshotClose("geometryOpacity" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("geometryOpacity", image_version)
 
         #Verify Coat
         cmds.setAttr("standardSurface1.coat", 0.9)
         cmds.refresh()
-        self.assertSnapshotClose("coatWeight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("coatWeight", image_version)
         cmds.setAttr("standardSurface1.coatColor", 0.0,0.0,0.0, type = 'double3')
         cmds.refresh()
-        self.assertSnapshotClose("coatColor" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        assertSnapshotCloseImpl("coatColor", image_version)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

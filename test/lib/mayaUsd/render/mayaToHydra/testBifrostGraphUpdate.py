@@ -32,6 +32,8 @@ class TestBifrostGraphUpdate(mtohUtils.MayaHydraBaseTestCase):
                                  self.IMAGEDIFF_FAIL_PERCENT)
 
     def test_BifrostGraphUpdate(self):
+        if self._usdVersion >= (0, 25, 5):
+            return # Skip Bifrost test until support for USD25.05 is added in Bifrost
         mayaUtils.openTestScene("testBifrost", "bifrost_node_update_hydra.ma")
         self.setHdStormRenderer()
         self.verifySnapshot("bifrostBeforeUpdate.png")
