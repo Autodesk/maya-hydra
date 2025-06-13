@@ -29,7 +29,7 @@ class TestArnoldLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.
     @property
     def IMAGE_DIFF_FAIL_PERCENT(self):
         # Use a larger tolerance on OSX
-        if platform.system() == 'Darwin':
+        if platform.system() == 'Darwin' and self._usdVersion >= (0, 25, 5):
             return 2
         return 0.2
 
