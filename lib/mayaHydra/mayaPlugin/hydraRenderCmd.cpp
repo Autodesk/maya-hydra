@@ -191,7 +191,16 @@ bool HydraRenderCmd::hydraRender()
             cameraPath.inclusiveMatrixInverse());
         inputParams.projectionMatrix = GetGfMatrixFromMaya(
             MFnCamera(cameraPath).projectionMatrix());
-    
+
+        // As per MFnCamera::projectionMatrix() documentation:
+        //
+        // The projection matrix that Maya's software renderer uses is
+        // almost identical to the OpenGL projection matrix. The
+        // difference is that Maya uses a left hand coordinate system
+        // and so the entries [2][2] and [3][2] are negated.
+        inputParams.projectionMatrix[2][2] = -inputParams.projectionMatrix[2][2];
+        inputParams.projectionMatrix[3][2] = -inputParams.projectionMatrix[3][2];
+
         // Unclear how to translate Maya data.
         // MHWRender::MDataServerOperation::MViewportScene carries MRenderItem's
         // created by OGS, and has some level of change notification.  Should

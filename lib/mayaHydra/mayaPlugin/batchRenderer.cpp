@@ -396,6 +396,14 @@ MStatus BatchRenderer::Render(
 
         _engine.Execute(_renderIndex, &tasks);
 
+
+        // HYDRA-1714: _taskController->IsConverged() always returns false, 
+        // so cannot be relied upon to signal end of render.
+        // TODO_BATCH_RENDER  Incorrectly just wait an arbitrary
+        // amount of time for rendering to complete.
+        constexpr auto msWait25s = std::chrono::duration<float, std::milli>(25000);
+        std::this_thread::sleep_for(msWait25s);
+
         const auto fileName = Fvp::ImageBufferWriter::GetFileName();
         if (!fileName.empty()) {
             if (!Fvp::ImageBufferWriter::Write(_fileWriterArgs, fileName)) {
@@ -411,11 +419,16 @@ MStatus BatchRenderer::Render(
         // timer callback relies on the idle loop, does not apply to
         // batch rendering.
         _isConverged = _taskController->IsConverged();
+
+        std::cout << "PPT: _isConverged is " 
+                  << (_isConverged ? "true" : "false") << std::endl;
+
         if (markTime) {
             std::lock_guard<std::mutex> lock(_lastRenderTimeMutex);
             _lastRenderTime = std::chrono::system_clock::now();
         }
-    };
+    }; // End of renderFrame lambda.
+
     if (_initializationAttempted && !_initializationSucceeded) {
         // Initialization must have failed already, stop trying.
         return MStatus::kFailure;
@@ -637,7 +650,8 @@ void BatchRenderer::_InitHydraResources()
 
     // As per https://stackoverflow.com/questions/9982681
     // an initializer_list cannot be used in a ternary operator.
-    _fileWriterArgs = _hgi ? VtDictionary{
+    // TODO_BATCH_RENDER Checking for use of Hydra Storm is not general enough.
+    _fileWriterArgs = _isUsingHdSt ? VtDictionary{
       {{"hgi", VtValue(_hgi.get())}, {"engine", VtValue(&_engine)}}} :
       VtDictionary{{{"taskController", VtValue(_taskController.get())}}}; 
 
