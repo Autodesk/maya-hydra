@@ -25,6 +25,7 @@
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 
 // This class is a filtering scene index that applies a different RepSelector on geometries (such as wireframe or wireframe on shaded)
 // and also applies an overrideWireframecolor for HdStorm 
@@ -70,6 +71,11 @@ const HdRetainedContainerDataSourceHandle sWireframeDisplayStyleDataSource
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
                 { HdReprTokens->refinedWire, TfToken(), TfToken() })));
 
+// Guide purpose render tag data source
+const HdRetainedContainerDataSourceHandle sGuidePurposeRenderTagDataSource
+    = HdRetainedContainerDataSource::New(
+        HdPurposeSchemaTokens->purpose,
+        HdRetainedTypedSampledDataSource<TfToken>::New(HdRenderTagTokens->guide));
 
 }//End of namespace
 
@@ -83,9 +89,12 @@ ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inp
 
 void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsReprChanged, int refineLevel)
 {
+    _convertToGuidePurposeRenderTag = false;
+
     switch (reprType){
         case RepSelectorType::WireframeRefined:
             _wireframeTypeDataSource = sWireframeDisplayStyleDataSource;
+            _convertToGuidePurposeRenderTag = true; // Convert to guide purpose render tag
             break;
         case RepSelectorType::WireframeOnSurface:
             _wireframeTypeDataSource = sdWireframeOnShadedDisplayStyleDataSource;
@@ -129,6 +138,12 @@ HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
         //Edit the dataSource as an overlay will not replace any existing attribute value.
         // So we need to edit the _primVarsTokens->overrideWireframeColor attribute as they may already exist in the prim
         auto edited = HdContainerDataSourceEditor(prim.dataSource);
+
+        if (_convertToGuidePurposeRenderTag) {
+            // If we are converting to guide purpose render tag
+            edited.Set(HdPurposeSchema::GetDefaultLocator(),
+                       sGuidePurposeRenderTagDataSource); // Set the purpose to guide
+        }
 
         //Edit the override wireframe color
         edited.Set(HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),

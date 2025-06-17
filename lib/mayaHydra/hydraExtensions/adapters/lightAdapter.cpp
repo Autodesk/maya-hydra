@@ -369,4 +369,10 @@ bool MayaHydraLightAdapter::_GetVisibility() const
     return false;
 }
 
+TfToken MayaHydraLightAdapter::GetRenderTag() const
+{ 
+    //We return the geometry render tag for this light primitive (which is a sprim) for it to be in the beauty pass
+    return HdRenderTagTokens->geometry; 
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE

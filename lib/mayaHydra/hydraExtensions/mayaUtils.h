@@ -158,8 +158,20 @@ bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath);
  *
  * @return true if the object is a light, false otherwise
  */
+MAYAHYDRALIB_API
 bool IsDagPathALight(const MDagPath& dagPath);
 
+/**
+ * @brief Get if this MDagPath is a camera.
+ *
+ * @param[in] dagPath is a MDagPath
+ *
+ * @return true if the object is a camera, false otherwise
+ */
+MAYAHYDRALIB_API
+bool IsDagPathACamera(const MDagPath& dagPath);
+
 } // namespace MAYAHYDRA_NS_DEF
+
 
 #endif // MAYAHYDRALIB_MAYA_UTILS_H

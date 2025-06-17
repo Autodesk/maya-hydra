@@ -32,9 +32,11 @@
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
+
 #if PXR_VERSION >= 2403
 #include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
 #endif
@@ -59,6 +61,13 @@ const HdRetainedContainerDataSourceHandle refinedWireDisplayStyleDataSource
             HdLegacyDisplayStyleSchemaTokens->reprSelector,
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
                 { HdReprTokens->refinedWire, TfToken(), TfToken() })));
+
+//Guide purpose render tag data source
+const HdRetainedContainerDataSourceHandle guidePurposeRenderTagDataSource
+    = HdRetainedContainerDataSource::New(
+        HdPurposeSchemaTokens->purpose,
+        HdRetainedTypedSampledDataSource<TfToken>::New(HdRenderTagTokens->guide)
+      );
 
 const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
@@ -361,6 +370,9 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
                             HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{color}),
                             HdPrimvarSchemaTokens->constant,
                             HdPrimvarSchemaTokens->color));
+    
+    edited.Set(HdPurposeSchema::GetDefaultLocator(),
+        guidePurposeRenderTagDataSource); // Set the purpose to guide
     
     //Is the prim in refined displayStyle (meaning shaded) ?
     if (HdLegacyDisplayStyleSchema styleSchema =

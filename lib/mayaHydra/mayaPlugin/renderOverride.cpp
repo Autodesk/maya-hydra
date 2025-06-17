@@ -21,6 +21,7 @@
 #include <pxr/imaging/garch/glApi.h>
 
 #include "renderOverride.h"
+#include "setViewportRenderPassesCommand.h"
 
 #include "mayaColorPreferencesTranslator.h"
 #include "pluginDebugCodes.h"
@@ -69,7 +70,6 @@
 #include <pxr/base/tf/type.h>
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/staticTokens.h>
-#include <pxr/pxr.h>
 
 #include <ufe/hierarchy.h>
 #include <ufe/selection.h>
@@ -98,10 +98,10 @@
 #include <pxr/imaging/hdx/tokens.h>
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/usd/kind/registry.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/modelAPI.h>
-#include <pxr/pxr.h>
 
 #include <mayaUsdAPI/proxyStage.h>
 
@@ -488,24 +488,61 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
         return SdfPathVector();
     }
 
-    auto* renderIndex = instance->renderIndex();
-    if (!renderIndex) {
-        return SdfPathVector();
+#ifndef VIEWPORT_TOOLBOX
+        auto* renderIndex = instance->renderIndex();
+        if (!renderIndex) {
+            return SdfPathVector();
+        }
+        auto primIds = renderIndex->GetRprimIds();
+        if (visibleOnly) {
+            primIds.erase(
+                std::remove_if(
+                    primIds.begin(),
+                    primIds.end(),
+                    [renderIndex](const SdfPath& primId) {
+                        auto* rprim = renderIndex->GetRprim(primId);
+                        if (!rprim)
+                            return true;
+                        return !rprim->IsVisible();
+                    }),
+                primIds.end());
+        }
+#else
+    // Accumulate RPrims from all render indices from all passes of the instance.
+    SdfPathVector primIds;
+    for (int i = 0; i < instance->_numRenderPasses; ++i) {
+        const hvt::FramePassPtr& pass = instance->_GetRenderPass(i);
+        if (!pass) {             
+            continue;
+        }
+
+        auto* renderIndex               = pass->GetRenderIndex();
+        if (!renderIndex) {
+            continue;
+        }
+
+        auto tempPrimIds = renderIndex->GetRprimIds();
+        if (visibleOnly) {
+            tempPrimIds.erase(
+                std::remove_if(
+                    tempPrimIds.begin(),
+                    tempPrimIds.end(),
+                    [renderIndex](const SdfPath& primId) {
+                        auto* rprim = renderIndex->GetRprim(primId);
+                        if (!rprim)
+                            return true;
+                        return !rprim->IsVisible();
+                    }),
+                tempPrimIds.end());
+        }
+
+        // Concatenate results
+        primIds.reserve(
+            primIds.size() + tempPrimIds.size()); // Reserve space to avoid reallocations
+        primIds.insert(
+            primIds.end(), tempPrimIds.begin(), tempPrimIds.end()); // Insert all elements
     }
-    auto primIds = renderIndex->GetRprimIds();
-    if (visibleOnly) {
-        primIds.erase(
-            std::remove_if(
-                primIds.begin(),
-                primIds.end(),
-                [renderIndex](const SdfPath& primId) {
-                    auto* rprim = renderIndex->GetRprim(primId);
-                    if (!rprim)
-                        return true;
-                    return !rprim->IsVisible();
-                }),
-            primIds.end());
-    }
+#endif
     return primIds;
 }
 
@@ -711,31 +748,52 @@ MStatus MtohRenderOverride::Render(
             editTasks(beautyTasks);
             _beautyFramePass->Render(beautyTasks);
         } else {
-            // Beauty pass
-            _beautyFramePass->params().enablePresentation = false;
-            _beautyFramePass->params().backgroundColor = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
-            HdTaskSharedPtrVector beautyTasks = _beautyFramePass->GetRenderTasks();
-            editTasks(beautyTasks);
-            _beautyFramePass->Render(beautyTasks);
+            // We can use the mayaHydraSetVisibleRenderPasses command to set the visible passes
+            const MIntArray renderPassesVisible
+                = MayaHydraSetVisibleRenderPasses::getVisibleRenderPasses();
+            
+            // Main pass is pass #0
+            const bool showMainRenderPass = std::find(renderPassesVisible.cbegin(), renderPassesVisible.cend(), 0)
+                                            != renderPassesVisible.cend();
+            // Secondary pass is pass #1
+            const bool showSecondaryRenderPass
+                = std::find(renderPassesVisible.cbegin(), renderPassesVisible.cend(), 1)
+                != renderPassesVisible.cend();
 
-            // Get buffers
-            std::shared_ptr<pxr::HdRenderBuffer> colorBuffer =
-                hvt::CreateRenderBufferProxy(_beautyFramePass, pxr::HdAovTokens->color);
+            if (showMainRenderPass) {
+                // Beauty pass
+                _beautyFramePass->params().enablePresentation = (showSecondaryRenderPass) ? false : true;
+                _beautyFramePass->params().backgroundColor = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
+                HdTaskSharedPtrVector beautyTasks = _beautyFramePass->GetRenderTasks();
+                editTasks(beautyTasks);
+                _beautyFramePass->Render(beautyTasks);
+            }
 
-            std::shared_ptr<pxr::HdRenderBuffer> depthBuffer =
-                hvt::CreateRenderBufferProxy(_beautyFramePass, pxr::HdAovTokens->depth);
+            if (showSecondaryRenderPass) {
+                // Get shared AOVs from the beauty pass
+                std::shared_ptr<pxr::HdRenderBuffer> colorBuffer
+                    = hvt::CreateRenderBufferProxy(_beautyFramePass, pxr::HdAovTokens->color);
 
-            const std::vector<std::pair<pxr::TfToken const&, pxr::HdRenderBuffer*>> inputAOVs = {
-                { pxr::HdAovTokens->color, colorBuffer.get() },
-                { pxr::HdAovTokens->depth, depthBuffer.get() }
-            };
+                std::shared_ptr<pxr::HdRenderBuffer> depthBuffer
+                    = hvt::CreateRenderBufferProxy(_beautyFramePass, pxr::HdAovTokens->depth);
 
-            // Secondary graphics pass
-            _secondaryGfxFramePass->params().backgroundColor = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
-            _secondaryGfxFramePass->params().clearBackground = false;
-            HdTaskSharedPtrVector secondaryGfxTasks = _secondaryGfxFramePass->GetRenderTasks(inputAOVs);
-            editTasks(secondaryGfxTasks);
-            _secondaryGfxFramePass->Render(secondaryGfxTasks);
+                std::vector<std::pair<pxr::TfToken const&, pxr::HdRenderBuffer*>> inputAOVs
+                    = { { pxr::HdAovTokens->color, colorBuffer.get() },
+                        { pxr::HdAovTokens->depth, depthBuffer.get() } };
+
+                // Secondary graphics pass
+                _secondaryGfxFramePass->params().backgroundColor = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
+                
+                if (!showMainRenderPass) {
+                    _secondaryGfxFramePass->params().clearBackground = true;
+                } else {
+                    _secondaryGfxFramePass->params().clearBackground = false;
+                }
+                
+                HdTaskSharedPtrVector secondaryGfxTasks = _secondaryGfxFramePass->GetRenderTasks(inputAOVs);
+                editTasks(secondaryGfxTasks);
+                _secondaryGfxFramePass->Render(secondaryGfxTasks);
+            }
         }
 #else
         _engine.Execute(_renderIndex, &tasks);
@@ -774,6 +832,13 @@ MStatus MtohRenderOverride::Render(
         ClearHydraResources(fullReset);
     }
 
+    const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
+    MayaHydraParams    delegateParams = _globals.delegateParams;
+    delegateParams.displaySmoothMeshes
+        = !(currentDisplayStyle & MHWRender::MFrameContext::kFlatShaded);
+
+    _SetRenderPurposeTags(delegateParams);
+ 
     if (!_initializationAttempted) {
         _InitHydraResources(drawContext);
 
@@ -810,6 +875,9 @@ MStatus MtohRenderOverride::Render(
 	            cameraName = viewCamera.name().asChar();
             }
     
+            _beautyFramePassFilteringFn
+                = _CreatePassFilteringFn(_mainPassRenderTags);
+    
             //Create a HydraViewportInformation 
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelNameStr, cameraName);
             const bool dataProducerSceneIndicesAdded = manager.AddViewportInformation(
@@ -830,10 +898,6 @@ MStatus MtohRenderOverride::Render(
         _needToReplaceSelection = false;
     }
 
-    const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
-    MayaHydraParams delegateParams = _globals.delegateParams;
-    delegateParams.displaySmoothMeshes = !(currentDisplayStyle & MHWRender::MFrameContext::kFlatShaded);
-    
     const bool currentUseDefaultMaterial = (drawContext.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
 
     if (_lightsManagementSceneIndex && _lightingMode != currentMayaLightingMode) {
@@ -1021,9 +1085,6 @@ MStatus MtohRenderOverride::Render(
 #endif
     }
 
-    // Set Purpose tags
-    SetRenderPurposeTags(delegateParams);
-
     // Set MSAA as per Maya AntiAliasing settings
     bool isMultiSampled = framecontext->getPostEffectEnabled(MHWRender::MFrameContext::kAntiAliasing);
 #ifdef VIEWPORT_TOOLBOX
@@ -1194,18 +1255,30 @@ MtohRenderOverride* MtohRenderOverride::_GetByName(TfToken rendererName)
 
 void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegateParams)
 {
-    TfTokenVector mhRenderTags = {HdRenderTagTokens->geometry};
-    if (delegateParams.renderPurpose)
-        mhRenderTags.push_back(HdRenderTagTokens->render);
-    if (delegateParams.proxyPurpose)
-        mhRenderTags.push_back(HdRenderTagTokens->proxy);
-    if (delegateParams.guidePurpose)
-        mhRenderTags.push_back(HdRenderTagTokens->guide);
-#ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->params().renderTags = mhRenderTags;
-    _secondaryGfxFramePass->params().renderTags = mhRenderTags;
+    _mainPassRenderTags = { HdRenderTagTokens->geometry }; // main pass
+    if (delegateParams.renderPurpose) {
+        _mainPassRenderTags.push_back(HdRenderTagTokens->render); // main pass
+    }
+    if (delegateParams.proxyPurpose){
+        _mainPassRenderTags.push_back(HdRenderTagTokens->proxy); // main pass
+    }
+
+#ifndef VIEWPORT_TOOLBOX
+    if (delegateParams.guidePurpose) { 
+        _mainPassRenderTags.push_back(HdRenderTagTokens->guide);
+    }
+
+    _taskController->SetRenderTags(_mainPassRenderTags);
 #else
-    _taskController->SetRenderTags(mhRenderTags);
+    _secondaryGfxPassRenderTags.clear();
+    //Debug
+    if (delegateParams.guidePurpose) {
+        if (_useSinglePass) {
+            _mainPassRenderTags.push_back(HdRenderTagTokens->guide); // main pass
+        } else {
+            _secondaryGfxPassRenderTags.push_back(HdRenderTagTokens->guide); // secondary pass
+        }
+    }
 #endif
 }
 
@@ -1231,6 +1304,11 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     GlfContextCaps::InitInstance();
 
 #ifdef VIEWPORT_TOOLBOX
+    static const TfTokenVector allPurposeRenderTags = { HdRenderTagTokens->geometry,
+                                                        HdRenderTagTokens->render,
+                                                        HdRenderTagTokens->proxy,
+                                                        HdRenderTagTokens->guide };
+
     hvt::RendererDescriptor beautyRendererDescriptor;
     beautyRendererDescriptor.hgiDriver    = &_hgiDriver;
     beautyRendererDescriptor.rendererName = _rendererDesc.rendererName;
@@ -1240,12 +1318,11 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     beautyFramePassDescriptor.renderIndex = _beautyRenderer->RenderIndex();
     beautyFramePassDescriptor.uid         = pxr::SdfPath("/beautyPass");
     _beautyFramePass = hvt::ViewportEngine::CreateFramePass(beautyFramePassDescriptor);
-    _beautyFramePassFilteringFn = [&](const PXR_NS::SdfPath& primPath) {
-        // Use Path based filtering by default
-        std::set<PXR_NS::SdfPath> filteringSceneRoots = { _highlightHierarchyPrefix };
-        return Fvp::FindSelfOrFirstParent(primPath, filteringSceneRoots) != filteringSceneRoots.end();
-    };
-
+    
+    // We set the passes to render all purposes by default, the actual filtering will be done in the
+    // filtering lambda of the passes
+    _beautyFramePass->params().renderTags = allPurposeRenderTags;
+    
     // Add the 'SkyDome' task to the frame pass.
     {
         // Get the first render task path.
@@ -1272,15 +1349,18 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     secondaryGfxFramePassDescriptor.renderIndex = _secondaryGfxRenderer->RenderIndex();
     secondaryGfxFramePassDescriptor.uid          = pxr::SdfPath("/secondaryGfxPass");
     _secondaryGfxFramePass = hvt::ViewportEngine::CreateFramePass(secondaryGfxFramePassDescriptor);
-    _secondaryGfxFramePassFilteringFn = [&](const PXR_NS::SdfPath& primPath) {
-        // Use Path based filtering by default
-        std::set<PXR_NS::SdfPath> filteringSceneRoots = _dataProducerMergingSceneIndexProxy->GetSceneRoots();
-        return Fvp::FindSelfOrFirstParent(primPath, filteringSceneRoots) != filteringSceneRoots.end();
-    };
+    _numRenderPasses = 2; // Update the number of render passes
+
+    // We set the passes to render all purposes by default, the actual filtering will be done in the
+    // filtering lambda of the passes
+    _secondaryGfxFramePass->params().renderTags = allPurposeRenderTags;
 
     _useSinglePass = mergePassesWithSameRenderer() && beautyRendererDescriptor.rendererName == secondaryGfxRendererDescriptor.rendererName;
 
-    GetMayaHydraLibInterface().RegisterTerminalSceneIndex(_beautyRenderer->RenderIndex()->GetTerminalSceneIndex());
+    GetMayaHydraLibInterface().RegisterTerminalSceneIndex(
+        _beautyRenderer->RenderIndex()->GetTerminalSceneIndex());
+    GetMayaHydraLibInterface().RegisterTerminalSceneIndex(
+        _secondaryGfxRenderer->RenderIndex()->GetTerminalSceneIndex());
 #else
     _rendererPlugin
         = HdRendererPluginRegistry::GetInstance().GetRendererPlugin(_rendererDesc.rendererName);
@@ -1487,6 +1567,9 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     if (_beautyRenderer && _beautyRenderer->RenderIndex()) {
         GetMayaHydraLibInterface().UnregisterTerminalSceneIndex(_beautyRenderer->RenderIndex()->GetTerminalSceneIndex());
     }
+    if (_secondaryGfxRenderer && _secondaryGfxRenderer->RenderIndex()) {
+        GetMayaHydraLibInterface().UnregisterTerminalSceneIndex(_secondaryGfxRenderer->RenderIndex()->GetTerminalSceneIndex());
+    }
     _beautyFramePass.reset();
     _beautyRenderer.reset();
     _secondaryGfxFramePass.reset();
@@ -1636,6 +1719,7 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 #ifdef VIEWPORT_TOOLBOX
     // Secondary graphics pass
     if (!_useSinglePass) {
+        _secondaryGfxFramePassFilteringFn = _CreatePassFilteringFn(_secondaryGfxPassRenderTags);
         _secondaryGfxRenderer->RenderIndex()->InsertSceneIndex(
             _GetPassFilteringSceneIndex(_secondaryGfxFramePassFilteringFn),
             SdfPath::AbsoluteRootPath());
@@ -1921,7 +2005,19 @@ void MtohRenderOverride::_PickByRegion(
 
     // Execute picking tasks.
 #ifdef VIEWPORT_TOOLBOX
+    //Do picking on the first pass
     _beautyFramePass->Pick(pickParams);
+    //Do picking on the 2nd pass
+    HdxPickHitVector tempHits;
+    pickParams.outHits = &tempHits;
+    _secondaryGfxFramePass->Pick(pickParams);
+    //Combine the 2 PickHitVector
+    if (!tempHits.empty()) {
+        // Reserve memory for efficiency
+        outHits.reserve(outHits.size() + tempHits.size());
+        // Insert all hits from tempHits into outHits
+        outHits.insert(outHits.end(), tempHits.begin(), tempHits.end());
+    }
 #else
     HdTaskSharedPtrVector pickingTasks = _taskController->GetPickingTasks();
     VtValue               pickParamsValue(pickParams);
@@ -2248,5 +2344,56 @@ HdRenderIndex* MtohRenderOverride::renderIndex() const
     return _renderIndex;
 #endif
 }
+
+#ifdef VIEWPORT_TOOLBOX
+Fvp::PassFilteringSceneIndex::FilteringOutFn
+MtohRenderOverride::_CreatePassFilteringFn(const TfTokenVector& renderTags)
+{
+    return [this, renderTags](const PXR_NS::SdfPath& primPath) {
+        // Use purpose render tag based filtering
+        if (_lastFilteringSceneIndexBeforeCustomFiltering) {
+            HdSceneIndexPrim prim
+                = _lastFilteringSceneIndexBeforeCustomFiltering->GetPrim(primPath);
+            if (prim.dataSource) {
+                if (HdPrimTypeIsLight(prim.primType)) {
+                    return false; // Always keep the lights
+                }
+                HdPurposeSchema purposeSchema = HdPurposeSchema::GetFromParent(prim.dataSource);
+                if (purposeSchema.IsDefined()) {
+                    HdTokenDataSourceHandle purposeDs = purposeSchema.GetPurpose();
+                    if (purposeDs) {
+                        // Check if the purpose matches the render tags
+                        const TfToken purposeRenderTag = purposeDs->GetTypedValue(0.0);
+                        return (
+                            std::find(
+                                renderTags.cbegin(),
+                                renderTags.cend(),
+                                purposeRenderTag)
+                            == renderTags.cend()); // Not found in the render tags,
+                                                   // so skip that prim
+                    }
+                }
+            }
+        }
+
+        return false; // will be rendered.
+    };
+}
+
+const hvt::FramePassPtr&
+MtohRenderOverride::_GetRenderPass(int passIndex)const
+{
+    static const hvt::FramePassPtr nullFramePass;
+
+    if (0 == passIndex) {
+        return _beautyFramePass;
+    } else if (1 == passIndex) {
+        return _secondaryGfxFramePass;
+    }
+
+    return nullFramePass;
+}
+
+#endif // VIEWPORT_TOOLBOX
 
 PXR_NAMESPACE_CLOSE_SCOPE

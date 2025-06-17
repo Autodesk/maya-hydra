@@ -279,6 +279,9 @@ private:
     /// are destructed last. Hgi may be used during engine/delegate destruction.
     HgiUniquePtr                              _hgi;
     HdDriver                                  _hgiDriver;
+
+    int                      _numRenderPasses = 1;
+
 #ifdef VIEWPORT_TOOLBOX
     hvt::RenderIndexProxyPtr _beautyRenderer;
     hvt::FramePassPtr _beautyFramePass;
@@ -287,6 +290,7 @@ private:
     hvt::FramePassPtr _secondaryGfxFramePass;
     Fvp::PassFilteringSceneIndex::FilteringOutFn _secondaryGfxFramePassFilteringFn;
     bool _useSinglePass{false};
+    const hvt::FramePassPtr& _GetRenderPass(int passIndex)const;
 #else
     HdEngine                                  _engine;
     HdRendererPlugin*                         _rendererPlugin = nullptr;
@@ -356,6 +360,14 @@ private:
     GfVec4d _viewport;
 
     int _currentOperation = -1;
+
+    TfTokenVector _mainPassRenderTags;
+    TfTokenVector _secondaryGfxPassRenderTags;
+#ifdef VIEWPORT_TOOLBOX
+    Fvp::PassFilteringSceneIndex::FilteringOutFn
+    _CreatePassFilteringFn(const TfTokenVector& renderTags);
+#endif
+    
 
     bool _needToReplaceSelection = false;
     const bool _isUsingHdSt = false;

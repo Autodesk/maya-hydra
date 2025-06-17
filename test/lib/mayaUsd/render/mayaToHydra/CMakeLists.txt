@@ -104,6 +104,11 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     )
 endif()
 
+#Viewport tool box render passes tests
+if(BUILD_WITH_VIEWPORT_TOOLBOX)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testRenderPasses.py)
+endif()
+
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.
 if(MayaUsd_FOUND)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testMayaUsdAPIUsage.py)

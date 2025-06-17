@@ -64,6 +64,9 @@ public:
     MAYAHYDRALIB_API
     void SetViewport(const GfVec4d& viewport);
 
+    MAYAHYDRALIB_API
+    TfToken GetRenderTag() const override { return HdRenderTagTokens->guide;}
+
 protected:
     static TfToken CameraType();
 

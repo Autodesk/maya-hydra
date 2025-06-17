@@ -37,7 +37,6 @@
 #include <pxr/imaging/hd/basisCurvesSchema.h>
 #include <pxr/imaging/hd/primOriginSchema.h>
 
-
 // This class is a filtering scene index that converts the geometries into a bounding box using the extent attribute. 
 // If the extent attribute is not present, we draw nothing, so an extent attribute must exist on all primitives for this mode to be supported correctly.
 
@@ -121,7 +120,6 @@ namespace
 
         HdDataSourceBaseHandle Get(const TfToken &name) override {
             if (name == HdXformSchemaTokens->xform ||
-                name == HdPurposeSchemaTokens->purpose ||
                 name == HdVisibilitySchemaTokens->visibility ||
                 name == HdInstancedBySchemaTokens->instancedBy ||
                 name == HdPrimOriginSchemaTokens->primOrigin) {
@@ -130,6 +128,18 @@ namespace
                 }
                 return nullptr;
             }
+
+            // Force the purpose render tag to be guide for bounding box display mode
+            if (name == HdPurposeSchemaTokens->purpose) {
+                // Guide purpose render tag data source
+                static const HdRetainedContainerDataSourceHandle guidePurposeRenderTagDataSource
+                    = HdRetainedContainerDataSource::New(
+                        HdPurposeSchemaTokens->purpose,
+                        HdRetainedTypedSampledDataSource<TfToken>::New(HdRenderTagTokens->guide));
+
+                return guidePurposeRenderTagDataSource;
+            }
+
             if (name == HdLegacyDisplayStyleSchemaTokens->displayStyle) {
                 static const HdDataSourceBaseHandle src =
                     HdLegacyDisplayStyleSchema::Builder()
@@ -315,7 +325,8 @@ namespace
                 _PrimDataSource::GetNames(),
                 { HdBasisCurvesSchemaTokens->basisCurves,
                   HdPrimvarsSchemaTokens->primvars,
-                  HdExtentSchemaTokens->extent });
+                  HdExtentSchemaTokens->extent,
+                  HdPurposeSchemaTokens->purpose });
             return result;
         }
 
@@ -329,6 +340,16 @@ namespace
             }
             if (name == HdPrimvarsSchemaTokens->primvars) {
                 return _BoundsPrimvarsDataSource::New(_primSource, _wireframeColor);
+            }
+            // Force the purpose render tag to be guide for bounding box display mode
+            if (name == HdPurposeSchemaTokens->purpose) {
+                // Guide purpose render tag data source
+                static const HdRetainedContainerDataSourceHandle guidePurposeRenderTagDataSource
+                    = HdRetainedContainerDataSource::New(
+                        HdPurposeSchemaTokens->purpose,
+                        HdRetainedTypedSampledDataSource<TfToken>::New(HdRenderTagTokens->guide));
+
+                return guidePurposeRenderTagDataSource;
             }
             if (name == HdExtentSchemaTokens->extent) {
                 if (_primSource) {

@@ -68,6 +68,7 @@
 #include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/extentSchema.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -146,6 +147,7 @@ public:
     static MObject     mSize;
     static MObject     mWorldS;
     static MObject     mColor;
+    static MObject     mDrawAsGuide;
 
     static	MTypeId		id;
     static	MString		nodeClassification;
@@ -155,6 +157,8 @@ private:
     float _GetSizeInCentimeters() const;
     ///get the value of the color attribute, returned as a 3D Hydra vector 
     GfVec3f _GetColor() const;
+    /// get the value of the DrawAsGuide attribute, which is a boolean, this is used so that when the mesh is drawn as a guide it appears in the second pass of maya hydra
+    bool _GetDrawAsGuide() const;
     ///Create the Hydra foot print primitives
     void _CreateAndAddFootPrintPrimitives();
     ///Remove the Hydra foot print primitives
@@ -290,7 +294,15 @@ namespace
     static const MPoint corner2( 0.17, 0.0, 0.3 );
     
     //Create the Hydra primitive and add it to the retained scene index
-    void _CreateAndAddPrim(const HdRetainedSceneIndexRefPtr& retainedSceneIndex, const SdfPath& primPath, const VtArray<GfVec3f>& points, const VtIntArray& faceVertexCount, const VtIntArray& faceVertexIndices, const GfVec3f& scale, const GfVec3f& displayColor)
+    void _CreateAndAddPrim(
+        const HdRetainedSceneIndexRefPtr& retainedSceneIndex,
+        const SdfPath&                    primPath,
+        const VtArray<GfVec3f>&           points,
+        const VtIntArray&                 faceVertexCount,
+        const VtIntArray&                 faceVertexIndices,
+        const GfVec3f&                    scale,
+        const GfVec3f&                    displayColor,
+        bool                              drawAsGuide)
     {
         using _PointArrayDs = HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>;
         using _IntArrayDs   = HdRetainedTypedSampledDataSource<VtIntArray>;
@@ -372,6 +384,13 @@ namespace
                 .SetMax(HdRetainedTypedSampledDataSource<GfVec3d>::New(GfVec3d(corner2.x*scaleArray[0], corner2.y*scaleArray[1], corner2.z*scaleArray[2])))
                 .Build(),
 
+            //Create a purpose render tag
+            HdPurposeSchemaTokens->purpose,
+            HdPurposeSchema::Builder()
+                .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
+                    (drawAsGuide) ? HdRenderTagTokens->guide : HdRenderTagTokens->geometry))
+                .Build(),
+            
             //create a mesh
             HdMeshSchemaTokens->mesh,
             meshDs,
@@ -396,7 +415,8 @@ namespace
         if (
             (plug       == MhFootPrint::mSize)  ||
             (parentPlug == MhFootPrint::mColor) ||
-            (plug       == MhFootPrint::mColor)
+            (plug       == MhFootPrint::mColor) || 
+            (plug       == MhFootPrint::mDrawAsGuide)
            ){
                 footPrint->updateFootPrintPrims();
         }
@@ -444,6 +464,7 @@ void nodeRemovedFromModel(MObject& node, void* /* clientData */)
 std::atomic_int MhFootPrint::_counter {0};
 MObject MhFootPrint::mSize;
 MObject MhFootPrint::mColor;
+MObject MhFootPrint::mDrawAsGuide;
 MTypeId MhFootPrint::id( 0x58000994 );
 MString	MhFootPrint::nodeClassification("hydraAPIExample/geometry/footPrint");
 MObject MhFootPrint::mWorldS;
@@ -507,9 +528,27 @@ void MhFootPrint::_CreateAndAddFootPrintPrimitives()
     const float fSize           = _GetSizeInCentimeters();
     const GfVec3f displayColor  = _GetColor();
     const GfVec3f scale         = {fSize,fSize,fSize};//convert size into a 3d uniform scale which we'll convert into a scale matrix
+    const bool drawAsGuide      = _GetDrawAsGuide();
 
-    _CreateAndAddPrim(_retainedSceneIndex, _solePath, solePoints, soleFaceVertexCounts, soleFaceVertexIndices, scale, displayColor);
-    _CreateAndAddPrim(_retainedSceneIndex, _heelPath, heelPoints, heelFaceVertexCounts, heelFaceVertexIndices, scale, displayColor);
+    _CreateAndAddPrim(
+        _retainedSceneIndex,
+        _solePath,
+        solePoints,
+        soleFaceVertexCounts,
+        soleFaceVertexIndices,
+        scale,
+        displayColor,
+        drawAsGuide);
+
+    _CreateAndAddPrim(
+        _retainedSceneIndex,
+        _heelPath,
+        heelPoints,
+        heelFaceVertexCounts,
+        heelFaceVertexIndices,
+        scale,
+        displayColor,
+        drawAsGuide);
 }
 
 //Remove the 2 primitives from the retained scene index
@@ -543,7 +582,21 @@ float MhFootPrint::_GetSizeInCentimeters() const
     return 1.0f;
 }
 
-// Retrieve value of the color attribute from the node
+bool MhFootPrint::_GetDrawAsGuide() const
+{
+    const MObject obj = thisMObject();
+    MPlug plug(obj, MhFootPrint::mDrawAsGuide);
+    if (!plug.isNull()) {
+        bool val = false;
+        if (plug.getValue(val)) {
+            return val;
+        }
+    }
+
+    return false;
+}
+
+    // Retrieve value of the color attribute from the node
 GfVec3f MhFootPrint::_GetColor() const
 {
     const MObject obj = thisMObject();
@@ -693,8 +746,13 @@ MStatus MhFootPrint::initialize()
     MAKE_INPUT(nAttr);
     CHECK_MSTATUS ( nAttr.setDefault(0.0, 0.0, 1.0) );
 
+    mDrawAsGuide = nAttr.create("drawAsGuide", "dag", MFnNumericData::kBoolean);
+    MAKE_INPUT(nAttr);
+    CHECK_MSTATUS(nAttr.setDefault(false));
+
     CHECK_MSTATUS ( addAttribute(mSize) );
     CHECK_MSTATUS ( addAttribute(mColor));
+    CHECK_MSTATUS ( addAttribute(mDrawAsGuide));
     CHECK_MSTATUS ( addAttribute(mWorldS));
     
     CHECK_MSTATUS ( attributeAffects(mSize, mWorldS));
