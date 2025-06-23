@@ -17,7 +17,7 @@ target_sources(${TARGET_NAME}
         tokens.cpp
         viewCommand.cpp
         pluginBuildInfoCommand.cpp
-		setViewportRenderPassesCommand.cpp
+        setViewportRenderPassesCommand.cpp
 )
 
 set(HEADERS

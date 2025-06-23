@@ -20,6 +20,7 @@
 #include <mayaHydraLib/mayaHydra.h>
 #include <maya/MPxCommand.h>
 #include <maya/MIntArray.h>
+#include <maya/MStringArray.h>
 
 namespace MAYAHYDRA_NS_DEF {
 
@@ -33,10 +34,12 @@ public:
 
     MStatus doIt(const MArgList& args) override;
 
-    static MIntArray getVisibleRenderPasses() { return _visibleRenderPasses; }
+    static const MIntArray& getVisibleRenderPasses() { return _visibleRenderPasses; }
+    static const MStringArray& getAovNames() { return _aovNames; }
 
 private:
     static MIntArray _visibleRenderPasses;
+    static MStringArray _aovNames;
 };
 
 } // namespace MAYAHYDRA_NS_DEF
