@@ -524,11 +524,16 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
                 primIds.end());
         }
 #else
-    // Accumulate RPrims from all render indices from all passes of the instance.
+    // Accumulate RPrims from all render indices from all passes of the instance which use the same rendererName.
     SdfPathVector primIds;
     for (int i = 0; i < instance->_GetNumRenderPasses(); ++i) {
         const hvt::FramePassPtr& pass = instance->_GetRenderPass(i);
         if (!pass) {             
+            continue;
+        }
+        
+        const std::string& rendererNameFromPass = instance->_renderPassesRendererNames[i];
+        if (rendererName != rendererNameFromPass){
             continue;
         }
 
@@ -536,8 +541,9 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
         if (!renderIndex) {
             continue;
         }
-
-        auto tempPrimIds = renderIndex->GetRprimIds();
+        
+        //Do a copy as we may remove some of them
+        SdfPathVector tempPrimIds = renderIndex->GetRprimIds();
         if (visibleOnly) {
             tempPrimIds.erase(
                 std::remove_if(
@@ -553,11 +559,16 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
         }
 
         // Concatenate results
-        primIds.reserve(
-            primIds.size() + tempPrimIds.size()); // Reserve space to avoid reallocations
-        primIds.insert(
-            primIds.end(), tempPrimIds.begin(), tempPrimIds.end()); // Insert all elements
+        if (tempPrimIds.size()) { 
+            primIds.reserve(
+                primIds.size() + tempPrimIds.size()); // Reserve space to avoid reallocations
+            primIds.insert(
+                primIds.end(), tempPrimIds.begin(), tempPrimIds.end()); // Insert all elements
+        }
     }
+
+    // Sort them by lexicographically order
+    std::sort(primIds.begin(), primIds.end(), std::less<SdfPath>());
 #endif
     return primIds;
 }
@@ -658,14 +669,6 @@ MStatus MtohRenderOverride::Render(
     // }
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER).Msg("MtohRenderOverride::Render()\n");
     // We can use the mayaHydraSetVisibleRenderPasses command to set the visible passes
-
-    const MIntArray& renderPassesVisible    = MayaHydraSetVisibleRenderPasses::getVisibleRenderPasses();
-    int       numVisibleRenderPasses        = renderPassesVisible.length();
-    const MStringArray& visibleAOVNames     = MayaHydraSetVisibleRenderPasses::getAovNames();
-    const int           numRenderPasses     = _GetNumRenderPasses();
-    if (numVisibleRenderPasses > numRenderPasses) {
-        numVisibleRenderPasses = numRenderPasses;//Case where we have merged the passes into a single pass
-    }
 
     auto renderFrame = [&](bool markTime = false) {
 #ifndef VIEWPORT_TOOLBOX
@@ -777,6 +780,16 @@ MStatus MtohRenderOverride::Render(
         }
 
 #ifdef VIEWPORT_TOOLBOX
+        const MIntArray& renderPassesVisible    = 
+            MayaHydraSetVisibleRenderPasses::getVisibleRenderPasses();
+        int                 numVisibleRenderPasses = renderPassesVisible.length();
+        const MStringArray& visibleAOVNames     = MayaHydraSetVisibleRenderPasses::getAovNames();
+        const int           numRenderPasses     = _GetNumRenderPasses();
+        if (numVisibleRenderPasses > numRenderPasses) {
+            numVisibleRenderPasses
+                = numRenderPasses; // Case where we have merged the passes into a single pass
+        }
+
         // Iterate over visible render passes
         for (int visibleIdx = 0; visibleIdx < numVisibleRenderPasses; ++visibleIdx) {
 
@@ -924,13 +937,13 @@ MStatus MtohRenderOverride::Render(
             }
     
             //Create a HydraViewportInformation 
-            _renderPassFilteringFn[0] = _CreatePassFilteringFn(_renderPassesRenderTags[0]);
+            _renderPassesFilteringFn[0] = _CreatePassFilteringFn(_renderPassesRenderTags[0]);
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelNameStr, cameraName);
             const bool dataProducerSceneIndicesAdded = manager.AddViewportInformation(
                 hydraViewportInformation,
                 renderIndex(),
                 _dataProducerMergingSceneIndexProxy,
-                _GetPassFilteringSceneIndex(_renderPassFilteringFn[0]));
+                _GetPassFilteringSceneIndex(_renderPassesFilteringFn[0]));
 
             //Update the selection since we have added data producer scene indices through manager.AddViewportInformation to the merging scene index
             if (dataProducerSceneIndicesAdded && _selectionSceneIndex){
@@ -986,7 +999,7 @@ MStatus MtohRenderOverride::Render(
                 renderIndex(),
                 _dataProducerMergingSceneIndexProxy,
                 _GetPassFilteringSceneIndex(
-                    _renderPassFilteringFn[0])); // Use the first pass filtering function to create
+                    _renderPassesFilteringFn[0])); // Use the first pass filtering function to create
                                                  // the pass filtering scene index
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(false);//Allow prim removal propagation again.
         }
@@ -1105,6 +1118,7 @@ MStatus MtohRenderOverride::Render(
 
 #ifdef VIEWPORT_TOOLBOX
     // Apply some settings
+    const int numRenderPasses = _GetNumRenderPasses();
     for (int i = 0; i < numRenderPasses; ++i) {
         const hvt::FramePassPtr& currentPass = _GetRenderPass(i);
         if (!currentPass) {
@@ -1328,6 +1342,10 @@ void MtohRenderOverride::_InitHydraResources(
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::_InitHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
+    //Debug remove me
+    //Enable next line to print the primitives that are filtered in/out for each pass
+    //TfDebug::Enable(MAYAHYDRALIB_RENDEROVERRIDE_FILTERING_PASSES);
+
     _initializationAttempted = true;
 
     GlfContextCaps::InitInstance();
@@ -1338,12 +1356,14 @@ void MtohRenderOverride::_InitHydraResources(
                                                         HdRenderTagTokens->proxy,
                                                         HdRenderTagTokens->guide };
 
+    _ClearRenderPassesData();
+    
     // Create 2 passes (which could be merged in a single pass)
-    TfTokenVector passRendererNames;
-    passRendererNames.push_back(_rendererDesc.rendererName);
-    passRendererNames.push_back(TfToken("HdStormRendererPlugin"));
+    _renderPassesRendererNames.push_back(_rendererDesc.rendererName);
+    _renderPassesRendererNames.push_back(TfToken("HdStormRendererPlugin"));
 
-    _CreateRenderPasses(passRendererNames);
+    //Using _renderPassesRendererNames
+    _CreateRenderPasses();
   
     _SetRenderPurposeTags(delegateParams);
 
@@ -2421,6 +2441,11 @@ MtohRenderOverride::_CreatePassFilteringFn(const TfTokenVector& renderTags)
                 = _lastFilteringSceneIndexBeforeCustomFiltering->GetPrim(primPath);
             if (prim.dataSource) {
                 if (HdPrimTypeIsLight(prim.primType)) {
+                    TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_FILTERING_PASSES)
+                        .Msg(
+                            "NumRenderTags = %zu, keeping prim id : %s because it's a light.\n",
+                            renderTags.size(),
+                            primPath.GetString().c_str());
                     return false; // Always keep the lights
                 }
                 HdPurposeSchema purposeSchema = HdPurposeSchema::GetFromParent(prim.dataSource);
@@ -2429,18 +2454,31 @@ MtohRenderOverride::_CreatePassFilteringFn(const TfTokenVector& renderTags)
                     if (purposeDs) {
                         // Check if the purpose matches the render tags
                         const TfToken purposeRenderTag = purposeDs->GetTypedValue(0.0);
-                        return (
+                        const bool result = (
                             std::find(
                                 renderTags.cbegin(),
                                 renderTags.cend(),
                                 purposeRenderTag)
-                            == renderTags.cend()); // Not found in the render tags,
+                            == renderTags.cend()
+                            ); // Not found in the render tags,
                                                    // so skip that prim
+                        TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_FILTERING_PASSES)
+                            .Msg(
+                                (result) 
+                                ? "NumRenderTags = %zu, ignoring prim id : %s\n"
+                                : "NumRenderTags = %zu, keeping prim id : %s\n",
+                                renderTags.size(),
+                                primPath.GetString().c_str());
+                        return result;
                     }
                 }
             }
         }
 
+         TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_FILTERING_PASSES)
+            .Msg("NumRenderTags = %zu, keeping prim id : %s\n",
+                renderTags.size(),
+                primPath.GetString().c_str());
         return false; // will be rendered.
     };
 }
@@ -2484,8 +2522,9 @@ void MtohRenderOverride::_ClearRenderPassesData()
 {
     _renderPassesRenderers.clear();
     _renderPasses.clear();
-    _renderPassFilteringFn.clear();
+    _renderPassesFilteringFn.clear();
     _renderPassesRenderTags.clear();
+    _renderPassesRendererNames.clear();
 }
 
 void MtohRenderOverride::_CreateFrameRenderPass(
@@ -2509,21 +2548,19 @@ void MtohRenderOverride::_CreateFrameRenderPass(
     _renderPasses.push_back(std::move(framePass));
 }
 
-void MtohRenderOverride::_CreateRenderPasses(const TfTokenVector& passRendererNames)
+void MtohRenderOverride::_CreateRenderPasses()
 {
-    _ClearRenderPassesData();
-    
     // Keep the number of passes to create
-    int numPasses = passRendererNames.size();
+    int numPasses = _renderPassesRendererNames.size();
 
     // Check if we need to have a single pass for all renderers
     if (mergePassesWithSameRenderer()) {
         //First pass renderer name
-        const TfToken rendererNameFromPass0 = passRendererNames[0];
+        const TfToken rendererNameFromPass0 = _renderPassesRendererNames[0];
         // Are the passes using the same renderer?
         bool      passesUseSameRenderer = true;
         for (int i = 1; i < numPasses; ++i) { //Start at index = 1 to get the second pass
-            if (passRendererNames[i] != rendererNameFromPass0) {
+            if (_renderPassesRendererNames[i] != rendererNameFromPass0) {
                 passesUseSameRenderer = false;
                 break;
             }
@@ -2537,11 +2574,11 @@ void MtohRenderOverride::_CreateRenderPasses(const TfTokenVector& passRendererNa
     // Create passes for each renderer
     for (int i=0; i < numPasses; ++i) {
         std::string passNumber = std::string("/Pass")+std::to_string(i);
-        _CreateFrameRenderPass(passRendererNames[i], SdfPath(passNumber));
+        _CreateFrameRenderPass(_renderPassesRendererNames[i], SdfPath(passNumber));
     }
     
     // Reserve space for filtering functions and initialize vectors
-    _renderPassFilteringFn.resize(_GetNumRenderPasses());
+    _renderPassesFilteringFn.resize(_GetNumRenderPasses());
     _renderPassesRenderTags.resize(_GetNumRenderPasses());
 }
 
@@ -2589,9 +2626,9 @@ void MtohRenderOverride::_CreateRenderPassesFilteringSceneIndices()
             continue;
         }
         
-        _renderPassFilteringFn[i] = _CreatePassFilteringFn(_renderPassesRenderTags[i]);
+        _renderPassesFilteringFn[i] = _CreatePassFilteringFn(_renderPassesRenderTags[i]);
         pass->GetRenderIndex()->InsertSceneIndex(
-            _GetPassFilteringSceneIndex(_renderPassFilteringFn[i]),
+            _GetPassFilteringSceneIndex(_renderPassesFilteringFn[i]),
             SdfPath::AbsoluteRootPath());
     }
 }

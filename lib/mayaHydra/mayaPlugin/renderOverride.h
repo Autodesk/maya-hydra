@@ -289,8 +289,9 @@ private:
 #ifdef VIEWPORT_TOOLBOX
     std::vector<hvt::RenderIndexProxyPtr>                       _renderPassesRenderers;
     std::vector<hvt::FramePassPtr>                              _renderPasses;
-    std::vector<Fvp::PassFilteringSceneIndex::FilteringOutFn>   _renderPassFilteringFn;
+    std::vector<Fvp::PassFilteringSceneIndex::FilteringOutFn>   _renderPassesFilteringFn;
     std::vector<TfTokenVector>                                  _renderPassesRenderTags;
+    TfTokenVector                                               _renderPassesRendererNames;
     
     Fvp::PassFilteringSceneIndex::FilteringOutFn
         _CreatePassFilteringFn(const TfTokenVector& renderTags);
@@ -298,7 +299,7 @@ private:
     int                      _GetNumRenderPasses() const;
     const hvt::FramePassPtr& _GetRenderPass(int passIndex)const;
     hvt::FramePassPtr&       _GetRenderPass(int passIndex);
-    void                     _CreateRenderPasses(const TfTokenVector& passRendererNames);
+    void                     _CreateRenderPasses();
     void                     _CreateRenderPassesFilteringSceneIndices();
     void                     _ClearRenderPassesData();
     void                     _CreateFrameRenderPass(
