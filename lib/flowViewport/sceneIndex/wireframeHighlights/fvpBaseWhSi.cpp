@@ -37,8 +37,10 @@
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 
-#if PXR_VERSION >= 2403
-#include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
+#if PXR_VERSION >= 2505 //USD 25.05+
+    #include <pxr/usdImaging/usdImaging/materialBindingsSchema.h>
+#elif PXR_VERSION >= 2403
+    #include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
 #endif
 #include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
 
@@ -830,7 +832,12 @@ BaseWhSi::MakeGeomSubsetHighlight(
     if (!GetMaterialPath(geomSubsetPrimDataSource).IsEmpty()) {
         HdContainerDataSourceEditor dataSourceEditor(editedMeshPrimDataSource);
         dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, HdMaterialBindingsSchema::GetDefaultLocator()));
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2505
+        dataSourceEditor.Set(
+            UsdImagingMaterialBindingsSchema::GetDefaultLocator(),
+            HdContainerDataSource::Get(
+                geomSubsetPrimDataSource, UsdImagingMaterialBindingsSchema::GetDefaultLocator()));
+#elif PXR_VERSION >= 2403
         dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator()));
 #endif
         editedMeshPrimDataSource = dataSourceEditor.Finish();
