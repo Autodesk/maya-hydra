@@ -44,19 +44,24 @@
 
 /* Examples
     //Set only the second render pass visible (uses default "color" AOV)
-    mayaHydraSetVisibleRenderPasses -e -v 1
+    MEL : mayaHydraSetVisibleRenderPasses -e -v 1
+    Python : maya.cmds.mayaHydraSetVisibleRenderPasses(edit=True, visible=1)
 
     //Set only the second render pass visible with "depth" AOV
-    mayaHydraSetVisibleRenderPasses -e -v 1 -aov "depth"
+    MEL : mayaHydraSetVisibleRenderPasses -e -v 1 -aov "depth"
+    Python : maya.cmds.mayaHydraSetVisibleRenderPasses(edit=True, visible=1, aovName="depth")
 
     //Set both passes visible with default AOVs
-    mayaHydraSetVisibleRenderPasses -e -v 0 -v 1
+    MEL : mayaHydraSetVisibleRenderPasses -e -v 0 -v 1
+    Python : //Python : cmds.mayaHydraSetVisibleRenderPasses(edit=True, visible=[0, 1])
 
-    //Set both passes visible with different AOVs
+    //Set both passes visible with different AOVs though the depth aov from 2nd pass with override the color aov from first pass 
     mayaHydraSetVisibleRenderPasses -e -v 0 -aov "color" -v 1 -aov "depth"
+    Python : cmds.mayaHydraSetVisibleRenderPasses(edit=True, visible=[0, 1], aovName=["color", "depth"])
 
-    // query the currently visible render passes and their AOV names
-    mayaHydraSetVisibleRenderPasses -q -v
+    // Query the currently visible render passes and their AOV names
+    MEL : mayaHydraSetVisibleRenderPasses -q -v
+    Python : result = cmds.mayaHydraSetVisibleRenderPasses(query=True, visible=True)
 */
 
 namespace MAYAHYDRA_NS_DEF {
