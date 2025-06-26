@@ -811,8 +811,13 @@ MStatus MtohRenderOverride::Render(
             // Enable presentation for the last visible pass only
             currentPass->params().enablePresentation = isLastVisiblePass;
             
-            // Set the AOV to visualize for the current pass
-            currentPass->params().visualizeAOV = TfToken(visibleAOVNames[visibleIdx].asChar());
+            // Set the AOV to visualize for the current pass if it exists
+            const TfToken aovName       = TfToken(visibleAOVNames[visibleIdx].asChar());
+            const bool    aovNameExists = currentPass->GetRenderBuffer(aovName) != nullptr;
+            currentPass->params().visualizeAOV
+                = (aovNameExists) 
+                ? aovName 
+                : HdAovTokens->color;
 
             if (isPass0) {
                 // Do not share the AOVs, for the first pass only

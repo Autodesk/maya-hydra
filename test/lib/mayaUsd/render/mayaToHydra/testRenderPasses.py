@@ -130,6 +130,10 @@ class TestRenderPasses(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.
 
             self.EnablePassesOneByOneAndDoSnapshots(name="SelHighlight", failures=failures)
             
+            #Set a wrong aov Name on purpose, it should show the color aov by default
+            cmds.mayaHydraSetVisibleRenderPasses(edit=True, visible=[0, 1], aovName=["wrongAovName1", "wrongAovName2"])
+            self.run_assertion("wrongAovName.png", "Wrong AOV name", failures)
+
             # Enable all render passes
             self.SetAllPassesVisibleToColorAOV()
             
