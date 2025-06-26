@@ -149,14 +149,8 @@ SdfPath MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath; // Common to all s
 
 namespace {
     
-    bool useMeshAdapter()
-    {
-        static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
-        return uma;
-    }
-
     bool filterMesh(const MRenderItem& ri) {
-        return useMeshAdapter() ?
+      return MayaHydraSceneIndex::useMeshAdapter() ?
             // Filter our mesh render items, and let the mesh adapter handle Maya
             // meshes.  The MRenderItem::name() for meshes is "StandardShadedItem", 
             // their MRenderItem::type() is InternalMaterialItem, but 
@@ -1781,6 +1775,12 @@ bool MayaHydraSceneIndex::passNormalsToHydra()
 {
     static const bool val = TfGetEnvSetting(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA);
     return val;
+}
+
+bool MayaHydraSceneIndex::useMeshAdapter()
+{
+    static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
+    return uma;
 }
 
 VtValue MayaHydraSceneIndex::_CreateDefaultMaterialFallback()

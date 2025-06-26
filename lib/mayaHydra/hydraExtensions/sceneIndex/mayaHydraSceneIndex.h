@@ -259,6 +259,10 @@ public:
     /// Is using an environment variable to tell if we should pass normals to Hydra when using the render item and mesh adapters
     static bool passNormalsToHydra();
 
+    /// Read an environment variable to use mesh adapters rather than
+    /// OGS-created render items for Maya meshes.
+    static bool useMeshAdapter();
+
     ///Create the default hydra material from maya default material or create a fallback material if it cannot be found
     void CreateMayaDefaultMaterialData();
 
