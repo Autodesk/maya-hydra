@@ -21,7 +21,7 @@ import mayaUtils
 from testUtils import PluginLoaded
 import platform
 
-class TestCustomShadersNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
+class TestRenderPasses(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.MayaHydraBaseTestCase to be able to call self.assertSnapshotClose
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
@@ -32,62 +32,109 @@ class TestCustomShadersNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohU
             return 3
         return 2 #We have errors on Windows and Linux of about 1%, so we need to increase the threshold
 
+    def run_assertion(self, filename, mode, failures):
+        try:
+            self.assertSnapshotClose(filename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        except AssertionError as e:
+            failures.append(f"Failed on {filename} ({mode}): {str(e)}")
+            # Still continue to the next test
+    
+    def SetAllPassesVisibleToColorAOV(self):
+        # Enable all render passes
+        cmds.mayaHydraSetVisibleRenderPasses(edit=True, visible=[0, 1])
+        #Workaround for a bug when re-enabling all passes
+        self.setViewport2Renderer()
+        self.setHdStormRenderer()
+
+    #Enable only pass #0 then pass #1 and do snapshots using as an option the aov namre specified
+    def EnablePassesOneByOneAndDoSnapshots(self, name, failures, aovName=""):
+        # Enable only pass#0
+        kwargs = {"edit": True, "visible": [0]}
+        if aovName:
+            kwargs["aovName"] = aovName
+        cmds.mayaHydraSetVisibleRenderPasses(**kwargs)
+        self.run_assertion(("FirstPass"+name+".png"), ("first pass "+name), failures)
+    
+        # Enable only pass#1
+        kwargs = {"edit": True, "visible": [1]}
+        if aovName:
+            kwargs["aovName"] = aovName
+        cmds.mayaHydraSetVisibleRenderPasses(**kwargs)
+        self.run_assertion(("SecondPass"+name+".png"), ("second pass "+name), failures)
+            
     def test_FootPrintNodeForSecondPass(self):
         with PluginLoaded('mayaHydraFootPrintNode'):
             #Create a mayaHydraFootPrintNode node which adds a dataProducerSceneIndex
             footPrintNodeName = cmds.createNode("MhFootPrint")
-            # Frame the currently selected objects in the active viewport
-            cmds.viewFit()
+            self.setBasicCam(1)
             #Clear selection
             cmds.select(clear=True)
             
             failures = []
             
-            def run_assertion(filename, mode):
-                try:
-                    self.assertSnapshotClose(filename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-                except AssertionError as e:
-                    failures.append(f"Failed on {filename} ({mode}): {str(e)}")
-                    # Still continue to the next test
+            self.EnablePassesOneByOneAndDoSnapshots(name="FootPrintAsGeom", failures=failures)
             
-            # Enable only the second render pass
-            cmds.mayaHydraSetVisibleRenderPasses(edit=True, visible=[1])
-            run_assertion("asGeom_2ndPass.png", "second pass")
-            
-            # Enable only the main render pass
-            cmds.mayaHydraSetVisibleRenderPasses(edit=True, visible=[0])
-            run_assertion("asGeom_1stPass.png", "first pass")
-            
-            # Enable all render passes
-            cmds.mayaHydraSetVisibleRenderPasses(edit=True, visible=[0, 1])
-            #Workaround for a bug when re-enabling all passes 
-            self.setViewport2Renderer()
-            self.setHdStormRenderer()
-            run_assertion("asGeom_AllPasses.png", "all passes")
+            self.SetAllPassesVisibleToColorAOV()
+            self.run_assertion("asGeom_AllPasses.png", "all passes", failures)
 
-            cmds.setAttr(footPrintNodeName + '.drawAsGuide', True)
+            #Draw the foot print node as a secondary graphics 
+            #It should make the node be part of the secondary graphics render pass if there is one, 
+            #as passes can be merged.
+            cmds.setAttr(footPrintNodeName + '.drawAsSecondaryGraphics', True)
             cmds.refresh()
-            # Frame the currently selected objects in the active viewport
-            cmds.viewFit()
 
-            # Enable only the second render pass
-            cmds.mayaHydraSetVisibleRenderPasses(edit=True, visible=[1])
-            run_assertion("asGuide_2ndPass.png", "guide second pass")
-            
-            # Enable only the main render pass
-            cmds.mayaHydraSetVisibleRenderPasses(edit=True, visible=[0])
-            run_assertion("asGuide_1stPass.png", "guide first pass")
-            
+            self.setBasicCam(1)
+            self.EnablePassesOneByOneAndDoSnapshots(name="FootPrintAsScndGraphics", failures=failures)
+
             # Enable all render passes
-            #Workaround for a bug when re-enabling all passes 
-            self.setViewport2Renderer()
-            self.setHdStormRenderer()
-            cmds.mayaHydraSetVisibleRenderPasses(edit=True, visible=[0, 1])
-            run_assertion("asGuide_AllPasses.png", "guide all passes")
+            self.SetAllPassesVisibleToColorAOV()
+            self.run_assertion("asScndGraphics_AllPasses.png", "ScndGraphics all passes", failures)
             
             # After all tests have run, report any failures
             if failures:
                 self.fail(f"The following assertions failed:\n" + "\n".join(failures))
 
+    def test_RenderPassesAllData(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            
+            failures = []
+            
+            # open a Maya scene with all data sources (maya, usd, custom)
+            testFile = mayaUtils.openTestScene(
+                    "testRenderPasses",
+                    "renderPasses.ma", useTestSettings=False)
+            cmds.refresh()
+            self.run_assertion("sceneLoaded.png", "scene loaded", failures)
+            #Render all passes
+            self.EnablePassesOneByOneAndDoSnapshots(name="SceneLoaded", failures=failures)
+            #Render all passes using the "depth" AOV
+            self.EnablePassesOneByOneAndDoSnapshots(name="SceneLoadedDepth", failures=failures, aovName="depth")
+            
+            #Draw the foot print node as secondary graphics 
+            #It should make the node be part of the secondary graphics render pass if there is one, 
+            #as passes can be merged.
+            cmds.setAttr('MhFootPrint1.drawAsSecondaryGraphics', True)
+            cmds.refresh()
+
+            #Render all passes
+            self.EnablePassesOneByOneAndDoSnapshots(name="SceneLoadedFPScndGraphics", failures=failures)
+
+            # Enable all render passes
+            self.SetAllPassesVisibleToColorAOV()
+
+            #Select all meshes, the sel highlight prims should appear in the 2nd pass only
+            cmds.select(clear=True) #maya
+            cmds.select('|pSphere1', add=True) #maya
+            cmds.select('|transform1', add=True) #custom prim FootStep
+            cmds.select('|PoolBallFlat_animated|PoolBallFlat_animatedShape', add=True)#usd prim
+
+            self.EnablePassesOneByOneAndDoSnapshots(name="SelHighlight", failures=failures)
+            
+            # Enable all render passes
+            self.SetAllPassesVisibleToColorAOV()
+            
+            # After all tests have run, report any failures
+            if failures:
+                self.fail(f"The following assertions failed:\n" + "\n".join(failures))
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

@@ -19,6 +19,8 @@
 #include <mayaHydraLib/adapters/dagAdapter.h>
 #include <mayaHydraLib/adapters/shapeAdapter.h>
 
+#include <flowViewport/fvpPurposeRenderTagsForPasses.h>
+
 #include <pxr/pxr.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -65,7 +67,7 @@ public:
     void SetViewport(const GfVec4d& viewport);
 
     MAYAHYDRALIB_API
-    TfToken GetRenderTag() const override { return HdRenderTagTokens->guide;}
+    TfToken GetRenderTag() const override { return Fvp::secondaryGraphicsRenderTagToken; }
 
 protected:
     static TfToken CameraType();

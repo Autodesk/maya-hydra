@@ -17,6 +17,7 @@
 //Local headers
 #include "fvpBBoxSceneIndex.h"
 #include "flowViewport/fvpUtils.h"
+#include "flowViewport/fvpPurposeRenderTagsForPasses.h"
 
 //USD/Hydra headers
 #include <pxr/base/gf/bbox3d.h>
@@ -129,15 +130,16 @@ namespace
                 return nullptr;
             }
 
-            // Force the purpose render tag to be guide for bounding box display mode
+            // Force the purpose render tag to be in the secondary graphics for bounding box display mode
             if (name == HdPurposeSchemaTokens->purpose) {
-                // Guide purpose render tag data source
-                static const HdRetainedContainerDataSourceHandle guidePurposeRenderTagDataSource
+                // Secondary graphics purpose render tag data source
+                static const HdRetainedContainerDataSourceHandle secondaryGraphicsPurposeRenderTagDataSource
                     = HdRetainedContainerDataSource::New(
                         HdPurposeSchemaTokens->purpose,
-                        HdRetainedTypedSampledDataSource<TfToken>::New(HdRenderTagTokens->guide));
+                        HdRetainedTypedSampledDataSource<TfToken>::New(
+                            Fvp::secondaryGraphicsRenderTagToken));
 
-                return guidePurposeRenderTagDataSource;
+                return secondaryGraphicsPurposeRenderTagDataSource;
             }
 
             if (name == HdLegacyDisplayStyleSchemaTokens->displayStyle) {
@@ -341,15 +343,16 @@ namespace
             if (name == HdPrimvarsSchemaTokens->primvars) {
                 return _BoundsPrimvarsDataSource::New(_primSource, _wireframeColor);
             }
-            // Force the purpose render tag to be guide for bounding box display mode
+            // Force the purpose render tag to be in the secondary graphics for bounding box display mode
             if (name == HdPurposeSchemaTokens->purpose) {
-                // Guide purpose render tag data source
-                static const HdRetainedContainerDataSourceHandle guidePurposeRenderTagDataSource
+                // Secondary graphics purpose render tag data source
+                static const HdRetainedContainerDataSourceHandle secondaryGraphicsPurposeRenderTagDataSource
                     = HdRetainedContainerDataSource::New(
                         HdPurposeSchemaTokens->purpose,
-                        HdRetainedTypedSampledDataSource<TfToken>::New(HdRenderTagTokens->guide));
+                        HdRetainedTypedSampledDataSource<TfToken>::New(
+                            Fvp::secondaryGraphicsRenderTagToken));
 
-                return guidePurposeRenderTagDataSource;
+                return secondaryGraphicsPurposeRenderTagDataSource;
             }
             if (name == HdExtentSchemaTokens->extent) {
                 if (_primSource) {

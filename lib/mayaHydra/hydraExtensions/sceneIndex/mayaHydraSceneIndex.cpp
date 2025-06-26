@@ -19,6 +19,7 @@
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
 #include <flowViewport/selection/fvpPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
+#include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 
 #include <maya/MDGMessage.h>
 #include <maya/MDagPath.h>
@@ -151,10 +152,11 @@ namespace {
     
     TfToken GetPurposeRenderTag(const MRenderItem& ri)
     {
-        // Every render item not being triangles should be a guide 
+        // This is where we sort the maya render items 
+        // At this time, every render item not being triangles is drawn as secondary graphics
         return (ri.primitive() != MHWRender::MGeometry::Primitive::kTriangles)
-            ? HdRenderTagTokens->guide
-            : HdRenderTagTokens->geometry;
+            ? Fvp::secondaryGraphicsRenderTagToken //will be drawn as secondary graphics
+            : HdRenderTagTokens->geometry; //will be drawn in the main pass
     }
 
     bool useMeshAdapter()

@@ -14,8 +14,8 @@
 //
 
 #include "fvpBaseWhSi.h"
-
-#include <flowViewport/fvpUtils.h>
+#include "flowViewport/fvpUtils.h"
+#include "flowViewport/fvpPurposeRenderTagsForPasses.h"
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/staticTokens.h>
@@ -64,12 +64,11 @@ const HdRetainedContainerDataSourceHandle refinedWireDisplayStyleDataSource
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
                 { HdReprTokens->refinedWire, TfToken(), TfToken() })));
 
-//Guide purpose render tag data source
-const HdRetainedContainerDataSourceHandle guidePurposeRenderTagDataSource
+//  Secondary graphics purpose render tag data source
+const HdRetainedContainerDataSourceHandle secondaryGraphicsPurposeRenderTagDataSource
     = HdRetainedContainerDataSource::New(
         HdPurposeSchemaTokens->purpose,
-        HdRetainedTypedSampledDataSource<TfToken>::New(HdRenderTagTokens->guide)
-      );
+        HdRetainedTypedSampledDataSource<TfToken>::New(Fvp::secondaryGraphicsRenderTagToken));
 
 const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
@@ -374,7 +373,7 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
                             HdPrimvarSchemaTokens->color));
     
     edited.Set(HdPurposeSchema::GetDefaultLocator(),
-        guidePurposeRenderTagDataSource); // Set the purpose to guide
+        secondaryGraphicsPurposeRenderTagDataSource); // Set the render tag to secondary graphics
     
     //Is the prim in refined displayStyle (meaning shaded) ?
     if (HdLegacyDisplayStyleSchema styleSchema =

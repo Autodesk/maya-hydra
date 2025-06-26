@@ -17,6 +17,7 @@
 //Local headers
 #include "fvpReprSelectorSceneIndex.h"
 #include "flowViewport/fvpUtils.h"
+#include "flowViewport/fvpPurposeRenderTagsForPasses.h"
 
 //USD/Hydra headers
 #include <pxr/imaging/hd/tokens.h>
@@ -71,11 +72,11 @@ const HdRetainedContainerDataSourceHandle sWireframeDisplayStyleDataSource
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
                 { HdReprTokens->refinedWire, TfToken(), TfToken() })));
 
-// Guide purpose render tag data source
-const HdRetainedContainerDataSourceHandle sGuidePurposeRenderTagDataSource
+// Secondary graphics purpose render tag data source
+const HdRetainedContainerDataSourceHandle secondaryGraphicsPurposeRenderTagDataSource
     = HdRetainedContainerDataSource::New(
         HdPurposeSchemaTokens->purpose,
-        HdRetainedTypedSampledDataSource<TfToken>::New(HdRenderTagTokens->guide));
+        HdRetainedTypedSampledDataSource<TfToken>::New(Fvp::secondaryGraphicsRenderTagToken));
 
 }//End of namespace
 
@@ -89,12 +90,12 @@ ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inp
 
 void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsReprChanged, int refineLevel)
 {
-    _convertToGuidePurposeRenderTag = false;
+    _convertToSecondaryGraphicsPurposeRenderTag = false;
 
     switch (reprType){
         case RepSelectorType::WireframeRefined:
             _wireframeTypeDataSource = sWireframeDisplayStyleDataSource;
-            _convertToGuidePurposeRenderTag = true; // Convert to guide purpose render tag
+            _convertToSecondaryGraphicsPurposeRenderTag = true; // Convert to secondary graphics purpose render tag
             break;
         case RepSelectorType::WireframeOnSurface:
             _wireframeTypeDataSource = sdWireframeOnShadedDisplayStyleDataSource;
@@ -139,10 +140,11 @@ HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
         // So we need to edit the _primVarsTokens->overrideWireframeColor attribute as they may already exist in the prim
         auto edited = HdContainerDataSourceEditor(prim.dataSource);
 
-        if (_convertToGuidePurposeRenderTag) {
-            // If we are converting to guide purpose render tag
+        if (_convertToSecondaryGraphicsPurposeRenderTag) {
+            // If we are converting to secondary graphics purpose render tag
             edited.Set(HdPurposeSchema::GetDefaultLocator(),
-                       sGuidePurposeRenderTagDataSource); // Set the purpose to guide
+                secondaryGraphicsPurposeRenderTagDataSource); // Set the purpose render tag to
+                                                              // secondary graphics
         }
 
         //Edit the override wireframe color

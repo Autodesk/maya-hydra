@@ -56,6 +56,7 @@
 #include <flowViewport/API/fvpDataProducerSceneIndexInterface.h>
 #include <flowViewport/selection/fvpPrefixPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
+#include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 
 //Hydra headers
 #include <pxr/base/vt/array.h>
@@ -147,7 +148,7 @@ public:
     static MObject     mSize;
     static MObject     mWorldS;
     static MObject     mColor;
-    static MObject     mDrawAsGuide;
+    static MObject     mDrawAsSecondaryGraphics;
 
     static	MTypeId		id;
     static	MString		nodeClassification;
@@ -157,8 +158,10 @@ private:
     float _GetSizeInCentimeters() const;
     ///get the value of the color attribute, returned as a 3D Hydra vector 
     GfVec3f _GetColor() const;
-    /// get the value of the DrawAsGuide attribute, which is a boolean, this is used so that when the mesh is drawn as a guide it appears in the second pass of maya hydra
-    bool _GetDrawAsGuide() const;
+    /// get the value of the DrawAsSecondaryGraphics attribute, which is a boolean, this is used so that when the mesh is drawn as a secondary graphics
+    //it appears in the secondary graphics pass of maya hydra (unless all passes are merged)
+    // this is used as an example to show how to set primitives as secondary graphics
+    bool _GetDrawAsSecondaryGraphics() const;
     ///Create the Hydra foot print primitives
     void _CreateAndAddFootPrintPrimitives();
     ///Remove the Hydra foot print primitives
@@ -302,7 +305,7 @@ namespace
         const VtIntArray&                 faceVertexIndices,
         const GfVec3f&                    scale,
         const GfVec3f&                    displayColor,
-        bool                              drawAsGuide)
+        bool                              drawAsSecondaryGraphics)
     {
         using _PointArrayDs = HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>;
         using _IntArrayDs   = HdRetainedTypedSampledDataSource<VtIntArray>;
@@ -384,11 +387,14 @@ namespace
                 .SetMax(HdRetainedTypedSampledDataSource<GfVec3d>::New(GfVec3d(corner2.x*scaleArray[0], corner2.y*scaleArray[1], corner2.z*scaleArray[2])))
                 .Build(),
 
-            //Create a purpose render tag
+            // Create a purpose render tag which is a way to specify how the primitive will be drawn.
+            // If the drawAsSecondaryGraphics is true, it will be drawn in the secondary graphics
+            // render pass if it exists. As if all render passes use the same render delegate they can be merged.
             HdPurposeSchemaTokens->purpose,
             HdPurposeSchema::Builder()
                 .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
-                    (drawAsGuide) ? HdRenderTagTokens->guide : HdRenderTagTokens->geometry))
+                    (drawAsSecondaryGraphics) ? Fvp::secondaryGraphicsRenderTagToken //Will be drawn as secondary graphics which can be in a separate render pass
+                                              : HdRenderTagTokens->geometry)) ////Will be drawn in the main render pass
                 .Build(),
             
             //create a mesh
@@ -416,7 +422,7 @@ namespace
             (plug       == MhFootPrint::mSize)  ||
             (parentPlug == MhFootPrint::mColor) ||
             (plug       == MhFootPrint::mColor) || 
-            (plug       == MhFootPrint::mDrawAsGuide)
+            (plug       == MhFootPrint::mDrawAsSecondaryGraphics)
            ){
                 footPrint->updateFootPrintPrims();
         }
@@ -464,7 +470,7 @@ void nodeRemovedFromModel(MObject& node, void* /* clientData */)
 std::atomic_int MhFootPrint::_counter {0};
 MObject MhFootPrint::mSize;
 MObject MhFootPrint::mColor;
-MObject MhFootPrint::mDrawAsGuide;
+MObject MhFootPrint::mDrawAsSecondaryGraphics;
 MTypeId MhFootPrint::id( 0x58000994 );
 MString	MhFootPrint::nodeClassification("hydraAPIExample/geometry/footPrint");
 MObject MhFootPrint::mWorldS;
@@ -525,10 +531,10 @@ MhFootPrint::~MhFootPrint()
 void MhFootPrint::_CreateAndAddFootPrintPrimitives() 
 { 
     //Get the value of the size and color attributes
-    const float fSize           = _GetSizeInCentimeters();
-    const GfVec3f displayColor  = _GetColor();
-    const GfVec3f scale         = {fSize,fSize,fSize};//convert size into a 3d uniform scale which we'll convert into a scale matrix
-    const bool drawAsGuide      = _GetDrawAsGuide();
+    const float fSize                   = _GetSizeInCentimeters();
+    const GfVec3f displayColor          = _GetColor();
+    const GfVec3f scale                 = {fSize,fSize,fSize};//convert size into a 3d uniform scale which we'll convert into a scale matrix
+    const bool drawAsSecondaryGraphics  = _GetDrawAsSecondaryGraphics();
 
     _CreateAndAddPrim(
         _retainedSceneIndex,
@@ -538,7 +544,7 @@ void MhFootPrint::_CreateAndAddFootPrintPrimitives()
         soleFaceVertexIndices,
         scale,
         displayColor,
-        drawAsGuide);
+        drawAsSecondaryGraphics);
 
     _CreateAndAddPrim(
         _retainedSceneIndex,
@@ -548,7 +554,7 @@ void MhFootPrint::_CreateAndAddFootPrintPrimitives()
         heelFaceVertexIndices,
         scale,
         displayColor,
-        drawAsGuide);
+        drawAsSecondaryGraphics);
 }
 
 //Remove the 2 primitives from the retained scene index
@@ -582,10 +588,10 @@ float MhFootPrint::_GetSizeInCentimeters() const
     return 1.0f;
 }
 
-bool MhFootPrint::_GetDrawAsGuide() const
+bool MhFootPrint::_GetDrawAsSecondaryGraphics() const
 {
     const MObject obj = thisMObject();
-    MPlug plug(obj, MhFootPrint::mDrawAsGuide);
+    MPlug plug(obj, MhFootPrint::mDrawAsSecondaryGraphics);
     if (!plug.isNull()) {
         bool val = false;
         if (plug.getValue(val)) {
@@ -746,13 +752,13 @@ MStatus MhFootPrint::initialize()
     MAKE_INPUT(nAttr);
     CHECK_MSTATUS ( nAttr.setDefault(0.0, 0.0, 1.0) );
 
-    mDrawAsGuide = nAttr.create("drawAsGuide", "dag", MFnNumericData::kBoolean);
+    mDrawAsSecondaryGraphics = nAttr.create("drawAsSecondaryGraphics", "dag", MFnNumericData::kBoolean);
     MAKE_INPUT(nAttr);
     CHECK_MSTATUS(nAttr.setDefault(false));
 
     CHECK_MSTATUS ( addAttribute(mSize) );
     CHECK_MSTATUS ( addAttribute(mColor));
-    CHECK_MSTATUS ( addAttribute(mDrawAsGuide));
+    CHECK_MSTATUS ( addAttribute(mDrawAsSecondaryGraphics));
     CHECK_MSTATUS ( addAttribute(mWorldS));
     
     CHECK_MSTATUS ( attributeAffects(mSize, mWorldS));

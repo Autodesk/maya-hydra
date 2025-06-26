@@ -56,6 +56,7 @@
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
+#include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 
 #ifdef VIEWPORT_TOOLBOX
 #include <hvt/engine/framePass.h>
@@ -1272,7 +1273,7 @@ MStatus MtohRenderOverride::Render(
         // The light & shadow parameters currently (19.11-20.08) are only used for tasks specific to
         // Storm
 #ifdef VIEWPORT_TOOLBOX
-        // Only iterate over visible render passes
+        // Only iterate over render passes
         const int numRenderPasses = _GetNumRenderPasses();
         for (int i = 0; i < numRenderPasses; ++i) {
             const hvt::FramePassPtr& currentPass = _GetRenderPass(i);
@@ -1355,6 +1356,9 @@ void MtohRenderOverride::_InitHydraResources(
                                                         HdRenderTagTokens->render,
                                                         HdRenderTagTokens->proxy,
                                                         HdRenderTagTokens->guide };
+    // Secondary graphics render pass index, please note 
+    // this pass may not exist if we merge render passes
+    static const int           secondaryGraphicsPassIndex = 1;
 
     _ClearRenderPassesData();
     
@@ -1396,9 +1400,33 @@ void MtohRenderOverride::_InitHydraResources(
     //Set passes constant parameters
     for (int i=0;i< _GetNumRenderPasses(); ++i) {
         const auto& currentPass = _GetRenderPass(i);
-        // Set the passes to render all purposes by default, the actual filtering will be done in
-        // the filtering lambda of the passes
-        currentPass->params().renderTags = allPurposeRenderTags;
+        // Set the passes to render all purposes by default, the actual render tag filtering will be done in
+        // the scene indices filtering lambda function
+
+        // Special case for the secondary ggraphics render pass which has its own render tag
+        // as Fvp::secondaryGraphicsRenderTagToken
+        const bool isTheSecondaryGraphicsRenderPass
+            = (1 == _GetNumRenderPasses() ) 
+            ? true // When we have a single pass, it's also the secondary graphics render pass
+            : secondaryGraphicsPassIndex == i; // When we have multiple passes, index secondaryGraphicsPassIndex is 
+                                               // the secondary graphics render pass
+        if (isTheSecondaryGraphicsRenderPass) {
+            // It's the secondary graphics render pass, add the secondary graphics render tag
+            //If it's not already inside allPurposeRenderTags
+            TfTokenVector secondaryGraphicsRenderTags = allPurposeRenderTags;
+            const bool hasAlreadyTheSecondaryGraphicsRenderTag = std::find( secondaryGraphicsRenderTags.cbegin(), 
+                                                                            secondaryGraphicsRenderTags.cend(), 
+                                                                            Fvp::secondaryGraphicsRenderTagToken) 
+                                                                    != secondaryGraphicsRenderTags.cend();
+            if ( ! hasAlreadyTheSecondaryGraphicsRenderTag) {
+                secondaryGraphicsRenderTags.push_back(Fvp::secondaryGraphicsRenderTagToken);//Add it
+            }
+
+            currentPass->params().renderTags = secondaryGraphicsRenderTags;
+        }
+        else{
+            currentPass->params().renderTags = allPurposeRenderTags;
+        }
         
         //Register teminal scene index
         GetMayaHydraLibInterface().RegisterTerminalSceneIndex(
@@ -2578,8 +2606,8 @@ void MtohRenderOverride::_CreateRenderPasses()
     }
     
     // Reserve space for filtering functions and initialize vectors
-    _renderPassesFilteringFn.resize(_GetNumRenderPasses());
-    _renderPassesRenderTags.resize(_GetNumRenderPasses());
+    _renderPassesFilteringFn.resize(numPasses);
+    _renderPassesRenderTags.resize(numPasses);
 }
 
 void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegateParams)
@@ -2599,20 +2627,33 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
 
     _taskController->SetRenderTags(mainPassRenderTags);
 #else
-    TfTokenVector secondPassRenderTags;
-    if (delegateParams.guidePurpose) {
+    // Fvp::secondaryGraphicsRenderTagToken is the token used for secondary graphics pass
+    TfTokenVector secondaryGraphicsPassRenderTags; 
+    
+    // Helper lambda to add render tags to passes
+    auto addRenderTag = [&](const TfToken& renderTag) {
         if (_GetNumRenderPasses() == 1) {
-            mainPassRenderTags.push_back(HdRenderTagTokens->guide); // main pass
+            mainPassRenderTags.push_back(renderTag); // main pass
         } else {
-            secondPassRenderTags.push_back(HdRenderTagTokens->guide); // second pass
+            secondaryGraphicsPassRenderTags.push_back(renderTag); // secondary graphics pass
         }
+    };
+
+    //The guide tagged primitives will be rendered as secondary graphics if we have a dedicated pass for it
+    if (delegateParams.guidePurpose) {
+        addRenderTag(HdRenderTagTokens->guide);
+    }
+
+    // If the secondary graphics render tag is not guide
+    if (Fvp::secondaryGraphicsRenderTagToken != HdRenderTagTokens->guide) {
+        addRenderTag(Fvp::secondaryGraphicsRenderTagToken);
     }
 
     //Set them in our array
     _renderPassesRenderTags.clear(); 
     _renderPassesRenderTags.emplace_back(mainPassRenderTags);
-    if (secondPassRenderTags.size()) {
-        _renderPassesRenderTags.emplace_back(secondPassRenderTags);
+    if (secondaryGraphicsPassRenderTags.size()) {
+        _renderPassesRenderTags.emplace_back(secondaryGraphicsPassRenderTags);
     }
 #endif
 }
