@@ -53,7 +53,6 @@ private:
     HdDataSourceBaseHandle _GetMaterialBindingDataSource();
     HdDataSourceBaseHandle _GetMaterialDataSource();
     HdDataSourceBaseHandle _GetDisplayColorDataSource();
-    HdDataSourceBaseHandle _GetPurposeRenderTagDataSource() const;
 
 private:
     SdfPath _id;
