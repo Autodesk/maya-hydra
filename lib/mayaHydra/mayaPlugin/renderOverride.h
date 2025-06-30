@@ -276,7 +276,6 @@ private:
 
     std::mutex                            _lastRenderTimeMutex;
     std::chrono::system_clock::time_point _lastRenderTime;
-    std::atomic<bool>                     _backupFrameBufferWorkaround = { false };
     std::atomic<bool>                     _playBlasting = { false };
     std::atomic<bool>                     _isConverged = { false };
     std::atomic<bool>                     _needsClear = { false };
@@ -287,10 +286,16 @@ private:
     HdDriver     _hgiDriver;
 
 #ifdef VIEWPORT_TOOLBOX
+    // HVT Render index proxies
     std::vector<hvt::RenderIndexProxyPtr>                       _renderPassesRenderers;
+    // HVT Render passes
     std::vector<hvt::FramePassPtr>                              _renderPasses;
+    // Filtering Lambda functions for the scene indices filtering prims for render passes
     std::vector<Fvp::PassFilteringSceneIndex::FilteringOutFn>   _renderPassesFilteringFn;
+    // We use a scene index to do the filtering for which prim goes to which render pass
+    // And _renderPassesRenderTags is used to say which render tags are used for each render pass
     std::vector<TfTokenVector>                                  _renderPassesRenderTags;
+    // We store the renderer names for each render pass
     TfTokenVector                                               _renderPassesRendererNames;
     
     Fvp::PassFilteringSceneIndex::FilteringOutFn

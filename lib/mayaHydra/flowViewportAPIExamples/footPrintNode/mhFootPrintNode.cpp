@@ -159,8 +159,8 @@ private:
     ///get the value of the color attribute, returned as a 3D Hydra vector 
     GfVec3f _GetColor() const;
     /// get the value of the DrawAsSecondaryGraphics attribute, which is a boolean, this is used so that when the mesh is drawn as a secondary graphics
-    //it appears in the secondary graphics pass of maya hydra (unless all passes are merged)
-    // this is used as an example to show how to set primitives as secondary graphics
+    // it appears in the secondary graphics pass of maya hydra.
+    // Rhis is used as an example to show how to set primitives as secondary graphics
     bool _GetDrawAsSecondaryGraphics() const;
     ///Create the Hydra foot print primitives
     void _CreateAndAddFootPrintPrimitives();
@@ -389,7 +389,7 @@ namespace
 
             // Create a purpose render tag which is a way to specify how the primitive will be drawn.
             // If the drawAsSecondaryGraphics is true, it will be drawn in the secondary graphics
-            // render pass if it exists. As if all render passes use the same render delegate they can be merged.
+            // render pass.
             HdPurposeSchemaTokens->purpose,
             HdPurposeSchema::Builder()
                 .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(

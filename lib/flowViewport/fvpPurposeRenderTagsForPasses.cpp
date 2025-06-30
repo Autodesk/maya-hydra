@@ -19,9 +19,7 @@
 namespace FVP_NS_DEF {
 
 // Apply this purpose render tag to a prim for it to be
-// rendered in the secondary graphics pass, if it exists. 
-// As, please note that passes can be merged in
-// a single pass if the render delegates from all passes are the same.
+// rendered in the secondary graphics pass.
 // 
 // So use Fvp::secondaryGraphicsRenderTagToken as the purpose render tag for the secondary graphics
 // primitives.

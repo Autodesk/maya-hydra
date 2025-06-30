@@ -703,27 +703,8 @@ MStatus MtohRenderOverride::Render(
         }
 #endif
 
-        auto editTasks = [&_backupFrameBufferWorkaround = _backupFrameBufferWorkaround](
-                             HdTaskSharedPtrVector& tasksToEdit) -> void {
-            // MAYA-114630
-            // https://github.com/PixarAnimationStudios/USD/commit/fc63eaef29
-            // removed backing, and restoring of GL_FRAMEBUFFER state.
-            // At the same time HdxColorizeSelectionTask modifies the frame buffer state
-            // Manually backup and restore the state of the frame buffer for now.
-            MayaHydraGLBackup backup;
-            if (_backupFrameBufferWorkaround) {
-                HdTaskSharedPtr backupTask(new MayaHydraBackupGLStateTask(backup));
-                HdTaskSharedPtr restoreTask(new MayaHydraRestoreGLStateTask(backup));
-                tasksToEdit.reserve(tasksToEdit.size() + 2);
-                for (auto it = tasksToEdit.begin(); it != tasksToEdit.end(); it++) {
-                    if (std::dynamic_pointer_cast<HdxColorizeSelectionTask>(*it)) {
-                        tasksToEdit.insert(it, backupTask);
-                        tasksToEdit.insert(it + 2, restoreTask);
-                        break;
-                    }
-                }
-            }
-
+        auto editTasks = [](HdTaskSharedPtrVector&  tasksToEdit,
+                            MayaHydraGLBackup&      backup) -> void {
             // Replace the existing HdxTaskController selection task (Storm) or
             // colorize selection task (non-Storm) with our selection task by
             // editing the task list, since HdxTaskController is not configurable.
@@ -733,7 +714,8 @@ MStatus MtohRenderOverride::Render(
         };
 
 #ifndef VIEWPORT_TOOLBOX
-        editTasks(tasks);
+        MayaHydraGLBackup backup;
+        editTasks(tasks, backup);
 #endif
 
         if (scene.changed()) {
@@ -819,10 +801,11 @@ MStatus MtohRenderOverride::Render(
                 ? aovName 
                 : HdAovTokens->color;
 
+            MayaHydraGLBackup backup;
             if (isPass0) {
                 // Do not share the AOVs, for the first pass only
                 HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks();
-                editTasks(passTasks);
+                editTasks(passTasks, backup);
                 currentPass->Render(passTasks);
             } else {
                 // Share AOVs from the previous visible pass or pass0
@@ -841,7 +824,8 @@ MStatus MtohRenderOverride::Render(
                           };
                 
                     HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(inputAOVs);
-                    editTasks(passTasks);
+                    editTasks(
+                        passTasks, backup);
                     currentPass->Render(passTasks);
                 }
             }
@@ -1599,21 +1583,11 @@ void MtohRenderOverride::_InitHydraResources(
         currentPass->params().viewInfo.viewport         = { { 0, 0 }, { width, height } };
         currentPass->params().viewInfo.viewMatrix       = viewMatrix;
         currentPass->params().viewInfo.projectionMatrix = projectionMatrix;
-        // Accumulate tasks in all passes
-        auto passTasks = currentPass->GetRenderTasks();
-        tasks.reserve(tasks.size() + passTasks.size());
-        tasks.insert(tasks.end(), passTasks.begin(), passTasks.end());
     }
 #else
     auto tasks = _taskController->GetRenderingTasks();
 #endif
-    for (auto task : tasks) {
-        if (std::dynamic_pointer_cast<HdxColorizeSelectionTask>(task)) {
-            _backupFrameBufferWorkaround = true;
-            break;
-        }
-    }
-
+    
     _initializationSucceeded = true;
 }
 
@@ -2610,9 +2584,7 @@ void MtohRenderOverride::_CreateRenderPasses()
         _CreateFrameRenderPass(_renderPassesRendererNames[i], SdfPath(passNumber));
     }
     
-    // Reserve space for filtering functions and initialize vectors
-    _renderPassesFilteringFn.resize(numPasses);
-    _renderPassesRenderTags.resize(numPasses);
+    
 }
 
 void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegateParams)

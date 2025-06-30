@@ -21,8 +21,7 @@
 namespace FVP_NS_DEF {
 
 /** Apply this purpose render tag to a hydra primitive to be
-    rendered in the secondary graphic pass. Please note that passes can be merged in
-    a single pass if the render delegates from all passes are the same.
+    rendered in the secondary graphic pass.
 */
 FVP_API
 extern const PXR_NS::TfToken secondaryGraphicsRenderTagToken;
