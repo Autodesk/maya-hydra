@@ -160,7 +160,7 @@ private:
     GfVec3f _GetColor() const;
     /// get the value of the DrawAsSecondaryGraphics attribute, which is a boolean, this is used so that when the mesh is drawn as a secondary graphics
     // it appears in the secondary graphics pass of maya hydra.
-    // Rhis is used as an example to show how to set primitives as secondary graphics
+    // This is used as an example to show how to set primitives as secondary graphics
     bool _GetDrawAsSecondaryGraphics() const;
     ///Create the Hydra foot print primitives
     void _CreateAndAddFootPrintPrimitives();
