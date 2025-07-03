@@ -21,6 +21,7 @@
 #include "renderOverride.h"
 #include "viewCommand.h"
 #include "pluginBuildInfoCommand.h"
+#include "setViewportRenderPassesCommand.h"
 
 #include <mayaHydraLib/adapters/adapter.h>
 
@@ -203,9 +204,18 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
     if (!plugin.registerCommand(
         MayaHydraPluginInfoCommand::commandName, MayaHydraPluginInfoCommand::creator, MayaHydraPluginInfoCommand::createSyntax)) {
-    ret = MS::kFailure;
-    ret.perror("Error registering MayaHydraPluginInfo command!");
-    return ret;
+        ret = MS::kFailure;
+        ret.perror("Error registering MayaHydraPluginInfo command!");
+        return ret;
+    }
+
+    if (!plugin.registerCommand(
+            MayaHydraSetVisibleRenderPasses::commandName,
+            MayaHydraSetVisibleRenderPasses::creator,
+            MayaHydraSetVisibleRenderPasses::createSyntax)) {
+        ret = MS::kFailure;
+        ret.perror("Error registering mayaHydraSetVisibleRenderPasses !");
+        return ret;
     }
 
     if (auto* renderer = MHWRender::MRenderer::theRenderer()) {
@@ -298,6 +308,11 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     if (!plugin.deregisterCommand(MayaHydraPluginInfoCommand::commandName)) {
         ret = MS::kFailure;
         ret.perror("Error deregistering MayaHydraPluginInfo command!");
+    }
+
+    if (!plugin.deregisterCommand(MayaHydraSetVisibleRenderPasses::commandName)) {
+        ret = MS::kFailure;
+        ret.perror("Error deregistering MayaHydraSetViewportRenderPassesCommand!");
     }
 
     return ret;

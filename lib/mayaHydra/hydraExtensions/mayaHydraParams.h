@@ -32,8 +32,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 struct MayaHydraParams
 {
     bool  proxyPurpose = true;
-    bool  renderPurpose = false;
-    bool  guidePurpose = false;
+    bool  renderPurpose = true;
+    bool  guidePurpose = true;
     int   textureMemoryPerTexture = 4 * 1024 * 1024;
     int   maximumShadowMapResolution = 2048;
     float motionSampleStart = 0;

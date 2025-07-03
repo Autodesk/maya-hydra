@@ -132,4 +132,12 @@ bool IsDagPathALight(const MDagPath& dagPath)
     return (typeName.indexW(_lightString) != -1);//Does the typename contains "Light"
 }
 
+bool IsDagPathACamera(const MDagPath& dagPath)
+{
+    if (!dagPath.isValid())
+        return false;
+
+    return dagPath.hasFn(MFn::kCamera);
+}
+
 } // namespace MAYAHYDRA_NS_DEF

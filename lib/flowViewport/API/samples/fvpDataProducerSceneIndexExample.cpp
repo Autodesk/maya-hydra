@@ -86,11 +86,18 @@ namespace PrototypeInstancing
     HdContainerDataSourceHandle constructPrimvarDataSource(const VtValue& value, const TfToken& interpolation, const TfToken& role)
     {
         static auto emptyArray = HdRetainedTypedSampledDataSource<VtIntArray>::New(VtIntArray());
-
-        return HdPrimvarSchema::BuildRetained(getRetainedDataSource(value),
-            HdSampledDataSourceHandle(), emptyArray, //is an indexer on the primVars which we don't use, primVars are not indexed in our case.
+        return HdPrimvarSchema::BuildRetained(
+            getRetainedDataSource(value),
+            HdSampledDataSourceHandle(),
+            emptyArray, // is an indexer on the primVars which we don't use, primVars are not
+                        // indexed in our case.
             HdPrimvarSchema::BuildInterpolationDataSource(interpolation),
-            HdPrimvarSchema::BuildInterpolationDataSource(role));
+            HdPrimvarSchema::BuildInterpolationDataSource(role)
+#if PXR_VERSION >= 2505 // const HdIntDataSourceHandle& elementSize added in USD 25.05
+                ,nullptr
+#endif
+        );
+
     }
 
     //Create an instancer topology data source for the instancer, and supply the matrices as a by-instance varying primvar.

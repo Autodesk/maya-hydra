@@ -13,6 +13,7 @@ target_sources(${TARGET_NAME}
         fvpUtils.cpp
         global.cpp
         tokens.cpp
+		fvpPurposeRenderTagsForPasses.cpp
 )
 
 set(HEADERS
@@ -24,6 +25,7 @@ set(HEADERS
     global.h
     tokens.h
     fvpWireframeColorInterface.h
+	fvpPurposeRenderTagsForPasses.h
 )
 
 # -----------------------------------------------------------------------------

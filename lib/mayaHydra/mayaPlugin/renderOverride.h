@@ -105,13 +105,14 @@ using HdxPickHitVector = std::vector<struct HdxPickHit>;
 /*! \brief MtohRenderOverride is a rendering override class for the viewport to use Hydra instead of
  * VP2.0.
  */
-class MtohRenderOverride : public MHWRender::MRenderOverride, 
-    public MayaHydra::PickContext
+class MtohRenderOverride
+    : public MHWRender::MRenderOverride
+    , public MayaHydra::PickContext
 {
 public:
-
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
-    static constexpr char kNbViewSelectedChangedCalls[] = "MtohRenderOverride:NbViewSelectedChangedCalls";
+    static constexpr char kNbViewSelectedChangedCalls[]
+        = "MtohRenderOverride:NbViewSelectedChangedCalls";
 #endif
 
     MtohRenderOverride(const MtohRendererDescription& desc);
@@ -141,12 +142,17 @@ public:
         const MHWRender::MDrawContext&                         drawContext,
         const MHWRender::MDataServerOperation::MViewportScene& scene);
 
-    ///When fullReset is true, we remove the data producer scene indices that apply to all viewports and the scene index registry where the usd stages have been loaded.
-    ///It means you are doing a full reset of hydra such as when doing "File New".
-    ///Use fullReset = false when you still want to see the previously registered data producer scene indices when using an hydra viewport.
+    /// When fullReset is true, we remove the data producer scene indices that apply to all
+    /// viewports and the scene index registry where the usd stages have been loaded. It means you
+    /// are doing a full reset of hydra such as when doing "File New". Use fullReset = false when
+    /// you still want to see the previously registered data producer scene indices when using an
+    /// hydra viewport.
     void ClearHydraResources(bool fullReset);
     void SelectionChanged(const Ufe::SelectionChanged& notification);
-    void SetRenderPurposeTags(const MayaHydraParams& delegateParams) { _SetRenderPurposeTags(delegateParams); };
+    void SetRenderPurposeTags(const MayaHydraParams& delegateParams)
+    {
+        _SetRenderPurposeTags(delegateParams);
+    };
     MString uiName() const override { return MString(_rendererDesc.displayName.GetText()); }
 
     MHWRender::DrawAPI supportedDrawAPIs() const override;
@@ -169,10 +175,9 @@ public:
         MPointArray&                     worldSpaceHitPts) override;
 
     // MayaHydra::PickContext overrides.
-    std::shared_ptr<const MayaHydraSceneIndexRegistry>
-    sceneIndexRegistry() const override;
+    std::shared_ptr<const MayaHydraSceneIndexRegistry> sceneIndexRegistry() const override;
 
-    HdRenderIndex* renderIndex() const override;
+    HdRenderIndex* renderIndex(int passIndex = 0) const override;
 
 private:
     typedef std::pair<MString, MCallbackIdArray> PanelCallbacks;
@@ -180,32 +185,35 @@ private:
 
     static MtohRenderOverride* _GetByName(TfToken rendererName);
 
-    void              _InitHydraResources(const MHWRender::MDrawContext& drawContext);
+    void _InitHydraResources(
+        const MHWRender::MDrawContext& drawContext,
+        const MayaHydraParams&         delegateParams);
     void              _RemovePanel(MString panelName);
     void              _DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext);
-    HdRenderDelegate* _GetRenderDelegate();   
-    HdRenderDelegate* _GetRenderDelegate() const;
+    HdRenderDelegate* _GetRenderDelegate(int renderPassIndex = 0);
+    HdRenderDelegate* _GetRenderDelegate(int renderPassIndex = 0) const;
     void              _ClearMayaHydraSceneIndex();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
-    void              _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
-    HdSceneIndexBaseRefPtr _GetPassFilteringSceneIndex(const Fvp::PassFilteringSceneIndex::FilteringOutFn& filteringFn);
-    VtValue           _GetUsedGPUMemory() const;
+    void _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
+    HdSceneIndexBaseRefPtr
+    _GetPassFilteringSceneIndex(const Fvp::PassFilteringSceneIndex::FilteringOutFn& filteringFn);
+    VtValue _GetUsedGPUMemory() const;
 
     void _PickByRegion(
         HdxPickHitVector& outHits,
-        const MMatrix& viewMatrix,
-        const MMatrix& projMatrix,
-        bool singlePick,
-        const TfToken& geomSubsetsPickMode,
-        bool pointSnappingActive,
-        int view_x,
-        int view_y,
-        int view_w,
-        int view_h,
-        unsigned int sel_x,
-        unsigned int sel_y,
-        unsigned int sel_w,
-        unsigned int sel_h);
+        const MMatrix&    viewMatrix,
+        const MMatrix&    projMatrix,
+        bool              singlePick,
+        const TfToken&    geomSubsetsPickMode,
+        bool              pointSnappingActive,
+        int               view_x,
+        int               view_y,
+        int               view_w,
+        int               view_h,
+        unsigned int      sel_x,
+        unsigned int      sel_y,
+        unsigned int      sel_w,
+        unsigned int      sel_h);
 
     inline PanelCallbacksList::iterator _FindPanelCallbacks(MString panelName)
     {
@@ -236,7 +244,7 @@ private:
     // Callbacks
     static void _ClearHydraCallback(void* data);
     static void _TimerCallback(float, float, void* data);
-    static void _PlayblastingChanged(bool state, void*); 
+    static void _PlayblastingChanged(bool state, void*);
     static void _PanelDeletedCallback(const MString& panelName, void* data);
     static void _RendererChangedCallback(
         const MString& panelName,
@@ -249,44 +257,59 @@ private:
         const MString& newOverride,
         void*          data);
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
-    static void _ViewSelectedChangedCb(
-        const MString& panelName,
-        bool           viewSelectedObjectsChanged,
-        void*          data);
+    static void
+    _ViewSelectedChangedCb(const MString& panelName, bool viewSelectedObjectsChanged, void* data);
 #endif
 
     MtohRendererDescription _rendererDesc;
 
-    std::shared_ptr<MayaHydraSceneIndexRegistry> _sceneIndexRegistry;
-    std::vector<std::unique_ptr<MHWRender::MRenderOperation>>    _operations;
-    MCallbackIdArray                             _callbacks;
-    MCallbackId                                  _timerCallback = 0;
-    PanelCallbacksList                           _renderPanelCallbacks;
-    const MtohRenderGlobals&                     _globals;
+    std::shared_ptr<MayaHydraSceneIndexRegistry>              _sceneIndexRegistry;
+    std::vector<std::unique_ptr<MHWRender::MRenderOperation>> _operations;
+    MCallbackIdArray                                          _callbacks;
+    MCallbackId                                               _timerCallback = 0;
+    PanelCallbacksList                                        _renderPanelCallbacks;
+    const MtohRenderGlobals&                                  _globals;
 
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
-    MCallbackId                                  _viewSelectedChangedCb{0};
+    MCallbackId _viewSelectedChangedCb { 0 };
 #endif
 
     std::mutex                            _lastRenderTimeMutex;
     std::chrono::system_clock::time_point _lastRenderTime;
-    std::atomic<bool>                     _backupFrameBufferWorkaround = { false };
     std::atomic<bool>                     _playBlasting = { false };
     std::atomic<bool>                     _isConverged = { false };
     std::atomic<bool>                     _needsClear = { false };
 
     /// Hgi and HdDriver should be constructed before HdEngine to ensure they
     /// are destructed last. Hgi may be used during engine/delegate destruction.
-    HgiUniquePtr                              _hgi;
-    HdDriver                                  _hgiDriver;
+    HgiUniquePtr _hgi;
+    HdDriver     _hgiDriver;
+
 #ifdef VIEWPORT_TOOLBOX
-    hvt::RenderIndexProxyPtr _beautyRenderer;
-    hvt::FramePassPtr _beautyFramePass;
-    Fvp::PassFilteringSceneIndex::FilteringOutFn _beautyFramePassFilteringFn;
-    hvt::RenderIndexProxyPtr _secondaryGfxRenderer;
-    hvt::FramePassPtr _secondaryGfxFramePass;
-    Fvp::PassFilteringSceneIndex::FilteringOutFn _secondaryGfxFramePassFilteringFn;
-    bool _useSinglePass{false};
+    // HVT Render index proxies
+    std::vector<hvt::RenderIndexProxyPtr>                       _renderPassesRenderers;
+    // HVT Render passes
+    std::vector<hvt::FramePassPtr>                              _renderPasses;
+    // Filtering Lambda functions for the scene indices filtering prims for render passes
+    std::vector<Fvp::PassFilteringSceneIndex::FilteringOutFn>   _renderPassesFilteringFn;
+    // We use a scene index to do the filtering for which prim goes to which render pass
+    // And _renderPassesRenderTags is used to say which render tags are used for each render pass
+    std::vector<TfTokenVector>                                  _renderPassesRenderTags;
+    // We store the renderer names for each render pass
+    TfTokenVector                                               _renderPassesRendererNames;
+    
+    Fvp::PassFilteringSceneIndex::FilteringOutFn
+        _CreatePassFilteringFn(const TfTokenVector& renderTags);
+    int                      _GetNumVisibleRenderPasses() const;
+    int                      _GetNumRenderPasses() const;
+    const hvt::FramePassPtr& _GetRenderPass(int passIndex)const;
+    hvt::FramePassPtr&       _GetRenderPass(int passIndex);
+    void                     _CreateRenderPasses();
+    void                     _CreateRenderPassesFilteringSceneIndices();
+    void                     _ClearRenderPassesData();
+    void                     _CreateFrameRenderPass(
+                                const std::string&                    rendererName,
+                                const SdfPath&                        passId);
 #else
     HdEngine                                  _engine;
     HdRendererPlugin*                         _rendererPlugin = nullptr;
@@ -355,7 +378,7 @@ private:
 
     GfVec4d _viewport;
 
-    int _currentOperation = -1;
+    int _currentOperation = -1;    
 
     bool _needToReplaceSelection = false;
     const bool _isUsingHdSt = false;

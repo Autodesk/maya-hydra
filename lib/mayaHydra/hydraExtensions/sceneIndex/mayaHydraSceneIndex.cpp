@@ -19,6 +19,7 @@
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
 #include <flowViewport/selection/fvpPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
+#include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 
 #include <maya/MDGMessage.h>
 #include <maya/MDagPath.h>
@@ -149,6 +150,15 @@ SdfPath MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath; // Common to all s
 
 namespace {
     
+    TfToken GetPurposeRenderTag(const MRenderItem& ri)
+    {
+        // This is where we sort the maya render items 
+        // At this time, every render item not being triangles is drawn as secondary graphics
+        return (ri.primitive() != MHWRender::MGeometry::Primitive::kTriangles)
+            ? Fvp::secondaryGraphicsRenderTagToken //will be drawn as secondary graphics
+            : HdRenderTagTokens->geometry; //will be drawn in the main pass
+    }
+
     bool useMeshAdapter()
     {
         static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
@@ -569,7 +579,8 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
 
         // ProxyGeometryItems are a special type of dummy render item created internally by Maya
         // to implement and handle MPxDrawOverride. We do not need to translate these to Hydra.
-        if (ri.name() == "ProxyGeometryItem") {
+        const MString riName = ri.name();
+        if (riName == "ProxyGeometryItem") {
             continue;
         }
 
@@ -591,7 +602,7 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
             }
             // MAYA-128021: We do not currently support maya instances.
             MDagPath dagPath(ri.sourceDagPath());
-            ria = std::make_shared<MayaHydraRenderItemAdapter>(dagPath, slowId, fastId, this, ri);
+            ria = std::make_shared<MayaHydraRenderItemAdapter>(dagPath, slowId, fastId, this, ri, GetPurposeRenderTag(ri));
 
             //Update the render item adapter if this render item is an aiSkydomeLight shape
             ria->SetIsRenderITemAnaiSkydomeLightTriangleShape(isRenderItem_aiSkyDomeLightTriangleShape(ri));

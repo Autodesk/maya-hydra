@@ -21,6 +21,7 @@
 #include <pxr/imaging/garch/glApi.h>
 
 #include "renderOverride.h"
+#include "setViewportRenderPassesCommand.h"
 
 #include "mayaColorPreferencesTranslator.h"
 #include "pluginDebugCodes.h"
@@ -55,6 +56,7 @@
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
+#include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 
 #ifdef VIEWPORT_TOOLBOX
 #include <hvt/engine/framePass.h>
@@ -69,7 +71,6 @@
 #include <pxr/base/tf/type.h>
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/staticTokens.h>
-#include <pxr/pxr.h>
 
 #include <ufe/hierarchy.h>
 #include <ufe/selection.h>
@@ -98,10 +99,10 @@
 #include <pxr/imaging/hdx/tokens.h>
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/usd/kind/registry.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/modelAPI.h>
-#include <pxr/pxr.h>
 
 #include <mayaUsdAPI/proxyStage.h>
 
@@ -391,19 +392,35 @@ MtohRenderOverride::~MtohRenderOverride()
     }
 }
 
-HdRenderDelegate* MtohRenderOverride::_GetRenderDelegate()
+HdRenderDelegate* MtohRenderOverride::_GetRenderDelegate(int renderPassIndex /*= 0*/)
 {
 #ifdef VIEWPORT_TOOLBOX
-    return _beautyRenderer && _beautyRenderer->RenderIndex() ? _beautyRenderer->RenderIndex()->GetRenderDelegate() : nullptr;
+    if (renderPassIndex < 0 || renderPassIndex >= _renderPasses.size()) {
+        TF_CODING_ERROR("Invalid render pass index: %d", renderPassIndex);
+        return nullptr;
+    }
+    
+    const auto& renderPass = _GetRenderPass(renderPassIndex);
+    return renderPass && renderPass->GetRenderIndex()
+        ? renderPass->GetRenderIndex()->GetRenderDelegate()
+        : nullptr;
 #else
     return _renderIndex ? _renderIndex->GetRenderDelegate() : nullptr;
 #endif
 }
 
-HdRenderDelegate* MtohRenderOverride::_GetRenderDelegate() const
+HdRenderDelegate* MtohRenderOverride::_GetRenderDelegate(int renderPassIndex /*= 0*/) const
 {
 #ifdef VIEWPORT_TOOLBOX
-    return _beautyRenderer && _beautyRenderer->RenderIndex() ? _beautyRenderer->RenderIndex()->GetRenderDelegate() : nullptr;
+    if (renderPassIndex < 0 || renderPassIndex >= _renderPasses.size()) {
+        TF_CODING_ERROR("Invalid render pass index: %d", renderPassIndex);
+        return nullptr;
+    }
+
+    const auto& renderPass = _GetRenderPass(renderPassIndex);
+    return renderPass && renderPass->GetRenderIndex()
+        ? renderPass->GetRenderIndex()->GetRenderDelegate()
+        : nullptr;
 #else
     return _renderIndex ? _renderIndex->GetRenderDelegate() : nullptr;
 #endif
@@ -488,24 +505,72 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
         return SdfPathVector();
     }
 
-    auto* renderIndex = instance->renderIndex();
-    if (!renderIndex) {
-        return SdfPathVector();
+#ifndef VIEWPORT_TOOLBOX
+        auto* renderIndex = instance->renderIndex();
+        if (!renderIndex) {
+            return SdfPathVector();
+        }
+        auto primIds = renderIndex->GetRprimIds();
+        if (visibleOnly) {
+            primIds.erase(
+                std::remove_if(
+                    primIds.begin(),
+                    primIds.end(),
+                    [renderIndex](const SdfPath& primId) {
+                        auto* rprim = renderIndex->GetRprim(primId);
+                        if (!rprim)
+                            return true;
+                        return !rprim->IsVisible();
+                    }),
+                primIds.end());
+        }
+#else
+    // Accumulate RPrims from all render indices from all passes of the instance which use the same rendererName.
+    SdfPathVector primIds;
+    for (int i = 0; i < instance->_GetNumRenderPasses(); ++i) {
+        const hvt::FramePassPtr& pass = instance->_GetRenderPass(i);
+        if (!pass) {             
+            continue;
+        }
+        
+        const std::string& rendererNameFromPass = instance->_renderPassesRendererNames[i];
+        if (rendererName != rendererNameFromPass){
+            continue;
+        }
+
+        auto* renderIndex               = pass->GetRenderIndex();
+        if (!renderIndex) {
+            continue;
+        }
+        
+        //Do a copy as we may remove some of them
+        SdfPathVector tempPrimIds = renderIndex->GetRprimIds();
+        if (visibleOnly) {
+            tempPrimIds.erase(
+                std::remove_if(
+                    tempPrimIds.begin(),
+                    tempPrimIds.end(),
+                    [renderIndex](const SdfPath& primId) {
+                        auto* rprim = renderIndex->GetRprim(primId);
+                        if (!rprim)
+                            return true;
+                        return !rprim->IsVisible();
+                    }),
+                tempPrimIds.end());
+        }
+
+        // Concatenate results
+        if (tempPrimIds.size()) { 
+            primIds.reserve(
+                primIds.size() + tempPrimIds.size()); // Reserve space to avoid reallocations
+            primIds.insert(
+                primIds.end(), tempPrimIds.begin(), tempPrimIds.end()); // Insert all elements
+        }
     }
-    auto primIds = renderIndex->GetRprimIds();
-    if (visibleOnly) {
-        primIds.erase(
-            std::remove_if(
-                primIds.begin(),
-                primIds.end(),
-                [renderIndex](const SdfPath& primId) {
-                    auto* rprim = renderIndex->GetRprim(primId);
-                    if (!rprim)
-                        return true;
-                    return !rprim->IsVisible();
-                }),
-            primIds.end());
-    }
+
+    // Sort them by lexicographically order
+    std::sort(primIds.begin(), primIds.end(), std::less<SdfPath>());
+#endif
     return primIds;
 }
 
@@ -604,6 +669,8 @@ MStatus MtohRenderOverride::Render(
     //     }
     // }
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER).Msg("MtohRenderOverride::Render()\n");
+    // We can use the mayaHydraSetVisibleRenderPasses command to set the visible passes
+
     auto renderFrame = [&](bool markTime = false) {
 #ifndef VIEWPORT_TOOLBOX
         HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
@@ -636,26 +703,8 @@ MStatus MtohRenderOverride::Render(
         }
 #endif
 
-        auto editTasks = [&_backupFrameBufferWorkaround=_backupFrameBufferWorkaround](HdTaskSharedPtrVector& tasksToEdit) -> void {
-            // MAYA-114630
-            // https://github.com/PixarAnimationStudios/USD/commit/fc63eaef29
-            // removed backing, and restoring of GL_FRAMEBUFFER state.
-            // At the same time HdxColorizeSelectionTask modifies the frame buffer state
-            // Manually backup and restore the state of the frame buffer for now.
-            MayaHydraGLBackup backup;
-            if (_backupFrameBufferWorkaround) {
-                HdTaskSharedPtr backupTask(new MayaHydraBackupGLStateTask(backup));
-                HdTaskSharedPtr restoreTask(new MayaHydraRestoreGLStateTask(backup));
-                tasksToEdit.reserve(tasksToEdit.size() + 2);
-                for (auto it = tasksToEdit.begin(); it != tasksToEdit.end(); it++) {
-                    if (std::dynamic_pointer_cast<HdxColorizeSelectionTask>(*it)) {
-                        tasksToEdit.insert(it, backupTask);
-                        tasksToEdit.insert(it + 2, restoreTask);
-                        break;
-                    }
-                }
-            }
-
+        auto editTasks = [](HdTaskSharedPtrVector&  tasksToEdit,
+                            MayaHydraGLBackup&      backup) -> void {
             // Replace the existing HdxTaskController selection task (Storm) or
             // colorize selection task (non-Storm) with our selection task by
             // editing the task list, since HdxTaskController is not configurable.
@@ -665,7 +714,8 @@ MStatus MtohRenderOverride::Render(
         };
 
 #ifndef VIEWPORT_TOOLBOX
-        editTasks(tasks);
+        MayaHydraGLBackup backup;
+        editTasks(tasks, backup);
 #endif
 
         if (scene.changed()) {
@@ -681,7 +731,9 @@ MStatus MtohRenderOverride::Render(
         }
 
         // Update plugin data producers
-        for (auto& viewportData : Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetAllViewportInfoAndData()) {
+        for (auto& viewportData :
+             Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get()
+                 .GetAllViewportInfoAndData()) {
             for (auto& dataProducer : viewportData.GetDataProducerSceneIndicesData()) {
                 dataProducer->UpdateVisibility();
                 dataProducer->UpdateTransform();
@@ -690,52 +742,93 @@ MStatus MtohRenderOverride::Render(
 
         // Update plugin filtering scene indices
         std::string rendererNamesToUpdate;
-        for (auto& sceneFilteringSceneIndexData : Fvp::FilteringSceneIndexInterfaceImp::get().getSceneFilteringSceneIndicesData()) {
+        for (auto& sceneFilteringSceneIndexData :
+             Fvp::FilteringSceneIndexInterfaceImp::get().getSceneFilteringSceneIndicesData()) {
             if (sceneFilteringSceneIndexData->UpdateVisibility()) {
-                rendererNamesToUpdate += sceneFilteringSceneIndexData->GetClient()->getRendererNames();
+                rendererNamesToUpdate
+                    += sceneFilteringSceneIndexData->GetClient()->getRendererNames();
             }
         }
-        for (auto& selectionHighlightFilteringSceneIndexData : Fvp::FilteringSceneIndexInterfaceImp::get().getSelectionHighlightFilteringSceneIndicesData()) {
+        for (auto& selectionHighlightFilteringSceneIndexData :
+             Fvp::FilteringSceneIndexInterfaceImp::get()
+                 .getSelectionHighlightFilteringSceneIndicesData()) {
             if (selectionHighlightFilteringSceneIndexData->UpdateVisibility()) {
-                rendererNamesToUpdate += selectionHighlightFilteringSceneIndexData->GetClient()->getRendererNames();
+                rendererNamesToUpdate
+                    += selectionHighlightFilteringSceneIndexData->GetClient()->getRendererNames();
             }
         }
         if (!rendererNamesToUpdate.empty()) {
-            Fvp::FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(rendererNamesToUpdate);
+            Fvp::FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(
+                rendererNamesToUpdate);
         }
 
 #ifdef VIEWPORT_TOOLBOX
-        if (_useSinglePass) {
-            _beautyFramePass->params().backgroundColor = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
-            HdTaskSharedPtrVector beautyTasks = _beautyFramePass->GetRenderTasks();
-            editTasks(beautyTasks);
-            _beautyFramePass->Render(beautyTasks);
-        } else {
-            // Beauty pass
-            _beautyFramePass->params().enablePresentation = false;
-            _beautyFramePass->params().backgroundColor = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
-            HdTaskSharedPtrVector beautyTasks = _beautyFramePass->GetRenderTasks();
-            editTasks(beautyTasks);
-            _beautyFramePass->Render(beautyTasks);
+        const MIntArray& renderPassesVisible    = 
+            MayaHydraSetVisibleRenderPasses::getVisibleRenderPasses();
+        int                 numVisibleRenderPasses = renderPassesVisible.length();
+        const MStringArray& visibleAOVNames     = MayaHydraSetVisibleRenderPasses::getAovNames();
+        const int           numRenderPasses     = _GetNumRenderPasses();
+        if (numVisibleRenderPasses > numRenderPasses) {
+            numVisibleRenderPasses
+                = numRenderPasses; // Case where we have merged the passes into a single pass
+        }
 
-            // Get buffers
-            std::shared_ptr<pxr::HdRenderBuffer> colorBuffer =
-                hvt::CreateRenderBufferProxy(_beautyFramePass, pxr::HdAovTokens->color);
+        // Iterate over visible render passes
+        for (int visibleIdx = 0; visibleIdx < numVisibleRenderPasses; ++visibleIdx) {
 
-            std::shared_ptr<pxr::HdRenderBuffer> depthBuffer =
-                hvt::CreateRenderBufferProxy(_beautyFramePass, pxr::HdAovTokens->depth);
+            const int actualPassIndex = renderPassesVisible[visibleIdx]; // Get the actual pass index
+            const hvt::FramePassPtr& currentPass = _GetRenderPass(actualPassIndex);
+            if (!currentPass) {
+                continue;
+            }
 
-            const std::vector<std::pair<pxr::TfToken const&, pxr::HdRenderBuffer*>> inputAOVs = {
-                { pxr::HdAovTokens->color, colorBuffer.get() },
-                { pxr::HdAovTokens->depth, depthBuffer.get() }
-            };
+            const bool isPass0              = (actualPassIndex == 0);
+            const bool isFirstVisiblePass   = (visibleIdx == 0);
+            const bool isLastVisiblePass    = (visibleIdx == numVisibleRenderPasses - 1);//Put me back later
 
-            // Secondary graphics pass
-            _secondaryGfxFramePass->params().backgroundColor = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
-            _secondaryGfxFramePass->params().clearBackground = false;
-            HdTaskSharedPtrVector secondaryGfxTasks = _secondaryGfxFramePass->GetRenderTasks(inputAOVs);
-            editTasks(secondaryGfxTasks);
-            _secondaryGfxFramePass->Render(secondaryGfxTasks);
+            // Clear background for the first visible pass only
+            currentPass->params().clearBackground = isFirstVisiblePass;
+            //currentPass->params().clearDepth      = isFirstVisiblePass; //Coming with a future update in HVT
+
+            // Enable presentation for the last visible pass only
+            currentPass->params().enablePresentation = isLastVisiblePass;
+            
+            // Set the AOV to visualize for the current pass if it exists
+            const TfToken aovName       = TfToken(visibleAOVNames[visibleIdx].asChar());
+            const bool    aovNameExists = currentPass->GetRenderBuffer(aovName) != nullptr;
+            currentPass->params().visualizeAOV
+                = (aovNameExists) 
+                ? aovName 
+                : HdAovTokens->color;
+
+            MayaHydraGLBackup backup;
+            if (isPass0) {
+                // Do not share the AOVs, for the first pass only
+                HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks();
+                editTasks(passTasks, backup);
+                currentPass->Render(passTasks);
+            } else {
+                // Share AOVs from the previous visible pass or pass0
+                const int previousPassIndex = (visibleIdx > 0) ?renderPassesVisible[visibleIdx - 1] : 0;
+                hvt::FramePassPtr& previousPass = _GetRenderPass(previousPassIndex);
+                if (previousPass) {
+                     std::shared_ptr<pxr::HdRenderBuffer> colorBuffer
+                        = hvt::CreateRenderBufferProxy(previousPass, pxr::HdAovTokens->color);
+
+                    std::shared_ptr<pxr::HdRenderBuffer> depthBuffer
+                        = hvt::CreateRenderBufferProxy(previousPass, pxr::HdAovTokens->depth);
+
+                    std::vector<std::pair<pxr::TfToken const&, pxr::HdRenderBuffer*>> inputAOVs
+                        = { { pxr::HdAovTokens->color, colorBuffer.get() },
+                            { pxr::HdAovTokens->depth, depthBuffer.get() } 
+                          };
+                
+                    HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(inputAOVs);
+                    editTasks(
+                        passTasks, backup);
+                    currentPass->Render(passTasks);
+                }
+            }
         }
 #else
         _engine.Execute(_renderIndex, &tasks);
@@ -752,11 +845,27 @@ MStatus MtohRenderOverride::Render(
         // HdTaskController will query all of the tasks it can for IsConverged.
         // This includes HdRenderPass::IsConverged and HdRenderBuffer::IsConverged (via colorizer).
         //
-        _isConverged = 
+        
 #ifdef VIEWPORT_TOOLBOX
-            _beautyFramePass->IsConverged() && _secondaryGfxFramePass->IsConverged();
+            _isConverged = true; 
+            
+            // Check if all render passes are converged
+            // Only iterate over visible render passes
+            for (int visibleIdx = 0; visibleIdx < numVisibleRenderPasses; ++visibleIdx) {
+                const int i = renderPassesVisible[visibleIdx]; // Get the actual pass index
+                const hvt::FramePassPtr& currentPass = _GetRenderPass(i);
+                if (!currentPass) {
+                    continue;
+                }
+
+                if (!currentPass->IsConverged()) {
+                    _isConverged = false;
+                    break;
+                }
+            }
+
 #else
-            _taskController->IsConverged();
+        _isConverged = _taskController->IsConverged();
 #endif
         if (markTime) {
             std::lock_guard<std::mutex> lock(_lastRenderTimeMutex);
@@ -774,14 +883,21 @@ MStatus MtohRenderOverride::Render(
         ClearHydraResources(fullReset);
     }
 
+    const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
+    MayaHydraParams    delegateParams = _globals.delegateParams;
+    delegateParams.displaySmoothMeshes
+        = !(currentDisplayStyle & MHWRender::MFrameContext::kFlatShaded);
+
     if (!_initializationAttempted) {
-        _InitHydraResources(drawContext);
+        _InitHydraResources(drawContext, delegateParams);
 
         if (!_initializationSucceeded) {
             return MStatus::kFailure;
         }
     }
 
+    _SetRenderPurposeTags(delegateParams);
+   
     MFrameContext::LightingMode currentMayaLightingMode = MFrameContext::LightingMode::kSceneLights;
 
     //This code with strings comparison will go away if we have multiple render proxies when doing multi viewports
@@ -811,9 +927,14 @@ MStatus MtohRenderOverride::Render(
             }
     
             //Create a HydraViewportInformation 
+            _renderPassesFilteringFn[0] = _CreatePassFilteringFn(_renderPassesRenderTags[0]);
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelNameStr, cameraName);
             const bool dataProducerSceneIndicesAdded = manager.AddViewportInformation(
-                hydraViewportInformation, renderIndex(), _dataProducerMergingSceneIndexProxy, _GetPassFilteringSceneIndex(_beautyFramePassFilteringFn));
+                hydraViewportInformation,
+                renderIndex(),
+                _dataProducerMergingSceneIndexProxy,
+                _GetPassFilteringSceneIndex(_renderPassesFilteringFn[0]));
+
             //Update the selection since we have added data producer scene indices through manager.AddViewportInformation to the merging scene index
             if (dataProducerSceneIndicesAdded && _selectionSceneIndex){
                 _needToReplaceSelection = true;
@@ -830,10 +951,6 @@ MStatus MtohRenderOverride::Render(
         _needToReplaceSelection = false;
     }
 
-    const unsigned int currentDisplayStyle = drawContext.getDisplayStyle();
-    MayaHydraParams delegateParams = _globals.delegateParams;
-    delegateParams.displaySmoothMeshes = !(currentDisplayStyle & MHWRender::MFrameContext::kFlatShaded);
-    
     const bool currentUseDefaultMaterial = (drawContext.getDisplayStyle() & MHWRender::MFrameContext::kDefaultMaterial);
 
     if (_lightsManagementSceneIndex && _lightingMode != currentMayaLightingMode) {
@@ -868,7 +985,12 @@ MStatus MtohRenderOverride::Render(
             }
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelNameStr, cameraName);
             manager.AddViewportInformation(
-                hydraViewportInformation, renderIndex(), _dataProducerMergingSceneIndexProxy, _GetPassFilteringSceneIndex(_beautyFramePassFilteringFn));
+                hydraViewportInformation,
+                renderIndex(),
+                _dataProducerMergingSceneIndexProxy,
+                _GetPassFilteringSceneIndex(
+                    _renderPassesFilteringFn[0])); // Use the first pass filtering function to create
+                                                 // the pass filtering scene index
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(false);//Allow prim removal propagation again.
         }
         else {
@@ -975,34 +1097,70 @@ MStatus MtohRenderOverride::Render(
         _oldRefineLevel = delegateParams.refineLevel;
     }
 
+    // Set MSAA as per Maya AntiAliasing settings
+    const bool isMultiSampled
+        = framecontext->getPostEffectEnabled(MHWRender::MFrameContext::kAntiAliasing);
+
+    auto viewMatrix
+        = GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx));
+    auto projectionMatrix
+        = GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kProjectionMtx));
+
 #ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->params().renderParams.enableLighting = true;
-    _beautyFramePass->params().renderParams.enableSceneMaterials = true;
-    _secondaryGfxFramePass->params().renderParams.enableLighting = true;
-    _secondaryGfxFramePass->params().renderParams.enableSceneMaterials = true;
+    // Apply some settings
+    const int numRenderPasses = _GetNumRenderPasses();
+    for (int i = 0; i < numRenderPasses; ++i) {
+        const hvt::FramePassPtr& currentPass = _GetRenderPass(i);
+        if (!currentPass) {
+            continue;
+        }
+
+        currentPass->params().enableMultisampling               = isMultiSampled;
+        currentPass->params().viewInfo.viewMatrix               = viewMatrix;
+        currentPass->params().viewInfo.projectionMatrix         = projectionMatrix;
+        currentPass->params().selectionColor                    = _globals.colorSelectionHighlightColor;// Default color in usdview.
+        currentPass->params().enableSelection                   = _globals.colorSelectionHighlight;
+        currentPass->params().collection                        = _renderCollection; // Same collection for all passes
+    }   
 #else
     HdxRenderTaskParams params;
-    params.enableLighting = true;
+    params.enableLighting       = true;
     params.enableSceneMaterials = true;
+    params.cullStyle            = HdCullStyleBackUnlessDoubleSided;
+    _taskController->SetSelectionColor(_globals.colorSelectionHighlightColor);// Default color in usdview.
+    _taskController->SetEnableSelection(_globals.colorSelectionHighlight);
+    _taskController->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
+
+    if (_isUsingHdSt) {
+        // Set MSAA on Color Buffer
+        HdAovDescriptor colorAovDesc    = _taskController->GetRenderOutputSettings(HdAovTokens->color);
+        colorAovDesc.multiSampled       = isMultiSampled;
+        _taskController->SetRenderOutputSettings(HdAovTokens->color, colorAovDesc);
+
+        // Set MSAA of Depth buffer
+        HdAovDescriptor depthAovDesc    = _taskController->GetRenderOutputSettings(HdAovTokens->depth);
+        depthAovDesc.multiSampled       = isMultiSampled;
+        _taskController->SetRenderOutputSettings(HdAovTokens->depth, depthAovDesc);
+    }
 #endif
 
     PXR_NS::GfVec4f wireframeSelectionColor;
     if (Fvp::ColorPreferences::getInstance().getColor(
             FvpColorPreferencesTokens->wireframeSelection, wireframeSelectionColor)) {
 #ifdef VIEWPORT_TOOLBOX
-        _beautyFramePass->params().renderParams.wireframeColor = wireframeSelectionColor;
-        _secondaryGfxFramePass->params().renderParams.wireframeColor = wireframeSelectionColor;
+        const int numRenderPasses = _GetNumRenderPasses();
+        for (int i = 0; i < numRenderPasses; ++i) {
+            const hvt::FramePassPtr& currentPass = _GetRenderPass(i);
+            if (!currentPass) {
+                continue;
+            }
+
+            currentPass->params().renderParams.wireframeColor = wireframeSelectionColor;
+        }
 #else
         params.wireframeColor = wireframeSelectionColor;
 #endif
     }
-
-#ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->params().renderParams.cullStyle = HdCullStyleBackUnlessDoubleSided;
-    _secondaryGfxFramePass->params().renderParams.cullStyle = HdCullStyleBackUnlessDoubleSided;
-#else
-    params.cullStyle = HdCullStyleBackUnlessDoubleSided;
-#endif
 
     int width = 0;
     int height = 0;
@@ -1012,55 +1170,23 @@ MStatus MtohRenderOverride::Render(
     if ((vpDirty = (width != _viewport[2] || height != _viewport[3]))) {
         _viewport = GfVec4d(0, 0, width, height);
 #ifdef VIEWPORT_TOOLBOX
-        _beautyFramePass->params().renderBufferSize = GfVec2i(width, height);
-        _beautyFramePass->params().viewInfo.viewport = {{0,0}, {width, height}};
-        _secondaryGfxFramePass->params().renderBufferSize = GfVec2i(width, height);
-        _secondaryGfxFramePass->params().viewInfo.viewport = {{0,0}, {width, height}};
+        // Only iterate over all render passes
+        const int numRenderPasses = _GetNumRenderPasses();
+        for (int i = 0; i < numRenderPasses; ++i) {
+            const hvt::FramePassPtr& currentPass = _GetRenderPass(i);
+            if (!currentPass) {
+                continue;
+            }
+
+            currentPass->params().renderBufferSize  = GfVec2i(width, height);
+            currentPass->params().viewInfo.viewport = { { 0, 0 }, { width, height } };
+        }
 #else
         _taskController->SetRenderViewport(_viewport);
 #endif
     }
 
-    // Set Purpose tags
-    SetRenderPurposeTags(delegateParams);
-
-    // Set MSAA as per Maya AntiAliasing settings
-    bool isMultiSampled = framecontext->getPostEffectEnabled(MHWRender::MFrameContext::kAntiAliasing);
-#ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->params().enableMultisampling = isMultiSampled;
-    _secondaryGfxFramePass->params().enableMultisampling = isMultiSampled;
-#else
-    if (_isUsingHdSt)
-    {  
-        // Set MSAA on Color Buffer
-        HdAovDescriptor colorAovDesc = _taskController->GetRenderOutputSettings(HdAovTokens->color);
-        colorAovDesc.multiSampled = isMultiSampled;
-        _taskController->SetRenderOutputSettings(HdAovTokens->color, colorAovDesc);
-
-        // Set MSAA of Depth buffer
-        HdAovDescriptor depthAovDesc = _taskController->GetRenderOutputSettings(HdAovTokens->depth);
-        depthAovDesc.multiSampled = isMultiSampled;        
-        _taskController->SetRenderOutputSettings(HdAovTokens->depth, depthAovDesc);
-    }
-#endif
-
-#ifdef VIEWPORT_TOOLBOX
-    // Disable color correction to let Maya take care of it
-    _beautyFramePass->params().enableColorCorrection = false;
-    _secondaryGfxFramePass->params().enableColorCorrection = false;
-#endif
-
-    auto viewMatrix = GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx));
-    auto projectionMatrix = GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kProjectionMtx));
-#ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->params().viewInfo.viewMatrix = viewMatrix;
-    _beautyFramePass->params().viewInfo.projectionMatrix = projectionMatrix;
-    _secondaryGfxFramePass->params().viewInfo.viewMatrix = viewMatrix;
-    _secondaryGfxFramePass->params().viewInfo.projectionMatrix = projectionMatrix;
-#else
-    _taskController->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
-#endif
-
+    
     if (delegateParams.motionSamplesEnabled()) {
         MStatus  status;
         MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
@@ -1072,8 +1198,17 @@ MStatus MtohRenderOverride::Render(
                 if (_mayaHydraSceneIndex) {
                     SdfPath cameraPath = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
 #ifdef VIEWPORT_TOOLBOX
-                    _beautyFramePass->params().renderParams.camera = cameraPath;
-                    _secondaryGfxFramePass->params().renderParams.camera = cameraPath;
+                    // Apply on all render passes
+                    const int numRenderPasses = _GetNumRenderPasses();
+                    for (int i = 0; i < numRenderPasses; ++i)
+                    {
+                        const hvt::FramePassPtr& currentPass = _GetRenderPass(i);
+                        if (!currentPass) {
+                            continue;
+                        }
+
+                        currentPass->params().renderParams.camera = cameraPath;
+                    }
 #else
                     params.camera = cameraPath;
 #endif
@@ -1094,34 +1229,13 @@ MStatus MtohRenderOverride::Render(
     _taskController->SetRenderParams(params);
     if (!params.camera.IsEmpty())
         _taskController->SetCameraPath(params.camera);
-#endif
 
-    // Default color in usdview.
-#ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->params().selectionColor = _globals.colorSelectionHighlightColor;
-    _beautyFramePass->params().enableSelection = _globals.colorSelectionHighlight;
-    _secondaryGfxFramePass->params().selectionColor = _globals.colorSelectionHighlightColor;
-    _secondaryGfxFramePass->params().enableSelection = _globals.colorSelectionHighlight;
-#else
-    _taskController->SetSelectionColor(_globals.colorSelectionHighlightColor);
-    _taskController->SetEnableSelection(_globals.colorSelectionHighlight);
-#endif
-
-#ifndef VIEWPORT_TOOLBOX
     if (_globals.outlineSelectionWidth != 0.f) {
         _taskController->SetSelectionOutlineRadius(_globals.outlineSelectionWidth);
         _taskController->SetSelectionEnableOutline(true);
     } else {
         _taskController->SetSelectionEnableOutline(false);
     }
-#endif
-
-#ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->params().collection = _renderCollection;
-    if (!_useSinglePass) {
-        _secondaryGfxFramePass->params().collection = _renderCollection;
-    }
-#else
     _taskController->SetCollection(_renderCollection);
 #endif
 
@@ -1148,10 +1262,17 @@ MStatus MtohRenderOverride::Render(
         // The light & shadow parameters currently (19.11-20.08) are only used for tasks specific to
         // Storm
 #ifdef VIEWPORT_TOOLBOX
-        _beautyFramePass->SetEnableShadows(enableShadows);
-        _beautyFramePass->SetShadowParams(shadowParams);
-        _secondaryGfxFramePass->SetEnableShadows(enableShadows);
-        _secondaryGfxFramePass->SetShadowParams(shadowParams);
+        // Only iterate over render passes
+        const int numRenderPasses = _GetNumRenderPasses();
+        for (int i = 0; i < numRenderPasses; ++i) {
+            const hvt::FramePassPtr& currentPass = _GetRenderPass(i);
+            if (!currentPass) {
+                continue;
+            }
+
+            currentPass->SetEnableShadows(enableShadows);
+            currentPass->SetShadowParams(shadowParams);
+        }
 #else
         _taskController->SetEnableShadows(enableShadows);
         _taskController->SetShadowParams(shadowParams);
@@ -1192,23 +1313,6 @@ MtohRenderOverride* MtohRenderOverride::_GetByName(TfToken rendererName)
     return nullptr;
 }
 
-void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegateParams)
-{
-    TfTokenVector mhRenderTags = {HdRenderTagTokens->geometry};
-    if (delegateParams.renderPurpose)
-        mhRenderTags.push_back(HdRenderTagTokens->render);
-    if (delegateParams.proxyPurpose)
-        mhRenderTags.push_back(HdRenderTagTokens->proxy);
-    if (delegateParams.guidePurpose)
-        mhRenderTags.push_back(HdRenderTagTokens->guide);
-#ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->params().renderTags = mhRenderTags;
-    _secondaryGfxFramePass->params().renderTags = mhRenderTags;
-#else
-    _taskController->SetRenderTags(mhRenderTags);
-#endif
-}
-
 void MtohRenderOverride::_ClearMayaHydraSceneIndex()
 {
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -1221,66 +1325,120 @@ void MtohRenderOverride::_ClearMayaHydraSceneIndex()
     _mayaHydraSceneIndex.Reset();
 }
 
-void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& drawContext)
+void MtohRenderOverride::_InitHydraResources(
+    const MHWRender::MDrawContext& drawContext,
+    const MayaHydraParams& delegateParams)
 {
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::_InitHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
+
+    //Debug remove me
+    //Enable next line to print the primitives that are filtered in/out for each pass
+    //TfDebug::Enable(MAYAHYDRALIB_RENDEROVERRIDE_FILTERING_PASSES);
 
     _initializationAttempted = true;
 
     GlfContextCaps::InitInstance();
 
 #ifdef VIEWPORT_TOOLBOX
-    hvt::RendererDescriptor beautyRendererDescriptor;
-    beautyRendererDescriptor.hgiDriver    = &_hgiDriver;
-    beautyRendererDescriptor.rendererName = _rendererDesc.rendererName;
-    hvt::ViewportEngine::CreateRenderer(_beautyRenderer, beautyRendererDescriptor);
+    static const TfTokenVector allPurposeRenderTags = { HdRenderTagTokens->geometry,
+                                                        HdRenderTagTokens->render,
+                                                        HdRenderTagTokens->proxy,
+                                                        HdRenderTagTokens->guide };
+    // Secondary graphics render pass index, please note 
+    // this pass may not exist if we merge render passes
+    static const int           secondaryGraphicsPassIndex = 1;
 
-    hvt::FramePassDescriptor beautyFramePassDescriptor;
-    beautyFramePassDescriptor.renderIndex = _beautyRenderer->RenderIndex();
-    beautyFramePassDescriptor.uid         = pxr::SdfPath("/beautyPass");
-    _beautyFramePass = hvt::ViewportEngine::CreateFramePass(beautyFramePassDescriptor);
-    _beautyFramePassFilteringFn = [&](const PXR_NS::SdfPath& primPath) {
-        // Use Path based filtering by default
-        std::set<PXR_NS::SdfPath> filteringSceneRoots = { _highlightHierarchyPrefix };
-        return Fvp::FindSelfOrFirstParent(primPath, filteringSceneRoots) != filteringSceneRoots.end();
-    };
+    _ClearRenderPassesData();
+    
+    // Create 2 passes (which could be merged in a single pass)
+    _renderPassesRendererNames.push_back(_rendererDesc.rendererName);
+    _renderPassesRendererNames.push_back(TfToken("HdStormRendererPlugin"));
 
-    // Add the 'SkyDome' task to the frame pass.
+    //Using _renderPassesRendererNames
+    _CreateRenderPasses();
+  
+    _SetRenderPurposeTags(delegateParams);
+
     {
+        // Add the 'SkyDome' task to the frame pass.
         // Get the first render task path.
-        auto renderTasks = _beautyFramePass->GetTaskManager()->GetTasks(hvt::TaskFlagsBits::kRenderTaskBit);
-        pxr::SdfPath firstRenderTaskPath = renderTasks[0]->GetId();
+        constexpr int skyDomePassIndex = 0; // first pass index
+        const hvt::FramePassPtr& skyDomePass = _GetRenderPass(skyDomePassIndex);
+
+        auto renderTasks
+            = skyDomePass->GetTaskManager()->GetTasks(hvt::TaskFlagsBits::kRenderTaskBit);
+        
+        const pxr::SdfPath firstRenderTaskPath = renderTasks[0]->GetId();
 
         // Define a getter for the layer settings.
-        const auto getLayerSettings = [&]() -> hvt::BasicLayerParams const* {
-            return &_beautyFramePass->params();
-        };
+        const auto getLayerSettings
+            = [&]() -> hvt::BasicLayerParams const* { return &skyDomePass->params(); };
 
         // Create the SkyDomeTask and insert it before the first existing render task.
-        hvt::CreateSkyDomeTask(_beautyFramePass->GetTaskManager(),
-            _beautyFramePass->GetRenderBufferAccessor(), getLayerSettings, firstRenderTaskPath,
+        //This task is to display the skydome, it needs to be in one pass only
+        
+        hvt::CreateSkyDomeTask(
+            skyDomePass->GetTaskManager(),
+            skyDomePass->GetRenderBufferAccessor(),
+            getLayerSettings,
+            firstRenderTaskPath,
             hvt::TaskManager::InsertionOrder::insertBefore);
     }
+        
+    //Set passes constant parameters
+    for (int i=0;i< _GetNumRenderPasses(); ++i) {
+        const auto& currentPass = _GetRenderPass(i);
+        // Set the passes to render all purposes by default, the actual render tag filtering will be done in
+        // the scene indices filtering lambda function
 
-    hvt::RendererDescriptor secondaryGfxRendererDescriptor;
-    secondaryGfxRendererDescriptor.hgiDriver    = &_hgiDriver;
-    secondaryGfxRendererDescriptor.rendererName = "HdStormRendererPlugin";
-    hvt::ViewportEngine::CreateRenderer(_secondaryGfxRenderer, secondaryGfxRendererDescriptor);
+        // Special case for the secondary ggraphics render pass which has its own render tag
+        // as Fvp::secondaryGraphicsRenderTagToken
+        const bool isTheSecondaryGraphicsRenderPass
+            = (1 == _GetNumRenderPasses() ) 
+            ? true // When we have a single pass, it's also the secondary graphics render pass
+            : secondaryGraphicsPassIndex == i; // When we have multiple passes, index secondaryGraphicsPassIndex is 
+                                               // the secondary graphics render pass
+        if (isTheSecondaryGraphicsRenderPass) {
+            // It's the secondary graphics render pass, add the secondary graphics render tag
+            //If it's not already inside allPurposeRenderTags
+            TfTokenVector secondaryGraphicsRenderTags = allPurposeRenderTags;
+            const bool hasAlreadyTheSecondaryGraphicsRenderTag = std::find( secondaryGraphicsRenderTags.cbegin(), 
+                                                                            secondaryGraphicsRenderTags.cend(), 
+                                                                            Fvp::secondaryGraphicsRenderTagToken) 
+                                                                    != secondaryGraphicsRenderTags.cend();
+            if ( ! hasAlreadyTheSecondaryGraphicsRenderTag) {
+                secondaryGraphicsRenderTags.push_back(Fvp::secondaryGraphicsRenderTagToken);//Add it
+            }
 
-    hvt::FramePassDescriptor secondaryGfxFramePassDescriptor;
-    secondaryGfxFramePassDescriptor.renderIndex = _secondaryGfxRenderer->RenderIndex();
-    secondaryGfxFramePassDescriptor.uid          = pxr::SdfPath("/secondaryGfxPass");
-    _secondaryGfxFramePass = hvt::ViewportEngine::CreateFramePass(secondaryGfxFramePassDescriptor);
-    _secondaryGfxFramePassFilteringFn = [&](const PXR_NS::SdfPath& primPath) {
-        // Use Path based filtering by default
-        std::set<PXR_NS::SdfPath> filteringSceneRoots = _dataProducerMergingSceneIndexProxy->GetSceneRoots();
-        return Fvp::FindSelfOrFirstParent(primPath, filteringSceneRoots) != filteringSceneRoots.end();
-    };
+            currentPass->params().renderTags = secondaryGraphicsRenderTags;
+        }
+        else{
+            currentPass->params().renderTags = allPurposeRenderTags;
+        }
+        
+        //Register teminal scene index
+        GetMayaHydraLibInterface().RegisterTerminalSceneIndex(
+            currentPass->GetRenderIndex()->GetTerminalSceneIndex());
 
-    _useSinglePass = mergePassesWithSameRenderer() && beautyRendererDescriptor.rendererName == secondaryGfxRendererDescriptor.rendererName;
+        //Set default values
+        currentPass->params().backgroundColor                   = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);//For clearing
+        //currentPass->params().backgroundDepth                   = 1.0f;//For clearing, //Coming with a future update in HVT
+        currentPass->params().renderParams.enableLighting       = true;
+        currentPass->params().renderParams.enableSceneMaterials = true;
+        currentPass->params().renderParams.cullStyle            = HdCullStyleBackUnlessDoubleSided;
+        currentPass->params().enableColorCorrection             = false; // Disable color correction to let Maya take care of it
+        currentPass->params().visualizeAOV                      = HdAovTokens->color;
+    }
 
-    GetMayaHydraLibInterface().RegisterTerminalSceneIndex(_beautyRenderer->RenderIndex()->GetTerminalSceneIndex());
+    // Note that if there are multiple passes and they share render buffers,
+    // the resulting image will depend on when the image writing code is
+    // called, rather than which frame pass is passed as an argument.
+    _fileWriterArgs = VtDictionary { { "framePass", VtValue(_GetRenderPass(0).get()) } };//Use first pass
+    if (_hgi) {
+        _fileWriterArgs.SetValueAtPath("hgi", VtValue(_hgi.get()));
+    }
+
 #else
     _rendererPlugin
         = HdRendererPluginRegistry::GetInstance().GetRendererPlugin(_rendererDesc.rendererName);
@@ -1304,32 +1462,16 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
             this)))
     );
     _taskController->SetEnableShadows(true);
-#endif
-
-    // Initialize the AOV system to render color
-#ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->params().visualizeAOV = HdAovTokens->color;
-    _secondaryGfxFramePass->params().visualizeAOV = HdAovTokens->color;
-#else
+    
     if (_isUsingHdSt) {
         _taskController->SetRenderOutputs({ HdAovTokens->color });
     }
-#endif
 
-#ifdef VIEWPORT_TOOLBOX
-    // Note that if there are multiple passes and they share render buffers,
-    // the resulting image will depend on when the image writing code is 
-    // called, rather than which frame pass is passed as an argument.
-    _fileWriterArgs = VtDictionary{{"framePass", VtValue(_beautyFramePass.get())}};
-    if (_hgi) {
-        _fileWriterArgs.SetValueAtPath("hgi", VtValue(_hgi.get()));
-    }
-#else
     // As per https://stackoverflow.com/questions/9982681
     // an initializer_list cannot be used in a ternary operator.
-    _fileWriterArgs = _hgi ? VtDictionary{
-      {{"hgi", VtValue(_hgi.get())}, {"engine", VtValue(&_engine)}}} :
-      VtDictionary{{{"taskController", VtValue(_taskController.get())}}}; 
+    _fileWriterArgs = _hgi
+        ? VtDictionary { { { "hgi", VtValue(_hgi.get()) }, { "engine", VtValue(&_engine) } } }
+        : VtDictionary { { { "taskController", VtValue(_taskController.get()) } } };
 #endif
 
     MayaHydraInitData mhInitData(
@@ -1353,8 +1495,11 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
     
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
 #ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
-    _secondaryGfxFramePass->SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
+    for (int i = 0; i < _GetNumRenderPasses(); ++i) {
+        const auto& currentPass = _GetRenderPass(i);
+        currentPass->SetTaskContextData(
+            FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
+    }
 #else
     _engine.SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
 #endif
@@ -1420,30 +1565,29 @@ void MtohRenderOverride::_InitHydraResources(const MHWRender::MDrawContext& draw
 
 #ifdef VIEWPORT_TOOLBOX
     // We need to setup the viewport and matrices to avoid warnings
-    // when calling GetRenderTasks; they will get updated when 
+    // when calling GetRenderTasks; they will get updated when
     // actual rendering occurs anyway.
     int width = 0;
     int height = 0;
     drawContext.getRenderTargetSize(width, height);
-    _beautyFramePass->params().renderBufferSize = GfVec2i(width, height);
-    _beautyFramePass->params().viewInfo.viewport = {{0,0}, {width, height}};
+    auto viewMatrix
+        = GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx));
+    auto projectionMatrix
+        = GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kProjectionMtx));
 
-    auto viewMatrix = GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx));
-    auto projectionMatrix = GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kProjectionMtx));
-    _beautyFramePass->params().viewInfo.viewMatrix = viewMatrix;
-    _beautyFramePass->params().viewInfo.projectionMatrix = projectionMatrix;
-
-    auto tasks = _beautyFramePass->GetRenderTasks();
+    HdTaskSharedPtrVector tasks;//From all passes
+    const int numRenderPasses = _GetNumRenderPasses();
+    for (int i = 0; i < numRenderPasses; ++i) {
+        const auto& currentPass = _GetRenderPass(i);
+        currentPass->params().renderBufferSize          = GfVec2i(width, height);
+        currentPass->params().viewInfo.viewport         = { { 0, 0 }, { width, height } };
+        currentPass->params().viewInfo.viewMatrix       = viewMatrix;
+        currentPass->params().viewInfo.projectionMatrix = projectionMatrix;
+    }
 #else
     auto tasks = _taskController->GetRenderingTasks();
 #endif
-    for (auto task : tasks) {
-        if (std::dynamic_pointer_cast<HdxColorizeSelectionTask>(task)) {
-            _backupFrameBufferWorkaround = true;
-            break;
-        }
-    }
-
+    
     _initializationSucceeded = true;
 }
 
@@ -1484,13 +1628,26 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _oldRefineLevel = 0;
 
 #ifdef VIEWPORT_TOOLBOX
-    if (_beautyRenderer && _beautyRenderer->RenderIndex()) {
-        GetMayaHydraLibInterface().UnregisterTerminalSceneIndex(_beautyRenderer->RenderIndex()->GetTerminalSceneIndex());
+    // Cleanup render passes
+    for (int i = 0; i < _GetNumRenderPasses(); ++i) {
+        auto& currentPass = _GetRenderPass(i);
+        if (currentPass) {
+            auto renderIndex = currentPass->GetRenderIndex();
+            if (renderIndex) {
+                GetMayaHydraLibInterface().UnregisterTerminalSceneIndex(renderIndex->GetTerminalSceneIndex());
+            }
+            currentPass.reset();
+            
+        }
+
+        auto& renderer = _renderPassesRenderers[i];
+        if (renderer) {
+            renderer.reset();
+        }
     }
-    _beautyFramePass.reset();
-    _beautyRenderer.reset();
-    _secondaryGfxFramePass.reset();
-    _secondaryGfxRenderer.reset();
+
+    _ClearRenderPassesData();
+
 #else
     // Cleanup internal context data that keep references to data that is now
     // invalid.
@@ -1532,7 +1689,7 @@ HdSceneIndexBaseRefPtr MtohRenderOverride::_GetPassFilteringSceneIndex(
     const Fvp::PassFilteringSceneIndex::FilteringOutFn& filteringFn)
 {
 #ifdef VIEWPORT_TOOLBOX
-    if (!_useSinglePass) {
+    if (_GetNumRenderPasses() > 1 && _GetNumVisibleRenderPasses() > 1) {
         auto passFilteringSceneIndex = Fvp::PassFilteringSceneIndex::New(
             _lastFilteringSceneIndexBeforeCustomFiltering, filteringFn);
         return passFilteringSceneIndex;
@@ -1544,9 +1701,20 @@ HdSceneIndexBaseRefPtr MtohRenderOverride::_GetPassFilteringSceneIndex(
 void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext)
 {
 #ifdef VIEWPORT_TOOLBOX
-    if (!_useSinglePass) {
-        _secondaryGfxRenderer->RenderIndex()->RemoveSceneIndex(
-            _lastFilteringSceneIndexBeforeCustomFiltering);
+    if (_GetNumRenderPasses() > 1) {
+        constexpr int secondPassIndex = 1;// Please note we start at the second pass
+        for (int i = secondPassIndex; i < _GetNumRenderPasses(); ++i) { 
+            auto& currentPass = _GetRenderPass(i);
+            if (!currentPass) {
+                continue;
+            }
+            auto renderIndex = currentPass->GetRenderIndex();
+            if (renderIndex) {
+                // Remove the previous filtering scene index from the pass render index.
+                renderIndex->RemoveSceneIndex(
+                    _lastFilteringSceneIndexBeforeCustomFiltering);
+            }
+        }
     }
 #endif
     // We need to recreate the filtering scene index chain after the merging scene index as there
@@ -1634,12 +1802,8 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 #endif
 
 #ifdef VIEWPORT_TOOLBOX
-    // Secondary graphics pass
-    if (!_useSinglePass) {
-        _secondaryGfxRenderer->RenderIndex()->InsertSceneIndex(
-            _GetPassFilteringSceneIndex(_secondaryGfxFramePassFilteringFn),
-            SdfPath::AbsoluteRootPath());
-    }
+    // Non main graphics passes
+    _CreateRenderPassesFilteringSceneIndices();
 #endif
 
 }
@@ -1921,7 +2085,27 @@ void MtohRenderOverride::_PickByRegion(
 
     // Execute picking tasks.
 #ifdef VIEWPORT_TOOLBOX
-    _beautyFramePass->Pick(pickParams);
+    //Accumulate the pick hits from all passes.
+    for (int i = 0; i < _GetNumRenderPasses(); ++i) {
+        const hvt::FramePassPtr& pass = _GetRenderPass(i);
+        if (!pass) {
+            continue;
+        }
+
+        // Set a temp HdxPickHitVector to avoid modifying the outHits vector
+        // in order to accumulate the pick hits from multiple passes.
+        HdxPickHitVector tempHits;
+        pickParams.outHits = &tempHits;
+        pass->Pick(pickParams);
+    
+        //Combine the 2 PickHitVector
+        if (!tempHits.empty()) {
+            // Reserve memory for efficiency
+            outHits.reserve(outHits.size() + tempHits.size());
+            // Insert all hits from tempHits into outHits
+            outHits.insert(outHits.end(), tempHits.begin(), tempHits.end());
+        }
+    }
 #else
     HdTaskSharedPtrVector pickingTasks = _taskController->GetPickingTasks();
     VtValue               pickParamsValue(pickParams);
@@ -2240,13 +2424,233 @@ MtohRenderOverride::sceneIndexRegistry() const
     return _sceneIndexRegistry;
 }
 
-HdRenderIndex* MtohRenderOverride::renderIndex() const
+HdRenderIndex* MtohRenderOverride::renderIndex(int passIndex /*= 0*/) const
 {
 #ifdef VIEWPORT_TOOLBOX
-    return _beautyRenderer ? _beautyRenderer->RenderIndex() : nullptr;
+    if (passIndex < 0 || passIndex >= _GetNumRenderPasses()) {
+        TF_CODING_ERROR("Invalid pass index %d, must be in range [0, %d)", passIndex, _GetNumRenderPasses());
+        return nullptr;
+    }
+    return _renderPassesRenderers[passIndex] ? _renderPassesRenderers[passIndex]->RenderIndex() : nullptr;
 #else
     return _renderIndex;
 #endif
 }
+
+#ifdef VIEWPORT_TOOLBOX
+Fvp::PassFilteringSceneIndex::FilteringOutFn
+MtohRenderOverride::_CreatePassFilteringFn(const TfTokenVector& renderTags)
+{
+    return [this, renderTags](const PXR_NS::SdfPath& primPath) {
+        // Use purpose render tag based filtering
+        if (_lastFilteringSceneIndexBeforeCustomFiltering) {
+            HdSceneIndexPrim prim
+                = _lastFilteringSceneIndexBeforeCustomFiltering->GetPrim(primPath);
+            if (prim.dataSource) {
+                if (HdPrimTypeIsLight(prim.primType)) {
+                    TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_FILTERING_PASSES)
+                        .Msg(
+                            "NumRenderTags = %zu, keeping prim id : %s because it's a light.\n",
+                            renderTags.size(),
+                            primPath.GetString().c_str());
+                    return false; // Always keep the lights
+                }
+                HdPurposeSchema purposeSchema = HdPurposeSchema::GetFromParent(prim.dataSource);
+                if (purposeSchema.IsDefined()) {
+                    HdTokenDataSourceHandle purposeDs = purposeSchema.GetPurpose();
+                    if (purposeDs) {
+                        // Check if the purpose matches the render tags
+                        const TfToken purposeRenderTag = purposeDs->GetTypedValue(0.0);
+                        const bool result = (
+                            std::find(
+                                renderTags.cbegin(),
+                                renderTags.cend(),
+                                purposeRenderTag)
+                            == renderTags.cend()
+                            ); // Not found in the render tags,
+                                                   // so skip that prim
+                        TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_FILTERING_PASSES)
+                            .Msg(
+                                (result) 
+                                ? "NumRenderTags = %zu, ignoring prim id : %s\n"
+                                : "NumRenderTags = %zu, keeping prim id : %s\n",
+                                renderTags.size(),
+                                primPath.GetString().c_str());
+                        return result;
+                    }
+                }
+            }
+        }
+
+         TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_FILTERING_PASSES)
+            .Msg("NumRenderTags = %zu, keeping prim id : %s\n",
+                renderTags.size(),
+                primPath.GetString().c_str());
+        return false; // will be rendered.
+    };
+}
+
+const hvt::FramePassPtr&
+MtohRenderOverride::_GetRenderPass(int passIndex)const
+{
+    if (passIndex < 0 || passIndex >= _renderPasses.size()) {
+        static const hvt::FramePassPtr nullFramePass;
+        TF_CODING_ERROR("Invalid render pass index: %d", passIndex);
+        return nullFramePass;
+    }
+
+    return _renderPasses[passIndex];
+}
+
+hvt::FramePassPtr& MtohRenderOverride::_GetRenderPass(int passIndex)
+{
+    if (passIndex < 0 || passIndex >= _renderPasses.size()) {
+        static hvt::FramePassPtr nullFramePass;
+        return nullFramePass;
+    }
+
+    return _renderPasses[passIndex];
+}
+
+int MtohRenderOverride::_GetNumRenderPasses()const
+{
+    return static_cast<int>(_renderPasses.size());
+}
+
+int MtohRenderOverride::_GetNumVisibleRenderPasses() const
+{
+    const MIntArray& renderPassesVisible
+        = MayaHydraSetVisibleRenderPasses::getVisibleRenderPasses();
+
+    return renderPassesVisible.length();
+}
+
+void MtohRenderOverride::_ClearRenderPassesData()
+{
+    _renderPassesRenderers.clear();
+    _renderPasses.clear();
+    _renderPassesFilteringFn.clear();
+    _renderPassesRenderTags.clear();
+    _renderPassesRendererNames.clear();
+}
+
+void MtohRenderOverride::_CreateFrameRenderPass(
+    const std::string& rendererName,
+    const SdfPath&     passId)
+{
+    // Create renderer
+    hvt::RendererDescriptor rendererDescriptor;
+    rendererDescriptor.hgiDriver    = &_hgiDriver;
+    rendererDescriptor.rendererName = rendererName;
+
+    hvt::RenderIndexProxyPtr renderer;
+    hvt::ViewportEngine::CreateRenderer(renderer, rendererDescriptor);
+    _renderPassesRenderers.push_back(renderer);
+
+    // Create main frame pass
+    hvt::FramePassDescriptor framePassDescriptor;
+    framePassDescriptor.renderIndex = renderer->RenderIndex();
+    framePassDescriptor.uid         = passId;
+    auto framePass                  = hvt::ViewportEngine::CreateFramePass(framePassDescriptor);
+    _renderPasses.push_back(std::move(framePass));
+}
+
+void MtohRenderOverride::_CreateRenderPasses()
+{
+    // Keep the number of passes to create
+    int numPasses = _renderPassesRendererNames.size();
+
+    // Check if we need to have a single pass for all renderers
+    if (mergePassesWithSameRenderer()) {
+        //First pass renderer name
+        const TfToken rendererNameFromPass0 = _renderPassesRendererNames[0];
+        // Are the passes using the same renderer?
+        bool      passesUseSameRenderer = true;
+        for (int i = 1; i < numPasses; ++i) { //Start at index = 1 to get the second pass
+            if (_renderPassesRendererNames[i] != rendererNameFromPass0) {
+                passesUseSameRenderer = false;
+                break;
+            }
+        }
+
+        if (passesUseSameRenderer) {
+            numPasses = 1; // If all passes use the same renderer, keep only one
+        }
+    }
+
+    // Create passes for each renderer
+    for (int i=0; i < numPasses; ++i) {
+        std::string passNumber = std::string("/Pass")+std::to_string(i);
+        _CreateFrameRenderPass(_renderPassesRendererNames[i], SdfPath(passNumber));
+    }
+    
+    
+}
+
+void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegateParams)
+{
+    TfTokenVector  mainPassRenderTags = { HdRenderTagTokens->geometry }; // main pass
+    if (delegateParams.renderPurpose) {
+        mainPassRenderTags.push_back(HdRenderTagTokens->render); // main pass
+    }
+    if (delegateParams.proxyPurpose) {
+        mainPassRenderTags.push_back(HdRenderTagTokens->proxy); // main pass
+    }
+
+#ifndef VIEWPORT_TOOLBOX
+    if (delegateParams.guidePurpose) {
+        mainPassRenderTags.push_back(HdRenderTagTokens->guide);
+    }
+
+    _taskController->SetRenderTags(mainPassRenderTags);
+#else
+    // Fvp::secondaryGraphicsRenderTagToken is the token used for secondary graphics pass
+    TfTokenVector secondaryGraphicsPassRenderTags; 
+    
+    // Helper lambda to add render tags to passes
+    auto addRenderTag = [&](const TfToken& renderTag) {
+        if (_GetNumRenderPasses() == 1) {
+            mainPassRenderTags.push_back(renderTag); // main pass
+        } else {
+            secondaryGraphicsPassRenderTags.push_back(renderTag); // secondary graphics pass
+        }
+    };
+
+    //The guide tagged primitives will be rendered as secondary graphics if we have a dedicated pass for it
+    if (delegateParams.guidePurpose) {
+        addRenderTag(HdRenderTagTokens->guide);
+    }
+
+    // If the secondary graphics render tag is not guide
+    if (Fvp::secondaryGraphicsRenderTagToken != HdRenderTagTokens->guide) {
+        addRenderTag(Fvp::secondaryGraphicsRenderTagToken);
+    }
+
+    //Set them in our array
+    _renderPassesRenderTags.clear(); 
+    _renderPassesRenderTags.emplace_back(mainPassRenderTags);
+    if (secondaryGraphicsPassRenderTags.size()) {
+        _renderPassesRenderTags.emplace_back(secondaryGraphicsPassRenderTags);
+    }
+#endif
+}
+
+void MtohRenderOverride::_CreateRenderPassesFilteringSceneIndices()
+{
+    constexpr int secondRenderPassIndex = 1; // Note that we start at the second pass index
+    for (int i = secondRenderPassIndex; i < _GetNumRenderPasses(); ++i) {
+        const auto& pass = _GetRenderPass(i);
+        if (!pass || ! (pass->GetRenderIndex())) {
+            continue;
+        }
+        
+        _renderPassesFilteringFn[i] = _CreatePassFilteringFn(_renderPassesRenderTags[i]);
+        pass->GetRenderIndex()->InsertSceneIndex(
+            _GetPassFilteringSceneIndex(_renderPassesFilteringFn[i]),
+            SdfPath::AbsoluteRootPath());
+    }
+}
+
+#endif // VIEWPORT_TOOLBOX
 
 PXR_NAMESPACE_CLOSE_SCOPE

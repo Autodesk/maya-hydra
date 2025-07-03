@@ -109,6 +109,7 @@ ReprSelectorSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, co
 
     PXR_NS::HdRetainedContainerDataSourceHandle _wireframeTypeDataSource = nullptr;
     std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
+    bool _convertToSecondaryGraphicsPurposeRenderTag = false;
 };
 
 }//end of namespace FVP_NS_DEF

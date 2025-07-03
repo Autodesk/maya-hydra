@@ -20,6 +20,8 @@
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#include <flowViewport/fvpPurposeRenderTagsForPasses.h>
+
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
@@ -367,6 +369,11 @@ bool MayaHydraLightAdapter::_GetVisibility() const
         }
     }
     return false;
+}
+
+TfToken MayaHydraLightAdapter::GetRenderTag() const
+{ 
+    return Fvp::secondaryGraphicsRenderTagToken; 
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

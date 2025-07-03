@@ -14,8 +14,8 @@
 //
 
 #include "fvpBaseWhSi.h"
-
-#include <flowViewport/fvpUtils.h>
+#include "flowViewport/fvpUtils.h"
+#include "flowViewport/fvpPurposeRenderTagsForPasses.h"
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/staticTokens.h>
@@ -32,11 +32,15 @@
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
-#if PXR_VERSION >= 2403
-#include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
+
+#if PXR_VERSION >= 2505 //USD 25.05+
+    #include <pxr/usdImaging/usdImaging/materialBindingsSchema.h>
+#elif PXR_VERSION >= 2403
+    #include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
 #endif
 #include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
 
@@ -59,6 +63,12 @@ const HdRetainedContainerDataSourceHandle refinedWireDisplayStyleDataSource
             HdLegacyDisplayStyleSchemaTokens->reprSelector,
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
                 { HdReprTokens->refinedWire, TfToken(), TfToken() })));
+
+//  Secondary graphics purpose render tag data source
+const HdRetainedContainerDataSourceHandle secondaryGraphicsPurposeRenderTagDataSource
+    = HdRetainedContainerDataSource::New(
+        HdPurposeSchemaTokens->purpose,
+        HdRetainedTypedSampledDataSource<TfToken>::New(Fvp::secondaryGraphicsRenderTagToken));
 
 const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
@@ -361,6 +371,9 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
                             HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{color}),
                             HdPrimvarSchemaTokens->constant,
                             HdPrimvarSchemaTokens->color));
+    
+    edited.Set(HdPurposeSchema::GetDefaultLocator(),
+        secondaryGraphicsPurposeRenderTagDataSource); // Set the render tag to secondary graphics
     
     //Is the prim in refined displayStyle (meaning shaded) ?
     if (HdLegacyDisplayStyleSchema styleSchema =
@@ -818,7 +831,12 @@ BaseWhSi::MakeGeomSubsetHighlight(
     if (!GetMaterialPath(geomSubsetPrimDataSource).IsEmpty()) {
         HdContainerDataSourceEditor dataSourceEditor(editedMeshPrimDataSource);
         dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, HdMaterialBindingsSchema::GetDefaultLocator()));
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2505
+        dataSourceEditor.Set(
+            UsdImagingMaterialBindingsSchema::GetDefaultLocator(),
+            HdContainerDataSource::Get(
+                geomSubsetPrimDataSource, UsdImagingMaterialBindingsSchema::GetDefaultLocator()));
+#elif PXR_VERSION >= 2403
         dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator()));
 #endif
         editedMeshPrimDataSource = dataSourceEditor.Finish();

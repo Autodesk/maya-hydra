@@ -17,6 +17,7 @@
 //Local headers
 #include "fvpReprSelectorSceneIndex.h"
 #include "flowViewport/fvpUtils.h"
+#include "flowViewport/fvpPurposeRenderTagsForPasses.h"
 
 //USD/Hydra headers
 #include <pxr/imaging/hd/tokens.h>
@@ -25,6 +26,7 @@
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 
 // This class is a filtering scene index that applies a different RepSelector on geometries (such as wireframe or wireframe on shaded)
 // and also applies an overrideWireframecolor for HdStorm 
@@ -70,6 +72,11 @@ const HdRetainedContainerDataSourceHandle sWireframeDisplayStyleDataSource
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
                 { HdReprTokens->refinedWire, TfToken(), TfToken() })));
 
+// Secondary graphics purpose render tag data source
+const HdRetainedContainerDataSourceHandle secondaryGraphicsPurposeRenderTagDataSource
+    = HdRetainedContainerDataSource::New(
+        HdPurposeSchemaTokens->purpose,
+        HdRetainedTypedSampledDataSource<TfToken>::New(Fvp::secondaryGraphicsRenderTagToken));
 
 }//End of namespace
 
@@ -83,9 +90,12 @@ ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inp
 
 void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsReprChanged, int refineLevel)
 {
+    _convertToSecondaryGraphicsPurposeRenderTag = false;
+
     switch (reprType){
         case RepSelectorType::WireframeRefined:
             _wireframeTypeDataSource = sWireframeDisplayStyleDataSource;
+            _convertToSecondaryGraphicsPurposeRenderTag = true; // Convert to secondary graphics purpose render tag
             break;
         case RepSelectorType::WireframeOnSurface:
             _wireframeTypeDataSource = sdWireframeOnShadedDisplayStyleDataSource;
@@ -129,6 +139,13 @@ HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
         //Edit the dataSource as an overlay will not replace any existing attribute value.
         // So we need to edit the _primVarsTokens->overrideWireframeColor attribute as they may already exist in the prim
         auto edited = HdContainerDataSourceEditor(prim.dataSource);
+
+        if (_convertToSecondaryGraphicsPurposeRenderTag) {
+            // If we are converting to secondary graphics purpose render tag
+            edited.Set(HdPurposeSchema::GetDefaultLocator(),
+                secondaryGraphicsPurposeRenderTagDataSource); // Set the purpose render tag to
+                                                              // secondary graphics
+        }
 
         //Edit the override wireframe color
         edited.Set(HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),

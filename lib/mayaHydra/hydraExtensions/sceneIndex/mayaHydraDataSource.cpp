@@ -40,6 +40,7 @@
 #include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/volumeFieldSchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
@@ -64,14 +65,17 @@ TfTokenVector
 MayaHydraDataSource::GetNames()
 {
     TfTokenVector result;
+    
 
     if (_type == HdPrimTypeTokens->mesh) {
         result.push_back(HdMeshSchemaTokens->mesh);
         result.push_back(HdExtentSchemaTokens->extent); //Add an extent attribute to support the bounding box display style
+        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
     }
 
     if (_type == HdPrimTypeTokens->basisCurves) {
         result.push_back(HdBasisCurvesSchemaTokens->basisCurves);
+        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
     }
 
     result.push_back(HdPrimvarsSchemaTokens->primvars);
@@ -81,12 +85,14 @@ MayaHydraDataSource::GetNames()
         result.push_back(HdLegacyDisplayStyleSchemaTokens->displayStyle);
         result.push_back(HdVisibilitySchemaTokens->visibility);
         result.push_back(HdXformSchemaTokens->xform);
+        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
     }
 
     if (HdPrimTypeIsLight(_type)) {
         result.push_back(HdMaterialSchemaTokens->material);
         result.push_back(HdXformSchemaTokens->xform);
         result.push_back(HdLightSchemaTokens->light);
+        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
     }
 
     if (_type == HdPrimTypeTokens->material) {
@@ -96,6 +102,7 @@ MayaHydraDataSource::GetNames()
     if (_type == HdPrimTypeTokens->camera) {
         result.push_back(HdCameraSchemaTokens->camera);
         result.push_back(HdXformSchemaTokens->xform);
+        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
     }
 
     return result;
@@ -110,16 +117,13 @@ MayaHydraDataSource::Get(const TfToken& name)
             return HdMeshSchema::Builder()
                 .SetTopology(
                     HdMeshTopologySchema::Builder()
-                    .SetFaceVertexCounts(
-                        HdRetainedTypedSampledDataSource<VtIntArray>::New(
+                        .SetFaceVertexCounts(HdRetainedTypedSampledDataSource<VtIntArray>::New(
                             topology.GetFaceVertexCounts()))
-                    .SetFaceVertexIndices(
-                        HdRetainedTypedSampledDataSource<VtIntArray>::New(
+                        .SetFaceVertexIndices(HdRetainedTypedSampledDataSource<VtIntArray>::New(
                             topology.GetFaceVertexIndices()))
-                    .SetOrientation(
-                        HdRetainedTypedSampledDataSource<TfToken>::New(
+                        .SetOrientation(HdRetainedTypedSampledDataSource<TfToken>::New(
                             HdMeshTopologySchemaTokens->rightHanded))
-                    .Build())
+                        .Build())
                 .SetSubdivisionScheme(
                     HdRetainedTypedSampledDataSource<TfToken>::New(topology.GetScheme()))
                 .SetDoubleSided(
@@ -191,6 +195,9 @@ MayaHydraDataSource::Get(const TfToken& name)
     }
     else if (name == HdTokens->displayColor) {//Is not part of a schema so using HdTokens->displayColor
         return _GetDisplayColorDataSource();
+    } else if (name == HdPurposeSchemaTokens->purpose && ! (_adapter->GetRenderTag().IsEmpty()) ) { 
+        return HdPurposeSchema::BuildRetained(
+            HdRetainedTypedSampledDataSource<TfToken>::New(_adapter->GetRenderTag()));
     }
 
     return nullptr;
