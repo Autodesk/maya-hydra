@@ -25,7 +25,6 @@ class TestImageDiffing(mtohUtils.MayaHydraBaseTestCase):
     COLORED_STRIPES_ONE_PIXEL_OFF = "colored_stripes_one_pixel_off.png"
     COLORED_STRIPES_SLIGHT_NOISE = "colored_stripes_slight_noise.png"
 
-    CUBE_SCENE_REFERENCE = "cube_scene.png"
     CUBE_SCENE_ONE_PIXEL_OFF = "cube_scene_one_pixel_off.png"
     CUBE_SCENE_SLIGHT_NOISE = "cube_scene_slight_noise.png"
 
