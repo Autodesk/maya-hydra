@@ -1349,6 +1349,15 @@ HdMeshTopology MayaHydraSceneIndex::GetMeshTopology(const SdfPath& id)
         _renderItemsAdapters);
 }
 
+HdBasisCurvesTopology MayaHydraSceneIndex::GetBasisCurvesTopology(const SdfPath& id)
+{
+    return _GetValue<MayaHydraAdapter, HdBasisCurvesTopology>(
+        id,
+        [](MayaHydraAdapter* a) -> HdBasisCurvesTopology { return a->GetBasisCurvesTopology(); },
+        _shapeAdapters,
+        _renderItemsAdapters);
+}
+
 void MayaHydraSceneIndex::RemoveAdapter(const SdfPath& id)
 {
     if (!_RemoveAdapter<MayaHydraAdapter>(

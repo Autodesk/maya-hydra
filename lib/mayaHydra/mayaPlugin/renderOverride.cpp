@@ -85,6 +85,10 @@
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
+#include <pxr/imaging/hd/dataSource.h>
+#include <pxr/imaging/hd/basisCurvesTopology.h>
+#include <pxr/imaging/hd/meshTopology.h>
+#include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hdx/selectionTask.h>
 #include <pxr/imaging/hdx/colorizeSelectionTask.h>
 #include <pxr/imaging/hdx/pickTask.h>
@@ -438,6 +442,77 @@ int MtohRenderOverride::GetUsedGPUMemory()
         totalGPUMemory += instance->_GetUsedGPUMemory().UncheckedGet<int>();
     }
     return totalGPUMemory / (1024*1024); 
+}
+
+std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
+{
+    std::map<std::string, int> stats = {
+        {"primitives", 0},
+        {"mesh", 0},
+        {"mesh.points", 0},
+        {"mesh.faces", 0},
+        {"curve", 0},
+        {"curve.points", 0},
+        {"point", 0},
+    };
+
+    MtohRenderOverride* instance = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(_allInstancesMutex);
+        for (auto* inst : _allInstances) {
+            if (inst->_initializationSucceeded && inst->_renderIndex) {
+                instance = inst;
+                break;
+            }
+        }
+    }
+
+    if (!instance || !instance->_renderIndex) {
+        return stats;
+    }
+
+    auto* renderIndex = instance->_renderIndex;
+    auto primIds = renderIndex->GetRprimIds();
+
+    for (const auto& primId : primIds) {
+        auto* rprim = renderIndex->GetRprim(primId);
+        if (!rprim) {
+            continue;
+        }
+
+        stats["primitives"]++;
+
+        HdSceneIndexPrim prim;
+        TfToken primType;
+        if (instance->_mayaHydraSceneIndex) {
+            prim = instance->_mayaHydraSceneIndex->GetPrim(primId);
+            primType = prim.primType;
+        }
+
+        if (primType.IsEmpty()) {
+            continue;
+        }
+
+        if (primType == HdPrimTypeTokens->mesh) {
+            stats["mesh"]++;
+            if (instance->_mayaHydraSceneIndex && prim.dataSource) {
+                HdMeshTopology meshTopology = instance->_mayaHydraSceneIndex->GetMeshTopology(primId);
+                stats["mesh.points"] += meshTopology.GetNumPoints();
+                stats["mesh.faces"] += meshTopology.GetNumFaces();
+            }
+        }
+        else if (primType == HdPrimTypeTokens->basisCurves) {
+            stats["curve"]++;
+            if (instance->_mayaHydraSceneIndex && prim.dataSource) {
+                HdBasisCurvesTopology curvesTopology = instance->_mayaHydraSceneIndex->GetBasisCurvesTopology(primId);
+                stats["curve.points"] += curvesTopology.GetNumPoints();
+            }
+        }
+        else if (primType == HdPrimTypeTokens->points) {
+            stats["point"]++;
+        }
+    }
+    return stats;
 }
 
 std::vector<MString> MtohRenderOverride::AllActiveRendererNames()
