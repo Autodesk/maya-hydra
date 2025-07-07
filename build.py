@@ -349,7 +349,7 @@ def RunCMake(context, extraArgs=None, stages=None):
                         installArg=installArg,
                         multiproc=FormatMultiProcs(context.numJobs, generator)))
 
-def RunCTest(context, extraArgs=None):
+def RunCTest(context, extraArgs=None, runOnlyFailed=False):
     buildDir = context.buildDir
     variant = BuildVariant(context)
 
@@ -358,9 +358,10 @@ def RunCTest(context, extraArgs=None):
             'ctest '
             '--output-on-failure ' 
             '--timeout 500 '
-            '-C {variant} '
+            '-C {variant} {rerun} '
             '{extraArgs} '
             .format(variant=variant,
+                    rerun = '--rerun-failed' if runOnlyFailed else '',
                     extraArgs=(" ".join(extraArgs) if extraArgs else "")))
 
 def RunMakeZipArchive(context):
@@ -518,6 +519,10 @@ def BuildAndInstall(context, buildArgs, stages):
         if context.lookdevxLocation:
             extraArgs.append('-DLOOKDEVX_LOCATION="{lookdevxLocation}"' 
                              .format(lookdevxLocation=context.lookdevxLocation))
+        
+        if context.bifrostLocation:
+            extraArgs.append('-DBIFROST_LOCATION="{bifrostLocation}"' 
+                             .format(bifrostLocation=context.bifrostLocation))
 
         if context.pxrUsdLocation:
             extraArgs.append('-DPXR_USD_LOCATION="{pxrUsdLocation}"'
@@ -549,7 +554,26 @@ def BuildAndInstall(context, buildArgs, stages):
         Print("""Success MayaHydra build and install !!!!""")
 
 def RunTests(context,extraArgs):
-    RunCTest(context,extraArgs)
+    # Clean out any previous ctest logs before running ctest.
+    lastTestLog = os.path.join(context.buildDir, 'Testing', 'Temporary','LastTest.log')
+    if os.path.exists(lastTestLog):
+        os.remove(lastTestLog)
+    lastTestsFailedLog = os.path.join(context.buildDir, 'Testing', 'Temporary', 'LastTestsFailed.log')
+    if os.path.exists(lastTestsFailedLog):
+        os.remove(lastTestsFailedLog)
+
+    try:
+        RunCTest(context, extraArgs)
+    except RuntimeError as e:
+        PrintWarning('One (or more) tests failed, re-running only failed tests.\n')
+        try:
+            RunCTest(context, extraArgs, runOnlyFailed=True)
+        except:
+            PrintWarning('One (or more) tests failed on re-run!\n')
+            raise e # Re-raise the original failure.
+        else:
+            Print('Successfully re-ran failed tests!')
+
     Print("""Success running MayaHydra tests !!!!""")
 
 def Package(context):
@@ -594,6 +618,9 @@ parser.add_argument("--mtoa-location", type=str,
 
 parser.add_argument("--lookdevx-location", type=str,
                     help="Directory where LookdevX is installed.")
+
+parser.add_argument("--bifrost-location", type=str,
+                    help="Directory where Bifrost is installed.")
                     
 parser.add_argument("--pxrusd-location", type=str,
                     help="Directory where Pixar USD is installed.")
@@ -729,6 +756,10 @@ class InstallContext:
         # LookdevX Location
         self.lookdevxLocation = (os.path.abspath(args.lookdevx_location).replace("\\","/")
                                 if args.lookdevx_location else None)
+        
+        # Bifrost Location
+        self.bifrostLocation = (os.path.abspath(args.bifrost_location).replace("\\","/")
+                                if args.bifrost_location else None)
         
         # PXR USD Location
         self.pxrUsdLocation = (os.path.abspath(args.pxrusd_location)

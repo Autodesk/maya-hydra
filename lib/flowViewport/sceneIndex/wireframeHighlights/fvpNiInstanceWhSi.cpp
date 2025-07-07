@@ -55,6 +55,11 @@ HdSceneIndexPrim NiInstanceWhSi::GetHighlightPrim(const SdfPath &selectionPath, 
 
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, _selectionPathsToPrototypePrefixes.at(selectionPath));
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
+    if (!prim.dataSource) {
+        // If there is no data source, return. Trying to get child
+        // data sources or schemas from a null data source will crash.
+        return prim;
+    }
     HdContainerDataSourceEditor dsEditor(prim.dataSource);
 
     dsEditor.Set(HdInstancedBySchema::GetDefaultLocator(), HdBlockDataSource::New());
@@ -62,7 +67,7 @@ HdSceneIndexPrim NiInstanceWhSi::GetHighlightPrim(const SdfPath &selectionPath, 
     HdSceneIndexPrim instancePrim = GetInputSceneIndex()->GetPrim(selectionKey.first);
     auto instanceXform = HdXformSchema::GetFromParent(instancePrim.dataSource).GetMatrix()->GetTypedValue(0);
     auto prototypeXform = HdXformSchema::GetFromParent(prim.dataSource).GetMatrix()->GetTypedValue(0);
-    dsEditor.Set(HdXformSchema::GetDefaultLocator().Append(HdXformSchemaTokens->matrix), HdRetainedTypedSampledDataSource<GfMatrix4d>::New(instanceXform * prototypeXform));
+    dsEditor.Set(HdXformSchema::GetDefaultLocator().Append(HdXformSchemaTokens->matrix), HdRetainedTypedSampledDataSource<GfMatrix4d>::New(prototypeXform * instanceXform));
 
     prim.dataSource = dsEditor.Finish();
     if (prim.primType == HdPrimTypeTokens->mesh) {

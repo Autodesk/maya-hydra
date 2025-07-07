@@ -476,9 +476,13 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(
         _fallbackMaterial = SdfPath::EmptyPath(); // Empty path for hydra fallback material
     });
 
-    // Add our pick handler to the pick handler registry.
-    auto pickHandler = std::make_shared<MayaPickHandler>(*this);
-    TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Register(_rprimPath, pickHandler));
+    // Add our pick handler to the pick handler registry if there is none.
+    auto& phr = MayaHydra::PickHandlerRegistry::Instance();
+    _unregisterPickHandler = (phr.RegisteredHandler(_rprimPath) == nullptr);
+    if (_unregisterPickHandler) {
+      auto pickHandler = std::make_shared<MayaPickHandler>(*this);
+      TF_AXIOM(phr.Register(_rprimPath, pickHandler));
+    }
 
     //Always add the mayaHydraFacesSelectionMaterialDataSource to display faces selection
     // Always Create the material since it will update the color from the preferences if it has
@@ -535,7 +539,9 @@ void MayaHydraSceneIndex::_Destroy()
     Fvp::PathMapperRegistry::Instance().SetFallbackMapper(nullptr);
 
     // Remove our pick handler from the pick handler registry.
-    TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Unregister(_rprimPath));
+    if (_unregisterPickHandler) {
+      TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Unregister(_rprimPath));
+    }
 }
 
 void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation::MViewportScene& scene, MFrameContext::DisplayStyle ds)

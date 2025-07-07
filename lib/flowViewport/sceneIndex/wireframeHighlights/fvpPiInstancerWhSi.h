@@ -18,6 +18,10 @@
 
 #include "fvpBaseWhSi.h"
 
+PXR_NAMESPACE_OPEN_SCOPE
+class HdSelectionsSchema;
+PXR_NAMESPACE_CLOSE_SCOPE
+
 namespace FVP_NS_DEF {
 
 // Pixar declarePtrs.h TF_DECLARE_REF_PTRS macro unusable, places resulting
@@ -111,8 +115,35 @@ private:
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _instancerPathsToSelections;
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _prototypePathsToSelections;
 
-    void _CreateSelectionHighlight(const PXR_NS::SdfPath& instancerPath, std::string selectionId);
+    // Create a selection highlight hierarchcy for a single selection in the
+    // instancer.  The first overload is a lower-performance convenience that
+    // calls the second overload.  For large numbers of selected instances,
+    // calling these methods once per instance is very costly in created prims.
+    // The overload with the HdSelectionsSchema argument should be used instead.
+    void _CreateSelectionHighlight(const PXR_NS::SdfPath& instancerPath, const std::string& selectionId);
+    void _CreateSelectionHighlight(
+        const PXR_NS::HdSceneIndexPrim&   instancerPrim,
+        const PXR_NS::SdfPath&            instancerPath,
+        const PXR_NS::HdSelectionsSchema& selectionsSchema,
+        const std::string&                selectionId);
+
+    // Convenience method to create a selection highlight for all selections in
+    // the instancer.
+    void _CreateSelectionHighlight(
+        const PXR_NS::HdSceneIndexPrim&   instancerPrim,
+        const PXR_NS::SdfPath&            instancerPath,
+        const PXR_NS::HdSelectionsSchema& selectionsSchema
+    );
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& instancerPath, std::string selectionId);
+
+    // Create a full highlight if the instancer argument is fully selected (or
+    // has a fully selected ancestor), or one or more point highlights if a
+    // selections schema can be created on the instancer.  Return true if a
+    // highlight was created.
+    inline bool _ConditionallyCreateSelectionHighlight(
+        const PXR_NS::HdSceneIndexPrim& instancerPrim,
+        const PXR_NS::SdfPath&          instancerPath
+    );
 };
 
 }

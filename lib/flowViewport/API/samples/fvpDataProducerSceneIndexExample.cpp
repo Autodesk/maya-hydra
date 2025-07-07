@@ -86,6 +86,7 @@ namespace PrototypeInstancing
     HdContainerDataSourceHandle constructPrimvarDataSource(const VtValue& value, const TfToken& interpolation, const TfToken& role)
     {
         static auto emptyArray = HdRetainedTypedSampledDataSource<VtIntArray>::New(VtIntArray());
+
         return HdPrimvarSchema::BuildRetained(
             getRetainedDataSource(value),
             HdSampledDataSourceHandle(),
@@ -97,7 +98,6 @@ namespace PrototypeInstancing
                 ,nullptr
 #endif
         );
-
     }
 
     //Create an instancer topology data source for the instancer, and supply the matrices as a by-instance varying primvar.

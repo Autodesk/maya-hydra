@@ -15,6 +15,7 @@
 
 #include "fvpBaseWhSi.h"
 #include "flowViewport/fvpUtils.h"
+#include "flowViewport/tokens.h"
 #include "flowViewport/fvpPurposeRenderTagsForPasses.h"
 
 #include <pxr/base/gf/vec3f.h>
@@ -48,13 +49,9 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace {
-TF_DEFINE_PRIVATE_TOKENS(
-    _tokens,
+DEFINE_PRIVATE_OVERRIDEWIREFRAMECOLOR_TOKEN
 
-    // Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
-    (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
- );
+namespace {
 
 const HdRetainedContainerDataSourceHandle refinedWireDisplayStyleDataSource
     = HdRetainedContainerDataSource::New(
@@ -73,9 +70,6 @@ const HdRetainedContainerDataSourceHandle secondaryGraphicsPurposeRenderTagDataS
 const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
         HdLegacyDisplayStyleSchemaTokens->reprSelector);
-
-const HdDataSourceLocator primvarsOverrideWireframeColorLocator(
-        HdPrimvarsSchema::GetDefaultLocator().Append(_tokens->overrideWireframeColor));
 
 const HdDataSourceLocator pointsValueLocator = HdDataSourceLocator(
     HdPrimvarsSchemaTokens->primvars,
@@ -361,7 +355,9 @@ private:
 
 namespace FVP_NS_DEF {
 
-//We want to set the displayStyle of the selected prim to refinedWireOnSurf only if the displayStyle of the prim is refined (meaning shaded)
+//We want to set the displayStyle of the highlighting prim with following overrides:
+// 1. A "reprSelector" with HdReprTokens->wire or HdReprTokens->refinedWire, means only draw wires.
+// 2. An "overrideWireframeColor" primvar with the color of the highlighting.
 HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& dataSource, const GfVec4f& color)
 {
     //Always edit its override wireframe color
@@ -383,13 +379,17 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
                 styleSchema.GetReprSelector()) {
             VtArray<TfToken> ar = ds->GetTypedValue(0.0f);
             TfToken refinedToken = ar[0];
-            if(HdReprTokens->refined == refinedToken){
-                //Is in refined display style, apply the wire on top of shaded reprselector
-                return HdOverlayContainerDataSource::New({ edited.Finish(), refinedWireDisplayStyleDataSource});
+            if (HdReprTokens->refined == refinedToken
+                || HdReprTokens->refinedWireOnSurf == refinedToken) {
+                //Is in refined display style, apply the refinedWire reprselector
+                return HdOverlayContainerDataSource::New({ refinedWireDisplayStyleDataSource, edited.Finish() });
+            } else if (HdReprTokens->wireOnSurf == refinedToken) {
+                //Is in non-refined display style, apply the wire reprselector
+                return HdOverlayContainerDataSource::New({ secondaryGraphicsPurposeRenderTagDataSource, edited.Finish() });
             }
         }else{
             //No reprSelector found, assume it's in the Collection that we have set HdReprTokens->refined
-            return HdOverlayContainerDataSource::New({ edited.Finish(), refinedWireDisplayStyleDataSource});
+            return HdOverlayContainerDataSource::New({ refinedWireDisplayStyleDataSource, edited.Finish() });
         }
     }
 

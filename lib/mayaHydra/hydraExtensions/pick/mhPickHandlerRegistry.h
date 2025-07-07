@@ -54,6 +54,12 @@ public:
     MAYAHYDRALIB_API
     bool Unregister(const PXR_NS::SdfPath& prefix);
 
+    //! Query the pick handler registered for that exact Hydra scene index
+    //! path.  If no pick handler has been registered, return a nullptr.
+    //! To obtain a handler that handles a given path, use GetHandler().
+    MAYAHYDRALIB_API
+    PickHandlerConstPtr RegisteredHandler(const PXR_NS::SdfPath& path) const;
+
     //! Get a pick handler for the argument Hydra scene index path.  This
     //! handler has a prefix that is an ancestor of the argument path.  If no
     //! pick handler is found, returns a null pointer.

@@ -106,6 +106,14 @@ bool PickHandlerRegistry::Unregister(const SdfPath& prefix)
     return true;
 }
 
+PickHandlerConstPtr PickHandlerRegistry::RegisteredHandler(
+    const PXR_NS::SdfPath& path
+) const
+{
+    auto found = pickHandlers.find(path);
+    return (found == pickHandlers.end()) ? nullptr : found->second;
+}
+
 PickHandlerConstPtr PickHandlerRegistry::GetHandler(const SdfPath& path) const
 {
     // No entries yet?  Fail.
