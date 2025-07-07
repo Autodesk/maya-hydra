@@ -179,7 +179,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         self.cubeShape = cmds.listRelatives(self.cubeTrans)[0]
         self.setHdStormRenderer()
         self.assertNodeNameInIndex(self.cubeShape)
-        # The single Maya cube shape maps to two rprims, the first once of
+        # The single Maya cube shape maps to two rprims, the first one of
         # which is the shape's StandardShadedItem.  The list is ordered, as the
         # Hydra call made is HdRenderIndex::GetRprimIds(), which sorts
         # according to std::less<SdfPath>, which will produce
