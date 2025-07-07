@@ -20,6 +20,7 @@ import mayaUsd.lib
 import mayaUtils
 import mtohUtils
 import testUtils
+import unittest
 import usdUtils
 
 from testUtils import PluginLoaded
@@ -68,6 +69,8 @@ kExcludeBluePencil         = 1 << 37
 class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
+
+    _requiredPlugins = ['drawUfe']
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1.5
@@ -309,6 +312,17 @@ class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
         #if mayaUtils.ufeSupportFixLevel() >= 9, the usd lights gizmo changed so we must use an updated image which has "_ufe_fl9" as a postfix.
         postFix = "_ufe_fl9" if mayaUtils.ufeSupportFixLevel() >= 9 else ""
         self.checkFilter("lights_USD", kExcludeLights, 2, postFix)
+    
+    @unittest.skipUnless(mayaUtils.ufeSupportFixLevel() >= 12, "Requires UFE camera filtering support from Maya")
+    def test_UsdCameras(self):
+        def createUsdCamera(stagePath):
+            cameraName = cmds.camera()
+            usdCameraName = mayaUsd.lib.PrimUpdaterManager.duplicate(cmds.ls(cameraName[0], long=True)[0], stagePath)
+            cmds.delete(cameraName)
+            cmds.select(usdCameraName)
+        stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
+        self.stackInstances(functools.partial(createUsdCamera, stagePath), 50, [0.005, 0, 0])
+        self.checkFilter("cameras_USD", kExcludeCameras, 3)
 
     # --- 3rd party data producers ---
 

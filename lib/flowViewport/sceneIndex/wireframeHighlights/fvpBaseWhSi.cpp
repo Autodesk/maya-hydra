@@ -16,6 +16,7 @@
 #include "fvpBaseWhSi.h"
 
 #include <flowViewport/fvpUtils.h>
+#include <flowViewport/tokens.h>
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/staticTokens.h>
@@ -35,7 +36,9 @@
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2505
+#include <pxr/usdImaging/usdImaging/materialBindingsSchema.h>
+#elif PXR_VERSION >= 2403
 #include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
 #endif
 #include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
@@ -44,13 +47,9 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace {
-TF_DEFINE_PRIVATE_TOKENS(
-    _tokens,
+DEFINE_PRIVATE_OVERRIDEWIREFRAMECOLOR_TOKEN
 
-    // Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
-    (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
- );
+namespace {
 
 const HdRetainedContainerDataSourceHandle refinedWireDisplayStyleDataSource
     = HdRetainedContainerDataSource::New(
@@ -60,12 +59,17 @@ const HdRetainedContainerDataSourceHandle refinedWireDisplayStyleDataSource
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
                 { HdReprTokens->refinedWire, TfToken(), TfToken() })));
 
+const HdRetainedContainerDataSourceHandle wireDisplayStyleDataSource
+    = HdRetainedContainerDataSource::New(
+        HdLegacyDisplayStyleSchemaTokens->displayStyle,
+        HdRetainedContainerDataSource::New(
+            HdLegacyDisplayStyleSchemaTokens->reprSelector,
+            HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
+                { HdReprTokens->wire, TfToken(), TfToken() })));
+
 const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
         HdLegacyDisplayStyleSchemaTokens->reprSelector);
-
-const HdDataSourceLocator primvarsOverrideWireframeColorLocator(
-        HdPrimvarsSchema::GetDefaultLocator().Append(_tokens->overrideWireframeColor));
 
 const HdDataSourceLocator pointsValueLocator = HdDataSourceLocator(
     HdPrimvarsSchemaTokens->primvars,
@@ -351,7 +355,9 @@ private:
 
 namespace FVP_NS_DEF {
 
-//We want to set the displayStyle of the selected prim to refinedWireOnSurf only if the displayStyle of the prim is refined (meaning shaded)
+//We want to set the displayStyle of the highlighting prim with following overrides:
+// 1. A "reprSelector" with HdReprTokens->wire or HdReprTokens->refinedWire, means only draw wires.
+// 2. An "overrideWireframeColor" primvar with the color of the highlighting.
 HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& dataSource, const GfVec4f& color)
 {
     //Always edit its override wireframe color
@@ -362,7 +368,7 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
                             HdPrimvarSchemaTokens->constant,
                             HdPrimvarSchemaTokens->color));
     
-    //Is the prim in refined displayStyle (meaning shaded) ?
+    //Is the prim having a DisplayStyle schema?
     if (HdLegacyDisplayStyleSchema styleSchema =
             HdLegacyDisplayStyleSchema::GetFromParent(dataSource)) {
 
@@ -370,13 +376,17 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
                 styleSchema.GetReprSelector()) {
             VtArray<TfToken> ar = ds->GetTypedValue(0.0f);
             TfToken refinedToken = ar[0];
-            if(HdReprTokens->refined == refinedToken){
-                //Is in refined display style, apply the wire on top of shaded reprselector
-                return HdOverlayContainerDataSource::New({ edited.Finish(), refinedWireDisplayStyleDataSource});
+            if (HdReprTokens->refined == refinedToken
+                || HdReprTokens->refinedWireOnSurf == refinedToken) {
+                //Is in refined display style, apply the refinedWire reprselector
+                return HdOverlayContainerDataSource::New({ refinedWireDisplayStyleDataSource, edited.Finish() });
+            } else if (HdReprTokens->wireOnSurf == refinedToken) {
+                //Is in non-refined display style, apply the wire reprselector
+                return HdOverlayContainerDataSource::New({ wireDisplayStyleDataSource, edited.Finish() });
             }
         }else{
             //No reprSelector found, assume it's in the Collection that we have set HdReprTokens->refined
-            return HdOverlayContainerDataSource::New({ edited.Finish(), refinedWireDisplayStyleDataSource});
+            return HdOverlayContainerDataSource::New({ refinedWireDisplayStyleDataSource, edited.Finish() });
         }
     }
 
@@ -818,7 +828,9 @@ BaseWhSi::MakeGeomSubsetHighlight(
     if (!GetMaterialPath(geomSubsetPrimDataSource).IsEmpty()) {
         HdContainerDataSourceEditor dataSourceEditor(editedMeshPrimDataSource);
         dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, HdMaterialBindingsSchema::GetDefaultLocator()));
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2505
+        dataSourceEditor.Set(UsdImagingMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, UsdImagingMaterialBindingsSchema::GetDefaultLocator()));
+#elif PXR_VERSION >= 2403
         dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator()));
 #endif
         editedMeshPrimDataSource = dataSourceEditor.Finish();

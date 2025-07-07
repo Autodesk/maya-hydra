@@ -20,6 +20,8 @@
 
 #include <maya/MPxCommand.h>
 
+#include <memory>
+
 namespace MAYAHYDRA_NS_DEF {
 
 class BatchRenderer;

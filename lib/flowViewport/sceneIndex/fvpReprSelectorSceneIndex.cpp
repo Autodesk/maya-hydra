@@ -17,6 +17,7 @@
 //Local headers
 #include "fvpReprSelectorSceneIndex.h"
 #include "flowViewport/fvpUtils.h"
+#include "flowViewport/tokens.h"
 
 //USD/Hydra headers
 #include <pxr/imaging/hd/tokens.h>
@@ -33,13 +34,9 @@ namespace FVP_NS_DEF {
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
+DEFINE_PRIVATE_OVERRIDEWIREFRAMECOLOR_TOKEN
+
 namespace {
-//Handle primsvars:overrideWireframeColor in Storm for wireframe selection highlighting color
-TF_DEFINE_PRIVATE_TOKENS(
-     _primVarsTokens,
- 
-     (overrideWireframeColor)    // Works in HdStorm to override the wireframe color
- );
 
 //refined means that it supports a "refineLevel" attribute in the displayStyle to get a more refined drawing, valid range is from 0 to 8
 
@@ -131,7 +128,7 @@ HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
         auto edited = HdContainerDataSourceEditor(prim.dataSource);
 
         //Edit the override wireframe color
-        edited.Set(HdPrimvarsSchema::GetDefaultLocator().Append(_primVarsTokens->overrideWireframeColor),
+        edited.Set(primvarsOverrideWireframeColorLocator,
                         Fvp::PrimvarDataSource::New(
                             HdRetainedTypedSampledDataSource<VtVec4fArray>::New(
                                                 VtVec4fArray{_wireframeColorInterface->getWireframeColor(primPath)}),
@@ -140,7 +137,7 @@ HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
         //Edit the cull style
         edited.Set(HdLegacyDisplayStyleSchema::GetCullStyleLocator(),
                         HdRetainedTypedSampledDataSource<TfToken>::New(HdCullStyleTokens->nothing));//No culling
-        prim.dataSource = HdOverlayContainerDataSource::New({ edited.Finish(), _wireframeTypeDataSource});
+        prim.dataSource = HdOverlayContainerDataSource::New({ _wireframeTypeDataSource, edited.Finish() });
     }
     return prim;
 }

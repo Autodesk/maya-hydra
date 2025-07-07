@@ -55,6 +55,11 @@ HdSceneIndexPrim NiInstanceWhSi::GetHighlightPrim(const SdfPath &selectionPath, 
 
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, _selectionPathsToPrototypePrefixes.at(selectionPath));
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
+    if (!prim.dataSource) {
+        // If there is no data source, return. Trying to get child
+        // data sources or schemas from a null data source will crash.
+        return prim;
+    }
     HdContainerDataSourceEditor dsEditor(prim.dataSource);
 
     dsEditor.Set(HdInstancedBySchema::GetDefaultLocator(), HdBlockDataSource::New());

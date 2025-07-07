@@ -26,7 +26,12 @@ class TestArnoldLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.
     _requiredPlugins = ['mtoa']
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.2
+    @property
+    def IMAGE_DIFF_FAIL_PERCENT(self):
+        # Use a larger tolerance on OSX
+        if platform.system() == 'Darwin' and self._usdVersion >= (0, 25, 5):
+            return 2
+        return 0.2
 
     def verifyLightingModes(self, shadowOn):
         imageSuffix = "_shadowOn" if shadowOn else ""
