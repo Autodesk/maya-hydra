@@ -86,15 +86,12 @@
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
 #include <pxr/imaging/hd/dataSource.h>
-#include <pxr/imaging/hd/basisCurvesTopology.h>
-#include <pxr/imaging/hd/meshTopology.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/basisCurvesSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/mesh.h>
 #include <pxr/imaging/hd/basisCurves.h>
 #include <pxr/imaging/hd/points.h>
-#include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hdx/selectionTask.h>
 #include <pxr/imaging/hdx/colorizeSelectionTask.h>
 #include <pxr/imaging/hdx/pickTask.h>
@@ -131,7 +128,6 @@
 #include <chrono>
 #include <exception>
 #include <limits>
-#include <numeric>
 
 int _profilerCategory = MProfiler::addCategory(
     "MtohRenderOverride (mayaHydra)",
@@ -456,6 +452,8 @@ std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
     std::map<std::string, int> stats = {
         {"primitives", 0},
         {"mesh", 0},
+        {"mesh.points", 0},
+        {"mesh.faces", 0},
         {"curve", 0},
         {"curve.points", 0},
         {"point", 0},
