@@ -88,7 +88,13 @@
 #include <pxr/imaging/hd/dataSource.h>
 #include <pxr/imaging/hd/basisCurvesTopology.h>
 #include <pxr/imaging/hd/meshTopology.h>
+#include <pxr/imaging/hd/meshSchema.h>
+#include <pxr/imaging/hd/basisCurvesSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
+#include <pxr/imaging/hd/mesh.h>
+#include <pxr/imaging/hd/basisCurves.h>
+#include <pxr/imaging/hd/points.h>
+#include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hdx/selectionTask.h>
 #include <pxr/imaging/hdx/colorizeSelectionTask.h>
 #include <pxr/imaging/hdx/pickTask.h>
@@ -125,6 +131,7 @@
 #include <chrono>
 #include <exception>
 #include <limits>
+#include <numeric>
 
 int _profilerCategory = MProfiler::addCategory(
     "MtohRenderOverride (mayaHydra)",
@@ -449,8 +456,6 @@ std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
     std::map<std::string, int> stats = {
         {"primitives", 0},
         {"mesh", 0},
-        {"mesh.points", 0},
-        {"mesh.faces", 0},
         {"curve", 0},
         {"curve.points", 0},
         {"point", 0},
@@ -481,35 +486,55 @@ std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
         }
 
         stats["primitives"]++;
-
-        HdSceneIndexPrim prim;
-        TfToken primType;
-        if (instance->_mayaHydraSceneIndex) {
-            prim = instance->_mayaHydraSceneIndex->GetPrim(primId);
-            primType = prim.primType;
-        }
-
-        if (primType.IsEmpty()) {
+        auto* mesh = dynamic_cast<const HdMesh*>(rprim);
+        if (mesh) {
+            stats["mesh"]++;
+            auto sceneIndexPrim = renderIndex->GetTerminalSceneIndex()->GetPrim(primId);
+            auto meshSchema = HdMeshSchema::GetFromParent(sceneIndexPrim.dataSource);
+            if (meshSchema.IsDefined()) {
+                auto meshTopology = meshSchema.GetTopology();
+                if (meshTopology.IsDefined()) {
+                    auto faceVertexCounts = meshTopology.GetFaceVertexCounts();
+                    auto faceVertexIndices = meshTopology.GetFaceVertexIndices();
+                    if (faceVertexCounts && faceVertexIndices) {
+                        auto counts = faceVertexCounts->GetTypedValue(0.0f);
+                        auto indices = faceVertexIndices->GetTypedValue(0.0f);
+                        stats["mesh.faces"] += counts.size();
+                        if (!indices.empty()) {
+                            int maxIndex = *std::max_element(indices.begin(), indices.end());
+                            stats["mesh.points"] += maxIndex + 1;
+                        }
+                    }
+                }
+            }
             continue;
         }
 
-        if (primType == HdPrimTypeTokens->mesh) {
-            stats["mesh"]++;
-            if (instance->_mayaHydraSceneIndex && prim.dataSource) {
-                HdMeshTopology meshTopology = instance->_mayaHydraSceneIndex->GetMeshTopology(primId);
-                stats["mesh.points"] += meshTopology.GetNumPoints();
-                stats["mesh.faces"] += meshTopology.GetNumFaces();
-            }
-        }
-        else if (primType == HdPrimTypeTokens->basisCurves) {
+        auto* curves = dynamic_cast<const HdBasisCurves*>(rprim);
+        if (curves) {
             stats["curve"]++;
-            if (instance->_mayaHydraSceneIndex && prim.dataSource) {
-                HdBasisCurvesTopology curvesTopology = instance->_mayaHydraSceneIndex->GetBasisCurvesTopology(primId);
-                stats["curve.points"] += curvesTopology.GetNumPoints();
+            auto sceneIndexPrim = renderIndex->GetTerminalSceneIndex()->GetPrim(primId);
+            auto curvesSchema = HdBasisCurvesSchema::GetFromParent(sceneIndexPrim.dataSource);
+            if (curvesSchema.IsDefined()) { 
+                auto curvesTopology  = curvesSchema.GetTopology();
+                if (curvesTopology.IsDefined()) {
+                    auto curveIndices = curvesTopology.GetCurveIndices();
+                    if (curveIndices) {
+                        auto indices = curveIndices->GetTypedValue(0.0f);
+                        if (!indices.empty()) {
+                            int maxIndex = *std::max_element(indices.begin(), indices.end());
+                            stats["curve.points"] += maxIndex + 1;
+                        }
+                    }
+                }
             }
+            continue;
         }
-        else if (primType == HdPrimTypeTokens->points) {
+
+        auto* points = dynamic_cast<const HdPoints*>(rprim);
+        if (points) {
             stats["point"]++;
+            continue;
         }
     }
     return stats;
