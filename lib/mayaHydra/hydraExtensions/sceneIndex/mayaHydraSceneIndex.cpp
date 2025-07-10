@@ -153,10 +153,12 @@ namespace {
     TfToken GetPurposeRenderTag(const MRenderItem& ri)
     {
         // This is where we sort the maya render items 
-        // At this time, every render item not being triangles is drawn as secondary graphics
-        return (ri.primitive() != MHWRender::MGeometry::Primitive::kTriangles)
-            ? Fvp::secondaryGraphicsRenderTagToken //will be drawn as secondary graphics
-            : HdRenderTagTokens->geometry; //will be drawn in the main pass
+        if (ri.type() == MHWRender::MRenderItem::RenderItemType::DecorationItem) {
+            // Decoration item == Viewport UI element, send to secondary graphics pass
+            return Fvp::secondaryGraphicsRenderTagToken;
+        }
+        // Default to beauty pass
+        return HdRenderTagTokens->geometry;
     }
 
     bool useMeshAdapter()
