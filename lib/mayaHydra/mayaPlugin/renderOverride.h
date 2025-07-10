@@ -102,6 +102,21 @@ class MayaHydraSceneIndexRegistry;
 class MayaHydraSceneDelegate;
 using HdxPickHitVector = std::vector<struct HdxPickHit>;
 
+#ifdef VIEWPORT_TOOLBOX
+/*! \brief Struct to hold all render pass related data in a single container
+ */
+struct RenderPassData {
+    hvt::RenderIndexProxyPtr                     renderer;
+    hvt::FramePassPtr                            framePass;
+    Fvp::PassFilteringSceneIndex::FilteringOutFn filteringFn;
+    TfTokenVector                                renderTags;
+    TfToken                                      rendererName;
+    
+    RenderPassData() = default;
+    RenderPassData(const TfToken& name) : rendererName(name) {}
+};
+#endif
+
 /*! \brief MtohRenderOverride is a rendering override class for the viewport to use Hydra instead of
  * VP2.0.
  */
@@ -286,17 +301,8 @@ private:
     HdDriver     _hgiDriver;
 
 #ifdef VIEWPORT_TOOLBOX
-    // HVT Render index proxies
-    std::vector<hvt::RenderIndexProxyPtr>                       _renderPassesRenderers;
-    // HVT Render passes
-    std::vector<hvt::FramePassPtr>                              _renderPasses;
-    // Filtering Lambda functions for the scene indices filtering prims for render passes
-    std::vector<Fvp::PassFilteringSceneIndex::FilteringOutFn>   _renderPassesFilteringFn;
-    // We use a scene index to do the filtering for which prim goes to which render pass
-    // And _renderPassesRenderTags is used to say which render tags are used for each render pass
-    std::vector<TfTokenVector>                                  _renderPassesRenderTags;
-    // We store the renderer names for each render pass
-    TfTokenVector                                               _renderPassesRendererNames;
+    // HVT Render passes data consolidated into a single vector
+    std::vector<RenderPassData>                             _renderPassesData;
     
     Fvp::PassFilteringSceneIndex::FilteringOutFn
         _CreatePassFilteringFn(const TfTokenVector& renderTags);
@@ -309,7 +315,8 @@ private:
     void                     _ClearRenderPassesData();
     void                     _CreateFrameRenderPass(
                                 const std::string&                    rendererName,
-                                const SdfPath&                        passId);
+                                const SdfPath&                        passId,
+                                int                                   passIndex);
 #else
     HdEngine                                  _engine;
     HdRendererPlugin*                         _rendererPlugin = nullptr;
