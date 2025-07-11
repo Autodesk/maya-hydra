@@ -131,6 +131,10 @@ using namespace MayaHydra;
 TF_DEFINE_ENV_SETTING(MAYA_HYDRA_USE_MESH_ADAPTER, false,
     "Use mesh adapter instead of MRenderItem for Maya meshes.");
 
+TF_DEFINE_ENV_SETTING(MAYA_HYDRA_EXPERIMENTAL_HYBRID_MESH_ADAPTER, 
+    "",
+    "In MRenderItem mode (MAYA_HYDRA_USE_MESH_ADAPTER is false), use mesh adapter for Maya meshes whose shape node name match this string, and MRenderItem for all others, to obtain a mixed Maya mesh MRenderItem / mesh adapter scene.");
+
 TF_DEFINE_ENV_SETTING(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA, true,
     "Pass the normals to Hydra (works for both render item and mesh adapters).");
 
@@ -155,8 +159,40 @@ namespace {
         return uma;
     }
 
+    std::string useExperimentalHybridMeshAdapterForName()
+    {
+        static const std::string hma = TfGetEnvSetting(MAYA_HYDRA_EXPERIMENTAL_HYBRID_MESH_ADAPTER);
+        return hma;
+    }
+
+    bool useExperimentalHybridMeshAdapter()
+    {
+        static const bool hmaNotEmpty = !useExperimentalHybridMeshAdapterForName().empty();
+        return hmaNotEmpty;
+    }
+
+    bool useMeshAdapterIfMesh(const MDagPath& dagPath)
+    {
+        // Unfortunately MDagPath::hasFn() on a transform will extend to
+        // the shape and query it, to be helpful, but this is not helpful at all.
+        auto node = dagPath.node();
+        if (!node.hasFn(MFn::kMesh)) {
+            return false;
+        }
+    
+        // Experimental support for Maya meshes: in MRenderItem mode, use
+        // mesh adapter if the Maya mesh shape node matches that in 
+        // MAYA_HYDRA_EXPERIMENTAL_HYBRID_MESH_ADAPTER environment variable.
+        MFnDependencyNode fn(node);
+        const auto& name = fn.name();
+        return std::string_view(name.asChar()).find(useExperimentalHybridMeshAdapterForName())
+            != std::string_view::npos;
+    }
+
     bool filterMesh(const MRenderItem& ri) {
-        return useMeshAdapter() ?
+        return (useMeshAdapter() || 
+                (useExperimentalHybridMeshAdapter() && 
+                 useMeshAdapterIfMesh(ri.sourceDagPath()))) ?
             // Filter our mesh render items, and let the mesh adapter handle Maya
             // meshes.  The MRenderItem::name() for meshes is "StandardShadedItem", 
             // their MRenderItem::type() is InternalMaterialItem, but 
@@ -642,19 +678,40 @@ void MayaHydraSceneIndex::Populate()
     MStatus status;
     MItDag dagIt(MItDag::kDepthFirst);
     dagIt.traverseUnderWorld(true);
-    if (useMeshAdapter()) {
+
+    if (useExperimentalHybridMeshAdapter()) {
         for (; !dagIt.isDone(); dagIt.next()) {
             MDagPath path;
             dagIt.getPath(path);
-            InsertDag(path);
+
+            if (useMeshAdapterIfMesh(path)) {
+                // Mesh adapter
+                InsertDag(path);
+            }
+            else {
+                // MRenderItem
+                MObject node = dagIt.currentItem(&status);
+                if (status != MS::kSuccess)
+                    continue;
+                OnDagNodeAdded(node);
+            }
         }
     }
     else {
-        for (; !dagIt.isDone(); dagIt.next()) {
-            MObject node = dagIt.currentItem(&status);
-            if (status != MS::kSuccess)
-                continue;
-            OnDagNodeAdded(node);
+        if (useMeshAdapter()) {
+            for (; !dagIt.isDone(); dagIt.next()) {
+                MDagPath path;
+                dagIt.getPath(path);
+                InsertDag(path);
+            }
+        }
+        else {
+            for (; !dagIt.isDone(); dagIt.next()) {
+                MObject node = dagIt.currentItem(&status);
+                if (status != MS::kSuccess)
+                    continue;
+                OnDagNodeAdded(node);
+            }
         }
     }
 
@@ -1320,11 +1377,9 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
         }
     }
 
-    if (useMeshAdapter()) {
-        auto shapeAdapter = TfMapLookupPtr(_shapeAdapters, id);
-        if (shapeAdapter == nullptr) {
-            return _fallbackMaterial;
-        }
+    // If mesh adapters are used the return shape adapter will be non-null.
+    auto shapeAdapter = TfMapLookupPtr(_shapeAdapters, id);
+    if (shapeAdapter) {
         auto material = shapeAdapter->get()->GetMaterial();
         if (material == MObject::kNullObj) {
             return _fallbackMaterial;
