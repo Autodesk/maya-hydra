@@ -85,6 +85,13 @@
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
+#include <pxr/imaging/hd/dataSource.h>
+#include <pxr/imaging/hd/meshSchema.h>
+#include <pxr/imaging/hd/basisCurvesSchema.h>
+#include <pxr/imaging/hd/sceneIndexPrimView.h>
+#include <pxr/imaging/hd/mesh.h>
+#include <pxr/imaging/hd/basisCurves.h>
+#include <pxr/imaging/hd/points.h>
 #include <pxr/imaging/hdx/selectionTask.h>
 #include <pxr/imaging/hdx/colorizeSelectionTask.h>
 #include <pxr/imaging/hdx/pickTask.h>
@@ -438,6 +445,97 @@ int MtohRenderOverride::GetUsedGPUMemory()
         totalGPUMemory += instance->_GetUsedGPUMemory().UncheckedGet<int>();
     }
     return totalGPUMemory / (1024*1024); 
+}
+
+std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
+{
+    std::map<std::string, int> stats = {
+        {"primitives", 0},
+        {"mesh", 0},
+        {"mesh.points", 0},
+        {"mesh.faces", 0},
+        {"curve", 0},
+        {"curve.points", 0},
+        {"point", 0},
+    };
+
+    MtohRenderOverride* instance = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(_allInstancesMutex);
+        for (auto* inst : _allInstances) {
+            if (inst->_initializationSucceeded && inst->_renderIndex) {
+                instance = inst;
+                break;
+            }
+        }
+    }
+
+    if (!instance || !instance->_renderIndex) {
+        return stats;
+    }
+
+    auto* renderIndex = instance->_renderIndex;
+    auto primIds = renderIndex->GetRprimIds();
+
+    for (const auto& primId : primIds) {
+        auto* rprim = renderIndex->GetRprim(primId);
+        if (!rprim) {
+            continue;
+        }
+
+        stats["primitives"]++;
+        auto* mesh = dynamic_cast<const HdMesh*>(rprim);
+        if (mesh) {
+            stats["mesh"]++;
+            auto sceneIndexPrim = renderIndex->GetTerminalSceneIndex()->GetPrim(primId);
+            auto meshSchema = HdMeshSchema::GetFromParent(sceneIndexPrim.dataSource);
+            if (meshSchema.IsDefined()) {
+                auto meshTopology = meshSchema.GetTopology();
+                if (meshTopology.IsDefined()) {
+                    auto faceVertexCounts = meshTopology.GetFaceVertexCounts();
+                    auto faceVertexIndices = meshTopology.GetFaceVertexIndices();
+                    if (faceVertexCounts && faceVertexIndices) {
+                        auto counts = faceVertexCounts->GetTypedValue(0.0f);
+                        auto indices = faceVertexIndices->GetTypedValue(0.0f);
+                        stats["mesh.faces"] += counts.size();
+                        if (!indices.empty()) {
+                            int maxIndex = *std::max_element(indices.begin(), indices.end());
+                            stats["mesh.points"] += maxIndex + 1;
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+
+        auto* curves = dynamic_cast<const HdBasisCurves*>(rprim);
+        if (curves) {
+            stats["curve"]++;
+            auto sceneIndexPrim = renderIndex->GetTerminalSceneIndex()->GetPrim(primId);
+            auto curvesSchema = HdBasisCurvesSchema::GetFromParent(sceneIndexPrim.dataSource);
+            if (curvesSchema.IsDefined()) { 
+                auto curvesTopology  = curvesSchema.GetTopology();
+                if (curvesTopology.IsDefined()) {
+                    auto curveIndices = curvesTopology.GetCurveIndices();
+                    if (curveIndices) {
+                        auto indices = curveIndices->GetTypedValue(0.0f);
+                        if (!indices.empty()) {
+                            int maxIndex = *std::max_element(indices.begin(), indices.end());
+                            stats["curve.points"] += maxIndex + 1;
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+
+        auto* points = dynamic_cast<const HdPoints*>(rprim);
+        if (points) {
+            stats["point"]++;
+            continue;
+        }
+    }
+    return stats;
 }
 
 std::vector<MString> MtohRenderOverride::AllActiveRendererNames()

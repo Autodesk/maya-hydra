@@ -151,6 +151,9 @@ public:
     // Utility function to get GPU memory usage stats
     static int GetUsedGPUMemory();
 
+    // Returns scene statistics as a map for the currently active render delegate from Hydra primitives
+    static std::map<std::string, int> GetSceneStatistics();
+
     bool                         startOperationIterator() override;
     MHWRender::MRenderOperation* renderOperation() override;
     bool                         nextRenderOperation() override;
