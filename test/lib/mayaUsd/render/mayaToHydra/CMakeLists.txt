@@ -6,6 +6,7 @@
 # only single platform exclusion is supported currently.
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
 set(INTERACTIVE_TEST_SCRIPT_FILES
+    testSceneStat.py
     testImageDiffing.py
     testMtohCommand.py
     testBasicRender.py

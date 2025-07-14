@@ -100,6 +100,9 @@ constexpr auto _rendererIdLong = "-renderer";
 constexpr auto _userDefaultsId = "-u";
 constexpr auto _userDefaultsIdLong = "-userDefaults";
 
+constexpr auto _sceneStats = "-ss";
+constexpr auto _sceneStatsLong = "-sceneStats";
+
 constexpr auto _helpText = R"HELP(For details on args usage please see 
 https://github.com/Autodesk/maya-hydra/tree/dev/doc/mayaHydraCommads.md
 )HELP";
@@ -151,6 +154,8 @@ MSyntax MtohViewCmd::createSyntax()
 
     syntax.addFlag(_usdVersion, _usdVersionLong);
 
+    syntax.addFlag(_sceneStats, _sceneStatsLong);
+
     return syntax;
 }
 
@@ -176,8 +181,14 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
 
     if (db.isFlagSet(_hdGPUMem)) {
         appendToResult(MtohRenderOverride::GetUsedGPUMemory());
-    } if (db.isFlagSet(_currentProcessMemory)) {
+    } else if (db.isFlagSet(_currentProcessMemory)) {
         appendToResult(getProcessMemory());
+    } else if (db.isFlagSet(_sceneStats)) {
+        auto stats = MtohRenderOverride::GetSceneStatistics();
+        for (const auto& pair : stats) {
+            appendToResult(pair.first.c_str()); 
+            appendToResult(std::to_string(pair.second).c_str());
+        }
     } else if (db.isFlagSet(_listRenderers)) {
         for (auto& plugin : MtohGetRendererDescriptions())
             appendToResult(plugin.rendererName.GetText());

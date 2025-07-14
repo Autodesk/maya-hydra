@@ -193,6 +193,8 @@ public:
 
     HdMeshTopology GetMeshTopology(const SdfPath& id);
 
+    HdBasisCurvesTopology GetBasisCurvesTopology(const SdfPath& id);
+
     SdfPath GetPrimPath(const MDagPath& dg, bool isSprim) const;
 
     SdfPath GetRprimPath() const { return _rprimPath; }
