@@ -70,16 +70,17 @@ MayaHydraDataSource::GetNames()
     if (_type == HdPrimTypeTokens->mesh) {
         result.push_back(HdMeshSchemaTokens->mesh);
         result.push_back(HdExtentSchemaTokens->extent); //Add an extent attribute to support the bounding box display style
-        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
     }
 
     if (_type == HdPrimTypeTokens->basisCurves) {
         result.push_back(HdBasisCurvesSchemaTokens->basisCurves);
-        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
     }
 
     result.push_back(HdPrimvarsSchemaTokens->primvars);
 
+    // As per
+    // https://github.com/PixarAnimationStudios/OpenUSD/blob/d3991f70df7d70ad7b7d2485c23a90ef8d05342b/pxr/imaging/hd/tokens.cpp#L68
+    // the following covers meshes, basis curves, points, and volumes.
     if (HdPrimTypeIsGprim(_type)) {
         result.push_back(HdMaterialBindingsSchema::GetSchemaToken());
         result.push_back(HdLegacyDisplayStyleSchemaTokens->displayStyle);
