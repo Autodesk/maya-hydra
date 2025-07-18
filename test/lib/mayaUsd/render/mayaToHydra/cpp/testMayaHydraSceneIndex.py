@@ -23,6 +23,11 @@ class TestMayaHydraSceneIndex(mtohUtils.MayaHydraBaseTestCase):
 
     def setupScene(self):
         self.setHdStormRenderer()
+
+        cmds.group(empty=True, name="group1")
+        cmds.group(empty=True, name="group2", parent="group1")
+        cmds.polyCube(name="leafShape", constructionHistory=False)
+        cmds.parent("leafShape", "group2")
         cmds.refresh()
 
     def test_PrimAncestors(self):

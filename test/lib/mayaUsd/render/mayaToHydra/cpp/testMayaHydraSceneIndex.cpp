@@ -55,12 +55,7 @@ TEST(MayaHydraSceneIndex, PrimAncestors)
     
     ASSERT_TRUE(mayaSceneIndex) << "Could not find MayaHydraSceneIndex in scene index tree";
     
-    // Setup
-    MString createGroupHierarchy = "group -em -n \"group1\"; group -em -n \"group2\" group1; polyCube -n \"leafShape\" -ch 0; parent leafShape group2;";
-    MStatus status = MGlobal::executeCommand(createGroupHierarchy);
-    ASSERT_EQ(status, MS::kSuccess);
-    ASSERT_EQ(MGlobal::executeCommand("refresh"), MS::kSuccess);
-    
+    // Setup of group hierarchy done in the Python driver
     // Test 1: _AddPrimAncestors, check ancestor creation
     SdfPath leafPrimPath;
 
@@ -81,7 +76,7 @@ TEST(MayaHydraSceneIndex, PrimAncestors)
     }
     
     // Test 2: _RemoveEmptyAncestors, check ancestor removal
-    status = MGlobal::executeCommand("delete leafShape");
+    MStatus status = MGlobal::executeCommand("delete leafShape");
     ASSERT_EQ(status, MS::kSuccess);
     
     ASSERT_EQ(MGlobal::executeCommand("refresh"), MS::kSuccess);
