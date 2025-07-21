@@ -328,29 +328,27 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
             }
         }
 
-        if ((_instancerPathsToSelections.find(entry.primPath) != _instancerPathsToSelections.end() || _prototypePathsToSelections.find(entry.primPath) != _prototypePathsToSelections.end())) {
-            bool highlightRebuild = (entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator()) || entry.dirtyLocators.Intersects(HdPrimvarsSchema::GetDefaultLocator()));
-            if (highlightRebuild) {
-                // Instancing topology or transforms changed : rebuild the highlights, since we don't know exactly how it was changed
-                auto instancerSelectionKeysToRebuild = _instancerPathsToSelections.find(entry.primPath);
-                if (instancerSelectionKeysToRebuild != _instancerPathsToSelections.end()) {
-                    const auto selectionKeysToRebuild = instancerSelectionKeysToRebuild->second;
-                    for (const auto& selectionKey : selectionKeysToRebuild) {
-                        _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
-                        _CreateSelectionHighlight(selectionKey.first, selectionKey.second);
-                    }
+        if ((_instancerPathsToSelections.find(entry.primPath) != _instancerPathsToSelections.end() || _prototypePathsToSelections.find(entry.primPath) != _prototypePathsToSelections.end()) 
+            && (entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator()) || entry.dirtyLocators.Intersects(HdPrimvarsSchema::GetDefaultLocator()))) {
+            // Instancing topology or transforms changed : rebuild the highlights, since we don't know exactly how it was changed
+            auto instancerSelectionKeysToRebuild = _instancerPathsToSelections.find(entry.primPath);
+            if (instancerSelectionKeysToRebuild != _instancerPathsToSelections.end()) {
+                const auto selectionKeysToRebuild = instancerSelectionKeysToRebuild->second;
+                for (const auto& selectionKey : selectionKeysToRebuild) {
+                    _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
+                    _CreateSelectionHighlight(selectionKey.first, selectionKey.second);
                 }
-                auto prototypeSelectionKeysToRebuild = _prototypePathsToSelections.find(entry.primPath);
-                if (prototypeSelectionKeysToRebuild != _prototypePathsToSelections.end()) {
-                    const auto selectionKeysToRebuild = prototypeSelectionKeysToRebuild->second;
-                    for (const auto& selectionKey : selectionKeysToRebuild) {
-                        _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
-                        _CreateSelectionHighlight(selectionKey.first, selectionKey.second);
-                    }
-                }
-                // No need to dirty in this case since we'll have removed and re-added prims, skip to next entries
-                continue;
             }
+            auto prototypeSelectionKeysToRebuild = _prototypePathsToSelections.find(entry.primPath);
+            if (prototypeSelectionKeysToRebuild != _prototypePathsToSelections.end()) {
+                const auto selectionKeysToRebuild = prototypeSelectionKeysToRebuild->second;
+                for (const auto& selectionKey : selectionKeysToRebuild) {
+                    _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
+                    _CreateSelectionHighlight(selectionKey.first, selectionKey.second);
+                }
+            }
+            // No need to dirty in this case since we'll have removed and re-added prims, skip to next entries
+            continue;
         }
 
         // Propagate notifications if this prim is a relevant instancer or a subprim of one
