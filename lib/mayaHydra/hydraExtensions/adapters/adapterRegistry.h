@@ -76,6 +76,9 @@ public:
     static void RegisterCameraAdapter(const TfToken& type, CameraAdapterCreator creator);
 
     MAYAHYDRALIB_API
+    static CameraAdapterCreator GetCameraAdapterCreator(const MObject& node);
+
+    MAYAHYDRALIB_API
     static CameraAdapterCreator GetCameraAdapterCreator(const MDagPath& dag);
 
     /// Find all MayaHydraAdapter plug-ins, and load them all
