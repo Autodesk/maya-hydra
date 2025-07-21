@@ -78,6 +78,22 @@ void VerifyDataSource(DataSourceEntry rootDataSourceEntry)
                 }
             }
         }
+        else if (dataSourceEntry.name == "perspShape") {
+            // Verify that the "persp" camera's data source
+            bool hasMayaPerspCameraDataSource = false;
+            if (auto containerDataSource
+                = pxr::HdContainerDataSource::Cast(dataSourceEntry.dataSource)) {
+                pxr::TfTokenVector childNames = containerDataSource->GetNames();
+                for (auto itChildNames = childNames.rbegin(); itChildNames != childNames.rend();
+                     itChildNames++) {
+                    if (*itChildNames == "camera") {
+                        hasMayaPerspCameraDataSource = true;
+                        break;
+                    }
+                }
+            }
+            EXPECT_TRUE(hasMayaPerspCameraDataSource);
+        }
 
         // Prepare next step
         dataSourceStack.pop();
