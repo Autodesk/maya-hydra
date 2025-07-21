@@ -84,13 +84,8 @@ void VerifyDataSource(DataSourceEntry rootDataSourceEntry)
             if (auto containerDataSource
                 = pxr::HdContainerDataSource::Cast(dataSourceEntry.dataSource)) {
                 pxr::TfTokenVector childNames = containerDataSource->GetNames();
-                for (auto itChildNames = childNames.rbegin(); itChildNames != childNames.rend();
-                     itChildNames++) {
-                    if (*itChildNames == "camera") {
-                        hasMayaPerspCameraDataSource = true;
-                        break;
-                    }
-                }
+                auto it = std::find(childNames.rbegin(), childNames.rend(), pxr::TfToken("camera"));
+                hasMayaPerspCameraDataSource = it != childNames.rend();
             }
             EXPECT_TRUE(hasMayaPerspCameraDataSource);
         }
