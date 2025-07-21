@@ -20,6 +20,7 @@ target_sources(${TARGET_NAME}
         testColorPreferences.cpp
         testCppFramework.cpp
         testHydraPrim.cpp
+        testMayaHydraSceneIndex.cpp
         testMayaSceneFlattening.cpp
         testMayaUsdUfeItems.cpp
         testDataProducerMergingSceneIndex.cpp

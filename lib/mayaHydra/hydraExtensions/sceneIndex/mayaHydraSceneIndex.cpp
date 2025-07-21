@@ -1188,6 +1188,22 @@ void MayaHydraSceneIndex::_AddPrimAncestors(const SdfPath& path)
 
 }
 
+void MayaHydraSceneIndex::_RemoveEmptyAncestors(const SdfPath& path)
+{
+    const auto& parentPath = path.GetParentPath();
+    if (parentPath == _rprimPath || parentPath == _sprimPath || parentPath == _materialPath) {
+        return;
+    }
+    auto parentPrim = GetPrim(parentPath);
+    if (parentPrim.dataSource && parentPrim.primType.IsEmpty()) {
+        auto childPaths = GetChildPrimPaths(parentPath);
+        if (childPaths.empty()) {
+            RemovePrims({ parentPath });
+            _RemoveEmptyAncestors(parentPath);
+        }
+    }
+}
+
 void MayaHydraSceneIndex::MarkRprimDirty(const SdfPath& id, HdDirtyBits dirtyBits) {
     _MarkPrimDirty(id, dirtyBits, HdDirtyBitsTranslator::RprimDirtyBitsToLocatorSet);
 }
@@ -1223,6 +1239,8 @@ void MayaHydraSceneIndex::_MarkPrimDirty(
 void MayaHydraSceneIndex::RemovePrim(const SdfPath& id)
 {
     RemovePrims({ id });
+
+    _RemoveEmptyAncestors(id);
 
     _renderCollectionChanged = true;
 }
