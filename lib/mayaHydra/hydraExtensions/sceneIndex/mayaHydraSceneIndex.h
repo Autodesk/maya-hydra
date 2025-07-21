@@ -289,6 +289,7 @@ private:
     // Utilites
     bool _GetRenderItem(int fastId, MayaHydraRenderItemAdapterPtr& adapter);
     void _AddPrimAncestors(const SdfPath& path);
+    void _RemoveEmptyAncestors(const SdfPath& path);
     void _AddRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
     void _RemoveRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
     bool _GetRenderItemMaterial(const MRenderItem& ri, SdfPath& material, MObject& shadingEngineNode);
