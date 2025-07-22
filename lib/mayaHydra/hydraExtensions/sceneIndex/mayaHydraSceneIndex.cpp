@@ -1145,10 +1145,6 @@ bool MayaHydraSceneIndex::GetPlaybackRunning() const
     return _isPlaybackRunning;
 }
 
-void MayaHydraSceneIndex::PostFrame()
-{
-}
-
 void MayaHydraSceneIndex::InsertPrim(
     MayaHydraAdapter* adapter,
     const TfToken& typeId,

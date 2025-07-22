@@ -1028,9 +1028,6 @@ MStatus MtohRenderOverride::Render(
     } else {
         renderFrame(true);
     }
-    if (_mayaHydraSceneIndex) {
-        _mayaHydraSceneIndex->PostFrame();
-    }
     
     //Store as old display style
     _oldDisplayStyle = currentDisplayStyle;

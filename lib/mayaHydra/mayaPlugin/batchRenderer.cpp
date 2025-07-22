@@ -57,6 +57,7 @@
 #include <pxr/base/tf/instantiateSingleton.h>
 #include <pxr/base/vt/value.h>
 #include <pxr/imaging/glf/contextCaps.h>
+#include <pxr/imaging/hd/renderBuffer.h>
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/imaging/hd/rprim.h>
@@ -396,37 +397,6 @@ MStatus BatchRenderer::Render(
 
         _engine.Execute(_renderIndex, &tasks);
 
-
-        // HYDRA-1714: _taskController->IsConverged() always returns false, 
-        // so cannot be relied upon to signal end of render.
-        // TODO_BATCH_RENDER  Incorrectly just wait an arbitrary
-        // amount of time for rendering to complete.
-        constexpr auto msWait25s = std::chrono::duration<float, std::milli>(25000);
-        std::this_thread::sleep_for(msWait25s);
-
-        const auto fileName = Fvp::ImageBufferWriter::GetFileName();
-        if (!fileName.empty()) {
-            if (!Fvp::ImageBufferWriter::Write(_fileWriterArgs, fileName)) {
-                TF_RUNTIME_ERROR("Failed to write image to %s",
-                                 fileName.c_str());
-            }
-        }
-
-        // HdTaskController will query all of the tasks it can for IsConverged.
-        // This includes HdRenderPass::IsConverged and HdRenderBuffer::IsConverged (via colorizer).
-        //
-        // TODO_BATCH_RENDER  Incorrect for batch rendering.  The
-        // timer callback relies on the idle loop, does not apply to
-        // batch rendering.
-        _isConverged = _taskController->IsConverged();
-
-        std::cout << "PPT: _isConverged is " 
-                  << (_isConverged ? "true" : "false") << std::endl;
-
-        if (markTime) {
-            std::lock_guard<std::mutex> lock(_lastRenderTimeMutex);
-            _lastRenderTime = std::chrono::system_clock::now();
-        }
     }; // End of renderFrame lambda.
 
     if (_initializationAttempted && !_initializationSucceeded) {
@@ -576,17 +546,57 @@ MStatus BatchRenderer::Render(
         if (_mayaHydraSceneIndex) {
             _mayaHydraSceneIndex->SetShadowsEnabled(enableShadows);
         }
-
-        renderFrame(true);
-
-    } else {
-        renderFrame(true);
     }
-    if (_mayaHydraSceneIndex) {
-        _mayaHydraSceneIndex->PostFrame();
+
+    // The renderFrame() lambda does too much to be called in a loop:
+    // all we want is to call it once, then call _Execute() repeatedly.
+    renderFrame(true);
+
+    constexpr auto wait100ms = std::chrono::duration<float, std::milli>(100);
+    constexpr int MAX_NB_RENDERS{50};
+    int nbRenders{1};
+    // For Arnold the following always returns false.
+    // _isConverged = _taskController->IsConverged();
+    auto isConverged = [this]() {
+        auto colorRenderBuffer = _taskController->GetRenderOutput(
+            HdAovTokens->color);
+        TF_AXIOM(colorRenderBuffer);
+        return colorRenderBuffer->IsConverged();
+    };
+    _isConverged = isConverged();
+
+    // Render to convergence, with a maximum number of renders.
+    for (; !_isConverged && nbRenders < MAX_NB_RENDERS; ++nbRenders) {
+        std::this_thread::sleep_for(wait100ms);
+
+        // See renderFrame() lambda comments.
+        HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
+        replaceSelectionTask(&tasks);
+
+        _engine.Execute(_renderIndex, &tasks);
+        _isConverged = isConverged();
     }
-    
-    return MStatus::kSuccess;
+
+    if (!_isConverged) {
+        // HYDRA-1714: render convergence unreliable.
+        // TODO_BATCH_RENDER  Incorrectly just wait an arbitrary
+        // amount of time for rendering to complete.
+        constexpr int ms25000{25000};
+        constexpr auto msWait25s = std::chrono::duration<float, std::milli>(ms25000);
+        TF_WARN("Render did not converge after %d renders, waiting %d milliseconds.", MAX_NB_RENDERS, ms25000);
+        std::this_thread::sleep_for(msWait25s);
+    }
+
+    const auto fileName = Fvp::ImageBufferWriter::GetFileName();
+    if (!fileName.empty()) {
+        if (!Fvp::ImageBufferWriter::Write(_fileWriterArgs, fileName)) {
+            TF_RUNTIME_ERROR("Failed to write image to %s",
+                             fileName.c_str());
+        }
+        return MStatus::kSuccess;
+    }
+
+    return MStatus::kFailure;
 }
 
 void BatchRenderer::_SetRenderPurposeTags(const MayaHydraParams& delegateParams)

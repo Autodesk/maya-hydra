@@ -146,7 +146,6 @@ public:
 
     // Operation that's performed on rendering a frame
     void PreFrame(const MHWRender::MDrawContext& drawContext);
-    void PostFrame();
 
     void SetParams(const MayaHydraParams& params);
     const MayaHydraParams& GetParams() const { return _params; }
