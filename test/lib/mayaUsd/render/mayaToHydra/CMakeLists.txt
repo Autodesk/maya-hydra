@@ -93,6 +93,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
     cpp/testUsdStageInvalidate.py
+    cpp/testCamera.py
 	#CPP tests disabled on OSX
     cpp/testWriteFile.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
 )
