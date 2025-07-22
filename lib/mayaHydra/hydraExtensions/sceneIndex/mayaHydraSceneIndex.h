@@ -335,6 +335,9 @@ private:
     using LightAdapterCreator
         = std::function<MayaHydraLightAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>;
     std::vector<std::pair<MObject, LightAdapterCreator>> _lightsToAdd;
+    using CameraAdapterCreator
+        = std::function<MayaHydraCameraAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>;
+    std::vector<std::pair<MObject, CameraAdapterCreator>> _camerasToAdd;
     std::vector<SdfPath> _materialTagsChanged;
 
     bool _defaultMaterialCreated = false;

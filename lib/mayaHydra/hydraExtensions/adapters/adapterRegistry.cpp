@@ -83,7 +83,13 @@ void MayaHydraAdapterRegistry::RegisterCameraAdapter(
 MayaHydraAdapterRegistry::CameraAdapterCreator
 MayaHydraAdapterRegistry::GetCameraAdapterCreator(const MDagPath& dag)
 {
-    MFnDependencyNode    depNode(dag.node());
+    return GetCameraAdapterCreator(dag.node());
+}
+
+MayaHydraAdapterRegistry::CameraAdapterCreator
+MayaHydraAdapterRegistry::GetCameraAdapterCreator(const MObject& node)
+{
+    MFnDependencyNode   depNode(node);
     CameraAdapterCreator ret = nullptr;
     TfMapLookup(GetInstance()._cameraAdapters, TfToken(depNode.typeName().asChar()), &ret);
     return ret;
