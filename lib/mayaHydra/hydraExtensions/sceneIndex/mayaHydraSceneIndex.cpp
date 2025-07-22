@@ -516,6 +516,7 @@ void MayaHydraSceneIndex::_Destroy()
         _renderItemsAdapters,
         _shapeAdapters,
         _lightAdapters,
+        _cameraAdapters,
         _materialAdapters);
 
     _renderItemsAdapters.clear();
@@ -1063,14 +1064,15 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
                             a->RemoveCallbacks();
                             a->CreateCallbacks();
                         }
-                if (std::get<1>(it) & MayaHydraSceneIndex::RebuildFlagPrim) {
-                    a->RemovePrim();
-                    a->Populate();
-                }
+                        if (std::get<1>(it) & MayaHydraSceneIndex::RebuildFlagPrim) {
+                            a->RemovePrim();
+                            a->Populate();
+                        }
                     },
                     _shapeAdapters,
-                        _lightAdapters,
-                        _materialAdapters);
+                    _lightAdapters,
+                    _cameraAdapters,
+                    _materialAdapters);
             }
             _adaptersToRebuild.clear();
         }
@@ -1284,12 +1286,12 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
                 else if (a->HasType(HdPrimTypeTokens->camera)) {
                     a->MarkDirty(HdCamera::DirtyParams);
                 }
-        a->InvalidateTransform();
-        a->MarkDirty(HdChangeTracker::DirtyTransform);
+                a->InvalidateTransform();
+                a->MarkDirty(HdChangeTracker::DirtyTransform);
             },
             _shapeAdapters,
-                _lightAdapters,
-                _cameraAdapters);
+            _lightAdapters,
+            _cameraAdapters);
     }
     // We need to trigger rebuilding shaders.
     if (oldParams.textureMemoryPerTexture != params.textureMemoryPerTexture) {
@@ -1381,6 +1383,7 @@ void MayaHydraSceneIndex::RemoveAdapter(const SdfPath& id)
         _renderItemsAdapters,
             _shapeAdapters,
             _lightAdapters,
+            _cameraAdapters,
             _materialAdapters)) {
         TF_WARN(
             "MayaHydraSceneIndex::RemoveAdapter(%s) -- Adapter does not exists", id.GetText());
@@ -1519,9 +1522,10 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
         id,
         [](MayaHydraAdapter* a) {
             a->RemoveCallbacks();
-    a->RemovePrim();
+            a->RemovePrim();
         },
-        _lightAdapters)) {
+        _lightAdapters,
+        _cameraAdapters)) {
         if (MObjectHandle(obj).isValid()) {
             OnDagNodeAdded(obj);
         }
