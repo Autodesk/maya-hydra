@@ -40,7 +40,7 @@ FindPrimPredicate getCameraPrimPredicate(const std::string& cameraName, const Tf
     };
 }
 
-void VerifyCameraPrims(const std::string& prefix, int primCount)
+void VerifyCameraPrims(const std::string& prefix, size_t primCount)
 {
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
@@ -61,16 +61,16 @@ void VerifyCameraPrims(const std::string& prefix, int primCount)
 
 TEST(Camera, defaultCameras)
 { 
-    VerifyCameraPrims("sprims", 4);
+    VerifyCameraPrims("sprims", 4u);
 }
 
 TEST(Camera, addMayaCamera)
 { 
-    VerifyCameraPrims("sprims", 5);
+    VerifyCameraPrims("sprims", 5u);
 }
 
 TEST(Camera, removeMayaCamera)
 { 
-    VerifyCameraPrims("sprims", 4);
+    VerifyCameraPrims("sprims", 4u);
 }
 }
