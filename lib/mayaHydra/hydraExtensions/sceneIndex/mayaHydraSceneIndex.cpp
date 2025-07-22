@@ -1833,6 +1833,11 @@ bool MayaHydraSceneIndex::passNormalsToHydra()
     return val;
 }
 
+bool MayaHydraSceneIndex::noMeshAdapters()
+{
+    return !useMeshAdapter() && !useExperimentalHybridMeshAdapter();
+}
+
 VtValue MayaHydraSceneIndex::_CreateDefaultMaterialFallback()
 {
     static const MColor kDefaultGrayColor = MColor(0.5f, 0.5f, 0.5f) * 0.8f;
