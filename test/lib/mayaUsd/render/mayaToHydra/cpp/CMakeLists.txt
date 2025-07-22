@@ -48,6 +48,7 @@ target_sources(${TARGET_NAME}
         testSceneIndexDirtying.cpp
         testUsdStageInvalidate.cpp
         testWriteFile.cpp
+        testCamera.cpp
 )
 
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
