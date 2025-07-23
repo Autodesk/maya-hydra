@@ -32,19 +32,17 @@ namespace{
     static const TfToken purposes[] = { HdMaterialBindingsSchemaTokens->allPurpose };
 
     // Support implicit surfaces from USD as well, not only meshes
-    bool _IsDefaultMaterialCompliantPrimitive(const TfToken& primType) 
-    { 
+    bool _IsDefaultMaterialCompliantPrimitive(const TfToken& primType)
+    {
         static std::set<TfToken> const compliantPrimitives = { HdPrimTypeTokens->cone,
                                                               HdPrimTypeTokens->cylinder,
                                                               HdPrimTypeTokens->cylinder_1,
                                                               HdPrimTypeTokens->cube,
-                                                              HdPrimTypeTokens->sphere,   
+                                                              HdPrimTypeTokens->sphere,
                                                               HdPrimTypeTokens->capsule,
                                                               HdPrimTypeTokens->capsule_1,
-                                                        #if PXR_VERSION >= 2403 // USD 24.03+
+                                                        #if PXR_VERSION >= 2405 // USD 24.05+
                                                               HdPrimTypeTokens->geomSubset,
-                                                        #endif
-                                                        #if HD_API_VERSION >= 67 // USD 24.05+
                                                               UsdGeomTokens->TetMesh,
                                                         #endif
                                                               UsdGeomTokens->Plane,
@@ -59,20 +57,20 @@ DefaultMaterialSceneIndex::New(
     const HdSceneIndexBaseRefPtr &inputSceneIndex,
     const PXR_NS::SdfPath& defaultMaterialPath,
     const PXR_NS::SdfPathVector& defaultMaterialExclusionList)
-{    
+{
     return TfCreateRefPtr(
         new DefaultMaterialSceneIndex(inputSceneIndex, defaultMaterialPath, defaultMaterialExclusionList));
 }
 
 DefaultMaterialSceneIndex::DefaultMaterialSceneIndex(
-    HdSceneIndexBaseRefPtr const &inputSceneIndex, 
+    HdSceneIndexBaseRefPtr const &inputSceneIndex,
     const PXR_NS::SdfPath& defaultMaterialPath,
     const PXR_NS::SdfPathVector& defaultMaterialExclusionList)
-  : HdSingleInputFilteringSceneIndexBase(inputSceneIndex), 
+  : HdSingleInputFilteringSceneIndexBase(inputSceneIndex),
     InputSceneIndexUtils(inputSceneIndex),
     _defaultMaterialPath(defaultMaterialPath),
     _defaultMaterialExclusionList(defaultMaterialExclusionList)
-{   
+{
 }
 
 HdSceneIndexPrim DefaultMaterialSceneIndex::GetPrim(const SdfPath& primPath) const
@@ -117,7 +115,7 @@ void DefaultMaterialSceneIndex::_SetDefaultMaterial(HdSceneIndexPrim& inoutPrim)
         = { HdMaterialBindingSchema::Builder()
                 .SetPath(HdRetainedTypedSampledDataSource<SdfPath>::New(_defaultMaterialPath))
                 .Build() };
-    
+
     if (_ShouldWeApplyTheDefaultMaterial(inoutPrim)) {
         inoutPrim.dataSource = HdContainerDataSourceEditor(inoutPrim.dataSource)
             .Set(
@@ -128,18 +126,18 @@ void DefaultMaterialSceneIndex::_SetDefaultMaterial(HdSceneIndexPrim& inoutPrim)
     }
 }
 
-void DefaultMaterialSceneIndex::Enable(bool enable) 
-{ 
+void DefaultMaterialSceneIndex::Enable(bool enable)
+{
     if (_isEnabled == enable){
         return;
     }
-    
-    _isEnabled = enable; 
+
+    _isEnabled = enable;
     _MarkMaterialsDirty();
 }
 
 void DefaultMaterialSceneIndex::_MarkMaterialsDirty()
-{ 
+{
     static const auto locator = HdMaterialBindingsSchema::GetDefaultLocator();
 
     HdSceneIndexObserver::DirtiedPrimEntries entries;

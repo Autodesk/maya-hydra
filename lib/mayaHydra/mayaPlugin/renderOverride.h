@@ -99,7 +99,7 @@ using HdxPickHitVector = std::vector<struct HdxPickHit>;
 /*! \brief MtohRenderOverride is a rendering override class for the viewport to use Hydra instead of
  * VP2.0.
  */
-class MtohRenderOverride : public MHWRender::MRenderOverride, 
+class MtohRenderOverride : public MHWRender::MRenderOverride,
     public MayaHydra::PickContext
 {
 public:
@@ -180,7 +180,7 @@ private:
     void              _InitHydraResources(const MHWRender::MDrawContext& drawContext);
     void              _RemovePanel(MString panelName);
     void              _DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext);
-    HdRenderDelegate* _GetRenderDelegate();   
+    HdRenderDelegate* _GetRenderDelegate();
     void              _ClearMayaHydraSceneIndex();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void              _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
@@ -231,7 +231,7 @@ private:
     // Callbacks
     static void _ClearHydraCallback(void* data);
     static void _TimerCallback(float, float, void* data);
-    static void _PlayblastingChanged(bool state, void*); 
+    static void _PlayblastingChanged(bool state, void*);
     static void _PanelDeletedCallback(const MString& panelName, void* data);
     static void _RendererChangedCallback(
         const MString& panelName,
@@ -291,7 +291,7 @@ private:
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
     Fvp::SelectionPtr                         _selection;
     SdfPath                                   _highlightHierarchyPrefix{"/FlowViewportSelectionHighlights"};
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
     Fvp::GeomSubsetWhSiRefPtr                 _geomSubsetWhSi;
 #endif
     Fvp::MeshWhSiRefPtr                       _meshWhSi;
@@ -330,13 +330,13 @@ private:
     std::shared_ptr<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker> _leadObjectPathTracker {nullptr};
     MAYAHYDRA_NS_DEF::MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex{nullptr};
 
-    /** This class creates the scene index data factories and set them up into the flow viewport library to be able to create DCC 
+    /** This class creates the scene index data factories and set them up into the flow viewport library to be able to create DCC
     *   specific scene index data classes without knowing their content in Flow viewport.
     *   This is done in the constructor of this class
     */
     MAYAHYDRA_NS_DEF::SceneIndexDataFactoriesSetup  _sceneIndexDataFactoriesSetup;
 
-    SdfPath _ID; // Root path to runtime data (like task controller) 
+    SdfPath _ID; // Root path to runtime data (like task controller)
 
     GfVec4d _viewport;
 
@@ -365,7 +365,7 @@ private:
     // first false (state change), then true (objects set).  To avoid
     // double dirtying in Hydra, we track the following isolate select
     // states per viewport:
-    // 
+    //
     enum class IsolateSelectState {IsolateSelectOff, IsolateSelectPendingObjects,
 				   IsolateSelectOn};
 
