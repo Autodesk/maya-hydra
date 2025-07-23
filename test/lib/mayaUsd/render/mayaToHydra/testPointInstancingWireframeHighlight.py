@@ -39,10 +39,6 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.modifyDefaultLightIntensityByUsdVersion()
         cmds.refresh()
 
-    def tearDown(self):
-        # Clean up after each test to prevent state contamination
-        cmds.file(new=True, force=True)
-
     def test_PointInstancerSelection(self):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
         cmds.setAttr('persp.translate', 10, 10, 10, type='float3')

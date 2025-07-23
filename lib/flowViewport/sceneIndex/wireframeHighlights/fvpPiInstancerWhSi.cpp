@@ -328,14 +328,9 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
             }
         }
 
-        auto hasPrimvarChanges = [&](const std::initializer_list<TfToken>& primvarNames) {
-            return std::any_of(primvarNames.begin(), primvarNames.end(), [&](const TfToken& token) {
-                return entry.dirtyLocators.Intersects(HdDataSourceLocator(HdPrimvarsSchemaTokens->primvars, token));
-            });
-        };
-        bool hasTransformOrSelectionChanges = hasPrimvarChanges({HdInstancerTokens->instanceTransforms, HdTokens->displayColor});
+        bool hasTransformChanges = entry.dirtyLocators.Intersects(HdDataSourceLocator(HdPrimvarsSchemaTokens->primvars, HdInstancerTokens->instanceTransforms));
         if ((_instancerPathsToSelections.find(entry.primPath) != _instancerPathsToSelections.end() || _prototypePathsToSelections.find(entry.primPath) != _prototypePathsToSelections.end()) 
-            && (entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator()) || hasTransformOrSelectionChanges)) {
+            && (entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator()) || hasTransformChanges)) {
             // Instancing topology or transforms changed : rebuild the highlights, since we don't know exactly how it was changed
             auto instancerSelectionKeysToRebuild = _instancerPathsToSelections.find(entry.primPath);
             if (instancerSelectionKeysToRebuild != _instancerPathsToSelections.end()) {
