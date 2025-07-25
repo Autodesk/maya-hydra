@@ -130,7 +130,6 @@ VtValue MayaHydraCameraAdapter::Get(const TfToken& key) { return MayaHydraShapeA
 
 VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
 {
-    constexpr double mayaInchToHydraCentimeter = 0.254;
     constexpr double mayaInchToHydraMillimeter = 0.0254;
     constexpr double mayaFocaLenToHydra = 0.01;
 
@@ -220,7 +219,7 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         auto focusDistance = camera.focusDistance(&status);
         if (hadError(status))
             return {};
-        return VtValue(float(focusDistance * mayaInchToHydraCentimeter));
+        return VtValue(float(focusDistance));
     }
     if (paramName == HdCameraTokens->focalLength) {
         const double aspectRatio = _viewport
@@ -236,7 +235,7 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
             = (convertFit(camera) == CameraUtilConformWindowPolicy::CameraUtilMatchVertically)
             ? (2.0 * cameraNear) / (top - bottom)
             : (2.0 * cameraNear) / (right - left);
-        return VtValue(float(focalLen * mayaFocaLenToHydra));
+        return VtValue(float(focalLen));
     }
     if (paramName == HdCameraTokens->clippingRange) {
         const double cameraNear = camera.nearClippingPlane();
