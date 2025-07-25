@@ -130,47 +130,22 @@ VtValue MayaHydraCameraAdapter::Get(const TfToken& key) { return MayaHydraShapeA
 
 VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
 {
-    constexpr double mayaInchToHydraMillimeter = 0.0254;
-    constexpr double mayaFocaLenToHydra = 0.01;
+    constexpr double inchToMM = 25.4;
 
     MStatus status;
 
     auto convertFit = [&](const MFnCamera& camera) -> CameraUtilConformWindowPolicy {
         const auto mayaFit = camera.filmFit(&status);
-        if (mayaFit == MFnCamera::kHorizontalFilmFit)
-            return CameraUtilConformWindowPolicy::CameraUtilMatchHorizontally;
-        if (mayaFit == MFnCamera::kVerticalFilmFit)
-            return CameraUtilConformWindowPolicy::CameraUtilMatchVertically;
-
-        const auto fitMatcher = camera.horizontalFilmAperture() > camera.verticalFilmAperture()
-            ? MFnCamera::kOverscanFilmFit
-            : MFnCamera::kFillFilmFit;
-        return mayaFit == fitMatcher ? CameraUtilConformWindowPolicy::CameraUtilMatchHorizontally
-                                     : CameraUtilConformWindowPolicy::CameraUtilMatchVertically;
-    };
-
-    auto apertureConvert = [&](const MFnCamera& camera, double glApertureX, double glApertureY) {
-        const auto   usdFit = convertFit(camera);
-        const double aperture = usdFit == CameraUtilConformWindowPolicy::CameraUtilMatchHorizontally
-            ? camera.horizontalFilmAperture()
-            : camera.verticalFilmAperture();
-        const double glAperture
-            = usdFit == CameraUtilConformWindowPolicy::CameraUtilMatchHorizontally ? glApertureX
-                                                                                   : glApertureY;
-        return (0.02 / aperture) * (aperture / glAperture);
-    };
-
-    auto viewParameters = [&](const MFnCamera& camera,
-                              const GfVec4d*   viewport,
-                              double&          apertureX,
-                              double&          apertureY,
-                              double&          offsetX,
-                              double&          offsetY) -> MStatus {
-        double aspectRatio = viewport
-            ? ((*viewport)[2] - (*viewport)[0]) / ((*viewport)[3] - (*viewport)[1])
-            : camera.aspectRatio();
-        return camera.getViewParameters(
-            aspectRatio, apertureX, apertureY, offsetX, offsetY, true, false, true);
+        switch (mayaFit) {
+            case MFnCamera::kFillFilmFit:
+                return CameraUtilConformWindowPolicy::CameraUtilCrop;
+            case MFnCamera::kHorizontalFilmFit:
+                return CameraUtilConformWindowPolicy::CameraUtilMatchHorizontally;
+            case MFnCamera::kVerticalFilmFit:
+                return CameraUtilConformWindowPolicy::CameraUtilMatchVertically;
+            default:
+                return CameraUtilConformWindowPolicy::CameraUtilFit;
+        }
     };
 
     auto hadError = [&](MStatus& status) -> bool {
@@ -222,20 +197,10 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         return VtValue(float(focusDistance));
     }
     if (paramName == HdCameraTokens->focalLength) {
-        const double aspectRatio = _viewport
-            ? (((*_viewport)[2] - (*_viewport)[0]) / ((*_viewport)[3] - (*_viewport)[1]))
-            : camera.aspectRatio();
-
-        double left, right, bottom, top;
-        status = camera.getViewingFrustum(aspectRatio, left, right, bottom, top, true, false, true);
-
-        const double cameraNear = camera.nearClippingPlane();
-
-        const double focalLen
-            = (convertFit(camera) == CameraUtilConformWindowPolicy::CameraUtilMatchVertically)
-            ? (2.0 * cameraNear) / (top - bottom)
-            : (2.0 * cameraNear) / (right - left);
-        return VtValue(float(focalLen));
+        auto focalLength = camera.focalLength(&status);
+        if (hadError(status))
+            return {};
+        return VtValue(float(focalLength)); /// focalLength is in mm, so no conversion needed
     }
     if (paramName == HdCameraTokens->clippingRange) {
         const double cameraNear = camera.nearClippingPlane();
@@ -252,32 +217,35 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         return VtValue(float(fStop));
     }
     if (paramName == HdCameraTokens->horizontalAperture) {
-        double apertureX, apertureY, offsetX, offsetY;
-        status = viewParameters(camera, _viewport.get(), apertureX, apertureY, offsetX, offsetY);
+        // Lens squeeze ratio applies horizontally only.
+        const double horizontalAperture =  camera.horizontalFilmAperture(&status) * camera.lensSqueezeRatio(&status);
         if (hadError(status))
             return {};
-        return VtValue(float(apertureX * apertureConvert(camera, apertureX, apertureY)));
+        return VtValue(float(horizontalAperture * inchToMM));
     }
     if (paramName == HdCameraTokens->verticalAperture) {
-        double apertureX, apertureY, offsetX, offsetY;
-        status = viewParameters(camera, _viewport.get(), apertureX, apertureY, offsetX, offsetY);
+        const double verticalAperture = camera.verticalFilmAperture();
         if (hadError(status))
             return {};
-        return VtValue(float(apertureY * apertureConvert(camera, apertureX, apertureY)));
+        return VtValue(float(verticalAperture * inchToMM));
     }
     if (paramName == HdCameraTokens->horizontalApertureOffset) {
-        double apertureX, apertureY, offsetX, offsetY;
-        status = viewParameters(camera, _viewport.get(), apertureX, apertureY, offsetX, offsetY);
+        // Film offset and shake (when enabled) have the same effect on film back
+        const double horizontalApertureOffset =
+            (camera.shakeEnabled(&status) ? camera.horizontalFilmOffset(&status) + camera.horizontalShake(&status)
+                                  : camera.horizontalFilmOffset(&status));
         if (hadError(status))
             return {};
-        return VtValue(float(offsetX * mayaInchToHydraMillimeter));
+        return VtValue(float(horizontalApertureOffset * inchToMM));
     }
     if (paramName == HdCameraTokens->verticalApertureOffset) {
-        double apertureX, apertureY, offsetX, offsetY;
-        status = viewParameters(camera, _viewport.get(), apertureX, apertureY, offsetX, offsetY);
+        // Film offset and shake (when enabled) have the same effect on film back
+        const double verticalApertureOffset =
+            (camera.shakeEnabled(&status) ? camera.verticalFilmOffset(&status) + camera.verticalShake(&status)
+                                  : camera.verticalFilmOffset(&status));
         if (hadError(status))
             return {};
-        return VtValue(float(offsetY * mayaInchToHydraMillimeter));
+        return VtValue(float(verticalApertureOffset * inchToMM));
     }
     if (paramName == HdCameraTokens->windowPolicy) {
         const auto windowPolicy = convertFit(camera);
