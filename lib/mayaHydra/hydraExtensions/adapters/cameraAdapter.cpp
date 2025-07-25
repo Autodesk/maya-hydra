@@ -133,7 +133,6 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
     constexpr double mayaInchToHydraCentimeter = 0.254;
     constexpr double mayaInchToHydraMillimeter = 0.0254;
     constexpr double mayaFocaLenToHydra = 0.01;
-    constexpr double mayaToHydraApertureScale = 10.0;
 
     MStatus status;
 
@@ -151,7 +150,7 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
                                      : CameraUtilConformWindowPolicy::CameraUtilMatchVertically;
     };
 
-    auto apertureConvert = [&](const MFnCamera& camera, bool isOrtho, double glApertureX, double glApertureY) {
+    auto apertureConvert = [&](const MFnCamera& camera, double glApertureX, double glApertureY) {
         const auto   usdFit = convertFit(camera);
         const double aperture = usdFit == CameraUtilConformWindowPolicy::CameraUtilMatchHorizontally
             ? camera.horizontalFilmAperture()
@@ -159,8 +158,7 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         const double glAperture
             = usdFit == CameraUtilConformWindowPolicy::CameraUtilMatchHorizontally ? glApertureX
                                                                                    : glApertureY;
-        auto res = (0.02 / aperture) * (aperture / glAperture);
-        return isOrtho ? res * mayaToHydraApertureScale : res;
+        return (0.02 / aperture) * (aperture / glAperture);
     };
 
     auto viewParameters = [&](const MFnCamera& camera,
@@ -195,18 +193,6 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         return {};
     }
 
-    if (paramName == HdCameraTokens->projection) {
-        if (isOrtho) {
-            return VtValue(HdCamera::Orthographic);
-        } else {
-            return VtValue(HdCamera::Perspective);
-        }
-    }
-    if (paramName == HdCameraTokens->clippingRange) {
-        const double cameraNear = camera.nearClippingPlane();
-        const double cameraFar = camera.farClippingPlane();
-        return VtValue(GfRange1f(cameraNear, cameraFar));
-    }
     if (paramName == HdCameraTokens->shutterOpen) {
         // No motion samples, instantaneous shutter
         if (!GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled())
@@ -224,40 +210,6 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         auto shutterClose = std::min(std::max(0.0, shutterAngle), maxRadians) / maxRadians;
         auto interval = GetMayaHydraSceneIndex()->GetCurrentTimeSamplingInterval();
         return VtValue(double(interval.GetMin() + interval.GetSize() * shutterClose));
-    }
-    if (paramName == HdCameraTokens->windowPolicy) {
-        const auto windowPolicy = convertFit(camera);
-        if (hadError(status))
-            return {};
-        return VtValue(windowPolicy);
-    }
-    if (paramName == HdCameraTokens->horizontalAperture) {
-        double apertureX, apertureY, offsetX, offsetY;
-        status = viewParameters(camera, _viewport.get(), apertureX, apertureY, offsetX, offsetY);
-        if (hadError(status))
-            return {};
-        return VtValue(float(apertureX * apertureConvert(camera, isOrtho, apertureX, apertureY)));
-    }
-    if (paramName == HdCameraTokens->verticalAperture) {
-        double apertureX, apertureY, offsetX, offsetY;
-        status = viewParameters(camera, _viewport.get(), apertureX, apertureY, offsetX, offsetY);
-        if (hadError(status))
-            return {};
-        return VtValue(float(apertureY * apertureConvert(camera, isOrtho, apertureX, apertureY)));
-    }
-    if (paramName == HdCameraTokens->horizontalApertureOffset) {
-        double apertureX, apertureY, offsetX, offsetY;
-        status = viewParameters(camera, _viewport.get(), apertureX, apertureY, offsetX, offsetY);
-        if (hadError(status))
-            return {};
-        return VtValue(float(offsetX * mayaInchToHydraMillimeter));
-    }
-    if (paramName == HdCameraTokens->verticalApertureOffset) {
-        double apertureX, apertureY, offsetX, offsetY;
-        status = viewParameters(camera, _viewport.get(), apertureX, apertureY, offsetX, offsetY);
-        if (hadError(status))
-            return {};
-        return VtValue(float(offsetY * mayaInchToHydraMillimeter));
     }
 
     // Don't bother with anything else for orthographic cameras
@@ -286,6 +238,11 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
             : (2.0 * cameraNear) / (right - left);
         return VtValue(float(focalLen * mayaFocaLenToHydra));
     }
+    if (paramName == HdCameraTokens->clippingRange) {
+        const double cameraNear = camera.nearClippingPlane();
+        const double cameraFar = camera.farClippingPlane();
+        return VtValue(GfRange1f(cameraNear, cameraFar));
+    }
     if (paramName == HdCameraTokens->fStop) {
         // For USD/Hydra fStop=0 should disable depthOfField
         if (!camera.isDepthOfField())
@@ -294,6 +251,47 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         if (hadError(status))
             return {};
         return VtValue(float(fStop));
+    }
+    if (paramName == HdCameraTokens->horizontalAperture) {
+        double apertureX, apertureY, offsetX, offsetY;
+        status = viewParameters(camera, _viewport.get(), apertureX, apertureY, offsetX, offsetY);
+        if (hadError(status))
+            return {};
+        return VtValue(float(apertureX * apertureConvert(camera, apertureX, apertureY)));
+    }
+    if (paramName == HdCameraTokens->verticalAperture) {
+        double apertureX, apertureY, offsetX, offsetY;
+        status = viewParameters(camera, _viewport.get(), apertureX, apertureY, offsetX, offsetY);
+        if (hadError(status))
+            return {};
+        return VtValue(float(apertureY * apertureConvert(camera, apertureX, apertureY)));
+    }
+    if (paramName == HdCameraTokens->horizontalApertureOffset) {
+        double apertureX, apertureY, offsetX, offsetY;
+        status = viewParameters(camera, _viewport.get(), apertureX, apertureY, offsetX, offsetY);
+        if (hadError(status))
+            return {};
+        return VtValue(float(offsetX * mayaInchToHydraMillimeter));
+    }
+    if (paramName == HdCameraTokens->verticalApertureOffset) {
+        double apertureX, apertureY, offsetX, offsetY;
+        status = viewParameters(camera, _viewport.get(), apertureX, apertureY, offsetX, offsetY);
+        if (hadError(status))
+            return {};
+        return VtValue(float(offsetY * mayaInchToHydraMillimeter));
+    }
+    if (paramName == HdCameraTokens->windowPolicy) {
+        const auto windowPolicy = convertFit(camera);
+        if (hadError(status))
+            return {};
+        return VtValue(windowPolicy);
+    }
+    if (paramName == HdCameraTokens->projection) {
+        if (isOrtho) {
+            return VtValue(HdCamera::Orthographic);
+        } else {
+            return VtValue(HdCamera::Perspective);
+        }
     }
 
     return {};
