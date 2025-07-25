@@ -238,6 +238,11 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
             : (2.0 * cameraNear) / (right - left);
         return VtValue(float(focalLen * mayaFocaLenToHydra));
     }
+    if (paramName == HdCameraTokens->clippingRange) {
+        const double cameraNear = camera.nearClippingPlane();
+        const double cameraFar = camera.farClippingPlane();
+        return VtValue(GfRange1f(cameraNear, cameraFar));
+    }
     if (paramName == HdCameraTokens->fStop) {
         // For USD/Hydra fStop=0 should disable depthOfField
         if (!camera.isDepthOfField())

@@ -1042,38 +1042,38 @@ MStatus MtohRenderOverride::Render(
         _taskController->SetRenderOutputSettings(HdAovTokens->depth, depthAovDesc);
     }
 
-    _taskController->SetFreeCameraMatrices(
-        GetGfMatrixFromMaya(
-            drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx)),
-        GetGfMatrixFromMaya(
-            drawContext.getMatrix(MHWRender::MFrameContext::kProjectionMtx)));
-
-    if (delegateParams.motionSamplesEnabled()) {
-        MStatus  status;
-        MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
-        if (status == MStatus::kSuccess) {
-            MString   ufeCameraPathString = getFrameContext()->getCurrentUfeCameraPath(&status);
-            Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
-            bool isMayaCamera = ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId();
-            if (isMayaCamera) {
-                if (_mayaHydraSceneIndex) {
+    MStatus  status;
+    MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
+    if (status == MStatus::kSuccess) {
+        MString   ufeCameraPathString = getFrameContext()->getCurrentUfeCameraPath(&status);
+        Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
+        bool isMayaCamera = ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId();
+        if (isMayaCamera) { // TODO: Support USD Camera
+            MFnCamera camera(camPath, &status);
+            if (status == MStatus::kSuccess) {
+                if (_mayaHydraSceneIndex && !camera.isOrtho()) { // TODO: Support Persp Camera
                     params.camera = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
                     if (vpDirty)
                         _mayaHydraSceneIndex->MarkSprimDirty(params.camera, HdCamera::DirtyParams);
                 }
             }
-        } else {
-            TF_WARN(
-                "MFrameContext::getCurrentCameraPath failure (%d): '%s'"
-                "\nUsing viewport matrices.",
-                int(status.statusCode()),
-                status.errorString().asChar());
-        }
+        } 
+    } else {
+        TF_WARN(
+            "MFrameContext::getCurrentCameraPath failure (%d): '%s'"
+            "\nUsing viewport matrices.",
+            int(status.statusCode()),
+            status.errorString().asChar());
     }
 
     _taskController->SetRenderParams(params);
+    // Use explicit camera if specified
     if (!params.camera.IsEmpty())
         _taskController->SetCameraPath(params.camera);
+    else
+        _taskController->SetFreeCameraMatrices(
+            GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx)),
+            GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kProjectionMtx)));
 
     // Default color in usdview.
     _taskController->SetSelectionColor(_globals.colorSelectionHighlightColor);
