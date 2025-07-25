@@ -1048,13 +1048,16 @@ MStatus MtohRenderOverride::Render(
         MString   ufeCameraPathString = getFrameContext()->getCurrentUfeCameraPath(&status);
         Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
         bool isMayaCamera = ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId();
-        if (isMayaCamera) {
-            if (_mayaHydraSceneIndex) {
-                params.camera = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
-                if (vpDirty)
-                _mayaHydraSceneIndex->MarkSprimDirty(params.camera, HdCamera::DirtyParams);
+        if (isMayaCamera) { // TODO: Support USD Camera
+            MFnCamera camera(camPath, &status);
+            if (status == MStatus::kSuccess) {
+                if (_mayaHydraSceneIndex && !camera.isOrtho()) { // TODO: Support Persp Camera
+                    params.camera = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
+                    if (vpDirty)
+                        _mayaHydraSceneIndex->MarkSprimDirty(params.camera, HdCamera::DirtyParams);
+                }
             }
-        }
+        } 
     } else {
         TF_WARN(
             "MFrameContext::getCurrentCameraPath failure (%d): '%s'"
