@@ -36,6 +36,11 @@
 #include <maya/MObjectHandle.h>
 #include <maya/MPlug.h>
 #include <maya/MPolyMessage.h>
+#include <maya/MFnAttribute.h>
+#include <maya/MFnTypedAttribute.h>
+#include <maya/MFnNumericAttribute.h>
+#include <maya/MFnEnumAttribute.h>
+#include <maya/MFnStringData.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -269,6 +274,13 @@ public:
             return GetUVs();
         }
 
+        // Check extension attributes
+        auto& it = _extAttrNameToValueMap.find(key.GetText());
+        if (it != _extAttrNameToValueMap.end())
+        {
+            return it->second;
+        }
+
         return {};
     }
 
@@ -418,6 +430,92 @@ public:
 
     HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation) override
     {
+        // All extension attributes as custom primvars
+        if (interpolation == HdInterpolationConstant) {
+            MFnMesh mesh(GetDagPath());
+            for (size_t i = 0; i < mesh.attributeCount(); i++) {
+                MObject      attrObj = mesh.attribute(i);
+                MFnAttribute attr(attrObj);
+                if (attr.isExtension()) {
+                    switch (attrObj.apiType()) {
+                        case MFn::kEnumAttribute: {
+                            MFnEnumAttribute enumAttr(attrObj);
+                            MPlug plug = mesh.findPlug(attr.name());
+                            short value = plug.asShort();
+                            short defaultVal = 0;
+                            enumAttr.getDefault(defaultVal);
+                            if (defaultVal != value) {
+                                auto attrName = attr.name().asChar();
+                                _extAttrNameToValueMap[attrName] = VtValue(value);
+                            }
+                        } break;
+                        case MFn::kTypedAttribute: {
+                            MFnTypedAttribute typeAttr(attrObj);
+                            MPlug             plug = mesh.findPlug(attr.name());
+                            switch (typeAttr.attrType()) {
+                                case MFnData::kString: {
+                                    MString value = plug.asString();
+                                    MObject defaultValObj;
+                                    typeAttr.getDefault(defaultValObj);
+                                    MFnStringData defaultStringData(defaultValObj);
+                                    MString defaultVal = defaultStringData.string();
+                                    if (defaultVal != value) {
+                                        auto attrName = attr.name().asChar();
+                                        _extAttrNameToValueMap[attrName] = VtValue(value.asChar());
+                                    }
+                                } break;
+                                default: // TODO: more types
+                                    break;
+                            } break;
+                        } break;
+                        case MFn::kNumericAttribute: {
+                            MFnNumericAttribute numericAttr(attrObj);
+                            MPlug             plug = mesh.findPlug(attr.name());
+                            switch (numericAttr.unitType()) {
+                                case MFnNumericData::kBoolean: {
+                                        auto value = plug.asBool();
+                                        bool defaultVal;
+                                        numericAttr.getDefault(defaultVal);
+                                        if (defaultVal != value) {
+                                            auto attrName = attr.name().asChar();
+                                            _extAttrNameToValueMap[attrName] = VtValue(value);
+                                        }
+                                } break;
+                                case MFnNumericData::kInt: {
+                                        auto  value = plug.asInt();
+                                        int defaultVal;
+                                        numericAttr.getDefault(defaultVal);
+                                        if (defaultVal != value) {
+                                            auto attrName = attr.name().asChar();
+                                            _extAttrNameToValueMap[attrName] = VtValue(value);
+                                        }
+                                } break;
+                                case MFnNumericData::kFloat: {
+                                        auto  value = plug.asFloat();
+                                        float defaultVal;
+                                        numericAttr.getDefault(defaultVal);
+                                        if (defaultVal != value) {
+                                            auto attrName = attr.name().asChar();
+                                            _extAttrNameToValueMap[attrName] = VtValue(value);
+                                        }
+                                } break;
+                                default: // TODO: more types
+                                    break;
+                            } break;
+                        } break;
+                        default: // TODO: more types
+                            break;
+                    }
+                }
+            }
+            // Use constant interpolation and none role for all primvars
+            HdPrimvarDescriptorVector descriptors;
+            for (auto it = _extAttrNameToValueMap.begin(); it != _extAttrNameToValueMap.end(); it++) {
+                descriptors.push_back(
+                    { TfToken(it->first), interpolation, HdPrimvarRoleTokens->none });
+            }
+            return descriptors;
+        }
         if (interpolation == HdInterpolationVertex) {
             static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
             return  passNormalsToHydra ? 
@@ -533,6 +631,8 @@ private:
     // To work around this, we register these callbacks specially, and only
     // remove them if the underlying node is currently valid.
     MCallbackIdArray _buggyCallbacks;
+
+    std::map<std::string, VtValue> _extAttrNameToValueMap;
 };
 
 TF_REGISTRY_FUNCTION(TfType)
