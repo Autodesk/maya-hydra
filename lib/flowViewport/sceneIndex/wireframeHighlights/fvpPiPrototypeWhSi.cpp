@@ -29,7 +29,7 @@ namespace {
 
 const std::set<TfToken> kSupportedPrimTypes = {
     HdPrimTypeTokens->mesh,
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
     HdPrimTypeTokens->geomSubset,
 #endif
 };
@@ -70,7 +70,7 @@ HdSceneIndexPrim PiPrototypeWhSi::GetHighlightPrim(const SdfPath &selectionPath,
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
     if (prim.primType == HdPrimTypeTokens->mesh) {
         prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(selectionKey.first));
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
         if (originalPrototypePrim.primType == HdPrimTypeTokens->geomSubset && originalPath == selectionKey.first.GetParentPath()) {
             prim.dataSource = MakeGeomSubsetHighlight(prim.dataSource, originalPrototypePrim.dataSource);
         }
@@ -89,15 +89,15 @@ SdfPathVector PiPrototypeWhSi::GetHighlightChildPrimPaths(const SdfPath &selecti
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
     auto originalChildPaths = GetInputSceneIndex()->GetChildPrimPaths(originalPath);
     for (const auto& originalChildPath : originalChildPaths) {
-        bool isInstancerRelevantPath = 
+        bool isInstancerRelevantPath =
             FindSelfOrFirstParent(originalChildPath, _instancerPathsToSelections) != _instancerPathsToSelections.end()
             || FindSelfOrFirstChild(originalChildPath, _instancerPathsToSelections) != _instancerPathsToSelections.end();
-        bool isPrototypeRelevantPath = 
+        bool isPrototypeRelevantPath =
             FindSelfOrFirstParent(originalChildPath, _prototypePathsToSelections) != _prototypePathsToSelections.end()
             || FindSelfOrFirstChild(originalChildPath, _prototypePathsToSelections) != _prototypePathsToSelections.end();
         bool isRelevantPath = isInstancerRelevantPath || isPrototypeRelevantPath;
         if (isRelevantPath) {
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
             bool isSelectedGeomSubsetPrototypePath = originalPrototypePrim.primType == HdPrimTypeTokens->geomSubset && originalChildPath == selectionKey.first;
             if (!isSelectedGeomSubsetPrototypePath) {
                 childPaths.emplace_back(originalChildPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
@@ -255,7 +255,7 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
             }
         }
 
-        if ((_instancerPathsToSelections.find(entry.primPath) != _instancerPathsToSelections.end() || _prototypePathsToSelections.find(entry.primPath) != _prototypePathsToSelections.end()) 
+        if ((_instancerPathsToSelections.find(entry.primPath) != _instancerPathsToSelections.end() || _prototypePathsToSelections.find(entry.primPath) != _prototypePathsToSelections.end())
             && entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator())) {
             // Instancing topology was changed : rebuild the highlights, since we don't know exactly how it was changed
             auto instancerSelectionKeysToRebuild = _instancerPathsToSelections.find(entry.primPath);
@@ -293,7 +293,7 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
             for (const auto& selectionKey : itPrototype->second) {
                 auto selectionPath = SelectionPathFromKey(selectionKey);
                 auto dirtiedPath = entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath);
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
                 if (prim.primType == HdPrimTypeTokens->geomSubset && entry.primPath == selectionKey.first) {
                     dirtiedPath = dirtiedPath.GetParentPath();
                 }

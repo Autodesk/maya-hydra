@@ -18,7 +18,7 @@
 
 #include "fvpBaseWhSi.h"
 
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
 
 namespace FVP_NS_DEF {
 
@@ -38,7 +38,7 @@ typedef PXR_NS::TfRefPtr<const GeomSubsetWhSi> GeomSubsetWhSiConstRefPtr;
 /// Highlight_<selectionIdentifier>
 /// |__<trimmedParentMesh>
 ///
-class GeomSubsetWhSi 
+class GeomSubsetWhSi
     : public BaseWhSi
 {
 public:
@@ -80,7 +80,7 @@ protected:
     void ProcessDirtiedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
-    
+
     FVP_API
     void ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected) override;
 
@@ -93,6 +93,6 @@ private:
 
 }
 
-#endif // #if PXR_VERSION >= 2403
+#endif // #if PXR_VERSION >= 2405
 
 #endif // FVP_GEOM_SUBSET_WH_SI_H

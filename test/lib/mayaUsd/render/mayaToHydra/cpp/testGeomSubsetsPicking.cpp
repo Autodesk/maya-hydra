@@ -38,7 +38,7 @@ using namespace MayaHydra;
 
 namespace {
 
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
 const std::string kStageUfePathSegment = "|GeomSubsetsPickingTestScene|GeomSubsetsPickingTestSceneShape";
 
 const std::string kCubeMeshUfePathSegment = "/Root/CubeMeshXform/CubeMesh";
@@ -133,7 +133,7 @@ void testPicking(const Ufe::Path& clickMarkerUfePath, const Ufe::Path& selectedO
 
 TEST(TestGeomSubsetsPicking, geomSubsetPicking)
 {
-#if PXR_VERSION < 2403
+#if PXR_VERSION < 2405
     GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
 #else
     const auto cubeUpperHalfMarkerUfePath = Ufe::PathString::path(kStageUfePathSegment + "," + kCubeUpperHalfMarkerUfePathSegment);
@@ -144,7 +144,7 @@ TEST(TestGeomSubsetsPicking, geomSubsetPicking)
 
 TEST(TestGeomSubsetsPicking, fallbackPicking)
 {
-#if PXR_VERSION < 2403
+#if PXR_VERSION < 2405
     GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
 #else
     const auto cubeLowerHalfMarkerUfePath = Ufe::PathString::path(kStageUfePathSegment + "," + kCubeLowerHalfMarkerUfePathSegment);
@@ -155,7 +155,7 @@ TEST(TestGeomSubsetsPicking, fallbackPicking)
 
 TEST(TestGeomSubsetsPicking, instanceGeomSubsetPicking)
 {
-#if PXR_VERSION < 2403
+#if PXR_VERSION < 2405
     GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
 #else
     const auto sphereInstanceUpperHalfMarkerUfePath = Ufe::PathString::path(kStageUfePathSegment + "," + kSphereInstanceUpperHalfMarkerUfePathSegment);
@@ -166,7 +166,7 @@ TEST(TestGeomSubsetsPicking, instanceGeomSubsetPicking)
 
 TEST(TestGeomSubsetsPicking, instanceFallbackPicking)
 {
-#if PXR_VERSION < 2403
+#if PXR_VERSION < 2405
     GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
 #else
     const auto sphereInstanceLowerHalfMarkerUfePath = Ufe::PathString::path(kStageUfePathSegment + "," + kSphereInstanceLowerHalfMarkerUfePathSegment);
@@ -177,7 +177,7 @@ TEST(TestGeomSubsetsPicking, instanceFallbackPicking)
 
 TEST(TestGeomSubsetsPicking, marqueeSelect)
 {
-#if PXR_VERSION < 2403
+#if PXR_VERSION < 2405
     GTEST_SKIP() << "Skipping test, USD version used does not support GeomSubset prims.";
 #else
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
@@ -195,7 +195,7 @@ TEST(TestGeomSubsetsPicking, marqueeSelect)
     // Preconditions
     auto ufeSelection = Ufe::GlobalSelection::get();
     ASSERT_TRUE(ufeSelection->empty());
-    
+
     for (const auto& geomSubsetName : geomSubsetNamesToSelect) {
         assertUnselected(inspector, FindGeomSubsetPredicate(geomSubsetName));
     }
