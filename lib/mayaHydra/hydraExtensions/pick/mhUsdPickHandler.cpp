@@ -229,11 +229,11 @@ Ufe::Path usdPathToUfePath(
         registration->pluginSceneIndex, usdPath) : Ufe::Path();
 }
 
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
 std::vector<UsdPickHandler::HitPath> resolveGeomSubsetsPicking(
-    HdSceneIndexBaseConstRefPtr sceneIndex, 
-    const SdfPath& basePrimPath, 
-    const TfToken& geomSubsetType, 
+    HdSceneIndexBaseConstRefPtr sceneIndex,
+    const SdfPath& basePrimPath,
+    const TfToken& geomSubsetType,
     int componentIndex)
 {
     if (componentIndex < 0) {
@@ -288,7 +288,7 @@ UsdPickHandler::HitPath resolveInstancePicking(HdRenderIndex& renderIndex, const
     // (implicit USD prototype created by USD itself) and point instancing
     // (explicitly authored USD prototypes).  As per HdxInstancerContext
     // documentation:
-    // 
+    //
     // [...] "exactly one of instancePrimOrigin or instancerPrimOrigin will
     // contain data depending on whether the instancing at the current
     // level was implicit or not, respectively."
@@ -302,7 +302,7 @@ UsdPickHandler::HitPath resolveInstancePicking(HdRenderIndex& renderIndex, const
         }
         auto instanceOriginPath = instanceOriginSchema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath);
 
-        // EMSUSD-1220 : Native instances picking depends on the Point Instances pick mode. 
+        // EMSUSD-1220 : Native instances picking depends on the Point Instances pick mode.
         if (GetPointInstancesPickMode() != UsdPointInstancesPickMode::Prototypes) {
             // "PointInstancer" and "Instances" pick modes : select the instanced prim
             return {instanceOriginPath, -1};
@@ -320,7 +320,7 @@ UsdPickHandler::HitPath resolveInstancePicking(HdRenderIndex& renderIndex, const
 
     // Explicit prototype instancing (i.e. USD point instancing).
     std::function<UsdPickHandler::HitPath(const HdxPrimOriginInfo& primOrigin, const HdxPickHit& hit)> pickFn[] = {pickInstancer, pickInstance, pickPrototype};
-                        
+
     // Retrieve pick mode from mayaUsd optionVar, to see if we're picking
     // instances, the instancer itself, or the prototype instanced by the
     // point instance.
@@ -353,12 +353,12 @@ bool UsdPickHandler::handlePickHit(
 
     std::vector<HitPath> hitPaths;
 
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
     if (GetGeomSubsetsPickMode() == GeomSubsetsPickModeTokens->Faces) {
         auto geomSubsetsHitPaths = resolveGeomSubsetsPicking(
-            renderIndex()->GetTerminalSceneIndex(), 
-            pickInput.pickHit.objectId, 
-            HdGeomSubsetSchemaTokens->typeFaceSet, 
+            renderIndex()->GetTerminalSceneIndex(),
+            pickInput.pickHit.objectId,
+            HdGeomSubsetSchemaTokens->typeFaceSet,
             pickInput.pickHit.elementIndex);
         if (!geomSubsetsHitPaths.empty()) {
             hitPaths.insert(hitPaths.end(), geomSubsetsHitPaths.begin(), geomSubsetsHitPaths.end());

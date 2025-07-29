@@ -62,8 +62,8 @@ typedef PXR_NS::TfRefPtr<const BaseWhSi> BaseWhSiConstRefPtr;
 ///
 /// The BaseWhSi class is responsible for composing the four parts
 /// together; derived classes only need to register and unregister
-/// selection highlights as needed (through unique pairs composed of 
-/// a prim path + a selection identifier), and handle the processing 
+/// selection highlights as needed (through unique pairs composed of
+/// a prim path + a selection identifier), and handle the processing
 /// of their selection highlight sub-hierarchies.
 ///
 /// To do this, the BaseWhSi class overrides the typical HdSceneIndex
@@ -73,7 +73,7 @@ typedef PXR_NS::TfRefPtr<const BaseWhSi> BaseWhSiConstRefPtr;
 /// must be implemented by the derived classes. These are :
 ///
 /// 1. GetHighlightPrim & GetHighlightChildPrimPaths
-/// These methods are implemented by the derived scene index to return the 
+/// These methods are implemented by the derived scene index to return the
 /// selection highlight sub-hierarchies. This allows derived scene indices to
 /// focus only on handling their specific flavor of selection highlighting.
 /// These methods will be automatically called by BaseWhSi::GetPrim and
@@ -89,10 +89,10 @@ typedef PXR_NS::TfRefPtr<const BaseWhSi> BaseWhSiConstRefPtr;
 /// 3. ProcessFullySelectedChange
 /// This is an optional method that can be overriden by derived classes if desired.
 /// This method will be called whenever a prim becomes fully selected, or when it
-/// stops being so. This is useful for handling selection highlights for when a 
+/// stops being so. This is useful for handling selection highlights for when a
 /// parent prim is selected/deselected.
-/// 
-class BaseWhSi 
+///
+class BaseWhSi
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
     , public Fvp::InputSceneIndexUtils<BaseWhSi>
 {
@@ -130,10 +130,10 @@ protected:
     void _PrimsDirtied(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) final;
-    
+
     FVP_API
     bool IsExcludedPath(const PXR_NS::SdfPath& path) const;
-    
+
     FVP_API
     PXR_NS::SdfPath SelectionPathFromKey(const SelectionKey& selectionKey) const;
 
@@ -160,17 +160,17 @@ protected:
     virtual void ProcessAddedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries) = 0;
-    
+
     FVP_API
     virtual void ProcessRemovedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries) = 0;
-    
+
     FVP_API
     virtual void ProcessDirtiedPrims(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) = 0;
-    
+
     // Optional helper method that can be overriden by derived classes;
     // this can help with handling highlights for when a parent prim is selected/deselected.
     FVP_API
@@ -179,19 +179,19 @@ protected:
     // Returns whether or not this prim or one of its parents is fully selected.
     FVP_API
     bool HasFullySelectedAncestorInclusive(const PXR_NS::SdfPath& primPath);
-    
+
     // Executes a given operation on a prim and all its descendants within the same hierarchy
     // (prototypes are considered separate hierarchies). When running the operation on a given
     // prim returns false, the prim's descendants are skipped.
     FVP_API
     void ForEachPrimInHierarchy(const PXR_NS::SdfPath& hierarchyRoot, const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation) const;
-    
+
     // Collect the paths to the instancers and prototypes of the instancing graph/network that the given prim is a part of.
     // The direction parameter allows for specifying whether to only collect instancers, prototypes, or both.
     FVP_API
     void CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPathsCollectionDirection direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const;
 
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
     // Given a mesh and geomSubset data sources, edits and returns the mesh data source to fit the given geomSubset
     FVP_API
     PXR_NS::HdContainerDataSourceHandle MakeGeomSubsetHighlight(
@@ -220,7 +220,7 @@ PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
     const PXR_NS::SdfPath& srcPrefix,
     const PXR_NS::SdfPath& dstPrefix);
 
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
 // Edit the given mesh data source such that its topology matches the given geomSubset.
 PXR_NS::HdContainerDataSourceHandle
 TrimMeshForGeomSubset(const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource, const PXR_NS::HdContainerDataSourceHandle& geomSubsetPrimDataSource);

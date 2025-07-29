@@ -38,7 +38,7 @@
 #include <pxr/imaging/hd/tokens.h>
 #if PXR_VERSION >= 2505
 #include <pxr/usdImaging/usdImaging/materialBindingsSchema.h>
-#elif PXR_VERSION >= 2403
+#elif PXR_VERSION >= 2405
 #include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
 #endif
 #include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
@@ -87,7 +87,7 @@ SdfPathVector _GetInstancingRelatedPaths(const HdSceneIndexPrim& prim, Fvp::Inst
 {
     HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    
+
     SdfPathVector instancingRelatedPaths;
 
     if ((direction & Fvp::InstancingPathsCollectionDirection::Prototypes)
@@ -147,8 +147,8 @@ bool _IsPrototypeSubPrim(const HdSceneIndexPrim& prim, const SdfPath& primPath)
 VtArray<SdfPath> _GetHierarchyRoots(const HdSceneIndexPrim& prim)
 {
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots() 
-        ? instancedBy.GetPrototypeRoots()->GetTypedValue(0) 
+    return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots()
+        ? instancedBy.GetPrototypeRoots()->GetTypedValue(0)
         : VtArray<SdfPath>({SdfPath::AbsoluteRootPath()});
 }
 
@@ -367,7 +367,7 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
                             HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{color}),
                             HdPrimvarSchemaTokens->constant,
                             HdPrimvarSchemaTokens->color));
-    
+
     //Is the prim having a DisplayStyle schema?
     if (HdLegacyDisplayStyleSchema styleSchema =
             HdLegacyDisplayStyleSchema::GetFromParent(dataSource)) {
@@ -395,8 +395,8 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
 }
 
 PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
-    const PXR_NS::HdContainerDataSourceHandle& primDataSource, 
-    const PXR_NS::SdfPath& srcPrefix, 
+    const PXR_NS::HdContainerDataSourceHandle& primDataSource,
+    const PXR_NS::SdfPath& srcPrefix,
     const PXR_NS::SdfPath& dstPrefix)
 {
     static const std::set<HdDataSourceLocator> kInstancingDataSourceLocators = {
@@ -410,7 +410,7 @@ PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
     HdContainerDataSourceEditor dataSourceEditor(primDataSource);
     for (const auto& instancingDataSourceLocator : kInstancingDataSourceLocators) {
         auto instancingDataSource = HdContainerDataSource::Get(primDataSource, instancingDataSourceLocator);
-        
+
         if (auto containerDataSource = HdContainerDataSource::Cast(instancingDataSource)) {
             dataSourceEditor.Set(
                 instancingDataSourceLocator,
@@ -435,7 +435,7 @@ PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
     return dataSourceEditor.Finish();
 }
 
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
 HdContainerDataSourceHandle
 TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshPrimDataSource, const HdContainerDataSourceHandle& geomSubsetPrimDataSource)
 {
@@ -498,7 +498,7 @@ TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshPrimDataSource, con
     }
     auto faceVertexCountsLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexCounts);
     auto faceVertexIndicesLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexIndices);
-    
+
     dataSourceEditor.Set(faceVertexCountsLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexCounts));
     dataSourceEditor.Set(faceVertexIndicesLocator, HdRetainedTypedSampledDataSource<VtIntArray>::New(trimmedFaceVertexIndices));
 
@@ -731,7 +731,7 @@ SdfPath BaseWhSi::UnregisterSelection(const SelectionKey& selectionKey)
 
 void
 BaseWhSi::ForEachPrimInHierarchy(
-    const PXR_NS::SdfPath& hierarchyRoot, 
+    const PXR_NS::SdfPath& hierarchyRoot,
     const std::function<bool(const PXR_NS::SdfPath&, const PXR_NS::HdSceneIndexPrim&)>& operation
 ) const
 {
@@ -774,7 +774,7 @@ BaseWhSi::CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPath
         }
         return;
     }
-    
+
     if (_IsPrototype(prim)) {
         if (outPrototypePaths.find(primPath) != outPrototypePaths.end()) {
             return;
@@ -816,7 +816,7 @@ BaseWhSi::CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPath
     }
 }
 
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
 PXR_NS::HdContainerDataSourceHandle
 BaseWhSi::MakeGeomSubsetHighlight(
     const PXR_NS::HdContainerDataSourceHandle& meshPrimDataSource,
@@ -830,7 +830,7 @@ BaseWhSi::MakeGeomSubsetHighlight(
         dataSourceEditor.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, HdMaterialBindingsSchema::GetDefaultLocator()));
 #if PXR_VERSION >= 2505
         dataSourceEditor.Set(UsdImagingMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, UsdImagingMaterialBindingsSchema::GetDefaultLocator()));
-#elif PXR_VERSION >= 2403
+#else
         dataSourceEditor.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdContainerDataSource::Get(geomSubsetPrimDataSource, UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator()));
 #endif
         editedMeshPrimDataSource = dataSourceEditor.Finish();
