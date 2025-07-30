@@ -180,33 +180,6 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn.append(topInstancerSecondInstanceItem)
         self.assertSnapshotClose("instanceWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-    def test_InstanceWireframeHighlightTransform(self):
-        cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
-        cmds.setAttr('persp.translate', 5, 10, 5, type='float3')
-
-        sn = ufe.GlobalSelection.get()
-        sn.clear()
-
-        topInstancerFirstInstancePath = self._stagePathSegment + "," + "/Root/TopInstancerXform/TopInstancer/0"
-        topInstancerFirstInstanceItem = ufe.Hierarchy.createItem(ufe.PathString.path(topInstancerFirstInstancePath))
-
-        sn.clear()
-        sn.append(topInstancerFirstInstanceItem)
-        
-        self.assertSnapshotClose("instanceWireframeHighlightTransform_beforeTransform.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        
-        cmds.move(1.5, 1.5, 1.5, r=True)
-        cmds.refresh()
-        self.assertSnapshotClose("instanceWireframeHighlightTransform_afterMove.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-        
-        cmds.scale(1.25, 1.25, 1.25, r=True)
-        cmds.refresh()
-        self.assertSnapshotClose("instanceWireframeHighlightTransform_afterScale.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
-        cmds.rotate(0, 90, 0, r=True)
-        cmds.refresh()
-        self.assertSnapshotClose("instanceWireframeHighlightTransform_afterRotation.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-    
     def test_PrototypeWireframeColorChange(self):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
         cmds.setAttr('persp.translate', 10, 10, 10, type='float3')

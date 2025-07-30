@@ -328,10 +328,9 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
             }
         }
 
-        bool hasTransformChanges = entry.dirtyLocators.Intersects(HdDataSourceLocator(HdPrimvarsSchemaTokens->primvars, HdInstancerTokens->instanceTransforms));
         if ((_instancerPathsToSelections.find(entry.primPath) != _instancerPathsToSelections.end() || _prototypePathsToSelections.find(entry.primPath) != _prototypePathsToSelections.end()) 
-            && (entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator()) || hasTransformChanges)) {
-            // Instancing topology or transforms changed : rebuild the highlights, since we don't know exactly how it was changed
+            && entry.dirtyLocators.Intersects(HdInstancerTopologySchema::GetDefaultLocator())) {
+            // Instancing topology was changed : rebuild the highlights, since we don't know exactly how it was changed
             auto instancerSelectionKeysToRebuild = _instancerPathsToSelections.find(entry.primPath);
             if (instancerSelectionKeysToRebuild != _instancerPathsToSelections.end()) {
                 const auto selectionKeysToRebuild = instancerSelectionKeysToRebuild->second;
