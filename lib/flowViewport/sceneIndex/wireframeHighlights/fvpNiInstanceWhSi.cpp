@@ -181,6 +181,7 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
 {
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
+        // If instance structure was dirtied, rebuild the highlight
         if (_primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end()
             && (entry.dirtyLocators.Intersects(HdInstanceSchema::GetDefaultLocator()) ||
                 entry.dirtyLocators.Intersects(HdDataSourceLocator(HdXformSchemaTokens->xform, HdXformSchemaTokens->matrix)))) {

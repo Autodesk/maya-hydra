@@ -19,7 +19,6 @@
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
-#include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
