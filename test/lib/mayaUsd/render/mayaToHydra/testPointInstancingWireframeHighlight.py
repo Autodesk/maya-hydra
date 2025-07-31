@@ -127,6 +127,7 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn.append(prototypeParentItem)
         self.assertSnapshotClose("prototype_parentSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
+    
     def test_PointInstancerWireframeColorChange(self):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
         cmds.setAttr('persp.translate', 10, 10, 10, type='float3')

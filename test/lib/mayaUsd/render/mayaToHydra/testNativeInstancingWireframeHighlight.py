@@ -141,7 +141,7 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("displaced_prototypeSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def test_NativeInstanceTransform(self):
-        self.loadUsdScene("instancedCubeHierarchies.usda", 3)  # Use working file
+        self.loadUsdScene("instancedCubeHierarchies.usda", 3)
         sn = ufe.GlobalSelection.get()
         sn.clear()
 
