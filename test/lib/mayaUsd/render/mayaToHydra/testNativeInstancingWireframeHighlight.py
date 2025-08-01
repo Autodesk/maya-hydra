@@ -31,6 +31,9 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_PERCENT = 1
 
     def loadUsdScene(self, sceneFile, cameraOffset):
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+        
         import usdUtils
         usdScenePath = testUtils.getTestScene('testNativeInstancingWireframeHighlight', sceneFile)
         usdUtils.createStageFromFile(usdScenePath)
@@ -39,10 +42,10 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.modifyDefaultLightIntensityByUsdVersion()
         cmds.refresh()
 
+        return sn
+
     def test_InstanceSelection(self):
-        self.loadUsdScene("instancedCubeHierarchies.usda", 3)
-        sn = ufe.GlobalSelection.get()
-        sn.clear()
+        sn = self.loadUsdScene("instancedCubeHierarchies.usda", 3)
 
         instancePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_1"
         parentPath = self._stagePathSegment + "," + "/cubeHierarchies"
@@ -59,9 +62,7 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("instanceSelection_parent.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
     def test_PrototypeSelection(self):
-        self.loadUsdScene("instancedCubeHierarchies.usda", 3)
-        sn = ufe.GlobalSelection.get()
-        sn.clear()
+        sn = self.loadUsdScene("instancedCubeHierarchies.usda", 3)
 
         baseCubePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_1/baseCube"
         topCubePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_2/topCube"
@@ -78,9 +79,7 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("prototypeSelection_topCube.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
     def test_InstanceWireframeColorChange(self):
-        self.loadUsdScene("instancedCubeHierarchies.usda", 3)
-        sn = ufe.GlobalSelection.get()
-        sn.clear()
+        sn = self.loadUsdScene("instancedCubeHierarchies.usda", 3)
 
         firstInstancePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_1"
         secondInstancePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_2"
@@ -96,9 +95,7 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("instanceWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
     def test_PrototypeWireframeColorChange(self):
-        self.loadUsdScene("instancedCubeHierarchies.usda", 3)
-        sn = ufe.GlobalSelection.get()
-        sn.clear()
+        sn = self.loadUsdScene("instancedCubeHierarchies.usda", 3)
 
         firstBaseCubePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_1/baseCube"
         firstTopCubePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_1/topCube"
@@ -119,9 +116,7 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("prototypeWireframeColorChange_secondTopCubeItem.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
     def test_DisplacedInstanceSelection(self):
-        self.loadUsdScene("displacedCubeScene.usda", 7)
-        sn = ufe.GlobalSelection.get()
-        sn.clear()
+        sn = self.loadUsdScene("displacedCubeScene.usda", 7)
 
         displacedCubeItem = ufe.Hierarchy.createItem(ufe.PathString.path(self._displacedCubePath))
 
@@ -130,9 +125,7 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("displaced_instanceSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
     def test_DisplacedPrototypeSelection(self):
-        self.loadUsdScene("displacedCubeScene.usda", 7)
-        sn = ufe.GlobalSelection.get()
-        sn.clear()
+        sn = self.loadUsdScene("displacedCubeScene.usda", 7)
 
         displacedCubePrototypeItem = ufe.Hierarchy.createItem(ufe.PathString.path(self._displacedCubePath + "/baseCube"))
 
@@ -141,9 +134,7 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("displaced_prototypeSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def test_NativeInstanceTransform(self):
-        self.loadUsdScene("instancedCubeHierarchies.usda", 3)
-        sn = ufe.GlobalSelection.get()
-        sn.clear()
+        sn = self.loadUsdScene("instancedCubeHierarchies.usda", 3)
 
         firstInstancePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_1"
         firstInstanceItem = ufe.Hierarchy.createItem(ufe.PathString.path(firstInstancePath))
