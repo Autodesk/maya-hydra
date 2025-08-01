@@ -133,7 +133,7 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn.append(displacedCubePrototypeItem)
         self.assertSnapshotClose("displaced_prototypeSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-    def test_TransformNativeInstance(self):
+    def test_NativeInstanceTransform(self):
         sn = self.loadUsdScene("instancedCubeHierarchies.usda", 3)
 
         firstInstancePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_1"
@@ -155,6 +155,8 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         cmds.rotate(0, 45, 0, r=True)
         cmds.refresh()
         self.assertSnapshotClose("nativeInstanceTransform_afterRotation.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        cmds.file(new=True, force=True)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
