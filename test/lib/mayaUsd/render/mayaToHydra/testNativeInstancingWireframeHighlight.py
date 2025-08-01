@@ -133,7 +133,7 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn.append(displacedCubePrototypeItem)
         self.assertSnapshotClose("displaced_prototypeSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-    def test_NativeInstanceTransform(self):
+    def test_TransformNativeInstance(self):
         sn = self.loadUsdScene("instancedCubeHierarchies.usda", 3)
 
         firstInstancePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_1"
