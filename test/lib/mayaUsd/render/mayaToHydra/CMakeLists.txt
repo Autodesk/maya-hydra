@@ -6,6 +6,7 @@
 # only single platform exclusion is supported currently.
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
 set(INTERACTIVE_TEST_SCRIPT_FILES
+    testSceneStat.py
     testImageDiffing.py
     testMtohCommand.py
     testBasicRender.py
@@ -70,6 +71,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
+    cpp/testMayaHydraSceneIndex.py
     cpp/testMayaSceneFlattening.py
     cpp/testMayaUsdUfeItems.py
     cpp/testDataProducerMergingSceneIndex.py
@@ -92,6 +94,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
     cpp/testUsdStageInvalidate.py
+    cpp/testCamera.py
 	#CPP tests disabled on OSX
     cpp/testWriteFile.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
 )

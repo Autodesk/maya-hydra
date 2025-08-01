@@ -528,6 +528,7 @@ void MayaHydraSceneIndex::_Destroy()
         _renderItemsAdapters,
         _shapeAdapters,
         _lightAdapters,
+        _cameraAdapters,
         _materialAdapters);
 
     _renderItemsAdapters.clear();
@@ -995,6 +996,18 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         _lightsToAdd.clear();
     }
 
+    if (!_camerasToAdd.empty()) {
+        for (auto& cameraToAdd : _camerasToAdd) {
+            MDagPath dag;
+            MStatus  status = MDagPath::getAPathTo(cameraToAdd.first, dag);
+            if (!status) {
+                return;
+            }
+            CreateCameraAdapter(dag);
+        }
+        _camerasToAdd.clear();
+    }
+
     if (useMeshAdapter() && !_addedNodes.empty()) {
         for (const auto& obj : _addedNodes) {
             if (obj.isNull()) {
@@ -1059,14 +1072,15 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
                             a->RemoveCallbacks();
                             a->CreateCallbacks();
                         }
-                if (std::get<1>(it) & MayaHydraSceneIndex::RebuildFlagPrim) {
-                    a->RemovePrim();
-                    a->Populate();
-                }
+                        if (std::get<1>(it) & MayaHydraSceneIndex::RebuildFlagPrim) {
+                            a->RemovePrim();
+                            a->Populate();
+                        }
                     },
                     _shapeAdapters,
-                        _lightAdapters,
-                        _materialAdapters);
+                    _lightAdapters,
+                    _cameraAdapters,
+                    _materialAdapters);
             }
             _adaptersToRebuild.clear();
         }
@@ -1196,6 +1210,22 @@ void MayaHydraSceneIndex::_AddPrimAncestors(const SdfPath& path)
 
 }
 
+void MayaHydraSceneIndex::_RemoveEmptyAncestors(const SdfPath& path)
+{
+    const auto& parentPath = path.GetParentPath();
+    if (parentPath == _rprimPath || parentPath == _sprimPath || parentPath == _materialPath) {
+        return;
+    }
+    auto parentPrim = GetPrim(parentPath);
+    if (parentPrim.dataSource && parentPrim.primType.IsEmpty()) {
+        auto childPaths = GetChildPrimPaths(parentPath);
+        if (childPaths.empty()) {
+            RemovePrims({ parentPath });
+            _RemoveEmptyAncestors(parentPath);
+        }
+    }
+}
+
 void MayaHydraSceneIndex::MarkRprimDirty(const SdfPath& id, HdDirtyBits dirtyBits) {
     _MarkPrimDirty(id, dirtyBits, HdDirtyBitsTranslator::RprimDirtyBitsToLocatorSet);
 }
@@ -1231,6 +1261,8 @@ void MayaHydraSceneIndex::_MarkPrimDirty(
 void MayaHydraSceneIndex::RemovePrim(const SdfPath& id)
 {
     RemovePrims({ id });
+
+    _RemoveEmptyAncestors(id);
 
     _renderCollectionChanged = true;
 }
@@ -1280,12 +1312,12 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
                 else if (a->HasType(HdPrimTypeTokens->camera)) {
                     a->MarkDirty(HdCamera::DirtyParams);
                 }
-        a->InvalidateTransform();
-        a->MarkDirty(HdChangeTracker::DirtyTransform);
+                a->InvalidateTransform();
+                a->MarkDirty(HdChangeTracker::DirtyTransform);
             },
             _shapeAdapters,
-                _lightAdapters,
-                _cameraAdapters);
+            _lightAdapters,
+            _cameraAdapters);
     }
     // We need to trigger rebuilding shaders.
     if (oldParams.textureMemoryPerTexture != params.textureMemoryPerTexture) {
@@ -1357,6 +1389,15 @@ HdMeshTopology MayaHydraSceneIndex::GetMeshTopology(const SdfPath& id)
         _renderItemsAdapters);
 }
 
+HdBasisCurvesTopology MayaHydraSceneIndex::GetBasisCurvesTopology(const SdfPath& id)
+{
+    return _GetValue<MayaHydraAdapter, HdBasisCurvesTopology>(
+        id,
+        [](MayaHydraAdapter* a) -> HdBasisCurvesTopology { return a->GetBasisCurvesTopology(); },
+        _shapeAdapters,
+        _renderItemsAdapters);
+}
+
 void MayaHydraSceneIndex::RemoveAdapter(const SdfPath& id)
 {
     if (!_RemoveAdapter<MayaHydraAdapter>(
@@ -1368,6 +1409,7 @@ void MayaHydraSceneIndex::RemoveAdapter(const SdfPath& id)
         _renderItemsAdapters,
             _shapeAdapters,
             _lightAdapters,
+            _cameraAdapters,
             _materialAdapters)) {
         TF_WARN(
             "MayaHydraSceneIndex::RemoveAdapter(%s) -- Adapter does not exists", id.GetText());
@@ -1506,9 +1548,10 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
         id,
         [](MayaHydraAdapter* a) {
             a->RemoveCallbacks();
-    a->RemovePrim();
+            a->RemovePrim();
         },
-        _lightAdapters)) {
+        _lightAdapters,
+        _cameraAdapters)) {
         if (MObjectHandle(obj).isValid()) {
             OnDagNodeAdded(obj);
         }
@@ -1614,11 +1657,14 @@ void MayaHydraSceneIndex::OnDagNodeAdded(const MObject& obj)
         return;
     }
 
-    // When not using the mesh adapter we care only about lights for this
-    // callback.  It is used to create a LightAdapter when adding a new light
+    // When not using the mesh adapter we care only about lights and cameras for this
+    // callback.  It is used to create a LightAdapter/CameraAdapter when adding a new light/camera
     // in the scene for Hydra rendering.
     if (auto lightFn = MayaHydraAdapterRegistry::GetLightAdapterCreator(obj)) {
         _lightsToAdd.push_back({ obj, lightFn });
+    }
+    else if (auto cameraFn = MayaHydraAdapterRegistry::GetCameraAdapterCreator(obj)) {
+        _camerasToAdd.push_back({ obj, cameraFn });
     }
     else if (useMeshAdapter()) {
         _addedNodes.push_back(obj);
@@ -1634,8 +1680,19 @@ void MayaHydraSceneIndex::OnDagNodeRemoved(const MObject& obj)
 
     if (it != _lightsToAdd.end()) {
         _lightsToAdd.erase(it, _lightsToAdd.end());
+        return;
     }
-    else if (useMeshAdapter()) {
+
+    const auto itCamera
+        = std::remove_if(_camerasToAdd.begin(), _camerasToAdd.end(), [&obj](const auto& item) {
+            return item.first == obj;
+        });
+    if (itCamera != _camerasToAdd.end()) {
+        _camerasToAdd.erase(itCamera, _camerasToAdd.end());
+        return;
+    }
+
+    if (useMeshAdapter()) {
         const auto it = std::remove_if(_addedNodes.begin(), _addedNodes.end(), [&obj](const auto& item) { return item == obj; });
 
         if (it != _addedNodes.end()) {

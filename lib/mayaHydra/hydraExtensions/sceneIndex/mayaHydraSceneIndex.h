@@ -184,6 +184,8 @@ public:
 
     HdMeshTopology GetMeshTopology(const SdfPath& id);
 
+    HdBasisCurvesTopology GetBasisCurvesTopology(const SdfPath& id);
+
     SdfPath GetPrimPath(const MDagPath& dg, bool isSprim) const;
 
     SdfPath GetRprimPath() const { return _rprimPath; }
@@ -278,6 +280,7 @@ private:
     // Utilites
     bool _GetRenderItem(int fastId, MayaHydraRenderItemAdapterPtr& adapter);
     void _AddPrimAncestors(const SdfPath& path);
+    void _RemoveEmptyAncestors(const SdfPath& path);
     void _AddRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
     void _RemoveRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
     bool _GetRenderItemMaterial(const MRenderItem& ri, SdfPath& material, MObject& shadingEngineNode);
@@ -323,6 +326,9 @@ private:
     using LightAdapterCreator
         = std::function<MayaHydraLightAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>;
     std::vector<std::pair<MObject, LightAdapterCreator>> _lightsToAdd;
+    using CameraAdapterCreator
+        = std::function<MayaHydraCameraAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>;
+    std::vector<std::pair<MObject, CameraAdapterCreator>> _camerasToAdd;
     std::vector<SdfPath> _materialTagsChanged;
 
     bool _defaultMaterialCreated = false;

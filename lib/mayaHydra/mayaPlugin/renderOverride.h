@@ -120,9 +120,8 @@ struct RenderPassData {
 /*! \brief MtohRenderOverride is a rendering override class for the viewport to use Hydra instead of
  * VP2.0.
  */
-class MtohRenderOverride
-    : public MHWRender::MRenderOverride
-    , public MayaHydra::PickContext
+class MtohRenderOverride : public MHWRender::MRenderOverride,
+    public MayaHydra::PickContext
 {
 public:
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
@@ -177,6 +176,9 @@ public:
 
     // Utility function to get GPU memory usage stats
     static int GetUsedGPUMemory();
+
+    // Returns scene statistics as a map for the currently active render delegate from Hydra primitives
+    static std::map<std::string, int> GetSceneStatistics();
 
     bool                         startOperationIterator() override;
     MHWRender::MRenderOperation* renderOperation() override;
@@ -336,7 +338,7 @@ private:
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;
     Fvp::SelectionPtr                         _selection;
     SdfPath                                   _highlightHierarchyPrefix{"/FlowViewportSelectionHighlights"};
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
     Fvp::GeomSubsetWhSiRefPtr                 _geomSubsetWhSi;
 #endif
     Fvp::MeshWhSiRefPtr                       _meshWhSi;
@@ -375,13 +377,13 @@ private:
     std::shared_ptr<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker> _leadObjectPathTracker {nullptr};
     MAYAHYDRA_NS_DEF::MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex{nullptr};
 
-    /** This class creates the scene index data factories and set them up into the flow viewport library to be able to create DCC 
+    /** This class creates the scene index data factories and set them up into the flow viewport library to be able to create DCC
     *   specific scene index data classes without knowing their content in Flow viewport.
     *   This is done in the constructor of this class
     */
     MAYAHYDRA_NS_DEF::SceneIndexDataFactoriesSetup  _sceneIndexDataFactoriesSetup;
 
-    SdfPath _ID; // Root path to runtime data (like task controller) 
+    SdfPath _ID; // Root path to runtime data (like task controller)
 
     GfVec4d _viewport;
 
@@ -410,7 +412,7 @@ private:
     // first false (state change), then true (objects set).  To avoid
     // double dirtying in Hydra, we track the following isolate select
     // states per viewport:
-    // 
+    //
     enum class IsolateSelectState {IsolateSelectOff, IsolateSelectPendingObjects,
 				   IsolateSelectOn};
 

@@ -92,6 +92,13 @@
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
+#include <pxr/imaging/hd/dataSource.h>
+#include <pxr/imaging/hd/meshSchema.h>
+#include <pxr/imaging/hd/basisCurvesSchema.h>
+#include <pxr/imaging/hd/sceneIndexPrimView.h>
+#include <pxr/imaging/hd/mesh.h>
+#include <pxr/imaging/hd/basisCurves.h>
+#include <pxr/imaging/hd/points.h>
 #include <pxr/imaging/hdx/selectionTask.h>
 #include <pxr/imaging/hdx/colorizeSelectionTask.h>
 #include <pxr/imaging/hdx/pickTask.h>
@@ -178,7 +185,7 @@ void replaceSelectionTask(PXR_NS::HdTaskSharedPtrVector* tasks)
     TF_AXIOM(tasks);
 
     auto isSnTask = [](const HdTaskSharedPtr& task) {
-        return std::dynamic_pointer_cast<HdxColorizeSelectionTask>(task) || 
+        return std::dynamic_pointer_cast<HdxColorizeSelectionTask>(task) ||
             std::dynamic_pointer_cast<HdxSelectionTask>(task);
     };
 
@@ -204,8 +211,8 @@ std::string getRenderingDestination(
 }
 #endif
 
-inline Fvp::LightsManagementSceneIndex::LightingMode convertFromMayaLightingModeToFlowViewportLightMode(MFrameContext::LightingMode mayaLightingMode) 
-{ 
+inline Fvp::LightsManagementSceneIndex::LightingMode convertFromMayaLightingModeToFlowViewportLightMode(MFrameContext::LightingMode mayaLightingMode)
+{
     switch (mayaLightingMode) {
         case MFrameContext::kLightDefault: return Fvp::LightsManagementSceneIndex::LightingMode::kDefaultLighting;
         case MFrameContext::kAmbientLight:
@@ -222,7 +229,7 @@ inline Fvp::LightsManagementSceneIndex::LightingMode convertFromMayaLightingMode
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
-// The following code currently lives inside the pxr namespace, but it would make more sense to 
+// The following code currently lives inside the pxr namespace, but it would make more sense to
 // have it inside the MayaHydra namespace. This using statement allows us to use MayaHydra symbols
 // from within the pxr namespace as if we were in the MayaHydra namespace.
 // Remove this once the code has been moved to the MayaHydra namespace.
@@ -281,7 +288,7 @@ public:
         : Ufe::Observer(), _renderOverride(renderOverride)
     {}
 
-    void operator()(const Ufe::Notification& notification) override 
+    void operator()(const Ufe::Notification& notification) override
     {
         // During Maya file read, each node will be selected in turn, so we get
         // notified for each node in the scene.  Prune this out.
@@ -378,7 +385,7 @@ MtohRenderOverride::~MtohRenderOverride()
     ClearHydraResources(fullReset);
 
     _operations.clear();
-    
+
     MMessage::removeCallbacks(_callbacks);
     _callbacks.clear();
     for (auto& panelAndCallbacks : _renderPanelCallbacks) {
@@ -476,13 +483,104 @@ VtValue MtohRenderOverride::_GetUsedGPUMemory() const
 }
 
 int MtohRenderOverride::GetUsedGPUMemory()
-{   
+{
     int totalGPUMemory = 0;
     std::lock_guard<std::mutex> lock(_allInstancesMutex);
     for (auto* instance : _allInstances) {
         totalGPUMemory += instance->_GetUsedGPUMemory().UncheckedGet<int>();
     }
-    return totalGPUMemory / (1024*1024); 
+    return totalGPUMemory / (1024*1024);
+}
+
+std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
+{
+    std::map<std::string, int> stats = {
+        {"primitives", 0},
+        {"mesh", 0},
+        {"mesh.points", 0},
+        {"mesh.faces", 0},
+        {"curve", 0},
+        {"curve.points", 0},
+        {"point", 0},
+    };
+
+    MtohRenderOverride* instance = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(_allInstancesMutex);
+        for (auto* inst : _allInstances) {
+            if (inst->_initializationSucceeded && inst->renderIndex()) {
+                instance = inst;
+                break;
+            }
+        }
+    }
+
+    if (!instance || !instance->renderIndex()) {
+        return stats;
+    }
+
+    auto* renderIndex = instance->renderIndex();
+    auto primIds = renderIndex->GetRprimIds();
+
+    for (const auto& primId : primIds) {
+        auto* rprim = renderIndex->GetRprim(primId);
+        if (!rprim) {
+            continue;
+        }
+
+        stats["primitives"]++;
+        auto* mesh = dynamic_cast<const HdMesh*>(rprim);
+        if (mesh) {
+            stats["mesh"]++;
+            auto sceneIndexPrim = renderIndex->GetTerminalSceneIndex()->GetPrim(primId);
+            auto meshSchema = HdMeshSchema::GetFromParent(sceneIndexPrim.dataSource);
+            if (meshSchema.IsDefined()) {
+                auto meshTopology = meshSchema.GetTopology();
+                if (meshTopology.IsDefined()) {
+                    auto faceVertexCounts = meshTopology.GetFaceVertexCounts();
+                    auto faceVertexIndices = meshTopology.GetFaceVertexIndices();
+                    if (faceVertexCounts && faceVertexIndices) {
+                        auto counts = faceVertexCounts->GetTypedValue(0.0f);
+                        auto indices = faceVertexIndices->GetTypedValue(0.0f);
+                        stats["mesh.faces"] += counts.size();
+                        if (!indices.empty()) {
+                            int maxIndex = *std::max_element(indices.begin(), indices.end());
+                            stats["mesh.points"] += maxIndex + 1;
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+
+        auto* curves = dynamic_cast<const HdBasisCurves*>(rprim);
+        if (curves) {
+            stats["curve"]++;
+            auto sceneIndexPrim = renderIndex->GetTerminalSceneIndex()->GetPrim(primId);
+            auto curvesSchema = HdBasisCurvesSchema::GetFromParent(sceneIndexPrim.dataSource);
+            if (curvesSchema.IsDefined()) {
+                auto curvesTopology  = curvesSchema.GetTopology();
+                if (curvesTopology.IsDefined()) {
+                    auto curveIndices = curvesTopology.GetCurveIndices();
+                    if (curveIndices) {
+                        auto indices = curveIndices->GetTypedValue(0.0f);
+                        if (!indices.empty()) {
+                            int maxIndex = *std::max_element(indices.begin(), indices.end());
+                            stats["curve.points"] += maxIndex + 1;
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+
+        auto* points = dynamic_cast<const HdPoints*>(rprim);
+        if (points) {
+            stats["point"]++;
+            continue;
+        }
+    }
+    return stats;
 }
 
 std::vector<MString> MtohRenderOverride::AllActiveRendererNames()
@@ -919,7 +1017,7 @@ MStatus MtohRenderOverride::Render(
         if (false == manager.ModelPanelIsAlreadyRegistered(panelNameStr)){
             //Get information from viewport
             std::string cameraName;
-    
+
             M3dView view;
 	        if (M3dView::getM3dViewFromModelPanel(panelName, view)){
                 MDagPath dpath;
@@ -969,7 +1067,7 @@ MStatus MtohRenderOverride::Render(
         _mayaHydraSceneIndex->SetDefaultLight(_defaultLight);
         _mayaHydraSceneIndex->SetParams(delegateParams);
         _mayaHydraSceneIndex->PreFrame(drawContext);
-        
+
         auto& manager = Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get();
         if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle)){
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(true);//Prevent prim removal propagation to keep the current selection.
@@ -1034,12 +1132,12 @@ MStatus MtohRenderOverride::Render(
     {
         auto objectExclusions = framecontext->objectTypeExclusions();
 
-        static const TfTokenVector polygonFilters = { 
-            FvpPruningTokens->meshes, 
-            FvpPruningTokens->capsules, 
-            FvpPruningTokens->cones, 
-            FvpPruningTokens->cubes, 
-            FvpPruningTokens->cylinders, 
+        static const TfTokenVector polygonFilters = {
+            FvpPruningTokens->meshes,
+            FvpPruningTokens->capsules,
+            FvpPruningTokens->cones,
+            FvpPruningTokens->cubes,
+            FvpPruningTokens->cylinders,
             FvpPruningTokens->spheres
         };
         static const std::map<MUint64, TfTokenVector> mayaFiltersToFvpPruningTokens = {
@@ -1058,7 +1156,7 @@ MStatus MtohRenderOverride::Render(
     // Toggle textures in the material network
     const unsigned int currentDisplayMode = drawContext.getDisplayStyle();
     bool isTextured = currentDisplayMode & MHWRender::MFrameContext::kTextured;
-    if (_pruneTexturesSceneIndex && 
+    if (_pruneTexturesSceneIndex &&
         _currentlyTextured != isTextured) {
         _pruneTexturesSceneIndex->MarkTexturesDirty(isTextured);
         _currentlyTextured = isTextured;
@@ -1069,37 +1167,37 @@ MStatus MtohRenderOverride::Render(
         if (_mayaHydraSceneIndex && !_mayaHydraSceneIndex->DefaultMaterialCreated()) {
             _mayaHydraSceneIndex->CreateMayaDefaultMaterialData();
         }
-    
+
         _defaultMaterialSceneIndex->Enable(currentUseDefaultMaterial);
         _useDefaultMaterial = currentUseDefaultMaterial;
     }
-    
+
     // Set Required Hydra Repr (Wireframe/WireframeOnShaded/Shaded)
     // Hydra supports Wireframe and WireframeOnSurfaceRefined repr for wireframe on shaded mode.
-    // Refinement level for Hydra is set in Hydra Render Globals    
+    // Refinement level for Hydra is set in Hydra Render Globals
     const MFrameContext::WireOnShadedMode wireOnShadedMode = MFrameContext::wireOnShadedMode();//Get the user preference
     if ( (_reprSelectorSceneIndex && (currentDisplayStyle != _oldDisplayStyle) ) || (delegateParams.refineLevel != _oldRefineLevel)){
-        if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) && 
-            ((currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded) || 
+        if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) &&
+            ((currentDisplayStyle & MHWRender::MFrameContext::kGouraudShaded) ||
             (currentDisplayStyle & MHWRender::MFrameContext::kTextured)) ) {
                 // Wireframe on top of shaded
                 if (MFrameContext::WireOnShadedMode::kWireframeOnShadedFull == wireOnShadedMode) {
                     _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurfaceRefined,
                                                          /*needsReprChanged=*/true, delegateParams.refineLevel);
-                } else {              
-                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface, 
+                } else {
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeOnSurface,
                                                          /*needsReprChanged=*/true, delegateParams.refineLevel);
                 }
             }
             else if( (currentDisplayStyle & MHWRender::MFrameContext::kWireFrame) ) {
                     //wireframe only, not on top of shaded
-                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined, 
-                                                         /*needsReprChanged=*/true, delegateParams.refineLevel); 
+                    _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::WireframeRefined,
+                                                         /*needsReprChanged=*/true, delegateParams.refineLevel);
                 }
             else // Shaded mode
-                _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, 
+                _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default,
                                                      /*needsReprChanged=*/false, delegateParams.refineLevel);
-            
+
         _oldRefineLevel = delegateParams.refineLevel;
     }
 
@@ -1135,7 +1233,6 @@ MStatus MtohRenderOverride::Render(
     params.cullStyle            = HdCullStyleBackUnlessDoubleSided;
     _taskController->SetSelectionColor(_globals.colorSelectionHighlightColor);// Default color in usdview.
     _taskController->SetEnableSelection(_globals.colorSelectionHighlight);
-    _taskController->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
 
     if (_isUsingHdSt) {
         // Set MSAA on Color Buffer
@@ -1191,17 +1288,17 @@ MStatus MtohRenderOverride::Render(
         _taskController->SetRenderViewport(_viewport);
 #endif
     }
-
     
-    if (delegateParams.motionSamplesEnabled()) {
-        MStatus  status;
-        MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
-        if (status == MStatus::kSuccess) {
-            MString   ufeCameraPathString = getFrameContext()->getCurrentUfeCameraPath(&status);
-            Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
-            bool isMayaCamera = ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId();
-            if (isMayaCamera) {
-                if (_mayaHydraSceneIndex) {
+    MStatus  status;
+    MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
+    if (status == MStatus::kSuccess) {
+        MString   ufeCameraPathString = getFrameContext()->getCurrentUfeCameraPath(&status);
+        Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
+        bool isMayaCamera = ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId();
+        if (isMayaCamera) { // TODO: Support USD Camera
+            MFnCamera camera(camPath, &status);
+            if (status == MStatus::kSuccess) {
+                if (_mayaHydraSceneIndex && !camera.isOrtho()) { // TODO: Support Persp Camera
                     SdfPath cameraPath = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
 #ifdef VIEWPORT_TOOLBOX
                     // Apply on all render passes
@@ -1212,7 +1309,7 @@ MStatus MtohRenderOverride::Render(
                         if (!currentPass) {
                             continue;
                         }
-
+    
                         currentPass->params().renderParams.camera = cameraPath;
                     }
 #else
@@ -1222,19 +1319,24 @@ MStatus MtohRenderOverride::Render(
                         _mayaHydraSceneIndex->MarkSprimDirty(cameraPath, HdCamera::DirtyParams);
                 }
             }
-        } else {
-            TF_WARN(
-                "MFrameContext::getCurrentCameraPath failure (%d): '%s'"
-                "\nUsing viewport matrices.",
-                int(status.statusCode()),
-                status.errorString().asChar());
         }
+    } else {
+        TF_WARN(
+            "MFrameContext::getCurrentCameraPath failure (%d): '%s'"
+            "\nUsing viewport matrices.",
+            int(status.statusCode()),
+            status.errorString().asChar());
     }
 
 #ifndef VIEWPORT_TOOLBOX
     _taskController->SetRenderParams(params);
+    // Use explicit camera if specified
     if (!params.camera.IsEmpty())
         _taskController->SetCameraPath(params.camera);
+    else
+        _taskController->SetFreeCameraMatrices(
+            GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx)),
+            GetGfMatrixFromMaya(drawContext.getMatrix(MHWRender::MFrameContext::kProjectionMtx)));
 
     if (_globals.outlineSelectionWidth != 0.f) {
         _taskController->SetSelectionOutlineRadius(_globals.outlineSelectionWidth);
@@ -1301,7 +1403,7 @@ MStatus MtohRenderOverride::Render(
     if (_mayaHydraSceneIndex) {
         _mayaHydraSceneIndex->PostFrame();
     }
-    
+
     //Store as old display style
     _oldDisplayStyle = currentDisplayStyle;
 
@@ -1498,7 +1600,7 @@ void MtohRenderOverride::_InitHydraResources(
 
     _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, !_hasDefaultLighting);
     TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
-    
+
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
 #ifdef VIEWPORT_TOOLBOX
     for (int i = 0; i < _GetNumRenderPasses(); ++i) {
@@ -1517,7 +1619,7 @@ void MtohRenderOverride::_InitHydraResources(
     if (!_sceneIndexRegistry) {
         _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_dataProducerMergingSceneIndexProxy->GetMergingSceneIndex()));
     }
-    
+
     // We provide the pick context for pick handlers, so set the pick handler
     // registry accordingly.
     PickHandlerRegistry::Instance().SetPickContext(this);
@@ -1538,7 +1640,7 @@ void MtohRenderOverride::_InitHydraResources(
     _inputSceneIndexOfFilteringSceneIndicesChain = _dirtyLeadObjectSceneIndex;
 
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
-    // _InitHydraResources() is always called from Render(), so 
+    // _InitHydraResources() is always called from Render(), so
     // getFrameContext() will be valid and non-null.
     auto viewportId = getRenderingDestination(getFrameContext());
 
@@ -1553,11 +1655,11 @@ void MtohRenderOverride::_InitHydraResources(
     _inputSceneIndexOfFilteringSceneIndicesChain = isSi;
 #endif
 
-    // Set the initial selection onto the selection scene index later. 
+    // Set the initial selection onto the selection scene index later.
     _needToReplaceSelection = true;
 
     _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
-    
+
     if (auto* renderDelegate = _GetRenderDelegate()) {
         // Pull in any options that may have changed due file-open.
         // If the currentScene has defaultRenderGlobals we'll absorb those new settings,
@@ -1611,7 +1713,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 
     //We don't have any viewport using Hydra any more
     Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveAllViewportsInformation();
-    
+
     if (fullReset){
         //Remove the data producer scene indices that apply to all viewports
         Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViewports();
@@ -1735,11 +1837,11 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _displayStyleSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims don't use global refinement
 
     // Add texture disabling Scene Index
-    _lastFilteringSceneIndexBeforeCustomFiltering = _pruneTexturesSceneIndex = 
+    _lastFilteringSceneIndexBeforeCustomFiltering = _pruneTexturesSceneIndex =
     Fvp::PruneTexturesSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
 
     // Add default material scene index
-    _lastFilteringSceneIndexBeforeCustomFiltering = _defaultMaterialSceneIndex = Fvp::DefaultMaterialSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
+    _lastFilteringSceneIndexBeforeCustomFiltering = _defaultMaterialSceneIndex = Fvp::DefaultMaterialSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering,
                                                                                 _mayaHydraSceneIndex ? _mayaHydraSceneIndex->GetDefaultMaterialPath() : SdfPath(),
                                                                                 _mayaHydraSceneIndex ? _mayaHydraSceneIndex->GetDefaultMaterialExclusionPaths(): SdfPathVector());
 
@@ -1748,11 +1850,11 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     if(! _leadObjectPathTracker){
         _leadObjectPathTracker = std::make_shared<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker>(_dirtyLeadObjectSceneIndex);
     }
-    
+
     if (! _wireframeColorInterfaceImp){
         _wireframeColorInterfaceImp = std::make_shared<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp>(_selection, _leadObjectPathTracker);
     }
-    
+
     //Are we using Bounding Box display style ?
     if (currentDisplayStyle & MHWRender::MFrameContext::kBoundingBox){
         //Insert the bounding box filtering scene index which converts geometries into a bounding box using the extent attribute
@@ -1760,10 +1862,10 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         bboxSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims are already converted by OGS
         _lastFilteringSceneIndexBeforeCustomFiltering = bboxSceneIndex;
     }
-  
+
     // Repr selector Scene Index
-    _lastFilteringSceneIndexBeforeCustomFiltering = _reprSelectorSceneIndex = 
-                                                 Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, 
+    _lastFilteringSceneIndexBeforeCustomFiltering = _reprSelectorSceneIndex =
+                                                 Fvp::ReprSelectorSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering,
                                                  _wireframeColorInterfaceImp);
     _reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
     _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false, _globals.delegateParams.refineLevel);
@@ -1773,18 +1875,18 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         //// At time of writing, wireframe selection highlighting of Maya native data
         //// is done by Maya at render item creation time, so avoid double wireframe
         //// selection highlighting by excluding MAYA_NATIVE_ROOT.
-        
-#if PXR_VERSION >= 2403
+
+#if PXR_VERSION >= 2405
         _lastFilteringSceneIndexBeforeCustomFiltering = _geomSubsetWhSi = Fvp::GeomSubsetWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _geomSubsetWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
 #endif
 
         _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _meshWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-        
+
         _lastFilteringSceneIndexBeforeCustomFiltering = _niInstanceWhSi = Fvp::NiInstanceWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _niInstanceWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-        
+
         _lastFilteringSceneIndexBeforeCustomFiltering = _niPrototypeWhSi = Fvp::NiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _niPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
 
@@ -1794,7 +1896,7 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         _lastFilteringSceneIndexBeforeCustomFiltering = _piPrototypeWhSi = Fvp::PiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _piPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
     }
-    
+
     TF_AXIOM(_mayaHydraSceneIndex);
     _lastFilteringSceneIndexBeforeCustomFiltering = _lightsManagementSceneIndex = Fvp::LightsManagementSceneIndex::New(
         _lastFilteringSceneIndexBeforeCustomFiltering, _mayaHydraSceneIndex->GetMayaDefaultLightPath());
@@ -1840,7 +1942,7 @@ void MtohRenderOverride::SelectionChanged(
 
     TF_AXIOM(_selectionSceneIndex);
 
-    // Two considerations: 
+    // Two considerations:
     // 1) Reading from the Maya active selection list only returns
     //    Maya objects, so must read from the UFE selection.
     // 2) The UFE selection does not have Maya component selections.
@@ -1869,7 +1971,7 @@ void MtohRenderOverride::SelectionChanged(
     };
     static std::function<void(const SnOp&, const SnSiPtr&)> changeSn[] = {appendSn, removeSn, insertSn, clearSn, replaceWithSn};
 
-    if (notification.opType() == 
+    if (notification.opType() ==
         Ufe::SelectionChanged::SelectionCompositeNotification) {
 
         const auto& compositeNotification = notification.staticCast<Ufe::SelectionCompositeNotification>();
@@ -1996,7 +2098,7 @@ void MtohRenderOverride::_PopulateSelectionList(
     const HdxPickHitVector&          hits,
     const MHWRender::MSelectionInfo& selectInfo,
     MSelectionList&                  selectionList,
-    MPointArray&                     worldSpaceHitPts, 
+    MPointArray&                     worldSpaceHitPts,
     bool&                            isOneMayaNodeInComponentsPickingMode)
 {
     if (hits.empty() || !_mayaHydraSceneIndex || !_ufeSn) {
@@ -2072,7 +2174,7 @@ void MtohRenderOverride::_PickByRegion(
     pickParams.collection = _renderCollection;
     pickParams.collection.SetExcludePaths({_highlightHierarchyPrefix});
     pickParams.outHits = &outHits;
-    
+
     if (geomSubsetsPickMode == GeomSubsetsPickModeTokens->Faces) {
         pickParams.pickTarget = HdxPickTokens->pickFaces;
     }
@@ -2335,7 +2437,7 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
         kNbViewSelectedChangedCalls, VtValue(nbCalls));
 
     M3dView view;
-    if (!TF_VERIFY(M3dView::getM3dViewFromModelPanel(viewName, view) == MS::kSuccess, 
+    if (!TF_VERIFY(M3dView::getM3dViewFromModelPanel(viewName, view) == MS::kSuccess,
                    "No view found for view name %s.", viewName.asChar())) {
         return;
     }
@@ -2359,13 +2461,13 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
     // viewSelectedObjectsChanged true or false.
     //
     // State transitions:
-    // 
+    //
     // off: message false --> go to pendingObjects, do not notify.
     // off: message true --> illegal, warn, do not notify.
-    // 
+    //
     // pendingObjects: message false --> illegal, warn, do not notify.
     // pendingObjects: message true --> notify, go to on.
-    // 
+    //
     // on: message false --> go to off, notify.
     // on: message true --> stay on, notify.
 
@@ -2381,7 +2483,7 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
         }
         found->second = IsolateSelectState::IsolateSelectOn;
     }
-    
+
     TF_VERIFY(found->second == IsolateSelectState::IsolateSelectOn);
 
     // The M3dView returns the list of view selected objects as strings.
@@ -2414,7 +2516,7 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
 // return true if we need to recreate the filtering scene indices chain because of a change, false otherwise.
 bool MtohRenderOverride::_NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle)
 {
-    if (areDifferentForOneOfTheseBits(currentDisplayStyle, _oldDisplayStyle,  
+    if (areDifferentForOneOfTheseBits(currentDisplayStyle, _oldDisplayStyle,
                                       MHWRender::MFrameContext::kBoundingBox)){
         return true;
     }

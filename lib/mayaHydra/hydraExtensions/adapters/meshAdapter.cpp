@@ -532,8 +532,6 @@ private:
     // problem callbacks include:
     //     MPolyMessage::addPolyComponentIdChangedCallback
     //     MPolyMessage::addUVSetChangedCallback
-    // Reproduction code can be found here:
-    //    https://gist.github.com/elrond79/668d9809873125f608e0f7360fff7fac
     // To work around this, we register these callbacks specially, and only
     // remove them if the underlying node is currently valid.
     MCallbackIdArray _buggyCallbacks;
