@@ -135,28 +135,24 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
     def test_NativeInstanceTransform(self):
         sn = self.loadUsdScene("instancedCubeHierarchies.usda", 3)
-
+        
         firstInstancePath = self._stagePathSegment + "," + "/cubeHierarchies/cubes_1"
         firstInstanceItem = ufe.Hierarchy.createItem(ufe.PathString.path(firstInstancePath))
-
+        
         sn.clear()
         sn.append(firstInstanceItem)
         
+        def transform_and_test(transform_cmd, image_name):
+            transform_cmd()
+            cmds.refresh()
+            self.assertSnapshotClose(image_name, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            cmds.undo()
+        
         self.assertSnapshotClose("nativeInstanceTransform_beforeTransform.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
-        cmds.scale(0.75, 0.75, 0.75, r=True)
-        cmds.refresh()
-        self.assertSnapshotClose("nativeInstanceTransform_afterScale.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
-        cmds.move(0, 0, 1.2, r=True)
-        cmds.refresh()
-        self.assertSnapshotClose("nativeInstanceTransform_afterTranslate.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
-        cmds.rotate(0, 45, 0, r=True)
-        cmds.refresh()
-        self.assertSnapshotClose("nativeInstanceTransform_afterRotation.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
-        cmds.file(new=True, force=True)
+        transform_and_test(lambda: cmds.scale(0.75, 0.75, 0.75, r=True), "nativeInstanceTransform_afterScale.png")
+        transform_and_test(lambda: cmds.move(0, 0, 1.2, r=True), "nativeInstanceTransform_afterTranslate.png")  
+        transform_and_test(lambda: cmds.rotate(0, 45, 0, r=True), "nativeInstanceTransform_afterRotation.png")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
