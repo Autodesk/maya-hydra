@@ -59,7 +59,7 @@ HdSceneIndexBaseRefPtr DataProducerMergingSceneIndexProxy::GetMergingSceneIndex(
 std::set<PXR_NS::SdfPath> DataProducerMergingSceneIndexProxy::GetSceneRoots() const
 {
     std::set<PXR_NS::SdfPath> sceneRoot;
-    for (auto& it = _sceneRoots.cbegin(); it != _sceneRoots.cend(); it++) {
+    for (auto it = _sceneRoots.cbegin(); it != _sceneRoots.cend(); it++) {
         sceneRoot.emplace(it->second);
     }
     return sceneRoot;
