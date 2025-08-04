@@ -1,51 +1,24 @@
-// Description: This procedure is called during command
-// line renders.
+// Description: This procedure is called during command line renders
+// with the Render executable.
 //
 global proc hydraStormCmdRender(string $option)
 {
-    print "PPT: hydraStormCmdRender() called.";
-    return;
-
-    string $cmd = "hydraRender -renderer Storm ";
-    $cmd += $option;
-
-    evalEcho $cmd;
+    hydraRender -renderer HdStormRendererPlugin;
 }
 
-// Description: *** fill this in ***
-//
+// Description: This procedure is called during batch rendering launched
+// interactively from Maya.
 global proc hydraStormBatchRender(string $option)
 {
-    print "PPT: hydraStormBatchRender() called.";
-    return;
-
-    string $cmd = "hydraRender -renderer Storm ";
-    $cmd += $option;
-
-    evalEcho $cmd;
+    hydraRender -renderer HdStormRendererPlugin;
 }
 
-// Description: *** fill this in ***
+// Description: render with HdStormRendererPlugin, the Hydra Storm renderer.
 //
-global proc string hydraStormRender(int $width, int $height, int $doShadows,
+global proc hydraStormRender(int $width, int $height, int $doShadows,
         int $doGlowPass, string $camera, string $option)
 {
-    print "PPT: hydraStormBatchRender() called.";
-
-    string $result = "";
-    return $result;
-
-    if (!objExists($camera)) {
-        $nonMayaCamExists = python("import maya.internal.ufeSupport.utils as ufeUtils; ufeUtils.isPathStringValidNonMayaObject('''" + $camera + "''')");
-        if ($nonMayaCamExists) {
-            error("Non-Maya Ufe cameras are not supported for hydraRender command.");
-        }
-    }
-
-    $result  = `eval hydraRender -renderer Storm
-            -camera $camera -cf -width $width -height $height $option`;
-
-    return $result;
+    hydraRender -renderer HdStormRendererPlugin;
 }
 
 // Description: This script returns the Hydra-specific command line arguments
@@ -53,6 +26,5 @@ global proc string hydraStormRender(int $width, int $height, int $doShadows,
 //
 global proc string hydraStormBatchRenderOptionsString()
 {
-	return "";
-	return " -r interBatch ";
+	return " -r hydraStorm ";
 }

@@ -243,6 +243,30 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
+    std::array rendererRegistrationScripts = {
+        "mayaHydra_render_Storm.mel",
+        "mayaHydra_register_renderer_Storm.mel",
+        // FIXME Arnold renderer registration should NOT be done here.
+        "mayaHydra_render_Arnold.mel",
+        "mayaHydra_register_renderer_Arnold.mel"
+    };
+
+    for (auto rendererRegistrationScript : rendererRegistrationScripts) {
+        if (MGlobal::sourceFile(MString(rendererRegistrationScript)) 
+            != MS::kSuccess) {
+            std::ostringstream msg;
+            msg << "Error sourcing renderer registration script "
+                << rendererRegistrationScript;
+            ret = MS::kFailure;
+            ret.perror(msg.str().c_str());
+            return ret;
+        }
+    }
+
+    // Renderer registration must be done after UI registration, as UI
+    // registration defines the UI tab in the Maya render settings.  To be
+    // re-evaluated as render settings UI requirements are clarified.  PPT,
+    // 1-Aug-2025.
     if (!plugin.registerUI(
         "mayaHydra_registerUI_load",
         "mayaHydra_registerUI_unload",
@@ -252,6 +276,24 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         ret = MS::kFailure;
         ret.perror("Error registering mayaHydra UI procedures.");
         return ret;
+    }
+
+    std::array rendererRegistrationCommands = {
+        "registerHydraStormRenderer()", 
+        // FIXME Arnold renderer registration should NOT be done here.
+        "registerHydraArnoldRenderer()"
+    };
+
+    for (auto rendererRegistrationCommand : rendererRegistrationCommands) {
+        if (MGlobal::executeCommand(MString(rendererRegistrationCommand)) 
+            != MS::kSuccess) {
+            std::ostringstream msg;
+            msg << "Error registering Hydra batch renderer using command "
+                << rendererRegistrationCommand;
+            ret = MS::kFailure;
+            ret.perror(msg.str().c_str());
+            return ret;
+        }
     }
 
     auto registerPluginLoadingCallback = [&](MSceneMessage::Message pluginLoadingMessage, MMessage::MStringArrayFunction callback) {

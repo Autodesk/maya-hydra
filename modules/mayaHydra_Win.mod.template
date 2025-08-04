@@ -20,3 +20,4 @@ scripts: scripts
 resources: 
 PATH+:=lib
 ${PXR_OVERRIDE_PLUGINPATH_NAME}+:=lib/usd
+MAYA_RENDER_DESC_PATH+:=renderDesc
