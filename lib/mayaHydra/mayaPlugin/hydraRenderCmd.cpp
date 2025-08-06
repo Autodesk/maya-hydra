@@ -23,6 +23,7 @@
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
 
 #include <maya/MArgDatabase.h>
+#include <maya/MAnimControl.h>
 #include <maya/MGlobal.h>
 #include <maya/MSyntax.h>
 #include <maya/MFnCamera.h>
@@ -32,8 +33,6 @@
 
 #include <pxr/pxr.h>
 #include <pxr/base/tf/scoped.h>
-
-#include <iostream>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -152,89 +151,106 @@ bool HydraRenderCmd::hydraRender()
         return false;
     }
     
-    // Loop over all cameras.
-    auto cameraIt = cameras.cbegin();
-    for (; cameraIt != cameras.cend(); ++cameraIt) {
-        auto camera = *cameraIt;
+    // Loop over all render times.
+    auto timeStart = renderSettings.frameStart;
+    auto timeEnd   = renderSettings.frameEnd;
+    auto timeIncr  = renderSettings.frameBy;
 
-        MSelectionList sn;
-        sn.add(camera);
-        MDagPath cameraPath;
-        if (sn.getDagPath(0, cameraPath) != MS::kSuccess) {
-            // Non-Maya UFE path.
-            continue;
-        }
-
-        // Camera attributes are on shape node beneath transform
-        if (cameraPath.extendToShape() != MS::kSuccess) {
-            return false;
-        }
-
-        // Is the camera renderable?
-        MFnDagNode cameraFn(cameraPath, &status);
-        // MFnDependencyNode cameraFn(cameraPath.node(), &status);
-        if (status != MS::kSuccess) {
-            return false;
-        }
-
-        if (!cameraFn.findPlug(
-                "renderable", /* wantNetworkedPlug = */ true).asBool()) {
-            std::cout << "PPT: camera " << camera.asChar() 
-                      << " not renderable, skipped." << std::endl;
-            continue;
-        }
-
-        inputParams.cameraPath = cameraPath;
-        inputParams.ufeCameraPath = Ufe::Path(
-            UfeExtensions::dagPathToUfePathSegment(cameraPath));
-        inputParams.viewMatrix = GetGfMatrixFromMaya(
-            cameraPath.inclusiveMatrixInverse());
-        inputParams.projectionMatrix = GetGfMatrixFromMaya(
-            MFnCamera(cameraPath).projectionMatrix());
-
-        // As per MFnCamera::projectionMatrix() documentation:
-        //
-        // The projection matrix that Maya's software renderer uses is
-        // almost identical to the OpenGL projection matrix. The
-        // difference is that Maya uses a left hand coordinate system
-        // and so the entries [2][2] and [3][2] are negated.
-        inputParams.projectionMatrix[2][2] = -inputParams.projectionMatrix[2][2];
-        inputParams.projectionMatrix[3][2] = -inputParams.projectionMatrix[3][2];
-
-        // Unclear how to translate Maya data.
-        // MHWRender::MDataServerOperation::MViewportScene carries MRenderItem's
-        // created by OGS, and has some level of change notification.  Should
-        // we still somehow rely on OGS?  Seems like the best approach.
-        // Another possibility would be to use in-memory conversion to USD
-        // from Maya USD's duplicate as USD.  For the moment pass in an
-        // empty scene and don't translate Maya data.
-        MHWRender::MDataServerOperation::MViewportScene scene;
-    
-        // Set the output filename.
-        const auto imageName = renderSettings.getImageName(
-            MCommonRenderSettingsData::kFullPathImage,
-            0.0,
-            "myScene",
-            camera,
-            "",                     // Use render settings file format
-            renderLayer,
-            /* createDirectory = */ true,
-            &status);
-        if (status != MS::kSuccess) {
-            return false;
-        }
-    
-        std::cout << "PPT: render settings file name is " << imageName.asChar()
-                  << std::endl;
-    
-        auto resetFileName = []() { Fvp::ImageBufferWriter::SetFileName(""); };
-        TfScoped guard(resetFileName);
-        Fvp::ImageBufferWriter::SetFileName(imageName.asChar());
-    
-        if (_batchRenderer->Render(inputParams, scene) != MS::kSuccess) {
-            return false;
-        }
+    // If the file naming scheme does not correspond to an animation,
+    // use the current time.
+    if (!renderSettings.isAnimated()) {
+        timeStart = MAnimControl::currentTime();
+        timeIncr = 1.0f;
+        timeEnd = timeStart;
     }
+
+    for (MTime time = timeStart; time <= timeEnd; time += timeIncr) {
+
+        const double frameNb = time.as(MTime::uiUnit());
+        if (MAnimControl::currentTime() != time) {
+            MAnimControl::setCurrentTime(time);
+        }
+
+        // Loop over all cameras.  FIXME  Probably ways to compute
+        // non-animated camera data once, for animated renders.
+        auto cameraIt = cameras.cbegin();
+        for (; cameraIt != cameras.cend(); ++cameraIt) {
+            auto camera = *cameraIt;
+    
+            MSelectionList sn;
+            sn.add(camera);
+            MDagPath cameraPath;
+            if (sn.getDagPath(0, cameraPath) != MS::kSuccess) {
+                // Non-Maya UFE path.
+                continue;
+            }
+    
+            // Camera attributes are on shape node beneath transform
+            if (cameraPath.extendToShape() != MS::kSuccess) {
+                return false;
+            }
+    
+            // Is the camera renderable?
+            MFnDagNode cameraFn(cameraPath, &status);
+            // MFnDependencyNode cameraFn(cameraPath.node(), &status);
+            if (status != MS::kSuccess) {
+                return false;
+            }
+    
+            if (!cameraFn.findPlug(
+                    "renderable", /* wantNetworkedPlug = */ true).asBool()) {
+                continue;
+            }
+    
+            inputParams.cameraPath = cameraPath;
+            inputParams.ufeCameraPath = Ufe::Path(
+                UfeExtensions::dagPathToUfePathSegment(cameraPath));
+            inputParams.viewMatrix = GetGfMatrixFromMaya(
+                cameraPath.inclusiveMatrixInverse());
+            inputParams.projectionMatrix = GetGfMatrixFromMaya(
+                MFnCamera(cameraPath).projectionMatrix());
+    
+            // As per MFnCamera::projectionMatrix() documentation:
+            //
+            // The projection matrix that Maya's software renderer uses is
+            // almost identical to the OpenGL projection matrix. The
+            // difference is that Maya uses a left hand coordinate system
+            // and so the entries [2][2] and [3][2] are negated.
+            inputParams.projectionMatrix[2][2] = -inputParams.projectionMatrix[2][2];
+            inputParams.projectionMatrix[3][2] = -inputParams.projectionMatrix[3][2];
+    
+            // Unclear how to translate Maya data.
+            // MHWRender::MDataServerOperation::MViewportScene carries MRenderItem's
+            // created by OGS, and has some level of change notification.  Should
+            // we still somehow rely on OGS?  Seems like the best approach.
+            // Another possibility would be to use in-memory conversion to USD
+            // from Maya USD's duplicate as USD.  For the moment pass in an
+            // empty scene and don't translate Maya data.
+            MHWRender::MDataServerOperation::MViewportScene scene;
+        
+            // Set the output filename.
+            const auto imageName = renderSettings.getImageName(
+                MCommonRenderSettingsData::kFullPathImage,
+                frameNb,
+                "myScene",
+                camera,
+                "",                     // Use render settings file format
+                renderLayer,
+                /* createDirectory = */ true,
+                &status);
+            if (status != MS::kSuccess) {
+                return false;
+            }
+        
+            auto resetFileName = []() { Fvp::ImageBufferWriter::SetFileName(""); };
+            TfScoped guard(resetFileName);
+            Fvp::ImageBufferWriter::SetFileName(imageName.asChar());
+        
+            if (_batchRenderer->Render(inputParams, scene) != MS::kSuccess) {
+                return false;
+            }
+        } // Camera loop
+    } // Time loop
     return true;
 }
 
