@@ -1,5 +1,36 @@
 # Changelog
 
+## [v0.7.2] - 2025-08-05
+
+**Build:**
+* Add support for USD 25.05 [#285](https://github.com/Autodesk/maya-hydra/pull/285)
+* Fix tests that fail with USD 25.05 [#287](https://github.com/Autodesk/maya-hydra/pull/287)
+* Fix test that fails with USD 25.05 on OSX [#288](https://github.com/Autodesk/maya-hydra/pull/288)
+* Add UFE camera filtering test [#289](https://github.com/Autodesk/maya-hydra/pull/289)
+* Add a unit test to check against regression with bifrost graph updates [#278](https://github.com/Autodesk/maya-hydra/pull/278)
+* Re-run failed cases to reduce random failures [#267](https://github.com/Autodesk/maya-hydra/pull/267)
+* Enable standard conformant preprocessor to fix Intellisense issue [#274](https://github.com/Autodesk/maya-hydra/pull/274)
+
+**Features:**
+* Support for GfVec4f in scene browser [#276](https://github.com/Autodesk/maya-hydra/pull/276)
+* Use default bounding box if no extents are specified [#279](https://github.com/Autodesk/maya-hydra/pull/279)
+
+**Bugfix:**
+* Fix Bifrost USD attribute changes don't refresh in the Hydra viewport [#266](https://github.com/Autodesk/maya-hydra/pull/266)
+* Fix selection highlights on USD objects when enabling wireframe [#277](https://github.com/Autodesk/maya-hydra/pull/277)
+* Fix misplaced selection highlights in native instancing [#272](https://github.com/Autodesk/maya-hydra/pull/272)
+* Fix geomsubset selection mode being very slow [#273](https://github.com/Autodesk/maya-hydra/pull/273)
+* Fix slow instances marquee select [#275](https://github.com/Autodesk/maya-hydra/pull/275)
+* Prevent crash in native instance highlighting [#284](https://github.com/Autodesk/maya-hydra/pull/284)
+* Avoid drawing faces for highlighting prims [#286](https://github.com/Autodesk/maya-hydra/pull/286)
+* Do not register pick handler twice [#271](https://github.com/Autodesk/maya-hydra/pull/271)
+
+**Performance:**
+* Point instance highlighting performance improvements [#280](https://github.com/Autodesk/maya-hydra/pull/280)
+
+**Miscellaneous:**
+* Update version in dev branch [#270](https://github.com/Autodesk/maya-hydra/pull/270)
+
 ## [v0.7.1] - 2025-04-28
 
 **Build:**
