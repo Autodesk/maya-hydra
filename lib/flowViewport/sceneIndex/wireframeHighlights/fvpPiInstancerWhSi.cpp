@@ -534,7 +534,6 @@ std::pair<PXR_NS::HdSelectionsSchema, PXR_NS::HdSelectionsSchema> PiInstancerWhS
     std::vector<HdDataSourceBaseHandle> leadSelectionList;
     std::vector<HdDataSourceBaseHandle> activeSelectionList;
     
-    // Get the instancer topology to access prototype paths
     HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(instancerPath);
     HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
     
@@ -544,10 +543,8 @@ std::pair<PXR_NS::HdSelectionsSchema, PXR_NS::HdSelectionsSchema> PiInstancerWhS
         bool isLead = false;
         
         if (_wireframeColorInterface) {
-            // Check if the instancer itself is the lead object
             isLead = _wireframeColorInterface->isLeadObject(primSelection.primPath);
             
-            // If not, check if any of the prototypes are lead objects
             if (!isLead && instancerTopology.IsDefined()) {
                 auto protoPaths = instancerTopology.GetPrototypes()->GetTypedValue(0);
                 for (const auto& protoPath : protoPaths) {

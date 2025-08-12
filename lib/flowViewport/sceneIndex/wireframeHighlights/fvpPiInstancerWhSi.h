@@ -145,6 +145,8 @@ private:
         const PXR_NS::SdfPath&          instancerPath
     );
 
+    // Identify the lead and active selections in the instancer, and return two 
+    // SelectionSchemas, one for lead and one for active.
     std::pair<PXR_NS::HdSelectionsSchema, PXR_NS::HdSelectionsSchema> _SeparateLeadAndActiveSchemas(
         const PXR_NS::HdSelectionsSchema& originalSelections,
         const PXR_NS::SdfPath& instancerPath
