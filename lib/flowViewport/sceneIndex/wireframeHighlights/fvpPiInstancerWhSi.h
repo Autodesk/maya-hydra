@@ -144,6 +144,11 @@ private:
         const PXR_NS::HdSceneIndexPrim& instancerPrim,
         const PXR_NS::SdfPath&          instancerPath
     );
+
+    std::pair<PXR_NS::HdSelectionsSchema, PXR_NS::HdSelectionsSchema> _SeparateLeadAndActiveSchemas(
+        const PXR_NS::HdSelectionsSchema& originalSelections,
+        const PXR_NS::SdfPath& instancerPath
+    );
 };
 
 }

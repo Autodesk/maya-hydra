@@ -53,6 +53,9 @@ public:
     MAYAHYDRALIB_API
     PXR_NS::GfVec4f getWireframeColor(const Fvp::PrimSelection& primSelection) const override;
 
+    MAYAHYDRALIB_API
+    bool isLeadObject(const PXR_NS::SdfPath& primPath) const override;
+
 private:
     enum SelectionState {kLead, kActive, kDormant};
 

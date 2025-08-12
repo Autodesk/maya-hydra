@@ -86,11 +86,29 @@ GfVec4f MhWireframeColorInterfaceImp::_getWireframeColor(const SelectionState& s
 }
 
 GfVec4f MhWireframeColorInterfaceImp::getWireframeColor(const SdfPath& primPath) const { 
+    std::string pathString = primPath.GetString();
+    
+    // Dual-hierarchy colour assignment - filtering is done in PiInstancerWhSi
+    if (pathString.find("Highlight_Lead") != std::string::npos) {
+        return _getWireframeColor(kLead);
+    }
+    else if (pathString.find("Highlight_Active") != std::string::npos) {
+        return _getWireframeColor(kActive);
+    }
+
     return _getWireframeColor(_getSelectionState(primPath));
 }
 
 GfVec4f MhWireframeColorInterfaceImp::getWireframeColor(const Fvp::PrimSelection& primSelection) const { 
     return _getWireframeColor(_getSelectionState(primSelection));
+}
+
+bool MhWireframeColorInterfaceImp::isLeadObject(const PXR_NS::SdfPath& primPath) const {
+    auto pt = _leadObjectPathTracker.lock();
+    if (!pt) {
+        return false;
+    }
+    return pt->isLeadObject(primPath);
 }
 
 }//End of MAYAHYDRA_NS_DEF
