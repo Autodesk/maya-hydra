@@ -3,21 +3,25 @@
 //
 global proc hydraStormCmdRender(string $option)
 {
-    hydraRender -renderer HdStormRendererPlugin;
+    // No interactive Maya to provide an OpenGL context, so ask for one.
+    hydraRender -renderer HdStormRendererPlugin -gpu 1;
 }
 
 // Description: This procedure is called during batch rendering launched
 // interactively from Maya.
 global proc hydraStormBatchRender(string $option)
 {
-    hydraRender -renderer HdStormRendererPlugin;
+    // No interactive Maya to provide an OpenGL context, so ask for one.
+    hydraRender -renderer HdStormRendererPlugin -gpu 1;
 }
 
-// Description: render with HdStormRendererPlugin, the Hydra Storm renderer.
+// Description: This procedure is called for render current frame launched
+// interactively from Maya.
 //
 global proc hydraStormRender(int $width, int $height, int $doShadows,
         int $doGlowPass, string $camera, string $option)
 {
+    // Interactive Maya provides the OpenGL context, no need to ask for one.
     hydraRender -renderer HdStormRendererPlugin;
 }
 

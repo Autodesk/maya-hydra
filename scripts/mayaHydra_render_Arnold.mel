@@ -13,7 +13,8 @@ global proc hydraArnoldBatchRender(string $option)
     hydraRender -renderer HdArnoldRendererPlugin;
 }
 
-// Description: render with HdArnoldRendererPlugin, the Hydra Arnold renderer.
+// Description: This procedure is called for render current frame launched
+// interactively from Maya.
 //
 global proc hydraArnoldRender(int $width, int $height, int $doShadows,
         int $doGlowPass, string $camera, string $option)

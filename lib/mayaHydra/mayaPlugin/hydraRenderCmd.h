@@ -25,6 +25,7 @@
 namespace MAYAHYDRA_NS_DEF {
 
 class BatchRenderer;
+class GLRenderWindow;
 
 class HydraRenderCmd : public MPxCommand
 {
@@ -46,8 +47,11 @@ private:
     bool initialize();
     bool render();
     bool hydraRender();
+    bool hydraPreRender();
 
-    std::unique_ptr<BatchRenderer> _batchRenderer;
+    std::unique_ptr<BatchRenderer>  _batchRenderer;
+    std::unique_ptr<GLRenderWindow> _renderWindow;
+    bool                            _gpuEnabled{false};
 };
 
 }

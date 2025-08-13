@@ -33,10 +33,13 @@
 
 #include <pxr/pxr.h>
 #include <pxr/base/tf/scoped.h>
+#include <pxr/imaging/glf/diagnostic.h> // For GlfRegisterDefaultDebugOutputMessageCallback()
+#include <pxr/imaging/garch/glApi.h>
+#include <pxr/imaging/garch/glDebugWindow.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-// hydraRender [-renderer string] [-camera string] [-currentFrame] [-frame float] [-height uint] [-layer name] [-width uint] 
+// hydraRender [-renderer string] [-camera string] [-currentFrame] [-frame float] [-height uint] [-layer name] [-width uint] [-gpu {0|1}]
 
 namespace {
 
@@ -62,6 +65,9 @@ constexpr auto _frameLong = "-frame";
 constexpr auto _layer = "-l";
 constexpr auto _layerLong = "-layer";
 
+constexpr auto _gpuEnabledFlag = "-gpu";
+constexpr auto _gpuEnabledFlagLong = "-gpuEnabled";
+
 // TODO_BATCH_RENDER  Add documentation for this command.
 constexpr auto _helpText = R"HELP(For details on args usage please see 
 https://github.com/Autodesk/maya-hydra/blob/dev/doc/mayaHydraCommands.md
@@ -71,7 +77,43 @@ https://github.com/Autodesk/maya-hydra/blob/dev/doc/mayaHydraCommands.md
 
 namespace MAYAHYDRA_NS_DEF {
 
+//======================================================================
+// CLASS GLRenderWindow
+//======================================================================
+
+class GLRenderWindow : public GarchGLDebugWindow
+{
+public:
+    typedef GLRenderWindow This;
+
+public:
+    GLRenderWindow();
+    virtual ~GLRenderWindow() = default;
+
+    // GarchGLDebugWindow overrides
+    virtual void OnInitializeGL();
+};
+
+GLRenderWindow::GLRenderWindow()
+    : GarchGLDebugWindow("Maya Hydra Render", 100, 100) // Width, height relevance?
+{}
+
+/* virtual */
+void
+GLRenderWindow::OnInitializeGL()
+{
+    GarchGLApiLoad();
+    GlfRegisterDefaultDebugOutputMessageCallback();
+
+    std::cout << glGetString(GL_VENDOR) << "\n";
+    std::cout << glGetString(GL_RENDERER) << "\n";
+    std::cout << glGetString(GL_VERSION) << "\n";
+}
 const MString HydraRenderCmd::name("hydraRender");
+
+//======================================================================
+// CLASS HydraRenderCmd 
+//======================================================================
 
 MSyntax HydraRenderCmd::createSyntax()
 {
@@ -82,6 +124,7 @@ MSyntax HydraRenderCmd::createSyntax()
     syntax.addFlag(_camera, _cameraLong, MSyntax::kString);
     syntax.addFlag(_renderer, _rendererLong, MSyntax::kString);
     syntax.addFlag(_currentFrame, _currentFrameLong);
+    syntax.addFlag(_gpuEnabledFlag, _gpuEnabledFlagLong, MSyntax::kBoolean);
     syntax.addFlag(_frameShort, _frameLong, MSyntax::kDouble);
     syntax.addFlag(_layer, _layerLong, MSyntax::kString);
 
@@ -108,7 +151,9 @@ bool HydraRenderCmd::render()
     // Must execute the render operations currently set up by
     // MtohRenderOverride::setup().
 
-    // hydraPreRender();
+    if (!hydraPreRender()) {
+        return false;
+    }
 
     if (!hydraRender()) {
         return false;
@@ -117,6 +162,20 @@ bool HydraRenderCmd::render()
     // Do we need this one?  Or just write to disk using the new image write
     // functionality?
     // hydraPresentTarget();
+
+    return true;
+}
+
+bool HydraRenderCmd::hydraPreRender()
+{
+    if (!_gpuEnabled) {
+        // Nothing to do, early out.
+        return true;
+    }
+
+    // If we need an OpenGL context, create one now.
+    _renderWindow = std::make_unique<GLRenderWindow>();
+    _renderWindow->Init();
 
     return true;
 }
@@ -274,6 +333,10 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
         CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_renderer, 0, rn));
 
         rendererName = TfToken(rn.asChar());
+    }
+
+    if (db.isFlagSet(_gpuEnabledFlag)) {
+        CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_gpuEnabledFlag, 0, _gpuEnabled));
     }
 
     // Create the batch renderer.  The second and third arguments of
