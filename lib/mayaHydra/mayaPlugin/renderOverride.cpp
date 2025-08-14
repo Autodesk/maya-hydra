@@ -887,8 +887,8 @@ MStatus MtohRenderOverride::Render(
             const bool isLastVisiblePass    = (visibleIdx == numVisibleRenderPasses - 1);//Put me back later
 
             // Clear background for the first visible pass only
-            currentPass->params().clearBackground = isFirstVisiblePass;
-            //currentPass->params().clearDepth      = isFirstVisiblePass; //Coming with a future update in HVT
+            currentPass->params().clearBackgroundColor = isFirstVisiblePass;
+            currentPass->params().clearBackgroundDepth = isFirstVisiblePass;
 
             // Enable presentation for the last visible pass only
             currentPass->params().enablePresentation = isLastVisiblePass;
