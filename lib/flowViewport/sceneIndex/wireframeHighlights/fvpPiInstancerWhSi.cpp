@@ -529,53 +529,6 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
     const PXR_NS::HdSceneIndexPrim&   instancerPrim,
     const PXR_NS::SdfPath&            instancerPath,
     const PXR_NS::HdSelectionsSchema& selectionsSchema,
-    const std::string&                selectionId
-)
-{
-    SelectionKey selectionKey { instancerPath, selectionId };
-    if (_selections.find(selectionKey) != _selections.end()) {
-        return;
-    }
-
-    // Collect paths
-    SdfPathSet instancerPaths;
-    SdfPathSet prototypePaths;
-    CollectInstancingPaths(instancerPath, InstancingPathsCollectionDirection::Bidirectional, instancerPaths, prototypePaths);
-
-    // Setup data structures
-    SdfPath selectionPath = RegisterSelection(selectionKey);
-
-    SelectionData selectionData;
-    selectionData._primSelection = selectionId == kFullHighlight ? PrimSelection {instancerPath} : ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(std::stoul(selectionId)));
-    selectionData._instancerPaths = instancerPaths;
-    selectionData._prototypePaths = prototypePaths;
-    _selections[selectionKey] = selectionData;
-    for (const auto& instancerPath : instancerPaths) {
-        _instancerPathsToSelections[instancerPath].emplace(selectionKey);
-    }
-    for (const auto& prototypePath : prototypePaths) {
-        _prototypePathsToSelections[prototypePath].emplace(selectionKey);
-    }
-
-    // Send notifications
-    HdSceneIndexObserver::AddedPrimEntries addedPrims;
-    auto operation = [&addedPrims, selectionPath](const pxr::SdfPath& primPath, const pxr::HdSceneIndexPrim& prim) -> bool {
-        addedPrims.emplace_back(primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), prim.primType);
-        return true;
-    };
-    for (const auto& instancerPath : instancerPaths) {
-        ForEachPrimInHierarchy(instancerPath, operation);
-    }
-    for (const auto& prototypePath : prototypePaths) {
-        ForEachPrimInHierarchy(prototypePath, operation);
-    }
-    _SendPrimsAdded(addedPrims);
-}
-
-void PiInstancerWhSi::_CreateSelectionHighlight(
-    const PXR_NS::HdSceneIndexPrim&   instancerPrim,
-    const PXR_NS::SdfPath&            instancerPath,
-    const PXR_NS::HdSelectionsSchema& selectionsSchema,
     const std::string&                selectionId,
     const PXR_NS::VtBoolArray&        instanceMask
 )
@@ -594,33 +547,43 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
     SdfPath selectionPath = RegisterSelection(selectionKey);
 
     SelectionData selectionData;
-    selectionData._primSelection = ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(0));
     selectionData._instancerPaths = instancerPaths;
     selectionData._prototypePaths = prototypePaths;
     
-    // Store instance data based on selection type
-    if (selectionId == kLeadHighlight) {
-        // Find the lead instance from the mask
-        selectionData._leadInstanceIndex = -1;
-        for (size_t i = 0; i < instanceMask.size(); ++i) {
-            if (instanceMask[i]) {
-                selectionData._leadInstanceIndex = static_cast<int>(i);
-                break; // Only one lead instance
-            }
-        }
-        selectionData._activeInstanceIndices.clear();
-    } else if (selectionId == kActiveHighlight) {
-        // Find all active instances from the mask
+    if (instanceMask.empty()) {
+        // Original behaviour: Handle different selection element access patterns and instance data
+        selectionData._primSelection = selectionId == kFullHighlight ? 
+            PrimSelection {instancerPath} : 
+            ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(std::stoul(selectionId)));
         selectionData._leadInstanceIndex = -1;
         selectionData._activeInstanceIndices.clear();
-        for (size_t i = 0; i < instanceMask.size(); ++i) {
-            if (instanceMask[i]) {
-                selectionData._activeInstanceIndices.push_back(static_cast<int>(i));
-            }
-        }
     } else {
-        selectionData._leadInstanceIndex = -1;
-        selectionData._activeInstanceIndices.clear();
+        // Find all active instances 
+        selectionData._primSelection = ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(0));
+        
+        // Store instance data based on selection type
+        if (selectionId == kLeadHighlight) {
+            // Find the lead instance from the mask
+            selectionData._leadInstanceIndex = -1;
+            for (size_t i = 0; i < instanceMask.size(); ++i) {
+                if (instanceMask[i]) {
+                    selectionData._leadInstanceIndex = static_cast<int>(i);
+                    break;
+                }
+            }
+            selectionData._activeInstanceIndices.clear();
+        } else if (selectionId == kActiveHighlight) {
+            selectionData._leadInstanceIndex = -1;
+            selectionData._activeInstanceIndices.clear();
+            for (size_t i = 0; i < instanceMask.size(); ++i) {
+                if (instanceMask[i]) {
+                    selectionData._activeInstanceIndices.push_back(static_cast<int>(i));
+                }
+            }
+        } else {
+            selectionData._leadInstanceIndex = -1;
+            selectionData._activeInstanceIndices.clear();
+        }
     }
     
     _selections[selectionKey] = selectionData;

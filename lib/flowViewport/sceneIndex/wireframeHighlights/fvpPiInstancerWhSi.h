@@ -127,7 +127,8 @@ private:
         const PXR_NS::HdSceneIndexPrim&   instancerPrim,
         const PXR_NS::SdfPath&            instancerPath,
         const PXR_NS::HdSelectionsSchema& selectionsSchema,
-        const std::string&                selectionId);
+        const std::string&                selectionId,
+        const PXR_NS::VtBoolArray&        instanceMask = PXR_NS::VtBoolArray());
 
     // Convenience method to create a selection highlight for all selections in
     // the instancer.
@@ -135,15 +136,6 @@ private:
         const PXR_NS::HdSceneIndexPrim&   instancerPrim,
         const PXR_NS::SdfPath&            instancerPath,
         const PXR_NS::HdSelectionsSchema& selectionsSchema
-    );
-    
-    // Overload for dual-color selection with specific instance mask
-    void _CreateSelectionHighlight(
-        const PXR_NS::HdSceneIndexPrim&   instancerPrim,
-        const PXR_NS::SdfPath&            instancerPath,
-        const PXR_NS::HdSelectionsSchema& selectionsSchema,
-        const std::string&                selectionId,
-        const PXR_NS::VtBoolArray&        instanceMask
     );
     
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& instancerPath, std::string selectionId);
