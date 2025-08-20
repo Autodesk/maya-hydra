@@ -15,8 +15,6 @@
 
 #include "fvpPiInstancerWhSi.h"
 
-#include <flowViewport/tokens.h>
-
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
@@ -25,9 +23,10 @@
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
-#include <pxr/imaging/hd/primvarsSchema.h>
 
-#include <set>
+#include <flowViewport/colorPreferences/fvpColorPreferences.h>
+#include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
+
 #include <string>
 #include <utility>
 
@@ -35,18 +34,16 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-DEFINE_PRIVATE_OVERRIDEWIREFRAMECOLOR_TOKEN
-
 const std::string kFullHighlight = "Full";
-const std::string leadHighlight = "Lead";
-const std::string activeHighlight = "Active";
+const std::string kLeadHighlight = "Lead";
+const std::string kActiveHighlight = "Active";
 
 // Computes the mask to use for an instancer's selection highlight
 // based on the instancer's topology and the selections.
-VtBoolArray
-_GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionsSchema& selections)
+PXR_NS::VtBoolArray
+_GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionsSchema& selections, const PXR_NS::VtBoolArray& selectedInstanceIndicies)
 {
-    VtBoolArray originalMask = 
+    PXR_NS::VtBoolArray originalMask = 
         originalInstancerTopology.GetMask()->GetTypedValue(0);
 
     size_t nbInstances = 0;
@@ -61,9 +58,9 @@ _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTop
     }
 
     // Initialize return mask
-    VtBoolArray selectionHighlightMask = 
-        selections.IsDefined() ? VtBoolArray(nbInstances, false) : 
-        (originalMask.empty() ? VtBoolArray(nbInstances, true) : originalMask);
+    PXR_NS::VtBoolArray selectionHighlightMask = 
+        selections.IsDefined() ? PXR_NS::VtBoolArray(nbInstances, false) : 
+        (originalMask.empty() ? PXR_NS::VtBoolArray(nbInstances, true) : originalMask);
 
     // Loop over all selections.
     const auto nbSelections = selections.GetNumElements();
@@ -88,7 +85,9 @@ _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTop
         for (size_t iInstanceIndices = 0; iInstanceIndices < nestedInstanceIndices.GetNumElements(); iInstanceIndices++) {
             auto instanceIndices = nestedInstanceIndices.GetElement(0);
             for (const auto& instanceIndex : instanceIndices.GetInstanceIndices()->GetTypedValue(0)) {
-                selectionHighlightMask[instanceIndex] = originalMask.empty() ? true : originalMask[instanceIndex];
+                if (selectedInstanceIndicies.empty() || selectedInstanceIndicies[instanceIndex]) {
+                    selectionHighlightMask[instanceIndex] = originalMask.empty() ? true : originalMask[instanceIndex];
+                }
             }
         }
     }
@@ -98,7 +97,7 @@ _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTop
 // Returns the overall data source for an instancer's selection highlight.
 // This replaces the mask data source.
 HdContainerDataSourceHandle
-_GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& originalDataSource, const HdSelectionsSchema& selections)
+_GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& originalDataSource, const HdSelectionsSchema& selections, const PXR_NS::VtBoolArray& selectedInstanceMask)
 {
     HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(originalDataSource);
 
@@ -106,8 +105,8 @@ _GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& ori
 
     if (selections.IsDefined()) {
         HdDataSourceLocator maskLocator = HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask);
-        VtBoolArray selectionHighlightMask = _GetSelectionHighlightMask(instancerTopology, selections);
-        auto selectionHighlightMaskDataSource = HdRetainedTypedSampledDataSource<VtBoolArray>::New(selectionHighlightMask);
+        PXR_NS::VtBoolArray selectionHighlightMask = _GetSelectionHighlightMask(instancerTopology, selections, selectedInstanceMask);
+        auto selectionHighlightMaskDataSource = HdRetainedTypedSampledDataSource<PXR_NS::VtBoolArray>::New(selectionHighlightMask);
         editedDataSource.Set(maskLocator, selectionHighlightMaskDataSource);
     }
 
@@ -118,6 +117,43 @@ bool _IsPointInstancer(const HdSceneIndexPrim& prim) {
     HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
     HdInstancedBySchema instancedBy = HdInstancedBySchema::GetFromParent(prim.dataSource);
     return prim.primType == HdPrimTypeTokens->instancer && instancerTopology.IsDefined() && !instancerTopology.GetInstanceLocations() && !instancedBy.IsDefined();
+}
+
+// Helper function to separate lead and active instances
+// Lead is the first selected instance, active are all the rest
+void _SeparateLeadAndActiveInstances(
+    const HdSelectionsSchema& selectionsSchema, 
+    const PXR_NS::SdfPath& instancerPath,
+    const std::shared_ptr<FVP_NS_DEF::WireframeColorInterface>& wireframeColorInterface,
+    int& leadInstanceIndex,
+    std::vector<int>& activeInstanceIndices
+) {
+    leadInstanceIndex = -1;
+    activeInstanceIndices.clear();
+    
+    std::vector<int> allSelectedInstances;
+    
+    // Collect all selected instance indices
+    const auto nbSelections = selectionsSchema.GetNumElements();
+    for (size_t snNdx = 0; snNdx < nbSelections; ++snNdx) {
+        const auto sn = selectionsSchema.GetElement(snNdx);
+        const auto nestedInstanceIndices = sn.GetNestedInstanceIndices();
+        if (!nestedInstanceIndices) continue;
+        
+        for (size_t iInstanceIndices = 0; iInstanceIndices < nestedInstanceIndices.GetNumElements(); iInstanceIndices++) {
+            auto instanceIndices = nestedInstanceIndices.GetElement(0);
+            for (const auto& instanceIndex : instanceIndices.GetInstanceIndices()->GetTypedValue(0)) {
+                allSelectedInstances.push_back(instanceIndex);
+            }
+        }
+    }
+    
+    if (!allSelectedInstances.empty()) {
+        leadInstanceIndex = allSelectedInstances.back();
+        for (size_t i = 0; i < allSelectedInstances.size() - 1; ++i) {
+            activeInstanceIndices.push_back(allSelectedInstances[i]);
+        }
+    }
 }
 
 }
@@ -165,13 +201,49 @@ HdSceneIndexPrim PiInstancerWhSi::GetHighlightPrim(const SdfPath &selectionPath,
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
     if (prim.primType == HdPrimTypeTokens->mesh) {
-        prim.dataSource = SetWireframeRepr(prim.dataSource, 
-            _wireframeColorInterface->getWireframeColor(selectionPath));
+        GfVec4f wireframeColor;
+        if (selectionKey.second == kLeadHighlight) {
+            if (!Fvp::ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->wireframeSelection, wireframeColor)) {
+                wireframeColor = _wireframeColorInterface->getWireframeColor(selectionKey.first);
+            }
+        } else if (selectionKey.second == kActiveHighlight) {
+            if (!Fvp::ColorPreferences::getInstance().getColor(FvpColorPreferencesTokens->wireframeSelectionSecondary, wireframeColor)) {
+                wireframeColor = _wireframeColorInterface->getWireframeColor(primSelection);
+            }
+        } else {
+            wireframeColor = primSelection.nestedInstanceIndices.empty() ? 
+                _wireframeColorInterface->getWireframeColor(selectionKey.first) : 
+                _wireframeColorInterface->getWireframeColor(primSelection);
+        }
+        prim.dataSource = SetWireframeRepr(prim.dataSource, wireframeColor);
     }
     else if (_IsPointInstancer(prim) && originalPath == selectionKey.first && selectionKey.second != kFullHighlight) {
         // Adjust the instancer mask to only show selected instances
         HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
-        prim.dataSource = _GetSelectionHighlightInstancerDataSource(prim.dataSource, selectionsSchema);
+        
+        // Create appropriate mask based on selection type
+        PXR_NS::VtBoolArray instanceMask;
+        auto selectionData = _selections.at(selectionKey);
+        
+        // Calculate total instances for mask creation
+        HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(prim.dataSource);
+        auto instanceIndices = instancerTopology.GetInstanceIndices();
+        size_t nbInstances = 0;
+        for (size_t iInstanceIndex = 0; iInstanceIndex < instanceIndices.GetNumElements(); iInstanceIndex++) {
+            auto protoInstances = instanceIndices.GetElement(iInstanceIndex)->GetTypedValue(0);
+            nbInstances += protoInstances.size();
+        }
+        
+        if (selectionKey.second == kLeadHighlight && selectionData._leadInstanceIndex != -1) {
+            instanceMask = PXR_NS::VtBoolArray(nbInstances, false);
+            instanceMask[selectionData._leadInstanceIndex] = true;
+        } else if (selectionKey.second == kActiveHighlight && !selectionData._activeInstanceIndices.empty()) {
+            instanceMask = PXR_NS::VtBoolArray(nbInstances, false);
+            for (int activeIndex : selectionData._activeInstanceIndices) {
+                instanceMask[activeIndex] = true;
+            }
+        }
+        prim.dataSource = _GetSelectionHighlightInstancerDataSource(prim.dataSource, selectionsSchema, instanceMask);
     }
     prim.dataSource = RepathInstancingDataSources(prim.dataSource, SdfPath::AbsoluteRootPath(), selectionPath);
     return prim;
@@ -317,11 +389,9 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
 {
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
-        if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator()) ||
-            entry.dirtyLocators.Intersects(primvarsOverrideWireframeColorLocator)) {
+        if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
             if (_IsPointInstancer(prim)) {
-                // Selection changed on the instancer or lead object status changed; rebuild the highlights
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
                     const auto selectionKeysToDelete = existingSelectionKeys->second;
@@ -425,16 +495,33 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
     const HdSelectionsSchema& selectionsSchema
 )
 {
-    // Separate the selections into lead and active based on actual selection status
-    auto [leadSelections, activeSelections] = _SeparateLeadAndActiveSchemas(selectionsSchema, instancerPath);
+    int leadInstanceIndex;
+    std::vector<int> activeInstanceIndices;
+    _SeparateLeadAndActiveInstances(selectionsSchema, instancerPath, _wireframeColorInterface, 
+                                   leadInstanceIndex, activeInstanceIndices);
     
-    // Create separate hierarchies with the filtered selections
-    if (leadSelections.IsDefined()) {
-        _CreateSelectionHighlight(instancerPrim, instancerPath, leadSelections, leadHighlight);
+    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
+    auto instanceIndices = instancerTopology.GetInstanceIndices();
+    size_t nbInstances = 0;
+    for (size_t iInstanceIndex = 0; iInstanceIndex < instanceIndices.GetNumElements(); iInstanceIndex++) {
+        auto protoInstances = instanceIndices.GetElement(iInstanceIndex)->GetTypedValue(0);
+        nbInstances += protoInstances.size();
     }
     
-    if (activeSelections.IsDefined()) {
-        _CreateSelectionHighlight(instancerPrim, instancerPath, activeSelections, activeHighlight);
+    // Lead instance highlighting if there are selected instances. Create active highlight
+    // if there is more than one instance selected
+    if (leadInstanceIndex != -1) {
+        PXR_NS::VtBoolArray leadMask(nbInstances, false);
+        leadMask[leadInstanceIndex] = true;
+        _CreateSelectionHighlight(instancerPrim, instancerPath, selectionsSchema, kLeadHighlight, leadMask);
+    }
+    
+    if (!activeInstanceIndices.empty()) {
+        PXR_NS::VtBoolArray activeMask(nbInstances, false);
+        for (int activeIndex : activeInstanceIndices) {
+            activeMask[activeIndex] = true;
+        }
+        _CreateSelectionHighlight(instancerPrim, instancerPath, selectionsSchema, kActiveHighlight, activeMask);
     }
 }
 
@@ -459,13 +546,7 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
     SdfPath selectionPath = RegisterSelection(selectionKey);
 
     SelectionData selectionData;
-    if (selectionId == kFullHighlight) {
-        selectionData._primSelection = PrimSelection {instancerPath};
-    } else if (selectionId == leadHighlight || selectionId == activeHighlight) {
-        selectionData._primSelection = PrimSelection {instancerPath};
-    } else {
-        selectionData._primSelection = ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(std::stoul(selectionId)));
-    }
+    selectionData._primSelection = selectionId == kFullHighlight ? PrimSelection {instancerPath} : ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(std::stoul(selectionId)));
     selectionData._instancerPaths = instancerPaths;
     selectionData._prototypePaths = prototypePaths;
     _selections[selectionKey] = selectionData;
@@ -491,15 +572,82 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
     _SendPrimsAdded(addedPrims);
 }
 
-void PiInstancerWhSi::_DeleteSelectionHighlight(const SdfPath& instancerPath, std::string selectionId)
+void PiInstancerWhSi::_CreateSelectionHighlight(
+    const PXR_NS::HdSceneIndexPrim&   instancerPrim,
+    const PXR_NS::SdfPath&            instancerPath,
+    const PXR_NS::HdSelectionsSchema& selectionsSchema,
+    const std::string&                selectionId,
+    const PXR_NS::VtBoolArray&        instanceMask
+)
 {
-    // For dual hierarchy, delete both lead and active hierarchies when the main "0" selection is removed
-    if (selectionId == "0") {
-        _DeleteSelectionHighlight(instancerPath, leadHighlight);
-        _DeleteSelectionHighlight(instancerPath, activeHighlight);
+    SelectionKey selectionKey { instancerPath, selectionId };
+    if (_selections.find(selectionKey) != _selections.end()) {
         return;
     }
 
+    // Collect paths
+    SdfPathSet instancerPaths;
+    SdfPathSet prototypePaths;
+    CollectInstancingPaths(instancerPath, InstancingPathsCollectionDirection::Bidirectional, instancerPaths, prototypePaths);
+
+    // Setup data structures
+    SdfPath selectionPath = RegisterSelection(selectionKey);
+
+    SelectionData selectionData;
+    selectionData._primSelection = ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(0));
+    selectionData._instancerPaths = instancerPaths;
+    selectionData._prototypePaths = prototypePaths;
+    
+    // Store instance data based on selection type
+    if (selectionId == kLeadHighlight) {
+        // Find the lead instance from the mask
+        selectionData._leadInstanceIndex = -1;
+        for (size_t i = 0; i < instanceMask.size(); ++i) {
+            if (instanceMask[i]) {
+                selectionData._leadInstanceIndex = static_cast<int>(i);
+                break; // Only one lead instance
+            }
+        }
+        selectionData._activeInstanceIndices.clear();
+    } else if (selectionId == kActiveHighlight) {
+        // Find all active instances from the mask
+        selectionData._leadInstanceIndex = -1;
+        selectionData._activeInstanceIndices.clear();
+        for (size_t i = 0; i < instanceMask.size(); ++i) {
+            if (instanceMask[i]) {
+                selectionData._activeInstanceIndices.push_back(static_cast<int>(i));
+            }
+        }
+    } else {
+        selectionData._leadInstanceIndex = -1;
+        selectionData._activeInstanceIndices.clear();
+    }
+    
+    _selections[selectionKey] = selectionData;
+    for (const auto& instancerPath : instancerPaths) {
+        _instancerPathsToSelections[instancerPath].emplace(selectionKey);
+    }
+    for (const auto& prototypePath : prototypePaths) {
+        _prototypePathsToSelections[prototypePath].emplace(selectionKey);
+    }
+
+    // Send notifications
+    HdSceneIndexObserver::AddedPrimEntries addedPrims;
+    auto operation = [&addedPrims, selectionPath](const pxr::SdfPath& primPath, const pxr::HdSceneIndexPrim& prim) -> bool {
+        addedPrims.emplace_back(primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), prim.primType);
+        return true;
+    };
+    for (const auto& instancerPath : instancerPaths) {
+        ForEachPrimInHierarchy(instancerPath, operation);
+    }
+    for (const auto& prototypePath : prototypePaths) {
+        ForEachPrimInHierarchy(prototypePath, operation);
+    }
+    _SendPrimsAdded(addedPrims);
+}
+
+void PiInstancerWhSi::_DeleteSelectionHighlight(const SdfPath& instancerPath, std::string selectionId)
+{
     // Collect paths
     SelectionKey selectionKey { instancerPath, selectionId };
     if (_selections.find(selectionKey) == _selections.end()) {
@@ -525,53 +673,6 @@ void PiInstancerWhSi::_DeleteSelectionHighlight(const SdfPath& instancerPath, st
 
     // Send notifications
     _SendPrimsRemoved({selectionPath});
-}
-
-std::pair<PXR_NS::HdSelectionsSchema, PXR_NS::HdSelectionsSchema> PiInstancerWhSi::_SeparateLeadAndActiveSchemas(
-    const HdSelectionsSchema& originalSelections,
-    const SdfPath& instancerPath
-) {
-    std::vector<HdDataSourceBaseHandle> leadSelectionList;
-    std::vector<HdDataSourceBaseHandle> activeSelectionList;
-    
-    HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(instancerPath);
-    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
-    
-    for (size_t selectionId = 0; selectionId < originalSelections.GetNumElements(); selectionId++) {
-        auto selection = originalSelections.GetElement(selectionId);
-        auto primSelection = ConvertHydraToFvpSelection(instancerPath, selection);
-        bool isLead = false;
-        
-        if (_wireframeColorInterface) {
-            isLead = _wireframeColorInterface->isLeadObject(primSelection.primPath);
-            
-            if (!isLead && instancerTopology.IsDefined()) {
-                auto protoPaths = instancerTopology.GetPrototypes()->GetTypedValue(0);
-                for (const auto& protoPath : protoPaths) {
-                    if (_wireframeColorInterface->isLeadObject(protoPath)) {
-                        isLead = true;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        if (isLead) {
-            leadSelectionList.push_back(selection.GetContainer());
-        } else {
-            activeSelectionList.push_back(selection.GetContainer());
-        }
-    }
-    
-    HdSelectionsSchema leadSelections = !leadSelectionList.empty() ?
-        HdSelectionsSchema(HdRetainedSmallVectorDataSource::New(leadSelectionList.size(), leadSelectionList.data())) :
-        HdSelectionsSchema(nullptr);
-    
-    HdSelectionsSchema activeSelections = !activeSelectionList.empty() ?
-        HdSelectionsSchema(HdRetainedSmallVectorDataSource::New(activeSelectionList.size(), activeSelectionList.data())) :
-        HdSelectionsSchema(nullptr);
-    
-    return std::make_pair(leadSelections, activeSelections);
 }
 
 }

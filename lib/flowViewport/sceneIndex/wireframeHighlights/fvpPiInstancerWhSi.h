@@ -108,6 +108,8 @@ private:
         PrimSelection _primSelection;
         PXR_NS::SdfPathSet _instancerPaths;
         PXR_NS::SdfPathSet _prototypePaths;
+        int _leadInstanceIndex;
+        std::vector<int> _activeInstanceIndices;
     };
 
     std::set<PXR_NS::SdfPath> _pointInstancerPaths;
@@ -134,6 +136,16 @@ private:
         const PXR_NS::SdfPath&            instancerPath,
         const PXR_NS::HdSelectionsSchema& selectionsSchema
     );
+    
+    // Overload for dual-color selection with specific instance mask
+    void _CreateSelectionHighlight(
+        const PXR_NS::HdSceneIndexPrim&   instancerPrim,
+        const PXR_NS::SdfPath&            instancerPath,
+        const PXR_NS::HdSelectionsSchema& selectionsSchema,
+        const std::string&                selectionId,
+        const PXR_NS::VtBoolArray&        instanceMask
+    );
+    
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& instancerPath, std::string selectionId);
 
     // Create a full highlight if the instancer argument is fully selected (or
@@ -143,13 +155,6 @@ private:
     inline bool _ConditionallyCreateSelectionHighlight(
         const PXR_NS::HdSceneIndexPrim& instancerPrim,
         const PXR_NS::SdfPath&          instancerPath
-    );
-
-    // Identify the lead and active selections in the instancer, and return two 
-    // SelectionSchemas, one for lead and one for active.
-    std::pair<PXR_NS::HdSelectionsSchema, PXR_NS::HdSelectionsSchema> _SeparateLeadAndActiveSchemas(
-        const PXR_NS::HdSelectionsSchema& originalSelections,
-        const PXR_NS::SdfPath& instancerPath
     );
 };
 
