@@ -35,9 +35,6 @@ public:
     //Get the wireframe color of a primitive for selection highlighting
     virtual PXR_NS::GfVec4f getWireframeColor(const PXR_NS::SdfPath& primPath) const = 0;
     virtual PXR_NS::GfVec4f getWireframeColor(const Fvp::PrimSelection& primSelection) const = 0;
-    
-    //Check if a primitive is the lead object (most recently selected)
-    virtual bool isLeadObject(const PXR_NS::SdfPath& primPath) const = 0;
 };
 
 }//end of namespace FVP_NS_DEF

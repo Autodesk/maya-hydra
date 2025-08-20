@@ -103,12 +103,4 @@ GfVec4f MhWireframeColorInterfaceImp::getWireframeColor(const Fvp::PrimSelection
     return _getWireframeColor(_getSelectionState(primSelection));
 }
 
-bool MhWireframeColorInterfaceImp::isLeadObject(const PXR_NS::SdfPath& primPath) const {
-    auto pt = _leadObjectPathTracker.lock();
-    if (!pt) {
-        return false;
-    }
-    return pt->isLeadObject(primPath);
-}
-
 }//End of MAYAHYDRA_NS_DEF

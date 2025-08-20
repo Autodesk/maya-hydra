@@ -40,10 +40,10 @@ const std::string kActiveHighlight = "Active";
 
 // Computes the mask to use for an instancer's selection highlight
 // based on the instancer's topology and the selections.
-PXR_NS::VtBoolArray
+VtBoolArray
 _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTopology, const HdSelectionsSchema& selections, const PXR_NS::VtBoolArray& selectedInstanceIndicies)
 {
-    PXR_NS::VtBoolArray originalMask = 
+    VtBoolArray originalMask = 
         originalInstancerTopology.GetMask()->GetTypedValue(0);
 
     size_t nbInstances = 0;
@@ -58,9 +58,9 @@ _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTop
     }
 
     // Initialize return mask
-    PXR_NS::VtBoolArray selectionHighlightMask = 
-        selections.IsDefined() ? PXR_NS::VtBoolArray(nbInstances, false) : 
-        (originalMask.empty() ? PXR_NS::VtBoolArray(nbInstances, true) : originalMask);
+    VtBoolArray selectionHighlightMask = 
+        selections.IsDefined() ? VtBoolArray(nbInstances, false) : 
+        (originalMask.empty() ? VtBoolArray(nbInstances, true) : originalMask);
 
     // Loop over all selections.
     const auto nbSelections = selections.GetNumElements();
@@ -105,8 +105,8 @@ _GetSelectionHighlightInstancerDataSource(const HdContainerDataSourceHandle& ori
 
     if (selections.IsDefined()) {
         HdDataSourceLocator maskLocator = HdInstancerTopologySchema::GetDefaultLocator().Append(HdInstancerTopologySchemaTokens->mask);
-        PXR_NS::VtBoolArray selectionHighlightMask = _GetSelectionHighlightMask(instancerTopology, selections, selectedInstanceMask);
-        auto selectionHighlightMaskDataSource = HdRetainedTypedSampledDataSource<PXR_NS::VtBoolArray>::New(selectionHighlightMask);
+        VtBoolArray selectionHighlightMask = _GetSelectionHighlightMask(instancerTopology, selections, selectedInstanceMask);
+        auto selectionHighlightMaskDataSource = HdRetainedTypedSampledDataSource<VtBoolArray>::New(selectionHighlightMask);
         editedDataSource.Set(maskLocator, selectionHighlightMaskDataSource);
     }
 
