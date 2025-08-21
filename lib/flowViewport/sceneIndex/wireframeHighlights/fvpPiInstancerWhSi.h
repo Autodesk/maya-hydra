@@ -110,7 +110,7 @@ private:
         PXR_NS::SdfPathSet _prototypePaths;
         int _leadInstanceIndex;
         std::set<int> _activeInstanceIndices;
-        size_t _selectedInstanceCount;  // Cache instance count to avoid recalculation
+        size_t _selectedInstanceCount;
     };
 
     std::set<PXR_NS::SdfPath> _pointInstancerPaths;
@@ -138,7 +138,6 @@ private:
         const PXR_NS::SdfPath&            instancerPath,
         const PXR_NS::HdSelectionsSchema& selectionsSchema
     );
-    
     void _DeleteSelectionHighlight(const PXR_NS::SdfPath& instancerPath, std::string selectionId);
 
     // Create a full highlight if the instancer argument is fully selected (or

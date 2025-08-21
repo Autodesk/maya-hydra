@@ -112,7 +112,7 @@ bool _IsPointInstancer(const HdSceneIndexPrim& prim) {
 }
 
 // Helper function to separate lead and active instances
-// Lead is the first selected instance, active are all the rest
+// Lead is the LAST chronologically selected instance, active are all the rest
 void _SeparateLeadAndActiveInstances(
     const HdSelectionsSchema& selectionsSchema, 
     const PXR_NS::SdfPath& instancerPath,
@@ -122,7 +122,6 @@ void _SeparateLeadAndActiveInstances(
 ) {
     leadInstanceIndex = -1;
     activeInstanceIndices.clear();
-    
     std::set<int> allSelectedInstances;
     
     const auto nbSelections = selectionsSchema.GetNumElements();
@@ -135,12 +134,12 @@ void _SeparateLeadAndActiveInstances(
             auto instanceIndices = nestedInstanceIndices.GetElement(0);
             for (const auto& instanceIndex : instanceIndices.GetInstanceIndices()->GetTypedValue(0)) {
                 allSelectedInstances.insert(instanceIndex);
+                leadInstanceIndex = instanceIndex;
             }
         }
     }
     
     if (!allSelectedInstances.empty()) {
-        leadInstanceIndex = *allSelectedInstances.rbegin();
         activeInstanceIndices = allSelectedInstances;
         activeInstanceIndices.erase(leadInstanceIndex);
     }
@@ -376,6 +375,7 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
             if (_IsPointInstancer(prim)) {
+                // Selection changed on the instancer; rebuild the highlights
                 auto existingSelectionKeys = _primPathsToSelections.find(entry.primPath);
                 if (existingSelectionKeys != _primPathsToSelections.end()) {
                     const auto selectionKeysToDelete = existingSelectionKeys->second;
@@ -551,15 +551,10 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
         }
         selectionData._selectedInstanceCount = nbInstances;
     } else {
-        // Find all active instances 
         selectionData._primSelection = ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(0));
-        
-        // Cache instance count from the provided mask size
         selectionData._selectedInstanceCount = instanceMask.size();
-        
-        // Store instance data based on selection type
+
         if (selectionId == kLeadHighlight) {
-            // Find the lead instance from the mask
             selectionData._leadInstanceIndex = -1;
             for (size_t i = 0; i < instanceMask.size(); ++i) {
                 if (instanceMask[i]) {
@@ -590,7 +585,6 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
         _prototypePathsToSelections[prototypePath].emplace(selectionKey);
     }
 
-    // Send notifications
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
     auto operation = [&addedPrims, selectionPath](const pxr::SdfPath& primPath, const pxr::HdSceneIndexPrim& prim) -> bool {
         addedPrims.emplace_back(primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), prim.primType);
