@@ -111,8 +111,8 @@ bool _IsPointInstancer(const HdSceneIndexPrim& prim) {
     return prim.primType == HdPrimTypeTokens->instancer && instancerTopology.IsDefined() && !instancerTopology.GetInstanceLocations() && !instancedBy.IsDefined();
 }
 
-// Helper function to separate lead and active instances
-// Lead is the LAST chronologically selected instance, active are all the rest
+// Helper function to separate lead and active instances for dual-color selection
+// Lead is the most recently selected instance, the other instances are active
 void _SeparateLeadAndActiveInstances(
     const HdSelectionsSchema& selectionsSchema, 
     const PXR_NS::SdfPath& instancerPath,

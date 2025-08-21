@@ -88,7 +88,6 @@ GfVec4f MhWireframeColorInterfaceImp::_getWireframeColor(const SelectionState& s
 GfVec4f MhWireframeColorInterfaceImp::getWireframeColor(const SdfPath& primPath) const { 
     std::string pathString = primPath.GetString();
     
-    // Dual-hierarchy colour assignment - filtering is done in PiInstancerWhSi
     if (pathString.find("Highlight_Lead") != std::string::npos) {
         return _getWireframeColor(kLead);
     }
