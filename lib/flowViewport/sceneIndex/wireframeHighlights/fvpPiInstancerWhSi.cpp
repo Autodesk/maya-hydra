@@ -210,11 +210,8 @@ HdSceneIndexPrim PiInstancerWhSi::GetHighlightPrim(const SdfPath &selectionPath,
         // Adjust the instancer mask to only show selected instances
         HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
         
-        // Create appropriate mask based on selection type
         PXR_NS::VtBoolArray instanceMask;
         auto selectionData = _selections.at(selectionKey);
-        
-        // Use cached instance count to avoid recalculation
         size_t nbInstances = selectionData._selectedInstanceCount;
         
         if (selectionKey.second == kLeadHighlight && selectionData._leadInstanceIndex != -1) {
