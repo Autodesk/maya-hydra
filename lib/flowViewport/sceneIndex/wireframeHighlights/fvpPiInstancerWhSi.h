@@ -109,7 +109,8 @@ private:
         PXR_NS::SdfPathSet _instancerPaths;
         PXR_NS::SdfPathSet _prototypePaths;
         int _leadInstanceIndex;
-        std::vector<int> _activeInstanceIndices;
+        std::set<int> _activeInstanceIndices;
+        size_t _selectedInstanceCount;  // Cache instance count to avoid recalculation
     };
 
     std::set<PXR_NS::SdfPath> _pointInstancerPaths;
