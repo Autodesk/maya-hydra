@@ -492,17 +492,13 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
     // Lead instance highlighting if there are selected instances. Create active highlight
     // if there is more than one instance selected
     if (leadInstanceIndex != -1) {
-        PXR_NS::VtBoolArray leadMask(nbInstances, false);
-        leadMask[leadInstanceIndex] = true;
-        _CreateSelectionHighlight(instancerPrim, instancerPath, selectionsSchema, kLeadHighlight, leadMask);
+        _CreateSelectionHighlight(instancerPrim, instancerPath, selectionsSchema, kLeadHighlight, 
+                                 leadInstanceIndex, {}, nbInstances);
     }
     
     if (!activeInstanceIndices.empty()) {
-        PXR_NS::VtBoolArray activeMask(nbInstances, false);
-        for (int activeIndex : activeInstanceIndices) {
-            activeMask[activeIndex] = true;
-        }
-        _CreateSelectionHighlight(instancerPrim, instancerPath, selectionsSchema, kActiveHighlight, activeMask);
+        _CreateSelectionHighlight(instancerPrim, instancerPath, selectionsSchema, kActiveHighlight, 
+                                 -1, activeInstanceIndices, nbInstances);
     }
 }
 
@@ -511,7 +507,9 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
     const PXR_NS::SdfPath&            instancerPath,
     const PXR_NS::HdSelectionsSchema& selectionsSchema,
     const std::string&                selectionId,
-    const PXR_NS::VtBoolArray&        instanceMask
+    int                               leadInstanceIndex,
+    const std::set<int>&              activeInstanceIndices,
+    size_t                            nbInstances
 )
 {
     SelectionKey selectionKey { instancerPath, selectionId };
@@ -531,8 +529,9 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
     selectionData._instancerPaths = instancerPaths;
     selectionData._prototypePaths = prototypePaths;
     
-    if (instanceMask.empty()) {
-        // Original behaviour: Handle different selection element access patterns and instance data
+    if (nbInstances == 0) {
+        // Legacy path: For kFullHighlight or numeric fallback IDs when transitioning selection states
+        // This path is NOT used for normal instance selection (dual hierarchy)
         selectionData._primSelection = selectionId == kFullHighlight ? 
             PrimSelection {instancerPath} : 
             ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(std::stoul(selectionId)));
@@ -541,37 +540,17 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
         
         HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
         auto instanceIndices = instancerTopology.GetInstanceIndices();
-        size_t nbInstances = 0;
+        size_t totalInstances = 0;
         for (size_t iInstanceIndex = 0; iInstanceIndex < instanceIndices.GetNumElements(); iInstanceIndex++) {
             auto protoInstances = instanceIndices.GetElement(iInstanceIndex)->GetTypedValue(0);
-            nbInstances += protoInstances.size();
+            totalInstances += protoInstances.size();
         }
-        selectionData._selectedInstanceCount = nbInstances;
+        selectionData._selectedInstanceCount = totalInstances;
     } else {
         selectionData._primSelection = ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(0));
-        selectionData._selectedInstanceCount = instanceMask.size();
-
-        if (selectionId == kLeadHighlight) {
-            selectionData._leadInstanceIndex = -1;
-            for (size_t i = 0; i < instanceMask.size(); ++i) {
-                if (instanceMask[i]) {
-                    selectionData._leadInstanceIndex = static_cast<int>(i);
-                    break;
-                }
-            }
-            selectionData._activeInstanceIndices.clear();
-        } else if (selectionId == kActiveHighlight) {
-            selectionData._leadInstanceIndex = -1;
-            selectionData._activeInstanceIndices.clear();
-            for (size_t i = 0; i < instanceMask.size(); ++i) {
-                if (instanceMask[i]) {
-                    selectionData._activeInstanceIndices.insert(static_cast<int>(i));
-                }
-            }
-        } else {
-            selectionData._leadInstanceIndex = -1;
-            selectionData._activeInstanceIndices.clear();
-        }
+        selectionData._selectedInstanceCount = nbInstances;
+        selectionData._leadInstanceIndex = leadInstanceIndex;
+        selectionData._activeInstanceIndices = activeInstanceIndices;
     }
     
     _selections[selectionKey] = selectionData;

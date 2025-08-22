@@ -129,7 +129,9 @@ private:
         const PXR_NS::SdfPath&            instancerPath,
         const PXR_NS::HdSelectionsSchema& selectionsSchema,
         const std::string&                selectionId,
-        const PXR_NS::VtBoolArray&        instanceMask = PXR_NS::VtBoolArray());
+        int                               leadInstanceIndex = -1,
+        const std::set<int>&              activeInstanceIndices = {},    
+        size_t                            nbInstances = 0);
 
     // Convenience method to create a selection highlight for all selections in
     // the instancer.
