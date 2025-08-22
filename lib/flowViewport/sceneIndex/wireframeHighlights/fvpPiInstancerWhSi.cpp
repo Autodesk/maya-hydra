@@ -111,6 +111,18 @@ bool _IsPointInstancer(const HdSceneIndexPrim& prim) {
     return prim.primType == HdPrimTypeTokens->instancer && instancerTopology.IsDefined() && !instancerTopology.GetInstanceLocations() && !instancedBy.IsDefined();
 }
 
+// Counts the total number of instances in a point instancer. O(n) where n is the number of instance indices.
+size_t _CountNbInstances(const PXR_NS::HdSceneIndexPrim& instancerPrim) {
+    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
+    auto instanceIndices = instancerTopology.GetInstanceIndices();
+    size_t totalInstances = 0;
+    for (size_t iInstanceIndex = 0; iInstanceIndex < instanceIndices.GetNumElements(); iInstanceIndex++) {
+        auto protoInstances = instanceIndices.GetElement(iInstanceIndex)->GetTypedValue(0);
+        totalInstances += protoInstances.size();
+    }
+    return totalInstances;
+}
+
 // Helper function to separate lead and active instances for dual-color selection
 // Lead is the most recently selected instance, the other instances are active
 void _SeparateLeadAndActiveInstances(
@@ -478,16 +490,9 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
 {
     int leadInstanceIndex;
     std::set<int> activeInstanceIndices;
+    size_t nbInstances = _CountNbInstances(instancerPrim);
     _SeparateLeadAndActiveInstances(selectionsSchema, instancerPath, _wireframeColorInterface, 
                                    leadInstanceIndex, activeInstanceIndices);
-    
-    HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
-    auto instanceIndices = instancerTopology.GetInstanceIndices();
-    size_t nbInstances = 0;
-    for (size_t iInstanceIndex = 0; iInstanceIndex < instanceIndices.GetNumElements(); iInstanceIndex++) {
-        auto protoInstances = instanceIndices.GetElement(iInstanceIndex)->GetTypedValue(0);
-        nbInstances += protoInstances.size();
-    }
     
     // Lead instance highlighting if there are selected instances. Create active highlight
     // if there is more than one instance selected
@@ -537,15 +542,7 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
             ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(std::stoul(selectionId)));
         selectionData._leadInstanceIndex = -1;
         selectionData._activeInstanceIndices.clear();
-        
-        HdInstancerTopologySchema instancerTopology = HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
-        auto instanceIndices = instancerTopology.GetInstanceIndices();
-        size_t totalInstances = 0;
-        for (size_t iInstanceIndex = 0; iInstanceIndex < instanceIndices.GetNumElements(); iInstanceIndex++) {
-            auto protoInstances = instanceIndices.GetElement(iInstanceIndex)->GetTypedValue(0);
-            totalInstances += protoInstances.size();
-        }
-        selectionData._selectedInstanceCount = totalInstances;
+        selectionData._selectedInstanceCount = _CountNbInstances(instancerPrim);
     } else {
         selectionData._primSelection = ConvertHydraToFvpSelection(instancerPath, selectionsSchema.GetElement(0));
         selectionData._selectedInstanceCount = nbInstances;
