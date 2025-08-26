@@ -84,7 +84,11 @@ void MayaHydraAdapter::RemoveCallbacks()
 
 VtValue MayaHydraAdapter::Get(const TfToken& key)
 {
-    TF_UNUSED(key);
+    // Get extension attributes
+    auto& it = _extAttrNameToValueMap.find(key.GetText());
+    if (it != _extAttrNameToValueMap.end()) {
+        return it->second;
+    }
     return {};
 };
 
@@ -119,6 +123,33 @@ MStatus MayaHydraAdapter::Initialize()
         MayaHydraMaterialNetworkConverter::initialize();
     }
     return status;
+}
+
+HdPrimvarDescriptorVector MayaHydraAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
+{
+    // All extension attributes as custom primvars
+    if (interpolation == HdInterpolationConstant) {
+        MAYAHYDRA_NS::GetExtensionAttributesFromNode(GetNode(), _extAttrNameToValueMap);
+        // Use constant interpolation and none role for all primvars
+        HdPrimvarDescriptorVector descriptors;
+        for (auto it = _extAttrNameToValueMap.begin(); it != _extAttrNameToValueMap.end(); it++) {
+            descriptors.push_back({ TfToken(it->first), interpolation, HdPrimvarRoleTokens->none });
+        }
+        return descriptors;
+    }
+    return HdPrimvarDescriptorVector();
+}
+
+void MayaHydraAdapter::HandleExtensionAttributesDirty()
+{
+    // Update extension attributes
+    MAYAHYDRA_NS::GetExtensionAttributesFromNode(GetNode(), _extAttrNameToValueMap);
+    // Notify the change tracker that the primvars have changed.
+    // Note there's no fine grained dirty notification mechanism on primvars yet, 
+    // like dirty flags for adding/removing/changing a specific primvar, only DirtyPrimvar for all changes.
+    // Currently, no performance bottleneck was spotted around this. 
+    // This could be improved if a more fine grained mechanism is provided.
+    MarkDirty(HdChangeTracker::DirtyPrimvar);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

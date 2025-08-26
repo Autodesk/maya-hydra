@@ -41,6 +41,7 @@
 #include <maya/MSelectionList.h>
 
 #include <vector>
+#include <map>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -86,6 +87,8 @@ public:
 
     bool IsPopulated() const { return _isPopulated; }
 
+    void HandleExtensionAttributesDirty();
+
     MAYAHYDRALIB_API
     virtual HdMeshTopology GetMeshTopology() { return {}; }
     MAYAHYDRALIB_API
@@ -95,10 +98,7 @@ public:
     MAYAHYDRALIB_API
     virtual GfMatrix4d GetTransform() { return GfMatrix4d(); }
     MAYAHYDRALIB_API
-    virtual HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation)
-    {
-        return HdPrimvarDescriptorVector();
-    }
+    virtual HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation);
     MAYAHYDRALIB_API
     virtual bool GetDoubleSided() const { return true; }
     MAYAHYDRALIB_API
@@ -124,6 +124,7 @@ protected:
     std::vector<MCallbackId> _callbacks;
     MayaHydraSceneIndex*     _mayaHydraSceneIndex;
     MObject                  _node;
+    VtDictionary             _extAttrNameToValueMap;
 
     bool _isPopulated = false;
 };

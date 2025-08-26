@@ -68,7 +68,6 @@ const std::pair<MObject&, HdDirtyBits> _dirtyBits[] {
     { MayaAttrs::mesh::displaySmoothMesh, HdChangeTracker::DirtyDisplayStyle },
     { MayaAttrs::mesh::smoothLevel, HdChangeTracker::DirtyDisplayStyle }
 };
-
 } // namespace
 
 /**
@@ -269,7 +268,8 @@ public:
             return GetUVs();
         }
 
-        return {};
+        // Let base class handle other keys
+        return MayaHydraShapeAdapter::Get(key);
     }
 
     size_t SamplePrimvar(const TfToken& key, size_t maxSampleCount, float* times, VtValue* samples)
@@ -418,27 +418,43 @@ public:
 
     HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation) override
     {
+        // Base descriptors
+        HdPrimvarDescriptorVector descs = MayaHydraShapeAdapter::GetPrimvarDescriptors(interpolation);
+
+        // Local descriptors
+        HdPrimvarDescriptorVector localDescs;
         if (interpolation == HdInterpolationVertex) {
             static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
-            return  passNormalsToHydra ? 
-            HdPrimvarDescriptorVector{
-                {UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point},//Vertices
-                {UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal}//Normals
-            } : 
-            HdPrimvarDescriptorVector{
-                {UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point}//Vertices only
-            };
+            if (passNormalsToHydra) {
+                localDescs = {
+                    { UsdGeomTokens->points,
+                      interpolation,
+                      HdPrimvarRoleTokens->point }, // Vertices
+                    { UsdGeomTokens->normals,
+                      interpolation,
+                      HdPrimvarRoleTokens->normal } // Normals
+                };
+            } else {
+                localDescs = {
+                    { UsdGeomTokens->points,
+                      interpolation,
+                      HdPrimvarRoleTokens->point } // Vertices only
+                };
+            }
         } else if (interpolation == HdInterpolationFaceVarying) {
             // UVs and tangents are face varying in maya.
             MFnMesh mesh(GetDagPath());
             if (mesh.numUVs() > 0) {
-                return HdPrimvarDescriptorVector{
+                localDescs = {
                     {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate},//uvs
                     {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate},//tangents
                 };
             }
         }
-        return {};
+
+        // Combine descriptors
+        descs.insert(descs.end(), localDescs.begin(), localDescs.end());
+        return descs;
     }
 
     bool GetDoubleSided() const override
@@ -500,6 +516,9 @@ private:
                     plug.name().asChar(),
                     plug.name().asChar());
         }
+
+        // Handle extension attributes change
+        adapter->HandleExtensionAttributesDirty();
     }
 
     static void TopologyChangedCallback(MObject& node, void* clientData)

@@ -54,11 +54,6 @@ public:
     MAYAHYDRALIB_API
     virtual PxOsdSubdivTags GetSubdivTags();
     MAYAHYDRALIB_API
-    virtual HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation) override
-    {
-        return {};
-    }
-    MAYAHYDRALIB_API
     virtual void MarkDirty(HdDirtyBits dirtyBits) override;
 
     MAYAHYDRALIB_API
