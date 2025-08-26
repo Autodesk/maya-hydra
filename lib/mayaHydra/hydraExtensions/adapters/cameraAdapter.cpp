@@ -98,6 +98,19 @@ void MayaHydraCameraAdapter::CreateCallbacks()
         AddCallback(paramsChanged);
     }
 
+    auto attributesChanged = MNodeMessage::addAttributeChangedCallback(
+        obj,
+        +[](MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+            auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
+            // Handle extension attributes change
+            adapter->HandleExtensionAttributesDirty();
+        },
+        reinterpret_cast<void*>(this),
+        &status);
+    if (status) {
+        AddCallback(attributesChanged);
+    }
+
     auto xformChanged = MDagMessage::addWorldMatrixModifiedCallback(
         dag,
         +[](MObject& transformNode, MDagMessage::MatrixModifiedFlags& modified, void* clientData) {

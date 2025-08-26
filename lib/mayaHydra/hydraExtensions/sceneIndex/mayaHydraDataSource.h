@@ -58,9 +58,6 @@ private:
     TfToken _type;
     MayaHydraSceneIndex* _sceneIndex = nullptr;
     MayaHydraAdapter* _adapter = nullptr;
-
-    std::atomic_bool _primvarsBuilt{false};
-    HdContainerDataSourceAtomicHandle _primvars;
 };
 
 HD_DECLARE_DATASOURCE_HANDLES(MayaHydraDataSource);
