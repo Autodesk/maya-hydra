@@ -22,6 +22,7 @@
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/hydraUtils.h>
 #include <mayaHydraLib/tokens.h>
+#include <mayaHydraLib/debugCodes.h>
 
 #include <maya/MDagPath.h>
 #include <maya/MGlobal.h>
@@ -29,10 +30,26 @@
 #include <maya/MPlug.h>
 #include <maya/MPlugArray.h>
 #include <maya/MRenderUtil.h>
+#include <maya/MFnAttribute.h>
+#include <maya/MFnTypedAttribute.h>
+#include <maya/MFnNumericAttribute.h>
+#include <maya/MFnEnumAttribute.h>
+#include <maya/MFnStringData.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
+
+template<typename T> 
+void UpdateAttrs(const char* attrName, const T& val, const T& defaultVal, VtDictionary& attrs)
+{
+    // Only store the attribute if it differs from the default value.
+    if (defaultVal != val) {
+        attrs[attrName] = VtValue(val);
+    } else {
+        attrs.erase(attrName);
+    }
+}
 
 TfToken GetFileTexturePath(const MFnDependencyNode& fileNode)
 {
@@ -228,4 +245,101 @@ PXR_NS::TfToken GetGeomSubsetsPickMode()
     return GeomSubsetsPickModeTokens->None;
 }
 
+void GetExtensionAttributesFromNode(
+    const MObject& node, PXR_NS::VtDictionary& attrs)
+{
+    MStatus           status;
+    MFnDependencyNode nodeFn(node, &status);
+    if (ARCH_UNLIKELY(!status)) {
+        return;
+    }
+
+    for (size_t i = 0; i < nodeFn.attributeCount(); i++) {
+        MObject      attrObj = nodeFn.attribute(i);
+        MFnAttribute attrFn(attrObj);
+        auto         attrName = attrFn.name().asChar();
+        MPlug        attrPlug(node, attrObj);
+        if (attrPlug.isChild())
+            continue;
+
+        if (attrFn.isExtension()) {
+            switch (attrObj.apiType()) {
+            case MFn::kEnumAttribute: {
+                MFnEnumAttribute enumAttr(attrObj);
+                short            value = attrPlug.asShort();
+                short            defaultVal = 0;
+                enumAttr.getDefault(defaultVal);
+                UpdateAttrs<short>(attrName, value, defaultVal, attrs);
+            } break;
+            case MFn::kTypedAttribute: {
+                MFnTypedAttribute typeAttr(attrObj);
+                switch (typeAttr.attrType()) {
+                case MFnData::kString: {
+                    MString value = attrPlug.asString();
+                    MObject defaultValObj;
+                    typeAttr.getDefault(defaultValObj);
+                    MFnStringData defaultStringData(defaultValObj);
+                    MString       defaultVal = defaultStringData.string();
+                    UpdateAttrs<MString>(attrName, value, defaultVal, attrs);
+                } break;
+                default:
+                    // TODO: Add more types if necessary
+                    TF_DEBUG(MAYAHYDRALIB_GET_EXTENSION_ATTRS)
+                        .Msg(
+                            "Not handled custom attribute: name=%s, type=kTypedAttribute\n",
+                            attrFn.name().asChar());
+                    break;
+                }
+                break;
+            } break;
+            case MFn::kNumericAttribute: {
+                MFnNumericAttribute numericAttr(attrObj);
+                switch (numericAttr.unitType()) {
+                case MFnNumericData::kBoolean: {
+                    auto value = attrPlug.asBool();
+                    bool defaultVal = false;
+                    numericAttr.getDefault(defaultVal);
+                    UpdateAttrs<bool>(attrName, value, defaultVal, attrs);
+                } break;
+                case MFnNumericData::kByte:
+                case MFnNumericData::kChar: {
+                    auto value = attrPlug.asChar();
+                    char defaultVal = 0;
+                    numericAttr.getDefault(defaultVal);
+                    UpdateAttrs<char>(attrName, value, defaultVal, attrs);
+                } break;
+                case MFnNumericData::kInt: {
+                    auto value = attrPlug.asInt();
+                    int  defaultVal = 0;
+                    numericAttr.getDefault(defaultVal);
+                    UpdateAttrs<int>(attrName, value, defaultVal, attrs);
+                } break;
+                case MFnNumericData::kFloat: {
+                    auto  value = attrPlug.asFloat();
+                    float defaultVal = 0.0f;
+                    numericAttr.getDefault(defaultVal);
+                    UpdateAttrs<float>(attrName, value, defaultVal, attrs);
+                } break;
+                default:
+                    // TODO: Add more types if necessary
+                    TF_DEBUG(MAYAHYDRALIB_GET_EXTENSION_ATTRS)
+                        .Msg(
+                            "Not handled custom attribute: name=%s, type=kNumericAttribute\n",
+                            attrFn.name().asChar());
+                    break;
+                }
+                break;
+            } break;
+            default:
+                // TODO: Add more types if necessary
+                TF_DEBUG(MAYAHYDRALIB_GET_EXTENSION_ATTRS)
+                    .Msg(
+                        "Not handled custom attribute: name=%s, type=%d\n",
+                        attrFn.name().asChar(),
+                        attrObj.apiType());
+                break;
+            }
+        }
+    }
+}
 } // namespace MAYAHYDRA_NS_DEF
