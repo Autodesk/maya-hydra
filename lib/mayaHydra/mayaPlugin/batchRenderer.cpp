@@ -552,9 +552,6 @@ MStatus BatchRenderer::Render(
     // all we want is to call it once, then call _Execute() repeatedly.
     renderFrame(true);
 
-    constexpr auto wait100ms = std::chrono::duration<float, std::milli>(100);
-    constexpr int MAX_NB_RENDERS{50};
-    int nbRenders{1};
     // For Arnold the following always returns false.
     // _isConverged = _taskController->IsConverged();
     auto isConverged = [this]() {
@@ -565,8 +562,9 @@ MStatus BatchRenderer::Render(
     };
     _isConverged = isConverged();
 
-    // Render to convergence, with a maximum number of renders.
-    for (; !_isConverged && nbRenders < MAX_NB_RENDERS; ++nbRenders) {
+    // Render to convergence.
+    constexpr auto wait100ms = std::chrono::duration<float, std::milli>(100);
+    while (!_isConverged) {
         std::this_thread::sleep_for(wait100ms);
 
         // See renderFrame() lambda comments.
@@ -575,16 +573,6 @@ MStatus BatchRenderer::Render(
 
         _engine.Execute(_renderIndex, &tasks);
         _isConverged = isConverged();
-    }
-
-    if (!_isConverged) {
-        // HYDRA-1714: render convergence unreliable.
-        // TODO_BATCH_RENDER  Incorrectly just wait an arbitrary
-        // amount of time for rendering to complete.
-        constexpr int ms25000{25000};
-        constexpr auto msWait25s = std::chrono::duration<float, std::milli>(ms25000);
-        TF_WARN("Render did not converge after %d renders, waiting %d milliseconds.", MAX_NB_RENDERS, ms25000);
-        std::this_thread::sleep_for(msWait25s);
     }
 
     const auto fileName = Fvp::ImageBufferWriter::GetFileName();
