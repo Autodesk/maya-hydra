@@ -60,6 +60,8 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 namespace {
 
+std::mutex dagAdapter_mutex;
+
 void _TransformNodeDirty(MObject& node, MPlug& plug, void* clientData)
 {
     auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
@@ -157,6 +159,8 @@ GfMatrix4d MayaHydraDagAdapter::GetTransform()
         if (IsInstanced()) {
             _transform.SetIdentity();
         } else {
+            // Apply a global lock to avoid race condition while doing parallel DG node evaluation.
+            std::lock_guard<std::mutex> lock(dagAdapter_mutex);
             _transform = GetGfMatrixFromMaya(_dagPath.inclusiveMatrix());
         }
         _invalidTransform = false;
