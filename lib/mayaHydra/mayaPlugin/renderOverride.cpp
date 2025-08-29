@@ -21,6 +21,7 @@
 #include <pxr/imaging/garch/glApi.h>
 
 #include "renderOverride.h"
+#include "renderRegionCommand.h"
 #include "setViewportRenderPassesCommand.h"
 
 #include "mayaColorPreferencesTranslator.h"
@@ -1282,11 +1283,20 @@ MStatus MtohRenderOverride::Render(
             }
 
             currentPass->params().renderBufferSize  = GfVec2i(width, height);
-            currentPass->params().viewInfo.viewport = { { 0, 0 }, { width, height } };
         }
 #else
         _taskController->SetRenderViewport(_viewport);
 #endif
+    }
+
+    const GfRange2f displayWindow(GfVec2f(0.0f), GfVec2f(width, height));
+    const GfRect2i renderRegion = MayaHydraRenderRegionCommand::getRenderRegion().has_value() ? MayaHydraRenderRegionCommand::getRenderRegion().value() : GfRect2i(GfVec2i(0.0f), GfVec2i(width, height));
+    for (int i = 0; i < numRenderPasses; ++i) {
+        const hvt::FramePassPtr& currentPass = _GetRenderPass(i);
+        if (!currentPass) {
+            continue;
+        }
+        currentPass->params().viewInfo.framing = PXR_NS::CameraUtilFraming(displayWindow, renderRegion);
     }
     
     MStatus  status;
@@ -1688,7 +1698,6 @@ void MtohRenderOverride::_InitHydraResources(
     for (int i = 0; i < numRenderPasses; ++i) {
         const auto& currentPass = _GetRenderPass(i);
         currentPass->params().renderBufferSize          = GfVec2i(width, height);
-        currentPass->params().viewInfo.viewport         = { { 0, 0 }, { width, height } };
         currentPass->params().viewInfo.viewMatrix       = viewMatrix;
         currentPass->params().viewInfo.projectionMatrix = projectionMatrix;
     }

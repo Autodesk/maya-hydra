@@ -18,6 +18,7 @@ target_sources(${TARGET_NAME}
         viewCommand.cpp
         pluginBuildInfoCommand.cpp
         setViewportRenderPassesCommand.cpp
+        renderRegionCommand.cpp
 )
 
 set(HEADERS
