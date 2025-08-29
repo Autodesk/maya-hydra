@@ -11,6 +11,9 @@ set(MEL_SCRIPT_FILES
     mayaHydra_create_globals_tab_Arnold.mel
     mayaHydra_register_renderer_Arnold.mel
     mayaHydra_render_Arnold.mel
+    mayaHydra_create_globals_tab_Prman.mel
+    mayaHydra_register_renderer_Prman.mel
+    mayaHydra_render_Prman.mel
 )
 
 install(

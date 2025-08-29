@@ -1,0 +1,31 @@
+// Description: This procedure is called during command line renders
+// with the Render executable.
+//
+global proc hydraPrmanCmdRender(string $option)
+{
+    hydraRender -renderer HdPrmanLoaderRendererPlugin;
+}
+
+// Description: This procedure is called during batch rendering launched
+// interactively from Maya.
+global proc hydraPrmanBatchRender(string $option)
+{
+    hydraRender -renderer HdPrmanLoaderRendererPlugin;
+}
+
+// Description: This procedure is called for render current frame launched
+// interactively from Maya.
+//
+global proc hydraPrmanRender(int $width, int $height, int $doShadows,
+        int $doGlowPass, string $camera, string $option)
+{
+    hydraRender -renderer HdPrmanLoaderRendererPlugin;
+}
+
+// Description: This script returns the Hydra-specific command line arguments
+// to the 'Render' executable on batch render from interactive mode.
+//
+global proc string hydraPrmanBatchRenderOptionsString()
+{
+	return " -r hydraPrman ";
+}

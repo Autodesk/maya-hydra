@@ -1,5 +1,6 @@
 set(RENDER_DESC_FILES
     hydraArnoldRenderer.xml
+    hydraPrmanRenderer.xml
     hydraStormRenderer.xml
 )
 

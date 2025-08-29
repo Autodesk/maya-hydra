@@ -246,9 +246,11 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     std::array rendererRegistrationScripts = {
         "mayaHydra_render_Storm.mel",
         "mayaHydra_register_renderer_Storm.mel",
-        // FIXME Arnold renderer registration should NOT be done here.
+        // FIXME Plugin renderer registration should NOT be done here.
         "mayaHydra_render_Arnold.mel",
-        "mayaHydra_register_renderer_Arnold.mel"
+        "mayaHydra_register_renderer_Arnold.mel",
+        "mayaHydra_render_Prman.mel",
+        "mayaHydra_register_renderer_Prman.mel"
     };
 
     for (auto rendererRegistrationScript : rendererRegistrationScripts) {
@@ -280,8 +282,9 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
     std::array rendererRegistrationCommands = {
         "registerHydraStormRenderer()", 
-        // FIXME Arnold renderer registration should NOT be done here.
-        "registerHydraArnoldRenderer()"
+        // FIXME Plugin renderer registration should NOT be done here.
+        "registerHydraArnoldRenderer()",
+        "registerHydraPrmanRenderer()"
     };
 
     for (auto rendererRegistrationCommand : rendererRegistrationCommands) {
