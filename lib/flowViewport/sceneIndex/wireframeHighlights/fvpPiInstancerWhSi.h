@@ -108,6 +108,9 @@ private:
         PrimSelection _primSelection;
         PXR_NS::SdfPathSet _instancerPaths;
         PXR_NS::SdfPathSet _prototypePaths;
+        int _leadInstanceIndex;
+        std::set<int> _activeInstanceIndices;
+        size_t _selectedInstanceCount;
     };
 
     std::set<PXR_NS::SdfPath> _pointInstancerPaths;
@@ -125,7 +128,10 @@ private:
         const PXR_NS::HdSceneIndexPrim&   instancerPrim,
         const PXR_NS::SdfPath&            instancerPath,
         const PXR_NS::HdSelectionsSchema& selectionsSchema,
-        const std::string&                selectionId);
+        const std::string&                selectionId,
+        int                               leadInstanceIndex = -1,
+        const std::set<int>&              activeInstanceIndices = {},    
+        size_t                            nbInstances = 0);
 
     // Convenience method to create a selection highlight for all selections in
     // the instancer.
