@@ -139,6 +139,13 @@ public:
     /// one modelEditor panel.
     static std::vector<MString> AllActiveRendererNames();
 
+    /// Returns the names of all AOVs made available by the render delegates
+    /// for a given render pass index.
+    /// TODO 2025-08-29 : This currently gathers AOVs from all viewports indiscriminately.
+    /// Once we have proper multi-viewport support, we should also be able to
+    /// specify which viewport to get the AOVs for.
+    static TfTokenVector GetAvailableRenderPassAovs(int passIndex);
+
     /// Returns a list of rprims in the render index for the given render
     /// delegate.
     ///

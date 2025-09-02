@@ -15,11 +15,15 @@
 //
 
 #include "setViewportRenderPassesCommand.h"
+#include "renderOverride.h"
 
 #include <maya/MArgParser.h>
+#include <maya/MIntArray.h>
 #include <maya/MSyntax.h>
 #include <maya/M3dView.h>
 #include <maya/MArgList.h>
+
+#include <pxr/pxr.h>
 
 #include <vector>
 #include <algorithm>
@@ -62,7 +66,17 @@
     // Query the currently visible render passes and their AOV names
     MEL : mayaHydraSetVisibleRenderPasses -q -v
     Python : result = cmds.mayaHydraSetVisibleRenderPasses(query=True, visible=True)
+
+    // List available AOV names for a render pass
+    MEL : mayaHydraSetVisibleRenderPasses -la 0
+    Python : result = cmds.mayaHydraSetVisibleRenderPasses(listAovs=0)
+
+    // Reset the displayed render passes and AOVs to defaults
+    MEL : mayaHydraSetVisibleRenderPasses -r
+    Python : result = cmds.mayaHydraSetVisibleRenderPasses(reset=True)
 */
+
+PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
 
@@ -85,6 +99,10 @@ constexpr auto _visiblePassesId = "-v";
 constexpr auto _visiblePassesIdLong = "-visible";
 constexpr auto _aovNameId = "-aov";
 constexpr auto _aovNameIdLong = "-aovName";
+constexpr auto _listAovsId = "-la";
+constexpr auto _listAovsIdLong = "-listAovs";
+constexpr auto _resetId = "-r";
+constexpr auto _resetIdLong = "-reset";
 
 } // namespace
 
@@ -102,6 +120,12 @@ MSyntax MayaHydraSetVisibleRenderPasses::createSyntax()
     syntax.addFlag(_aovNameId, _aovNameIdLong, MSyntax::kString);
     syntax.makeFlagMultiUse(_aovNameId);
 
+    // Add flag to list available AOVs - requires pass index (int)
+    syntax.addFlag(_listAovsId, _listAovsIdLong, MSyntax::kUnsigned);
+
+    // Add flag to reset displayed render passes and AOVs
+    syntax.addFlag(_resetId, _resetIdLong, MSyntax::kNoArg);
+
     return syntax;
 }
 
@@ -114,6 +138,19 @@ MStatus MayaHydraSetVisibleRenderPasses::doIt(const MArgList& args)
 
     const bool isQuery = argData.isQuery();
     const bool isEdit = argData.isEdit();
+
+    if (argData.isFlagSet(_resetId)) {
+        _visibleRenderPasses = MIntArray(_defaultVisibleRenderPasses, sizeof(_defaultVisibleRenderPasses) / sizeof(_defaultVisibleRenderPasses[0]));
+        _aovNames = MStringArray(_defaultAovNames, sizeof(_defaultAovNames) / sizeof(_defaultAovNames[0]));
+    }
+
+    if (argData.isFlagSet(_listAovsId)) {
+        int passIndex = argData.flagArgumentInt(_listAovsId, 0);
+        auto aovs = MtohRenderOverride::GetAvailableRenderPassAovs(passIndex);
+        for (const auto& aov : aovs) {
+            appendToResult(aov.GetText());
+        }
+    }
 
     if (argData.isFlagSet(_visiblePassesId)) {
         if (isQuery) {

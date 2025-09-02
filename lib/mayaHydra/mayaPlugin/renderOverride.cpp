@@ -111,6 +111,7 @@
 #include <pxr/usd/kind/registry.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/modelAPI.h>
+#include <pxr/usdImaging/usdImagingGL/engine.h>
 
 #include <mayaUsdAPI/proxyStage.h>
 
@@ -595,6 +596,21 @@ std::vector<MString> MtohRenderOverride::AllActiveRendererNames()
         }
     }
     return renderers;
+}
+
+TfTokenVector MtohRenderOverride::GetAvailableRenderPassAovs(int passIndex)
+{
+    TfTokenVector aovs;
+
+    std::lock_guard<std::mutex> lock(_allInstancesMutex);
+    for (auto* instance : _allInstances) {
+        if (instance->_initializationSucceeded && passIndex < static_cast<int>(instance->_renderPassesData.size())) {
+            UsdImagingGLEngine engine(instance->_hgiDriver, instance->_renderPassesData[passIndex].rendererName);
+            auto currAovs = engine.GetRendererAovs();
+            aovs.insert(aovs.end(), currAovs.begin(), currAovs.end());
+        }
+    }
+    return aovs;
 }
 
 SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visibleOnly)

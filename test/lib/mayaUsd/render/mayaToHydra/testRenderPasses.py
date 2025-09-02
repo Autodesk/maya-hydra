@@ -140,5 +140,25 @@ class TestRenderPasses(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.
             # After all tests have run, report any failures
             if failures:
                 self.fail(f"The following assertions failed:\n" + "\n".join(failures))
+    
+    def test_ListAovs(self):
+        stormAovs = cmds.mayaHydraSetVisibleRenderPasses(listAovs=0)
+        if self._usdVersion <= (0, 24, 11):
+            self.assertEqual(stormAovs, ['color', 'primId', 'depth'])
+        else:
+            self.assertEqual(stormAovs, ['color', 'primId', 'depth', 'Neye'])
+
+    
+    def test_Reset(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            mayaUtils.openTestScene(
+                        "testRenderPasses",
+                        "renderPasses.ma", useTestSettings=False)
+            cmds.refresh()
+            cmds.mayaHydraSetVisibleRenderPasses(edit=True, visible=[0], aovName=["depth"])
+            self.assertSnapshotClose("beforeReset.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            cmds.mayaHydraSetVisibleRenderPasses(reset=True)
+            self.assertSnapshotClose("afterReset.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
