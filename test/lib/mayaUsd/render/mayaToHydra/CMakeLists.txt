@@ -130,6 +130,7 @@ endif()
 # both versions of the test in parallel will conflict.
 set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshes.py
+    testTransformMeshAdapter.py
     cpp/testMeshAdapterTransform.py
 )
 
