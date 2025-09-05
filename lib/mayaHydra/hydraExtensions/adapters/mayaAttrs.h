@@ -64,6 +64,10 @@ using namespace nonAmbientLightShapeNode;
 extern MObject dmapResolution;
 extern MObject dmapBias;
 extern MObject dmapFilterSize;
+extern MObject useDmapAutoFocus;
+extern MObject dmapWidthFocus;
+extern MObject dmapFarClipPlane;
+extern MObject dmapNearClipPlane;
 
 } // namespace nonExtendedLightShapeNode
 

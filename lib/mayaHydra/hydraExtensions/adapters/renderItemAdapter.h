@@ -95,7 +95,7 @@ public:
     };
 
     MAYAHYDRALIB_API
-    GfBBox3d GetBoundingBox()const override { return _bounds; }
+    GfBBox3d GetBoundingBox() override { return _bounds; }
 
     MAYAHYDRALIB_API
     GfVec4f GetDisplayColor() const override { return {_wireframeColor.r, _wireframeColor.g, _wireframeColor.b, _wireframeColor.a}; }

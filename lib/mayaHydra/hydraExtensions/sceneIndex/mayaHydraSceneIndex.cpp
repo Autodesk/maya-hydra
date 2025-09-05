@@ -1100,21 +1100,6 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         if (found != globalLightPaths.end())
             activeLightPaths.emplace(lightPath.fullPathName().asChar(), 
                                      lightPath);
-
-        if (!lightParam->getParameter(MHWRender::MLightParameterInformation::kShadowOn, intVals)
-            || intVals.length() < 1 || intVals[0] != 1) {
-            continue;
-        }
-
-        if (lightParam->getParameter(
-            MHWRender::MLightParameterInformation::kShadowViewProj, matrixVal)) {
-            _FindAdapter<MayaHydraLightAdapter>(
-                GetPrimPath(lightPath, true),
-                [&matrixVal](MayaHydraLightAdapter* a) {
-                    a->SetShadowProjectionMatrix(GetGfMatrixFromMaya(matrixVal));
-                },
-                _lightAdapters);
-        }
     }
 
     if (_lightsManagementSceneIndex) {
@@ -1418,6 +1403,18 @@ void MayaHydraSceneIndex::GetLightedPrimPaths(SdfPathVector& lightedPrimPaths)
         },
         _renderItemsAdapters,
         _shapeAdapters);
+}
+
+GfBBox3d MayaHydraSceneIndex::GetBoundingBox()
+{
+    GfBBox3d bbox;
+    _MapAdapter<MayaHydraAdapter>(
+        [&](MayaHydraAdapter* a) {
+            bbox = GfBBox3d::Combine(a->GetBoundingBox(), bbox);
+        },
+        _renderItemsAdapters,
+        _shapeAdapters);
+    return bbox;
 }
 
 bool MayaHydraSceneIndex::_GetRenderItemMaterial(

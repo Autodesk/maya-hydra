@@ -105,7 +105,6 @@ MayaHydraLightAdapter::MayaHydraLightAdapter(MayaHydraSceneIndex* mayaHydraScene
     // This should be avoided, not a good idea to call virtual functions
     // directly or indirectly in a constructor.
     UpdateVisibility();
-    _shadowProjectionMatrix.SetIdentity();
 }
 
 MayaHydraLightAdapter::~MayaHydraLightAdapter()
@@ -145,6 +144,90 @@ void MayaHydraLightAdapter::RemovePrim()
 }
 
 bool MayaHydraLightAdapter::HasType(const TfToken& typeId) const { return typeId == LightType(); }
+
+GfMatrix4d MayaHydraLightAdapter::_CalculateShadowProjectionMatrix()
+{
+    // Calculate the shadow projection matrix based on the light type and its parameters.
+    // This is similar to how Maya VP2 calculates internally.
+    MFnLight light(GetDagPath());
+    const auto xform = GetTransform();
+    auto pos = xform.Transform(GfVec3d(0.0, 0.0, 0.0)); // Maya light pos is (0,0,0) by default
+    auto dir = xform.TransformDir(GfVec3d(0.0, 0.0, -1.0)); // Maya light dir is -Z by default
+    auto up = xform.TransformDir(GfVec3d(0.0, 1.0, 0.0));  // Maya light up is +Y by default
+
+    auto isDirectional = GetNode().hasFn(MFn::kDirectionalLight);
+    auto useDmapAutoFocus = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::useDmapAutoFocus, true).asBool();
+    auto dmapWidthFocus = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapWidthFocus, true).asDouble(); 
+    auto farClip = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapFarClipPlane, true).asDouble();
+    auto nearClip = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapNearClipPlane, true).asDouble();
+
+    // View matrix is also needed as the light position needs to be adjusted to fit the scene.
+    // To make sure the adjusted view matrix takes effect, we'll multiply the calculated matrix by the light transform, 
+    // this will give the expected final matrix when Hydra is computing the ViewProjection matrix for shadow map.
+    // Hydra ViewProjection Matrix = ViewMatrix(inverted LightTransform) * ProjectionMatrix(LightTransform * viewMatrix * projectionMatrix)
+    // = viewMatrix * projectionMatrix.
+    GfMatrix4d viewMatrix;
+    GfMatrix4d projMatrix;
+    if (isDirectional) {
+        // Adjust light position to fit the scene
+        GfBBox3d    bbox = GetMayaHydraSceneIndex()->GetBoundingBox();
+        GfVec3d     boxCenter = bbox.ComputeCentroid();
+        GfBBox3d    aabb = bbox.ComputeAlignedBox();
+        const GfRange3d& r = aabb.GetRange();
+        auto        boxRadius = 0.5 * (r.GetMax() - r.GetMin()).GetLength();
+        pos = boxCenter - boxRadius * dir;
+
+        // View matrix
+        GfVec3d    ndir = dir.GetNormalized();
+        GfVec3d    right = GfCross(up, ndir).GetNormalized();
+        GfVec3d    realUp = GfCross(ndir, right);
+        viewMatrix.SetColumn(0, GfVec4d(right[0], right[1], right[2], -GfDot(right, pos)));
+        viewMatrix.SetColumn(1, GfVec4d(realUp[0], realUp[1], realUp[2], -GfDot(realUp, pos)));
+        viewMatrix.SetColumn(2, GfVec4d(ndir[0], ndir[1], ndir[2], -GfDot(ndir, pos)));
+        viewMatrix.SetColumn(3, GfVec4d(0,0,0,1));
+
+        // Proj matrix
+        auto frustumDepth = 2.0 * boxRadius;
+        frustumDepth = frustumDepth <= 0.00001 ? 0.00001 : frustumDepth;
+        auto fov = useDmapAutoFocus ? frustumDepth : dmapWidthFocus;
+
+        projMatrix.SetIdentity();
+        projMatrix[0][0] = 2.0 / fov;
+        projMatrix[1][1] = 2.0 / fov;
+        projMatrix[2][2] = 1.0 / frustumDepth;
+        projMatrix[3][2] = 0.0;
+        projMatrix[2][3] = 0.0;
+        projMatrix[3][3] = 1.0;
+    } else {
+        // View matrix
+        GfVec3d ndir = dir.GetNormalized();
+        GfVec3d right = GfCross(up, ndir).GetNormalized();
+        GfVec3d realUp = GfCross(ndir, right);
+        viewMatrix.SetColumn(0, GfVec4d(right[0], right[1], right[2], -GfDot(right, pos)));
+        viewMatrix.SetColumn(1, GfVec4d(realUp[0], realUp[1], realUp[2], -GfDot(realUp, pos)));
+        viewMatrix.SetColumn(2, GfVec4d(ndir[0], ndir[1], ndir[2], -GfDot(ndir, pos)));
+        viewMatrix.SetColumn(3, GfVec4d(0,0,0,1));
+
+        // Proj matrix
+        double fov = (useDmapAutoFocus && GetNode().hasFn(MFn::kAreaLight)) ? 110.0 : dmapWidthFocus;
+        fov = fov > 160.0 ? 160.0 : fov;
+        auto frustumDepth = farClip - nearClip;
+        frustumDepth = frustumDepth < 1.0 ? 1.0 : frustumDepth;
+        nearClip = nearClip < 1.0f ? 1.0f : nearClip;
+
+        projMatrix.SetIdentity();
+        projMatrix[0][0] = 1.0 / tan(0.5 * fov * (2.0 * M_PI / 360.0) + 0.00001);
+        projMatrix[1][1] = 1.0 * projMatrix[0][0];
+        projMatrix[2][2] = farClip / frustumDepth;
+        projMatrix[3][2] = -(farClip * nearClip) / frustumDepth;
+        projMatrix[2][3] = 1.0f;
+        projMatrix[3][3] = 0.0f;
+    }
+
+    // To make sure the adjusted view matrix takes effect, multiply by the light transform to counteract 
+    // the ViewMaxtrix (inverted LightTransform) calculated by Hydra.
+    return xform * viewMatrix * projMatrix;
+}
 
 VtValue MayaHydraLightAdapter::Get(const TfToken& key)
 {
@@ -217,8 +300,7 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
     } else if (key == HdLightTokens->shadowParams) {
         HdxShadowParams shadowParams;
         MFnLight        mayaLight(GetDagPath());
-        const bool      bLightHasShadowsenabled = mayaLight.useRayTraceShadows();
-        if (!bLightHasShadowsenabled) {
+        if (!GetShadowsEnabled(mayaLight)) {
             shadowParams.enabled = false;
         } else {
             _CalculateShadowParams(mayaLight, shadowParams);
@@ -295,14 +377,6 @@ void MayaHydraLightAdapter::CreateCallbacks()
     MayaHydraAdapter::CreateCallbacks();
 }
 
-void MayaHydraLightAdapter::SetShadowProjectionMatrix(const GfMatrix4d& matrix)
-{
-    if (!GfIsClose(_shadowProjectionMatrix, matrix, 0.0001)) {
-        MarkDirty(HdLight::DirtyShadowParams);
-        _shadowProjectionMatrix = matrix;
-    }
-}
-
 void MayaHydraLightAdapter::_CalculateShadowParams(MFnLight& light, HdxShadowParams& params)
 {
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_LIGHT_SHADOWS)
@@ -322,8 +396,8 @@ void MayaHydraLightAdapter::_CalculateShadowParams(MFnLight& light, HdxShadowPar
         : std::min(
             GetMayaHydraSceneIndex()->GetParams().maximumShadowMapResolution, dmapResolutionPlug.asInt());
 
-    params.shadowMatrix
-        = std::make_shared<MayaHydraConstantShadowMatrix>(GetTransform() * _shadowProjectionMatrix);
+    params.shadowMatrix = std::make_shared<MayaHydraConstantShadowMatrix>(_CalculateShadowProjectionMatrix());
+
     params.bias = dmapBiasPlug.isNull() ? -0.001 : -dmapBiasPlug.asFloat();
     params.blur = dmapFilterSizePlug.isNull() ? 0.0
                                               : (static_cast<double>(dmapFilterSizePlug.asInt()))

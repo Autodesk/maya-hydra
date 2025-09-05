@@ -113,7 +113,7 @@ public:
         constexpr bool materialIsFinal = false;
         return HdDisplayStyle(refineLevel, flatShading, displacement, occludedSelectionShowsThrough, pointsShadingEnabled, materialIsFinal); }
     MAYAHYDRALIB_API
-    virtual GfBBox3d GetBoundingBox() const { return GfBBox3d(); }
+    virtual GfBBox3d GetBoundingBox() { return GfBBox3d(); }
     MAYAHYDRALIB_API
     virtual GfVec4f GetDisplayColor() const { return {1.f,1.f,1.f,1.f}; }
 

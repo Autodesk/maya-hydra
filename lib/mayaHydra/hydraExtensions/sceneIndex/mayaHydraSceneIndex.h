@@ -271,6 +271,9 @@ public:
     /// Get all paths of all lighted prims
     void GetLightedPrimPaths(SdfPathVector& lightedPrimPaths);
 
+    /// Get the bounding box for all prims
+    GfBBox3d GetBoundingBox();
+
     void SetLightsManagementSceneIndex(
         const Fvp::LightsManagementSceneIndexRefPtr lightsManagementSceneIndex);//Can be a nullptr
     

@@ -38,9 +38,13 @@ class MayaHydraSceneIndex;
 class MayaHydraLightAdapter : public MayaHydraDagAdapter
 {
 public:
-    inline bool GetShadowsEnabled(MFnNonExtendedLight& light)
+    inline bool GetShadowsEnabled(MFnLight& light)
     {
-        return light.useDepthMapShadows() || light.useRayTraceShadows();
+        if (light.object().hasFn(MFn::kNonExtendedLight)) {
+            MFnNonExtendedLight nonExtLight(light.object());
+            return nonExtLight.useDepthMapShadows() || nonExtLight.useRayTraceShadows();
+        }
+        return light.useRayTraceShadows();
     }
 
     MAYAHYDRALIB_API
@@ -65,8 +69,6 @@ public:
     VtValue Get(const TfToken& key) override;
     MAYAHYDRALIB_API
     virtual void CreateCallbacks() override;
-    MAYAHYDRALIB_API
-    void SetShadowProjectionMatrix(const GfMatrix4d& matrix);
     
 protected:
     MAYAHYDRALIB_API
@@ -76,7 +78,8 @@ protected:
     MAYAHYDRALIB_API
     bool _GetVisibility() const override;
 
-    GfMatrix4d _shadowProjectionMatrix;
+    GfMatrix4d _CalculateShadowProjectionMatrix();
+
     bool       _isLightingOn = true;
 };
 
