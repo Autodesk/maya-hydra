@@ -53,6 +53,7 @@
 #include <pxr/imaging/hd/pluginRenderDelegateUniqueHandle.h>
 #include <pxr/imaging/hdSt/renderDelegate.h>
 #include <pxr/imaging/hdx/taskController.h>
+#include <pxr/imaging/hdsi/sceneGlobalsSceneIndex.h>
 #include <pxr/pxr.h>
 
 #include <maya/MCallbackIdArray.h>
@@ -122,6 +123,9 @@ private:
     void              _DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext);
     PXR_NS::HdRenderDelegate* _GetRenderDelegate();   
     void              _ClearMayaHydraSceneIndex();
+    void              _SetActiveRenderSettingsPrimFromStageMetadata();
+    void              _SetActiveRenderSettingsPrimPath(const PXR_NS::SdfPath& path);
+
     void              _SetRenderPurposeTags(const PXR_NS::MayaHydraParams& delegateParams);
     void              _CreateSceneIndicesChainAfterMergingSceneIndex();
     PXR_NS::VtValue   _GetUsedGPUMemory() const;
@@ -162,6 +166,7 @@ private:
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
+    PXR_NS::HdsiSceneGlobalsSceneIndexRefPtr  _sceneGlobalsSceneIndex;
 
     PXR_NS::HdRprimCollection                 _renderCollection {
         PXR_NS::HdTokens->geometry,

@@ -50,6 +50,9 @@
 #include <pxr/pxr.h>
 
 #include <ufe/pathString.h>
+#include <ufe/sceneSegmentHandler.h>
+#include <ufe/sceneItemList.h>
+#include <ufe/runTimeMgr.h>
 
 #include <ufeExtensions/Global.h>
 
@@ -71,9 +74,11 @@
 #include <pxr/usd/kind/registry.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/modelAPI.h>
+#include <pxr/usd/usdRender/tokens.h>
 #include <pxr/pxr.h>
 
 #include <mayaUsdAPI/proxyStage.h>
+#include <mayaUsdAPI/utils.h>
 
 #include <maya/M3dView.h>
 #include <maya/MConditionMessage.h>
@@ -717,6 +722,13 @@ void BatchRenderer::_InitHydraResources()
     _renderDelegate->SetRenderSetting(
         HdRenderSettingsTokens->enableInteractive, VtValue(false));
 
+    // Support a USD stage providing the render settings through prims in the
+    // Hydra scene.  At time of writing (5-Sep-2025) only Hydra Prman does, if
+    // the  HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS=true environment
+    // variable is used.  This is done through USD stage-level metadata that
+    // points to a render settings prim in the USD scene.
+    _SetActiveRenderSettingsPrimFromStageMetadata();
+
     _initializationSucceeded = true;
 }
 
@@ -786,6 +798,7 @@ void BatchRenderer::_CreateSceneIndicesChainAfterMergingSceneIndex()
     //We use as its input scene index : _inputSceneIndexOfFilteringSceneIndicesChain
     _lastFilteringSceneIndexBeforeCustomFiltering = _inputSceneIndexOfFilteringSceneIndicesChain;
 
+    _lastFilteringSceneIndexBeforeCustomFiltering = _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
     TF_AXIOM(_mayaHydraSceneIndex);
     _lastFilteringSceneIndexBeforeCustomFiltering = _lightsManagementSceneIndex = Fvp::LightsManagementSceneIndex::New(
         _lastFilteringSceneIndexBeforeCustomFiltering, _mayaHydraSceneIndex->GetMayaDefaultLightPath());
@@ -822,6 +835,81 @@ void BatchRenderer::_TimerCallback(float, float, void* data)
 HdRenderIndex* BatchRenderer::renderIndex() const
 {
     return _renderIndex;
+}
+
+void BatchRenderer::_SetActiveRenderSettingsPrimPath(const SdfPath& path)
+{
+    if (!TF_VERIFY(_sceneGlobalsSceneIndex, "Scene globals scene index not yet initialized")) {
+        return;
+    }
+    _sceneGlobalsSceneIndex->SetActiveRenderSettingsPrimPath(path);
+}
+
+void BatchRenderer::_SetActiveRenderSettingsPrimFromStageMetadata()
+{
+    // The chosen USD render settings prim path is stored as USD stage-level
+    // metadata (if present).  Find all USD stages in the Maya scene,
+    // under the Maya root node.  The USD stages are accessed through
+    // Maya proxy shape nodes, which are gateway nodes in the UFE root
+    // scene segment.
+    const auto mayaSceneSegmentHandler = Ufe::RunTimeMgr::instance().sceneSegmentHandler(MayaUsdAPI::getMayaRunTimeId());
+    const auto mayaRootPath = mayaSceneSegmentHandler->rootSceneSegmentRootPath();
+    const auto gatewayItems = Ufe::SceneSegmentHandler::findGatewayItems(
+        mayaRootPath, MayaUsdAPI::getUsdRunTimeId());
+
+    // Loop over gateway items to find proxy shape nodes.
+    Ufe::SceneItemList proxyShapes;
+    std::copy_if(
+        gatewayItems.begin(), gatewayItems.end(), 
+        std::back_inserter(proxyShapes), [=](const Ufe::SceneItem::Ptr& item) {
+            return item->nodeType() == std::string("mayaUsdProxyShape"); });
+
+    TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
+                 "Found %zu MayaUsdProxyShape nodes in scene.\n",
+                 proxyShapes.size());
+
+    // Get the USD stage from the first USD proxy shape node.
+    if (!proxyShapes.empty()) {
+        const auto ps = proxyShapes.front();
+        const auto psPath = ps->path();
+        TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
+                     Ufe::PathString::string(psPath) + 
+                     " chosen to provide render settings.\n");
+
+        const auto stage = MayaUsdAPI::getStage(psPath);
+        if (TF_VERIFY(stage, "No stage found for proxy shape %s", Ufe::PathString::string(psPath).c_str())) {
+            // Check if there is a render settings prim path in the stage
+            // metadata.
+            std::string rsPathStr;
+            if (stage->HasAuthoredMetadata(
+                    UsdRenderTokens->renderSettingsPrimPath)) {
+                stage->GetMetadata(
+                    UsdRenderTokens->renderSettingsPrimPath, &rsPathStr);
+            }
+
+            // Add the delegateId prefix since the scene globals scene index is
+            // inserted into the merging scene index.
+            if (!rsPathStr.empty()) {
+                // The proper way to do this is to call
+                // MayaHydra::sceneIndexPathPrefix(), which correctly deals
+                // with possible USD proxy shape name duplication in the Maya
+                // Dag.  Unfortunately, at this point, the Hydra scene is not
+                // fully populated.  This level of correctness is beyond the
+                // scope of the production rendering POC.
+                const auto hydraRsPath = SdfPath(rsPathStr).ReplacePrefix(SdfPath::AbsoluteRootPath(), SdfPath("/MayaUsdProxyShape_PluginNode").AppendElementString(ps->nodeName()));
+
+                TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
+                             "Active render settings set to " +
+                             hydraRsPath.GetAsString() + "\n");
+
+                _SetActiveRenderSettingsPrimPath(hydraRsPath);
+            }
+            else {
+                TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
+                             "No stage-level render settings metadata found.\n");
+            }
+        }
+    }
 }
 
 }
