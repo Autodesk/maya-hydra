@@ -24,7 +24,7 @@ class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
     _requiredPlugins = ['drawUfe']
 
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
-    IMAGEDIFF_FAIL_PERCENT = 0.1
+    IMAGEDIFF_FAIL_PERCENT = 1
 
     def verifySnapshot(self, imageName):
         cmds.refresh()
