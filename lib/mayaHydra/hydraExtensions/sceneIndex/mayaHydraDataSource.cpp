@@ -47,6 +47,10 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+namespace {
+    using LockType = std::recursive_mutex;
+    LockType dg_access_mutex;
+}
 
 MayaHydraDataSource::MayaHydraDataSource(
     const SdfPath& id,
@@ -104,6 +108,9 @@ MayaHydraDataSource::GetNames()
 HdDataSourceBaseHandle
 MayaHydraDataSource::Get(const TfToken& name)
 {
+    // Apply a global lock to avoid race condition while doing parallel DG node evaluation.
+    std::lock_guard<LockType> lock(dg_access_mutex);
+
     if (name == HdMeshSchemaTokens->mesh) {
         if (_type == HdPrimTypeTokens->mesh) {
             auto topology = _adapter->GetMeshTopology();
