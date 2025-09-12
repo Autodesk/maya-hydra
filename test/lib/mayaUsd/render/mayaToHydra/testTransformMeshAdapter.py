@@ -15,6 +15,7 @@
 import maya.cmds as cmds
 
 import fixturesUtils
+import mayaUtils
 import mtohUtils
 
 class TestTransformMeshAdapter(mtohUtils.MayaHydraBaseTestCase):
@@ -53,6 +54,34 @@ class TestTransformMeshAdapter(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.scale(2, 2, 2, cubeParent, absolute=True)
         self.verifySnapshot("cube_parent_moved_rotated_scaled.png")
+
+    def test_mayaNurbsCurve(self):
+        mayaUtils.openNewScene()
+        self.setBasicCam(10)
+        self.setHdStormRenderer()
+
+        curveTrans = cmds.circle(name="mayaNurbsCurve")
+        curveParent = cmds.group(curveTrans, name='curveParent')
+        
+        self.verifySnapshot("curve_untransformed.png")
+
+        cmds.scale(3, 1, 3, curveTrans, absolute=True)
+        self.verifySnapshot("curve_scaled.png")
+
+        cmds.move(0, 2, 0, curveTrans, absolute=True)
+        self.verifySnapshot("curve_scaled_moved.png")
+
+        cmds.rotate(0, 45, 0, curveTrans, absolute=True)
+        self.verifySnapshot("curve_scaled_moved_rotated.png")
+
+        cmds.move(0, -3, 0, curveParent, absolute=True)
+        self.verifySnapshot("curve_parent_moved.png")
+
+        cmds.rotate(0, 0, 45, curveParent, absolute=True)
+        self.verifySnapshot("curve_parent_moved_rotated.png")
+
+        cmds.scale(2, 2, 2, curveParent, absolute=True)
+        self.verifySnapshot("curve_parent_moved_rotated_scaled.png")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
