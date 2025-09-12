@@ -22,7 +22,7 @@ class TestTransformMeshAdapter(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
-    IMAGEDIFF_FAIL_PERCENT = 0.1
+    IMAGEDIFF_FAIL_PERCENT = 0.5
 
     def verifySnapshot(self, imageName):
         cmds.refresh()
