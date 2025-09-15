@@ -22,11 +22,13 @@
 #include "renderRegionCommand.h"
 #include "viewCommand.h"
 #include "pluginBuildInfoCommand.h"
-#include "setViewportRenderPassesCommand.h"
+#include "setVisibleFramePassesCommand.h"
+#include "getFramePassesCountCommand.h"
 
 #include <mayaHydraLib/adapters/adapter.h>
 
 #include <flowViewport/global.h>
+#include <filesystem>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -211,11 +213,11 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     }
 
     if (!plugin.registerCommand(
-            MayaHydraSetVisibleRenderPasses::commandName,
-            MayaHydraSetVisibleRenderPasses::creator,
-            MayaHydraSetVisibleRenderPasses::createSyntax)) {
+            MayaHydraSetVisibleFramePasses::commandName,
+            MayaHydraSetVisibleFramePasses::creator,
+            MayaHydraSetVisibleFramePasses::createSyntax)) {
         ret = MS::kFailure;
-        ret.perror("Error registering mayaHydraSetVisibleRenderPasses !");
+        ret.perror("Error registering MayaHydraSetVisibleFramePasses !");
         return ret;
     }
 
@@ -227,7 +229,20 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         ret.perror("Error registering mayaHydraRenderRegion command!");
         return ret;
     }
+	
+	if (!plugin.registerCommand(
+            MayaHydraGetFramePassesCount::commandName,
+            MayaHydraGetFramePassesCount::creator,
+            MayaHydraGetFramePassesCount::createSyntax)) {
+        ret = MS::kFailure;
+        ret.perror("Error registering MayaHydraGetFramePassesCount !");
+        return ret;
+    }
 
+    // Set the path where maya hydra is loaded to be used later
+    //This must be called before the renderoverride is created
+    MtohSetMayaHydraPluginLocation(std::filesystem::path(plugin.loadPath().asChar())); 
+  
     if (auto* renderer = MHWRender::MRenderer::theRenderer()) {
         for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {
             auto    mtohRenderer = std::make_unique<PXR_NS::MtohRenderOverride>(desc);
@@ -320,9 +335,9 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
         ret.perror("Error deregistering MayaHydraPluginInfo command!");
     }
 
-    if (!plugin.deregisterCommand(MayaHydraSetVisibleRenderPasses::commandName)) {
+    if (!plugin.deregisterCommand(MayaHydraSetVisibleFramePasses::commandName)) {
         ret = MS::kFailure;
-        ret.perror("Error deregistering MayaHydraSetViewportRenderPassesCommand!");
+        ret.perror("Error deregistering MayaHydraSetVisibleFramePasses command!");
     }
 
     if (!plugin.deregisterCommand(MayaHydraRenderRegionCommand::commandName)) {

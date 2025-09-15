@@ -26,6 +26,7 @@ set(HEADERS
     tokens.h
     fvpWireframeColorInterface.h
 	fvpPurposeRenderTagsForPasses.h
+	fvpFramePassData.h
 )
 
 # -----------------------------------------------------------------------------

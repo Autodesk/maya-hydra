@@ -197,8 +197,10 @@ MayaHydraDataSource::Get(const TfToken& name)
     else if (name == HdTokens->displayColor) {//Is not part of a schema so using HdTokens->displayColor
         return _GetDisplayColorDataSource();
     } else if (name == HdPurposeSchemaTokens->purpose && ! (_adapter->GetRenderTag().IsEmpty()) ) { 
-        return HdPurposeSchema::BuildRetained(
-            HdRetainedTypedSampledDataSource<TfToken>::New(_adapter->GetRenderTag()));
+        return HdPurposeSchema::Builder()
+                    .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
+                        _adapter->GetRenderTag()))
+                    .Build();
     }
 
     return nullptr;

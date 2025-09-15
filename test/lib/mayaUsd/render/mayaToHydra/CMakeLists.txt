@@ -116,7 +116,7 @@ endif()
 
 #Viewport tool box render passes tests
 if(BUILD_WITH_VIEWPORT_TOOLBOX)
-    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testRenderPasses.py)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testFramePasses.py)
 endif()
 
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.

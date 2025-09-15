@@ -17,6 +17,7 @@
 
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+#include "flowViewport/fvpFramePassData.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
@@ -37,11 +38,13 @@ class PassFilteringSceneIndex
 public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
-    using FilteringOutFn = std::function<bool(const PXR_NS::SdfPath& primPath)>;
+    FVP_API
+    static void ResetPassFilteringLog();
 
     FVP_API
     static PassFilteringSceneIndexRefPtr
-    New(const PXR_NS::HdSceneIndexBaseRefPtr& inputScene, const FilteringOutFn& filteringOutFn);
+    New(const PXR_NS::HdSceneIndexBaseRefPtr& inputScene,
+        const Fvp::FramePassConstDataPtr&    framePassData);
 
     FVP_API
     ~PassFilteringSceneIndex() override = default;
@@ -53,30 +56,57 @@ public:
     PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath& primPath) const override;
 
 protected:
+
     FVP_API
     PassFilteringSceneIndex(
         PXR_NS::HdSceneIndexBaseRefPtr const& inputSceneIndex,
-        const FilteringOutFn& filteringOutFn);
+        const Fvp::FramePassConstDataPtr&    framePassData);
 
+    // IMPORTANT: These notification methods (_PrimsAdded, _PrimsRemoved, _PrimsDirtied) and
+    // GetChildPrimPaths must NOT apply any filtering logic. They must forward all notifications
+    // and child paths unchanged to ensure proper scene graph synchronization when prims are
+    // dynamically moved between different frame passes (e.g., when switching display modes
+    // like wireframe, or when render tags change). Filtering is only applied in GetPrim().
+    
     FVP_API
     void _PrimsAdded(
         const PXR_NS::HdSceneIndexBase &sender,
-        const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries) override;
+        const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries) override{
+        if (!_IsObserved()) {
+            return;
+        }
+        _SendPrimsAdded(entries);
+    }
 
     FVP_API
     void _PrimsRemoved(
         const PXR_NS::HdSceneIndexBase &sender,
-        const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries) override;
+        const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries) override{
+        if (!_IsObserved()) {
+            return;
+        }
+        _SendPrimsRemoved(entries);
+    }
 
     FVP_API
     void _PrimsDirtied(
         const PXR_NS::HdSceneIndexBase &sender,
-        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
+        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override
+    {
+        if (!_IsObserved()) {
+            return;
+        }
+        _SendPrimsDirtied(entries);
+    }
 
     FVP_API
     bool _IsFilteredOut(const PXR_NS::SdfPath& primPath) const;
 
-    const FilteringOutFn& _filteringOutFn;
+    Fvp::FramePassConstDataPtr _framePassData;
+
+private:
+    // Helper function to determine if a prim should be included in all passes
+    bool _ShouldIncludeInAllPasses(const PXR_NS::HdSceneIndexPrim& prim) const;
 };
 
 } // namespace FVP_NS_DEF

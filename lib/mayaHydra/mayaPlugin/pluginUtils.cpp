@@ -33,10 +33,13 @@
 #include <pxr/usdImaging/usdImagingGL/engine.h>
 
 #include <maya/MGlobal.h>
+#include <filesystem>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
+
+    std::filesystem::path _mayaHydraPluginLocation;
 
 std::pair<
     const MayaHydra::MtohRendererDescriptionVector&,
@@ -125,6 +128,16 @@ const MtohRendererDescriptionVector& MtohGetRendererDescriptions()
 const MtohRendererSettings& MtohGetRendererSettings()
 {
     return MtohInitializeRenderPlugins().second;
+}
+
+void MtohSetMayaHydraPluginLocation(const std::filesystem::path& mayaHydraLocation)
+{
+    _mayaHydraPluginLocation = mayaHydraLocation;
+}
+
+std::filesystem::path MtohGetMayaHydraPluginLocation() 
+{ 
+    return _mayaHydraPluginLocation;
 }
 
 } // namespace MAYAHYDRA_NS_DEF

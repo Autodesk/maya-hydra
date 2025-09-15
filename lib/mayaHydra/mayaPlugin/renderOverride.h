@@ -42,6 +42,7 @@
 #include <mayaHydraLib/pick/mhPickHandlerFwd.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
 
+#include <flowViewport/fvpFramePassData.h>
 #include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
 #include <flowViewport/selection/fvpSelectionTracker.h>
@@ -60,11 +61,7 @@
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPassFilteringSceneIndex.h>
-
-#ifdef VIEWPORT_TOOLBOX
-#include <hvt/engine/renderIndexProxy.h>
-#include <hvt/engine/framePass.h>
-#endif
+#include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
@@ -102,21 +99,6 @@ class MayaHydraSceneIndexRegistry;
 class MayaHydraSceneDelegate;
 using HdxPickHitVector = std::vector<struct HdxPickHit>;
 
-#ifdef VIEWPORT_TOOLBOX
-/*! \brief Struct to hold all render pass related data in a single container
- */
-struct RenderPassData {
-    hvt::RenderIndexProxyPtr                     renderer;
-    hvt::FramePassPtr                            framePass;
-    Fvp::PassFilteringSceneIndex::FilteringOutFn filteringFn;
-    TfTokenVector                                renderTags;
-    TfToken                                      rendererName;
-    
-    RenderPassData() = default;
-    RenderPassData(const TfToken& name) : rendererName(name) {}
-};
-#endif
-
 /*! \brief MtohRenderOverride is a rendering override class for the viewport to use Hydra instead of
  * VP2.0.
  */
@@ -144,7 +126,9 @@ public:
     /// TODO 2025-08-29 : This currently gathers AOVs from all viewports indiscriminately.
     /// Once we have proper multi-viewport support, we should also be able to
     /// specify which viewport to get the AOVs for.
-    static TfTokenVector GetAvailableRenderPassAovs(int passIndex);
+    static TfTokenVector GetAvailableFramePassAovs(int passIndex);
+
+    static MtohRenderOverride* GetByName(TfToken rendererName);
 
     /// Returns a list of rprims in the render index for the given render
     /// delegate.
@@ -201,13 +185,14 @@ public:
     // MayaHydra::PickContext overrides.
     std::shared_ptr<const MayaHydraSceneIndexRegistry> sceneIndexRegistry() const override;
 
+    std::string renderIndexName(int passIndex = 0) const;
+
     HdRenderIndex* renderIndex(int passIndex = 0) const override;
+    int            getNumFramePasses() const { return _GetNumFramePasses(); }
 
 private:
     typedef std::pair<MString, MCallbackIdArray> PanelCallbacks;
     typedef std::vector<PanelCallbacks>          PanelCallbacksList;
-
-    static MtohRenderOverride* _GetByName(TfToken rendererName);
 
     void _InitHydraResources(
         const MHWRender::MDrawContext& drawContext,
@@ -220,7 +205,7 @@ private:
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
     HdSceneIndexBaseRefPtr
-    _GetPassFilteringSceneIndex(const Fvp::PassFilteringSceneIndex::FilteringOutFn& filteringFn);
+    _CreatePassFilteringSceneIndex(const Fvp::FramePassConstDataPtr& filteringData);
     VtValue _GetUsedGPUMemory() const;
 
     void _PickByRegion(
@@ -310,23 +295,25 @@ private:
     HdDriver     _hgiDriver;
 
 #ifdef VIEWPORT_TOOLBOX
-    // HVT Render passes data consolidated into a single vector
-    std::vector<RenderPassData>                             _renderPassesData;
+    // Data per pass - each FramePassData contains both configuration data and the actual FramePass
+    // This ensures they stay synchronized and eliminates index-based access issues
+    Fvp::FramePassDataPtrVector                                _framePassesData;
     
-    Fvp::PassFilteringSceneIndex::FilteringOutFn
-        _CreatePassFilteringFn(const TfTokenVector& renderTags);
-    int                      _GetNumVisibleRenderPasses() const;
-    int                      _GetNumRenderPasses() const;
-    const hvt::FramePassPtr& _GetRenderPass(int passIndex)const;
-    hvt::FramePassPtr&       _GetRenderPass(int passIndex);
-    void                     _CreateRenderPasses();
-    void                     _CreateRenderPassesFilteringSceneIndices();
-    void                     _ClearRenderPassesData();
-    void                     _CreateFrameRenderPass(
+    int                      _GetNumVisibleFramePasses() const;
+    int                      _GetNumFramePasses() const;
+    const hvt::FramePassPtr& _GetFramePass(int passIndex)const;
+    hvt::FramePassPtr&       _GetFramePass(int passIndex);
+    void                     _CreateFramePasses();
+    void                     _CreateNonMainFramePassesFilteringSceneIndices();
+    void                     _ClearFramePassesData();
+    void                     _CreateFramePass(
                                 const std::string&                    rendererName,
                                 const SdfPath&                        passId,
-                                int                                   passIndex);
+                                const int passIndex);
+    void                    _CreateFramePassesData();
+    
 #else
+    int                                       _GetNumFramePasses() const { return 1; }
     HdEngine                                  _engine;
     HdRendererPlugin*                         _rendererPlugin = nullptr;
     std::unique_ptr<HdxTaskController>        _taskController;
@@ -340,6 +327,7 @@ private:
     Fvp::DisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
     Fvp::PruneTexturesSceneIndexRefPtr        _pruneTexturesSceneIndex;
     Fvp::ReprSelectorSceneIndexRefPtr         _reprSelectorSceneIndex;
+    Fvp::BboxSceneIndexRefPtr                 _bboxSceneIndex;
     Fvp::DefaultMaterialSceneIndexRefPtr      _defaultMaterialSceneIndex;
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::SelectionSceneIndexRefPtr            _selectionSceneIndex;

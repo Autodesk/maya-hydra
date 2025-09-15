@@ -8,6 +8,7 @@ add_library(${TARGET_NAME} SHARED)
 target_sources(${TARGET_NAME} 
     PRIVATE
         colorNotFoundException.cpp
+        envSettings.cpp
         mayaColorPreferencesTranslator.cpp
         plugin.cpp
         pluginDebugCodes.cpp
@@ -17,12 +18,14 @@ target_sources(${TARGET_NAME}
         tokens.cpp
         viewCommand.cpp
         pluginBuildInfoCommand.cpp
-        setViewportRenderPassesCommand.cpp
         renderRegionCommand.cpp
+        setVisibleFramePassesCommand.cpp
+        getFramePassesCountCommand.cpp
 )
 
 set(HEADERS
     pluginUtils.h
+    envSettings.h
 )
 
 # -----------------------------------------------------------------------------

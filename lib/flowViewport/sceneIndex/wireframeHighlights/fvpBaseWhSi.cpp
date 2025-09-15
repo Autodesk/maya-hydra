@@ -68,12 +68,6 @@ const HdRetainedContainerDataSourceHandle wireDisplayStyleDataSource
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
                 { HdReprTokens->wire, TfToken(), TfToken() })));
 
-//  Secondary graphics purpose render tag data source
-const HdRetainedContainerDataSourceHandle secondaryGraphicsPurposeRenderTagDataSource
-= HdRetainedContainerDataSource::New(
-    HdPurposeSchemaTokens->purpose,
-    HdRetainedTypedSampledDataSource<TfToken>::New(Fvp::secondaryGraphicsRenderTagToken));
-
 const HdDataSourceLocator reprSelectorLocator(
         HdLegacyDisplayStyleSchemaTokens->displayStyle,
         HdLegacyDisplayStyleSchemaTokens->reprSelector);
@@ -375,8 +369,12 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
                             HdPrimvarSchemaTokens->constant,
                             HdPrimvarSchemaTokens->color));
 
+    //  Secondary graphics purpose render tag data source
     edited.Set(HdPurposeSchema::GetDefaultLocator(),
-        secondaryGraphicsPurposeRenderTagDataSource); // Set the render tag to secondary graphics
+                HdPurposeSchema::Builder()
+                .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
+                    Fvp::secondaryGraphicsRenderTagToken))
+                .Build());
 
     //Is the prim having a DisplayStyle schema?
     if (HdLegacyDisplayStyleSchema styleSchema =

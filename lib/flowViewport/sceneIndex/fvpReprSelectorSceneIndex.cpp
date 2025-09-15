@@ -28,6 +28,8 @@
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/purposeSchema.h>
+#include <pxr/imaging/hd/visibilitySchema.h>
+#include <pxr/imaging/hd/xformSchema.h>
 
 // This class is a filtering scene index that applies a different RepSelector on geometries (such as wireframe or wireframe on shaded)
 // and also applies an overrideWireframecolor for HdStorm 
@@ -69,12 +71,6 @@ const HdRetainedContainerDataSourceHandle sWireframeDisplayStyleDataSource
             HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
                 { HdReprTokens->refinedWire, TfToken(), TfToken() })));
 
-// Secondary graphics purpose render tag data source
-const HdRetainedContainerDataSourceHandle secondaryGraphicsPurposeRenderTagDataSource
-    = HdRetainedContainerDataSource::New(
-        HdPurposeSchemaTokens->purpose,
-        HdRetainedTypedSampledDataSource<TfToken>::New(Fvp::secondaryGraphicsRenderTagToken));
-
 }//End of namespace
 
 ReprSelectorSceneIndex::ReprSelectorSceneIndex(const HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>& wireframeColorInterface) 
@@ -108,9 +104,13 @@ void ReprSelectorSceneIndex::SetReprType(RepSelectorType reprType, bool needsRep
     }
     
     const HdDataSourceLocatorSet locators{
-    HdLegacyDisplayStyleSchema::GetDefaultLocator(),
-    HdPrimvarsSchema::GetDefaultLocator(),
-    HdLegacyDisplayStyleSchema::GetDefaultLocator()
+        HdLegacyDisplayStyleSchema::GetDefaultLocator(),
+        HdPrimvarsSchema::GetDefaultLocator(),
+        HdPurposeSchema::GetDefaultLocator(),
+        // Also include locators from data that are flattened in USD or custom data sources, 
+        // see DataProducerSceneIndexDataBase::_CreateSceneIndexChainForDataProducerSceneIndex
+        HdVisibilitySchema::GetDefaultLocator(), 
+        HdXformSchema::GetDefaultLocator(),
     };
     _needsReprChanged = needsReprChanged;
     _DirtyAllPrims(locators);
@@ -139,11 +139,14 @@ HdSceneIndexPrim ReprSelectorSceneIndex::GetPrim(const SdfPath& primPath) const
 
         if (_convertToSecondaryGraphicsPurposeRenderTag) {
             // If we are converting to secondary graphics purpose render tag
-            edited.Set(HdPurposeSchema::GetDefaultLocator(),
-                secondaryGraphicsPurposeRenderTagDataSource); // Set the purpose render tag to
-                                                              // secondary graphics
+            edited.Set(
+                HdPurposeSchema::GetDefaultLocator(),
+                HdPurposeSchema::Builder()
+                    .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
+                        Fvp::secondaryGraphicsRenderTagToken))
+                    .Build());
         }
-
+        
         //Edit the override wireframe color
         edited.Set(primvarsOverrideWireframeColorLocator,
                         Fvp::PrimvarDataSource::New(
