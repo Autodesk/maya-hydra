@@ -1,3 +1,13 @@
+# Building for older Maya versions
+
+If you want to try your hand at building mayaHydra for a Maya version that is not officially supported, we list here the USD versions to use. Do note that we make no guarantee as to whether things will compile, or what features may work or not. Building for Maya 2024 is more complicated than later versions; the sections below detail the process to do this. For 2025 and later, the process should be the same as usual.
+
+|        Maya version       | USD version   |
+|:-------------------------:|:----------------:|
+| 2024                 | 22.11           |
+| 2025                 | 23.11           |
+| 2026                 | 24.11           |
+
 # Example guide on how to build with latest version of openUSD and previous version of Maya such as 2024
 
 Please be aware that <b>Maya 2024 is not officially supported </b>since we have added new features to Maya API in newer versions of Maya.<br>
