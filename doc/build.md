@@ -11,15 +11,15 @@ Before building the project, consult the following table to ensure you use the r
 | Required | ![](images/windows.png) | ![](images/mac.png) | ![](images/linux.png) |
 |:-:|:-:|:-:|:-:|
 | Operating System | Windows 10 <br> Windows 11 | High Sierra (10.13)<br>Mojave (10.14)<br>Catalina (10.15)<br>Big Sur (11.2.x) | Rocky Linux 8.6 / Linux® Red Hat® Enterprise 8.6 WS |
-| Compiler Requirement| Maya 2025 (VS 2022)<br>Maya 2026 (VS 2022)<br>Maya PR (VS 2022) | Maya 2025 (Xcode 13.4 or higher)<br>Maya 2026 (Xcode 13.4 or higher)<br>Maya PR (Xcode 13.4 or higher) | Maya 2025 (gcc 11.2.1)<br>Maya 2026 (gcc 11.2.1)<br>Maya PR (gcc 11.2.1) |
+| Compiler Requirement| Maya 2026 (VS 2022)<br>Maya PR (VS 2022) | Maya 2026 (Xcode 13.4 or higher)<br>Maya PR (Xcode 13.4 or higher) | Maya 2026 (gcc 11.2.1)<br>Maya PR (gcc 11.2.1) |
 | CMake Version (min/max) | 3.21...3.30 | 3.21...3.30 | 3.21...3.30 |
 | Python | 3.11.4, 3.11.9 | 3.11.4, 3.11.9 | 3.11.4, 3.11.9 |
 | Python Packages | PyYAML, PySide, PyOpenGL | PyYAML, PySide2, PyOpenGL | PyYAML, PySide, PyOpenGL |
 | Build generator | Visual Studio, Ninja (Recommended) | XCode, Ninja (Recommended) | Ninja (Recommended) |
 | Command processor | x64 Native Tools Command Prompt for VS 2022 | bash | bash |
-| Supported Maya Version | 2025, 2026, PR | 2025, 2026, PR | 2025, 2026, PR |
+| Supported Maya Version | 2026, PR | 2026, PR | 2026, PR |
 
->Note: Maya 2024 is not officially supported. For more details about building for Maya 2024, [see this example.](./rebuildingWithCustomOpenUSDAndPreviousMayaVersion.md)
+>Note: While mayaHydra may compile with older versions of Maya than those listed above, they are not officially supported and functionality may break. For more details about building for older Maya versions, [see this document.](./legacyBuilds.md)
 
 >Note: Visit the online Maya developer help document under ***Setting up your build environment*** for additional compiler requirements on different platforms.
 
@@ -30,7 +30,7 @@ If you want to <B>be able to import usd data in maya through [MayaUSD](https://g
 
 | | ![](images/pxr.png) | USD version used in Maya | USD source for MayaUSD / MayaHydra |
 |:-: |:-: |:-:|:-:|
-| CommitID/Tags | [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11)<BR>[v24.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.11)<BR>[v25.05](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v25.05) | Maya 2025 = v23.11<br>Maya 2026 = v24.11<br>Maya PR = v25.05 | [v23.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v23.11-MayaUsd-Public)<br>[v24.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v24.11-MayaUsd-Public)<br>[v25.05-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v25.05-MayaUsd-Public) |
+| CommitID/Tags | [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11)<BR>[v24.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.11)<BR>[v25.05](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v25.05) | Maya 2026 = v24.11<br>Maya PR = v25.05 | [v24.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v24.11-MayaUsd-Public)<br>[v25.05-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v25.05-MayaUsd-Public) |
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
 
@@ -38,7 +38,7 @@ For additional information on building Pixar USD, see the ***Additional Build In
 
 #### 3. Download and Build MayaUSD 
 
-Starting from Maya 2025, the project requires [MayaUSD](https://github.com/Autodesk/maya-usd) to build.  This enables more features for USD stages when using a hydra render delegate, such as: hide/delete the stage when the proxy shape node is hidden/deleted, or applying a transform on the proxy shape node will apply it on the stage. 
+The project requires [MayaUSD](https://github.com/Autodesk/maya-usd) to build.  This enables more features for USD stages when using a hydra render delegate, such as: hide/delete the stage when the proxy shape node is hidden/deleted, or applying a transform on the proxy shape node will apply it on the stage. 
 
 To build MayaUSD, see the github page https://github.com/Autodesk/maya-usd/blob/dev/doc/build.md
 
@@ -48,7 +48,7 @@ The Universal Front End (UFE) is a DCC-agnostic component that allows Maya to br
 
 | UFE Version | Maya Version | UFE Docs (external) |
 |-|-|:-:|
-| v4.2.0<br>v6.0.0<br>vTBD | Maya 2025<br>Maya 2026<br>Maya PR | https://help.autodesk.com/view/MAYADEV/2025/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
+| v6.0.0<br>vTBD | Maya 2026<br>Maya PR | https://help.autodesk.com/view/MAYADEV/2026/ENU/?guid=MAYA_API_REF_ufe_ref_index_html |
 
 To build the project with UFE support, you will need to use the headers and libraries included in the ***Maya Devkit***:
 
@@ -91,13 +91,13 @@ There are at least five arguments that must be passed to the script:
 
 ```
 Linux:
-➜ maya-hydra python build.py --maya-location /usr/autodesk/maya2025 --mayausd-location /usr/local/mayaUSD-Release --pxrusd-location /usr/local/USD-Release --devkit-location /usr/local/devkitBase /usr/local/workspace
+➜ maya-hydra python build.py --maya-location /usr/autodesk/maya2026 --mayausd-location /usr/local/mayaUSD-Release --pxrusd-location /usr/local/USD-Release --devkit-location /usr/local/devkitBase /usr/local/workspace
 
 MacOSX:
-➜ maya-hydra python build.py --maya-location /Applications/Autodesk/maya2025 --mayausd-location /opt/local/mayaUSD-Release --pxrusd-location /opt/local/USD-Release --devkit-location /opt/local/devkitBase /opt/local/workspace
+➜ maya-hydra python build.py --maya-location /Applications/Autodesk/maya2026 --mayausd-location /opt/local/mayaUSD-Release --pxrusd-location /opt/local/USD-Release --devkit-location /opt/local/devkitBase /opt/local/workspace
 
 Windows:
-➜ C:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya2025" --mayausd-location C:\mayaUSD-Release --pxrusd-location C:\USD-Release --devkit-location C:\devkitBase C:\workspace
+➜ C:\maya-hydra> python build.py --maya-location "C:\Program Files\Autodesk\Maya2026" --mayausd-location C:\mayaUSD-Release --pxrusd-location C:\USD-Release --devkit-location C:\devkitBase C:\workspace
 ```
 
 **Notes:** 
@@ -202,9 +202,9 @@ Please see [Rebuilding with the latest OpenUSD version and with a previous versi
 
 It is important to use the Python version shipped with Maya and not the system version when building USD on MacOS. Note that this is primarily an issue on MacOS, where Maya's version of Python is likely to conflict with the version provided by the system. 
 
-To build USD and the Maya plug-ins on MacOS for Maya (2025), run:
+To build USD and the Maya plug-ins on MacOS for Maya (2026), run:
 ```
-/Applications/Autodesk/maya2025/Maya.app/Contents/bin/mayapy build_usd.py ~/Desktop/BUILD
+/Applications/Autodesk/maya2026/Maya.app/Contents/bin/mayapy build_usd.py ~/Desktop/BUILD
 ```
 By default, ``usdview`` is built which has a dependency on PyOpenGL. Since the Python version of Maya doesn't ship with PyOpenGL you will be prompted with the following error message:
 ```
