@@ -729,6 +729,16 @@ VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
         return MayaHydraMaterialAdapter::GetPreviewMaterialResource(id);
     }
 
+    // Check if this is a light primitive - PRMan calls GetMaterialResource for lights
+    auto lightRet = _GetValue<MayaHydraLightAdapter, VtValue>(
+        id,
+        [](MayaHydraLightAdapter* a) -> VtValue { return a->GetLightMaterialNetwork(); },
+        _lightAdapters);
+    if (!lightRet.IsEmpty()) {
+        return lightRet;
+    }
+
+    // Handle regular material adapters
     auto ret = _GetValue<MayaHydraMaterialAdapter, VtValue>(
         id,
         [](MayaHydraMaterialAdapter* a) -> VtValue { return a->GetMaterialResource(); },

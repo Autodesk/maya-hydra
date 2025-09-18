@@ -30,6 +30,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testArnoldLights.py|depOnPlugins:mtoa
 	testViewportFilters.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa
+    testLightingByRenderDelegate.py|depOnPlugins:mtoa
 	testBifrostGraphUpdate.py|depOnPlugins:bifrost
 	#End of tests that have a dependency on other plugins
     testLookThrough.py

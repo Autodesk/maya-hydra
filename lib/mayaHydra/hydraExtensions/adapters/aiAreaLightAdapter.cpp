@@ -23,7 +23,7 @@
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
-#include <pxr/pxr.h>
+#include <pxr/usd/usdLux/tokens.h>
 
 #include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
@@ -222,41 +222,21 @@ public:
         constexpr float defaultHeight = 2.0f;
         
         //The width, height, length, radius are only queried by Hydra if the "normalize" (aiNormalize below) attribute is unchecked
-        if (paramName == HdLightTokens->width) {//Rect
+        if (    (paramName == HdLightTokens->width) 
+            ||  (paramName == UsdLuxTokens->inputsWidth)) {
             return VtValue(float(defaultWidth  * scale2[0]));
-        }else if (paramName == HdLightTokens->height) { //Rect
+        }else if ((paramName == HdLightTokens->height)
+            ||  (paramName == UsdLuxTokens->inputsHeight)){
             return VtValue(float(defaultHeight * scale2[1]));
-        }else if (paramName == HdLightTokens->radius) { //Cylinder, sphere and disk
+        }else if ((paramName == HdLightTokens->radius) 
+            ||  (paramName == UsdLuxTokens->inputsRadius)) {
             return VtValue(float(scale2[0]));
-        }else if (paramName == HdLightTokens->length) {//Cylinder
+        } else if ( (paramName == HdLightTokens->length)
+                ||  (paramName == UsdLuxTokens->inputsLength)) {
             return VtValue(float(scale2[0]));
-        }else if (paramName == HdLightTokens->intensity) {
-            float intensity = getFloatFromMPlug("intensity", 1.0f);
-            return VtValue(intensity);
-        }else if (paramName == HdLightTokens->exposure) {
-            float exposure = getFloatFromMPlug("aiExposure", 0.0f);
-            return VtValue(exposure);
-        }else if (paramName == HdLightTokens->color || paramName == HdTokens->displayColor) {
-            float colorR = getFloatFromMPlug("colorR", 1.0f);
-            float colorG = getFloatFromMPlug("colorG", 1.0f);
-            float colorB = getFloatFromMPlug("colorB", 1.0f);
-            return VtValue(GfVec3f(colorR, colorG, colorB));
-        } else if (paramName == HdLightTokens->enableColorTemperature){
-            const bool enableColorTemperature = getBoolFromMPlug("aiUseColorTemperature", false);
-            return VtValue(enableColorTemperature);
-        } else if (paramName == HdLightTokens->colorTemperature){
-            float  colorTemperature = getFloatFromMPlug("aiColorTemperature", 6500.f);
-            return VtValue(colorTemperature);
-        } else if (paramName == HdLightTokens->diffuse) {
-            return VtValue(1.0f);
-        } else if (paramName == HdLightTokens->specular) {
-            return VtValue(1.0f);
-        } else if (paramName == HdLightTokens->normalize){
-            const bool normalize = getBoolFromMPlug("aiNormalize", false);
-            return VtValue(normalize);
         }
-
-        return { };
+        
+        return MayaHydraLightAdapter::GetLightParamValue(paramName);
     }
 
     // We need a special case when the user changes the light type, we need to repopulate the prim

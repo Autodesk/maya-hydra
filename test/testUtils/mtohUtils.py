@@ -150,6 +150,16 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         cmds.refresh(f=1)
         self.delegateId = ""
 
+    def setHdArnoldRenderer(self):
+        """Set HdArnold as the current render delegate"""
+        self.activeEditor = cmds.playblast(activeEditor=1)
+        cmds.modelEditor(
+            self.activeEditor, e=1,
+            rendererOverrideName="mayaHydraRenderOverride_HdArnoldRendererPlugin")
+        cmds.refresh(f=1)
+        self.delegateId = cmds.mayaHydra(renderer="HdArnoldRendererPlugin",
+                                    sceneDelegateId="MayaHydraSceneDelegate")
+
     def setBasicCam(self, dist=DEFAULT_CAM_DIST):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
         cmds.setAttr('persp.translate', dist, .75 * dist, dist, type='float3')

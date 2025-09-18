@@ -152,6 +152,15 @@ bool SetNodeAttribute(MObject node, std::string attrName, AttrType newValue)
 bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath);
 
 /**
+ * @brief Get if this MDagPath is an Arnold Area light.
+ *
+ * @param[in] dagPath is a MDagPath
+ *
+ * @return true if the object is an Arnold area light, false otherwise
+ */
+bool IsDagPathAnArnoldAreaLight(const MDagPath& dagPath);
+
+    /**
  * @brief Get if this MDagPath is a light.
  *
  * @param[in] dagPath is a MDagPath
@@ -159,6 +168,31 @@ bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath);
  * @return true if the object is a light, false otherwise
  */
 bool IsDagPathALight(const MDagPath& dagPath);
+
+/**
+ * @brief Retrieves the texture file path from a dome light node.
+ *
+ * This function extracts the texture file path from a Maya dome light node,
+ * which is typically used for environment lighting or sky dome lighting.
+ * The function is designed to work with Arnold sky dome lights and other
+ * dome light types that support texture-based lighting.
+ *
+ * @param[in] lightNode The Maya dependency node representing the dome light.
+ *                      Must be a valid dome light node (e.g., aiSkyDomeLight).
+ *
+ * @return A string containing the full path to the texture file used by the
+ *         dome light. Returns an empty string if:
+ *         - The light node is not a valid dome light
+ *         - No texture file is assigned to the dome light
+ *         - The texture file path cannot be retrieved
+ *
+ * @note The returned path may be relative or absolute depending on how the
+ *       texture was assigned in Maya. It's the caller's responsibility to
+ *       resolve relative paths if needed.
+ *
+ * @see IsDagPathAnArnoldSkyDomeLight() for checking if a DAG path is an Arnold sky dome light
+ */
+std::string GetDomeLightTexture(const MFnDependencyNode& lightNode);
 
 } // namespace MAYAHYDRA_NS_DEF
 

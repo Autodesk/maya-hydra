@@ -59,11 +59,14 @@ public:
                 GetDagPath().partialPathName().asChar());
 
         MFnPointLight light(GetDagPath());
-        if (paramName == HdLightTokens->radius) {
-            const float radius = light.shadowRadius();
+        if (    (paramName == HdLightTokens->radius ) 
+            ||  (paramName == UsdLuxTokens->inputsRadius) ) {
+            // For point lights, use a default radius if the render delegate asks for it
+            constexpr float radius = 0.01f; // Default radius for point lights
             return VtValue(radius);
         } else if (paramName == UsdLuxTokens->treatAsPoint) {
-            const bool treatAsPoint = (light.shadowRadius() == 0.0);
+            // For point lights, we can treat as point if radius is very small
+            constexpr bool treatAsPoint = true; // Point lights are typically treated as points
             return VtValue(treatAsPoint);
         }
         return MayaHydraLightAdapter::GetLightParamValue(paramName);

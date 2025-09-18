@@ -48,7 +48,7 @@ public:
         if (GetMayaHydraSceneIndex()->IsHdSt()) {
             return HdPrimTypeTokens->simpleLight;
         } else {
-            return HdPrimTypeTokens->distantLight;
+            return HdPrimTypeTokens->distantLight;//We don't use this light type with Storm as it has no shadows so far
         }
     }
 
@@ -62,7 +62,6 @@ public:
         const GfVec3f lightDirection {(float)-zDir.data()[0], (float)-zDir.data()[1], (float)-zDir.data()[2]};
         GfVec3f position;
         MAYAHYDRA_NS_DEF::GetDirectionalLightPositionFromDirectionVector(position, lightDirection);
-        light.SetHasShadow(true);
         light.SetPosition({ position.data()[0], position.data()[1], position.data()[2], 0.0f });
     }
 
@@ -93,7 +92,8 @@ public:
 
     VtValue GetLightParamValue(const TfToken& paramName) override
     {
-        if (paramName == HdLightTokens->angle) {
+        if (  (paramName == HdLightTokens->angle)
+            ||(paramName == UsdLuxTokens->inputsAngle)) {
             MStatus           status;
             MFnDependencyNode lightNode(GetNode(), &status);
             if (ARCH_UNLIKELY(!status)) {
@@ -101,9 +101,9 @@ public:
             }
             return VtValue(
                 lightNode.findPlug(MayaAttrs::directionalLight::lightAngle, true).asFloat());
-        } else {
-            return MayaHydraLightAdapter::GetLightParamValue(paramName);
-        }
+        } 
+        
+        return MayaHydraLightAdapter::GetLightParamValue(paramName);
     }
 };
 

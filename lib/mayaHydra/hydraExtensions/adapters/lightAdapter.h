@@ -68,7 +68,24 @@ public:
     MAYAHYDRALIB_API
     VtValue Get(const TfToken& key) override;
     MAYAHYDRALIB_API
+    virtual VtValue GetLightMaterialNetwork() const;//Is for PRMan
+    MAYAHYDRALIB_API
     virtual void CreateCallbacks() override;
+    
+    // Helper struct and method for Maya light parameters
+    struct MayaLightParams {
+        float intensity = 1.0f;
+        GfVec3f color { 1.0f, 1.0f, 1.0f };
+        GfVec3f shadowColor { 0.0f, 0.0f, 0.0f };
+        float exposure = 0.0f;
+        bool normalize = true;
+        float diffuse = 1.0f;
+        float specular = 1.0f;
+        bool enableColorTemperature = false;
+        float colorTemperature = 6500.0f;
+    };
+    MAYAHYDRALIB_API
+    MayaLightParams GetMayaLightParams() const;
     
 protected:
     MAYAHYDRALIB_API

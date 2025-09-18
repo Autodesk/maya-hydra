@@ -21,6 +21,7 @@
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+#include <mayaHydraLib/mayaUtils.h>
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
@@ -151,27 +152,6 @@ public:
                 }
             }
             return VtValue(GfVec3f(r,g,b));
-        } else if (paramName == HdLightTokens->intensity ||
-                   paramName == UsdLuxTokens->inputsIntensity) {
-            return VtValue(light.findPlug("intensity", true).asFloat());
-        } else if (paramName == HdLightTokens->diffuse ||
-                   paramName == UsdLuxTokens->inputsDiffuse) {
-            MPlug aiDiffuse = light.findPlug("aiDiffuse", true, &status);
-            if (status == MS::kSuccess) {
-                return VtValue(aiDiffuse.asFloat());
-            }
-        } else if (paramName == HdLightTokens->specular || 
-                   paramName == UsdLuxTokens->inputsSpecular) {
-            MPlug aiSpecular = light.findPlug("aiSpecular", true, &status);
-            if (status == MS::kSuccess) {
-                return VtValue(aiSpecular.asFloat());
-            }
-        } else if (paramName == HdLightTokens->exposure ||
-                   paramName == UsdLuxTokens->inputsExposure) {
-            return VtValue(light.findPlug("aiExposure", true).asFloat());
-        } else if (paramName == HdLightTokens->normalize ||
-                   paramName == UsdLuxTokens->inputsNormalize) {
-            return VtValue(light.findPlug("aiNormalize", true).asBool());
         } else if (paramName == HdLightTokens->textureFormat ||
                    paramName == UsdLuxTokens->inputsTextureFormat) {
             const auto format = light.findPlug("format", true).asShort();
@@ -204,35 +184,19 @@ public:
                 return VtValue(SdfAssetPath());
             }
 
-            MPlugArray conns;
-            light.findPlug("color", true).connectedTo(conns, true, false);
-            if (conns.length() < 1) {
-                // Should never happen as it has been tested before with its equivalent : _colorIsConnected
-                return VtValue(SdfAssetPath());
-            }
-            MFnDependencyNode file(conns[0].node(), &status);
-            if (ARCH_UNLIKELY(
-                    !status || (file.typeName() != MayaHydraAdapterTokens->file.GetText()))) {
-                // Be aware that dome lights in HdStorm always need a texture to work correctly,
-                // the color is not used if no texture is present. 
-                if (! _dummyTextureFullPathFilename.empty()){
-                    // SdfAssetPath requires both "path" "resolvedPath"
-                    return VtValue(SdfAssetPath(_dummyTextureFullPathFilename, _dummyTextureFullPathFilename));
-                } else {
-                    return VtValue(SdfAssetPath());// this will produce a warning but hopefully is an edge case
-                }
-            }
-
-            const char* fileTextureName
-                = file.findPlug(MayaAttrs::file::fileTextureName, true).asString().asChar();
+            const std::string domeLightTexturePath = MAYAHYDRA_NS::GetDomeLightTexture(
+                light); // Using mayaUtils.h, the resulting string could be empty
+            
             // SdfAssetPath requires both "path" "resolvedPath"
-            return VtValue(SdfAssetPath(fileTextureName, fileTextureName));
+            return VtValue(SdfAssetPath(domeLightTexturePath, domeLightTexturePath));
 
         } else if (paramName == HdLightTokens->enableColorTemperature ||
                    paramName == UsdLuxTokens->inputsEnableColorTemperature) {
-            return VtValue(false);
+            return VtValue(false); // Needs to be false as Arnold sky dome light has no color
+                                   // temperature attribute
         }
-        return {};
+
+        return MayaHydraLightAdapter::GetLightParamValue(paramName);
     }
 };
 

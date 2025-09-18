@@ -16,16 +16,31 @@
 
 #include "mayaUtils.h"
 
+#include <mayaHydraLib/adapters/mayaAttrs.h>
+
 #include <maya/MDagPath.h>
 #include <maya/MFnDagNode.h>
 #include <maya/MMatrix.h>
 #include <maya/MPlug.h>
+#include <maya/MPlugArray.h>
 #include <maya/MSelectionList.h>
 #include <maya/MObjectArray.h>
 #include <maya/MStringArray.h>
 
-namespace MAYAHYDRA_NS_DEF {
+namespace {
 
+    bool IsDagPathOfGivenType(const MDagPath& dagPath, const MString& type)
+    {
+        if (!dagPath.isValid()) {
+            return false;
+        }
+        auto shapeDagPath = dagPath;
+        shapeDagPath.extendToShape();
+        return type == MFnDependencyNode(shapeDagPath.node()).typeName();
+    }
+}
+
+namespace MAYAHYDRA_NS_DEF {
 
 MStatus GetDagPathFromNodeName(const MString& nodeName, MDagPath& outDagPath)
 {
@@ -111,13 +126,13 @@ MStatus GetObjectsFromNodeNames(const MStringArray& nodeNames, MObjectArray & ou
 bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath)
 {
     static const MString _aiSkyDomeLight("aiSkyDomeLight");
-    
-    if (!dagPath.isValid()) {
-        return false;
-    }
-    auto shapeDagPath = dagPath;
-    shapeDagPath.extendToShape();
-    return _aiSkyDomeLight == MFnDependencyNode(shapeDagPath.node()).typeName();
+    return IsDagPathOfGivenType(dagPath, _aiSkyDomeLight);
+}
+
+bool IsDagPathAnArnoldAreaLight(const MDagPath& dagPath)
+{
+    static const MString _aiAreaLight("aiAreaLight");
+    return IsDagPathOfGivenType(dagPath, _aiAreaLight);
 }
 
 bool IsDagPathALight(const MDagPath& dagPath)
@@ -130,6 +145,31 @@ bool IsDagPathALight(const MDagPath& dagPath)
     shapeDagPath.extendToShape();
     const MString typeName = MFnDependencyNode(shapeDagPath.node()).typeName();
     return (typeName.indexW(_lightString) != -1);//Does the typename contains "Light"
+}
+
+std::string GetDomeLightTexture(const MFnDependencyNode& lightNode)
+{
+    // Be aware that dome lights in HdStorm always need a texture to work correctly,
+    // the color is not used if no texture is present.
+    const auto plug = lightNode.findPlug("color", true);
+    MPlugArray conns;
+    plug.connectedTo(conns, true, false);
+    const bool _colorIsConnected = (conns.length() > 0);
+    if (!_colorIsConnected) {
+        return "";
+    }
+        
+    MStatus status;
+    MFnDependencyNode file(conns[0].node(), &status);
+    static const MString fileString ("file");
+    if (!status || (file.typeName() != fileString)) {
+        return "";
+    }
+
+    const char* fileTextureName
+        = file.findPlug(PXR_NS::MayaAttrs::file::fileTextureName, true).asString().asChar();
+    
+    return fileTextureName;
 }
 
 } // namespace MAYAHYDRA_NS_DEF
