@@ -33,6 +33,8 @@
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
 
+#include <optional>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
