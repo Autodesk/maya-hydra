@@ -121,12 +121,14 @@ public:
     /// one modelEditor panel.
     static std::vector<MString> AllActiveRendererNames();
 
+#ifdef VIEWPORT_TOOLBOX
     /// Returns the names of all AOVs made available by the render delegates
     /// for a given render pass index.
     /// TODO 2025-08-29 : This currently gathers AOVs from all viewports indiscriminately.
     /// Once we have proper multi-viewport support, we should also be able to
     /// specify which viewport to get the AOVs for.
     static TfTokenVector GetAvailableFramePassAovs(int passIndex);
+#endif
 
     static MtohRenderOverride* GetByName(TfToken rendererName);
 
@@ -204,8 +206,10 @@ private:
     void              _ClearMayaHydraSceneIndex();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
+#ifdef VIEWPORT_TOOLBOX
     HdSceneIndexBaseRefPtr
     _CreatePassFilteringSceneIndex(const Fvp::FramePassConstDataPtr& filteringData);
+#endif
     VtValue _GetUsedGPUMemory() const;
 
     void _PickByRegion(

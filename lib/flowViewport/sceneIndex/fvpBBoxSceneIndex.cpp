@@ -21,6 +21,7 @@
 
 //USD/Hydra headers
 #include <pxr/base/gf/bbox3d.h>
+#include <pxr/imaging/hd/dataSourceLocator.h>
 #include <pxr/usdImaging/usdImaging/modelSchema.h>
 #include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
@@ -394,9 +395,8 @@ void BboxSceneIndex::_DirtyAllPrims()
         return;
     }
 
-    // Instead of just dirtying, let's remove and re-add all prims
-    // This forces a complete recreation of the prims with the new topology
-    HdSceneIndexObserver::RemovedPrimEntries removedEntries;
+    // Instead of just dirtying, let's re-add all prims
+    // This forces a complete resync of the prims with the new topology
     HdSceneIndexObserver::AddedPrimEntries   addedEntries;
 
     for (const SdfPath& path : HdSceneIndexPrimView(GetInputSceneIndex())) {
@@ -404,9 +404,6 @@ void BboxSceneIndex::_DirtyAllPrims()
 
         // Check if this prim is supported for conversion (regardless of enabled state)
         if (prim.dataSource && !_isExcluded(path) && _IsSupportedPrimType(prim.primType)) {
-            // Remove the prim
-            removedEntries.emplace_back(path);
-
             // Re-add it with the appropriate type based on current enabled state
             if (_enabled) {
                 // Convert to bounding box
@@ -418,9 +415,6 @@ void BboxSceneIndex::_DirtyAllPrims()
         }
     }
 
-    if (!removedEntries.empty()) {
-        _SendPrimsRemoved(removedEntries);
-    }
     if (!addedEntries.empty()) {
         _SendPrimsAdded(addedEntries);
     }

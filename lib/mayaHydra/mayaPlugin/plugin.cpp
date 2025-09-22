@@ -19,11 +19,13 @@
 #include "pluginUtils.h"
 #include "renderGlobals.h"
 #include "renderOverride.h"
-#include "renderRegionCommand.h"
 #include "viewCommand.h"
 #include "pluginBuildInfoCommand.h"
-#include "setVisibleFramePassesCommand.h"
 #include "getFramePassesCountCommand.h"
+#ifdef VIEWPORT_TOOLBOX
+#include "renderRegionCommand.h"
+#include "setVisibleFramePassesCommand.h"
+#endif
 
 #include <mayaHydraLib/adapters/adapter.h>
 
@@ -212,6 +214,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
+#ifdef VIEWPORT_TOOLBOX
     if (!plugin.registerCommand(
             MayaHydraSetVisibleFramePasses::commandName,
             MayaHydraSetVisibleFramePasses::creator,
@@ -229,7 +232,8 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         ret.perror("Error registering mayaHydraRenderRegion command!");
         return ret;
     }
-	
+#endif
+
 	if (!plugin.registerCommand(
             MayaHydraGetFramePassesCount::commandName,
             MayaHydraGetFramePassesCount::creator,
@@ -335,6 +339,7 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
         ret.perror("Error deregistering MayaHydraPluginInfo command!");
     }
 
+#ifdef VIEWPORT_TOOLBOX
     if (!plugin.deregisterCommand(MayaHydraSetVisibleFramePasses::commandName)) {
         ret = MS::kFailure;
         ret.perror("Error deregistering MayaHydraSetVisibleFramePasses command!");
@@ -343,6 +348,12 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     if (!plugin.deregisterCommand(MayaHydraRenderRegionCommand::commandName)) {
         ret = MS::kFailure;
         ret.perror("Error deregistering mayaHydraRenderRegion command!");
+    }
+#endif
+
+    if (!plugin.deregisterCommand(MayaHydraGetFramePassesCount::commandName)) {
+        ret = MS::kFailure;
+        ret.perror("Error deregistering MayaHydraGetFramePassesCount command!");
     }
 
     return ret;

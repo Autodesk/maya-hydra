@@ -13,6 +13,8 @@
 // limitations under the License.
 //
 
+#ifdef VIEWPORT_TOOLBOX
+
 #include "fvpPassFilteringSceneIndex.h"
 #include "flowViewport/fvpUtils.h"
 
@@ -63,7 +65,11 @@ PassFilteringSceneIndexRefPtr PassFilteringSceneIndex::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex,
     const Fvp::FramePassConstDataPtr& framePassData)
 {
-    return TfCreateRefPtr(new PassFilteringSceneIndex(inputSceneIndex, framePassData));
+    // If we return TfCreateRefPtr directly, Clang will destroy the rvalue before
+    // returning, which means we will return a null pointer. To avoid this, store 
+    // the pointer in an lvalue first and return that.
+    auto refPtr = TfCreateRefPtr(new PassFilteringSceneIndex(inputSceneIndex, framePassData));
+    return refPtr;
 }
 
 PassFilteringSceneIndex::PassFilteringSceneIndex(
@@ -155,7 +161,7 @@ bool PassFilteringSceneIndex::_IsFilteredOut(const SdfPath& primPath) const
             return result;
         } else {
             // Now do the expensive GetPrim() call only when necessary
-            const HdSceneIndexBaseRefPtr& inputSceneIndex = _GetInputSceneIndex();
+            const HdSceneIndexBaseRefPtr& inputSceneIndex = GetInputSceneIndex();
             if (!inputSceneIndex) {
                 result = false; // No input scene index, include by default
                 reason = "No input scene index";
@@ -288,7 +294,7 @@ bool PassFilteringSceneIndex::_IsFilteredOut(const SdfPath& primPath) const
     }
 
     // Now do the expensive GetPrim() call only when necessary
-    const HdSceneIndexBaseRefPtr& inputSceneIndex = _GetInputSceneIndex();
+    const HdSceneIndexBaseRefPtr& inputSceneIndex = GetInputSceneIndex();
     if (!inputSceneIndex) {
         return false; // No input scene index, include by default
     }
@@ -356,3 +362,5 @@ SdfPathVector PassFilteringSceneIndex::GetChildPrimPaths(const SdfPath& primPath
 }
 
 } // namespace FVP_NS_DEF
+
+#endif // VIEWPORT_TOOLBOX

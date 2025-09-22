@@ -643,6 +643,7 @@ std::vector<MString> MtohRenderOverride::AllActiveRendererNames()
     return renderers;
 }
 
+#ifdef VIEWPORT_TOOLBOX
 TfTokenVector MtohRenderOverride::GetAvailableFramePassAovs(int passIndex)
 {
     TfTokenVector aovs;
@@ -659,6 +660,7 @@ TfTokenVector MtohRenderOverride::GetAvailableFramePassAovs(int passIndex)
     }
     return aovs;
 }
+#endif
 
 SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visibleOnly)
 {
@@ -1123,7 +1125,12 @@ MStatus MtohRenderOverride::Render(
                 hydraViewportInformation,
                 renderIndex(),
                 _dataProducerMergingSceneIndexProxy,
-                _CreatePassFilteringSceneIndex(_framePassesData[0]));
+#ifdef VIEWPORT_TOOLBOX
+                _CreatePassFilteringSceneIndex(_framePassesData[0])
+#else
+                _lastFilteringSceneIndexBeforeCustomFiltering
+#endif
+            );
 
             //Update the selection since we have added data producer scene indices through manager.AddViewportInformation to the merging scene index
             if (dataProducerSceneIndicesAdded && _selectionSceneIndex){
@@ -1180,8 +1187,13 @@ MStatus MtohRenderOverride::Render(
                 hydraViewportInformation,
                 renderIndex(),
                 _dataProducerMergingSceneIndexProxy,
-                _CreatePassFilteringSceneIndex(_framePassesData[0])); // Use the first pass filtering function to
-                                                      // create the pass filtering scene index
+#ifdef VIEWPORT_TOOLBOX
+                _CreatePassFilteringSceneIndex(_framePassesData[0]) // Use the first pass filtering function to
+                                                                    // create the pass filtering scene index
+#else
+                _lastFilteringSceneIndexBeforeCustomFiltering
+#endif
+            );
 
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(false);//Allow prim removal propagation again.
         }
@@ -1380,6 +1392,7 @@ MStatus MtohRenderOverride::Render(
 #endif
     }
 
+#ifdef VIEWPORT_TOOLBOX
     const GfRange2f displayWindow(GfVec2f(0.0f), GfVec2f(width, height));
     const GfRect2i renderRegion = MayaHydraRenderRegionCommand::getRenderRegion().has_value() ? MayaHydraRenderRegionCommand::getRenderRegion().value() : GfRect2i(GfVec2i(0.0f), GfVec2i(width, height));
     for (int i = 0; i < numFramePasses; ++i) {
@@ -1389,6 +1402,7 @@ MStatus MtohRenderOverride::Render(
         }
         currentPass->params().viewInfo.framing = PXR_NS::CameraUtilFraming(displayWindow, renderRegion);
     }
+#endif
     
     MStatus  status;
     MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
@@ -1841,6 +1855,13 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 
         auto& _framePassesRenderer = _framePassesData[i]->_renderIndexProxy;
         if (_framePassesRenderer) {
+#ifdef CODE_COVERAGE_WORKAROUND
+            // Store the pointers so they don't get immediately destroyed,
+            // as hvt::RenderIndexProxy's dtor will call HdRenderIndex's dtor,
+            // which crashes on Clang.
+            static std::vector<hvt::RenderIndexProxyPtr> leakedRenderIndexProxyPtrs;
+            leakedRenderIndexProxyPtrs.push_back(_framePassesRenderer);
+#endif
             _framePassesRenderer.reset();
         }
     }
@@ -1884,6 +1905,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     PickHandlerRegistry::Instance().SetPickContext(nullptr);
 }
 
+#ifdef VIEWPORT_TOOLBOX
 HdSceneIndexBaseRefPtr MtohRenderOverride::_CreatePassFilteringSceneIndex(
     const Fvp::FramePassConstDataPtr& filteringData)
 {
@@ -1894,6 +1916,7 @@ HdSceneIndexBaseRefPtr MtohRenderOverride::_CreatePassFilteringSceneIndex(
 #endif
     return _lastFilteringSceneIndexBeforeCustomFiltering;
 }
+#endif
 
 void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext)
 {
@@ -2818,7 +2841,7 @@ void MtohRenderOverride::_CreateFramePassesData()
 void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegateParams)
 {
 #ifndef VIEWPORT_TOOLBOX
-    TfTokenVector mainPassRenderTags = { HdRenderTagTokens->geometry };
+    TfTokenVector mainPassRenderTags = { HdRenderTagTokens->geometry, Fvp::secondaryGraphicsRenderTagToken };
     if (delegateParams.renderPurpose) {
         mainPassRenderTags.push_back(HdRenderTagTokens->render);
     }

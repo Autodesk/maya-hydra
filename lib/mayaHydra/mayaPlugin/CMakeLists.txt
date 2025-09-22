@@ -18,9 +18,9 @@ target_sources(${TARGET_NAME}
         tokens.cpp
         viewCommand.cpp
         pluginBuildInfoCommand.cpp
-        renderRegionCommand.cpp
-        setVisibleFramePassesCommand.cpp
         getFramePassesCountCommand.cpp
+        $<$<BOOL:${BUILD_WITH_VIEWPORT_TOOLBOX}>:renderRegionCommand.cpp>
+        $<$<BOOL:${BUILD_WITH_VIEWPORT_TOOLBOX}>:setVisibleFramePassesCommand.cpp>
 )
 
 set(HEADERS
