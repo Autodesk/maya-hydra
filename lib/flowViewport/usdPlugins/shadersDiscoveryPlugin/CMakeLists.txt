@@ -71,6 +71,7 @@ endif()
 
 configure_file("plugInfo.json.in" ${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json @ONLY)
 
+# Install only the generated plugInfo.json
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/flowViewportShadersDiscoveryPlugin/resources)
 			
 install(TARGETS ${TARGET_NAME}

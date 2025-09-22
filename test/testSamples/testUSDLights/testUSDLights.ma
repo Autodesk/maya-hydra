@@ -2,7 +2,7 @@
 //Name: testUSDLights.ma
 //Last modified: Fri, Sep 19, 2025 04:57:02 PM
 //Codeset: 1252
-requires maya "2025ff01";
+requires maya "2025ff02";
 requires -nodeType "mayaUsdLayerManager" -nodeType "mayaUsdProxyShape" -nodeType "ufeLightDirectional"
 		 -nodeType "ufeLightDome" -nodeType "ufeLightDisk" -dataType "pxrUsdStageData" "mayaUsdPlugin" "0.34.0";
 currentUnit -l centimeter -a degree -t film;

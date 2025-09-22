@@ -19,7 +19,7 @@ from __future__ import print_function
 
 try:
    from shutil import which as find_executable
-except Exception:
+except ImportError:
    from distutils.spawn import find_executable
 
 from glob import glob
