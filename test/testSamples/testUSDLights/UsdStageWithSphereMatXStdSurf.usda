@@ -49,6 +49,6 @@ def DomeLight "DomeLight1"
     asset inputs:texture:file = @./sky.hdr@
     double3 xformOp:translate = (0, 8.329096001473479, 0)
     uniform token[] xformOpOrder = ["xformOp:translate"]
-	bool inputs:shadow:enable = 1
+    bool inputs:shadow:enable = 1
 }
 
