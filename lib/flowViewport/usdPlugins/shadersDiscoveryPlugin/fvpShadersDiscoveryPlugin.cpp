@@ -51,9 +51,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-SDR_REGISTER_DISCOVERY_PLUGIN(FlowViewportShadersDiscoveryPlugin);
-
-
 static std::string _GetShaderResourcePath(char const* resourceName = "")
 {
     static PlugPluginPtr plugin = PlugRegistry::GetInstance().GetPluginWithName("flowViewportShadersDiscoveryPlugin");
@@ -65,6 +62,7 @@ static std::string _GetShaderResourcePath(char const* resourceName = "")
 }
 
 #if PXR_VERSION >= 2508 // Ndr classes have been deprecated in USD 25.08
+SDR_REGISTER_DISCOVERY_PLUGIN(FlowViewportShadersDiscoveryPlugin);
 const SdrStringVec& FlowViewportShadersDiscoveryPlugin::GetSearchURIs() const
 {
     static const SdrStringVec searchPaths { _GetShaderResourcePath() };
@@ -114,6 +112,7 @@ FlowViewportShadersDiscoveryPlugin::DiscoverShaderNodes(const Context& context)
 }
 #else
 //Before 25.08
+NDR_REGISTER_DISCOVERY_PLUGIN(FlowViewportShadersDiscoveryPlugin);
 const NdrStringVec& FlowViewportShadersDiscoveryPlugin::GetSearchURIs() const
 {
     static const NdrStringVec searchPaths{_GetShaderResourcePath()};
