@@ -86,6 +86,15 @@ GfVec4f MhWireframeColorInterfaceImp::_getWireframeColor(const SelectionState& s
 }
 
 GfVec4f MhWireframeColorInterfaceImp::getWireframeColor(const SdfPath& primPath) const { 
+    std::string pathString = primPath.GetString();
+    
+    if (pathString.find("Highlight_Lead") != std::string::npos) {
+        return _getWireframeColor(kLead);
+    }
+    else if (pathString.find("Highlight_Active") != std::string::npos) {
+        return _getWireframeColor(kActive);
+    }
+
     return _getWireframeColor(_getSelectionState(primPath));
 }
 

@@ -136,6 +136,7 @@ endif()
 # both versions of the test in parallel will conflict.
 set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshes.py
+    testTransformMeshAdapter.py
     cpp/testMeshAdapterTransform.py
 )
 
@@ -158,6 +159,8 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
         ENV
             "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
             "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
+
+            "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
 
             "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
 

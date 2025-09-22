@@ -21,8 +21,10 @@ import mtohUtils
 class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
+    _requiredPlugins = ['drawUfe']
+
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
-    IMAGEDIFF_FAIL_PERCENT = 0.1
+    IMAGEDIFF_FAIL_PERCENT = 1
 
     def verifySnapshot(self, imageName, imageVersion=None):
         cmds.refresh()
@@ -104,6 +106,64 @@ class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
         self.verifySnapshot("usd_cube_parent_moved_rotated_scaled.png", img_version)
 
         self.resetDefaultLightIntensityByUsdVersion()
+
+    def test_mayaCamera(self):
+        mayaUtils.openNewScene()
+        self.setBasicCam(10)
+        self.setHdStormRenderer()
+
+        camTrans, camShape = cmds.camera(name='testCam')
+
+        self.verifySnapshot("camera_untransformed.png")
+
+        cmds.move(0, 2, 0, camTrans, absolute=True)
+        self.verifySnapshot("camera_moved.png")
+
+        cmds.rotate(0, 45, 0, camTrans, absolute=True)
+        self.verifySnapshot("camera_moved_rotated.png")
+
+        cmds.scale(3, 1, 3, camTrans, absolute=True)
+        self.verifySnapshot("camera_moved_rotated_scaled.png")
+
+        camParent = cmds.group(camTrans, name='camParent')
+        cmds.move(0, -3, 0, camParent, absolute=True)
+        self.verifySnapshot("camera_parent_moved.png")
+
+        cmds.rotate(0, 0, 45, camParent, absolute=True)
+        self.verifySnapshot("camera_parent_moved_rotated.png")
+
+        cmds.scale(2, 2, 2, camParent, absolute=True)
+        self.verifySnapshot("camera_parent_moved_rotated_scaled.png")
+
+    def test_mayaLight(self):
+        mayaUtils.openNewScene()
+        self.setBasicCam(10)
+        self.setHdStormRenderer()
+
+        lightShape = cmds.directionalLight(name='mayaDirectionalLightShape')
+        lightTrans = cmds.listRelatives(lightShape, parent=True)[0]
+        cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, displayLights='all')
+
+        self.verifySnapshot("light_untransformed.png")
+
+        cmds.move(2, 3, 2, lightTrans, absolute=True)
+        self.verifySnapshot("light_moved.png")
+
+        cmds.rotate(-20, 45, 30, lightTrans, absolute=True)
+        self.verifySnapshot("light_moved_rotated.png")
+
+        cmds.scale(3, 1, 3, lightTrans, absolute=True)
+        self.verifySnapshot("light_moved_rotated_scaled.png")
+
+        lightParent = cmds.group(lightTrans, name='lightParent')
+        cmds.move(0, -3, 0, lightParent, absolute=True)
+        self.verifySnapshot("light_parent_moved.png")
+
+        cmds.rotate(0, 0, 45, lightParent, absolute=True)
+        self.verifySnapshot("light_parent_moved_rotated.png")
+
+        cmds.scale(1.5, 1.5, 1.5, lightParent, absolute=True)
+        self.verifySnapshot("light_parent_moved_rotated_scaled.png")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

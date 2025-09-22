@@ -1118,8 +1118,8 @@ MStatus MtohRenderOverride::Render(
 	            MFnCamera viewCamera(dpath);
 	            cameraName = viewCamera.name().asChar();
             }
-    
-            //Create a HydraViewportInformation 
+
+            //Create a HydraViewportInformation
             const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelNameStr, cameraName);
             const bool dataProducerSceneIndicesAdded = manager.AddViewportInformation(
                 hydraViewportInformation,

@@ -192,12 +192,14 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         self.cubeShape = cmds.listRelatives(self.cubeTrans)[0]
         self.setHdStormRenderer()
         self.assertNodeNameInIndex(self.cubeShape)
-        # The single Maya cube shape maps to two rprims, the first one of
-        # which is the shape's StandardShadedItem.  The list is ordered, as the
-        # Hydra call made is HdRenderIndex::GetRprimIds(), which sorts
-        # according to std::less<SdfPath>, which will produce
+        # The single Maya cube shape maps to two rprims.
+        # If using MeshAdapter, the mesh is the first prim (pCubeShape1)
+        # If using RenderItemAdapter, the mesh is the second prim (StandardShadedItem)
+        # The list is ordered, as the Hydra call made is HdRenderIndex::GetRprimIds(), 
+        # which sorts according to std::less<SdfPath>, which will produce
         # lexicographically-ordered paths.
-        self.cubeRprim = self.getIndex()[1]
+        useMeshAdapter = os.getenv('MAYA_HYDRA_USE_MESH_ADAPTER', 0)
+        self.cubeRprim = self.getIndex()[0] if useMeshAdapter else self.getIndex()[1]
         cmds.select(clear=1)
         cmds.refresh()
         self.assertVisible(self.cubeRprim)

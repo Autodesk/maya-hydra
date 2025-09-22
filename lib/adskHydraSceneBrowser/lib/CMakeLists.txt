@@ -172,18 +172,10 @@ else()
     set_target_properties(Qt6::Core PROPERTIES INTERFACE_COMPILE_DEFINITIONS QT_NO_KEYWORDS)
 endif()
 
-
-if(PXR_VERSION VERSION_LESS 2408)
-	target_compile_definitions(${TARGET_NAME} 
-		PRIVATE 
-			HDUI_EXPORT
-	)
-else()
-	target_compile_definitions(${TARGET_NAME} 
-		PRIVATE 
-			HDUI_EXPORTS
-	)
-endif()
+target_compile_definitions(${TARGET_NAME} 
+	PRIVATE 
+        $<IF:$<VERSION_LESS:${PXR_VERSION},2408>,HDUI_EXPORT,HDUI_EXPORTS>
+)
 
 mayaHydra_compile_config(${TARGET_NAME}) # TODO : This will have to be changed when moving to a standalone repo.
 
