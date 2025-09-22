@@ -24,14 +24,15 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
     testMayaLights.py
-    testUSDLights.py
+    #testUSDLights.py re-enable once the bug is fixed; logged as HYDRA-1884
     testUVandUDIM.py
+	#Updating to usd 25.08, disabling unit tests that don't support plugins with usd 25.08 HYDRA-1881
 	#Tests that have a dependency on other plugins
-	testMaterialXOnNative.py|depOnPlugins:lookdevx
-    testArnoldLights.py|depOnPlugins:mtoa
-	testViewportFilters.py|depOnPlugins:mtoa
-	testMayaLightingModes.py|depOnPlugins:mtoa
-	testBifrostGraphUpdate.py|depOnPlugins:bifrost
+	#testMaterialXOnNative.py|depOnPlugins:lookdevx
+    #testArnoldLights.py|depOnPlugins:mtoa
+	#testViewportFilters.py|depOnPlugins:mtoa
+	#testMayaLightingModes.py|depOnPlugins:mtoa
+	#testBifrostGraphUpdate.py|depOnPlugins:bifrost
 	#End of tests that have a dependency on other plugins
     testLookThrough.py
     testObjectTemplate.py
@@ -45,7 +46,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testFootPrintNode.py
     testBackgroundColor.py
     testGrid.py
-    testUsdTextureToggle.py
+    #testUsdTextureToggle.py re-enable once the bug is fixed; logged as HYDRA-1884
     testUsdStageDefaultLighting.py
     testPassingNormalsOnMayaNative.py
     testMayaComponentsPicking.py
@@ -103,7 +104,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 # HYDRA-1245.
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
-        testIsolateSelectWithUsdLighting.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+        #testIsolateSelectWithUsdLighting.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX - re-enable once the bug is fixed; logged as HYDRA-1884
         cpp/testIsolateSelect.py
         cpp/testIsolateSelectSwitchToVP2.py
         cpp/testIsolateSelectMayaSelectionHighlighting.py

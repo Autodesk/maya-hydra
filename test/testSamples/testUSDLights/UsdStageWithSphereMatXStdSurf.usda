@@ -23,3 +23,32 @@ def Scope "mtl"
     }
 }
 
+def DistantLight "DistantLight1"
+{
+    float inputs:angle = 0.53
+    color3f inputs:shadow:color
+    bool inputs:shadow:enable = 1
+    token visibility = "inherited"
+    float3 xformOp:rotateXYZ = (-90, 0, 0)
+    double3 xformOp:translate = (0, 8, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+}
+
+def DiskLight "DiskLight1"
+{
+    float inputs:radius = 2.4875622
+    token visibility = "inherited"
+	bool inputs:shadow:enable = 1
+    float3 xformOp:rotateXYZ = (-90, 0, 0)
+    double3 xformOp:translate = (0, 8, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+}
+
+def DomeLight "DomeLight1"
+{
+    asset inputs:texture:file = @./sky.hdr@
+    double3 xformOp:translate = (0, 8.329096001473479, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+	bool inputs:shadow:enable = 1
+}
+

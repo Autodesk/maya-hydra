@@ -4,13 +4,13 @@
         "Info": {
           "Types": {
             "FlowViewportShadersDiscoveryPlugin": {
-              "bases": [ "NdrDiscoveryPlugin" ],
+              "bases": [ "@BASE_CLASS_NAME@" ],
               "displayName": "Flow viewport custom shaders discovery plugin."
             }
           },
           "ShaderResources": "shaders"
         },
-		"LibraryPath": "libflowViewportShadersDiscoveryPlugin.dylib",
+		"LibraryPath": "@LIBRARY_PATH@",
         "Name": "flowViewportShadersDiscoveryPlugin",
         "ResourcePath": "shaders",
         "Root": "..",

@@ -53,15 +53,23 @@ target_link_libraries(${TARGET_NAME}
 # install
 # -----------------------------------------------------------------------------
 
+# Generate plugInfo.json with the correct base class depending on USD version
+# and the proper library name depending on the platform.
+if (PXR_VERSION VERSION_GREATER_EQUAL 2508)
+    set(BASE_CLASS_NAME "SdrDiscoveryPlugin")
+else()
+    set(BASE_CLASS_NAME "NdrDiscoveryPlugin")
+endif()
+
 if (IS_WINDOWS)
-    configure_file("plugInfo_Win.json" ${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json) 
+    set(LIBRARY_PATH "flowViewportShadersDiscoveryPlugin.dll")
+elseif(IS_LINUX)
+    set(LIBRARY_PATH "libflowViewportShadersDiscoveryPlugin.so")
+elseif(IS_MACOSX)
+    set(LIBRARY_PATH "libflowViewportShadersDiscoveryPlugin.dylib")
 endif()
-if (IS_LINUX)
-	configure_file("plugInfo_Linux.json" ${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json)
-endif()
-if (IS_MACOSX)
-	configure_file("plugInfo_OSX.json" ${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json)
-endif()
+
+configure_file("plugInfo.json.in" ${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json @ONLY)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/flowViewportShadersDiscoveryPlugin/resources)
 			

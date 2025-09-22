@@ -15,6 +15,7 @@
 
 #include "flowViewport/sceneIndex/fvpDefaultMaterialSceneIndex.h"
 
+#include <pxr/pxr.h>//To include PXR_VERSION
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/materialSchema.h>
@@ -36,11 +37,14 @@ namespace{
     {
         static std::set<TfToken> const compliantPrimitives = { HdPrimTypeTokens->cone,
                                                               HdPrimTypeTokens->cylinder,
-                                                              HdPrimTypeTokens->cylinder_1,
+#if PXR_VERSION < 2508
+                                                              HdPrimTypeTokens->cylinder_1, 
+                                                              HdPrimTypeTokens->capsule_1,
+#endif
                                                               HdPrimTypeTokens->cube,
                                                               HdPrimTypeTokens->sphere,
                                                               HdPrimTypeTokens->capsule,
-                                                              HdPrimTypeTokens->capsule_1,
+                                                              
                                                         #if PXR_VERSION >= 2405 // USD 24.05+
                                                               HdPrimTypeTokens->geomSubset,
                                                               UsdGeomTokens->TetMesh,

@@ -17,15 +17,17 @@
 
 from __future__ import print_function
 
-from distutils.spawn import find_executable
+try:
+   from shutil import which as find_executable
+except Exception:
+   from distutils.spawn import find_executable
+
 from glob import glob
 
 import argparse
 import contextlib
 import codecs
 import datetime
-import distutils
-import distutils.util
 import multiprocessing
 import os
 import platform
@@ -76,6 +78,22 @@ def PrintError(error):
         import traceback
         traceback.print_exc()
     print("ERROR:", error)
+
+def strtobool(val):
+    """Convert a string representation of truth to bool.
+
+    Accepted true values are: 'y', 'yes', 't', 'true', 'on', '1'
+    Accepted false values are: 'n', 'no', 'f', 'false', 'off', '0'
+    Case-insensitive; raises ValueError for invalid values.
+    """
+    if isinstance(val, bool):
+        return val
+    v = str(val).strip().lower()
+    if v in ("y", "yes", "t", "true", "on", "1"):
+        return True
+    if v in ("n", "no", "f", "false", "off", "0"):
+        return False
+    raise ValueError("Invalid truth value: {0}".format(val))
 
 def Python3():
     return sys.version_info.major == 3
@@ -662,7 +680,7 @@ parser.add_argument("-j", "--jobs", type=int, default=GetCPUCount(),
                           "(default: # of processors [{0}])"
                           .format(GetCPUCount())))
 
-parser.add_argument("--redirect-outstream-file", type=distutils.util.strtobool, dest="redirect_outstream_file", default=True,
+parser.add_argument("--redirect-outstream-file", type=strtobool, dest="redirect_outstream_file", default=True,
                     help="Redirect output stream to a file. Set this flag to false to redirect output stream to console instead.")
 
 args = parser.parse_args()
