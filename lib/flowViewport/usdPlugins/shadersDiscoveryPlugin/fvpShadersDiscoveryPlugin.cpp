@@ -38,10 +38,9 @@
 // limitations under the License.
 //
 
-#include <string>
-
 #include "fvpShadersDiscoveryPlugin.h"
 
+#include <string>
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/thisPlugin.h>
 
