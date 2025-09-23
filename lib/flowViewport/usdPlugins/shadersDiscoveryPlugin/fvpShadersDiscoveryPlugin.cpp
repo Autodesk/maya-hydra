@@ -38,6 +38,8 @@
 // limitations under the License.
 //
 
+#include <string>
+
 #include "fvpShadersDiscoveryPlugin.h"
 
 #include <pxr/base/plug/plugin.h>
@@ -48,7 +50,6 @@
 
 #include <pxr/usd/usdShade/shader.h>
 #include <pxr/usd/usdShade/shaderDefUtils.h>
-#include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
 

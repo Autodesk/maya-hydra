@@ -40,16 +40,23 @@ namespace{
 #if PXR_VERSION < 2508
                                                               HdPrimTypeTokens->cylinder_1, 
                                                               HdPrimTypeTokens->capsule_1,
+#else
+                                                              // For usd 25.08+, adding all missing RPrim types
+                                                              HdPrimTypeTokens->nurbsPatch,
+                                                              HdPrimTypeTokens->nurbsCurves,
+                                                              HdPrimTypeTokens->basisCurves,
+                                                              HdPrimTypeTokens->plane,
+                                                              HdPrimTypeTokens->points,
+                                                              HdPrimTypeTokens->volume,
+                                                              HdPrimTypeTokens->model,
+                                                              HdPrimTypeTokens->tetMesh,
 #endif
                                                               HdPrimTypeTokens->cube,
                                                               HdPrimTypeTokens->sphere,
                                                               HdPrimTypeTokens->capsule,
-                                                              
                                                         #if PXR_VERSION >= 2405 // USD 24.05+
                                                               HdPrimTypeTokens->geomSubset,
-                                                              UsdGeomTokens->TetMesh,
                                                         #endif
-                                                              UsdGeomTokens->Plane,
                                                               HdPrimTypeTokens->mesh};
         return compliantPrimitives.count(primType) == 1;
     }
