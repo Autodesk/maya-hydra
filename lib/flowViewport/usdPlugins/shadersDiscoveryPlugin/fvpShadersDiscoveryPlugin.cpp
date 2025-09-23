@@ -48,6 +48,7 @@
 
 #include <pxr/usd/usdShade/shader.h>
 #include <pxr/usd/usdShade/shaderDefUtils.h>
+#include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
