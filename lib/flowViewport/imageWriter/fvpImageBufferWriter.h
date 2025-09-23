@@ -54,6 +54,17 @@ public:
     FVP_API
     virtual ~ImageBufferWriter() = default;
 
+    template<typename T>
+    static T* GetPtr(const PXR_NS::VtDictionary& args, const char* key)
+    {
+        auto found = args.find(key);
+        if (found == args.end() || !found->second.IsHolding<T*>()) {
+            return nullptr;
+        }
+    
+        return found->second.Get<T*>();
+    };
+
     //! Factory method to create an image buffer writer.
     FVP_API
     static Ptr Create(

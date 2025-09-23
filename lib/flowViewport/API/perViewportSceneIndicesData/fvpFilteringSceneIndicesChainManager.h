@@ -19,7 +19,6 @@
 
 //Local headers
 #include "flowViewport/api.h"
-#include "flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h"
 
 //Hydra headers
 #include <pxr/imaging/hd/sceneIndex.h>
@@ -29,7 +28,6 @@
 
 namespace FVP_NS_DEF {
 
-class RenderIndexProxy; //Predeclaration
 class ViewportInformationAndSceneIndicesPerViewportData;//Predeclaration
 
 /**Is a singleton to manage the custom filtering scene indices chain which is appended after the merging scene index

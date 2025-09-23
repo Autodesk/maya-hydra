@@ -1,4 +1,4 @@
-// Copyright 2023 Autodesk
+// Copyright 2025 Autodesk
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,17 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#ifndef FVP_RENDER_INDEX_PROXY_FWD_H
-#define FVP_RENDER_INDEX_PROXY_FWD_H
+#ifndef FVP_PURPOSE_RENDER_TAGS_FOR_PASSES_H
+#define FVP_PURPOSE_RENDER_TAGS_FOR_PASSES_H
 
-#include "flowViewport/api.h"
-#include <memory>
+#include <flowViewport/api.h>
+#include <pxr/base/tf/token.h>
 
 namespace FVP_NS_DEF {
 
-class RenderIndexProxy;
-using RenderIndexProxyPtr = std::shared_ptr<RenderIndexProxy>;
+/** Apply this purpose render tag to a hydra primitive to be
+    rendered in the secondary graphic pass.
+*/
+FVP_API
+extern const PXR_NS::TfToken secondaryGraphicsRenderTagToken;
 
-}//End of namespace FVP_NS_DEF
+} // namespace FVP_NS_DEF
 
-#endif //FVP_RENDER_INDEX_PROXY_FWD_H
+#endif // FVP_PURPOSE_RENDER_TAGS_FOR_PASSES_H

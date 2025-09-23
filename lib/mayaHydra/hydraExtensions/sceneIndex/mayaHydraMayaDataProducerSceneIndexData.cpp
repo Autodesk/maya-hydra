@@ -61,9 +61,6 @@ MayaDataProducerSceneIndexData::MayaDataProducerSceneIndexData(FVP_NS_DEF::DataP
     if (_dccNode) {
         SetupDCCNode();
     }
-    //Reset the prefix member which was used only for SetupDCCNode, as for usd stages we add a prefixing scene index outside of flow viewport which holds the prefix.
-    //This is a way to have a common call to MAYAHYDRA_NS::MhDataProducersMayaNodeToSdfPathRegistry::Get().Add in this class.
-    _prefix = SdfPath::AbsoluteRootPath();
     _CreateSceneIndexChainForUsdStageSceneIndex(params);
 }
 

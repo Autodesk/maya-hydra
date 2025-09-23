@@ -19,7 +19,7 @@
 
 //Local headers
 #include "fvpViewportInformationAndSceneIndicesPerViewportData.h"
-#include "flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h"
+#include "flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h"
 #include "flowViewport/sceneIndex/fvpIsolateSelectSceneIndex.h"
 #include "flowViewport/selection/fvpSelectionFwd.h"
 
@@ -48,7 +48,9 @@ public:
  
     //A new Hydra viewport was created, we need inputSceneIndexForCustomFiltering to be used as an input scene index for custom filtering scene indices
     //return true if some data producer scene indices were added
-    bool AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, const Fvp::RenderIndexProxyPtr& renderIndexProxy, 
+    bool AddViewportInformation(const InformationInterface::ViewportInformation& viewportInfo, 
+                                PXR_NS::HdRenderIndex* renderIndex, 
+                                const Fvp::DataProducerMergingSceneIndexProxyPtr& dataProducerMergingSceneIndexProxy, 
                                 const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndexForCustomFiltering);
     
     //A Hydra viewport was deleted

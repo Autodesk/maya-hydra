@@ -28,16 +28,36 @@ class TestCurveTools(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 0.5
 
-    def compareSnapshot(self, referenceFilename, cameraDistance=15):
-        self.setBasicCam(cameraDistance)
-        cmds.refresh()
-        self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
-
     def setUp(self):
         super(TestCurveTools, self).setUp()
         self.setHdStormRenderer()
         cmds.refresh()
+        
+        # Initialize failure tracking
+        self._failures = []
     
+    def compareSnapshot(self, referenceFilename, cameraDistance=15):
+        """Compare snapshot and collect failures instead of stopping on first failure."""
+        try:
+            self.setBasicCam(cameraDistance)
+            cmds.refresh()
+            self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes)
+        except Exception as e:
+            # Collect the failure instead of raising it immediately
+            self._failures.append((referenceFilename, str(e)))
+    
+    def tearDown(self):
+        """Report all collected failures at the end of each test method."""
+        if self._failures:
+            failure_messages = []
+            for filename, error in self._failures:
+                failure_messages.append(f"  - {filename}: {error}")
+            
+            error_msg = f"Image comparison failures in {self._testMethodName}:\n" + "\n".join(failure_messages)
+            self.fail(error_msg)
+        
+        super(TestCurveTools, self).tearDown()
+
     def createCircularArc(self, makeCircularArcNodeType):
         arcNode = cmds.createNode(makeCircularArcNodeType)
         curveNode = cmds.createNode("nurbsCurve")

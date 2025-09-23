@@ -131,8 +131,6 @@ const GfRange3d& MayaHydraShapeAdapter::GetExtent()
     return _extent;
 }
 
-TfToken MayaHydraShapeAdapter::GetRenderTag() const { return HdTokens->geometry; }
-
 void MayaHydraShapeAdapter::PopulateSelectedPaths(
     const MDagPath&                             selectedDag,
     SdfPathVector&                              selectedSdfPaths,

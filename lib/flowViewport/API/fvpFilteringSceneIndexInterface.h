@@ -19,7 +19,6 @@
 
 //Local headers
 #include "flowViewport/api.h"
-#include "flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h"
 #include "flowViewport/API/fvpFilteringSceneIndexClientFwd.h"
 
 //Std headers

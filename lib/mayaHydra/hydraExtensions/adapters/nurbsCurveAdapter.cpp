@@ -19,6 +19,8 @@
 #include <mayaHydraLib/adapters/shapeAdapter.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#include <flowViewport/fvpPurposeRenderTagsForPasses.h>
+
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/pxOsd/tokens.h>
@@ -168,7 +170,7 @@ public:
         return {};
     }
 
-    TfToken GetRenderTag() const override { return HdRenderTagTokens->guide; }
+    TfToken GetRenderTag() const override { return Fvp::secondaryGraphicsRenderTagToken; }
 
 private:
     static void NodeDirtiedCallback(MObject& node, MPlug& plug, void* clientData)

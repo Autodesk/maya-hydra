@@ -130,7 +130,7 @@ void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(
         // Compare data source
         if (compareDataSourceHierarchy) {
             _primHierarchyWidget->setCurrentItem(primQtItem);
-            CompareDataSourceHierarchy(
+            CompareDataSourceHierarchy( primPath,
                 { primPath.GetNameToken(), prim.dataSource }, compareDataSourceValues);
         }
 
@@ -148,8 +148,9 @@ void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(
 }
 
 void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
-    DataSourceEntry rootDataSourceEntry,
-    bool            compareValues)
+    const PXR_NS::SdfPath& primPath,
+    DataSourceEntry        rootDataSourceEntry,
+    bool                   compareValues)
 {
     // Setup traversal data structures (depth-first search)
     QTreeWidgetItemIterator itDataSourceTreeWidget = GetIteratorForTree(_dataSourceHierarchyWidget);
@@ -164,7 +165,7 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
         // Compare data source name
         std::string actualDataSourceName = dataSourceQtItem->text(0).toStdString();
         std::string expectedDataSourceName = dataSourceEntry.name;
-        EXPECT_EQ(actualDataSourceName, expectedDataSourceName);
+        EXPECT_EQ(actualDataSourceName, expectedDataSourceName) << " for prim " << primPath.GetText();
 
         // Compare data source value
         if (compareValues) {

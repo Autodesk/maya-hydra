@@ -56,6 +56,7 @@
 #include <flowViewport/API/fvpDataProducerSceneIndexInterface.h>
 #include <flowViewport/selection/fvpPrefixPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
+#include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 
 //Hydra headers
 #include <pxr/base/vt/array.h>
@@ -68,6 +69,7 @@
 #include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/extentSchema.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -146,6 +148,7 @@ public:
     static MObject     mSize;
     static MObject     mWorldS;
     static MObject     mColor;
+    static MObject     mDrawAsSecondaryGraphics;
 
     static	MTypeId		id;
     static	MString		nodeClassification;
@@ -155,6 +158,10 @@ private:
     float _GetSizeInCentimeters() const;
     ///get the value of the color attribute, returned as a 3D Hydra vector 
     GfVec3f _GetColor() const;
+    /// get the value of the DrawAsSecondaryGraphics attribute, which is a boolean, this is used so that when the mesh is drawn as a secondary graphics
+    // it appears in the secondary graphics pass of maya hydra.
+    // This is used as an example to show how to set primitives as secondary graphics
+    bool _GetDrawAsSecondaryGraphics() const;
     ///Create the Hydra foot print primitives
     void _CreateAndAddFootPrintPrimitives();
     ///Remove the Hydra foot print primitives
@@ -290,7 +297,15 @@ namespace
     static const MPoint corner2( 0.17, 0.0, 0.3 );
     
     //Create the Hydra primitive and add it to the retained scene index
-    void _CreateAndAddPrim(const HdRetainedSceneIndexRefPtr& retainedSceneIndex, const SdfPath& primPath, const VtArray<GfVec3f>& points, const VtIntArray& faceVertexCount, const VtIntArray& faceVertexIndices, const GfVec3f& scale, const GfVec3f& displayColor)
+    void _CreateAndAddPrim(
+        const HdRetainedSceneIndexRefPtr& retainedSceneIndex,
+        const SdfPath&                    primPath,
+        const VtArray<GfVec3f>&           points,
+        const VtIntArray&                 faceVertexCount,
+        const VtIntArray&                 faceVertexIndices,
+        const GfVec3f&                    scale,
+        const GfVec3f&                    displayColor,
+        bool                              drawAsSecondaryGraphics)
     {
         using _PointArrayDs = HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>;
         using _IntArrayDs   = HdRetainedTypedSampledDataSource<VtIntArray>;
@@ -372,6 +387,16 @@ namespace
                 .SetMax(HdRetainedTypedSampledDataSource<GfVec3d>::New(GfVec3d(corner2.x*scaleArray[0], corner2.y*scaleArray[1], corner2.z*scaleArray[2])))
                 .Build(),
 
+            // Create a purpose render tag which is a way to specify how the primitive will be drawn.
+            // If the drawAsSecondaryGraphics is true, it will be drawn in the secondary graphics
+            // render pass.
+            HdPurposeSchemaTokens->purpose,
+            HdPurposeSchema::Builder()
+                .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
+                    (drawAsSecondaryGraphics) ? Fvp::secondaryGraphicsRenderTagToken //Will be drawn as secondary graphics which can be in a separate render pass
+                                              : HdRenderTagTokens->geometry)) ////Will be drawn in the main render pass
+                .Build(),
+            
             //create a mesh
             HdMeshSchemaTokens->mesh,
             meshDs,
@@ -396,7 +421,8 @@ namespace
         if (
             (plug       == MhFootPrint::mSize)  ||
             (parentPlug == MhFootPrint::mColor) ||
-            (plug       == MhFootPrint::mColor)
+            (plug       == MhFootPrint::mColor) || 
+            (plug       == MhFootPrint::mDrawAsSecondaryGraphics)
            ){
                 footPrint->updateFootPrintPrims();
         }
@@ -444,6 +470,7 @@ void nodeRemovedFromModel(MObject& node, void* /* clientData */)
 std::atomic_int MhFootPrint::_counter {0};
 MObject MhFootPrint::mSize;
 MObject MhFootPrint::mColor;
+MObject MhFootPrint::mDrawAsSecondaryGraphics;
 MTypeId MhFootPrint::id( 0x58000994 );
 MString	MhFootPrint::nodeClassification("hydraAPIExample/geometry/footPrint");
 MObject MhFootPrint::mWorldS;
@@ -504,12 +531,30 @@ MhFootPrint::~MhFootPrint()
 void MhFootPrint::_CreateAndAddFootPrintPrimitives() 
 { 
     //Get the value of the size and color attributes
-    const float fSize           = _GetSizeInCentimeters();
-    const GfVec3f displayColor  = _GetColor();
-    const GfVec3f scale         = {fSize,fSize,fSize};//convert size into a 3d uniform scale which we'll convert into a scale matrix
+    const float fSize                   = _GetSizeInCentimeters();
+    const GfVec3f displayColor          = _GetColor();
+    const GfVec3f scale                 = {fSize,fSize,fSize};//convert size into a 3d uniform scale which we'll convert into a scale matrix
+    const bool drawAsSecondaryGraphics  = _GetDrawAsSecondaryGraphics();
 
-    _CreateAndAddPrim(_retainedSceneIndex, _solePath, solePoints, soleFaceVertexCounts, soleFaceVertexIndices, scale, displayColor);
-    _CreateAndAddPrim(_retainedSceneIndex, _heelPath, heelPoints, heelFaceVertexCounts, heelFaceVertexIndices, scale, displayColor);
+    _CreateAndAddPrim(
+        _retainedSceneIndex,
+        _solePath,
+        solePoints,
+        soleFaceVertexCounts,
+        soleFaceVertexIndices,
+        scale,
+        displayColor,
+        drawAsSecondaryGraphics);
+
+    _CreateAndAddPrim(
+        _retainedSceneIndex,
+        _heelPath,
+        heelPoints,
+        heelFaceVertexCounts,
+        heelFaceVertexIndices,
+        scale,
+        displayColor,
+        drawAsSecondaryGraphics);
 }
 
 //Remove the 2 primitives from the retained scene index
@@ -543,7 +588,21 @@ float MhFootPrint::_GetSizeInCentimeters() const
     return 1.0f;
 }
 
-// Retrieve value of the color attribute from the node
+bool MhFootPrint::_GetDrawAsSecondaryGraphics() const
+{
+    const MObject obj = thisMObject();
+    MPlug plug(obj, MhFootPrint::mDrawAsSecondaryGraphics);
+    if (!plug.isNull()) {
+        bool val = false;
+        if (plug.getValue(val)) {
+            return val;
+        }
+    }
+
+    return false;
+}
+
+    // Retrieve value of the color attribute from the node
 GfVec3f MhFootPrint::_GetColor() const
 {
     const MObject obj = thisMObject();
@@ -693,8 +752,13 @@ MStatus MhFootPrint::initialize()
     MAKE_INPUT(nAttr);
     CHECK_MSTATUS ( nAttr.setDefault(0.0, 0.0, 1.0) );
 
+    mDrawAsSecondaryGraphics = nAttr.create("drawAsSecondaryGraphics", "dag", MFnNumericData::kBoolean);
+    MAKE_INPUT(nAttr);
+    CHECK_MSTATUS(nAttr.setDefault(false));
+
     CHECK_MSTATUS ( addAttribute(mSize) );
     CHECK_MSTATUS ( addAttribute(mColor));
+    CHECK_MSTATUS ( addAttribute(mDrawAsSecondaryGraphics));
     CHECK_MSTATUS ( addAttribute(mWorldS));
     
     CHECK_MSTATUS ( attributeAffects(mSize, mWorldS));

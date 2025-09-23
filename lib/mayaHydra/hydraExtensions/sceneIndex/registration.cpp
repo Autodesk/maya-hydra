@@ -18,7 +18,6 @@
 #include "mayaHydraLib/sceneIndex/registration.h"
 #include "mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndex.h"
 
-#include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/fvpUtils.h>
@@ -72,8 +71,8 @@ struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
 
 // MayaHydraSceneIndexRegistration is used to register a scene index for
 // mayaUsdPlugin proxy shape nodes.
-MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy)
-    : _renderIndexProxy(renderIndexProxy)
+MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(const HdSceneIndexBaseRefPtr& dataProducerMergingSceneIndex)
+    : _dataProducerMergingSceneIndex(dataProducerMergingSceneIndex)
 {
     if (!MFnPlugin::isNodeRegistered(kMayaUsdProxyShapeNode)) {
         MGlobal::displayWarning("mayaUsdPlugin not loaded, cannot be registered to Maya Hydra.  Please load mayaUsdPlugin, then switch back to a Maya Hydra viewport renderer.");
@@ -189,7 +188,7 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
 
     registration->dagNode = MObjectHandle(dagNode);
     registration->sceneIndexPathPrefix = sceneIndexPathPrefix(
-        _renderIndexProxy->GetMergingSceneIndex(), dagNode);
+        _dataProducerMergingSceneIndex, dagNode);
         
     //We receive only dag nodes of type MayaUsdProxyShapeNode
     MAYAUSDAPI_NS::ProxyStage proxyStage(dagNode);

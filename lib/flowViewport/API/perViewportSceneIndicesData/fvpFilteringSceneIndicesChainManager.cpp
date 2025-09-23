@@ -19,7 +19,7 @@
 #ifdef CODE_COVERAGE_WORKAROUND
 #include <flowViewport/fvpUtils.h>
 #endif
-#include "flowViewport/sceneIndex/fvpRenderIndexProxy.h"
+
 #include "flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h"
 #include "flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h"
 
@@ -63,7 +63,7 @@ HdSceneIndexBaseRefPtr FilteringSceneIndicesChainManager::createFilteringSceneIn
         return nullptr;//Not an empty filtering scene indices chain
     }
 
-    //Append the filtering scene indices chain to the merging scene index from renderIndexProxy
+    //Append the filtering scene indices chain to the merging scene index
     _AppendFilteringSceneIndicesChain(viewportInformationAndSceneIndicesPerViewportData, inputSceneIndex);
     
     if (viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndex() == nullptr){
@@ -82,10 +82,9 @@ void FilteringSceneIndicesChainManager::destroyFilteringSceneIndicesChain(Viewpo
         return;
     }
 
-    auto renderIndexProxy = viewportInformationAndSceneIndicesPerViewportData.GetRenderIndexProxy();
-    TF_AXIOM(renderIndexProxy);
-    auto& renderIndex = renderIndexProxy->GetRenderIndex();
-    renderIndex.RemoveSceneIndex(lastSceneIndex);//Remove the whole chain from the render index
+    auto renderIndex = viewportInformationAndSceneIndicesPerViewportData.GetRenderIndex();
+    TF_AXIOM(renderIndex);
+    renderIndex->RemoveSceneIndex(lastSceneIndex);//Remove the whole chain from the render index
 
     //Remove a ref on it which should cascade the same on its references
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -115,12 +114,12 @@ void FilteringSceneIndicesChainManager::updateFilteringSceneIndicesChain(const s
             }
         }
 
-        const auto& renderIndexProxy = viewportInformationAndSceneIndicesPerViewportData.GetRenderIndexProxy();
+        auto renderIndex = viewportInformationAndSceneIndicesPerViewportData.GetRenderIndex();
         destroyFilteringSceneIndicesChain(viewportInformationAndSceneIndicesPerViewportData);
         createFilteringSceneIndicesChain(viewportInformationAndSceneIndicesPerViewportData);
         const auto& lastSceneIndex = viewportInformationAndSceneIndicesPerViewportData.GetLastFilteringSceneIndex();
-        TF_AXIOM(lastSceneIndex && renderIndexProxy);
-        renderIndexProxy->GetRenderIndex().InsertSceneIndex(lastSceneIndex, SdfPath::AbsoluteRootPath());
+        TF_AXIOM(lastSceneIndex && renderIndex);
+        renderIndex->InsertSceneIndex(lastSceneIndex, SdfPath::AbsoluteRootPath());
     }
 }
 

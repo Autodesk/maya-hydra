@@ -26,6 +26,7 @@
 #include <maya/MFrameContext.h>
 #include <maya/MString.h>
 
+#include <filesystem>
 #include <string>
 #include <vector>
 namespace MAYAHYDRA_NS_DEF {
@@ -55,6 +56,8 @@ using MtohRendererSettings
 std::string                          MtohGetRendererPluginDisplayName(const pxr::TfToken& id);
 const MtohRendererDescriptionVector& MtohGetRendererDescriptions();
 const MtohRendererSettings&          MtohGetRendererSettings();
+std::filesystem::path                MtohGetMayaHydraPluginLocation();
+void                                 MtohSetMayaHydraPluginLocation(const std::filesystem::path& mayaHydraLocation);
 
 } // namespace MAYAHYDRA_NS_DEF
 

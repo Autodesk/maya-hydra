@@ -18,7 +18,6 @@
 #include "fvpDataProducerSceneIndexInterfaceImp.h"
 #include "fvpInformationInterfaceImp.h"
 #include "flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h"
-#include "flowViewport/sceneIndex/fvpRenderIndexProxy.h"
 
 //Hydra headers
 #include <pxr/imaging/hd/renderIndex.h>
@@ -112,19 +111,19 @@ bool DataProducerSceneIndexInterfaceImp::addDataProducerSceneIndex(const PXR_NS:
 
 void DataProducerSceneIndexInterfaceImp::removeAllViewportDataProducerSceneIndices(ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData)
 {
-    auto& renderIndexProxy = viewportInformationAndSceneIndicesPerViewportData.GetRenderIndexProxy();
-    if(nullptr == renderIndexProxy){
+    auto dataProducerMergingSceneIndexProxy = viewportInformationAndSceneIndicesPerViewportData.GetDataProducerMergingSceneIndexProxy();
+    if (nullptr == dataProducerMergingSceneIndexProxy) {
         return;
     }
 
     auto& dataProducerSceneIndicesDataForthisViewport = viewportInformationAndSceneIndicesPerViewportData.GetDataProducerSceneIndicesData();
 
     for (const auto& dataProducerSceneIndicesData : dataProducerSceneIndicesDataForthisViewport){
-        //Remove it from the render index
+        // Remove the data producer scene index from the merging scene index
         if (dataProducerSceneIndicesData){
             const auto& sceneIndex = dataProducerSceneIndicesData->GetDataProducerLastSceneIndexChain();
             if (sceneIndex){
-                renderIndexProxy->RemoveSceneIndex(sceneIndex);
+                dataProducerMergingSceneIndexProxy->RemoveSceneIndex(sceneIndex);
             }else{
                 TF_CODING_ERROR("dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain() is a nullptr, that should never happen here.");
             }
@@ -254,10 +253,10 @@ void DataProducerSceneIndexInterfaceImp::_AddDataProducerSceneIndexToThisViewpor
     
     dataProducerSceneIndicesDataForthisViewport.insert(dataProducerSceneIndexData);//dataProducerSceneIndexData can be shared between multiple viewports
     
-    //Add it to the merging scene index if the render index proxy is present, it may happen that it will be set later
-    auto renderIndexProxy = viewportInformationAndSceneIndicesPerViewportData->GetRenderIndexProxy();
-    if (renderIndexProxy && dataProducerSceneIndexData && dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain()){
-        renderIndexProxy->InsertSceneIndex(dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain(), dataProducerSceneIndexData->GetPrefix());
+    //Add it to the merging scene index if the merging scene index is present, it may happen that it will be set later
+    auto dataProducerMergingSceneIndexProxy = viewportInformationAndSceneIndicesPerViewportData->GetDataProducerMergingSceneIndexProxy();
+    if (dataProducerMergingSceneIndexProxy && dataProducerSceneIndexData && dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain()){
+        dataProducerMergingSceneIndexProxy->InsertSceneIndex(dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain(), dataProducerSceneIndexData->GetPrefix());
     }
 }
 

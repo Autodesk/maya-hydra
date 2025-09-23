@@ -54,7 +54,7 @@ protected:
         bool compareDataSourceValues = false);
 
     void
-    CompareDataSourceHierarchy(DataSourceEntry rootDataSourceEntry, bool compareValues = false);
+    CompareDataSourceHierarchy(const PXR_NS::SdfPath& primPath, DataSourceEntry rootDataSourceEntry, bool compareValues = false);
 
     void CompareDataSourceValue(pxr::HdSampledDataSourceHandle sampledDataSource);
 

@@ -67,6 +67,8 @@ public:
     virtual void CreateCallbacks() override;
     MAYAHYDRALIB_API
     void SetShadowProjectionMatrix(const GfMatrix4d& matrix);
+    MAYAHYDRALIB_API
+    TfToken GetRenderTag() const override;
     
 protected:
     MAYAHYDRALIB_API

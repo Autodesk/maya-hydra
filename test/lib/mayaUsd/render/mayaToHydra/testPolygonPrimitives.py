@@ -28,10 +28,32 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
 
     _requiredPlugins = ['modelingToolkit']
 
+    def setUp(self):
+        super(TestPolygonPrimitives, self).setUp()
+        
+        # Initialize failure tracking
+        self._failures = []
+
     def compareSnapshot(self, referenceFilename, cameraDistance=15, imageVersion=None):
-        self.setBasicCam(cameraDistance)
-        cmds.refresh()
-        self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+        try:
+            self.setBasicCam(cameraDistance)
+            cmds.refresh()
+            self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+        except Exception as e:
+            # Collect the failure instead of raising it immediately
+            self._failures.append((referenceFilename, str(e)))
+    
+    def tearDown(self):
+        """Report all collected failures at the end of each test method."""
+        if self._failures:
+            failure_messages = []
+            for filename, error in self._failures:
+                failure_messages.append(f"  - {filename}: {error}")
+            
+            error_msg = f"Image comparison failures in {self._testMethodName}:\n" + "\n".join(failure_messages)
+            self.fail(error_msg)
+        
+        super(TestPolygonPrimitives, self).tearDown()
 
     def setupScene(self, polygonCreationCallable):
         self.setHdStormRenderer()
@@ -72,8 +94,8 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr(polyCreatorNodeName + ".axisX", 1)
         cmds.setAttr(polyCreatorNodeName + ".axisY", 2)
         cmds.setAttr(polyCreatorNodeName + ".axisZ", -1)
-        self.compareSnapshot("cube_modified.png")
-
+        self.compareSnapshot(referenceFilename="cube_modified.png", imageVersion=self._imageVersionFor2Passes)
+        
     # Cylinder attributes is a superset of sphere and cone
     def test_PolygonCylinder(self):
         polyCreatorNodeName = self.setupScene(cmds.polyCylinder)
@@ -91,14 +113,14 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         self.compareSnapshot("cylinder_modified.png")
 
         cmds.setAttr(polyCreatorNodeName + ".roundCap", True)
-        self.compareSnapshot("cylinder_roundCap.png")
+        self.compareSnapshot(referenceFilename="cylinder_roundCap.png", imageVersion=self._imageVersionFor2Passes)
 
         cmds.setAttr(polyCreatorNodeName + ".roundCapHeightCompensation", True)
         self.compareSnapshot("cylinder_roundCapHeightCompensation.png")
         
     def test_PolygonTorus(self):
         polyCreatorNodeName = self.setupScene(cmds.polyTorus)
-        self.compareSnapshot("torus_fresh.png", 5)
+        self.compareSnapshot("torus_fresh.png", 5, self._imageVersionFor2Passes)
         
         cmds.setAttr(polyCreatorNodeName + ".radius", 4)
         cmds.setAttr(polyCreatorNodeName + ".sectionRadius", 2)
@@ -109,7 +131,7 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr(polyCreatorNodeName + ".axisX", 1)
         cmds.setAttr(polyCreatorNodeName + ".axisY", 2)
         cmds.setAttr(polyCreatorNodeName + ".axisZ", -1)
-        self.compareSnapshot("torus_modified.png")
+        self.compareSnapshot(referenceFilename="torus_modified.png", imageVersion=self._imageVersionFor2Passes)
 
     def test_PolygonDisc(self):
         polyCreatorNodeName = self.setupScene(cmds.polyDisc)
@@ -127,7 +149,7 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         self.compareSnapshot("disc_subdivision_triangles.png")
 
         cmds.setAttr(polyCreatorNodeName + ".subdivisionMode", 2)
-        self.compareSnapshot("disc_subdivision_pie.png")
+        self.compareSnapshot(referenceFilename="disc_subdivision_pie.png", imageVersion=self._imageVersionFor2Passes)
 
         cmds.setAttr(polyCreatorNodeName + ".subdivisionMode", 3)
         self.compareSnapshot("disc_subdivision_caps.png")
@@ -150,7 +172,7 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.setAttr(polyCreatorNodeName + ".primitive", 1)
         cmds.setAttr(polyCreatorNodeName + ".subdivisionMode", 1)
-        self.compareSnapshot("platonic_cube_triangles.png")
+        self.compareSnapshot(referenceFilename="platonic_cube_triangles.png", imageVersion=self._imageVersionFor2Passes)
 
         cmds.setAttr(polyCreatorNodeName + ".primitive", 2)
         cmds.setAttr(polyCreatorNodeName + ".subdivisionMode", 2)
@@ -158,11 +180,11 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.setAttr(polyCreatorNodeName + ".primitive", 3)
         cmds.setAttr(polyCreatorNodeName + ".subdivisionMode", 3)
-        self.compareSnapshot("platonic_dodecahedron_caps.png")
+        self.compareSnapshot(referenceFilename="platonic_dodecahedron_caps.png", imageVersion=self._imageVersionFor2Passes)
 
         cmds.setAttr(polyCreatorNodeName + ".primitive", 4)
         cmds.setAttr(polyCreatorNodeName + ".subdivisionMode", 1)
-        self.compareSnapshot("platonic_icosahedron_triangles.png")
+        self.compareSnapshot(referenceFilename="platonic_icosahedron_triangles.png", imageVersion=self._imageVersionFor2Passes)
 
     def test_PolygonPyramid(self):
         polyCreatorNodeName = self.setupScene(cmds.polyPyramid)
@@ -202,7 +224,7 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         self.compareSnapshot("prism_5sides.png")
 
         cmds.setAttr(polyCreatorNodeName + ".numberOfSides", 8)
-        self.compareSnapshot("prism_8sides.png")
+        self.compareSnapshot(referenceFilename="prism_8sides.png", imageVersion=self._imageVersionFor2Passes)
 
     def test_PolygonPipe(self):
         polyCreatorNodeName = self.setupScene(cmds.polyPipe)
@@ -228,7 +250,7 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
 
     def test_PolygonHelix(self):
         polyCreatorNodeName = self.setupScene(cmds.polyHelix)
-        self.compareSnapshot("helix_fresh.png", 5)
+        self.compareSnapshot("helix_fresh.png", 5, self._imageVersionFor2Passes)
         
         cmds.setAttr(polyCreatorNodeName + ".coils", 2)
         cmds.setAttr(polyCreatorNodeName + ".height", 5)
@@ -247,11 +269,11 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         self.compareSnapshot("helix_roundCap.png")
 
         cmds.setAttr(polyCreatorNodeName + ".direction", 0)
-        self.compareSnapshot("helix_clockwise.png")
+        self.compareSnapshot(referenceFilename="helix_clockwise.png", imageVersion=self._imageVersionFor2Passes)
 
     def test_PolygonGear(self):
         polyCreatorNodeName = self.setupScene(cmds.polyGear)
-        self.compareSnapshot("gear_fresh.png", 5)
+        self.compareSnapshot("gear_fresh.png", 5, self._imageVersionFor2Passes)
         
         cmds.setAttr(polyCreatorNodeName + ".sides", 10)
         cmds.setAttr(polyCreatorNodeName + ".radius", 5)
@@ -265,7 +287,7 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr(polyCreatorNodeName + ".gearMiddle", 0.75)
         cmds.setAttr(polyCreatorNodeName + ".twist", 10)
         cmds.setAttr(polyCreatorNodeName + ".taper", 1.25)
-        self.compareSnapshot("gear_modified.png")
+        self.compareSnapshot(referenceFilename="gear_modified.png", imageVersion=self._imageVersionFor2Passes)
 
     def test_PolygonSoccerBall(self):
         polyCreatorNodeName = self.setupScene(cmds.polyPrimitive)
@@ -291,13 +313,13 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr(polyCreatorNodeName + ".verticalDivisions", 4)
         cmds.setAttr(polyCreatorNodeName + ".ellipse0", 0.75)
         cmds.setAttr(polyCreatorNodeName + ".ellipse1", 1.25)
-        self.compareSnapshot("superEllipse_modified.png")
+        self.compareSnapshot(referenceFilename="superEllipse_modified.png", imageVersion=self._imageVersionFor2Passes)
 
         cmds.setAttr(polyCreatorNodeName + ".ellipseMirror", True)
-        self.compareSnapshot("superEllipse_mirror.png")
+        self.compareSnapshot(referenceFilename="superEllipse_mirror.png", imageVersion=self._imageVersionFor2Passes)
 
         self.setupSuperShapeHelix(polyCreatorNodeName)
-        self.compareSnapshot("superEllipse_helix.png")
+        self.compareSnapshot(referenceFilename="superEllipse_helix.png", imageVersion=self._imageVersionFor2Passes)
 
     def test_PolygonSphericalHarmonics(self):
         polyCreatorNodeName = self.setupScene(self.getSuperShapeCreationCallable("SphericalHarmonics"))
@@ -315,12 +337,14 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr(polyCreatorNodeName + ".harmonics5", 2)
         cmds.setAttr(polyCreatorNodeName + ".harmonics6", 0.1)
         cmds.setAttr(polyCreatorNodeName + ".harmonics7", 2)
-        self.compareSnapshot("sphericalHarmonics_modified.png")
+        self.compareSnapshot(referenceFilename="sphericalHarmonics_modified.png", imageVersion=self._imageVersionFor2Passes)
 
         self.setupSuperShapeHelix(polyCreatorNodeName)
         imageVersion = None
         if(os.getenv('MAYA_HAS_RENDER_ITEM_CULL_MODE_API', 'NOT-FOUND') in ('1', 'TRUE')):
             imageVersion = "RenderItemHasCullModeAPI"
+            if self._imageVersionFor2Passes != None:
+                imageVersion = "RenderItemHasCullModeAPI_"+self._imageVersionFor2Passes
         self.compareSnapshot("sphericalHarmonics_helix.png", 15, imageVersion)
 
     def test_PolygonUltra(self):
@@ -349,12 +373,15 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr(polyCreatorNodeName + ".ultra13", 2) # Vertical Exponent 3
         cmds.setAttr(polyCreatorNodeName + ".ultra14", 2) # Vertical Exponent 4
         cmds.setAttr(polyCreatorNodeName + ".ultra15", 1.5) # Vertical Exponent 5
-        self.compareSnapshot("ultra_modified.png")
+
+        self.compareSnapshot(referenceFilename="ultra_modified.png", imageVersion=self._imageVersionFor2Passes)
 
         self.setupSuperShapeHelix(polyCreatorNodeName)
         imageVersion = None
         if(os.getenv('MAYA_HAS_RENDER_ITEM_CULL_MODE_API', 'NOT-FOUND') in ('1', 'TRUE')):
             imageVersion = "RenderItemHasCullModeAPI"
+            if self._imageVersionFor2Passes != None:
+                imageVersion = "RenderItemHasCullModeAPI_"+self._imageVersionFor2Passes
         self.compareSnapshot("ultra_helix.png", 15 , imageVersion)
 
 if __name__ == '__main__':
