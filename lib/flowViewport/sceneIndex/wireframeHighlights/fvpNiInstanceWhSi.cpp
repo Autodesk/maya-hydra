@@ -82,7 +82,7 @@ HdSceneIndexPrim NiInstanceWhSi::GetHighlightPrim(const SdfPath &selectionPath, 
         prototypeXform = prototypeMatrixDS->GetTypedValue(0);
     } else {
         TF_WARN(
-            "Prototype Prim %s (selection %s) has no xform matrix datasource, using identity.",
+            "Prototype Prim %s (selection %s) has no matrix, using identity.",
             originalPath.GetText(),
             selectionPath.GetText());
     }
