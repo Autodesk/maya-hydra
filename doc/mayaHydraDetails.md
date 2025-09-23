@@ -87,7 +87,7 @@ classDiagram
     -_rendererPlugin: HdRendererPlugin*
     -_taskController: HdxTaskController*
     -_renderDelegate: HdPluginRenderDelegateUniqueHandle
-    -_renderIndexProxy: std::unique_ptr<Fvp::RenderIndexProxy>
+    -_dataProducerMergingSceneIndexProxy: std::shared_ptr<Fvp::DataProducerMergingSceneIndexProxy>
     -_renderIndex: HdRenderIndex*
     -_fvpSelectionTracker: Fvp::SelectionTrackerSharedPtr
     -_selectionSceneIndex: Fvp::SelectionSceneIndexRefPtr

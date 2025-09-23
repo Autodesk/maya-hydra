@@ -80,7 +80,14 @@ void DataProducerSceneIndexDataBase::_CreateSceneIndexChainForDataProducerSceneI
                 Make<HdFlattenedVisibilityDataSourceProvider>(),
                 HdXformSchema::GetSchemaToken(),
                 Make<HdFlattenedXformDataSourceProvider>());
-        _lastSceneIndexChain = HdFlatteningSceneIndex::New(_lastSceneIndexChain, flattenDataSource);
+
+        HdSceneIndexBaseRefPtr inputSceneIndex = HdFlatteningSceneIndex::New(_lastSceneIndexChain, flattenDataSource);
+        if ((!_prefix.IsEmpty()) && (_prefix != SdfPath::AbsoluteRootPath())) {
+            // Add a prefixing scene index to inputSceneIndex
+            inputSceneIndex = HdPrefixingSceneIndex::New(inputSceneIndex, _prefix);
+        }
+
+        _lastSceneIndexChain = inputSceneIndex;
     }
     else{
         _CreateSceneIndexChainForDataProducerSceneIndexWithoutDCCNode(_dataProducerSceneIndex);

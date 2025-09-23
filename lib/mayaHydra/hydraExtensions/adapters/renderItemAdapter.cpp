@@ -58,12 +58,14 @@ MayaHydraRenderItemAdapter::MayaHydraRenderItemAdapter(
     const SdfPath&        slowId,
     int                   fastId,
     MayaHydraSceneIndex*  mayaHydraSceneIndex,
-    const MRenderItem&    ri)
+    const MRenderItem&    ri,
+    TfToken              purposeRenderTag)
     : MayaHydraAdapter(MObject(), slowId, mayaHydraSceneIndex)
     , _dagPath(dagPath)
     , _primitive(ri.primitive())
     , _name(ri.name())
     , _fastId(fastId)
+    , _purposeRenderTag(purposeRenderTag)
 #ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API
     , _cullMode(ri.cullMode())
 #endif
@@ -73,7 +75,10 @@ MayaHydraRenderItemAdapter::MayaHydraRenderItemAdapter(
 
 MayaHydraRenderItemAdapter::~MayaHydraRenderItemAdapter() { _RemoveRprim(); }
 
-TfToken MayaHydraRenderItemAdapter::GetRenderTag() const { return HdRenderTagTokens->geometry; }
+TfToken MayaHydraRenderItemAdapter::GetRenderTag() const
+{
+    return _purposeRenderTag;
+}
 
 void MayaHydraRenderItemAdapter::UpdateTransform(const MRenderItem& ri)
 {

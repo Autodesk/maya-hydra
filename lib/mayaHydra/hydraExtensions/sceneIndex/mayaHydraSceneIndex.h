@@ -54,10 +54,6 @@
 
 #include <unordered_map>
 
-namespace FVP_NS_DEF {
-class RenderIndexProxy;
-}
-
 UFE_NS_DEF {
 class Path;
 }
@@ -68,12 +64,10 @@ struct MayaHydraInitData
 {
     MayaHydraInitData(
         TfToken            nameIn,
-        HdEngine&          engineIn,
         HdRenderIndex&     renderIndexIn,
         const SdfPath&     delegateIDIn,
         bool               isHdStIn)
         : name(nameIn)
-        , engine(engineIn)
         , renderIndex(renderIndexIn)
         , delegateID(delegateIDIn)
         , isHdSt(isHdStIn)
@@ -81,7 +75,6 @@ struct MayaHydraInitData
     }
 
     TfToken            name;
-    HdEngine&          engine;
     HdRenderIndex&     renderIndex;
     SdfPath            delegateID;
     bool               isHdSt;
@@ -184,8 +177,6 @@ public:
     VtValue GetMaterialResource(const SdfPath& id);
 
     GfInterval GetCurrentTimeSamplingInterval() const;
-
-    HdChangeTracker& GetChangeTracker();
 
     HdRenderIndex& GetRenderIndex() { return _renderIndex; }
 

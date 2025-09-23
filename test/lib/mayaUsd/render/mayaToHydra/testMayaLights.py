@@ -45,15 +45,21 @@ class TestMayaLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
         #Turn on/off shadows
         cmds.modelEditor(panel, edit=True, shadows=shadowOn)
 
+        #Deal with 2 render passes
+        img_version = None
+        frame_passes_count = self.framePassesCount
+        if frame_passes_count == 2:
+            img_version = "two_passes"
+
         #All Lights mode
         cmds.modelEditor(panel, edit=True, displayLights="all")
         cmds.refresh()
-        self.assertSnapshotClose("allLights" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("allLights" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
 
         #Default Light mode
         cmds.modelEditor(panel, edit=True, displayLights="default")
         cmds.refresh()
-        self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
 
         #Selected Light mode
         cmds.modelEditor(panel, edit=True, displayLights="selected")
@@ -61,31 +67,31 @@ class TestMayaLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
         #Use Directional Light
         cmds.select( 'directionalLight1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("directionalLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("directionalLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
 
         #Use Point Light
         #TODO: Enable shadowOn test on point light when it works
         if not shadowOn:
             cmds.select( 'pointLight1', r=True )
             cmds.refresh()
-            self.assertSnapshotClose("pointLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("pointLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
 
         #Use Spot Light
         cmds.select( 'spotLight1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("spotLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("spotLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
 
         #Flat Light mode
         #TODO: Enable test on flat lighting mode when it works
         #cmds.modelEditor(panel, edit=True, displayLights="flat")
         #cmds.refresh()
-        #self.assertSnapshotClose("flatLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        #self.assertSnapshotClose("flatLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
 
         #No Light mode
         if not shadowOn:
             cmds.modelEditor(panel, edit=True, displayLights="none")
             cmds.refresh()
-            self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
 
     #Test maya lights (e.g., default,directional,point,spot,etc.) with a maya native sphere and usd sphere.
     def test_MayaLights(self):

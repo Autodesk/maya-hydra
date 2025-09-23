@@ -44,7 +44,7 @@ public:
     sceneIndexRegistry() const = 0;
 
     MAYAHYDRALIB_API
-    virtual PXR_NS::HdRenderIndex* renderIndex() const = 0;
+    virtual PXR_NS::HdRenderIndex* renderIndex(int passIndex = 0) const = 0;
 };
 
 }
