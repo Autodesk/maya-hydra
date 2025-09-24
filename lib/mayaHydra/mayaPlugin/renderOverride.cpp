@@ -1694,7 +1694,7 @@ void MtohRenderOverride::_InitHydraResources(
         _isUsingHdSt
     );
 
-    // Data producer mering scene index sets up the Flow Viewport merging scene index, must
+    // Data producer merging scene index sets up the Flow Viewport merging scene index, must
     // be created first, as it is required for:
     // - Selection scene index, which uses the Flow Viewport merging scene
     //   index as input.
