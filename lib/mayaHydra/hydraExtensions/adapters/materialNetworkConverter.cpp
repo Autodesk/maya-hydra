@@ -139,7 +139,11 @@ TfToken GetOutputName(const HdMaterialNode& material, SdfValueTypeName type)
     if (SdrShaderNodeConstPtr sdrNode = shaderReg.GetShaderNodeByIdentifier(material.identifier)) {
         // First, get the list off all outputs of the correct type.
         std::vector<TfToken> validOutputs;
-        auto                 outputNames = sdrNode->GetOutputNames();
+#if PXR_VERSION >= 2508
+        auto outputNames = sdrNode->GetShaderOutputNames();
+#else
+        auto outputNames = sdrNode->GetOutputNames();
+#endif
 
         auto addMatchingOutputs = [&](SdfValueTypeName matchingType) {
             for (const auto& outName : outputNames) {
@@ -1241,11 +1245,19 @@ const MayaHydraShaderParams& MayaHydraMaterialNetworkConverter::GetPreviewShader
             SdrShaderNodeConstPtr sdrNode
                 = shaderReg.GetShaderNodeByIdentifier(UsdImagingTokens->UsdPreviewSurface);
             if (TF_VERIFY(sdrNode)) {
+#if PXR_VERSION >= 2508
+                auto inputNames = sdrNode->GetShaderInputNames();
+#else
                 auto inputNames = sdrNode->GetInputNames();
+#endif
                 _previewShaderParams.reserve(inputNames.size());
 
                 for (auto& inputName : inputNames) {
+#if PXR_VERSION >= 2508
+                    auto property = sdrNode->GetShaderInput(inputName);
+#else
                     auto property = sdrNode->GetInput(inputName);
+#endif
                     if (!TF_VERIFY(property)) {
                         continue;
                     }

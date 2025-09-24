@@ -27,6 +27,7 @@ If OpenUSD was not built with the same version of Python as the one used in your
 | 2024                 | 3.10.8           |
 | 2025                 | 3.11.4           |
 | 2026                 | 3.11.9           |
+| PR                 | 3.13.3           |
 
 So for Maya 2024, we need to rebuild OpenUSD with Python 3.10.8.<br>
 To do so, you need to clone the OpenUSD repository and checkout the version used by MayaUsd and MayaHydra which is [v24.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v24.11-MayaUsd-Public).<br>
