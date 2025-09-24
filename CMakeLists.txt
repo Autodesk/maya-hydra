@@ -127,6 +127,10 @@ if (CMAKE_WANT_MATERIALX_BUILD)
 endif()
 include(cmake/usd.cmake)
 
+# Avoid re-invoking OpenUSD's pxrConfig.cmake from subprojects (e.g., hydra-viewport-toolbox)
+# which can lead to duplicate imported targets like TBB::tbb.
+set(pxr_FOUND TRUE)
+
 set(CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE FALSE)
 if (DEFINED PXR_USD_LOCATION)
     file(GLOB_RECURSE STRING_UTILS_HEADER_PATH
