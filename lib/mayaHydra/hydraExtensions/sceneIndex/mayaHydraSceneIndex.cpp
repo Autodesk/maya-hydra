@@ -598,6 +598,9 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
             MDagPath dagPath(ri.sourceDagPath());
             ria = std::make_shared<MayaHydraRenderItemAdapter>(dagPath, slowId, fastId, this, ri);
 
+            // Handle custom attribute changes
+            ria->CreateCallbacks();
+
             //Update the render item adapter if this render item is an aiSkydomeLight shape
             ria->SetIsRenderITemAnaiSkydomeLightTriangleShape(isRenderItem_aiSkyDomeLightTriangleShape(ri));
 

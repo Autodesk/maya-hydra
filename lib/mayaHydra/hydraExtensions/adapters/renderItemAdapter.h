@@ -176,6 +176,9 @@ public:
     bool Illuminated() const override;
 
     MAYAHYDRALIB_API
+    void CreateCallbacks() override;
+
+    MAYAHYDRALIB_API
     SdfPath& GetMaterial() { return _material; }
 
     MAYAHYDRALIB_API

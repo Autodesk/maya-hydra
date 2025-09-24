@@ -34,6 +34,7 @@
 
 #include <maya/MAnimControl.h>
 #include <maya/MDGContextGuard.h>
+#include <maya/MNodeMessage.h>
 
 #include <functional>
 
@@ -594,6 +595,24 @@ bool MayaHydraRenderItemAdapter::Illuminated() const
         MHWRender::MGeometry::Primitive::kLines != _primitive
         && MHWRender::MGeometry::Primitive::kLineStrip != _primitive
         && MHWRender::MGeometry::Primitive::kPoints != _primitive);
+}
+
+void MayaHydraRenderItemAdapter::CreateCallbacks()
+{
+    MStatus status;
+    auto attributesChanged = MNodeMessage::addAttributeChangedCallback(
+        GetDagPath().node(),
+        +[](MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+            auto* adapter = reinterpret_cast<MayaHydraRenderItemAdapter*>(clientData);
+            // Handle extension attributes change
+            adapter->HandleExtensionAttributesDirty(plug);
+        },
+        reinterpret_cast<void*>(this),
+        &status);
+
+    if (status) {
+        AddCallback(attributesChanged);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////
