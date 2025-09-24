@@ -199,7 +199,11 @@ surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 	
     vec3 directLight = vec3(0.0);
 	vec3 indirectLight = vec3(0.0);//For dome light
-    float glossiness = 30.0;//Hardcoded
+    float glossiness = 30.0;//Hardcoded (Blinn-Phong exponent for direct specular)
+    // Convert Blinn-Phong exponent to microfacet roughness in [0,1] for IBL.
+    // This keeps indirect lighting stable across USD versions which assume
+    // roughness in [0,1] for BRDF lookup and reflection LOD.
+    float roughness = clamp(sqrt(2.0 / (glossiness + 2.0)), 0.0, 1.0);
 	float ior = 1.5; //Hardcoded
 	float metallic = 0.0;//Hardcoded
 	float occlusion = 1.0;//Hardcoded
@@ -224,7 +228,7 @@ surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 		float atten = lightDistanceAttenuation(Peye, i);
 		float spot = lightSpotAttenuation(l, i);
 
-		float intensity = 1.0 * atten * spot;
+		float intensity = atten * spot;
 
 		vec3 lightDiffuseIrradiance = intensity * light.diffuse.rgb;
 		vec3 lightSpecularIrradiance = intensity * light.specular.rgb;
@@ -243,7 +247,7 @@ surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
             LightingContributions indirectLightContrib = 
                 evaluateIndirectLighting(diffuseColor, specularColor,
                     Neye, Reye, NdotE, EdotH, ior, metallic, occlusion,
-                    glossiness, useSpecularWorkflow,
+                    roughness, useSpecularWorkflow,
                     clearcoatAmount, clearcoatColor, clearcoatRoughness,
                     light.worldToLightTransform);
             indirectLight += (indirectLightContrib.diffuse * light.diffuse.rgb 

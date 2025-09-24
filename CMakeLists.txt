@@ -92,7 +92,9 @@ include(cmake/flowViewport_version.info)
 set(FLOWVIEWPORT_VERSION "${FLOWVIEWPORT_MAJOR_VERSION}.${FLOWVIEWPORT_MINOR_VERSION}.${FLOWVIEWPORT_PATCH_LEVEL}")
 
 set(DEFAULT_PYTHON_3_VERSION 3.10)
-if (MAYA_APP_VERSION VERSION_GREATER 2024)
+if (MAYA_APP_VERSION VERSION_GREATER 2026)
+    set(DEFAULT_PYTHON_3_VERSION 3.13)
+elseif (MAYA_APP_VERSION VERSION_GREATER 2024)
     set(DEFAULT_PYTHON_3_VERSION 3.11)
 endif()
 if (NOT BUILD_WITH_PYTHON_3_VERSION)
@@ -124,6 +126,10 @@ if (CMAKE_WANT_MATERIALX_BUILD)
     endif()
 endif()
 include(cmake/usd.cmake)
+
+# Avoid re-invoking OpenUSD's pxrConfig.cmake from subprojects (e.g., hydra-viewport-toolbox)
+# which can lead to duplicate imported targets like TBB::tbb.
+set(pxr_FOUND TRUE)
 
 set(CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE FALSE)
 if (DEFINED PXR_USD_LOCATION)

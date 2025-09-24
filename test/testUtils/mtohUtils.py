@@ -192,14 +192,14 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         self.cubeShape = cmds.listRelatives(self.cubeTrans)[0]
         self.setHdStormRenderer()
         self.assertNodeNameInIndex(self.cubeShape)
-        # The single Maya cube shape maps to two rprims.
-        # If using MeshAdapter, the mesh is the first prim (pCubeShape1)
-        # If using RenderItemAdapter, the mesh is the second prim (StandardShadedItem)
-        # The list is ordered, as the Hydra call made is HdRenderIndex::GetRprimIds(), 
-        # which sorts according to std::less<SdfPath>, which will produce
-        # lexicographically-ordered paths.
-        useMeshAdapter = os.getenv('MAYA_HYDRA_USE_MESH_ADAPTER', 0)
-        self.cubeRprim = self.getIndex()[0] if useMeshAdapter else self.getIndex()[1]
+        index_list = self.getIndex()
+        # Get the cube prim by ignoring the prims whose name contains DormantPolywire
+        cubePrims = [p for p in index_list if 'dormantpolywire' not in p.lower()]
+        if cubePrims:
+            self.cubeRprim = cubePrims[0]
+        else:
+            self.fail("Expected a non-DormantPolyWire prim, but none was found")
+        
         cmds.select(clear=1)
         cmds.refresh()
         self.assertVisible(self.cubeRprim)

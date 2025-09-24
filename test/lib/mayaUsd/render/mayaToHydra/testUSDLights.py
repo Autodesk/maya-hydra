@@ -40,37 +40,36 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
         cmds.refresh()
         self.assertSnapshotClose("allLights" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-        #TODO: Enable code below when those lighting modes are supported by usd lights
         #Default Light mode
-        #cmds.modelEditor(panel, edit=True, displayLights="default")
-        #cmds.refresh()
-        #self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        cmds.modelEditor(panel, edit=True, displayLights="default")
+        cmds.refresh()
+        self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Selected Light mode
-        #cmds.modelEditor(panel, edit=True, displayLights="selected")
-        #cmds.select( clear=True )
+        cmds.modelEditor(panel, edit=True, displayLights="selected")
+        cmds.select( clear=True )
 
-        #cmds.select( 'distantLight1', r=True )
-        #cmds.refresh()
-        #self.assertSnapshotClose("directionalLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DistantLight1', r=True )
+        cmds.refresh()
+        self.assertSnapshotClose("distantLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-        #cmds.select( 'diskLight1', r=True )
-        #cmds.refresh()
-        #self.assertSnapshotClose("pointLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DiskLight1', r=True )
+        cmds.refresh()
+        self.assertSnapshotClose("diskLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
-        #cmds.select( 'domeLight1', r=True )
-        #cmds.refresh()
-        #self.assertSnapshotClose("spotLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DomeLight1', r=True )
+        cmds.refresh()
+        self.assertSnapshotClose("domeLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Flat Light mode
-        #cmds.modelEditor(panel, edit=True, displayLights="flat")
-        #cmds.refresh()
-        #self.assertSnapshotClose("flatLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        cmds.modelEditor(panel, edit=True, displayLights="flat")
+        cmds.refresh()
+        self.assertSnapshotClose("flatLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #No Light mode
-        #cmds.modelEditor(panel, edit=True, displayLights="none")
-        #cmds.refresh()
-        #self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        cmds.modelEditor(panel, edit=True, displayLights="none")
+        cmds.refresh()
+        self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     #Test usd lights (e.g., disk,distant,dome,etc.) with a maya native sphere and usd sphere.
     def test_USDLights(self):
