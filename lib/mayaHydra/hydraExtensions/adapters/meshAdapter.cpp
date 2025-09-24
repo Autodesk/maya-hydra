@@ -455,6 +455,8 @@ public:
 
     bool HasType(const TfToken& typeId) const override { return typeId == HdPrimTypeTokens->mesh; }
 
+    TfToken GetRenderTag() const override { return HdRenderTagTokens->geometry; }
+
 private:
     static void NodeDirtiedCallback(MObject& node, MPlug& plug, void* clientData)
     {

@@ -20,8 +20,12 @@
 //Local headers
 #include "flowViewport/api.h"
 #include "flowViewport/API/fvpInformationInterface.h"
-#include "flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h"
+#include "flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h"
 #include "fvpDataProducerSceneIndexDataBase.h"
+
+PXR_NAMESPACE_OPEN_SCOPE
+class HdRenderIndex;
+PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace FVP_NS_DEF {
 
@@ -33,13 +37,15 @@ class ViewportInformationAndSceneIndicesPerViewportData
 {
 public:
     ViewportInformationAndSceneIndicesPerViewportData(const InformationInterface::ViewportInformation& viewportInformation, 
-                                                      const Fvp::RenderIndexProxyPtr& renderIndexProxy);
+                                                      PXR_NS::HdRenderIndex* renderIndex,
+                                                      const Fvp::DataProducerMergingSceneIndexProxyPtr& dataProducerMergingSceneIndexProxy);
     ~ViewportInformationAndSceneIndicesPerViewportData();
     
     const InformationInterface::ViewportInformation& GetViewportInformation()const { return _viewportInformation;}
     PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndex() {return _lastFilteringSceneIndex;}
     const PXR_NS::HdSceneIndexBaseRefPtr& GetLastFilteringSceneIndex() const {return _lastFilteringSceneIndex;}
-    const Fvp::RenderIndexProxyPtr GetRenderIndexProxy() const {return _renderIndexProxy;}
+    PXR_NS::HdRenderIndex* GetRenderIndex() const { return _renderIndex; }
+    const Fvp::DataProducerMergingSceneIndexProxyPtr GetDataProducerMergingSceneIndexProxy() const { return _dataProducerMergingSceneIndexProxy; }
     void SetInputSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex) {_inputSceneIndex = inputSceneIndex;}
     const PXR_NS::HdSceneIndexBaseRefPtr&   GetInputSceneIndex() const {return _inputSceneIndex;}
     const std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr>& GetDataProducerSceneIndicesData() const {return _dataProducerSceneIndicesData;}
@@ -52,7 +58,8 @@ public:
         _dataProducerSceneIndicesData = other._dataProducerSceneIndicesData;
         _inputSceneIndex = other._inputSceneIndex;
         _lastFilteringSceneIndex = other._lastFilteringSceneIndex;
-        _renderIndexProxy = other._renderIndexProxy;
+        _renderIndex = other._renderIndex;
+        _dataProducerMergingSceneIndexProxy = other._dataProducerMergingSceneIndexProxy;
         return *this;
     }
 
@@ -69,8 +76,11 @@ private:
     /// The last scene index of the custom filtering scene indices chain for this viewport
     PXR_NS::HdSceneIndexBaseRefPtr                                          _lastFilteringSceneIndex {nullptr};
     
-    ///Is a render index proxy per viewport to avoid accessing directly the render index
-    Fvp::RenderIndexProxyPtr                                                _renderIndexProxy {nullptr};
+    ///Is a render index per viewport
+    PXR_NS::HdRenderIndex*                                                  _renderIndex { nullptr };
+
+    /// Is a merging scene index per viewport to merge all data producer scene indices
+    Fvp::DataProducerMergingSceneIndexProxyPtr                              _dataProducerMergingSceneIndexProxy { nullptr };
 
     /// When the render proxy is added to this class, we may have to apply all the _dataProducerSceneIndicesData to this viewport, this is what this function does.
     void _AddAllDataProducerSceneIndexToMergingSCeneIndex();

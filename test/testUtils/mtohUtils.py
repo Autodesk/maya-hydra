@@ -96,6 +96,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         #Set the usd version
         cls._usdVersion = Usd.GetVersion()
         
+        # Set the image version for 2 passes once per test file
+        cls._imageVersionFor2Passes = None
+        
     def setUp(self):
         # Maya is not closed/reset between each test of a test suite,
         # so open a new file before each test to minimize leftovers
@@ -105,6 +108,16 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         assert not modified, 'Internal test framework error: scene left as modified by mayaUtils.openNewScene()'
 
         self.setHdStormRenderer()
+
+        # Store the frame passes count as a member variable to avoid repeated command calls
+        self.framePassesCount = cmds.mayaHydraGetFramePassesCount()
+        
+        # Set the image version for 2 passes once per test file
+        if self.__class__._imageVersionFor2Passes is None:
+            if self.framePassesCount == 2:
+                self.__class__._imageVersionFor2Passes = "two_passes"
+            else:
+                self.__class__._imageVersionFor2Passes = None
 
         # We've just opened a new scene, so we should not be modified.  Setting
         # Storm as the renderer should conceptually not change that status, but

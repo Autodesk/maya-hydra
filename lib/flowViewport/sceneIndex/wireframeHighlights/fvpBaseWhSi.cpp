@@ -14,9 +14,9 @@
 //
 
 #include "fvpBaseWhSi.h"
-
-#include <flowViewport/fvpUtils.h>
-#include <flowViewport/tokens.h>
+#include "flowViewport/fvpUtils.h"
+#include "flowViewport/tokens.h"
+#include "flowViewport/fvpPurposeRenderTagsForPasses.h"
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/staticTokens.h>
@@ -33,6 +33,7 @@
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
@@ -367,6 +368,13 @@ HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& 
                             HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{color}),
                             HdPrimvarSchemaTokens->constant,
                             HdPrimvarSchemaTokens->color));
+
+    //  Secondary graphics purpose render tag data source
+    edited.Set(HdPurposeSchema::GetDefaultLocator(),
+                HdPurposeSchema::Builder()
+                .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
+                    Fvp::secondaryGraphicsRenderTagToken))
+                .Build());
 
     //Is the prim having a DisplayStyle schema?
     if (HdLegacyDisplayStyleSchema styleSchema =

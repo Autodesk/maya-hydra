@@ -19,6 +19,7 @@
 #include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {

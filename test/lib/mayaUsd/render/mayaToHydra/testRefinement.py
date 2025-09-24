@@ -37,8 +37,14 @@ class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
         #modify light intensity for usd 24.11+
         self.modifyDefaultLightIntensityByUsdVersion()
 
-    def verifySnapshot(self, imageName, imageVersion=None):
+    def verifySnapshot(self, imageName, useDynamicVersion=False):
         cmds.refresh()
+        imageVersion = None
+        if useDynamicVersion:
+            frame_passes_count = self.framePassesCount
+            if frame_passes_count == 2:
+                imageVersion = "two_passes"
+                
         self.assertSnapshotClose(imageName, 
                                  self.IMAGEDIFF_FAIL_THRESHOLD,
                                  self.IMAGEDIFF_FAIL_PERCENT,
@@ -85,25 +91,25 @@ class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 0)
         cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
-        self.verifySnapshot("basisCurves_refined_0.png")
+        self.verifySnapshot(imageName="basisCurves_refined_0.png", useDynamicVersion=True)
 
         cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 1)
         cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
-        self.verifySnapshot("basisCurves_refined_1.png")
+        self.verifySnapshot(imageName="basisCurves_refined_1.png", useDynamicVersion=True)
 
         cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 2)
         cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
-        self.verifySnapshot("basisCurves_refined_2.png")
+        self.verifySnapshot(imageName="basisCurves_refined_2.png", useDynamicVersion=True)
 
         image_version = 'USD2508+' if self._usdVersion >= (0, 25, 8) else None
         cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 3)
         cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
-        self.verifySnapshot("basisCurves_refined_3.png", image_version)
+        self.verifySnapshot(imageName="basisCurves_refined_3.png", useDynamicVersion=True)
 
         #restore the default
         cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 0)
         cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
-        self.verifySnapshot("basisCurves_refined_0.png")
+        self.verifySnapshot(imageName="basisCurves_refined_0.png", useDynamicVersion=True)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

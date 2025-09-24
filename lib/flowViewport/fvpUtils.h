@@ -26,6 +26,7 @@
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/sceneIndex.h>
 
 namespace FVP_NS_DEF {
 

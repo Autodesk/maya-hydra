@@ -158,8 +158,10 @@ bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath);
  *
  * @return true if the object is a light, false otherwise
  */
+MAYAHYDRALIB_API
 bool IsDagPathALight(const MDagPath& dagPath);
 
 } // namespace MAYAHYDRA_NS_DEF
+
 
 #endif // MAYAHYDRALIB_MAYA_UTILS_H
