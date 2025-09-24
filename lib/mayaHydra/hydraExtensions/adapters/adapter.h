@@ -87,7 +87,7 @@ public:
 
     bool IsPopulated() const { return _isPopulated; }
 
-    void HandleExtensionAttributesDirty();
+    void HandleExtensionAttributesDirty(const MPlug& plug);
 
     MAYAHYDRALIB_API
     virtual HdMeshTopology GetMeshTopology() { return {}; }
@@ -125,6 +125,7 @@ protected:
     MayaHydraSceneIndex*     _mayaHydraSceneIndex;
     MObject                  _node;
     VtDictionary             _extAttrNameToValueMap;
+    bool                     _extAttrMapNeedUpdate { true };
 
     bool _isPopulated = false;
 };

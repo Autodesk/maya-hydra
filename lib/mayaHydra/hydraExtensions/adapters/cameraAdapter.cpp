@@ -103,7 +103,7 @@ void MayaHydraCameraAdapter::CreateCallbacks()
         +[](MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
             auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
             // Handle extension attributes change
-            adapter->HandleExtensionAttributesDirty();
+            adapter->HandleExtensionAttributesDirty(plug);
         },
         reinterpret_cast<void*>(this),
         &status);
