@@ -601,8 +601,9 @@ bool MayaHydraRenderItemAdapter::Illuminated() const
 void MayaHydraRenderItemAdapter::CreateCallbacks()
 {
     MStatus status;
+    auto obj = GetNode();
     auto attributesChanged = MNodeMessage::addAttributeChangedCallback(
-        GetDagPath().node(),
+        obj,
         +[](MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
             auto* adapter = reinterpret_cast<MayaHydraRenderItemAdapter*>(clientData);
             // Handle extension attributes change
