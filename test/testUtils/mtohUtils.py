@@ -55,7 +55,8 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     # with "cannot be unloaded because it is still in use" error.
     # Unloading modelingToolkit fails with a
     # "Dynamic unloading is not currently supported." error
-    _pluginsCantUnload = ['mayaHydraFlowViewportAPILocator', 'mtoa', 'modelingToolkit']
+    # mayaUsdPlugin looged as HYDRA-1896, we should remove this when HYDRA-1896 is fixed
+    _pluginsCantUnload = ['mayaHydraFlowViewportAPILocator', 'mtoa', 'modelingToolkit', 'mayaUsdPlugin']
 
     @classmethod
     def setUpClass(cls):
