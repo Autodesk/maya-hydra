@@ -356,6 +356,9 @@ bool dataSourceMatchesReference(
     std::stringstream outputDump;
     outputDump << outputFile.rdbuf();
     std::string outputString = outputDump.str();
+    // Remove carriage returns from the string in case there's any
+    outputString.erase(
+        std::remove(outputString.begin(), outputString.end(), '\r'), outputString.end());
 
     std::ifstream     referenceFile(referencePath);
     std::stringstream referenceDump;
@@ -364,7 +367,6 @@ bool dataSourceMatchesReference(
 
     // Remove carriage returns from the reference string, as these can sometimes be 
     // inadvertently/automatically added to the reference files stored in git.
-    // The test outputs always use line feeds only, so no need to do it for those.
     referenceString.erase(
         std::remove(referenceString.begin(), referenceString.end(), '\r'), referenceString.end());
 
