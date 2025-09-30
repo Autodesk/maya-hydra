@@ -357,8 +357,6 @@ bool dataSourceMatchesReference(
     outputDump << outputFile.rdbuf();
     std::string outputString = outputDump.str();
 
-    EXPECT_EQ(outputPath, referencePath);
-
     std::ifstream     referenceFile(referencePath);
     std::stringstream referenceDump;
     referenceDump << referenceFile.rdbuf();
