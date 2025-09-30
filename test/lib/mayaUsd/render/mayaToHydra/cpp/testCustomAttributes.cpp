@@ -64,25 +64,21 @@ TEST(CustomAttributes, defaultArnoldCustomAttributes)
 
             HdDataSourceLocator visLocator
                 = primvarsLocator.Append(TfToken("aiAutobumpVisibility"));
-            dataSourceMatchesReference(
+            EXPECT_TRUE(dataSourceMatchesReference(
                 HdContainerDataSource::Get(prim.dataSource, visLocator),
-                getPathToSample("cube_primvar_aiAutobumpVisibility_fresh.txt"));
-            // 
-            //EXPECT_TRUE(dataSourceMatchesReference(
-            //    HdContainerDataSource::Get(prim.dataSource, visLocator),
-            //    getPathToSample("cube_primvar_aiAutobumpVisibility_fresh.txt")));
+                getPathToSample("cube_primvar_aiAutobumpVisibility_fresh.txt")));
 
-            //HdDataSourceLocator iterLocator = primvarsLocator.Append(TfToken("aiSubdivIterations"));
-            //EXPECT_TRUE(dataSourceMatchesReference(
-            //    HdContainerDataSource::Get(prim.dataSource, iterLocator),
-            //    getPathToSample("cube_primvar_aiSubdivIterations_fresh.txt")));
+            HdDataSourceLocator iterLocator = primvarsLocator.Append(TfToken("aiSubdivIterations"));
+            EXPECT_TRUE(dataSourceMatchesReference(
+                HdContainerDataSource::Get(prim.dataSource, iterLocator),
+                getPathToSample("cube_primvar_aiSubdivIterations_fresh.txt")));
 
-            //MObject cubeNode;
-            //ASSERT_TRUE(GetDependNodeFromNodeName("pCubeShape1", cubeNode));
-            //EXPECT_TRUE(SetNodeAttribute(cubeNode, "aiAutobumpVisibility", 0));
-            //EXPECT_TRUE(dataSourceMatchesReference(
-            //    HdContainerDataSource::Get(prim.dataSource, visLocator),
-            //    getPathToSample("cube_primvar_aiAutobumpVisibility_modified.txt")));
+            MObject cubeNode;
+            ASSERT_TRUE(GetDependNodeFromNodeName("pCubeShape1", cubeNode));
+            EXPECT_TRUE(SetNodeAttribute(cubeNode, "aiAutobumpVisibility", 0));
+            EXPECT_TRUE(dataSourceMatchesReference(
+                HdContainerDataSource::Get(prim.dataSource, visLocator),
+                getPathToSample("cube_primvar_aiAutobumpVisibility_modified.txt")));
 
             testPassed = true;
             break;
