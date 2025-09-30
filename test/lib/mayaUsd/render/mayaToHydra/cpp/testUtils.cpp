@@ -364,6 +364,8 @@ bool dataSourceMatchesReference(
     referenceDump << referenceFile.rdbuf();
     std::string referenceString = referenceDump.str();
 
+    EXPECT_EQ(outputString, referenceString);
+
     // Remove carriage returns from the reference string, as these can sometimes be 
     // inadvertently/automatically added to the reference files stored in git.
     // The test outputs always use line feeds only, so no need to do it for those.
