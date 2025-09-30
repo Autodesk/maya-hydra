@@ -360,11 +360,24 @@ bool dataSourceMatchesReference(
     EXPECT_EQ(outputPath, referencePath);
 
     std::ifstream     referenceFile(referencePath);
-    std::stringstream referenceDump;
-    referenceDump << referenceFile.rdbuf();
-    std::string referenceString = referenceDump.str();
+    std::string   referenceString;
+    if (referenceFile.is_open()) {
 
-    EXPECT_EQ(outputString, referenceString);
+        referenceFile.seekg(0, std::ios::beg);
+
+        std::stringstream referenceDump;
+        referenceDump << referenceFile.rdbuf();
+        referenceString = referenceDump.str();
+
+        EXPECT_EQ(outputString, referenceString);
+    
+    } else {
+        bool isGood = referenceFile.good();
+        bool isFail = referenceFile.fail();
+        EXPECT_EQ(true, isGood);
+        EXPECT_EQ(true, isFail);
+        EXPECT_EQ(false, isGood);
+    }
 
     // Remove carriage returns from the reference string, as these can sometimes be 
     // inadvertently/automatically added to the reference files stored in git.
