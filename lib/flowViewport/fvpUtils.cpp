@@ -22,6 +22,10 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
+namespace {
+    std::function<int(const char*, const char*)> eventBeginFunc;
+    std::function<void(int)> eventEndFunc;
+}
 namespace FVP_NS_DEF {
 
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -36,6 +40,27 @@ void leakSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& si) {
     leakedSi->push_back(si);
 }
 #endif
+
+void SetProfileBegin(std::function<int(const char*, const char*)> func) {
+    eventBeginFunc = func;
+}
+
+void SetProfileEnd(std::function<void(int)> func) {
+    eventEndFunc = func;
+}
+
+int ProfileBegin(const char* eventName, const char* description){
+    if (eventBeginFunc) {
+        return eventBeginFunc(eventName, description);
+    } else {
+        return -1;
+    }
+}
+void ProfileEnd(int eventId) {
+    if (eventEndFunc) {
+        eventEndFunc(eventId);
+    }
+}
 
 PXR_NS::HdDataSourceBaseHandle createSelectionDataSource(const Fvp::PrimSelection& selection)
 {

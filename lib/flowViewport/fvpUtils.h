@@ -133,6 +133,16 @@ Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, c
 // Get the path to the prim's bound material.
 PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
 
+FVP_API
+void SetProfileBegin(std::function<int(const char*, const char*)> func);
+FVP_API
+void SetProfileEnd(std::function<void(int)> func);
+
+FVP_API
+int ProfileBegin(const char* eventName, const char* description);
+FVP_API
+void ProfileEnd(int eventId);
+
 } // namespace FVP_NS_DEF
 
 #endif // FVP_UTILS_H
