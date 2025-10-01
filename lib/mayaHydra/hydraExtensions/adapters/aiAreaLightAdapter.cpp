@@ -60,14 +60,17 @@ void _lightShapeChangedCallBack(
     TF_UNUSED(msg);
     TF_UNUSED(otherPlug);
 
+    auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
     auto plugPartialName = plug.partialName();
     if (plugPartialName == MString("ai_translator")) {
         // This is changing the light type, we need to remove the prim and add it again
-        auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
         adapter->RemovePrim();
         adapter->Populate();
         adapter->InvalidateTransform();
     }
+
+    // Handle extension attributes change
+    adapter->HandleExtensionAttributesDirty(plug);
 }
 
 void _dirtyTransform(MObject& node, void* clientData)

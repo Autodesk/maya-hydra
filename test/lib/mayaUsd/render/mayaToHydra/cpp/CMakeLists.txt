@@ -49,6 +49,7 @@ target_sources(${TARGET_NAME}
         testUsdStageInvalidate.cpp
         testWriteFile.cpp
         testCamera.cpp
+        testCustomAttributes.cpp
 )
 
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)

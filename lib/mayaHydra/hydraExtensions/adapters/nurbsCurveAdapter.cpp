@@ -133,7 +133,8 @@ public:
             }
             return VtValue(ret);
         }
-        return {};
+        // Let base class handle other keys
+        return MayaHydraShapeAdapter::Get(key);
     }
 
     HdBasisCurvesTopology GetBasisCurvesTopology() override
@@ -160,14 +161,18 @@ public:
 
     HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation) override
     {
+        // Base descriptors
+        HdPrimvarDescriptorVector descs = MayaHydraShapeAdapter::GetPrimvarDescriptors(interpolation);
+
+        // Local descriptors
+        HdPrimvarDescriptorVector localDescs;
         if (interpolation == HdInterpolationVertex) {
-            HdPrimvarDescriptor desc;
-            desc.name = UsdGeomTokens->points;
-            desc.interpolation = interpolation;
-            desc.role = HdPrimvarRoleTokens->point;
-            return { desc };
+            localDescs = { { HdTokens->points, interpolation, HdPrimvarRoleTokens->point } };
         }
-        return {};
+
+        // Combine descriptors
+        descs.insert(descs.end(), localDescs.begin(), localDescs.end());
+        return descs;
     }
 
     TfToken GetRenderTag() const override { return Fvp::secondaryGraphicsRenderTagToken; }
@@ -215,6 +220,9 @@ private:
                     plug.name().asChar(),
                     plug.name().asChar());
         }
+
+        // Handle extension attributes change
+        adapter->HandleExtensionAttributesDirty(plug);
     }
 
     static void TopologyChangedCallback(MObject& node, void* clientData)

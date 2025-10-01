@@ -24,6 +24,7 @@
 #include <pxr/base/tf/token.h>
 #include <pxr/usd/sdf/path.h>
 #include <pxr/imaging/hd/sceneIndex.h>
+#include <pxr/base/vt/dictionary.h>
 
 #include <maya/MFloatMatrix.h>
 #include <maya/MFnDependencyNode.h>
@@ -250,6 +251,20 @@ PXR_NS::GfVec4f getPreferencesColor(const PXR_NS::TfToken& token);
  */
 MAYAHYDRALIB_API
 PXR_NS::TfToken GetGeomSubsetsPickMode();
+
+/**
+ * @brief Get the extension attributes from a Maya node.
+ *
+ * This function retrieves all the extension attributes of a given Maya node and stores them in a map.
+ * The keys of the map are the attribute names, and the values are the attribute values.
+ *
+ * @param[in] node is the node in the Maya scene graph.
+ * @param[out] attrs is a map that will contain the attribute names and their corresponding values.
+ */
+MAYAHYDRALIB_API
+void GetExtensionAttributesFromNode(
+    const MObject& node,
+    PXR_NS::VtDictionary& attrs);
 
 } // namespace MAYAHYDRA_NS_DEF
 

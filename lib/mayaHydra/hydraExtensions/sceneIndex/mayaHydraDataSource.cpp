@@ -230,10 +230,6 @@ HdDataSourceBaseHandle MayaHydraDataSource::_GetDisplayColorDataSource()
 
 HdDataSourceBaseHandle MayaHydraDataSource::_GetPrimvarsDataSource()
 {
-    if (_primvarsBuilt.load()) {
-        return HdContainerDataSource::AtomicLoad(_primvars);
-    }
-
     MayaHydraPrimvarsDataSourceHandle primvarsDs;
 
     for (size_t interpolation = HdInterpolationConstant;
@@ -253,10 +249,6 @@ HdDataSourceBaseHandle MayaHydraDataSource::_GetPrimvarsDataSource()
                 primvarDesc.indexed);
         }
     }
-
-    HdContainerDataSourceHandle ds = primvarsDs;
-    HdContainerDataSource::AtomicStore(_primvars, ds);
-    _primvarsBuilt.store(true);
 
     return primvarsDs;
 }
