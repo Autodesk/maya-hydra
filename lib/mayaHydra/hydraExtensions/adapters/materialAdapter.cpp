@@ -175,6 +175,10 @@ public:
         if (status) {
             AddCallback(id);
         }
+        id = MNodeMessage::addAttributeChangedCallback(obj, _AttributeChangedCallback, this, &status);
+        if (status) {
+            AddCallback(id);
+        }
         _CreateSurfaceMaterialCallback();
         MayaHydraAdapter::CreateCallbacks();
     }
@@ -194,7 +198,16 @@ private:
         adapter->_CreateSurfaceMaterialCallback();
         adapter->MarkDirty(HdMaterial::AllDirty);
     }
-
+    static void _AttributeChangedCallback(
+        MNodeMessage::AttributeMessage msg,
+        MPlug&                         plug,
+        MPlug&                         otherPlug,
+        void*                          clientData)
+    {
+        auto* adapter = reinterpret_cast<MayaHydraShadingEngineAdapter*>(clientData);
+        // Handle extension attributes change
+        adapter->HandleExtensionAttributesDirty(plug);
+    }
     static void _DirtyShaderParams(MObject& /*node*/, void* clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraShadingEngineAdapter*>(clientData);
