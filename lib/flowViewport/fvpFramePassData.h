@@ -20,9 +20,14 @@
 
 #ifdef VIEWPORT_TOOLBOX
 
+#include <pxr/pxr.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/usd/sdf/path.h>
-#include <pxr/pxr.h>
+#include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/imaging/hd/sceneIndexObserver.h>
+#include <pxr/imaging/hd/sceneIndexPrimView.h>
+
+#include "fvpUtils.h"
 
 #include <hvt/engine/renderIndexProxy.h>
 #include <hvt/engine/framePass.h>
@@ -72,11 +77,22 @@ struct FramePassData
     //! render prims that do not have a purpose render tag
     bool _supportPrimsWithNoPurposeRenderTag = false;
 
+    //! The filtering scene index for this pass, we cannot use the actual pass filtering scene index class as it also includes this class definition
+    PXR_NS::HdSingleInputFilteringSceneIndexBaseRefPtr _passFilteringSceneIndex;
+
     //! Helper methods to safely access the frame pass
     bool IsValid() const { return _framePass != nullptr; }
     bool HasRenderIndexProxy() const { return _renderIndexProxy != nullptr; }
     const hvt::FramePassPtr& GetFramePass() const { return _framePass; }
     hvt::RenderIndexProxyPtr GetRenderIndexProxy() const { return _renderIndexProxy; }
+    void
+    SetPassFilteringSceneIndex(const PXR_NS::HdSingleInputFilteringSceneIndexBaseRefPtr& sceneIndex)
+    {
+        _passFilteringSceneIndex = sceneIndex;
+    }
+
+    FVP_API
+    void DirtyPrimsFromPurposeRenderTag(const PXR_NS::TfToken purposeRenderTag);
 };
 
 //! Shared pointer type for FramePassData to enable sharing between scene indices

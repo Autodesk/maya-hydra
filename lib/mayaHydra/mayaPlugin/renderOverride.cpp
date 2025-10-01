@@ -55,6 +55,7 @@
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpPassFilteringSceneIndex.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
@@ -154,6 +155,20 @@ namespace {
 PXR_NAMESPACE_USING_DIRECTIVE
 
 const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaHydraViewportRenderer");
+
+TfToken _GetPurposeRenderTagFromAttrName(const TfToken& attrName)
+{
+    if (attrName == TfToken("mayaHydraRenderPurpose")) {
+        return HdRenderTagTokens->render;
+    } else if (attrName == TfToken("mayaHydraProxyPurpose")) {
+        return HdRenderTagTokens->proxy;
+    } else if (attrName == TfToken("mayaHydraGuidePurpose")) {
+        return HdRenderTagTokens->guide;
+    } else {
+        TF_CODING_ERROR("Unknown purpose attribute name '%s'", attrName.GetText());
+        return {};
+    }
+}
 
 inline bool areDifferentForOneOfTheseBits(unsigned int val1, unsigned int val2, unsigned int bitsToTest)
 {
@@ -483,7 +498,30 @@ void MtohRenderOverride::UpdateRenderGlobals(
                 }
             }
         }
+    } 
+    #ifdef VIEWPORT_TOOLBOX
+    else {
+        if (attrName.GetString().find("Purpose") != 0) {
+            //One of the render purpose attributes just changed
+            //Get purpose render tag from attribute name
+            const PXR_NS::TfToken purposeRenderTag
+                = _GetPurposeRenderTagFromAttrName(attrName);
+
+            if (!purposeRenderTag.IsEmpty()) {
+                std::lock_guard<std::mutex> lock(_allInstancesMutex);
+                for (auto* instance : _allInstances) {
+                    const Fvp::FramePassDataPtrVector& framePassDataArray
+                        = instance->_framePassesData;
+                    for (auto& framePassData : framePassDataArray) {
+                        if (framePassData && framePassData->IsValid()) {
+                            framePassData->DirtyPrimsFromPurposeRenderTag(purposeRenderTag);
+                        }
+                    }
+                }
+            }
+        }
     }
+    #endif
 
     // Less than ideal still
     MGlobal::executeCommandOnIdle("refresh -f");
@@ -1853,6 +1891,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
             currentPass.reset();
         }
 
+        _framePassesData[i]->_passFilteringSceneIndex = nullptr;//Reset scene index
         auto& _framePassesRenderer = _framePassesData[i]->_renderIndexProxy;
         if (_framePassesRenderer) {
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -1907,12 +1946,13 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 
 #ifdef VIEWPORT_TOOLBOX
 HdSceneIndexBaseRefPtr MtohRenderOverride::_CreatePassFilteringSceneIndex(
-    const Fvp::FramePassConstDataPtr& filteringData)
+    Fvp::FramePassDataPtr& filteringData)
 {
 #ifdef VIEWPORT_TOOLBOX
-        return Fvp::PassFilteringSceneIndex::New(
-            _lastFilteringSceneIndexBeforeCustomFiltering, 
-            filteringData);
+    auto passFilteringSceneIndex = Fvp::PassFilteringSceneIndex::New(
+        _lastFilteringSceneIndexBeforeCustomFiltering, filteringData);
+    filteringData->SetPassFilteringSceneIndex(passFilteringSceneIndex);//Store in pass filtering data
+    return passFilteringSceneIndex;
 #endif
     return _lastFilteringSceneIndexBeforeCustomFiltering;
 }

@@ -60,7 +60,6 @@
 #include <flowViewport/sceneIndex/wireframeHighlights/fvpPiPrototypeWhSi.h>
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
-#include <flowViewport/sceneIndex/fvpPassFilteringSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
@@ -208,7 +207,7 @@ private:
     void _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
 #ifdef VIEWPORT_TOOLBOX
     HdSceneIndexBaseRefPtr
-    _CreatePassFilteringSceneIndex(const Fvp::FramePassConstDataPtr& filteringData);
+    _CreatePassFilteringSceneIndex(Fvp::FramePassDataPtr& filteringData);
 #endif
     VtValue _GetUsedGPUMemory() const;
 

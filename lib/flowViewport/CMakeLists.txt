@@ -14,6 +14,7 @@ target_sources(${TARGET_NAME}
         global.cpp
         tokens.cpp
 		fvpPurposeRenderTagsForPasses.cpp
+		fvpFramePassData.cpp
 )
 
 set(HEADERS

@@ -178,18 +178,12 @@ bool PassFilteringSceneIndex::_IsFilteredOut(const SdfPath& primPath) const
                         const bool passSupportsPrimsWithNoPurposeRenderTag
                             = _framePassData->_supportPrimsWithNoPurposeRenderTag;
 
-                        // Check if the prim has a purpose schema and apply filtering based on it.
-                        HdPurposeSchema purposeSchema = HdPurposeSchema::GetFromParent(prim.dataSource);
-                        if (purposeSchema.IsDefined()) {
-                            HdTokenDataSourceHandle purposeDs = purposeSchema.GetPurpose();
-                            if (purposeDs) {
-                                // Check if the prim's purpose render tag matches one of the includeRenderTags
-                                const TfToken purposeRenderTag = purposeDs->GetTypedValue(0.0);
-                                result = (_framePassData->_includeRenderTags.find(purposeRenderTag) 
-                                         == _framePassData->_includeRenderTags.end());
-                                reason = result ? "Purpose tag not in include list"
-                                                : "Purpose tag matched";
-                            }
+                        const TfToken purposeRenderTag = GetPurposeRenderTag(prim.dataSource);//From fvpUtils
+                        if (!purposeRenderTag.IsEmpty()) {
+                            result = (_framePassData->_includeRenderTags.find(purposeRenderTag)
+                                     == _framePassData->_includeRenderTags.end());
+                            reason = result ? "Purpose tag not in include list"
+                                            : "Purpose tag matched";
                         } else {
                             // Geometric prim without purpose tag
                             if (passSupportsPrimsWithNoPurposeRenderTag) {
@@ -311,16 +305,10 @@ bool PassFilteringSceneIndex::_IsFilteredOut(const SdfPath& primPath) const
         const bool passSupportsPrimsWithNoPurposeRenderTag
             = _framePassData->_supportPrimsWithNoPurposeRenderTag;
 
-        // Check if the prim has a purpose schema and apply filtering based on it.
-        HdPurposeSchema purposeSchema = HdPurposeSchema::GetFromParent(prim.dataSource);
-        if (purposeSchema.IsDefined()) {
-            HdTokenDataSourceHandle purposeDs = purposeSchema.GetPurpose();
-            if (purposeDs) {
-                // Check if the prim's purpose render tag matches one of the includeRenderTags
-                const TfToken purposeRenderTag = purposeDs->GetTypedValue(0.0);
-                return (_framePassData->_includeRenderTags.find(purposeRenderTag) 
-                       == _framePassData->_includeRenderTags.end());
-            }
+        const TfToken purposeRenderTag = GetPurposeRenderTag(prim.dataSource);//From fvpUtils
+        if (!purposeRenderTag.IsEmpty()) {
+            return (_framePassData->_includeRenderTags.find(purposeRenderTag)
+                   == _framePassData->_includeRenderTags.end());
         } else {
             return !passSupportsPrimsWithNoPurposeRenderTag;
         }
@@ -359,6 +347,29 @@ SdfPathVector PassFilteringSceneIndex::GetChildPrimPaths(const SdfPath& primPath
     }
 
     return filteredChildPaths;
+}
+
+void PassFilteringSceneIndex::DirtyPrimsFromPurposeRenderTag(const TfToken purposeRenderTag)
+{
+    HdSceneIndexObserver::RemovedPrimEntries removedEntries;
+    HdSceneIndexObserver::AddedPrimEntries   addedEntries;
+    auto& inputSceneIndex = GetInputSceneIndex();
+    if (inputSceneIndex) { 
+        for (const SdfPath& path : HdSceneIndexPrimView(inputSceneIndex)) {
+            HdSceneIndexPrim prim = inputSceneIndex->GetPrim(path);
+            const TfToken    purposeRenderTagFromPrim = GetPurposeRenderTag(prim.dataSource);//From fvpUtils
+            if (purposeRenderTag == purposeRenderTagFromPrim){
+                removedEntries.emplace_back(path);
+                addedEntries.emplace_back(path, prim.primType);
+            }
+        }
+    }
+    if (!removedEntries.empty()) {
+        _SendPrimsRemoved(removedEntries);
+    }
+    if (!addedEntries.empty()) {
+        _SendPrimsAdded(addedEntries);
+    }
 }
 
 } // namespace FVP_NS_DEF
