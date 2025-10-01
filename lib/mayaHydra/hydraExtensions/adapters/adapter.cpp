@@ -23,12 +23,16 @@
 #include <pxr/base/tf/type.h>
 
 #include <maya/MNodeMessage.h>
+#include <maya/MFnAttribute.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_REGISTRY_FUNCTION(TfType) { TfType::Define<MayaHydraAdapter>(); }
 
 namespace {
+
+using LockType = std::recursive_mutex;
+LockType dg_access_mutex;
 
 void _preRemoval(MObject& node, void* clientData)
 {
@@ -84,7 +88,11 @@ void MayaHydraAdapter::RemoveCallbacks()
 
 VtValue MayaHydraAdapter::Get(const TfToken& key)
 {
-    TF_UNUSED(key);
+    // Get extension attributes
+    auto it = _extAttrNameToValueMap.find(key.GetText());
+    if (it != _extAttrNameToValueMap.end()) {
+        return it->second;
+    }
     return {};
 };
 
@@ -119,6 +127,44 @@ MStatus MayaHydraAdapter::Initialize()
         MayaHydraMaterialNetworkConverter::initialize();
     }
     return status;
+}
+
+HdPrimvarDescriptorVector MayaHydraAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
+{
+    // All extension attributes as custom primvars
+    if (interpolation == HdInterpolationConstant) {
+        if (_extAttrMapNeedUpdate) {
+            // Apply a global lock to avoid race condition while doing parallel DG node evaluation.
+            std::lock_guard<LockType> lock(dg_access_mutex);
+            MAYAHYDRA_NS::GetExtensionAttributesFromNode(GetNode(), _extAttrNameToValueMap);
+            _extAttrMapNeedUpdate = false;
+        }
+        // Use constant interpolation and none role for all primvars
+        HdPrimvarDescriptorVector descriptors;
+        for (auto it = _extAttrNameToValueMap.begin(); it != _extAttrNameToValueMap.end(); it++) {
+            descriptors.push_back({ TfToken(it->first), interpolation, HdPrimvarRoleTokens->none });
+        }
+        return descriptors;
+    }
+    return HdPrimvarDescriptorVector();
+}
+
+void MayaHydraAdapter::HandleExtensionAttributesDirty(const MPlug& plug)
+{
+    MStatus status;
+    MObject attrObj = plug.attribute(&status);
+    if (status) {
+        MFnAttribute fnAttr(attrObj);
+        if (fnAttr.isExtension()) {
+            _extAttrMapNeedUpdate = true;
+            // Notify the change tracker that the primvars have changed.
+            // Note there's no fine grained dirty notification mechanism on primvars yet,
+            // like dirty flags for adding/removing/changing a specific primvar, only
+            // DirtyPrimvar for all changes. Currently, no performance bottleneck was spotted
+            // around this. This could be improved if a more fine grained mechanism is provided.
+            MarkDirty(HdChangeTracker::DirtyPrimvar);
+        }
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

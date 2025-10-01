@@ -59,14 +59,18 @@ void _changeVisibility(
 {
     TF_UNUSED(msg);
     TF_UNUSED(otherPlug);
+
+    auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
     if (plug == MayaAttrs::dagNode::visibility) {
-        auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
         if (adapter->UpdateVisibility()) {
             adapter->RemovePrim();
             adapter->Populate();
             adapter->InvalidateTransform();
         }
     }
+
+    // Handle extension attributes change
+    adapter->HandleExtensionAttributesDirty(plug);
 }
 
 void _dirtyTransform(MObject& node, void* clientData)
@@ -223,7 +227,8 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
         }
         return VtValue(shadowParams);
     }
-    return {};
+    // Let base class handle other keys
+    return MayaHydraDagAdapter::Get(key);
 }
 
 VtValue MayaHydraLightAdapter::GetLightParamValue(const TfToken& paramName)
