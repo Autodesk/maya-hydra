@@ -158,16 +158,17 @@ const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaHydraViewportRenderer");
 
 TfToken _GetPurposeRenderTagFromAttrName(const TfToken& attrName)
 {
-    if (attrName == TfToken("mayaHydraRenderPurpose")) {
-        return HdRenderTagTokens->render;
-    } else if (attrName == TfToken("mayaHydraProxyPurpose")) {
-        return HdRenderTagTokens->proxy;
-    } else if (attrName == TfToken("mayaHydraGuidePurpose")) {
-        return HdRenderTagTokens->guide;
-    } else {
-        TF_CODING_ERROR("Unknown purpose attribute name '%s'", attrName.GetText());
-        return {};
+    static const std::map<TfToken, TfToken> attrToTag {
+        { TfToken("mayaHydraRenderPurpose"),    HdRenderTagTokens->render },
+        { TfToken("mayaHydraProxyPurpose"),     HdRenderTagTokens->proxy },
+        { TfToken("mayaHydraGuidePurpose"),     HdRenderTagTokens->guide }
+    };
+    auto found = attrToTag.find(attrName);
+    if (found != attrToTag.end()) {
+        return found->second;
     }
+    TF_CODING_ERROR("Unknown purpose attribute name '%s'", attrName.GetText());
+    return {};
 }
 
 inline bool areDifferentForOneOfTheseBits(unsigned int val1, unsigned int val2, unsigned int bitsToTest)

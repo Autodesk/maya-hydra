@@ -23,9 +23,6 @@
 #include <pxr/pxr.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/usd/sdf/path.h>
-#include <pxr/imaging/hd/filteringSceneIndex.h>
-#include <pxr/imaging/hd/sceneIndexObserver.h>
-#include <pxr/imaging/hd/sceneIndexPrimView.h>
 
 #include "fvpUtils.h"
 
@@ -77,7 +74,8 @@ struct FramePassData
     //! render prims that do not have a purpose render tag
     bool _supportPrimsWithNoPurposeRenderTag = false;
 
-    //! The filtering scene index for this pass, we cannot use the actual pass filtering scene index class as it also includes this class definition
+    //! The filtering scene index for this pass, we cannot use Fvp::PassFilteringSceneIndex as it
+    //! also includes this class declaration
     PXR_NS::HdSingleInputFilteringSceneIndexBaseRefPtr _passFilteringSceneIndex;
 
     //! Helper methods to safely access the frame pass

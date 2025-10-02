@@ -22,6 +22,8 @@
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/basisCurvesSchema.h>
 #include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/sceneIndexPrimView.h>
+
 
 // For debugging purpose, set USE_LOGGING_VERSION to 1 to use logging version in _IsFilteredOut function, 0 for no logging version
 // This will create a text file with the list of all prims tested for filtering and the 
@@ -351,7 +353,6 @@ SdfPathVector PassFilteringSceneIndex::GetChildPrimPaths(const SdfPath& primPath
 
 void PassFilteringSceneIndex::DirtyPrimsFromPurposeRenderTag(const TfToken purposeRenderTag)
 {
-    HdSceneIndexObserver::RemovedPrimEntries removedEntries;
     HdSceneIndexObserver::AddedPrimEntries   addedEntries;
     auto& inputSceneIndex = GetInputSceneIndex();
     if (inputSceneIndex) { 
@@ -359,16 +360,12 @@ void PassFilteringSceneIndex::DirtyPrimsFromPurposeRenderTag(const TfToken purpo
             HdSceneIndexPrim prim = inputSceneIndex->GetPrim(path);
             const TfToken    purposeRenderTagFromPrim = GetPurposeRenderTag(prim.dataSource);//From fvpUtils
             if (purposeRenderTag == purposeRenderTagFromPrim){
-                removedEntries.emplace_back(path);
                 addedEntries.emplace_back(path, prim.primType);
             }
         }
     }
-    if (!removedEntries.empty()) {
-        _SendPrimsRemoved(removedEntries);
-    }
     if (!addedEntries.empty()) {
-        _SendPrimsAdded(addedEntries);
+        _SendPrimsAdded(addedEntries);//Sending an add prim for an existing prim is equivalent to a resync
     }
 }
 
