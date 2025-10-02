@@ -22,6 +22,7 @@
 #include "flowViewport/fvpFramePassData.h"
 
 #include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/base/tf/token.h>
 
 #include <functional>
 
@@ -56,6 +57,9 @@ public:
 
     FVP_API
     PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath& primPath) const override;
+
+    FVP_API
+    void DirtyPrimsFromPurposeRenderTag(const PXR_NS::TfToken purposeRenderTag);
 
 protected:
 

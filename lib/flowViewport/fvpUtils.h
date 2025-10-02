@@ -132,6 +132,9 @@ Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, c
 // Get the path to the prim's bound material.
 PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
 
+// Get the prim's purpose render tag token from its data source, or empty if undefined
+PXR_NS::TfToken GetPurposeRenderTag(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
+
 } // namespace FVP_NS_DEF
 
 #endif // FVP_UTILS_H
