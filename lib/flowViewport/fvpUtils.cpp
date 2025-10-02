@@ -15,10 +15,11 @@
 
 #include "fvpUtils.h"
 
+#include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/selectionSchema.h>
-
+#include <pxr/imaging/hd/purposeSchema.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -107,6 +108,22 @@ SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSourc
     }
 
     return bindingPathDataSource->GetTypedValue(0);
+}
+
+TfToken GetPurposeRenderTag(const PXR_NS::HdContainerDataSourceHandle& primDataSource)
+{
+    if (!primDataSource) {
+        return TfToken();
+    }
+    HdPurposeSchema purposeSchema = HdPurposeSchema::GetFromParent(primDataSource);
+    if (!purposeSchema.IsDefined()) {
+        return TfToken();
+    }
+    HdTokenDataSourceHandle purposeDs = purposeSchema.GetPurpose();
+    if (!purposeDs) {
+        return TfToken();
+    }
+    return purposeDs->GetTypedValue(0.0);
 }
 
 } // namespace FVP_NS_DEF
