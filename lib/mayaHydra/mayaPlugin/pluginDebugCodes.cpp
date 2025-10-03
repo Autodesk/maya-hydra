@@ -48,6 +48,10 @@ TF_REGISTRY_FUNCTION(TfDebug)
     TF_DEBUG_ENVIRONMENT_SYMBOL(
         MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
         "Print information about batch rendering render settings.");
+
+    TF_DEBUG_ENVIRONMENT_SYMBOL(
+        MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+        "Print status information from the batch render command.");
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

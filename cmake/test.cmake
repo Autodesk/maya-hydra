@@ -85,6 +85,296 @@ function(mayaUsd_get_unittest_target unittest_target unittest_basename)
     set(${unittest_target} "${unittest_name}" PARENT_SCOPE)
 endfunction()
 
+# -----------------------------------------------------------------------------
+# Shared helper functions for test setup
+# -----------------------------------------------------------------------------
+
+# Set up common path environment variables for Maya Hydra tests
+function(_mayaHydra_setup_test_common_path_vars)
+    set(ALL_PATH_VARS
+        PYTHONPATH
+        MAYA_MODULE_PATH
+        MAYA_PLUG_IN_PATH
+        MAYA_SCRIPT_PATH
+        XBMLANGPATH
+        ${PXR_OVERRIDE_PLUGINPATH_NAME}
+        PXR_MTLX_STDLIB_SEARCH_PATHS
+    )
+
+    if(IS_WINDOWS)
+        # Put path at the front of the list of env vars.
+        list(INSERT ALL_PATH_VARS 0 PATH)
+    else()
+        list(APPEND ALL_PATH_VARS
+             LD_LIBRARY_PATH
+             IDIFF_LD_LIBRARY_PATH
+             LD_PRELOAD
+        )
+    endif()
+
+    # Set initial empty values for all path vars
+    # NOTE - we prefix varnames with "MAYAHYDRA_VARNAME_" just to make collision
+    # with some existing var less likely
+    foreach(pathvar ${ALL_PATH_VARS})
+        set(MAYAHYDRA_VARNAME_${pathvar} "" PARENT_SCOPE)
+    endforeach()
+
+    if(IS_WINDOWS)
+        list(APPEND MAYAHYDRA_VARNAME_PATH "${MAYA_LOCATION}/bin")
+        set(MAYAHYDRA_VARNAME_PATH ${MAYAHYDRA_VARNAME_PATH} PARENT_SCOPE)
+    else()
+        # Set up environment for idiff execution
+        set(MAYAHYDRA_VARNAME_LD_LIBRARY_PATH "${ADDITIONAL_LD_LIBRARY_PATH}" PARENT_SCOPE)
+    
+        # LD_LIBRARY_PATH needs to be set for the idiff executable because its 
+        # RPATH is absolute rather than relative to ORIGIN, meaning the RPATH 
+        # points to the absolute path on the machine where idiff was built.
+        # This absence of relative paths for RPATH comes from OpenImageIO.
+        # We introduce a second workaround to avoid Maya using usd's libpng, 
+        # because both use incompatible versions of libpng. This is done by 
+        # setting LD_LIBRARY_PATH to IDIFF_LD_LIBRARY_PATH only when we run 
+        # idiff using Python's subprocess module.
+        set(MAYAHYDRA_VARNAME_IDIFF_LD_LIBRARY_PATH "${ADDITIONAL_LD_LIBRARY_PATH}:${PXR_USD_LOCATION}/lib64:${PXR_USD_LOCATION}/lib" PARENT_SCOPE)
+    
+        # Maya uses a very old version of GLEW, so we need support for
+        # pre-loading a newer version from elsewhere.
+        set(MAYAHYDRA_VARNAME_LD_PRELOAD "${ADDITIONAL_LD_PRELOAD}" PARENT_SCOPE)
+    endif()
+
+    # Return the list of path variables
+    set(ALL_PATH_VARS ${ALL_PATH_VARS} PARENT_SCOPE)
+endfunction()
+
+# Set up environment for overall test and Maya defaults. 
+function(_mayaHydra_setup_test_common_defaults test_name)
+    set(ALL_TEST_VARS
+        IMAGE_DIFF_TOOL
+        MAYA_HAS_RENDER_ITEM_CULL_MODE_API
+    )
+
+    set(MAYAHYDRA_VARNAME_IMAGE_DIFF_TOOL "${IMAGE_DIFF_TOOL}")
+
+    set(MAYAHYDRA_VARNAME_MAYA_HAS_RENDER_ITEM_CULL_MODE_API "${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}")
+
+    foreach(testvar ${ALL_TEST_VARS})
+        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+            "${testvar}=${MAYAHYDRA_VARNAME_${testvar}}")
+    endforeach()
+endfunction()
+
+# Emulate what the module files for mayaHydra, mayaUsdPlugin, and other plugins
+# would do.
+function(_mayaHydra_setup_test_plugins)
+    # mayaHydra
+    list(APPEND MAYAHYDRA_VARNAME_PATH
+         "${CMAKE_INSTALL_PREFIX}/lib")
+    list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+         "${CMAKE_INSTALL_PREFIX}/lib/usd")
+    list(APPEND MAYAHYDRA_VARNAME_MAYA_PLUG_IN_PATH
+         "${CMAKE_INSTALL_PREFIX}/lib/maya")
+    list(APPEND MAYAHYDRA_VARNAME_MAYA_SCRIPT_PATH
+         "${CMAKE_INSTALL_PREFIX}/scripts")
+
+    # mayaUsdPlugin
+    if(DEFINED MAYAUSD_LOCATION)
+        list(APPEND MAYAHYDRA_VARNAME_PATH
+             "${MAYAUSD_LOCATION}/lib")
+        list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
+             "${MAYAUSD_LOCATION}/lib/scripts")
+        list(APPEND MAYAHYDRA_VARNAME_MAYA_SCRIPT_PATH
+             "${MAYAUSD_LOCATION}/lib/scripts")
+        if (IS_LINUX)
+            # On Linux the paths in XBMLANGPATH need a /%B at the end.
+            list(APPEND MAYAHYDRA_VARNAME_XBMLANGPATH
+                 "${MAYAUSD_LOCATION}/lib/icons/%B")
+        else()
+            list(APPEND MAYAHYDRA_VARNAME_XBMLANGPATH
+                 "${MAYAUSD_LOCATION}/lib/icons")
+        endif()
+        list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH 
+             "${MAYAUSD_LOCATION}/lib/python")
+        list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+             "${MAYAUSD_LOCATION}/lib/usd")
+        list(APPEND MAYAHYDRA_VARNAME_MAYA_PLUG_IN_PATH
+             "${MAYAUSD_LOCATION}/plugin/adsk/plugin")
+        list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
+             "${MAYAUSD_LOCATION}/plugin/adsk/scripts")
+        list(APPEND MAYAHYDRA_VARNAME_MAYA_SCRIPT_PATH
+             "${MAYAUSD_LOCATION}/plugin/adsk/scripts")
+        list(APPEND MAYAHYDRA_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
+             "${PXR_USD_LOCATION}/libraries")
+        list(APPEND MAYAHYDRA_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
+             "${MAYAUSD_LOCATION}/libraries")
+    endif()
+    
+    # mtoa
+    if(DEFINED MTOA_LOCATION)
+        # It seems like we need to use MAYA_MODULE_PATH for MtoA to work properly.
+        # Even if we emulate the .mod file by manually setting the same env vars
+        # to the same values, MtoA itself will appear to load successfully when 
+        # calling loadPlugin, but some of its extensions will fail to initialize,
+        # leading to incorrect behavior and test failures. In those cases, it seems
+        # like having a locally installed MtoA fixed it, but we can't rely on that.
+        list(APPEND MAYAHYDRA_VARNAME_MAYA_MODULE_PATH
+             "${MTOA_LOCATION}")
+    endif()
+    
+    # lookdevx
+    if(DEFINED LOOKDEVX_LOCATION)
+        list(APPEND MAYAHYDRA_VARNAME_PATH
+             "${LOOKDEVX_LOCATION}/bin")
+        list(APPEND MAYAHYDRA_VARNAME_PATH
+             "${LOOKDEVX_LOCATION}/plug-ins")
+        list(APPEND MAYAHYDRA_VARNAME_MAYA_SCRIPT_PATH
+             "${LOOKDEVX_LOCATION}/scripts") #Contains some AE templates files
+        list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
+             "${LOOKDEVX_LOCATION}/scripts")#Contains some python scripts
+        list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
+             "${LOOKDEVX_LOCATION}/python")
+        list(APPEND MAYAHYDRA_VARNAME_MAYA_PLUG_IN_PATH
+             "${LOOKDEVX_LOCATION}/plug-ins")
+    endif()
+
+    if(DEFINED BIFROST_LOCATION)
+        #The bifrost package contains 2 template files that should have been converted by ecg maya hydra to bifrost.mod and vnn.mod files 
+        #These .mod files are used to set the environment for Bifrost and VNN plugins in Maya.
+		set(BIFROST_MOD "${BIFROST_LOCATION}/bifrost.mod")
+		if(EXISTS "${BIFROST_MOD}")
+			message(STATUS "bifrost.mod exists at: ${BIFROST_MOD}")
+			list(APPEND MAYAHYDRA_VARNAME_MAYA_MODULE_PATH "${BIFROST_LOCATION}") #Add the common location for bifrost and vnn .mod files to maya mod files
+		else()
+			message(FATAL_ERROR "Could not find bifrost.mod at: ${BIFROST_MOD}")
+        endif()
+    endif()
+
+    set(ALL_PATH_VARS
+        PATH
+        PYTHONPATH
+        MAYA_MODULE_PATH
+        MAYA_PLUG_IN_PATH
+        MAYA_SCRIPT_PATH
+        XBMLANGPATH
+        ${PXR_OVERRIDE_PLUGINPATH_NAME}
+        PXR_MTLX_STDLIB_SEARCH_PATHS)
+
+    foreach(pathvar ${ALL_PATH_VARS})
+        set(MAYAHYDRA_VARNAME_${pathvar} ${MAYAHYDRA_VARNAME_${pathvar}} PARENT_SCOPE)
+    endforeach()
+
+endfunction()
+
+# Adjust PATH and PYTHONPATH to include USD.
+function(_mayaHydra_setup_test_USD_paths)
+    # These should come last (esp PYTHONPATH, in case another module is overriding
+    # with pkgutil)
+   if (DEFINED MAYAHYDRA_TO_USD_RELATIVE_PATH)
+        set(USD_INSTALL_LOCATION "${CMAKE_INSTALL_PREFIX}/${MAYAHYDRA_TO_USD_RELATIVE_PATH}")
+    else()
+        set(USD_INSTALL_LOCATION ${PXR_USD_LOCATION})
+    endif()
+    # Inherit any existing PYTHONPATH, but keep it at the end.
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
+        "${USD_INSTALL_LOCATION}/lib/python")
+    if(IS_WINDOWS)
+        list(APPEND MAYAHYDRA_VARNAME_PATH
+            "${USD_INSTALL_LOCATION}/bin")
+        list(APPEND MAYAHYDRA_VARNAME_PATH
+            "${USD_INSTALL_LOCATION}/lib")
+    endif()
+
+    set(ALL_PATH_VARS PATH PYTHONPATH)
+    foreach(pathvar ${ALL_PATH_VARS})
+        set(MAYAHYDRA_VARNAME_${pathvar} ${MAYAHYDRA_VARNAME_${pathvar}} PARENT_SCOPE)
+    endforeach()
+endfunction()
+
+function(_mayaHydra_setup_test_finalize_env test_name)
+    # NOTE: this should come after any setting of PATH/PYTHONPATH so
+    #       that our entries will come first.
+    # Inherit any existing PATH/PYTHONPATH, but keep it at the end.
+    # This is needed (especially for PATH) because we will overwrite
+    # both with the values from our list and we need to keep any
+    # system entries.
+    list(APPEND MAYAHYDRA_VARNAME_PATH $ENV{PATH})
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH $ENV{PYTHONPATH})
+
+    # convert the internally-processed envs from cmake list
+    foreach(pathvar ${ALL_PATH_VARS})
+        separate_argument_list(MAYAHYDRA_VARNAME_${pathvar})
+    endforeach()
+
+    # prepend the passed-in ENV values - assume these are already
+    # separated + escaped
+    foreach(name_value_pair ${ARG_ENV})
+        mayaUsd_split_head_tail("${name_value_pair}" "=" env_name env_value)
+        if(NOT env_name)
+            message(FATAL_ERROR "poorly formatted NAME=VALUE pair - name "
+                "missing: ${name_value_pair}")
+        endif()
+
+        # now either prepend to existing list, or create new
+        if("${env_name}" IN_LIST ALL_PATH_VARS)
+            if(IS_WINDOWS)
+                set(MAYAHYDRA_VARNAME_${env_name}
+                    "${env_value}\;${MAYAHYDRA_VARNAME_${env_name}}")
+            else()
+                set(MAYAHYDRA_VARNAME_${env_name}
+                    "${env_value}:${MAYAHYDRA_VARNAME_${env_name}}")
+            endif()
+        else()
+            set("MAYAHYDRA_VARNAME_${env_name}" ${env_value})
+            list(APPEND ALL_PATH_VARS "${env_name}")
+        endif()
+    endforeach()
+
+    # Unset any MAYA_MODULE_PATH as we set all the individual variables
+    # so we don't want to conflict with a MayaUsd module.
+    set_property(TEST ${test_name} APPEND PROPERTY ENVIRONMENT "MAYA_MODULE_PATH=")
+
+    # set all env vars
+    foreach(pathvar ${ALL_PATH_VARS})
+        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+            "${pathvar}=${MAYAHYDRA_VARNAME_${pathvar}}")
+    endforeach()
+    
+    # Set a temporary folder path for the TMP,TEMP and MAYA_APP_DIR in which the
+    # maya profile will be created.
+    # Note: replace bad chars in test_name with _.
+    string(REGEX REPLACE "[:<>\|]" "_" SANITIZED_TEST_NAME ${test_name})
+    set(MAYA_APP_TEMP_DIR "${CMAKE_BINARY_DIR}/test/Temporary/${SANITIZED_TEST_NAME}")
+    # Note: ${WORKING_DIR} can point to the source folder, so don't use it
+    #       in any env var that will write files (such as MAYA_APP_DIR).
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "TMP=${MAYA_APP_TEMP_DIR}"
+        "TEMP=${MAYA_APP_TEMP_DIR}"
+        "MAYA_APP_DIR=${MAYA_APP_TEMP_DIR}")
+    file(MAKE_DIRECTORY ${MAYA_APP_TEMP_DIR})
+
+    # Set the Python major version in MAYA_PYTHON_VERSION. Maya 2020 and
+    # earlier that are Python 2 only will simply ignore it.
+    # without "MAYA_NO_STANDALONE_ATEXIT=1", standalone.uninitialize() will
+    # set exitcode to 0
+    # MAYA_DISABLE_CIP=1  Avoid fatal crash on start-up.
+    # MAYA_DISABLE_CER=1  Customer Error Reporting.
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "MAYA_PYTHON_VERSION=${MAYA_PY_VERSION}"
+        "MAYA_NO_STANDALONE_ATEXIT=1"
+        "MAYA_DEBUG_ENABLE_CRASH_REPORTING=1"
+        "MAYA_DEBUG_NO_SAVE_ON_CRASH=1"
+        "MAYA_NO_MORE_ASSERT=1"
+        "MAYA_DISABLE_CIP=1"
+        "MAYA_DISABLE_CER=1")
+
+    if(IS_MACOSX)
+        # Necessary for tests like DiffCore to find python
+        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+            "DYLD_LIBRARY_PATH=${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
+        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+            "DYLD_FRAMEWORK_PATH=${MAYA_LOCATION}/Maya.app/Contents/Frameworks")
+    endif()
+
+endfunction()
+
 if (OIIO_idiff_BINARY)
     set(IMAGE_DIFF_TOOL ${OIIO_idiff_BINARY} CACHE STRING "Use idiff for image comparison")
 endif()
@@ -147,7 +437,7 @@ function(mayaUsd_add_test test_name)
     # 1) Arg processing
     # -----------------
 
-    cmake_parse_arguments(PREFIX
+    cmake_parse_arguments(ARG
         "NO_STANDALONE_INIT;INTERACTIVE"                                # options
         "PYTHON_MODULE;PYTHON_COMMAND;PYTHON_SCRIPT;WORKING_DIRECTORY"  # one_value keywords
         "COMMAND;ENV"                                                   # multi_value keywords
@@ -158,7 +448,7 @@ function(mayaUsd_add_test test_name)
     #     PYTHON_MODULE / PYTHON_COMMAND / PYTHON_SCRIPT / COMMAND
     set(NUM_EXCLUSIVE_ITEMS 0)
     foreach(option_name PYTHON_MODULE PYTHON_COMMAND PYTHON_SCRIPT COMMAND)
-        if(PREFIX_${option_name})
+        if(ARG_${option_name})
             math(EXPR NUM_EXCLUSIVE_ITEMS "${NUM_EXCLUSIVE_ITEMS} + 1")
         endif()
     endforeach()
@@ -167,22 +457,22 @@ function(mayaUsd_add_test test_name)
             "one of PYTHON_MODULE, PYTHON_COMMAND, PYTHON_SCRIPT, or COMMAND")
     endif()
 
-    if(PREFIX_NO_STANDALONE_INIT AND NOT (PREFIX_PYTHON_MODULE
-                                          OR PREFIX_PYTHON_COMMAND))
+    if(ARG_NO_STANDALONE_INIT AND NOT (ARG_PYTHON_MODULE
+                                          OR ARG_PYTHON_COMMAND))
         message(FATAL_ERROR "mayaUsd_add_test: NO_STANDALONE_INIT may only be "
             "used with PYTHON_MODULE or PYTHON_COMMAND")
     endif()
 
-    if(PREFIX_INTERACTIVE AND NOT PREFIX_PYTHON_SCRIPT)
+    if(ARG_INTERACTIVE AND NOT ARG_PYTHON_SCRIPT)
         message(FATAL_ERROR "mayaUsd_add_test: INTERACTIVE may only be "
             "used with PYTHON_SCRIPT")
     endif()
 
     # set the working_dir
-    if(PREFIX_WORKING_DIRECTORY)
-        set(WORKING_DIR ${PREFIX_WORKING_DIRECTORY})
+    if(ARG_WORKING_DIRECTORY)
+        set(WORKING_DIR ${ARG_WORKING_DIRECTORY})
     else()
-        set(WORKING_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+        set(WORKING_DIR ${CMAKE_CURRENT_BINARY_DIR})
     endif()
 
     # --------------
@@ -190,18 +480,18 @@ function(mayaUsd_add_test test_name)
     # --------------
 
     set(PYTEST_CODE "")
-    if(PREFIX_PYTHON_MODULE)
-        set(MODULE_NAME "${PREFIX_PYTHON_MODULE}")
+    if(ARG_PYTHON_MODULE)
+        set(MODULE_NAME "${ARG_PYTHON_MODULE}")
         set(PYTEST_CODE "
 import sys
 from unittest import main
 import ${MODULE_NAME}
 main(module=${MODULE_NAME})
 ")
-    elseif(PREFIX_PYTHON_COMMAND)
-        set(PYTEST_CODE "${PREFIX_PYTHON_COMMAND}")
-    elseif(PREFIX_PYTHON_SCRIPT)
-        if (PREFIX_INTERACTIVE)
+    elseif(ARG_PYTHON_COMMAND)
+        set(PYTEST_CODE "${ARG_PYTHON_COMMAND}")
+    elseif(ARG_PYTHON_SCRIPT)
+        if (ARG_INTERACTIVE)
             if(WIN32)
                 set(QUOTE "'")
             else()
@@ -212,7 +502,7 @@ import os\\n\
 import sys\\n\
 import time\\n\
 import traceback\\n\
-file = ${QUOTE}${PREFIX_PYTHON_SCRIPT}${QUOTE}\\n\
+file = ${QUOTE}${ARG_PYTHON_SCRIPT}${QUOTE}\\n\
 if not os.path.isabs(file):\\n\
     file = os.path.join(${QUOTE}${CMAKE_CURRENT_SOURCE_DIR}${QUOTE}, file)\\n\
 openMode = ${QUOTE}rb${QUOTE}\\n\
@@ -232,15 +522,15 @@ except Exception:\\n\
             set(COMMAND_CALL ${MAYA_EXECUTABLE} -c ${MEL_PY_EXEC_COMMAND})
         else()
             set(SCRIPT ${CMAKE_BINARY_DIR}/test/Temporary/scripts/runner_${test_name}.py)
-            FILE(WRITE ${SCRIPT} "${PREFIX_PYTHON_SCRIPT}")
+            FILE(WRITE ${SCRIPT} "${ARG_PYTHON_SCRIPT}")
             set(COMMAND_CALL ${MAYA_PY_EXECUTABLE} ${SCRIPT})
         endif()
     else()
-        set(COMMAND_CALL ${PREFIX_COMMAND})
+        set(COMMAND_CALL ${ARG_COMMAND})
     endif()
 
     if(PYTEST_CODE)
-        if(NOT PREFIX_NO_STANDALONE_INIT)
+        if(NOT ARG_NO_STANDALONE_INIT)
             # first, indent pycode
             mayaUsd_indent(indented_PYTEST_CODE "${PYTEST_CODE}")
             # then wrap in try/finally, and call maya.standalone.[un]initialize()
@@ -270,239 +560,33 @@ finally:
     # 3) Set up environ
     # -----------------
 
-    set(ALL_PATH_VARS
-        PYTHONPATH
-        MAYA_MODULE_PATH
-        MAYA_PLUG_IN_PATH
-        MAYA_SCRIPT_PATH
-        XBMLANGPATH
-        ${PXR_OVERRIDE_PLUGINPATH_NAME}
-        PXR_MTLX_STDLIB_SEARCH_PATHS
-    )
+    _mayaHydra_setup_test_common_path_vars()
+    list(APPEND MAYAHYDRA_VARNAME_PATH "${CMAKE_INSTALL_PREFIX}/lib/gtest")
 
-    if(IS_WINDOWS)
-        # Put path at the front of the list of env vars.
-        list(INSERT ALL_PATH_VARS 0
-            PATH
-        )
-    else()
-        list(APPEND ALL_PATH_VARS
-            LD_LIBRARY_PATH
-        )
-    endif()
-
-    # Set initial empty values for all path vars
-    foreach(pathvar ${ALL_PATH_VARS})
-        set(MAYAUSD_VARNAME_${pathvar})
-    endforeach()
-
-    if(IS_WINDOWS)
-        list(APPEND MAYAUSD_VARNAME_PATH "${CMAKE_INSTALL_PREFIX}/lib/gtest")
-        list(APPEND MAYAUSD_VARNAME_PATH "${MAYA_LOCATION}/bin")
-    endif()
-
-    # NOTE - we prefix varnames with "MAYAUSD_VARNAME_" just to make collision
-    # with some existing var less likely
+    _mayaHydra_setup_test_common_defaults("${test_name}")
 
     # Emulate what the module files for mayaHydra and mayaUsdPlugin would do.
-
-    # mayaHydra
-    list(APPEND MAYAUSD_VARNAME_PATH
-         "${CMAKE_INSTALL_PREFIX}/lib")
-    list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-         "${CMAKE_INSTALL_PREFIX}/lib/usd")
-    list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
-         "${CMAKE_INSTALL_PREFIX}/lib/maya")
-    list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
-         "${CMAKE_INSTALL_PREFIX}/scripts")
-
-    # mayaUsdPlugin
-    if(DEFINED MAYAUSD_LOCATION)
-        list(APPEND MAYAUSD_VARNAME_PATH
-             "${MAYAUSD_LOCATION}/lib")
-        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
-             "${MAYAUSD_LOCATION}/lib/scripts")
-        list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
-             "${MAYAUSD_LOCATION}/lib/scripts")
-        if (IS_LINUX)
-            # On Linux the paths in XBMLANGPATH need a /%B at the end.
-            list(APPEND MAYAUSD_VARNAME_XBMLANGPATH
-                 "${MAYAUSD_LOCATION}/lib/icons/%B")
-        else()
-            list(APPEND MAYAUSD_VARNAME_XBMLANGPATH
-                 "${MAYAUSD_LOCATION}/lib/icons")
-        endif()
-        list(APPEND MAYAUSD_VARNAME_PYTHONPATH 
-             "${MAYAUSD_LOCATION}/lib/python")
-        list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-             "${MAYAUSD_LOCATION}/lib/usd")
-        list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
-             "${MAYAUSD_LOCATION}/plugin/adsk/plugin")
-        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
-             "${MAYAUSD_LOCATION}/plugin/adsk/scripts")
-        list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
-             "${MAYAUSD_LOCATION}/plugin/adsk/scripts")
-        list(APPEND MAYAUSD_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
-             "${PXR_USD_LOCATION}/libraries")
-        list(APPEND MAYAUSD_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
-             "${MAYAUSD_LOCATION}/libraries")
-    endif()
-    
-    # mtoa
-    if(DEFINED MTOA_LOCATION)
-        # It seems like we need to use MAYA_MODULE_PATH for MtoA to work properly.
-        # Even if we emulate the .mod file by manually setting the same env vars
-        # to the same values, MtoA itself will appear to load successfully when 
-        # calling loadPlugin, but some of its extensions will fail to initialize,
-        # leading to incorrect behavior and test failures. In those cases, it seems
-        # like having a locally installed MtoA fixed it, but we can't rely on that.
-        list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH
-             "${MTOA_LOCATION}")
-    endif()
-    
-    # lookdevx
-    if(DEFINED LOOKDEVX_LOCATION)
-        list(APPEND MAYAUSD_VARNAME_PATH
-             "${LOOKDEVX_LOCATION}/bin")
-        list(APPEND MAYAUSD_VARNAME_PATH
-             "${LOOKDEVX_LOCATION}/plug-ins")
-        list(APPEND MAYAUSD_VARNAME_MAYA_SCRIPT_PATH
-             "${LOOKDEVX_LOCATION}/scripts") #Contains some AE templates files
-        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
-             "${LOOKDEVX_LOCATION}/scripts")#Contains some python scripts
-        list(APPEND MAYAUSD_VARNAME_PYTHONPATH
-             "${LOOKDEVX_LOCATION}/python")
-        list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
-             "${LOOKDEVX_LOCATION}/plug-ins")
-    endif()
-
-    if(DEFINED BIFROST_LOCATION)
-        #The bifrost package contains 2 template files that should have been converted by ecg maya hydra to bifrost.mod and vnn.mod files 
-        #These .mod files are used to set the environment for Bifrost and VNN plugins in Maya.
-		set(BIFROST_MOD "${BIFROST_LOCATION}/bifrost.mod")
-		if(EXISTS "${BIFROST_MOD}")
-			message(STATUS "bifrost.mod exists at: ${BIFROST_MOD}")
-			list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH "${BIFROST_LOCATION}") #Add the common location for bifrost and vnn .mod files to maya mod files
-		else()
-			message(FATAL_ERROR "Could not find bifrost.mod at: ${BIFROST_MOD}")
-        endif()
-    endif()
+    _mayaHydra_setup_test_plugins()
 
     if(IS_WINDOWS AND DEFINED ENV{PYTHONHOME})
         # If the environment contains a PYTHONHOME, also set the path to
         # that folder so that we can find the python DLLs.
-        list(APPEND MAYAUSD_VARNAME_PATH $ENV{PYTHONHOME})
+        list(APPEND MAYAHYDRA_VARNAME_PATH $ENV{PYTHONHOME})
     endif()
 
     # Adjust PYTHONPATH to include the path to our test utilities.
-    list(APPEND MAYAUSD_VARNAME_PYTHONPATH "${MAYA_USD_DIR}/test/testUtils")
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_USD_DIR}/test/testUtils")
 
     # Adjust PYTHONPATH to include the path to our test.
-    list(APPEND MAYAUSD_VARNAME_PYTHONPATH "${CMAKE_CURRENT_SOURCE_DIR}")
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${CMAKE_CURRENT_SOURCE_DIR}")
 
     # Adjust PATH and PYTHONPATH to include USD.
-    # These should come last (esp PYTHONPATH, in case another module is overriding
-    # with pkgutil)
-   if (DEFINED MAYAHYDRA_TO_USD_RELATIVE_PATH)
-        set(USD_INSTALL_LOCATION "${CMAKE_INSTALL_PREFIX}/${MAYAHYDRA_TO_USD_RELATIVE_PATH}")
-    else()
-        set(USD_INSTALL_LOCATION ${PXR_USD_LOCATION})
-    endif()
-    # Inherit any existing PYTHONPATH, but keep it at the end.
-    list(APPEND MAYAUSD_VARNAME_PYTHONPATH
-        "${USD_INSTALL_LOCATION}/lib/python")
-    if(IS_WINDOWS)
-        list(APPEND MAYAUSD_VARNAME_PATH
-            "${USD_INSTALL_LOCATION}/bin")
-        list(APPEND MAYAUSD_VARNAME_PATH
-            "${USD_INSTALL_LOCATION}/lib")
-    endif()
+    _mayaHydra_setup_test_USD_paths()
 
-    # NOTE: this should come after any setting of PATH/PYTHONPATH so
-    #       that our entries will come first.
-    # Inherit any existing PATH/PYTHONPATH, but keep it at the end.
-    # This is needed (especially for PATH) because we will overwrite
-    # both with the values from our list and we need to keep any
-    # system entries.
-    list(APPEND MAYAUSD_VARNAME_PATH $ENV{PATH})
-    list(APPEND MAYAUSD_VARNAME_PYTHONPATH $ENV{PYTHONPATH})
+    # Set environment variables as test properties.
+    _mayaHydra_setup_test_finalize_env("${test_name}")
 
-    # convert the internally-processed envs from cmake list
-    foreach(pathvar ${ALL_PATH_VARS})
-        separate_argument_list(MAYAUSD_VARNAME_${pathvar})
-    endforeach()
-
-    # prepend the passed-in ENV values - assume these are already
-    # separated + escaped
-    foreach(name_value_pair ${PREFIX_ENV})
-        mayaUsd_split_head_tail("${name_value_pair}" "=" env_name env_value)
-        if(NOT env_name)
-            message(FATAL_ERROR "poorly formatted NAME=VALUE pair - name "
-                "missing: ${name_value_pair}")
-        endif()
-
-        # now either prepend to existing list, or create new
-        if("${env_name}" IN_LIST ALL_PATH_VARS)
-            if(IS_WINDOWS)
-                set(MAYAUSD_VARNAME_${env_name}
-                    "${env_value}\;${MAYAUSD_VARNAME_${env_name}}")
-            else()
-                set(MAYAUSD_VARNAME_${env_name}
-                    "${env_value}:${MAYAUSD_VARNAME_${env_name}}")
-            endif()
-        else()
-            set("MAYAUSD_VARNAME_${env_name}" ${env_value})
-            list(APPEND ALL_PATH_VARS "${env_name}")
-        endif()
-    endforeach()
-
-    # Unset any MAYA_MODULE_PATH as we set all the individual variables
-    # so we don't want to conflict with a MayaUsd module.
-    set_property(TEST ${test_name} APPEND PROPERTY ENVIRONMENT "MAYA_MODULE_PATH=")
-
-    # set all env vars
-    foreach(pathvar ${ALL_PATH_VARS})
-        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-            "${pathvar}=${MAYAUSD_VARNAME_${pathvar}}")
-    endforeach()
-    
-    # Set a temporary folder path for the TMP,TEMP and MAYA_APP_DIR in which the
-    # maya profile will be created.
-    # Note: replace bad chars in test_name with _.
-    string(REGEX REPLACE "[:<>\|]" "_" SANITIZED_TEST_NAME ${test_name})
-    set(MAYA_APP_TEMP_DIR "${CMAKE_BINARY_DIR}/test/Temporary/${SANITIZED_TEST_NAME}")
-    # Note: ${WORKING_DIR} can point to the source folder, so don't use it
-    #       in any env var that will write files (such as MAYA_APP_DIR).
-    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-        "TMP=${MAYA_APP_TEMP_DIR}"
-        "TEMP=${MAYA_APP_TEMP_DIR}"
-        "MAYA_APP_DIR=${MAYA_APP_TEMP_DIR}")
-    file(MAKE_DIRECTORY ${MAYA_APP_TEMP_DIR})
-
-    # Set the Python major version in MAYA_PYTHON_VERSION. Maya 2020 and
-    # earlier that are Python 2 only will simply ignore it.
-    # without "MAYA_NO_STANDALONE_ATEXIT=1", standalone.uninitialize() will
-    # set exitcode to 0
-    # MAYA_DISABLE_CIP=1  Avoid fatal crash on start-up.
-    # MAYA_DISABLE_CER=1  Customer Error Reporting.
-    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-        "MAYA_PYTHON_VERSION=${MAYA_PY_VERSION}"
-        "MAYA_NO_STANDALONE_ATEXIT=1"
-        "MAYA_DEBUG_ENABLE_CRASH_REPORTING=1"
-        "MAYA_DEBUG_NO_SAVE_ON_CRASH=1"
-        "MAYA_NO_MORE_ASSERT=1"
-        "MAYA_DISABLE_CIP=1"
-        "MAYA_DISABLE_CER=1")
-
-    if(IS_MACOSX)
-        # Necessary for tests like DiffCore to find python
-        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-            "DYLD_LIBRARY_PATH=${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
-        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-            "DYLD_FRAMEWORK_PATH=${MAYA_LOCATION}/Maya.app/Contents/Frameworks")
-    endif()
-
-    if (PREFIX_INTERACTIVE)
+    if (ARG_INTERACTIVE)
         # Add the "interactive" label to all tests that launch the Maya UI.
         # This allows bypassing them by using the --label-exclude/-LE option to
         # ctest. This is useful when running tests in a headless configuration.
@@ -523,4 +607,156 @@ finally:
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
             "MAYA_IGNORE_DIALOGS=1")
     endif()
+endfunction()
+
+#
+# mayaHydra_add_cmd_line_render_test( <scene_file_labeled>
+#                           [RENDERER <renderer_name>]
+#                           [IMAGE_EXTENSION <extension>]
+#                           [FAIL <idiff fail value>]
+#                           [FAILPERCENT <idiff failpercent value>]
+#                           [WORKING_DIRECTORY <dir>]
+#                           [ENV <varname>=<varvalue> ...])
+#
+# Similar to mayaUsd_add_test but uses the Render executable instead of Maya or
+# mayapy.  This is to run batch rendering tests that don't require the Maya UI.
+#
+# The first argument is the Maya scene file to render.  It can be a relative
+# path, and it may have appended labels after a | separator. 
+#
+#   RENDERER           - Name of renderer to be passed to the Render
+#                        (default hydraStorm).
+#   IMAGE_EXTENSION    - Image file extension, without the dot (default png).
+#                        This is appended to the test name.
+#   FAIL               - idiff fail value (default 0.01)
+#   FAILPERCENT        - idiff failpercent value idiff (default 1.0)
+#   WORKING_DIRECTORY  - Directory from which the test executable will be called.
+#   ENV                - Set or append the indicated environment variables;
+#                        Similar to mayaUsd_add_test, this function manages
+#                        the same environment variables.
+#
+function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
+    # -----------------
+    # 1) Arg processing
+    # -----------------
+
+    cmake_parse_arguments(ARG
+        ""                                       # No boolean options.
+        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;IMAGE_EXTENSION;FAIL;FAILPERCENT" # one_value keywords
+        "ENV"                                    # multi_value keywords
+        ${ARGN}
+    )
+
+    # set the working_dir
+    if(ARG_WORKING_DIRECTORY)
+        set(WORKING_DIR ${ARG_WORKING_DIRECTORY})
+    else()
+        set(WORKING_DIR ${CMAKE_CURRENT_BINARY_DIR})
+    endif()
+
+    # -------------- 
+    # 2) Create test
+    # --------------
+
+    set(RENDERER "hydraStorm")
+    if(ARG_RENDERER)
+        set(RENDERER "${ARG_RENDERER}")
+    endif()
+       
+    set( "")
+    if(ARG_SCENE_FILE_LABELED)
+        set(SCENE_FILE_LABELED "${ARG_SCENE_FILE_LABELED}")
+    endif()
+
+    # Parse line to extract scene file and labels added with | syntax.
+    get_testfile_and_labels(ALL_LABELS SCENE_FILE ${SCENE_FILE_LABELED})
+    # Remove extension to define the test name
+    mayaUsd_get_unittest_target(test_name ${SCENE_FILE})
+
+    set(IMAGE_EXTENSION "png")
+    if(ARG_IMAGE_EXTENSION)
+        set(IMAGE_EXTENSION "${ARG_IMAGE_EXTENSION}")
+    endif()
+
+    set(FAIL "0.01")
+    if(ARG_FAIL)
+        set(FAIL "${ARG_FAIL}")
+    endif()
+
+    set(FAILPERCENT "1.0")
+    if(ARG_FAILPERCENT)
+        set(FAILPERCENT "${ARG_FAILPERCENT}")
+    endif()
+
+    # Prepend the scene directory to the argument scene file.
+    set(SCENE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/scenes)
+
+    set(SCENE_PATH ${SCENE_DIR}/${SCENE_FILE})
+
+    # Our test command is a trivial script that invokes the Render executable
+    # to render an image, then invokes idiff to compare the rendered result
+    # with a reference image.
+
+    # The command needs to be the name of an executable, without any 
+    # arguments, as CMake calls an executable with that string unparsed.
+
+    # CMake add_test COMMAND option arguments are unconditionally quoted.  On
+    # Windows this prevents the use of the simple cmd shell, as cmd /c works,
+    # but cmd "/c" does not: the cmd shell no longer interprets the /c as a
+    # flag argument.  Use PowerShell instead.
+    set(CMD PowerShell)
+
+    set(RENDER_ARGS "${RENDER_EXECUTABLE} -renderer ${RENDERER} ${SCENE_PATH}")
+
+    # Replace illegal characters in test_name with _.  Rendered images are
+    # written here.
+    string(REGEX REPLACE "[:<>\|]" "_" SANITIZED_TEST_NAME ${test_name})
+    set(MAYA_APP_TEMP_DIR "${CMAKE_BINARY_DIR}/test/Temporary/${SANITIZED_TEST_NAME}")
+
+    set(RENDERED_IMAGE_PATH "${MAYA_APP_TEMP_DIR}/projects/default/images/${SANITIZED_TEST_NAME}.${IMAGE_EXTENSION}")
+    cmake_path(REPLACE_EXTENSION SCENE_PATH ".${IMAGE_EXTENSION}" OUTPUT_VARIABLE EXPECTED_IMAGE_PATH)
+
+    set(IDIFF_ARGS "idiff -fail ${FAIL} -failpercent ${FAILPERCENT} ${RENDERED_IMAGE_PATH} ${EXPECTED_IMAGE_PATH}")
+
+    # Quote semicolon to avoid interpretation as CMake list element separator.
+    set(CMD_ARGS -Command "${RENDER_ARGS} \; if (\$?) { ${IDIFF_ARGS} }")
+    message(STATUS "PPT: CMD_ARGS is ${CMD_ARGS}")
+
+    add_test(
+        NAME "${test_name}"
+        WORKING_DIRECTORY ${WORKING_DIR}
+        COMMAND ${CMD} ${CMD_ARGS}
+    )
+
+    # -----------------
+    # 3) Set up environ
+    # -----------------
+
+    _mayaHydra_setup_test_common_path_vars()
+    list(APPEND ALL_PATH_VARS MAYA_RENDER_DESC_PATH)
+
+    _mayaHydra_setup_test_common_defaults("${test_name}")
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "MAYA_DEFAULT_SURFACE_SHADER=standardSurface")
+
+    # Emulate what the module files for mayaHydra and mayaUsdPlugin would do.
+    _mayaHydra_setup_test_plugins()
+    list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
+         "${CMAKE_INSTALL_PREFIX}/renderDesc")
+
+    # Adjust PATH and PYTHONPATH to include USD.
+    _mayaHydra_setup_test_USD_paths()
+    
+    # Set environment variables as test properties.
+    _mayaHydra_setup_test_finalize_env("${test_name}")
+
+    # For render tests, we don't want interactive UI elements
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "MAYA_IGNORE_DIALOGS=1")
+        
+    # Add a label to identify render tests
+    set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
+
+    apply_labels_to_test("${ALL_LABELS}" ${test_name})
+
 endfunction()

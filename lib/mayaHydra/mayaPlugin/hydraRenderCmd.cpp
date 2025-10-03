@@ -16,6 +16,7 @@
 #include "hydraRenderCmd.h"
 
 #include "pluginUtils.h"
+#include "pluginDebugCodes.h"
 #include "batchRenderer.h"
 
 #include <ufeExtensions/Global.h>
@@ -30,12 +31,15 @@
 #include <maya/MCommonRenderSettingsData.h>
 #include <maya/MRenderUtil.h>
 #include <maya/MFnRenderLayer.h>
+#include <maya/MFileIO.h>
 
 #include <pxr/pxr.h>
 #include <pxr/base/tf/scoped.h>
 #include <pxr/imaging/glf/diagnostic.h> // For GlfRegisterDefaultDebugOutputMessageCallback()
 #include <pxr/imaging/garch/glApi.h>
 #include <pxr/imaging/garch/glDebugWindow.h>
+
+#include <filesystem>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -188,6 +192,11 @@ bool HydraRenderCmd::hydraRender()
     MCommonRenderSettingsData renderSettings;
     MRenderUtil::getCommonRenderSettings(renderSettings);
 
+    // Unexpectedly renderSettings.name is empty, so parse the scene name
+    // ourselves.
+    std::filesystem::path scenePath{MFileIO::currentFile().asChar()};
+    MString sceneName{scenePath.stem().c_str()};
+
     BatchRenderer::InputParams inputParams;
     inputParams.width = renderSettings.width;
     inputParams.height = renderSettings.height;
@@ -291,7 +300,7 @@ bool HydraRenderCmd::hydraRender()
             const auto imageName = renderSettings.getImageName(
                 MCommonRenderSettingsData::kFullPathImage,
                 frameNb,
-                "myScene",
+                sceneName,
                 camera,
                 "",                     // Use render settings file format
                 renderLayer,
@@ -300,7 +309,10 @@ bool HydraRenderCmd::hydraRender()
             if (status != MS::kSuccess) {
                 return false;
             }
-        
+
+            TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+                         "Render image name is %s.\n", imageName.asChar());
+
             auto resetFileName = []() { Fvp::ImageBufferWriter::SetFileName(""); };
             TfScoped guard(resetFileName);
             Fvp::ImageBufferWriter::SetFileName(imageName.asChar());
