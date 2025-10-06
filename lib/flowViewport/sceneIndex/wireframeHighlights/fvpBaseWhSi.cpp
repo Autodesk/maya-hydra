@@ -28,6 +28,10 @@
 #include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
+#include <pxr/imaging/hd/materialConnectionSchema.h>
+#include <pxr/imaging/hd/materialNodeParameterSchema.h>
+#include <pxr/imaging/hd/materialNodeSchema.h>
+#include <pxr/imaging/hd/materialSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
@@ -151,6 +155,24 @@ VtArray<SdfPath> _GetHierarchyRoots(const HdSceneIndexPrim& prim)
     return instancedBy.IsDefined() && instancedBy.GetPrototypeRoots()
         ? instancedBy.GetPrototypeRoots()->GetTypedValue(0)
         : VtArray<SdfPath>({SdfPath::AbsoluteRootPath()});
+}
+
+bool _MaterialHasDisplacement(const HdSceneIndexPrim& materialPrim) {
+    if (materialPrim.primType != HdPrimTypeTokens->material) {
+        return false;
+    }
+    auto materialSchema = HdMaterialSchema::GetFromParent(materialPrim.dataSource);
+    auto materialNetwork = materialSchema.GetMaterialNetwork();
+    auto nodes = materialNetwork.GetNodes();
+    for (const auto& nodeName : nodes.GetNames()) {
+        auto displacement = nodes.Get(nodeName).GetParameters().Get(TfToken("displacement"));
+        if (displacement.IsDefined()) {
+            return true;
+        }
+    }
+    auto terminals = materialNetwork.GetTerminals();
+    auto displacement = terminals.Get(HdMaterialTerminalTokens->displacement);
+    return displacement.IsDefined();
 }
 
 // Copied over from USD's rerootingSceneIndex.cpp
@@ -355,52 +377,6 @@ private:
 }
 
 namespace FVP_NS_DEF {
-
-//We want to set the displayStyle of the highlighting prim with following overrides:
-// 1. A "reprSelector" with HdReprTokens->wire or HdReprTokens->refinedWire, means only draw wires.
-// 2. An "overrideWireframeColor" primvar with the color of the highlighting.
-HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& dataSource, const GfVec4f& color)
-{
-    //Always edit its override wireframe color
-    auto edited = HdContainerDataSourceEditor(dataSource);
-    edited.Set(primvarsOverrideWireframeColorLocator,
-                        Fvp::PrimvarDataSource::New(
-                            HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{color}),
-                            HdPrimvarSchemaTokens->constant,
-                            HdPrimvarSchemaTokens->color));
-
-    //  Secondary graphics purpose render tag data source
-    edited.Set(HdPurposeSchema::GetDefaultLocator(),
-                HdPurposeSchema::Builder()
-                .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
-                    Fvp::secondaryGraphicsRenderTagToken))
-                .Build());
-
-    //Is the prim having a DisplayStyle schema?
-    if (HdLegacyDisplayStyleSchema styleSchema =
-            HdLegacyDisplayStyleSchema::GetFromParent(dataSource)) {
-
-        if (HdTokenArrayDataSourceHandle ds =
-                styleSchema.GetReprSelector()) {
-            VtArray<TfToken> ar = ds->GetTypedValue(0.0f);
-            TfToken refinedToken = ar[0];
-            if (HdReprTokens->refined == refinedToken
-                || HdReprTokens->refinedWireOnSurf == refinedToken) {
-                //Is in refined display style, apply the refinedWire reprselector
-                return HdOverlayContainerDataSource::New({ refinedWireDisplayStyleDataSource, edited.Finish() });
-            } else if (HdReprTokens->wireOnSurf == refinedToken) {
-                //Is in non-refined display style, apply the wire reprselector
-                return HdOverlayContainerDataSource::New({ wireDisplayStyleDataSource, edited.Finish() });
-            }
-        }else{
-            //No reprSelector found, assume it's in the Collection that we have set HdReprTokens->refined
-            return HdOverlayContainerDataSource::New({ refinedWireDisplayStyleDataSource, edited.Finish() });
-        }
-    }
-
-    //For the other case, we are only updating the wireframe color assuming we are already drawing lines
-    return edited.Finish();
-}
 
 PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
     const PXR_NS::HdContainerDataSourceHandle& primDataSource,
@@ -836,6 +812,69 @@ BaseWhSi::CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPath
     for (const auto& affectedInstancedByPath : affectedInstancedByPaths) {
         CollectInstancingPaths(affectedInstancedByPath, InstancingPathsCollectionDirection::InstancedBy, outInstancerPaths, outPrototypePaths);
     }
+}
+
+//We want to set the displayStyle of the highlighting prim with following overrides:
+// 1. A "reprSelector" with HdReprTokens->wire or HdReprTokens->refinedWire, means only draw wires.
+// 2. An "overrideWireframeColor" primvar with the color of the highlighting.
+HdContainerDataSourceHandle
+BaseWhSi::SetWireframeRepr(const HdContainerDataSourceHandle& dataSource, const GfVec4f& color) const
+{
+    //Always edit its override wireframe color
+    auto edited = HdContainerDataSourceEditor(dataSource);
+    edited.Set(primvarsOverrideWireframeColorLocator,
+                        Fvp::PrimvarDataSource::New(
+                            HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{color}),
+                            HdPrimvarSchemaTokens->constant,
+                            HdPrimvarSchemaTokens->color));
+
+    //  Secondary graphics purpose render tag data source
+    edited.Set(HdPurposeSchema::GetDefaultLocator(),
+                HdPurposeSchema::Builder()
+                .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
+                    Fvp::secondaryGraphicsRenderTagToken))
+                .Build());
+    
+    // If no displacement, block materials to avoid unnecessary shader compilation
+    auto materialBindings = HdMaterialBindingsSchema::GetFromParent(dataSource);
+    if (materialBindings.IsDefined()) {
+        auto materialPath = materialBindings.GetMaterialBinding().GetPath()->GetTypedValue(0);
+        if (!_MaterialHasDisplacement(GetInputSceneIndex()->GetPrim(materialPath))) {
+            edited.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+        }
+    }
+    auto directMaterialBindings = UsdImagingDirectMaterialBindingsSchema::GetFromParent(dataSource);
+    if (directMaterialBindings.IsDefined()) {
+        auto materialPath = directMaterialBindings.GetDirectMaterialBinding().GetMaterialPath()->GetTypedValue(0);
+        if (!_MaterialHasDisplacement(GetInputSceneIndex()->GetPrim(materialPath))) {
+            edited.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
+        }
+    }
+
+    //Is the prim having a DisplayStyle schema?
+    if (HdLegacyDisplayStyleSchema styleSchema =
+            HdLegacyDisplayStyleSchema::GetFromParent(dataSource)) {
+
+        if (HdTokenArrayDataSourceHandle ds =
+                styleSchema.GetReprSelector()) {
+            VtArray<TfToken> ar = ds->GetTypedValue(0.0f);
+            TfToken refinedToken = ar[0];
+            if (HdReprTokens->refined == refinedToken
+                || HdReprTokens->refinedWireOnSurf == refinedToken) {
+                //Is in refined display style, apply the refinedWire reprselector
+                return HdOverlayContainerDataSource::New({ refinedWireDisplayStyleDataSource, edited.Finish() });
+            } else if (HdReprTokens->wireOnSurf == refinedToken) {
+                //Is in non-refined display style, apply the wire reprselector
+                return HdOverlayContainerDataSource::New({ wireDisplayStyleDataSource, edited.Finish() });
+            }
+        }else{
+            //No reprSelector found, assume it's in the Collection that we have set HdReprTokens->refined
+            return HdOverlayContainerDataSource::New({ refinedWireDisplayStyleDataSource, edited.Finish() });
+        }
+    }
+
+    //For the other case, we are only updating the wireframe color assuming we are already drawing lines
+    return edited.Finish();
 }
 
 #if PXR_VERSION >= 2405
