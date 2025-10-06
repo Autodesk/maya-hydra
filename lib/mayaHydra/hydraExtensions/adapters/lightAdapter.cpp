@@ -331,7 +331,7 @@ void MayaHydraLightAdapter::_CalculateShadowParams(MFnLight& light, HdxShadowPar
     const bool isPointLight = IsDagPathALightOfThisType(GetDagPath(), pointLight);
     if (isPointLight) {
         GlfSimpleLight simpleLight;
-        GetGlfSimpleLightPosAndDirFromMfnLight(light, simpleLight);
+        GetGlfSimpleLightPosAndDirFromMFnLight(light, simpleLight);
     
 
         const GfBBox3d  bbox    = GetMayaHydraSceneIndex()->GetBoundingBox();//Only get the maya data
@@ -397,7 +397,7 @@ TfToken MayaHydraLightAdapter::GetRenderTag() const
     return Fvp::secondaryGraphicsRenderTagToken; 
 }
 
-void MayaHydraLightAdapter::GetGlfSimpleLightPosAndDirFromMfnLight(
+void MayaHydraLightAdapter::GetGlfSimpleLightPosAndDirFromMFnLight(
     MFnLight& light,
     GlfSimpleLight& outSimpleLight)
 {

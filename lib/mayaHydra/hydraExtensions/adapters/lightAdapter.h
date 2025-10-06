@@ -67,7 +67,7 @@ public:
     
     bool GetShadowsEnabled(MFnLight& light)const;
     
-    void GetGlfSimpleLightPosAndDirFromMfnLight(
+    void GetGlfSimpleLightPosAndDirFromMFnLight(
         MFnLight&           light,
         GlfSimpleLight&     outSimpleLight);
 
