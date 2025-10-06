@@ -345,7 +345,7 @@ void MayaHydraLightAdapter::_CalculateShadowParams(MFnLight& light, HdxShadowPar
     }
 
     params.bias = dmapBiasPlug.isNull() ? -0.001 : -dmapBiasPlug.asFloat();
-    params.blur = dmapFilterSizePlug.isNull() ? 0.0 : (static_cast<double>(dmapFilterSizePlug.asInt()))/ static_cast<double>(params.resolution);
+    params.blur = dmapFilterSizePlug.isNull() ? 0.0 : (static_cast<double>(dmapFilterSizePlug.asInt())) / static_cast<double>(params.resolution);
 
     if (TfDebug::IsEnabled(MAYAHYDRALIB_ADAPTER_LIGHT_SHADOWS)) {
         std::cout << "Resulting HdxShadowParams:\n";
