@@ -332,9 +332,7 @@ void MayaHydraLightAdapter::_CalculateShadowParams(MFnLight& light, HdxShadowPar
     if (isPointLight) {
         GlfSimpleLight simpleLight;
         GetGlfSimpleLightPosAndDirFromMFnLight(light, simpleLight);
-    
-
-        const GfBBox3d  bbox    = GetMayaHydraSceneIndex()->GetBoundingBox();//Only get the maya data
+        const GfBBox3d  bbox    = GetMayaHydraSceneIndex()->GetBoundingBox(); // Only get the Maya data
         const GfBBox3d  aabb    = bbox.ComputeAlignedBox();
         const GfRange3f r       = GfRange3f(aabb.GetRange());
         params.shadowMatrix = std::make_shared<MayaHydraShadowMatrixComputation>(r, simpleLight);
