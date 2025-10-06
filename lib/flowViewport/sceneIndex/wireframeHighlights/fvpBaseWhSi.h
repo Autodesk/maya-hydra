@@ -191,6 +191,9 @@ protected:
     FVP_API
     void CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPathsCollectionDirection direction, PXR_NS::SdfPathSet& outInstancerPaths, PXR_NS::SdfPathSet& outPrototypePaths) const;
 
+    // Make the given prim be drawn as a wireframe of the given color.
+    PXR_NS::HdContainerDataSourceHandle SetWireframeRepr(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color) const;
+
 #if PXR_VERSION >= 2405
     // Given a mesh and geomSubset data sources, edits and returns the mesh data source to fit the given geomSubset
     FVP_API
@@ -209,9 +212,6 @@ protected:
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _primPathsToSelections;
     std::set<PXR_NS::SdfPath> _selectionPaths;
 };
-
-// Make the given prim be drawn as a wireframe of the given color.
-PXR_NS::HdContainerDataSourceHandle SetWireframeRepr(const PXR_NS::HdContainerDataSourceHandle& dataSource, const PXR_NS::GfVec4f& color);
 
 // Repath instancing-related data sources by replacing srcPrefix with dstPrefix.
 // Mainly used to setup selection highlight instancers and instances.
