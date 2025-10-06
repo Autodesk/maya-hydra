@@ -138,9 +138,12 @@
 #include <chrono>
 #include <exception>
 #include <limits>
+#include <fstream>
 
 #include <pxr/base/tf/getenv.h>
 #include <pxr/base/tf/envSetting.h>
+#include <pxr/base/trace/trace.h>
+#include <pxr/base/trace/reporter.h>
 #include "envSettings.h"
 
 int _profilerCategory = MProfiler::addCategory(
@@ -1015,7 +1018,11 @@ MStatus MtohRenderOverride::Render(
                         MProfiler::kColorD_L1,
                         "MtohRenderOverride::Render1",
                         "MtohRenderOverride::Render1");
+                    auto start = std::chrono::high_resolution_clock::now();
                     currentPass->Render(passTasks);
+                    auto end = std::chrono::high_resolution_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+                    std::cout << "MtohRenderOverride::Render1 : " << duration.count() << " us" << std::endl;
                 }
             } else {
                 // Share AOVs from the previous visible pass or pass0
@@ -1602,6 +1609,8 @@ void MtohRenderOverride::_InitHydraResources(
 
     _initializationAttempted = true;
 
+    PXR_NS::TraceCollector::GetInstance().SetEnabled(true);
+
     GlfContextCaps::InitInstance();
     auto eventBegin = [](const char* eventName, const char* description) -> int {
         return MProfiler::eventBegin(_profilerCategory, MProfiler::kColorB_L1, eventName, description);
@@ -1864,6 +1873,14 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     if (!_initializationAttempted) {
         return;
     }
+
+    PXR_NS::TraceCollector::GetInstance().SetEnabled(false);
+    std::ofstream reportFile("report.trace");
+    PXR_NS::TraceReporter::GetGlobalReporter()->Report(reportFile);
+ 
+    std::ofstream chromeReportFile("report.json");
+    PXR_NS::TraceReporter::GetGlobalReporter()->ReportChromeTracing(chromeReportFile);
+
 
     Fvp::SetProfileBegin(nullptr);
     Fvp::SetProfileEnd(nullptr);
