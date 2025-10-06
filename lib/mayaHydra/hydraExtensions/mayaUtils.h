@@ -158,7 +158,7 @@ bool IsDagPathALight(const MDagPath& dagPath);
  * @param[in] dagPath is a MDagPath
  * @param[in] lightTypeString is a light type string such as "aiSkyDomeLight"
  *
- * @;return true if the object is a light of this type, false otherwise
+ * @return true if the object is a light of this type, false otherwise
  */
 bool IsDagPathALightOfThisType(const MDagPath& dagPath, const MString& lightTypeString);
 
