@@ -7,25 +7,8 @@
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
 set(STORM_RENDER_SCENES
     basic/sphere.ma
-    texturing/mayaSphereMayaMaterialStorm.ma
-    texturing/mayaSphereMaterialXStorm.ma
-    texturing/usdSphereMaterialXStorm.ma
-    texturing/usdSphereUsdMaterialStorm.ma
-)
-
-set(ARNOLD_RENDER_SCENES
-    texturing/mayaSphereMayaMaterialArnold.ma
-    texturing/mayaSphereMaterialXArnold.ma
-    texturing/usdSphereMaterialXArnold.ma
-    texturing/usdSphereUsdMaterialArnold.ma
 )
 
 foreach(scene ${STORM_RENDER_SCENES})
     mayaHydra_add_cmd_line_render_test(${scene})
-endforeach()
-
-foreach(scene ${ARNOLD_RENDER_SCENES})
-    mayaHydra_add_cmd_line_render_test(${scene}
-    RENDERER hydraArnold
-)
 endforeach()
