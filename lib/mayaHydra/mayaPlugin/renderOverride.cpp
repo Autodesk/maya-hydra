@@ -1013,6 +1013,13 @@ MStatus MtohRenderOverride::Render(
                 = (aovNameExists) 
                 ? aovName 
                 : HdAovTokens->color;
+            
+            if (visibleIdx > 0) {
+                currentPass->params().renderParams.depthBiasEnable = true;
+                currentPass->params().renderParams.depthBiasUseDefault = false;
+                currentPass->params().renderParams.depthBiasConstantFactor = -1.0f;
+                currentPass->params().renderParams.depthBiasSlopeFactor = -1.0f;
+            }
 
             MayaHydraGLBackup backup;
             if (isPass0) {
