@@ -964,36 +964,14 @@ BaseWhSi::SetWireframeRepr(const HdContainerDataSourceHandle& dataSource, const 
         );
     }
 #else
+    auto usdMaterialBindings = UsdImagingDirectMaterialBindingsSchema::GetFromParent(dataSource);
+    if (usdMaterialBindings.IsDefined()) {
+        edited.Set(
+            UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), 
+            _MaterialBlockingContainerDataSource::New(usdMaterialBindings.GetContainer(), GetInputSceneIndex(), TfToken("materialPath"))
+        );
+    }
 #endif
-//    auto hdMaterialBindings = HdMaterialBindingsSchema::GetFromParent(dataSource);
-//    if (hdMaterialBindings.IsDefined()) {
-//        auto materialPath = hdMaterialBindings.GetMaterialBinding().GetPath()->GetTypedValue(0);
-//        if (!_MaterialHasDisplacement(GetInputSceneIndex()->GetPrim(materialPath))) {
-//            edited.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-//        }
-//    }
-//#if PXR_VERSION >= 2505
-//    auto usdMaterialBindings = UsdImagingMaterialBindingsSchema::GetFromParent(dataSource);
-//    if (usdMaterialBindings.IsDefined()) {
-//        auto materialBindings = usdMaterialBindings.GetMaterialBindings();
-//        auto newMaterialBindings = HdVectorDataSource<
-//        for (size_t iBinding = 0; iBinding < materialBindings.GetNumElements(); iBinding++) {
-//            auto materialPath = materialBindings.GetElement(iBinding).GetDirectMaterialBinding().GetMaterialPath()->GetTypedValue(0);
-//            if (!_MaterialHasDisplacement(GetInputSceneIndex()->GetPrim(materialPath))) {
-//                edited.Set(UsdImagingMaterialBindingsSchema::GetDefaultLocator().Append(purpose), HdBlockDataSource::New());
-//            }
-//            materialBindings
-//        }
-//    }
-//#else
-//    auto usdMaterialBindings = UsdImagingDirectMaterialBindingsSchema::GetFromParent(dataSource);
-//    if (usdMaterialBindings.IsDefined()) {
-//        auto materialPath = usdMaterialBindings.GetDirectMaterialBinding().GetMaterialPath()->GetTypedValue(0);
-//        if (!_MaterialHasDisplacement(GetInputSceneIndex()->GetPrim(materialPath))) {
-//            edited.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-//        }
-//    }
-//#endif
 
     //Is the prim having a DisplayStyle schema?
     if (HdLegacyDisplayStyleSchema styleSchema =
