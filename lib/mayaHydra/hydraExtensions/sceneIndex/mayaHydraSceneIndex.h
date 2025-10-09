@@ -262,6 +262,9 @@ public:
     void SetLightsManagementSceneIndex(
         const Fvp::LightsManagementSceneIndexRefPtr lightsManagementSceneIndex);//Can be a nullptr
     
+    GfBBox3d GetBoundingBox()const;
+
+
 private:
     MayaHydraSceneIndex(
         MayaHydraInitData& initData,

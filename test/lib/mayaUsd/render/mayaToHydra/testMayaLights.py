@@ -70,11 +70,9 @@ class TestMayaLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.Ma
         self.assertSnapshotClose("directionalLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
 
         #Use Point Light
-        #TODO: Enable shadowOn test on point light when it works
-        if not shadowOn:
-            cmds.select( 'pointLight1', r=True )
-            cmds.refresh()
-            self.assertSnapshotClose("pointLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
+        cmds.select( 'pointLight1', r=True )
+        cmds.refresh()
+        self.assertSnapshotClose("pointLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
 
         #Use Spot Light
         cmds.select( 'spotLight1', r=True )
