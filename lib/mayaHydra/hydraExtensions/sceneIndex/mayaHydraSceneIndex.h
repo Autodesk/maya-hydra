@@ -104,10 +104,9 @@ public:
 
     static MayaHydraSceneIndexRefPtr New(
         MayaHydraInitData& initData,
-        bool lightEnabled,
         bool interactive
     ) {
-        return TfCreateRefPtr(new MayaHydraSceneIndex(initData, lightEnabled, interactive));
+        return TfCreateRefPtr(new MayaHydraSceneIndex(initData, interactive));
     }
 
     ~MayaHydraSceneIndex();
@@ -280,7 +279,6 @@ public:
 private:
     MayaHydraSceneIndex(
         MayaHydraInitData& initData,
-        bool lightEnabled, 
         bool interactive
     );
 

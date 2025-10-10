@@ -41,7 +41,6 @@
 #include <flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h>
 #include <flowViewport/selection/fvpSelectionTracker.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
-#include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
@@ -120,7 +119,6 @@ public:
 private:
 
     void              _InitHydraResources();
-    void              _DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext);
     PXR_NS::HdRenderDelegate* _GetRenderDelegate();   
     void              _ClearMayaHydraSceneIndex();
     void              _SetActiveRenderSettingsPrimFromStageMetadata();
@@ -165,15 +163,12 @@ private:
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
-    Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
     PXR_NS::HdsiSceneGlobalsSceneIndexRefPtr  _sceneGlobalsSceneIndex;
 
     PXR_NS::HdRprimCollection                 _renderCollection {
         PXR_NS::HdTokens->geometry,
         PXR_NS::HdReprSelector(PXR_NS::HdReprTokens->refined),
         PXR_NS::SdfPath::AbsoluteRootPath() };
-
-    PXR_NS::GlfSimpleLight _defaultLight;
 
     PXR_NS::MayaHydraSceneIndexRefPtr _mayaHydraSceneIndex;
 
@@ -193,8 +188,6 @@ private:
     const bool _isUsingHdSt = false;
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
-    bool       _hasDefaultLighting = false;
-    MFrameContext::LightingMode _lightingMode = MFrameContext::LightingMode::kSceneLights;
 };
 
 }

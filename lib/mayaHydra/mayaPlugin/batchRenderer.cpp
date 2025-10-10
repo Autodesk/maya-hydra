@@ -200,9 +200,6 @@ BatchRenderer::BatchRenderer(const MtohRendererDescription& desc)
     if (status) {
         _callbacks.append(id);
     }
-
-    _defaultLight.SetSpecular(GfVec4f(0.0f));
-    _defaultLight.SetAmbient(GfVec4f(0.0f));
 }
 
 BatchRenderer::~BatchRenderer()
@@ -267,74 +264,6 @@ SdfPath BatchRenderer::RendererSceneDelegateId(TfToken sceneDelegateName)
 {
     return _mayaHydraSceneIndex ?
         _mayaHydraSceneIndex->GetDelegateID(sceneDelegateName) : SdfPath();
-}
-
-void BatchRenderer::_DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext)
-{
-    constexpr auto considerAllSceneLights = MHWRender::MDrawContext::kFilteredIgnoreLightLimit;
-
-    const auto numLights = drawContext.numberOfActiveLights(considerAllSceneLights);
-    auto       foundMayaDefaultLight = false;
-    if (numLights == 1) {
-        auto* lightParam = drawContext.getLightParameterInformation(0, considerAllSceneLights);
-        if (lightParam != nullptr && !lightParam->lightPath().isValid()) {
-            // This light does not exist so it must be the
-            // default maya light
-            MFloatPointArray positions;
-            MFloatVector     direction;
-            auto             intensity = 0.0f;
-            MColor           color;
-            auto             hasDirection = false;
-            auto             hasPosition = false;
-
-            // Maya default light has no position, only direction
-            drawContext.getLightInformation(
-                0,
-                positions,
-                direction,
-                intensity,
-                color,
-                hasDirection,
-                hasPosition,
-                considerAllSceneLights);
-
-            if (hasDirection && !hasPosition) {
-
-#if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
-                intensity /= M_PI;//Is a HdPrimTypeTokens->simpleLight
-#endif
-
-                // Note for devs : if you update more parameters in the default light, don't forget
-                // to update MtohDefaultLightDelegate::SetDefaultLight and MayaHydraSceneIndex::SetDefaultLight, currently there are only 3 :
-                // position, diffuse, specular
-                GfVec3f position;
-                GetDirectionalLightPositionFromDirectionVector(position, {direction.x, direction.y, direction.z});
-                _defaultLight.SetPosition({ position.data()[0], position.data()[1], position.data()[2], 0.0f });
-                _defaultLight.SetDiffuse(
-                    { intensity * color.r, intensity * color.g, intensity * color.b, 1.0f });
-                _defaultLight.SetSpecular(
-                    { intensity * color.r, intensity * color.g, intensity * color.b, 1.0f });
-                foundMayaDefaultLight = true;
-            }
-        }
-    }
-
-    TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_DEFAULT_LIGHTING)
-        .Msg(
-            "BatchRenderer::"
-            "_DetectMayaDefaultLighting() "
-            "foundMayaDefaultLight=%i\n",
-            foundMayaDefaultLight);
-
-    if (foundMayaDefaultLight != _hasDefaultLighting) {
-        _hasDefaultLighting = foundMayaDefaultLight;
-        TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_DEFAULT_LIGHTING)
-            .Msg(
-                "BatchRenderer::"
-                "_DetectMayaDefaultLighting() clearing! "
-                "_hasDefaultLighting=%i\n",
-                _hasDefaultLighting);
-    }
 }
 
 MStatus BatchRenderer::Render(
@@ -409,8 +338,6 @@ MStatus BatchRenderer::Render(
         return MStatus::kFailure;
     }
 
-    // Figure out what to do with default lighting.
-    // _DetectMayaDefaultLighting(drawContext);
     if (_needsClear.exchange(false)) {
         constexpr bool fullReset = false;
         ClearHydraResources(fullReset);
@@ -423,8 +350,6 @@ MStatus BatchRenderer::Render(
             return MStatus::kFailure;
         }
     }
-
-    MFrameContext::LightingMode currentMayaLightingMode = MFrameContext::LightingMode::kSceneLights;
 
     // TODO_BATCH_RENDER  Remove this viewport architecture dependency.
     const std::string panelName{batchRenderDummyPanelName};
@@ -447,15 +372,7 @@ MStatus BatchRenderer::Render(
     MayaHydraParams delegateParams = _globals.delegateParams;
     delegateParams.displaySmoothMeshes = true; // This is the default.
     
-    if (_lightsManagementSceneIndex && _lightingMode != currentMayaLightingMode) {
-        _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(currentMayaLightingMode));
-        _lightingMode = currentMayaLightingMode;
-        _hasDefaultLighting = (MFrameContext::kLightDefault == _lightingMode);//Update default lighting
-    }
-
     if (_mayaHydraSceneIndex) {
-        _mayaHydraSceneIndex->SetDefaultLightEnabled(_hasDefaultLighting);
-        _mayaHydraSceneIndex->SetDefaultLight(_defaultLight);
         _mayaHydraSceneIndex->SetParams(delegateParams);
         // TODO_BATCH_RENDER
         // Maya Hydra scene index does way too much, viewport render aware.
@@ -676,7 +593,7 @@ void BatchRenderer::_InitHydraResources()
     _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(*_renderIndex);
 
     constexpr bool interactive = false;
-    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, !_hasDefaultLighting, interactive);
+    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, interactive);
     TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
     
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
@@ -800,9 +717,6 @@ void BatchRenderer::_CreateSceneIndicesChainAfterMergingSceneIndex()
 
     _lastFilteringSceneIndexBeforeCustomFiltering = _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
     TF_AXIOM(_mayaHydraSceneIndex);
-    _lastFilteringSceneIndexBeforeCustomFiltering = _lightsManagementSceneIndex = Fvp::LightsManagementSceneIndex::New(
-        _lastFilteringSceneIndexBeforeCustomFiltering, _mayaHydraSceneIndex->GetMayaDefaultLightPath());
-    _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(_lightingMode));
 
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);

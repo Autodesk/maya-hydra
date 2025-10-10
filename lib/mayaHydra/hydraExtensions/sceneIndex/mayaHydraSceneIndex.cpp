@@ -439,7 +439,6 @@ private:
 
 MayaHydraSceneIndex::MayaHydraSceneIndex(
     MayaHydraInitData& initData,
-    bool /* lightEnabled */,
     bool interactive
 )
     : _ID(initData.delegateID.AppendChild(
