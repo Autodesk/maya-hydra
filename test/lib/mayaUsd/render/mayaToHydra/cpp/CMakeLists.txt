@@ -50,6 +50,7 @@ target_sources(${TARGET_NAME}
         testWriteFile.cpp
         testCamera.cpp
         testCustomAttributes.cpp
+        testMaterialBlocking.cpp
 )
 
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)

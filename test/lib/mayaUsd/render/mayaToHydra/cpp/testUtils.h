@@ -38,6 +38,7 @@
 #include <fstream>
 #include <functional>
 #include <limits>
+#include <string_view>
 
 UFE_NS_DEF {
 class Path;
@@ -46,6 +47,8 @@ class Path;
 PXR_NAMESPACE_OPEN_SCOPE
 
 constexpr double DEFAULT_TOLERANCE = std::numeric_limits<double>::epsilon();
+
+constexpr std::string_view kHighlightsHierarchyPrefix = "FlowViewportSelectionHighlights";
 
 using SceneIndicesVector = std::vector<HdSceneIndexBaseRefPtr>;
 
