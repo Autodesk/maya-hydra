@@ -18,8 +18,13 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/usdImaging/usdImaging/collectionMaterialBindingSchema.h>
+
+#if PXR_VERSION >= 2505
 #include <pxr/usdImaging/usdImaging/materialBindingSchema.h>
 #include <pxr/usdImaging/usdImaging/materialBindingsSchema.h>
+#else
+#include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
+#endif
 
 #include <gtest/gtest.h>
 
@@ -73,6 +78,11 @@ TEST(MaterialBlocking, testMaterialBlocking)
         }
     }
 #else
-
+    auto usdMaterialBindings = UsdImagingDirectMaterialBindingsSchema::GetFromParent(cubePrim.dataSource);
+    ASSERT_TRUE(usdMaterialBindings.IsDefined());
+    ASSERT_FALSE(usdMaterialBindings.GetDirectMaterialBinding().GetMaterialPath());
+    for (const auto& purpose : usdMaterialBindings.GetPurposes()) {
+        ASSERT_FALSE(usdMaterialBindings.GetDirectMaterialBinding(purpose).GetMaterialPath());
+    }
 #endif
 }
