@@ -79,6 +79,29 @@ const SceneIndicesVector& GetTerminalSceneIndices()
     return GetMayaHydraLibInterface().GetTerminalSceneIndices();
 }
 
+const HdSceneIndexBasePtr GetPassSceneIndex(int passIndex)
+{
+    const SdfPath passPath = SdfPath("/Pass" + std::to_string(passIndex));
+    const auto& sceneIndices = GetTerminalSceneIndices();
+    size_t iSceneIndex = 0;
+    for (;iSceneIndex < sceneIndices.size(); iSceneIndex++) {
+        if (!sceneIndices[iSceneIndex]->GetChildPrimPaths(passPath).empty()) {
+            return sceneIndices[iSceneIndex];
+        }
+    }
+    return nullptr;
+}
+
+const HdSceneIndexBasePtr GetBeautyPassSceneIndex()
+{
+    return GetPassSceneIndex(0);
+}
+
+const HdSceneIndexBasePtr GetSecondaryGraphicsPassSceneIndex()
+{
+    return GetPassSceneIndex(1);
+}
+
 bool MatricesAreClose(const GfMatrix4d& hydraMatrix, const MMatrix& mayaMatrix, double tolerance)
 {
     return GfIsClose(hydraMatrix, GetGfMatrixFromMaya(mayaMatrix), tolerance);

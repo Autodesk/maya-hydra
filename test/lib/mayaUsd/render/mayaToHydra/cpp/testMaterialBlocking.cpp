@@ -28,16 +28,9 @@ PXR_NAMESPACE_USING_DIRECTIVE
 TEST(MaterialBlocking, testMaterialBlocking)
 {
     // Get the selection highlight scene index
-    const auto& sceneIndices = GetTerminalSceneIndices();
-    ASSERT_GT(sceneIndices.size(), 0u);
-    size_t iSceneIndex = 0;
-    for (;iSceneIndex < sceneIndices.size(); iSceneIndex++) {
-        if (!sceneIndices[iSceneIndex]->GetChildPrimPaths(SdfPath("/Pass1")).empty()) {
-            break;
-        }
-    }
-    ASSERT_LT(iSceneIndex, sceneIndices.size());
-    SceneIndexInspector inspector(sceneIndices[iSceneIndex]);
+    auto secondaryGraphicsPassSceneIndex = GetSecondaryGraphicsPassSceneIndex();
+    ASSERT_NE(secondaryGraphicsPassSceneIndex, nullptr);
+    SceneIndexInspector inspector(secondaryGraphicsPassSceneIndex);
 
     // Find the cube prim
     FindPrimPredicate findCubePredicate = [](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {

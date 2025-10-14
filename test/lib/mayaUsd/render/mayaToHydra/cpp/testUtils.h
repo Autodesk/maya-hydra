@@ -60,6 +60,27 @@ using SceneIndicesVector = std::vector<HdSceneIndexBaseRefPtr>;
 const SceneIndicesVector& GetTerminalSceneIndices();
 
 /**
+ * @brief Retrieve the scene index associated to a given pass
+ *
+ * @return A reference to the scene index of the desired pass.
+ */
+const HdSceneIndexBasePtr GetPassSceneIndex(int passIndex);
+
+/**
+ * @brief Retrieve the scene index associated to the beauty pass
+ *
+ * @return A reference to the beauty pass scene index.
+ */
+const HdSceneIndexBasePtr GetBeautyPassSceneIndex();
+
+/**
+ * @brief Retrieve the scene index associated to the secondary graphics pass
+ *
+ * @return A reference to the secondary graphics pass scene index.
+ */
+const HdSceneIndexBasePtr GetSecondaryGraphicsPassSceneIndex();
+
+/**
  * @brief Compare a Hydra and a Maya matrix and return whether they are similar
  *
  * Compare a Hydra and a Maya matrix and return whether the difference between each of their
