@@ -271,7 +271,7 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
             cmds.createNode('MhFootPrint')
             cmds.refresh()
             self.setBasicCam(0.5)
-            self.assertSnapshotClose("selectionHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes)
+            self.assertSnapshotClose("selectionHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes + ("_usd2508+" if self._usdVersion >= (0, 25, 8) else ""))
 
     # Test picking.  Once picked, the footprint node must appear in the global
     # selection.
