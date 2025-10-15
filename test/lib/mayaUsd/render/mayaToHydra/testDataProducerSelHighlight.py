@@ -123,6 +123,8 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", False)
         cmds.refresh()
 
+        imageVersion = "usd2508+" if self._usdVersion >= (0, 25, 8) else None
+
         #Select the Usd prims to see the selection highlight and their colors respecting the lead object
         ufeGlobalSel =  ufe.GlobalSelection.get()
         ufeGlobalSel.clear()
@@ -130,34 +132,36 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         ufeGlobalSel.append(self.pSphere2UfeItem)
         ufeGlobalSel.append(self.pTorusUfeItem)
         ufeGlobalSel.append(self.pPlaneUfeItem)
-        self.compareSnapshot("VP2_AllSelected.png")
+        self.compareSnapshot("VP2_AllSelected.png", imageVersion=imageVersion)
 
         #Switch to Storm, we should keep the selected items and their color
         self.setHdStormRenderer()
-        self.compareSnapshot("Storm_AllSelected.png")
+        self.compareSnapshot("Storm_AllSelected.png", imageVersion=imageVersion)
 
         #Switch to wireframe display mode, we should keep the selected items and their color
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, displayAppearance="wireframe")
-        self.compareSnapshot("Storm_Wireframe_AllSelected.png")
+        self.compareSnapshot("Storm_Wireframe_AllSelected.png", imageVersion=imageVersion)
 
         #Switch to bounding box display mode, we should keep the selected items and their color
         #For this snapshot and only for it, we need to modify the default lighting and reset it after the snapshot
         cmds.modelEditor(panel, edit=True, displayAppearance="boundingBox")
         self.modifyDefaultLightIntensityByUsdVersion()
-        self.compareSnapshot("Storm_BoundingBox_AllSelected.png")
+        self.compareSnapshot("Storm_BoundingBox_AllSelected.png", imageVersion=imageVersion)
         self.resetDefaultLightIntensityByUsdVersion()
 
         #Switch to wireframe on shaded display mode, we should keep the selected items and their color
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
-        self.compareSnapshot("Storm_WireOnShaded_AllSelected.png")
+        self.compareSnapshot("Storm_WireOnShaded_AllSelected.png", imageVersion=imageVersion)
 
     def impl_LeadAndActiveColorsSelectionHighlighting(self, baseImageVersion: str, imageVersion: str = None):
         # Append _two_passes to the base image version if we have two frame passes
         finalImageVersion = baseImageVersion
         if imageVersion == "two_passes":
             finalImageVersion = f"{baseImageVersion}_two_passes"
+        if self._usdVersion >= (0, 25, 8):
+            finalImageVersion = finalImageVersion + "_usd2508+"
         
         def assertSnapshotCloseImpl(img_name: str):
             self.compareSnapshot(img_name, imageVersion=finalImageVersion)
@@ -216,9 +220,13 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         #Switch to HdStorm
         self.setHdStormRenderer()
         cmds.refresh()
+
+        imageVersion = self._imageVersionFor2Passes
+        if self._usdVersion >= (0, 25, 8):
+            imageVersion = imageVersion + "_usd2508+"
     
         cmds.select(self.shapeNode)
-        self.compareSnapshot("selectMayaUsdNode.png", imageVersion=self._imageVersionFor2Passes)
+        self.compareSnapshot("selectMayaUsdNode.png", imageVersion=imageVersion)
         
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

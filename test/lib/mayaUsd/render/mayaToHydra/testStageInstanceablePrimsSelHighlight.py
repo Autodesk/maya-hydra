@@ -37,13 +37,13 @@ class TestStageInstanceablePrimsSelHighlight(mtohUtils.MayaHydraBaseTestCase): #
         ufe.GlobalSelection.get().clear()
         ufe.GlobalSelection.get().append(cylinderItems)
         cylinderSnapshotName = "cylSel"+ snapshotSuffix +".png"
-        self.assertSnapshotClose(cylinderSnapshotName, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes)
+        self.assertSnapshotClose(cylinderSnapshotName, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes + ("_usd2508+" if self._usdVersion >= (0, 25, 8) else ""))
 
         #Select the sphere and do a snapshot
         ufe.GlobalSelection.get().clear()
         ufe.GlobalSelection.get().append(sphereItem)
         sphereSnapshotName = "spherSel"+ snapshotSuffix +".png"
-        self.assertSnapshotClose(sphereSnapshotName, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes)
+        self.assertSnapshotClose(sphereSnapshotName, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes + ("_usd2508+" if self._usdVersion >= (0, 25, 8) else ""))
 
     def test_UsdStageInstanceablePrimsSelHighlight(self):
         import usdUtils # usdUtils imports mayaUsd.ufe
