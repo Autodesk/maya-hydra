@@ -171,11 +171,6 @@ TfToken _GetPurposeRenderTagFromAttrName(const TfToken& attrName)
     return {};
 }
 
-inline bool areDifferentForOneOfTheseBits(unsigned int val1, unsigned int val2, unsigned int bitsToTest)
-{
-    return ((val1 & bitsToTest) != (val2 & bitsToTest));
-}
-
 inline bool isInComponentsPickingMode(const MHWRender::MSelectionInfo& selectInfo)
 {
     return selectInfo.selectable(MSelectionMask::kSelectMeshVerts)
@@ -192,6 +187,7 @@ inline bool isInComponentsPickingMode(const MHWRender::MSelectionInfo& selectInf
 // configurable and cannot be replaced by plugin behavior.  Currently, the Flow
 // Viewport selection task is a no-op.  PPT, 2-Oct-2023.
 
+#ifndef VIEWPORT_TOOLBOX
 void replaceSelectionTask(HdTaskSharedPtrVector* tasks)
 {
     // For TF_WARN and TF_AXIOM macros.
@@ -213,6 +209,7 @@ void replaceSelectionTask(HdTaskSharedPtrVector* tasks)
 
     *found = HdTaskSharedPtr(new Fvp::SelectionTask);
 }
+#endif
 
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
 std::string getRenderingDestination(
@@ -908,7 +905,6 @@ MStatus MtohRenderOverride::Render(
                 TF_WARN("HdxProgressiveTask not found");
             }
         }
-#endif
 
         auto editTasks = [](HdTaskSharedPtrVector&  tasksToEdit,
                             MayaHydraGLBackup&      backup) -> void {
@@ -920,7 +916,6 @@ MStatus MtohRenderOverride::Render(
             replaceSelectionTask(&tasksToEdit);
         };
 
-#ifndef VIEWPORT_TOOLBOX
         MayaHydraGLBackup backup;
         editTasks(tasks, backup);
 #endif
@@ -1021,7 +1016,6 @@ MStatus MtohRenderOverride::Render(
                 currentPass->params().renderParams.depthBiasSlopeFactor = -1.0f;
             }
 
-            MayaHydraGLBackup backup;
             if (isPass0) {
                 // Do not share the AOVs, for the first pass only
                 HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks();
@@ -1035,7 +1029,6 @@ MStatus MtohRenderOverride::Render(
                 OutputDebugStringA(framePassParameters.c_str());
                 */
 
-                editTasks(passTasks, backup);
                 currentPass->Render(passTasks);
             } else {
                 // Share AOVs from the previous visible pass or pass0
@@ -1054,8 +1047,6 @@ MStatus MtohRenderOverride::Render(
                           };
                 
                     HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(inputAOVs);
-                    editTasks(
-                        passTasks, backup);
                     
                     /*Debug code left here if needed later
                     hvt::FramePass& framePassToDebug = *currentPass;
@@ -2770,6 +2761,10 @@ void MtohRenderOverride::_CreateFramePass(
     framePassDescriptor.renderIndex = renderer->RenderIndex();
     framePassDescriptor.uid         = passId;
     auto framePass                  = hvt::ViewportEngine::CreateFramePass(framePassDescriptor);
+
+    // Remove the default selection tasks as we do not use them.
+    framePass->GetTaskManager()->RemoveTask(HdxPrimitiveTokens->colorizeSelectionTask);
+    framePass->GetTaskManager()->RemoveTask(TfToken("selectionTask"));
 
     // Update the consolidated frame pass data
     _framePassesData[passIndex]->_renderIndexProxy = renderer;
