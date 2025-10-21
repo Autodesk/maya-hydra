@@ -77,7 +77,8 @@ class TestConvergence(mtohUtils.MayaHydraBaseTestCase):
         cmds.refresh()
         return objectName
     
-    def test_Convergence(self):
+    def test_HdStormConvergence(self):
+        # Create a scene with varied data
         import mayaUsd_createStageWithNewLayer
         stagePath = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         self.createMayaCube()
@@ -85,8 +86,11 @@ class TestConvergence(mtohUtils.MayaHydraBaseTestCase):
         self.createUsdCube(stagePath)
         self.createUsdCubeFromMaya(stagePath)
         self.createUsdRectLight(stagePath)
-        for _ in range(10):
-            cmds.refresh(force=True)
+
+        # Refresh the viewport
+        cmds.refresh(force=True)
+        
+        # Check that rendering has converged
         self.assertTrue(cmds.mayaHydraTesting(converged=True))
 
 if __name__ == '__main__':
