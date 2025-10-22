@@ -70,6 +70,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	#HYDRA-1660 re-enable testMayaDisplayModes
 	#testMayaDisplayModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testRenderRegion.py
+    testConvergence.py
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
