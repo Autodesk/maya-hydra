@@ -18,7 +18,6 @@
 #include "mayaHydraLib/sceneIndex/registration.h"
 #include "mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndex.h"
 
-#include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/fvpUtils.h>
@@ -58,7 +57,8 @@ using namespace MayaHydra;
 struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
 {
     void Update() override {
-        auto proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexBaseRefPtr>(pluginSceneIndex);
+        auto proxyShapeSceneIndex
+            = TfDynamic_cast<::MayaHydra::MayaUsdProxyShapeSceneIndexBaseRefPtr>(pluginSceneIndex);
         proxyShapeSceneIndex->UpdateTime();
     }
 
@@ -72,8 +72,11 @@ struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
 
 // MayaHydraSceneIndexRegistration is used to register a scene index for
 // mayaUsdPlugin proxy shape nodes.
-MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(const std::shared_ptr<Fvp::RenderIndexProxy>& renderIndexProxy, bool interactive)
-    : _renderIndexProxy(renderIndexProxy), _interactive(interactive)
+    MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(
+          const HdSceneIndexBaseRefPtr& dataProducerMergingSceneIndex,
+          bool                          interactive)
+    : _dataProducerMergingSceneIndex(dataProducerMergingSceneIndex)
+    , _interactive(interactive)
 {
     if (!MFnPlugin::isNodeRegistered(kMayaUsdProxyShapeNode)) {
         MGlobal::displayWarning("mayaUsdPlugin not loaded, cannot be registered to Maya Hydra.  Please load mayaUsdPlugin, then switch back to a Maya Hydra viewport renderer.");
@@ -189,7 +192,7 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
 
     registration->dagNode = MObjectHandle(dagNode);
     registration->sceneIndexPathPrefix = sceneIndexPathPrefix(
-        _renderIndexProxy->GetMergingSceneIndex(), dagNode);
+        _dataProducerMergingSceneIndex, dagNode);
         
     //We receive only dag nodes of type MayaUsdProxyShapeNode
     MAYAUSDAPI_NS::ProxyStage proxyStage(dagNode);

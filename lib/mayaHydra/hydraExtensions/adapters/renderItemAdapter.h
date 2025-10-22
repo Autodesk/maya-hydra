@@ -68,7 +68,8 @@ public:
         const SdfPath&        slowId,
         int                   fastId,
         MayaHydraSceneIndex*  mayaHydraSceneIndex,
-        const MRenderItem&    ri);
+        const MRenderItem&    ri,
+        TfToken               purposeRenderTag);
 
     MAYAHYDRALIB_API
     virtual ~MayaHydraRenderItemAdapter();
@@ -225,6 +226,7 @@ private:
     bool                        _isHideOnPlayback = false;
     bool                        _isArnoldSkyDomeLightTriangleShape = false;
     GfBBox3d                    _bounds;//Bounding box
+    TfToken                     _purposeRenderTag;
 #ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API
     MRenderItem::CullMode       _cullMode = MRenderItem::CullNone;
 #endif

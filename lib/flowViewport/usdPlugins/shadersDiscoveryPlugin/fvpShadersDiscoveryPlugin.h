@@ -41,6 +41,29 @@
 #ifndef FLOW_VIEWPORT_SHADERS_DISCOVERY_PLUGIN_H
 #define FLOW_VIEWPORT_SHADERS_DISCOVERY_PLUGIN_H
 
+#include <pxr/pxr.h>//To include PXR_VERSION
+
+#if PXR_VERSION >= 2508 // Ndr classes have been deprecated in USD 25.08
+#include <pxr/usd/sdr/discoveryPlugin.h>
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+class FlowViewportShadersDiscoveryPlugin;
+TF_DECLARE_WEAK_AND_REF_PTRS(FlowViewportShadersDiscoveryPlugin);
+
+class FlowViewportShadersDiscoveryPlugin : public SdrDiscoveryPlugin
+{
+public:
+    FlowViewportShadersDiscoveryPlugin() = default;
+    ~FlowViewportShadersDiscoveryPlugin() override = default;
+    SdrShaderNodeDiscoveryResultVec DiscoverShaderNodes(const Context& context) override;
+    const SdrStringVec&             GetSearchURIs() const override;
+};
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
+#else
+//Before 25.08
 #include <pxr/usd/ndr/discoveryPlugin.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -58,5 +81,6 @@ class FlowViewportShadersDiscoveryPlugin : public NdrDiscoveryPlugin
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
+#endif
 
 #endif // FLOW_VIEWPORT_SHADERS_DISCOVERY_PLUGIN_H

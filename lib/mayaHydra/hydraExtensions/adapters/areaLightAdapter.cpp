@@ -85,7 +85,15 @@ public:
                     return VtValue(overidenIntensity);
                 }
             }
-        }
+        }else if (
+                (paramName == HdLightTokens->shadowEnable)
+                || (paramName == HdLightTokens->hasShadow)
+                || (paramName == UsdLuxTokens->inputsShadowEnable))
+            {
+                // From a comment in OpenUSD : Shadows are supported on for SimpleLights and
+                // DistantLights
+                return VtValue(false); // No shadows
+            }
 
         return MayaHydraLightAdapter::GetLightParamValue(paramName);
     }

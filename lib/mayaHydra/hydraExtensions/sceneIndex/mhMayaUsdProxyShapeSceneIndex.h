@@ -51,39 +51,37 @@ public:
         const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
         const MObjectHandle&                   dagNodeHandle,
         const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
-        const Ufe::Path&                       sceneIndexAppPath
-    );
+        const Ufe::Path&                       sceneIndexAppPath);
 
     ~MayaUsdProxyShapeSceneIndex() override;
 
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
 
     const Ufe::Path& GetSceneIndexAppPath() const { return _sceneIndexAppPath; }
-    void SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath) { 
+    void             SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath)
+    {
         _sceneIndexAppPath = sceneIndexAppPath;
     }
 
 private:
-
     MayaUsdProxyShapeSceneIndex(
         const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
         const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
         const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
         const MObjectHandle&                   dagNodeHandle,
         const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
-        const Ufe::Path&                       sceneIndexAppPath
-    );
+        const Ufe::Path&                       sceneIndexAppPath);
 
     void _Destroy() override;
     void _DestroyDerived();
 
     // Path mapper support.
-    const SdfPath                   _sceneIndexPathPrefix;
-    Ufe::Path                       _sceneIndexAppPath;
-    const Ufe::Observer::Ptr        _appSceneObserver{};
-    const Fvp::PathMapperConstPtr   _usdPathMapper{};
+    const SdfPath                 _sceneIndexPathPrefix;
+    Ufe::Path                     _sceneIndexAppPath;
+    const Ufe::Observer::Ptr      _appSceneObserver {};
+    const Fvp::PathMapperConstPtr _usdPathMapper {};
 };
 
 } // namespace MAYAHYDRA_NS_DEF
 
-#endif //MAYA_HYDRA_MAYAUSD_PROXY_SHAPE_SCENE_INDEX_PLUGIN_H
+#endif // MAYA_HYDRA_MAYAUSD_PROXY_SHAPE_SCENE_INDEX_PLUGIN_H

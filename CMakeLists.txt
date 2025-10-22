@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-cmake_minimum_required(VERSION 3.13...3.17)
+cmake_minimum_required(VERSION 3.21..3.30)
 
 project(maya-hydra)
 
@@ -23,6 +23,7 @@ project(maya-hydra)
 option(BUILD_TESTS "Build tests." ON)
 option(BUILD_STRICT_MODE "Enforce all warnings as errors." ON)
 option(BUILD_SHARED_LIBS "Build libraries as shared or static." ON)
+option(ENABLE_VIEWPORT_TOOLBOX "Build MayaHydra with ViewportToolbox support." ON)
 option(CODE_COVERAGE "Build and collect code coverage info." OFF)
 
 if(APPLE)
@@ -91,7 +92,9 @@ include(cmake/flowViewport_version.info)
 set(FLOWVIEWPORT_VERSION "${FLOWVIEWPORT_MAJOR_VERSION}.${FLOWVIEWPORT_MINOR_VERSION}.${FLOWVIEWPORT_PATCH_LEVEL}")
 
 set(DEFAULT_PYTHON_3_VERSION 3.10)
-if (MAYA_APP_VERSION VERSION_GREATER 2024)
+if (MAYA_APP_VERSION VERSION_GREATER 2026)
+    set(DEFAULT_PYTHON_3_VERSION 3.13)
+elseif (MAYA_APP_VERSION VERSION_GREATER 2024)
     set(DEFAULT_PYTHON_3_VERSION 3.11)
 endif()
 if (NOT BUILD_WITH_PYTHON_3_VERSION)
@@ -124,6 +127,10 @@ if (CMAKE_WANT_MATERIALX_BUILD)
 endif()
 include(cmake/usd.cmake)
 
+# Avoid re-invoking OpenUSD's pxrConfig.cmake from subprojects (e.g., hydra-viewport-toolbox)
+# which can lead to duplicate imported targets like TBB::tbb.
+set(pxr_FOUND TRUE)
+
 set(CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE FALSE)
 if (DEFINED PXR_USD_LOCATION)
     file(GLOB_RECURSE STRING_UTILS_HEADER_PATH
@@ -146,6 +153,18 @@ if(UFE_FOUND)
     message(STATUS "Building with UFE ${UFE_VERSION}.")
 else()
     message(STATUS "UFE not found.")
+endif()
+
+if (ENABLE_VIEWPORT_TOOLBOX)
+    set(VIEWPORTTOOLBOX_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/lib/hydra-viewport-toolbox/include")
+    set(VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_LIB hvt)
+    # Note: The multi-configuration generators (e.g., VS) always append the build type to the output directories
+    if(CMAKE_CONFIGURATION_TYPES)
+        set(VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH "${CMAKE_BINARY_DIR}/lib/hydra-viewport-toolbox/bin/${CMAKE_BUILD_TYPE}")
+    else()
+        set(VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH "${CMAKE_BINARY_DIR}/lib/hydra-viewport-toolbox/bin")
+    endif()
+    set(BUILD_WITH_VIEWPORT_TOOLBOX TRUE)
 endif()
 
 find_package(MayaUsd)
@@ -195,11 +214,6 @@ endif()
 # compiler configuration
 #------------------------------------------------------------------------------
 include(cmake/compiler_config.cmake)
-
-#------------------------------------------------------------------------------
-# gulrak filesystem
-#------------------------------------------------------------------------------
-include(cmake/gulrak.cmake)
 
 #------------------------------------------------------------------------------
 # test

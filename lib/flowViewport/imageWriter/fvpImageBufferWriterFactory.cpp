@@ -24,15 +24,15 @@ namespace FVP_NS_DEF {
 /* static */ 
 ImageBufferWriter::Ptr ImageBufferWriter::Create(
     const PXR_NS::VtDictionary& args,
-    const PXR_NS::TfToken&      aov
-)
+    bool useHVT,
+    const PXR_NS::TfToken&      aov)
 {
     // Can't use ternary operator because of differing std::shared_ptr types.
     if (args.find("hgi") == args.end()) {
-        return std::make_shared<RenderBufferWriter>(args, aov);
+        return std::make_shared<RenderBufferWriter>(args, useHVT, aov);
     }
     else {
-        return std::make_shared<TextureBufferWriter>(args, aov);
+        return std::make_shared<TextureBufferWriter>(args, useHVT, aov);
     }
 }
 

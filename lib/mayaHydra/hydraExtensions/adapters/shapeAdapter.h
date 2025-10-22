@@ -64,7 +64,7 @@ public:
     virtual GfBBox3d GetBoundingBox() override;
 
     MAYAHYDRALIB_API
-    virtual TfToken GetRenderTag() const override;
+    virtual TfToken GetRenderTag() const override { return HdTokens->geometry; }
 
     MAYAHYDRALIB_API
     virtual void PopulateSelectedPaths(

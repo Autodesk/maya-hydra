@@ -116,8 +116,6 @@ private:
     void _StageSet(const MAYAUSDAPI_NS::ProxyStageSetNotice& notice);
     void _StageInvalidate(const MAYAUSDAPI_NS::ProxyStageInvalidateNotice& notice);
 
-private:
-
     UsdImagingStageSceneIndexRefPtr _usdImagingStageSceneIndex {nullptr};
     MAYAUSDAPI_NS::ProxyStage       _proxyStage;
     std::atomic<bool>               _populated { false };

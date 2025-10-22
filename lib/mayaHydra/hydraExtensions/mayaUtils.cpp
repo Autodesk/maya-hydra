@@ -21,24 +21,11 @@
 #include <maya/MDagPath.h>
 #include <maya/MFnDagNode.h>
 #include <maya/MMatrix.h>
+#include <maya/MObjectArray.h>
 #include <maya/MPlug.h>
 #include <maya/MPlugArray.h>
 #include <maya/MSelectionList.h>
-#include <maya/MObjectArray.h>
 #include <maya/MStringArray.h>
-
-namespace {
-
-    bool IsDagPathOfGivenType(const MDagPath& dagPath, const MString& type)
-    {
-        if (!dagPath.isValid()) {
-            return false;
-        }
-        auto shapeDagPath = dagPath;
-        shapeDagPath.extendToShape();
-        return type == MFnDependencyNode(shapeDagPath.node()).typeName();
-    }
-}
 
 namespace MAYAHYDRA_NS_DEF {
 
@@ -97,29 +84,29 @@ bool IsUfeItemFromMayaUsd(const MObject& obj, MStatus* returnStatus)
     return IsUfeItemFromMayaUsd(dagPath, returnStatus);
 }
 
-MStatus GetObjectsFromNodeNames(const MStringArray& nodeNames, MObjectArray & outObjects)
+MStatus GetObjectsFromNodeNames(const MStringArray& nodeNames, MObjectArray& outObjects)
 {
-    const unsigned int numObjects = outObjects.length() ;
-    if (nodeNames.length() != numObjects){
+    const unsigned int numObjects = outObjects.length();
+    if (nodeNames.length() != numObjects) {
         return MStatus::kInvalidParameter;
     }
 
-    for (auto& obj : outObjects){
+    for (auto& obj : outObjects) {
         obj = MObject::kNullObj;
     }
 
-    MStatus status;
+    MStatus        status;
     MSelectionList sList;
-    for (const auto& nodeName : nodeNames){
+    for (const auto& nodeName : nodeNames) {
         status = sList.add(nodeName);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
 
-    for (unsigned int i=0;i<numObjects;++i){
+    for (unsigned int i = 0; i < numObjects; ++i) {
         status = sList.getDependNode(i, outObjects[i]);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
-    
+
     return MS::kSuccess;
 }
 
@@ -144,7 +131,7 @@ bool IsDagPathALight(const MDagPath& dagPath)
     auto shapeDagPath = dagPath;
     shapeDagPath.extendToShape();
     const MString typeName = MFnDependencyNode(shapeDagPath.node()).typeName();
-    return (typeName.indexW(_lightString) != -1);//Does the typename contains "Light"
+    return (typeName.indexW(_lightString) != -1); // Does the typename contains "Light"
 }
 
 std::string GetDomeLightTexture(const MFnDependencyNode& lightNode)
@@ -158,18 +145,28 @@ std::string GetDomeLightTexture(const MFnDependencyNode& lightNode)
     if (!_colorIsConnected) {
         return "";
     }
-        
-    MStatus status;
-    MFnDependencyNode file(conns[0].node(), &status);
-    static const MString fileString ("file");
+
+    MStatus              status;
+    MFnDependencyNode    file(conns[0].node(), &status);
+    static const MString fileString("file");
     if (!status || (file.typeName() != fileString)) {
         return "";
     }
 
     const char* fileTextureName
         = file.findPlug(PXR_NS::MayaAttrs::file::fileTextureName, true).asString().asChar();
-    
+
     return fileTextureName;
+}
+
+bool IsDagPathOfGivenType(const MDagPath& dagPath, const MString& type)
+{
+    if (!dagPath.isValid()) {
+        return false;
+    }
+    auto shapeDagPath = dagPath;
+    shapeDagPath.extendToShape();
+    return type == MFnDependencyNode(shapeDagPath.node()).typeName();
 }
 
 } // namespace MAYAHYDRA_NS_DEF

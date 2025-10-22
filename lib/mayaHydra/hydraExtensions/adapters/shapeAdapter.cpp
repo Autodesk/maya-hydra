@@ -117,8 +117,6 @@ GfBBox3d MayaHydraShapeAdapter::GetBoundingBox()
     return bbox;
 }
 
-TfToken MayaHydraShapeAdapter::GetRenderTag() const { return HdTokens->geometry; }
-
 void MayaHydraShapeAdapter::PopulateSelectedPaths(
     const MDagPath&                             selectedDag,
     SdfPathVector&                              selectedSdfPaths,

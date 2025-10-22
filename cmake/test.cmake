@@ -663,7 +663,6 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
         set(RENDERER "${ARG_RENDERER}")
     endif()
        
-    set( "")
     if(ARG_SCENE_FILE_LABELED)
         set(SCENE_FILE_LABELED "${ARG_SCENE_FILE_LABELED}")
     endif()
@@ -700,13 +699,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # The command needs to be the name of an executable, without any 
     # arguments, as CMake calls an executable with that string unparsed.
 
-    # CMake add_test COMMAND option arguments are unconditionally quoted.  On
-    # Windows this prevents the use of the simple cmd shell, as cmd /c works,
-    # but cmd "/c" does not: the cmd shell no longer interprets the /c as a
-    # flag argument.  Use PowerShell instead.
-    set(CMD PowerShell)
-
-    set(RENDER_ARGS "${RENDER_EXECUTABLE} -renderer ${RENDERER} ${SCENE_PATH}")
+    set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" \"${SCENE_PATH}\"")
 
     # Replace illegal characters in test_name with _.  Rendered images are
     # written here.
@@ -716,11 +709,30 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     set(RENDERED_IMAGE_PATH "${MAYA_APP_TEMP_DIR}/projects/default/images/${SANITIZED_TEST_NAME}.${IMAGE_EXTENSION}")
     cmake_path(REPLACE_EXTENSION SCENE_PATH ".${IMAGE_EXTENSION}" OUTPUT_VARIABLE EXPECTED_IMAGE_PATH)
 
-    set(IDIFF_ARGS "idiff -fail ${FAIL} -failpercent ${FAILPERCENT} ${RENDERED_IMAGE_PATH} ${EXPECTED_IMAGE_PATH}")
+    # Always use the discovered idiff binary; do not fall back to PATH
+    if (IMAGE_DIFF_TOOL)
+        set(IDIFF_CMD "${IMAGE_DIFF_TOOL}")
+    else()
+        message(FATAL_ERROR "idiff binary not discovered. Set IMAGE_DIFF_TOOL (e.g. via OIIO_idiff_BINARY).")
+    endif()
 
-    # Quote semicolon to avoid interpretation as CMake list element separator.
-    set(CMD_ARGS -Command "${RENDER_ARGS} \; if (\$?) { ${IDIFF_ARGS} }")
-    message(STATUS "PPT: CMD_ARGS is ${CMD_ARGS}")
+    # CMake add_test COMMAND option arguments are unconditionally quoted.  On
+    # Windows this prevents the use of the simple cmd shell, as cmd /c works,
+    # but cmd "/c" does not: the cmd shell no longer interprets the /c as a
+    # flag argument.  Use PowerShell instead.
+    # Cross-platform command runner: PowerShell on Windows, POSIX sh elsewhere.
+    set(IDIFF_ARGS  "${IDIFF_CMD} -fail ${FAIL} -failpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
+    if (WIN32)
+        set(CMD PowerShell)
+		# Windows (PowerShell)
+		set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" \"${SCENE_PATH}\"")
+		set(IDIFF_ARGS  "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
+		set(CMD_ARGS -Command "${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE")
+    else()
+        # Use POSIX shell; '&&' ensures idiff runs only on successful render
+        set(CMD /bin/sh)
+        set(CMD_ARGS -c "${RENDER_ARGS} && ${IDIFF_ARGS}")
+    endif()
 
     add_test(
         NAME "${test_name}"

@@ -19,7 +19,10 @@
 #include <mayaHydraLib/adapters/constantShadowMatrix.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+#include <mayaHydraLib/adapters/shadowMatrixComputation.h>
 #include <mayaHydraLib/mayaUtils.h>
+
+#include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/type.h>
@@ -252,8 +255,7 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
             intensity /= M_PI;
         }
 #endif
-        const bool     shadowsEnabled = GetShadowsEnabled(mayaLight);
-
+        
         MPoint         pt(0.0, 0.0, 0.0, 1.0);
         const auto     inclusiveMatrix = GetDagPath().inclusiveMatrix();
         const auto     position = pt * inclusiveMatrix;
@@ -266,14 +268,14 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
             = mayaLight.findPlug(MayaAttrs::nonAmbientLightShapeNode::emitSpecular, true).asBool();
         MVector    pv(0.0, 0.0, -1.0);
         const auto lightDirection = (pv * inclusiveMatrix).normal();
-        light.SetHasShadow(shadowsEnabled);
         const GfVec4f zeroColor(0.0f, 0.0f, 0.0f, 1.0f);
         const GfVec4f lightColor(
             color.r * intensity, color.g * intensity, color.b * intensity, 1.0f);
         light.SetDiffuse(emitDiffuse ? lightColor : zeroColor);
         light.SetAmbient(zeroColor);
         light.SetSpecular(emitSpecular ? lightColor : zeroColor);
-        light.SetShadowResolution(1024);
+        const bool bLightHasShadowsenabled = GetShadowsEnabled(mayaLight);
+        light.SetHasShadow(bLightHasShadowsenabled);
         light.SetID(GetID());
         light.SetPosition(GfVec4f(position.x, position.y, position.z, position.w));
         light.SetSpotDirection(GfVec3f(lightDirection.x, lightDirection.y, lightDirection.z));
@@ -524,90 +526,97 @@ VtValue MayaHydraLightAdapter::GetLightMaterialNetwork()const
         // that it is the expected color a white Lambertian surface would have
         // if one of these colored "simple" lights was pointed directly at it.
         // To achieve this, the light color needs to be scaled appropriately.
-        lightNode.parameters[HdLightTokens->diffuse]    = mayaParams.diffuse  * float(M_PI);
-        lightNode.parameters[HdLightTokens->specular]   = mayaParams.specular * float(M_PI);
+        lightNode.parameters[HdLightTokens->diffuse] = mayaParams.diffuse * float(M_PI);
+        lightNode.parameters[HdLightTokens->specular] = mayaParams.specular * float(M_PI);
     } else if (lightType == "pointLight") {
         lightNode.identifier = TfToken("PxrSphereLight");
-        
+
         // Override intensity to match Storm and Arnold
         const float pointLightIntensity = mayaParams.intensity * 2.0f * M_PI;
         lightNode.parameters[HdLightTokens->intensity] = VtValue(pointLightIntensity);
-        
+
         // PxrSphereLight is a sphere-shaped light that needs a radius
         constexpr float radius = 0.01f; // Default radius for point lights
         lightNode.parameters[HdLightTokens->radius] = VtValue(radius);
 
     } else if (lightType == "spotLight") {
         lightNode.identifier = TfToken("PxrDiskLight");
-        
+
         // Override intensity to match Storm and Arnold
         const float spotLightIntensity = mayaParams.intensity * 2.0f * M_PI;
         lightNode.parameters[HdLightTokens->intensity] = VtValue(spotLightIntensity);
-        
+
         // PxrDiskLight is a disk-shaped light that needs a radius
         // Calculate radius based on cone angle and a reasonable distance (same as in maya)
-        MFnSpotLight spotLight(GetDagPath());
-        const double coneAngleRadians = spotLight.coneAngle();
-        constexpr float FRUSTUM_LOCATION(1.3f); // same as in maya but as a positive value, it is negative in maya
-        const float     radius = static_cast<float>(tan(coneAngleRadians / 2.0) * FRUSTUM_LOCATION);
+        MFnSpotLight    spotLight(GetDagPath());
+        const double    coneAngleRadians = spotLight.coneAngle();
+        constexpr float FRUSTUM_LOCATION(
+            1.3f); // same as in maya but as a positive value, it is negative in maya
+        const float radius = static_cast<float>(tan(coneAngleRadians / 2.0) * FRUSTUM_LOCATION);
         lightNode.parameters[HdLightTokens->radius] = VtValue(radius);
-        
+
         // Add spot light specific parameters using proper USD tokens
-        lightNode.parameters[HdLightTokens->shapingConeAngle] = VtValue(spotLight.coneAngle() * 180.0 / M_PI);
-        lightNode.parameters[HdLightTokens->shapingConeSoftness] = VtValue(spotLight.penumbraAngle() * 180.0 / M_PI);
+        lightNode.parameters[HdLightTokens->shapingConeAngle]
+            = VtValue(spotLight.coneAngle() * 180.0 / M_PI);
+        lightNode.parameters[HdLightTokens->shapingConeSoftness]
+            = VtValue(spotLight.penumbraAngle() * 180.0 / M_PI);
     } else if ((lightType == "areaLight") || isAnArnoldAreaLight) {
         lightNode.identifier = TfToken("PxrRectLight");
-        
+
         // Area light specific parameters using proper USD tokens
-        MFnAreaLight areaLight(GetDagPath());
-        constexpr float             defaultWidthForAreaLights   = 2.0f;
-        constexpr float             defaultHeightForAreaLights  = 2.0f;
+        MFnAreaLight                areaLight(GetDagPath());
+        constexpr float             defaultWidthForAreaLights = 2.0f;
+        constexpr float             defaultHeightForAreaLights = 2.0f;
         double                      scale[3] = { 1.0, 1.0, 1.0 };
         const MTransformationMatrix modelMatrix(inclusiveMatrix);
         modelMatrix.getScale(scale, MSpace::kWorld);
-        const float widthScaled     = defaultWidthForAreaLights * scale[0];
-        const float heightScaled    = defaultHeightForAreaLights * scale[1];
-        lightNode.parameters[HdLightTokens->width]  = VtValue(widthScaled);
+        const float widthScaled = defaultWidthForAreaLights * scale[0];
+        const float heightScaled = defaultHeightForAreaLights * scale[1];
+        lightNode.parameters[HdLightTokens->width] = VtValue(widthScaled);
         lightNode.parameters[HdLightTokens->height] = VtValue(heightScaled);
     } else {
         const bool isSkyDomeLight = IsDagPathAnArnoldSkyDomeLight(GetDagPath());
         if (isSkyDomeLight) {
             lightNode.identifier = TfToken("PxrDomeLight");
-            
+
             // For the domelight, add the domelight texture resource.
-            MStatus status;
+            MStatus           status;
             MFnDependencyNode lightDepNode(GetNode(), &status);
             const std::string domeLightTexturePath = GetDomeLightTexture(lightDepNode);
-            
+
             if (!domeLightTexturePath.empty()) {
                 // Set texture file with proper SdfAssetPath
-                lightNode.parameters[HdLightTokens->textureFile] = 
-                    VtValue(SdfAssetPath(domeLightTexturePath, domeLightTexturePath));
-                
-                // Set texture format - Get Arnold format and map to USD tokens using correct UsdLuxTokens
+                lightNode.parameters[HdLightTokens->textureFile]
+                    = VtValue(SdfAssetPath(domeLightTexturePath, domeLightTexturePath));
+
+                // Set texture format - Get Arnold format and map to USD tokens using correct
+                // UsdLuxTokens
                 MPlug formatPlug = lightDepNode.findPlug("format", true, &status);
                 if (status == MS::kSuccess) {
                     const auto format = formatPlug.asShort();
                     // mirrored_ball : 0, angular : 1, latlong : 2
                     if (format == 0) {
-                        lightNode.parameters[HdLightTokens->textureFormat] = VtValue(UsdLuxTokens->mirroredBall);
+                        lightNode.parameters[HdLightTokens->textureFormat]
+                            = VtValue(UsdLuxTokens->mirroredBall);
                     } else if (format == 2) {
-                        lightNode.parameters[HdLightTokens->textureFormat] = VtValue(UsdLuxTokens->latlong);
+                        lightNode.parameters[HdLightTokens->textureFormat]
+                            = VtValue(UsdLuxTokens->latlong);
                     } else {
-                        lightNode.parameters[HdLightTokens->textureFormat] = VtValue(UsdLuxTokens->automatic);
+                        lightNode.parameters[HdLightTokens->textureFormat]
+                            = VtValue(UsdLuxTokens->automatic);
                     }
                 } else {
                     // Default to automatic if format plug not found
                     lightNode.parameters[HdLightTokens->textureFormat]
                         = VtValue(UsdLuxTokens->automatic);
                 }
-                
+
                 // When texture is connected, use white color (matching aiSkyDomeLightAdapter)
                 lightNode.parameters[HdLightTokens->color] = VtValue(GfVec3f(1.0f, 1.0f, 1.0f));
                 // Override intensity to match Storm and Arnold
                 const float domeLightIntensity = mayaParams.intensity * M_PI;
                 lightNode.parameters[HdLightTokens->intensity] = domeLightIntensity;
-                
+
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
                     .Msg("Dome light texture path: %s\n", domeLightTexturePath.c_str());
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
@@ -615,148 +624,94 @@ VtValue MayaHydraLightAdapter::GetLightMaterialNetwork()const
             } else {
                 // Handle case where no texture is connected
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-                    .Msg("Warning: No texture found for dome light %s - using color only\n", 
-                         GetDagPath().partialPathName().asChar());
-                
+                    .Msg(
+                        "Warning: No texture found for dome light %s - using color only\n",
+                        GetDagPath().partialPathName().asChar());
+
                 // For dome lights without texture, don't set textureFile parameter
                 // PRMan should handle this case gracefully
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-                    .Msg("Using Arnold color and fallback intensity for dome light without texture\n");
+                    .Msg("Using Arnold color and fallback intensity for dome light without "
+                         "texture\n");
             }
-            
+
             // Debug: Print all dome light parameters with values (AFTER all parameters are set)
-            TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-                .Msg("Dome light final parameters:\n");
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET).Msg("Dome light final parameters:\n");
             for (const auto& param : lightNode.parameters) {
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
                     .Msg("  %s: %s\n", param.first.GetText(), param.second.GetTypeName().c_str());
             }
-            
+
             // Debug: Print specific key parameter values (AFTER all parameters are set)
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET).Msg("Dome light key values:\n");
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-                .Msg("Dome light key values:\n");
+                .Msg(
+                    "  intensity: %f\n",
+                    lightNode.parameters[HdLightTokens->intensity].Get<float>());
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-                .Msg("  intensity: %f\n", lightNode.parameters[HdLightTokens->intensity].Get<float>());
+                .Msg(
+                    "  exposure: %f\n", lightNode.parameters[HdLightTokens->exposure].Get<float>());
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-                .Msg("  exposure: %f\n", lightNode.parameters[HdLightTokens->exposure].Get<float>());
+                .Msg(
+                    "  normalize: %s\n",
+                    lightNode.parameters[HdLightTokens->normalize].Get<bool>() ? "true" : "false");
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-                .Msg("  normalize: %s\n", lightNode.parameters[HdLightTokens->normalize].Get<bool>() ? "true" : "false");
+                .Msg(
+                    "  shadowEnable: %s\n",
+                    lightNode.parameters[HdLightTokens->shadowEnable].Get<bool>() ? "true"
+                                                                                  : "false");
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-                .Msg("  shadowEnable: %s\n", lightNode.parameters[HdLightTokens->shadowEnable].Get<bool>() ? "true" : "false");
+                .Msg(
+                    "  cameraVisibility: %s\n",
+                    lightNode.parameters[TfToken("cameraVisibility")].Get<bool>() ? "true"
+                                                                                  : "false");
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-                .Msg("  cameraVisibility: %s\n", lightNode.parameters[TfToken("cameraVisibility")].Get<bool>() ? "true" : "false");
-            TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-                .Msg("  primaryVisibility: %s\n", lightNode.parameters[TfToken("primaryVisibility")].Get<bool>() ? "true" : "false");
-            
+                .Msg(
+                    "  primaryVisibility: %s\n",
+                    lightNode.parameters[TfToken("primaryVisibility")].Get<bool>() ? "true"
+                                                                                   : "false");
+
             // Debug: Print final color value
             GfVec3f finalColor = lightNode.parameters[HdLightTokens->color].Get<GfVec3f>();
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
                 .Msg("  final color: (%f, %f, %f)\n", finalColor[0], finalColor[1], finalColor[2]);
         }
     }
-    
+
     // Add the light node to the network
     lightNetwork.nodes.push_back(lightNode);
-    
+
     // Add the network to the material network map with 'light' terminal
     networkMap.map[HdMaterialTerminalTokens->light] = lightNetwork;
     networkMap.terminals.push_back(lightNode.path);
-    
+
     // Debug: Print final material network structure
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
         .Msg("Final material network for light %s:\n", GetDagPath().partialPathName().asChar());
-    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-        .Msg("  Light type: %s\n", lightType.asChar());
+    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET).Msg("  Light type: %s\n", lightType.asChar());
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
         .Msg("  Light identifier: %s\n", lightNode.identifier.GetText());
-    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-        .Msg("  Light path: %s\n", lightNode.path.GetText());
-    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-        .Msg("  Terminal: %s\n", lightNode.path.GetText());
+    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET).Msg("  Light path: %s\n", lightNode.path.GetText());
+    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET).Msg("  Terminal: %s\n", lightNode.path.GetText());
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
         .Msg("  Number of parameters: %zu\n", lightNode.parameters.size());
-    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-        .Msg("  Network map size: %zu\n", networkMap.map.size());
-    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-        .Msg("  Terminals size: %zu\n", networkMap.terminals.size());
-    
+    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET).Msg("  Network map size: %zu\n", networkMap.map.size());
+    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET).Msg("  Terminals size: %zu\n", networkMap.terminals.size());
+
     // Debug: Verify the material network is properly structured
     if (networkMap.map.find(HdMaterialTerminalTokens->light) != networkMap.map.end()) {
-        TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-            .Msg("  Material network has 'light' terminal: YES\n");
+        TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET).Msg("  Material network has 'light' terminal: YES\n");
     } else {
         TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
             .Msg("  Material network has 'light' terminal: NO - ERROR!\n");
     }
-    
+
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-        .Msg("  Returning material network for light: %s\n", GetDagPath().partialPathName().asChar());
-    
-    return VtValue(networkMap);
-}
-
-void MayaHydraLightAdapter::CreateCallbacks()
-{
-    TF_DEBUG(MAYAHYDRALIB_ADAPTER_CALLBACKS)
-        .Msg("Creating light adapter callbacks for prim (%s).\n", GetID().GetText());
-
-    MStatus status;
-    auto    dag = GetDagPath();
-    auto    obj = dag.node();
-    auto    id = MNodeMessage::addNodeDirtyCallback(obj, _dirtyParams, this, &status);
-    if (status) {
-        AddCallback(id);
-    }
-    dag.pop();
-    for (; dag.length() > 0; dag.pop()) {
-        // The adapter itself will free the callbacks, so we don't have to worry
-        // about passing raw pointers to the callbacks. Hopefully.
-        obj = dag.node();
-        if (obj != MObject::kNullObj) {
-            id = MNodeMessage::addAttributeChangedCallback(obj, _changeVisibility, this, &status);
-            if (status) {
-                AddCallback(id);
-            }
-            id = MNodeMessage::addNodeDirtyCallback(obj, _dirtyTransform, this, &status);
-            if (status) {
-                AddCallback(id);
-            }
-            _AddHierarchyChangedCallbacks(dag);
-        }
-    }
-    MayaHydraAdapter::CreateCallbacks();
-}
-
-void MayaHydraLightAdapter::_CalculateShadowParams(MFnLight& light, HdxShadowParams& params)
-{
-    TF_DEBUG(MAYAHYDRALIB_ADAPTER_LIGHT_SHADOWS)
         .Msg(
-            "Called MayaHydraLightAdapter::_CalculateShadowParams - %s\n",
+            "  Returning material network for light: %s\n",
             GetDagPath().partialPathName().asChar());
 
-    const auto dmapResolutionPlug
-        = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapResolution, true);
-    const auto dmapBiasPlug = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapBias, true);
-    const auto dmapFilterSizePlug
-        = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapFilterSize, true);
-
-    params.enabled = true;
-    params.resolution = dmapResolutionPlug.isNull()
-        ? GetMayaHydraSceneIndex()->GetParams().maximumShadowMapResolution
-        : std::min(
-            GetMayaHydraSceneIndex()->GetParams().maximumShadowMapResolution, dmapResolutionPlug.asInt());
-
-    params.shadowMatrix = std::make_shared<MayaHydraConstantShadowMatrix>(_CalculateShadowProjectionMatrix());
-
-    params.bias = dmapBiasPlug.isNull() ? -0.001 : -dmapBiasPlug.asFloat();
-    params.blur = dmapFilterSizePlug.isNull() ? 0.0
-                                              : (static_cast<double>(dmapFilterSizePlug.asInt()))
-            / static_cast<double>(params.resolution);
-
-    if (TfDebug::IsEnabled(MAYAHYDRALIB_ADAPTER_LIGHT_SHADOWS)) {
-        std::cout << "Resulting HdxShadowParams:\n";
-        std::cout << params << "\n";
-    }
+    return VtValue(networkMap);
 }
 
 bool MayaHydraLightAdapter::_GetVisibility() const
@@ -796,6 +751,112 @@ bool MayaHydraLightAdapter::_GetVisibility() const
         }
     }
     return false;
+}
+
+TfToken MayaHydraLightAdapter::GetRenderTag() const 
+{ 
+    return Fvp::secondaryGraphicsRenderTagToken; 
+}
+
+void MayaHydraLightAdapter::CreateCallbacks()
+{
+    TF_DEBUG(MAYAHYDRALIB_ADAPTER_CALLBACKS)
+        .Msg("Creating light adapter callbacks for prim (%s).\n", GetID().GetText());
+
+    MStatus status;
+    auto    dag = GetDagPath();
+    auto    obj = dag.node();
+    auto    id = MNodeMessage::addNodeDirtyCallback(obj, _dirtyParams, this, &status);
+    if (status) {
+        AddCallback(id);
+    }
+    dag.pop();
+    for (; dag.length() > 0; dag.pop()) {
+        // The adapter itself will free the callbacks, so we don't have to worry
+        // about passing raw pointers to the callbacks. Hopefully.
+        obj = dag.node();
+        if (obj != MObject::kNullObj) {
+            id = MNodeMessage::addAttributeChangedCallback(obj, _changeVisibility, this, &status);
+            if (status) {
+                AddCallback(id);
+            }
+            id = MNodeMessage::addNodeDirtyCallback(obj, _dirtyTransform, this, &status);
+            if (status) {
+                AddCallback(id);
+            }
+            _AddHierarchyChangedCallbacks(dag);
+        }
+    }
+    MayaHydraAdapter::CreateCallbacks();
+}
+
+void MayaHydraLightAdapter::GetGlfSimpleLightPosAndDirFromMFnLight(
+    MFnLight&       light,
+    GlfSimpleLight& outSimpleLight)
+{
+    MPoint     pt(0.0, 0.0, 0.0, 1.0);
+    const auto inclusiveMatrix = GetDagPath().inclusiveMatrix();
+    const auto position = pt * inclusiveMatrix;
+    MVector    pv(0.0, 0.0, -1.0);
+    const auto lightDirection = (pv * inclusiveMatrix).normal();
+
+    outSimpleLight.SetPosition(GfVec4f(position.x, position.y, position.z, position.w));
+    outSimpleLight.SetSpotDirection(GfVec3f(lightDirection.x, lightDirection.y, lightDirection.z));
+}
+
+bool MayaHydraLightAdapter::GetShadowsEnabled(MFnLight& light) const
+{
+    if (light.useRayTraceShadows()) {
+        return true;
+    }
+    // Check if the light is a non-extended light
+    MFnNonExtendedLight nonExtendedLight(light.object());
+    return nonExtendedLight.useDepthMapShadows();
+}
+
+void MayaHydraLightAdapter::_CalculateShadowParams(MFnLight& light, HdxShadowParams& params)
+{
+    TF_DEBUG(MAYAHYDRALIB_ADAPTER_LIGHT_SHADOWS)
+        .Msg(
+            "Called MayaHydraLightAdapter::_CalculateShadowParams - %s\n",
+            GetDagPath().partialPathName().asChar());
+
+    const auto dmapResolutionPlug
+        = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapResolution, true);
+    const auto dmapBiasPlug = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapBias, true);
+    const auto dmapFilterSizePlug
+        = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapFilterSize, true);
+
+    params.enabled = true;
+    params.resolution = dmapResolutionPlug.isNull()
+        ? GetMayaHydraSceneIndex()->GetParams().maximumShadowMapResolution
+        : std::min(
+              GetMayaHydraSceneIndex()->GetParams().maximumShadowMapResolution,
+              dmapResolutionPlug.asInt());
+
+    // Shadow matrix for point lights needs to be different in Storm
+    static const MString pointLight("pointLight");
+    const bool           isPointLight = IsDagPathOfGivenType(GetDagPath(), pointLight);
+    if (isPointLight) {
+        GlfSimpleLight simpleLight;
+        GetGlfSimpleLightPosAndDirFromMFnLight(light, simpleLight);
+        const GfBBox3d  bbox = GetMayaHydraSceneIndex()->GetBoundingBox(); // Only get the Maya data
+        const GfBBox3d  aabb = bbox.ComputeAlignedBox();
+        const GfRange3f r = GfRange3f(aabb.GetRange());
+        params.shadowMatrix = std::make_shared<MayaHydraShadowMatrixComputation>(r, simpleLight);
+    } else {
+        params.shadowMatrix = std::make_shared<MayaHydraConstantShadowMatrix>(_CalculateShadowProjectionMatrix());
+    }
+
+    params.bias = dmapBiasPlug.isNull() ? -0.001 : -dmapBiasPlug.asFloat();
+    params.blur = dmapFilterSizePlug.isNull() ? 0.0
+                                              : (static_cast<double>(dmapFilterSizePlug.asInt()))
+            / static_cast<double>(params.resolution);
+
+    if (TfDebug::IsEnabled(MAYAHYDRALIB_ADAPTER_LIGHT_SHADOWS)) {
+        std::cout << "Resulting HdxShadowParams:\n";
+        std::cout << params << "\n";
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -31,6 +31,9 @@ TF_REGISTRY_FUNCTION(TfType) { TfType::Define<MayaHydraAdapter>(); }
 
 namespace {
 
+using LockType = std::recursive_mutex;
+LockType dg_access_mutex;
+
 void _preRemoval(MObject& node, void* clientData)
 {
     TF_UNUSED(node);
@@ -86,7 +89,7 @@ void MayaHydraAdapter::RemoveCallbacks()
 VtValue MayaHydraAdapter::Get(const TfToken& key)
 {
     // Get extension attributes
-    auto& it = _extAttrNameToValueMap.find(key.GetText());
+    auto it = _extAttrNameToValueMap.find(key.GetText());
     if (it != _extAttrNameToValueMap.end()) {
         return it->second;
     }
@@ -131,6 +134,8 @@ HdPrimvarDescriptorVector MayaHydraAdapter::GetPrimvarDescriptors(HdInterpolatio
     // All extension attributes as custom primvars
     if (interpolation == HdInterpolationConstant) {
         if (_extAttrMapNeedUpdate) {
+            // Apply a global lock to avoid race condition while doing parallel DG node evaluation.
+            std::lock_guard<LockType> lock(dg_access_mutex);
             MAYAHYDRA_NS::GetExtensionAttributesFromNode(GetNode(), _extAttrNameToValueMap);
             _extAttrMapNeedUpdate = false;
         }

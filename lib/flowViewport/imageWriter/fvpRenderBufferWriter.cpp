@@ -16,6 +16,10 @@
 
 #include <flowViewport/imageWriter/fvpRenderBufferWriter.h>
 
+#ifdef VIEWPORT_TOOLBOX
+#include <hvt/engine/framePass.h>
+#endif
+
 #include <pxr/imaging/hdSt/hioConversions.h>
 #include <pxr/imaging/hdx/taskController.h>
 #include <pxr/imaging/hd/renderBuffer.h>
@@ -26,17 +30,19 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace {
 
 HdRenderBuffer* getRenderBuffer(
-    const VtDictionary&    args,
+    const VtDictionary&    args, bool useHVT,
     const PXR_NS::TfToken& aovToken
 )
 {
-    auto found = args.find("taskController");
-    if (found == args.end() || !found->second.IsHolding<HdxTaskController*>()) {
-        return nullptr;
+    if (useHVT) {
+        auto framePass = Fvp::ImageBufferWriter::GetPtr<hvt::FramePass>(args, "framePass");
+        return framePass ? framePass->GetRenderBuffer(aovToken) : nullptr;
+    } else {
+        auto taskController
+            = Fvp::ImageBufferWriter::GetPtr<HdxTaskController>(args, "taskController");
+        return taskController ? taskController->GetRenderOutput(aovToken) : nullptr;
     }
-
-    auto taskController = found->second.Get<HdxTaskController*>();
-    return taskController ? taskController->GetRenderOutput(aovToken) : nullptr;
+    return nullptr;
 }
 
 }
@@ -45,8 +51,10 @@ namespace FVP_NS_DEF {
 
 RenderBufferWriter::RenderBufferWriter(
     const PXR_NS::VtDictionary& args,
-    const TfToken&              aov
-) : ImageBufferWriter(), _renderBuffer(getRenderBuffer(args, aov))
+    bool                        useHVT,
+    const TfToken&              aov)
+    : ImageBufferWriter()
+    , _renderBuffer(getRenderBuffer(args, useHVT, aov))
 {}
 
 unsigned int RenderBufferWriter::Width() const

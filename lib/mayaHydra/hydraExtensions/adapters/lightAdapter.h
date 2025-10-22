@@ -38,15 +38,6 @@ class MayaHydraSceneIndex;
 class MayaHydraLightAdapter : public MayaHydraDagAdapter
 {
 public:
-    inline bool GetShadowsEnabled(MFnLight& light)
-    {
-        if (light.object().hasFn(MFn::kNonExtendedLight)) {
-            MFnNonExtendedLight nonExtLight(light.object());
-            return nonExtLight.useDepthMapShadows() || nonExtLight.useRayTraceShadows();
-        }
-        return light.useRayTraceShadows();
-    }
-
     MAYAHYDRALIB_API
     MayaHydraLightAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag);
     MAYAHYDRALIB_API
@@ -84,9 +75,18 @@ public:
         bool enableColorTemperature = false;
         float colorTemperature = 6500.0f;
     };
+    
     MAYAHYDRALIB_API
     MayaLightParams GetMayaLightParams() const;
+    MAYAHYDRALIB_API
+    TfToken GetRenderTag() const override;
     
+    bool GetShadowsEnabled(MFnLight& light)const;
+    
+    void GetGlfSimpleLightPosAndDirFromMFnLight(
+        MFnLight&           light,
+        GlfSimpleLight&     outSimpleLight);
+
 protected:
     MAYAHYDRALIB_API
     virtual void _CalculateLightParams(GlfSimpleLight& light) { }

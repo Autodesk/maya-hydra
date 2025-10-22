@@ -53,6 +53,7 @@ private:
     HdDataSourceBaseHandle _GetMaterialBindingDataSource();
     HdDataSourceBaseHandle _GetMaterialDataSource();
     HdDataSourceBaseHandle _GetDisplayColorDataSource();
+
 private:
     SdfPath _id;
     TfToken _type;

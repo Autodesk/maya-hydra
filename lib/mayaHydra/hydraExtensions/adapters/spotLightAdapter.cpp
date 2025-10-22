@@ -106,7 +106,9 @@ protected:
         if (key == HdLightTokens->shadowParams) {
             HdxShadowParams shadowParams;
             MFnSpotLight    mayaLight(GetDagPath());
-            if (!GetShadowsEnabled(mayaLight)) {
+            if (!GetShadowsEnabled(mayaLight)
+                || !(GetMayaHydraSceneIndex()
+                         ->IsHdSt())) { // Shadows are only supported for Storm with simpleLights 
                 shadowParams.enabled = false;
                 return VtValue(shadowParams);
             }

@@ -32,13 +32,11 @@
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
 #include <flowViewport/debugCodes.h>
-#include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/selection/fvpSelectionTask.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h>
 #include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
-#include <flowViewport/sceneIndex/fvpRenderIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
 
@@ -75,7 +73,6 @@
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/modelAPI.h>
 #include <pxr/usd/usdRender/tokens.h>
-#include <pxr/pxr.h>
 
 #include <mayaUsdAPI/proxyStage.h>
 #include <mayaUsdAPI/utils.h>
@@ -286,6 +283,15 @@ MStatus BatchRenderer::Render(
     auto renderFrame = [&](bool markTime = false) {
         HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
 
+        if (_mayaHydraSceneIndex) {
+            if (!TF_VERIFY(_mayaHydraSceneIndex->useMeshAdapter(), 
+                    "The environment variable MAYA_HYDRA_USE_MESH_ADAPTER is turned off explicitly. Please either remove that environment variable or turn it on to use production rendering.")) 
+            {
+                return;
+            }
+        }
+        
+
         // Replace the existing HdxTaskController selection task (Storm) or
         // colorize selection task (non-Storm) with our selection task by
         // editing the task list, since HdxTaskController is not configurable.
@@ -362,7 +368,11 @@ MStatus BatchRenderer::Render(
         const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelName, cameraName);
         // The following returns true only if there are non-Maya data producers
         // added.
-        manager.AddViewportInformation(hydraViewportInformation, _renderIndexProxy, _lastFilteringSceneIndexBeforeCustomFiltering);
+        manager.AddViewportInformation(
+            hydraViewportInformation, 
+            renderIndex(),
+            _dataProducerMergingSceneIndexProxy,
+            _lastFilteringSceneIndexBeforeCustomFiltering);
     }
 
     if (_needToReplaceSelection){
@@ -499,7 +509,8 @@ MStatus BatchRenderer::Render(
 
     const auto fileName = Fvp::ImageBufferWriter::GetFileName();
     if (!fileName.empty()) {
-        if (!Fvp::ImageBufferWriter::Write(_fileWriterArgs, fileName)) {
+        constexpr bool useHVT = false; //Even if we compile with HVT we don't use it for batch rendering
+        if (!Fvp::ImageBufferWriter::Write(_fileWriterArgs, fileName, useHVT)) {
             TF_RUNTIME_ERROR("Failed to write image to %s",
                              fileName.c_str());
         }
@@ -528,7 +539,7 @@ void BatchRenderer::_ClearMayaHydraSceneIndex()
     // HdRetainedSceneIndex dtor crashes in Windows clang code coverage build.
     _mayaHydraSceneIndex->_Destroy();
 #else
-    _renderIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
+    _dataProducerMergingSceneIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
 #endif
     _mayaHydraSceneIndex.Reset();
 }
@@ -577,23 +588,24 @@ void BatchRenderer::_InitHydraResources()
 
     MayaHydraInitData mhInitData(
         TfToken("MayaHydraSceneIndex"),
-        _engine,
-        *_renderIndex,
+        *renderIndex(),
         MAYA_NATIVE_ROOT,
         _isUsingHdSt
     );
 
-    // Render index proxy sets up the Flow Viewport merging scene index, must
+    // Data producer merging scene index sets up the Flow Viewport merging scene index, must
     // be created first, as it is required for:
     // - Selection scene index, which uses the Flow Viewport merging scene
     //   index as input.
     // - Maya scene producer, which needs the render index proxy to insert
     //   itself.
 
-    _renderIndexProxy = std::make_shared<Fvp::RenderIndexProxy>(*_renderIndex);
+    _dataProducerMergingSceneIndexProxy
+        = std::make_shared<Fvp::DataProducerMergingSceneIndexProxy>();
 
     constexpr bool interactive = false;
-    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, interactive);
+    constexpr bool _hasDefaultLighting = false; // Batch rendering does not use default lighting.
+    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, interactive, !_hasDefaultLighting);
     TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
     
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
@@ -601,15 +613,18 @@ void BatchRenderer::_InitHydraResources()
 
     _mayaHydraSceneIndex->Populate();
     //Add the scene index as an input scene index of the merging scene index
-    _renderIndexProxy->InsertSceneIndex(_mayaHydraSceneIndex, SdfPath::AbsoluteRootPath());
+    _dataProducerMergingSceneIndexProxy->InsertSceneIndex(
+        _mayaHydraSceneIndex, SdfPath::AbsoluteRootPath());
     
     if (!_sceneIndexRegistry) {
         constexpr bool interactive = false;
-        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(_renderIndexProxy, interactive));
+        _sceneIndexRegistry.reset(new MayaHydraSceneIndexRegistry(
+            _dataProducerMergingSceneIndexProxy->GetMergingSceneIndex(), interactive));
     }
     
     //Create internal scene indices chain
-    _inputSceneIndexOfFilteringSceneIndicesChain = _renderIndexProxy->GetMergingSceneIndex();
+    _inputSceneIndexOfFilteringSceneIndicesChain
+        = _dataProducerMergingSceneIndexProxy->GetMergingSceneIndex();
 
     //Put BlockPrimRemovalPropagationSceneIndex first as it can block/unblock the prim removal propagation on the whole scene indices chain
     _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
@@ -701,8 +716,9 @@ void BatchRenderer::ClearHydraResources(bool fullReset)
         _rendererPlugin = nullptr;
     }
 
-    //Decrease ref count on the render index proxy which owns the merging scene index at the end of this function as some previous calls may likely use it to remove some scene indices
-    _renderIndexProxy.reset();
+    // Decrease ref count on the render index proxy which owns the merging scene index at the end of
+    // this function as some previous calls may likely use it to remove some scene indices
+    _dataProducerMergingSceneIndexProxy.reset();
 
     _viewport = GfVec4d(0, 0, 0, 0);
     _initializationSucceeded = false;

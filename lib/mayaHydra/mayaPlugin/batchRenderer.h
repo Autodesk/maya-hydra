@@ -38,10 +38,10 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexDataFactoriesSetup.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
-#include <flowViewport/sceneIndex/fvpRenderIndexProxyFwd.h>
 #include <flowViewport/selection/fvpSelectionTracker.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
@@ -154,7 +154,6 @@ private:
     PXR_NS::HdRendererPlugin*                 _rendererPlugin = nullptr;
     std::unique_ptr<PXR_NS::HdxTaskController> _taskController;
     PXR_NS::HdPluginRenderDelegateUniqueHandle _renderDelegate = nullptr;
-    Fvp::RenderIndexProxyPtr                  _renderIndexProxy{nullptr};
     PXR_NS::VtDictionary                      _fileWriterArgs{};
     PXR_NS::HdSceneIndexBaseRefPtr            _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
     PXR_NS::HdSceneIndexBaseRefPtr            _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
@@ -164,6 +163,7 @@ private:
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     PXR_NS::HdsiSceneGlobalsSceneIndexRefPtr  _sceneGlobalsSceneIndex;
+    Fvp::DataProducerMergingSceneIndexProxyPtr _dataProducerMergingSceneIndexProxy { nullptr };
 
     PXR_NS::HdRprimCollection                 _renderCollection {
         PXR_NS::HdTokens->geometry,

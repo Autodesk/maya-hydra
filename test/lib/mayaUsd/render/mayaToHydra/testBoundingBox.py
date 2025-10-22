@@ -43,7 +43,7 @@ class TestBoundingBox(mtohUtils.MayaHydraBaseTestCase):
 
     def test_BoundingBoxWithExtents(self):
         self.loadUsdScene(self._extentsFilename)
-        self.assertSnapshotClose("boundingBox_extents.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("boundingBox_extents.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes)
     
     def test_BoundingBoxNoExtents(self):
         self.loadUsdScene(self._noExtentsFilename)

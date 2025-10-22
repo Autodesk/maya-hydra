@@ -1,0 +1,3 @@
+[submodule "lib/hydra-viewport-toolbox"]
+	path = lib/hydra-viewport-toolbox
+	url = https://github.com/Autodesk/hydra-viewport-toolbox.git

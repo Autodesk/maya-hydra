@@ -198,26 +198,6 @@ public:
             }
         }
 
-        auto getFloatFromMPlug = [&depNode](const char* attrName, float initVal) {
-            float val = initVal;
-            MStatus status;
-            MPlug plug = depNode.findPlug(attrName, true, &status);
-            if (status && !plug.isNull()) {
-                val = plug.asFloat();
-            }
-            return val;
-        };
-
-        auto getBoolFromMPlug = [&depNode](const char* attrName, bool initVal) {
-            bool  val = initVal;
-            MStatus status;
-            MPlug   plug = depNode.findPlug(attrName, true, &status);
-            if (status && !plug.isNull()) {
-                val = plug.asBool();
-            }
-            return val;
-        };
-        
         constexpr float defaultWidth  = 2.0f;//By default the drawing of the light shape has a width and height of 2.0
         constexpr float defaultHeight = 2.0f;
         
@@ -234,6 +214,10 @@ public:
         } else if ( (paramName == HdLightTokens->length)
                 ||  (paramName == UsdLuxTokens->inputsLength)) {
             return VtValue(float(scale2[0]));
+        } else if ((paramName == HdLightTokens->shadowEnable) || (paramName == HdLightTokens->hasShadow)
+            || (paramName == UsdLuxTokens->inputsShadowEnable)) {
+            // From a comment in OpenUSD : Shadows are supported on for SimpleLights and DistantLights
+            return VtValue(false);//No shadows
         }
         
         return MayaHydraLightAdapter::GetLightParamValue(paramName);

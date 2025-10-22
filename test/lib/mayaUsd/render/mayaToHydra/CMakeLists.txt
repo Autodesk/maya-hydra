@@ -6,6 +6,7 @@
 # only single platform exclusion is supported currently.
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
 set(INTERACTIVE_TEST_SCRIPT_FILES
+    testSceneStat.py
     testImageDiffing.py
     testMtohCommand.py
     testBasicRender.py
@@ -25,6 +26,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaLights.py
     testUSDLights.py
     testUVandUDIM.py
+	testPurposeRenderTag.py
+
 	#Tests that have a dependency on other plugins
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
@@ -48,7 +51,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testUsdTextureToggle.py
     testUsdStageDefaultLighting.py
     testPassingNormalsOnMayaNative.py
-    testMayaComponentsPicking.py
+    testMayaComponentsPicking.py|skipOnPlatform:osx # HYDRA-1882 : Crash in HdxOitResolveTask on OSX
     testFlowPluginsHierarchicalProperties.py
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
@@ -67,10 +70,12 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
 	#HYDRA-1660 re-enable testMayaDisplayModes
 	#testMayaDisplayModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    testRenderRegion.py
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
     cpp/testDataProducerExample.py
+    cpp/testMayaHydraSceneIndex.py
     cpp/testMayaSceneFlattening.py
     cpp/testMayaUsdUfeItems.py
     cpp/testDataProducerMergingSceneIndex.py
@@ -93,6 +98,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
     cpp/testUsdStageInvalidate.py
+    cpp/testCamera.py
     cpp/testCustomAttributes.py|depOnPlugins:mtoa
 	#CPP tests disabled on OSX
     cpp/testWriteFile.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
@@ -112,6 +118,11 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     )
 endif()
 
+#Viewport tool box render passes tests
+if(BUILD_WITH_VIEWPORT_TOOLBOX)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testFramePasses.py)
+endif()
+
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.
 if(MayaUsd_FOUND)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testMayaUsdAPIUsage.py)
@@ -129,6 +140,7 @@ endif()
 # both versions of the test in parallel will conflict.
 set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshes.py
+    testTransformMeshAdapter.py
     cpp/testMeshAdapterTransform.py
 )
 

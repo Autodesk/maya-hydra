@@ -36,7 +36,8 @@ public:
 
     FVP_API
     TextureBufferWriter(
-      const PXR_NS::VtDictionary& args,
+      const PXR_NS::VtDictionary& args, 
+      bool                        useHVT,
       const PXR_NS::TfToken&      aov
     );
 

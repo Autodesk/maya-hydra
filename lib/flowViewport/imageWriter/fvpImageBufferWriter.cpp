@@ -59,10 +59,11 @@ bool ImageBufferWriter::Write(const std::string& fileName)
 bool ImageBufferWriter::Write(
     const PXR_NS::VtDictionary& args,
     const std::string&          fileName,
+    bool                        useHVT,
     const PXR_NS::TfToken&      aov
 )
 {
-    auto writer = Create(args, aov);
+    auto writer = Create(args, useHVT, aov);
     return (writer ? writer->Write(fileName) : false);
 }
 

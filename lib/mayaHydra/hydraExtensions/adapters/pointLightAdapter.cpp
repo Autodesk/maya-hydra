@@ -68,7 +68,15 @@ public:
             // For point lights, we can treat as point if radius is very small
             constexpr bool treatAsPoint = true; // Point lights are typically treated as points
             return VtValue(treatAsPoint);
+        } else if (
+            ( ! GetMayaHydraSceneIndex()->IsHdSt()) && (
+            (paramName == HdLightTokens->shadowEnable) || (paramName == HdLightTokens->hasShadow)
+            || (paramName == UsdLuxTokens->inputsShadowEnable))) {
+            // From a comment in OpenUSD : Shadows are supported on for SimpleLights and
+            // DistantLights
+            return VtValue(false); // No shadows
         }
+
         return MayaHydraLightAdapter::GetLightParamValue(paramName);
     }
 };

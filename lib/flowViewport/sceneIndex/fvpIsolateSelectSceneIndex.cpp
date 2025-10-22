@@ -94,14 +94,14 @@ Dependencies instancedPrim(
     auto prim = si.GetInputSceneIndex()->GetPrim(primPath);
     auto instanceSchema = HdInstanceSchema::GetFromParent(prim.dataSource);
     return (instanceSchema.IsDefined() ? Dependencies{{
-                instanceSchema.GetInstancer()->GetTypedValue(0)}} : 
+                instanceSchema.GetInstancer()->GetTypedValue(0)}} :
         Dependencies());
 }
 
 bool isGeomSubset(const HdSceneIndexPrim& prim) {
     // HYDRA-1339: PiPrototypePropagatingSceneIndex removes GeomSubset type
     // from Hydra prims
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
     return (prim.primType == HdPrimTypeTokens->geomSubset) ||
         HdGeomSubsetSchema::GetFromParent(prim.dataSource).IsDefined();
 #else
@@ -172,7 +172,7 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
 
     auto instancerMask = _instancerMasks.find(primPath);
     if (instancerMask != _instancerMasks.end()) {
-        inputPrim.dataSource = 
+        inputPrim.dataSource =
             setInstancerMaskDataSource(inputPrim, instancerMask->second);
 
         return inputPrim;
@@ -180,7 +180,7 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
 
     // If isolate selection is empty, then nothing is included (everything
     // is excluded), as desired.
-    const bool included = 
+    const bool included =
         _isolateSelection->HasAncestorOrDescendantInclusive(primPath);
 
     TF_DEBUG(FVP_ISOLATE_SELECT_SCENE_INDEX)
@@ -335,7 +335,7 @@ void IsolateSelectSceneIndex::_DirtyIsolateSelection(const SelectionConstPtr& ne
         (newIsolateSelection && newIsolateSelection->IsEmpty())) {
         return;
     }
-        
+
     // Keep paths in a set to minimize dirtying.
     std::set<SdfPath> dirtyPaths;
 
@@ -365,7 +365,7 @@ void IsolateSelectSceneIndex::_InsertSelectedPaths(
     if (!selection) {
         return;
     }
-    const auto& paths = selection->IsEmpty() ? 
+    const auto& paths = selection->IsEmpty() ?
         GetChildPrimPaths(SdfPath::AbsoluteRootPath()) :
         selection->GetFullySelectedPaths();
     for (const auto& primPath : paths) {
@@ -457,7 +457,7 @@ void IsolateSelectSceneIndex::_DirtyVisibility(
 }
 
 void IsolateSelectSceneIndex::_DirtyVisibilityRecursive(
-    const SdfPath&                            primPath, 
+    const SdfPath&                            primPath,
     HdSceneIndexObserver::DirtiedPrimEntries* dirtiedEntries
 ) const
 {
@@ -500,7 +500,7 @@ void IsolateSelectSceneIndex::_DirtyVisibilityRecursive(
     }
 
     for (const auto& childPath : GetChildPrimPaths(primPath)) {
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
         // Recursing down to set visibility on a geomSubset child is wasteful.
         auto childPrim = GetInputSceneIndex()->GetPrim(childPath);
         if (childPrim.primType == HdPrimTypeTokens->geomSubset) {
@@ -660,11 +660,11 @@ void IsolateSelectSceneIndex::_DirtyInstancerMasks(
     }
 
     _SendPrimsDirtied(dirtiedEntries);
-    
+
 }
 
 void IsolateSelectSceneIndex::_AddDirtyInstancerMaskEntry(
-    const SdfPath&                            primPath, 
+    const SdfPath&                            primPath,
     HdSceneIndexObserver::DirtiedPrimEntries* dirtiedEntries
 ) const
 {

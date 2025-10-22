@@ -19,7 +19,7 @@
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 
-#if PXR_VERSION >= 2403
+#if PXR_VERSION >= 2405
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -182,11 +182,11 @@ void GeomSubsetWhSi::_DeleteSelectionHighlight(const SdfPath& geomSubsetPath)
     // Erase from data structures
     SelectionKey selectionKey { geomSubsetPath, "" };
     SdfPath selectionPath = UnregisterSelection(selectionKey);
-    
+
     // Send notifications
     _SendPrimsRemoved({selectionPath});
 }
 
 }
 
-#endif // #if PXR_VERSION >= 2403
+#endif // #if PXR_VERSION >= 2405

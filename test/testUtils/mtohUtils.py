@@ -55,7 +55,8 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     # with "cannot be unloaded because it is still in use" error.
     # Unloading modelingToolkit fails with a
     # "Dynamic unloading is not currently supported." error
-    _pluginsCantUnload = ['mayaHydraFlowViewportAPILocator', 'mtoa', 'modelingToolkit']
+    # mayaUsdPlugin looged as HYDRA-1896, we should remove this when HYDRA-1896 is fixed
+    _pluginsCantUnload = ['mayaHydraFlowViewportAPILocator', 'mtoa', 'modelingToolkit', 'mayaUsdPlugin']
 
     @classmethod
     def setUpClass(cls):
@@ -96,6 +97,9 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         #Set the usd version
         cls._usdVersion = Usd.GetVersion()
         
+        # Set the image version for 2 passes once per test file
+        cls._imageVersionFor2Passes = None
+        
     def setUp(self):
         # Maya is not closed/reset between each test of a test suite,
         # so open a new file before each test to minimize leftovers
@@ -105,6 +109,16 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         assert not modified, 'Internal test framework error: scene left as modified by mayaUtils.openNewScene()'
 
         self.setHdStormRenderer()
+
+        # Store the frame passes count as a member variable to avoid repeated command calls
+        self.framePassesCount = cmds.mayaHydraGetFramePassesCount()
+        
+        # Set the image version for 2 passes once per test file
+        if self.__class__._imageVersionFor2Passes is None:
+            if self.framePassesCount == 2:
+                self.__class__._imageVersionFor2Passes = "two_passes"
+            else:
+                self.__class__._imageVersionFor2Passes = None
 
         # We've just opened a new scene, so we should not be modified.  Setting
         # Storm as the renderer should conceptually not change that status, but
@@ -189,12 +203,14 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         self.cubeShape = cmds.listRelatives(self.cubeTrans)[0]
         self.setHdStormRenderer()
         self.assertNodeNameInIndex(self.cubeShape)
-        # The single Maya cube shape maps to two rprims, the first once of
-        # which is the shape's StandardShadedItem.  The list is ordered, as the
-        # Hydra call made is HdRenderIndex::GetRprimIds(), which sorts
-        # according to std::less<SdfPath>, which will produce
-        # lexicographically-ordered paths.
-        self.cubeRprim = self.getIndex()[1]
+        index_list = self.getIndex()
+        # Get the cube prim by ignoring the prims whose name contains DormantPolywire
+        cubePrims = [p for p in index_list if 'dormantpolywire' not in p.lower()]
+        if cubePrims:
+            self.cubeRprim = cubePrims[0]
+        else:
+            self.fail("Expected a non-DormantPolyWire prim, but none was found")
+        
         cmds.select(clear=1)
         cmds.refresh()
         self.assertVisible(self.cubeRprim)

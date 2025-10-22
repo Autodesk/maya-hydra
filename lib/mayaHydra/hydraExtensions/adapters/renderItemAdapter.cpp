@@ -59,12 +59,14 @@ MayaHydraRenderItemAdapter::MayaHydraRenderItemAdapter(
     const SdfPath&        slowId,
     int                   fastId,
     MayaHydraSceneIndex*  mayaHydraSceneIndex,
-    const MRenderItem&    ri)
+    const MRenderItem&    ri,
+    TfToken              purposeRenderTag)
     : MayaHydraAdapter(dagPath.node(), slowId, mayaHydraSceneIndex)
     , _dagPath(dagPath)
     , _primitive(ri.primitive())
     , _name(ri.name())
     , _fastId(fastId)
+    , _purposeRenderTag(purposeRenderTag)
 #ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API
     , _cullMode(ri.cullMode())
 #endif
@@ -74,7 +76,10 @@ MayaHydraRenderItemAdapter::MayaHydraRenderItemAdapter(
 
 MayaHydraRenderItemAdapter::~MayaHydraRenderItemAdapter() { _RemoveRprim(); }
 
-TfToken MayaHydraRenderItemAdapter::GetRenderTag() const { return HdRenderTagTokens->geometry; }
+TfToken MayaHydraRenderItemAdapter::GetRenderTag() const
+{
+    return _purposeRenderTag;
+}
 
 void MayaHydraRenderItemAdapter::UpdateTransform(const MRenderItem& ri)
 {
@@ -197,7 +202,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         const MPoint& min = bbox.min();
         const MPoint& max = bbox.max();
         _bounds.SetRange(GfRange3d({min.x, min.y, min.z}, {max.x, max.y, max.z}));
-        // Append the world matrix
+        // Apply the world matrix
         MMatrix matrix;
         data._ri.getMatrix(matrix);
         _bounds.SetMatrix(GetGfMatrixFromMaya(matrix));
@@ -600,8 +605,9 @@ bool MayaHydraRenderItemAdapter::Illuminated() const
 void MayaHydraRenderItemAdapter::CreateCallbacks()
 {
     MStatus status;
+    auto obj = GetNode();
     auto attributesChanged = MNodeMessage::addAttributeChangedCallback(
-        GetDagPath().node(),
+        obj,
         +[](MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
             auto* adapter = reinterpret_cast<MayaHydraRenderItemAdapter*>(clientData);
             // Handle extension attributes change

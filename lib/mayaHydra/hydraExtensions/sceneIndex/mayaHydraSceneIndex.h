@@ -54,13 +54,12 @@
 
 #include <unordered_map>
 
-namespace FVP_NS_DEF {
-class RenderIndexProxy;
-}
-
 UFE_NS_DEF {
 class Path;
 }
+
+// Forward declaration so that qualified friend declaration is valid.
+namespace MAYAHYDRA_NS_DEF { class BatchRenderer; }
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -68,12 +67,10 @@ struct MayaHydraInitData
 {
     MayaHydraInitData(
         TfToken            nameIn,
-        HdEngine&          engineIn,
         HdRenderIndex&     renderIndexIn,
         const SdfPath&     delegateIDIn,
         bool               isHdStIn)
         : name(nameIn)
-        , engine(engineIn)
         , renderIndex(renderIndexIn)
         , delegateID(delegateIDIn)
         , isHdSt(isHdStIn)
@@ -81,7 +78,6 @@ struct MayaHydraInitData
     }
 
     TfToken            name;
-    HdEngine&          engine;
     HdRenderIndex&     renderIndex;
     SdfPath            delegateID;
     bool               isHdSt;
@@ -104,9 +100,9 @@ public:
 
     static MayaHydraSceneIndexRefPtr New(
         MayaHydraInitData& initData,
-        bool interactive
-    ) {
-        return TfCreateRefPtr(new MayaHydraSceneIndex(initData, interactive));
+        bool interactive,
+        bool lightEnabled) {
+        return TfCreateRefPtr(new MayaHydraSceneIndex(initData, interactive, lightEnabled));
     }
 
     ~MayaHydraSceneIndex();
@@ -185,13 +181,13 @@ public:
 
     GfInterval GetCurrentTimeSamplingInterval() const;
 
-    HdChangeTracker& GetChangeTracker();
-
     HdRenderIndex& GetRenderIndex() { return _renderIndex; }
 
     SdfPath GetDelegateID(TfToken name);
 
     HdMeshTopology GetMeshTopology(const SdfPath& id);
+
+    HdBasisCurvesTopology GetBasisCurvesTopology(const SdfPath& id);
 
     SdfPath GetPrimPath(const MDagPath& dg, bool isSprim) const;
 
@@ -257,9 +253,9 @@ public:
     /// Is using an environment variable to tell if we should pass normals to Hydra when using the render item and mesh adapters
     static bool passNormalsToHydra();
 
-    /// Read an environment variable to use mesh adapters rather than
-    /// OGS-created render items for Maya meshes.
-    static bool useMeshAdapter();
+    /// Is using an environment variable to tell if we should use the mesh adapter instead of the
+    /// render item adapter for Maya meshes or when we are using batch production rendering it should be always on
+    bool useMeshAdapter();
 
     ///Create the default hydra material from maya default material or create a fallback material if it cannot be found
     void CreateMayaDefaultMaterialData();
@@ -279,8 +275,8 @@ public:
 private:
     MayaHydraSceneIndex(
         MayaHydraInitData& initData,
-        bool interactive
-    );
+        bool interactive,
+        bool lightEnabled);
 
     template <typename AdapterPtr, typename Map>
     AdapterPtr _CreateAdapter(
@@ -295,6 +291,7 @@ private:
     // Utilites
     bool _GetRenderItem(int fastId, MayaHydraRenderItemAdapterPtr& adapter);
     void _AddPrimAncestors(const SdfPath& path);
+    void _RemoveEmptyAncestors(const SdfPath& path);
     void _AddRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
     void _RemoveRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
     bool _GetRenderItemMaterial(const MRenderItem& ri, SdfPath& material, MObject& shadingEngineNode);
@@ -316,6 +313,7 @@ private:
 
 #ifdef CODE_COVERAGE_WORKAROUND
     friend class MtohRenderOverride;
+    friend class MAYAHYDRA_NS_DEF::BatchRenderer;
 #endif
     void _Destroy();
 
@@ -340,6 +338,9 @@ private:
     using LightAdapterCreator
         = std::function<MayaHydraLightAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>;
     std::vector<std::pair<MObject, LightAdapterCreator>> _lightsToAdd;
+    using CameraAdapterCreator
+        = std::function<MayaHydraCameraAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>;
+    std::vector<std::pair<MObject, CameraAdapterCreator>> _camerasToAdd;
     std::vector<SdfPath> _materialTagsChanged;
 
     bool _defaultMaterialCreated = false;
@@ -373,7 +374,6 @@ private:
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex { nullptr };
 
     bool _unregisterPickHandler{false};
-
     bool _interactive{true};
 };
 

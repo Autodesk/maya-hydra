@@ -47,7 +47,7 @@ const std::string kPolyFaceColorName = "polyFace";
  * @return The resulting status of the operation.
  */
 MAYAHYDRALIB_API
-MStatus GetObjectsFromNodeNames(const MStringArray& nodeNames, MObjectArray & outObjects);
+MStatus GetObjectsFromNodeNames(const MStringArray& nodeNames, MObjectArray& outObjects);
 
 /**
  * @brief Get the DAG path of a node from the Maya scene graph using its name
@@ -74,7 +74,7 @@ MStatus GetDependNodeFromNodeName(const MString& nodeName, MObject& outDependNod
 /**
  * @brief Get the Maya transform matrix of a node from its DAG path
  *
- * The output transform matrix is the resultant ("flattened") matrix from it and 
+ * The output transform matrix is the resultant ("flattened") matrix from it and
  * its parents' transforms.
  *
  * @param[in] dagPath is the DAG path of the node in the Maya scene graph.
@@ -88,7 +88,7 @@ MStatus GetMayaMatrixFromDagPath(const MDagPath& dagPath, MMatrix& outMatrix);
 /**
  * @brief Determines whether a given DAG path points to a UFE item created by maya-usd
  *
- * UFE stands for Universal Front End : the goal of the Universal Front End is to create a 
+ * UFE stands for Universal Front End : the goal of the Universal Front End is to create a
  * DCC-agnostic component that will allow a DCC to browse and edit data in multiple data models.
  *
  * @param[in] dagPath is the DAG path of the node in the Maya scene graph.
@@ -104,7 +104,7 @@ bool IsUfeItemFromMayaUsd(const MDagPath& dagPath, MStatus* returnStatus = nullp
 /**
  * @brief Determines whether a given object is a UFE item created by maya-usd
  *
- * UFE stands for Universal Front End : the goal of the Universal Front End is to create a 
+ * UFE stands for Universal Front End : the goal of the Universal Front End is to create a
  * DCC-agnostic component that will allow a DCC to browse and edit data in multiple data models.
  *
  * @param[in] obj is the object representing the DAG node.
@@ -160,7 +160,7 @@ bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath);
  */
 bool IsDagPathAnArnoldAreaLight(const MDagPath& dagPath);
 
-    /**
+/**
  * @brief Get if this MDagPath is a light.
  *
  * @param[in] dagPath is a MDagPath
@@ -193,6 +193,16 @@ bool IsDagPathALight(const MDagPath& dagPath);
  * @see IsDagPathAnArnoldSkyDomeLight() for checking if a DAG path is an Arnold sky dome light
  */
 std::string GetDomeLightTexture(const MFnDependencyNode& lightNode);
+
+/**
+ * @brief Get if this MDagPath is of the given type.
+ *
+ * @param[in] dagPath is a MDagPath
+ * @param[in] type is a Maya type string
+ *
+ * @return true if the object is a dag path of the vien type, false otherwise
+ */
+bool IsDagPathOfGivenType(const MDagPath& dagPath, const MString& type);
 
 } // namespace MAYAHYDRA_NS_DEF
 

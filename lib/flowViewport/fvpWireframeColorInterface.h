@@ -17,7 +17,6 @@
 #define FLOW_VIEWPORT_WIREFRAME_COLOR_INTERFACE_H
 
 //Local headers
-#include "flowViewport/api.h"
 #include "flowViewport/selection/fvpSelectionTypes.h"
 
 //Hydra headers
