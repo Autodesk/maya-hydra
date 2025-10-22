@@ -143,6 +143,14 @@ public:
     /// Intended mostly for use in debugging and testing.
     static SdfPath RendererSceneDelegateId(TfToken rendererName, TfToken sceneDelegateName);
 
+    /// Returns whether the given renderer has converged.
+    /// TODO 2025-10-21 : This currently only checks the first viewport found
+    /// that uses the given renderer. Once we have proper multi-viewport support, 
+    /// we should also be able to specify which viewport to check the convergence for.
+    ///
+    /// Intended mostly for use in debugging and testing.
+    static bool HasConverged(TfToken rendererName);
+
     //! Main entry point for rendering, called by Maya.
     MStatus Render(
         const MHWRender::MDrawContext&                         drawContext,

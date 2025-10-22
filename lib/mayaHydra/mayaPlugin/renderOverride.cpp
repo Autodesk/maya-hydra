@@ -791,6 +791,15 @@ SdfPath MtohRenderOverride::RendererSceneDelegateId(TfToken rendererName, TfToke
     return SdfPath();
 }
 
+bool MtohRenderOverride::HasConverged(TfToken rendererName)
+{
+    MtohRenderOverride* instance = GetByName(rendererName);
+    if (!instance) {
+        return false;
+    }
+    return instance->_isConverged;
+}
+
 void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext)
 {
     constexpr auto considerAllSceneLights = MHWRender::MDrawContext::kFilteredIgnoreLightLimit;
