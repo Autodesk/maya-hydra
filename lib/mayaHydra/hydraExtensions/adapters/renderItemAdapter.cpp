@@ -34,6 +34,7 @@
 
 #include <maya/MAnimControl.h>
 #include <maya/MDGContextGuard.h>
+#include <maya/MNodeMessage.h>
 
 #include <functional>
 
@@ -60,7 +61,7 @@ MayaHydraRenderItemAdapter::MayaHydraRenderItemAdapter(
     MayaHydraSceneIndex*  mayaHydraSceneIndex,
     const MRenderItem&    ri,
     TfToken              purposeRenderTag)
-    : MayaHydraAdapter(MObject(), slowId, mayaHydraSceneIndex)
+    : MayaHydraAdapter(dagPath.node(), slowId, mayaHydraSceneIndex)
     , _dagPath(dagPath)
     , _primitive(ri.primitive())
     , _name(ri.name())
@@ -201,6 +202,10 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         const MPoint& min = bbox.min();
         const MPoint& max = bbox.max();
         _bounds.SetRange(GfRange3d({min.x, min.y, min.z}, {max.x, max.y, max.z}));
+        // Apply the world matrix
+        MMatrix matrix;
+        data._ri.getMatrix(matrix);
+        _bounds.SetMatrix(GetGfMatrixFromMaya(matrix));
     }
     VtIntArray vertexIndices;
     VtIntArray vertexCounts;
@@ -480,7 +485,8 @@ VtValue MayaHydraRenderItemAdapter::Get(const TfToken& key)
             _wireframeColor[0], _wireframeColor[1], _wireframeColor[2], _wireframeColor[3]));
     }
 
-    return {};
+    // Let base class handle other keys
+    return MayaHydraAdapter::Get(key);
 }
 
 void MayaHydraRenderItemAdapter::MarkDirty(HdDirtyBits dirtyBits)
@@ -493,25 +499,29 @@ void MayaHydraRenderItemAdapter::MarkDirty(HdDirtyBits dirtyBits)
 HdPrimvarDescriptorVector
 MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
 {
-    HdPrimvarDescriptor desc;
+    // Base descriptors
+    HdPrimvarDescriptorVector descs = MayaHydraAdapter::GetPrimvarDescriptors(interpolation);
 
-    // Vertices
-    if (interpolation == HdInterpolationVertex) {
+    // Local descriptors
+    HdPrimvarDescriptorVector localDescs;
+    if (interpolation == HdInterpolationVertex) {// Vertices
         static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
-        return  passNormalsToHydra ? 
-        HdPrimvarDescriptorVector{
-            {UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point},//Vertices
-            {UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal}//Normals
-        } : 
-        HdPrimvarDescriptorVector{
-            {UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point}//Vertices only
-        };
+        if(passNormalsToHydra) {
+            localDescs = {
+                { UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point },//Vertices
+                { UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal }//Normals
+            };
+        }
+        else {
+            localDescs = {
+                { UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point }//Vertices only
+            };
+        }
     } 
     else if (interpolation == HdInterpolationFaceVarying) {
         // UVs and tangents are face varying in maya.
         if (_primitive == MGeometry::Primitive::kTriangles) {
-            return  
-            HdPrimvarDescriptorVector{
+            localDescs = {
                 {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate},//uvs
                 {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate},//tangents
             };
@@ -524,10 +534,7 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
             case MGeometry::Primitive::kAdjacentLines: //Fall into
             case MGeometry::Primitive::kAdjacentLineStrip:
             {
-                desc.name           = HdTokens->displayColor;//Use display color only for lines/points (avoid triangles)
-                desc.interpolation  = interpolation;
-                desc.role           = HdPrimvarRoleTokens->color;
-                return { desc };
+                localDescs = { { HdTokens->displayColor, interpolation, HdPrimvarRoleTokens->color } };//Use display color only for lines/points (avoid triangles)
             }
             break;
             default:
@@ -535,7 +542,9 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
         }
     }
 
-    return {};
+    // Combine descriptors
+    descs.insert(descs.end(), localDescs.begin(), localDescs.end());
+    return descs;
 }
 
 VtValue MayaHydraRenderItemAdapter::GetMaterialResource() { return {}; }
@@ -591,6 +600,25 @@ bool MayaHydraRenderItemAdapter::Illuminated() const
         MHWRender::MGeometry::Primitive::kLines != _primitive
         && MHWRender::MGeometry::Primitive::kLineStrip != _primitive
         && MHWRender::MGeometry::Primitive::kPoints != _primitive);
+}
+
+void MayaHydraRenderItemAdapter::CreateCallbacks()
+{
+    MStatus status;
+    auto obj = GetNode();
+    auto attributesChanged = MNodeMessage::addAttributeChangedCallback(
+        obj,
+        +[](MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+            auto* adapter = reinterpret_cast<MayaHydraRenderItemAdapter*>(clientData);
+            // Handle extension attributes change
+            adapter->HandleExtensionAttributesDirty(plug);
+        },
+        reinterpret_cast<void*>(this),
+        &status);
+
+    if (status) {
+        AddCallback(attributesChanged);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////

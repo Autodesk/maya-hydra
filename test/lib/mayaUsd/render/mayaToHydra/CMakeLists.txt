@@ -23,9 +23,11 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaShadingModes.py
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
-    testMayaLights.py
+	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
+    #testMayaLights.py
     testUSDLights.py
     testUVandUDIM.py
+	testPurposeRenderTag.py
 	#Tests that have a dependency on other plugins
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
@@ -68,6 +70,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	#HYDRA-1660 re-enable testMayaDisplayModes
 	#testMayaDisplayModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testRenderRegion.py
+    testConvergence.py
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
@@ -96,8 +99,10 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testSceneIndexDirtying.py
     cpp/testUsdStageInvalidate.py
     cpp/testCamera.py
+    cpp/testCustomAttributes.py|depOnPlugins:mtoa
 	#CPP tests disabled on OSX
     cpp/testWriteFile.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    cpp/testMaterialBlocking.py
 )
 
 # These two test files are identical, except for disabled tests.  See
@@ -154,16 +159,8 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
     set(target "${target}_meshAdapter")
     mayaUsd_add_test(${target}
         INTERACTIVE
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         PYTHON_SCRIPT ${test_filename}
         ENV
-            "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
-            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
-
-            "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
-
-            "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
-
             "MAYA_HYDRA_USE_MESH_ADAPTER=1"
     )
 
@@ -178,17 +175,9 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_VP2_RENDER_DELEGATE})
     mayaUsd_get_unittest_target(target ${test_filename})
     mayaUsd_add_test(${target}
         INTERACTIVE
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         PYTHON_SCRIPT ${test_filename}
         ENV
-            "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
-            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
-
-            "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
-
             "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
-
-            "MAYA_HAS_RENDER_ITEM_CULL_MODE_API=${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}"
     )
 
     # Assign a CTest label to these tests for easy filtering.
@@ -202,32 +191,9 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
     mayaUsd_get_unittest_target(target ${test_filename})
     mayaUsd_add_test(${target}
         INTERACTIVE
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         PYTHON_SCRIPT ${test_filename}
         ENV
-            "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
-            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
-
-            "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
-
-            # LD_LIBRARY_PATH needs to be set for the idiff executable because its 
-            # RPATH is absolute rather than relative to ORIGIN, meaning the RPATH 
-            # points to the absolute path on the machine where idiff was built.
-            # This absence of relative paths for RPATH comes from OpenImageIO.
-            # We introduce a second workaround to avoid Maya using usd's libpng, 
-            # because both use incompatible versions of libpng. This is done by 
-            # setting LD_LIBRARY_PATH to IDIFF_LD_LIBRARY_PATH only when we run 
-            # idiff using Python's subprocess module.
-            "IDIFF_LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}:${PXR_USD_LOCATION}/lib64:${PXR_USD_LOCATION}/lib"
-
-            # Maya uses a very old version of GLEW, so we need support for
-            # pre-loading a newer version from elsewhere.
-            "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
-
-            # Use standard surface as default for now
             "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
-
-            "MAYA_HAS_RENDER_ITEM_CULL_MODE_API=${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}"
     )
 
     # Add a ctest label to these tests for easy filtering.

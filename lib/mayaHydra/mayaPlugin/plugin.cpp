@@ -22,6 +22,7 @@
 #include "viewCommand.h"
 #include "pluginBuildInfoCommand.h"
 #include "getFramePassesCountCommand.h"
+#include "testingCommand.h"
 #ifdef VIEWPORT_TOOLBOX
 #include "renderRegionCommand.h"
 #include "setVisibleFramePassesCommand.h"
@@ -233,6 +234,15 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
+    if (!plugin.registerCommand(
+            MayaHydraTestingCommand::commandName,
+            MayaHydraTestingCommand::creator,
+            MayaHydraTestingCommand::createSyntax)) {
+        ret = MS::kFailure;
+        ret.perror("Error registering mayaHydraTesting command!");
+        return ret;
+    }
+
 #ifdef VIEWPORT_TOOLBOX
     if (!plugin.registerCommand(
             MayaHydraSetVisibleFramePasses::commandName,
@@ -358,6 +368,11 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     if (!plugin.deregisterCommand(MayaHydraPluginInfoCommand::commandName)) {
         ret = MS::kFailure;
         ret.perror("Error deregistering MayaHydraPluginInfo command!");
+    }
+
+    if (!plugin.deregisterCommand(MayaHydraTestingCommand::commandName)) {
+        ret = MS::kFailure;
+        ret.perror("Error deregistering mayaHydraTesting command!");
     }
 
 #ifdef VIEWPORT_TOOLBOX

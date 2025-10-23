@@ -27,6 +27,7 @@
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
+#include <pxr/imaging/hd/materialBindingSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/materialConnectionSchema.h>
 #include <pxr/imaging/hd/materialNodeParameterSchema.h>
@@ -42,6 +43,7 @@
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #if PXR_VERSION >= 2505
+#include <pxr/usdImaging/usdImaging/materialBindingSchema.h>
 #include <pxr/usdImaging/usdImaging/materialBindingsSchema.h>
 #elif PXR_VERSION >= 2405
 #include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
@@ -373,6 +375,130 @@ private:
     const SdfPath _dstPrefix;
     HdContainerDataSourceHandle const _inputDataSource;
 };
+
+class _MaterialBlockingContainerDataSource : public HdContainerDataSource {
+public:
+    HD_DECLARE_DATASOURCE(_MaterialBlockingContainerDataSource)
+    
+    _MaterialBlockingContainerDataSource(
+        HdContainerDataSourceHandle const &inputDataSource,
+        HdSceneIndexBaseRefPtr const &inputSceneIndex,
+        const TfToken& materialPathToken);
+
+    TfTokenVector GetNames() override;
+
+    HdDataSourceBaseHandle Get(const TfToken& name) override;
+
+private:
+    HdContainerDataSourceHandle const _inputDataSource;
+    HdSceneIndexBaseRefPtr const _inputSceneIndex;
+    TfToken const _materialPathToken;
+};
+
+class _MaterialBlockingVectorDataSource : public HdVectorDataSource {
+public:
+    HD_DECLARE_DATASOURCE(_MaterialBlockingVectorDataSource)
+    
+    _MaterialBlockingVectorDataSource(
+        HdVectorDataSourceHandle const &inputDataSource,
+        HdSceneIndexBaseRefPtr const &inputSceneIndex,
+        const TfToken& materialPathToken);
+
+    size_t GetNumElements() override;
+
+    HdDataSourceBaseHandle GetElement(size_t element) override;
+
+private:
+    HdVectorDataSourceHandle const _inputDataSource;
+    HdSceneIndexBaseRefPtr const _inputSceneIndex;
+    TfToken const _materialPathToken;
+};
+
+_MaterialBlockingContainerDataSource::_MaterialBlockingContainerDataSource(
+    HdContainerDataSourceHandle const &inputDataSource,
+    HdSceneIndexBaseRefPtr const &inputSceneIndex,
+    const TfToken& materialPathToken)
+  : _inputDataSource(inputDataSource),
+    _inputSceneIndex(inputSceneIndex),
+    _materialPathToken(materialPathToken)
+{
+}
+
+TfTokenVector _MaterialBlockingContainerDataSource::GetNames()
+{
+    return _inputDataSource ? _inputDataSource->GetNames() : TfTokenVector();
+}
+
+HdDataSourceBaseHandle _MaterialBlockingContainerDataSource::Get(const TfToken& name)
+{
+    if (!_inputDataSource) {
+        return nullptr;
+    }
+
+    HdDataSourceBaseHandle const childDataSource = _inputDataSource->Get(name);
+    if (!childDataSource) {
+        return nullptr;
+    }
+
+    if (auto childContainer = HdContainerDataSource::Cast(childDataSource)) {
+        return _MaterialBlockingContainerDataSource::New(std::move(childContainer), _inputSceneIndex, _materialPathToken);
+    }
+
+    if (auto childVector = HdVectorDataSource::Cast(childDataSource)) {
+        return _MaterialBlockingVectorDataSource::New(std::move(childVector), _inputSceneIndex, _materialPathToken);
+    }
+
+    if (name == _materialPathToken) {
+        auto childPathDataSource = HdTypedSampledDataSource<SdfPath>::Cast(childDataSource);
+        if (childPathDataSource) {
+            auto materialPath = childPathDataSource->GetTypedValue(0);
+            auto materialPrim = _inputSceneIndex->GetPrim(materialPath);
+            if (_MaterialHasDisplacement(materialPrim)) {
+                return childDataSource;
+            }
+        }
+        return HdBlockDataSource::New();
+    }
+
+    return childDataSource;
+}
+
+_MaterialBlockingVectorDataSource::_MaterialBlockingVectorDataSource(
+    HdVectorDataSourceHandle const &inputDataSource,
+    HdSceneIndexBaseRefPtr const &inputSceneIndex,
+    const TfToken& materialPathToken)
+  : _inputDataSource(inputDataSource),
+    _inputSceneIndex(inputSceneIndex),
+    _materialPathToken(materialPathToken)
+{
+}
+
+size_t _MaterialBlockingVectorDataSource::GetNumElements()
+{
+    return _inputDataSource ? _inputDataSource->GetNumElements() : 0;
+}
+
+HdDataSourceBaseHandle _MaterialBlockingVectorDataSource::GetElement(size_t element)
+{
+    if (!_inputDataSource) {
+        return nullptr;
+    }
+
+    HdDataSourceBaseHandle const childDataSource = _inputDataSource->GetElement(element);
+    if (!childDataSource) {
+        return nullptr;
+    }
+
+    if (auto childContainer = HdContainerDataSource::Cast(childDataSource)) {
+        return _MaterialBlockingContainerDataSource::New(std::move(childContainer), _inputSceneIndex, _materialPathToken);
+    }
+
+    if (auto childVector = HdVectorDataSource::Cast(childDataSource)) {
+        return _MaterialBlockingVectorDataSource::New(std::move(childVector), _inputSceneIndex, _materialPathToken);
+    }
+
+    return childDataSource;
+}
 
 }
 
@@ -835,21 +961,31 @@ BaseWhSi::SetWireframeRepr(const HdContainerDataSourceHandle& dataSource, const 
                     Fvp::secondaryGraphicsRenderTagToken))
                 .Build());
     
-    // If no displacement, block materials to avoid unnecessary shader compilation
-    auto materialBindings = HdMaterialBindingsSchema::GetFromParent(dataSource);
-    if (materialBindings.IsDefined()) {
-        auto materialPath = materialBindings.GetMaterialBinding().GetPath()->GetTypedValue(0);
-        if (!_MaterialHasDisplacement(GetInputSceneIndex()->GetPrim(materialPath))) {
-            edited.Set(HdMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-        }
+    // Block materials without displacement to avoid unnecessary shader compilation
+    auto hdMaterialBindings = HdMaterialBindingsSchema::GetFromParent(dataSource);
+    if (hdMaterialBindings.IsDefined()) {
+        edited.Set(
+            HdMaterialBindingsSchema::GetDefaultLocator(), 
+            _MaterialBlockingContainerDataSource::New(hdMaterialBindings.GetContainer(), GetInputSceneIndex(), HdMaterialBindingSchemaTokens->path)
+        );
     }
-    auto directMaterialBindings = UsdImagingDirectMaterialBindingsSchema::GetFromParent(dataSource);
-    if (directMaterialBindings.IsDefined()) {
-        auto materialPath = directMaterialBindings.GetDirectMaterialBinding().GetMaterialPath()->GetTypedValue(0);
-        if (!_MaterialHasDisplacement(GetInputSceneIndex()->GetPrim(materialPath))) {
-            edited.Set(UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), HdBlockDataSource::New());
-        }
+#if PXR_VERSION >= 2505
+    auto usdMaterialBindings = UsdImagingMaterialBindingsSchema::GetFromParent(dataSource);
+    if (usdMaterialBindings.IsDefined()) {
+        edited.Set(
+            UsdImagingMaterialBindingsSchema::GetDefaultLocator(), 
+            _MaterialBlockingContainerDataSource::New(usdMaterialBindings.GetContainer(), GetInputSceneIndex(), TfToken("materialPath"))
+        );
     }
+#else
+    auto usdMaterialBindings = UsdImagingDirectMaterialBindingsSchema::GetFromParent(dataSource);
+    if (usdMaterialBindings.IsDefined()) {
+        edited.Set(
+            UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), 
+            _MaterialBlockingContainerDataSource::New(usdMaterialBindings.GetContainer(), GetInputSceneIndex(), TfToken("materialPath"))
+        );
+    }
+#endif
 
     //Is the prim having a DisplayStyle schema?
     if (HdLegacyDisplayStyleSchema styleSchema =

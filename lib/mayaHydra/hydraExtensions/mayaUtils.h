@@ -153,15 +153,6 @@ bool SetNodeAttribute(MObject node, std::string attrName, AttrType newValue)
 }
 
 /**
- * @brief Get if this MDagPath is an Arnold sky dome light.
- *
- * @param[in] dagPath is a MDagPath
- *
- * @return true if the object is an Arnold sky dome light, false otherwise
- */
-bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath);
-
-/**
  * @brief Get if this MDagPath is a light.
  *
  * @param[in] dagPath is a MDagPath
@@ -170,6 +161,16 @@ bool IsDagPathAnArnoldSkyDomeLight(const MDagPath& dagPath);
  */
 MAYAHYDRALIB_API
 bool IsDagPathALight(const MDagPath& dagPath);
+
+/**
+ * @brief Get if this MDagPath is a light of the given type.
+ *
+ * @param[in] dagPath is a MDagPath
+ * @param[in] lightTypeString is a light type string such as "aiSkyDomeLight"
+ *
+ * @return true if the object is a light of this type, false otherwise
+ */
+bool IsDagPathALightOfThisType(const MDagPath& dagPath, const MString& lightTypeString);
 
 } // namespace MAYAHYDRA_NS_DEF
 

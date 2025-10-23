@@ -108,8 +108,9 @@ public:
 // For some dag paths we use the shape to translate it to an Hydra path
 bool _UseTheShapeDagPath(const MDagPath& dagpath) 
 { 
+    static const MString aiSkyDomeLight("aiSkyDomeLight");
     //Only for the Arnold skydome light
-    return MAYAHYDRA_NS_DEF::IsDagPathAnArnoldSkyDomeLight(dagpath);
+    return MAYAHYDRA_NS_DEF::IsDagPathALightOfThisType(dagpath, aiSkyDomeLight);
 }
 
 //Check if this dag path is registered in Sprims (such as the Arnold sky dome light)
@@ -612,6 +613,9 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(const MDataServerOperation
             // MAYA-128021: We do not currently support maya instances.
             MDagPath dagPath(ri.sourceDagPath());
             ria = std::make_shared<MayaHydraRenderItemAdapter>(dagPath, slowId, fastId, this, ri, GetPurposeRenderTag(ri));
+
+            // Handle custom attribute changes
+            ria->CreateCallbacks();
 
             //Update the render item adapter if this render item is an aiSkydomeLight shape
             ria->SetIsRenderITemAnaiSkydomeLightTriangleShape(isRenderItem_aiSkyDomeLightTriangleShape(ri));
@@ -1910,5 +1914,14 @@ void MayaHydraSceneIndex::SetLightsManagementSceneIndex(const Fvp::LightsManagem
     _lightsManagementSceneIndex = lightsManagementSceneIndex;
 }
 
+GfBBox3d MayaHydraSceneIndex::GetBoundingBox()const
+{
+    GfBBox3d bbox;
+    _MapAdapter<MayaHydraAdapter>(
+        [&](MayaHydraAdapter* a) { bbox = GfBBox3d::Combine(a->GetBoundingBox(), bbox); },
+        _renderItemsAdapters
+        ,_shapeAdapters);
+    return bbox;
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE

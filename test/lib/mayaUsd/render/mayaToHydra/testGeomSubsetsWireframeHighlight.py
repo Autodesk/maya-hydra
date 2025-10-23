@@ -85,7 +85,7 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(sphereGeomSubsetItem)
-        self.assertSnapshotClose("instancedGeomSubsetHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes)
+        self.assertSnapshotClose("instancedGeomSubsetHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes + ("_usd2508+" if self._usdVersion >= (0, 25, 8) else ""))
     
     def test_WireframeColorChange(self):
         if self._usdVersion < (0, 24, 3):
@@ -107,7 +107,7 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("wireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes)
 
         sn.append(sphereGeomSubsetItem)
-        self.assertSnapshotClose("wireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes)
+        self.assertSnapshotClose("wireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes + ("_usd2508+" if self._usdVersion >= (0, 25, 8) else ""))
     
     def test_MeshAndGeomSubsetSelection(self):
         if self._usdVersion < (0, 24, 3):
@@ -148,7 +148,7 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         geomSubsetPath = self._displacementStageUfePathSegment + "," + self._displacementGeomSubsetUfePathSegment
         geomSubsetItem = ufe.Hierarchy.createItem(ufe.PathString.path(geomSubsetPath))
         sn.append(geomSubsetItem)
-        self.assertSnapshotClose("displacement.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes)
+        self.assertSnapshotClose("displacement.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes + ("_usd2508+" if self._usdVersion >= (0, 25, 8) else ""))
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

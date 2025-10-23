@@ -55,6 +55,7 @@
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpPassFilteringSceneIndex.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
@@ -158,9 +159,19 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaHydraViewportRenderer");
 
-inline bool areDifferentForOneOfTheseBits(unsigned int val1, unsigned int val2, unsigned int bitsToTest)
+TfToken _GetPurposeRenderTagFromAttrName(const TfToken& attrName)
 {
-    return ((val1 & bitsToTest) != (val2 & bitsToTest));
+    static const std::map<TfToken, TfToken> attrToTag {
+        { TfToken("mayaHydraRenderPurpose"),    HdRenderTagTokens->render },
+        { TfToken("mayaHydraProxyPurpose"),     HdRenderTagTokens->proxy },
+        { TfToken("mayaHydraGuidePurpose"),     HdRenderTagTokens->guide }
+    };
+    auto found = attrToTag.find(attrName);
+    if (found != attrToTag.end()) {
+        return found->second;
+    }
+    TF_CODING_ERROR("Unknown purpose attribute name '%s'", attrName.GetText());
+    return {};
 }
 
 inline bool isInComponentsPickingMode(const MHWRender::MSelectionInfo& selectInfo)
@@ -179,6 +190,7 @@ inline bool isInComponentsPickingMode(const MHWRender::MSelectionInfo& selectInf
 // configurable and cannot be replaced by plugin behavior.  Currently, the Flow
 // Viewport selection task is a no-op.  PPT, 2-Oct-2023.
 
+#ifndef VIEWPORT_TOOLBOX
 void replaceSelectionTask(HdTaskSharedPtrVector* tasks)
 {
     // For TF_WARN and TF_AXIOM macros.
@@ -200,6 +212,7 @@ void replaceSelectionTask(HdTaskSharedPtrVector* tasks)
 
     *found = HdTaskSharedPtr(new Fvp::SelectionTask);
 }
+#endif
 
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
 std::string getRenderingDestination(
@@ -486,7 +499,30 @@ void MtohRenderOverride::UpdateRenderGlobals(
                 }
             }
         }
+    } 
+    #ifdef VIEWPORT_TOOLBOX
+    else {
+        if (attrName.GetString().find("Purpose") != 0) {
+            //One of the render purpose attributes just changed
+            //Get purpose render tag from attribute name
+            const PXR_NS::TfToken purposeRenderTag
+                = _GetPurposeRenderTagFromAttrName(attrName);
+
+            if (!purposeRenderTag.IsEmpty()) {
+                std::lock_guard<std::mutex> lock(_allInstancesMutex);
+                for (auto* instance : _allInstances) {
+                    const Fvp::FramePassDataPtrVector& framePassDataArray
+                        = instance->_framePassesData;
+                    for (auto& framePassData : framePassDataArray) {
+                        if (framePassData && framePassData->IsValid()) {
+                            framePassData->DirtyPrimsFromPurposeRenderTag(purposeRenderTag);
+                        }
+                    }
+                }
+            }
+        }
     }
+    #endif
 
     // Less than ideal still
     MGlobal::executeCommandOnIdle("refresh -f");
@@ -758,6 +794,15 @@ SdfPath MtohRenderOverride::RendererSceneDelegateId(TfToken rendererName, TfToke
     return SdfPath();
 }
 
+bool MtohRenderOverride::HasConverged(TfToken rendererName)
+{
+    MtohRenderOverride* instance = GetByName(rendererName);
+    if (!instance) {
+        return false;
+    }
+    return instance->_isConverged;
+}
+
 void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContext& drawContext)
 {
     constexpr auto considerAllSceneLights = MHWRender::MDrawContext::kFilteredIgnoreLightLimit;
@@ -849,6 +894,11 @@ MStatus MtohRenderOverride::Render(
         "MtohRenderOverride::Render");
 
     auto renderFrame = [&](bool markTime = false) {
+        MProfilingScope profilingScopeForEvalrenderFrame(
+            _profilerCategory,
+            MProfiler::kColorD_L1,
+            "MtohRenderOverride::renderFrame",
+            "MtohRenderOverride::renderFrame");
 #ifndef VIEWPORT_TOOLBOX
         HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
 
@@ -878,12 +928,6 @@ MStatus MtohRenderOverride::Render(
                 TF_WARN("HdxProgressiveTask not found");
             }
         }
-#endif
-        MProfilingScope profilingScopeForEvalrenderFrame(
-            _profilerCategory,
-            MProfiler::kColorD_L1,
-            "MtohRenderOverride::renderFrame",
-            "MtohRenderOverride::renderFrame");
 
         auto editTasks = [](HdTaskSharedPtrVector&  tasksToEdit,
                             MayaHydraGLBackup&      backup) -> void {
@@ -895,7 +939,6 @@ MStatus MtohRenderOverride::Render(
             replaceSelectionTask(&tasksToEdit);
         };
 
-#ifndef VIEWPORT_TOOLBOX
         MayaHydraGLBackup backup;
         editTasks(tasks, backup);
 #endif
@@ -988,8 +1031,14 @@ MStatus MtohRenderOverride::Render(
                 = (aovNameExists) 
                 ? aovName 
                 : HdAovTokens->color;
+            
+            if (visibleIdx > 0) {
+                currentPass->params().renderParams.depthBiasEnable = true;
+                currentPass->params().renderParams.depthBiasUseDefault = false;
+                currentPass->params().renderParams.depthBiasConstantFactor = -1.0f;
+                currentPass->params().renderParams.depthBiasSlopeFactor = -1.0f;
+            }
 
-            MayaHydraGLBackup backup;
             if (isPass0) {
                 // Do not share the AOVs, for the first pass only
                 HdTaskSharedPtrVector passTasks;
@@ -1011,7 +1060,6 @@ MStatus MtohRenderOverride::Render(
                 OutputDebugStringA(framePassParameters.c_str());
                 */
 
-                editTasks(passTasks, backup);
                 {
                     MProfilingScope profilingScopeForEvalRenderFirstPass(
                         _profilerCategory,
@@ -1049,8 +1097,6 @@ MStatus MtohRenderOverride::Render(
                             "MtohRenderOverride::GetRenderTasks2");
                         passTasks = currentPass->GetRenderTasks(inputAOVs);
                     }
-                    editTasks(
-                        passTasks, backup);
                     
                     /*Debug code left here if needed later
                     hvt::FramePass& framePassToDebug = *currentPass;
@@ -1756,7 +1802,7 @@ void MtohRenderOverride::_InitHydraResources(
         _isUsingHdSt
     );
 
-    // Data producer mering scene index sets up the Flow Viewport merging scene index, must
+    // Data producer merging scene index sets up the Flow Viewport merging scene index, must
     // be created first, as it is required for:
     // - Selection scene index, which uses the Flow Viewport merging scene
     //   index as input.
@@ -1926,6 +1972,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
             currentPass.reset();
         }
 
+        _framePassesData[i]->_passFilteringSceneIndex = nullptr;//Reset scene index
         auto& _framePassesRenderer = _framePassesData[i]->_renderIndexProxy;
         if (_framePassesRenderer) {
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -1980,12 +2027,13 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 
 #ifdef VIEWPORT_TOOLBOX
 HdSceneIndexBaseRefPtr MtohRenderOverride::_CreatePassFilteringSceneIndex(
-    const Fvp::FramePassConstDataPtr& filteringData)
+    Fvp::FramePassDataPtr& filteringData)
 {
 #ifdef VIEWPORT_TOOLBOX
-        return Fvp::PassFilteringSceneIndex::New(
-            _lastFilteringSceneIndexBeforeCustomFiltering, 
-            filteringData);
+    auto passFilteringSceneIndex = Fvp::PassFilteringSceneIndex::New(
+        _lastFilteringSceneIndexBeforeCustomFiltering, filteringData);
+    filteringData->SetPassFilteringSceneIndex(passFilteringSceneIndex);//Store in pass filtering data
+    return passFilteringSceneIndex;
 #endif
     return _lastFilteringSceneIndexBeforeCustomFiltering;
 }
@@ -2807,6 +2855,10 @@ void MtohRenderOverride::_CreateFramePass(
     framePassDescriptor.renderIndex = renderer->RenderIndex();
     framePassDescriptor.uid         = passId;
     auto framePass                  = hvt::ViewportEngine::CreateFramePass(framePassDescriptor);
+
+    // Remove the default selection tasks as we do not use them.
+    framePass->GetTaskManager()->RemoveTask(HdxPrimitiveTokens->colorizeSelectionTask);
+    framePass->GetTaskManager()->RemoveTask(TfToken("selectionTask"));
 
     // Update the consolidated frame pass data
     _framePassesData[passIndex]->_renderIndexProxy = renderer;

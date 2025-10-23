@@ -19,6 +19,8 @@
 #include <mayaHydraLib/adapters/constantShadowMatrix.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+#include <mayaHydraLib/adapters/shadowMatrixComputation.h>
+#include <mayaHydraLib/mayaUtils.h>
 
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 
@@ -59,14 +61,18 @@ void _changeVisibility(
 {
     TF_UNUSED(msg);
     TF_UNUSED(otherPlug);
+
+    auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
     if (plug == MayaAttrs::dagNode::visibility) {
-        auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
         if (adapter->UpdateVisibility()) {
             adapter->RemovePrim();
             adapter->Populate();
             adapter->InvalidateTransform();
         }
     }
+
+    // Handle extension attributes change
+    adapter->HandleExtensionAttributesDirty(plug);
 }
 
 void _dirtyTransform(MObject& node, void* clientData)
@@ -174,14 +180,14 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
             = mayaLight.findPlug(MayaAttrs::nonAmbientLightShapeNode::emitSpecular, true).asBool();
         MVector    pv(0.0, 0.0, -1.0);
         const auto lightDirection = (pv * inclusiveMatrix).normal();
-        light.SetHasShadow(false);
         const GfVec4f zeroColor(0.0f, 0.0f, 0.0f, 1.0f);
         const GfVec4f lightColor(
             color.r * intensity, color.g * intensity, color.b * intensity, 1.0f);
         light.SetDiffuse(emitDiffuse ? lightColor : zeroColor);
         light.SetAmbient(zeroColor);
         light.SetSpecular(emitSpecular ? lightColor : zeroColor);
-        light.SetShadowResolution(1024);
+        const bool bLightHasShadowsenabled = GetShadowsEnabled(mayaLight);
+        light.SetHasShadow(bLightHasShadowsenabled);
         light.SetID(GetID());
         light.SetPosition(GfVec4f(position.x, position.y, position.z, position.w));
         light.SetSpotDirection(GfVec3f(lightDirection.x, lightDirection.y, lightDirection.z));
@@ -215,7 +221,7 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
     } else if (key == HdLightTokens->shadowParams) {
         HdxShadowParams shadowParams;
         MFnLight        mayaLight(GetDagPath());
-        const bool      bLightHasShadowsenabled = mayaLight.useRayTraceShadows();
+        const bool      bLightHasShadowsenabled = GetShadowsEnabled(mayaLight);
         if (!bLightHasShadowsenabled) {
             shadowParams.enabled = false;
         } else {
@@ -223,7 +229,8 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
         }
         return VtValue(shadowParams);
     }
-    return {};
+    // Let base class handle other keys
+    return MayaHydraDagAdapter::Get(key);
 }
 
 VtValue MayaHydraLightAdapter::GetLightParamValue(const TfToken& paramName)
@@ -319,12 +326,24 @@ void MayaHydraLightAdapter::_CalculateShadowParams(MFnLight& light, HdxShadowPar
         : std::min(
             GetMayaHydraSceneIndex()->GetParams().maximumShadowMapResolution, dmapResolutionPlug.asInt());
 
-    params.shadowMatrix
-        = std::make_shared<MayaHydraConstantShadowMatrix>(GetTransform() * _shadowProjectionMatrix);
+    // Shadow matrix for point lights needs to be different in Storm
+    static const MString pointLight("pointLight");
+    const bool isPointLight = IsDagPathALightOfThisType(GetDagPath(), pointLight);
+    if (isPointLight) {
+        GlfSimpleLight simpleLight;
+        GetGlfSimpleLightPosAndDirFromMFnLight(light, simpleLight);
+        const GfBBox3d  bbox    = GetMayaHydraSceneIndex()->GetBoundingBox(); // Only get the Maya data
+        const GfBBox3d  aabb    = bbox.ComputeAlignedBox();
+        const GfRange3f r       = GfRange3f(aabb.GetRange());
+        params.shadowMatrix = std::make_shared<MayaHydraShadowMatrixComputation>(r, simpleLight);
+    } 
+    else {
+        params.shadowMatrix = std::make_shared<MayaHydraConstantShadowMatrix>(
+            GetTransform() * _shadowProjectionMatrix);
+    }
+
     params.bias = dmapBiasPlug.isNull() ? -0.001 : -dmapBiasPlug.asFloat();
-    params.blur = dmapFilterSizePlug.isNull() ? 0.0
-                                              : (static_cast<double>(dmapFilterSizePlug.asInt()))
-            / static_cast<double>(params.resolution);
+    params.blur = dmapFilterSizePlug.isNull() ? 0.0 : (static_cast<double>(dmapFilterSizePlug.asInt())) / static_cast<double>(params.resolution);
 
     if (TfDebug::IsEnabled(MAYAHYDRALIB_ADAPTER_LIGHT_SHADOWS)) {
         std::cout << "Resulting HdxShadowParams:\n";
@@ -374,6 +393,30 @@ bool MayaHydraLightAdapter::_GetVisibility() const
 TfToken MayaHydraLightAdapter::GetRenderTag() const
 { 
     return Fvp::secondaryGraphicsRenderTagToken; 
+}
+
+void MayaHydraLightAdapter::GetGlfSimpleLightPosAndDirFromMFnLight(
+    MFnLight& light,
+    GlfSimpleLight& outSimpleLight)
+{
+    MPoint     pt(0.0, 0.0, 0.0, 1.0);
+    const auto inclusiveMatrix = GetDagPath().inclusiveMatrix();
+    const auto position = pt * inclusiveMatrix;
+    MVector    pv(0.0, 0.0, -1.0);
+    const auto lightDirection = (pv * inclusiveMatrix).normal();
+
+    outSimpleLight.SetPosition(GfVec4f(position.x, position.y, position.z, position.w));
+    outSimpleLight.SetSpotDirection(GfVec3f(lightDirection.x, lightDirection.y, lightDirection.z));
+}
+
+bool MayaHydraLightAdapter::GetShadowsEnabled(MFnLight& light)const
+{
+    if (light.useRayTraceShadows()) {
+        return true;
+    }
+    // Check if the light is a non-extended light
+    MFnNonExtendedLight nonExtendedLight(light.object());
+    return nonExtendedLight.useDepthMapShadows();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

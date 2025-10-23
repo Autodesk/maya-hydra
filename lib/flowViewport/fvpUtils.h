@@ -26,7 +26,6 @@
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
-#include <pxr/imaging/hd/sceneIndex.h>
 
 namespace FVP_NS_DEF {
 
@@ -142,6 +141,9 @@ FVP_API
 int ProfileBegin(const char* eventName, const char* description);
 FVP_API
 void ProfileEnd(int eventId);
+
+// Get the prim's purpose render tag token from its data source, or empty if undefined
+PXR_NS::TfToken GetPurposeRenderTag(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
 
 } // namespace FVP_NS_DEF
 
