@@ -98,11 +98,6 @@ public:
     /// Intended mostly for use in debugging and testing.
     PXR_NS::SdfPathVector RendererRprims(bool visibleOnly = false);
 
-    /// Returns the scene delegate id for the given scene delegate name.
-    ///
-    /// Intended mostly for use in debugging and testing.
-    PXR_NS::SdfPath RendererSceneDelegateId(PXR_NS::TfToken sceneDelegateName);
-
     //! Main entry point for rendering, called by Maya.
     MStatus Render(
         const InputParams&                                     inputParams,

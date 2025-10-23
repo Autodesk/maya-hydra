@@ -147,21 +147,6 @@ void replaceSelectionTask(PXR_NS::HdTaskSharedPtrVector* tasks)
     *found = HdTaskSharedPtr(new Fvp::SelectionTask);
 }
 
-// TODO_BATCH_RENDER Re-evaluate the need for this code in batch mode.
-inline Fvp::LightsManagementSceneIndex::LightingMode convertFromMayaLightingModeToFlowViewportLightMode(MFrameContext::LightingMode mayaLightingMode) 
-{ 
-    switch (mayaLightingMode) {
-        case MFrameContext::kLightDefault: return Fvp::LightsManagementSceneIndex::LightingMode::kDefaultLighting;
-        case MFrameContext::kAmbientLight:
-            TF_WARN("Ambient/Flat lighting mode is not supported");//Fall into next switch/case as we want to return kSceneLighting
-        case MFrameContext::kSceneLights: return Fvp::LightsManagementSceneIndex::LightingMode::kSceneLighting;
-        case MFrameContext::kSelectedLights:
-            return Fvp::LightsManagementSceneIndex::LightingMode::kSelectedLightsOnly;
-        case MFrameContext::kNoLighting: return Fvp::LightsManagementSceneIndex::LightingMode::kNoLighting;
-        default: return Fvp::LightsManagementSceneIndex::LightingMode::kSceneLighting;
-    }
-}
-
 } // namespace
 
 namespace MAYAHYDRA_NS_DEF {
@@ -255,12 +240,6 @@ SdfPathVector BatchRenderer::RendererRprims(bool visibleOnly)
             primIds.end());
     }
     return primIds;
-}
-
-SdfPath BatchRenderer::RendererSceneDelegateId(TfToken sceneDelegateName)
-{
-    return _mayaHydraSceneIndex ?
-        _mayaHydraSceneIndex->GetDelegateID(sceneDelegateName) : SdfPath();
 }
 
 MStatus BatchRenderer::Render(
@@ -475,9 +454,6 @@ MStatus BatchRenderer::Render(
         // Storm
         _taskController->SetEnableShadows(enableShadows);
         _taskController->SetShadowParams(shadowParams);
-        if (_mayaHydraSceneIndex) {
-            _mayaHydraSceneIndex->SetShadowsEnabled(enableShadows);
-        }
     }
 
     // The renderFrame() lambda does too much to be called in a loop:
