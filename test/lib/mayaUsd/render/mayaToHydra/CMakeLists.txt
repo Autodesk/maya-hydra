@@ -60,7 +60,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaReference.py
     testUsdInheritsSpecializes.py
 	#Disabled tests on OSX
-	testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testPointInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testGeomSubsetsWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testNativeInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
@@ -147,13 +146,15 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     cpp/testMeshAdapterTransform.py
 )
 
-# The following 3 tests incorrectly depend on having the VP2 render delegate
+# The following tests incorrectly depend on having the VP2 render delegate
 # enabled.  We must fix this, to ensure that mayaHydra does not rely
 # on computations made by VP2 for its use.  Entered as HYDRA-1961.
 set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
 	testViewportFilters.py|depOnPlugins:mtoa
     testFlowPluginsHierarchicalProperties.py
     testBoundingBox.py
+	#Disabled tests on OSX
+	testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
 )
 
 # Use mesh adapter for mesh support instead of MRenderItem. using Interactive (Maya.exe with UI)
