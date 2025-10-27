@@ -1440,7 +1440,13 @@ MStatus MtohRenderOverride::Render(
 
 #ifdef VIEWPORT_TOOLBOX
     const GfRange2f displayWindow(GfVec2f(0.0f), GfVec2f(width, height));
-    const GfRect2i renderRegion = MayaHydraRenderRegionCommand::getRenderRegion().has_value() ? MayaHydraRenderRegionCommand::getRenderRegion().value() : GfRect2i(GfVec2i(0.0f), GfVec2i(width, height));
+    GfRect2i renderRegion = MayaHydraRenderRegionCommand::getRenderRegion().has_value() ? MayaHydraRenderRegionCommand::getRenderRegion().value() : GfRect2i(GfVec2i(0.0f), GfVec2i(width, height));
+    // Sanitize render region to avoid crash for some renderers (e.g., HdPrman-26)
+    const int minX = std::clamp(renderRegion.GetMinX(), 0, width - 1);
+    const int minY = std::clamp(renderRegion.GetMinY(), 0, height - 1);
+    const int maxX = std::clamp(renderRegion.GetMaxX(), minX, width - 1);
+    const int maxY = std::clamp(renderRegion.GetMaxY(), minY, height - 1);
+    renderRegion = GfRect2i(GfVec2i(minX, minY), GfVec2i(maxX, maxY));
     for (int i = 0; i < numFramePasses; ++i) {
         const hvt::FramePassPtr& currentPass = _GetFramePass(i);
         if (!currentPass) {
