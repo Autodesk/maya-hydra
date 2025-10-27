@@ -18,16 +18,13 @@
 
 #include <mayaHydraLib/api.h>
 #include <mayaHydraLib/pick/mhPickHandlerFwd.h>
+#include <mayaHydraLib/pick/mhPickHitFwd.h>
 
 #include <pxr/pxr.h>
 
 #include <maya/MApiNamespace.h>
 
 #include <ufe/namedSelection.h>
-
-PXR_NAMESPACE_OPEN_SCOPE
-struct HdxPickHit;
-PXR_NAMESPACE_CLOSE_SCOPE
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -56,7 +53,7 @@ public:
     ) const = 0;
 
     MAYAHYDRALIB_API
-    virtual bool inSingleNodeComponentsPick(const HdxPickHit&) const {
+    virtual bool inSingleNodeComponentsPick(const PickHit&) const {
         return false;
     }
 };
@@ -66,12 +63,12 @@ public:
 /// Picking input consists of the Hydra pick hit and the Maya selection state.
 struct PickHandler::Input {
     Input(
-        const HdxPickHit&                pickHitArg, 
+        const PickHit&                   pickHitArg, 
         const MHWRender::MSelectionInfo& pickInfoArg,
         const bool                       isSolePickHitArg
     ) : pickHit(pickHitArg), pickInfo(pickInfoArg), isSolePickHit(isSolePickHitArg) {}
 
-    const HdxPickHit&                pickHit;
+    const PickHit&                   pickHit;
     const MHWRender::MSelectionInfo& pickInfo;
     const bool                       isSolePickHit;
 };

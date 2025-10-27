@@ -30,6 +30,7 @@
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
+#include <mayaHydraLib/pick/mhPickHit.h>
 #include <mayaHydraLib/pick/mhPickHandler.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
 #include <mayaHydraLib/hydraUtils.h>
@@ -258,7 +259,7 @@ std::vector<MtohRenderOverride*> _allInstances;
 //! \brief  Get the index of the hit nearest to a given cursor point.
 int GetNearestHitIndex(
     const MHWRender::MFrameContext& frameContext,
-    const HdxPickHitVector&         hits,
+    const PickHitVector&            hits,
     int                             cursor_x,
     int                             cursor_y)
 {
@@ -268,9 +269,9 @@ int GetNearestHitIndex(
     float  depth_min = std::numeric_limits<float>::max();
 
     for (unsigned int i = 0; i < hits.size(); i++) {
-        const HdxPickHit& hit = hits[i];
+        const PickHit& hit = hits[i];
         const MPoint      worldSpaceHitPoint(
-            hit.worldSpaceHitPoint[0], hit.worldSpaceHitPoint[1], hit.worldSpaceHitPoint[2]);
+            hit.hdxPickHit.worldSpaceHitPoint[0], hit.hdxPickHit.worldSpaceHitPoint[1], hit.hdxPickHit.worldSpaceHitPoint[2]);
 
         // Calculate the (x, y) coordinate relative to the lower left corner of the viewport.
         double hit_x, hit_y;
@@ -282,9 +283,9 @@ int GetNearestHitIndex(
         double dist2 = dist_x * dist_x + dist_y * dist_y;
 
         // Find the hit nearest to the cursor.
-        if ((dist2 < dist2_min) || (dist2 == dist2_min && hit.normalizedDepth < depth_min)) {
+        if ((dist2 < dist2_min) || (dist2 == dist2_min && hit.hdxPickHit.normalizedDepth < depth_min)) {
             dist2_min = dist2;
-            depth_min = hit.normalizedDepth;
+            depth_min = hit.hdxPickHit.normalizedDepth;
             nearestHitIndex = (int)i;
         }
     }
@@ -2244,7 +2245,7 @@ bool MtohRenderOverride::nextRenderOperation()
 }
 
 void MtohRenderOverride::_PopulateSelectionList(
-    const HdxPickHitVector&          hits,
+    const PickHitVector&             hits,
     const MHWRender::MSelectionInfo& selectInfo,
     MSelectionList&                  selectionList,
     MPointArray&                     worldSpaceHitPts,
@@ -2257,11 +2258,11 @@ void MtohRenderOverride::_PopulateSelectionList(
     PickHandler::Output pickOutput(selectionList, worldSpaceHitPts, _ufeSn);
 
     MStatus status;
-    for (const HdxPickHit& hit : hits) {
+    for (const PickHit& hit : hits) {
         PickHandler::Input pickInput(hit, selectInfo, hits.size() == 1u);
 
         auto pickHandler = _PickHandler(hit);
-        if (TF_VERIFY(pickHandler, "No pick handler found for pick hit %s!", hit.objectId.GetText())) {
+        if (TF_VERIFY(pickHandler, "No pick handler found for pick hit %s!", hit.hdxPickHit.objectId.GetText())) {
 
             if (pickHandler->inSingleNodeComponentsPick(hit)) {
                 isOneMayaNodeInComponentsPickingMode = true;
@@ -2274,13 +2275,13 @@ void MtohRenderOverride::_PopulateSelectionList(
 }
 
 PickHandlerConstPtr
-MtohRenderOverride::_PickHandler(const HdxPickHit& pickHit) const
+MtohRenderOverride::_PickHandler(const PickHit& pickHit) const
 {
-    return PickHandlerRegistry::Instance().GetHandler(pickHit.objectId);
+    return PickHandlerRegistry::Instance().GetHandler(pickHit.hdxPickHit.objectId);
 }
 
 void MtohRenderOverride::_PickByRegion(
-    HdxPickHitVector& outHits,
+    PickHitVector& outHits,
     const MMatrix& viewMatrix,
     const MMatrix& projMatrix,
     bool singlePick,
@@ -2322,7 +2323,6 @@ void MtohRenderOverride::_PickByRegion(
     pickParams.projectionMatrix.Set(adjustedProjMatrix.matrix);
     pickParams.collection = _renderCollection;
     pickParams.collection.SetExcludePaths({_highlightHierarchyPrefix});
-    pickParams.outHits = &outHits;
 
     if (geomSubsetsPickMode == GeomSubsetsPickModeTokens->Faces) {
         pickParams.pickTarget = HdxPickTokens->pickFaces;
@@ -2358,14 +2358,27 @@ void MtohRenderOverride::_PickByRegion(
             // Reserve memory for efficiency
             outHits.reserve(outHits.size() + tempHits.size());
             // Insert all hits from tempHits into outHits
-            outHits.insert(outHits.end(), tempHits.begin(), tempHits.end());
+            for (const auto& hit : tempHits) {
+                outHits.emplace_back(i, hit);
+            }
         }
     }
 #else
+    HdxPickHitVector tempHits;
+    pickParams.outHits = &tempHits;
     HdTaskSharedPtrVector pickingTasks = _taskController->GetPickingTasks();
     VtValue               pickParamsValue(pickParams);
     _engine.SetTaskContextData(HdxPickTokens->pickParams, pickParamsValue);
     _engine.Execute(_taskController->GetRenderIndex(), &pickingTasks);
+    // Build the PickHitVector
+    if (!tempHits.empty()) {
+        // Reserve memory for efficiency
+        outHits.reserve(outHits.size() + tempHits.size());
+        // Insert all hits from tempHits into outHits
+        for (const auto& hit : tempHits) {
+            outHits.emplace_back((0, hit);
+        }
+    }
 #endif
 }
 
@@ -2413,7 +2426,7 @@ bool MtohRenderOverride::select(
     if (status != MStatus::kSuccess)
         return false;
 
-    HdxPickHitVector outHits;
+    PickHitVector outHits;
     const bool singlePick = selectInfo.singleSelection();
     const TfToken geomSubsetsPickMode = GetGeomSubsetsPickMode();
     const bool pointSnappingActive = selectInfo.pointSnapping();
@@ -2460,7 +2473,7 @@ bool MtohRenderOverride::select(
         }
 
         if (nearestHitIndex >= 0) {
-            const HdxPickHit hit = outHits[nearestHitIndex];
+            const auto hit = outHits[nearestHitIndex];
             outHits.clear();
             outHits.push_back(hit);
         } else {
