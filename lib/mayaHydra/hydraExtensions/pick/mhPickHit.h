@@ -36,8 +36,8 @@ struct PickHit
         : passIndex(passIdx)
         , hdxPickHit(pickHit) {}
 
-    int        passIndex; // FramePass index.
-    HdxPickHit hdxPickHit;
+    const int        passIndex; // FramePass index.
+    const HdxPickHit hdxPickHit;
 };
 
 }
