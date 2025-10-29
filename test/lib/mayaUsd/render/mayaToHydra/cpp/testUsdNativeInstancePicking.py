@@ -65,5 +65,35 @@ class TestUsdNativeInstancePicking(mtohUtils.MayaHydraBaseTestCase):
                     self.PICK_PATH + marker,
                     f="TestUsdPicking.pickInstanceWithMarker")
 
+
+class TestUsdNativeInstancePicking_Guide(mtohUtils.MayaHydraBaseTestCase):
+    # MayaHydraBaseTestCase.setUpClass requirement.
+    _file = __file__
+
+    PICK_PATH = "|instancedCubeHierarchies_Guide|instancedCubeHierarchies_GuideShape,/cubeHierarchies"
+
+    def loadUsdScene(self):
+        usdScenePath = testUtils.getTestScene('testUsdNativeInstances', 'instancedCubeHierarchies_Guide.usda')
+        usdUtils.createStageFromFile(usdScenePath)
+
+    def setUp(self):
+        super(TestUsdNativeInstancePicking_Guide, self).setUp()
+        self.loadUsdScene()
+        cmds.select(clear=True)
+        cmds.setAttr('persp.translate', 0, 0, 15, type='float3')
+        cmds.setAttr('persp.rotate', 0, 0, 0, type='float3')
+        cmds.refresh()
+
+    def test_NativeInstances(self):
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.optionVar(
+                    sv=('mayaUsd_PointInstancesPickMode', 'Instances'))
+            
+            instances = ["/cubes_1", "/cubes_2"]
+            for instance in instances:
+                cmds.mayaHydraCppTest(
+                    self.PICK_PATH + instance,
+                    f="TestUsdPicking.pickPrim")
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

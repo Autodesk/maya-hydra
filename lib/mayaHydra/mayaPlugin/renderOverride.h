@@ -41,6 +41,7 @@
 #include <mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h>
 #include <mayaHydraLib/pick/mhPickHandlerFwd.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
+#include <mayaHydraLib/pick/mhPickHitFwd.h>
 
 #include <flowViewport/fvpFramePassData.h>
 #include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
@@ -96,7 +97,6 @@ using MtohRendererDescription = MayaHydra::MtohRendererDescription;
 using HgiUniquePtr = std::unique_ptr<class Hgi>;
 class MayaHydraSceneIndexRegistry;
 class MayaHydraSceneDelegate;
-using HdxPickHitVector = std::vector<struct HdxPickHit>;
 
 /*! \brief MtohRenderOverride is a rendering override class for the viewport to use Hydra instead of
  * VP2.0.
@@ -220,7 +220,7 @@ private:
     VtValue _GetUsedGPUMemory() const;
 
     void _PickByRegion(
-        HdxPickHitVector& outHits,
+        MayaHydra::PickHitVector& outHits,
         const MMatrix&    viewMatrix,
         const MMatrix&    projMatrix,
         bool              singlePick,
@@ -247,7 +247,7 @@ private:
     }
 
     void _PopulateSelectionList(
-        const HdxPickHitVector&          hits,
+        const MayaHydra::PickHitVector&    hits,
         const MHWRender::MSelectionInfo& selectInfo,
         MSelectionList&                  selectionList,
         MPointArray&                     worldSpaceHitPts,
@@ -259,7 +259,7 @@ private:
 
     // Determine the pick handler which should handle a pick hit, to transform
     // the pick hit into a selection.
-    MayaHydra::PickHandlerConstPtr _PickHandler(const HdxPickHit& hit) const;
+    MayaHydra::PickHandlerConstPtr _PickHandler(const MayaHydra::PickHit& hit) const;
 
     // Callbacks
     static void _ClearHydraCallback(void* data);

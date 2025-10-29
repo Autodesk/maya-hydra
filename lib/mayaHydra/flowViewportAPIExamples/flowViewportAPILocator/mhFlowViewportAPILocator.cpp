@@ -30,6 +30,7 @@
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/pick/mhPickHandler.h>
+#include <mayaHydraLib/pick/mhPickHit.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
 #include <ufeExtensions/Global.h>
 #include <ufeExtensions/cvtTypeUtils.h>
@@ -211,7 +212,7 @@ public:
     ) const override
     {
         auto cubeUfePath = MhFlowViewportAPILocator::getCubeUfePath(
-            _locatorObj, pickInput.pickHit.objectId.GetName());
+            _locatorObj, pickInput.pickHit.hdxPickHit.objectId.GetName());
 
         // Append the picked object to the UFE selection.
         auto si = Ufe::Hierarchy::createItem(cubeUfePath);

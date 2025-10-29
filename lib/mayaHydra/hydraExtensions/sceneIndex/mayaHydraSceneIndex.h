@@ -32,6 +32,7 @@
 #include <mayaHydraLib/adapters/cameraAdapter.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDefaultLightDataSource.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraMaterialDataSource.h>
+#include <mayaHydraLib/pick/mhPickHitFwd.h>
 
 #include <flowViewport/selection/fvpPathMapperFwd.h>
 #include <flowViewport/selection/fvpSelectionTypes.h>
@@ -113,12 +114,12 @@ public:
 
     // Add hydra pick points and items to Maya's selection list
     bool AddPickHitToSelectionList(
-        const HdxPickHit& hit,
+        const MayaHydra::PickHit&        hit,
         const MHWRender::MSelectionInfo& selectInfo,
         MSelectionList& selectionList,
         MPointArray& worldSpaceHitPts);
 
-    bool IsPickedNodeInComponentsPickingMode(const HdxPickHit& hit)const;
+    bool IsPickedNodeInComponentsPickingMode(const MayaHydra::PickHit& hit) const;
     
 
     // Insert a primitive to hydra scene
