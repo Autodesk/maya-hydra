@@ -53,7 +53,7 @@ public:
 
 private:
 
-    PXR_NS::HdRenderIndex* renderIndex() const;
+    PXR_NS::HdRenderIndex* renderIndex(int passIndex = 0) const;
     std::shared_ptr<const MayaHydraSceneIndexRegistry>
     sceneIndexRegistry() const;
 };

@@ -9,6 +9,8 @@ target_sources(${TARGET_NAME}
     mhPickHandlerFwd.cpp
     mhPickHandlerRegistry.cpp
     mhUsdPickHandler.cpp
+    mhPickHit.cpp
+    mhPickHitFwd.cpp
 )
 
 set(HEADERS
@@ -18,6 +20,8 @@ set(HEADERS
     mhPickHandlerFwd.h
     mhPickHandlerRegistry.h
     mhUsdPickHandler.h
+    mhPickHit.h
+    mhPickHitFwd.h
 )
 
 # -----------------------------------------------------------------------------
