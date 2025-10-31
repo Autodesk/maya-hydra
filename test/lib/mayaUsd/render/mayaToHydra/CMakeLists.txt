@@ -58,6 +58,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testSceneModified.py
     testIsolateSelectWithGeomSubset.py
     testMayaReference.py
+    testUsdDeleteCamera.py
     testUsdInheritsSpecializes.py
 	#Disabled tests on OSX
     testPointInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
