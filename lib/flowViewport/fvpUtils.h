@@ -26,6 +26,7 @@
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/sceneIndex.h>
 
 namespace FVP_NS_DEF {
 
@@ -131,6 +132,9 @@ Fvp::PrimSelection ConvertHydraToFvpSelection(const PXR_NS::SdfPath& primPath, c
 
 // Get the path to the prim's bound material.
 PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
+
+FVP_API
+bool MaterialHasDisplacement(const PXR_NS::HdSceneIndexPrim& materialPrim);
 
 FVP_API
 void SetProfileBegin(std::function<int(const char*, const char*)> func);

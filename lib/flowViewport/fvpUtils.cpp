@@ -18,6 +18,10 @@
 #include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/instanceIndicesSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
+#include <pxr/imaging/hd/materialConnectionSchema.h>
+#include <pxr/imaging/hd/materialNodeParameterSchema.h>
+#include <pxr/imaging/hd/materialNodeSchema.h>
+#include <pxr/imaging/hd/materialSchema.h>
 #include <pxr/imaging/hd/selectionSchema.h>
 #include <pxr/imaging/hd/purposeSchema.h>
 
@@ -133,6 +137,24 @@ SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primDataSourc
     }
 
     return bindingPathDataSource->GetTypedValue(0);
+}
+
+bool MaterialHasDisplacement(const PXR_NS::HdSceneIndexPrim& materialPrim) {
+    if (materialPrim.primType != HdPrimTypeTokens->material) {
+        return false;
+    }
+    auto materialSchema = HdMaterialSchema::GetFromParent(materialPrim.dataSource);
+    auto materialNetwork = materialSchema.GetMaterialNetwork();
+    auto nodes = materialNetwork.GetNodes();
+    for (const auto& nodeName : nodes.GetNames()) {
+        auto displacement = nodes.Get(nodeName).GetParameters().Get(TfToken("displacement"));
+        if (displacement.IsDefined()) {
+            return true;
+        }
+    }
+    auto terminals = materialNetwork.GetTerminals();
+    auto displacement = terminals.Get(HdMaterialTerminalTokens->displacement);
+    return displacement.IsDefined();
 }
 
 TfToken GetPurposeRenderTag(const PXR_NS::HdContainerDataSourceHandle& primDataSource)
