@@ -67,8 +67,18 @@ struct FramePassData
     //! Paths to force exclude from this frame pass
     PXR_NS::SdfPathVector _excludePaths;
 
+    //! Path under which selection highlight prims are located.
+    //! Used to force-keep certain materials present in the frame pass
+    //! in order to properly render selection highlights.
+    PXR_NS::SdfPath _highlightHierarchyPrefix;
+
     //! Whether to keep lights in this frame pass
     bool _keepLights = false;
+
+    //! Whether to keep materials in this frame pass.
+    //! Note that some materials may still be kept if needed
+    //! to properly render certain prims, such as selection highlights.
+    bool _keepMaterials = false;
 
     //! this frame pass supports prims with no purpose render tags, set this to true if you want to
     //! render prims that do not have a purpose render tag

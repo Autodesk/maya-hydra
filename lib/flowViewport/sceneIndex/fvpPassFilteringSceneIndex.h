@@ -42,9 +42,6 @@ public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
     FVP_API
-    static void ResetPassFilteringLog();
-
-    FVP_API
     static PassFilteringSceneIndexRefPtr
     New(const PXR_NS::HdSceneIndexBaseRefPtr& inputScene,
         const Fvp::FramePassConstDataPtr&    framePassData);
@@ -77,42 +74,38 @@ protected:
     FVP_API
     void _PrimsAdded(
         const PXR_NS::HdSceneIndexBase &sender,
-        const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries) override{
-        if (!_IsObserved()) {
-            return;
-        }
-        _SendPrimsAdded(entries);
-    }
+        const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries) override;
 
     FVP_API
     void _PrimsRemoved(
         const PXR_NS::HdSceneIndexBase &sender,
-        const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries) override{
-        if (!_IsObserved()) {
-            return;
-        }
-        _SendPrimsRemoved(entries);
-    }
+        const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries) override;
 
     FVP_API
     void _PrimsDirtied(
         const PXR_NS::HdSceneIndexBase &sender,
-        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override
-    {
-        if (!_IsObserved()) {
-            return;
-        }
-        _SendPrimsDirtied(entries);
-    }
+        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
 
     FVP_API
     bool _IsFilteredOut(const PXR_NS::SdfPath& primPath) const;
 
+    FVP_API
+    bool _ShouldBeFilteredOut(const PXR_NS::SdfPath& primPath) const;
+
+    FVP_API
+    void _UpdateFilteringStatus(const PXR_NS::SdfPath& primPath);
+
+    FVP_API
+    void _UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath);
+
     Fvp::FramePassConstDataPtr _framePassData;
 
 private:
-    // Helper function to determine if a prim should be included in all passes
-    bool _ShouldIncludeInAllPasses(const PXR_NS::HdSceneIndexPrim& prim) const;
+    PXR_NS::SdfPathSet _filteredPrims;
+
+    // Used to track the materials that are required to properly render selection highlights
+    std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _highlightsToMaterialsPaths;
+    std::map<PXR_NS::SdfPath, int> _highlightMaterialsUsage;
 };
 
 } // namespace FVP_NS_DEF
