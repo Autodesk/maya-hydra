@@ -60,7 +60,7 @@ QTreeWidgetItemIterator GetIteratorForTree(QTreeWidget* treeWidget)
     return QTreeWidgetItemIterator(treeWidget);
 }
 
-pxr::HdSceneIndexBasePtr AdskHydraSceneBrowserTestFixture::sceneIndex = nullptr;
+PXR_NS::HdSceneIndexBasePtr AdskHydraSceneBrowserTestFixture::sceneIndex = nullptr;
 
 void AdskHydraSceneBrowserTestFixture::SetUp()
 {
@@ -73,19 +73,19 @@ void AdskHydraSceneBrowserTestFixture::SetUp()
     QSplitter* sceneBrowserSplitter = FindFirstChild<QSplitter>(_sceneBrowserWidget.get());
     ASSERT_NE(sceneBrowserSplitter, nullptr);
 
-    _primHierarchyWidget = FindFirstChild<pxr::HduiSceneIndexTreeWidget>(sceneBrowserSplitter);
+    _primHierarchyWidget = FindFirstChild<PXR_NS::HduiSceneIndexTreeWidget>(sceneBrowserSplitter);
     ASSERT_NE(_primHierarchyWidget, nullptr);
     _dataSourceHierarchyWidget
-        = FindFirstChild<pxr::HduiDataSourceTreeWidget>(sceneBrowserSplitter);
+        = FindFirstChild<PXR_NS::HduiDataSourceTreeWidget>(sceneBrowserSplitter);
     ASSERT_NE(_dataSourceHierarchyWidget, nullptr);
-    _dataSourceValueView = FindFirstChild<pxr::HduiDataSourceValueTreeView>(sceneBrowserSplitter);
+    _dataSourceValueView = FindFirstChild<PXR_NS::HduiDataSourceValueTreeView>(sceneBrowserSplitter);
     ASSERT_NE(_dataSourceValueView, nullptr);
 }
 
 void AdskHydraSceneBrowserTestFixture::TearDown() { _sceneBrowserWidget->close(); }
 
 void AdskHydraSceneBrowserTestFixture::SetReferenceSceneIndex(
-    pxr::HdSceneIndexBasePtr referenceSceneIndex)
+    PXR_NS::HdSceneIndexBasePtr referenceSceneIndex)
 {
     sceneIndex = referenceSceneIndex;
 }
@@ -96,13 +96,13 @@ void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(
 {
     // Setup traversal data structures (depth-first search)
     QTreeWidgetItemIterator  itPrimsTreeWidget = GetIteratorForTree(_primHierarchyWidget);
-    std::stack<pxr::SdfPath> primPathsStack({ pxr::SdfPath::AbsoluteRootPath() });
+    std::stack<PXR_NS::SdfPath> primPathsStack({ PXR_NS::SdfPath::AbsoluteRootPath() });
 
     // Traverse hierarchy and compare (depth-first search)
     while (*itPrimsTreeWidget && !primPathsStack.empty()) {
         // Get the objects for the current step
         QTreeWidgetItem* primQtItem = *itPrimsTreeWidget;
-        pxr::SdfPath     primPath = primPathsStack.top();
+        PXR_NS::SdfPath     primPath = primPathsStack.top();
 
         // Compare prim name
         std::string actualPrimName = primQtItem->text(0).toStdString();
@@ -114,7 +114,7 @@ void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(
         EXPECT_EQ(actualPrimName, expectedPrimName);
 
         // Compare prim type
-        pxr::HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
+        PXR_NS::HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
         if (primQtItem->columnCount() > 1) {
             std::string actualPrimType = primQtItem->text(1).toStdString();
             std::string expectedPrimType = prim.primType;
@@ -123,7 +123,7 @@ void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(
             // In this case, the Qt prim item only has a column for its name,
             // so we at least make sure the prim type is empty.
             // So far it seems this case only happens for the root path.
-            EXPECT_EQ(prim.primType, pxr::TfToken())
+            EXPECT_EQ(prim.primType, PXR_NS::TfToken())
                 << "Prim had a non-empty type but its Qt item had no column for it.";
         }
 
@@ -139,7 +139,7 @@ void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(
         primPathsStack.pop();
 
         // Push child paths on the stack
-        pxr::SdfPathVector childPaths = sceneIndex->GetChildPrimPaths(primPath);
+        PXR_NS::SdfPathVector childPaths = sceneIndex->GetChildPrimPaths(primPath);
         for (auto itChildPaths = childPaths.rbegin(); itChildPaths != childPaths.rend();
              itChildPaths++) {
             primPathsStack.push(*itChildPaths);
@@ -171,7 +171,7 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
         if (compareValues) {
             _dataSourceHierarchyWidget->setCurrentItem(dataSourceQtItem);
             if (auto sampledDataSource
-                = pxr::HdSampledDataSource::Cast(dataSourceEntry.dataSource)) {
+                = PXR_NS::HdSampledDataSource::Cast(dataSourceEntry.dataSource)) {
                 CompareDataSourceValue(sampledDataSource);
             }
         }
@@ -182,22 +182,22 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
 
         // Push child data sources on the stack
         if (auto containerDataSource
-            = pxr::HdContainerDataSource::Cast(dataSourceEntry.dataSource)) {
-            pxr::TfTokenVector childNames = containerDataSource->GetNames();
+            = PXR_NS::HdContainerDataSource::Cast(dataSourceEntry.dataSource)) {
+            PXR_NS::TfTokenVector childNames = containerDataSource->GetNames();
             for (auto itChildNames = childNames.rbegin(); itChildNames != childNames.rend();
                  itChildNames++) {
-                pxr::TfToken                dataSourceName = *itChildNames;
-                pxr::HdDataSourceBaseHandle dataSource = containerDataSource->Get(dataSourceName);
+                PXR_NS::TfToken                dataSourceName = *itChildNames;
+                PXR_NS::HdDataSourceBaseHandle dataSource = containerDataSource->Get(dataSourceName);
                 if (dataSource) {
                     dataSourceStack.push({ dataSourceName, dataSource });
                 }
             }
         } else if (
-            auto vectorDataSource = pxr::HdVectorDataSource::Cast(dataSourceEntry.dataSource)) {
+            auto vectorDataSource = PXR_NS::HdVectorDataSource::Cast(dataSourceEntry.dataSource)) {
             for (size_t iElement = 0; iElement < vectorDataSource->GetNumElements(); iElement++) {
                 size_t reversedElementIndex = vectorDataSource->GetNumElements() - 1 - iElement;
-                pxr::TfToken dataSourceName = pxr::TfToken(std::to_string(reversedElementIndex));
-                pxr::HdDataSourceBaseHandle dataSource
+                PXR_NS::TfToken dataSourceName = PXR_NS::TfToken(std::to_string(reversedElementIndex));
+                PXR_NS::HdDataSourceBaseHandle dataSource
                     = vectorDataSource->GetElement(reversedElementIndex);
                 if (dataSource) {
                     dataSourceStack.push({ dataSourceName, dataSource });
@@ -208,11 +208,11 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
 }
 
 void AdskHydraSceneBrowserTestFixture::CompareDataSourceValue(
-    pxr::HdSampledDataSourceHandle sampledDataSource)
+    PXR_NS::HdSampledDataSourceHandle sampledDataSource)
 {
     _dataSourceValueView->expandAll();
 
-    pxr::VtValue value = sampledDataSource->GetValue(0.0f);
+    PXR_NS::VtValue value = sampledDataSource->GetValue(0.0f);
 
     // The supported value types can be found in dataSourceValueTreeView.cpp, in the
     // Hdui_GetModelFromValue function.
@@ -222,12 +222,12 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceValue(
         CompareIfArray<int>(value);
         CompareIfArray<float>(value);
         CompareIfArray<double>(value);
-        CompareIfArray<pxr::TfToken>(value);
-        CompareIfArray<pxr::SdfPath>(value);
-        CompareIfArray<pxr::GfVec3f>(value);
-        CompareIfArray<pxr::GfVec3d>(value);
-        CompareIfArray<pxr::GfMatrix4d>(value);
-        CompareIfArray<pxr::GfVec2f>(value);
+        CompareIfArray<PXR_NS::TfToken>(value);
+        CompareIfArray<PXR_NS::SdfPath>(value);
+        CompareIfArray<PXR_NS::GfVec3f>(value);
+        CompareIfArray<PXR_NS::GfVec3d>(value);
+        CompareIfArray<PXR_NS::GfMatrix4d>(value);
+        CompareIfArray<PXR_NS::GfVec2f>(value);
     }
 }
 
@@ -247,7 +247,7 @@ bool AdskHydraSceneBrowserTestFixture::MatchesFallbackTextOutput(const std::stri
     return std::regex_match(text, fallbackTextOutputRegex);
 }
 
-void AdskHydraSceneBrowserTestFixture::CompareValueContent(const pxr::VtValue& value)
+void AdskHydraSceneBrowserTestFixture::CompareValueContent(const PXR_NS::VtValue& value)
 {
     QAbstractItemModel* dataSourceItemModel = _dataSourceValueView->model();
     EXPECT_EQ(dataSourceItemModel->rowCount(), 1);
@@ -261,11 +261,11 @@ void AdskHydraSceneBrowserTestFixture::CompareValueContent(const pxr::VtValue& v
 #if PXR_VERSION < 2408
     valueStream << value;
 #else
-    if (value.IsHolding<pxr::SdfPathVector>()) {
+    if (value.IsHolding<PXR_NS::SdfPathVector>()) {
         // Special case for SdfPathVector.
         // See https://github.com/PixarAnimationStudios/OpenUSD/commit/1d19b1d
-        pxr::SdfPathVector paths = value.Get<pxr::SdfPathVector>();
-        for (pxr::SdfPath const& path : paths) {
+        PXR_NS::SdfPathVector paths = value.Get<PXR_NS::SdfPathVector>();
+        for (PXR_NS::SdfPath const& path : paths) {
             valueStream << path << "\n";
         }
     }
@@ -307,16 +307,16 @@ void AdskHydraSceneBrowserTestFixture::CompareValueContent(const pxr::VtValue& v
 }
 
 template <typename ElementType>
-void AdskHydraSceneBrowserTestFixture::CompareIfArray(const pxr::VtValue& value)
+void AdskHydraSceneBrowserTestFixture::CompareIfArray(const PXR_NS::VtValue& value)
 {
-    if (value.IsHolding<pxr::VtArray<ElementType>>()) {
-        CompareArrayContents<ElementType>(value.UncheckedGet<pxr::VtArray<ElementType>>());
+    if (value.IsHolding<PXR_NS::VtArray<ElementType>>()) {
+        CompareArrayContents<ElementType>(value.UncheckedGet<PXR_NS::VtArray<ElementType>>());
     }
 }
 
 template <typename ElementType>
 void AdskHydraSceneBrowserTestFixture::CompareArrayContents(
-    const pxr::VtArray<ElementType>& vtArray)
+    const PXR_NS::VtArray<ElementType>& vtArray)
 {
     QAbstractItemModel* dataSourceItemModel = _dataSourceValueView->model();
     EXPECT_EQ(static_cast<size_t>(dataSourceItemModel->rowCount()), vtArray.size());
