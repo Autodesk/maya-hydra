@@ -116,8 +116,9 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
 
     // Check for materials
     if (prim.primType == HdPrimTypeTokens->material) {
-        if (!_framePassData->_keepMaterials && 
-            _highlightMaterialsUsage.find(primPath) == _highlightMaterialsUsage.end()) {
+        if (_highlightMaterialsUsage.find(primPath) != _highlightMaterialsUsage.end()) {
+            return false;
+        } else if (!_framePassData->_keepMaterials) {
             return true;
         }
     }
@@ -128,8 +129,8 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
         if (!purposeRenderTag.IsEmpty()) {
             return (_framePassData->_includeRenderTags.find(purposeRenderTag)
                    == _framePassData->_includeRenderTags.end());
-        } else {
-            return !_framePassData->_supportPrimsWithNoPurposeRenderTag;
+        } else if (!_framePassData->_supportPrimsWithNoPurposeRenderTag && !prim.primType.IsEmpty()) {
+            return true;
         }
     } else {
         // No data source
@@ -149,7 +150,12 @@ void PassFilteringSceneIndex::_UpdateFilteringStatus(const PXR_NS::SdfPath& prim
 
 void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath)
 {
+    if (_framePassData->_keepMaterials) {
+        // If we keep the materials, we can completely skip all the highlight material logic
+        return;
+    }
     if (_framePassData->_highlightHierarchyPrefix.IsEmpty() || !primPath.HasPrefix(_framePassData->_highlightHierarchyPrefix)) {
+        // This is not a highlight prim
         return;
     }
 
@@ -160,6 +166,7 @@ void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPa
             _highlightMaterialsUsage[prevMaterialPath->second]--;
             if (_highlightMaterialsUsage[prevMaterialPath->second] == 0) {
                 _highlightMaterialsUsage.erase(prevMaterialPath->second);
+                _filteredPrims.insert(primPath);
                 _SendPrimsRemoved({prevMaterialPath->second});
             }
         }
@@ -170,7 +177,7 @@ void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPa
     }
 
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-    if (prim.primType != HdPrimTypeTokens->mesh) {
+    if (!(prim.primType == HdPrimTypeTokens->mesh || prim.primType == HdPrimTypeTokens->geomSubset)) {
         return removeMaterialEntry();
     }
     auto materialPath = GetMaterialPath(prim.dataSource);
@@ -188,6 +195,7 @@ void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPa
         _highlightsToMaterialsPaths[primPath] = materialPath;
         _highlightMaterialsUsage[materialPath]++;
         if (_highlightMaterialsUsage[materialPath] == 1) {
+            _filteredPrims.erase(materialPath);
             _SendPrimsAdded({{materialPath, materialPrim.primType}});
         }
     }
@@ -203,8 +211,8 @@ HdSceneIndexPrim PassFilteringSceneIndex::GetPrim(const SdfPath& primPath) const
 
 SdfPathVector PassFilteringSceneIndex::GetChildPrimPaths(const SdfPath& primPath) const
 {
-    // If this prim is filtered out, return no children
-    if (_IsFilteredOut(primPath)) {
+    // If this prim is filtered out and there are no highlight materials under it, return no children
+    if (_IsFilteredOut(primPath) && FindSelfOrFirstChild(primPath, _highlightMaterialsUsage) == _highlightMaterialsUsage.cend()) {
         return {};
     }
 
@@ -214,7 +222,7 @@ SdfPathVector PassFilteringSceneIndex::GetChildPrimPaths(const SdfPath& primPath
     // Filter out children that should be filtered out
     SdfPathVector filteredChildPaths;
     for (const SdfPath& childPath : childPaths) {
-        if (!_IsFilteredOut(childPath)) {
+        if (!_IsFilteredOut(childPath) || FindSelfOrFirstChild(primPath, _highlightMaterialsUsage) != _highlightMaterialsUsage.cend()) {
             filteredChildPaths.push_back(childPath);
         }
     }
