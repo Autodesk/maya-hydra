@@ -149,8 +149,10 @@ void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPa
         // If we don't remove the materials, we can completely skip all the highlight material logic
         return;
     }
-    if (_framePassData->_highlightHierarchyPrefix.IsEmpty() || !primPath.HasPrefix(_framePassData->_highlightHierarchyPrefix)) {
-        // This is not a highlight prim
+    bool isMayaFacesHighlightPrim = primPath.GetName().find("PolyActiveFaces") != std::string::npos;
+    bool isFvpHighlightPrim = !_framePassData->_highlightHierarchyPrefix.IsEmpty() && primPath.HasPrefix(_framePassData->_highlightHierarchyPrefix);
+    if (!(isMayaFacesHighlightPrim || isFvpHighlightPrim)) {
+        // Not a relevant prim
         return;
     }
 
@@ -180,7 +182,7 @@ void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPa
         return removeMaterialEntry();
     }
     auto materialPrim = GetInputSceneIndex()->GetPrim(materialPath);
-    if (!MaterialHasDisplacement(materialPrim)) {
+    if (isFvpHighlightPrim && !MaterialHasDisplacement(materialPrim)) {
         return removeMaterialEntry();
     }
 
