@@ -110,15 +110,15 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
     HdSceneIndexPrim prim = inputSceneIndex->GetPrim(primPath);
 
     // Check for lights
-    if (!_framePassData->_keepLights && HdPrimTypeIsLight(prim.primType)) {
-        return true;
+    if (_framePassData->_keepLights && HdPrimTypeIsLight(prim.primType)) {
+        return false;
     }
 
     // Check for materials
     if (prim.primType == HdPrimTypeTokens->material) {
         if (_highlightMaterialsUsage.find(primPath) != _highlightMaterialsUsage.end()) {
             return false;
-        } else if (!_framePassData->_keepMaterials) {
+        } else if (_framePassData->_removeMaterials) {
             return true;
         }
     }
@@ -150,8 +150,8 @@ void PassFilteringSceneIndex::_UpdateFilteringStatus(const PXR_NS::SdfPath& prim
 
 void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath)
 {
-    if (_framePassData->_keepMaterials) {
-        // If we keep the materials, we can completely skip all the highlight material logic
+    if (!_framePassData->_removeMaterials) {
+        // If we don't remove the materials, we can completely skip all the highlight material logic
         return;
     }
     if (_framePassData->_highlightHierarchyPrefix.IsEmpty() || !primPath.HasPrefix(_framePassData->_highlightHierarchyPrefix)) {

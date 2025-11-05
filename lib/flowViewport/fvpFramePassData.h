@@ -75,10 +75,10 @@ struct FramePassData
     //! Whether to keep lights in this frame pass
     bool _keepLights = false;
 
-    //! Whether to keep materials in this frame pass.
+    //! Whether to remove materials in this frame pass.
     //! Note that some materials may still be kept if needed
     //! to properly render certain prims, such as selection highlights.
-    bool _keepMaterials = false;
+    bool _removeMaterials = false;
 
     //! this frame pass supports prims with no purpose render tags, set this to true if you want to
     //! render prims that do not have a purpose render tag
