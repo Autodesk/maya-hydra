@@ -168,10 +168,13 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(
 
     Fvp::Instruments::instance().set(kNbPopulateCalls, VtValue(_nbPopulateCalls));
 
-    // Add our pick handler to the pick handler registry.  All USD scene indices
-    // could share the same pick handler, but create a new one for simplicity.
-    auto pickHandler = std::make_shared<UsdPickHandler>();
-    TF_AXIOM(PickHandlerRegistry::Instance().Register(sceneIndexPathPrefix, pickHandler));
+    // Add our pick handler to the pick handler registry if there is none.
+    auto& phr = MayaHydra::PickHandlerRegistry::Instance();
+    _unregisterPickHandler = (phr.RegisteredHandler(sceneIndexPathPrefix) == nullptr);
+    if (_unregisterPickHandler) {
+        auto pickHandler = std::make_shared<UsdPickHandler>();
+        TF_AXIOM(phr.Register(sceneIndexPathPrefix, pickHandler));
+    }
 
     // The gateway node (proxy shape) is a Maya node, so the scene index
     // path must be a single segment.
@@ -181,9 +184,10 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(
     // (proxy shape) that corresponds to our scene index data producer.
     Scene::instance().addObserver(_appSceneObserver);
 
-    // Register a mapper in the path mapper registry.
-    TF_AXIOM(Fvp::PathMapperRegistry::Instance().Register(
-                 _sceneIndexAppPath, _usdPathMapper));
+    // Register a mapper in the path mapper registry, if there is none
+    // for this path.
+    _unregisterPathMapper = Fvp::PathMapperRegistry::Instance().Register(
+        _sceneIndexAppPath, _usdPathMapper);
 }
 
 MayaUsdProxyShapeSceneIndex::~MayaUsdProxyShapeSceneIndex()
@@ -197,11 +201,14 @@ void MayaUsdProxyShapeSceneIndex::_Destroy()
     TfNotice::Revoke(_stageInvalidateNoticeKey);
     TfNotice::Revoke(_objectsChangedNoticeKey);
 
-    TF_AXIOM(PickHandlerRegistry::Instance().Unregister(_sceneIndexPathPrefix));
+    if (_unregisterPickHandler) {
+        TF_AXIOM(PickHandlerRegistry::Instance().Unregister(_sceneIndexPathPrefix));
+    }
 
     // Unregister our path mapper.
-    TF_AXIOM(Fvp::PathMapperRegistry::Instance().Unregister(
-                 _sceneIndexAppPath));
+    if (_unregisterPathMapper) {
+        Fvp::PathMapperRegistry::Instance().Unregister(_sceneIndexAppPath);
+    }
 
     // Ufe::Subject has automatic cleanup of stale observers, but this can
     // be problematic on application exit if the library of the observer is
