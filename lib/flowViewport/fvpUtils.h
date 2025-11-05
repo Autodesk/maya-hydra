@@ -136,6 +136,16 @@ PXR_NS::SdfPath GetMaterialPath(const PXR_NS::HdContainerDataSourceHandle& primD
 FVP_API
 bool MaterialHasDisplacement(const PXR_NS::HdSceneIndexPrim& materialPrim);
 
+FVP_API
+void SetProfileBegin(std::function<int(const char*, const char*)> func);
+FVP_API
+void SetProfileEnd(std::function<void(int)> func);
+
+FVP_API
+int ProfileBegin(const char* eventName, const char* description);
+FVP_API
+void ProfileEnd(int eventId);
+
 // Get the prim's purpose render tag token from its data source, or empty if undefined
 PXR_NS::TfToken GetPurposeRenderTag(const PXR_NS::HdContainerDataSourceHandle& primDataSource);
 

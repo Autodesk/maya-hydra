@@ -643,6 +643,7 @@ BaseWhSi::BaseWhSi(
 HdSceneIndexPrim BaseWhSi::GetPrim(const PXR_NS::SdfPath &primPath) const
 {
     if (primPath.HasPrefix(_highlightHierarchyPrefix) && !_selectionPaths.empty()) {
+        int eventId = Fvp::ProfileBegin("BaseWhSi::GetPrim", "BaseWhSi::GetPrim");
         auto it = FindSelfOrFirstParent(primPath, _selectionPaths);
         bool isHighlightPrim = it != _selectionPaths.end() && *it != primPath;
         if (isHighlightPrim) {
@@ -650,7 +651,9 @@ HdSceneIndexPrim BaseWhSi::GetPrim(const PXR_NS::SdfPath &primPath) const
             while (_selectionPaths.find(selectionPath) == _selectionPaths.end()) {
                 selectionPath = selectionPath.GetParentPath();
             }
-            return GetHighlightPrim(selectionPath, primPath);
+            auto highlightPrim = GetHighlightPrim(selectionPath, primPath);
+            Fvp::ProfileEnd(eventId);
+            return highlightPrim;
         }
     }
     return GetInputSceneIndex()->GetPrim(primPath);
@@ -664,6 +667,7 @@ SdfPathVector BaseWhSi::GetChildPrimPaths(const PXR_NS::SdfPath &primPath) const
         return childPaths;
     }
     if (primPath.HasPrefix(_highlightHierarchyPrefix) && !_selectionPaths.empty()) {
+        int eventId = Fvp::ProfileBegin("BaseWhSi::GetChildPrimPaths", "BaseWhSi::GetChildPrimPaths");
         // To return the paths leading up to and including selection paths
         auto it = _selectionPaths.upper_bound(primPath);
         while (it != _selectionPaths.end() && it->HasPrefix(primPath)) {
@@ -674,6 +678,7 @@ SdfPathVector BaseWhSi::GetChildPrimPaths(const PXR_NS::SdfPath &primPath) const
             it++;
         }
         if (!childPaths.empty()) {
+            Fvp::ProfileEnd(eventId);
             return childPaths;
         }
 
@@ -683,8 +688,11 @@ SdfPathVector BaseWhSi::GetChildPrimPaths(const PXR_NS::SdfPath &primPath) const
             selectionPath = selectionPath.GetParentPath();
         }
         if (_selectionPaths.find(selectionPath) != _selectionPaths.end()) {
-            return GetHighlightChildPrimPaths(selectionPath, primPath);
+            auto highlightChildPrimPaths = GetHighlightChildPrimPaths(selectionPath, primPath);
+            Fvp::ProfileEnd(eventId);
+            return highlightChildPrimPaths;
         }
+        Fvp::ProfileEnd(eventId);
     }
     return childPaths;
 }
@@ -693,6 +701,7 @@ void BaseWhSi::_PrimsAdded(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::AddedPrimEntries &entries)
 {
+    int eventId = Fvp::ProfileBegin("BaseWhSi::_PrimsAdded", "BaseWhSi::_PrimsAdded");
     _SendPrimsAdded(entries);
     HdSceneIndexObserver::AddedPrimEntries filteredEntries;
     for (const auto& entry : entries) {
@@ -711,12 +720,14 @@ void BaseWhSi::_PrimsAdded(
         }
     }
     ProcessAddedPrims(sender, filteredEntries);
+    Fvp::ProfileEnd(eventId);
 }
 
 void BaseWhSi::_PrimsRemoved(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::RemovedPrimEntries &entries)
 {
+    int eventId = Fvp::ProfileBegin("BaseWhSi::_PrimsRemoved", "BaseWhSi::_PrimsRemoved");
     _SendPrimsRemoved(entries);
     HdSceneIndexObserver::RemovedPrimEntries filteredEntries;
     for (const auto& entry : entries) {
@@ -729,12 +740,14 @@ void BaseWhSi::_PrimsRemoved(
         }
     }
     ProcessRemovedPrims(sender, filteredEntries);
+    Fvp::ProfileEnd(eventId);
 }
 
 void BaseWhSi::_PrimsDirtied(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
+    int eventId = Fvp::ProfileBegin("BaseWhSi::_PrimsDirtied", "BaseWhSi::_PrimsDirtied");
     _SendPrimsDirtied(entries);
     HdSceneIndexObserver::DirtiedPrimEntries filteredEntries;
     std::vector<SdfPath> selectionChangePaths;
@@ -768,6 +781,7 @@ void BaseWhSi::_PrimsDirtied(
         ProcessFullySelectedChange(selectionChangePath, _fullySelectedPaths.find(selectionChangePath) != _fullySelectedPaths.end());
     }
     ProcessDirtiedPrims(sender, filteredEntries);
+    Fvp::ProfileEnd(eventId);
 }
 
 void BaseWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)
