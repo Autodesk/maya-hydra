@@ -511,10 +511,12 @@ void MtohRenderOverride::UpdateRenderGlobals(
             if (!purposeRenderTag.IsEmpty()) {
                 std::lock_guard<std::mutex> lock(_allInstancesMutex);
                 for (auto* instance : _allInstances) {
-                    const Fvp::FramePassDataPtrVector& framePassDataArray
+                    Fvp::FramePassDataPtrVector& framePassDataArray
                         = instance->_framePassesData;
                     for (auto& framePassData : framePassDataArray) {
                         if (framePassData && framePassData->IsValid()) {
+                            auto params = instance->_globals.delegateParams;
+                            framePassData->_renderTagsUpdateFn(params.renderPurpose, params.proxyPurpose, params.guidePurpose);
                             framePassData->DirtyPrimsFromPurposeRenderTag(purposeRenderTag);
                         }
                     }

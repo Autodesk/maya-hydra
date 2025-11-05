@@ -232,19 +232,26 @@ SdfPathVector PassFilteringSceneIndex::GetChildPrimPaths(const SdfPath& primPath
 
 void PassFilteringSceneIndex::DirtyPrimsFromPurposeRenderTag(const TfToken purposeRenderTag)
 {
-    HdSceneIndexObserver::AddedPrimEntries   addedEntries;
     auto& inputSceneIndex = GetInputSceneIndex();
-    if (inputSceneIndex) { 
-        for (const SdfPath& path : HdSceneIndexPrimView(inputSceneIndex)) {
-            HdSceneIndexPrim prim = inputSceneIndex->GetPrim(path);
-            const TfToken    purposeRenderTagFromPrim = GetPurposeRenderTag(prim.dataSource);//From fvpUtils
-            if (purposeRenderTag == purposeRenderTagFromPrim){
-                addedEntries.emplace_back(path, prim.primType);
+    if (inputSceneIndex) {
+        HdSceneIndexObserver::AddedPrimEntries   newlyUnfilteredEntries;
+        HdSceneIndexObserver::RemovedPrimEntries newlyFilteredEntries;
+        for (const SdfPath& primPath : HdSceneIndexPrimView(inputSceneIndex)) {
+            bool wasPreviouslyFiltered = _IsFilteredOut(primPath);
+            _UpdateFilteringStatus(primPath);
+            _UpdateHighlightMaterialStatus(primPath);
+            if (wasPreviouslyFiltered != _IsFilteredOut(primPath)) {
+                // Filtering status changed
+                if (wasPreviouslyFiltered) {
+                        newlyUnfilteredEntries.emplace_back(
+                            primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
+                } else {
+                        newlyFilteredEntries.emplace_back(primPath);
+                }
             }
         }
-    }
-    if (!addedEntries.empty()) {
-        _SendPrimsAdded(addedEntries);//Sending an add prim for an existing prim is equivalent to a resync
+        _SendPrimsAdded(newlyUnfilteredEntries);
+        _SendPrimsRemoved(newlyFilteredEntries);
     }
 }
 
