@@ -1255,7 +1255,7 @@ MStatus MtohRenderOverride::Render(
             // provides prims to render all viewports.
             auto isSi = manager.GetIsolateSelectSceneIndex();
             auto isolateSelection = manager.GetOrCreateIsolateSelection(panelNameStr);
-            if (isSi->GetIsolateSelection() != isolateSelection) {
+            if (isSi && (isSi->GetIsolateSelection() != isolateSelection)) {
                 TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
                     .Msg("Switching scene index to isolate selection %p\n", &*isolateSelection);
                 // Isolate select scene index is being switched to a different
