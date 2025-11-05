@@ -72,9 +72,6 @@ struct FramePassData
     //! in order to properly render selection highlights.
     PXR_NS::SdfPath _highlightHierarchyPrefix;
 
-    //! Whether to keep lights in this frame pass
-    bool _keepLights = false;
-
     //! Whether to remove materials in this frame pass.
     //! Note that some materials may still be kept if needed
     //! to properly render certain prims, such as selection highlights.

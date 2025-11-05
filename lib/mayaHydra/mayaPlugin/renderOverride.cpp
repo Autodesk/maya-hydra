@@ -2827,7 +2827,6 @@ void MtohRenderOverride::_CreateFramePassesData()
         filteringData->_excludePaths = (shouldUseSingleFramePass) 
                                         ? SdfPathVector{}
                                         : SdfPathVector{_highlightHierarchyPrefix}; // Ignore selection highlight prims if we have multiple passes
-        filteringData->_keepLights   = true;
         filteringData->_removeMaterials = false;
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = true; // Main graphics pass supports prims with no purpose render tag
@@ -2865,7 +2864,6 @@ void MtohRenderOverride::_CreateFramePassesData()
         filteringData->_includePaths = { _highlightHierarchyPrefix }; // include selection highlight prims.
         filteringData->_excludePaths = { };
         filteringData->_highlightHierarchyPrefix = _highlightHierarchyPrefix;
-        filteringData->_keepLights = true;
         filteringData->_removeMaterials = true;
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = false; // Secondary graphics pass does not support prims with no purpose render tag

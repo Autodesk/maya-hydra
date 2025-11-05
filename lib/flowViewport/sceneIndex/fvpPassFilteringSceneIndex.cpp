@@ -109,18 +109,13 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
 
     HdSceneIndexPrim prim = inputSceneIndex->GetPrim(primPath);
 
-    // Check for lights
-    if (_framePassData->_keepLights && HdPrimTypeIsLight(prim.primType)) {
-        return false;
-    }
-
-    // Check for materials
-    if (prim.primType == HdPrimTypeTokens->material) {
-        if (_highlightMaterialsUsage.find(primPath) != _highlightMaterialsUsage.end()) {
-            return false;
-        } else if (_framePassData->_removeMaterials) {
+    if (!HdPrimTypeIsGprim(prim.primType)) {
+        if (prim.primType == HdPrimTypeTokens->material 
+            && _framePassData->_removeMaterials 
+            && _highlightMaterialsUsage.find(primPath) == _highlightMaterialsUsage.end()) {
             return true;
         }
+        return false; // Include all non-geometric prims by default
     }
 
     // Now apply the main filtering logic based on purpose render tags
@@ -129,8 +124,8 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
         if (!purposeRenderTag.IsEmpty()) {
             return (_framePassData->_includeRenderTags.find(purposeRenderTag)
                    == _framePassData->_includeRenderTags.end());
-        } else if (!_framePassData->_supportPrimsWithNoPurposeRenderTag && !prim.primType.IsEmpty()) {
-            return true;
+        } else {
+            return !_framePassData->_supportPrimsWithNoPurposeRenderTag;
         }
     } else {
         // No data source
