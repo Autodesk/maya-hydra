@@ -109,13 +109,13 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
 
     HdSceneIndexPrim prim = inputSceneIndex->GetPrim(primPath);
 
-    if (!HdPrimTypeIsGprim(prim.primType)) {
+    if (std::find(HdRprimTypeTokens->allTokens.begin(), HdRprimTypeTokens->allTokens.end(), prim.primType) == HdRprimTypeTokens->allTokens.end()) {
         if (prim.primType == HdPrimTypeTokens->material 
             && _framePassData->_removeMaterials 
             && _highlightMaterialsUsage.find(primPath) == _highlightMaterialsUsage.end()) {
             return true;
         }
-        return false; // Include all non-geometric prims by default
+        return false; // Include all non-Rprims by default
     }
 
     // Now apply the main filtering logic based on purpose render tags
