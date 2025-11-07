@@ -2448,7 +2448,6 @@ bool MtohRenderOverride::select(
     MSelectionList& selectionList,
     MPointArray&    worldSpaceHitPts)
 {
-    std::cout << "--------------- MtohRenderOverride::select" << std::endl;
     MProfilingScope profilingScopeForEval(
         _profilerCategory,
         MProfiler::kColorD_L1,
@@ -2912,34 +2911,16 @@ void MtohRenderOverride::_CreateFramePassesData()
         filteringData->_excludePaths = (shouldUseSingleFramePass) 
                                         ? SdfPathVector{}
                                         : SdfPathVector{_highlightHierarchyPrefix}; // Ignore selection highlight prims if we have multiple passes
+        filteringData->_renderTags = { HdRenderTagTokens->geometry, HdRenderTagTokens->render, HdRenderTagTokens->proxy };
+        if (shouldUseSingleFramePass) {
+            filteringData->_renderTags.insert(HdRenderTagTokens->guide);
+            filteringData->_renderTags.insert(Fvp::secondaryGraphicsRenderTagToken);
+        }
         filteringData->_removeMaterials = false;
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = true; // Main graphics pass supports prims with no purpose render tag
         
         _framePassesData.emplace_back(filteringData);
-        
-        // Define the render tags update function after emplacing, capturing shared ptr to the element
-        const size_t currentIndex = _framePassesData.size() - 1;
-        _framePassesData[currentIndex]->_renderTagsUpdateFn = [this, currentIndex, shouldUseSingleFramePass](
-                  bool includeRenderPurpose, bool includeProxyPurpose, bool includeGuidePurpose) {
-            auto& filteringData = _framePassesData[currentIndex];
-            filteringData->_includeRenderTags = { HdRenderTagTokens->geometry }; // main pass
-            if (includeRenderPurpose) {
-                filteringData->_includeRenderTags.insert(HdRenderTagTokens->render); // main pass
-            }
-            if (includeProxyPurpose) {
-                filteringData->_includeRenderTags.insert(HdRenderTagTokens->proxy); // main pass
-            }
-
-            if (shouldUseSingleFramePass) { 
-                // When using a single pass, everything should be included in the main pass
-                filteringData->_includeRenderTags.insert(Fvp::secondaryGraphicsRenderTagToken);
-                // Include guide tags in the main pass
-                if (includeGuidePurpose) {
-                    filteringData->_includeRenderTags.insert(HdRenderTagTokens->guide);
-                }
-            }
-        };
     }
 
     // Secondary graphics pass - only create if not using single frame pass
@@ -2948,28 +2929,12 @@ void MtohRenderOverride::_CreateFramePassesData()
         filteringData->_rendererName = MtohTokens->HdStormRendererPlugin;//Storm by default
         filteringData->_includePaths = { _highlightHierarchyPrefix }; // include selection highlight prims.
         filteringData->_excludePaths = { };
+        filteringData->_renderTags = { HdRenderTagTokens->guide, Fvp::secondaryGraphicsRenderTagToken };
         filteringData->_highlightHierarchyPrefix = _highlightHierarchyPrefix;
         filteringData->_removeMaterials = true;
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = false; // Secondary graphics pass does not support prims with no purpose render tag
         _framePassesData.emplace_back(filteringData);
-
-         // Define the render tags update function after emplacing, capturing shared ptr to the
-        // element
-        const size_t currentIndex = _framePassesData.size() - 1;
-        _framePassesData[currentIndex]->_renderTagsUpdateFn
-            = [this, currentIndex](
-                  bool includeRenderPurpose, bool includeProxyPurpose, bool includeGuidePurpose) {
-                  auto& filteringData = _framePassesData[currentIndex];
-                  
-                  // Set the render tags for the secondary graphics pass
-                  filteringData->_includeRenderTags = { Fvp::secondaryGraphicsRenderTagToken };
-
-                  if (includeGuidePurpose) {
-                      // Insert guide tag (std::set automatically handles duplicates)
-                      filteringData->_includeRenderTags.insert(HdRenderTagTokens->guide);
-                  }
-               };
     }
 }
 

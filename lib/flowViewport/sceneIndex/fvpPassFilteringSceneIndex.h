@@ -87,7 +87,7 @@ protected:
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
 
     FVP_API
-    bool _IsFilteredOut(const PXR_NS::SdfPath& primPath) const;
+    bool _IsAncestorFilteredOutInclusive(const PXR_NS::SdfPath& primPath) const;
 
     FVP_API
     bool _ShouldBeFilteredOut(const PXR_NS::SdfPath& primPath) const;
@@ -97,6 +97,9 @@ protected:
 
     FVP_API
     void _UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath);
+
+    FVP_API
+    void _UpdateFilteringForTree(const PXR_NS::SdfPath& primPath);
 
     Fvp::FramePassConstDataPtr _framePassData;
 

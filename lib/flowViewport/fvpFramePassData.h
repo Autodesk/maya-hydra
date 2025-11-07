@@ -52,8 +52,8 @@ struct FramePassData
         void(bool includeRenderPurpose, bool includeProxyPurpose, bool includeGuidePurpose)>
         _renderTagsUpdateFn;
 
-    //! Current render tags to include for this pass (updated dynamically)
-    std::set<PXR_NS::TfToken> _includeRenderTags;
+    //! Render tags to include for this pass
+    std::set<PXR_NS::TfToken> _renderTags;
 
     //! Current HVT frame pass
     hvt::FramePassPtr   _framePass;

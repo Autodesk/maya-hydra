@@ -13,6 +13,7 @@
 // limitations under the License.
 //
 
+#include <iostream>
 #ifdef VIEWPORT_TOOLBOX
 
 #include "fvpPassFilteringSceneIndex.h"
@@ -66,25 +67,32 @@ PassFilteringSceneIndex::PassFilteringSceneIndex(
     , InputSceneIndexUtils(inputSceneIndex)
     , _framePassData(framePassData)
 {
+    int eventId = Fvp::ProfileBegin("PassFilteringSceneIndex::PassFilteringSceneIndex", "potato");
     for (const SdfPath& primPath : HdSceneIndexPrimView(GetInputSceneIndex())) {
         _UpdateFilteringStatus(primPath);
         _UpdateHighlightMaterialStatus(primPath);
     }
+    Fvp::ProfileEnd(eventId);
 }
 
-bool PassFilteringSceneIndex::_IsFilteredOut(const PXR_NS::SdfPath& primPath) const
+bool PassFilteringSceneIndex::_IsAncestorFilteredOutInclusive(const SdfPath& primPath) const
 {
-    return _filteredPrims.find(primPath) != _filteredPrims.end();
+    return FindSelfOrFirstParent(primPath, _filteredPrims) != _filteredPrims.end();
 }
 
 bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) const
 {
+    int eventId = Fvp::ProfileBegin("_ShouldBeFilteredOut", primPath.GetText());
     // Clean version without logging
     if (!(_framePassData && _framePassData->_framePass) ) {
+        Fvp::ProfileEnd(eventId);
+        //reason = "_framePassData && _framePassData->_framePass";
         return true; // Safety check, exclude if no pass name
     }
 
     if (primPath.IsAbsoluteRootPath()) {
+        Fvp::ProfileEnd(eventId);
+        //reason = "IsAbsoluteRootPath";
         return false; // Always include root prims
     }
 
@@ -92,67 +100,107 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
     // Include paths: if specified and prim matches, definitely include it (workaround for special cases)
     if (!_framePassData->_includePaths.empty()
         && isPrefixedBySdfPath(primPath, _framePassData->_includePaths)) {
+            //reason = "_includePaths";
+            Fvp::ProfileEnd(eventId);
         return false; // Prim is in the include paths, it will be rendered
     }
 
     // Exclude paths: if specified and prim matches, definitely exclude it (workaround for special cases)
     if (!_framePassData->_excludePaths.empty()
         && isPrefixedBySdfPath(primPath, _framePassData->_excludePaths)) {
+            //reason = "_excludePaths";
+            Fvp::ProfileEnd(eventId);
         return true; // Prim is in the exclude paths, it will be skipped
     }
 
     // Now do the expensive GetPrim() call only when necessary
     const HdSceneIndexBaseRefPtr& inputSceneIndex = GetInputSceneIndex();
     if (!inputSceneIndex) {
+        //reason = "no input scene index";
+        Fvp::ProfileEnd(eventId);
         return false; // No input scene index, include by default
     }
 
     HdSceneIndexPrim prim = inputSceneIndex->GetPrim(primPath);
 
-    if (std::find(HdRprimTypeTokens->allTokens.begin(), HdRprimTypeTokens->allTokens.end(), prim.primType) == HdRprimTypeTokens->allTokens.end()) {
-        if (prim.primType == HdPrimTypeTokens->material 
-            && _framePassData->_removeMaterials 
-            && _highlightMaterialsUsage.find(primPath) == _highlightMaterialsUsage.end()) {
-            return true;
-        }
-        return false; // Include all non-Rprims by default
+    if (_framePassData->_removeMaterials && prim.primType == HdPrimTypeTokens->material) {
+        //reason = "materials removed";
+        Fvp::ProfileEnd(eventId);
+        return true;
     }
+
+    //if (std::find(HdRprimTypeTokens->allTokens.begin(), HdRprimTypeTokens->allTokens.end(), prim.primType) == HdRprimTypeTokens->allTokens.end()) {
+    //    if (prim.primType == HdPrimTypeTokens->material 
+    //        && _framePassData->_removeMaterials) {
+    //        return true;
+    //    }
+    //    return false; // Include all non-Rprims by default
+    //}
 
     // Now apply the main filtering logic based on purpose render tags
     if (prim.dataSource) {
-        const TfToken purposeRenderTag = GetPurposeRenderTag(prim.dataSource);//From fvpUtils
-        if (!purposeRenderTag.IsEmpty()) {
-            return (_framePassData->_includeRenderTags.find(purposeRenderTag)
-                   == _framePassData->_includeRenderTags.end());
-        } else {
-            return !_framePassData->_supportPrimsWithNoPurposeRenderTag;
+        const TfToken purposeRenderTag = GetPurposeRenderTag(prim.dataSource);
+        if (!purposeRenderTag.IsEmpty() && _framePassData->_renderTags.find(purposeRenderTag) == _framePassData->_renderTags.end()) {
+            //reason = "render tag was not enabled for this pass";
+            Fvp::ProfileEnd(eventId);
+            return true;
         }
-    } else {
-        // No data source
+        if (purposeRenderTag.IsEmpty() && !_framePassData->_supportPrimsWithNoPurposeRenderTag && std::find(HdRprimTypeTokens->allTokens.begin(), HdRprimTypeTokens->allTokens.end(), prim.primType) != HdRprimTypeTokens->allTokens.end()) {
+            //reason = "!_framePassData->_supportPrimsWithNoPurposeRenderTag";
+            Fvp::ProfileEnd(eventId);
+            return true;
+        }
     }
-
+    //reason = "default";
+    Fvp::ProfileEnd(eventId);
     return false; // will be rendered.
 }
 
 void PassFilteringSceneIndex::_UpdateFilteringStatus(const PXR_NS::SdfPath& primPath)
 {
+    int eventId = Fvp::ProfileBegin("_UpdateFilteringStatus", primPath.GetText());
+    if (_IsAncestorFilteredOutInclusive(primPath) && _filteredPrims.find(primPath) == _filteredPrims.end()) {
+        // This is a child of a filtered prim. Nothing to do.
+        Fvp::ProfileEnd(eventId);
+        return;
+    }
+    //bool wasFiltered = _IsAncestorFilteredOutInclusive(primPath);
+    //std::string reason;
     if (_ShouldBeFilteredOut(primPath)) {
+        //if (!wasFiltered) {
+        //    std::cout << "Filtering " << primPath << " for : " << reason << std::endl;
+        //}
+        for (auto it = _filteredPrims.begin(); it != _filteredPrims.end();) {
+            if ((*it).HasPrefix(primPath)) {
+                it = _filteredPrims.erase(it);
+            } else {
+                ++it;
+            }
+        }
         _filteredPrims.insert(primPath);
+        // Remove child paths so only root filtered prims are kept. When one is unfiltered, we recheck its children anywayss
     } else {
+        //if (wasFiltered) {
+        //    std::cout << "UN-filtering " << primPath << " for : " << reason << std::endl;
+        //}
         _filteredPrims.erase(primPath);
     }
+    Fvp::ProfileEnd(eventId);
 }
 
 void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath)
 {
+    int eventId = Fvp::ProfileBegin("_UpdateHighlightMaterialStatus", primPath.GetText());
     if (!_framePassData->_removeMaterials) {
         // If we don't remove the materials, we can completely skip all the highlight material logic
+        Fvp::ProfileEnd(eventId);
         return;
     }
     bool isMayaFacesHighlightPrim = primPath.GetName().find("PolyActiveFaces") != std::string::npos;
     bool isFvpHighlightPrim = !_framePassData->_highlightHierarchyPrefix.IsEmpty() && primPath.HasPrefix(_framePassData->_highlightHierarchyPrefix);
     if (!(isMayaFacesHighlightPrim || isFvpHighlightPrim)) {
         // Not a relevant prim
+        Fvp::ProfileEnd(eventId);
         return;
     }
 
@@ -163,27 +211,34 @@ void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPa
             _highlightMaterialsUsage[prevMaterialPath->second]--;
             if (_highlightMaterialsUsage[prevMaterialPath->second] == 0) {
                 _highlightMaterialsUsage.erase(prevMaterialPath->second);
-                _filteredPrims.insert(primPath);
                 _SendPrimsRemoved({prevMaterialPath->second});
             }
         }
     };
 
-    if (_IsFilteredOut(primPath)) {
+    if (_IsAncestorFilteredOutInclusive(primPath)) {
         removeMaterialEntry();
+        Fvp::ProfileEnd(eventId);
+        return;
     }
 
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     if (!(prim.primType == HdPrimTypeTokens->mesh || prim.primType == HdPrimTypeTokens->geomSubset)) {
-        return removeMaterialEntry();
+        removeMaterialEntry();
+        Fvp::ProfileEnd(eventId);
+        return;
     }
     auto materialPath = GetMaterialPath(prim.dataSource);
     if (materialPath.IsEmpty()) {
-        return removeMaterialEntry();
+        removeMaterialEntry();
+        Fvp::ProfileEnd(eventId);
+        return;
     }
     auto materialPrim = GetInputSceneIndex()->GetPrim(materialPath);
     if (isFvpHighlightPrim && !MaterialHasDisplacement(materialPrim)) {
-        return removeMaterialEntry();
+        removeMaterialEntry();
+        Fvp::ProfileEnd(eventId);
+        return;
     }
 
     if (materialPath != prevMaterialPath->second) {
@@ -192,24 +247,76 @@ void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPa
         _highlightsToMaterialsPaths[primPath] = materialPath;
         _highlightMaterialsUsage[materialPath]++;
         if (_highlightMaterialsUsage[materialPath] == 1) {
-            _filteredPrims.erase(materialPath);
             _SendPrimsAdded({{materialPath, materialPrim.primType}});
         }
     }
+    Fvp::ProfileEnd(eventId);
+}
+
+void PassFilteringSceneIndex::_UpdateFilteringForTree(const PXR_NS::SdfPath& primPath)
+{
+    int eventId = Fvp::ProfileBegin("_UpdateFilteringForTree", primPath.GetText());
+    if (_IsAncestorFilteredOutInclusive(primPath) && _filteredPrims.find(primPath) == _filteredPrims.end()) {
+        // This is a child of a filtered prim. Nothing to do.
+        Fvp::ProfileEnd(eventId);
+        return;
+    }
+    bool wasFiltered = _IsAncestorFilteredOutInclusive(primPath);
+    _UpdateFilteringStatus(primPath);
+    if (wasFiltered == _IsAncestorFilteredOutInclusive(primPath)) {
+        // Was filtered and still is : nothing to do
+        // Was not filtered and still not : nothing to do
+        Fvp::ProfileEnd(eventId);
+        return;
+    }
+
+    // The filtering status changed.
+    if (_IsAncestorFilteredOutInclusive(primPath)) {
+        for (const auto& subTreePath : HdSceneIndexPrimView(GetInputSceneIndex(), primPath)) {
+            _UpdateHighlightMaterialStatus(subTreePath);
+        }
+        _SendPrimsRemoved({primPath});
+    } else {
+        // Prim was just unfiltered. Need to check its children.
+        // Update the whole sub-hierarchy
+        // HdSceneIndexPrimView includes the prim itself
+        HdSceneIndexObserver::AddedPrimEntries addedEntries;
+        HdSceneIndexPrimView subTree(GetInputSceneIndex(), primPath);
+        for (auto itTree = subTree.begin(); itTree != subTree.end(); ++itTree) {
+            const SdfPath& currPath = *itTree;
+            if (currPath != primPath) {
+                _UpdateFilteringStatus(currPath);
+            }
+            if (_filteredPrims.find(currPath) == _filteredPrims.end()) {
+                _UpdateHighlightMaterialStatus(currPath);
+                addedEntries.emplace_back(currPath, GetInputSceneIndex()->GetPrim(currPath).primType);
+            } else {
+                itTree.SkipDescendants();
+            }
+        }
+        _SendPrimsAdded(addedEntries);
+    }
+    Fvp::ProfileEnd(eventId);
 }
 
 HdSceneIndexPrim PassFilteringSceneIndex::GetPrim(const SdfPath& primPath) const
 {
-    if (_IsFilteredOut(primPath)) {
-        return {}; // Return empty prim
+    int eventId = Fvp::ProfileBegin("PassFilteringSceneIndex::GetPrim", primPath.GetText());
+    // If an ancestor if filtered out and this is not a highlight material, return nothing
+    if (_IsAncestorFilteredOutInclusive(primPath) && _highlightMaterialsUsage.find(primPath) == _highlightMaterialsUsage.end()) {
+        Fvp::ProfileEnd(eventId);
+        return {};
     }
+    Fvp::ProfileEnd(eventId);
     return GetInputSceneIndex()->GetPrim(primPath);
 }
 
 SdfPathVector PassFilteringSceneIndex::GetChildPrimPaths(const SdfPath& primPath) const
 {
+    int eventId = Fvp::ProfileBegin("PassFilteringSceneIndex::GetChildPrimPaths", primPath.GetText());
     // If this prim is filtered out and there are no highlight materials under it, return no children
-    if (_IsFilteredOut(primPath) && FindSelfOrFirstChild(primPath, _highlightMaterialsUsage) == _highlightMaterialsUsage.cend()) {
+    if (_IsAncestorFilteredOutInclusive(primPath) && FindSelfOrFirstChild(primPath, _highlightMaterialsUsage) == _highlightMaterialsUsage.cend()) {
+        Fvp::ProfileEnd(eventId);
         return {};
     }
 
@@ -219,37 +326,24 @@ SdfPathVector PassFilteringSceneIndex::GetChildPrimPaths(const SdfPath& primPath
     // Filter out children that should be filtered out
     SdfPathVector filteredChildPaths;
     for (const SdfPath& childPath : childPaths) {
-        if (!_IsFilteredOut(childPath) || FindSelfOrFirstChild(primPath, _highlightMaterialsUsage) != _highlightMaterialsUsage.cend()) {
+        if (!_IsAncestorFilteredOutInclusive(childPath) || FindSelfOrFirstChild(primPath, _highlightMaterialsUsage) != _highlightMaterialsUsage.cend()) {
             filteredChildPaths.push_back(childPath);
         }
     }
-
+    Fvp::ProfileEnd(eventId);
     return filteredChildPaths;
 }
 
 void PassFilteringSceneIndex::DirtyPrimsFromPurposeRenderTag(const TfToken purposeRenderTag)
 {
+    int eventId = Fvp::ProfileBegin("PassFilteringSceneIndex::DirtyPrimsFromPurposeRenderTag", purposeRenderTag.GetText());
     auto& inputSceneIndex = GetInputSceneIndex();
     if (inputSceneIndex) {
-        HdSceneIndexObserver::AddedPrimEntries   newlyUnfilteredEntries;
-        HdSceneIndexObserver::RemovedPrimEntries newlyFilteredEntries;
         for (const SdfPath& primPath : HdSceneIndexPrimView(inputSceneIndex)) {
-            bool wasPreviouslyFiltered = _IsFilteredOut(primPath);
-            _UpdateFilteringStatus(primPath);
-            _UpdateHighlightMaterialStatus(primPath);
-            if (wasPreviouslyFiltered != _IsFilteredOut(primPath)) {
-                // Filtering status changed
-                if (wasPreviouslyFiltered) {
-                        newlyUnfilteredEntries.emplace_back(
-                            primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
-                } else {
-                        newlyFilteredEntries.emplace_back(primPath);
-                }
-            }
+            _UpdateFilteringForTree(primPath);
         }
-        _SendPrimsAdded(newlyUnfilteredEntries);
-        _SendPrimsRemoved(newlyFilteredEntries);
     }
+    Fvp::ProfileEnd(eventId);
 }
 
 void PassFilteringSceneIndex::_PrimsAdded(
@@ -257,18 +351,19 @@ void PassFilteringSceneIndex::_PrimsAdded(
     const HdSceneIndexObserver::AddedPrimEntries &entries)
 {
     HdSceneIndexObserver::AddedPrimEntries addedEntries;
+    int eventId = Fvp::ProfileBegin("PassFilteringSceneIndex::_PrimsAdded", "PassFilteringSceneIndex::_PrimsAdded");
 
     for (const auto& addedEntry : entries) {
-        _UpdateFilteringStatus(addedEntry.primPath);
-        if (!_IsFilteredOut(addedEntry.primPath)) {
+        _UpdateFilteringForTree(addedEntry.primPath);
+        if (!_IsAncestorFilteredOutInclusive(addedEntry.primPath) || _highlightMaterialsUsage.find(addedEntry.primPath) != _highlightMaterialsUsage.end()) {
             addedEntries.emplace_back(addedEntry);
-            _UpdateHighlightMaterialStatus(addedEntry.primPath);
         }
     }
 
     if (!addedEntries.empty()) {
         _SendPrimsAdded(addedEntries);
     }
+    Fvp::ProfileEnd(eventId);
 }
 
 void PassFilteringSceneIndex::_PrimsRemoved(
@@ -276,56 +371,46 @@ void PassFilteringSceneIndex::_PrimsRemoved(
     const HdSceneIndexObserver::RemovedPrimEntries &entries)
 {
     HdSceneIndexObserver::RemovedPrimEntries removedEntries;
+    int eventId = Fvp::ProfileBegin("PassFilteringSceneIndex::_PrimsRemoved", "PassFilteringSceneIndex::_PrimsRemoved");
 
     for (const auto& removedEntry : entries) {
-        if (!_IsFilteredOut(removedEntry.primPath)) {
+        if (!_IsAncestorFilteredOutInclusive(removedEntry.primPath)) {
+            for (const auto& subTreePath : HdSceneIndexPrimView(GetInputSceneIndex(), removedEntry.primPath)) {
+                _UpdateHighlightMaterialStatus(subTreePath);
+            }
             removedEntries.emplace_back(removedEntry);
-            _UpdateHighlightMaterialStatus(removedEntry.primPath);
         } else {
             _filteredPrims.erase(removedEntry.primPath);
+            for (auto it = _filteredPrims.begin(); it != _filteredPrims.end();) {
+                if ((*it).HasPrefix(removedEntry.primPath)) {
+                    it = _filteredPrims.erase(it);
+                } else {
+                    ++it;
+                }
+            }
         }
     }
 
     if (!removedEntries.empty()) {
         _SendPrimsRemoved(removedEntries);
     }
+    Fvp::ProfileEnd(eventId);
 }
 
 void PassFilteringSceneIndex::_PrimsDirtied(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
-    // There are three potential scenarios here for a given prim :
-    // 1. Its filtering status did NOT change -> forward the PrimsDirtied notification as-is
-    // 2. Its filtering status DID change :
-    //    2a. If the prim was previously filtered -> it is now unfiltered, so send a PrimsAdded notification
-    //    2b. If the prim was previously unfiltered -> it is now filtered, so send a PrimsRemoved notification
-    HdSceneIndexObserver::AddedPrimEntries   newlyUnfilteredEntries;
-    HdSceneIndexObserver::RemovedPrimEntries newlyFilteredEntries;
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
+    int eventId = Fvp::ProfileBegin("PassFilteringSceneIndex::_PrimsDirtied", "PassFilteringSceneIndex::_PrimsDirtied");
     for (const auto& entry : entries) {
-        bool wasPreviouslyFiltered = _IsFilteredOut(entry.primPath);
-        _UpdateFilteringStatus(entry.primPath);
-        _UpdateHighlightMaterialStatus(entry.primPath);
-        if (wasPreviouslyFiltered == _IsFilteredOut(entry.primPath)) {
-            // Filtering status did not change, forward notification as-is
-            if (!_IsFilteredOut(entry.primPath)) {
-                dirtiedEntries.push_back(entry);
-            }
-        }
-        else {
-            // Filtering status changed, send a different notification instead
-            if (wasPreviouslyFiltered) {
-                    newlyUnfilteredEntries.emplace_back(
-                        entry.primPath, GetInputSceneIndex()->GetPrim(entry.primPath).primType);
-            } else {
-                    newlyFilteredEntries.emplace_back(entry.primPath);
-            }
+        _UpdateFilteringForTree(entry.primPath);
+        if (!_IsAncestorFilteredOutInclusive(entry.primPath) || _highlightMaterialsUsage.find(entry.primPath) != _highlightMaterialsUsage.end()) {
+            dirtiedEntries.emplace_back(entry);
         }
     }
-    _SendPrimsAdded(newlyUnfilteredEntries);
-    _SendPrimsRemoved(newlyFilteredEntries);
     _SendPrimsDirtied(dirtiedEntries);
+    Fvp::ProfileEnd(eventId);
 }
 
 } // namespace FVP_NS_DEF
