@@ -68,7 +68,9 @@ PassFilteringSceneIndex::PassFilteringSceneIndex(
 {
     for (const SdfPath& primPath : HdSceneIndexPrimView(GetInputSceneIndex())) {
         _UpdateFilteringStatus(primPath);
-        _UpdateHighlightMaterialStatus(primPath);
+        if (!_IsFilteredOut(primPath)) {
+            _UpdateHighlightMaterialStatus(primPath);
+        }
     }
 }
 
@@ -164,7 +166,7 @@ void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPa
             if (_highlightMaterialsUsage[prevMaterialPath->second] == 0) {
                 _highlightMaterialsUsage.erase(prevMaterialPath->second);
                 _filteredPrims.insert(primPath);
-                _SendPrimsRemoved({prevMaterialPath->second});
+                _SendPrimsAdded({{prevMaterialPath->second, TfToken()}});
             }
         }
     };
@@ -200,7 +202,7 @@ void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPa
 
 HdSceneIndexPrim PassFilteringSceneIndex::GetPrim(const SdfPath& primPath) const
 {
-    if (_IsFilteredOut(primPath)) {
+    if (_IsFilteredOut(primPath) && _highlightMaterialsUsage.find(primPath) == _highlightMaterialsUsage.end()) {
         return {}; // Return empty prim
     }
     return GetInputSceneIndex()->GetPrim(primPath);
@@ -208,47 +210,29 @@ HdSceneIndexPrim PassFilteringSceneIndex::GetPrim(const SdfPath& primPath) const
 
 SdfPathVector PassFilteringSceneIndex::GetChildPrimPaths(const SdfPath& primPath) const
 {
-    // If this prim is filtered out and there are no highlight materials under it, return no children
-    if (_IsFilteredOut(primPath) && FindSelfOrFirstChild(primPath, _highlightMaterialsUsage) == _highlightMaterialsUsage.cend()) {
-        return {};
-    }
-
-    // Get children from input scene index
-    SdfPathVector childPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
-
-    // Filter out children that should be filtered out
-    SdfPathVector filteredChildPaths;
-    for (const SdfPath& childPath : childPaths) {
-        if (!_IsFilteredOut(childPath) || FindSelfOrFirstChild(primPath, _highlightMaterialsUsage) != _highlightMaterialsUsage.cend()) {
-            filteredChildPaths.push_back(childPath);
-        }
-    }
-
-    return filteredChildPaths;
+    return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
 void PassFilteringSceneIndex::DirtyPrimsFromPurposeRenderTag(const TfToken purposeRenderTag)
 {
     auto& inputSceneIndex = GetInputSceneIndex();
     if (inputSceneIndex) {
-        HdSceneIndexObserver::AddedPrimEntries   newlyUnfilteredEntries;
-        HdSceneIndexObserver::RemovedPrimEntries newlyFilteredEntries;
+        HdSceneIndexObserver::AddedPrimEntries   updatedEntries;
         for (const SdfPath& primPath : HdSceneIndexPrimView(inputSceneIndex)) {
             bool wasPreviouslyFiltered = _IsFilteredOut(primPath);
             _UpdateFilteringStatus(primPath);
-            _UpdateHighlightMaterialStatus(primPath);
             if (wasPreviouslyFiltered != _IsFilteredOut(primPath)) {
+                _UpdateHighlightMaterialStatus(primPath);
                 // Filtering status changed
                 if (wasPreviouslyFiltered) {
-                        newlyUnfilteredEntries.emplace_back(
+                        updatedEntries.emplace_back(
                             primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
                 } else {
-                        newlyFilteredEntries.emplace_back(primPath);
+                        updatedEntries.emplace_back(primPath, TfToken());
                 }
             }
         }
-        _SendPrimsAdded(newlyUnfilteredEntries);
-        _SendPrimsRemoved(newlyFilteredEntries);
+        _SendPrimsAdded(updatedEntries);
     }
 }
 
@@ -259,10 +243,15 @@ void PassFilteringSceneIndex::_PrimsAdded(
     HdSceneIndexObserver::AddedPrimEntries addedEntries;
 
     for (const auto& addedEntry : entries) {
+        bool wasPreviouslyFiltered = _IsFilteredOut(addedEntry.primPath);
         _UpdateFilteringStatus(addedEntry.primPath);
+        if (wasPreviouslyFiltered != _IsFilteredOut(addedEntry.primPath)) {
+            _UpdateHighlightMaterialStatus(addedEntry.primPath);
+        }
         if (!_IsFilteredOut(addedEntry.primPath)) {
             addedEntries.emplace_back(addedEntry);
-            _UpdateHighlightMaterialStatus(addedEntry.primPath);
+        } else {
+            addedEntries.emplace_back(addedEntry.primPath, TfToken());
         }
     }
 
@@ -278,8 +267,8 @@ void PassFilteringSceneIndex::_PrimsRemoved(
     HdSceneIndexObserver::RemovedPrimEntries removedEntries;
 
     for (const auto& removedEntry : entries) {
+        removedEntries.emplace_back(removedEntry);
         if (!_IsFilteredOut(removedEntry.primPath)) {
-            removedEntries.emplace_back(removedEntry);
             _UpdateHighlightMaterialStatus(removedEntry.primPath);
         } else {
             _filteredPrims.erase(removedEntry.primPath);
@@ -300,13 +289,11 @@ void PassFilteringSceneIndex::_PrimsDirtied(
     // 2. Its filtering status DID change :
     //    2a. If the prim was previously filtered -> it is now unfiltered, so send a PrimsAdded notification
     //    2b. If the prim was previously unfiltered -> it is now filtered, so send a PrimsRemoved notification
-    HdSceneIndexObserver::AddedPrimEntries   newlyUnfilteredEntries;
-    HdSceneIndexObserver::RemovedPrimEntries newlyFilteredEntries;
+    HdSceneIndexObserver::AddedPrimEntries   updatedEntries;
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
     for (const auto& entry : entries) {
         bool wasPreviouslyFiltered = _IsFilteredOut(entry.primPath);
         _UpdateFilteringStatus(entry.primPath);
-        _UpdateHighlightMaterialStatus(entry.primPath);
         if (wasPreviouslyFiltered == _IsFilteredOut(entry.primPath)) {
             // Filtering status did not change, forward notification as-is
             if (!_IsFilteredOut(entry.primPath)) {
@@ -314,17 +301,17 @@ void PassFilteringSceneIndex::_PrimsDirtied(
             }
         }
         else {
+            _UpdateHighlightMaterialStatus(entry.primPath);
             // Filtering status changed, send a different notification instead
             if (wasPreviouslyFiltered) {
-                    newlyUnfilteredEntries.emplace_back(
+                    updatedEntries.emplace_back(
                         entry.primPath, GetInputSceneIndex()->GetPrim(entry.primPath).primType);
             } else {
-                    newlyFilteredEntries.emplace_back(entry.primPath);
+                    updatedEntries.emplace_back(entry.primPath, TfToken());
             }
         }
     }
-    _SendPrimsAdded(newlyUnfilteredEntries);
-    _SendPrimsRemoved(newlyFilteredEntries);
+    _SendPrimsAdded(updatedEntries);
     _SendPrimsDirtied(dirtiedEntries);
 }
 
