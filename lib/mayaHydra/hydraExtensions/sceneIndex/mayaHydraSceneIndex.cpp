@@ -44,6 +44,7 @@
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
 #include <mayaHydraLib/pick/mhPickHandler.h>
+#include <mayaHydraLib/pick/mhPickHit.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
 #include <flowViewport/selection/fvpDataProducersNodeHashCodeToSdfPathRegistry.h>
 
@@ -85,7 +86,7 @@ public:
     {
         // Maya does not create Hydra instances, so if the pick hit instancer
         // ID isn't empty, it's not a Maya pick hit.
-        if (!pickInput.pickHit.instancerId.IsEmpty()) {
+        if (!pickInput.pickHit.hdxPickHit.instancerId.IsEmpty()) {
             return false;
         }
 
@@ -95,7 +96,7 @@ public:
         );
     }
 
-    bool inSingleNodeComponentsPick(const HdxPickHit& hit) const override {
+    bool inSingleNodeComponentsPick(const MayaHydra::PickHit& hit) const override {
         // Is the picked node in components selection mode?  If so it is in the
         // hilite list.
         MSelectionList hiliteList;
@@ -866,7 +867,7 @@ SdfPath MayaHydraSceneIndex::SetCameraViewport(const MDagPath& camPath, const Gf
     return {};
 }
 
-bool MayaHydraSceneIndex::IsPickedNodeInComponentsPickingMode(const HdxPickHit& hit)const
+bool MayaHydraSceneIndex::IsPickedNodeInComponentsPickingMode(const MayaHydra::PickHit& hit) const
 {
     // Is the picked node in components selection mode ? If so it is in the hilite list
     MSelectionList hiliteList;
@@ -877,7 +878,7 @@ bool MayaHydraSceneIndex::IsPickedNodeInComponentsPickingMode(const HdxPickHit& 
 
     bool isOneMayaNodeInComponentsPickingMode = false;
             
-    SdfPath hitId = hit.objectId;
+    SdfPath hitId = hit.hdxPickHit.objectId;
     if (hitId.HasPrefix(GetRprimPath())) {
         _FindAdapter<MayaHydraRenderItemAdapter>(
             hitId,
@@ -906,12 +907,12 @@ bool MayaHydraSceneIndex::IsPickedNodeInComponentsPickingMode(const HdxPickHit& 
 }
 
 bool MayaHydraSceneIndex::AddPickHitToSelectionList(
-    const HdxPickHit& hit,
+    const MayaHydra::PickHit& hit,
     const MHWRender::MSelectionInfo& /* selectInfo */,
     MSelectionList& selectionList,
     MPointArray& worldSpaceHitPts)
 {
-    SdfPath hitId = hit.objectId;
+    SdfPath hitId = hit.hdxPickHit.objectId;
     // validate that hit is indeed a maya item. Alternatively, the rprim hit could be an rprim
     // defined by a scene index such as maya usd.
     if (hitId.HasPrefix(GetRprimPath())) {
@@ -927,9 +928,9 @@ bool MayaHydraSceneIndex::AddPickHitToSelectionList(
                 }
                 selectionList.add(selectPath);
                 worldSpaceHitPts.append(
-                    hit.worldSpaceHitPoint[0],
-                    hit.worldSpaceHitPoint[1],
-                    hit.worldSpaceHitPoint[2]);
+                    hit.hdxPickHit.worldSpaceHitPoint[0],
+                    hit.hdxPickHit.worldSpaceHitPoint[1],
+                    hit.hdxPickHit.worldSpaceHitPoint[2]);
             },
             _renderItemsAdapters);
         return true;
