@@ -68,9 +68,6 @@ PassFilteringSceneIndex::PassFilteringSceneIndex(
 {
     for (const SdfPath& primPath : HdSceneIndexPrimView(GetInputSceneIndex())) {
         _UpdateFilteringStatus(primPath);
-        if (!_IsFilteredOut(primPath)) {
-            _UpdateHighlightMaterialStatus(primPath);
-        }
     }
 }
 
@@ -115,6 +112,7 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
         if (prim.primType == HdPrimTypeTokens->material 
             && _framePassData->_removeMaterials 
             && _highlightMaterialsUsage.find(primPath) == _highlightMaterialsUsage.end()) {
+            // Filter out non-highlight materials
             return true;
         }
         return false; // Include all non-Rprims by default
@@ -136,43 +134,63 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
     return false; // will be rendered.
 }
 
-void PassFilteringSceneIndex::_UpdateFilteringStatus(const PXR_NS::SdfPath& primPath)
+HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateFilteringStatus(const PXR_NS::SdfPath& primPath, bool dirtied, bool resync)
 {
-    if (_ShouldBeFilteredOut(primPath)) {
+    HdSceneIndexObserver::AddedPrimEntries updatedPrims;
+
+    bool isFilteredOut = _IsFilteredOut(primPath);
+    bool shouldBeFilteredOut = _ShouldBeFilteredOut(primPath);
+
+    if (!isFilteredOut && shouldBeFilteredOut) {
         _filteredPrims.insert(primPath);
-    } else {
+        updatedPrims.emplace_back(primPath, TfToken());
+    } else if (isFilteredOut && !shouldBeFilteredOut) {
         _filteredPrims.erase(primPath);
+        updatedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
+    } else if (!isFilteredOut && !shouldBeFilteredOut && resync) {
+        updatedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
     }
+
+    bool updateHighlightMaterial = (isFilteredOut != shouldBeFilteredOut) || (!isFilteredOut && !shouldBeFilteredOut && dirtied);
+    if (updateHighlightMaterial) {
+        auto materialUpdates = _UpdateHighlightMaterialStatus(primPath);
+        updatedPrims.insert(updatedPrims.end(), materialUpdates.begin(), materialUpdates.end());
+    }
+
+    return updatedPrims;
 }
 
-void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath)
+HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath)
 {
     if (!_framePassData->_removeMaterials) {
         // If we don't remove the materials, we can completely skip all the highlight material logic
-        return;
+        return {};
     }
     bool isMayaFacesHighlightPrim = primPath.GetName().find("PolyActiveFaces") != std::string::npos;
     bool isFvpHighlightPrim = !_framePassData->_highlightHierarchyPrefix.IsEmpty() && primPath.HasPrefix(_framePassData->_highlightHierarchyPrefix);
     if (!(isMayaFacesHighlightPrim || isFvpHighlightPrim)) {
         // Not a relevant prim
-        return;
+        return {};
     }
 
     auto prevMaterialPath = _highlightsToMaterialsPaths.find(primPath);
-    auto removeMaterialEntry = [&]() {
+    auto removeMaterialEntry = [&]() -> HdSceneIndexObserver::AddedPrimEntries {
         if (prevMaterialPath != _highlightsToMaterialsPaths.end()) {
             _highlightsToMaterialsPaths.erase(primPath);
             _highlightMaterialsUsage[prevMaterialPath->second]--;
             if (_highlightMaterialsUsage[prevMaterialPath->second] == 0) {
                 _highlightMaterialsUsage.erase(prevMaterialPath->second);
-                _filteredPrims.insert(primPath);
-                _SendPrimsAdded({{prevMaterialPath->second, TfToken()}});
+                if (_ShouldBeFilteredOut(prevMaterialPath->second)) {
+                    _filteredPrims.insert(prevMaterialPath->second);
+                    return {{prevMaterialPath->second, TfToken()}};
+                }
             }
         }
+        return {};
     };
 
     if (_IsFilteredOut(primPath)) {
-        removeMaterialEntry();
+        return removeMaterialEntry();
     }
 
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
@@ -189,20 +207,25 @@ void PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPa
     }
 
     if (materialPath != prevMaterialPath->second) {
-        removeMaterialEntry();
+        auto updatedPrims = removeMaterialEntry();
         // Add the new material entry
         _highlightsToMaterialsPaths[primPath] = materialPath;
         _highlightMaterialsUsage[materialPath]++;
         if (_highlightMaterialsUsage[materialPath] == 1) {
-            _filteredPrims.erase(materialPath);
-            _SendPrimsAdded({{materialPath, materialPrim.primType}});
+            if (_IsFilteredOut(materialPath)) {
+                _filteredPrims.erase(materialPath);
+                updatedPrims.emplace_back(materialPath, materialPrim.primType);
+            }
         }
+        return updatedPrims;
     }
+
+    return {};
 }
 
 HdSceneIndexPrim PassFilteringSceneIndex::GetPrim(const SdfPath& primPath) const
 {
-    if (_IsFilteredOut(primPath) && _highlightMaterialsUsage.find(primPath) == _highlightMaterialsUsage.end()) {
+    if (_IsFilteredOut(primPath)) {
         return {}; // Return empty prim
     }
     return GetInputSceneIndex()->GetPrim(primPath);
@@ -217,22 +240,14 @@ void PassFilteringSceneIndex::DirtyPrimsFromPurposeRenderTag(const TfToken purpo
 {
     auto& inputSceneIndex = GetInputSceneIndex();
     if (inputSceneIndex) {
-        HdSceneIndexObserver::AddedPrimEntries   updatedEntries;
+        HdSceneIndexObserver::AddedPrimEntries updatedEntries;
         for (const SdfPath& primPath : HdSceneIndexPrimView(inputSceneIndex)) {
-            bool wasPreviouslyFiltered = _IsFilteredOut(primPath);
-            _UpdateFilteringStatus(primPath);
-            if (wasPreviouslyFiltered != _IsFilteredOut(primPath)) {
-                _UpdateHighlightMaterialStatus(primPath);
-                // Filtering status changed
-                if (wasPreviouslyFiltered) {
-                        updatedEntries.emplace_back(
-                            primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
-                } else {
-                        updatedEntries.emplace_back(primPath, TfToken());
-                }
-            }
+            auto updatedPrims = _UpdateFilteringStatus(primPath, false);
+            updatedEntries.insert(updatedEntries.end(), updatedPrims.begin(), updatedPrims.end());
         }
-        _SendPrimsAdded(updatedEntries);
+        if (!updatedEntries.empty()) {
+            _SendPrimsAdded(updatedEntries);
+        }
     }
 }
 
@@ -243,16 +258,8 @@ void PassFilteringSceneIndex::_PrimsAdded(
     HdSceneIndexObserver::AddedPrimEntries addedEntries;
 
     for (const auto& addedEntry : entries) {
-        bool wasPreviouslyFiltered = _IsFilteredOut(addedEntry.primPath);
-        _UpdateFilteringStatus(addedEntry.primPath);
-        if (wasPreviouslyFiltered != _IsFilteredOut(addedEntry.primPath)) {
-            _UpdateHighlightMaterialStatus(addedEntry.primPath);
-        }
-        if (!_IsFilteredOut(addedEntry.primPath)) {
-            addedEntries.emplace_back(addedEntry);
-        } else {
-            addedEntries.emplace_back(addedEntry.primPath, TfToken());
-        }
+        auto updatedEntries = _UpdateFilteringStatus(addedEntry.primPath, true, true);
+        addedEntries.insert(addedEntries.end(), updatedEntries.begin(), updatedEntries.end());
     }
 
     if (!addedEntries.empty()) {
@@ -265,16 +272,24 @@ void PassFilteringSceneIndex::_PrimsRemoved(
     const HdSceneIndexObserver::RemovedPrimEntries &entries)
 {
     HdSceneIndexObserver::RemovedPrimEntries removedEntries;
+    HdSceneIndexObserver::AddedPrimEntries updatedPrims;
 
     for (const auto& removedEntry : entries) {
         removedEntries.emplace_back(removedEntry);
-        if (!_IsFilteredOut(removedEntry.primPath)) {
-            _UpdateHighlightMaterialStatus(removedEntry.primPath);
-        } else {
-            _filteredPrims.erase(removedEntry.primPath);
+        for (auto it = _filteredPrims.begin(); it != _filteredPrims.end();) {
+            if ((*it).HasPrefix(removedEntry.primPath)) {
+                it = _filteredPrims.erase(it);
+            } else {
+                it++;
+            }
         }
+        auto materialUpdates = _UpdateHighlightMaterialStatus(removedEntry.primPath);
+        updatedPrims.insert(updatedPrims.end(), materialUpdates.begin(), materialUpdates.end());
     }
 
+    if (!updatedPrims.empty()) {
+        _SendPrimsAdded(updatedPrims);
+    }
     if (!removedEntries.empty()) {
         _SendPrimsRemoved(removedEntries);
     }
@@ -292,27 +307,18 @@ void PassFilteringSceneIndex::_PrimsDirtied(
     HdSceneIndexObserver::AddedPrimEntries   updatedEntries;
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
     for (const auto& entry : entries) {
-        bool wasPreviouslyFiltered = _IsFilteredOut(entry.primPath);
-        _UpdateFilteringStatus(entry.primPath);
-        if (wasPreviouslyFiltered == _IsFilteredOut(entry.primPath)) {
-            // Filtering status did not change, forward notification as-is
-            if (!_IsFilteredOut(entry.primPath)) {
-                dirtiedEntries.push_back(entry);
-            }
-        }
-        else {
-            _UpdateHighlightMaterialStatus(entry.primPath);
-            // Filtering status changed, send a different notification instead
-            if (wasPreviouslyFiltered) {
-                    updatedEntries.emplace_back(
-                        entry.primPath, GetInputSceneIndex()->GetPrim(entry.primPath).primType);
-            } else {
-                    updatedEntries.emplace_back(entry.primPath, TfToken());
-            }
+        auto updatedPrims = _UpdateFilteringStatus(entry.primPath);
+        updatedEntries.insert(updatedEntries.end(), updatedPrims.begin(), updatedPrims.end());
+        if (!_IsFilteredOut(entry.primPath)) {
+            dirtiedEntries.emplace_back(entry);
         }
     }
-    _SendPrimsAdded(updatedEntries);
-    _SendPrimsDirtied(dirtiedEntries);
+    if (!updatedEntries.empty()) {
+        _SendPrimsAdded(updatedEntries);
+    }
+    if (!dirtiedEntries.empty()) {
+        _SendPrimsDirtied(dirtiedEntries);
+    }
 }
 
 } // namespace FVP_NS_DEF

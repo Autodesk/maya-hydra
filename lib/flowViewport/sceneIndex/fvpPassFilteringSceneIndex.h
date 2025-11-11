@@ -15,6 +15,7 @@
 #ifndef FVP_PASS_FILTERING_SCENE_INDEX_H
 #define FVP_PASS_FILTERING_SCENE_INDEX_H
 
+#include <pxr/imaging/hd/sceneIndexObserver.h>
 #ifdef VIEWPORT_TOOLBOX
 
 #include "flowViewport/api.h"
@@ -93,10 +94,10 @@ protected:
     bool _ShouldBeFilteredOut(const PXR_NS::SdfPath& primPath) const;
 
     FVP_API
-    void _UpdateFilteringStatus(const PXR_NS::SdfPath& primPath);
+    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _UpdateFilteringStatus(const PXR_NS::SdfPath& primPath, bool dirtied = true, bool resync = false);
 
     FVP_API
-    void _UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath);
+    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath);
 
     Fvp::FramePassConstDataPtr _framePassData;
 
