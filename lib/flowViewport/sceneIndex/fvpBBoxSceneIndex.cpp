@@ -486,12 +486,6 @@ bool BboxSceneIndex::_ShouldConvertToBoundingBox(
         return false;
     }
 
-    // Check if the prim has an extent (required for bounding box creation)
-    HdExtentSchema extentSchema = HdExtentSchema::GetFromParent(prim.dataSource);
-    if (!extentSchema.IsDefined()) {
-        return false;
-    }
-
     return true;
 }
 
