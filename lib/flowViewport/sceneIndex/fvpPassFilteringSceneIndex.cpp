@@ -167,6 +167,29 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateFiltering
     return updatedPrims;
 }
 
+HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_RemoveHighlightMaterialEntry(const PXR_NS::SdfPath& primPath)
+{
+    if (!_framePassData->_removeMaterials) {
+        // If we don't remove the materials, we can completely skip all the highlight material logic
+        return {};
+    }
+
+    auto itMaterialPath = _highlightsToMaterialsPaths.find(primPath);
+    if (itMaterialPath != _highlightsToMaterialsPaths.end()) {
+        _highlightsToMaterialsPaths.erase(primPath);
+        _highlightMaterialsUsage[itMaterialPath->second]--;
+        if (_highlightMaterialsUsage[itMaterialPath->second] == 0) {
+            _highlightMaterialsUsage.erase(itMaterialPath->second);
+            if (_ShouldBeFilteredOut(itMaterialPath->second)) {
+                _filteredPrims.insert(itMaterialPath->second);
+                return {{itMaterialPath->second, TfToken()}};
+            }
+        }
+    }
+
+    return {};
+}
+
 HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath)
 {
     if (!_framePassData->_removeMaterials) {
@@ -174,32 +197,16 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateHighlight
         return {};
     }
 
-    auto prevMaterialPath = _highlightsToMaterialsPaths.find(primPath);
-    auto removeMaterialEntry = [&]() -> HdSceneIndexObserver::AddedPrimEntries {
-        if (prevMaterialPath != _highlightsToMaterialsPaths.end()) {
-            _highlightsToMaterialsPaths.erase(primPath);
-            _highlightMaterialsUsage[prevMaterialPath->second]--;
-            if (_highlightMaterialsUsage[prevMaterialPath->second] == 0) {
-                _highlightMaterialsUsage.erase(prevMaterialPath->second);
-                if (_ShouldBeFilteredOut(prevMaterialPath->second)) {
-                    _filteredPrims.insert(prevMaterialPath->second);
-                    return {{prevMaterialPath->second, TfToken()}};
-                }
-            }
-        }
-        return {};
-    };
-
     if (_IsFilteredOut(primPath)) {
-        return removeMaterialEntry();
+        return _RemoveHighlightMaterialEntry(primPath);
     }
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     if (!isRprimType(prim.primType)) {
-        return removeMaterialEntry();
+        return _RemoveHighlightMaterialEntry(primPath);
     }
     auto materialPath = GetMaterialPath(prim.dataSource);
     if (materialPath.IsEmpty()) {
-        return removeMaterialEntry();
+        return _RemoveHighlightMaterialEntry(primPath);
     }
 
     // Do some checks to see if the material needs to have displacement to be relevant
@@ -214,11 +221,12 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateHighlight
         }
     }
     if (requireDisplacement && !MaterialHasDisplacement(GetInputSceneIndex()->GetPrim(materialPath))) {
-        return removeMaterialEntry();
+        return _RemoveHighlightMaterialEntry(primPath);
     }
 
-    if (materialPath != prevMaterialPath->second) {
-        auto updatedPrims = removeMaterialEntry();
+    auto prevMaterialPath = _highlightsToMaterialsPaths.find(primPath);
+    if (prevMaterialPath == _highlightsToMaterialsPaths.end() || materialPath != prevMaterialPath->second) {
+        auto updatedPrims = _RemoveHighlightMaterialEntry(primPath);
         // Add the new material entry
         _highlightsToMaterialsPaths[primPath] = materialPath;
         _highlightMaterialsUsage[materialPath]++;
@@ -294,8 +302,10 @@ void PassFilteringSceneIndex::_PrimsRemoved(
                 it++;
             }
         }
-        auto materialUpdates = _UpdateHighlightMaterialStatus(removedEntry.primPath);
-        updatedPrims.insert(updatedPrims.end(), materialUpdates.begin(), materialUpdates.end());
+        for (const auto& primPath : HdSceneIndexPrimView(GetInputSceneIndex(), removedEntry.primPath)) {
+            auto materialUpdates = _RemoveHighlightMaterialEntry(primPath);
+            updatedPrims.insert(updatedPrims.end(), materialUpdates.begin(), materialUpdates.end());
+        }
     }
 
     if (!updatedPrims.empty()) {
@@ -311,16 +321,19 @@ void PassFilteringSceneIndex::_PrimsDirtied(
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
     HdSceneIndexObserver::AddedPrimEntries   updatedEntries;
-    HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
     for (const auto& entry : entries) {
         auto updatedPrims = _UpdateFilteringStatus(entry.primPath);
         updatedEntries.insert(updatedEntries.end(), updatedPrims.begin(), updatedPrims.end());
-        if (!_IsFilteredOut(entry.primPath)) {
-            dirtiedEntries.emplace_back(entry);
-        }
     }
     if (!updatedEntries.empty()) {
         _SendPrimsAdded(updatedEntries);
+    }
+
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
+    for (const auto& entry : entries) {
+        if (!_IsFilteredOut(entry.primPath)) {
+            dirtiedEntries.emplace_back(entry);
+        }
     }
     if (!dirtiedEntries.empty()) {
         _SendPrimsDirtied(dirtiedEntries);

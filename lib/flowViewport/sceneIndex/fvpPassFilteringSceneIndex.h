@@ -99,6 +99,9 @@ protected:
     FVP_API
     PXR_NS::HdSceneIndexObserver::AddedPrimEntries _UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath);
 
+    FVP_API
+    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _RemoveHighlightMaterialEntry(const PXR_NS::SdfPath& primPath);
+
     Fvp::FramePassConstDataPtr _framePassData;
 
 private:
