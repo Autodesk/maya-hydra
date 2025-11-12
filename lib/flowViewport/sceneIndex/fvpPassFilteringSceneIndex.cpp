@@ -18,9 +18,11 @@
 #include "fvpPassFilteringSceneIndex.h"
 #include "flowViewport/fvpUtils.h"
 
+#include <pxr/imaging/hd/repr.h>
+#include <pxr/imaging/hd/basisCurvesSchema.h>
 #include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
-#include <pxr/imaging/hd/basisCurvesSchema.h>
+#include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 
@@ -42,6 +44,11 @@ bool isPrefixedBySdfPath(const SdfPath& pathToCheck, const SdfPathVector& paths)
     }
 
     return false;
+}
+
+bool isRprimType(const TfToken& primType)
+{
+    return std::find(HdRprimTypeTokens->allTokens.begin(), HdRprimTypeTokens->allTokens.end(), primType) != HdRprimTypeTokens->allTokens.end();
 }
 
 } // namespace
@@ -108,7 +115,7 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
 
     HdSceneIndexPrim prim = inputSceneIndex->GetPrim(primPath);
 
-    if (std::find(HdRprimTypeTokens->allTokens.begin(), HdRprimTypeTokens->allTokens.end(), prim.primType) == HdRprimTypeTokens->allTokens.end()) {
+    if (!isRprimType(prim.primType)) {
         if (prim.primType == HdPrimTypeTokens->material 
             && _framePassData->_removeMaterials 
             && _highlightMaterialsUsage.find(primPath) == _highlightMaterialsUsage.end()) {
@@ -166,12 +173,6 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateHighlight
         // If we don't remove the materials, we can completely skip all the highlight material logic
         return {};
     }
-    bool isMayaFacesHighlightPrim = primPath.GetName().find("PolyActiveFaces") != std::string::npos;
-    bool isFvpHighlightPrim = !_framePassData->_highlightHierarchyPrefix.IsEmpty() && primPath.HasPrefix(_framePassData->_highlightHierarchyPrefix);
-    if (!(isMayaFacesHighlightPrim || isFvpHighlightPrim)) {
-        // Not a relevant prim
-        return {};
-    }
 
     auto prevMaterialPath = _highlightsToMaterialsPaths.find(primPath);
     auto removeMaterialEntry = [&]() -> HdSceneIndexObserver::AddedPrimEntries {
@@ -192,17 +193,27 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateHighlight
     if (_IsFilteredOut(primPath)) {
         return removeMaterialEntry();
     }
-
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-    if (!(prim.primType == HdPrimTypeTokens->mesh || prim.primType == HdPrimTypeTokens->geomSubset)) {
+    if (!isRprimType(prim.primType)) {
         return removeMaterialEntry();
     }
     auto materialPath = GetMaterialPath(prim.dataSource);
     if (materialPath.IsEmpty()) {
         return removeMaterialEntry();
     }
-    auto materialPrim = GetInputSceneIndex()->GetPrim(materialPath);
-    if (isFvpHighlightPrim && !MaterialHasDisplacement(materialPrim)) {
+
+    // Do some checks to see if the material needs to have displacement to be relevant
+    bool requireDisplacement = prim.primType == HdPrimTypeTokens->basisCurves;
+    if (!requireDisplacement) {
+        auto displayStyle = HdLegacyDisplayStyleSchema::GetFromParent(prim.dataSource);
+        if (displayStyle.IsDefined() && displayStyle.GetReprSelector()) {
+            auto reprSelector = displayStyle.GetReprSelector()->GetTypedValue(0);
+            if (reprSelector[0] == HdReprTokens->wire || reprSelector[0] == HdReprTokens->refinedWire) {
+                requireDisplacement = true;
+            }
+        }
+    }
+    if (requireDisplacement && !MaterialHasDisplacement(GetInputSceneIndex()->GetPrim(materialPath))) {
         return removeMaterialEntry();
     }
 
@@ -214,7 +225,7 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateHighlight
         if (_highlightMaterialsUsage[materialPath] == 1) {
             if (_IsFilteredOut(materialPath)) {
                 _filteredPrims.erase(materialPath);
-                updatedPrims.emplace_back(materialPath, materialPrim.primType);
+                updatedPrims.emplace_back(materialPath, HdPrimTypeTokens->material);
             }
         }
         return updatedPrims;
