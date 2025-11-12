@@ -22,18 +22,8 @@
 #include <maya/MApiNamespace.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MPlug.h>
-#include <maya/MProfiler.h>
 
 #include <string>
-
-const std::string kUsdProfilerCategory = "USD";
-inline int getProfilerCategoryIndex(const char* categoryName) {
-    int categoryIndex = MProfiler::getCategoryIndex(categoryName);
-    if (categoryIndex < 0) {
-        categoryIndex = MProfiler::addCategory(categoryName);
-    }
-    return categoryIndex;
-}
 
 namespace MAYAHYDRA_NS_DEF {
 

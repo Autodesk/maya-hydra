@@ -140,12 +140,9 @@
 #include <chrono>
 #include <exception>
 #include <limits>
-#include <fstream>
 
 #include <pxr/base/tf/getenv.h>
 #include <pxr/base/tf/envSetting.h>
-#include <pxr/base/trace/trace.h>
-#include <pxr/base/trace/reporter.h>
 #include "envSettings.h"
 
 int _profilerCategory = MProfiler::addCategory(
@@ -890,18 +887,7 @@ MStatus MtohRenderOverride::Render(
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER).Msg("MtohRenderOverride::Render()\n");
     // We can use the mayaHydraSetVisibleFramePasses command to set the visible passes
 
-    MProfilingScope profilingScopeForEvalRender(
-        _profilerCategory,
-        MProfiler::kColorD_L1,
-        "MtohRenderOverride::Render",
-        "MtohRenderOverride::Render");
-
     auto renderFrame = [&](bool markTime = false) {
-        MProfilingScope profilingScopeForEvalrenderFrame(
-            _profilerCategory,
-            MProfiler::kColorD_L1,
-            "MtohRenderOverride::renderFrame",
-            "MtohRenderOverride::renderFrame");
 #ifndef VIEWPORT_TOOLBOX
         HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
 
@@ -1041,15 +1027,7 @@ MStatus MtohRenderOverride::Render(
 
             if (isPass0) {
                 // Do not share the AOVs, for the first pass only
-                HdTaskSharedPtrVector passTasks;
-                {
-                    MProfilingScope profilingScopeForEvalGetRenderTasksFirstPass(
-                        _profilerCategory,
-                        MProfiler::kColorD_L1,
-                        "MtohRenderOverride::GetRenderTasks1",
-                        "MtohRenderOverride::GetRenderTasks1");
-                    passTasks = currentPass->GetRenderTasks();
-                }
+                HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks();
                 
                 /*Debug code left here if needed later
                 hvt::FramePass& framePassToDebug = *currentPass;
@@ -1060,18 +1038,7 @@ MStatus MtohRenderOverride::Render(
                 OutputDebugStringA(framePassParameters.c_str());
                 */
 
-                {
-                    MProfilingScope profilingScopeForEvalRenderFirstPass(
-                        _profilerCategory,
-                        MProfiler::kColorD_L1,
-                        "MtohRenderOverride::Render1",
-                        "MtohRenderOverride::Render1");
-                    auto start = std::chrono::high_resolution_clock::now();
-                    currentPass->Render(passTasks);
-                    auto end = std::chrono::high_resolution_clock::now();
-                    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-                    std::cout << "MtohRenderOverride::Render1 : " << duration.count() << " us" << std::endl;
-                }
+                currentPass->Render(passTasks);
             } else {
                 // Share AOVs from the previous visible pass or pass0
                 const int previousPassIndex = (visibleIdx > 0) ?framePassesVisible[visibleIdx - 1] : 0;
@@ -1088,15 +1055,7 @@ MStatus MtohRenderOverride::Render(
                             { pxr::HdAovTokens->depth, depthBuffer.get() } 
                           };
                 
-                    HdTaskSharedPtrVector passTasks;
-                    {
-                        MProfilingScope profilingScopeForEvalGetRenderTasksSecondPass(
-                            _profilerCategory,
-                            MProfiler::kColorD_L1,
-                            "MtohRenderOverride::GetRenderTasks2",
-                            "MtohRenderOverride::GetRenderTasks2");
-                        passTasks = currentPass->GetRenderTasks(inputAOVs);
-                    }
+                    HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(inputAOVs);
                     
                     /*Debug code left here if needed later
                     hvt::FramePass& framePassToDebug = *currentPass;
@@ -1106,18 +1065,7 @@ MStatus MtohRenderOverride::Render(
                     OutputDebugStringA("Second Frame Pass parameters:");
                     OutputDebugStringA(framePassParameters.c_str());
                     */
-                    {
-                        MProfilingScope profilingScopeForEvalRenderSecondPass(
-                            _profilerCategory,
-                            MProfiler::kColorD_L1,
-                            "MtohRenderOverride::Render2",
-                            "MtohRenderOverride::Render2");
-                        auto start = std::chrono::high_resolution_clock::now();
-                        currentPass->Render(passTasks);
-                        auto end = std::chrono::high_resolution_clock::now();
-                        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-                        std::cout << "MtohRenderOverride::Render2 : " << duration.count() << " us" << std::endl;
-                    }
+                    currentPass->Render(passTasks);
                 }
             }
         }
@@ -1661,17 +1609,7 @@ void MtohRenderOverride::_InitHydraResources(
 
     _initializationAttempted = true;
 
-    PXR_NS::TraceCollector::GetInstance().SetEnabled(true);
-
     GlfContextCaps::InitInstance();
-    auto eventBegin = [](const char* eventName, const char* description) -> int {
-        return MProfiler::eventBegin(_profilerCategory, MProfiler::kColorB_L1, eventName, description);
-    };
-    auto eventEnd = [](int eventId) -> void {
-        MProfiler::eventEnd(eventId);
-    };
-    Fvp::SetProfileBegin(eventBegin);
-    Fvp::SetProfileEnd(eventEnd);
 
 #ifdef VIEWPORT_TOOLBOX
     static const TfTokenVector allPurposeRenderTags = { HdRenderTagTokens->geometry,
@@ -1925,17 +1863,6 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     if (!_initializationAttempted) {
         return;
     }
-
-    PXR_NS::TraceCollector::GetInstance().SetEnabled(false);
-    std::ofstream reportFile("report.trace");
-    PXR_NS::TraceReporter::GetGlobalReporter()->Report(reportFile);
- 
-    std::ofstream chromeReportFile("report.json");
-    PXR_NS::TraceReporter::GetGlobalReporter()->ReportChromeTracing(chromeReportFile);
-
-
-    Fvp::SetProfileBegin(nullptr);
-    Fvp::SetProfileEnd(nullptr);
 
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
@@ -2368,12 +2295,6 @@ void MtohRenderOverride::_PickByRegion(
     unsigned int sel_w,
     unsigned int sel_h)
 {
-    MProfilingScope profilingScopeForEval(
-        _profilerCategory,
-        MProfiler::kColorD_L1,
-        "MtohRenderOverride::_PickByRegion",
-        "MtohRenderOverride::_PickByRegion");
-    
     MMatrix adjustedProjMatrix;
     // Compute a pick matrix that, when it is post-multiplied with the projection matrix, will
     // cause the picking region to fill the entire viewport for OpenGL selection.
@@ -2467,12 +2388,13 @@ bool MtohRenderOverride::select(
     MSelectionList& selectionList,
     MPointArray&    worldSpaceHitPts)
 {
-    std::cout << "--------------- MtohRenderOverride::select" << std::endl;
+#ifdef MAYAHYDRA_PROFILERS_ENABLED
     MProfilingScope profilingScopeForEval(
         _profilerCategory,
         MProfiler::kColorD_L1,
         "MtohRenderOverride::select",
         "MtohRenderOverride::select");
+#endif
     /*
     * There are 2 modes of selection picking for components in maya :
     * 1) You can be in components picking mode, this setting is global.This is detected in the function "isInComponentsPickingMode(selectInfo)"
@@ -2560,14 +2482,7 @@ bool MtohRenderOverride::select(
 
     //isOneMayaNodeInComponentsPickingMode will be true if one of the picked node is in components picking mode
     bool isOneMayaNodeInComponentsPickingMode = false;
-    {
-        MProfilingScope profilingScopeForEval(
-            _profilerCategory,
-            MProfiler::kColorD_L1,
-            "MtohRenderOverride::_PopulateSelectionList",
-            "MtohRenderOverride::_PopulateSelectionList");
-        _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneMayaNodeInComponentsPickingMode);
-    }
+    _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneMayaNodeInComponentsPickingMode);
     if (isOneMayaNodeInComponentsPickingMode){
         return false;//When being in components picking on a node, returning false will use maya/OGS for components selection
     }

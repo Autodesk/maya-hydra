@@ -28,7 +28,6 @@
 #include "setVisibleFramePassesCommand.h"
 #endif
 
-#include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/adapters/adapter.h>
 
 #include <flowViewport/global.h>
@@ -42,7 +41,6 @@
 #include <maya/MGlobal.h>
 #include <maya/MSceneMessage.h>
 #include <maya/MCommandResult.h>
-#include <maya/MProfiler.h>
 
 #include <memory>
 #include <vector>
@@ -125,23 +123,6 @@ private:
         return (typedResult != 0);
     }
 };
-
-std::map<std::string, int> eventIdByName;
-    void ProfileBegin(const char* eventName) {
-        std::string eventNameStr(eventName);
-        eventIdByName.emplace(
-            eventNameStr,
-            MProfiler::eventBegin(
-            getProfilerCategoryIndex(kUsdProfilerCategory.c_str()),
-            MProfiler::ProfilingColor::kColorA_L1,
-            eventName));
-    }
-    void ProfileEnd(const char* eventName)
-    {
-        std::string eventNameStr(eventName);
-        MProfiler::eventEnd(eventIdByName.at(eventNameStr));
-        eventIdByName.erase(eventNameStr);
-    }
 
 }
 
@@ -328,8 +309,6 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
             return ret;
         }
     }
-
-    PXR_NS::TfDiagnosticMgr::GetInstance().SetProfilingCallbacks(&ProfileBegin, &ProfileEnd);
 
     initialize();
 
