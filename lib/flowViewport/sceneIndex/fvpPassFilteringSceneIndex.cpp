@@ -299,11 +299,6 @@ void PassFilteringSceneIndex::_PrimsDirtied(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
-    // There are three potential scenarios here for a given prim :
-    // 1. Its filtering status did NOT change -> forward the PrimsDirtied notification as-is
-    // 2. Its filtering status DID change :
-    //    2a. If the prim was previously filtered -> it is now unfiltered, so send a PrimsAdded notification
-    //    2b. If the prim was previously unfiltered -> it is now filtered, so send a PrimsRemoved notification
     HdSceneIndexObserver::AddedPrimEntries   updatedEntries;
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
     for (const auto& entry : entries) {
