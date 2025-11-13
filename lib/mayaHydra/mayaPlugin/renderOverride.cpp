@@ -772,7 +772,6 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
             primIds.insert(
                 primIds.end(), tempPrimIds.begin(), tempPrimIds.end()); // Insert all elements
         }
-        break; // We found the right frame pass and its render index, no need to continue, data has been taken from the renderindex
     }
 
     // Sort them by lexicographically order
