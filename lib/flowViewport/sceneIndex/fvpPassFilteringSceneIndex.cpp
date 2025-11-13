@@ -176,13 +176,14 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_RemoveHighlight
 
     auto itMaterialPath = _highlightsToMaterialsPaths.find(primPath);
     if (itMaterialPath != _highlightsToMaterialsPaths.end()) {
+        auto materialPath = itMaterialPath->second;
         _highlightsToMaterialsPaths.erase(primPath);
-        _highlightMaterialsUsage[itMaterialPath->second]--;
-        if (_highlightMaterialsUsage[itMaterialPath->second] == 0) {
-            _highlightMaterialsUsage.erase(itMaterialPath->second);
-            if (_ShouldBeFilteredOut(itMaterialPath->second)) {
-                _filteredPrims.insert(itMaterialPath->second);
-                return {{itMaterialPath->second, TfToken()}};
+        _highlightMaterialsUsage[materialPath]--;
+        if (_highlightMaterialsUsage[materialPath] == 0) {
+            _highlightMaterialsUsage.erase(materialPath);
+            if (_ShouldBeFilteredOut(materialPath)) {
+                _filteredPrims.insert(materialPath);
+                return {{materialPath, TfToken()}};
             }
         }
     }
