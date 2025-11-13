@@ -64,9 +64,9 @@ TEST(PassFiltering, testPassFiltering)
     auto testPrim = [&](const SdfPath& primPath, const TfToken& primType, std::set<int> passIndices) {
         for (size_t iPassIndex = 0; iPassIndex < passSceneIndices.size(); iPassIndex++) {
             if (passIndices.find(iPassIndex) != passIndices.end()) {
-                ASSERT_TRUE(isPresent(passSceneIndices[iPassIndex], primPath, primType)) << primPath.GetName() << " was not found";
+                ASSERT_TRUE(isPresent(passSceneIndices[iPassIndex], primPath, primType)) << primPath.GetName() << " of type " << primType << " was not found in pass " << iPassIndex;
             } else {
-                ASSERT_TRUE(isFilteredOut(passSceneIndices[iPassIndex], primPath)) << primPath.GetName() << " was found";
+                ASSERT_TRUE(isFilteredOut(passSceneIndices[iPassIndex], primPath)) << primPath.GetName() << " was found in pass " << iPassIndex;
             }
         }
     };
