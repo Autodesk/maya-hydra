@@ -20,7 +20,7 @@
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
-#include <pxr/pxr.h>
+#include <pxr/usd/usdLux/tokens.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -38,14 +38,7 @@ public:
 
     void _CalculateLightParams(GlfSimpleLight& light) override { light.SetSpotCutoff(90.0f); }
 
-    const TfToken& LightType() const override
-    {
-        if (GetMayaHydraSceneIndex()->IsHdSt()) {
-            return HdPrimTypeTokens->simpleLight;
-        } else {
-            return HdPrimTypeTokens->rectLight;
-        }
-    }
+    const TfToken& LightType() const override { return HdPrimTypeTokens->rectLight; }
 
     VtValue GetLightParamValue(const TfToken& paramName) override
     {
@@ -55,11 +48,48 @@ public:
                 paramName.GetText(),
                 GetDagPath().partialPathName().asChar());
 
-        if (paramName == HdLightTokens->width) {
-            return VtValue(2.0f);
-        } else if (paramName == HdLightTokens->height) {
-            return VtValue(2.0f);
+        auto sizeScaled = [=](int index) {
+            constexpr float             defaultSizeForAreaLights[2] { 2.0f, 2.0f };
+            double                      scale[3] = { 1.0, 1.0, 1.0 };
+            const MTransformationMatrix modelMatrix(GetDagPath().inclusiveMatrix());
+            modelMatrix.getScale(scale, MSpace::kWorld);
+            const float sizeScaled = defaultSizeForAreaLights[index] * scale[index];
+            return VtValue(sizeScaled);
+        };
+
+        // To increase the width or height of a maya area light, you need to scale the shape
+        //  so apply the scaling factor to the default width and height of 2
+        if ((paramName == HdLightTokens->width) || (paramName == UsdLuxTokens->inputsWidth)) {
+            constexpr int widthIndex = 0;
+            return sizeScaled(widthIndex);
+        } else if (
+            (paramName == HdLightTokens->height) || (paramName == UsdLuxTokens->inputsHeight)) {
+            constexpr int heightIndex = 1;
+            return sizeScaled(heightIndex);
+        } else if (
+            (paramName == HdLightTokens->intensity)
+            || (paramName == UsdLuxTokens->inputsIntensity)) {
+            // Override intensity to match VP2
+            MStatus           status;
+            MFnDependencyNode lightDepNode(GetNode(), &status);
+            if (status == MS::kSuccess) {
+                MPlug intensityPlug = lightDepNode.findPlug("intensity", true, &status);
+                if (status == MS::kSuccess && !intensityPlug.isNull()) {
+                    float overidenIntensity = intensityPlug.asFloat();
+                    if (GetMayaHydraSceneIndex()->IsHdSt()) {
+                        overidenIntensity /= M_PI; // For Storm only
+                    }
+                    return VtValue(overidenIntensity);
+                }
+            }
+        } else if (
+            (paramName == HdLightTokens->shadowEnable) || (paramName == HdLightTokens->hasShadow)
+            || (paramName == UsdLuxTokens->inputsShadowEnable)) {
+            // From a comment in OpenUSD : Shadows are supported on for SimpleLights and
+            // DistantLights
+            return VtValue(false); // No shadows
         }
+
         return MayaHydraLightAdapter::GetLightParamValue(paramName);
     }
 };
@@ -73,8 +103,10 @@ TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, areaLight)
 {
     MayaHydraAdapterRegistry::RegisterLightAdapter(
         TfToken("areaLight"),
-        [](MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag) -> MayaHydraLightAdapterPtr {
-            return MayaHydraLightAdapterPtr(new MayaHydraAreaLightAdapter(mayaHydraSceneIndex, dag));
+        [](MayaHydraSceneIndex* mayaHydraSceneIndex,
+           const MDagPath&      dag) -> MayaHydraLightAdapterPtr {
+            return MayaHydraLightAdapterPtr(
+                new MayaHydraAreaLightAdapter(mayaHydraSceneIndex, dag));
         });
 }
 
