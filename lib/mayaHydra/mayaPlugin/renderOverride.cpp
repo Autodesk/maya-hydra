@@ -1043,15 +1043,15 @@ MStatus MtohRenderOverride::Render(
                 const int previousPassIndex = (visibleIdx > 0) ?framePassesVisible[visibleIdx - 1] : 0;
                 hvt::FramePassPtr& previousPass = _GetFramePass(previousPassIndex);
                 if (previousPass) {
-                     std::shared_ptr<pxr::HdRenderBuffer> colorBuffer
-                        = hvt::CreateRenderBufferProxy(previousPass, pxr::HdAovTokens->color);
+                     std::shared_ptr<PXR_NS::HdRenderBuffer> colorBuffer
+                        = hvt::CreateRenderBufferProxy(previousPass, PXR_NS::HdAovTokens->color);
 
-                    std::shared_ptr<pxr::HdRenderBuffer> depthBuffer
-                        = hvt::CreateRenderBufferProxy(previousPass, pxr::HdAovTokens->depth);
+                    std::shared_ptr<PXR_NS::HdRenderBuffer> depthBuffer
+                        = hvt::CreateRenderBufferProxy(previousPass, PXR_NS::HdAovTokens->depth);
 
-                    std::vector<std::pair<pxr::TfToken const&, pxr::HdRenderBuffer*>> inputAOVs
-                        = { { pxr::HdAovTokens->color, colorBuffer.get() },
-                            { pxr::HdAovTokens->depth, depthBuffer.get() } 
+                    std::vector<std::pair<PXR_NS::TfToken const&, PXR_NS::HdRenderBuffer*>> inputAOVs
+                        = { { PXR_NS::HdAovTokens->color, colorBuffer.get() },
+                            { PXR_NS::HdAovTokens->depth, depthBuffer.get() } 
                           };
                 
                     HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(inputAOVs);
@@ -1633,7 +1633,7 @@ void MtohRenderOverride::_InitHydraResources(
         auto renderTasks
             = skyDomePass->GetTaskManager()->GetTasks(hvt::TaskFlagsBits::kRenderTaskBit);
         
-        const pxr::SdfPath firstRenderTaskPath = renderTasks[0]->GetId();
+        const PXR_NS::SdfPath firstRenderTaskPath = renderTasks[0]->GetId();
 
         // Define a getter for the layer settings.
         const auto getLayerSettings

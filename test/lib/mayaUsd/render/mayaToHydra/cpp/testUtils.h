@@ -419,21 +419,21 @@ bool dataSourceMatchesReference(
 */
 class DecimalStreamingOverride {
 public:
-    DecimalStreamingOverride(const pxr::TfDecimalToStringConfig& overrideConfig)
+    DecimalStreamingOverride(const PXR_NS::TfDecimalToStringConfig& overrideConfig)
     {
-        _prevFloatConfig = pxr::TfStreamFloat::ToStringConfig();
-        _prevDoubleConfig = pxr::TfStreamDouble::ToStringConfig();
-        pxr::TfStreamFloat::ToStringConfig() = overrideConfig;
-        pxr::TfStreamDouble::ToStringConfig() = overrideConfig;
+        _prevFloatConfig = PXR_NS::TfStreamFloat::ToStringConfig();
+        _prevDoubleConfig = PXR_NS::TfStreamDouble::ToStringConfig();
+        PXR_NS::TfStreamFloat::ToStringConfig() = overrideConfig;
+        PXR_NS::TfStreamDouble::ToStringConfig() = overrideConfig;
     }
     ~DecimalStreamingOverride()
     {
-        pxr::TfStreamFloat::ToStringConfig() = _prevFloatConfig;
-        pxr::TfStreamDouble::ToStringConfig() = _prevDoubleConfig;
+        PXR_NS::TfStreamFloat::ToStringConfig() = _prevFloatConfig;
+        PXR_NS::TfStreamDouble::ToStringConfig() = _prevDoubleConfig;
     }
 private:
-    pxr::TfDecimalToStringConfig _prevFloatConfig;
-    pxr::TfDecimalToStringConfig _prevDoubleConfig;
+    PXR_NS::TfDecimalToStringConfig _prevFloatConfig;
+    PXR_NS::TfDecimalToStringConfig _prevDoubleConfig;
 };
 #endif
 
