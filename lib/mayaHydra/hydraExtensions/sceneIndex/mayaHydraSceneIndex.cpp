@@ -1629,9 +1629,15 @@ AdapterPtr MayaHydraSceneIndex::_CreateAdapter(
     if (adapter == nullptr || !adapter->IsSupported()) {
         return {};
     }
+    // Order is important here. We need to add the adapter to the map before populating.
+    // Why : once we send PrimsAdded notifications, a downstream scene index might query 
+    // a prim that uses a MayaHydraDataSource and try to get its material. Since 
+    // MayaHydraDataSource::_GetMaterialBindingDataSource() calls MayaHydraSceneIndex::GetMaterialId(), 
+    // which in turn does lookups into the adapter maps, the adapter map needs to contain 
+    // the desired prim's adapter.
+    adapterMap.insert({ id, adapter });
     adapter->Populate();
     adapter->CreateCallbacks();
-    adapterMap.insert({ id, adapter });
     return adapter;
 }
 
