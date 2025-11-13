@@ -239,7 +239,7 @@ GfMatrix4d MayaHydraLightAdapter::_CalculateShadowProjectionMatrix()
     }
 
     // To make sure the adjusted view matrix takes effect, multiply by the light transform to
-    // counteract the ViewMaxtrix (inverted LightTransform) calculated by Hydra.
+    // counteract the ViewMatrix (inverted LightTransform) calculated by Hydra.
     return xform * viewMatrix * projMatrix;
 }
 
