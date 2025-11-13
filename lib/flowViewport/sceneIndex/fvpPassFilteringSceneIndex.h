@@ -15,18 +15,17 @@
 #ifndef FVP_PASS_FILTERING_SCENE_INDEX_H
 #define FVP_PASS_FILTERING_SCENE_INDEX_H
 
-#include <pxr/imaging/hd/sceneIndexObserver.h>
 #ifdef VIEWPORT_TOOLBOX
 
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 #include "flowViewport/fvpFramePassData.h"
 
-#include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/base/tf/token.h>
+#include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/imaging/hd/sceneIndexObserver.h>
 
-#include <functional>
-
+#include <map>
 
 namespace FVP_NS_DEF {
 
@@ -97,10 +96,10 @@ protected:
     PXR_NS::HdSceneIndexObserver::AddedPrimEntries _UpdateFilteringStatus(const PXR_NS::SdfPath& primPath, bool dirtied = true, bool resync = false);
 
     FVP_API
-    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath);
+    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _RemoveHighlightMaterialEntry(const PXR_NS::SdfPath& primPath);
 
     FVP_API
-    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _RemoveHighlightMaterialEntry(const PXR_NS::SdfPath& primPath);
+    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath);
 
     Fvp::FramePassConstDataPtr _framePassData;
 

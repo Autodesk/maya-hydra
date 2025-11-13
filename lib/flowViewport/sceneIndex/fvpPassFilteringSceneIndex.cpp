@@ -18,13 +18,12 @@
 #include "fvpPassFilteringSceneIndex.h"
 #include "flowViewport/fvpUtils.h"
 
-#include <pxr/imaging/hd/repr.h>
-#include <pxr/imaging/hd/basisCurvesSchema.h>
-#include <pxr/imaging/hd/purposeSchema.h>
-#include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
-#include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/repr.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
+#include <pxr/imaging/hd/tokens.h>
+
+#include <algorithm>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -117,7 +116,6 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
 
     if (!isRprimType(prim.primType)) {
         if (prim.primType == HdPrimTypeTokens->material 
-            && _framePassData->_removeMaterials 
             && _highlightMaterialsUsage.find(primPath) == _highlightMaterialsUsage.end()) {
             // Filter out non-highlight materials
             return true;
@@ -169,11 +167,6 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateFiltering
 
 HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_RemoveHighlightMaterialEntry(const PXR_NS::SdfPath& primPath)
 {
-    if (!_framePassData->_removeMaterials) {
-        // If we don't remove the materials, we can completely skip all the highlight material logic
-        return {};
-    }
-
     auto itMaterialPath = _highlightsToMaterialsPaths.find(primPath);
     if (itMaterialPath != _highlightsToMaterialsPaths.end()) {
         auto materialPath = itMaterialPath->second;
@@ -193,11 +186,6 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_RemoveHighlight
 
 HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath)
 {
-    if (!_framePassData->_removeMaterials) {
-        // If we don't remove the materials, we can completely skip all the highlight material logic
-        return {};
-    }
-
     if (_IsFilteredOut(primPath)) {
         return _RemoveHighlightMaterialEntry(primPath);
     }
