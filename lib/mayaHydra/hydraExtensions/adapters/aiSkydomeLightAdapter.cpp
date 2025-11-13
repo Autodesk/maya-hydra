@@ -20,6 +20,7 @@
 #include <mayaHydraLib/adapters/lightAdapter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
+#include <mayaHydraLib/envUtils.h>
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
@@ -70,14 +71,11 @@ public:
         }
 
         if (_tmpFolderPath.empty()) {
-            const char* tmpDir = getenv("TMPDIR");
-            if (tmpDir) {
+            std::string tmpDir;
+            if (MAYAHYDRA_NS_DEF::tryGetEnvUtf8("TMPDIR", tmpDir)) {
                 _tmpFolderPath = tmpDir;
-            } else {
-                tmpDir = getenv("TEMP");
-                if (tmpDir) {
-                    _tmpFolderPath = tmpDir;
-                }
+            } else if (MAYAHYDRA_NS_DEF::tryGetEnvUtf8("TEMP", tmpDir)) {
+                _tmpFolderPath = tmpDir;
             }
         }
 
