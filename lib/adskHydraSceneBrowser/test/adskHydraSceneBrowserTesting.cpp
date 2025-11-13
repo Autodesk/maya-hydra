@@ -38,7 +38,7 @@ bool RunTestsWithFilter(std::string filter)
 }
 
 namespace AdskHydraSceneBrowserTesting {
-bool RunFullSceneIndexComparisonTest(pxr::HdSceneIndexBasePtr referenceSceneIndex)
+bool RunFullSceneIndexComparisonTest(PXR_NS::HdSceneIndexBasePtr referenceSceneIndex)
 {
     AdskHydraSceneBrowserTestFixture::SetReferenceSceneIndex(referenceSceneIndex);
     return RunTestsWithFilter("AdskHydraSceneBrowserTestFixture.FullSceneIndexComparison");

@@ -525,7 +525,7 @@ MhFootPrint::~MhFootPrint()
     
     //Remove our retained scene index from hydra
     Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, pxr::FvpViewportAPITokens->allViewports);
+    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allViewports);
 }
 
 //Create the Hydra foot print primitives in the retained scene index
@@ -709,7 +709,7 @@ void MhFootPrint::removedFromModelCb()
 
     //Remove the data producer scene index.
     auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, pxr::FvpViewportAPITokens->allViewports);
+    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allViewports);
 }
 
 //---------------------------------------------------------------------------

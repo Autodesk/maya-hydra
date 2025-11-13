@@ -565,7 +565,7 @@ MhCustomShaders::~MhCustomShaders()
     
     //Remove our retained scene index from hydra
     Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, pxr::FvpViewportAPITokens->allViewports);
+    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allViewports);
 }
 
 //Create the Hydra materials in the retained scene index
@@ -656,7 +656,7 @@ void MhCustomShaders::removedFromModelCb()
 
     //Remove the data producer scene index.
     auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, pxr::FvpViewportAPITokens->allViewports);
+    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allViewports);
 }
 
 void MhCustomShaders::_UpdateMaterialColor(const double3& color)

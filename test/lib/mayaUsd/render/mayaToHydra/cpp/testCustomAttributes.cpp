@@ -48,7 +48,7 @@ TEST(CustomAttributes, defaultArnoldCustomAttributes)
     ASSERT_GT(sceneIndices.size(), 0u);
     SceneIndexInspector inspector(sceneIndices.front());
 
-    DecimalStreamingOverride decimalStreamingOverride({ pxr::TfDecimalToStringMode::FIXED, 5, false });
+    DecimalStreamingOverride decimalStreamingOverride({ PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
 
     HdSceneIndexPrim prim;
     bool             testPassed = false;

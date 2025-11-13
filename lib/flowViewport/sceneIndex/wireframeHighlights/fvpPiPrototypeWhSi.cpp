@@ -340,7 +340,7 @@ void PiPrototypeWhSi::_CreateSelectionHighlight(const PXR_NS::SdfPath& prototype
 
     // Send notifications
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
-    auto operation = [&addedPrims, selectionPath](const pxr::SdfPath& primPath, const pxr::HdSceneIndexPrim& prim) -> bool {
+    auto operation = [&addedPrims, selectionPath](const PXR_NS::SdfPath& primPath, const PXR_NS::HdSceneIndexPrim& prim) -> bool {
         addedPrims.emplace_back(primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), prim.primType);
         return true;
     };

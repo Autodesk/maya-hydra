@@ -27,8 +27,8 @@ namespace {
 
 struct DataSourceEntry
 {
-    pxr::TfToken                name;
-    pxr::HdDataSourceBaseHandle dataSource;
+    PXR_NS::TfToken                name;
+    PXR_NS::HdDataSourceBaseHandle dataSource;
 };
 
 void VerifyDataSource(DataSourceEntry rootDataSourceEntry)
@@ -41,11 +41,11 @@ void VerifyDataSource(DataSourceEntry rootDataSourceEntry)
         // Verify representation selector's correctness
         if (dataSourceEntry.name == "reprSelector") {
             if (auto sampledDataSource
-                = pxr::HdSampledDataSource::Cast(dataSourceEntry.dataSource)) {
+                = PXR_NS::HdSampledDataSource::Cast(dataSourceEntry.dataSource)) {
                 
-                pxr::VtValue value = sampledDataSource->GetValue(0.0f);
-                if (value.IsHolding<pxr::VtArray<pxr::TfToken>>()) {
-                    auto array = value.UncheckedGet<pxr::VtArray<pxr::TfToken>>();
+                PXR_NS::VtValue value = sampledDataSource->GetValue(0.0f);
+                if (value.IsHolding<PXR_NS::VtArray<PXR_NS::TfToken>>()) {
+                    auto array = value.UncheckedGet<PXR_NS::VtArray<PXR_NS::TfToken>>();
 
                     int numPointReprs = 0;
                     int numWireReprs  = 0;
@@ -53,20 +53,20 @@ void VerifyDataSource(DataSourceEntry rootDataSourceEntry)
 
                     // Count representations in use 
                     for (size_t j = 0; j < array.size(); ++j) {
-                        pxr::TfToken reprName(array[j]);
+                        PXR_NS::TfToken reprName(array[j]);
 
-                        if (reprName == pxr::HdReprTokens->hull || 
-                            reprName == pxr::HdReprTokens->smoothHull || 
-                            reprName == pxr::HdReprTokens->refined) {
+                        if (reprName == PXR_NS::HdReprTokens->hull || 
+                            reprName == PXR_NS::HdReprTokens->smoothHull || 
+                            reprName == PXR_NS::HdReprTokens->refined) {
                             ++numSurfReprs;
-                        } else if (reprName == pxr::HdReprTokens->refinedWire ||
-                                reprName == pxr::HdReprTokens->wire) {
+                        } else if (reprName == PXR_NS::HdReprTokens->refinedWire ||
+                                reprName == PXR_NS::HdReprTokens->wire) {
                             ++numWireReprs;
-                        } else if (reprName == pxr::HdReprTokens->refinedWireOnSurf ||
-                                reprName == pxr::HdReprTokens->wireOnSurf) {
+                        } else if (reprName == PXR_NS::HdReprTokens->refinedWireOnSurf ||
+                                reprName == PXR_NS::HdReprTokens->wireOnSurf) {
                             ++numWireReprs;
                             ++numSurfReprs;
-                        } else if (reprName == pxr::HdReprTokens->points) {
+                        } else if (reprName == PXR_NS::HdReprTokens->points) {
                             ++numPointReprs;
                         }
                     }
@@ -82,22 +82,22 @@ void VerifyDataSource(DataSourceEntry rootDataSourceEntry)
         // Prepare next step
         dataSourceStack.pop();
         if (auto containerDataSource
-            = pxr::HdContainerDataSource::Cast(dataSourceEntry.dataSource)) {
-            pxr::TfTokenVector childNames = containerDataSource->GetNames();
+            = PXR_NS::HdContainerDataSource::Cast(dataSourceEntry.dataSource)) {
+            PXR_NS::TfTokenVector childNames = containerDataSource->GetNames();
             for (auto itChildNames = childNames.rbegin(); itChildNames != childNames.rend();
                  itChildNames++) {
-                pxr::TfToken                dataSourceName = *itChildNames;
-                pxr::HdDataSourceBaseHandle dataSource = containerDataSource->Get(dataSourceName);
+                PXR_NS::TfToken                dataSourceName = *itChildNames;
+                PXR_NS::HdDataSourceBaseHandle dataSource = containerDataSource->Get(dataSourceName);
                 if (dataSource) {
                     dataSourceStack.push({ dataSourceName, dataSource });
                 }
             }
         } else if (
-            auto vectorDataSource = pxr::HdVectorDataSource::Cast(dataSourceEntry.dataSource)) {
+            auto vectorDataSource = PXR_NS::HdVectorDataSource::Cast(dataSourceEntry.dataSource)) {
             for (size_t iElement = 0; iElement < vectorDataSource->GetNumElements(); iElement++) {
                 size_t reversedElementIndex = vectorDataSource->GetNumElements() - 1 - iElement;
-                pxr::TfToken dataSourceName = pxr::TfToken(std::to_string(reversedElementIndex));
-                pxr::HdDataSourceBaseHandle dataSource
+                PXR_NS::TfToken dataSourceName = PXR_NS::TfToken(std::to_string(reversedElementIndex));
+                PXR_NS::HdDataSourceBaseHandle dataSource
                     = vectorDataSource->GetElement(reversedElementIndex);
                 if (dataSource) {
                     dataSourceStack.push({ dataSourceName, dataSource });
@@ -114,20 +114,20 @@ TEST(HydraScene, testHydraSceneCorrectness)
     // Retrieve the scene index
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     EXPECT_TRUE(!sceneIndices.empty());
-    pxr::HdSceneIndexBasePtr sceneIndex = sceneIndices.front();
+    PXR_NS::HdSceneIndexBasePtr sceneIndex = sceneIndices.front();
 
     // Traverse the hierarchy
-    std::stack<pxr::SdfPath> primPathsStack({ pxr::SdfPath::AbsoluteRootPath() });
+    std::stack<PXR_NS::SdfPath> primPathsStack({ PXR_NS::SdfPath::AbsoluteRootPath() });
     while (!primPathsStack.empty()) {
-        pxr::SdfPath primPath = primPathsStack.top();
-        pxr::HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
+        PXR_NS::SdfPath primPath = primPathsStack.top();
+        PXR_NS::HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
 
         // Verify the data source
         VerifyDataSource({ primPath.GetNameToken(), prim.dataSource });
 
         // Prepare next step
         primPathsStack.pop();
-        pxr::SdfPathVector childPaths = sceneIndex->GetChildPrimPaths(primPath);
+        PXR_NS::SdfPathVector childPaths = sceneIndex->GetChildPrimPaths(primPath);
         for (auto itChildPaths = childPaths.rbegin(); itChildPaths != childPaths.rend();
              itChildPaths++) {
             primPathsStack.push(*itChildPaths);
