@@ -125,6 +125,10 @@ protected:
     bool _PathExists(const PXR_NS::SdfPath& primPath) const;
 
 private:
+    // Represents the scene visible to downstream scene indices.
+    // The keys of the table represent the paths visible in the scene,
+    // and the bool values represent whether the prim at a path is
+    // included or not. Excluded prims have no type and no data source.
     PXR_NS::SdfPathTable<bool> _hierarchy;
 };
 
