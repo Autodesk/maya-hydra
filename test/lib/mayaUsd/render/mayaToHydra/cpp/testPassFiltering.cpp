@@ -53,14 +53,7 @@ TEST(PassFiltering, testPassFiltering)
         GetPassSceneIndex(1)
     };
     
-    auto sphereMeshPrims = SceneIndexInspector(passSceneIndices[0]).FindPrims(findSphereMeshPredicate);
-    ASSERT_EQ(sphereMeshPrims.size(), 1u);
-    auto sphereMeshPath = sphereMeshPrims.front().primPath;
-
-    auto sphereWireframePrims = SceneIndexInspector(passSceneIndices[1]).FindPrims(findSphereWireframePredicate);
-    ASSERT_EQ(sphereWireframePrims.size(), 1u);
-    auto sphereWireframePath = sphereWireframePrims.front().primPath;
-
+    // Checks that a prim is present in the given passes, and filtered out in the others.
     auto testPrim = [&](const SdfPath& primPath, const TfToken& primType, std::set<int> passIndices) {
         for (size_t iPassIndex = 0; iPassIndex < passSceneIndices.size(); iPassIndex++) {
             if (passIndices.find(iPassIndex) != passIndices.end()) {
@@ -70,6 +63,14 @@ TEST(PassFiltering, testPassFiltering)
             }
         }
     };
+
+    auto sphereMeshPrims = SceneIndexInspector(passSceneIndices[0]).FindPrims(findSphereMeshPredicate);
+    ASSERT_EQ(sphereMeshPrims.size(), 1u);
+    auto sphereMeshPath = sphereMeshPrims.front().primPath;
+
+    auto sphereWireframePrims = SceneIndexInspector(passSceneIndices[1]).FindPrims(findSphereWireframePredicate);
+    ASSERT_EQ(sphereWireframePrims.size(), 1u);
+    auto sphereWireframePath = sphereWireframePrims.front().primPath;
 
     // Maya mesh prim
     testPrim(
@@ -104,12 +105,12 @@ TEST(PassFiltering, testPassFiltering)
     testPrim(
         SdfPath("/MayaUsdProxyShape_PluginNode/GeomSubsetWireframeHighlightDisplacementTestSceneShape/mtl/UsdPreviewSurface1"), 
         HdPrimTypeTokens->material,
-        {0,1} // Materials should be in both passes
+        {0,1} // Should be in both passes
     );
     testPrim(
         SdfPath("/MayaUsdProxyShape_PluginNode/GeomSubsetWireframeHighlightDisplacementTestSceneShape/mtl/UsdPreviewSurface2"), 
         HdPrimTypeTokens->material,
-        {0,1} // Materials should be in both passes
+        {0,1} // Should be in both passes
     );
     testPrim(
         SdfPath("/FlowViewportSelectionHighlights/MayaUsdProxyShape_PluginNode/GeomSubsetWireframeHighlightDisplacementTestSceneShape/SphereInstancer/Highlight_Full/MayaUsdProxyShape_PluginNode/GeomSubsetWireframeHighlightDisplacementTestSceneShape/SphereInstancer"), 
