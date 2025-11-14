@@ -117,7 +117,7 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
     if (!isRprimType(prim.primType)) {
         if (prim.primType == HdPrimTypeTokens->material 
             && _materialUseCounts.find(primPath) == _materialUseCounts.end()) {
-            // Filter out non-highlight materials
+            // Filter out unused materials
             return true;
         }
         return false; // Include all non-Rprims by default
@@ -156,8 +156,8 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateFiltering
         updatedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
     }
 
-    bool updateHighlightMaterial = (isFilteredOut != shouldBeFilteredOut) || (!isFilteredOut && !shouldBeFilteredOut && dirtied);
-    if (updateHighlightMaterial) {
+    bool updateMaterial = (isFilteredOut != shouldBeFilteredOut) || (!isFilteredOut && !shouldBeFilteredOut && dirtied);
+    if (updateMaterial) {
         auto materialUpdates = _UpdateMaterialEntry(primPath);
         updatedPrims.insert(updatedPrims.end(), materialUpdates.begin(), materialUpdates.end());
     }
@@ -241,6 +241,7 @@ HdSceneIndexPrim PassFilteringSceneIndex::GetPrim(const SdfPath& primPath) const
 
 SdfPathVector PassFilteringSceneIndex::GetChildPrimPaths(const SdfPath& primPath) const
 {
+    // We only filter prims, not paths, so defer to the input scene index
     return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
@@ -248,6 +249,7 @@ void PassFilteringSceneIndex::DirtyPrimsFromPurposeRenderTag(const TfToken purpo
 {
     auto& inputSceneIndex = GetInputSceneIndex();
     if (inputSceneIndex) {
+        // Update the whole scene
         HdSceneIndexObserver::AddedPrimEntries updatedEntries;
         for (const SdfPath& primPath : HdSceneIndexPrimView(inputSceneIndex)) {
             auto updatedPrims = _UpdateFilteringStatus(primPath, false);
@@ -266,8 +268,8 @@ void PassFilteringSceneIndex::_PrimsAdded(
     HdSceneIndexObserver::AddedPrimEntries addedEntries;
 
     for (const auto& addedEntry : entries) {
-        auto updatedEntries = _UpdateFilteringStatus(addedEntry.primPath, true, true);
-        addedEntries.insert(addedEntries.end(), updatedEntries.begin(), updatedEntries.end());
+        auto updatedPrims = _UpdateFilteringStatus(addedEntry.primPath, true, true);
+        addedEntries.insert(addedEntries.end(), updatedPrims.begin(), updatedPrims.end());
     }
 
     if (!addedEntries.empty()) {
@@ -279,11 +281,10 @@ void PassFilteringSceneIndex::_PrimsRemoved(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::RemovedPrimEntries &entries)
 {
-    HdSceneIndexObserver::RemovedPrimEntries removedEntries;
-    HdSceneIndexObserver::AddedPrimEntries updatedPrims;
-
+    // 1. Update the scene filtering
+    HdSceneIndexObserver::AddedPrimEntries updatedEntries;
     for (const auto& removedEntry : entries) {
-        removedEntries.emplace_back(removedEntry);
+        // Remove the prim and its children from our filtered prims data 
         for (auto it = _filteredPrims.begin(); it != _filteredPrims.end();) {
             if ((*it).HasPrefix(removedEntry.primPath)) {
                 it = _filteredPrims.erase(it);
@@ -291,20 +292,23 @@ void PassFilteringSceneIndex::_PrimsRemoved(
                 it++;
             }
         }
+
+        // Remove material entries on the prim and its children
         auto _rprimsToMaterialPathsCopy = _rprimsToMaterialPaths;
         for (const auto& [primPath, materialPath] : _rprimsToMaterialPathsCopy) {
             if (primPath.HasPrefix(removedEntry.primPath)) {
                 auto materialUpdates = _RemoveMaterialEntry(primPath);
-                updatedPrims.insert(updatedPrims.end(), materialUpdates.begin(), materialUpdates.end());
+                updatedEntries.insert(updatedEntries.end(), materialUpdates.begin(), materialUpdates.end());
             }
         }
     }
-
-    if (!updatedPrims.empty()) {
-        _SendPrimsAdded(updatedPrims);
+    if (!updatedEntries.empty()) {
+        _SendPrimsAdded(updatedEntries);
     }
-    if (!removedEntries.empty()) {
-        _SendPrimsRemoved(removedEntries);
+
+    // 2. Send out the prims removed notifications
+    if (!entries.empty()) {
+        _SendPrimsRemoved(entries);
     }
 }
 
@@ -312,7 +316,8 @@ void PassFilteringSceneIndex::_PrimsDirtied(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
-    HdSceneIndexObserver::AddedPrimEntries   updatedEntries;
+    // 1. Update the scene filtering
+    HdSceneIndexObserver::AddedPrimEntries updatedEntries;
     for (const auto& entry : entries) {
         auto updatedPrims = _UpdateFilteringStatus(entry.primPath);
         updatedEntries.insert(updatedEntries.end(), updatedPrims.begin(), updatedPrims.end());
@@ -321,6 +326,7 @@ void PassFilteringSceneIndex::_PrimsDirtied(
         _SendPrimsAdded(updatedEntries);
     }
 
+    // 2. Send out the dirty notifications on the non-filtered prims
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
     for (const auto& entry : entries) {
         if (!_IsFilteredOut(entry.primPath)) {
