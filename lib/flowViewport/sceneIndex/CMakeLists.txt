@@ -16,6 +16,7 @@ target_sources(${TARGET_NAME}
     fvpLightsManagementSceneIndex.cpp
     fvpPassFilteringSceneIndex.cpp
     fvpDataProducerMergingSceneIndexProxy.cpp
+    fvpPrimRemovalEnforcingSceneIndex.cpp
 )
 
 set(HEADERS
@@ -32,6 +33,7 @@ set(HEADERS
     fvpLightsManagementSceneIndex.h
     fvpPassFilteringSceneIndex.h
     fvpDataProducerMergingSceneIndexProxy.h
+    fvpPrimRemovalEnforcingSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------
