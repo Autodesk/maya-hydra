@@ -174,6 +174,7 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_RemoveMaterialE
         _materialUseCounts[materialPath]--;
         if (_materialUseCounts[materialPath] == 0) {
             _materialUseCounts.erase(materialPath);
+            // If no one's using the material and we should filter it out, do so.
             if (_ShouldBeFilteredOut(materialPath)) {
                 _filteredPrims.insert(materialPath);
                 return {{materialPath, TfToken()}};
@@ -200,6 +201,7 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateMaterialE
 
     // Do some checks to see if the material needs to have displacement to be relevant
     bool requireDisplacement = prim.primType == HdPrimTypeTokens->basisCurves;
+    // Check if it's a wireframe
     if (!requireDisplacement) {
         auto displayStyle = HdLegacyDisplayStyleSchema::GetFromParent(prim.dataSource);
         if (displayStyle.IsDefined() && displayStyle.GetReprSelector()) {
@@ -220,6 +222,7 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateMaterialE
         _rprimsToMaterialPaths[primPath] = materialPath;
         _materialUseCounts[materialPath]++;
         if (_materialUseCounts[materialPath] == 1) {
+            // If the material was previously filtered out, unfilter it
             if (_IsFilteredOut(materialPath)) {
                 _filteredPrims.erase(materialPath);
                 updatedPrims.emplace_back(materialPath, HdPrimTypeTokens->material);
