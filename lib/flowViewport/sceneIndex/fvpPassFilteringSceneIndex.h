@@ -65,12 +65,6 @@ protected:
         PXR_NS::HdSceneIndexBaseRefPtr const& inputSceneIndex,
         const Fvp::FramePassConstDataPtr&    framePassData);
 
-    // IMPORTANT: These notification methods (_PrimsAdded, _PrimsRemoved, _PrimsDirtied) and
-    // GetChildPrimPaths must NOT apply any filtering logic. They must forward all notifications
-    // and child paths unchanged to ensure proper scene graph synchronization when prims are
-    // dynamically moved between different frame passes (e.g., when switching display modes
-    // like wireframe, or when render tags change). Filtering is only applied in GetPrim().
-    
     FVP_API
     void _PrimsAdded(
         const PXR_NS::HdSceneIndexBase &sender,
@@ -96,19 +90,19 @@ protected:
     PXR_NS::HdSceneIndexObserver::AddedPrimEntries _UpdateFilteringStatus(const PXR_NS::SdfPath& primPath, bool dirtied = true, bool resync = false);
 
     FVP_API
-    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _RemoveHighlightMaterialEntry(const PXR_NS::SdfPath& primPath);
+    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _RemoveMaterialEntry(const PXR_NS::SdfPath& primPath);
 
     FVP_API
-    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath);
+    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _UpdateMaterialEntry(const PXR_NS::SdfPath& primPath);
 
     Fvp::FramePassConstDataPtr _framePassData;
 
 private:
     PXR_NS::SdfPathSet _filteredPrims;
 
-    // Used to track the materials that are required to properly render selection highlights
-    std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _highlightsToMaterialsPaths;
-    std::map<PXR_NS::SdfPath, int> _highlightMaterialsUsage;
+    // Used to track the materials required by the Rprims that will actually be rendered in the pass 
+    std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _rprimsToMaterialPaths;
+    std::map<PXR_NS::SdfPath, int> _materialUseCounts;
 };
 
 } // namespace FVP_NS_DEF

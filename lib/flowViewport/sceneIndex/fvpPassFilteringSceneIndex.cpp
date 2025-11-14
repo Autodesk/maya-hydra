@@ -116,7 +116,7 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
 
     if (!isRprimType(prim.primType)) {
         if (prim.primType == HdPrimTypeTokens->material 
-            && _highlightMaterialsUsage.find(primPath) == _highlightMaterialsUsage.end()) {
+            && _materialUseCounts.find(primPath) == _materialUseCounts.end()) {
             // Filter out non-highlight materials
             return true;
         }
@@ -158,22 +158,22 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateFiltering
 
     bool updateHighlightMaterial = (isFilteredOut != shouldBeFilteredOut) || (!isFilteredOut && !shouldBeFilteredOut && dirtied);
     if (updateHighlightMaterial) {
-        auto materialUpdates = _UpdateHighlightMaterialStatus(primPath);
+        auto materialUpdates = _UpdateMaterialEntry(primPath);
         updatedPrims.insert(updatedPrims.end(), materialUpdates.begin(), materialUpdates.end());
     }
 
     return updatedPrims;
 }
 
-HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_RemoveHighlightMaterialEntry(const PXR_NS::SdfPath& primPath)
+HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_RemoveMaterialEntry(const PXR_NS::SdfPath& primPath)
 {
-    auto itMaterialPath = _highlightsToMaterialsPaths.find(primPath);
-    if (itMaterialPath != _highlightsToMaterialsPaths.end()) {
+    auto itMaterialPath = _rprimsToMaterialPaths.find(primPath);
+    if (itMaterialPath != _rprimsToMaterialPaths.end()) {
         auto materialPath = itMaterialPath->second;
-        _highlightsToMaterialsPaths.erase(primPath);
-        _highlightMaterialsUsage[materialPath]--;
-        if (_highlightMaterialsUsage[materialPath] == 0) {
-            _highlightMaterialsUsage.erase(materialPath);
+        _rprimsToMaterialPaths.erase(primPath);
+        _materialUseCounts[materialPath]--;
+        if (_materialUseCounts[materialPath] == 0) {
+            _materialUseCounts.erase(materialPath);
             if (_ShouldBeFilteredOut(materialPath)) {
                 _filteredPrims.insert(materialPath);
                 return {{materialPath, TfToken()}};
@@ -184,18 +184,18 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_RemoveHighlight
     return {};
 }
 
-HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateHighlightMaterialStatus(const PXR_NS::SdfPath& primPath)
+HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateMaterialEntry(const PXR_NS::SdfPath& primPath)
 {
     if (_IsFilteredOut(primPath)) {
-        return _RemoveHighlightMaterialEntry(primPath);
+        return _RemoveMaterialEntry(primPath);
     }
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     if (!isRprimType(prim.primType)) {
-        return _RemoveHighlightMaterialEntry(primPath);
+        return _RemoveMaterialEntry(primPath);
     }
     auto materialPath = GetMaterialPath(prim.dataSource);
     if (materialPath.IsEmpty()) {
-        return _RemoveHighlightMaterialEntry(primPath);
+        return _RemoveMaterialEntry(primPath);
     }
 
     // Do some checks to see if the material needs to have displacement to be relevant
@@ -210,16 +210,16 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateHighlight
         }
     }
     if (requireDisplacement && !MaterialHasDisplacement(GetInputSceneIndex()->GetPrim(materialPath))) {
-        return _RemoveHighlightMaterialEntry(primPath);
+        return _RemoveMaterialEntry(primPath);
     }
 
-    auto prevMaterialPath = _highlightsToMaterialsPaths.find(primPath);
-    if (prevMaterialPath == _highlightsToMaterialsPaths.end() || materialPath != prevMaterialPath->second) {
-        auto updatedPrims = _RemoveHighlightMaterialEntry(primPath);
+    auto prevMaterialPath = _rprimsToMaterialPaths.find(primPath);
+    if (prevMaterialPath == _rprimsToMaterialPaths.end() || materialPath != prevMaterialPath->second) {
+        auto updatedPrims = _RemoveMaterialEntry(primPath);
         // Add the new material entry
-        _highlightsToMaterialsPaths[primPath] = materialPath;
-        _highlightMaterialsUsage[materialPath]++;
-        if (_highlightMaterialsUsage[materialPath] == 1) {
+        _rprimsToMaterialPaths[primPath] = materialPath;
+        _materialUseCounts[materialPath]++;
+        if (_materialUseCounts[materialPath] == 1) {
             if (_IsFilteredOut(materialPath)) {
                 _filteredPrims.erase(materialPath);
                 updatedPrims.emplace_back(materialPath, HdPrimTypeTokens->material);
@@ -291,10 +291,10 @@ void PassFilteringSceneIndex::_PrimsRemoved(
                 it++;
             }
         }
-        auto _highlightsToMaterialsPathsCopy = _highlightsToMaterialsPaths;
-        for (const auto& [primPath, materialPath] : _highlightsToMaterialsPathsCopy) {
+        auto _rprimsToMaterialPathsCopy = _rprimsToMaterialPaths;
+        for (const auto& [primPath, materialPath] : _rprimsToMaterialPathsCopy) {
             if (primPath.HasPrefix(removedEntry.primPath)) {
-                auto materialUpdates = _RemoveHighlightMaterialEntry(primPath);
+                auto materialUpdates = _RemoveMaterialEntry(primPath);
                 updatedPrims.insert(updatedPrims.end(), materialUpdates.begin(), materialUpdates.end());
             }
         }
