@@ -39,8 +39,7 @@ namespace FVP_NS_DEF {
 /*! \brief Data structure containing all per-pass information
  *
  * This struct contains all the configuration data needed for a frame pass such as filtering
- * primitives in a frame pass, including renderer selection, paths,
- * render tags, and light handling preferences.
+ * primitives in a frame pass, including renderer selection, paths, render tags, etc.
  */
 struct FramePassData
 {
