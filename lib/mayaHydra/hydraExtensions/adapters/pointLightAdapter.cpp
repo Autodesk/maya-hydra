@@ -74,6 +74,7 @@ public:
                 || (paramName == UsdLuxTokens->inputsShadowEnable))) {
             // From a comment in OpenUSD : Shadows are supported on for SimpleLights and
             // DistantLights
+            // https://github.com/PixarAnimationStudios/OpenUSD/blob/8843f3b7b334bbcd8df014e63d1b8fad24fc6b6e/pxr/imaging/hdx/shadowTask.cpp#L117
             return VtValue(false); // No shadows
         }
 
