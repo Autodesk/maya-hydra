@@ -67,6 +67,8 @@ struct FramePassData
     //! Paths to force exclude from this frame pass
     PXR_NS::SdfPathVector _excludePaths;
 
+    int _passIndex = -1;
+
     //! this frame pass supports prims with no purpose render tags, set this to true if you want to
     //! render prims that do not have a purpose render tag
     bool _supportPrimsWithNoPurposeRenderTag = false;

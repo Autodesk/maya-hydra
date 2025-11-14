@@ -23,6 +23,7 @@
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/tokens.h>
 
+#include <iostream>
 #include <algorithm>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -73,6 +74,9 @@ PassFilteringSceneIndex::PassFilteringSceneIndex(
     , _framePassData(framePassData)
 {
     for (const SdfPath& primPath : HdSceneIndexPrimView(GetInputSceneIndex())) {
+        if (_framePassData->_passIndex == 0) {
+            std::cout << "Constructor processing " << primPath << std::endl;
+        }
         _UpdateFilteringStatus(primPath);
     }
 }
@@ -148,11 +152,20 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateFiltering
 
     if (!isFilteredOut && shouldBeFilteredOut) {
         _filteredPrims.insert(primPath);
+        if (_framePassData->_passIndex == 0) {
+            std::cout << "Filtering out (_UpdateFilteringStatus) " << primPath << std::endl;
+        }
         updatedPrims.emplace_back(primPath, TfToken());
     } else if (isFilteredOut && !shouldBeFilteredOut) {
         _filteredPrims.erase(primPath);
+        if (_framePassData->_passIndex == 0) {
+            std::cout << "Unfiltering (_UpdateFilteringStatus) " << primPath << std::endl;
+        }
         updatedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
     } else if (!isFilteredOut && !shouldBeFilteredOut && resync) {
+        if (_framePassData->_passIndex == 0) {
+            std::cout << "Adding or resyncing (_UpdateFilteringStatus) " << primPath << std::endl;
+        }
         updatedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
     }
 
@@ -175,6 +188,9 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_RemoveHighlight
         if (_highlightMaterialsUsage[materialPath] == 0) {
             _highlightMaterialsUsage.erase(materialPath);
             if (_ShouldBeFilteredOut(materialPath)) {
+                if (_framePassData->_passIndex == 0) {
+                    std::cout << "Material filtering out " << materialPath << " from " << primPath << std::endl;
+                }
                 _filteredPrims.insert(materialPath);
                 return {{materialPath, TfToken()}};
             }
@@ -222,6 +238,9 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateHighlight
         if (_highlightMaterialsUsage[materialPath] == 1) {
             if (_IsFilteredOut(materialPath)) {
                 _filteredPrims.erase(materialPath);
+                if (_framePassData->_passIndex == 0) {
+                    std::cout << "Material unfiltering in " << materialPath << " from " << primPath << std::endl;
+                }
                 updatedPrims.emplace_back(materialPath, HdPrimTypeTokens->material);
             }
         }
@@ -250,6 +269,9 @@ void PassFilteringSceneIndex::DirtyPrimsFromPurposeRenderTag(const TfToken purpo
     if (inputSceneIndex) {
         HdSceneIndexObserver::AddedPrimEntries updatedEntries;
         for (const SdfPath& primPath : HdSceneIndexPrimView(inputSceneIndex)) {
+            if (_framePassData->_passIndex == 0) {
+                std::cout << "DirtyPrimsFromPurposeRenderTag processing " << primPath << std::endl;
+            }
             auto updatedPrims = _UpdateFilteringStatus(primPath, false);
             updatedEntries.insert(updatedEntries.end(), updatedPrims.begin(), updatedPrims.end());
         }
@@ -266,6 +288,9 @@ void PassFilteringSceneIndex::_PrimsAdded(
     HdSceneIndexObserver::AddedPrimEntries addedEntries;
 
     for (const auto& addedEntry : entries) {
+        if (_framePassData->_passIndex == 0) {
+            std::cout << "Processing _PrimsAdded " << addedEntry.primPath << std::endl;
+        }
         auto updatedEntries = _UpdateFilteringStatus(addedEntry.primPath, true, true);
         addedEntries.insert(addedEntries.end(), updatedEntries.begin(), updatedEntries.end());
     }
@@ -284,8 +309,14 @@ void PassFilteringSceneIndex::_PrimsRemoved(
 
     for (const auto& removedEntry : entries) {
         removedEntries.emplace_back(removedEntry);
+        if (_framePassData->_passIndex == 0) {
+            std::cout << "Processing _PrimsRemoved " << removedEntry.primPath << std::endl;
+        }
         for (auto it = _filteredPrims.begin(); it != _filteredPrims.end();) {
             if ((*it).HasPrefix(removedEntry.primPath)) {
+                if (_framePassData->_passIndex == 0) {
+                    std::cout << "Removing  " << (*it) << " from filtered prims due to " << removedEntry.primPath  << " removed " << std::endl;
+                }
                 it = _filteredPrims.erase(it);
             } else {
                 it++;
@@ -311,6 +342,9 @@ void PassFilteringSceneIndex::_PrimsDirtied(
 {
     HdSceneIndexObserver::AddedPrimEntries   updatedEntries;
     for (const auto& entry : entries) {
+        if (_framePassData->_passIndex == 0) {
+            std::cout << "Processing _PrimsDirtied (update) " << entry.primPath << std::endl;
+        }
         auto updatedPrims = _UpdateFilteringStatus(entry.primPath);
         updatedEntries.insert(updatedEntries.end(), updatedPrims.begin(), updatedPrims.end());
     }
@@ -320,7 +354,13 @@ void PassFilteringSceneIndex::_PrimsDirtied(
 
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
     for (const auto& entry : entries) {
+        if (_framePassData->_passIndex == 0) {
+            std::cout << "Processing _PrimsDirtied (dirty) " << entry.primPath << std::endl;
+        }
         if (!_IsFilteredOut(entry.primPath)) {
+            if (_framePassData->_passIndex == 0) {
+                std::cout << "Adding dirty notification for " << entry.primPath << std::endl;
+            }
             dirtiedEntries.emplace_back(entry);
         }
     }

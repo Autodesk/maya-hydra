@@ -20,6 +20,8 @@
 
 #include <gtest/gtest.h>
 
+#include <iostream>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
@@ -70,6 +72,16 @@ TEST(PassFiltering, testPassFiltering)
             }
         }
     };
+
+    std::ofstream outPass0("pass0.txt");
+    std::cout << " --------------- PASS 0 BEGIN --------------- " << std::endl;
+    SceneIndexInspector(passSceneIndices[0]).WriteHierarchy(outPass0);
+    std::cout << " --------------- PASS 0 END --------------- " << std::endl;
+
+    std::ofstream outPass1("pass1.txt");
+    std::cout << " --------------- PASS 1 BEGIN --------------- " << std::endl;
+    SceneIndexInspector(passSceneIndices[1]).WriteHierarchy(outPass1);
+    std::cout << " --------------- PASS 1 END --------------- " << std::endl;
 
     // Maya mesh prim
     testPrim(
