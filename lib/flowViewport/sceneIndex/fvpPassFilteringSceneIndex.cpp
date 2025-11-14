@@ -252,9 +252,6 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateHighlight
 
 HdSceneIndexPrim PassFilteringSceneIndex::GetPrim(const SdfPath& primPath) const
 {
-    if (FindSelfOrFirstParent(primPath, _primsInRemoval) != _primsInRemoval.end()) {
-        return {};
-    }
     if (_IsFilteredOut(primPath)) {
         return {}; // Return empty prim
     }
@@ -263,9 +260,6 @@ HdSceneIndexPrim PassFilteringSceneIndex::GetPrim(const SdfPath& primPath) const
 
 SdfPathVector PassFilteringSceneIndex::GetChildPrimPaths(const SdfPath& primPath) const
 {
-    if (FindSelfOrFirstParent(primPath, _primsInRemoval) != _primsInRemoval.end()) {
-        return {};
-    }
     return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
@@ -315,7 +309,6 @@ void PassFilteringSceneIndex::_PrimsRemoved(
 
     for (const auto& removedEntry : entries) {
         removedEntries.emplace_back(removedEntry);
-        _primsInRemoval.insert(removedEntry.primPath);
         if (_framePassData->_passIndex == 0) {
             std::cout << "Processing _PrimsRemoved " << removedEntry.primPath << std::endl;
         }
@@ -344,7 +337,6 @@ void PassFilteringSceneIndex::_PrimsRemoved(
     if (!removedEntries.empty()) {
         _SendPrimsRemoved(removedEntries);
     }
-    _primsInRemoval.clear();
 }
 
 void PassFilteringSceneIndex::_PrimsDirtied(

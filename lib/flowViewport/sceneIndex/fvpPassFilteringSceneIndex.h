@@ -106,8 +106,6 @@ protected:
 private:
     PXR_NS::SdfPathSet _filteredPrims;
 
-    PXR_NS::SdfPathSet _primsInRemoval;
-
     // Used to track the materials that are required to properly render selection highlights
     std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _highlightsToMaterialsPaths;
     std::map<PXR_NS::SdfPath, int> _highlightMaterialsUsage;
