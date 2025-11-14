@@ -85,11 +85,11 @@ createNode mayaUsdProxyShape -n "GeomSubsetWireframeHighlightDisplacementTestSce
 	setAttr -k off ".v";
 	setAttr ".covm[0]"  0 1 1;
 	setAttr ".cdvm[0]"  0 1 1;
-	setAttr ".fp" -type "string" "D:/dev/maya-hydra-vt/maya-hydra/ecg-maya-hydra/maya-hydra/test/testSamples/testGeomSubsetsWireframeHighlight/GeomSubsetWireframeHighlightDisplacementTestScene.usda";
+	setAttr ".fp" -type "string" "./GeomSubsetWireframeHighlightDisplacementTestScene.usda";
 	setAttr ".pp" -type "string" "";
 	setAttr ".epp" -type "string" "";
 	setAttr ".usdStageLoadRules" -type "string" "/=none";
-	setAttr ".usdStageTargetLayer" -type "string" "D:/dev/maya-hydra-vt/maya-hydra/ecg-maya-hydra/maya-hydra/test/testSamples/testGeomSubsetsWireframeHighlight/GeomSubsetWireframeHighlightDisplacementTestScene.usda";
+	setAttr ".usdStageTargetLayer" -type "string" "./GeomSubsetWireframeHighlightDisplacementTestScene.usda";
 createNode transform -n "pSphere1";
 	rename -uid "250BBAFE-4AE1-BDBC-08D8-55B56B399C4B";
 	setAttr ".t" -type "double3" -9.1285748446526664 0 0 ;
