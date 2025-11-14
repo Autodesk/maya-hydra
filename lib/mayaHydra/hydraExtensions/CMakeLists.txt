@@ -8,7 +8,6 @@ add_library(${TARGET_NAME} SHARED)
 target_sources(${TARGET_NAME} 
     PRIVATE
         debugCodes.cpp
-        envUtils.cpp
         hydraUtils.cpp
         mayaHydraLibInterfaceImp.cpp
         mayaUtils.cpp
@@ -22,7 +21,6 @@ target_sources(${TARGET_NAME}
 set(HEADERS
     api.h
     debugCodes.h
-    envUtils.h
     hydraUtils.h
     mayaHydraParams.h
     mayaHydraLibInterface.h

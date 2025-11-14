@@ -215,12 +215,17 @@ public:
             (paramName == HdLightTokens->length) || (paramName == UsdLuxTokens->inputsLength)) {
             return VtValue(float(scale2[0]));
         } else if (
-            (paramName == HdLightTokens->shadowEnable) || (paramName == HdLightTokens->hasShadow)
-            || (paramName == UsdLuxTokens->inputsShadowEnable)) {
-            // From a comment in OpenUSD : Shadows are supported only for SimpleLights and
+            GetMayaHydraSceneIndex()->IsHdSt() //Storm will use shadow maps
+            &&(
+                (paramName == HdLightTokens->shadowEnable)  || 
+                (paramName == HdLightTokens->hasShadow)     || 
+                (paramName == UsdLuxTokens->inputsShadowEnable)
+              )
+            ){
+            // From a comment in OpenUSD : Shadow maps are supported only for SimpleLights and
             // DistantLights
             // https://github.com/PixarAnimationStudios/OpenUSD/blob/8843f3b7b334bbcd8df014e63d1b8fad24fc6b6e/pxr/imaging/hdx/shadowTask.cpp#L117
-            return VtValue(false); // No shadows
+            return VtValue(false); // No shadows for Storm with aiAreaLight
         }
 
         return MayaHydraLightAdapter::GetLightParamValue(paramName);

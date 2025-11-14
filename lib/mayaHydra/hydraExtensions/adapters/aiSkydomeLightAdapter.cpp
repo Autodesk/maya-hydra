@@ -20,15 +20,14 @@
 #include <mayaHydraLib/adapters/lightAdapter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
-#include <mayaHydraLib/envUtils.h>
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
-#include <pxr/pxr.h>
 #include <pxr/usd/sdf/assetPath.h>
 #include <pxr/usd/usdLux/tokens.h>
+#include <pxr/base/tf/getenv.h>
 
 #include <maya/MPlugArray.h>
 #include <maya/MTextureManager.h>
@@ -71,11 +70,16 @@ public:
         }
 
         if (_tmpFolderPath.empty()) {
-            std::string tmpDir;
-            if (MAYAHYDRA_NS_DEF::tryGetEnvUtf8("TMPDIR", tmpDir)) {
+            std::string tmpDir = TfGetenv("TMPDIR");
+            if (!tmpDir.empty()) {
                 _tmpFolderPath = tmpDir;
-            } else if (MAYAHYDRA_NS_DEF::tryGetEnvUtf8("TEMP", tmpDir)) {
-                _tmpFolderPath = tmpDir;
+            }
+            else
+            {
+                tmpDir = TfGetenv("TEMP");
+                if (!tmpDir.empty()) {
+                    _tmpFolderPath = tmpDir;
+                }
             }
         }
 
