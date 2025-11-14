@@ -322,9 +322,12 @@ void PassFilteringSceneIndex::_PrimsRemoved(
                 it++;
             }
         }
-        for (const auto& primPath : HdSceneIndexPrimView(GetInputSceneIndex(), removedEntry.primPath)) {
-            auto materialUpdates = _RemoveHighlightMaterialEntry(primPath);
-            updatedPrims.insert(updatedPrims.end(), materialUpdates.begin(), materialUpdates.end());
+        auto _highlightsToMaterialsPathsCopy = _highlightsToMaterialsPaths;
+        for (const auto& [primPath, materialPath] : _highlightsToMaterialsPathsCopy) {
+            if (primPath.HasPrefix(removedEntry.primPath)) {
+                auto materialUpdates = _RemoveHighlightMaterialEntry(primPath);
+                updatedPrims.insert(updatedPrims.end(), materialUpdates.begin(), materialUpdates.end());
+            }
         }
     }
 
