@@ -95,6 +95,8 @@ void PrimRemovalEnforcingSceneIndex::_PrimsRemoved(
     const HdSceneIndexObserver::RemovedPrimEntries &entries)
 {
     for (const auto& removedEntry : entries) {
+        // As _hierarchy is an SdfPathTable, all descendents will also
+        // be automatically removed from the table.
         _hierarchy.erase(removedEntry.primPath);
     }
     if (!entries.empty()) {
@@ -108,6 +110,7 @@ void PrimRemovalEnforcingSceneIndex::_PrimsDirtied(
 {
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
     for (const auto& entry : entries) {
+        // Avoid sending notifications on non-existent prims
         if (_PrimExists(entry.primPath)) {
             dirtiedEntries.push_back(entry);
         }
