@@ -33,6 +33,18 @@ class PassFilteringSceneIndex;
 typedef PXR_NS::TfRefPtr<PassFilteringSceneIndex> PassFilteringSceneIndexRefPtr;
 typedef PXR_NS::TfRefPtr<const PassFilteringSceneIndex> PassFilteringSceneIndexConstRefPtr;
 
+/// \class PassFilteringSceneIndex
+///
+/// A scene index that filters out prims based on whether they are relevant
+/// to the frame pass they are part of or not.
+///
+/// The filtering operates on a per-prim basis : filtering out a prim means
+/// that only the prim data itself is filtered out, not its whole sub-tree.
+/// Filtering out a prim does not mean its children are also filtered out.
+/// This is why filtering and unfiltering are both done through PrimsAdded
+/// notification rather than PrimsRemoved : a filtered prim is just
+/// resynced to a prim with no type and no data source.
+///
 class PassFilteringSceneIndex
     :
     public PXR_NS::HdSingleInputFilteringSceneIndexBase
