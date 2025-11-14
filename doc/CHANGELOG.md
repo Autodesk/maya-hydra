@@ -1,5 +1,33 @@
 # Changelog
 
+## [v0.7.3] - 2025-10-01
+
+**Added:**
+* Support Transform Selection Highlighting on Native Instances [#296](https://github.com/Autodesk/maya-hydra/pull/296)
+* Enable `cameraAdapter` when `MAYA_HYDRA_USE_MESH_ADAPTER` is 0 [#297](https://github.com/Autodesk/maya-hydra/pull/297)
+* Delete Ancestor Prim Folders from Hydra Scene Browser [#295](https://github.com/Autodesk/maya-hydra/pull/295)
+* Hydra Primitive Scene Stats [#294](https://github.com/Autodesk/maya-hydra/pull/294)
+* Dual hierarchy implementation [#308](https://github.com/Autodesk/maya-hydra/pull/308)
+
+**Fixed:**
+* Change erroneous USD version code switch from 2403 to 2405 [#300](https://github.com/Autodesk/maya-hydra/pull/300)
+* Fix camera translation to Hydra [#301](https://github.com/Autodesk/maya-hydra/pull/301)
+* Fix issue when using new Qt [#299](https://github.com/Autodesk/maya-hydra/pull/299)
+* Fix minor details [#292](https://github.com/Autodesk/maya-hydra/pull/292)
+
+**Build / Dependencies:**
+* Update minimum CMake version [#312](https://github.com/Autodesk/maya-hydra/pull/312)
+* Bump MayaHydra version [#314](https://github.com/Autodesk/maya-hydra/pull/314)
+* Update to next development version [#290](https://github.com/Autodesk/maya-hydra/pull/290)
+
+**Documentation:**
+* Update build docs [#313](https://github.com/Autodesk/maya-hydra/pull/313)
+* Remove dead link [#293](https://github.com/Autodesk/maya-hydra/pull/293)
+
+**Tests:**
+* Add NURBS curve test [#311](https://github.com/Autodesk/maya-hydra/pull/311)
+* Extend transform tests [#309](https://github.com/Autodesk/maya-hydra/pull/309)
+
 ## [v0.7.2] - 2025-08-05
 
 **Build:**
