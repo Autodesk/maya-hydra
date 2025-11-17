@@ -159,24 +159,6 @@ VtArray<SdfPath> _GetHierarchyRoots(const HdSceneIndexPrim& prim)
         : VtArray<SdfPath>({SdfPath::AbsoluteRootPath()});
 }
 
-bool _MaterialHasDisplacement(const HdSceneIndexPrim& materialPrim) {
-    if (materialPrim.primType != HdPrimTypeTokens->material) {
-        return false;
-    }
-    auto materialSchema = HdMaterialSchema::GetFromParent(materialPrim.dataSource);
-    auto materialNetwork = materialSchema.GetMaterialNetwork();
-    auto nodes = materialNetwork.GetNodes();
-    for (const auto& nodeName : nodes.GetNames()) {
-        auto displacement = nodes.Get(nodeName).GetParameters().Get(TfToken("displacement"));
-        if (displacement.IsDefined()) {
-            return true;
-        }
-    }
-    auto terminals = materialNetwork.GetTerminals();
-    auto displacement = terminals.Get(HdMaterialTerminalTokens->displacement);
-    return displacement.IsDefined();
-}
-
 // Copied over from USD's rerootingSceneIndex.cpp
 class _RerootingSceneIndexPathDataSource : public HdPathDataSource
 {
@@ -453,7 +435,7 @@ HdDataSourceBaseHandle _MaterialBlockingContainerDataSource::Get(const TfToken& 
         if (childPathDataSource) {
             auto materialPath = childPathDataSource->GetTypedValue(0);
             auto materialPrim = _inputSceneIndex->GetPrim(materialPath);
-            if (_MaterialHasDisplacement(materialPrim)) {
+            if (Fvp::MaterialHasDisplacement(materialPrim)) {
                 return childDataSource;
             }
         }

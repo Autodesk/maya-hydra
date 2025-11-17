@@ -51,6 +51,7 @@ target_sources(${TARGET_NAME}
         testCamera.cpp
         testCustomAttributes.cpp
         testMaterialBlocking.cpp
+        testPassFiltering.cpp
 )
 
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)

@@ -21,11 +21,11 @@
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 #include "flowViewport/fvpFramePassData.h"
 
-#include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/base/tf/token.h>
+#include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/imaging/hd/sceneIndexObserver.h>
 
-#include <functional>
-
+#include <map>
 
 namespace FVP_NS_DEF {
 
@@ -33,6 +33,18 @@ class PassFilteringSceneIndex;
 typedef PXR_NS::TfRefPtr<PassFilteringSceneIndex> PassFilteringSceneIndexRefPtr;
 typedef PXR_NS::TfRefPtr<const PassFilteringSceneIndex> PassFilteringSceneIndexConstRefPtr;
 
+/// \class PassFilteringSceneIndex
+///
+/// A scene index that filters out prims based on whether they are relevant
+/// to the frame pass they are part of or not.
+///
+/// The filtering operates on a per-prim basis : filtering out a prim means
+/// that only the prim data itself is filtered out, not its whole sub-tree.
+/// Filtering out a prim does not mean its children are also filtered out.
+/// This is why filtering and unfiltering are both done through PrimsAdded
+/// notification rather than PrimsRemoved : a filtered prim is just
+/// resynced to a prim with no type and no data source.
+///
 class PassFilteringSceneIndex
     :
     public PXR_NS::HdSingleInputFilteringSceneIndexBase
@@ -40,9 +52,6 @@ class PassFilteringSceneIndex
 {
 public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
-
-    FVP_API
-    static void ResetPassFilteringLog();
 
     FVP_API
     static PassFilteringSceneIndexRefPtr
@@ -68,51 +77,44 @@ protected:
         PXR_NS::HdSceneIndexBaseRefPtr const& inputSceneIndex,
         const Fvp::FramePassConstDataPtr&    framePassData);
 
-    // IMPORTANT: These notification methods (_PrimsAdded, _PrimsRemoved, _PrimsDirtied) and
-    // GetChildPrimPaths must NOT apply any filtering logic. They must forward all notifications
-    // and child paths unchanged to ensure proper scene graph synchronization when prims are
-    // dynamically moved between different frame passes (e.g., when switching display modes
-    // like wireframe, or when render tags change). Filtering is only applied in GetPrim().
-    
     FVP_API
     void _PrimsAdded(
         const PXR_NS::HdSceneIndexBase &sender,
-        const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries) override{
-        if (!_IsObserved()) {
-            return;
-        }
-        _SendPrimsAdded(entries);
-    }
+        const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries) override;
 
     FVP_API
     void _PrimsRemoved(
         const PXR_NS::HdSceneIndexBase &sender,
-        const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries) override{
-        if (!_IsObserved()) {
-            return;
-        }
-        _SendPrimsRemoved(entries);
-    }
+        const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries) override;
 
     FVP_API
     void _PrimsDirtied(
         const PXR_NS::HdSceneIndexBase &sender,
-        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override
-    {
-        if (!_IsObserved()) {
-            return;
-        }
-        _SendPrimsDirtied(entries);
-    }
+        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
 
     FVP_API
     bool _IsFilteredOut(const PXR_NS::SdfPath& primPath) const;
 
+    FVP_API
+    bool _ShouldBeFilteredOut(const PXR_NS::SdfPath& primPath) const;
+
+    FVP_API
+    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _UpdateFilteringStatus(const PXR_NS::SdfPath& primPath, bool dirtied = true, bool resync = false);
+
+    FVP_API
+    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _RemoveMaterialEntry(const PXR_NS::SdfPath& primPath);
+
+    FVP_API
+    PXR_NS::HdSceneIndexObserver::AddedPrimEntries _UpdateMaterialEntry(const PXR_NS::SdfPath& primPath);
+
     Fvp::FramePassConstDataPtr _framePassData;
 
 private:
-    // Helper function to determine if a prim should be included in all passes
-    bool _ShouldIncludeInAllPasses(const PXR_NS::HdSceneIndexPrim& prim) const;
+    PXR_NS::SdfPathSet _filteredPrims;
+
+    // Used to track the materials required by the prims that will actually be rendered in the pass 
+    std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _primsToMaterialPaths;
+    std::map<PXR_NS::SdfPath, int> _materialUseCounts;
 };
 
 } // namespace FVP_NS_DEF

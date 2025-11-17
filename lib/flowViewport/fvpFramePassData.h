@@ -39,8 +39,7 @@ namespace FVP_NS_DEF {
 /*! \brief Data structure containing all per-pass information
  *
  * This struct contains all the configuration data needed for a frame pass such as filtering
- * primitives in a frame pass, including renderer selection, paths,
- * render tags, and light handling preferences.
+ * primitives in a frame pass, including renderer selection, paths, render tags, etc.
  */
 struct FramePassData
 {
@@ -66,9 +65,6 @@ struct FramePassData
 
     //! Paths to force exclude from this frame pass
     PXR_NS::SdfPathVector _excludePaths;
-
-    //! Whether to keep lights in this frame pass
-    bool _keepLights = false;
 
     //! this frame pass supports prims with no purpose render tags, set this to true if you want to
     //! render prims that do not have a purpose render tag
