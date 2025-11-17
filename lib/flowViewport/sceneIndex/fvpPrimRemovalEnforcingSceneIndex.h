@@ -59,6 +59,7 @@ typedef PXR_NS::TfRefPtr<const PrimRemovalEnforcingSceneIndex> PrimRemovalEnforc
 ///    However, this GetPrim/GetChildPrimPaths call will end up recursing into all
 ///    of the merging scene index's input scenes, including the UsdImagingDrawModeSceneIndex,
 ///    which will (incorrectly) return a valid prim and child prim paths.
+///    https://github.com/PixarAnimationStudios/OpenUSD/blob/v25.08/pxr/imaging/hd/mergingSceneIndex.cpp#L507-L533
 /// 5. HdMergingSceneIndex considers the prim to still be present, and sends out
 ///    PrimsAdded notifications to resync.
 /// 6. Any downstream scene index observer will receive the PrimsAdded notifications
@@ -75,7 +76,7 @@ typedef PXR_NS::TfRefPtr<const PrimRemovalEnforcingSceneIndex> PrimRemovalEnforc
 /// 
 /// To note, this bug was previously avoided by HdMergingSceneIndex explicitly avoiding calling
 /// GetPrim/GetChildPrimPaths on the scene index that sent the PrimsRemoved notifications. This
-/// change is what unearthed the latent issue in UsdImagingDrawModeSceneIndex : 
+/// change, included in USD 25.02+, is what unearthed the latent issue in UsdImagingDrawModeSceneIndex : 
 /// https://github.com/PixarAnimationStudios/OpenUSD/commit/b4112c76b57c13cee4f6d7634dffef88c68c98e6
 ///
 class PrimRemovalEnforcingSceneIndex
