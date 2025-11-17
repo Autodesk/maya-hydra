@@ -183,7 +183,7 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("instanceWireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         sn.append(topInstancerSecondInstanceItem)
-        #The image has been updated with a wrong result for 2 passes and logged as HYDRA-1849
+        #Has antialiasing issues, logged already, but the selection highlight colors are as expected
         self.assertSnapshotClose("instanceWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
     
     def test_PrototypeWireframeColorChange(self):
