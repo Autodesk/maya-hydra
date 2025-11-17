@@ -509,10 +509,12 @@ void MtohRenderOverride::UpdateRenderGlobals(
             if (!purposeRenderTag.IsEmpty()) {
                 std::lock_guard<std::mutex> lock(_allInstancesMutex);
                 for (auto* instance : _allInstances) {
-                    const Fvp::FramePassDataPtrVector& framePassDataArray
+                    Fvp::FramePassDataPtrVector& framePassDataArray
                         = instance->_framePassesData;
                     for (auto& framePassData : framePassDataArray) {
                         if (framePassData && framePassData->IsValid()) {
+                            auto params = instance->_globals.delegateParams;
+                            framePassData->_renderTagsUpdateFn(params.renderPurpose, params.proxyPurpose, params.guidePurpose);
                             framePassData->DirtyPrimsFromPurposeRenderTag(purposeRenderTag);
                         }
                     }
@@ -770,7 +772,6 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
             primIds.insert(
                 primIds.end(), tempPrimIds.begin(), tempPrimIds.end()); // Insert all elements
         }
-        break; // We found the right frame pass and its render index, no need to continue, data has been taken from the renderindex
     }
 
     // Sort them by lexicographically order
@@ -987,9 +988,6 @@ MStatus MtohRenderOverride::Render(
             numVisibleFramePasses
                 = numFramePasses;
         }
-
-        // Reset the pass filtering log at the start of each render frame
-        Fvp::PassFilteringSceneIndex::ResetPassFilteringLog();
 
         // Iterate over visible passes
         for (int visibleIdx = 0; visibleIdx < numVisibleFramePasses; ++visibleIdx) {
@@ -2847,7 +2845,6 @@ void MtohRenderOverride::_CreateFramePassesData()
         filteringData->_excludePaths = (shouldUseSingleFramePass) 
                                         ? SdfPathVector{}
                                         : SdfPathVector{_highlightHierarchyPrefix}; // Ignore selection highlight prims if we have multiple passes
-        filteringData->_keepLights   = true;
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = true; // Main graphics pass supports prims with no purpose render tag
         
@@ -2883,7 +2880,6 @@ void MtohRenderOverride::_CreateFramePassesData()
         filteringData->_rendererName = MtohTokens->HdStormRendererPlugin;//Storm by default
         filteringData->_includePaths = { _highlightHierarchyPrefix }; // include selection highlight prims.
         filteringData->_excludePaths = { };
-        filteringData->_keepLights = true;
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = false; // Secondary graphics pass does not support prims with no purpose render tag
         _framePassesData.emplace_back(filteringData);

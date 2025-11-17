@@ -105,6 +105,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	#CPP tests disabled on OSX
     cpp/testWriteFile.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     cpp/testMaterialBlocking.py
+    cpp/testPassFiltering.py
 )
 
 # These two test files are identical, except for disabled tests.  See
