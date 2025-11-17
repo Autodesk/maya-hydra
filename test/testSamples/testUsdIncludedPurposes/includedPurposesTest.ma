@@ -1,8 +1,8 @@
-//Maya ASCII 2027ff01 scene
+//Maya ASCII 2026 scene
 //Name: includedPurposeTest.ma
 //Last modified: Fri, Nov 14, 2025 11:18:43 AM
 //Codeset: 1252
-requires maya "2027ff01";
+requires maya "2026";
 requires "stereoCamera" "10.0";
 requires -nodeType "aiOptions" -nodeType "aiAOVDriver" -nodeType "aiAOVFilter" -nodeType "aiImagerDenoiserOidn"
 		 "mtoa" "5.5.5";
@@ -11,7 +11,7 @@ requires -nodeType "mayaUsdLayerManager" -nodeType "mayaUsdProxyShape" -nodeType
 requires "stereoCamera" "10.0";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";
-fileInfo "product" "Maya 2027";
+fileInfo "product" "Maya 2026";
 fileInfo "version" "Preview Release";
 fileInfo "cutIdentifier" "202510212348-000000";
 fileInfo "osv" "Windows 11 Enterprise v2009 (Build: 22631)";

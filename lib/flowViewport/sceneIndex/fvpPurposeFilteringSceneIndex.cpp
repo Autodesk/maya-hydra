@@ -20,8 +20,6 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 
-#include <iostream>
-
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
@@ -74,7 +72,7 @@ bool PurposeFilteringSceneIndex::_FilterOut(const SdfPath& primPath) const
     // Algorithm:
     // - Prim with no purpose: pass it through (unfiltered)
     // - Prim with unknown purpose: pass it through (unfiltered).
-    //   Known purposes are is {render, proxy, guide}
+    //   Known purposes are {render, proxy, guide}
     // - Prim with known purpose: pass it through only if in set of
     //   included purposes.
 
@@ -164,7 +162,7 @@ void PurposeFilteringSceneIndex::_UpdateFilteringForTree(const PXR_NS::SdfPath& 
 
 HdSceneIndexPrim PurposeFilteringSceneIndex::GetPrim(const SdfPath& primPath) const
 {
-    // If an ancestor if filtered out, return nothing
+    // If an ancestor is filtered out, return nothing
     if (_IsAncestorFilteredOutInclusive(primPath)) {
         return {};
     }

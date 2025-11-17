@@ -2878,13 +2878,8 @@ void MtohRenderOverride::_CreateFramePassesData()
     if (!shouldUseSingleFramePass) {
         auto filteringData = std::make_shared<Fvp::FramePassData>();
         filteringData->_rendererName = MtohTokens->HdStormRendererPlugin;//Storm by default
-        // We must not add the _highlightHierarchyPrefix (selection highlight
-        // prims) to the list of included prims, as selection highlights are
-        // created from scene data which might not have a displayable purpose.
-        // For example, selecting a render purpose USD prim while render
-        // purpose is not displayed should not show a selection highlight.
-        filteringData->_includePaths = {};
-        filteringData->_excludePaths = {};
+        filteringData->_includePaths = { _highlightHierarchyPrefix }; // include selection highlight prims.
+        filteringData->_excludePaths = { };
         filteringData->_keepLights = true;
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = false; // Secondary graphics pass does not support prims with no purpose render tag

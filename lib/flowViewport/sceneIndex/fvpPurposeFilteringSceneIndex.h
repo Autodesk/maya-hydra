@@ -63,12 +63,6 @@ protected:
         PXR_NS::HdSceneIndexBaseRefPtr const& inputSceneIndex,
         const Purposes&                       includedPurposes);
 
-    // IMPORTANT: These notification methods (_PrimsAdded, _PrimsRemoved, _PrimsDirtied) and
-    // GetChildPrimPaths must NOT apply any filtering logic. They must forward all notifications
-    // and child paths unchanged to ensure proper scene graph synchronization when prims are
-    // dynamically moved between different frame passes (e.g., when switching display modes
-    // like wireframe, or when render tags change). Filtering is only applied in GetPrim().
-    
     FVP_API
     void _PrimsAdded(
         const PXR_NS::HdSceneIndexBase &sender,
