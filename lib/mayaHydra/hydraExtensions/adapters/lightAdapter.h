@@ -59,17 +59,32 @@ public:
     MAYAHYDRALIB_API
     VtValue Get(const TfToken& key) override;
     MAYAHYDRALIB_API
-    virtual void CreateCallbacks() override;
+    virtual VtValue GetLightMaterialNetwork() const; // Is for PRMan
     MAYAHYDRALIB_API
-    void SetShadowProjectionMatrix(const GfMatrix4d& matrix);
+    virtual void CreateCallbacks() override;
+
+    // Helper struct and method for Maya light parameters
+    struct MayaLightParams
+    {
+        float   intensity = 1.0f;
+        GfVec3f color { 1.0f, 1.0f, 1.0f };
+        GfVec3f shadowColor { 0.0f, 0.0f, 0.0f };
+        float   exposure = 0.0f;
+        bool    normalize = true;
+        float   diffuse = 1.0f;
+        float   specular = 1.0f;
+        bool    enableColorTemperature = false;
+        float   colorTemperature = 6500.0f;
+    };
+
+    MAYAHYDRALIB_API
+    MayaLightParams GetMayaLightParams() const;
     MAYAHYDRALIB_API
     TfToken GetRenderTag() const override;
-    
-    bool GetShadowsEnabled(MFnLight& light)const;
-    
-    void GetGlfSimpleLightPosAndDirFromMFnLight(
-        MFnLight&           light,
-        GlfSimpleLight&     outSimpleLight);
+
+    bool GetShadowsEnabled(MFnLight& light) const;
+
+    void GetGlfSimpleLightPosAndDirFromMFnLight(MFnLight& light, GlfSimpleLight& outSimpleLight);
 
 protected:
     MAYAHYDRALIB_API
@@ -79,8 +94,9 @@ protected:
     MAYAHYDRALIB_API
     bool _GetVisibility() const override;
 
-    GfMatrix4d _shadowProjectionMatrix;
-    bool       _isLightingOn = true;
+    GfMatrix4d _CalculateShadowProjectionMatrix();
+
+    bool _isLightingOn = true;
 };
 
 using MayaHydraLightAdapterPtr = std::shared_ptr<MayaHydraLightAdapter>;

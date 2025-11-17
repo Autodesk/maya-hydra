@@ -67,6 +67,10 @@ MObject dmapResolution;
 MObject dmapBias;
 MObject dmapFilterSize;
 MObject useDepthMapShadows;
+MObject useDmapAutoFocus;
+MObject dmapWidthFocus;
+MObject dmapFarClipPlane;
+MObject dmapNearClipPlane;
 
 } // namespace nonExtendedLightShapeNode
 
@@ -199,6 +203,10 @@ MStatus initialize()
         SET_ATTR_OBJ(dmapResolution);
         SET_ATTR_OBJ(dmapBias);
         SET_ATTR_OBJ(dmapFilterSize);
+        SET_ATTR_OBJ(useDmapAutoFocus);
+        SET_ATTR_OBJ(dmapWidthFocus);
+        SET_ATTR_OBJ(dmapFarClipPlane);
+        SET_ATTR_OBJ(dmapNearClipPlane);
     }
 
     {

@@ -90,7 +90,6 @@ protected:
         MStatus      status;
         MFnSpotLight mayaLight(GetDagPath(), &status);
         if (TF_VERIFY(status)) {
-            light.SetHasShadow(true);
             light.SetSpotCutoff(GetSpotCutoff(mayaLight));
             light.SetSpotFalloff(GetSpotFalloff(mayaLight));
         }
@@ -107,7 +106,9 @@ protected:
         if (key == HdLightTokens->shadowParams) {
             HdxShadowParams shadowParams;
             MFnSpotLight    mayaLight(GetDagPath());
-            if (!GetShadowsEnabled(mayaLight)) {
+            if (!GetShadowsEnabled(mayaLight)
+                || !(GetMayaHydraSceneIndex()
+                         ->IsHdSt())) { // Shadows are only supported for Storm with simpleLights
                 shadowParams.enabled = false;
                 return VtValue(shadowParams);
             }
@@ -132,11 +133,16 @@ protected:
         MStatus      status;
         MFnSpotLight light(GetDagPath(), &status);
         if (TF_VERIFY(status)) {
-            if (paramName == HdLightTokens->radius) {
-                const float radius = light.shadowRadius();
+            if ((paramName == HdLightTokens->radius) || (paramName == UsdLuxTokens->inputsRadius)) {
+                constexpr float FRUSTUM_LOCATION(1.3f); // same as in maya but positive
+                // Calculate radius based on cone angle and a reasonable distance
+                const double coneAngleRadians = light.coneAngle();
+                const float  radius
+                    = static_cast<float>(tan(coneAngleRadians / 2.0) * FRUSTUM_LOCATION);
                 return VtValue(radius);
             } else if (paramName == UsdLuxTokens->treatAsPoint) {
-                const bool treatAsPoint = (light.shadowRadius() == 0.0);
+                // For spot lights, we don't treat as point since they have a cone
+                constexpr bool treatAsPoint = false;
                 return VtValue(treatAsPoint);
             } else if (paramName == UsdLuxTokens->inputsShapingConeAngle) {
                 return VtValue(GetSpotCutoff(light));
@@ -159,8 +165,10 @@ TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, spotLight)
 {
     MayaHydraAdapterRegistry::RegisterLightAdapter(
         TfToken("spotLight"),
-        [](MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag) -> MayaHydraLightAdapterPtr {
-            return MayaHydraLightAdapterPtr(new MayaHydraSpotLightAdapter(mayaHydraSceneIndex, dag));
+        [](MayaHydraSceneIndex* mayaHydraSceneIndex,
+           const MDagPath&      dag) -> MayaHydraLightAdapterPtr {
+            return MayaHydraLightAdapterPtr(
+                new MayaHydraSpotLightAdapter(mayaHydraSceneIndex, dag));
         });
 }
 
