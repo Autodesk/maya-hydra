@@ -167,10 +167,10 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateFiltering
 
 HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_RemoveMaterialEntry(const PXR_NS::SdfPath& primPath)
 {
-    auto itMaterialPath = _rprimsToMaterialPaths.find(primPath);
-    if (itMaterialPath != _rprimsToMaterialPaths.end()) {
+    auto itMaterialPath = _primsToMaterialPaths.find(primPath);
+    if (itMaterialPath != _primsToMaterialPaths.end()) {
         auto materialPath = itMaterialPath->second;
-        _rprimsToMaterialPaths.erase(primPath);
+        _primsToMaterialPaths.erase(primPath);
         _materialUseCounts[materialPath]--;
         if (_materialUseCounts[materialPath] == 0) {
             _materialUseCounts.erase(materialPath);
@@ -215,11 +215,11 @@ HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateMaterialE
         return _RemoveMaterialEntry(primPath);
     }
 
-    auto prevMaterialPath = _rprimsToMaterialPaths.find(primPath);
-    if (prevMaterialPath == _rprimsToMaterialPaths.end() || materialPath != prevMaterialPath->second) {
+    auto prevMaterialPath = _primsToMaterialPaths.find(primPath);
+    if (prevMaterialPath == _primsToMaterialPaths.end() || materialPath != prevMaterialPath->second) {
         auto updatedPrims = _RemoveMaterialEntry(primPath);
         // Add the new material entry
-        _rprimsToMaterialPaths[primPath] = materialPath;
+        _primsToMaterialPaths[primPath] = materialPath;
         _materialUseCounts[materialPath]++;
         if (_materialUseCounts[materialPath] == 1) {
             // If the material was previously filtered out, unfilter it
@@ -297,8 +297,8 @@ void PassFilteringSceneIndex::_PrimsRemoved(
         }
 
         // Remove material entries on the prim and its children
-        auto _rprimsToMaterialPathsCopy = _rprimsToMaterialPaths;
-        for (const auto& [primPath, materialPath] : _rprimsToMaterialPathsCopy) {
+        auto _primsToMaterialPathsCopy = _primsToMaterialPaths;
+        for (const auto& [primPath, materialPath] : _primsToMaterialPathsCopy) {
             if (primPath.HasPrefix(removedEntry.primPath)) {
                 auto materialUpdates = _RemoveMaterialEntry(primPath);
                 updatedEntries.insert(updatedEntries.end(), materialUpdates.begin(), materialUpdates.end());

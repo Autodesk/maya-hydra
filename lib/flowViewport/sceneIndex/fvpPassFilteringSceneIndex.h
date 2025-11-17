@@ -112,8 +112,8 @@ protected:
 private:
     PXR_NS::SdfPathSet _filteredPrims;
 
-    // Used to track the materials required by the Rprims that will actually be rendered in the pass 
-    std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _rprimsToMaterialPaths;
+    // Used to track the materials required by the prims that will actually be rendered in the pass 
+    std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _primsToMaterialPaths;
     std::map<PXR_NS::SdfPath, int> _materialUseCounts;
 };
 
