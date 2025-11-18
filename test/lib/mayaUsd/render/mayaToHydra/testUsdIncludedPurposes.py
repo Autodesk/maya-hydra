@@ -27,10 +27,9 @@ class TestUsdIncludedPurposes(mtohUtils.MayaHydraBaseTestCase):
 
     def test_UsdIncludedPurposes(self):
         """
-        Load in a Maya file with a USD stage, then 
-        Test that creates a USD stage with a single USD camera, verifies it is
-        shown in the Hydra Storm viewport, then deletes the USD stage and
-        verifies the camera is no longer shown.
+        Load in a Maya file with a USD stage with prims of various purposes,
+        then vary the included purposes and verify that the expected prims
+        are shown.
         """
         testFile = mayaUtils.openTestScene(
             "testUsdIncludedPurposes", "includedPurposesTest.ma")
