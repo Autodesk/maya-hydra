@@ -998,7 +998,7 @@ MStatus MtohRenderOverride::Render(
         const MIntArray& framePassesVisible    = 
             MayaHydraSetVisibleFramePasses::getVisibleFramePasses();
         int                 numVisibleFramePasses = framePassesVisible.length();
-        const MString& visibleAOVName     = MayaHydraSetVisibleFramePasses::getAovName();
+        const MStringArray& visibleAOVNames = MayaHydraSetVisibleFramePasses::getAovNames();
         const int           numFramePasses     = _GetNumFramePasses();
         if (numVisibleFramePasses > numFramePasses) {
             numVisibleFramePasses
@@ -1029,7 +1029,7 @@ MStatus MtohRenderOverride::Render(
             currentPass->params().enablePresentation = isLastVisiblePass;
             
             // Set the AOV to visualize for the current pass if it exists
-            const TfToken aovName       = TfToken(visibleAOVName.asChar());
+            const TfToken aovName = TfToken(visibleAOVNames[visibleIdx].asChar());
             // Can't rely on GetRenderBuffer(aovName) here as the AOV may not have been created yet
             const auto renderDelegate = _GetRenderDelegate(actualPassIndex);
             const bool aovNameExists

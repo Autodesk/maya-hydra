@@ -38,12 +38,12 @@
  * 
  * Functionality:
  * - Set which render passes are visible by specifying pass indices (0, 1, 2, etc.)
- * - Optionally specify AOV name for all passes (defaults to "color" if not provided)
+ * - Optionally specify AOV names for each pass (defaults to "color" if not provided)
  * - Query currently visible render passes and their associated AOV names
  * - Supports multiple passes in a single command
  * 
- * The command manages static arrays that store the visible pass indices and 
- * the AOV name, which can be accessed by other parts of the Maya-Hydra system.
+ * The command manages static arrays that store the visible pass indices and their
+ * corresponding AOV names, which can be accessed by other parts of the Maya-Hydra system.
  */
 
 /* Examples
@@ -58,6 +58,10 @@
     //Set both passes visible with default AOVs
     MEL : mayaHydraSetVisibleFramePasses -e -v 0 -v 1
     Python : //Python : cmds.mayaHydraSetVisibleFramePasses(edit=True, visible=[0, 1])
+
+    //Set both passes visible with different AOVs though the depth aov from 2nd pass with override the color aov from first pass 
+    mayaHydraSetVisibleFramePasses -e -v 0 -aov "color" -v 1 -aov "depth"
+    Python : cmds.mayaHydraSetVisibleFramePasses(edit=True, visible=[0, 1], aovName=["color", "depth"])
 
     // Query the currently visible render passes and their AOV names
     MEL : mayaHydraSetVisibleFramePasses -q -v
@@ -78,13 +82,15 @@ namespace MAYAHYDRA_NS_DEF {
 
 const MString MayaHydraSetVisibleFramePasses::commandName("mayaHydraSetVisibleFramePasses");
 constexpr int _defaultVisibleFramePasses[] = { 0, 1 }; // Default visible passes (main and second)
-const MString _defaultAovName("color");         // Default AOV name
+const char* _defaultAovNames[] = { "color", "color" }; // Default AOV names
 
 MIntArray MayaHydraSetVisibleFramePasses::_visibleFramePasses(
     _defaultVisibleFramePasses,
     2); // Default visible passes (main and secondary)
 
-MString MayaHydraSetVisibleFramePasses::_aovName(_defaultAovName); // Default AOV name
+MStringArray MayaHydraSetVisibleFramePasses::_aovNames(
+    _defaultAovNames,
+    2); // Default AOV names
 
 namespace {
 
@@ -112,6 +118,7 @@ MSyntax MayaHydraSetVisibleFramePasses::createSyntax()
     
     // Add flag for AOV names - requires AOV name (string)
     syntax.addFlag(_aovNameId, _aovNameIdLong, MSyntax::kString);
+    syntax.makeFlagMultiUse(_aovNameId);
 
     // Add flag to list available AOVs - requires pass index (int)
     syntax.addFlag(_listAovsId, _listAovsIdLong, MSyntax::kUnsigned);
@@ -134,7 +141,7 @@ MStatus MayaHydraSetVisibleFramePasses::doIt(const MArgList& args)
 
     if (argData.isFlagSet(_resetId)) {
         _visibleFramePasses = MIntArray(_defaultVisibleFramePasses, sizeof(_defaultVisibleFramePasses) / sizeof(_defaultVisibleFramePasses[0]));
-        _aovName = _defaultAovName;
+        _aovNames = MStringArray(_defaultAovNames, sizeof(_defaultAovNames) / sizeof(_defaultAovNames[0]));
     }
 
     if (argData.isFlagSet(_listAovsId)) {
@@ -150,40 +157,50 @@ MStatus MayaHydraSetVisibleFramePasses::doIt(const MArgList& args)
             // Return the currently visible passes and their AOV names
             for (unsigned int i = 0; i < _visibleFramePasses.length(); i++) {
                 appendToResult(_visibleFramePasses[i]);
+                appendToResult(_aovNames[i]);
             }
-            appendToResult(_aovName);
         } else if (isEdit) {
             _visibleFramePasses.clear();
+            _aovNames.clear();
 
-            // Create a set to store passes for sorting and ensure uniqueness
+            // Create a map to store pass-AOV pairs for sorting and ensure uniqueness
             // This ensures that pass indices are unique and ordered by increasing pass index
-            // Example: "-v 1 -aov color -v 0" will result in 
-            //          passes [0,1] with AOV "color"
-            std::set<int> passes;
+            // If the same pass index is specified multiple times, the last AOV name will be used
+            // Example: "-v 1 -aov color -v 0 -aov depth" will result in 
+            //          passes [0,1] with AOVs ["depth","color"]
+            std::map<int, MString> passAovMap;
 
-            // Get the pass indices
+            // Get the pass indices and their corresponding AOV names
             const unsigned int numPasses = argData.numberOfFlagUses(_visiblePassesId);
+            const unsigned int numAovs = argData.isFlagSet(_aovNameId) ? argData.numberOfFlagUses(_aovNameId) : 0;
 
             for (unsigned int i = 0; i < numPasses; ++i) {
                 MArgList flagArgs;
                 argData.getFlagArgumentList(_visiblePassesId, i, flagArgs);
                 if (flagArgs.length() >= 1) {
                     const int passIndex = flagArgs.asInt(0);
-                    // Insert into set (automatically handles uniqueness and sorting)
-                    passes.insert(passIndex);
+                    
+                    // Determine the AOV name for this pass
+                    MString aovName("color"); // Default AOV
+                    if (i < numAovs) {
+                        MArgList aovFlagArgs;
+                        argData.getFlagArgumentList(_aovNameId, i, aovFlagArgs);
+                        if (aovFlagArgs.length() >= 1) {
+                            aovName = aovFlagArgs.asString(0);
+                        }
+                    }
+                    
+                    // Insert into map (automatically handles uniqueness and sorting)
+                    passAovMap[passIndex] = aovName;
                 }
             }
 
-            // Get the AOV name
-            MString aovName(_defaultAovName);
-            argData.getFlagArgument(_aovNameId, 0, aovName);
-
-            // Extract sorted and unique pass indices into member arrays
-            // The set automatically keeps entries sorted by key (pass index)
-            for (const auto& pass : passes) {
-                _visibleFramePasses.append(pass);
+            // Extract sorted and unique pass indices and AOV names into member arrays
+            // The map automatically keeps entries sorted by key (pass index)
+            for (const auto& pair : passAovMap) {
+                _visibleFramePasses.append(pair.first);
+                _aovNames.append(pair.second);
             }
-            _aovName = aovName;
         }
     }
 

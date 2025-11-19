@@ -35,11 +35,11 @@ public:
     MStatus doIt(const MArgList& args) override;
 
     static const MIntArray& getVisibleFramePasses() { return _visibleFramePasses; }
-    static const MString& getAovName() { return _aovName; }
+    static const MStringArray& getAovNames() { return _aovNames; }
 
 private:
     static MIntArray _visibleFramePasses;
-    static MString _aovName;
+    static MStringArray _aovNames;
 };
 
 } // namespace MAYAHYDRA_NS_DEF
