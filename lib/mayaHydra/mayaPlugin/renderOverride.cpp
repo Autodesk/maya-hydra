@@ -292,30 +292,6 @@ int GetNearestHitIndex(
 
     return nearestHitIndex;
 }
-
-// Can't rely on UsdImagingGLEngine::GetRenderAovs() as it may interfere with the current renderer
-TfTokenVector _GetRenderAovs(HdRenderIndex* renderIndex)
-{
-    TfTokenVector aovs;
-    if (renderIndex && renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
-
-        static const TfToken candidates[] = { HdAovTokens->primId,
-                                              HdAovTokens->depth,
-                                              HdAovTokens->normal,
-                                              HdAovTokens->Neye,
-                                              HdAovTokensMakePrimvar(TfToken("st")) };
-
-        aovs = { HdAovTokens->color };
-        for (auto const& aov : candidates) {
-            if (renderIndex->GetRenderDelegate()->GetDefaultAovDescriptor(aov).format
-                != HdFormatInvalid) {
-                aovs.push_back(aov);
-            }
-        }
-    }
-    return aovs;
-}
-
 } // namespace
 
 class MtohRenderOverride::SelectionObserver : public Ufe::Observer
@@ -713,7 +689,26 @@ TfTokenVector MtohRenderOverride::GetAvailableFramePassAovs(int passIndex)
     for (auto* instance : _allInstances) {
         if (instance->_initializationSucceeded
             && passIndex < static_cast<int>(instance->_framePassesData.size())) {
-            const auto& currAovs = instance->_framePassesData[passIndex]->_availableAovs;
+            // Can't rely on UsdImagingGLEngine::GetRenderAovs() as creating a temp UsdImagingGLEngine with same hgi 
+            // may interfere with the current renderer, just copy the same implementation here
+            TfTokenVector currAovs;
+            const auto    renderIndex = instance->renderIndex(passIndex);
+            if (renderIndex && renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
+
+                static const TfToken candidates[] = { HdAovTokens->primId,
+                                                      HdAovTokens->depth,
+                                                      HdAovTokens->normal,
+                                                      HdAovTokens->Neye,
+                                                      HdAovTokensMakePrimvar(TfToken("st")) };
+
+                currAovs = { HdAovTokens->color };
+                for (auto const& aov : candidates) {
+                    if (renderIndex->GetRenderDelegate()->GetDefaultAovDescriptor(aov).format
+                        != HdFormatInvalid) {
+                        currAovs.push_back(aov);
+                    }
+                }
+            }
             aovs.insert(aovs.end(), currAovs.begin(), currAovs.end());
         }
     }
@@ -1003,7 +998,7 @@ MStatus MtohRenderOverride::Render(
         const MIntArray& framePassesVisible    = 
             MayaHydraSetVisibleFramePasses::getVisibleFramePasses();
         int                 numVisibleFramePasses = framePassesVisible.length();
-        const MStringArray& visibleAOVNames     = MayaHydraSetVisibleFramePasses::getAovNames();
+        const MString& visibleAOVName     = MayaHydraSetVisibleFramePasses::getAovName();
         const int           numFramePasses     = _GetNumFramePasses();
         if (numVisibleFramePasses > numFramePasses) {
             numVisibleFramePasses
@@ -1034,10 +1029,13 @@ MStatus MtohRenderOverride::Render(
             currentPass->params().enablePresentation = isLastVisiblePass;
             
             // Set the AOV to visualize for the current pass if it exists
-            const TfToken aovName       = TfToken(visibleAOVNames[visibleIdx].asChar());
+            const TfToken aovName       = TfToken(visibleAOVName.asChar());
             // Can't rely on GetRenderBuffer(aovName) here as the AOV may not have been created yet
-            const auto& availableAovs = _framePassesData[actualPassIndex]->_availableAovs;
-            const bool  aovNameExists = std::find(availableAovs.begin(), availableAovs.end(), aovName) != availableAovs.end();
+            const auto renderDelegate = _GetRenderDelegate(actualPassIndex);
+            const bool aovNameExists
+                = renderDelegate ? 
+                renderDelegate->GetDefaultAovDescriptor(aovName).format != HdFormatInvalid
+                : false;
             currentPass->params().visualizeAOV
                 = (aovNameExists) 
                 ? aovName 
@@ -1080,7 +1078,7 @@ MStatus MtohRenderOverride::Render(
                     }
                     const hvt::RenderBufferBindings aovBindings = previousPass->GetRenderBufferBindingsForNextPass(inputAOVs);
                     HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(aovBindings);
-                    
+
                     /*Debug code left here if needed later
                     hvt::FramePass& framePassToDebug = *currentPass;
                     std::ostringstream content;
@@ -2819,7 +2817,6 @@ void MtohRenderOverride::_CreateFramePass(
 
     // Update the consolidated frame pass data
     _framePassesData[passIndex]->_renderIndexProxy = renderer;
-    _framePassesData[passIndex]->_availableAovs = _GetRenderAovs(renderer->RenderIndex());
     _framePassesData[passIndex]->_framePass = std::move(framePass);
 }
 
