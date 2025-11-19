@@ -106,4 +106,17 @@ public:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
+namespace MAYAHYDRA_NS_DEF {
+namespace RenderGlobalsUtils {
+
+// Translate a Maya default render globals attribute name to its corresponding
+// purpose.
+PXR_NS::TfToken GetPurposeRenderTagFromAttrName(const PXR_NS::TfToken& attrName);
+
+// Read the included purposes from the MayaHydra render globals.
+std::set<PXR_NS::TfToken> GetIncludedPurposes();
+
+}
+}
+
 #endif // MTOH_RENDER_GLOBALS_H

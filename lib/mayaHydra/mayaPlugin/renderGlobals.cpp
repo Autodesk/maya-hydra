@@ -1217,3 +1217,61 @@ MtohRenderGlobals::GlobalChanged(const GlobalParams& params, bool storeUserSetti
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+PXR_NAMESPACE_USING_DIRECTIVE
+
+namespace MAYAHYDRA_NS_DEF {
+namespace RenderGlobalsUtils {
+
+TfToken GetPurposeRenderTagFromAttrName(const TfToken& attrName)
+{
+    static const std::map<TfToken, TfToken> attrToTag {
+        { TfToken("mayaHydraRenderPurpose"),    HdRenderTagTokens->render },
+        { TfToken("mayaHydraProxyPurpose"),     HdRenderTagTokens->proxy },
+        { TfToken("mayaHydraGuidePurpose"),     HdRenderTagTokens->guide }
+    };
+    auto found = attrToTag.find(attrName);
+    if (found != attrToTag.end()) {
+        return found->second;
+    }
+    TF_CODING_ERROR("Unknown purpose attribute name '%s'", attrName.GetText());
+    return {};
+}
+
+// Read the included purposes from the MayaHydra render globals.
+std::set<PXR_NS::TfToken> GetIncludedPurposes()
+{
+    static MObject rgObj;
+    MStatus status;
+
+    if (rgObj.isNull()) {
+        MSelectionList sn;
+        status = sn.add(MString(_tokens->defaultRenderGlobals.GetText()));
+        TF_AXIOM(status == MS::kSuccess);
+        status = sn.getDependNode(0, rgObj);
+        TF_AXIOM(status == MS::kSuccess);
+    }
+
+    std::set<PXR_NS::TfToken> includedPurposes;
+    MFnDependencyNode rgFn(rgObj);
+    constexpr bool setOptionVar = false;
+    for (auto attrName : {_tokens->mayaHydraProxyPurpose, _tokens->mayaHydraRenderPurpose, _tokens->mayaHydraGuidePurpose}) {
+        bool enabled;
+        // Purpose attributes are dynamically created on the
+        // defaultRenderGlobals node, so incorrectly querying them before
+        // creation will fail.
+        if (!_GetAttribute(
+                rgFn, MString(attrName.GetText()), enabled, setOptionVar)) {
+            TF_WARN("_GetAttribute(%s.%s) failed.", rgFn.name().asChar(), attrName.GetText());
+            continue;
+        }
+        if (enabled) {
+            includedPurposes.insert(GetPurposeRenderTagFromAttrName(attrName));
+        }
+    }
+
+    return includedPurposes;
+}
+
+}
+}

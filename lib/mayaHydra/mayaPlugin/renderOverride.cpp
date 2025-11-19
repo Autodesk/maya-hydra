@@ -157,21 +157,6 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaHydraViewportRenderer");
 
-TfToken _GetPurposeRenderTagFromAttrName(const TfToken& attrName)
-{
-    static const std::map<TfToken, TfToken> attrToTag {
-        { TfToken("mayaHydraRenderPurpose"),    HdRenderTagTokens->render },
-        { TfToken("mayaHydraProxyPurpose"),     HdRenderTagTokens->proxy },
-        { TfToken("mayaHydraGuidePurpose"),     HdRenderTagTokens->guide }
-    };
-    auto found = attrToTag.find(attrName);
-    if (found != attrToTag.end()) {
-        return found->second;
-    }
-    TF_CODING_ERROR("Unknown purpose attribute name '%s'", attrName.GetText());
-    return {};
-}
-
 inline bool isInComponentsPickingMode(const MHWRender::MSelectionInfo& selectInfo)
 {
     return selectInfo.selectable(MSelectionMask::kSelectMeshVerts)
@@ -475,6 +460,9 @@ void MtohRenderOverride::UpdateRenderGlobals(
     // next call to MtohRenderOverride::Render, so just force an invalidation
     // XXX: This will need to change if mayaHydra settings should ever make it to the delegate
     // itself.
+
+    // If the attribute name does not start with mayaHydra, or mayaHydra is
+    // not found.
     if (attrName.GetString().find("mayaHydra") != 0) {
         std::lock_guard<std::mutex> lock(_allInstancesMutex);
         for (auto* instance : _allInstances) {
@@ -504,7 +492,7 @@ void MtohRenderOverride::UpdateRenderGlobals(
             //One of the render purpose attributes just changed
             //Get purpose render tag from attribute name
             const PXR_NS::TfToken purposeRenderTag
-                = _GetPurposeRenderTagFromAttrName(attrName);
+                = RenderGlobalsUtils::GetPurposeRenderTagFromAttrName(attrName);
 
             if (!purposeRenderTag.IsEmpty()) {
                 std::lock_guard<std::mutex> lock(_allInstancesMutex);
@@ -1780,12 +1768,21 @@ void MtohRenderOverride::_InitHydraResources(
     // registry accordingly.
     PickHandlerRegistry::Instance().SetPickContext(this);
 
-    //Create internal scene indices chain
+    // Create internal scene indices chain
     _inputSceneIndexOfFilteringSceneIndicesChain = _dataProducerMergingSceneIndexProxy->GetMergingSceneIndex();
 
     //Put BlockPrimRemovalPropagationSceneIndex first as it can block/unblock the prim removal propagation on the whole scene indices chain
     _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
-    _pruningSceneIndex = Fvp::PruningSceneIndex::New(_blockPrimRemovalPropagationSceneIndex);
+
+    // As of 13-Nov-2025, order of operations in _InitHydraResources() is such
+    // that render globals are initialized after this method is called.  Thus
+    // the included purposes attributes do not yet exist on the
+    // defaultRenderGlobals node.  Simply pass in an empty set of included
+    // purposes here.
+    _purposeFilteringSceneIndex = Fvp::PurposeFilteringSceneIndex::New(
+        _blockPrimRemovalPropagationSceneIndex, {});
+        // RenderGlobalsUtils::GetIncludedPurposes());
+    _pruningSceneIndex = Fvp::PruningSceneIndex::New(_purposeFilteringSceneIndex);
     _pruningSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya filtering is handled by VP2/OGS.
     _selection = std::make_shared<Fvp::Selection>();
     _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_pruningSceneIndex, _selection);
@@ -2937,7 +2934,8 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
         }
     }
 #endif
-}
 
+    _purposeFilteringSceneIndex->UpdatePrimsFromIncludedPurposes(RenderGlobalsUtils::GetIncludedPurposes());
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE
