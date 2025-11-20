@@ -220,7 +220,7 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
 
         imageVersion = None
         if self._usdVersion >= (0, 25, 8):
-            imageVersion = "_usd2508+"
+            imageVersion = "usd2508+"
     
         cmds.select(self.shapeNode)
         self.compareSnapshot("selectMayaUsdNode.png", imageVersion=imageVersion)

@@ -26,7 +26,7 @@ class TestStageInstanceablePrimsSelHighlight(mtohUtils.MayaHydraBaseTestCase): #
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 0.3
-    
+
     def setUp(self):
         super(TestStageInstanceablePrimsSelHighlight, self).setUp()
 
@@ -36,7 +36,7 @@ class TestStageInstanceablePrimsSelHighlight(mtohUtils.MayaHydraBaseTestCase): #
 
         imageVersion = None
         if self._usdVersion >= (0, 25, 8):
-            imageVersion = "_usd2508+"
+            imageVersion = "usd2508+"
 
         #Select the cylinder and do a snapshot
         ufe.GlobalSelection.get().clear()

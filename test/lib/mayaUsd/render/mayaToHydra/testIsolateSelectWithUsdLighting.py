@@ -58,7 +58,7 @@ class TestIsolateSelectWithUsdLighting(mtohUtils.MayaHydraBaseTestCase):
 
         imageVersion = None
         if self._usdVersion >= (0, 25, 8):
-            imageVersion = "_usd2508+"
+            imageVersion = "usd2508+"
 
         self.assertSnapshotClose("isolateSelectWithUsdLighting" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 

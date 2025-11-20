@@ -47,7 +47,7 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     def setUpClass(cls):
         super(TestGeomSubsetsWireframeHighlight, cls).setUpClass()
         if cls._usdVersion >= (0, 25, 8):
-            cls._imageVersionUSD = "_usd2508+"
+            cls._imageVersionUSD = "usd2508+"
 
     def setUp(self):
         super(TestGeomSubsetsWireframeHighlight, self).setUp()
