@@ -35,11 +35,6 @@ class TestLookThrough(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.M
                 "testLookThrough.ma")
         cmds.refresh()
 
-        imageVersion = None
-        frame_passes_count = self.framePassesCount
-        if frame_passes_count == 2:
-            imageVersion = "two_passes"
-
         #Verify Default display
         panel = mayaUtils.activeModelPanel()
         self.assertSnapshotClose("default" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
@@ -47,12 +42,12 @@ class TestLookThrough(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.M
         #Verify look through camera
         cmds.lookThru( panel, 'persp1' )
         cmds.refresh()
-        self.assertSnapshotClose("lookThroughCamera" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+        self.assertSnapshotClose("lookThroughCamera" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Verify look through spot Light
         cmds.lookThru( panel, 'spotLight1' )
         cmds.refresh()
-        self.assertSnapshotClose("lookThroughSpotLight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+        self.assertSnapshotClose("lookThroughSpotLight" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         #Verify look through area light, use a small far clip to clip the scene
         cmds.lookThru( panel, 'areaLight1', nc=0.0, fc=7.5 )

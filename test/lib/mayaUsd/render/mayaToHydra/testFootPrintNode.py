@@ -43,6 +43,8 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         super(TestFootPrintNode, cls).setUpClass()
         if cls._usdVersion >= (0, 24, 11):
             cls.imageVersionUSD = 'usd_2411+'
+        if cls._usdVersion >= (0, 25, 8):
+            cls.imageVersionUSD = "_usd2508+"
 
     #This function is called before each test is launched
     def setUp(self):
@@ -271,7 +273,7 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
             cmds.createNode('MhFootPrint')
             cmds.refresh()
             self.setBasicCam(0.5)
-            self.assertSnapshotClose("selectionHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes + ("_usd2508+" if self._usdVersion >= (0, 25, 8) else ""))
+            self.assertSnapshotClose("selectionHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersionUSD)
 
     # Test picking.  Once picked, the footprint node must appear in the global
     # selection.
