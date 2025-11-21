@@ -28,6 +28,8 @@
 #include <ufe/scene.h>
 #include <ufe/sceneNotification.h>
 
+#include <optional>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class MayaFilteringSceneIndexData;
