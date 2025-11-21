@@ -27,6 +27,8 @@
 #include <ufe/sceneNotification.h>
 #include <ufe/transform3d.h>
 
+#include <optional>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class MayaDataProducerSceneIndexData;

@@ -68,20 +68,14 @@ class TestMayaHydraRender(BasicRenderBaseTestCase):
 
     def test_cube(self):
         imageVersion = maya.mel.eval("defaultShaderName").rstrip(digits)
-        
-        #Change image file name for 2 frame passes as the sel. highlight is different
-        passes = None
-        if self._imageVersionFor2Passes:
-            passes = "_two_passes"
 
         self.makeCubeScene(camDist=6)
         self.assertSnapshotClose(
             "cube_unselected.png", self.IMAGE_DIFF_FAIL_THRESHOLD,
             self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
         cmds.select(self.cubeTrans)
-        imageFilename = "cube_selected" + (passes if passes else "") + ".png"
         self.assertSnapshotClose(
-            imageFilename, self.IMAGE_DIFF_FAIL_THRESHOLD,
+            "cube_selected.png", self.IMAGE_DIFF_FAIL_THRESHOLD,
             self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
 

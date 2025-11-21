@@ -157,21 +157,6 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaHydraViewportRenderer");
 
-TfToken _GetPurposeRenderTagFromAttrName(const TfToken& attrName)
-{
-    static const std::map<TfToken, TfToken> attrToTag {
-        { TfToken("mayaHydraRenderPurpose"),    HdRenderTagTokens->render },
-        { TfToken("mayaHydraProxyPurpose"),     HdRenderTagTokens->proxy },
-        { TfToken("mayaHydraGuidePurpose"),     HdRenderTagTokens->guide }
-    };
-    auto found = attrToTag.find(attrName);
-    if (found != attrToTag.end()) {
-        return found->second;
-    }
-    TF_CODING_ERROR("Unknown purpose attribute name '%s'", attrName.GetText());
-    return {};
-}
-
 inline bool isInComponentsPickingMode(const MHWRender::MSelectionInfo& selectInfo)
 {
     return selectInfo.selectable(MSelectionMask::kSelectMeshVerts)
@@ -475,6 +460,9 @@ void MtohRenderOverride::UpdateRenderGlobals(
     // next call to MtohRenderOverride::Render, so just force an invalidation
     // XXX: This will need to change if mayaHydra settings should ever make it to the delegate
     // itself.
+
+    // If the attribute name does not start with mayaHydra, or mayaHydra is
+    // not found.
     if (attrName.GetString().find("mayaHydra") != 0) {
         std::lock_guard<std::mutex> lock(_allInstancesMutex);
         for (auto* instance : _allInstances) {
@@ -504,15 +492,17 @@ void MtohRenderOverride::UpdateRenderGlobals(
             //One of the render purpose attributes just changed
             //Get purpose render tag from attribute name
             const PXR_NS::TfToken purposeRenderTag
-                = _GetPurposeRenderTagFromAttrName(attrName);
+                = RenderGlobalsUtils::GetPurposeRenderTagFromAttrName(attrName);
 
             if (!purposeRenderTag.IsEmpty()) {
                 std::lock_guard<std::mutex> lock(_allInstancesMutex);
                 for (auto* instance : _allInstances) {
-                    const Fvp::FramePassDataPtrVector& framePassDataArray
+                    Fvp::FramePassDataPtrVector& framePassDataArray
                         = instance->_framePassesData;
                     for (auto& framePassData : framePassDataArray) {
                         if (framePassData && framePassData->IsValid()) {
+                            auto params = instance->_globals.delegateParams;
+                            framePassData->_renderTagsUpdateFn(params.renderPurpose, params.proxyPurpose, params.guidePurpose);
                             framePassData->DirtyPrimsFromPurposeRenderTag(purposeRenderTag);
                         }
                     }
@@ -787,7 +777,6 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
             primIds.insert(
                 primIds.end(), tempPrimIds.begin(), tempPrimIds.end()); // Insert all elements
         }
-        break; // We found the right frame pass and its render index, no need to continue, data has been taken from the renderindex
     }
 
     // Sort them by lexicographically order
@@ -1004,9 +993,6 @@ MStatus MtohRenderOverride::Render(
             numVisibleFramePasses
                 = numFramePasses;
         }
-
-        // Reset the pass filtering log at the start of each render frame
-        Fvp::PassFilteringSceneIndex::ResetPassFilteringLog();
 
         // Iterate over visible passes
         for (int visibleIdx = 0; visibleIdx < numVisibleFramePasses; ++visibleIdx) {
@@ -1803,12 +1789,21 @@ void MtohRenderOverride::_InitHydraResources(
     // registry accordingly.
     PickHandlerRegistry::Instance().SetPickContext(this);
 
-    //Create internal scene indices chain
+    // Create internal scene indices chain
     _inputSceneIndexOfFilteringSceneIndicesChain = _dataProducerMergingSceneIndexProxy->GetMergingSceneIndex();
 
     //Put BlockPrimRemovalPropagationSceneIndex first as it can block/unblock the prim removal propagation on the whole scene indices chain
     _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
-    _pruningSceneIndex = Fvp::PruningSceneIndex::New(_blockPrimRemovalPropagationSceneIndex);
+
+    // As of 13-Nov-2025, order of operations in _InitHydraResources() is such
+    // that render globals are initialized after this method is called.  Thus
+    // the included purposes attributes do not yet exist on the
+    // defaultRenderGlobals node.  Simply pass in an empty set of included
+    // purposes here.
+    _purposeFilteringSceneIndex = Fvp::PurposeFilteringSceneIndex::New(
+        _blockPrimRemovalPropagationSceneIndex, {});
+        // RenderGlobalsUtils::GetIncludedPurposes());
+    _pruningSceneIndex = Fvp::PruningSceneIndex::New(_purposeFilteringSceneIndex);
     _pruningSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya filtering is handled by VP2/OGS.
     _selection = std::make_shared<Fvp::Selection>();
     _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_pruningSceneIndex, _selection);
@@ -2868,7 +2863,6 @@ void MtohRenderOverride::_CreateFramePassesData()
         filteringData->_excludePaths = (shouldUseSingleFramePass) 
                                         ? SdfPathVector{}
                                         : SdfPathVector{_highlightHierarchyPrefix}; // Ignore selection highlight prims if we have multiple passes
-        filteringData->_keepLights   = true;
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = true; // Main graphics pass supports prims with no purpose render tag
         
@@ -2904,7 +2898,6 @@ void MtohRenderOverride::_CreateFramePassesData()
         filteringData->_rendererName = MtohTokens->HdStormRendererPlugin;//Storm by default
         filteringData->_includePaths = { _highlightHierarchyPrefix }; // include selection highlight prims.
         filteringData->_excludePaths = { };
-        filteringData->_keepLights = true;
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = false; // Secondary graphics pass does not support prims with no purpose render tag
         _framePassesData.emplace_back(filteringData);
@@ -2962,7 +2955,8 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
         }
     }
 #endif
-}
 
+    _purposeFilteringSceneIndex->UpdatePrimsFromIncludedPurposes(RenderGlobalsUtils::GetIncludedPurposes());
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE
