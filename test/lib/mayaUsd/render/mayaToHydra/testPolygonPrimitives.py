@@ -23,13 +23,13 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    @property
-    def IMAGE_DIFF_FAIL_THRESHOLD(self):
-        if platform.system() == "Darwin":
-            return 0.1
-        return 0.05
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.05
 
-    IMAGE_DIFF_FAIL_PERCENT = 1.5
+    @property
+    def IMAGE_DIFF_FAIL_PERCENT(self):
+        if platform.system() == "Darwin":
+            return 2
+        return 1.5
 
     _requiredPlugins = ['modelingToolkit']
 
