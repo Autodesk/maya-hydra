@@ -28,7 +28,6 @@ class TestMeshWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1
-    imageVersion=None
 
     def loadUsdScene(self):
         import usdUtils
@@ -42,10 +41,6 @@ class TestMeshWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr('persp.translate', 2, 2, 2, type='float3')
         self.modifyDefaultLightIntensityByUsdVersion()
         cmds.refresh()
-        # Compute imageVersion once during setup
-        frame_passes_count = self.framePassesCount
-        if frame_passes_count == 2:
-            self.imageVersion = "two_passes"
 
     def test_MeshSelection(self):
         sn = ufe.GlobalSelection.get()
@@ -63,7 +58,7 @@ class TestMeshWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(parentItem)
-        self.assertSnapshotClose("meshSelection_parent.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
+        self.assertSnapshotClose("meshSelection_parent.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
     def test_WireframeColorChange(self):
         sn = ufe.GlobalSelection.get()
@@ -80,7 +75,7 @@ class TestMeshWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("wireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         sn.append(topCubeItem)
-        self.assertSnapshotClose("wireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
+        self.assertSnapshotClose("wireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

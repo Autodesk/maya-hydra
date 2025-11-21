@@ -41,7 +41,7 @@ class TestCurveTools(mtohUtils.MayaHydraBaseTestCase):
         try:
             self.setBasicCam(cameraDistance)
             cmds.refresh()
-            self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes)
+            self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         except Exception as e:
             # Collect the failure instead of raising it immediately
             self._failures.append((referenceFilename, str(e)))

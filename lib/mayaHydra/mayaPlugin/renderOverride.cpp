@@ -1031,16 +1031,9 @@ MStatus MtohRenderOverride::Render(
                 const int previousPassIndex = (visibleIdx > 0) ?framePassesVisible[visibleIdx - 1] : 0;
                 hvt::FramePassPtr& previousPass = _GetFramePass(previousPassIndex);
                 if (previousPass) {
-                     std::shared_ptr<PXR_NS::HdRenderBuffer> colorBuffer
-                        = hvt::CreateRenderBufferProxy(previousPass, PXR_NS::HdAovTokens->color);
-
-                    std::shared_ptr<PXR_NS::HdRenderBuffer> depthBuffer
-                        = hvt::CreateRenderBufferProxy(previousPass, PXR_NS::HdAovTokens->depth);
-
-                    std::vector<std::pair<PXR_NS::TfToken const&, PXR_NS::HdRenderBuffer*>> inputAOVs
-                        = { { PXR_NS::HdAovTokens->color, colorBuffer.get() },
-                            { PXR_NS::HdAovTokens->depth, depthBuffer.get() } 
-                          };
+                    hvt::RenderBufferBindings inputAOVs = previousPass->GetRenderBufferBindingsForNextPass(
+                        { PXR_NS::HdAovTokens->color, PXR_NS::HdAovTokens->depth }
+                    );
                 
                     HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(inputAOVs);
                     

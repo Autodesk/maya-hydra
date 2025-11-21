@@ -38,12 +38,6 @@ class TestMayaShadingModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
 
         panel = mayaUtils.activeModelPanel()        
         
-        #Deal with 2 render passes
-        img_version = None
-        frame_passes_count = self.framePassesCount
-        if frame_passes_count == 2:
-            img_version = "two_passes"
-
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=False)
         #Smooth Shading
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
@@ -59,14 +53,14 @@ class TestMayaShadingModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
         #Bounding Box
         cmds.modelEditor(panel, edit=True, displayAppearance="boundingBox")
         cmds.refresh()
-        self.assertSnapshotClose("boundingBox" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
+        self.assertSnapshotClose("boundingBox" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
 
         #SmoothWirefame
         cmds.modelEditor(panel, edit=True, displayAppearance="wireframe")
         cmds.modelEditor(panel, edit=True, smoothWireframe=True)
         cmds.refresh()
-        self.assertSnapshotClose("smoothwireframe" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
+        self.assertSnapshotClose("smoothwireframe" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.modelEditor(panel, edit=True, smoothWireframe=False)
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
 
@@ -74,14 +68,14 @@ class TestMayaShadingModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUt
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
         cmds.modelEditor(panel, edit=True, smoothWireframe=True)
         cmds.refresh()
-        self.assertSnapshotClose("smoothwireframeonshaded" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
+        self.assertSnapshotClose("smoothwireframeonshaded" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         cmds.modelEditor(panel, edit=True, smoothWireframe=False)
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=False)
 
         #X-ray
         cmds.modelEditor(panel, edit=True, xray=True)
         cmds.refresh()
-        self.assertSnapshotClose("xray" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, img_version)
+        self.assertSnapshotClose("xray" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)        
         cmds.modelEditor(panel, edit=True, xray=False)
         
 if __name__ == '__main__':

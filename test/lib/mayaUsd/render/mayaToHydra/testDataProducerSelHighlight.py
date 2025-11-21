@@ -155,11 +155,8 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
         self.compareSnapshot("Storm_WireOnShaded_AllSelected.png", imageVersion=imageVersion)
 
-    def impl_LeadAndActiveColorsSelectionHighlighting(self, baseImageVersion: str, imageVersion: str = None):
-        # Append _two_passes to the base image version if we have two frame passes
+    def impl_LeadAndActiveColorsSelectionHighlighting(self, baseImageVersion: str):
         finalImageVersion = baseImageVersion
-        if imageVersion == "two_passes":
-            finalImageVersion = f"{baseImageVersion}_two_passes"
         if self._usdVersion >= (0, 25, 8):
             finalImageVersion = finalImageVersion + "_usd2508+"
         
@@ -201,16 +198,16 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
 
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
-        self.impl_LeadAndActiveColorsSelectionHighlighting("smoothShaded", imageVersion=self._imageVersionFor2Passes)
+        self.impl_LeadAndActiveColorsSelectionHighlighting("smoothShaded")
 
         #Switch to wireframe display mode
         cmds.modelEditor(panel, edit=True, displayAppearance="wireframe")
-        self.impl_LeadAndActiveColorsSelectionHighlighting("wireframe", imageVersion=self._imageVersionFor2Passes)
+        self.impl_LeadAndActiveColorsSelectionHighlighting("wireframe")
 
         #Switch to wireframe on shaded display mode
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
-        self.impl_LeadAndActiveColorsSelectionHighlighting("wireframeOnShaded", imageVersion=self._imageVersionFor2Passes)
+        self.impl_LeadAndActiveColorsSelectionHighlighting("wireframeOnShaded")
     
     #We want to check that when we select the maya usd proxy shape node it highlights all primitives from the stage
     def test_MayaUsdNodesSelectionHighlighting(self):
@@ -221,9 +218,9 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         self.setHdStormRenderer()
         cmds.refresh()
 
-        imageVersion = self._imageVersionFor2Passes
+        imageVersion = None
         if self._usdVersion >= (0, 25, 8):
-            imageVersion = imageVersion + "_usd2508+"
+            imageVersion = "usd2508+"
     
         cmds.select(self.shapeNode)
         self.compareSnapshot("selectMayaUsdNode.png", imageVersion=imageVersion)

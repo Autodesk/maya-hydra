@@ -26,11 +26,11 @@ class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
     IMAGEDIFF_FAIL_PERCENT = 1
 
-    def verifySnapshot(self, imageName, imageVersion=None):
+    def verifySnapshot(self, imageName):
         cmds.refresh()
         self.assertSnapshotClose(imageName, 
                                  self.IMAGEDIFF_FAIL_THRESHOLD,
-                                 self.IMAGEDIFF_FAIL_PERCENT, imageVersion)
+                                 self.IMAGEDIFF_FAIL_PERCENT)
 
     def test_nativePrim(self):
         self.makeCubeScene(camDist=6)
@@ -78,12 +78,6 @@ class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
         
         #modify light intensity for usd 24.11+
         self.modifyDefaultLightIntensityByUsdVersion()
-        
-        #Deal with 2 render passes
-        img_version = None
-        frame_passes_count = self.framePassesCount
-        if frame_passes_count == 2:
-            img_version = "two_passes"
 
         self.verifySnapshot("usd_cube_untransformed.png")
 
@@ -103,7 +97,7 @@ class TestTransforms(mtohUtils.MayaHydraBaseTestCase):
         self.verifySnapshot("usd_cube_parent_moved_rotated.png")
 
         UsdGeom.XformCommonAPI(parentPrimA).SetScale((2, 3, 2))
-        self.verifySnapshot("usd_cube_parent_moved_rotated_scaled.png", img_version)
+        self.verifySnapshot("usd_cube_parent_moved_rotated_scaled.png")
 
         self.resetDefaultLightIntensityByUsdVersion()
 

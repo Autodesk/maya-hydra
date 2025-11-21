@@ -22,27 +22,22 @@ class TestNurbsPrimitives(mtohUtils.MayaHydraBaseTestCase):
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 0.75
-    imageVersion=None
 
-    def compareSnapshot(self, referenceFilename, cameraDistance=10, imageVersion=None):
+    def compareSnapshot(self, referenceFilename, cameraDistance=10):
         self.setBasicCam(cameraDistance)
         cmds.refresh()
-        self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+        self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
     def setupScene(self, nurbsCreationCallable):
         self.setHdStormRenderer()
         makeNurbNodeName = nurbsCreationCallable()[1]
         cmds.refresh()
-        frame_passes_count = self.framePassesCount
-        if frame_passes_count == 2:
-            self.imageVersion = "two_passes"
         return makeNurbNodeName
 
     # Torus attributes is a superset of sphere, cone, and cylinder attributes
     def test_NurbsTorus(self):
         makeNurbNodeName = self.setupScene(cmds.torus)
-       
-        self.compareSnapshot(referenceFilename="torus_fresh.png", cameraDistance=5, imageVersion=self.imageVersion)
+        self.compareSnapshot("torus_fresh.png", 5)
         
         cmds.setAttr(makeNurbNodeName + ".startSweep", 50)
         cmds.setAttr(makeNurbNodeName + ".endSweep", 300)
@@ -52,11 +47,11 @@ class TestNurbsPrimitives(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr(makeNurbNodeName + ".spans", 6)
         cmds.setAttr(makeNurbNodeName + ".heightRatio", 0.8)
         cmds.setAttr(makeNurbNodeName + ".minorSweep", 250)
-        self.compareSnapshot(referenceFilename="torus_modified.png", imageVersion=self.imageVersion)
+        self.compareSnapshot("torus_modified.png")
 
         cmds.setAttr(makeNurbNodeName + ".useTolerance", True)
         cmds.setAttr(makeNurbNodeName + ".tolerance", 0.05)
-        self.compareSnapshot("torus_tolerance.png", imageVersion=self.imageVersion)
+        self.compareSnapshot("torus_tolerance.png")
 
     # Cube attributes is a superset of plane attributes
     def test_NurbsCube(self):
@@ -69,7 +64,7 @@ class TestNurbsPrimitives(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr(makeNurbNodeName + ".width", 4)
         cmds.setAttr(makeNurbNodeName + ".lengthRatio", 2)
         cmds.setAttr(makeNurbNodeName + ".heightRatio", 3)
-        self.compareSnapshot(referenceFilename="cube_modified.png", imageVersion=self.imageVersion)
+        self.compareSnapshot("cube_modified.png")
 
     def test_NurbsCircle(self):
         makeNurbNodeName = self.setupScene(cmds.circle)
