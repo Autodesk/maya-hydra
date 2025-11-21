@@ -319,11 +319,10 @@ SelectionSceneIndex::_PrimsRemoved(
     TF_DEBUG(FVP_SELECTION_SCENE_INDEX)
         .Msg("SelectionSceneIndex::_PrimsRemoved() called.\n");
 
-    if (!_selection->IsEmpty()) {
-        for (const auto &entry : entries) {
-            _selection->RemoveHierarchy(entry.primPath);
-        }
-    }
+    // The selection scene index must NOT manage the Fvp::Selection here.
+    // Filtering prims through _PrimsRemoved does NOT change the 
+    // Fvp::Selection, which is updated rather through 
+    // Fvp::SelectionSceneIndex::{Add,Remove,Replace,Clear}Selection().
 
     _SendPrimsRemoved(entries);
 }

@@ -72,6 +72,22 @@ class TestUsdIncludedPurposes(mtohUtils.MayaHydraBaseTestCase):
             self.IMAGE_DIFF_FAIL_PERCENT
         )
 
+        # HYDRA-1990: bringing a selected prim back into the scene through
+        # included purposes must show selection highlighting for objects with
+        # that purpose.
+
+        cmds.setAttr('defaultRenderGlobals.mayaHydraRenderPurpose', 1)
+
+        cmds.refresh()
+
+        self.assertSnapshotClose(
+            "coneSelected.png",
+            self.IMAGE_DIFF_FAIL_THRESHOLD,
+            self.IMAGE_DIFF_FAIL_PERCENT
+        )
+
+        # Leave only guide purpose (and default, i.e. no purpose).
+        cmds.setAttr('defaultRenderGlobals.mayaHydraRenderPurpose', 0)
         cmds.setAttr('defaultRenderGlobals.mayaHydraProxyPurpose', 0)
 
         cmds.refresh()
