@@ -88,9 +88,6 @@ class TestMeshes(mtohUtils.MayaHydraBaseTestCase):
 
         #Set the usd version
         cls._usdVersion = Usd.GetVersion()
-        
-        # Set the image version for 2 passes once per test file
-        cls._imageVersionFor2Passes = None
 
     @unittest.skipUnless(mayaUtils.hydraFixLevel() > 0, "Requires Data Server render item lifescope fix.")
     def test_sweepMesh(self):
