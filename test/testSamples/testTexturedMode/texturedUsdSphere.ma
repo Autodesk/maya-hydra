@@ -3,7 +3,6 @@
 //Last modified: Thu, Nov 20, 2025 04:08:23 PM
 //Codeset: 1252
 requires maya "2026";
-requires "mtoa" "5.5.5";
 requires -nodeType "mayaUsdLayerManager" -nodeType "mayaUsdProxyShape" -dataType "pxrUsdStageData"
 		 "mayaUsdPlugin" "0.35.0";
 currentUnit -l centimeter -a degree -t film;
@@ -43,7 +42,6 @@ createNode camera -s -n "topShape" -p "top";
 	setAttr ".man" -type "string" "top_mask";
 	setAttr ".hc" -type "string" "viewSet -t %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -s -n "front";
 	rename -uid "2ACD4712-43AF-47BE-9D7D-808F77FB6BE4";
 	setAttr ".v" no;
@@ -59,7 +57,6 @@ createNode camera -s -n "frontShape" -p "front";
 	setAttr ".man" -type "string" "front_mask";
 	setAttr ".hc" -type "string" "viewSet -f %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -s -n "side";
 	rename -uid "412F0271-447B-A38C-BDFF-E9B45EB9C891";
 	setAttr ".v" no;
@@ -76,7 +73,6 @@ createNode camera -s -n "sideShape" -p "side";
 	setAttr ".man" -type "string" "side_mask";
 	setAttr ".hc" -type "string" "viewSet -s %camera";
 	setAttr ".o" yes;
-	setAttr ".ai_translator" -type "string" "orthographic";
 createNode transform -n "stage1";
 	rename -uid "93A05A83-4962-F8DA-8EB9-6F96BE2511FB";
 createNode mayaUsdProxyShape -n "stageShape1" -p "stage1";
