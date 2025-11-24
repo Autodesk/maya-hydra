@@ -34,7 +34,10 @@ class TestTexturedMode(mtohUtils.MayaHydraBaseTestCase):
             "testTexturedMode", "texturedUsdSphere.ma")
 
         self.setHdStormRenderer()
-        self.setBasicCam(5)
+        self.setBasicCam(3)
+
+        panel = 'modelPanel4'
+        cmds.modelEditor(panel, edit=True, displayLights="all")
 
         cmds.refresh()
 
