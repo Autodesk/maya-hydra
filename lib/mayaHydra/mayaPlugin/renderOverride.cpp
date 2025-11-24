@@ -688,7 +688,9 @@ TfTokenVector MtohRenderOverride::GetAvailableFramePassAovs(int passIndex)
                 static const TfToken candidates[] = { HdAovTokens->primId,
                                                       HdAovTokens->depth,
                                                       HdAovTokens->normal,
+#if PXR_VERSION > 2411
                                                       HdAovTokens->Neye,
+#endif
                                                       HdAovTokensMakePrimvar(TfToken("st")) };
 
                 currAovs = { HdAovTokens->color };
