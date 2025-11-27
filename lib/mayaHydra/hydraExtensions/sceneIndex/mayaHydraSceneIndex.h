@@ -256,7 +256,7 @@ public:
 
     /// Get the maya default light path to be used in filtering scene indices to recognize the
     /// default light in primitives path
-    static const SdfPath& GetMayaDefaultLightPath() { return _mayaDefaultLightPath; }
+    static const SdfPath& MayaDefaultLightPath();
 
     /// Get all paths of all lighted prims
     void GetLightedPrimPaths(SdfPathVector& lightedPrimPaths);
@@ -352,7 +352,6 @@ private:
     // Default light
     GlfSimpleLight _mayaDefaultLight;
     bool           _useMayaDefaultLight = false;
-    static SdfPath _mayaDefaultLightPath;
 
     bool _xRayEnabled = false;
     bool _isPlaybackRunning = false;
