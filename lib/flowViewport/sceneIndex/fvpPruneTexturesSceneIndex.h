@@ -37,12 +37,11 @@ public:
 
     FVP_API
     static PruneTexturesSceneIndexRefPtr New(
-            const PXR_NS::HdSceneIndexBaseRefPtr &inputScene);
+        const PXR_NS::HdSceneIndexBaseRefPtr &inputScene,
+        bool pruneTextures);
 
     FVP_API
-    void MarkTexturesDirty(bool isTextured);
-    
-    bool _needsTexturesPruned = false;
+    void MarkTexturesDirty(bool pruneTextures);
     
     void _DirtyAllPrims(const PXR_NS::HdDataSourceLocatorSet locators);
     
@@ -51,7 +50,10 @@ protected:
     
 private:
     PruneTexturesSceneIndex(
-        PXR_NS::HdSceneIndexBaseRefPtr const &inputSceneIndex);
+        PXR_NS::HdSceneIndexBaseRefPtr const &inputSceneIndex,
+        bool pruneTextures);
+
+    bool _pruneTextures{false};
 };
 
 } //end of namespace FVP_NS_DEF

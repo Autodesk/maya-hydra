@@ -1314,7 +1314,8 @@ MStatus MtohRenderOverride::Render(
     bool isTextured = currentDisplayMode & MHWRender::MFrameContext::kTextured;
     if (_pruneTexturesSceneIndex &&
         _currentlyTextured != isTextured) {
-        _pruneTexturesSceneIndex->MarkTexturesDirty(isTextured);
+        const bool pruneTextures = !isTextured;
+        _pruneTexturesSceneIndex->MarkTexturesDirty(pruneTextures);
         _currentlyTextured = isTextured;
     }
 
@@ -2007,8 +2008,9 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _displayStyleSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims don't use global refinement
 
     // Add texture disabling Scene Index
+    const bool pruneTextures = !(drawContext.getDisplayStyle() & MHWRender::MFrameContext::kTextured);
     _lastFilteringSceneIndexBeforeCustomFiltering = _pruneTexturesSceneIndex =
-    Fvp::PruneTexturesSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+        Fvp::PruneTexturesSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, pruneTextures);
 
     // Add default material scene index
     _lastFilteringSceneIndexBeforeCustomFiltering = _defaultMaterialSceneIndex = Fvp::DefaultMaterialSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering,
