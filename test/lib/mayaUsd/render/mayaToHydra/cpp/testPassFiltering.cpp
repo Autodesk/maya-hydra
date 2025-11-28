@@ -117,4 +117,18 @@ TEST(PassFiltering, testPassFiltering)
         HdPrimTypeTokens->instancer,
         {1}
     );
+
+    // Maya light
+    testPrim(
+        SdfPath("/MayaHydraViewportRenderer/sprims/areaLight1/areaLightShape1"), 
+        HdPrimTypeTokens->rectLight,
+        {0}
+    );
+
+    // USD light
+    testPrim(
+        SdfPath("/MayaUsdProxyShape_PluginNode/stageShape1/DistantLight1"), 
+        HdPrimTypeTokens->distantLight,
+        {0}
+    );
 }

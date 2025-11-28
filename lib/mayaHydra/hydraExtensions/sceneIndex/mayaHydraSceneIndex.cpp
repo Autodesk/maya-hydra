@@ -150,7 +150,6 @@ SdfPath MayaHydraSceneIndex::_fallbackMaterial;
 SdfPath MayaHydraSceneIndex::_mayaDefaultMaterialPath;     // Common to all scene indexes
 VtValue MayaHydraSceneIndex::_mayaDefaultMaterialFallback; // Used only if we cannot find the maya
                                                            // default material
-SdfPath MayaHydraSceneIndex::_mayaDefaultLightPath;           // Common to all scene indexes
 SdfPath MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath; // Common to all scene indexes
 
 namespace {
@@ -475,7 +474,6 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData, bool light
 {
     static std::once_flag once;
     std::call_once(once, []() {
-        _mayaDefaultLightPath = SdfPath::AbsoluteRootPath().AppendChild(_tokens->DefaultMayaLight);
         MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath
             = SdfPath::AbsoluteRootPath().AppendChild(_tokens->MayaFacesSelectionMaterial);
         MayaHydraSceneIndex::_mayaDefaultMaterialPath = SdfPath::AbsoluteRootPath().AppendChild(
@@ -702,12 +700,12 @@ void MayaHydraSceneIndex::SetDefaultLightEnabled(const bool enabled)
 
         if (_useMayaDefaultLight) {
             auto mayaDefaultLightDataSource = MayaHydraDefaultLightDataSource::New(
-                _mayaDefaultLightPath, HdPrimTypeTokens->simpleLight, this);
-            AddPrims({ { _mayaDefaultLightPath,
+                MayaDefaultLightPath(), HdPrimTypeTokens->simpleLight, this);
+            AddPrims({ { MayaDefaultLightPath(),
                          HdPrimTypeTokens->simpleLight,
                          mayaDefaultLightDataSource } });
         } else {
-            RemovePrim(_mayaDefaultLightPath);
+            RemovePrim(MayaDefaultLightPath());
         }
     }
 }
@@ -724,7 +722,7 @@ void MayaHydraSceneIndex::SetDefaultLight(const GlfSimpleLight& light)
         _mayaDefaultLight.SetDiffuse(light.GetDiffuse());
         _mayaDefaultLight.SetSpecular(light.GetSpecular());
         _mayaDefaultLight.SetPosition(light.GetPosition());
-        MarkSprimDirty(_mayaDefaultLightPath, HdLight::DirtyParams);
+        MarkSprimDirty(MayaDefaultLightPath(), HdLight::DirtyParams);
     }
 }
 
@@ -1915,6 +1913,12 @@ GfBBox3d MayaHydraSceneIndex::GetBoundingBox() const
         _renderItemsAdapters,
         _shapeAdapters);
     return bbox;
+}
+
+const SdfPath& MayaHydraSceneIndex::MayaDefaultLightPath()
+{
+    static SdfPath _mayaDefaultLightPath = SdfPath::AbsoluteRootPath().AppendChild(_tokens->DefaultMayaLight);
+    return _mayaDefaultLightPath;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

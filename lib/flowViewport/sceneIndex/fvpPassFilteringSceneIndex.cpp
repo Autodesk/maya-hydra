@@ -120,7 +120,12 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
             // Filter out unused materials
             return true;
         }
-        return false; // Include all non-Rprims by default
+
+        if (_framePassData->_removeLights && HdPrimTypeIsLight(prim.primType)) {
+            return true; // Lights filtered out
+        }
+
+        return false; // Include non-Rprims by default
     }
 
     // Now apply the main filtering logic based on purpose render tags

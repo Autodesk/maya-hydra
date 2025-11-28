@@ -20,7 +20,6 @@
 #include <pxr/imaging/hd/materialSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 
-#include <iostream>
 namespace FVP_NS_DEF {
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -29,13 +28,13 @@ TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (UsdPreviewSurface)
     (ND_standard_surface_surfaceshader)
+    (ND_open_pbr_surface_surfaceshader)
 );
 
 namespace {
 
 void
-_PruneTexturesFromMatNetwork(
-    HdMaterialNetworkInterface *networkInterface)
+_PruneTexturesFromMatNetwork(HdMaterialNetworkInterface *networkInterface)
 {
     if (!networkInterface) {
         return;
@@ -44,6 +43,7 @@ _PruneTexturesFromMatNetwork(
     for (TfToken const &nodeName : nodeNames) {
         const TfToken nodeType = networkInterface->GetNodeType(nodeName);
         if (nodeType == _tokens->ND_standard_surface_surfaceshader ||
+            nodeType == _tokens->ND_open_pbr_surface_surfaceshader ||
             nodeType == _tokens->UsdPreviewSurface) {                
             // Look for incoming connection(textures) to surface shader params
             TfTokenVector inputConnections = networkInterface->GetNodeInputConnectionNames(nodeName);
@@ -60,16 +60,17 @@ _PruneTexturesFromMatNetwork(
 // static
 PruneTexturesSceneIndexRefPtr
 PruneTexturesSceneIndex::New(
-    const HdSceneIndexBaseRefPtr &inputSceneIndex)
+    const HdSceneIndexBaseRefPtr &inputSceneIndex,
+    bool pruneTextures)
 {    
     return TfCreateRefPtr(
-        new PruneTexturesSceneIndex(inputSceneIndex));
+        new PruneTexturesSceneIndex(inputSceneIndex, pruneTextures));
 }
 
 void
-PruneTexturesSceneIndex::MarkTexturesDirty(bool isTextured)
+PruneTexturesSceneIndex::MarkTexturesDirty(bool pruneTextures)
 {
-    _needsTexturesPruned = isTextured;
+    _pruneTextures = pruneTextures;
     const HdDataSourceLocatorSet locators {
         HdMaterialSchema::GetDefaultLocator().Append(HdMaterialSchemaTokens->material),
         // Workaround for HYDRA-1061, see https://forum.aousd.org/t/primvars-and-material-dirtying-issue-in-storm/1675
@@ -80,18 +81,19 @@ PruneTexturesSceneIndex::MarkTexturesDirty(bool isTextured)
 }
 
 PruneTexturesSceneIndex::PruneTexturesSceneIndex(
-    HdSceneIndexBaseRefPtr const &inputSceneIndex)
+    HdSceneIndexBaseRefPtr const &inputSceneIndex,
+    bool pruneTextures)
   : HdMaterialFilteringSceneIndexBase(inputSceneIndex), 
     InputSceneIndexUtils(inputSceneIndex)
+  , _pruneTextures(pruneTextures)
 {   
 }
 
 PruneTexturesSceneIndex::FilteringFnc 
 PruneTexturesSceneIndex::_GetFilteringFunction() const
 {
-    return !_needsTexturesPruned ? 
-            _PruneTexturesFromMatNetwork :
-            [](HdMaterialNetworkInterface*){};
+    return _pruneTextures ? 
+        _PruneTexturesFromMatNetwork : [](HdMaterialNetworkInterface*){};
 }
 
 void
