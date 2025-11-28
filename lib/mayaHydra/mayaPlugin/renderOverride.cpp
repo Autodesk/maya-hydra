@@ -2069,7 +2069,7 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 
     TF_AXIOM(_mayaHydraSceneIndex);
     _lastFilteringSceneIndexBeforeCustomFiltering = _lightsManagementSceneIndex = Fvp::LightsManagementSceneIndex::New(
-        _lastFilteringSceneIndexBeforeCustomFiltering, _mayaHydraSceneIndex->GetMayaDefaultLightPath());
+        _lastFilteringSceneIndexBeforeCustomFiltering, _mayaHydraSceneIndex->MayaDefaultLightPath());
     _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(_lightingMode));
     _mayaHydraSceneIndex->SetLightsManagementSceneIndex(_lightsManagementSceneIndex);
 
@@ -2867,6 +2867,7 @@ void MtohRenderOverride::_CreateFramePassesData()
         filteringData->_excludePaths = (shouldUseSingleFramePass) 
                                         ? SdfPathVector{}
                                         : SdfPathVector{_highlightHierarchyPrefix}; // Ignore selection highlight prims if we have multiple passes
+        filteringData->_removeLights = false; // Keep all lights in this pass
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = true; // Main graphics pass supports prims with no purpose render tag
         
@@ -2900,8 +2901,9 @@ void MtohRenderOverride::_CreateFramePassesData()
     if (!shouldUseSingleFramePass) {
         auto filteringData = std::make_shared<Fvp::FramePassData>();
         filteringData->_rendererName = MtohTokens->HdStormRendererPlugin;//Storm by default
-        filteringData->_includePaths = { _highlightHierarchyPrefix }; // include selection highlight prims.
+        filteringData->_includePaths = { _highlightHierarchyPrefix, MayaHydraSceneIndex::MayaDefaultLightPath() }; // include selection highlight prims.
         filteringData->_excludePaths = { };
+        filteringData->_removeLights = true; // Remove lights from this pass except for the default light, kept through the include paths
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = false; // Secondary graphics pass does not support prims with no purpose render tag
         _framePassesData.emplace_back(filteringData);
