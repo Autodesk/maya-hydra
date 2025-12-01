@@ -13,19 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-<<<<<<<< HEAD:lib/mayaHydra/mayaPlugin/envSettings.h
-
-#ifndef MAYAHYDRA_ENV_SETTINGS_H
-#define MAYAHYDRA_ENV_SETTINGS_H
-
-#include <mayaHydraLib/api.h>
-
-namespace MAYAHYDRA_NS_DEF {
-    bool useSingleFramePass();
-}
-
-#endif // MAYAHYDRA_ENV_SETTINGS_H
-========
 #ifndef MH_PICK_HIT_FWD_H
 #define MH_PICK_HIT_FWD_H
 
@@ -42,4 +29,3 @@ using PickHitVector = std::vector<struct PickHit>;
 } // namespace MAYAHYDRA_NS_DEF
 
 #endif
->>>>>>>> dev:lib/mayaHydra/hydraExtensions/pick/mhPickHitFwd.h

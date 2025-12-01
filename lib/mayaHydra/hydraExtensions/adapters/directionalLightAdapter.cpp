@@ -103,6 +103,7 @@ public:
             }
             return VtValue(
                 lightNode.findPlug(MayaAttrs::directionalLight::lightAngle, true).asFloat());
+        }
 
         return MayaHydraLightAdapter::GetLightParamValue(paramName);
     }

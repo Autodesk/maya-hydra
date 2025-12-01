@@ -200,6 +200,7 @@ public:
         constexpr float defaultWidth
             = 2.0f; // By default the drawing of the light shape has a width and height of 2.0
         constexpr float defaultHeight = 2.0f;
+
         // The width, height, length, radius are only queried by Hydra if the "normalize"
         // (aiNormalize below) attribute is unchecked
         if ((paramName == HdLightTokens->width) || (paramName == UsdLuxTokens->inputsWidth)) {
@@ -227,6 +228,7 @@ public:
             return VtValue(false); // No shadows for Storm with aiAreaLight
         }
 
+        return MayaHydraLightAdapter::GetLightParamValue(paramName);
     }
 
     // We need a special case when the user changes the light type, we need to repopulate the prim

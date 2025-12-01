@@ -66,6 +66,9 @@ struct FramePassData
     //! Paths to force exclude from this frame pass
     PXR_NS::SdfPathVector _excludePaths;
 
+    //! Determines if lights are filtered out from this pass or not.
+    bool _removeLights = false;
+
     //! this frame pass supports prims with no purpose render tags, set this to true if you want to
     //! render prims that do not have a purpose render tag
     bool _supportPrimsWithNoPurposeRenderTag = false;

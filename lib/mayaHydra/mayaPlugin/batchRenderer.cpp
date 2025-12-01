@@ -485,8 +485,7 @@ MStatus BatchRenderer::Render(
 
     const auto fileName = Fvp::ImageBufferWriter::GetFileName();
     if (!fileName.empty()) {
-        constexpr bool useHVT = false; //Even if we compile with HVT we don't use it for batch rendering
-        if (!Fvp::ImageBufferWriter::Write(_fileWriterArgs, fileName, useHVT)) {
+        if (!Fvp::ImageBufferWriter::Write(_fileWriterArgs, fileName)) {
             TF_RUNTIME_ERROR("Failed to write image to %s",
                              fileName.c_str());
         }

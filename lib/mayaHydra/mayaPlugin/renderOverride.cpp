@@ -779,7 +779,6 @@ SdfPathVector MtohRenderOverride::RendererRprims(TfToken rendererName, bool visi
             primIds.insert(
                 primIds.end(), tempPrimIds.begin(), tempPrimIds.end()); // Insert all elements
         }
-        break; // We found the right frame pass and its render index, no need to continue, data has been taken from the renderindex
     }
 
     // Sort them by lexicographically order
@@ -924,7 +923,6 @@ MStatus MtohRenderOverride::Render(
                 TF_WARN("HdxProgressiveTask not found");
             }
         }
-#endif
 
         auto editTasks = [](HdTaskSharedPtrVector&  tasksToEdit,
                             MayaHydraGLBackup&      backup) -> void {
@@ -936,7 +934,6 @@ MStatus MtohRenderOverride::Render(
             replaceSelectionTask(&tasksToEdit);
         };
 
-#ifndef VIEWPORT_TOOLBOX
         MayaHydraGLBackup backup;
         editTasks(tasks, backup);
 #endif
@@ -1088,13 +1085,7 @@ MStatus MtohRenderOverride::Render(
 
         const auto fileName = Fvp::ImageBufferWriter::GetFileName();
         if (!fileName.empty()) {
-            constexpr bool useHVT =
-#ifdef VIEWPORT_TOOLBOX
-                true;
-#else
-                false;
-#endif
-            if (!Fvp::ImageBufferWriter::Write(_fileWriterArgs, fileName, useHVT)) {
+            if (!Fvp::ImageBufferWriter::Write(_fileWriterArgs, fileName)) {
                 TF_RUNTIME_ERROR("Failed to write image to %s",
                                  fileName.c_str());
             }
@@ -1323,7 +1314,8 @@ MStatus MtohRenderOverride::Render(
     bool isTextured = currentDisplayMode & MHWRender::MFrameContext::kTextured;
     if (_pruneTexturesSceneIndex &&
         _currentlyTextured != isTextured) {
-        _pruneTexturesSceneIndex->MarkTexturesDirty(isTextured);
+        const bool pruneTextures = !isTextured;
+        _pruneTexturesSceneIndex->MarkTexturesDirty(pruneTextures);
         _currentlyTextured = isTextured;
     }
 
@@ -2016,8 +2008,9 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _displayStyleSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya native prims don't use global refinement
 
     // Add texture disabling Scene Index
+    const bool pruneTextures = !(drawContext.getDisplayStyle() & MHWRender::MFrameContext::kTextured);
     _lastFilteringSceneIndexBeforeCustomFiltering = _pruneTexturesSceneIndex =
-    Fvp::PruneTexturesSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+        Fvp::PruneTexturesSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, pruneTextures);
 
     // Add default material scene index
     _lastFilteringSceneIndexBeforeCustomFiltering = _defaultMaterialSceneIndex = Fvp::DefaultMaterialSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering,
@@ -2076,7 +2069,7 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 
     TF_AXIOM(_mayaHydraSceneIndex);
     _lastFilteringSceneIndexBeforeCustomFiltering = _lightsManagementSceneIndex = Fvp::LightsManagementSceneIndex::New(
-        _lastFilteringSceneIndexBeforeCustomFiltering, _mayaHydraSceneIndex->GetMayaDefaultLightPath());
+        _lastFilteringSceneIndexBeforeCustomFiltering, _mayaHydraSceneIndex->MayaDefaultLightPath());
     _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(_lightingMode));
     _mayaHydraSceneIndex->SetLightsManagementSceneIndex(_lightsManagementSceneIndex);
 
@@ -2874,6 +2867,7 @@ void MtohRenderOverride::_CreateFramePassesData()
         filteringData->_excludePaths = (shouldUseSingleFramePass) 
                                         ? SdfPathVector{}
                                         : SdfPathVector{_highlightHierarchyPrefix}; // Ignore selection highlight prims if we have multiple passes
+        filteringData->_removeLights = false; // Keep all lights in this pass
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = true; // Main graphics pass supports prims with no purpose render tag
         
@@ -2907,8 +2901,9 @@ void MtohRenderOverride::_CreateFramePassesData()
     if (!shouldUseSingleFramePass) {
         auto filteringData = std::make_shared<Fvp::FramePassData>();
         filteringData->_rendererName = MtohTokens->HdStormRendererPlugin;//Storm by default
-        filteringData->_includePaths = { _highlightHierarchyPrefix }; // include selection highlight prims.
+        filteringData->_includePaths = { _highlightHierarchyPrefix, MayaHydraSceneIndex::MayaDefaultLightPath() }; // include selection highlight prims.
         filteringData->_excludePaths = { };
+        filteringData->_removeLights = true; // Remove lights from this pass except for the default light, kept through the include paths
         filteringData->_supportPrimsWithNoPurposeRenderTag
             = false; // Secondary graphics pass does not support prims with no purpose render tag
         _framePassesData.emplace_back(filteringData);
@@ -2969,138 +2964,5 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
 
     _purposeFilteringSceneIndex->UpdatePrimsFromIncludedPurposes(RenderGlobalsUtils::GetIncludedPurposes());
 }
-
-void MtohRenderOverride::_CreateNonMainFramePassesFilteringSceneIndices()
-{
-    // Note that we start at the second pass index
-    // because the main pass is already done
-    constexpr int secondFramePassIndex = 1; 
-    for (int i = secondFramePassIndex; i < _GetNumFramePasses(); ++i) {
-        const auto& pass = _GetFramePass(i);
-        if (!pass || ! (pass->GetRenderIndex())) {
-            continue;
-        }
-        
-        pass->GetRenderIndex()->InsertSceneIndex(
-            _CreatePassFilteringSceneIndex(_framePassesData[i]),
-            SdfPath::AbsoluteRootPath());
-    }
-}
-
-
-//This is where the passes and their information is created
-void MtohRenderOverride::_CreateFramePassesData()
-{ 
-    _ClearFramePassesData();
-
-    // Check if we should use single frame pass when using the same renderer
-    static const bool _useSingleFramePass = useSingleFramePass();
-    const bool shouldUseSingleFramePass = _useSingleFramePass && 
-        (_rendererDesc.rendererName == MtohTokens->HdStormRendererPlugin);
-
-    // Main pass
-    {
-        auto filteringData = std::make_shared<Fvp::FramePassData>();
-        filteringData->_rendererName = _rendererDesc.rendererName;//Render delegate chosen by the user
-        filteringData->_includePaths = {};
-        filteringData->_excludePaths = (shouldUseSingleFramePass) 
-                                        ? SdfPathVector{}
-                                        : SdfPathVector{_highlightHierarchyPrefix}; // Ignore selection highlight prims if we have multiple passes
-        filteringData->_keepLights   = true;
-        filteringData->_supportPrimsWithNoPurposeRenderTag
-            = true; // Main graphics pass supports prims with no purpose render tag
-        
-        _framePassesData.emplace_back(filteringData);
-        
-        // Define the render tags update function after emplacing, capturing shared ptr to the element
-        const size_t currentIndex = _framePassesData.size() - 1;
-        _framePassesData[currentIndex]->_renderTagsUpdateFn = [this, currentIndex, shouldUseSingleFramePass](
-                  bool includeRenderPurpose, bool includeProxyPurpose, bool includeGuidePurpose) {
-            auto& filteringData = _framePassesData[currentIndex];
-            filteringData->_includeRenderTags = { HdRenderTagTokens->geometry }; // main pass
-            if (includeRenderPurpose) {
-                filteringData->_includeRenderTags.insert(HdRenderTagTokens->render); // main pass
-            }
-            if (includeProxyPurpose) {
-                filteringData->_includeRenderTags.insert(HdRenderTagTokens->proxy); // main pass
-            }
-
-            if (shouldUseSingleFramePass) { 
-                // When using a single pass, everything should be included in the main pass
-                filteringData->_includeRenderTags.insert(Fvp::secondaryGraphicsRenderTagToken);
-                // Include guide tags in the main pass
-                if (includeGuidePurpose) {
-                    filteringData->_includeRenderTags.insert(HdRenderTagTokens->guide);
-                }
-            }
-        };
-    }
-
-    // Secondary graphics pass - only create if not using single frame pass
-    if (!shouldUseSingleFramePass) {
-        auto filteringData = std::make_shared<Fvp::FramePassData>();
-        filteringData->_rendererName = MtohTokens->HdStormRendererPlugin;//Storm by default
-        filteringData->_includePaths = { _highlightHierarchyPrefix }; // include selection highlight prims.
-        filteringData->_excludePaths = { };
-        filteringData->_keepLights = true;
-        filteringData->_supportPrimsWithNoPurposeRenderTag
-            = false; // Secondary graphics pass does not support prims with no purpose render tag
-        _framePassesData.emplace_back(filteringData);
-
-         // Define the render tags update function after emplacing, capturing shared ptr to the
-        // element
-        const size_t currentIndex = _framePassesData.size() - 1;
-        _framePassesData[currentIndex]->_renderTagsUpdateFn
-            = [this, currentIndex](
-                  bool includeRenderPurpose, bool includeProxyPurpose, bool includeGuidePurpose) {
-                  auto& filteringData = _framePassesData[currentIndex];
-                  
-                  // Set the render tags for the secondary graphics pass
-                  filteringData->_includeRenderTags = { Fvp::secondaryGraphicsRenderTagToken };
-
-                  if (includeGuidePurpose) {
-                      // Insert guide tag (std::set automatically handles duplicates)
-                      filteringData->_includeRenderTags.insert(HdRenderTagTokens->guide);
-                  }
-               };
-    }
-}
-
-#endif // VIEWPORT_TOOLBOX
-
-void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegateParams)
-{
-#ifndef VIEWPORT_TOOLBOX
-    TfTokenVector mainPassRenderTags = { HdRenderTagTokens->geometry, Fvp::secondaryGraphicsRenderTagToken };
-    if (delegateParams.renderPurpose) {
-        mainPassRenderTags.push_back(HdRenderTagTokens->render);
-    }
-    if (delegateParams.proxyPurpose) {
-        mainPassRenderTags.push_back(HdRenderTagTokens->proxy);
-    }
-
-    if (delegateParams.guidePurpose) {
-        mainPassRenderTags.push_back(HdRenderTagTokens->guide);
-    }
-
-    _taskController->SetRenderTags(mainPassRenderTags);
-#else
-    {
-        const bool renderPurpose = delegateParams.renderPurpose;
-        const bool proxyPurpose = delegateParams.proxyPurpose;
-        const bool guidePurpose = delegateParams.guidePurpose;
-
-        // Update the render tags for each pass
-        const int numFramePassesData = static_cast<int>(_framePassesData.size());
-        for (int i = 0; i < numFramePassesData; ++i) {
-            auto& filteringData = _framePassesData[i];
-            if (filteringData && filteringData->_renderTagsUpdateFn) {
-                filteringData->_renderTagsUpdateFn(renderPurpose, proxyPurpose, guidePurpose);
-            }
-        }
-    }
-#endif
-}
-
 
 PXR_NAMESPACE_CLOSE_SCOPE

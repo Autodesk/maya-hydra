@@ -30,7 +30,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace {
 
 HdRenderBuffer* getRenderBuffer(
-    const VtDictionary&    args, bool useHVT,
+    const VtDictionary&    args,
     const PXR_NS::TfToken& aovToken
 )
 {
@@ -54,10 +54,8 @@ namespace FVP_NS_DEF {
 
 RenderBufferWriter::RenderBufferWriter(
     const PXR_NS::VtDictionary& args,
-    bool                        useHVT,
-    const TfToken&              aov)
-    : ImageBufferWriter()
-    , _renderBuffer(getRenderBuffer(args, useHVT, aov))
+    const TfToken&              aov
+) : ImageBufferWriter(), _renderBuffer(getRenderBuffer(args, aov))
 {}
 
 unsigned int RenderBufferWriter::Width() const

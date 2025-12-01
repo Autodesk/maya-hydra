@@ -260,6 +260,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         ret = MS::kFailure;
         ret.perror("Error registering MayaHydraGetFramePassesCount !");
         return ret;
+    }
 
     // *** FIXME ***  Have a single templated function for all 3 commands. 
     if (!plugin.registerCommand(

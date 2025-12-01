@@ -57,6 +57,9 @@
 
 UFE_NS_DEF { class Path; }
 
+// Forward declaration so that qualified friend declaration is valid.
+namespace MAYAHYDRA_NS_DEF { class BatchRenderer; }
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 struct MayaHydraInitData
@@ -94,8 +97,10 @@ public:
     };
     template <typename T> using AdapterMap = std::unordered_map<SdfPath, T, SdfPath::Hash>;
 
-    static MayaHydraSceneIndexRefPtr New(MayaHydraInitData& initData, bool lightEnabled)
-    {
+    static MayaHydraSceneIndexRefPtr New(
+        MayaHydraInitData& initData,
+        bool interactive,
+        bool lightEnabled) {
         return TfCreateRefPtr(new MayaHydraSceneIndex(initData, interactive, lightEnabled));
     }
 
@@ -249,19 +254,20 @@ public:
     /// render item and mesh adapters
     static bool passNormalsToHydra();
 
+    /// Is using an environment variable to tell if we should use the mesh adapter instead of the
+    /// render item adapter for Maya meshes or when we are using batch production rendering it should be always on
+    bool useMeshAdapter();
+
     /// Create the default hydra material from maya default material or create a fallback material
     /// if it cannot be found
     void CreateMayaDefaultMaterialData();
 
     /// Get the maya default light path to be used in filtering scene indices to recognize the
     /// default light in primitives path
-    static const SdfPath& GetMayaDefaultLightPath() { return _mayaDefaultLightPath; }
+    static const SdfPath& MayaDefaultLightPath();
 
     /// Get all paths of all lighted prims
     void GetLightedPrimPaths(SdfPathVector& lightedPrimPaths);
-
-    /// Get the bounding box for all prims
-    GfBBox3d GetBoundingBox();
 
     void SetLightsManagementSceneIndex(
         const Fvp::LightsManagementSceneIndexRefPtr lightsManagementSceneIndex); // Can be a nullptr
@@ -269,7 +275,10 @@ public:
     GfBBox3d GetBoundingBox() const;
 
 private:
-    MayaHydraSceneIndex(MayaHydraInitData& initData, bool lightEnabled);
+    MayaHydraSceneIndex(
+        MayaHydraInitData& initData,
+        bool interactive,
+        bool lightEnabled);
 
     template <typename AdapterPtr, typename Map>
     AdapterPtr _CreateAdapter(
@@ -355,7 +364,6 @@ private:
     // Default light
     GlfSimpleLight _mayaDefaultLight;
     bool           _useMayaDefaultLight = false;
-    static SdfPath _mayaDefaultLightPath;
 
     bool _xRayEnabled = false;
     bool _isPlaybackRunning = false;

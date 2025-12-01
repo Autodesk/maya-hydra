@@ -80,8 +80,6 @@ public:
     MAYAHYDRALIB_API
     MayaLightParams GetMayaLightParams() const;
     MAYAHYDRALIB_API
-    MayaLightParams GetMayaLightParams() const;
-    MAYAHYDRALIB_API
     TfToken GetRenderTag() const override;
 
     bool GetShadowsEnabled(MFnLight& light) const;

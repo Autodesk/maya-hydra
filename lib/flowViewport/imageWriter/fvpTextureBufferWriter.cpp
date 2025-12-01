@@ -30,8 +30,9 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace {
 
 HgiTextureHandle getTextureHandle(
-    const VtDictionary& args, bool useHVT,
-    const TfToken&      aovToken)
+    const VtDictionary& args,
+    const TfToken&      aovToken
+)
 {
 #ifdef VIEWPORT_TOOLBOX
     auto framePass = Fvp::ImageBufferWriter::GetPtr<hvt::FramePass>(args, "framePass");
@@ -44,13 +45,6 @@ HgiTextureHandle getTextureHandle(
         VtValue aov;
         return (engine->GetTaskContextData(aovToken, &aov) && aov.IsHolding<HgiTextureHandle>()) ? 
             aov.Get<HgiTextureHandle>() : HgiTextureHandle();
-    } else {
-        auto engine = Fvp::ImageBufferWriter::GetPtr<HdEngine>(args, "engine");
-        if (engine) {
-            VtValue aov;
-            return (engine->GetTaskContextData(aovToken, &aov) && aov.IsHolding<HgiTextureHandle>()) ? 
-                aov.Get<HgiTextureHandle>() : HgiTextureHandle();
-        }
     }
 #endif
     return {};

@@ -106,13 +106,13 @@ public:
 };
 
 // For some dag paths we use the shape to translate it to an Hydra path
-bool _UseTheShapeDagPath(const MDagPath& dagpath)
-{
-    // Only for the Arnold skydome light
-    return MAYAHYDRA_NS_DEF::IsDagPathOfGivenType(dagpath, aiSkyDomeLight); // From mayaUtils.h
+bool _UseTheShapeDagPath(const MDagPath& dagpath) 
+{ 
+    //Only for the Arnold skydome light
+    return MAYAHYDRA_NS_DEF::IsDagPathAnArnoldSkyDomeLight(dagpath);
 }
 
-// Check if this dag path is registered in Sprims (such as the Arnold sky dome light)
+//Check if this dag path is registered in Sprims (such as the Arnold sky dome light)
 bool _IsDagPathRegisteredInHydraSPrims(const MDagPath& dagpath)
 {
     return MAYAHYDRA_NS_DEF::IsDagPathALight(dagpath);
@@ -123,7 +123,7 @@ bool _IsDagPathRegisteredInHydraSPrims(const MDagPath& dagpath)
 PXR_NAMESPACE_OPEN_SCOPE
 
 // Bring the MayaHydra namespace into scope.
-// The following code currently lives inside the pxr namespace, but it would make more sense to
+// The following code currently lives inside the pxr namespace, but it would make more sense to 
 // have it inside the MayaHydra namespace. This using statement allows us to use MayaHydra symbols
 // from within the pxr namespace as if we were in the MayaHydra namespace.
 // Remove this once the code has been moved to the MayaHydra namespace.
@@ -147,14 +147,15 @@ TF_DEFINE_PRIVATE_TOKENS(
         diffuseColor)(emissiveColor)(opacity)(roughness)(MayaHydraMeshPoints)(constantLighting)(DefaultMayaLight));
 
 SdfPath MayaHydraSceneIndex::_fallbackMaterial;
-SdfPath MayaHydraSceneIndex::_mayaDefaultMaterialPath;     // Common to all scene indexes
+SdfPath MayaHydraSceneIndex::_mayaDefaultMaterialPath; // Common to all scene indexes
 VtValue MayaHydraSceneIndex::_mayaDefaultMaterialFallback; // Used only if we cannot find the maya
                                                            // default material
-SdfPath MayaHydraSceneIndex::_mayaDefaultLightPath;           // Common to all scene indexes
 SdfPath MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath; // Common to all scene indexes
 
 namespace {
+    
     TfToken GetPurposeRenderTag(const MRenderItem& ri)
+    {
         // This is where we sort the maya render items 
         if (ri.type() == MHWRender::MRenderItem::RenderItemType::DecorationItem) {
             // Decoration item == Viewport UI element, send to secondary graphics pass
@@ -162,292 +163,275 @@ namespace {
         }
         // Default to beauty pass
         return HdRenderTagTokens->geometry;
-
-TfToken GetPurposeRenderTag(const MRenderItem& ri)
-{
-    // This is where we sort the maya render items
-    if (ri.type() == MHWRender::MRenderItem::RenderItemType::DecorationItem) {
-        // Decoration item == Viewport UI element, send to secondary graphics pass
-        return Fvp::secondaryGraphicsRenderTagToken;
     }
-    // Default to beauty pass
-    return HdRenderTagTokens->geometry;
-}
 
-bool useMeshAdapter()
-{
-    static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
-    return uma;
-}
-
-bool filterMesh(const MRenderItem& ri)
-{
-    return useMeshAdapter() ?
-                            // Filter our mesh render items, and let the mesh adapter handle Maya
-                            // meshes.  The MRenderItem::name() for meshes is "StandardShadedItem",
-                            // their MRenderItem::type() is InternalMaterialItem, but
-                            // this type can also be used for other purposes, e.g. face groups, so
-                            // using the name is more appropriate.
+    bool filterMesh(const MRenderItem& ri, bool useMeshAdapter) {
+        return useMeshAdapter ?
+            // Filter our mesh render items, and let the mesh adapter handle Maya
+            // meshes.  The MRenderItem::name() for meshes is "StandardShadedItem", 
+            // their MRenderItem::type() is InternalMaterialItem, but 
+            // this type can also be used for other purposes, e.g. face groups, so
+            // using the name is more appropriate.
         (ri.name() == "StandardShadedItem")
                             : false;
-}
+    }
 
-bool isRenderItem_aiSkyDomeLightTriangleShape(const MRenderItem& renderItem)
-{
-    static const std::string _aiSkyDomeLight("aiSkyDomeLight");
+    bool isRenderItem_aiSkyDomeLightTriangleShape(const MRenderItem& renderItem)
+    {
+        static const std::string _aiSkyDomeLight("aiSkyDomeLight");
 
-    const auto prim = renderItem.primitive();
-    MDagPath   dag = renderItem.sourceDagPath();
+        const auto prim = renderItem.primitive();
+        MDagPath dag = renderItem.sourceDagPath();
     if (dag.isValid() && (MHWRender::MGeometry::Primitive::kTriangles == prim)
         && (MHWRender::MRenderItem::DecorationItem == renderItem.type())) {
-        std::string fpName = dag.fullPathName().asChar();
-        if (fpName.find(_aiSkyDomeLight) != std::string::npos) {
-            // This render item is a aiSkyDomeLight
+            std::string fpName = dag.fullPathName().asChar();
+            if (fpName.find(_aiSkyDomeLight) != std::string::npos) {
+                //This render item is a aiSkyDomeLight
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool AreLightsParamsWeUseDifferent(const GlfSimpleLight& light1, const GlfSimpleLight& light2)
+    {
+        // We only update 3 parameters in the default light : position, diffuse and specular. We don't
+        // use the primitive's transform.
+        return (light1.GetPosition() != light2.GetPosition())
+            || // Position (in which we actually store a direction, updated when rotating the view for
+               // example)
+            (light1.GetDiffuse() != light2.GetDiffuse())
+            || (light1.GetSpecular() != light2.GetSpecular());
+    }
+
+    template<class T> SdfPath toSdfPath(const T& src);
+template <> inline SdfPath toSdfPath<MDagPath>(const MDagPath& dag)
+{
+        return DagPathToSdfPath(dag, false, false);
+    }
+template <> inline SdfPath toSdfPath<MRenderItem>(const MRenderItem& ri)
+{
+        return RenderItemToSdfPath(ri, false);
+    }
+
+    template<class T> SdfPath maybePrepend(const T& src, const SdfPath& inPath);
+template <> inline SdfPath maybePrepend<MDagPath>(const MDagPath&, const SdfPath& inPath)
+{
+        return inPath;
+    }
+template <> inline SdfPath maybePrepend<MRenderItem>(const MRenderItem& ri, const SdfPath& inPath)
+{
+        // Prepend Maya path, for organization and readability.
+    auto sdfDagPath = DagPathToSdfPath(ri.sourceDagPath(), false, false)
+                          .MakeRelativePath(SdfPath::AbsoluteRootPath());
+        if (sdfDagPath.IsEmpty()){
+            return inPath;
+        }
+        return sdfDagPath.AppendPath(inPath);
+    }
+
+template <class T> SdfPath GetMayaPrimPath(const T& src)
+    {
+        SdfPath mayaPath = toSdfPath(src);
+        if (mayaPath.IsEmpty() || mayaPath.IsAbsoluteRootPath())
+            return {};
+
+        // We cannot append an absolute path (I.e : starting with "/")
+        if (mayaPath.IsAbsolutePath()) {
+            mayaPath = mayaPath.MakeRelativePath(SdfPath::AbsoluteRootPath());
+        }
+
+        mayaPath = maybePrepend(src, mayaPath);
+
+        return mayaPath;
+    }
+
+    bool IsTexturedSkyDomeRenderItem(const SdfPath& name)
+    {
+        static const std::string _aiTexturedSkyDome("texturedSkyDome");
+        if (name.GetString().find(_aiTexturedSkyDome) != std::string::npos) {
+            // This render item is an texturedDomeLighnt
+            return true;
+        }
+        return false;
+    }
+
+    SdfPath _GetPrimPath(const SdfPath& base, const MDagPath& dg)
+    {
+        return base.AppendPath(GetMayaPrimPath(dg));
+    }
+
+    SdfPath GetRenderItemMayaPrimPath(const MRenderItem& ri)
+    {
+        if (ri.InternalObjectId() == 0)
+            return {};
+
+        return GetMayaPrimPath(ri);
+    }
+
+    SdfPath GetRenderItemPrimPath(const SdfPath& base, const MRenderItem& ri)
+    {
+        return base.AppendPath(GetRenderItemMayaPrimPath(ri));
+    }
+
+    template <typename T, typename F> inline void _MapAdapter(F)
+    {
+        // Do nothing.
+    }
+
+    template <typename T, typename M0, typename F, typename... M>
+    inline void _MapAdapter(F f, const M0& m0, const M&... m)
+    {
+        for (auto& it : m0) {
+            f(static_cast<T*>(it.second.get()));
+        }
+        _MapAdapter<T>(f, m...);
+    }
+
+    template <typename T, typename F> inline bool _FindAdapter(const SdfPath&, F) { return false; }
+
+    template <typename T, typename M0, typename F, typename... M>
+    inline bool _FindAdapter(const SdfPath& id, F f, const M0& m0, const M&... m)
+    {
+        auto* adapterPtr = TfMapLookupPtr(m0, id);
+        if (adapterPtr == nullptr) {
+            return _FindAdapter<T>(id, f, m...);
+    } else {
+            f(static_cast<T*>(adapterPtr->get()));
             return true;
         }
     }
 
-    return false;
-}
+    template <typename T, typename F> inline bool _RemoveAdapter(const SdfPath&, F) { return false; }
 
-bool AreLightsParamsWeUseDifferent(const GlfSimpleLight& light1, const GlfSimpleLight& light2)
-{
-    // We only update 3 parameters in the default light : position, diffuse and specular. We don't
-    // use the primitive's transform.
-    return (light1.GetPosition() != light2.GetPosition())
-        || // Position (in which we actually store a direction, updated when rotating the view for
-           // example)
-        (light1.GetDiffuse() != light2.GetDiffuse())
-        || (light1.GetSpecular() != light2.GetSpecular());
-}
-
-template <class T> SdfPath toSdfPath(const T& src);
-template <> inline SdfPath toSdfPath<MDagPath>(const MDagPath& dag)
-{
-    return DagPathToSdfPath(dag, false, false);
-}
-template <> inline SdfPath toSdfPath<MRenderItem>(const MRenderItem& ri)
-{
-    return RenderItemToSdfPath(ri, false);
-}
-
-template <class T> SdfPath maybePrepend(const T& src, const SdfPath& inPath);
-template <> inline SdfPath maybePrepend<MDagPath>(const MDagPath&, const SdfPath& inPath)
-{
-    return inPath;
-}
-template <> inline SdfPath maybePrepend<MRenderItem>(const MRenderItem& ri, const SdfPath& inPath)
-{
-    // Prepend Maya path, for organization and readability.
-    auto sdfDagPath = DagPathToSdfPath(ri.sourceDagPath(), false, false)
-                          .MakeRelativePath(SdfPath::AbsoluteRootPath());
-    if (sdfDagPath.IsEmpty()) {
-        return inPath;
-    }
-    return sdfDagPath.AppendPath(inPath);
-}
-
-template <class T> SdfPath GetMayaPrimPath(const T& src)
-{
-    SdfPath mayaPath = toSdfPath(src);
-    if (mayaPath.IsEmpty() || mayaPath.IsAbsoluteRootPath())
-        return {};
-
-    // We cannot append an absolute path (I.e : starting with "/")
-    if (mayaPath.IsAbsolutePath()) {
-        mayaPath = mayaPath.MakeRelativePath(SdfPath::AbsoluteRootPath());
-    }
-
-    mayaPath = maybePrepend(src, mayaPath);
-
-    return mayaPath;
-}
-
-bool IsTexturedSkyDomeRenderItem(const SdfPath& name)
-{
-    static const std::string _aiTexturedSkyDome("texturedSkyDome");
-    if (name.GetString().find(_aiTexturedSkyDome) != std::string::npos) {
-        // This render item is an texturedDomeLighnt
-        return true;
-    }
-    return false;
-}
-
-SdfPath _GetPrimPath(const SdfPath& base, const MDagPath& dg)
-{
-    return base.AppendPath(GetMayaPrimPath(dg));
-}
-
-SdfPath GetRenderItemMayaPrimPath(const MRenderItem& ri)
-{
-    if (ri.InternalObjectId() == 0)
-        return {};
-
-    return GetMayaPrimPath(ri);
-}
-
-SdfPath GetRenderItemPrimPath(const SdfPath& base, const MRenderItem& ri)
-{
-    return base.AppendPath(GetRenderItemMayaPrimPath(ri));
-}
-
-template <typename T, typename F> inline void _MapAdapter(F)
-{
-    // Do nothing.
-}
-
-template <typename T, typename M0, typename F, typename... M>
-inline void _MapAdapter(F f, const M0& m0, const M&... m)
-{
-    for (auto& it : m0) {
-        f(static_cast<T*>(it.second.get()));
-    }
-    _MapAdapter<T>(f, m...);
-}
-
-template <typename T, typename F> inline bool _FindAdapter(const SdfPath&, F) { return false; }
-
-template <typename T, typename M0, typename F, typename... M>
-inline bool _FindAdapter(const SdfPath& id, F f, const M0& m0, const M&... m)
-{
-    auto* adapterPtr = TfMapLookupPtr(m0, id);
-    if (adapterPtr == nullptr) {
-        return _FindAdapter<T>(id, f, m...);
+    template <typename T, typename M0, typename F, typename... M>
+    inline bool _RemoveAdapter(const SdfPath& id, F f, M0& m0, M&... m)
+    {
+        auto* adapterPtr = TfMapLookupPtr(m0, id);
+        if (adapterPtr == nullptr) {
+            return _RemoveAdapter<T>(id, f, m...);
     } else {
-        f(static_cast<T*>(adapterPtr->get()));
-        return true;
+            f(static_cast<T*>(adapterPtr->get()));
+            m0.erase(id);
+            return true;
+        }
     }
-}
 
-template <typename T, typename F> inline bool _RemoveAdapter(const SdfPath&, F) { return false; }
+    template <typename R> inline R _GetDefaultValue() { return {}; }
 
-template <typename T, typename M0, typename F, typename... M>
-inline bool _RemoveAdapter(const SdfPath& id, F f, M0& m0, M&... m)
-{
-    auto* adapterPtr = TfMapLookupPtr(m0, id);
-    if (adapterPtr == nullptr) {
-        return _RemoveAdapter<T>(id, f, m...);
+    template <typename T, typename R, typename F> inline R _GetValue(const SdfPath&, F)
+    {
+        return _GetDefaultValue<R>();
+    }
+
+    template <typename T, typename R, typename F, typename M0, typename... M>
+    inline R _GetValue(const SdfPath& id, F f, const M0& m0, const M&... m)
+    {
+        auto* adapterPtr = TfMapLookupPtr(m0, id);
+        if (adapterPtr == nullptr) {
+            return _GetValue<T, R>(id, f, m...);
     } else {
-        f(static_cast<T*>(adapterPtr->get()));
-        m0.erase(id);
-        return true;
-    }
-}
-
-template <typename R> inline R _GetDefaultValue() { return {}; }
-
-template <typename T, typename R, typename F> inline R _GetValue(const SdfPath&, F)
-{
-    return _GetDefaultValue<R>();
-}
-
-template <typename T, typename R, typename F, typename M0, typename... M>
-inline R _GetValue(const SdfPath& id, F f, const M0& m0, const M&... m)
-{
-    auto* adapterPtr = TfMapLookupPtr(m0, id);
-    if (adapterPtr == nullptr) {
-        return _GetValue<T, R>(id, f, m...);
-    } else {
-        return f(static_cast<T*>(adapterPtr->get()));
-    }
-}
-
-void _onDagNodeAdded(MObject& obj, void* clientData)
-{
-    reinterpret_cast<MayaHydraSceneIndex*>(clientData)->OnDagNodeAdded(obj);
-}
-
-void _onDagNodeRemoved(MObject& obj, void* clientData)
-{
-    reinterpret_cast<MayaHydraSceneIndex*>(clientData)->OnDagNodeRemoved(obj);
-}
-
-const MString defaultLightSet("defaultLightSet");
-
-void _connectionChanged(MPlug& srcPlug, MPlug& destPlug, bool made, void* clientData)
-{
-    TF_UNUSED(made);
-    const auto srcObj = srcPlug.node();
-    if (!srcObj.hasFn(MFn::kTransform)) {
-        return;
-    }
-    const auto destObj = destPlug.node();
-    if (!destObj.hasFn(MFn::kSet)) {
-        return;
-    }
-    if (srcPlug != MayaAttrs::dagNode::instObjGroups) {
-        return;
-    }
-    MStatus           status;
-    MFnDependencyNode destNode(destObj, &status);
-    if (ARCH_UNLIKELY(!status)) {
-        return;
-    }
-    if (destNode.name() != defaultLightSet) {
-        return;
-    }
-    auto*    index = reinterpret_cast<MayaHydraSceneIndex*>(clientData);
-    MDagPath dag;
-    status = MDagPath::getAPathTo(srcObj, dag);
-    if (ARCH_UNLIKELY(!status)) {
-        return;
-    }
-    unsigned int shapesBelow = 0;
-    dag.numberOfShapesDirectlyBelow(shapesBelow);
-    for (auto i = decltype(shapesBelow) { 0 }; i < shapesBelow; ++i) {
-        auto dagCopy = dag;
-        dagCopy.extendToShapeDirectlyBelow(i);
-        index->UpdateLightVisibility(dagCopy);
-    }
-}
-
-SdfPath _GetMaterialPath(const SdfPath& base, const MObject& obj)
-{
-    MStatus           status;
-    MFnDependencyNode node(obj, &status);
-    if (!status) {
-        return {};
-    }
-    const auto* chr = node.name().asChar();
-    if (chr == nullptr || chr[0] == '\0') {
-        return {};
+            return f(static_cast<T*>(adapterPtr->get()));
+        }
     }
 
-    std::string nodeName(chr);
-    SanitizeNameForSdfPath(nodeName);
-    return base.AppendPath(SdfPath(nodeName));
-}
+    void _onDagNodeAdded(MObject& obj, void* clientData)
+    {
+        reinterpret_cast<MayaHydraSceneIndex*>(clientData)->OnDagNodeAdded(obj);
+    }
 
-bool GetShadingEngineNode(const MRenderItem& ri, MObject& shadingEngineNode)
-{
-    MDagPath dagPath = ri.sourceDagPath();
-    if (dagPath.isValid()) {
-        MFnDagNode   dagNode(dagPath.node());
-        MObjectArray sets, comps;
-        dagNode.getConnectedSetsAndMembers(dagPath.instanceNumber(), sets, comps, true);
-        assert(sets.length() == comps.length());
-        for (uint32_t i = 0; i < sets.length(); ++i) {
-            const MObject& object = sets[i];
-            if (object.apiType() == MFn::kShadingEngine) {
-                // To support per-face shading, find the shading node matched with the render item
-                const MObject& comp = comps[i];
-                MObject        shadingComp = ri.shadingComponent();
-                if (shadingComp.isNull() || comp.isNull()
-                    || MFnComponent(comp).isEqual(shadingComp)) {
-                    shadingEngineNode = object;
-                    return true;
+    void _onDagNodeRemoved(MObject& obj, void* clientData)
+    {
+        reinterpret_cast<MayaHydraSceneIndex*>(clientData)->OnDagNodeRemoved(obj);
+    }
+
+    const MString defaultLightSet("defaultLightSet");
+
+    void _connectionChanged(MPlug& srcPlug, MPlug& destPlug, bool made, void* clientData)
+    {
+        TF_UNUSED(made);
+        const auto srcObj = srcPlug.node();
+        if (!srcObj.hasFn(MFn::kTransform)) {
+            return;
+        }
+        const auto destObj = destPlug.node();
+        if (!destObj.hasFn(MFn::kSet)) {
+            return;
+        }
+        if (srcPlug != MayaAttrs::dagNode::instObjGroups) {
+            return;
+        }
+        MStatus           status;
+        MFnDependencyNode destNode(destObj, &status);
+        if (ARCH_UNLIKELY(!status)) {
+            return;
+        }
+        if (destNode.name() != defaultLightSet) {
+            return;
+        }
+        auto* index = reinterpret_cast<MayaHydraSceneIndex*>(clientData);
+        MDagPath dag;
+        status = MDagPath::getAPathTo(srcObj, dag);
+        if (ARCH_UNLIKELY(!status)) {
+            return;
+        }
+        unsigned int shapesBelow = 0;
+        dag.numberOfShapesDirectlyBelow(shapesBelow);
+        for (auto i = decltype(shapesBelow) { 0 }; i < shapesBelow; ++i) {
+            auto dagCopy = dag;
+            dagCopy.extendToShapeDirectlyBelow(i);
+            index->UpdateLightVisibility(dagCopy);
+        }
+    }
+
+    SdfPath _GetMaterialPath(const SdfPath& base, const MObject& obj)
+    {
+        MStatus           status;
+        MFnDependencyNode node(obj, &status);
+        if (!status) {
+            return {};
+        }
+        const auto* chr = node.name().asChar();
+        if (chr == nullptr || chr[0] == '\0') {
+            return {};
+        }
+
+        std::string nodeName(chr);
+        SanitizeNameForSdfPath(nodeName);
+        return base.AppendPath(SdfPath(nodeName));
+    }
+
+    bool GetShadingEngineNode(const MRenderItem& ri, MObject& shadingEngineNode)
+    {
+        MDagPath dagPath = ri.sourceDagPath();
+        if (dagPath.isValid()) {
+            MFnDagNode   dagNode(dagPath.node());
+            MObjectArray sets, comps;
+            dagNode.getConnectedSetsAndMembers(dagPath.instanceNumber(), sets, comps, true);
+            assert(sets.length() == comps.length());
+            for (uint32_t i = 0; i < sets.length(); ++i) {
+                const MObject& object = sets[i];
+                if (object.apiType() == MFn::kShadingEngine) {
+                    // To support per-face shading, find the shading node matched with the render item
+                    const MObject& comp = comps[i];
+                    MObject        shadingComp = ri.shadingComponent();
+                    if (shadingComp.isNull() || comp.isNull()
+                        || MFnComponent(comp).isEqual(shadingComp)) {
+                        shadingEngineNode = object;
+                        return true;
+                    }
                 }
             }
         }
+        return false;
     }
-    return false;
-}
 
-std::mutex _adaptersToRecreateMutex;
-std::mutex _adaptersToRebuildMutex;
-const MString
-    sActiveFacesName(L"PolyActiveFaces"); // When we have a render item which is a selection of
-                                          // faces, it always has this name in maya.
+    std::mutex _adaptersToRecreateMutex;
+    std::mutex _adaptersToRebuildMutex;
+    const MString
+        sActiveFacesName(L"PolyActiveFaces"); // When we have a render item which is a selection of
+                                              // faces, it always has this name in maya.
 
 class MayaPathMapper : public Fvp::PathMapper
 {
@@ -471,9 +455,9 @@ private:
 
 } // namespace
 
-MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData, bool lightEnabled)
+MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData, bool interactive, bool lightEnabled)
     : _ID(initData.delegateID.AppendChild(
-          TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this))))
+        TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this))))
     , _renderIndex(initData.renderIndex)
     , _isHdSt(initData.isHdSt)
     , _rprimPath(initData.delegateID.AppendPath(SdfPath(std::string("rprims"))))
@@ -484,7 +468,6 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData, bool light
 {
     static std::once_flag once;
     std::call_once(once, []() {
-        _mayaDefaultLightPath = SdfPath::AbsoluteRootPath().AppendChild(_tokens->DefaultMayaLight);
         MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath
             = SdfPath::AbsoluteRootPath().AppendChild(_tokens->MayaFacesSelectionMaterial);
         MayaHydraSceneIndex::_mayaDefaultMaterialPath = SdfPath::AbsoluteRootPath().AppendChild(
@@ -497,13 +480,13 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData, bool light
     auto& phr = MayaHydra::PickHandlerRegistry::Instance();
     _unregisterPickHandler = (phr.RegisteredHandler(_rprimPath) == nullptr);
     if (_unregisterPickHandler) {
-        auto pickHandler = std::make_shared<MayaPickHandler>(*this);
-        TF_AXIOM(phr.Register(_rprimPath, pickHandler));
+      auto pickHandler = std::make_shared<MayaPickHandler>(*this);
+      TF_AXIOM(phr.Register(_rprimPath, pickHandler));
     }
 
-    // Always add the mayaHydraFacesSelectionMaterialDataSource to display faces selection
-    //  Always Create the material since it will update the color from the preferences if it has
-    //  changed.
+    //Always add the mayaHydraFacesSelectionMaterialDataSource to display faces selection
+    // Always Create the material since it will update the color from the preferences if it has
+    // changed.
     if (_interactive) {
         _mayaFacesSelectionMaterial = MayaHydraSceneIndex::_CreateMayaFacesSelectionMaterial();
     }
@@ -524,13 +507,13 @@ MayaHydraSceneIndex::~MayaHydraSceneIndex() { _Destroy(); }
 
 void MayaHydraSceneIndex::_Destroy()
 {
-    // Remove global materials
-    if (_mayaDefaultMaterialFallback.IsHolding<HdMaterialNetworkMap>()) {
-        // Remove the fallback material in case it was created
+    //Remove global materials
+    if (_mayaDefaultMaterialFallback.IsHolding<HdMaterialNetworkMap>()){
+        //Remove the fallback material in case it was created
         RemovePrims({ { MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath,
                         MayaHydraSceneIndex::_mayaDefaultMaterialPath } });
-    } else {
-        RemovePrims({ { MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath } });
+    }else{
+        RemovePrims({ { MayaHydraSceneIndex::_mayaFacesSelectionMaterialPath} }); 
     }
 
     for (auto callback : _callbacks) {
@@ -558,7 +541,7 @@ void MayaHydraSceneIndex::_Destroy()
 
     // Remove our pick handler from the pick handler registry.
     if (_unregisterPickHandler) {
-        TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Unregister(_rprimPath));
+      TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Unregister(_rprimPath));
     }
 }
 
@@ -634,7 +617,7 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(
             // Handle custom attribute changes
             ria->CreateCallbacks();
 
-            // Update the render item adapter if this render item is an aiSkydomeLight shape
+            //Update the render item adapter if this render item is an aiSkydomeLight shape
             ria->SetIsRenderITemAnaiSkydomeLightTriangleShape(
                 isRenderItem_aiSkyDomeLightTriangleShape(ri));
 
@@ -653,7 +636,7 @@ void MayaHydraSceneIndex::HandleCompleteViewportScene(
             ria->SetMaterial(material);
         }
 
-        MColor wireframeColor;
+        MColor                   wireframeColor;
 
         MDagPath dagPath = ri.sourceDagPath();
         if (dagPath.isValid()) {
@@ -675,7 +658,7 @@ void MayaHydraSceneIndex::Populate()
     MayaHydraAdapterRegistry::LoadAllPlugin();
 
     MStatus status;
-    MItDag  dagIt(MItDag::kDepthFirst);
+    MItDag dagIt(MItDag::kDepthFirst);
     dagIt.traverseUnderWorld(true);
     if (useMeshAdapter()) {
         for (; !dagIt.isDone(); dagIt.next()) {
@@ -713,12 +696,12 @@ void MayaHydraSceneIndex::SetDefaultLightEnabled(const bool enabled)
 
         if (_useMayaDefaultLight) {
             auto mayaDefaultLightDataSource = MayaHydraDefaultLightDataSource::New(
-                _mayaDefaultLightPath, HdPrimTypeTokens->simpleLight, this);
-            AddPrims({ { _mayaDefaultLightPath,
+                MayaDefaultLightPath(), HdPrimTypeTokens->simpleLight, this);
+            AddPrims({ { MayaDefaultLightPath(),
                          HdPrimTypeTokens->simpleLight,
                          mayaDefaultLightDataSource } });
         } else {
-            RemovePrim(_mayaDefaultLightPath);
+            RemovePrim(MayaDefaultLightPath());
         }
     }
 }
@@ -735,23 +718,23 @@ void MayaHydraSceneIndex::SetDefaultLight(const GlfSimpleLight& light)
         _mayaDefaultLight.SetDiffuse(light.GetDiffuse());
         _mayaDefaultLight.SetSpecular(light.GetSpecular());
         _mayaDefaultLight.SetPosition(light.GetPosition());
-        MarkSprimDirty(_mayaDefaultLightPath, HdLight::DirtyParams);
+        MarkSprimDirty(MayaDefaultLightPath(), HdLight::DirtyParams);
     }
 }
 
 void modifyDefaultMaterialOpacity(HdMaterialNetworkMap& materialNetworkMap, bool xrayEnabled)
 {
-
+    
     // Hardcoded value taken from OGSMayaRenderItem::UpdateExtraOpacityParam
     constexpr float xRayOpacityValue = 0.3f;
-    const TfToken   _opacityToken("opacity");
-    for (auto& iter : materialNetworkMap.map) {
-        HdMaterialNetwork& hdNetwork = iter.second;
-        if (hdNetwork.nodes.empty())
+    const TfToken _opacityToken("opacity");
+    for (auto &iter: materialNetworkMap.map) {
+        HdMaterialNetwork &hdNetwork = iter.second;
+        if (hdNetwork.nodes.empty())      
             continue;
-        for (HdMaterialNode& node : hdNetwork.nodes) {
+        for (HdMaterialNode &node : hdNetwork.nodes) {
             const auto it = node.parameters.find(_opacityToken);
-            if (it != node.parameters.cend())
+            if (it != node.parameters.cend()) 
                 node.parameters[_opacityToken] = xrayEnabled ? xRayOpacityValue : 1.f;
         }
     }
@@ -767,16 +750,6 @@ VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
         return MayaHydraMaterialAdapter::GetPreviewMaterialResource(id);
     }
 
-    // Check if this is a light primitive - PRMan calls GetMaterialResource for lights
-    auto lightRet = _GetValue<MayaHydraLightAdapter, VtValue>(
-        id,
-        [](MayaHydraLightAdapter* a) -> VtValue { return a->GetLightMaterialNetwork(); },
-        _lightAdapters);
-    if (!lightRet.IsEmpty()) {
-        return lightRet;
-    }
-
-    // Handle regular material adapters
     auto ret = _GetValue<MayaHydraMaterialAdapter, VtValue>(
         id,
         [](MayaHydraMaterialAdapter* a) -> VtValue { return a->GetMaterialResource(); },
@@ -784,9 +757,9 @@ VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
     return ret.IsEmpty() ? MayaHydraMaterialAdapter::GetPreviewMaterialResource(id) : ret;
 }
 
-// Create the default maya material or create a fallback material if it cannot be found
-void MayaHydraSceneIndex::CreateMayaDefaultMaterialData()
-{
+//Create the default maya material or create a fallback material if it cannot be found
+void MayaHydraSceneIndex::CreateMayaDefaultMaterialData() 
+{ 
     bool defaultMaterialCreatedSuccessfully = false;
 
     // Get the shading group of the default material
@@ -795,11 +768,11 @@ void MayaHydraSceneIndex::CreateMayaDefaultMaterialData()
         defaultMaterialCreatedSuccessfully = _CreateMaterial(
             MayaHydraSceneIndex::_mayaDefaultMaterialPath, defaultMaterialShadingGroupObj);
     }
-
-    if (!defaultMaterialCreatedSuccessfully) {
+    
+    if (! defaultMaterialCreatedSuccessfully){
         TF_CODING_WARNING("maya default material and its shading group could not be retrieved, "
                           "using a fallback material");
-
+        
         _mayaDefaultMaterialFallback = MayaHydraSceneIndex::_CreateDefaultMaterialFallback();
 
         auto mayaHydraDefaultMaterialDataSource = MayaHydraMaterialDataSource::New(
@@ -839,7 +812,7 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
 
     // Check if this Maya node has a special path mapper associated with it.
     const Ufe::PathSegment seg = UfeExtensions::dagPathToUfePathSegment(shapeDagPath);
-    if (!seg.empty()) {
+    if (!seg.empty()) { 
         const Ufe::Path shapeAppPath { seg };
         const auto&     pmr = Fvp::PathMapperRegistry::Instance();
         if (pmr.HasMapper(shapeAppPath)) {
@@ -882,13 +855,13 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelectionsLit(const Ufe::P
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg("    mapped to scene index path %s.\n", primPath.GetText());
 
-    return Fvp::PrimSelections({ Fvp::PrimSelection { primPath } });
+    return Fvp::PrimSelections({Fvp::PrimSelection{primPath}});
 }
 
 SdfPath MayaHydraSceneIndex::SetCameraViewport(const MDagPath& camPath, const GfVec4d& viewport)
 {
     const SdfPath camID = GetPrimPath(camPath, true);
-    auto&&        cameraAdapter = TfMapLookupPtr(_cameraAdapters, camID);
+    auto&& cameraAdapter = TfMapLookupPtr(_cameraAdapters, camID);
     if (cameraAdapter) {
         (*cameraAdapter)->SetViewport(viewport);
         return camID;
@@ -901,12 +874,12 @@ bool MayaHydraSceneIndex::IsPickedNodeInComponentsPickingMode(const MayaHydra::P
     // Is the picked node in components selection mode ? If so it is in the hilite list
     MSelectionList hiliteList;
     MGlobal::getHiliteList(hiliteList);
-    if (hiliteList.isEmpty()) {
+    if (hiliteList.isEmpty()){
         return false;
     }
 
     bool isOneMayaNodeInComponentsPickingMode = false;
-
+            
     SdfPath hitId = hit.hdxPickHit.objectId;
     if (hitId.HasPrefix(GetRprimPath())) {
         _FindAdapter<MayaHydraRenderItemAdapter>(
@@ -939,7 +912,7 @@ bool MayaHydraSceneIndex::AddPickHitToSelectionList(
     const MayaHydra::PickHit& hit,
     const MHWRender::MSelectionInfo& /* selectInfo */,
     MSelectionList& selectionList,
-    MPointArray&    worldSpaceHitPts)
+    MPointArray& worldSpaceHitPts)
 {
     SdfPath hitId = hit.hdxPickHit.objectId;
     // validate that hit is indeed a maya item. Alternatively, the rprim hit could be an rprim
@@ -951,7 +924,7 @@ bool MayaHydraSceneIndex::AddPickHitToSelectionList(
                 // prepare the selection path of the hit item, the transform path is expected if
                 // available
                 const auto& itemPath = a->GetDagPath();
-
+        
                 MDagPath selectPath;
                 if (MS::kSuccess != MDagPath::getAPathTo(itemPath.transform(), selectPath)) {
                     selectPath = itemPath;
@@ -978,7 +951,7 @@ MayaHydraSceneIndex::LightDagPathMap MayaHydraSceneIndex::_GetGlobalLightPaths()
     // By the time this function is called _lightAdapters should already have been populated
     // with both Maya and Arnold light adapters. The adapters contain the DagPath information
     // we store it here in unordered_map for fast retrieval
-    for (const auto& entry : _lightAdapters)
+    for(const auto& entry : _lightAdapters)
         allLightPaths.emplace(
             entry.second->GetDagPath().fullPathName().asChar(), entry.second->GetDagPath());
     return allLightPaths;
@@ -998,9 +971,9 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         if (IsHdSt()) {
             for (const auto& id : _materialTagsChanged) {
                 if (_GetValue<MayaHydraMaterialAdapter, bool>(
-                        id,
-                        [](MayaHydraMaterialAdapter* a) { return a->UpdateMaterialTag(); },
-                        _materialAdapters)) {
+                    id,
+                    [](MayaHydraMaterialAdapter* a) { return a->UpdateMaterialTag(); },
+                    _materialAdapters)) {
                     auto& renderIndex = GetRenderIndex();
                     for (const auto& rprimId : renderIndex.GetRprimIds()) {
                         const auto* rprim = renderIndex.GetRprim(rprimId);
@@ -1070,7 +1043,7 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
     // We don't need to rebuild something that's already being recreated.
     // Since we have a few elements, linear search over vectors is going to
     // be okay.
-    // Block for the lifetime of _adaptersToRecreateMutex and _adaptersToRebuildMutex
+    //Block for the lifetime of _adaptersToRecreateMutex and _adaptersToRebuildMutex
     {
         std::lock_guard<std::mutex> lockRecreate(_adaptersToRecreateMutex);
         std::lock_guard<std::mutex> lockRebuild(_adaptersToRebuildMutex);
@@ -1078,7 +1051,7 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
         if (!_adaptersToRecreate.empty()) {
             for (const auto& it : _adaptersToRecreate) {
                 RecreateAdapter(std::get<0>(it), std::get<1>(it));
-
+                
                 for (auto itr = _adaptersToRebuild.begin(); itr != _adaptersToRebuild.end();
                      ++itr) {
                     if (std::get<0>(it) == std::get<0>(*itr)) {
@@ -1090,8 +1063,8 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
             _adaptersToRecreate.clear();
         }
     }
-
-    // Block for the lifetime of _adaptersToRebuildMutex
+    
+    //Block for the lifetime of _adaptersToRebuildMutex
     {
         std::lock_guard<std::mutex> lock(_adaptersToRebuildMutex);
         if (!_adaptersToRebuild.empty()) {
@@ -1119,12 +1092,12 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
     if (!IsHdSt()) {
         return;
     }
-
+   
     LightDagPathMap globalLightPaths = _GetGlobalLightPaths();
     LightDagPathMap activeLightPaths;
-    constexpr auto  considerAllSceneLights = MHWRender::MDrawContext::kFilteredIgnoreLightLimit;
-    MStatus         status;
-    const auto      numLights = context.numberOfActiveLights(considerAllSceneLights, &status);
+    constexpr auto considerAllSceneLights = MHWRender::MDrawContext::kFilteredIgnoreLightLimit;
+    MStatus        status;
+    const auto     numLights = context.numberOfActiveLights(considerAllSceneLights, &status);
 
     if ((!status || numLights == 0) && (0 == globalLightPaths.size())) {
         _MapAdapter<MayaHydraLightAdapter>(
@@ -1185,12 +1158,10 @@ void MayaHydraSceneIndex::PreFrame(const MHWRender::MDrawContext& context)
 
 bool MayaHydraSceneIndex::GetPlaybackRunning() const { return _isPlaybackRunning; }
 
-void MayaHydraSceneIndex::PostFrame() { }
-
 void MayaHydraSceneIndex::InsertPrim(
     MayaHydraAdapter* adapter,
-    const TfToken&    typeId,
-    const SdfPath&    id)
+    const TfToken& typeId,
+    const SdfPath& id)
 {
     auto dataSource = MayaHydraDataSource::New(id, typeId, this, adapter);
 
@@ -1220,7 +1191,6 @@ void MayaHydraSceneIndex::_AddPrimAncestors(const SdfPath& path)
         AddPrims({ { parentPath, TfToken(), HdRetainedContainerDataSource::New() } });
         _AddPrimAncestors(parentPath);
     }
-
 }
 
 void MayaHydraSceneIndex::_RemoveEmptyAncestors(const SdfPath& path)
@@ -1264,11 +1234,11 @@ void MayaHydraSceneIndex::_MarkPrimDirty(
     HdDirtyBits             dirtyBits,
     DirtyBitsToLocatorsFunc dirtyBitsToLocatorsFunc)
 {
-    HdSceneIndexPrim       prim = GetPrim(id);
+    HdSceneIndexPrim prim = GetPrim(id);
     HdDataSourceLocatorSet locators;
     dirtyBitsToLocatorsFunc(prim.primType, dirtyBits, &locators);
     if (!locators.IsEmpty()) {
-        DirtyPrims({ { id, locators } });
+        DirtyPrims({ {id, locators} });
     }
 }
 
@@ -1294,7 +1264,7 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
         _MapAdapter<MayaHydraRenderItemAdapter>(
             [](MayaHydraRenderItemAdapter* a) {
                 if (a->HasType(HdPrimTypeTokens->mesh) || a->HasType(HdPrimTypeTokens->basisCurves)
-                    || a->HasType(HdPrimTypeTokens->points)) {
+                || a->HasType(HdPrimTypeTokens->points)) {
                     a->MarkDirty(HdChangeTracker::DirtyTopology);
                 }
             },
@@ -1312,7 +1282,7 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
         _MapAdapter<MayaHydraRenderItemAdapter>(
             [](MayaHydraRenderItemAdapter* a) {
                 if (a->HasType(HdPrimTypeTokens->mesh) || a->HasType(HdPrimTypeTokens->basisCurves)
-                    || a->HasType(HdPrimTypeTokens->points)) {
+                || a->HasType(HdPrimTypeTokens->points)) {
                     a->InvalidateTransform();
                     a->MarkDirty(HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyTransform);
                 }
@@ -1351,15 +1321,15 @@ SdfPath MayaHydraSceneIndex::GetMaterialId(const SdfPath& id)
     auto result = TfMapLookupPtr(_renderItemsAdapters, id);
     if (result != nullptr) {
         auto& renderItemAdapter = *result;
-
+        
         auto& material = renderItemAdapter->GetMaterial();
-        auto  ismayaFacesSelectionMaterial = material == _mayaFacesSelectionMaterialPath;
+        auto ismayaFacesSelectionMaterial = material == _mayaFacesSelectionMaterialPath;
         // Check if this render item is a wireframe primitive
         if (MHWRender::MGeometry::Primitive::kLines == renderItemAdapter->GetPrimitive()
             || MHWRender::MGeometry::Primitive::kLineStrip == renderItemAdapter->GetPrimitive()) {
             return _fallbackMaterial;
         }
-
+        
         if (material == kInvalidMaterial) {
             return _fallbackMaterial;
         }
@@ -1414,12 +1384,12 @@ HdBasisCurvesTopology MayaHydraSceneIndex::GetBasisCurvesTopology(const SdfPath&
 void MayaHydraSceneIndex::RemoveAdapter(const SdfPath& id)
 {
     if (!_RemoveAdapter<MayaHydraAdapter>(
-            id,
-            [](MayaHydraAdapter* a) {
-                a->RemoveCallbacks();
-                a->RemovePrim();
-            },
-            _renderItemsAdapters,
+        id,
+        [](MayaHydraAdapter* a) {
+            a->RemoveCallbacks();
+            a->RemovePrim();
+        },
+        _renderItemsAdapters,
             _shapeAdapters,
             _lightAdapters,
             _cameraAdapters,
@@ -1487,22 +1457,10 @@ void MayaHydraSceneIndex::GetLightedPrimPaths(SdfPathVector& lightedPrimPaths)
         _shapeAdapters);
 }
 
-GfBBox3d MayaHydraSceneIndex::GetBoundingBox()
-{
-    GfBBox3d bbox;
-    _MapAdapter<MayaHydraAdapter>(
-        [&](MayaHydraAdapter* a) {
-            bbox = GfBBox3d::Combine(a->GetBoundingBox(), bbox);
-        },
-        _renderItemsAdapters,
-        _shapeAdapters);
-    return bbox;
-}
-
 bool MayaHydraSceneIndex::_GetRenderItemMaterial(
     const MRenderItem& ri,
-    SdfPath&           material,
-    MObject&           shadingEngineNode)
+    SdfPath& material,
+    MObject& shadingEngineNode)
 {
     if (MHWRender::MGeometry::Primitive::kLines == ri.primitive()
         || MHWRender::MGeometry::Primitive::kLineStrip == ri.primitive()) {
@@ -1510,7 +1468,7 @@ bool MayaHydraSceneIndex::_GetRenderItemMaterial(
         return true;
     }
 
-    // Is it a face components selection render item ?
+    //Is it a face components selection render item ? 
     const MString& renderItemName = ri.name();
     // Compare its name with the content of sActiveFacesName which is the hardcoded name for face
     // components selection render item
@@ -1520,8 +1478,8 @@ bool MayaHydraSceneIndex::_GetRenderItemMaterial(
     }
 
     if (GetShadingEngineNode(ri, shadingEngineNode))
-    // Else try to find associated material node if this is a material shader.
-    // NOTE: The existing maya material support in hydra expects a shading engine node
+        // Else try to find associated material node if this is a material shader.
+        // NOTE: The existing maya material support in hydra expects a shading engine node
     {
         material = GetMaterialPath(shadingEngineNode);
         if (TfMapLookupPtr(_materialAdapters, material) != nullptr) {
@@ -1569,13 +1527,13 @@ void MayaHydraSceneIndex::RebuildAdapterOnIdle(const SdfPath& id, uint32_t flags
 void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
 {
     if (_RemoveAdapter<MayaHydraAdapter>(
-            id,
-            [](MayaHydraAdapter* a) {
-                a->RemoveCallbacks();
-                a->RemovePrim();
-            },
-            _lightAdapters,
-            _cameraAdapters)) {
+        id,
+        [](MayaHydraAdapter* a) {
+            a->RemoveCallbacks();
+            a->RemovePrim();
+        },
+        _lightAdapters,
+        _cameraAdapters)) {
         if (MObjectHandle(obj).isValid()) {
             OnDagNodeAdded(obj);
         }
@@ -1584,12 +1542,12 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
 
     if (useMeshAdapter()
         && _RemoveAdapter<MayaHydraAdapter>(
-            id,
-            [](MayaHydraAdapter* a) {
-                a->RemoveCallbacks();
-                a->RemovePrim();
-            },
-            _shapeAdapters)) {
+        id,
+        [](MayaHydraAdapter* a) {
+            a->RemoveCallbacks();
+            a->RemovePrim();
+        },
+        _shapeAdapters)) {
         MFnDagNode dgNode(obj);
         MDagPath   path;
         dgNode.getPath(path);
@@ -1600,12 +1558,12 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
     }
 
     if (_RemoveAdapter<MayaHydraMaterialAdapter>(
-            id,
-            [](MayaHydraMaterialAdapter* a) {
-                a->RemoveCallbacks();
-                a->RemovePrim();
-            },
-            _materialAdapters)) {
+        id,
+        [](MayaHydraMaterialAdapter* a) {
+            a->RemoveCallbacks();
+            a->RemovePrim();
+        },
+        _materialAdapters)) {
         auto& renderIndex = GetRenderIndex();
         for (const auto& rprimId : renderIndex.GetRprimIds()) {
             const auto* rprim = renderIndex.GetRprim(rprimId);
@@ -1621,10 +1579,10 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
 
 template <typename AdapterPtr, typename Map>
 AdapterPtr MayaHydraSceneIndex::_CreateAdapter(
-    const MDagPath&                                                         dag,
+    const MDagPath& dag,
     const std::function<AdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>& adapterCreator,
-    Map&                                                                    adapterMap,
-    bool                                                                    isSprim)
+    Map& adapterMap,
+    bool                                                                     isSprim)
 {
     // Filter for whether we should even attempt to create the adapter
 
@@ -1703,8 +1661,8 @@ void MayaHydraSceneIndex::OnDagNodeRemoved(const MObject& obj)
 {
     const auto it
         = std::remove_if(_lightsToAdd.begin(), _lightsToAdd.end(), [&obj](const auto& item) {
-              return item.first == obj;
-          });
+        return item.first == obj;
+            });
 
     if (it != _lightsToAdd.end()) {
         _lightsToAdd.erase(it, _lightsToAdd.end());
@@ -1713,8 +1671,8 @@ void MayaHydraSceneIndex::OnDagNodeRemoved(const MObject& obj)
 
     const auto itCamera
         = std::remove_if(_camerasToAdd.begin(), _camerasToAdd.end(), [&obj](const auto& item) {
-              return item.first == obj;
-          });
+            return item.first == obj;
+        });
     if (itCamera != _camerasToAdd.end()) {
         _camerasToAdd.erase(itCamera, _camerasToAdd.end());
         return;
@@ -1861,13 +1819,13 @@ VtValue MayaHydraSceneIndex::GetShadingStyle(SdfPath const& id)
             || MHWRender::MGeometry::Primitive::kLineStrip == primitive) {
             return VtValue(
                 _tokens
-                    ->constantLighting); // Use fallbackMaterial + constantLighting + displayColor
+                ->constantLighting); // Use fallbackMaterial + constantLighting + displayColor
         }
     }
     return VtValue();
 }
 
-bool MayaHydraSceneIndex::passNormalsToHydra()
+bool MayaHydraSceneIndex::passNormalsToHydra() 
 {
     static const bool val = TfGetEnvSetting(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA);
     return val;
@@ -1955,6 +1913,12 @@ GfBBox3d MayaHydraSceneIndex::GetBoundingBox() const
         _renderItemsAdapters,
         _shapeAdapters);
     return bbox;
+}
+
+const SdfPath& MayaHydraSceneIndex::MayaDefaultLightPath()
+{
+    static SdfPath _mayaDefaultLightPath = SdfPath::AbsoluteRootPath().AppendChild(_tokens->DefaultMayaLight);
+    return _mayaDefaultLightPath;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -62,6 +62,8 @@ public:
         if ((paramName == HdLightTokens->width) || (paramName == UsdLuxTokens->inputsWidth)) {
             constexpr int widthIndex = 0;
             return sizeScaled(widthIndex);
+        } else if (
+            (paramName == HdLightTokens->height) || (paramName == UsdLuxTokens->inputsHeight)) {
             constexpr int heightIndex = 1;
             return sizeScaled(heightIndex);
         } else if (
@@ -76,7 +78,10 @@ public:
                     float overidenIntensity = intensityPlug.asFloat();
                     if (GetMayaHydraSceneIndex()->IsHdSt()) {
                         overidenIntensity /= M_PI; // For Storm only
-                        overidenIntensity /= M_PI;//For Storm only
+                    }
+                    return VtValue(overidenIntensity);
+                }
+            }
         } else if (
             GetMayaHydraSceneIndex()->IsHdSt() //Storm will use shadow maps
             &&(
@@ -90,6 +95,7 @@ public:
             // DistantLights
             // https://github.com/PixarAnimationStudios/OpenUSD/blob/8843f3b7b334bbcd8df014e63d1b8fad24fc6b6e/pxr/imaging/hdx/shadowTask.cpp#L117
             return VtValue(false); // No shadows for Storm with lights of type HdPrimTypeTokens->rectLight
+        }
 
         return MayaHydraLightAdapter::GetLightParamValue(paramName);
     }
