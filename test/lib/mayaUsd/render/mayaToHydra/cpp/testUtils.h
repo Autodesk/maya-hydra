@@ -38,6 +38,7 @@
 #include <fstream>
 #include <functional>
 #include <limits>
+#include <string_view>
 
 UFE_NS_DEF {
 class Path;
@@ -47,6 +48,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 constexpr double DEFAULT_TOLERANCE = std::numeric_limits<double>::epsilon();
 
+constexpr std::string_view kHighlightsHierarchyPrefix = "FlowViewportSelectionHighlights";
+
 using SceneIndicesVector = std::vector<HdSceneIndexBaseRefPtr>;
 
 /**
@@ -55,6 +58,27 @@ using SceneIndicesVector = std::vector<HdSceneIndexBaseRefPtr>;
  * @return A reference to the vector of registered terminal scene indices.
  */
 const SceneIndicesVector& GetTerminalSceneIndices();
+
+/**
+ * @brief Retrieve the scene index associated to a given pass
+ *
+ * @return A reference to the scene index of the desired pass.
+ */
+const HdSceneIndexBasePtr GetPassSceneIndex(int passIndex);
+
+/**
+ * @brief Retrieve the scene index associated to the beauty pass
+ *
+ * @return A reference to the beauty pass scene index.
+ */
+const HdSceneIndexBasePtr GetBeautyPassSceneIndex();
+
+/**
+ * @brief Retrieve the scene index associated to the secondary graphics pass
+ *
+ * @return A reference to the secondary graphics pass scene index.
+ */
+const HdSceneIndexBasePtr GetSecondaryGraphicsPassSceneIndex();
 
 /**
  * @brief Compare a Hydra and a Maya matrix and return whether they are similar
@@ -395,21 +419,21 @@ bool dataSourceMatchesReference(
 */
 class DecimalStreamingOverride {
 public:
-    DecimalStreamingOverride(const pxr::TfDecimalToStringConfig& overrideConfig)
+    DecimalStreamingOverride(const PXR_NS::TfDecimalToStringConfig& overrideConfig)
     {
-        _prevFloatConfig = pxr::TfStreamFloat::ToStringConfig();
-        _prevDoubleConfig = pxr::TfStreamDouble::ToStringConfig();
-        pxr::TfStreamFloat::ToStringConfig() = overrideConfig;
-        pxr::TfStreamDouble::ToStringConfig() = overrideConfig;
+        _prevFloatConfig = PXR_NS::TfStreamFloat::ToStringConfig();
+        _prevDoubleConfig = PXR_NS::TfStreamDouble::ToStringConfig();
+        PXR_NS::TfStreamFloat::ToStringConfig() = overrideConfig;
+        PXR_NS::TfStreamDouble::ToStringConfig() = overrideConfig;
     }
     ~DecimalStreamingOverride()
     {
-        pxr::TfStreamFloat::ToStringConfig() = _prevFloatConfig;
-        pxr::TfStreamDouble::ToStringConfig() = _prevDoubleConfig;
+        PXR_NS::TfStreamFloat::ToStringConfig() = _prevFloatConfig;
+        PXR_NS::TfStreamDouble::ToStringConfig() = _prevDoubleConfig;
     }
 private:
-    pxr::TfDecimalToStringConfig _prevFloatConfig;
-    pxr::TfDecimalToStringConfig _prevDoubleConfig;
+    PXR_NS::TfDecimalToStringConfig _prevFloatConfig;
+    PXR_NS::TfDecimalToStringConfig _prevDoubleConfig;
 };
 #endif
 

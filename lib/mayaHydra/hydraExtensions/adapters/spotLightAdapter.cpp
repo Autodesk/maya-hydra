@@ -108,7 +108,7 @@ protected:
             MFnSpotLight    mayaLight(GetDagPath());
             if (!GetShadowsEnabled(mayaLight)
                 || !(GetMayaHydraSceneIndex()
-                         ->IsHdSt())) { // Shadows are only supported for Storm with simpleLights 
+                         ->IsHdSt())) { // Shadows are only supported for Storm with simpleLights
                 shadowParams.enabled = false;
                 return VtValue(shadowParams);
             }
@@ -133,12 +133,11 @@ protected:
         MStatus      status;
         MFnSpotLight light(GetDagPath(), &status);
         if (TF_VERIFY(status)) {
-            if (    (paramName == HdLightTokens->radius) 
-                ||  (paramName == UsdLuxTokens->inputsRadius)) {
+            if ((paramName == HdLightTokens->radius) || (paramName == UsdLuxTokens->inputsRadius)) {
                 constexpr float FRUSTUM_LOCATION(1.3f); // same as in maya but positive
                 // Calculate radius based on cone angle and a reasonable distance
                 const double coneAngleRadians = light.coneAngle();
-                 const float radius
+                const float  radius
                     = static_cast<float>(tan(coneAngleRadians / 2.0) * FRUSTUM_LOCATION);
                 return VtValue(radius);
             } else if (paramName == UsdLuxTokens->treatAsPoint) {
@@ -166,8 +165,10 @@ TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, spotLight)
 {
     MayaHydraAdapterRegistry::RegisterLightAdapter(
         TfToken("spotLight"),
-        [](MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag) -> MayaHydraLightAdapterPtr {
-            return MayaHydraLightAdapterPtr(new MayaHydraSpotLightAdapter(mayaHydraSceneIndex, dag));
+        [](MayaHydraSceneIndex* mayaHydraSceneIndex,
+           const MDagPath&      dag) -> MayaHydraLightAdapterPtr {
+            return MayaHydraLightAdapterPtr(
+                new MayaHydraSpotLightAdapter(mayaHydraSceneIndex, dag));
         });
 }
 

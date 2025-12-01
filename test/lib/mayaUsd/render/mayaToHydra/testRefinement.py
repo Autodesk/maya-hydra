@@ -37,7 +37,7 @@ class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
         #modify light intensity for usd 24.11+
         self.modifyDefaultLightIntensityByUsdVersion()
 
-    def verifySnapshot(self, imageName, useDynamicVersion=False, usdImageVersion=None):
+    def verifySnapshot(self, imageName, imageVersion=None):
         cmds.refresh()
         imageVersion = None
         if useDynamicVersion:
@@ -107,7 +107,7 @@ class TestRefinement(mtohUtils.MayaHydraBaseTestCase):
         _usdImageVersion = 'USD2508+' if self._usdVersion >= (0, 25, 8) else None
         cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 3)
         cmds.mayaHydra(updateRenderGlobals="mayaHydraRefinementLevel")
-        self.verifySnapshot(imageName="basisCurves_refined_3.png", useDynamicVersion=True, usdImageVersion=_usdImageVersion)
+        self.verifySnapshot("basisCurves_refined_3.png", _usdImageVersion)
 
         #restore the default
         cmds.setAttr("defaultRenderGlobals.mayaHydraRefinementLevel", 0)

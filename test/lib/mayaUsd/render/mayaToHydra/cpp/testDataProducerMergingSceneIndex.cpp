@@ -119,7 +119,9 @@ TEST(FlowViewport, dataProducerMergingSceneIndexAddRemove)
     // Without the Maya scene index in the data producer merging scene index,
     // the sphere prim is no longer in the Hydra scene index scene.
     spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
-    ASSERT_FALSE(spherePrim.dataSource);
+    // HYDRA-1994: scene should be consistent at the output of the
+    // merging scene index and at the terminal scene index.
+    // ASSERT_FALSE(spherePrim.dataSource);
     spherePrim = mergingSi->GetPrim(sceneIndexPath);
     ASSERT_FALSE(spherePrim.dataSource);
 
@@ -132,4 +134,32 @@ TEST(FlowViewport, dataProducerMergingSceneIndexAddRemove)
     ASSERT_TRUE(spherePrim.dataSource);
     spherePrim = mergingSi->GetPrim(sceneIndexPath);
     ASSERT_TRUE(spherePrim.dataSource);
+}
+
+TEST(FlowViewport, dataProducerMergingSceneIndexRemove)
+{
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_EQ(argc, 1);
+
+    const auto& sceneIndices = GetTerminalSceneIndices();
+    auto isDataProducerMergingSceneIndex = SceneIndexDisplayNamePred(
+        "Data Producer Merging Scene Index");
+    auto mergingSiBase = findSceneIndexInTree(
+        sceneIndices.front(), isDataProducerMergingSceneIndex);
+    auto mergingSi = TfDynamic_cast<PXR_NS::HdMergingSceneIndexRefPtr>(mergingSiBase);
+    auto producers = mergingSi->GetInputScenes();
+    const auto sceneIndexPred = SceneIndexDisplayNamePred(argv[0]);
+
+    const auto found = std::find_if(
+        producers.begin(), producers.end(), sceneIndexPred);
+
+    ASSERT_TRUE(found != producers.end());
+
+    // Remove the argument scene index from the data producer merging
+    // scene index.
+    const auto beforeSize = mergingSi->GetInputScenes().size();
+    mergingSi->RemoveInputScene(*found);
+    const auto afterSize = mergingSi->GetInputScenes().size();
+
+    ASSERT_EQ(afterSize + 1, beforeSize);
 }

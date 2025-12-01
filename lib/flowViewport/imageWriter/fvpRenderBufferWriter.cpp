@@ -34,14 +34,17 @@ HdRenderBuffer* getRenderBuffer(
     const PXR_NS::TfToken& aovToken
 )
 {
-    if (useHVT) {
-        auto framePass = Fvp::ImageBufferWriter::GetPtr<hvt::FramePass>(args, "framePass");
+#ifdef VIEWPORT_TOOLBOX
+    auto framePass = Fvp::ImageBufferWriter::GetPtr<hvt::FramePass>(args, "framePass");
+    if (framePass) {
         return framePass ? framePass->GetRenderBuffer(aovToken) : nullptr;
-    } else {
-        auto taskController
-            = Fvp::ImageBufferWriter::GetPtr<HdxTaskController>(args, "taskController");
+    }
+#else
+    auto taskController = Fvp::ImageBufferWriter::GetPtr<HdxTaskController>(args, "taskController");
+    if (taskController) {
         return taskController ? taskController->GetRenderOutput(aovToken) : nullptr;
     }
+#endif
     return nullptr;
 }
 

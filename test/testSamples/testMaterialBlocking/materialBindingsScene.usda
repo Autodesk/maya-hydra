@@ -1,0 +1,67 @@
+#usda 1.0
+(
+    upAxis = "Y"
+)
+
+def Xform "scene"
+{
+    def Xform "cubes" (
+        prepend apiSchemas = ["CollectionAPI:cubes", "MaterialBindingAPI"]
+    )
+    {
+        rel collection:cubes:includes = </scene/cubes>
+        rel material:binding:collection:cubes = [
+            </scene/cubes.collection:cubes>,
+            </materials/green>,
+        ] (
+            bindMaterialAs = "weakerThanDescendants"
+        )
+
+        def Xform "cube0" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+            prepend references = @cube.usda@
+        )
+        {
+            rel material:binding = </materials/red>
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Xform "cube1" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+            prepend references = @cube.usda@
+        )
+        {
+            rel material:binding = </materials/red>
+            double3 xformOp:translate = (0, 3, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+    }
+}
+
+def "materials"
+{
+    def Material "red"
+    {
+        token outputs:surface.connect = </materials/red/Shader.outputs:surface>
+
+        def Shader "Shader"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (1, 0, 0)
+            token outputs:surface
+        }
+    }
+
+    def Material "green"
+    {
+        token outputs:surface.connect = </materials/green/Shader.outputs:surface>
+
+        def Shader "Shader"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0, 1, 0)
+            token outputs:surface
+        }
+    }
+}

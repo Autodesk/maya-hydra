@@ -200,7 +200,7 @@ std::string GetDomeLightTexture(const MFnDependencyNode& lightNode);
  * @param[in] dagPath is a MDagPath
  * @param[in] type is a Maya type string
  *
- * @return true if the object is a dag path of the vien type, false otherwise
+ * @return true if the object is a dag path of the given type, false otherwise
  */
 bool IsDagPathOfGivenType(const MDagPath& dagPath, const MString& type);
 

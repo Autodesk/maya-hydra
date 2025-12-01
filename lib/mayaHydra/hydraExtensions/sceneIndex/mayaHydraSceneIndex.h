@@ -17,59 +17,55 @@
 #ifndef MAYAHYDRASCENEINDEX_H
 #define MAYAHYDRASCENEINDEX_H
 
-#include <maya/MDagPath.h>
-#include <maya/MFrameContext.h>
-#include <maya/MObject.h>
-#include <maya/MSelectionList.h>
-#include <maya/MDrawContext.h>
+#include "pxr/imaging/hd/dirtyBitsTranslator.h"
 
+#include <mayaHydraLib/adapters/cameraAdapter.h>
+#include <mayaHydraLib/adapters/lightAdapter.h>
+#include <mayaHydraLib/adapters/materialAdapter.h>
+#include <mayaHydraLib/adapters/renderItemAdapter.h>
+#include <mayaHydraLib/adapters/shapeAdapter.h>
 #include <mayaHydraLib/api.h>
 #include <mayaHydraLib/mayaHydraParams.h>
-#include <mayaHydraLib/adapters/shapeAdapter.h>
-#include <mayaHydraLib/adapters/renderItemAdapter.h>
-#include <mayaHydraLib/adapters/materialAdapter.h>
-#include <mayaHydraLib/adapters/lightAdapter.h>
-#include <mayaHydraLib/adapters/cameraAdapter.h>
+#include <mayaHydraLib/pick/mhPickHitFwd.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDefaultLightDataSource.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraMaterialDataSource.h>
 
-#include <flowViewport/selection/fvpPathMapperFwd.h>
-#include <flowViewport/selection/fvpSelectionTypes.h>
-#include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
-
-#include <pxr/pxr.h>
-#include <pxr/usd/sdf/path.h>
-#include <pxr/imaging/hdx/pickTask.h>
 #include <pxr/imaging/hd/changeTracker.h>
-#include <pxr/imaging/hd/selection.h>
 #include <pxr/imaging/hd/driver.h>
 #include <pxr/imaging/hd/engine.h>
 #include <pxr/imaging/hd/renderIndex.h>
 #include <pxr/imaging/hd/rendererPlugin.h>
-#include <pxr/imaging/hdx/taskController.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
-#include "pxr/imaging/hd/dirtyBitsTranslator.h"
+#include <pxr/imaging/hd/selection.h>
+#include <pxr/imaging/hdx/pickTask.h>
+#include <pxr/imaging/hdx/taskController.h>
+#include <pxr/pxr.h>
+#include <pxr/usd/sdf/path.h>
 
+#include <maya/MDagPath.h>
+#include <maya/MDrawContext.h>
+#include <maya/MFrameContext.h>
+#include <maya/MObject.h>
+#include <maya/MSelectionList.h>
 #include <ufe/ufe.h>
+
+#include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
+#include <flowViewport/selection/fvpPathMapperFwd.h>
+#include <flowViewport/selection/fvpSelectionTypes.h>
 
 #include <unordered_map>
 
-UFE_NS_DEF {
-class Path;
-}
-
-// Forward declaration so that qualified friend declaration is valid.
-namespace MAYAHYDRA_NS_DEF { class BatchRenderer; }
+UFE_NS_DEF { class Path; }
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 struct MayaHydraInitData
 {
     MayaHydraInitData(
-        TfToken            nameIn,
-        HdRenderIndex&     renderIndexIn,
-        const SdfPath&     delegateIDIn,
-        bool               isHdStIn)
+        TfToken        nameIn,
+        HdRenderIndex& renderIndexIn,
+        const SdfPath& delegateIDIn,
+        bool           isHdStIn)
         : name(nameIn)
         , renderIndex(renderIndexIn)
         , delegateID(delegateIDIn)
@@ -77,10 +73,10 @@ struct MayaHydraInitData
     {
     }
 
-    TfToken            name;
-    HdRenderIndex&     renderIndex;
-    SdfPath            delegateID;
-    bool               isHdSt;
+    TfToken        name;
+    HdRenderIndex& renderIndex;
+    SdfPath        delegateID;
+    bool           isHdSt;
 };
 
 class MayaHydraSceneIndex;
@@ -98,10 +94,8 @@ public:
     };
     template <typename T> using AdapterMap = std::unordered_map<SdfPath, T, SdfPath::Hash>;
 
-    static MayaHydraSceneIndexRefPtr New(
-        MayaHydraInitData& initData,
-        bool interactive,
-        bool lightEnabled) {
+    static MayaHydraSceneIndexRefPtr New(MayaHydraInitData& initData, bool lightEnabled)
+    {
         return TfCreateRefPtr(new MayaHydraSceneIndex(initData, interactive, lightEnabled));
     }
 
@@ -110,26 +104,24 @@ public:
     // ------------------------------------------------------------------------
     // Maya Hydra scene producer implementations
     // Propogate scene changes from Maya to Hydra
-    void HandleCompleteViewportScene(const MDataServerOperation::MViewportScene& scene, MFrameContext::DisplayStyle ds);
+    void HandleCompleteViewportScene(
+        const MDataServerOperation::MViewportScene& scene,
+        MFrameContext::DisplayStyle                 ds);
 
     // Populate data from Maya
     void Populate();
 
     // Add hydra pick points and items to Maya's selection list
     bool AddPickHitToSelectionList(
-        const HdxPickHit& hit,
+        const MayaHydra::PickHit&        hit,
         const MHWRender::MSelectionInfo& selectInfo,
-        MSelectionList& selectionList,
-        MPointArray& worldSpaceHitPts);
+        MSelectionList&                  selectionList,
+        MPointArray&                     worldSpaceHitPts);
 
-    bool IsPickedNodeInComponentsPickingMode(const HdxPickHit& hit)const;
-    
+    bool IsPickedNodeInComponentsPickingMode(const MayaHydra::PickHit& hit) const;
 
     // Insert a primitive to hydra scene
-    void InsertPrim(
-        MayaHydraAdapter* adapter,
-        const TfToken& typeId,
-        const SdfPath& id);
+    void InsertPrim(MayaHydraAdapter* adapter, const TfToken& typeId, const SdfPath& id);
 
     // Remove a primitive from hydra scene
     void RemovePrim(const SdfPath& id);
@@ -142,7 +134,7 @@ public:
     // Operation that's performed on rendering a frame
     void PreFrame(const MHWRender::MDrawContext& drawContext);
 
-    void SetParams(const MayaHydraParams& params);
+    void                   SetParams(const MayaHydraParams& params);
     const MayaHydraParams& GetParams() const { return _params; }
 
     VtValue GetShadingStyle(const SdfPath& id);
@@ -163,9 +155,9 @@ public:
     void UpdateLightsShadowCollection();
 
     // Enable or disable default lighting
-    void SetDefaultLightEnabled(const bool enabled);
-    bool GetDefaultLightEnabled() const { return _useMayaDefaultLight; }
-    void SetDefaultLight(const GlfSimpleLight& light);
+    void                  SetDefaultLightEnabled(const bool enabled);
+    bool                  GetDefaultLightEnabled() const { return _useMayaDefaultLight; }
+    void                  SetDefaultLight(const GlfSimpleLight& light);
     const GlfSimpleLight& GetDefaultLight() const { return _mayaDefaultLight; }
 
     // Dag Node operations
@@ -175,7 +167,7 @@ public:
     void AddNewInstance(const MDagPath& dag);
     void UpdateLightVisibility(const MDagPath& dag);
 
-    void MaterialTagChanged(const SdfPath& id);
+    void    MaterialTagChanged(const SdfPath& id);
     SdfPath GetMaterialId(const SdfPath& id);
     VtValue GetMaterialResource(const SdfPath& id);
 
@@ -200,13 +192,16 @@ public:
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
     Fvp::PrimSelections UfePathToPrimSelectionsLit(const Ufe::Path& appPath) const;
 
-    //Sdfpath of the maya default material
-    SdfPath GetDefaultMaterialPath() const{return _mayaDefaultMaterialPath;}
+    // Sdfpath of the maya default material
+    SdfPath GetDefaultMaterialPath() const { return _mayaDefaultMaterialPath; }
 
-    bool DefaultMaterialCreated() const{return _defaultMaterialCreated;}
+    bool DefaultMaterialCreated() const { return _defaultMaterialCreated; }
 
-    //Is the exclusion list of materials that should be skipped when using the default material
-    SdfPathVector GetDefaultMaterialExclusionPaths()const{ return {_mayaFacesSelectionMaterialPath};}
+    // Is the exclusion list of materials that should be skipped when using the default material
+    SdfPathVector GetDefaultMaterialExclusionPaths() const
+    {
+        return { _mayaFacesSelectionMaterialPath };
+    }
 
     // Common function to return templated sample types
     template <typename T, typename Getter>
@@ -249,19 +244,18 @@ public:
         }
         return nSamples;
     }
-   
-    /// Is using an environment variable to tell if we should pass normals to Hydra when using the render item and mesh adapters
+
+    /// Is using an environment variable to tell if we should pass normals to Hydra when using the
+    /// render item and mesh adapters
     static bool passNormalsToHydra();
 
-    /// Is using an environment variable to tell if we should use the mesh adapter instead of the
-    /// render item adapter for Maya meshes or when we are using batch production rendering it should be always on
-    bool useMeshAdapter();
-
-    ///Create the default hydra material from maya default material or create a fallback material if it cannot be found
+    /// Create the default hydra material from maya default material or create a fallback material
+    /// if it cannot be found
     void CreateMayaDefaultMaterialData();
 
-    /// Get the maya default light path to be used in filtering scene indices to recognize the default light in primitives path
-    static const SdfPath& GetMayaDefaultLightPath() {return _mayaDefaultLightPath;}
+    /// Get the maya default light path to be used in filtering scene indices to recognize the
+    /// default light in primitives path
+    static const SdfPath& GetMayaDefaultLightPath() { return _mayaDefaultLightPath; }
 
     /// Get all paths of all lighted prims
     void GetLightedPrimPaths(SdfPathVector& lightedPrimPaths);
@@ -270,23 +264,22 @@ public:
     GfBBox3d GetBoundingBox();
 
     void SetLightsManagementSceneIndex(
-        const Fvp::LightsManagementSceneIndexRefPtr lightsManagementSceneIndex);//Can be a nullptr
-    
+        const Fvp::LightsManagementSceneIndexRefPtr lightsManagementSceneIndex); // Can be a nullptr
+
+    GfBBox3d GetBoundingBox() const;
+
 private:
-    MayaHydraSceneIndex(
-        MayaHydraInitData& initData,
-        bool interactive,
-        bool lightEnabled);
+    MayaHydraSceneIndex(MayaHydraInitData& initData, bool lightEnabled);
 
     template <typename AdapterPtr, typename Map>
     AdapterPtr _CreateAdapter(
-        const MDagPath& dag,
+        const MDagPath&                                                         dag,
         const std::function<AdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>& adapterCreator,
-        Map& adapterMap,
-        bool isSprim = false);
-    MayaHydraLightAdapterPtr CreateLightAdapter(const MDagPath& dagPath);
+        Map&                                                                    adapterMap,
+        bool                                                                    isSprim = false);
+    MayaHydraLightAdapterPtr  CreateLightAdapter(const MDagPath& dagPath);
     MayaHydraCameraAdapterPtr CreateCameraAdapter(const MDagPath& dagPath);
-    MayaHydraShapeAdapterPtr CreateShapeAdapter(const MDagPath& dagPath);
+    MayaHydraShapeAdapterPtr  CreateShapeAdapter(const MDagPath& dagPath);
 
     // Utilites
     bool _GetRenderItem(int fastId, MayaHydraRenderItemAdapterPtr& adapter);
@@ -294,18 +287,20 @@ private:
     void _RemoveEmptyAncestors(const SdfPath& path);
     void _AddRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
     void _RemoveRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
-    bool _GetRenderItemMaterial(const MRenderItem& ri, SdfPath& material, MObject& shadingEngineNode);
+    bool
+    _GetRenderItemMaterial(const MRenderItem& ri, SdfPath& material, MObject& shadingEngineNode);
     SdfPath _GetRenderItemPrimPath(const MRenderItem& ri);
     SdfPath GetMaterialPath(const MObject& obj);
-    bool _CreateMaterial(const SdfPath& id, const MObject& obj);
-    
+    bool    _CreateMaterial(const SdfPath& id, const MObject& obj);
+
     using LightDagPathMap = std::unordered_map<std::string, MDagPath>;
     LightDagPathMap _GetGlobalLightPaths() const;
-    
-    static VtValue  _CreateDefaultMaterialFallback();
-    static VtValue  _CreateMayaFacesSelectionMaterial();
 
-    using DirtyBitsToLocatorsFunc = std::function<void(TfToken const&, const HdDirtyBits, HdDataSourceLocatorSet*)>;
+    static VtValue _CreateDefaultMaterialFallback();
+    static VtValue _CreateMayaFacesSelectionMaterial();
+
+    using DirtyBitsToLocatorsFunc
+        = std::function<void(TfToken const&, const HdDirtyBits, HdDataSourceLocatorSet*)>;
     void _MarkPrimDirty(
         const SdfPath&          id,
         HdDirtyBits             dirtyBits,
@@ -318,21 +313,21 @@ private:
     void _Destroy();
 
 private:
-    SdfPath _ID;
+    SdfPath         _ID;
     MayaHydraParams _params;
 
     HdRenderIndex& _renderIndex;
 
     // Adapters
-    AdapterMap<MayaHydraLightAdapterPtr> _lightAdapters;
-    AdapterMap<MayaHydraCameraAdapterPtr> _cameraAdapters;
-    AdapterMap<MayaHydraShapeAdapterPtr> _shapeAdapters;
-    AdapterMap<MayaHydraRenderItemAdapterPtr> _renderItemsAdapters;
+    AdapterMap<MayaHydraLightAdapterPtr>                   _lightAdapters;
+    AdapterMap<MayaHydraCameraAdapterPtr>                  _cameraAdapters;
+    AdapterMap<MayaHydraShapeAdapterPtr>                   _shapeAdapters;
+    AdapterMap<MayaHydraRenderItemAdapterPtr>              _renderItemsAdapters;
     std::unordered_map<int, MayaHydraRenderItemAdapterPtr> _renderItemsAdaptersFast;
-    AdapterMap<MayaHydraMaterialAdapterPtr>    _materialAdapters;
-    std::vector<MCallbackId>                   _callbacks;
-    std::vector<std::tuple<SdfPath, MObject>>  _adaptersToRecreate;
-    std::vector<std::tuple<SdfPath, uint32_t>> _adaptersToRebuild;
+    AdapterMap<MayaHydraMaterialAdapterPtr>                _materialAdapters;
+    std::vector<MCallbackId>                               _callbacks;
+    std::vector<std::tuple<SdfPath, MObject>>              _adaptersToRecreate;
+    std::vector<std::tuple<SdfPath, uint32_t>>             _adaptersToRebuild;
 
     std::vector<MObject> _addedNodes;
     using LightAdapterCreator
@@ -341,22 +336,25 @@ private:
     using CameraAdapterCreator
         = std::function<MayaHydraCameraAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>;
     std::vector<std::pair<MObject, CameraAdapterCreator>> _camerasToAdd;
-    std::vector<SdfPath> _materialTagsChanged;
+    std::vector<SdfPath>                                  _materialTagsChanged;
 
-    bool _defaultMaterialCreated = false;
+    bool           _defaultMaterialCreated = false;
     static SdfPath _fallbackMaterial;
     /// _mayaDefaultMaterialPath is common to all scene indexes
     static SdfPath _mayaDefaultMaterialPath;
-    static VtValue _mayaDefaultMaterialFallback;//Used only if we cannot find the maya default material
+    static VtValue
+        _mayaDefaultMaterialFallback; // Used only if we cannot find the maya default material
 
-    /// _mayaFacesSelectionMaterialPath is a path to a Hydra material used to display the faces selection on nodes when being in components selection mode
+    /// _mayaFacesSelectionMaterialPath is a path to a Hydra material used to display the faces
+    /// selection on nodes when being in components selection mode
     static SdfPath _mayaFacesSelectionMaterialPath;
-    /// _mayaFacesSelectionMaterial is a Hydra material used to display the faces selection on nodes when being in components selection mode
+    /// _mayaFacesSelectionMaterial is a Hydra material used to display the faces selection on nodes
+    /// when being in components selection mode
     VtValue _mayaFacesSelectionMaterial;
 
     // Default light
     GlfSimpleLight _mayaDefaultLight;
-    bool _useMayaDefaultLight = false;
+    bool           _useMayaDefaultLight = false;
     static SdfPath _mayaDefaultLightPath;
 
     bool _xRayEnabled = false;
@@ -369,7 +367,7 @@ private:
     SdfPath _sprimPath;
     SdfPath _materialPath;
 
-    const Fvp::PathMapperConstPtr _mayaPathMapper{};
+    const Fvp::PathMapperConstPtr _mayaPathMapper {};
 
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex { nullptr };
 

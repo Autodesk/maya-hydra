@@ -38,10 +38,7 @@ public:
 
     void _CalculateLightParams(GlfSimpleLight& light) override { light.SetSpotCutoff(90.0f); }
 
-    const TfToken& LightType() const override
-    {
-        return HdPrimTypeTokens->rectLight;
-    }
+    const TfToken& LightType() const override { return HdPrimTypeTokens->rectLight; }
 
     VtValue GetLightParamValue(const TfToken& paramName) override
     {
@@ -52,7 +49,7 @@ public:
                 GetDagPath().partialPathName().asChar());
 
         auto sizeScaled = [=](int index) {
-            constexpr float defaultSizeForAreaLights[2] { 2.0f, 2.0f };
+            constexpr float             defaultSizeForAreaLights[2] { 2.0f, 2.0f };
             double                      scale[3] = { 1.0, 1.0, 1.0 };
             const MTransformationMatrix modelMatrix(GetDagPath().inclusiveMatrix());
             modelMatrix.getScale(scale, MSpace::kWorld);
@@ -60,18 +57,16 @@ public:
             return VtValue(sizeScaled);
         };
 
-        //To increase the width or height of a maya area light, you need to scale the shape
-        // so apply the scaling factor to the default width and height of 2
-        if ((paramName == HdLightTokens->width)
-            || (paramName == UsdLuxTokens->inputsWidth)){
+        // To increase the width or height of a maya area light, you need to scale the shape
+        //  so apply the scaling factor to the default width and height of 2
+        if ((paramName == HdLightTokens->width) || (paramName == UsdLuxTokens->inputsWidth)) {
             constexpr int widthIndex = 0;
             return sizeScaled(widthIndex);
-        } else if ( (paramName == HdLightTokens->height) 
-            ||      (paramName == UsdLuxTokens->inputsHeight) ) {
             constexpr int heightIndex = 1;
             return sizeScaled(heightIndex);
-        } else if  ((paramName == HdLightTokens->intensity) 
-                ||  (paramName == UsdLuxTokens->inputsIntensity) ){
+        } else if (
+            (paramName == HdLightTokens->intensity)
+            || (paramName == UsdLuxTokens->inputsIntensity)) {
             // Override intensity to match VP2
             MStatus           status;
             MFnDependencyNode lightDepNode(GetNode(), &status);
@@ -80,20 +75,21 @@ public:
                 if (status == MS::kSuccess && !intensityPlug.isNull()) {
                     float overidenIntensity = intensityPlug.asFloat();
                     if (GetMayaHydraSceneIndex()->IsHdSt()) {
+                        overidenIntensity /= M_PI; // For Storm only
                         overidenIntensity /= M_PI;//For Storm only
-                    }
-                    return VtValue(overidenIntensity);
-                }
-            }
-        }else if (
-                (paramName == HdLightTokens->shadowEnable)
-                || (paramName == HdLightTokens->hasShadow)
-                || (paramName == UsdLuxTokens->inputsShadowEnable))
-            {
-                // From a comment in OpenUSD : Shadows are supported on for SimpleLights and
-                // DistantLights
-                return VtValue(false); // No shadows
-            }
+        } else if (
+            GetMayaHydraSceneIndex()->IsHdSt() //Storm will use shadow maps
+            &&(
+                (paramName == HdLightTokens->shadowEnable)  || 
+                (paramName == HdLightTokens->hasShadow)     || 
+                (paramName == UsdLuxTokens->inputsShadowEnable) 
+              )
+            ) 
+        {
+            // From a comment in OpenUSD : Shadow maps are supported only for SimpleLights and
+            // DistantLights
+            // https://github.com/PixarAnimationStudios/OpenUSD/blob/8843f3b7b334bbcd8df014e63d1b8fad24fc6b6e/pxr/imaging/hdx/shadowTask.cpp#L117
+            return VtValue(false); // No shadows for Storm with lights of type HdPrimTypeTokens->rectLight
 
         return MayaHydraLightAdapter::GetLightParamValue(paramName);
     }
@@ -108,8 +104,10 @@ TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, areaLight)
 {
     MayaHydraAdapterRegistry::RegisterLightAdapter(
         TfToken("areaLight"),
-        [](MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag) -> MayaHydraLightAdapterPtr {
-            return MayaHydraLightAdapterPtr(new MayaHydraAreaLightAdapter(mayaHydraSceneIndex, dag));
+        [](MayaHydraSceneIndex* mayaHydraSceneIndex,
+           const MDagPath&      dag) -> MayaHydraLightAdapterPtr {
+            return MayaHydraLightAdapterPtr(
+                new MayaHydraAreaLightAdapter(mayaHydraSceneIndex, dag));
         });
 }
 

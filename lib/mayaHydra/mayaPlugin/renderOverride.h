@@ -41,6 +41,7 @@
 #include <mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h>
 #include <mayaHydraLib/pick/mhPickHandlerFwd.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
+#include <mayaHydraLib/pick/mhPickHitFwd.h>
 
 #include <flowViewport/fvpFramePassData.h>
 #include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
@@ -60,6 +61,7 @@
 #include <flowViewport/sceneIndex/wireframeHighlights/fvpPiPrototypeWhSi.h>
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpPurposeFilteringSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
@@ -96,7 +98,6 @@ using MtohRendererDescription = MayaHydra::MtohRendererDescription;
 using HgiUniquePtr = std::unique_ptr<class Hgi>;
 class MayaHydraSceneIndexRegistry;
 class MayaHydraSceneDelegate;
-using HdxPickHitVector = std::vector<struct HdxPickHit>;
 
 /*! \brief MtohRenderOverride is a rendering override class for the viewport to use Hydra instead of
  * VP2.0.
@@ -142,6 +143,14 @@ public:
     ///
     /// Intended mostly for use in debugging and testing.
     static SdfPath RendererSceneDelegateId(TfToken rendererName, TfToken sceneDelegateName);
+
+    /// Returns whether the given renderer has converged.
+    /// TODO 2025-10-21 : This currently only checks the first viewport found
+    /// that uses the given renderer. Once we have proper multi-viewport support, 
+    /// we should also be able to specify which viewport to check the convergence for.
+    ///
+    /// Intended mostly for use in debugging and testing.
+    static bool HasConverged(TfToken rendererName);
 
     //! Main entry point for rendering, called by Maya.
     MStatus Render(
@@ -212,7 +221,7 @@ private:
     VtValue _GetUsedGPUMemory() const;
 
     void _PickByRegion(
-        HdxPickHitVector& outHits,
+        MayaHydra::PickHitVector& outHits,
         const MMatrix&    viewMatrix,
         const MMatrix&    projMatrix,
         bool              singlePick,
@@ -239,7 +248,7 @@ private:
     }
 
     void _PopulateSelectionList(
-        const HdxPickHitVector&          hits,
+        const MayaHydra::PickHitVector&    hits,
         const MHWRender::MSelectionInfo& selectInfo,
         MSelectionList&                  selectionList,
         MPointArray&                     worldSpaceHitPts,
@@ -251,7 +260,7 @@ private:
 
     // Determine the pick handler which should handle a pick hit, to transform
     // the pick hit into a selection.
-    MayaHydra::PickHandlerConstPtr _PickHandler(const HdxPickHit& hit) const;
+    MayaHydra::PickHandlerConstPtr _PickHandler(const MayaHydra::PickHit& hit) const;
 
     // Callbacks
     static void _ClearHydraCallback(void* data);
@@ -346,6 +355,7 @@ private:
     Fvp::PiPrototypeWhSiRefPtr                _piPrototypeWhSi;
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
+    Fvp::PurposeFilteringSceneIndexRefPtr     _purposeFilteringSceneIndex;
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
 
     // Naming this identifier _ufeSelection clashes with UFE's selection.h

@@ -64,7 +64,11 @@ class TestIsolateSelectWithUsdLighting(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.refresh()
 
-        self.assertSnapshotClose("isolateSelectWithUsdLighting" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
+        imageVersion = None
+        if self._usdVersion >= (0, 25, 8):
+            imageVersion = "usd2508+"
+
+        self.assertSnapshotClose("isolateSelectWithUsdLighting" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
         # Disable the isolate selection.
         disableIsolateSelect(modelPanel)

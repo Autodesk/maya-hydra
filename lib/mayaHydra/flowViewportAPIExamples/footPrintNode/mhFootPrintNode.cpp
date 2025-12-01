@@ -48,6 +48,7 @@
 
 // MayaHydra headers.
 #include <mayaHydraLib/pick/mhPickHandler.h>
+#include <mayaHydraLib/pick/mhPickHit.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
 #include <ufeExtensions/Global.h>
 
@@ -99,7 +100,7 @@ public:
         MDagPath dagPath;
         TF_AXIOM(MDagPath::getAPathTo(_footPrintObj, dagPath) == MS::kSuccess);
         pickOutput.mayaSelection.add(dagPath);
-        const auto& wsPt = pickInput.pickHit.worldSpaceHitPoint;
+        const auto& wsPt = pickInput.pickHit.hdxPickHit.worldSpaceHitPoint;
         pickOutput.mayaWorldSpaceHitPts.append(wsPt[0], wsPt[1], wsPt[2]);
 
         return true;
@@ -524,7 +525,7 @@ MhFootPrint::~MhFootPrint()
     
     //Remove our retained scene index from hydra
     Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, pxr::FvpViewportAPITokens->allViewports);
+    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allViewports);
 }
 
 //Create the Hydra foot print primitives in the retained scene index
@@ -708,7 +709,7 @@ void MhFootPrint::removedFromModelCb()
 
     //Remove the data producer scene index.
     auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, pxr::FvpViewportAPITokens->allViewports);
+    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allViewports);
 }
 
 //---------------------------------------------------------------------------

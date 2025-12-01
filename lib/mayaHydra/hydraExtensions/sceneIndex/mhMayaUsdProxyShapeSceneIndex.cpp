@@ -30,8 +30,7 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/usdImaging/usdImaging/usdPrimInfoSchema.h>
 
-#include <ufe/scene.h>
-#include <ufe/sceneNotification.h>
+#include <optional>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -158,10 +157,13 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(
     , _appSceneObserver(std::make_shared<UsdPathMapperSceneObserver>(*this))
     , _usdPathMapper(std::make_shared<UsdPathMapper>(*this))
 {
-    // Add our pick handler to the pick handler registry.  All USD scene indices
-    // could share the same pick handler, but create a new one for simplicity.
-    auto pickHandler = std::make_shared<UsdPickHandler>();
-    TF_AXIOM(PickHandlerRegistry::Instance().Register(sceneIndexPathPrefix, pickHandler));
+    // Add our pick handler to the pick handler registry if there is none.
+    auto& phr = MayaHydra::PickHandlerRegistry::Instance();
+    _unregisterPickHandler = (phr.RegisteredHandler(sceneIndexPathPrefix) == nullptr);
+    if (_unregisterPickHandler) {
+        auto pickHandler = std::make_shared<UsdPickHandler>();
+        TF_AXIOM(phr.Register(sceneIndexPathPrefix, pickHandler));
+    }
 
     // The gateway node (proxy shape) is a Maya node, so the scene index
     // path must be a single segment.
@@ -171,8 +173,10 @@ MayaUsdProxyShapeSceneIndex::MayaUsdProxyShapeSceneIndex(
     // (proxy shape) that corresponds to our scene index data producer.
     Scene::instance().addObserver(_appSceneObserver);
 
-    // Register a mapper in the path mapper registry.
-    TF_AXIOM(Fvp::PathMapperRegistry::Instance().Register(_sceneIndexAppPath, _usdPathMapper));
+    // Register a mapper in the path mapper registry, if there is none
+    // for this path.
+    _unregisterPathMapper = Fvp::PathMapperRegistry::Instance().Register(
+        _sceneIndexAppPath, _usdPathMapper);
 }
 
 MayaUsdProxyShapeSceneIndex::~MayaUsdProxyShapeSceneIndex()
@@ -186,12 +190,14 @@ void MayaUsdProxyShapeSceneIndex::_Destroy()
     ParentClass::_Destroy();
 }
 
-void MayaUsdProxyShapeSceneIndex::_DestroyDerived()
-{
-    TF_AXIOM(PickHandlerRegistry::Instance().Unregister(_sceneIndexPathPrefix));
+    if (_unregisterPickHandler) {
+        TF_AXIOM(PickHandlerRegistry::Instance().Unregister(_sceneIndexPathPrefix));
+    }
 
     // Unregister our path mapper.
-    TF_AXIOM(Fvp::PathMapperRegistry::Instance().Unregister(_sceneIndexAppPath));
+    if (_unregisterPathMapper) {
+        Fvp::PathMapperRegistry::Instance().Unregister(_sceneIndexAppPath);
+    }
 
     // Ufe::Subject has automatic cleanup of stale observers, but this can
     // be problematic on application exit if the library of the observer is
@@ -216,8 +222,76 @@ MayaUsdProxyShapeSceneIndexRefPtr MayaUsdProxyShapeSceneIndex::New(
         sceneIndexAppPath));
 }
 
-Fvp::PrimSelections
-MayaUsdProxyShapeSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) const
+void MayaUsdProxyShapeSceneIndex::UpdateTime()
+{
+    if (_usdImagingStageSceneIndex && _dagNodeHandle.isValid()) {
+        _usdImagingStageSceneIndex->SetTime(_proxyStage.getTime());//We have the possibility to scale and offset the time in _proxyShapeBase
+    }
+}
+
+void MayaUsdProxyShapeSceneIndex::_StageSet(const MAYAUSDAPI_NS::ProxyStageSetNotice& notice) 
+{ 
+    _populated = false;
+    Populate(); 
+}
+
+// Stage invalidated.  See
+// https://github.com/Autodesk/maya-usd/blob/dev/lib/mayaUsd/nodes/proxyShapeBase.cpp    
+// for all inputs that can invalidate the stage, among which:
+// - the USD file path
+// - the USD prim at the root of the stage
+// - the input stage cache ID, e.g. for a Bifrost-generated stage.  Note that
+//   in this case, the mayaUsd stage pointer DOES NOT CHANGE: the 
+//   Bifrost-generated stage is added as a sub-layer of the mayaUsd stage.
+// - etc.
+// In these cases we set the stage to null and start over.
+void MayaUsdProxyShapeSceneIndex::_StageInvalidate(const MAYAUSDAPI_NS::ProxyStageInvalidateNotice& notice) 
+{ 
+    constexpr char const* INVALID_PROXY_SHAPE_MSG = 
+        "Stage invalidate notification for invalid proxy shape node at path %s";
+
+    if (!TF_VERIFY(_dagNodeHandle.isValid(), INVALID_PROXY_SHAPE_MSG, notice.GetProxyShapePath().data())) {
+        return;
+    }
+
+    // Is the notification for us?
+    if (notice.GetProxyShapeObj() != _dagNodeHandle.object()) {
+        return;
+    }
+
+    _usdImagingStageSceneIndex->SetStage(nullptr);
+    _populated = false;
+    // Simply mark populate as dirty and do not call
+    // Populate();
+    // here.  Doing so is incorrect for two reasons:
+    // - _StageInvalidate() is a callback called during Maya invalidation.
+    //   Populate() calls MayaUsdProxyShapeBase::getUsdStage(), which calls
+    //   MayaUsdProxyShapeBase::compute(), which should not be done during
+    //   dirty propagation.
+    // - Calling getUsdStage() through Populate() creates an invalidate
+    //   callback dependency between _StageInvalidate() and
+    //   the mayaUsd plugin MayaStagesSubject::onStageInvalidate().  During
+    //   getUsdStage(), MayaStagesSubject::setupListeners() is called, and it
+    //   depends on MayaStagesSubject::onStageInvalidate() being called first,
+    //   otherwise setupListeners() and therefore getUsdStage() will fail.
+    //
+    //   Invalidate callbacks should not have dependencies on one another ---
+    //   it should be possible to call them in random order.
+}
+
+void MayaUsdProxyShapeSceneIndex::_ObjectsChanged(
+    const MAYAUSDAPI_NS::ProxyStageObjectsChangedNotice& notice)
+{
+    PopulateAndApplyPendingChanges();
+}
+
+void MayaUsdProxyShapeSceneIndex::PopulateAndApplyPendingChanges() 
+{ 
+    Populate();
+    _usdImagingStageSceneIndex->ApplyPendingUpdates();
+}
+
+void MayaUsdProxyShapeSceneIndex::Populate()
 {
     // If the data model object application path does not match the path we
     // translate, return an empty path.
@@ -355,6 +429,13 @@ MayaUsdProxyShapeSceneIndex::UfePathToPrimSelections(const Ufe::Path& appPath) c
     // Now have primSelections in the namespace of this scene index.  Need to
     // account for the prefix, which is added downstream of this scene index.
     return addPrefix(_sceneIndexPathPrefix, primSelections);
+}
+
+bool MayaUsdProxyShapeSceneIndex::HasPendingUpdates() const
+{
+    //When we receive a stage invalidate we remove the stage and set populate to false
+    //We need to re-populate to see the changes
+    return (false == _populated);
 }
 
 } // namespace MAYAHYDRA_NS_DEF

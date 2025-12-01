@@ -22,6 +22,7 @@
 #include "pxr/imaging/hd/filteringSceneIndex.h"
 
 #include <set>
+#include <optional>
 
 namespace FVP_NS_DEF {
 

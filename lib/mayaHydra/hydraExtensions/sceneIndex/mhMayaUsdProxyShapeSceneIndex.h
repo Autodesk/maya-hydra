@@ -53,7 +53,25 @@ public:
         const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
         const Ufe::Path&                       sceneIndexAppPath);
 
-    ~MayaUsdProxyShapeSceneIndex() override;
+    // From HdSceneIndexBase
+    HdSceneIndexPrim GetPrim(const SdfPath& primPath) const override;
+    SdfPathVector GetChildPrimPaths(const SdfPath& primPath) const override;
+
+    MayaUsdProxyShapeSceneIndex(const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
+                                const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
+                                const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
+                                const MObjectHandle&                   dagNodeHandle,
+                                const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
+                                const Ufe::Path&                       sceneIndexAppPath);
+
+    virtual ~MayaUsdProxyShapeSceneIndex();
+
+    // When we receive a stage invalidate we remove the stage and set populate to false
+    // We need to re-populate to see the changes
+    //HasPendingUpdates() is true when this is the case
+    bool HasPendingUpdates() const;
+    void PopulateAndApplyPendingChanges();
+
 
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
 
@@ -72,14 +90,30 @@ private:
         const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
         const Ufe::Path&                       sceneIndexAppPath);
 
-    void _Destroy() override;
-    void _DestroyDerived();
+private:
+    void _ObjectsChanged(const MAYAUSDAPI_NS::ProxyStageObjectsChangedNotice& notice);
+    void _StageSet(const MAYAUSDAPI_NS::ProxyStageSetNotice& notice);
+    void _StageInvalidate(const MAYAUSDAPI_NS::ProxyStageInvalidateNotice& notice);
+
+private:
+
+    UsdImagingStageSceneIndexRefPtr _usdImagingStageSceneIndex {nullptr};
+    MAYAUSDAPI_NS::ProxyStage       _proxyStage;
+    std::atomic<bool>               _populated { false };
+    MObjectHandle                   _dagNodeHandle;
+    TfNotice::Key                   _stageSetNoticeKey;
+    TfNotice::Key                   _stageInvalidateNoticeKey;
+    TfNotice::Key                   _objectsChangedNoticeKey;
+    long int                        _nbPopulateCalls{0};
 
     // Path mapper support.
-    const SdfPath                 _sceneIndexPathPrefix;
-    Ufe::Path                     _sceneIndexAppPath;
-    const Ufe::Observer::Ptr      _appSceneObserver {};
-    const Fvp::PathMapperConstPtr _usdPathMapper {};
+    const SdfPath                   _sceneIndexPathPrefix;
+    Ufe::Path                       _sceneIndexAppPath;
+    const Ufe::Observer::Ptr        _appSceneObserver{};
+    const Fvp::PathMapperConstPtr   _usdPathMapper{};
+
+    bool _unregisterPickHandler{false};
+    bool _unregisterPathMapper{false};
 };
 
 } // namespace MAYAHYDRA_NS_DEF

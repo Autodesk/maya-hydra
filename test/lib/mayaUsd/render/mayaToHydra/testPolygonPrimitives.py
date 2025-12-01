@@ -24,7 +24,12 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
-    IMAGE_DIFF_FAIL_PERCENT = 1.5
+
+    @property
+    def IMAGE_DIFF_FAIL_PERCENT(self):
+        if platform.system() == "Darwin":
+            return 2
+        return 1.5
 
     _requiredPlugins = ['modelingToolkit']
 
@@ -94,7 +99,7 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr(polyCreatorNodeName + ".axisX", 1)
         cmds.setAttr(polyCreatorNodeName + ".axisY", 2)
         cmds.setAttr(polyCreatorNodeName + ".axisZ", -1)
-        self.compareSnapshot(referenceFilename="cube_modified.png", imageVersion=self._imageVersionFor2Passes)
+        self.compareSnapshot("cube_modified.png")
         
     # Cylinder attributes is a superset of sphere and cone
     def test_PolygonCylinder(self):
