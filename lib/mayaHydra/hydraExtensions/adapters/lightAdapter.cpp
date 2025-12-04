@@ -31,20 +31,22 @@
 #include <pxr/usd/usdLux/tokens.h>
 
 #include <maya/MColor.h>
-#include <maya/MFnLight.h>
-#include <maya/MFnSpotLight.h>
-#include <maya/MFnPointLight.h>
 #include <maya/MFnAreaLight.h>
+#include <maya/MFnLight.h>
+#include <maya/MFnPointLight.h>
+#include <maya/MFnSpotLight.h>
 #include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
 #include <maya/MPlugArray.h>
 #include <maya/MPoint.h>
 
+#include <flowViewport/fvpPurposeRenderTagsForPasses.h>
+
 #include <iostream>
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
-// The following code currently lives inside the pxr namespace, but it would make more sense to 
+// The following code currently lives inside the pxr namespace, but it would make more sense to
 // have it inside the MayaHydra namespace. This using statement allows us to use MayaHydra symbols
 // from within the pxr namespace as if we were in the MayaHydra namespace.
 // Remove this once the code has been moved to the MayaHydra namespace.
@@ -107,7 +109,9 @@ const MString defaultLightSet("defaultLightSet");
 // MayaHydraLightAdapter is the base class for any light adapter used to handle the translation from
 // a light to hydra.
 
-MayaHydraLightAdapter::MayaHydraLightAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag)
+MayaHydraLightAdapter::MayaHydraLightAdapter(
+    MayaHydraSceneIndex* mayaHydraSceneIndex,
+    const MDagPath&      dag)
     : MayaHydraDagAdapter(mayaHydraSceneIndex->GetPrimPath(dag, true), mayaHydraSceneIndex, dag)
 {
     // This should be avoided, not a good idea to call virtual functions
@@ -115,9 +119,7 @@ MayaHydraLightAdapter::MayaHydraLightAdapter(MayaHydraSceneIndex* mayaHydraScene
     UpdateVisibility();
 }
 
-MayaHydraLightAdapter::~MayaHydraLightAdapter()
-{
-}
+MayaHydraLightAdapter::~MayaHydraLightAdapter() { }
 
 bool MayaHydraLightAdapter::IsSupported() const
 {
@@ -157,42 +159,47 @@ GfMatrix4d MayaHydraLightAdapter::_CalculateShadowProjectionMatrix()
 {
     // Calculate the shadow projection matrix based on the light type and its parameters.
     // This is similar to how Maya VP2 calculates internally.
-    MFnLight light(GetDagPath());
+    MFnLight   light(GetDagPath());
     const auto xform = GetTransform();
-    auto pos = xform.Transform(GfVec3d(0.0, 0.0, 0.0)); // Maya light pos is (0,0,0) by default
+    auto pos = xform.Transform(GfVec3d(0.0, 0.0, 0.0));     // Maya light pos is (0,0,0) by default
     auto dir = xform.TransformDir(GfVec3d(0.0, 0.0, -1.0)); // Maya light dir is -Z by default
-    auto up = xform.TransformDir(GfVec3d(0.0, 1.0, 0.0));  // Maya light up is +Y by default
+    auto up = xform.TransformDir(GfVec3d(0.0, 1.0, 0.0));   // Maya light up is +Y by default
 
     auto isDirectional = GetNode().hasFn(MFn::kDirectionalLight);
-    auto useDmapAutoFocus = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::useDmapAutoFocus, true).asBool();
-    auto dmapWidthFocus = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapWidthFocus, true).asDouble(); 
-    auto farClip = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapFarClipPlane, true).asDouble();
-    auto nearClip = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapNearClipPlane, true).asDouble();
+    auto useDmapAutoFocus
+        = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::useDmapAutoFocus, true).asBool();
+    auto dmapWidthFocus
+        = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapWidthFocus, true).asDouble();
+    auto farClip
+        = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapFarClipPlane, true).asDouble();
+    auto nearClip
+        = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapNearClipPlane, true).asDouble();
 
     // View matrix is also needed as the light position needs to be adjusted to fit the scene.
-    // To make sure the adjusted view matrix takes effect, we'll multiply the calculated matrix by the light transform, 
-    // this will give the expected final matrix when Hydra is computing the ViewProjection matrix for shadow map.
-    // Hydra ViewProjection Matrix = ViewMatrix(inverted LightTransform) * ProjectionMatrix(LightTransform * viewMatrix * projectionMatrix)
-    // = viewMatrix * projectionMatrix.
+    // To make sure the adjusted view matrix takes effect, we'll multiply the calculated matrix by
+    // the light transform, this will give the expected final matrix when Hydra is computing the
+    // ViewProjection matrix for shadow map. Hydra ViewProjection Matrix = ViewMatrix(inverted
+    // LightTransform) * ProjectionMatrix(LightTransform * viewMatrix * projectionMatrix) =
+    // viewMatrix * projectionMatrix.
     GfMatrix4d viewMatrix;
     GfMatrix4d projMatrix;
     if (isDirectional) {
         // Adjust light position to fit the scene
-        GfBBox3d    bbox = GetMayaHydraSceneIndex()->GetBoundingBox();
-        GfVec3d     boxCenter = bbox.ComputeCentroid();
-        GfBBox3d    aabb = bbox.ComputeAlignedBox();
+        GfBBox3d         bbox = GetMayaHydraSceneIndex()->GetBoundingBox();
+        GfVec3d          boxCenter = bbox.ComputeCentroid();
+        GfBBox3d         aabb = bbox.ComputeAlignedBox();
         const GfRange3d& r = aabb.GetRange();
-        auto        boxRadius = 0.5 * (r.GetMax() - r.GetMin()).GetLength();
+        auto             boxRadius = 0.5 * (r.GetMax() - r.GetMin()).GetLength();
         pos = boxCenter - boxRadius * dir;
 
         // View matrix
-        GfVec3d    ndir = dir.GetNormalized();
-        GfVec3d    right = GfCross(up, ndir).GetNormalized();
-        GfVec3d    realUp = GfCross(ndir, right);
+        GfVec3d ndir = dir.GetNormalized();
+        GfVec3d right = GfCross(up, ndir).GetNormalized();
+        GfVec3d realUp = GfCross(ndir, right);
         viewMatrix.SetColumn(0, GfVec4d(right[0], right[1], right[2], -GfDot(right, pos)));
         viewMatrix.SetColumn(1, GfVec4d(realUp[0], realUp[1], realUp[2], -GfDot(realUp, pos)));
         viewMatrix.SetColumn(2, GfVec4d(ndir[0], ndir[1], ndir[2], -GfDot(ndir, pos)));
-        viewMatrix.SetColumn(3, GfVec4d(0,0,0,1));
+        viewMatrix.SetColumn(3, GfVec4d(0, 0, 0, 1));
 
         // Proj matrix
         auto frustumDepth = 2.0 * boxRadius;
@@ -214,10 +221,11 @@ GfMatrix4d MayaHydraLightAdapter::_CalculateShadowProjectionMatrix()
         viewMatrix.SetColumn(0, GfVec4d(right[0], right[1], right[2], -GfDot(right, pos)));
         viewMatrix.SetColumn(1, GfVec4d(realUp[0], realUp[1], realUp[2], -GfDot(realUp, pos)));
         viewMatrix.SetColumn(2, GfVec4d(ndir[0], ndir[1], ndir[2], -GfDot(ndir, pos)));
-        viewMatrix.SetColumn(3, GfVec4d(0,0,0,1));
+        viewMatrix.SetColumn(3, GfVec4d(0, 0, 0, 1));
 
         // Proj matrix
-        double fov = (useDmapAutoFocus && GetNode().hasFn(MFn::kAreaLight)) ? 110.0 : dmapWidthFocus;
+        double fov
+            = (useDmapAutoFocus && GetNode().hasFn(MFn::kAreaLight)) ? 110.0 : dmapWidthFocus;
         fov = fov > 160.0 ? 160.0 : fov;
         auto frustumDepth = farClip - nearClip;
         frustumDepth = frustumDepth < 1.0 ? 1.0 : frustumDepth;
@@ -232,8 +240,8 @@ GfMatrix4d MayaHydraLightAdapter::_CalculateShadowProjectionMatrix()
         projMatrix[3][3] = 0.0f;
     }
 
-    // To make sure the adjusted view matrix takes effect, multiply by the light transform to counteract 
-    // the ViewMaxtrix (inverted LightTransform) calculated by Hydra.
+    // To make sure the adjusted view matrix takes effect, multiply by the light transform to
+    // counteract the ViewMatrix (inverted LightTransform) calculated by Hydra.
     return xform * viewMatrix * projMatrix;
 }
 
@@ -249,16 +257,16 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
         MFnLight       mayaLight(GetDagPath());
         GlfSimpleLight light;
         const auto     color = mayaLight.color();
-        auto     intensity   = mayaLight.intensity();
+        auto           intensity = mayaLight.intensity();
 #if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
-        if( LightType() == HdPrimTypeTokens->simpleLight){
+        if (LightType() == HdPrimTypeTokens->simpleLight) {
             intensity /= M_PI;
         }
 #endif
-        
-        MPoint         pt(0.0, 0.0, 0.0, 1.0);
-        const auto     inclusiveMatrix = GetDagPath().inclusiveMatrix();
-        const auto     position = pt * inclusiveMatrix;
+
+        MPoint     pt(0.0, 0.0, 0.0, 1.0);
+        const auto inclusiveMatrix = GetDagPath().inclusiveMatrix();
+        const auto position = pt * inclusiveMatrix;
         // This will return zero / false if the plug is nonexistent.
         const auto decayRate
             = mayaLight.findPlug(MayaAttrs::nonAmbientLightShapeNode::decayRate, true).asShort();
@@ -266,8 +274,8 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
             = mayaLight.findPlug(MayaAttrs::nonAmbientLightShapeNode::emitDiffuse, true).asBool();
         const auto emitSpecular
             = mayaLight.findPlug(MayaAttrs::nonAmbientLightShapeNode::emitSpecular, true).asBool();
-        MVector    pv(0.0, 0.0, -1.0);
-        const auto lightDirection = (pv * inclusiveMatrix).normal();
+        MVector       pv(0.0, 0.0, -1.0);
+        const auto    lightDirection = (pv * inclusiveMatrix).normal();
         const GfVec4f zeroColor(0.0f, 0.0f, 0.0f, 1.0f);
         const GfVec4f lightColor(
             color.r * intensity, color.g * intensity, color.b * intensity, 1.0f);
@@ -287,11 +295,9 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
             light.SetAttenuation(GfVec3f(0.0f, 0.0f, 1.0f));
         }
 #if PXR_VERSION < 2308
-        light.SetTransform(
-            GetGfMatrixFromMaya(GetDagPath().inclusiveMatrixInverse()));
+        light.SetTransform(GetGfMatrixFromMaya(GetDagPath().inclusiveMatrixInverse()));
 #else
-        light.SetTransform(
-            GetGfMatrixFromMaya(inclusiveMatrix));
+        light.SetTransform(GetGfMatrixFromMaya(inclusiveMatrix));
 #endif
         _CalculateLightParams(light);
         return VtValue(light);
@@ -301,9 +307,7 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
         // Exclude prims that should not be lighted by only taking lighted paths
         SdfPathVector lightedPaths;
         GetMayaHydraSceneIndex()->GetLightedPrimPaths(lightedPaths);
-        HdRprimCollection coll(
-            HdTokens->geometry,
-            HdReprSelector(HdReprTokens->refined));
+        HdRprimCollection coll(HdTokens->geometry, HdReprSelector(HdReprTokens->refined));
         coll.SetRootPaths(lightedPaths);
         return VtValue(coll);
     } else if (key == HdLightTokens->shadowParams) {
@@ -322,17 +326,17 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
 
 MayaHydraLightAdapter::MayaLightParams MayaHydraLightAdapter::GetMayaLightParams() const
 {
-    MayaLightParams params;
-    MStatus status;
+    MayaLightParams   params;
+    MStatus           status;
     MFnDependencyNode lightDepNode(GetNode(), &status);
-    
+
     if (status == MS::kSuccess) {
         // Get intensity
         MPlug intensityPlug = lightDepNode.findPlug("intensity", true, &status);
         if (status == MS::kSuccess && !intensityPlug.isNull()) {
             params.intensity = intensityPlug.asFloat();
         }
-        
+
         // Get color
         MPlug colorPlug = lightDepNode.findPlug("color", true, &status);
         if (status == MS::kSuccess && !colorPlug.isNull()) {
@@ -340,10 +344,10 @@ MayaHydraLightAdapter::MayaLightParams MayaHydraLightAdapter::GetMayaLightParams
             colorPlug.child(0).getValue(r);
             colorPlug.child(1).getValue(g);
             colorPlug.child(2).getValue(b);
-            
+
             params.color = GfVec3f(r, g, b);
         }
-        
+
         // Get shadowColor
         MPlug shadowColorPlug = lightDepNode.findPlug("shadowColor", true, &status);
         if (status == MS::kSuccess && !shadowColorPlug.isNull()) {
@@ -351,47 +355,47 @@ MayaHydraLightAdapter::MayaLightParams MayaHydraLightAdapter::GetMayaLightParams
             shadowColorPlug.child(0).getValue(r);
             shadowColorPlug.child(1).getValue(g);
             shadowColorPlug.child(2).getValue(b);
-            
+
             params.shadowColor = GfVec3f(r, g, b);
         }
-        
+
         // Get exposure
         MPlug exposurePlug = lightDepNode.findPlug("aiExposure", true, &status);
         if (status == MS::kSuccess && !exposurePlug.isNull()) {
             params.exposure = exposurePlug.asFloat();
         }
-        
+
         // Get normalize
         MPlug normalizePlug = lightDepNode.findPlug("aiNormalize", true, &status);
         if (status == MS::kSuccess && !normalizePlug.isNull()) {
             params.normalize = normalizePlug.asBool();
         }
-        
+
         // Get diffuse
         MPlug diffusePlug = lightDepNode.findPlug("aiDiffuse", true, &status);
         if (status == MS::kSuccess && !diffusePlug.isNull()) {
             params.diffuse = diffusePlug.asFloat();
         }
-        
+
         // Get specular
         MPlug specularPlug = lightDepNode.findPlug("aiSpecular", true, &status);
         if (status == MS::kSuccess && !specularPlug.isNull()) {
             params.specular = specularPlug.asFloat();
         }
-        
+
         // Get enableColorTemperature
         MPlug enableColorTempPlug = lightDepNode.findPlug("aiEnableTemperature", true, &status);
         if (status == MS::kSuccess && !enableColorTempPlug.isNull()) {
             params.enableColorTemperature = enableColorTempPlug.asBool();
         }
-        
+
         // Get colorTemperature
         MPlug colorTempPlug = lightDepNode.findPlug("aiColorTemperature", true, &status);
         if (status == MS::kSuccess && !colorTempPlug.isNull()) {
             params.colorTemperature = colorTempPlug.asFloat();
         }
     }
-    
+
     return params;
 }
 
@@ -404,49 +408,49 @@ VtValue MayaHydraLightAdapter::GetLightParamValue(const TfToken& paramName)
             GetDagPath().partialPathName().asChar());
 
     MFnLight light(GetDagPath());
-    
+
     // Get Maya parameters (including Arnold attributes with "ai" prefix)
     const MayaLightParams mayaParams = GetMayaLightParams();
-    
-    if ((paramName == HdLightTokens->color) 
-        || (paramName == HdTokens->displayColor)
+
+    if ((paramName == HdLightTokens->color) || (paramName == HdTokens->displayColor)
         || (paramName == UsdLuxTokens->inputsColor)) {
         return VtValue(mayaParams.color);
-    } else if ((paramName == HdLightTokens->intensity) 
-            || (paramName == UsdLuxTokens->inputsIntensity)) {
+    } else if (
+        (paramName == HdLightTokens->intensity) || (paramName == UsdLuxTokens->inputsIntensity)) {
         auto intensity = mayaParams.intensity;
 #if defined(HD_API_VERSION) && HD_API_VERSION >= 74 // For USD 24.11+
-        if( LightType() == HdPrimTypeTokens->simpleLight){
+        if (LightType() == HdPrimTypeTokens->simpleLight) {
             intensity /= M_PI;
         }
 #endif
         return VtValue(intensity);
-    } else if ((paramName == HdLightTokens->exposure) 
-            || (paramName == UsdLuxTokens->inputsExposure)) {
+    } else if (
+        (paramName == HdLightTokens->exposure) || (paramName == UsdLuxTokens->inputsExposure)) {
         return VtValue(mayaParams.exposure);
-    } else if ((paramName == HdLightTokens->normalize)
-            || (paramName == UsdLuxTokens->inputsNormalize)) {
+    } else if (
+        (paramName == HdLightTokens->normalize) || (paramName == UsdLuxTokens->inputsNormalize)) {
         return VtValue(mayaParams.normalize);
-    } else if ((paramName == HdLightTokens->enableColorTemperature)
-            || (paramName == UsdLuxTokens->inputsEnableColorTemperature)) {
+    } else if (
+        (paramName == HdLightTokens->enableColorTemperature)
+        || (paramName == UsdLuxTokens->inputsEnableColorTemperature)) {
         return VtValue(mayaParams.enableColorTemperature);
-    } else if ((paramName == HdLightTokens->diffuse)
-            || (paramName == UsdLuxTokens->inputsDiffuse)) {
+    } else if (
+        (paramName == HdLightTokens->diffuse) || (paramName == UsdLuxTokens->inputsDiffuse)) {
         return VtValue(mayaParams.diffuse);
-    } else if ((paramName == HdLightTokens->specular) 
-            || (paramName == UsdLuxTokens->inputsSpecular)) {
+    } else if (
+        (paramName == HdLightTokens->specular) || (paramName == UsdLuxTokens->inputsSpecular)) {
         return VtValue(mayaParams.specular);
-    } else if ((paramName == HdLightTokens->colorTemperature)
-            || (paramName == UsdLuxTokens->inputsColorTemperature)) {
+    } else if (
+        (paramName == HdLightTokens->colorTemperature)
+        || (paramName == UsdLuxTokens->inputsColorTemperature)) {
         return VtValue(mayaParams.colorTemperature);
-    } else if ((paramName == HdLightTokens->shadowColor)
-            || (paramName == UsdLuxTokens->inputsShadowColor)) {
+    } else if (
+        (paramName == HdLightTokens->shadowColor)
+        || (paramName == UsdLuxTokens->inputsShadowColor)) {
         return VtValue(mayaParams.shadowColor);
     } else if (
-            (paramName == HdLightTokens->shadowEnable) 
-        ||  (paramName == HdLightTokens->hasShadow)
-        ||  (paramName == UsdLuxTokens->inputsShadowEnable)
-        ) {
+        (paramName == HdLightTokens->shadowEnable) || (paramName == HdLightTokens->hasShadow)
+        || (paramName == UsdLuxTokens->inputsShadowEnable)) {
         const bool shadowsEnabled = GetShadowsEnabled(light);
         return VtValue(shadowsEnabled);
     }
@@ -454,58 +458,59 @@ VtValue MayaHydraLightAdapter::GetLightParamValue(const TfToken& paramName)
 }
 
 // Is for PRMan and potentially other renderers that use material networks for lights.
-VtValue MayaHydraLightAdapter::GetLightMaterialNetwork()const
+VtValue MayaHydraLightAdapter::GetLightMaterialNetwork() const
 {
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-        .Msg("Called MayaHydraLightAdapter::GetLightMaterialNetwork() - %s\n",
+        .Msg(
+            "Called MayaHydraLightAdapter::GetLightMaterialNetwork() - %s\n",
             GetDagPath().partialPathName().asChar());
-    
+
     // Additional debugging for dome lights
     const bool isSkyDomeLight = IsDagPathAnArnoldSkyDomeLight(GetDagPath());
     if (isSkyDomeLight) {
         TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-            .Msg("Processing Arnold Sky Dome Light: %s\n", 
-                 GetDagPath().partialPathName().asChar());
+            .Msg("Processing Arnold Sky Dome Light: %s\n", GetDagPath().partialPathName().asChar());
     }
 
     // Create material network for RenderMan lights
     HdMaterialNetworkMap networkMap;
-    HdMaterialNetwork lightNetwork;
-    HdMaterialNode lightNode;
-    
+    HdMaterialNetwork    lightNetwork;
+    HdMaterialNode       lightNode;
+
     // Set the light node path
     lightNode.path = GetID();
-    
+
     // Determine the appropriate PRMan light shader based on Maya light type
-    MFnLight mayaLight(GetDagPath());
-    MString lightType = mayaLight.typeName();
+    MFnLight   mayaLight(GetDagPath());
+    MString    lightType = mayaLight.typeName();
     const bool isAnArnoldAreaLight = IsDagPathAnArnoldAreaLight(GetDagPath());
-    
+
     // Debug: Print Maya light parameters
-    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-        .Msg("Maya light parameters:\n");
-    
+    TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET).Msg("Maya light parameters:\n");
+
     const auto inclusiveMatrix = GetDagPath().inclusiveMatrix();
     const bool shadowsEnabled = mayaLight.useRayTraceShadows();
-    
-     // Get Maya parameters (including Arnold attributes with "ai" prefix)
-    MayaLightParams mayaParams = GetMayaLightParams();   
-       
-    lightNode.parameters[HdLightTokens->color]                  = VtValue(mayaParams.color);
-    lightNode.parameters[HdLightTokens->intensity]              = VtValue(mayaParams.intensity);
-    lightNode.parameters[HdLightTokens->exposure]               = VtValue(mayaParams.exposure);
-    lightNode.parameters[HdLightTokens->normalize]              = VtValue(mayaParams.normalize);
-    lightNode.parameters[HdLightTokens->diffuse]                = VtValue(mayaParams.diffuse);
-    lightNode.parameters[HdLightTokens->specular]               = VtValue(mayaParams.specular);
-    lightNode.parameters[HdLightTokens->enableColorTemperature] = VtValue(mayaParams.enableColorTemperature);
-    lightNode.parameters[HdLightTokens->colorTemperature]       = VtValue(mayaParams.colorTemperature);
-    lightNode.parameters[HdLightTokens->shadowEnable]           = VtValue(shadowsEnabled);
-    lightNode.parameters[HdLightTokens->shadowColor]            = VtValue(mayaParams.shadowColor);
+
+    // Get Maya parameters (including Arnold attributes with "ai" prefix)
+    MayaLightParams mayaParams = GetMayaLightParams();
+
+    lightNode.parameters[HdLightTokens->color] = VtValue(mayaParams.color);
+    lightNode.parameters[HdLightTokens->intensity] = VtValue(mayaParams.intensity);
+    lightNode.parameters[HdLightTokens->exposure] = VtValue(mayaParams.exposure);
+    lightNode.parameters[HdLightTokens->normalize] = VtValue(mayaParams.normalize);
+    lightNode.parameters[HdLightTokens->diffuse] = VtValue(mayaParams.diffuse);
+    lightNode.parameters[HdLightTokens->specular] = VtValue(mayaParams.specular);
+    lightNode.parameters[HdLightTokens->enableColorTemperature]
+        = VtValue(mayaParams.enableColorTemperature);
+    lightNode.parameters[HdLightTokens->colorTemperature] = VtValue(mayaParams.colorTemperature);
+    lightNode.parameters[HdLightTokens->shadowEnable] = VtValue(shadowsEnabled);
+    lightNode.parameters[HdLightTokens->shadowColor] = VtValue(mayaParams.shadowColor);
     lightNode.parameters[HdTokens->transform] = VtValue(GetGfMatrixFromMaya(inclusiveMatrix));
 
     // Add additional RenderMan specific parameters
-    lightNode.parameters[TfToken("visibility:camera")]= VtValue(false); // true means the light shape is visible in the rendering
-    
+    lightNode.parameters[TfToken("visibility:camera")]
+        = VtValue(false); // true means the light shape is visible in the rendering
+
     // Default to distant light for unknown types
     lightNode.identifier = TfToken("PxrDistantLight");
 
@@ -515,10 +520,11 @@ VtValue MayaHydraLightAdapter::GetLightMaterialNetwork()const
         // The following values come from OpenUSD/pxr/imaging/hdx/taskController.cpp
         // Distant Light values
         constexpr float DISTANT_LIGHT_ANGLE = 0.53f;
-        lightNode.parameters[HdLightTokens->angle]      = VtValue(DISTANT_LIGHT_ANGLE);//The actual angle comes from the transform
+        lightNode.parameters[HdLightTokens->angle]
+            = VtValue(DISTANT_LIGHT_ANGLE); // The actual angle comes from the transform
 
         constexpr float DISTANT_LIGHT_INTENSITY = 15000.0f;
-        const float distantLightIntensity = mayaParams.intensity * DISTANT_LIGHT_INTENSITY;
+        const float     distantLightIntensity = mayaParams.intensity * DISTANT_LIGHT_INTENSITY;
         lightNode.parameters[HdLightTokens->intensity] = distantLightIntensity;
 
         // The following values come from OpenUSD/pxr/imaging/hdx/taskController.cpp
@@ -753,10 +759,7 @@ bool MayaHydraLightAdapter::_GetVisibility() const
     return false;
 }
 
-TfToken MayaHydraLightAdapter::GetRenderTag() const 
-{ 
-    return Fvp::secondaryGraphicsRenderTagToken; 
-}
+TfToken MayaHydraLightAdapter::GetRenderTag() const { return Fvp::secondaryGraphicsRenderTagToken; }
 
 void MayaHydraLightAdapter::CreateCallbacks()
 {
@@ -845,7 +848,8 @@ void MayaHydraLightAdapter::_CalculateShadowParams(MFnLight& light, HdxShadowPar
         const GfRange3f r = GfRange3f(aabb.GetRange());
         params.shadowMatrix = std::make_shared<MayaHydraShadowMatrixComputation>(r, simpleLight);
     } else {
-        params.shadowMatrix = std::make_shared<MayaHydraConstantShadowMatrix>(_CalculateShadowProjectionMatrix());
+        params.shadowMatrix
+            = std::make_shared<MayaHydraConstantShadowMatrix>(_CalculateShadowProjectionMatrix());
     }
 
     params.bias = dmapBiasPlug.isNull() ? -0.001 : -dmapBiasPlug.asFloat();

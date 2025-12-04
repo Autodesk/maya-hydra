@@ -76,10 +76,13 @@ private:
     void _DestroyDerived();
 
     // Path mapper support.
-    const SdfPath                 _sceneIndexPathPrefix;
-    Ufe::Path                     _sceneIndexAppPath;
-    const Ufe::Observer::Ptr      _appSceneObserver {};
-    const Fvp::PathMapperConstPtr _usdPathMapper {};
+    const SdfPath                   _sceneIndexPathPrefix;
+    Ufe::Path                       _sceneIndexAppPath;
+    const Ufe::Observer::Ptr        _appSceneObserver{};
+    const Fvp::PathMapperConstPtr   _usdPathMapper{};
+
+    bool _unregisterPickHandler{false};
+    bool _unregisterPathMapper{false};
 };
 
 } // namespace MAYAHYDRA_NS_DEF

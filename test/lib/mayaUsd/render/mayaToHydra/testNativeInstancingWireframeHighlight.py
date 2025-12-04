@@ -29,14 +29,6 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1
-    imageVersion=None
-
-    def setUp(self):
-        super(TestNativeInstancingWireframeHighlight, self).setUp()
-        # Compute imageVersion once during setup
-        frame_passes_count = self.framePassesCount
-        if frame_passes_count == 2:
-            self.imageVersion = "two_passes"
 
     def loadUsdScene(self, sceneFile, cameraOffset):
         sn = ufe.GlobalSelection.get()

@@ -61,7 +61,7 @@ TEST(NurbsSurfaces, nurbsTorus)
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
-    DecimalStreamingOverride decimalStreamingOverride({ pxr::TfDecimalToStringMode::FIXED, 5, false });
+    DecimalStreamingOverride decimalStreamingOverride({ PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
 
     HdSceneIndexPrim torusPrim; 
     bool testPassed = false;
@@ -127,7 +127,7 @@ TEST(NurbsSurfaces, nurbsCube)
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
-    DecimalStreamingOverride decimalStreamingOverride({ pxr::TfDecimalToStringMode::FIXED, 5, false });
+    DecimalStreamingOverride decimalStreamingOverride({ PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
 
     PrimEntriesVector planePrims;
     bool testPassed = false;
@@ -184,7 +184,8 @@ TEST(NurbsSurfaces, nurbsCircle)
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
     
-    DecimalStreamingOverride decimalStreamingOverride({ pxr::TfDecimalToStringMode::FIXED, 5, false });
+    DecimalStreamingOverride decimalStreamingOverride({ PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
+
 
     HdSceneIndexPrim circlePrim;
     bool testPassed = false;
@@ -265,7 +266,7 @@ TEST(NurbsSurfaces, nurbsSquare)
     ASSERT_GT(sceneIndices.size(), 0u);
 
     DecimalStreamingOverride decimalStreamingOverride(
-        { pxr::TfDecimalToStringMode::FIXED, 5, false });
+        { PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
 
     PrimEntriesVector linePrims;
     bool testPassed = false;

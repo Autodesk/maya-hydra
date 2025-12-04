@@ -257,7 +257,7 @@ void NiInstanceWhSi::_CreateSelectionHighlight(const SdfPath& instancePath)
 
     // Send notifications
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
-    auto operation = [&addedPrims, prototypePath, selectionPath](const pxr::SdfPath& primPath, const pxr::HdSceneIndexPrim& prim) -> bool {
+    auto operation = [&addedPrims, prototypePath, selectionPath](const PXR_NS::SdfPath& primPath, const PXR_NS::HdSceneIndexPrim& prim) -> bool {
         addedPrims.emplace_back(primPath.ReplacePrefix(prototypePath.GetParentPath(), selectionPath), prim.primType);
         return true;
     };

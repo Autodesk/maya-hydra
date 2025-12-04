@@ -69,7 +69,6 @@ public:
     FVP_API
     static Ptr Create(
       const PXR_NS::VtDictionary& args,
-      bool                        useHVT,
       const PXR_NS::TfToken&      aov = PXR_NS::HdAovTokens->color
     );
 
@@ -81,7 +80,6 @@ public:
     static bool Write(
         const PXR_NS::VtDictionary& args,
         const std::string&          fileName,
-        bool                        useHVT,
         const PXR_NS::TfToken&      aov = PXR_NS::HdAovTokens->color
     );
 

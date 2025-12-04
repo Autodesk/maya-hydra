@@ -17,8 +17,8 @@
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/lightAdapter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
-#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 #include <mayaHydraLib/hydraUtils.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
@@ -48,19 +48,22 @@ public:
         if (GetMayaHydraSceneIndex()->IsHdSt()) {
             return HdPrimTypeTokens->simpleLight;
         } else {
-            return HdPrimTypeTokens->distantLight;//We don't use this light type with Storm as it has no shadows so far
+            return HdPrimTypeTokens->distantLight; // We don't use this light type with Storm as it
+                                                   // has no shadows so far
         }
     }
 
     void _CalculateLightParams(GlfSimpleLight& light) override
     {
-        //To simulate a directional light which has no actual position, but doesn't seem to be supported in hydra, we set a position very very far
-        //so it looks like a directional light.
-        // Directional lights point toward -Z, but we need the opposite
-        // for the position so the light acts as a directional light.
-        auto zDir = GetTransform().GetRow(2);
-        const GfVec3f lightDirection {(float)-zDir.data()[0], (float)-zDir.data()[1], (float)-zDir.data()[2]};
-        GfVec3f position;
+        // To simulate a directional light which has no actual position, but doesn't seem to be
+        // supported in hydra, we set a position very very far so it looks like a directional light.
+        //  Directional lights point toward -Z, but we need the opposite
+        //  for the position so the light acts as a directional light.
+        auto          zDir = GetTransform().GetRow(2);
+        const GfVec3f lightDirection { (float)-zDir.data()[0],
+                                       (float)-zDir.data()[1],
+                                       (float)-zDir.data()[2] };
+        GfVec3f       position;
         MAYAHYDRA_NS_DEF::GetDirectionalLightPositionFromDirectionVector(position, lightDirection);
         light.SetPosition({ position.data()[0], position.data()[1], position.data()[2], 0.0f });
     }
@@ -92,8 +95,7 @@ public:
 
     VtValue GetLightParamValue(const TfToken& paramName) override
     {
-        if (  (paramName == HdLightTokens->angle)
-            ||(paramName == UsdLuxTokens->inputsAngle)) {
+        if ((paramName == HdLightTokens->angle) || (paramName == UsdLuxTokens->inputsAngle)) {
             MStatus           status;
             MFnDependencyNode lightNode(GetNode(), &status);
             if (ARCH_UNLIKELY(!status)) {
@@ -101,8 +103,8 @@ public:
             }
             return VtValue(
                 lightNode.findPlug(MayaAttrs::directionalLight::lightAngle, true).asFloat());
-        } 
-        
+        }
+
         return MayaHydraLightAdapter::GetLightParamValue(paramName);
     }
 };
@@ -116,8 +118,10 @@ TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, directionalLight)
 {
     MayaHydraAdapterRegistry::RegisterLightAdapter(
         TfToken("directionalLight"),
-        [](MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag) -> MayaHydraLightAdapterPtr {
-            return MayaHydraLightAdapterPtr(new MayaHydraDirectionalLightAdapter(mayaHydraSceneIndex, dag));
+        [](MayaHydraSceneIndex* mayaHydraSceneIndex,
+           const MDagPath&      dag) -> MayaHydraLightAdapterPtr {
+            return MayaHydraLightAdapterPtr(
+                new MayaHydraDirectionalLightAdapter(mayaHydraSceneIndex, dag));
         });
 }
 

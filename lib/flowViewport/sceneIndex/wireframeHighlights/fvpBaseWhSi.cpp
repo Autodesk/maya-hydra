@@ -27,7 +27,12 @@
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/instanceSchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
+#include <pxr/imaging/hd/materialBindingSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
+#include <pxr/imaging/hd/materialConnectionSchema.h>
+#include <pxr/imaging/hd/materialNodeParameterSchema.h>
+#include <pxr/imaging/hd/materialNodeSchema.h>
+#include <pxr/imaging/hd/materialSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
@@ -38,6 +43,7 @@
 #include <pxr/imaging/hd/selectionsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #if PXR_VERSION >= 2505
+#include <pxr/usdImaging/usdImaging/materialBindingSchema.h>
 #include <pxr/usdImaging/usdImaging/materialBindingsSchema.h>
 #elif PXR_VERSION >= 2405
 #include <pxr/usdImaging/usdImaging/directMaterialBindingsSchema.h>
@@ -352,55 +358,133 @@ private:
     HdContainerDataSourceHandle const _inputDataSource;
 };
 
+class _MaterialBlockingContainerDataSource : public HdContainerDataSource {
+public:
+    HD_DECLARE_DATASOURCE(_MaterialBlockingContainerDataSource)
+    
+    _MaterialBlockingContainerDataSource(
+        HdContainerDataSourceHandle const &inputDataSource,
+        HdSceneIndexBaseRefPtr const &inputSceneIndex,
+        const TfToken& materialPathToken);
+
+    TfTokenVector GetNames() override;
+
+    HdDataSourceBaseHandle Get(const TfToken& name) override;
+
+private:
+    HdContainerDataSourceHandle const _inputDataSource;
+    HdSceneIndexBaseRefPtr const _inputSceneIndex;
+    TfToken const _materialPathToken;
+};
+
+class _MaterialBlockingVectorDataSource : public HdVectorDataSource {
+public:
+    HD_DECLARE_DATASOURCE(_MaterialBlockingVectorDataSource)
+    
+    _MaterialBlockingVectorDataSource(
+        HdVectorDataSourceHandle const &inputDataSource,
+        HdSceneIndexBaseRefPtr const &inputSceneIndex,
+        const TfToken& materialPathToken);
+
+    size_t GetNumElements() override;
+
+    HdDataSourceBaseHandle GetElement(size_t element) override;
+
+private:
+    HdVectorDataSourceHandle const _inputDataSource;
+    HdSceneIndexBaseRefPtr const _inputSceneIndex;
+    TfToken const _materialPathToken;
+};
+
+_MaterialBlockingContainerDataSource::_MaterialBlockingContainerDataSource(
+    HdContainerDataSourceHandle const &inputDataSource,
+    HdSceneIndexBaseRefPtr const &inputSceneIndex,
+    const TfToken& materialPathToken)
+  : _inputDataSource(inputDataSource),
+    _inputSceneIndex(inputSceneIndex),
+    _materialPathToken(materialPathToken)
+{
+}
+
+TfTokenVector _MaterialBlockingContainerDataSource::GetNames()
+{
+    return _inputDataSource ? _inputDataSource->GetNames() : TfTokenVector();
+}
+
+HdDataSourceBaseHandle _MaterialBlockingContainerDataSource::Get(const TfToken& name)
+{
+    if (!_inputDataSource) {
+        return nullptr;
+    }
+
+    HdDataSourceBaseHandle const childDataSource = _inputDataSource->Get(name);
+    if (!childDataSource) {
+        return nullptr;
+    }
+
+    if (auto childContainer = HdContainerDataSource::Cast(childDataSource)) {
+        return _MaterialBlockingContainerDataSource::New(std::move(childContainer), _inputSceneIndex, _materialPathToken);
+    }
+
+    if (auto childVector = HdVectorDataSource::Cast(childDataSource)) {
+        return _MaterialBlockingVectorDataSource::New(std::move(childVector), _inputSceneIndex, _materialPathToken);
+    }
+
+    if (name == _materialPathToken) {
+        auto childPathDataSource = HdTypedSampledDataSource<SdfPath>::Cast(childDataSource);
+        if (childPathDataSource) {
+            auto materialPath = childPathDataSource->GetTypedValue(0);
+            auto materialPrim = _inputSceneIndex->GetPrim(materialPath);
+            if (Fvp::MaterialHasDisplacement(materialPrim)) {
+                return childDataSource;
+            }
+        }
+        return HdBlockDataSource::New();
+    }
+
+    return childDataSource;
+}
+
+_MaterialBlockingVectorDataSource::_MaterialBlockingVectorDataSource(
+    HdVectorDataSourceHandle const &inputDataSource,
+    HdSceneIndexBaseRefPtr const &inputSceneIndex,
+    const TfToken& materialPathToken)
+  : _inputDataSource(inputDataSource),
+    _inputSceneIndex(inputSceneIndex),
+    _materialPathToken(materialPathToken)
+{
+}
+
+size_t _MaterialBlockingVectorDataSource::GetNumElements()
+{
+    return _inputDataSource ? _inputDataSource->GetNumElements() : 0;
+}
+
+HdDataSourceBaseHandle _MaterialBlockingVectorDataSource::GetElement(size_t element)
+{
+    if (!_inputDataSource) {
+        return nullptr;
+    }
+
+    HdDataSourceBaseHandle const childDataSource = _inputDataSource->GetElement(element);
+    if (!childDataSource) {
+        return nullptr;
+    }
+
+    if (auto childContainer = HdContainerDataSource::Cast(childDataSource)) {
+        return _MaterialBlockingContainerDataSource::New(std::move(childContainer), _inputSceneIndex, _materialPathToken);
+    }
+
+    if (auto childVector = HdVectorDataSource::Cast(childDataSource)) {
+        return _MaterialBlockingVectorDataSource::New(std::move(childVector), _inputSceneIndex, _materialPathToken);
+    }
+
+    return childDataSource;
+}
+
 }
 
 namespace FVP_NS_DEF {
-
-//We want to set the displayStyle of the highlighting prim with following overrides:
-// 1. A "reprSelector" with HdReprTokens->wire or HdReprTokens->refinedWire, means only draw wires.
-// 2. An "overrideWireframeColor" primvar with the color of the highlighting.
-HdContainerDataSourceHandle SetWireframeRepr(const HdContainerDataSourceHandle& dataSource, const GfVec4f& color)
-{
-    //Always edit its override wireframe color
-    auto edited = HdContainerDataSourceEditor(dataSource);
-    edited.Set(primvarsOverrideWireframeColorLocator,
-                        Fvp::PrimvarDataSource::New(
-                            HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{color}),
-                            HdPrimvarSchemaTokens->constant,
-                            HdPrimvarSchemaTokens->color));
-
-    //  Secondary graphics purpose render tag data source
-    edited.Set(HdPurposeSchema::GetDefaultLocator(),
-                HdPurposeSchema::Builder()
-                .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
-                    Fvp::secondaryGraphicsRenderTagToken))
-                .Build());
-
-    //Is the prim having a DisplayStyle schema?
-    if (HdLegacyDisplayStyleSchema styleSchema =
-            HdLegacyDisplayStyleSchema::GetFromParent(dataSource)) {
-
-        if (HdTokenArrayDataSourceHandle ds =
-                styleSchema.GetReprSelector()) {
-            VtArray<TfToken> ar = ds->GetTypedValue(0.0f);
-            TfToken refinedToken = ar[0];
-            if (HdReprTokens->refined == refinedToken
-                || HdReprTokens->refinedWireOnSurf == refinedToken) {
-                //Is in refined display style, apply the refinedWire reprselector
-                return HdOverlayContainerDataSource::New({ refinedWireDisplayStyleDataSource, edited.Finish() });
-            } else if (HdReprTokens->wireOnSurf == refinedToken) {
-                //Is in non-refined display style, apply the wire reprselector
-                return HdOverlayContainerDataSource::New({ wireDisplayStyleDataSource, edited.Finish() });
-            }
-        }else{
-            //No reprSelector found, assume it's in the Collection that we have set HdReprTokens->refined
-            return HdOverlayContainerDataSource::New({ refinedWireDisplayStyleDataSource, edited.Finish() });
-        }
-    }
-
-    //For the other case, we are only updating the wireframe color assuming we are already drawing lines
-    return edited.Finish();
-}
 
 PXR_NS::HdContainerDataSourceHandle RepathInstancingDataSources(
     const PXR_NS::HdContainerDataSourceHandle& primDataSource,
@@ -822,6 +906,79 @@ BaseWhSi::CollectInstancingPaths(const PXR_NS::SdfPath& primPath, InstancingPath
     for (const auto& affectedInstancedByPath : affectedInstancedByPaths) {
         CollectInstancingPaths(affectedInstancedByPath, InstancingPathsCollectionDirection::InstancedBy, outInstancerPaths, outPrototypePaths);
     }
+}
+
+//We want to set the displayStyle of the highlighting prim with following overrides:
+// 1. A "reprSelector" with HdReprTokens->wire or HdReprTokens->refinedWire, means only draw wires.
+// 2. An "overrideWireframeColor" primvar with the color of the highlighting.
+HdContainerDataSourceHandle
+BaseWhSi::SetWireframeRepr(const HdContainerDataSourceHandle& dataSource, const GfVec4f& color) const
+{
+    //Always edit its override wireframe color
+    auto edited = HdContainerDataSourceEditor(dataSource);
+    edited.Set(primvarsOverrideWireframeColorLocator,
+                        Fvp::PrimvarDataSource::New(
+                            HdRetainedTypedSampledDataSource<VtVec4fArray>::New(VtVec4fArray{color}),
+                            HdPrimvarSchemaTokens->constant,
+                            HdPrimvarSchemaTokens->color));
+
+    //  Secondary graphics purpose render tag data source
+    edited.Set(HdPurposeSchema::GetDefaultLocator(),
+                HdPurposeSchema::Builder()
+                .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
+                    Fvp::secondaryGraphicsRenderTagToken))
+                .Build());
+    
+    // Block materials without displacement to avoid unnecessary shader compilation
+    auto hdMaterialBindings = HdMaterialBindingsSchema::GetFromParent(dataSource);
+    if (hdMaterialBindings.IsDefined()) {
+        edited.Set(
+            HdMaterialBindingsSchema::GetDefaultLocator(), 
+            _MaterialBlockingContainerDataSource::New(hdMaterialBindings.GetContainer(), GetInputSceneIndex(), HdMaterialBindingSchemaTokens->path)
+        );
+    }
+#if PXR_VERSION >= 2505
+    auto usdMaterialBindings = UsdImagingMaterialBindingsSchema::GetFromParent(dataSource);
+    if (usdMaterialBindings.IsDefined()) {
+        edited.Set(
+            UsdImagingMaterialBindingsSchema::GetDefaultLocator(), 
+            _MaterialBlockingContainerDataSource::New(usdMaterialBindings.GetContainer(), GetInputSceneIndex(), TfToken("materialPath"))
+        );
+    }
+#else
+    auto usdMaterialBindings = UsdImagingDirectMaterialBindingsSchema::GetFromParent(dataSource);
+    if (usdMaterialBindings.IsDefined()) {
+        edited.Set(
+            UsdImagingDirectMaterialBindingsSchema::GetDefaultLocator(), 
+            _MaterialBlockingContainerDataSource::New(usdMaterialBindings.GetContainer(), GetInputSceneIndex(), TfToken("materialPath"))
+        );
+    }
+#endif
+
+    //Is the prim having a DisplayStyle schema?
+    if (HdLegacyDisplayStyleSchema styleSchema =
+            HdLegacyDisplayStyleSchema::GetFromParent(dataSource)) {
+
+        if (HdTokenArrayDataSourceHandle ds =
+                styleSchema.GetReprSelector()) {
+            VtArray<TfToken> ar = ds->GetTypedValue(0.0f);
+            TfToken refinedToken = ar[0];
+            if (HdReprTokens->refined == refinedToken
+                || HdReprTokens->refinedWireOnSurf == refinedToken) {
+                //Is in refined display style, apply the refinedWire reprselector
+                return HdOverlayContainerDataSource::New({ refinedWireDisplayStyleDataSource, edited.Finish() });
+            } else if (HdReprTokens->wireOnSurf == refinedToken) {
+                //Is in non-refined display style, apply the wire reprselector
+                return HdOverlayContainerDataSource::New({ wireDisplayStyleDataSource, edited.Finish() });
+            }
+        }else{
+            //No reprSelector found, assume it's in the Collection that we have set HdReprTokens->refined
+            return HdOverlayContainerDataSource::New({ refinedWireDisplayStyleDataSource, edited.Finish() });
+        }
+    }
+
+    //For the other case, we are only updating the wireframe color assuming we are already drawing lines
+    return edited.Finish();
 }
 
 #if PXR_VERSION >= 2405

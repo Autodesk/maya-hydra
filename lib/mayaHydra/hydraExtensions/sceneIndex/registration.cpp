@@ -19,6 +19,7 @@
 #include "mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndex.h"
 
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
+#include <flowViewport/sceneIndex/fvpPrimRemovalEnforcingSceneIndex.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/fvpUtils.h>
 
@@ -244,7 +245,17 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
         registration->pluginSceneIndex,
         registration->sceneIndexPathPrefix);
 
-    registration->rootSceneIndex = pfsi;
+    // Add a scene index that enforces a coherent prim removal + prim retrieval behavior.
+    // This is to work around a bug in OpenUSD with the UsdImagingDrawModeSceneIndex where 
+    // it can send PrimsRemoved notifications, but still return valid prims and prim paths 
+    // when calling GetPrim and GetChildPrimPaths afterwards. This issue has likely been
+    // latent for a while, but became an active problem starting with USD 25.02, with this
+    // change in HdMergingSceneIndex : 
+    // https://github.com/PixarAnimationStudios/OpenUSD/blob/v25.08/pxr/imaging/hd/mergingSceneIndex.cpp#L507-L533
+    // See fvpPrimRemovalEnforcingSceneIndex.h for a more detailed breakdown of the issue.
+    auto primRemovalSi = Fvp::PrimRemovalEnforcingSceneIndex::New(pfsi);
+
+    registration->rootSceneIndex = primRemovalSi;
 
     //Set the chain back into the dataProducerSceneIndexData in both members
     dataProducerSceneIndexData->SetDataProducerSceneIndex(registration->rootSceneIndex);

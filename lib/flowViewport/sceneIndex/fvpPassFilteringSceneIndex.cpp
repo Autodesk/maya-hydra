@@ -18,22 +18,12 @@
 #include "fvpPassFilteringSceneIndex.h"
 #include "flowViewport/fvpUtils.h"
 
-#include <pxr/imaging/hd/purposeSchema.h>
-#include <pxr/imaging/hd/meshSchema.h>
-#include <pxr/imaging/hd/basisCurvesSchema.h>
-#include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
+#include <pxr/imaging/hd/repr.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
+#include <pxr/imaging/hd/tokens.h>
 
-
-// For debugging purpose, set USE_LOGGING_VERSION to 1 to use logging version in _IsFilteredOut function, 0 for no logging version
-// This will create a text file with the list of all prims tested for filtering and the 
-// result and reason why it was filtered in/out.
-// Modify "logFilename" later in the code to match your configuration.
-#define USE_LOGGING_VERSION 0
-
-#if USE_LOGGING_VERSION
-    #include <fstream>
-#endif
+#include <algorithm>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -55,10 +45,11 @@ bool isPrefixedBySdfPath(const SdfPath& pathToCheck, const SdfPathVector& paths)
     return false;
 }
 
-#if USE_LOGGING_VERSION
-    // Write to file periodically (every 10 calls to avoid too much I/O)
-    static int callCount = 0;
-#endif
+bool isRprimType(const TfToken& primType)
+{
+    return std::find(HdRprimTypeTokens->allTokens.begin(), HdRprimTypeTokens->allTokens.end(), primType) != HdRprimTypeTokens->allTokens.end();
+}
+
 } // namespace
 
 namespace FVP_NS_DEF {
@@ -81,191 +72,17 @@ PassFilteringSceneIndex::PassFilteringSceneIndex(
     , InputSceneIndexUtils(inputSceneIndex)
     , _framePassData(framePassData)
 {
+    for (const SdfPath& primPath : HdSceneIndexPrimView(GetInputSceneIndex())) {
+        _UpdateFilteringStatus(primPath);
+    }
 }
 
-bool PassFilteringSceneIndex::_ShouldIncludeInAllPasses(const HdSceneIndexPrim& prim) const
+bool PassFilteringSceneIndex::_IsFilteredOut(const PXR_NS::SdfPath& primPath) const
 {
-    if (_framePassData && _framePassData->_keepLights && HdPrimTypeIsLight(prim.primType)) {
-        return true;
-    }
-
-    return (!HdPrimTypeIsGprim(prim.primType)); // Non geometric prims are included in all passes
+    return _filteredPrims.find(primPath) != _filteredPrims.end();
 }
 
-#if USE_LOGGING_VERSION
-    // Keep the global static variables for logging
-    static std::map<std::string, std::vector<std::tuple<std::string, bool, std::string>>> passResults;
-    static std::mutex                                                       logMutex;
-    static bool                                                             firstCall = true;
-    static const std::string logFilename = "pass_filtering_log.txt";
-
-void PassFilteringSceneIndex::ResetPassFilteringLog()
-{
-    std::lock_guard<std::mutex> lock(logMutex);
-    passResults.clear();
-
-    // Clear the log file
-    std::ofstream logFile(logFilename, std::ios::trunc);
-    logFile.close();
-
-    // Reset the first call flag so logging will be enabled again
-    firstCall = true;
-}
-
-    // Single function with conditional compilation
-bool PassFilteringSceneIndex::_IsFilteredOut(const SdfPath& primPath) const
-{
-
-   // Logging version with full debug output
-    if (firstCall) {
-        // Clear the log file at the start
-        std::ofstream logFile(logFilename, std::ios::trunc);
-        logFile.close();
-        firstCall = false;
-        callCount = 0;
-    }
-
-    // Get pass name for logging - use frame pass name
-    std::string passName = _framePassData && _framePassData->_framePass
-        ? _framePassData->_framePass->GetName()
-        : "Unknown";
-    if (passName == "Unknown") {
-        return true; // Safety check, exclude if no pass name
-    }
-
-    bool        result = false; // Will store the final result
-    std::string reason = "";    // For debugging
-
-    if (primPath.IsAbsoluteRootPath()) {
-        result = false; // Include the root prim
-        reason = "Is the root prim";
-    } else
-    if (!_framePassData) {
-        result = false; // No filtering data, include the prim
-        reason = "No filtering data";
-    } else {
-        // Fast checks that don't require GetPrim() - do these first for performance
-        // Include paths: if specified and prim matches, definitely include it (workaround for special cases)
-        if (!_framePassData->_includePaths.empty()
-            && isPrefixedBySdfPath(primPath, _framePassData->_includePaths)) {
-            result = false; // Prim is in the include paths, it will be rendered
-            reason = "Included by path";
-        }
-        // Exclude paths: if specified and prim matches, definitely exclude it (workaround for special cases)
-        else if (!_framePassData->_excludePaths.empty()
-            && isPrefixedBySdfPath(primPath, _framePassData->_excludePaths)) {
-            result = true; // Prim is in the exclude paths, it will be skipped
-            reason = "Excluded by path";
-        }
-        
-        // If we have a result from the fast checks, return it immediately
-        if (reason == "Included by path" || reason == "Excluded by path") {
-            return result;
-        } else {
-            // Now do the expensive GetPrim() call only when necessary
-            const HdSceneIndexBaseRefPtr& inputSceneIndex = GetInputSceneIndex();
-            if (!inputSceneIndex) {
-                result = false; // No input scene index, include by default
-                reason = "No input scene index";
-            } else {
-                HdSceneIndexPrim prim = inputSceneIndex->GetPrim(primPath);
-                
-                // Check if this prim should be included in all passes (non-geometric prims)
-                if (prim.dataSource && _ShouldIncludeInAllPasses(prim)) {
-                    result = false; // Include non-geometric prims in all passes
-                    reason = "Non-geometric prim (included in all passes)";
-                } else {
-                    // Now apply the main filtering logic based on purpose render tags
-                    if (prim.dataSource) {
-                        const bool passSupportsPrimsWithNoPurposeRenderTag
-                            = _framePassData->_supportPrimsWithNoPurposeRenderTag;
-
-                        const TfToken purposeRenderTag = GetPurposeRenderTag(prim.dataSource);//From fvpUtils
-                        if (!purposeRenderTag.IsEmpty()) {
-                            result = (_framePassData->_includeRenderTags.find(purposeRenderTag)
-                                     == _framePassData->_includeRenderTags.end());
-                            reason = result ? "Purpose tag not in include list"
-                                            : "Purpose tag matched";
-                        } else {
-                            // Geometric prim without purpose tag
-                            if (passSupportsPrimsWithNoPurposeRenderTag) {
-                                result = false;
-                                reason = "Geometric prim without purpose tag but supported";
-                            } else {
-                                result = true; // No purpose render tag and not supported, so skip it
-                                reason = "Geometric prim without purpose tag and not supported";
-                            }
-                        }
-                    } else {
-                        result = false; // Default to include
-                        reason = "Geometric prim without data source";
-                    }
-                }
-            }
-        }
-    }
-
-    // Log the result for render tag filtering cases
-    // Log the result
-    {
-        std::lock_guard<std::mutex> lock(logMutex);
-        passResults[passName].emplace_back(primPath.GetText(), result, reason);
-    }
-
-    // Write to file periodically (every 10 calls to avoid too much I/O)
-    if (++callCount % 10 == 0) {
-        std::lock_guard<std::mutex> lock(logMutex);
-        std::ofstream               logFile(logFilename, std::ios::trunc);
-
-        // Create a sorted copy of the pass entries
-        std::vector<std::pair<std::string, std::vector<std::tuple<std::string, bool, std::string>>>>
-            sortedPasses;
-        for (const auto& passEntry : passResults) {
-            sortedPasses.emplace_back(passEntry.first, passEntry.second);
-        }
-
-        // Sort by pass name
-        std::sort(
-            sortedPasses.begin(),
-            sortedPasses.end(),
-            [](const std::pair<std::string, std::vector<std::tuple<std::string, bool, std::string>>>& a,
-                const std::pair<std::string, std::vector<std::tuple<std::string, bool, std::string>>>& b) {
-                return a.first < b.first; // Sort by pass name
-            });
-
-        for (const auto& passEntry : sortedPasses) {
-            logFile << "/" << passEntry.first << "\n";
-
-            // Create a sorted copy of the prim entries for this pass
-            std::vector<std::tuple<std::string, bool, std::string>> sortedPrims = passEntry.second;
-            std::sort(
-                sortedPrims.begin(),
-                sortedPrims.end(),
-                [](const std::tuple<std::string, bool, std::string>& a,
-                    const std::tuple<std::string, bool, std::string>& b) {
-                    return std::get<0>(a) < std::get<0>(b); // Sort by prim path (first element)
-                });
-
-            for (const auto& primEntry : sortedPrims) {
-                logFile << "   " << std::get<0>(primEntry) << " - "
-                        << (std::get<1>(primEntry) ? "FILTERED_OUT" : "INCLUDED") 
-                        << " (" << std::get<2>(primEntry) << ")\n";
-            }
-            logFile << "\n";
-        }
-        logFile.close();
-    }
-
-    return result;
-}
-
-#else
-//No logging version of these functions
-void PassFilteringSceneIndex::ResetPassFilteringLog()
-{
-}
-
-bool PassFilteringSceneIndex::_IsFilteredOut(const SdfPath& primPath) const
+bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) const
 {
     // Clean version without logging
     if (!(_framePassData && _framePassData->_framePass) ) {
@@ -296,23 +113,24 @@ bool PassFilteringSceneIndex::_IsFilteredOut(const SdfPath& primPath) const
     }
 
     HdSceneIndexPrim prim = inputSceneIndex->GetPrim(primPath);
-    
-    // Check if this prim should be included in all passes (non-geometric prims)
-    if (prim.dataSource && _ShouldIncludeInAllPasses(prim)) {
-        return false; // Include non-geometric prims in all passes
+
+    if (!isRprimType(prim.primType)) {
+        if (prim.primType == HdPrimTypeTokens->material 
+            && _materialUseCounts.find(primPath) == _materialUseCounts.end()) {
+            // Filter out unused materials
+            return true;
+        }
+        return false; // Include all non-Rprims by default
     }
 
     // Now apply the main filtering logic based on purpose render tags
     if (prim.dataSource) {
-        const bool passSupportsPrimsWithNoPurposeRenderTag
-            = _framePassData->_supportPrimsWithNoPurposeRenderTag;
-
         const TfToken purposeRenderTag = GetPurposeRenderTag(prim.dataSource);//From fvpUtils
         if (!purposeRenderTag.IsEmpty()) {
             return (_framePassData->_includeRenderTags.find(purposeRenderTag)
                    == _framePassData->_includeRenderTags.end());
         } else {
-            return !passSupportsPrimsWithNoPurposeRenderTag;
+            return !_framePassData->_supportPrimsWithNoPurposeRenderTag;
         }
     } else {
         // No data source
@@ -320,7 +138,101 @@ bool PassFilteringSceneIndex::_IsFilteredOut(const SdfPath& primPath) const
 
     return false; // will be rendered.
 }
-#endif
+
+HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateFilteringStatus(const PXR_NS::SdfPath& primPath, bool dirtied, bool resync)
+{
+    HdSceneIndexObserver::AddedPrimEntries updatedPrims;
+
+    bool isFilteredOut = _IsFilteredOut(primPath);
+    bool shouldBeFilteredOut = _ShouldBeFilteredOut(primPath);
+
+    if (!isFilteredOut && shouldBeFilteredOut) {
+        _filteredPrims.insert(primPath);
+        updatedPrims.emplace_back(primPath, TfToken());
+    } else if (isFilteredOut && !shouldBeFilteredOut) {
+        _filteredPrims.erase(primPath);
+        updatedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
+    } else if (!isFilteredOut && !shouldBeFilteredOut && resync) {
+        updatedPrims.emplace_back(primPath, GetInputSceneIndex()->GetPrim(primPath).primType);
+    }
+
+    bool updateMaterial = (isFilteredOut != shouldBeFilteredOut) || (!isFilteredOut && !shouldBeFilteredOut && dirtied);
+    if (updateMaterial) {
+        auto materialUpdates = _UpdateMaterialEntry(primPath);
+        updatedPrims.insert(updatedPrims.end(), materialUpdates.begin(), materialUpdates.end());
+    }
+
+    return updatedPrims;
+}
+
+HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_RemoveMaterialEntry(const PXR_NS::SdfPath& primPath)
+{
+    auto itMaterialPath = _primsToMaterialPaths.find(primPath);
+    if (itMaterialPath != _primsToMaterialPaths.end()) {
+        auto materialPath = itMaterialPath->second;
+        _primsToMaterialPaths.erase(primPath);
+        _materialUseCounts[materialPath]--;
+        if (_materialUseCounts[materialPath] == 0) {
+            _materialUseCounts.erase(materialPath);
+            // If no one's using the material and we should filter it out, do so.
+            if (_ShouldBeFilteredOut(materialPath)) {
+                _filteredPrims.insert(materialPath);
+                return {{materialPath, TfToken()}};
+            }
+        }
+    }
+
+    return {};
+}
+
+HdSceneIndexObserver::AddedPrimEntries PassFilteringSceneIndex::_UpdateMaterialEntry(const PXR_NS::SdfPath& primPath)
+{
+    if (_IsFilteredOut(primPath)) {
+        return _RemoveMaterialEntry(primPath);
+    }
+    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+    if (!isRprimType(prim.primType)) {
+        return _RemoveMaterialEntry(primPath);
+    }
+    auto materialPath = GetMaterialPath(prim.dataSource);
+    if (materialPath.IsEmpty()) {
+        return _RemoveMaterialEntry(primPath);
+    }
+
+    // Do some checks to see if the material needs to have displacement to be relevant
+    bool requireDisplacement = prim.primType == HdPrimTypeTokens->basisCurves;
+    // Check if it's a wireframe
+    if (!requireDisplacement) {
+        auto displayStyle = HdLegacyDisplayStyleSchema::GetFromParent(prim.dataSource);
+        if (displayStyle.IsDefined() && displayStyle.GetReprSelector()) {
+            auto reprSelector = displayStyle.GetReprSelector()->GetTypedValue(0);
+            if (reprSelector[0] == HdReprTokens->wire || reprSelector[0] == HdReprTokens->refinedWire) {
+                requireDisplacement = true;
+            }
+        }
+    }
+    if (requireDisplacement && !MaterialHasDisplacement(GetInputSceneIndex()->GetPrim(materialPath))) {
+        return _RemoveMaterialEntry(primPath);
+    }
+
+    auto prevMaterialPath = _primsToMaterialPaths.find(primPath);
+    if (prevMaterialPath == _primsToMaterialPaths.end() || materialPath != prevMaterialPath->second) {
+        auto updatedPrims = _RemoveMaterialEntry(primPath);
+        // Add the new material entry
+        _primsToMaterialPaths[primPath] = materialPath;
+        _materialUseCounts[materialPath]++;
+        if (_materialUseCounts[materialPath] == 1) {
+            // If the material was previously filtered out, unfilter it
+            if (_IsFilteredOut(materialPath)) {
+                _filteredPrims.erase(materialPath);
+                updatedPrims.emplace_back(materialPath, HdPrimTypeTokens->material);
+            }
+        }
+        return updatedPrims;
+    }
+
+    return {};
+}
 
 HdSceneIndexPrim PassFilteringSceneIndex::GetPrim(const SdfPath& primPath) const
 {
@@ -332,40 +244,100 @@ HdSceneIndexPrim PassFilteringSceneIndex::GetPrim(const SdfPath& primPath) const
 
 SdfPathVector PassFilteringSceneIndex::GetChildPrimPaths(const SdfPath& primPath) const
 {
-    // If this prim is filtered out, return no children
-    if (_IsFilteredOut(primPath)) {
-        return {};
-    }
-
-    // Get children from input scene index
-    SdfPathVector childPaths = GetInputSceneIndex()->GetChildPrimPaths(primPath);
-
-    // Filter out children that should be filtered out
-    SdfPathVector filteredChildPaths;
-    for (const SdfPath& childPath : childPaths) {
-        if (!_IsFilteredOut(childPath)) {
-            filteredChildPaths.push_back(childPath);
-        }
-    }
-
-    return filteredChildPaths;
+    // We only filter prims, not paths, so defer to the input scene index
+    return GetInputSceneIndex()->GetChildPrimPaths(primPath);
 }
 
 void PassFilteringSceneIndex::DirtyPrimsFromPurposeRenderTag(const TfToken purposeRenderTag)
 {
-    HdSceneIndexObserver::AddedPrimEntries   addedEntries;
     auto& inputSceneIndex = GetInputSceneIndex();
-    if (inputSceneIndex) { 
-        for (const SdfPath& path : HdSceneIndexPrimView(inputSceneIndex)) {
-            HdSceneIndexPrim prim = inputSceneIndex->GetPrim(path);
-            const TfToken    purposeRenderTagFromPrim = GetPurposeRenderTag(prim.dataSource);//From fvpUtils
-            if (purposeRenderTag == purposeRenderTagFromPrim){
-                addedEntries.emplace_back(path, prim.primType);
+    if (inputSceneIndex) {
+        // Update the whole scene
+        HdSceneIndexObserver::AddedPrimEntries updatedEntries;
+        for (const SdfPath& primPath : HdSceneIndexPrimView(inputSceneIndex)) {
+            auto updatedPrims = _UpdateFilteringStatus(primPath, false);
+            updatedEntries.insert(updatedEntries.end(), updatedPrims.begin(), updatedPrims.end());
+        }
+        if (!updatedEntries.empty()) {
+            _SendPrimsAdded(updatedEntries);
+        }
+    }
+}
+
+void PassFilteringSceneIndex::_PrimsAdded(
+    const HdSceneIndexBase &sender,
+    const HdSceneIndexObserver::AddedPrimEntries &entries)
+{
+    HdSceneIndexObserver::AddedPrimEntries addedEntries;
+
+    for (const auto& addedEntry : entries) {
+        auto updatedPrims = _UpdateFilteringStatus(addedEntry.primPath, true, true);
+        addedEntries.insert(addedEntries.end(), updatedPrims.begin(), updatedPrims.end());
+    }
+
+    if (!addedEntries.empty()) {
+        _SendPrimsAdded(addedEntries);
+    }
+}
+
+void PassFilteringSceneIndex::_PrimsRemoved(
+    const HdSceneIndexBase &sender,
+    const HdSceneIndexObserver::RemovedPrimEntries &entries)
+{
+    // 1. Update the scene filtering
+    HdSceneIndexObserver::AddedPrimEntries updatedEntries;
+    for (const auto& removedEntry : entries) {
+        // Remove the prim and its children from our filtered prims data 
+        for (auto it = _filteredPrims.begin(); it != _filteredPrims.end();) {
+            if ((*it).HasPrefix(removedEntry.primPath)) {
+                it = _filteredPrims.erase(it);
+            } else {
+                it++;
+            }
+        }
+
+        // Remove material entries on the prim and its children
+        auto _primsToMaterialPathsCopy = _primsToMaterialPaths;
+        for (const auto& [primPath, materialPath] : _primsToMaterialPathsCopy) {
+            if (primPath.HasPrefix(removedEntry.primPath)) {
+                auto materialUpdates = _RemoveMaterialEntry(primPath);
+                updatedEntries.insert(updatedEntries.end(), materialUpdates.begin(), materialUpdates.end());
             }
         }
     }
-    if (!addedEntries.empty()) {
-        _SendPrimsAdded(addedEntries);//Sending an add prim for an existing prim is equivalent to a resync
+    if (!updatedEntries.empty()) {
+        _SendPrimsAdded(updatedEntries);
+    }
+
+    // 2. Send out the prims removed notifications
+    if (!entries.empty()) {
+        _SendPrimsRemoved(entries);
+    }
+}
+
+void PassFilteringSceneIndex::_PrimsDirtied(
+    const HdSceneIndexBase &sender,
+    const HdSceneIndexObserver::DirtiedPrimEntries &entries)
+{
+    // 1. Update the scene filtering
+    HdSceneIndexObserver::AddedPrimEntries updatedEntries;
+    for (const auto& entry : entries) {
+        auto updatedPrims = _UpdateFilteringStatus(entry.primPath);
+        updatedEntries.insert(updatedEntries.end(), updatedPrims.begin(), updatedPrims.end());
+    }
+    if (!updatedEntries.empty()) {
+        _SendPrimsAdded(updatedEntries);
+    }
+
+    // 2. Send out the dirty notifications on the non-filtered prims
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
+    for (const auto& entry : entries) {
+        if (!_IsFilteredOut(entry.primPath)) {
+            dirtiedEntries.emplace_back(entry);
+        }
+    }
+    if (!dirtiedEntries.empty()) {
+        _SendPrimsDirtied(dirtiedEntries);
     }
 }
 

@@ -21,13 +21,13 @@
 #include "renderOverride.h"
 #include "viewCommand.h"
 #include "pluginBuildInfoCommand.h"
-#include "hydraRenderCmd.h"
 #include "getFramePassesCountCommand.h"
+#include "testingCommand.h"
 #ifdef VIEWPORT_TOOLBOX
-    #include "renderRegionCommand.h"
-    #include "setVisibleFramePassesCommand.h"
+#include "renderRegionCommand.h"
+#include "setVisibleFramePassesCommand.h"
 #endif
-
+#include "hydraRenderCmd.h"
 
 #include <mayaHydraLib/adapters/adapter.h>
 
@@ -224,13 +224,12 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
-    // *** FIXME ***  Have a single templated function for all 3 commands. 
     if (!plugin.registerCommand(
-            HydraRenderCmd::name, HydraRenderCmd::creator, HydraRenderCmd::createSyntax)) {
+            MayaHydraTestingCommand::commandName,
+            MayaHydraTestingCommand::creator,
+            MayaHydraTestingCommand::createSyntax)) {
         ret = MS::kFailure;
-        std::ostringstream msg;
-        msg << "Error registering " << HydraRenderCmd::name << " command!";
-        ret.perror(msg.str().c_str());
+        ret.perror("Error registering mayaHydraTesting command!");
         return ret;
     }
 
@@ -260,6 +259,16 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
             MayaHydraGetFramePassesCount::createSyntax)) {
         ret = MS::kFailure;
         ret.perror("Error registering MayaHydraGetFramePassesCount !");
+        return ret;
+    }
+
+    // *** FIXME ***  Have a single templated function for all 3 commands. 
+    if (!plugin.registerCommand(
+            HydraRenderCmd::name, HydraRenderCmd::creator, HydraRenderCmd::createSyntax)) {
+        ret = MS::kFailure;
+        std::ostringstream msg;
+        msg << "Error registering " << HydraRenderCmd::name << " command!";
+        ret.perror(msg.str().c_str());
         return ret;
     }
 
@@ -409,6 +418,11 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     if (!plugin.deregisterCommand(MayaHydraPluginInfoCommand::commandName)) {
         ret = MS::kFailure;
         ret.perror("Error deregistering MayaHydraPluginInfo command!");
+    }
+
+    if (!plugin.deregisterCommand(MayaHydraTestingCommand::commandName)) {
+        ret = MS::kFailure;
+        ret.perror("Error deregistering mayaHydraTesting command!");
     }
 
 #ifdef VIEWPORT_TOOLBOX

@@ -159,7 +159,7 @@ if (ENABLE_VIEWPORT_TOOLBOX)
     set(VIEWPORTTOOLBOX_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/lib/hydra-viewport-toolbox/include")
     set(VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_LIB hvt)
     # Note: The multi-configuration generators (e.g., VS) always append the build type to the output directories
-    if(CMAKE_CONFIGURATION_TYPES)
+    if(GENERATOR_IS_MULTI_CONFIG)
         set(VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH "${CMAKE_BINARY_DIR}/lib/hydra-viewport-toolbox/bin/${CMAKE_BUILD_TYPE}")
     else()
         set(VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH "${CMAKE_BINARY_DIR}/lib/hydra-viewport-toolbox/bin")

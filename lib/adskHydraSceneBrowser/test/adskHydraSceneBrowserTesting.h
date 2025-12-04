@@ -22,7 +22,7 @@
 
 namespace AdskHydraSceneBrowserTesting {
 HDUITEST_API
-bool RunFullSceneIndexComparisonTest(pxr::HdSceneIndexBasePtr referenceSceneIndex);
+bool RunFullSceneIndexComparisonTest(PXR_NS::HdSceneIndexBasePtr referenceSceneIndex);
 } // namespace AdskHydraSceneBrowserTesting
 
 #endif // ADSK_HYDRA_SCENE_BROWSER_TESTING_H
