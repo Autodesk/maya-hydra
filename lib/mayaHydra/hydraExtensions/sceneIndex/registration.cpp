@@ -169,7 +169,7 @@ bool MayaHydraSceneIndexRegistry::_RemoveSceneIndexForNode(const MObject& dagNod
     if (it != _registrationsByObjectHandle.end()) {
         MayaHydraSceneIndexRegistrationPtr registration(it->second);
         Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-        dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(registration->rootSceneIndex);
+        dataProducerSceneIndexInterface.removeDataProducerSceneIndex(registration->rootSceneIndex);
         _registrationsByObjectHandle.erase(dagNodeHandle);
         _registrations.erase(registration->sceneIndexPathPrefix);
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -261,8 +261,8 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     dataProducerSceneIndexData->SetDataProducerSceneIndex(registration->rootSceneIndex);
     dataProducerSceneIndexData->SetDataProducerLastSceneIndexChain(registration->rootSceneIndex);
 
-    //Add this chain scene index to the render index proxy from all viewports
-    const bool bRes = Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageDataProducerSceneIndexDataBaseToAllViewports(dataProducerSceneIndexData);
+    //Add this chain scene index to the render index proxy from all views
+    const bool bRes = Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageDataProducerSceneIndexDataBaseToAllViews(dataProducerSceneIndexData);
     if (false == bRes){
         TF_CODING_ERROR("Fvp::DataProducerSceneIndexInterfaceImp::get().addDataProducerSceneIndex returned false !");
     }

@@ -19,7 +19,7 @@
 //Flow Viewport headers
 #include <flowViewport/API/fvpFilteringSceneIndexClientFwd.h>
 #include <flowViewport/API/fvpFilteringSceneIndexInterface.h>
-#include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndexDataBase.h>
+#include <flowViewport/API/renderViewData/fvpFilteringSceneIndexDataBase.h>
 
 // UFE headers
 #include "ufeExtensions/Global.h"

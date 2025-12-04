@@ -33,8 +33,8 @@
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
 #include <flowViewport/debugCodes.h>
 #include <flowViewport/selection/fvpSelectionTask.h>
-#include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h>
-#include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
+#include <flowViewport/API/renderViewData/fvpFilteringSceneIndicesChainManager.h>
+#include <flowViewport/API/renderViewData/fvpRenderViewDataManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
@@ -110,7 +110,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace {
 
 // TODO_BATCH_RENDER
-// Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::AddViewportInformation
+// Fvp::RenderViewDataManager::AddRenderViewData
 // connects a custom data producer scene index chain with the Hydra Flow
 // Viewport Toolkit merging scene index, depending on the Hydra renderer.
 // This should be changed for batch rendering.  For now, use a dummy panel
@@ -291,8 +291,8 @@ MStatus BatchRenderer::Render(
         }
 
         // Update plugin data producers
-        for (auto& viewportData : Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetAllViewportInfoAndData()) {
-            for (auto& dataProducer : viewportData.GetDataProducerSceneIndicesData()) {
+        for (auto& viewData : Fvp::RenderViewDataManager::Get().GetAllViewData()) {
+            for (auto& dataProducer : viewData.GetDataProducerSceneIndicesData()) {
                 dataProducer->UpdateVisibility();
                 dataProducer->UpdateTransform();
             }
@@ -338,17 +338,17 @@ MStatus BatchRenderer::Render(
 
     // TODO_BATCH_RENDER  Remove this viewport architecture dependency.
     const std::string panelName{batchRenderDummyPanelName};
-    auto& manager = Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get();
-    if (!manager.ModelPanelIsAlreadyRegistered(panelName)){
+    auto& manager = Fvp::RenderViewDataManager::Get();
+    if (!manager.ViewIsAlreadyRegistered(panelName)){
         // TODO_BATCH_RENDER  Should this string be the whole UFE path, i.e.
         // Ufe::PathString::string(ufeCameraPath)?
         auto cameraName{inputParams.ufeCameraPath.back().string()};
     
-        const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelName, cameraName);
+        const Fvp::InformationInterface::RenderViewDesc renderViewDesc(panelName, false);
         // The following returns true only if there are non-Maya data producers
         // added.
-        manager.AddViewportInformation(
-            hydraViewportInformation, 
+        manager.AddRenderViewData(
+            renderViewDesc, 
             renderIndex(),
             _dataProducerMergingSceneIndexProxy,
             _lastFilteringSceneIndexBeforeCustomFiltering);
@@ -639,7 +639,7 @@ void BatchRenderer::_InitHydraResources()
     _initializationSucceeded = true;
 }
 
-//When fullReset is true, we remove the data producer scene indices that apply to all viewports.
+//When fullReset is true, we remove the data producer scene indices that apply to all views.
 //It means you are doing a full reset of hydra such as when doing "File New".
 //Use fullReset = false when you still want to see the previously registered data producer scene indices when using an hydra viewport.
 void BatchRenderer::ClearHydraResources(bool fullReset)
@@ -652,15 +652,15 @@ void BatchRenderer::ClearHydraResources(bool fullReset)
         .Msg("BatchRenderer::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
     // TODO_BATCH_RENDER  Do not call 
-    // Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveAllViewportsInformation()
+    // Fvp::RenderViewDataManager::Get().RemoveAllViewportsInformation()
     // as this will affect interactive viewports.  Only remove
     // information for our dummy batch render viewport.  Must remove this
     // viewport architecture dependence.
-    Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveViewportInformation(batchRenderDummyPanelName);
+    Fvp::RenderViewDataManager::Get().RemoveRenderViewData(batchRenderDummyPanelName);
     
     if (fullReset){
-        //Remove the data producer scene indices that apply to all viewports
-        Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViewports();
+        //Remove the data producer scene indices that apply to all views
+        Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViews();
     }
 
     // Remove the scene index registry

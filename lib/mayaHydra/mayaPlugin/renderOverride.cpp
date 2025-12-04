@@ -46,12 +46,13 @@
 #include <flowViewport/debugCodes.h>
 #include <flowViewport/selection/fvpSelectionTask.h>
 #include <flowViewport/selection/fvpSelection.h>
-#include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h>
+#include <flowViewport/API/renderViewData/fvpFilteringSceneIndicesChainManager.h>
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
+#include <flowViewport/API/renderViewData/fvpIsolateSelectManager.h>
 #include <flowViewport/sceneIndex/fvpIsolateSelectSceneIndex.h>
 #include <flowViewport/fvpInstruments.h>
 #endif
-#include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
+#include <flowViewport/API/renderViewData/fvpRenderViewDataManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
@@ -951,9 +952,7 @@ MStatus MtohRenderOverride::Render(
         }
 
         // Update plugin data producers
-        for (auto& viewportData :
-             Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get()
-                 .GetAllViewportInfoAndData()) {
+        for (auto& viewportData : Fvp::RenderViewDataManager::Get().GetAllViewData()) {
             for (auto& dataProducer : viewportData.GetDataProducerSceneIndicesData()) {
                 dataProducer->UpdateVisibility();
                 dataProducer->UpdateTransform();
@@ -1162,22 +1161,11 @@ MStatus MtohRenderOverride::Render(
 
         currentMayaLightingMode = framecontext->getLightingMode();
 
-        auto& manager = Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get();
-        if (false == manager.ModelPanelIsAlreadyRegistered(panelNameStr)){
-            //Get information from viewport
-            std::string cameraName;
-
-            M3dView view;
-	        if (M3dView::getM3dViewFromModelPanel(panelName, view)){
-                MDagPath dpath;
-	            view.getCamera(dpath);
-	            MFnCamera viewCamera(dpath);
-	            cameraName = viewCamera.name().asChar();
-            }
-
+        auto& manager = Fvp::RenderViewDataManager::Get();
+        if (false == manager.ViewIsAlreadyRegistered(panelNameStr)){
             //Create a HydraViewportInformation
-            const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelNameStr, cameraName);
-            const bool dataProducerSceneIndicesAdded = manager.AddViewportInformation(
+            const Fvp::InformationInterface::RenderViewDesc hydraViewportInformation(panelNameStr, true);
+            const bool dataProducerSceneIndicesAdded = manager.AddRenderViewData(
                 hydraViewportInformation,
                 renderIndex(),
                 _dataProducerMergingSceneIndexProxy,
@@ -1218,28 +1206,18 @@ MStatus MtohRenderOverride::Render(
         _mayaHydraSceneIndex->SetParams(delegateParams);
         _mayaHydraSceneIndex->PreFrame(drawContext);
 
-        auto& manager = Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get();
+        auto& manager = Fvp::RenderViewDataManager::Get();
         if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle)){
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(true);//Prevent prim removal propagation to keep the current selection.
             _mayaHydraSceneIndex->SetLightsManagementSceneIndex(nullptr);
 
-            manager.RemoveViewportInformation(panelNameStr);
+            manager.RemoveRenderViewData(panelNameStr);
             TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
                 .Msg("Re-creating scene index chain to render %s\n", panelNameStr.c_str());
             _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
             
-            //Get information from viewport
-            std::string cameraName;
-            M3dView view;
-            if (M3dView::getM3dViewFromModelPanel(panelName, view)){
-                MDagPath dpath;
-                view.getCamera(dpath);
-                MFnCamera viewCamera(dpath);
-                cameraName = viewCamera.name().asChar();
-            }
-            
-            const Fvp::InformationInterface::ViewportInformation hydraViewportInformation(panelNameStr, cameraName);
-            manager.AddViewportInformation(
+            const Fvp::InformationInterface::RenderViewDesc hydraViewportInformation(panelNameStr, true);
+            manager.AddRenderViewData(
                 hydraViewportInformation,
                 renderIndex(),
                 _dataProducerMergingSceneIndexProxy,
@@ -1262,8 +1240,9 @@ MStatus MtohRenderOverride::Render(
             // isolate selection.  We currently have a single scene index tree,
             // thus a single isolate select scene index is common to and
             // provides prims to render all viewports.
-            auto isSi = manager.GetIsolateSelectSceneIndex();
-            auto isolateSelection = manager.GetOrCreateIsolateSelection(panelNameStr);
+            auto& isolateSelectMgr = Fvp::IsolateSelectManager::Get();
+            auto isSi = isolateSelectMgr.GetIsolateSelectSceneIndex();
+            auto isolateSelection = isolateSelectMgr.GetOrCreateIsolateSelection(panelNameStr);
             if (isSi && (isSi->GetIsolateSelection() != isolateSelection)) {
                 TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
                     .Msg("Switching scene index to isolate selection %p\n", &*isolateSelection);
@@ -1822,13 +1801,13 @@ void MtohRenderOverride::_InitHydraResources(
     auto viewportId = getRenderingDestination(getFrameContext());
 
     // Add isolate select scene index.
-    auto& perVpDataMgr = Fvp::ViewportDataMgr::Get();
-    auto selection = perVpDataMgr.GetOrCreateIsolateSelection(viewportId);
+    auto& isolateSelectMgr = Fvp::IsolateSelectManager::Get();
+    auto selection = isolateSelectMgr.GetOrCreateIsolateSelection(viewportId);
     auto isSi = Fvp::IsolateSelectSceneIndex::New(
         viewportId, selection, _inputSceneIndexOfFilteringSceneIndicesChain);
     // At time of writing we have a single selection scene index serving
     // all viewports.
-    perVpDataMgr.SetIsolateSelectSceneIndex(isSi);
+    isolateSelectMgr.SetIsolateSelectSceneIndex(isSi);
     _inputSceneIndexOfFilteringSceneIndicesChain = isSi;
 #endif
 
@@ -1888,11 +1867,11 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
         .Msg("MtohRenderOverride::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
     //We don't have any viewport using Hydra any more
-    Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveAllViewportsInformation();
+    Fvp::RenderViewDataManager::Get().RemoveAllRenderViewData();
 
     if (fullReset){
-        //Remove the data producer scene indices that apply to all viewports
-        Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViewports();
+        //Remove the data producer scene indices that apply to all views
+        Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViews();
     }
 
     // Remove the scene index registry
@@ -2089,7 +2068,7 @@ void MtohRenderOverride::_RemovePanel(MString panelName)
     auto foundPanelCallbacks = _FindPanelCallbacks(panelName);
     if (foundPanelCallbacks != _renderPanelCallbacks.end()) {
         MMessage::removeCallbacks(foundPanelCallbacks->second);
-        Fvp::ViewportInformationAndSceneIndicesPerViewportDataManager::Get().RemoveViewportInformation(std::string(panelName.asChar()));
+        Fvp::RenderViewDataManager::Get().RemoveRenderViewData(std::string(panelName.asChar()));
         _renderPanelCallbacks.erase(foundPanelCallbacks);
     }
 
@@ -2632,9 +2611,9 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
     // The M3dView returns the list of view selected objects as strings.
     // If isolate select is turned off, we want to disable isolate selection.
     // Otherwise, replace with what is in the M3dView.
-    auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
+    auto& isolateSelectMgr = Fvp::IsolateSelectManager::Get();
     if (!view.viewSelected()) {
-        vpDataMgr.DisableIsolateSelection(viewName.asChar());
+        isolateSelectMgr.DisableIsolateSelection(viewName.asChar());
         found->second = IsolateSelectState::IsolateSelectOff;
         return;
     }
@@ -2691,7 +2670,7 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
         }
     }
 
-    vpDataMgr.ReplaceIsolateSelection(viewName.asChar(), isolateSelection);
+    isolateSelectMgr.ReplaceIsolateSelection(viewName.asChar(), isolateSelection);
 }
 #endif
 
