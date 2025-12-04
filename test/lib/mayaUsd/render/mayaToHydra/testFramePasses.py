@@ -26,6 +26,7 @@ class TestFramePasses(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.M
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.01
+    _imageVersion = None
 
     @property
     def IMAGE_DIFF_FAIL_PERCENT(self):
@@ -36,9 +37,14 @@ class TestFramePasses(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.M
     def setUp(self):
         super(TestFramePasses, self).setUp()
 
-    def run_assertion(self, filename, mode, failures):
+    def run_assertion(self, filename, mode, failures, useDynamicVersion=False):
         try:
-            self.assertSnapshotClose(filename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            # Use dynamic image version only when requested and there are 2 frame passes
+            imageVersion = None
+            if useDynamicVersion:
+                imageVersion = self._imageVersionFor2Passes
+            
+            self.assertSnapshotClose(filename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
         except AssertionError as e:
             failures.append(f"Failed on {filename} ({mode}): {str(e)}")
             # Still continue to the next test
@@ -51,20 +57,20 @@ class TestFramePasses(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.M
         self.setHdStormRenderer()
 
     #Enable only pass #0 then pass #1 and do snapshots using as an option the aov namre specified
-    def EnablePassesOneByOneAndDoSnapshots(self, name, failures, aovName=""):
+    def EnablePassesOneByOneAndDoSnapshots(self, name, failures, aovName="", useDynamicVersion=False):
         # Enable only pass#0
         kwargs = {"edit": True, "visible": [0]}
         if aovName:
             kwargs["aovName"] = aovName
         cmds.mayaHydraSetVisibleFramePasses(**kwargs)
-        self.run_assertion(("FirstPass"+name+".png"), ("first pass "+name), failures)
+        self.run_assertion(("FirstPass"+name+".png"), ("first pass "+name), failures, useDynamicVersion)
     
         # Enable only pass#1
         kwargs = {"edit": True, "visible": [1]}
         if aovName:
             kwargs["aovName"] = aovName
         cmds.mayaHydraSetVisibleFramePasses(**kwargs)
-        self.run_assertion(("SecondPass"+name+".png"), ("second pass "+name), failures)
+        self.run_assertion(("SecondPass"+name+".png"), ("second pass "+name), failures, useDynamicVersion)
             
     def test_FootPrintNodeForSecondPass(self):
         with PluginLoaded('mayaHydraFootPrintNode'):
@@ -88,7 +94,7 @@ class TestFramePasses(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.M
             cmds.refresh()
 
             self.setBasicCam(1)
-            self.EnablePassesOneByOneAndDoSnapshots(name="FootPrintAsScndGraphics", failures=failures)
+            self.EnablePassesOneByOneAndDoSnapshots(name="FootPrintAsScndGraphics", failures=failures, useDynamicVersion=True)#Is dependent on the number of frame passes
 
             # Enable all passes
             self.SetAllPassesVisibleToColorAOV()
@@ -112,7 +118,7 @@ class TestFramePasses(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.M
             #Render all passes
             self.EnablePassesOneByOneAndDoSnapshots(name="SceneLoaded", failures=failures)
             #Render all passes using the "depth" AOV
-            self.EnablePassesOneByOneAndDoSnapshots(name="SceneLoadedDepth", failures=failures, aovName="depth")
+            self.EnablePassesOneByOneAndDoSnapshots(name="SceneLoadedDepth", failures=failures, aovName="depth", useDynamicVersion=True)#Is dependent on the number of frame passes
             
             #Draw the foot print node as secondary graphics 
             #It should make the node be part of the secondary graphics pass if there is one, 
@@ -132,11 +138,11 @@ class TestFramePasses(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.M
             cmds.select('|transform1', add=True) #custom prim FootStep
             cmds.select('|PoolBallFlat_animated|PoolBallFlat_animatedShape', add=True)#usd prim
 
-            self.EnablePassesOneByOneAndDoSnapshots(name="SelHighlight", failures=failures)
+            self.EnablePassesOneByOneAndDoSnapshots(name="SelHighlight", failures=failures, useDynamicVersion=True)#Is dependent on the number of frame passes
             
             #Set a wrong aov Name on purpose, it should show the color aov by default
-            cmds.mayaHydraSetVisibleFramePasses(edit=True, visible=[0, 1], aovName=["wrongAovName1", "wrongAovName2"])
-            self.run_assertion("wrongAovName.png", "Wrong AOV name", failures)
+            cmds.mayaHydraSetVisibleFramePasses(edit=True, visible=[0, 1], aovName="wrongAovName1")
+            self.run_assertion("wrongAovName.png", "Wrong AOV name", failures, True)#Is dependent on the number of frame passes
 
             # Enable all passes
             self.SetAllPassesVisibleToColorAOV()
@@ -158,8 +164,8 @@ class TestFramePasses(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.M
                         "testFramePasses",
                         "framePasses.ma", useTestSettings=False)
             cmds.refresh()
-            cmds.mayaHydraSetVisibleFramePasses(edit=True, visible=[0], aovName=["depth"])
-            self.assertSnapshotClose("beforeReset.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            cmds.mayaHydraSetVisibleFramePasses(edit=True, visible=[0], aovName="depth")
+            self.assertSnapshotClose("beforeReset.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionFor2Passes)
             cmds.mayaHydraSetVisibleFramePasses(reset=True)
             self.assertSnapshotClose("afterReset.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
