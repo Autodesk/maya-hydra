@@ -28,7 +28,7 @@ namespace FVP_NS_DEF
     class InformationClient;//Predeclaration
 
     /*!\class InformationInterface 
-    \brief : interface for a customer to register a callbacks InformationClient to get Hydra viewports information.
+    \brief : interface for a customer to register a callbacks InformationClient to get Hydra render view information.
     * To get an instance of the InformationInterface class, please use :
     * Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
     */
@@ -39,55 +39,53 @@ namespace FVP_NS_DEF
         ///Interface accessor
         static FVP_API InformationInterface& Get();
 
-        ///Struct used to store information about a Hydra viewport from the DCC
-        struct ViewportInformation
+        ///Descriptor struct used to store information about a Hydra render view from the DCC
+        struct RenderViewDesc
         {
             /// Constructor
-            ViewportInformation(const std::string& viewportId, const std::string& cameraName)
-                : _viewportId(viewportId), _cameraName(cameraName) {}
+            RenderViewDesc(const std::string& viewId, bool isViewport)
+                : _viewId(viewId), _isViewport(isViewport) {}
             
-            ///_viewportId is a Hydra viewport string identifier which is unique for all hydra viewports during a session
-            std::string _viewportId;
+            /// Identifier which is unique for all Hydra render views during a session
+            std::string _viewId;
 
-            ///_cameraName is the name of the camera/viewport when the viewport was created, it is not updated if the camera's name has changed.
-            std::string _cameraName;
+            /// Marks whether this render view is an interactive viewport or not
+            bool _isViewport;
 
-            ///_rendererName is the Hydra viewport renderer name (example : "GL" for Storm or "Arnold" for the Arnold render delegate)
+            /// Hydra renderer name (example : "GL" for Storm or "Arnold" for the Arnold render delegate)
             std::string _rendererName;
 
             /**
              *  @brief  Assignment operator.
              */
-            ViewportInformation& operator = (const ViewportInformation& other){
-                _viewportId = other._viewportId;
-                _cameraName = other._cameraName;
+            RenderViewDesc& operator = (const RenderViewDesc& other){
+                _viewId = other._viewId;
                 _rendererName = other._rendererName;
                 return *this;
             }
             
             /**
              *  @brief  Equal operator.
-             *  @return true if the ViewportInformation are identical.
+             *  @return true if the RenderViewDesc are identical.
              */
-            bool operator ==(const ViewportInformation& other)const{
-                return  _viewportId == other._viewportId &&
-                        _cameraName == other._cameraName &&
+            bool operator ==(const RenderViewDesc& other)const{
+                return  _viewId == other._viewId &&
                         _rendererName == other._rendererName;
             }
 
             /**
              *  @brief  lower than operator for containers ordering.
-             *  @return true if the ViewportInformation sent as a parameter is considered as lower.
+             *  @return true if the RenderViewDesc sent as a parameter is considered as lower.
              */
-            bool operator <(const ViewportInformation& other) const{ //to be used in std::set
-                auto a = {_viewportId, _cameraName, _rendererName};
-                auto b = {other._viewportId, other._cameraName, other._rendererName};
+            bool operator <(const RenderViewDesc& other) const{ //to be used in std::set
+                auto a = {_viewId, _rendererName};
+                auto b = {other._viewId, other._rendererName};
                 return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end());
             }
         };
 
-        ///Set of InformationInterface::ViewportInformation
-        typedef std::set<InformationInterface::ViewportInformation> ViewportInformationSet;
+        ///Set of InformationInterface::RenderViewDesc
+        typedef std::set<InformationInterface::RenderViewDesc> RenderViewDescSet;
 
         /**
         *  @brief      Register a set of callbacks through an InformationClient instance
@@ -104,11 +102,11 @@ namespace FVP_NS_DEF
         virtual void UnregisterInformationClient(const std::shared_ptr<InformationClient>& client)= 0;
 
         /**
-        *  @brief      Get the Hydra viewports information. 
+        *  @brief      Get all the Hydra render view descriptors. 
         *
-        *  @param[out] outAllHydraViewportInformation is a set of ViewportInformation to have information about each Hydra viewport in use in the current DCC.
+        *  @param[out] outRenderViewDescs is a set of RenderViewDesc to have information about each Hydra render view in use in the current DCC.
         */
-        virtual void GetViewportsInformation(ViewportInformationSet& outAllHydraViewportInformation)const  = 0;
+        virtual void GetAllRenderViewDescs(RenderViewDescSet& outRenderViewDescs)const  = 0;
     };
 
 }//end of namespace

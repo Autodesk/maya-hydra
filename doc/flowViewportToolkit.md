@@ -47,7 +47,7 @@ It contains a :
 -   The renderer names to which your filtering scene index applies. Say "GL, Arnold" for applying this filter to Storm and the Arnold render delegates. Note : using *FvpViewportAPITokens->allRenderers* means applies to all render delegates.
 -   A DCC node as a *void** , dccNode is specific to a DCC (like Maya). For Maya it is a *MObject** DAG node. If you provide a non null pointer, we automatically track some events from the DCC node such as node deleted/undeleted or the visibility attribute updates.  When the node is present and visible, we automatically apply the filtering scene index. And when it  is deleted or not visible, we remove the filtering scene index, so no filtering is happening in that case.  It is a convenient way for you to control the filtering through a Maya node. If it is a *nullptr*, we always apply the filtering scene index until you unregister it.
 
-The implementation can be found in the *[FilteringSceneIndexInterfaceImp](../lib/flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.cpp)*  and in the *[FilteringSceneIndicesChainManager](../lib/flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.cpp)* classes.
+The implementation can be found in the *[FilteringSceneIndexInterfaceImp](../lib/flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.cpp)*  and in the *[FilteringSceneIndicesChainManager](../lib/flowViewport/API/renderViewData/fvpFilteringSceneIndicesChainManager.cpp)* classes.
 
 ## Adding Hydra primitives
 To add new primitives in a viewport, we created an interface called *[DataProducerSceneIndexInterface](../lib/flowViewport/API/fvpDataProducerSceneIndexInterface.h)*. It is used to manage data producer scene indices in a Hydra viewport. A data producer scene index is a scene index that adds primitives. 
@@ -66,8 +66,8 @@ You provide :
  - a *HdSceneIndexBaseRefPtr* which is the scene index producing primitives (it could also be the last scene index of a scene index chain, as soon as it creates some primitives)
  - a *SdfPath* which is a prefix you want to add to all your data producer scene index primitives. Note : if you don't want any prefix, pass *SdfPath::AbsoluteRootPath()* to this parameter.
  - a dccNode is a *MObject** from a DAG node for Maya. If you provide a no null pointer, we automatically track some events from attributes such as transform or visibility updated and apply this change to the primitives from the data producer scene index. If the node gets deleted, we remove the scene index primitives from the merging scene index. If this parameter is a *nullptr*, we won't do anything if the node's attributes changes or the node gets deleted. Basically, this is a way for you to set the DCC node as a parent node for all your primitives from the scene index.
- - a hydraViewportId which is a Hydra viewport string identifier to which your data producer scene index needs to be associated to. This is a way to add your primitives to only one viewport. Note : set it to *PXR_NS::FvpViewportAPITokens->allViewports* to add this data producer scene index to all viewports. To retrieve a specific hydra viewport identifier, please use the *[InformationInterface](../lib/flowViewport/API/fvpInformationInterface.h)* class.
- - a rendererNames which are the Hydra renderer (render delegate)  names to which this scene index should be added. This is only used when hydraViewportId above is set to *PXR_NS::FvpViewportAPITokens->allViewports*, meaning you want to add this scene index to all viewports that are using these renderers. Note : to apply to multiple renderers, use a separator such as : "GL, Arnold". We are actually looking for the render delegate's name in this string. Set this parameter to *PXR_NS::FvpViewportAPITokens->allRenderers* to add your scene index to all viewports whatever their renderer is.
+ - a viewId which is a Hydra viewport string identifier to which your data producer scene index needs to be associated to. This is a way to add your primitives to only one viewport. Note : set it to *PXR_NS::FvpViewportAPITokens->allRenderViews* to add this data producer scene index to all viewports. To retrieve a specific hydra viewport identifier, please use the *[InformationInterface](../lib/flowViewport/API/fvpInformationInterface.h)* class.
+ - a rendererNames which are the Hydra renderer (render delegate)  names to which this scene index should be added. This is only used when viewId above is set to *PXR_NS::FvpViewportAPITokens->allRenderViews*, meaning you want to add this scene index to all viewports that are using these renderers. Note : to apply to multiple renderers, use a separator such as : "GL, Arnold". We are actually looking for the render delegate's name in this string. Set this parameter to *PXR_NS::FvpViewportAPITokens->allRenderers* to add your scene index to all viewports whatever their renderer is.
 An example of data producer scene index can be found in [DataProducerSceneIndexExample](../lib/flowViewport/API/samples/fvpDataProducerSceneIndexExample.cpp).
 
 ## Get Hydra viewports information
@@ -78,12 +78,12 @@ To get an instance of the InformationInterface class, please use :
 
 It can be used to  :
  - Register /unregister a functor which is the *[Fvp::InformationClient](../lib/flowViewport/API/fvpInformationClient.h)* class to register callbacks when a new Hydra viewport is created/deleted.
- - Get the existing Hydra viewport information via the [Fvp::InformationInterface::GetViewportInformation](../lib/flowViewport/API/fvpInformationInterface.h#L100) method
+ - Get the existing Hydra viewport information via the [Fvp::InformationInterface::GetAllRenderViewDescs](../lib/flowViewport/API/fvpInformationInterface.h#L109) method
 
-The information we provide from a Hydra viewport is in the  *[Fvp::InformationInterface::ViewportsInformation](../lib/flowViewport/API/fvpInformationInterface.h#L43)* struct and contains (at the time of this writing):
+The information we provide from a Hydra viewport is in the  *[Fvp::InformationInterface::RenderViewDesc](../lib/flowViewport/API/fvpInformationInterface.h#L43)* struct and contains (at the time of this writing):
 
- - a viewportId which is a Hydra viewport string identifier which is unique for all hydra viewports during a session.
- - a cameraName which is the name of the camera/viewport when the viewport was created, it is not updated if the camera's name changes.
+ - a viewId which is a Hydra viewport string identifier which is unique for all hydra viewports during a session.
+ - a isViewport which indicates if this is an interactive viewport or not (the API is also used by batch rendering, which creates render views that are not viewports).
  - a rendererName which is the Hydra viewport renderer name (example : "GL" for Storm or "Arnold" for the Arnold render delegate)
 
 This struct may be extended in the future to contain more information.

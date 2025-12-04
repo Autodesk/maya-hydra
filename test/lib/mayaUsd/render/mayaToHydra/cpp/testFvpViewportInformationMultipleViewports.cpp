@@ -42,8 +42,8 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewportsInit)
     informationInterface.RegisterInformationClient(_infoClientTest);
     
     //Get all Hydra viewports information
-    Fvp::InformationInterface::ViewportInformationSet allViewportsInformation;
-    informationInterface.GetViewportsInformation(allViewportsInformation);
+    Fvp::InformationInterface::RenderViewDescSet allViewportsInformation;
+    informationInterface.GetAllRenderViewDescs(allViewportsInformation);
     ASSERT_EQ(allViewportsInformation.size(), (size_t)0);//We should have 0 hydra viewport
 
     //Check initial count for _infoClientTest callbacks
@@ -62,8 +62,8 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports2Viewports)
     Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
     
     //Get all Hydra viewports information
-    Fvp::InformationInterface::ViewportInformationSet allViewportsInformation;
-    informationInterface.GetViewportsInformation(allViewportsInformation);
+    Fvp::InformationInterface::RenderViewDescSet allViewportsInformation;
+    informationInterface.GetAllRenderViewDescs(allViewportsInformation);
     ASSERT_EQ(allViewportsInformation.size(), (size_t)2); //we should have 2 Hydra viewports
 
     //Check renderers name, they all should be Storm
@@ -84,8 +84,8 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports1Viewport)
     Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
     
     //Get all Hydra viewports information
-    Fvp::InformationInterface::ViewportInformationSet allViewportsInformation;
-    informationInterface.GetViewportsInformation(allViewportsInformation);
+    Fvp::InformationInterface::RenderViewDescSet allViewportsInformation;
+    informationInterface.GetAllRenderViewDescs(allViewportsInformation);
     ASSERT_EQ(allViewportsInformation.size(), (size_t)1);//We should have 1 hydra viewport
 
    //Check renderers name, they all should be Storm
@@ -107,8 +107,8 @@ TEST(FlowViewportAPI, viewportInformationMultipleViewports0Viewport)
     Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
     
     //Get all Hydra viewports information
-    Fvp::InformationInterface::ViewportInformationSet allViewportsInformation;
-    informationInterface.GetViewportsInformation(allViewportsInformation);
+    Fvp::InformationInterface::RenderViewDescSet allViewportsInformation;
+    informationInterface.GetAllRenderViewDescs(allViewportsInformation);
     ASSERT_EQ(allViewportsInformation.size(), (size_t)0);//We should not have any hydra viewport
 
    ///Both should have been called once only

@@ -22,7 +22,7 @@
 
 //flow viewport headers
 #include <flowViewport/API/fvpFilteringSceneIndexClient.h>
-#include <flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h>
+#include <flowViewport/API/renderViewData/fvpFilteringSceneIndicesChainManager.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 

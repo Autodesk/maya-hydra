@@ -31,7 +31,7 @@ namespace FVP_NS_DEF
     * To get an instance of the FilteringSceneIndexInterface class, please use :
     * Fvp::FilteringSceneIndexInterface& filteringSceneIndexInterface = Fvp::FilteringSceneIndexInterface::get();
     * 
-    * The filtering scene indices added to a hydra viewport will act on all kind of data : DCC native data, USD stages and custom primitives added by data producer scene indices.
+    * The filtering scene indices added to a hydra render view will act on all kind of data : DCC native data, USD stages and custom primitives added by data producer scene indices.
     */
     class FilteringSceneIndexInterface
     {
