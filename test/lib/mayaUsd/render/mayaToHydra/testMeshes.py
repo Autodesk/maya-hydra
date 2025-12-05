@@ -19,9 +19,13 @@ import fixturesUtils
 import mtohUtils
 import mayaUtils
 from testUtils import PluginLoaded
+import testUtils
+from pxr import Usd
 
 import unittest
 import os
+
+MAYAUSD_PLUGIN_NAME = 'mayaUsdPlugin'
 
 class TestMeshes(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
@@ -46,10 +50,44 @@ class TestMeshes(mtohUtils.MayaHydraBaseTestCase):
             raise ValueError("Subclasses of MayaHydraBaseTestCase must "
                              "define `_file = __file__`")
 
+        # Set up the custom suffix for this test
         meshAdapter = os.getenv('MAYA_HYDRA_USE_MESH_ADAPTER', 0)
-        fixturesUtils.setUpClass(cls._file, 'mayaHydra',
-                                 initializeStandalone=False,
-                                 suffix='_meshAdapter' if meshAdapter else '')
+        customSuffix = '_meshAdapter' if meshAdapter else ''
+        
+        # Call fixturesUtils.setUpClass with our custom suffix
+        inputPath = fixturesUtils.setUpClass(
+            cls._file, 'mayaHydra', initializeStandalone=False, 
+            suffix=customSuffix)
+
+        # Set up input directory like the parent class does
+        if cls._inputDir is None:
+            inputDirName = os.path.splitext(os.path.basename(cls._file))[0]
+            inputDirName = testUtils.stripPrefix(inputDirName, 'test')
+            if not inputDirName.endswith('Test'):
+                inputDirName += 'Test'
+            cls._inputDir = os.path.join(inputPath, inputDirName)
+
+        cls._testDir = os.path.abspath('.')
+
+        # This optionVar sets the color management status used when creating a new scene.
+        # We set it to off to have color management turned off by default before each test
+        # (as setUp creates a new file), and to avoid inadvertently turning it on mid-test
+        # if a new file is manually created.
+        cmds.optionVar(intValue=('colorManagementEnabledByDefault', 0))
+
+        if MAYAUSD_PLUGIN_NAME not in cls._requiredPlugins:
+            cls._requiredPlugins.append(MAYAUSD_PLUGIN_NAME)
+
+        for p in cls._requiredPlugins:
+            # If a plugin fails to load, the entire test suite will be immediately aborted.
+            # Note that in the case of mtoa, the plugin might load successfully but not
+            # initialize properly, which means issues will only be caught in the actual tests.
+            if not cmds.pluginInfo(p, q=True, loaded=True):
+                cls._pluginsToUnload.append(p)
+                cmds.loadPlugin(p, quiet=True)
+
+        #Set the usd version
+        cls._usdVersion = Usd.GetVersion()
 
     @unittest.skipUnless(mayaUtils.hydraFixLevel() > 0, "Requires Data Server render item lifescope fix.")
     def test_sweepMesh(self):

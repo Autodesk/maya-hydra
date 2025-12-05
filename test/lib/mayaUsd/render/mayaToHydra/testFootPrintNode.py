@@ -34,15 +34,8 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.01
     IMAGE_DIFF_FAIL_PERCENT = 0.1
-    imageVersion = None
 
     _requiredPlugins = ['mayaHydraCppTests']
-
-    @classmethod
-    def setUpClass(cls):
-        super(TestFootPrintNode, cls).setUpClass()
-        if cls._usdVersion >= (0, 24, 11):
-            cls.imageVersion = 'usd_2411+'
 
     #This function is called before each test is launched
     def setUp(self):
@@ -258,8 +251,8 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
                 "testFootPrintNode",
                 "testFootPrintNodeSaved.ma")
             cmds.refresh()
-            #using imageVersion as the color is different for this image under usd 24.11+
-            self.assertSnapshotClose("loadingFootPrintScene.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
+            imageVersion = "usd_2411+" if self._usdVersion >= (0, 24, 11) else ""
+            self.assertSnapshotClose("loadingFootPrintScene.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
     # Test selection highlighting.  When the footprint node is selected, only
     # its two Hydra scene index prims (heel and sole) should have a
@@ -271,7 +264,8 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
             cmds.createNode('MhFootPrint')
             cmds.refresh()
             self.setBasicCam(0.5)
-            self.assertSnapshotClose("selectionHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            imageVersion = "usd2508+" if self._usdVersion >= (0, 25, 8) else ""
+            self.assertSnapshotClose("selectionHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
     # Test picking.  Once picked, the footprint node must appear in the global
     # selection.

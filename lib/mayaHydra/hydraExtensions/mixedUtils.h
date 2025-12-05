@@ -24,6 +24,7 @@
 #include <pxr/base/tf/token.h>
 #include <pxr/usd/sdf/path.h>
 #include <pxr/imaging/hd/sceneIndex.h>
+#include <pxr/base/vt/dictionary.h>
 
 #include <maya/MFloatMatrix.h>
 #include <maya/MFnDependencyNode.h>
@@ -92,9 +93,9 @@ inline int getProcessMemory()
  *
  * @return `GfMatrix4d` equal to \p mayaMat.
  */
-inline pxr::GfMatrix4d GetGfMatrixFromMaya(const MMatrix& mayaMat)
+inline PXR_NS::GfMatrix4d GetGfMatrixFromMaya(const MMatrix& mayaMat)
 {
-    pxr::GfMatrix4d mat;
+    PXR_NS::GfMatrix4d mat;
     memcpy(mat.GetArray(), mayaMat[0], sizeof(double) * 16);
     return mat;
 }
@@ -106,9 +107,9 @@ inline pxr::GfMatrix4d GetGfMatrixFromMaya(const MMatrix& mayaMat)
  *
  * @return `GfMatrix4d` equal to \p mayaMat.
  */
-inline pxr::GfMatrix4d GetGfMatrixFromMaya(const MFloatMatrix& mayaMat)
+inline PXR_NS::GfMatrix4d GetGfMatrixFromMaya(const MFloatMatrix& mayaMat)
 {
-    pxr::GfMatrix4d mat;
+    PXR_NS::GfMatrix4d mat;
     for (unsigned i = 0; i < 4; ++i) {
         for (unsigned j = 0; j < 4; ++j)
             mat[i][j] = mayaMat(i, j);
@@ -124,7 +125,7 @@ inline pxr::GfMatrix4d GetGfMatrixFromMaya(const MFloatMatrix& mayaMat)
  * @return Full path to the texture pointed used by the file node. `<UDIM>` tags are kept intact.
  */
 MAYAHYDRALIB_API
-pxr::TfToken GetFileTexturePath(const MFnDependencyNode& fileNode);
+PXR_NS::TfToken GetFileTexturePath(const MFnDependencyNode& fileNode);
 
 /**
  * @brief Determines whether or not a given DagPath refers to a shape.
@@ -151,7 +152,7 @@ bool IsShape(const MDagPath& dagPath);
  * @return The SdfPath corresponding to the given DAG path.
  */
 MAYAHYDRALIB_API
-pxr::SdfPath DagPathToSdfPath(
+PXR_NS::SdfPath DagPathToSdfPath(
     const MDagPath& dagPath,
     const bool      mergeTransformAndShape,
     const bool      stripNamespaces);
@@ -167,7 +168,7 @@ pxr::SdfPath DagPathToSdfPath(
  * @return The SdfPath corresponding to the given MRenderItem.
  */
 MAYAHYDRALIB_API
-pxr::SdfPath RenderItemToSdfPath(const MRenderItem& ri, const bool stripNamespaces);
+PXR_NS::SdfPath RenderItemToSdfPath(const MRenderItem& ri, const bool stripNamespaces);
 
 /**
  * @brief Retrieves an RGB color preference from Maya.
@@ -250,6 +251,20 @@ PXR_NS::GfVec4f getPreferencesColor(const PXR_NS::TfToken& token);
  */
 MAYAHYDRALIB_API
 PXR_NS::TfToken GetGeomSubsetsPickMode();
+
+/**
+ * @brief Get the extension attributes from a Maya node.
+ *
+ * This function retrieves all the extension attributes of a given Maya node and stores them in a map.
+ * The keys of the map are the attribute names, and the values are the attribute values.
+ *
+ * @param[in] node is the node in the Maya scene graph.
+ * @param[out] attrs is a map that will contain the attribute names and their corresponding values.
+ */
+MAYAHYDRALIB_API
+void GetExtensionAttributesFromNode(
+    const MObject& node,
+    PXR_NS::VtDictionary& attrs);
 
 } // namespace MAYAHYDRA_NS_DEF
 

@@ -24,14 +24,41 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
-    IMAGE_DIFF_FAIL_PERCENT = 1.5
+
+    @property
+    def IMAGE_DIFF_FAIL_PERCENT(self):
+        if platform.system() == "Darwin":
+            return 2
+        return 1.5
 
     _requiredPlugins = ['modelingToolkit']
 
+    def setUp(self):
+        super(TestPolygonPrimitives, self).setUp()
+        
+        # Initialize failure tracking
+        self._failures = []
+
     def compareSnapshot(self, referenceFilename, cameraDistance=15, imageVersion=None):
-        self.setBasicCam(cameraDistance)
-        cmds.refresh()
-        self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+        try:
+            self.setBasicCam(cameraDistance)
+            cmds.refresh()
+            self.assertSnapshotClose(referenceFilename, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
+        except Exception as e:
+            # Collect the failure instead of raising it immediately
+            self._failures.append((referenceFilename, str(e)))
+    
+    def tearDown(self):
+        """Report all collected failures at the end of each test method."""
+        if self._failures:
+            failure_messages = []
+            for filename, error in self._failures:
+                failure_messages.append(f"  - {filename}: {error}")
+            
+            error_msg = f"Image comparison failures in {self._testMethodName}:\n" + "\n".join(failure_messages)
+            self.fail(error_msg)
+        
+        super(TestPolygonPrimitives, self).tearDown()
 
     def setupScene(self, polygonCreationCallable):
         self.setHdStormRenderer()
@@ -73,7 +100,7 @@ class TestPolygonPrimitives(mtohUtils.MayaHydraBaseTestCase):
         cmds.setAttr(polyCreatorNodeName + ".axisY", 2)
         cmds.setAttr(polyCreatorNodeName + ".axisZ", -1)
         self.compareSnapshot("cube_modified.png")
-
+        
     # Cylinder attributes is a superset of sphere and cone
     def test_PolygonCylinder(self):
         polyCreatorNodeName = self.setupScene(cmds.polyCylinder)

@@ -182,7 +182,7 @@ function(mayaUsd_add_test test_name)
     if(PREFIX_WORKING_DIRECTORY)
         set(WORKING_DIR ${PREFIX_WORKING_DIRECTORY})
     else()
-        set(WORKING_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+        set(WORKING_DIR ${CMAKE_CURRENT_BINARY_DIR})
     endif()
 
     # --------------
@@ -288,10 +288,15 @@ finally:
     else()
         list(APPEND ALL_PATH_VARS
             LD_LIBRARY_PATH
+            IDIFF_LD_LIBRARY_PATH
+            LD_PRELOAD
         )
     endif()
 
     # Set initial empty values for all path vars
+    # NOTE - we prefix varnames with "MAYAUSD_VARNAME_" just to make collision
+    # with some existing var less likely
+
     foreach(pathvar ${ALL_PATH_VARS})
         set(MAYAUSD_VARNAME_${pathvar})
     endforeach()
@@ -299,10 +304,39 @@ finally:
     if(IS_WINDOWS)
         list(APPEND MAYAUSD_VARNAME_PATH "${CMAKE_INSTALL_PREFIX}/lib/gtest")
         list(APPEND MAYAUSD_VARNAME_PATH "${MAYA_LOCATION}/bin")
+    else()
+        # Set up environment for idiff execution
+        set(MAYAUSD_VARNAME_LD_LIBRARY_PATH "${ADDITIONAL_LD_LIBRARY_PATH}")
+    
+        # LD_LIBRARY_PATH needs to be set for the idiff executable because its 
+        # RPATH is absolute rather than relative to ORIGIN, meaning the RPATH 
+        # points to the absolute path on the machine where idiff was built.
+        # This absence of relative paths for RPATH comes from OpenImageIO.
+        # We introduce a second workaround to avoid Maya using usd's libpng, 
+        # because both use incompatible versions of libpng. This is done by 
+        # setting LD_LIBRARY_PATH to IDIFF_LD_LIBRARY_PATH only when we run 
+        # idiff using Python's subprocess module.
+        set(MAYAUSD_VARNAME_IDIFF_LD_LIBRARY_PATH "${ADDITIONAL_LD_LIBRARY_PATH}:${PXR_USD_LOCATION}/lib64:${PXR_USD_LOCATION}/lib")
+    
+        # Maya uses a very old version of GLEW, so we need support for
+        # pre-loading a newer version from elsewhere.
+        set(MAYAUSD_VARNAME_LD_PRELOAD "${ADDITIONAL_LD_PRELOAD}")
     endif()
 
-    # NOTE - we prefix varnames with "MAYAUSD_VARNAME_" just to make collision
-    # with some existing var less likely
+    # Set up environment for overall test and Maya defaults. 
+    set(ALL_TEST_VARS
+        IMAGE_DIFF_TOOL
+        MAYA_HAS_RENDER_ITEM_CULL_MODE_API
+    )
+
+    set(MAYAUSD_VARNAME_IMAGE_DIFF_TOOL "${IMAGE_DIFF_TOOL}")
+
+    set(MAYAUSD_VARNAME_MAYA_HAS_RENDER_ITEM_CULL_MODE_API "${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}")
+
+    foreach(testvar ${ALL_TEST_VARS})
+        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+            "${testvar}=${MAYAUSD_VARNAME_${testvar}}")
+    endforeach()
 
     # Emulate what the module files for mayaHydra and mayaUsdPlugin would do.
 

@@ -60,23 +60,32 @@ TEST(NurbsSurfaces, nurbsTorus)
 #else
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
-    SceneIndexInspector inspector(sceneIndices.front());
 
-    DecimalStreamingOverride decimalStreamingOverride({ pxr::TfDecimalToStringMode::FIXED, 5, false });
+    DecimalStreamingOverride decimalStreamingOverride({ PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
 
-    PrimEntriesVector foundPrims
-        = inspector.FindPrims(getNurbPrimPredicate("nurbsTorus1", HdPrimTypeTokens->mesh));
-    ASSERT_EQ(foundPrims.size(), 1u);
-    HdSceneIndexPrim torusPrim = foundPrims.front().prim;
-    EXPECT_EQ(torusPrim.primType, HdPrimTypeTokens->mesh);
-    ASSERT_NE(torusPrim.dataSource, nullptr);
+    HdSceneIndexPrim torusPrim; 
+    bool testPassed = false;
+    for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
+        SceneIndexInspector inspector(sceneIndex);
+        
+        PrimEntriesVector foundPrims
+            = inspector.FindPrims(getNurbPrimPredicate("nurbsTorus1", HdPrimTypeTokens->mesh));
+        if (foundPrims.size() == 1u) {
+            torusPrim = foundPrims.front().prim;
+            EXPECT_EQ(torusPrim.primType, HdPrimTypeTokens->mesh);
+            ASSERT_NE(torusPrim.dataSource, nullptr);
 
-    EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(torusPrim.dataSource, meshTopologyLocator),
-        getPathToSample("torus_topology_fresh.txt")));
-    EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(torusPrim.dataSource, pointsLocator),
-        getPathToSample("torus_points_fresh.txt")));
+            EXPECT_TRUE(dataSourceMatchesReference(
+                HdContainerDataSource::Get(torusPrim.dataSource, meshTopologyLocator),
+                getPathToSample("torus_topology_fresh.txt")));
+            EXPECT_TRUE(dataSourceMatchesReference(
+                HdContainerDataSource::Get(torusPrim.dataSource, pointsLocator),
+                getPathToSample("torus_points_fresh.txt")));
+            testPassed = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(testPassed);
 
     MObject makeNurbNode;
     ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbTorus1", makeNurbNode));
@@ -117,13 +126,22 @@ TEST(NurbsSurfaces, nurbsCube)
 #else
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
-    SceneIndexInspector inspector(sceneIndices.front());
 
-    DecimalStreamingOverride decimalStreamingOverride({ pxr::TfDecimalToStringMode::FIXED, 5, false });
+    DecimalStreamingOverride decimalStreamingOverride({ PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
 
-    PrimEntriesVector planePrims
-        = inspector.FindPrims(getNurbPrimPredicate("nurbsCube1", HdPrimTypeTokens->mesh));
-    ASSERT_EQ(planePrims.size(), 6u);
+    PrimEntriesVector planePrims;
+    bool testPassed = false;
+    for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
+        SceneIndexInspector inspector(sceneIndex);
+    
+        planePrims
+            = inspector.FindPrims(getNurbPrimPredicate("nurbsCube1", HdPrimTypeTokens->mesh));
+        if (planePrims.size() == 6u) {
+            testPassed = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(testPassed);
 
     auto testPlanePrims = [planePrims](std::string testSuffix) -> void {
         for (PrimEntry planePrim : planePrims) {
@@ -165,23 +183,31 @@ TEST(NurbsSurfaces, nurbsCircle)
 #else
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
-    SceneIndexInspector inspector(sceneIndices.front());
+    
+    DecimalStreamingOverride decimalStreamingOverride({ PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
 
-    DecimalStreamingOverride decimalStreamingOverride({ pxr::TfDecimalToStringMode::FIXED, 5, false });
+    HdSceneIndexPrim circlePrim;
+    bool testPassed = false;
+    for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
+        SceneIndexInspector inspector(sceneIndex);
+        PrimEntriesVector foundPrims
+            = inspector.FindPrims(getNurbPrimPredicate("nurbsCircle1", HdPrimTypeTokens->basisCurves));
+        if (foundPrims.size() == 1u) {
+            circlePrim = foundPrims.front().prim;
+            EXPECT_EQ(circlePrim.primType, HdPrimTypeTokens->basisCurves);
+            ASSERT_NE(circlePrim.dataSource, nullptr);
+            EXPECT_TRUE(dataSourceMatchesReference(
+                HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator),
+                getPathToSample("circle_topology_fresh.txt")));
+            EXPECT_TRUE(dataSourceMatchesReference(
+                HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
+                getPathToSample("circle_points_fresh.txt")));
+            testPassed = true;
+            break;
+        }
+    }
 
-    PrimEntriesVector foundPrims
-        = inspector.FindPrims(getNurbPrimPredicate("nurbsCircle1", HdPrimTypeTokens->basisCurves));
-    ASSERT_EQ(foundPrims.size(), 1u);
-    HdSceneIndexPrim circlePrim = foundPrims.front().prim;
-    EXPECT_EQ(circlePrim.primType, HdPrimTypeTokens->basisCurves);
-    ASSERT_NE(circlePrim.dataSource, nullptr);
-
-    EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(circlePrim.dataSource, curvesTopologyLocator),
-        getPathToSample("circle_topology_fresh.txt")));
-    EXPECT_TRUE(dataSourceMatchesReference(
-        HdContainerDataSource::Get(circlePrim.dataSource, pointsLocator),
-        getPathToSample("circle_points_fresh.txt")));
+    ASSERT_TRUE(testPassed);
 
     MObject makeNurbNode;
     ASSERT_TRUE(GetDependNodeFromNodeName("makeNurbCircle1", makeNurbNode));
@@ -237,13 +263,22 @@ TEST(NurbsSurfaces, nurbsSquare)
 #else
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
-    SceneIndexInspector inspector(sceneIndices.front());
 
-    DecimalStreamingOverride decimalStreamingOverride({ pxr::TfDecimalToStringMode::FIXED, 5, false });
+    DecimalStreamingOverride decimalStreamingOverride(
+        { PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
 
-    PrimEntriesVector linePrims
-        = inspector.FindPrims(getNurbPrimPredicate("nurbsSquare1", HdPrimTypeTokens->basisCurves));
-    ASSERT_EQ(linePrims.size(), 4u);
+    PrimEntriesVector linePrims;
+    bool testPassed = false;
+    for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
+        SceneIndexInspector inspector(sceneIndex);
+        linePrims = inspector.FindPrims(
+            getNurbPrimPredicate("nurbsSquare1", HdPrimTypeTokens->basisCurves));
+        if (linePrims.size() == 4u) {
+            testPassed = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(testPassed);
 
     auto testLinePrims = [linePrims](std::string testSuffix) -> void {
         for (PrimEntry linePrim : linePrims) {

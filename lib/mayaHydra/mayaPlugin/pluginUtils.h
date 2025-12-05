@@ -26,6 +26,7 @@
 #include <maya/MFrameContext.h>
 #include <maya/MString.h>
 
+#include <filesystem>
 #include <string>
 #include <vector>
 namespace MAYAHYDRA_NS_DEF {
@@ -34,27 +35,29 @@ constexpr auto MTOH_RENDER_OVERRIDE_PREFIX = "mayaHydraRenderOverride_";
 
 struct MtohRendererDescription
 {
-    MtohRendererDescription(const pxr::TfToken& rn, const pxr::TfToken& on, const pxr::TfToken& dn)
+    MtohRendererDescription(const PXR_NS::TfToken& rn, const PXR_NS::TfToken& on, const PXR_NS::TfToken& dn)
         : rendererName(rn)
         , overrideName(on)
         , displayName(dn)
     {
     }
 
-    pxr::TfToken rendererName;
-    pxr::TfToken overrideName;
-    pxr::TfToken displayName;
+    PXR_NS::TfToken rendererName;
+    PXR_NS::TfToken overrideName;
+    PXR_NS::TfToken displayName;
 };
 
 using MtohRendererDescriptionVector = std::vector<MtohRendererDescription>;
 
 /// Map from MtohRendererDescription::rendererName to its HdRenderSettingDescriptorList
 using MtohRendererSettings
-    = std::unordered_map<pxr::TfToken, pxr::HdRenderSettingDescriptorList, pxr::TfToken::HashFunctor>;
+    = std::unordered_map<PXR_NS::TfToken, PXR_NS::HdRenderSettingDescriptorList, PXR_NS::TfToken::HashFunctor>;
 
-std::string                          MtohGetRendererPluginDisplayName(const pxr::TfToken& id);
+std::string                          MtohGetRendererPluginDisplayName(const PXR_NS::TfToken& id);
 const MtohRendererDescriptionVector& MtohGetRendererDescriptions();
 const MtohRendererSettings&          MtohGetRendererSettings();
+std::filesystem::path                MtohGetMayaHydraPluginLocation();
+void                                 MtohSetMayaHydraPluginLocation(const std::filesystem::path& mayaHydraLocation);
 
 } // namespace MAYAHYDRA_NS_DEF
 

@@ -54,11 +54,6 @@ public:
     MAYAHYDRALIB_API
     virtual PxOsdSubdivTags GetSubdivTags();
     MAYAHYDRALIB_API
-    virtual HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation) override
-    {
-        return {};
-    }
-    MAYAHYDRALIB_API
     virtual void MarkDirty(HdDirtyBits dirtyBits) override;
 
     MAYAHYDRALIB_API
@@ -70,7 +65,7 @@ public:
     const GfRange3d& GetExtent();
 
     MAYAHYDRALIB_API
-    virtual TfToken GetRenderTag() const override;
+    virtual TfToken GetRenderTag() const override { return HdTokens->geometry; }
 
     MAYAHYDRALIB_API
     virtual void PopulateSelectedPaths(

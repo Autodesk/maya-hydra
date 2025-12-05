@@ -5,6 +5,9 @@
 # See accompanying README.md for currently supported list of label mapping.
 # only single platform exclusion is supported currently.
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
+# Tests are run with the VP2 render delegate disabled, to ensure 
+# that mayaHydra does not rely on computations made by VP2 for its use.
+#
 set(INTERACTIVE_TEST_SCRIPT_FILES
     testSceneStat.py
     testImageDiffing.py
@@ -23,13 +26,14 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaShadingModes.py
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
-    testMayaLights.py
+	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
+    #testMayaLights.py
     testUSDLights.py
     testUVandUDIM.py
+	testPurposeRenderTag.py
 	#Tests that have a dependency on other plugins
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
-	testViewportFilters.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa
 	testBifrostGraphUpdate.py|depOnPlugins:bifrost
 	#End of tests that have a dependency on other plugins
@@ -48,17 +52,17 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testUsdTextureToggle.py
     testUsdStageDefaultLighting.py
     testPassingNormalsOnMayaNative.py
-    testMayaComponentsPicking.py
-    testFlowPluginsHierarchicalProperties.py
+    testMayaComponentsPicking.py|skipOnPlatform:osx # HYDRA-1882 : Crash in HdxOitResolveTask on OSX
     testCustomShadersNode.py
     testMayaDefaultMaterial.py
 	testSceneModified.py
     testIsolateSelectWithGeomSubset.py
     testMayaReference.py
+    testTexturedMode.py
+    testUsdDeleteCamera.py
+    testUsdIncludedPurposes.py
     testUsdInheritsSpecializes.py
-    testBoundingBox.py
 	#Disabled tests on OSX
-	testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testPointInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testGeomSubsetsWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testNativeInstancingWireframeHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
@@ -67,6 +71,8 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testStageVariants.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
 	#HYDRA-1660 re-enable testMayaDisplayModes
 	#testMayaDisplayModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    testRenderRegion.py
+    testConvergence.py
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
@@ -95,8 +101,13 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testSceneIndexDirtying.py
     cpp/testUsdStageInvalidate.py
     cpp/testCamera.py
+    cpp/testCustomAttributes.py|depOnPlugins:mtoa
+    cpp/testUsdAnim.py
+    cpp/testUsdStageFromFile.py
 	#CPP tests disabled on OSX
     cpp/testWriteFile.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+    cpp/testMaterialBlocking.py
+    cpp/testPassFiltering.py
 )
 
 # These two test files are identical, except for disabled tests.  See
@@ -111,6 +122,11 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
         cpp/testUsdPointInstancingIsolateSelect.py
         cpp/testUsdPointInstancingIsolateSelectBBox.py
     )
+endif()
+
+#Viewport tool box render passes tests
+if(BUILD_WITH_VIEWPORT_TOOLBOX)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testFramePasses.py)
 endif()
 
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.
@@ -134,11 +150,15 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     cpp/testMeshAdapterTransform.py
 )
 
-# Run the following tests with the VP2 render delegate disabled, to ensure 
-# that mayaHydra does not rely on computations made by VP2 for its use.
-set(INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_VP2_RENDER_DELEGATE
-    cpp/testUsdAnim.py
-    cpp/testUsdStageFromFile.py
+# The following tests incorrectly depend on having the VP2 render delegate
+# enabled.  We must fix this, to ensure that mayaHydra does not rely
+# on computations made by VP2 for its use.  Entered as HYDRA-1961.
+set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
+	testViewportFilters.py|depOnPlugins:mtoa
+    testFlowPluginsHierarchicalProperties.py
+    testBoundingBox.py
+	#Disabled tests on OSX
+	testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
 )
 
 # Use mesh adapter for mesh support instead of MRenderItem. using Interactive (Maya.exe with UI)
@@ -148,17 +168,10 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
     set(target "${target}_meshAdapter")
     mayaUsd_add_test(${target}
         INTERACTIVE
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         PYTHON_SCRIPT ${test_filename}
         ENV
-            "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
-            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
-
-            "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
-
-            "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
-
             "MAYA_HYDRA_USE_MESH_ADAPTER=1"
+            "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
     )
 
     # Assign a CTest label to these tests for easy filtering.
@@ -166,23 +179,15 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
 
 endforeach()
 
-# Disable VP2 render delegate and use interactive Maya with UI.
-foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_DISABLE_VP2_RENDER_DELEGATE})
+# Leave VP2 render delegate enabled and use interactive Maya with UI.
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE})
     get_testfile_and_labels(all_labels test_filename ${script})
     mayaUsd_get_unittest_target(target ${test_filename})
     mayaUsd_add_test(${target}
         INTERACTIVE
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         PYTHON_SCRIPT ${test_filename}
         ENV
-            "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
-            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
-
-            "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
-
-            "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
-
-            "MAYA_HAS_RENDER_ITEM_CULL_MODE_API=${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}"
+            "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
     )
 
     # Assign a CTest label to these tests for easy filtering.
@@ -196,32 +201,10 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
     mayaUsd_get_unittest_target(target ${test_filename})
     mayaUsd_add_test(${target}
         INTERACTIVE
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         PYTHON_SCRIPT ${test_filename}
         ENV
-            "MAYA_PLUG_IN_PATH=${CMAKE_INSTALL_PREFIX}/lib/maya"
-            "LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}"
-
-            "IMAGE_DIFF_TOOL=${IMAGE_DIFF_TOOL}"
-
-            # LD_LIBRARY_PATH needs to be set for the idiff executable because its 
-            # RPATH is absolute rather than relative to ORIGIN, meaning the RPATH 
-            # points to the absolute path on the machine where idiff was built.
-            # This absence of relative paths for RPATH comes from OpenImageIO.
-            # We introduce a second workaround to avoid Maya using usd's libpng, 
-            # because both use incompatible versions of libpng. This is done by 
-            # setting LD_LIBRARY_PATH to IDIFF_LD_LIBRARY_PATH only when we run 
-            # idiff using Python's subprocess module.
-            "IDIFF_LD_LIBRARY_PATH=${ADDITIONAL_LD_LIBRARY_PATH}:${PXR_USD_LOCATION}/lib64:${PXR_USD_LOCATION}/lib"
-
-            # Maya uses a very old version of GLEW, so we need support for
-            # pre-loading a newer version from elsewhere.
-            "LD_PRELOAD=${ADDITIONAL_LD_PRELOAD}"
-
-            # Use standard surface as default for now
             "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
-
-            "MAYA_HAS_RENDER_ITEM_CULL_MODE_API=${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}"
+            "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
     )
 
     # Add a ctest label to these tests for easy filtering.

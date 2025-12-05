@@ -140,6 +140,9 @@ private:
     Ufe::Path                       _sceneIndexAppPath;
     const Ufe::Observer::Ptr        _appSceneObserver{};
     const Fvp::PathMapperConstPtr   _usdPathMapper{};
+
+    bool _unregisterPickHandler{false};
+    bool _unregisterPathMapper{false};
 };
 
 } // namespace MAYAHYDRA_NS_DEF

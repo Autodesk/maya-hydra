@@ -219,7 +219,7 @@ The Flow Viewport Toolkit has a new base class:
       *and their descendants*.
     - Use Hydra selection data sources to determine when & how to create wireframe highlights.
     - Update wireframe highlights when selected prims are dirtied.
-- **Render index proxy**:
+- **Data producer merging scene index proxy**:
     - Provides encapsulated access to the data producer merging scene
       index.  This is a standard Hydra merging scene index to which Flow
       Viewport data producers are connected.
@@ -241,7 +241,7 @@ class Selection{
 class SelectionSceneIndex
 class BaseWhSi
 
-class RenderIndexProxy{
+class DataProducerMergingSceneIndexProxy{
 +HdMergingSceneIndex mergingSceneIndex
 +InsertSceneIndex()
 +RemoveSceneIndex()
@@ -251,7 +251,7 @@ HdSingleInputFilteringSceneIndexBase <|-- SelectionSceneIndex
 
 HdSingleInputFilteringSceneIndexBase <|-- BaseWhSi
 
-RenderIndexProxy *-- HdMergingSceneIndex : Owns
+DataProducerMergingSceneIndexProxy *-- HdMergingSceneIndex : Owns
 
 SelectionSceneIndex o-- Selection : Read / Write
 ```

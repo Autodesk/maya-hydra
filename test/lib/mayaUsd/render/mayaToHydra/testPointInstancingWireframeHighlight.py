@@ -23,10 +23,18 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
+    _imageVersionUSD = None
+
     _stagePathSegment = "|NestedAndComposedPointInstancers|NestedAndComposedPointInstancersShape"
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestPointInstancingWireframeHighlight, cls).setUpClass()
+        if cls._usdVersion >= (0, 25, 8):
+            cls._imageVersionUSD = "usd2508+"
 
     def loadUsdScene(self):
         import usdUtils
@@ -58,31 +66,31 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(topInstancerItem)
-        self.assertSnapshotClose("directSelection_topInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("directSelection_topInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         sn.clear()
         sn.append(secondInstancerItem)
-        self.assertSnapshotClose("directSelection_secondInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("directSelection_secondInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         sn.clear()
         sn.append(thirdInstancerItem)
-        self.assertSnapshotClose("directSelection_thirdInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("directSelection_thirdInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         sn.clear()
         sn.append(fourthInstancerItem)
-        self.assertSnapshotClose("directSelection_fourthInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("directSelection_fourthInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         topInstancerParentPath = self._stagePathSegment + "," + "/Root/TopInstancerXform"
         topInstancerParentItem = ufe.Hierarchy.createItem(ufe.PathString.path(topInstancerParentPath))
         sn.clear()
         sn.append(topInstancerParentItem)
-        self.assertSnapshotClose("parentSelection_topInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("parentSelection_topInstancer.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         rootPath = self._stagePathSegment + "," + "/Root"
         rootItem = ufe.Hierarchy.createItem(ufe.PathString.path(rootPath))
         sn.clear()
         sn.append(rootItem)
-        self.assertSnapshotClose("rootSelection_all.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("rootSelection_all.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
     def test_InstanceSelection(self):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
@@ -99,11 +107,11 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(topInstancerFirstInstanceItem)
-        self.assertSnapshotClose("topInstancerFirstInstance.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("topInstancerFirstInstance.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         sn.clear()
         sn.append(secondInstancerSecondInstanceItem)
-        self.assertSnapshotClose("secondInstancerSecondInstance.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("secondInstancerSecondInstance.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
 
     def test_PrototypeSelection(self):
@@ -121,11 +129,11 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(prototypeItem)
-        self.assertSnapshotClose("prototype_directSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("prototype_directSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         sn.clear()
         sn.append(prototypeParentItem)
-        self.assertSnapshotClose("prototype_parentSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("prototype_parentSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
     
     def test_PointInstancerWireframeColorChange(self):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
@@ -146,19 +154,19 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(topInstancerItem)
-        self.assertSnapshotClose("pointInstancerWireframeColorChange_1.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("pointInstancerWireframeColorChange_1.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         sn.append(secondInstancerItem)
-        self.assertSnapshotClose("pointInstancerWireframeColorChange_2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("pointInstancerWireframeColorChange_2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         sn.append(thirdInstancerItem)
-        self.assertSnapshotClose("pointInstancerWireframeColorChange_3.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("pointInstancerWireframeColorChange_3.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         sn.append(fourthInstancerItem)
-        self.assertSnapshotClose("pointInstancerWireframeColorChange_4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("pointInstancerWireframeColorChange_4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         sn.remove(fourthInstancerItem)
-        self.assertSnapshotClose("pointInstancerWireframeColorChange_5.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("pointInstancerWireframeColorChange_5.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
     
     def test_InstanceWireframeColorChange(self):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
@@ -175,10 +183,10 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(topInstancerFirstInstanceItem)
-        self.assertSnapshotClose("instanceWireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("instanceWireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         sn.append(topInstancerSecondInstanceItem)
-        self.assertSnapshotClose("instanceWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("instanceWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
     
     def test_PrototypeWireframeColorChange(self):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
@@ -195,10 +203,10 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(cubePrototypeItem)
-        self.assertSnapshotClose("prototypeWireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("prototypeWireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         sn.append(pyramidPrototypeItem)
-        self.assertSnapshotClose("prototypeWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("prototypeWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

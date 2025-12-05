@@ -1,0 +1,102 @@
+// Copyright 2025 Autodesk
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+#ifndef FVP_PURPOSE_FILTERING_SCENE_INDEX_H
+#define FVP_PURPOSE_FILTERING_SCENE_INDEX_H
+
+#include "flowViewport/api.h"
+#include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+
+#include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/base/tf/token.h>
+
+#include <set>
+
+namespace FVP_NS_DEF {
+
+class PurposeFilteringSceneIndex;
+typedef PXR_NS::TfRefPtr<PurposeFilteringSceneIndex> PurposeFilteringSceneIndexRefPtr;
+typedef PXR_NS::TfRefPtr<const PurposeFilteringSceneIndex> PurposeFilteringSceneIndexConstRefPtr;
+
+class PurposeFilteringSceneIndex
+    :
+    public PXR_NS::HdSingleInputFilteringSceneIndexBase
+    , public InputSceneIndexUtils<PurposeFilteringSceneIndex>
+{
+public:
+    using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
+
+    using Purposes = std::set<PXR_NS::TfToken>;
+
+    FVP_API
+    static PurposeFilteringSceneIndexRefPtr
+    New(const PXR_NS::HdSceneIndexBaseRefPtr& inputScene,
+        const Purposes&                       includedPurposes);
+
+    FVP_API
+    ~PurposeFilteringSceneIndex() override = default;
+
+    FVP_API
+    PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath& primPath) const override;
+
+    FVP_API
+    PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath& primPath) const override;
+
+    FVP_API
+    void UpdatePrimsFromIncludedPurposes(const Purposes& includedPurposes);
+
+protected:
+
+    FVP_API
+    PurposeFilteringSceneIndex(
+        PXR_NS::HdSceneIndexBaseRefPtr const& inputSceneIndex,
+        const Purposes&                       includedPurposes);
+
+    FVP_API
+    void _PrimsAdded(
+        const PXR_NS::HdSceneIndexBase &sender,
+        const PXR_NS::HdSceneIndexObserver::AddedPrimEntries &entries) override;
+
+    FVP_API
+    void _PrimsRemoved(
+        const PXR_NS::HdSceneIndexBase &sender,
+        const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries &entries) override;
+
+    FVP_API
+    void _PrimsDirtied(
+        const PXR_NS::HdSceneIndexBase &sender,
+        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
+
+    FVP_API
+    bool _IsAncestorFilteredOutInclusive(const PXR_NS::SdfPath& primPath) const;
+
+    FVP_API
+    bool _FilterOut(const PXR_NS::SdfPath& primPath) const;
+
+    FVP_API
+    void _UpdateFilteringStatus(const PXR_NS::SdfPath& primPath);
+
+    FVP_API
+    void _UpdateFilteringForTree(const PXR_NS::SdfPath& primPath);
+
+private:
+
+    Purposes           _includedPurposes;
+
+    PXR_NS::SdfPathSet _filteredPrims;
+};
+
+} // namespace FVP_NS_DEF
+
+#endif // FVP_PURPOSE_FILTERING_SCENE_INDEX_H

@@ -16,20 +16,19 @@
 
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
-#include <mayaHydraLib/adapters/lightAdapter.h>
-#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
-#include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/dagAdapter.h>
+#include <mayaHydraLib/adapters/lightAdapter.h>
+#include <mayaHydraLib/adapters/mayaAttrs.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
-#include <pxr/pxr.h>
+#include <pxr/usd/usdLux/tokens.h>
 
 #include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
 
 namespace {
 
@@ -60,14 +59,17 @@ void _lightShapeChangedCallBack(
     TF_UNUSED(msg);
     TF_UNUSED(otherPlug);
 
-    auto plugPartialName = plug.partialName();
+    auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
+    auto  plugPartialName = plug.partialName();
     if (plugPartialName == MString("ai_translator")) {
         // This is changing the light type, we need to remove the prim and add it again
-        auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
         adapter->RemovePrim();
         adapter->Populate();
         adapter->InvalidateTransform();
     }
+
+    // Handle extension attributes change
+    adapter->HandleExtensionAttributesDirty(plug);
 }
 
 void _dirtyTransform(MObject& node, void* clientData)
@@ -108,8 +110,8 @@ public:
     const TfToken& LightType() const override
     {
         const TfToken& defaultLightType = HdPrimTypeTokens->rectLight;
-        
-        //Get the light type
+
+        // Get the light type
         MStatus           status;
         MFnDependencyNode depNode(GetNode(), &status);
         if (!status) {
@@ -117,19 +119,19 @@ public:
         }
 
         MString primitiveType = "quad";
-        MPlug plug = depNode.findPlug("aiTranslator", true, &status);
+        MPlug   plug = depNode.findPlug("aiTranslator", true, &status);
         if (status && !plug.isNull()) {
             primitiveType = plug.asString();
-            if (primitiveType.length() == 0){
+            if (primitiveType.length() == 0) {
                 return defaultLightType;
             }
         }
 
         if (primitiveType == "quad") {
             return defaultLightType;
-        }else if (primitiveType == "disk") {
+        } else if (primitiveType == "disk") {
             return HdPrimTypeTokens->diskLight;
-        }else if (primitiveType == "cylinder") {
+        } else if (primitiveType == "cylinder") {
             return HdPrimTypeTokens->cylinderLight;
         }
 
@@ -144,25 +146,25 @@ public:
                 paramName.GetText(),
                 GetDagPath().partialPathName().asChar());
 
-        MStatus status;
+        MStatus           status;
         MFnDependencyNode depNode(GetNode(), &status);
-        if (! status) {
+        if (!status) {
             return {};
         }
-        
+
         // the aiAreaLight has no width/height/radius/length attributes, so we need to calculate
         // them from the scale
-        MString               primitiveType = "quad";
-        double                scale2[3] = { 1.0, 1.0, 1.0 };
+        MString primitiveType = "quad";
+        double  scale2[3] = { 1.0, 1.0, 1.0 };
 
-        MPlug plug = depNode.findPlug("aiTranslator", true, &status);
+        MPlug                 plug = depNode.findPlug("aiTranslator", true, &status);
         MTransformationMatrix modelMatrix(GetDagPath().inclusiveMatrix());
         if (status && !plug.isNull()) {
             primitiveType = plug.asString();
             if (primitiveType.length() == 0)
                 primitiveType = "quad";
         }
-        
+
         if (primitiveType == "quad") {
             modelMatrix.getScale(scale2, MSpace::kWorld);
         }
@@ -195,65 +197,38 @@ public:
             }
         }
 
-        auto getFloatFromMPlug = [&depNode](const char* attrName, float initVal) {
-            float val = initVal;
-            MStatus status;
-            MPlug plug = depNode.findPlug(attrName, true, &status);
-            if (status && !plug.isNull()) {
-                val = plug.asFloat();
-            }
-            return val;
-        };
-
-        auto getBoolFromMPlug = [&depNode](const char* attrName, bool initVal) {
-            bool  val = initVal;
-            MStatus status;
-            MPlug   plug = depNode.findPlug(attrName, true, &status);
-            if (status && !plug.isNull()) {
-                val = plug.asBool();
-            }
-            return val;
-        };
-        
-        constexpr float defaultWidth  = 2.0f;//By default the drawing of the light shape has a width and height of 2.0
+        constexpr float defaultWidth
+            = 2.0f; // By default the drawing of the light shape has a width and height of 2.0
         constexpr float defaultHeight = 2.0f;
-        
-        //The width, height, length, radius are only queried by Hydra if the "normalize" (aiNormalize below) attribute is unchecked
-        if (paramName == HdLightTokens->width) {//Rect
-            return VtValue(float(defaultWidth  * scale2[0]));
-        }else if (paramName == HdLightTokens->height) { //Rect
+
+        // The width, height, length, radius are only queried by Hydra if the "normalize"
+        // (aiNormalize below) attribute is unchecked
+        if ((paramName == HdLightTokens->width) || (paramName == UsdLuxTokens->inputsWidth)) {
+            return VtValue(float(defaultWidth * scale2[0]));
+        } else if (
+            (paramName == HdLightTokens->height) || (paramName == UsdLuxTokens->inputsHeight)) {
             return VtValue(float(defaultHeight * scale2[1]));
-        }else if (paramName == HdLightTokens->radius) { //Cylinder, sphere and disk
+        } else if (
+            (paramName == HdLightTokens->radius) || (paramName == UsdLuxTokens->inputsRadius)) {
             return VtValue(float(scale2[0]));
-        }else if (paramName == HdLightTokens->length) {//Cylinder
+        } else if (
+            (paramName == HdLightTokens->length) || (paramName == UsdLuxTokens->inputsLength)) {
             return VtValue(float(scale2[0]));
-        }else if (paramName == HdLightTokens->intensity) {
-            float intensity = getFloatFromMPlug("intensity", 1.0f);
-            return VtValue(intensity);
-        }else if (paramName == HdLightTokens->exposure) {
-            float exposure = getFloatFromMPlug("aiExposure", 0.0f);
-            return VtValue(exposure);
-        }else if (paramName == HdLightTokens->color || paramName == HdTokens->displayColor) {
-            float colorR = getFloatFromMPlug("colorR", 1.0f);
-            float colorG = getFloatFromMPlug("colorG", 1.0f);
-            float colorB = getFloatFromMPlug("colorB", 1.0f);
-            return VtValue(GfVec3f(colorR, colorG, colorB));
-        } else if (paramName == HdLightTokens->enableColorTemperature){
-            const bool enableColorTemperature = getBoolFromMPlug("aiUseColorTemperature", false);
-            return VtValue(enableColorTemperature);
-        } else if (paramName == HdLightTokens->colorTemperature){
-            float  colorTemperature = getFloatFromMPlug("aiColorTemperature", 6500.f);
-            return VtValue(colorTemperature);
-        } else if (paramName == HdLightTokens->diffuse) {
-            return VtValue(1.0f);
-        } else if (paramName == HdLightTokens->specular) {
-            return VtValue(1.0f);
-        } else if (paramName == HdLightTokens->normalize){
-            const bool normalize = getBoolFromMPlug("aiNormalize", false);
-            return VtValue(normalize);
+        } else if (
+            GetMayaHydraSceneIndex()->IsHdSt() //Storm will use shadow maps
+            &&(
+                (paramName == HdLightTokens->shadowEnable)  || 
+                (paramName == HdLightTokens->hasShadow)     || 
+                (paramName == UsdLuxTokens->inputsShadowEnable)
+              )
+            ){
+            // From a comment in OpenUSD : Shadow maps are supported only for SimpleLights and
+            // DistantLights
+            // https://github.com/PixarAnimationStudios/OpenUSD/blob/8843f3b7b334bbcd8df014e63d1b8fad24fc6b6e/pxr/imaging/hdx/shadowTask.cpp#L117
+            return VtValue(false); // No shadows for Storm with aiAreaLight
         }
 
-        return { };
+        return MayaHydraLightAdapter::GetLightParamValue(paramName);
     }
 
     // We need a special case when the user changes the light type, we need to repopulate the prim
@@ -265,19 +240,19 @@ public:
         MStatus status;
         auto    dag = GetDagPath();
         auto    obj = dag.node();
-        
+
         // This is what is new compared to MayaHydraLightAdapter::CreateCallbacks()
-        auto    id  = MNodeMessage::addAttributeChangedCallback(obj, _lightShapeChangedCallBack, this, &status);
+        auto id = MNodeMessage::addAttributeChangedCallback(
+            obj, _lightShapeChangedCallBack, this, &status);
         if (status) {
             AddCallback(id);
         }
 
-        //This is the same as in MayaHydraLightAdapter::CreateCallbacks()
+        // This is the same as in MayaHydraLightAdapter::CreateCallbacks()
         id = MNodeMessage::addNodeDirtyCallback(obj, _dirtyParams, this, &status);
         if (status) {
             AddCallback(id);
         }
-        
 
         dag.pop();
         for (; dag.length() > 0; dag.pop()) {
@@ -299,8 +274,6 @@ public:
         }
         MayaHydraAdapter::CreateCallbacks();
     }
-
-    
 };
 
 TF_REGISTRY_FUNCTION(TfType)
@@ -309,11 +282,13 @@ TF_REGISTRY_FUNCTION(TfType)
 }
 
 TF_REGISTRY_FUNCTION_WITH_TAG(MayaHydraAdapterRegistry, aiAreaLightMayaHydra)
-{   
+{
     MayaHydraAdapterRegistry::RegisterLightAdapter(
         TfToken("aiAreaLight"),
-        [](MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag) -> MayaHydraLightAdapterPtr {
-            return MayaHydraLightAdapterPtr(new MayaHydraAiAreaLightAdapter(mayaHydraSceneIndex, dag));
+        [](MayaHydraSceneIndex* mayaHydraSceneIndex,
+           const MDagPath&      dag) -> MayaHydraLightAdapterPtr {
+            return MayaHydraLightAdapterPtr(
+                new MayaHydraAiAreaLightAdapter(mayaHydraSceneIndex, dag));
         });
 }
 

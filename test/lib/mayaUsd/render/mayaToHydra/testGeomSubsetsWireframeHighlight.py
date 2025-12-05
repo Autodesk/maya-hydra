@@ -25,6 +25,8 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
+    _imageVersionUSD = None
+
     _baseStageFilename = "GeomSubsetsWireframeHighlightTestScene.usda"
     _baseStageUfePathSegment = "|GeomSubsetsWireframeHighlightTestScene|GeomSubsetsWireframeHighlightTestSceneShape"
 
@@ -40,6 +42,16 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
     
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestGeomSubsetsWireframeHighlight, cls).setUpClass()
+        if cls._usdVersion >= (0, 25, 8):
+            cls._imageVersionUSD = "usd2508+"
+
+    def setUp(self):
+        super(TestGeomSubsetsWireframeHighlight, self).setUp()
+
 
     def loadUsdScene(self, stageFilename):
         usdScenePath = testUtils.getTestScene('testGeomSubsetsWireframeHighlight', stageFilename)
@@ -65,7 +77,7 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(cubeGeomSubsetItem)
-        self.assertSnapshotClose("simpleGeomSubsetHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("simpleGeomSubsetHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
     def test_InstancedGeomSubset(self):
         if self._usdVersion < (0, 24, 3):
@@ -81,7 +93,7 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(sphereGeomSubsetItem)
-        self.assertSnapshotClose("instancedGeomSubsetHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("instancedGeomSubsetHighlight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
     
     def test_WireframeColorChange(self):
         if self._usdVersion < (0, 24, 3):
@@ -100,10 +112,10 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(cubeGeomSubsetItem)
-        self.assertSnapshotClose("wireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("wireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         sn.append(sphereGeomSubsetItem)
-        self.assertSnapshotClose("wireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("wireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
     
     def test_MeshAndGeomSubsetSelection(self):
         if self._usdVersion < (0, 24, 3):
@@ -123,13 +135,13 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         sn.clear()
         sn.append(cubeGeomSubsetItem)
         sn.append(cubeMeshItem)
-        self.assertSnapshotClose("geomSubsetThenMeshSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("geomSubsetThenMeshSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
         # HYDRA-1407 : If a mesh and one of its geomSubsets are both selected, the mesh's wireframe color overpowers the geomSubset's
         #sn.clear()
         #sn.append(cubeMeshItem)
         #sn.append(cubeGeomSubsetItem)
-        #self.assertSnapshotClose("meshThenGeomSubsetSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        #self.assertSnapshotClose("meshThenGeomSubsetSelection.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
     
     def test_Displacement(self):
         if self._usdVersion < (0, 24, 3):
@@ -144,7 +156,7 @@ class TestGeomSubsetsWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         geomSubsetPath = self._displacementStageUfePathSegment + "," + self._displacementGeomSubsetUfePathSegment
         geomSubsetItem = ufe.Hierarchy.createItem(ufe.PathString.path(geomSubsetPath))
         sn.append(geomSubsetItem)
-        self.assertSnapshotClose("displacement.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("displacement.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self._imageVersionUSD)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

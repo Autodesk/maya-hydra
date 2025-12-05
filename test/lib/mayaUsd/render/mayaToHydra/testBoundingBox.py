@@ -31,6 +31,9 @@ class TestBoundingBox(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1
 
+    def setUp(self):
+        super(TestBoundingBox, self).setUp()
+
     def loadUsdScene(self, stageFilename):
         usdScenePath = testUtils.getTestScene('testBoundingBox', stageFilename)
         usdUtils.createStageFromFile(usdScenePath)

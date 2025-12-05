@@ -23,6 +23,7 @@ target_sources(${TARGET_NAME}
         shapeAdapter.cpp
         spotLightAdapter.cpp
         tokens.cpp
+        shadowMatrixComputation.cpp
 )
 
 set(HEADERS
@@ -39,6 +40,7 @@ set(HEADERS
     mayaAttrs.h
     shapeAdapter.h
     tokens.h
+    shadowMatrixComputation.h
 )
 
 if (MAYA_HAS_RENDER_ITEM_CULL_MODE_API)

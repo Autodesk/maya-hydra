@@ -4,7 +4,6 @@
 target_sources(${TARGET_NAME}
     PRIVATE
     fvpIsolateSelectSceneIndex.cpp
-    fvpRenderIndexProxy.cpp
     fvpSceneIndexUtils.cpp
     fvpSelectionSceneIndex.cpp
     fvpDisplayStyleOverrideSceneIndex.cpp
@@ -15,12 +14,14 @@ target_sources(${TARGET_NAME}
     fvpBlockPrimRemovalPropagationSceneIndex.cpp
     fvpDefaultMaterialSceneIndex.cpp
     fvpLightsManagementSceneIndex.cpp
+    fvpPassFilteringSceneIndex.cpp
+    fvpPurposeFilteringSceneIndex.cpp
+    fvpDataProducerMergingSceneIndexProxy.cpp
+    fvpPrimRemovalEnforcingSceneIndex.cpp
 )
 
 set(HEADERS
     fvpIsolateSelectSceneIndex.h
-    fvpRenderIndexProxy.h
-    fvpRenderIndexProxyFwd.h
     fvpSceneIndexUtils.h
     fvpSelectionSceneIndex.h
     fvpDisplayStyleOverrideSceneIndex.h
@@ -31,6 +32,10 @@ set(HEADERS
     fvpBlockPrimRemovalPropagationSceneIndex.h
     fvpDefaultMaterialSceneIndex.h
     fvpLightsManagementSceneIndex.h
+    fvpPassFilteringSceneIndex.h
+    fvpPurposeFilteringSceneIndex.h
+    fvpDataProducerMergingSceneIndexProxy.h
+    fvpPrimRemovalEnforcingSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------

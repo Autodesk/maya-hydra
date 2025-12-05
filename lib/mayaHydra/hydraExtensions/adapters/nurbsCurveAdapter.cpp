@@ -19,6 +19,8 @@
 #include <mayaHydraLib/adapters/shapeAdapter.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#include <flowViewport/fvpPurposeRenderTagsForPasses.h>
+
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/pxOsd/tokens.h>
@@ -131,7 +133,8 @@ public:
             }
             return VtValue(ret);
         }
-        return {};
+        // Let base class handle other keys
+        return MayaHydraShapeAdapter::Get(key);
     }
 
     HdBasisCurvesTopology GetBasisCurvesTopology() override
@@ -158,17 +161,21 @@ public:
 
     HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation) override
     {
+        // Base descriptors
+        HdPrimvarDescriptorVector descs = MayaHydraShapeAdapter::GetPrimvarDescriptors(interpolation);
+
+        // Local descriptors
+        HdPrimvarDescriptorVector localDescs;
         if (interpolation == HdInterpolationVertex) {
-            HdPrimvarDescriptor desc;
-            desc.name = UsdGeomTokens->points;
-            desc.interpolation = interpolation;
-            desc.role = HdPrimvarRoleTokens->point;
-            return { desc };
+            localDescs = { { HdTokens->points, interpolation, HdPrimvarRoleTokens->point } };
         }
-        return {};
+
+        // Combine descriptors
+        descs.insert(descs.end(), localDescs.begin(), localDescs.end());
+        return descs;
     }
 
-    TfToken GetRenderTag() const override { return HdRenderTagTokens->guide; }
+    TfToken GetRenderTag() const override { return Fvp::secondaryGraphicsRenderTagToken; }
 
 private:
     static void NodeDirtiedCallback(MObject& node, MPlug& plug, void* clientData)
@@ -213,6 +220,9 @@ private:
                     plug.name().asChar(),
                     plug.name().asChar());
         }
+
+        // Handle extension attributes change
+        adapter->HandleExtensionAttributesDirty(plug);
     }
 
     static void TopologyChangedCallback(MObject& node, void* clientData)

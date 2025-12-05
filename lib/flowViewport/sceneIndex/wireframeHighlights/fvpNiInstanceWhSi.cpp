@@ -64,9 +64,29 @@ HdSceneIndexPrim NiInstanceWhSi::GetHighlightPrim(const SdfPath &selectionPath, 
 
     dsEditor.Set(HdInstancedBySchema::GetDefaultLocator(), HdBlockDataSource::New());
 
+    GfMatrix4d instanceXform(1.0);
     HdSceneIndexPrim instancePrim = GetInputSceneIndex()->GetPrim(selectionKey.first);
-    auto instanceXform = HdXformSchema::GetFromParent(instancePrim.dataSource).GetMatrix()->GetTypedValue(0);
-    auto prototypeXform = HdXformSchema::GetFromParent(prim.dataSource).GetMatrix()->GetTypedValue(0);
+    auto instanceMatrixDS = HdXformSchema::GetFromParent(instancePrim.dataSource).GetMatrix();
+    if (instanceMatrixDS) {
+        instanceXform = instanceMatrixDS->GetTypedValue(0);
+    } else {
+        TF_WARN(
+            "Instance Prim %s (selection %s) has no matrix, using identity.",
+            selectionKey.first.GetText(),
+            selectionPath.GetText());
+    }
+
+    GfMatrix4d prototypeXform(1.0);
+    auto prototypeMatrixDS = HdXformSchema::GetFromParent(prim.dataSource).GetMatrix();
+    if (prototypeMatrixDS) {
+        prototypeXform = prototypeMatrixDS->GetTypedValue(0);
+    } else {
+        TF_WARN(
+            "Prototype Prim %s (selection %s) has no matrix, using identity.",
+            originalPath.GetText(),
+            selectionPath.GetText());
+    }
+
     dsEditor.Set(HdXformSchema::GetDefaultLocator().Append(HdXformSchemaTokens->matrix), HdRetainedTypedSampledDataSource<GfMatrix4d>::New(prototypeXform * instanceXform));
 
     prim.dataSource = dsEditor.Finish();
@@ -237,7 +257,7 @@ void NiInstanceWhSi::_CreateSelectionHighlight(const SdfPath& instancePath)
 
     // Send notifications
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
-    auto operation = [&addedPrims, prototypePath, selectionPath](const pxr::SdfPath& primPath, const pxr::HdSceneIndexPrim& prim) -> bool {
+    auto operation = [&addedPrims, prototypePath, selectionPath](const PXR_NS::SdfPath& primPath, const PXR_NS::HdSceneIndexPrim& prim) -> bool {
         addedPrims.emplace_back(primPath.ReplacePrefix(prototypePath.GetParentPath(), selectionPath), prim.primType);
         return true;
     };

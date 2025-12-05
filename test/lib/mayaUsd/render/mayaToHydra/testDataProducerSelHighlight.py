@@ -32,11 +32,43 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
     shapeNode = "sample_usdShape"
         
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
+    
     @property
     def IMAGE_DIFF_FAIL_PERCENT(self):
         if platform.system() == "Darwin":
             return 3
         return 0.5
+
+    def compareSnapshot(self, referenceFilename, threshold=None, percent=None, imageVersion=None):
+        """Compare snapshot and collect failures instead of stopping on first failure."""
+        try:
+            if threshold is None:
+                threshold = self.IMAGE_DIFF_FAIL_THRESHOLD
+            if percent is None:
+                percent = self.IMAGE_DIFF_FAIL_PERCENT
+            
+            self.assertSnapshotClose(referenceFilename, threshold, percent, imageVersion=imageVersion)
+        except Exception as e:
+            # Collect the failure instead of raising it immediately
+            self._failures.append((referenceFilename, str(e)))
+
+    def setUp(self):
+        super(TestDataProducerSelectionHighlighting, self).setUp()
+        
+        # Initialize failure tracking
+        self._failures = []
+
+    def tearDown(self):
+        """Report all collected failures at the end of each test method."""
+        if self._failures:
+            failure_messages = []
+            for filename, error in self._failures:
+                failure_messages.append(f"  - {filename}: {error}")
+            
+            error_msg = f"Image comparison failures in {self._testMethodName}:\n" + "\n".join(failure_messages)
+            self.fail(error_msg)
+        
+        super(TestDataProducerSelectionHighlighting, self).tearDown()
 
     def loadFileAndInitUfeVariables(self):
         import usdUtils # usdUtils imports mayaUsd.ufe
@@ -91,6 +123,8 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", False)
         cmds.refresh()
 
+        imageVersion = "usd2508+" if self._usdVersion >= (0, 25, 8) else None
+
         #Select the Usd prims to see the selection highlight and their colors respecting the lead object
         ufeGlobalSel =  ufe.GlobalSelection.get()
         ufeGlobalSel.clear()
@@ -98,32 +132,36 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         ufeGlobalSel.append(self.pSphere2UfeItem)
         ufeGlobalSel.append(self.pTorusUfeItem)
         ufeGlobalSel.append(self.pPlaneUfeItem)
-        self.assertSnapshotClose("VP2_AllSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.compareSnapshot("VP2_AllSelected.png", imageVersion=imageVersion)
 
         #Switch to Storm, we should keep the selected items and their color
         self.setHdStormRenderer()
-        self.assertSnapshotClose("Storm_AllSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.compareSnapshot("Storm_AllSelected.png", imageVersion=imageVersion)
 
         #Switch to wireframe display mode, we should keep the selected items and their color
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, displayAppearance="wireframe")
-        self.assertSnapshotClose("Storm_Wireframe_AllSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.compareSnapshot("Storm_Wireframe_AllSelected.png", imageVersion=imageVersion)
 
         #Switch to bounding box display mode, we should keep the selected items and their color
         #For this snapshot and only for it, we need to modify the default lighting and reset it after the snapshot
         cmds.modelEditor(panel, edit=True, displayAppearance="boundingBox")
         self.modifyDefaultLightIntensityByUsdVersion()
-        self.assertSnapshotClose("Storm_BoundingBox_AllSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.compareSnapshot("Storm_BoundingBox_AllSelected.png", imageVersion=imageVersion)
         self.resetDefaultLightIntensityByUsdVersion()
 
         #Switch to wireframe on shaded display mode, we should keep the selected items and their color
         cmds.modelEditor(panel, edit=True, displayAppearance="smoothShaded")
         cmds.modelEditor(panel, edit=True, wireframeOnShaded=True)
-        self.assertSnapshotClose("Storm_WireOnShaded_AllSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.compareSnapshot("Storm_WireOnShaded_AllSelected.png", imageVersion=imageVersion)
 
-    def impl_LeadAndActiveColorsSelectionHighlighting(self, imageVersion:str):
-        def assertSnapshotCloseImpl(img_name:str):
-            self.assertSnapshotClose(img_name, self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion=imageVersion)
+    def impl_LeadAndActiveColorsSelectionHighlighting(self, baseImageVersion: str):
+        finalImageVersion = baseImageVersion
+        if self._usdVersion >= (0, 25, 8):
+            finalImageVersion = finalImageVersion + "_usd2508+"
+        
+        def assertSnapshotCloseImpl(img_name: str):
+            self.compareSnapshot(img_name, imageVersion=finalImageVersion)
 
         # Select objects to check if the lead / active selection highlight colors work
         ufeGlobalSel =  ufe.GlobalSelection.get()
@@ -179,9 +217,13 @@ class TestDataProducerSelectionHighlighting(mtohUtils.MayaHydraBaseTestCase): #S
         #Switch to HdStorm
         self.setHdStormRenderer()
         cmds.refresh()
+
+        imageVersion = None
+        if self._usdVersion >= (0, 25, 8):
+            imageVersion = "usd2508+"
     
         cmds.select(self.shapeNode)
-        self.assertSnapshotClose("selectMayaUsdNode.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.compareSnapshot("selectMayaUsdNode.png", imageVersion=imageVersion)
         
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

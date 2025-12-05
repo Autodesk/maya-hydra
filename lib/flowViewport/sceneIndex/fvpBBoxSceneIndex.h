@@ -59,10 +59,16 @@ public:
     }
     
     FVP_API
+    void Enable(bool enable);
+    
+    FVP_API
+    bool Enabled() const { return _enabled; }
+
+    FVP_API
     ~BboxSceneIndex() override = default;
 
     FVP_API
-    void addExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot) { 
+    void AddExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot) { 
         _excludedSceneRoots.emplace(sceneRoot);
     }
 
@@ -70,16 +76,18 @@ protected:
     BboxSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex, const std::shared_ptr<WireframeColorInterface>&  wireframeColorInterface);
 
     //From HdSingleInputFilteringSceneIndexBase
-    void _PrimsAdded(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override;
+    void _PrimsAdded(
+        const PXR_NS::HdSceneIndexBase&                       sender,
+        const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override;
+
     void _PrimsRemoved(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& entries)override{
         if (!_IsObserved())return;
         _SendPrimsRemoved(entries);
     }
-    void _PrimsDirtied(const PXR_NS::HdSceneIndexBase& sender, const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries)override{
-        if (!_IsObserved())return;
-        _SendPrimsDirtied(entries);
-    }
-
+    void _PrimsDirtied(
+        const PXR_NS::HdSceneIndexBase&                         sender,
+        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
+    
     bool _isExcluded(const PXR_NS::SdfPath& sceneRoot) const { 
         for (const auto& excluded : _excludedSceneRoots) {
             if (sceneRoot.HasPrefix(excluded)) {
@@ -89,6 +97,19 @@ protected:
         return false;
     }
 
+    bool _ShouldConvertToBoundingBox(
+        const PXR_NS::SdfPath&          primPath,
+        const PXR_NS::HdSceneIndexPrim& prim)
+        const;
+
+
+    PXR_NS::HdContainerDataSourceHandle _CreateBoundingBoxDataSource(
+        const PXR_NS::SdfPath&  primPath,
+        const PXR_NS::HdSceneIndexPrim& prim) const;
+
+    void _DirtyAllPrims();
+
+    bool                                     _enabled = false;
     std::set<PXR_NS::SdfPath> _excludedSceneRoots;
     std::shared_ptr<WireframeColorInterface> _wireframeColorInterface;
 };

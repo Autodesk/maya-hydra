@@ -39,6 +39,8 @@ class TestIsolateSelectWithUsdLighting(mtohUtils.MayaHydraBaseTestCase):
                 "testIsolateSelectWithUsdLighting",
                 "mayaPlusUSDMeshesWithUSDLighting.ma")
 
+        self.setHdStormRenderer()
+
         # Bring the camera in closer.
         self.setBasicCam(5)
 
@@ -54,7 +56,11 @@ class TestIsolateSelectWithUsdLighting(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.refresh()
 
-        self.assertSnapshotClose("isolateSelectWithUsdLighting" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        imageVersion = None
+        if self._usdVersion >= (0, 25, 8):
+            imageVersion = "usd2508+"
+
+        self.assertSnapshotClose("isolateSelectWithUsdLighting" + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
         # Disable the isolate selection.
         disableIsolateSelect(modelPanel)

@@ -76,14 +76,17 @@ HdSceneIndexPrim NiPrototypeWhSi::GetHighlightPrim(const SdfPath &selectionPath,
     HdInstanceIndicesSchema instanceIndices = activeSelection.GetNestedInstanceIndices().GetElement(0);
     auto instanceIndex = instanceIndices.GetInstanceIndices()->GetTypedValue(0).front();
     HdInstancedBySchema instancedBySchema = HdInstancedBySchema::GetFromParent(prim.dataSource);
-    auto instancerPath = instancedBySchema.GetPaths()->GetTypedValue(0).front();
-    HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(instancerPath);
-    HdPrimvarsSchema primvarsSchema = HdPrimvarsSchema::GetFromParent(instancerPrim.dataSource);
-    auto instanceTransformsSchema = primvarsSchema.GetPrimvar(HdInstancerTokens->instanceTransforms);
-    auto instanceTransforms = HdTypedSampledDataSource<VtArray<GfMatrix4d>>::Cast(instanceTransformsSchema.GetPrimvarValue());
-    auto instanceXform = instanceTransforms->GetTypedValue(0)[instanceIndex];
-    auto prototypeXform = HdXformSchema::GetFromParent(prim.dataSource).GetMatrix()->GetTypedValue(0);
-    dsEditor.Set(HdXformSchema::GetDefaultLocator().Append(HdXformSchemaTokens->matrix), HdRetainedTypedSampledDataSource<GfMatrix4d>::New(prototypeXform * instanceXform));
+    auto instancerPaths = instancedBySchema.GetPaths();
+    if (instancerPaths) {
+        auto instancerPath = instancerPaths->GetTypedValue(0).front();
+        HdSceneIndexPrim instancerPrim = GetInputSceneIndex()->GetPrim(instancerPath);
+        HdPrimvarsSchema primvarsSchema = HdPrimvarsSchema::GetFromParent(instancerPrim.dataSource);
+        auto instanceTransformsSchema = primvarsSchema.GetPrimvar(HdInstancerTokens->instanceTransforms);
+        auto instanceTransforms = HdTypedSampledDataSource<VtArray<GfMatrix4d>>::Cast(instanceTransformsSchema.GetPrimvarValue());
+        auto instanceXform = instanceTransforms->GetTypedValue(0)[instanceIndex];
+        auto prototypeXform = HdXformSchema::GetFromParent(prim.dataSource).GetMatrix()->GetTypedValue(0);
+        dsEditor.Set(HdXformSchema::GetDefaultLocator().Append(HdXformSchemaTokens->matrix), HdRetainedTypedSampledDataSource<GfMatrix4d>::New(prototypeXform * instanceXform));
+    }
 
     dsEditor.Set(HdInstancedBySchema::GetDefaultLocator(), HdBlockDataSource::New());
 
@@ -255,7 +258,7 @@ void NiPrototypeWhSi::_CreateSelectionHighlight(const PXR_NS::SdfPath& prototype
 
     // Send notifications
     HdSceneIndexObserver::AddedPrimEntries addedPrims;
-    auto operation = [&addedPrims, prototypePath, selectionPath](const pxr::SdfPath& primPath, const pxr::HdSceneIndexPrim& prim) -> bool {
+    auto operation = [&addedPrims, prototypePath, selectionPath](const PXR_NS::SdfPath& primPath, const PXR_NS::HdSceneIndexPrim& prim) -> bool {
         addedPrims.emplace_back(primPath.ReplacePrefix(prototypePath.GetParentPath(), selectionPath), prim.primType);
         return true;
     };

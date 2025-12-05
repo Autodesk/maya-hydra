@@ -14,6 +14,7 @@
 // limitations under the License.
 //
 
+#include <mayaHydraLib/pick/mhPickHit.h>
 #include <mayaHydraLib/pick/mhUsdPickHandler.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
@@ -280,7 +281,7 @@ UsdPickHandler::HitPath resolveInstancePicking(HdRenderIndex& renderIndex, const
 {
     auto primOrigin = HdxPrimOriginInfo::FromPickHit(&renderIndex, pickHit);
 
-    if (pickHit.instancerId.IsEmpty()) {
+    if (pickHit.instancerId.IsEmpty() || primOrigin.instancerContexts.empty()) {
         return {primOrigin.GetFullPath(), -1};
     }
 
@@ -345,7 +346,7 @@ bool UsdPickHandler::handlePickHit(
         return false;
     }
 
-    auto registration = sceneIndexRegistry()->GetSceneIndexRegistrationForRprim(pickInput.pickHit.objectId);
+    auto registration = sceneIndexRegistry()->GetSceneIndexRegistrationForRprim(pickInput.pickHit.hdxPickHit.objectId);
 
     if (!registration) {
         return false;
@@ -356,23 +357,23 @@ bool UsdPickHandler::handlePickHit(
 #if PXR_VERSION >= 2405
     if (GetGeomSubsetsPickMode() == GeomSubsetsPickModeTokens->Faces) {
         auto geomSubsetsHitPaths = resolveGeomSubsetsPicking(
-            renderIndex()->GetTerminalSceneIndex(),
-            pickInput.pickHit.objectId,
+            renderIndex(pickInput.pickHit.passIndex)->GetTerminalSceneIndex(),
+            pickInput.pickHit.hdxPickHit.objectId,
             HdGeomSubsetSchemaTokens->typeFaceSet,
-            pickInput.pickHit.elementIndex);
+            pickInput.pickHit.hdxPickHit.elementIndex);
         if (!geomSubsetsHitPaths.empty()) {
             hitPaths.insert(hitPaths.end(), geomSubsetsHitPaths.begin(), geomSubsetsHitPaths.end());
         }
 
         // If we did not find any geomSubset and this is the only pick hit, then fallback to selecting the base prim/instance.
         if (hitPaths.empty() && pickInput.isSolePickHit) {
-            hitPaths.push_back(resolveInstancePicking(*renderIndex(), pickInput.pickHit));
+            hitPaths.push_back(resolveInstancePicking(*renderIndex(pickInput.pickHit.passIndex), pickInput.pickHit.hdxPickHit));
         }
     } else {
-        hitPaths.push_back(resolveInstancePicking(*renderIndex(), pickInput.pickHit));
+        hitPaths.push_back(resolveInstancePicking(*renderIndex(pickInput.pickHit.passIndex), pickInput.pickHit.hdxPickHit));
     }
 #else
-    hitPaths.push_back(resolveInstancePicking(*renderIndex(), pickInput.pickHit));
+    hitPaths.push_back(resolveInstancePicking(*renderIndex(pickInput.pickHit.passIndex), pickInput.pickHit.hdxPickHit));
 #endif
 
     size_t nbSelectedUfeItems = 0;
@@ -429,9 +430,9 @@ bool UsdPickHandler::handlePickHit(
     return nbSelectedUfeItems > 0;
 }
 
-HdRenderIndex* UsdPickHandler::renderIndex() const
+HdRenderIndex* UsdPickHandler::renderIndex(int passIndex) const
 {
-    return PickHandlerRegistry::Instance().GetPickContext()->renderIndex();
+    return PickHandlerRegistry::Instance().GetPickContext()->renderIndex(passIndex);
 }
 
 std::shared_ptr<const MayaHydraSceneIndexRegistry>

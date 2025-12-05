@@ -40,6 +40,7 @@
 #include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/volumeFieldSchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
@@ -64,6 +65,7 @@ TfTokenVector
 MayaHydraDataSource::GetNames()
 {
     TfTokenVector result;
+    
 
     if (_type == HdPrimTypeTokens->mesh) {
         result.push_back(HdMeshSchemaTokens->mesh);
@@ -76,17 +78,22 @@ MayaHydraDataSource::GetNames()
 
     result.push_back(HdPrimvarsSchemaTokens->primvars);
 
+    // As per
+    // https://github.com/PixarAnimationStudios/OpenUSD/blob/d3991f70df7d70ad7b7d2485c23a90ef8d05342b/pxr/imaging/hd/tokens.cpp#L68
+    // the following covers meshes, basis curves, points, and volumes.
     if (HdPrimTypeIsGprim(_type)) {
         result.push_back(HdMaterialBindingsSchema::GetSchemaToken());
         result.push_back(HdLegacyDisplayStyleSchemaTokens->displayStyle);
         result.push_back(HdVisibilitySchemaTokens->visibility);
         result.push_back(HdXformSchemaTokens->xform);
+        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
     }
 
     if (HdPrimTypeIsLight(_type)) {
         result.push_back(HdMaterialSchemaTokens->material);
         result.push_back(HdXformSchemaTokens->xform);
         result.push_back(HdLightSchemaTokens->light);
+        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
     }
 
     if (_type == HdPrimTypeTokens->material) {
@@ -96,6 +103,7 @@ MayaHydraDataSource::GetNames()
     if (_type == HdPrimTypeTokens->camera) {
         result.push_back(HdCameraSchemaTokens->camera);
         result.push_back(HdXformSchemaTokens->xform);
+        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
     }
 
     return result;
@@ -110,16 +118,13 @@ MayaHydraDataSource::Get(const TfToken& name)
             return HdMeshSchema::Builder()
                 .SetTopology(
                     HdMeshTopologySchema::Builder()
-                    .SetFaceVertexCounts(
-                        HdRetainedTypedSampledDataSource<VtIntArray>::New(
+                        .SetFaceVertexCounts(HdRetainedTypedSampledDataSource<VtIntArray>::New(
                             topology.GetFaceVertexCounts()))
-                    .SetFaceVertexIndices(
-                        HdRetainedTypedSampledDataSource<VtIntArray>::New(
+                        .SetFaceVertexIndices(HdRetainedTypedSampledDataSource<VtIntArray>::New(
                             topology.GetFaceVertexIndices()))
-                    .SetOrientation(
-                        HdRetainedTypedSampledDataSource<TfToken>::New(
+                        .SetOrientation(HdRetainedTypedSampledDataSource<TfToken>::New(
                             HdMeshTopologySchemaTokens->rightHanded))
-                    .Build())
+                        .Build())
                 .SetSubdivisionScheme(
                     HdRetainedTypedSampledDataSource<TfToken>::New(topology.GetScheme()))
                 .SetDoubleSided(
@@ -191,6 +196,11 @@ MayaHydraDataSource::Get(const TfToken& name)
     }
     else if (name == HdTokens->displayColor) {//Is not part of a schema so using HdTokens->displayColor
         return _GetDisplayColorDataSource();
+    } else if (name == HdPurposeSchemaTokens->purpose && ! (_adapter->GetRenderTag().IsEmpty()) ) { 
+        return HdPurposeSchema::Builder()
+                    .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
+                        _adapter->GetRenderTag()))
+                    .Build();
     }
 
     return nullptr;
@@ -220,10 +230,6 @@ HdDataSourceBaseHandle MayaHydraDataSource::_GetDisplayColorDataSource()
 
 HdDataSourceBaseHandle MayaHydraDataSource::_GetPrimvarsDataSource()
 {
-    if (_primvarsBuilt.load()) {
-        return HdContainerDataSource::AtomicLoad(_primvars);
-    }
-
     MayaHydraPrimvarsDataSourceHandle primvarsDs;
 
     for (size_t interpolation = HdInterpolationConstant;
@@ -243,10 +249,6 @@ HdDataSourceBaseHandle MayaHydraDataSource::_GetPrimvarsDataSource()
                 primvarDesc.indexed);
         }
     }
-
-    HdContainerDataSourceHandle ds = primvarsDs;
-    HdContainerDataSource::AtomicStore(_primvars, ds);
-    _primvarsBuilt.store(true);
 
     return primvarsDs;
 }

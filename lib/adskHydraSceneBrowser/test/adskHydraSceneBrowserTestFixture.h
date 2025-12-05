@@ -33,8 +33,8 @@
 
 struct DataSourceEntry
 {
-    pxr::TfToken                name;
-    pxr::HdDataSourceBaseHandle dataSource;
+    PXR_NS::TfToken                name;
+    PXR_NS::HdDataSourceBaseHandle dataSource;
 };
 
 class AdskHydraSceneBrowserTestFixture : public ::testing::Test
@@ -46,7 +46,7 @@ public:
     void SetUp() override;
     void TearDown() override;
 
-    static void SetReferenceSceneIndex(pxr::HdSceneIndexBasePtr referenceSceneIndex);
+    static void SetReferenceSceneIndex(PXR_NS::HdSceneIndexBasePtr referenceSceneIndex);
 
 protected:
     void ComparePrimHierarchy(
@@ -54,26 +54,26 @@ protected:
         bool compareDataSourceValues = false);
 
     void
-    CompareDataSourceHierarchy(DataSourceEntry rootDataSourceEntry, bool compareValues = false);
+    CompareDataSourceHierarchy(const PXR_NS::SdfPath& primPath, DataSourceEntry rootDataSourceEntry, bool compareValues = false);
 
-    void CompareDataSourceValue(pxr::HdSampledDataSourceHandle sampledDataSource);
+    void CompareDataSourceValue(PXR_NS::HdSampledDataSourceHandle sampledDataSource);
 
     bool MatchesFallbackTextOutput(const std::string& text);
 
-    void CompareValueContent(const pxr::VtValue& value);
+    void CompareValueContent(const PXR_NS::VtValue& value);
 
-    template <typename ElementType> void CompareIfArray(const pxr::VtValue& value);
+    template <typename ElementType> void CompareIfArray(const PXR_NS::VtValue& value);
 
     template <typename ElementType>
-    void CompareArrayContents(const pxr::VtArray<ElementType>& vtArray);
+    void CompareArrayContents(const PXR_NS::VtArray<ElementType>& vtArray);
 
-    std::unique_ptr<pxr::HduiSceneIndexDebuggerWidget> _sceneBrowserWidget
-        = std::make_unique<pxr::HduiSceneIndexDebuggerWidget>();
-    pxr::HduiSceneIndexTreeWidget*    _primHierarchyWidget = nullptr;
-    pxr::HduiDataSourceTreeWidget*    _dataSourceHierarchyWidget = nullptr;
-    pxr::HduiDataSourceValueTreeView* _dataSourceValueView = nullptr;
+    std::unique_ptr<PXR_NS::HduiSceneIndexDebuggerWidget> _sceneBrowserWidget
+        = std::make_unique<PXR_NS::HduiSceneIndexDebuggerWidget>();
+    PXR_NS::HduiSceneIndexTreeWidget*    _primHierarchyWidget = nullptr;
+    PXR_NS::HduiDataSourceTreeWidget*    _dataSourceHierarchyWidget = nullptr;
+    PXR_NS::HduiDataSourceValueTreeView* _dataSourceValueView = nullptr;
 
-    static pxr::HdSceneIndexBasePtr sceneIndex;
+    static PXR_NS::HdSceneIndexBasePtr sceneIndex;
 };
 
 #endif // ADSK_HYDRA_SCENE_BROWSER_TEST_FIXTURE_H
