@@ -2396,7 +2396,7 @@ void MtohRenderOverride::_PickByRegion(
         outHits.reserve(outHits.size() + tempHits.size());
         // Insert all hits from tempHits into outHits
         for (const auto& hit : tempHits) {
-            outHits.emplace_back((0, hit));
+            outHits.emplace_back(0, hit);
         }
     }
 #endif
