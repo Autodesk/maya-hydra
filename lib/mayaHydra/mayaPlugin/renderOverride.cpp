@@ -989,7 +989,7 @@ MStatus MtohRenderOverride::Render(
         const MIntArray& framePassesVisible    = 
             MayaHydraSetVisibleFramePasses::getVisibleFramePasses();
         int                 numVisibleFramePasses = framePassesVisible.length();
-        const MStringArray& visibleAOVNames = MayaHydraSetVisibleFramePasses::getAovNames();
+        const MString visibleAOVName = MayaHydraSetVisibleFramePasses::getAovName();
         const int           numFramePasses     = _GetNumFramePasses();
         if (numVisibleFramePasses > numFramePasses) {
             numVisibleFramePasses
@@ -1015,20 +1015,20 @@ MStatus MtohRenderOverride::Render(
 
             // Enable presentation for the last visible pass only
             currentPass->params().enablePresentation = isLastVisiblePass;
-            
-            // Set the AOV to visualize for the current pass if it exists
-            const TfToken aovName = TfToken(visibleAOVNames[visibleIdx].asChar());
-            // Can't rely on GetRenderBuffer(aovName) here as the AOV may not have been created yet
-            const auto renderDelegate = _GetRenderDelegate(actualPassIndex);
-            const bool aovNameExists
-                = renderDelegate ? 
-                renderDelegate->GetDefaultAovDescriptor(aovName).format != HdFormatInvalid
-                : false;
-            currentPass->params().visualizeAOV
-                = (aovNameExists) 
-                ? aovName 
-                : HdAovTokens->color;
-            
+            // Set the AOV to visualize
+            // Per HVT, the AOV to visualize must be set on the last visible pass, and HdAovTokens->color must be set on other passes
+            TfToken visualizeAOV = HdAovTokens->color;
+            if (isLastVisiblePass) {
+                const TfToken aovName = TfToken(visibleAOVName.asChar());
+                // Can't rely on GetRenderBuffer(aovName) here as the AOV may not have been created yet
+                const auto renderDelegate = _GetRenderDelegate(actualPassIndex);
+                const bool aovNameExists = renderDelegate
+                    ? renderDelegate->GetDefaultAovDescriptor(aovName).format != HdFormatInvalid
+                    : false;
+                visualizeAOV = (aovNameExists) ? aovName : HdAovTokens->color;
+            }
+            currentPass->params().visualizeAOV = visualizeAOV;
+
             if (visibleIdx > 0) {
                 currentPass->params().renderParams.depthBiasEnable = true;
                 currentPass->params().renderParams.depthBiasUseDefault = false;
@@ -1055,17 +1055,10 @@ MStatus MtohRenderOverride::Render(
                 const int previousPassIndex = (visibleIdx > 0) ?framePassesVisible[visibleIdx - 1] : 0;
                 hvt::FramePassPtr& previousPass = _GetFramePass(previousPassIndex);
                 if (previousPass) {
-                    std::vector<TfToken> inputAOVs;
-                    const auto& preVisualizedAOV = previousPass->params().visualizeAOV;
-                    // If a non-color AOV was visualized previously, HVT expects to share only that one
-                    if (preVisualizedAOV == HdAovTokens->color) {
-                        inputAOVs = { HdAovTokens->color, HdAovTokens->depth };
-                    }
-                    else {
-                        inputAOVs = { preVisualizedAOV };
-                    }
-                    const hvt::RenderBufferBindings aovBindings = previousPass->GetRenderBufferBindingsForNextPass(inputAOVs);
-                    HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(aovBindings);
+                    const hvt::RenderBufferBindings inputAOVs = previousPass->GetRenderBufferBindingsForNextPass(
+                            { PXR_NS::HdAovTokens->color, PXR_NS::HdAovTokens->depth }
+                    );
+                    HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(inputAOVs);
 
                     /*Debug code left here if needed later
                     hvt::FramePass& framePassToDebug = *currentPass;
