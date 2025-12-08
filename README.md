@@ -52,6 +52,7 @@ USD proxies in Viewport 2.0? Some potential reasons include:
 
 ## Known Limitations
 
+- Not supported when DirectX 11 is used as the rendering engine for Viewport 2.0
 - Limited Maya material support:
   - Maya Standard Surface materials are translated into the USD Preview Surface which has limitations in available parameters and does not match one to one (e.g. transparency and opacity)
   - Only direct texture inputs are supported for Maya materials. No other Hypershade nodes are supported (e.g. ramp or procedural textures)
