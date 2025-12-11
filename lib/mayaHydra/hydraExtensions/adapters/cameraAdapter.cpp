@@ -31,6 +31,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
+TF_DEFINE_PRIVATE_TOKENS(
+    _tokens,
+    (depthOfField)
+);
+
 TF_REGISTRY_FUNCTION(TfType)
 {
     TfType::Define<MayaHydraCameraAdapter, TfType::Bases<MayaHydraShapeAdapter>>();
@@ -260,7 +265,12 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
             return VtValue(HdCamera::Perspective);
         }
     }
-
+    if (paramName == _tokens->depthOfField) {
+        const bool depthOfField = camera.isDepthOfField(&status);
+        if (hadError(status))
+            return {};
+        return VtValue(depthOfField);
+    }
     return {};
 }
 
