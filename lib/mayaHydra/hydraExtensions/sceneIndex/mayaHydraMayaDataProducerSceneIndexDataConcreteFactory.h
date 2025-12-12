@@ -20,7 +20,7 @@
 #include "mayaHydraLib/api.h"
 
 //Flow Viewport headers
-#include <flowViewport/API/perViewportSceneIndicesData/fvpDataProducerSceneIndexDataAbstractFactory.h>
+#include <flowViewport/API/renderViewData/fvpDataProducerSceneIndexDataAbstractFactory.h>
 
 namespace MAYAHYDRA_NS_DEF {
 

@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-/* This class is an example on how to add Hydra primitives into a Hydra viewport. We add a grid of cubes meshes as primitives.
+/* This class is an example on how to add Hydra primitives into a Hydra render view. We add a grid of cubes meshes as primitives.
     We are using a HdRetainedSceneIndex as it contains helper functions to add/remove/dirty prims.
     We could also have done a subclass of HdRetainedSceneIndex as well.
 */
@@ -578,7 +578,7 @@ HdRetainedSceneIndex::AddedPrimEntry DataProducerSceneIndexExample::_CreateCubeP
 void DataProducerSceneIndexExample::addDataProducerSceneIndex(const PXR_NS::SdfPath& prefix)
 {
     if (!_dataProducerSceneIndexAdded && _hydraInterface){
-        const bool res = _hydraInterface->addDataProducerSceneIndex(_retainedSceneIndex, prefix, _containerNode, PXR_NS::FvpViewportAPITokens->allViewports, PXR_NS::FvpViewportAPITokens->allRenderers);
+        const bool res = _hydraInterface->addDataProducerSceneIndex(_retainedSceneIndex, prefix, _containerNode, PXR_NS::FvpViewportAPITokens->allRenderViews, PXR_NS::FvpViewportAPITokens->allRenderers);
         if (false == res){
             TF_CODING_ERROR("_hydraInterface->addDataProducerSceneIndex returned false !");
         }
@@ -589,7 +589,7 @@ void DataProducerSceneIndexExample::addDataProducerSceneIndex(const PXR_NS::SdfP
 void DataProducerSceneIndexExample::removeDataProducerSceneIndex() 
 { 
     if (_dataProducerSceneIndexAdded && _hydraInterface){
-        _hydraInterface->removeViewportDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allViewports);
+        _hydraInterface->removeDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allRenderViews);
         _dataProducerSceneIndexAdded = false;
     }
 }

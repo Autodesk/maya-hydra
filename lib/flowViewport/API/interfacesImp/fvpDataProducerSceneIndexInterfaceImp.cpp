@@ -17,7 +17,7 @@
 //Local headers
 #include "fvpDataProducerSceneIndexInterfaceImp.h"
 #include "fvpInformationInterfaceImp.h"
-#include "flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h"
+#include "flowViewport/API/renderViewData/fvpRenderViewDataManager.h"
 
 //Hydra headers
 #include <pxr/imaging/hd/renderIndex.h>
@@ -34,10 +34,10 @@
 /// 
 namespace
 {
-    std::mutex dataProducerSceneIndicesThatApplyToAllViewports_mutex;
+    std::mutex dataProducerSceneIndicesThatApplyToAllViews_mutex;
 
-    // Are the scene indices that need to be applied to all viewports
-    std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr> dataProducerSceneIndicesThatApplyToAllViewports;
+    // Are the scene indices that need to be applied to all render views
+    std::set<PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr> dataProducerSceneIndicesThatApplyToAllViews;
 
     // Abstract factory to create the scene index data, an implementation is provided by the DCC
     FVP_NS::DataProducerSceneIndexDataAbstractFactory* sceneIndexDataFactory{nullptr};
@@ -74,15 +74,15 @@ PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr DataProducerSceneIndexI
     return dataProducerSceneIndexData; 
 }
 
-bool DataProducerSceneIndexInterfaceImp::addUsdStageDataProducerSceneIndexDataBaseToAllViewports(PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr&  dataProducerSceneIndexData){
-    //Apply this usd scene index to all viewports
-    return _AddDataProducerSceneIndexToAllViewports(dataProducerSceneIndexData);
+bool DataProducerSceneIndexInterfaceImp::addUsdStageDataProducerSceneIndexDataBaseToAllViews(PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr&  dataProducerSceneIndexData){
+    //Apply this usd scene index to all render views
+    return _AddDataProducerSceneIndexToAllViews(dataProducerSceneIndexData);
 }
 
 bool DataProducerSceneIndexInterfaceImp::addDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
                                                                    const PXR_NS::SdfPath& preFix,
                                                                    void* dccNode /*= nullptr*/,
-                                                                   const std::string& hydraViewportId /*= allViewports*/,
+                                                                   const std::string& viewId /*= allRenderViews*/,
                                                                    const std::string& rendererNames /*= allRenderers*/
                                                                     )
 {   
@@ -92,33 +92,33 @@ bool DataProducerSceneIndexInterfaceImp::addDataProducerSceneIndex(const PXR_NS:
         return false;
     }
 
-    //PXR_NS::FvpViewportAPITokens->allViewports == hydraViewportId means the user wants customDataProducerSceneIndex to be applied in all viewports.
-    if (PXR_NS::FvpViewportAPITokens->allViewports == hydraViewportId){
-        //Apply this data producer scene index to all viewports
-        return _AddDataProducerSceneIndexToAllViewports(dataProducerSceneIndexData);
+    //PXR_NS::FvpViewportAPITokens->allRenderViews == viewId means the user wants customDataProducerSceneIndex to be applied in all render views.
+    if (PXR_NS::FvpViewportAPITokens->allRenderViews == viewId){
+        //Apply this data producer scene index to all render views
+        return _AddDataProducerSceneIndexToAllViews(dataProducerSceneIndexData);
     } 
 
-    //Apply this data producer scene index to a single viewport
-    const ViewportInformationAndSceneIndicesPerViewportData* viewportInfoAndData = 
-        ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetViewportInfoAndDataFromViewportId(hydraViewportId);
-    if (viewportInfoAndData){
-        _AddDataProducerSceneIndexToThisViewport(viewportInfoAndData->GetViewportInformation(), dataProducerSceneIndexData);
+    //Apply this data producer scene index to a single render view
+    const RenderViewData* viewData = 
+        RenderViewDataManager::Get().GetViewDataFromViewId(viewId);
+    if (viewData){
+        _AddDataProducerSceneIndexToThisView(viewData->GetViewDesc(), dataProducerSceneIndexData);
         return true;
     }
 
     return false;
 }
 
-void DataProducerSceneIndexInterfaceImp::removeAllViewportDataProducerSceneIndices(ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData)
+void DataProducerSceneIndexInterfaceImp::removeAllDataProducerSceneIndicesFromView(RenderViewData& viewData)
 {
-    auto dataProducerMergingSceneIndexProxy = viewportInformationAndSceneIndicesPerViewportData.GetDataProducerMergingSceneIndexProxy();
+    auto dataProducerMergingSceneIndexProxy = viewData.GetDataProducerMergingSceneIndexProxy();
     if (nullptr == dataProducerMergingSceneIndexProxy) {
         return;
     }
 
-    auto& dataProducerSceneIndicesDataForthisViewport = viewportInformationAndSceneIndicesPerViewportData.GetDataProducerSceneIndicesData();
+    auto& dataProducerSceneIndicesDataForThisView = viewData.GetDataProducerSceneIndicesData();
 
-    for (const auto& dataProducerSceneIndicesData : dataProducerSceneIndicesDataForthisViewport){
+    for (const auto& dataProducerSceneIndicesData : dataProducerSceneIndicesDataForThisView){
         // Remove the data producer scene index from the merging scene index
         if (dataProducerSceneIndicesData){
             const auto& sceneIndex = dataProducerSceneIndicesData->GetDataProducerLastSceneIndexChain();
@@ -130,63 +130,63 @@ void DataProducerSceneIndexInterfaceImp::removeAllViewportDataProducerSceneIndic
         }
     }
 
-    dataProducerSceneIndicesDataForthisViewport.clear();
+    dataProducerSceneIndicesDataForThisView.clear();
 }
 
-void DataProducerSceneIndexInterfaceImp::removeViewportDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
-                                                                              const std::string& hydraViewportId /*= allViewports*/)
+void DataProducerSceneIndexInterfaceImp::removeDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
+                                                                      const std::string& viewId /*= allRenderViews*/)
 {
-    if (PXR_NS::FvpViewportAPITokens->allViewports == hydraViewportId){
-        //It was applied to all viewports
+    if (PXR_NS::FvpViewportAPITokens->allRenderViews == viewId){
+        //It was applied to all render views
         
-        ViewportInformationAndSceneIndicesPerViewportDataVector& allViewportsInfoAndSceneIndices = 
-            ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetAllViewportInfoAndData();
+        RenderViewDataVector& allViewData = 
+            RenderViewDataManager::Get().GetAllViewData();
 
-        //We need to remove it from all viewports where it was applied.
-        for (auto& viewportInfoAndData : allViewportsInfoAndSceneIndices){
-            viewportInfoAndData.RemoveViewportDataProducerSceneIndex(customDataProducerSceneIndex);
+        //We need to remove it from all render views where it was applied.
+        for (auto& viewData : allViewData){
+            viewData.RemoveDataProducerSceneIndex(customDataProducerSceneIndex);
         }
 
-        //Also remove it from the dataProducerSceneIndicesThatApplyToAllViewports array
-        auto findResult = std::find_if(dataProducerSceneIndicesThatApplyToAllViewports.begin(), dataProducerSceneIndicesThatApplyToAllViewports.end(),
+        //Also remove it from the dataProducerSceneIndicesThatApplyToAllViews array
+        auto findResult = std::find_if(dataProducerSceneIndicesThatApplyToAllViews.begin(), dataProducerSceneIndicesThatApplyToAllViews.end(),
                     [&customDataProducerSceneIndex](const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSIData) { 
                         return (dataProducerSIData && dataProducerSIData->GetDataProducerSceneIndex() == customDataProducerSceneIndex);}
         );
-        if (findResult != dataProducerSceneIndicesThatApplyToAllViewports.end()){
-            dataProducerSceneIndicesThatApplyToAllViewports.erase(findResult);// Which also decreases ref count
+        if (findResult != dataProducerSceneIndicesThatApplyToAllViews.end()){
+            dataProducerSceneIndicesThatApplyToAllViews.erase(findResult);// Which also decreases ref count
         }
     }else{
-        //It was applied to a single viewport
-        auto viewportInformationAndSceneIndicesPerViewportData = ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetViewportInfoAndDataFromViewportId(hydraViewportId);
-        viewportInformationAndSceneIndicesPerViewportData->RemoveViewportDataProducerSceneIndex(customDataProducerSceneIndex);
+        //It was applied to a single render view
+        auto viewData = RenderViewDataManager::Get().GetViewDataFromViewId(viewId);
+        viewData->RemoveDataProducerSceneIndex(customDataProducerSceneIndex);
     }
 }
 
-bool DataProducerSceneIndexInterfaceImp::_AddDataProducerSceneIndexToAllViewports(const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData)
+bool DataProducerSceneIndexInterfaceImp::_AddDataProducerSceneIndexToAllViews(const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData)
 { 
     //Remove const from _dataProducerSceneIndexData
     PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr dataProducerSceneIndexDataNonConst = dataProducerSceneIndexData;
     
     //This is a block for the mutex lifetime
     {
-        std::lock_guard<std::mutex> lockDataProducerSceneIndicesDataPerViewport(dataProducerSceneIndicesThatApplyToAllViewports_mutex);
+        std::lock_guard<std::mutex> lockDataProducerSceneIndicesDataPerView(dataProducerSceneIndicesThatApplyToAllViews_mutex);
         
         //Check if it is already inside our array
-        auto findResult = dataProducerSceneIndicesThatApplyToAllViewports.find(dataProducerSceneIndexDataNonConst);
-        if (findResult != dataProducerSceneIndicesThatApplyToAllViewports.cend()){
+        auto findResult = dataProducerSceneIndicesThatApplyToAllViews.find(dataProducerSceneIndexDataNonConst);
+        if (findResult != dataProducerSceneIndicesThatApplyToAllViews.cend()){
             return false;
         }
 
         //It is not already in dataProducerSceneIndexDataSet
-        //Add it with the data producer scene indices that need to be applied to all viewports
-        dataProducerSceneIndicesThatApplyToAllViewports.insert(dataProducerSceneIndexDataNonConst);
+        //Add it with the data producer scene indices that need to be applied to all render views
+        dataProducerSceneIndicesThatApplyToAllViews.insert(dataProducerSceneIndexDataNonConst);
     }
 
-    //Apply it to all existing hydra viewports
-    InformationInterface::ViewportInformationSet viewportsInformation;
-    InformationInterfaceImp::Get().GetViewportsInformation(viewportsInformation);
-    for (const auto& viewportInfo : viewportsInformation){
-        _AddDataProducerSceneIndexToThisViewport(viewportInfo, dataProducerSceneIndexData);
+    //Apply it to all existing hydra render views
+    InformationInterface::RenderViewDescSet viewDescs;
+    InformationInterfaceImp::Get().GetAllRenderViewDescs(viewDescs);
+    for (const auto& viewDesc : viewDescs){
+        _AddDataProducerSceneIndexToThisView(viewDesc, dataProducerSceneIndexData);
     }
 
     return true;
@@ -223,50 +223,50 @@ PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr DataProducerSceneIndexI
     return sceneIndexDataFactory->createDataProducerSceneIndexDataBase(params);
 }
 
-void DataProducerSceneIndexInterfaceImp::_AddDataProducerSceneIndexToThisViewport(const InformationInterface::ViewportInformation& viewportInformation, 
+void DataProducerSceneIndexInterfaceImp::_AddDataProducerSceneIndexToThisView(const InformationInterface::RenderViewDesc& viewDesc, 
                                                                                   const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData)
 {
     TF_AXIOM(dataProducerSceneIndexData);
 
-    const std::string& hydraViewportId = viewportInformation._viewportId;
-    TF_AXIOM(hydraViewportId.length() > 0);
+    const std::string& viewId = viewDesc._viewId;
+    TF_AXIOM(viewId.length() > 0);
     
     //Check if there is some filtering per Hydra renderer
-    const std::string& viewportRendererName                         = viewportInformation._rendererName;
+    const std::string& viewRendererName                         = viewDesc._rendererName;
     const std::string& dataProducerSceneIndexApplyToRendererNames   = dataProducerSceneIndexData->GetRendererNames();
-    if ( (! viewportRendererName.empty() )&& (dataProducerSceneIndexApplyToRendererNames != PXR_NS::FvpViewportAPITokens->allRenderers) ){
+    if ( (! viewRendererName.empty() )&& (dataProducerSceneIndexApplyToRendererNames != PXR_NS::FvpViewportAPITokens->allRenderers) ){
         //Filtering per renderer is applied
-        if (std::string::npos == dataProducerSceneIndexApplyToRendererNames.find(viewportRendererName)){
-            return; //Ignore the current hydra viewport renderer name is not part of the supported renderers for this data producer scene index
+        if (std::string::npos == dataProducerSceneIndexApplyToRendererNames.find(viewRendererName)){
+            return; //Ignore the current hydra render view renderer name is not part of the supported renderers for this data producer scene index
         }
     }
 
-    ViewportInformationAndSceneIndicesPerViewportData* viewportInformationAndSceneIndicesPerViewportData = 
-        ViewportInformationAndSceneIndicesPerViewportDataManager::Get().GetViewportInfoAndDataFromViewportId(hydraViewportId);
-    TF_AXIOM(viewportInformationAndSceneIndicesPerViewportData );
+    RenderViewData* viewData = 
+        RenderViewDataManager::Get().GetViewDataFromViewId(viewId);
+    TF_AXIOM(viewData );
     
-    auto& dataProducerSceneIndicesDataForthisViewport = viewportInformationAndSceneIndicesPerViewportData->GetDataProducerSceneIndicesData();
-    auto findResult = dataProducerSceneIndicesDataForthisViewport.find(dataProducerSceneIndexData);
-    if (findResult != dataProducerSceneIndicesDataForthisViewport.end()){
+    auto& dataProducerSceneIndicesDataForthisView = viewData->GetDataProducerSceneIndicesData();
+    auto findResult = dataProducerSceneIndicesDataForthisView.find(dataProducerSceneIndexData);
+    if (findResult != dataProducerSceneIndicesDataForthisView.end()){
         return; //Already in our array
     }
     
-    dataProducerSceneIndicesDataForthisViewport.insert(dataProducerSceneIndexData);//dataProducerSceneIndexData can be shared between multiple viewports
+    dataProducerSceneIndicesDataForthisView.insert(dataProducerSceneIndexData);//dataProducerSceneIndexData can be shared between multiple render views
     
     //Add it to the merging scene index if the merging scene index is present, it may happen that it will be set later
-    auto dataProducerMergingSceneIndexProxy = viewportInformationAndSceneIndicesPerViewportData->GetDataProducerMergingSceneIndexProxy();
+    auto dataProducerMergingSceneIndexProxy = viewData->GetDataProducerMergingSceneIndexProxy();
     if (dataProducerMergingSceneIndexProxy && dataProducerSceneIndexData && dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain()){
         dataProducerMergingSceneIndexProxy->InsertSceneIndex(dataProducerSceneIndexData->GetDataProducerLastSceneIndexChain(), dataProducerSceneIndexData->GetPrefix());
     }
 }
 
-bool DataProducerSceneIndexInterfaceImp::hydraViewportSceneIndexAdded(const InformationInterface::ViewportInformation& viewportInfo)
+bool DataProducerSceneIndexInterfaceImp::hydraViewSceneIndexAdded(const InformationInterface::RenderViewDesc& viewDesc)
 {
     bool dataProducerSceneIndicesAdded = false;
-    //Add the data producer scene indices that apply to all viewports to this newly created hydra viewport
-    std::lock_guard<std::mutex> lockDataProducerSceneIndicesDataPerViewport(dataProducerSceneIndicesThatApplyToAllViewports_mutex);
-    for (const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData : dataProducerSceneIndicesThatApplyToAllViewports){
-        _AddDataProducerSceneIndexToThisViewport(viewportInfo, dataProducerSceneIndexData);
+    //Add the data producer scene indices that apply to all render views to this newly created hydra render view
+    std::lock_guard<std::mutex> lockDataProducerSceneIndicesDataPerView(dataProducerSceneIndicesThatApplyToAllViews_mutex);
+    for (const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData : dataProducerSceneIndicesThatApplyToAllViews){
+        _AddDataProducerSceneIndexToThisView(viewDesc, dataProducerSceneIndexData);
         dataProducerSceneIndicesAdded = true;
     }
 
@@ -278,10 +278,10 @@ void DataProducerSceneIndexInterfaceImp::setSceneIndexDataFactory(DataProducerSc
     sceneIndexDataFactory = &factory;
 }
 
-void DataProducerSceneIndexInterfaceImp::ClearDataProducerSceneIndicesThatApplyToAllViewports() 
+void DataProducerSceneIndexInterfaceImp::ClearDataProducerSceneIndicesThatApplyToAllViews() 
 { 
-    std::lock_guard<std::mutex> lockDataProducerSceneIndicesDataPerViewport(dataProducerSceneIndicesThatApplyToAllViewports_mutex);
-    dataProducerSceneIndicesThatApplyToAllViewports.clear();
+    std::lock_guard<std::mutex> lockDataProducerSceneIndicesDataPerView(dataProducerSceneIndicesThatApplyToAllViews_mutex);
+    dataProducerSceneIndicesThatApplyToAllViews.clear();
 }
 
 } //End of namespace FVP_NS_DEF

@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#ifndef FLOW_VIEWPORT_API_PERVIEWPORTSCENEINDICESDATA_DATA_PRODUCER_SCENE_INDEX_DATA_BASE_H
-#define FLOW_VIEWPORT_API_PERVIEWPORTSCENEINDICESDATA_DATA_PRODUCER_SCENE_INDEX_DATA_BASE_H
+#ifndef FLOW_VIEWPORT_API_RENDERVIEWDATA_DATA_PRODUCER_SCENE_INDEX_DATA_BASE_H
+#define FLOW_VIEWPORT_API_RENDERVIEWDATA_DATA_PRODUCER_SCENE_INDEX_DATA_BASE_H
 
 //Local headers
 #include "flowViewport/api.h"
@@ -35,7 +35,7 @@ class DataProducerSceneIndexDataBase;//Predeclaration
 TF_DECLARE_WEAK_AND_REF_PTRS(DataProducerSceneIndexDataBase);//Be able to use Ref counting pointers on DataProducerSceneIndexDataBase
 
 /** DataProducerSceneIndexDataBase is storing information about a custom data producer scene index.
-*   Since an instance of the DataProducerSceneIndexDataBase class can be shared between multiple viewports in our records, we need ref counting.
+*   Since an instance of the DataProducerSceneIndexDataBase class can be shared between multiple render views in our records, we need ref counting.
 */
  class FVP_API DataProducerSceneIndexDataBase : public TfRefBase, public TfWeakBase
 {
@@ -109,7 +109,7 @@ protected:
     HdSceneIndexBaseRefPtr              _dataProducerSceneIndex = nullptr;
     /// data producer scene index rootPath for insertion (used in HdRenderIndex::InsertSceneIndex)
     SdfPath                             _prefix;
-    /// Are the Hydra renderer(s) to which this scene index should be applied (e.g : "GL, Arnold") or DataProducerSceneIndexInterface::allViewports to apply to all viewports
+    /// Are the Hydra renderer(s) to which this scene index should be applied (e.g : "GL, Arnold") or DataProducerSceneIndexInterface::allRenderViews to apply to all render views
     std::string                         _rendererNames;
     /// Is the DCC node so a MObject* DAG node for Maya
     void*                               _dccNode;
@@ -130,5 +130,5 @@ protected:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif //FLOW_VIEWPORT_API_PERVIEWPORTSCENEINDICESDATA_DATA_PRODUCER_SCENE_INDEX_DATA_BASE_H
+#endif //FLOW_VIEWPORT_API_RENDERVIEWDATA_DATA_PRODUCER_SCENE_INDEX_DATA_BASE_H
 

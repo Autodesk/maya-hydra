@@ -29,8 +29,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 // clang-format off
 #define FVP_VIEWPORT_API_TOKENS\
-    /** Use this string in the viewport identifier parameters, named "hydraViewportId" in this class, to apply the data producer scene index to all viewports.*/\
-    (allViewports) \
+    /** Use this string in the render view identifier parameters, named "viewId" in this class, to apply the data producer scene index to all render views.*/\
+    (allRenderViews) \
     /**  Use this string for the "rendererNames" parameter to apply to all renderers.*/\
     (allRenderers)
 // clang-format on

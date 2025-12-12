@@ -17,7 +17,7 @@
 #define MAYA_HYDRA_HYDRAEXTENSIONS_SCENEINDEX_MAYA_DATA_PRODUCER_SCENE_INDEX_DATA_H
 
 //Flow viewport headers
-#include <flowViewport/API/perViewportSceneIndicesData/fvpDataProducerSceneIndexDataBase.h>
+#include <flowViewport/API/renderViewData/fvpDataProducerSceneIndexDataBase.h>
 
 // UFE headers
 #include "ufeExtensions/Global.h"

@@ -32,24 +32,24 @@ namespace FVP_NS_DEF
     public:
         
         /**
-        *  @brief      Callback function called when a Hydra viewport scene index is being created by our Hydra viewport plugin
+        *  @brief      Callback function called when a Hydra render view scene index is being created by our Hydra render view plugin
         *
-        *             This is a callback function that gets called when a Hydra viewport scene index is being created by our Hydra viewport plugin. 
-        *              A typical case is when a Hydra viewport is created.
+        *             This is a callback function that gets called when a Hydra render view scene index is being created by our Hydra render view plugin. 
+        *              A typical case is when a Hydra render view is created.
         * 
-        *  @param[in]  viewportInformation is a Hydra viewport information from the scene index being added by our Hydra viewport plugin.
+        *  @param[in]  viewDesc is a Hydra render view information from the scene index being added by our Hydra render view plugin.
         */
-        virtual void SceneIndexAdded(const InformationInterface::ViewportInformation& viewportInformation) = 0;
+        virtual void SceneIndexAdded(const InformationInterface::RenderViewDesc& viewDesc) = 0;
         
         /**
-        *  @brief      Callback function called when a Hydra viewport scene index is being removed by our Hydra viewport plugin
+        *  @brief      Callback function called when a Hydra render view scene index is being removed by our Hydra render view plugin
         *
-        *              This is a callback function that gets called when a Hydra viewport scene index is removed by our Hydra viewport plugin. 
-        *              A typical case is when a Hydra viewport is removed.
+        *              This is a callback function that gets called when a Hydra render view scene index is removed by our Hydra render view plugin. 
+        *              A typical case is when a Hydra render view is removed.
         * 
-        *  @param[in]  viewportInformation is a Hydra viewport information from the scene index being removed by our Hydra viewport plugin.
+        *  @param[in]  viewDesc is a Hydra render view information from the scene index being removed by our Hydra render view plugin.
         */
-        virtual void SceneIndexRemoved(const InformationInterface::ViewportInformation& viewportInformation) = 0;
+        virtual void SceneIndexRemoved(const InformationInterface::RenderViewDesc& viewDesc) = 0;
 
         /// Destructor
         virtual ~InformationClient() = default;

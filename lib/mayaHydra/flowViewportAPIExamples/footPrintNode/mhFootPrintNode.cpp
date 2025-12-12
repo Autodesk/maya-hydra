@@ -525,7 +525,7 @@ MhFootPrint::~MhFootPrint()
     
     //Remove our retained scene index from hydra
     Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allViewports);
+    dataProducerSceneIndexInterface.removeDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allRenderViews);
 }
 
 //Create the Hydra foot print primitives in the retained scene index
@@ -676,7 +676,7 @@ void MhFootPrint::addedToModelCb()
     MObject obj = thisMObject();
     _cbAttributeChangedId = MNodeMessage::addAttributeChangedCallback(obj, attributeChangedCallback, ((void*)this));
 
-    //Data producer scene index interface is used to add the retained scene index to all viewports with all render delegates
+    //Data producer scene index interface is used to add the retained scene index to all render views with all render delegates
     auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
     dataProducerSceneIndexInterface.addDataProducerSceneIndex(_retainedSceneIndex, _pathPrefix, (void*)&obj);
 
@@ -709,7 +709,7 @@ void MhFootPrint::removedFromModelCb()
 
     //Remove the data producer scene index.
     auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allViewports);
+    dataProducerSceneIndexInterface.removeDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allRenderViews);
 }
 
 //---------------------------------------------------------------------------

@@ -34,4 +34,4 @@ install(FILES ${HEADERS}
 # -----------------------------------------------------------------------------
 add_subdirectory(interfacesImp)
 add_subdirectory(samples)
-add_subdirectory(perViewportSceneIndicesData)
+add_subdirectory(renderViewData)

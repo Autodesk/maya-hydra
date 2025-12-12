@@ -30,12 +30,12 @@ public:
     ~InfoClientTest() override = default;
 
     //From Fvp::InformationClient
-    void SceneIndexAdded(const Fvp::InformationInterface::ViewportInformation& viewportInformation)override
+    void SceneIndexAdded(const Fvp::InformationInterface::RenderViewDesc& viewDesc)override
     {
         ++_numSceneIndexAdded;//We want to count the number of times this is called
     }
 
-    void SceneIndexRemoved(const Fvp::InformationInterface::ViewportInformation& viewportInformation)override
+    void SceneIndexRemoved(const Fvp::InformationInterface::RenderViewDesc& viewDesc)override
     {
         ++_numSceneIndexRemoved;//We want to count the number of times this is called
     }

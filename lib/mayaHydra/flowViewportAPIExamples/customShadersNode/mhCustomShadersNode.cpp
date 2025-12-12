@@ -565,7 +565,7 @@ MhCustomShaders::~MhCustomShaders()
     
     //Remove our retained scene index from hydra
     Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allViewports);
+    dataProducerSceneIndexInterface.removeDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allRenderViews);
 }
 
 //Create the Hydra materials in the retained scene index
@@ -636,9 +636,9 @@ void MhCustomShaders::addedToModelCb()
     MObject obj = thisMObject();
     _cbAttributeChangedId = MNodeMessage::addAttributeChangedCallback(obj, attributeChangedCallback, ((void*)this));
 
-    //Data producer scene index interface is used to add the retained scene index to all viewports with all render delegates
+    //Data producer scene index interface is used to add the retained scene index to all views with all render delegates
     auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-    dataProducerSceneIndexInterface.addDataProducerSceneIndex(_retainedSceneIndex, noPrefix, (void*)&obj, FvpViewportAPITokens->allViewports,FvpViewportAPITokens->allRenderers);
+    dataProducerSceneIndexInterface.addDataProducerSceneIndex(_retainedSceneIndex, noPrefix, (void*)&obj, FvpViewportAPITokens->allRenderViews,FvpViewportAPITokens->allRenderers);
 
     //Update color
     MPlug colorPlug(obj, mColor);
@@ -656,7 +656,7 @@ void MhCustomShaders::removedFromModelCb()
 
     //Remove the data producer scene index.
     auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
-    dataProducerSceneIndexInterface.removeViewportDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allViewports);
+    dataProducerSceneIndexInterface.removeDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allRenderViews);
 }
 
 void MhCustomShaders::_UpdateMaterialColor(const double3& color)

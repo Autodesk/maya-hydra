@@ -21,7 +21,7 @@
 #include "flowViewport/api.h"
 #include "flowViewport/API/fvpFilteringSceneIndexInterface.h"//Viewport API headers
 #include "flowViewport/API/fvpFilteringSceneIndexClient.h"
-#include "flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndexDataAbstractFactory.h"
+#include "flowViewport/API/renderViewData/fvpFilteringSceneIndexDataAbstractFactory.h"
 
 //Std headers
 #include <set>

@@ -43,8 +43,8 @@ TEST(FlowViewportAPI, viewportInformationWithHydra)
     informationInterface.RegisterInformationClient(_infoClientTest);
     
     //Get all Hydra viewports information
-    Fvp::InformationInterface::ViewportInformationSet allViewportInformation;
-    informationInterface.GetViewportsInformation(allViewportInformation);
+    Fvp::InformationInterface::RenderViewDescSet allViewportInformation;
+    informationInterface.GetAllRenderViewDescs(allViewportInformation);
     ASSERT_EQ(allViewportInformation.size(), (size_t)1);//We should have 1 hydra viewport
 
     //Check renderer name
@@ -68,8 +68,8 @@ TEST(FlowViewportAPI, viewportInformationWithoutHydra)
     Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
     
     //Get all Hydra viewports information
-    Fvp::InformationInterface::ViewportInformationSet allViewportInformation;
-    informationInterface.GetViewportsInformation(allViewportInformation);
+    Fvp::InformationInterface::RenderViewDescSet allViewportInformation;
+    informationInterface.GetAllRenderViewDescs(allViewportInformation);
     ASSERT_EQ(allViewportInformation.size(), (size_t)0); //we should have no Hydra viewports
 
     //Only SceneIndexRemoved should have been called once
@@ -86,8 +86,8 @@ TEST(FlowViewportAPI, viewportInformationWithHydraAgain)
     Fvp::InformationInterface& informationInterface = Fvp::InformationInterface::Get();
     
     //Get all Hydra viewports information
-    Fvp::InformationInterface::ViewportInformationSet allViewportInformation;
-    informationInterface.GetViewportsInformation(allViewportInformation);
+    Fvp::InformationInterface::RenderViewDescSet allViewportInformation;
+    informationInterface.GetAllRenderViewDescs(allViewportInformation);
     ASSERT_EQ(allViewportInformation.size(), (size_t)1);//We should have 1 hydra viewport
 
     //Check renderer name

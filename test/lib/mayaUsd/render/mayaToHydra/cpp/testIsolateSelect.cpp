@@ -17,7 +17,7 @@
 
 #include <mayaHydraLib/hydraUtils.h>
 
-#include <flowViewport/API/perViewportSceneIndicesData/fvpViewportInformationAndSceneIndicesPerViewportDataManager.h>
+#include <flowViewport/API/renderViewData/fvpIsolateSelectManager.h>
 #include <flowViewport/sceneIndex/fvpIsolateSelectSceneIndex.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/selection/fvpSelection.h>
@@ -280,9 +280,9 @@ TEST(TestIsolateSelection, add)
     const std::string viewportId(argv[0]);
     const Ufe::Path appPath(Ufe::PathString::path(argv[1]));
 
-    auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
+    auto& isolateSelectMgr = Fvp::IsolateSelectManager::Get();
     auto primSelections = Fvp::ufePathToPrimSelections(appPath);
-    vpDataMgr.AddIsolateSelection(viewportId, primSelections);
+    isolateSelectMgr.AddIsolateSelection(viewportId, primSelections);
 }
 
 TEST(TestIsolateSelection, remove)
@@ -292,9 +292,9 @@ TEST(TestIsolateSelection, remove)
     const std::string viewportId(argv[0]);
     const Ufe::Path appPath(Ufe::PathString::path(argv[1]));
 
-    auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
+    auto& isolateSelectMgr = Fvp::IsolateSelectManager::Get();
     auto primSelections = Fvp::ufePathToPrimSelections(appPath);
-    vpDataMgr.RemoveIsolateSelection(viewportId, primSelections);
+    isolateSelectMgr.RemoveIsolateSelection(viewportId, primSelections);
 }
 
 TEST(TestIsolateSelection, clear)
@@ -303,8 +303,8 @@ TEST(TestIsolateSelection, clear)
     ASSERT_EQ(argc, 1);
     const std::string viewportId(argv[0]);
 
-    auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
-    vpDataMgr.ClearIsolateSelection(viewportId);
+    auto& isolateSelectMgr = Fvp::IsolateSelectManager::Get();
+    isolateSelectMgr.ClearIsolateSelection(viewportId);
 }
 
 TEST(TestIsolateSelection, replace)
@@ -338,8 +338,8 @@ TEST(TestIsolateSelection, replace)
         }
     }
 
-    auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
-    vpDataMgr.ReplaceIsolateSelection(viewportId, isolateSelect);
+    auto& isolateSelectMgr = Fvp::IsolateSelectManager::Get();
+    isolateSelectMgr.ReplaceIsolateSelection(viewportId, isolateSelect);
 }
 
 TEST(TestIsolateSelection, disable)
@@ -348,7 +348,7 @@ TEST(TestIsolateSelection, disable)
     ASSERT_EQ(argc, 1);
     const std::string viewportId(argv[0]);
 
-    auto& vpDataMgr = Fvp::ViewportDataMgr::Get();
-    vpDataMgr.DisableIsolateSelection(viewportId);
+    auto& isolateSelectMgr = Fvp::IsolateSelectManager::Get();
+    isolateSelectMgr.DisableIsolateSelection(viewportId);
 }
 

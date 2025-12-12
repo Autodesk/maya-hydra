@@ -36,10 +36,10 @@ public:
     //From InformationInterface
     void RegisterInformationClient(const std::shared_ptr<InformationClient>& client)override;
     void UnregisterInformationClient(const std::shared_ptr<InformationClient>& client)override;
-    void GetViewportsInformation(ViewportInformationSet& outHydraviewportInformationSet) const override;
+    void GetAllRenderViewDescs(RenderViewDescSet& outRenderViewDescs) const override;
    
-    void SceneIndexAdded(const InformationInterface::ViewportInformation& _viewportInfo);
-    void SceneIndexRemoved(const InformationInterface::ViewportInformation& viewportInfo);
+    void SceneIndexAdded(const InformationInterface::RenderViewDesc& viewDesc);
+    void SceneIndexRemoved(const InformationInterface::RenderViewDesc& viewDesc);
 
 private:
     InformationInterfaceImp()             = default;
