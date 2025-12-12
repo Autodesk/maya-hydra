@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef FLOW_VIEWPORT_API_PERVIEWPORTSCENEINDICESDATA_FILTERING_SCENE_INDEX_CHAIN_MANAGER
-#define FLOW_VIEWPORT_API_PERVIEWPORTSCENEINDICESDATA_FILTERING_SCENE_INDEX_CHAIN_MANAGER
+#ifndef FLOW_VIEWPORT_API_RENDERVIEWDATA_FILTERING_SCENE_INDEX_CHAIN_MANAGER
+#define FLOW_VIEWPORT_API_RENDERVIEWDATA_FILTERING_SCENE_INDEX_CHAIN_MANAGER
 
 //Local headers
 #include "flowViewport/api.h"
@@ -28,7 +28,7 @@
 
 namespace FVP_NS_DEF {
 
-class ViewportInformationAndSceneIndicesPerViewportData;//Predeclaration
+class RenderViewData;//Predeclaration
 
 /**Is a singleton to manage the custom filtering scene indices chain which is appended after the merging scene index
 * To access this class, use Fvp::FilteringSceneIndicesChainManager& filteringSceneIndicesChainManager = Fvp::FilteringSceneIndicesChainManager::get();
@@ -43,30 +43,30 @@ public:
     static FilteringSceneIndicesChainManager& get();
 
     /**  
-    *   @brief  Create the filtering scene indices chain for this viewport. 
-    *   @param[in] viewportInformationAndSceneIndicesPerViewportData is the ViewportInformationAndSceneIndicesPerViewportData from the hydra viewport.
+    *   @brief  Create the filtering scene indices chain for this render view. 
+    *   @param[in] viewData is the RenderViewData from the hydra render view.
     *   @param[in] inputFilteringSceneIndex is the input scene index for your filtering scene index.
     *   @return the latest scene index from the custom filtering scene indices chain
     */
-    PXR_NS::HdSceneIndexBaseRefPtr  createFilteringSceneIndicesChain(ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData,
+    PXR_NS::HdSceneIndexBaseRefPtr  createFilteringSceneIndicesChain(RenderViewData& viewData,
                                                                     const PXR_NS::HdSceneIndexBaseRefPtr& inputFilteringSceneIndex = nullptr);
 
     /**  
-    *   @brief  Removes from the render index the last element of the filtering scene indices chain for this viewport and delete the whole chain
-    *   @param[in] viewportInformationAndSceneIndicesPerViewportData is the ViewportInformationAndSceneIndicesPerViewportData from the hydra viewport.
+    *   @brief  Removes from the render index the last element of the filtering scene indices chain for this render view and delete the whole chain
+    *   @param[in] viewData is the RenderViewData from the hydra render view.
     */
-    void destroyFilteringSceneIndicesChain(ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData);
+    void destroyFilteringSceneIndicesChain(RenderViewData& viewData);
 
     /**
     *  @brief       Update the whole filtering scene indices chains.
     *
     *               Update the whole chain by destroying it then create it again (use case is : a new FilteringSceneIndexClient was registered / unregistered 
     *               so we must re-create the filtering scene indices chain with this change.
-    *               We update only the viewports whose renderer display name is in rendererDisplayName.
+    *               We update only the render views whose renderer display name is in rendererDisplayName.
     * 
     *  @param[in]   rendererDisplayNames is a string containing either nothing ("") meaning this should apply to all renderers 
     *               or it contains one or more renderers display names such as ("GL, Arnold") and in this case we must update 
-    *               only the viewports filtering scene indices chain which are using this renderer.
+    *               only the render views filtering scene indices chain which are using this renderer.
     */
     void updateFilteringSceneIndicesChain(const std::string& rendererDisplayNames);
 
@@ -76,11 +76,11 @@ public:
 
 private:
     /**
-    *   @brief  Create the filtering scene indices chain for this viewport. 
-    *   @param[in] viewportInformationAndSceneIndicesPerViewportData is the ViewportInformationAndSceneIndicesPerViewportData from the hydra viewport.
+    *   @brief  Create the filtering scene indices chain for this render view. 
+    *   @param[in] viewData is the RenderViewData from the hydra render view.
     *   @param[in] inputFilteringSceneIndex is the input scene index for your filtering scene index.
     */
-    void _AppendFilteringSceneIndicesChain( ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData, 
+    void _AppendFilteringSceneIndicesChain( RenderViewData& viewData, 
                                             const PXR_NS::HdSceneIndexBaseRefPtr& inputScene);
 
     /// Private constructor
@@ -93,5 +93,5 @@ private:
 
 }//End of namespace FVP_NS_DEF
 
-#endif //FLOW_VIEWPORT_API_PERVIEWPORTSCENEINDICESDATA_FILTERING_SCENE_INDEX_CHAIN_MANAGER
+#endif //FLOW_VIEWPORT_API_RENDERVIEWDATA_FILTERING_SCENE_INDEX_CHAIN_MANAGER
 

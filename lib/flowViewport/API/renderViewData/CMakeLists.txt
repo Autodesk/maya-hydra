@@ -3,22 +3,24 @@
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME}
     PRIVATE
-    fvpViewportInformationAndSceneIndicesPerViewportData.cpp
-    fvpViewportInformationAndSceneIndicesPerViewportDataManager.cpp
+    fvpRenderViewData.cpp
+    fvpRenderViewDataManager.cpp
     fvpDataProducerSceneIndexDataBase.cpp
     fvpFilteringSceneIndexDataBase.cpp
     fvpFilteringSceneIndicesChainManager.cpp
+    fvpIsolateSelectManager.cpp
     fvpViewportAPITokens.cpp
 )
 
 set(HEADERS
-    fvpViewportInformationAndSceneIndicesPerViewportData.h
-    fvpViewportInformationAndSceneIndicesPerViewportDataManager.h
+    fvpRenderViewData.h
+    fvpRenderViewDataManager.h
     fvpDataProducerSceneIndexDataAbstractFactory.h
     fvpDataProducerSceneIndexDataBase.h
     fvpFilteringSceneIndexDataAbstractFactory.h
     fvpFilteringSceneIndexDataBase.h
     fvpFilteringSceneIndicesChainManager.h
+    fvpIsolateSelectManager.h
 )
 
 # -----------------------------------------------------------------------------
@@ -28,7 +30,7 @@ mayaUsd_promoteHeaderList(
     HEADERS
         ${HEADERS}
     BASEDIR
-        ${TARGET_NAME}/API/perViewportSceneIndicesData
+        ${TARGET_NAME}/API/renderViewData
 )
 
 # -----------------------------------------------------------------------------
@@ -36,5 +38,5 @@ mayaUsd_promoteHeaderList(
 # -----------------------------------------------------------------------------
 install(FILES ${HEADERS}
     DESTINATION 
-        ${CMAKE_INSTALL_PREFIX}/include/flowViewport/API/perViewportSceneIndicesData
+        ${CMAKE_INSTALL_PREFIX}/include/flowViewport/API/renderViewData
 )

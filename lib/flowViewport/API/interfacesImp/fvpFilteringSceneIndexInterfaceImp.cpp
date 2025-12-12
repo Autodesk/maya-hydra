@@ -16,7 +16,7 @@
 
 //Local headers
 #include "fvpFilteringSceneIndexInterfaceImp.h"
-#include "flowViewport/API/perViewportSceneIndicesData/fvpFilteringSceneIndicesChainManager.h"
+#include "flowViewport/API/renderViewData/fvpFilteringSceneIndicesChainManager.h"
 
 //Std headers
 #include <mutex>

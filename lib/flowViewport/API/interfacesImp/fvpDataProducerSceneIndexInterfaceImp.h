@@ -23,7 +23,7 @@
 #include "flowViewport/api.h"
 #include "flowViewport/API/fvpDataProducerSceneIndexInterface.h"
 #include "flowViewport/API/fvpInformationInterface.h"
-#include "flowViewport/API/perViewportSceneIndicesData/fvpDataProducerSceneIndexDataAbstractFactory.h"
+#include "flowViewport/API/renderViewData/fvpDataProducerSceneIndexDataAbstractFactory.h"
 #include "flowViewport/API/fvpViewportAPITokens.h"
 
 //Std Headers
@@ -35,7 +35,7 @@
 
 namespace FVP_NS_DEF {
 
-class ViewportInformationAndSceneIndicesPerViewportData;
+class RenderViewData;
 
 ///Is a singleton, use Fvp::DataProducerSceneIndexInterfaceImp& dataProducerSceneIndexInterfaceImp = Fvp::DataProducerSceneIndexInterfaceImp::Get() to get an instance of that interface
 class DataProducerSceneIndexInterfaceImp : public DataProducerSceneIndexInterface
@@ -55,34 +55,34 @@ public:
                                         void* dccNode);
 
     ///Specific internal function for Usd Stages
-    FVP_API bool addUsdStageDataProducerSceneIndexDataBaseToAllViewports(PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr&  dataProducerSceneIndexData);
+    FVP_API bool addUsdStageDataProducerSceneIndexDataBaseToAllViews(PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr&  dataProducerSceneIndexData);
 
     ///From FVP_NS_DEF::DataProducerSceneIndexInterface
     bool addDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
                                     const PXR_NS::SdfPath& preFix,
                                     void* dccNode = nullptr,
-                                    const std::string& hydraViewportId = PXR_NS::FvpViewportAPITokens->allViewports,
+                                    const std::string& viewId = PXR_NS::FvpViewportAPITokens->allRenderViews,
                                     const std::string& rendererNames = PXR_NS::FvpViewportAPITokens->allRenderers
                                     )override;
-    void removeViewportDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
-                                              const std::string& hydraViewportId = PXR_NS::FvpViewportAPITokens->allViewports)override;
+    void removeDataProducerSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
+                                      const std::string& viewId = PXR_NS::FvpViewportAPITokens->allRenderViews)override;
 
 
-    FVP_API void ClearDataProducerSceneIndicesThatApplyToAllViewports();
+    FVP_API void ClearDataProducerSceneIndicesThatApplyToAllViews();
 
     //Called by flow viewport
-    ///hydraViewportSceneIndexAdded is called when a new hydra viewport is created by the ViewportInformationAndSceneIndicesPerViewportDataManager, it's not a callback.
+    ///hydraViewSceneIndexAdded is called when a new hydra render view is created by the RenderViewDataManager, it's not a callback.
     //returns true if some data producer scene indices were added
-    bool hydraViewportSceneIndexAdded(const InformationInterface::ViewportInformation& viewportInfo);
-    void removeAllViewportDataProducerSceneIndices(ViewportInformationAndSceneIndicesPerViewportData& viewportInformationAndSceneIndicesPerViewportData);
+    bool hydraViewSceneIndexAdded(const InformationInterface::RenderViewDesc& viewDesc);
+    void removeAllDataProducerSceneIndicesFromView(RenderViewData& viewData);
 
     ///Since Flow viewport is DCC agnostic, the DCC will implement a concrete factory and call setSceneIndexDataFactory to register it in this class.
     FVP_API
     void setSceneIndexDataFactory(DataProducerSceneIndexDataAbstractFactory& factory);
 
 protected:
-    bool _AddDataProducerSceneIndexToAllViewports(const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData);
-    void _AddDataProducerSceneIndexToThisViewport(const InformationInterface::ViewportInformation& viewportInformation, const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData);
+    bool _AddDataProducerSceneIndexToAllViews(const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData);
+    void _AddDataProducerSceneIndexToThisView(const InformationInterface::RenderViewDesc& viewDesc, const PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr& dataProducerSceneIndexData);
     
     PXR_NS::FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr _CreateDataProducerSceneIndexData( const PXR_NS::HdSceneIndexBaseRefPtr& customDataProducerSceneIndex,
                                                                 const std::string& rendererNames,
