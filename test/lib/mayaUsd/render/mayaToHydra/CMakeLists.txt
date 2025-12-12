@@ -60,6 +60,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testSceneModified.py
     testIsolateSelectWithGeomSubset.py
     testMayaReference.py
+    testTexturedMode.py
     testUsdDeleteCamera.py
     testUsdIncludedPurposes.py
     testUsdInheritsSpecializes.py
