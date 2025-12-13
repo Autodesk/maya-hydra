@@ -135,15 +135,6 @@ public:
         return _defaultMaterialPath;
     }
 
-    // Add Hydra pick points and items to Maya's selection list
-    bool AddPickHitToSelectionList(
-        const MayaHydra::PickHit&        hit,
-        const MHWRender::MSelectionInfo& selectInfo,
-        MSelectionList&                  selectionList,
-        MPointArray&                     worldSpaceHitPts);
-
-    bool IsPickedNodeInComponentsPickingMode(const MayaHydra::PickHit& hit) const;
-
     MAYAHYDRALIB_API
     void SetLightsManagementSceneIndex(const Fvp::LightsManagementSceneIndexRefPtr& lightsManagementSceneIndex); // Can be a nullptr
 
@@ -195,6 +186,18 @@ protected:
         MayaViewportSceneIndex* _owner;
     };
     _MergingSceneIndexObserver _observer;
+
+    friend class MayaPickHandler;
+    class MayaPickHandler;
+    
+    // Add Hydra pick points and items to Maya's selection list
+    bool AddPickHitToSelectionList(
+        const MayaHydra::PickHit&        hit,
+        const MHWRender::MSelectionInfo& selectInfo,
+        MSelectionList&                  selectionList,
+        MPointArray&                     worldSpaceHitPts);
+
+    bool IsPickedNodeInComponentsPickingMode(const MayaHydra::PickHit& hit) const;
 
     void _UpdateActiveLights(const MDrawContext& viewportDrawContext);
     

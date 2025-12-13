@@ -59,42 +59,6 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 namespace {
 
-// Pick handler for Maya data. As the Maya pick handler and the Maya
-// scene index are circularly dependent (the Maya pick handler calls
-// MayaViewportSceneIndex::AddPickHitToSelectionList() in the Maya scene index
-// interface, and the Maya scene index builds the Maya pick handler), they are
-// both defined here in the same implementation file.
-class MayaPickHandler : public MayaHydra::PickHandler
-{
-    MayaViewportSceneIndex& _mayaViewportSceneIndex;
-
-public:
-    MayaPickHandler(MayaViewportSceneIndex& mayaViewportSceneIndex)
-        : _mayaViewportSceneIndex(mayaViewportSceneIndex)
-    {
-    }
-
-    bool handlePickHit(const Input& pickInput, Output& pickOutput) const override
-    {
-        // Maya does not create Hydra instances, so if the pick hit instancer
-        // ID isn't empty, it's not a Maya pick hit.
-        if (!pickInput.pickHit.hdxPickHit.instancerId.IsEmpty()) {
-            return false;
-        }
-
-        return _mayaViewportSceneIndex.AddPickHitToSelectionList(
-            pickInput.pickHit,
-            pickInput.pickInfo,
-            pickOutput.mayaSelection,
-            pickOutput.mayaWorldSpaceHitPts);
-    }
-
-    bool inSingleNodeComponentsPick(const MayaHydra::PickHit& hit) const override
-    {
-        return _mayaViewportSceneIndex.IsPickedNodeInComponentsPickingMode(hit);
-    }
-};
-
 HdMaterialNetworkMap _CreateMayaFacesSelectionMaterial(const SdfPath& materialPath)
 {
     const GfVec4f faceSelectioncolor
@@ -140,6 +104,42 @@ bool _AreLightParamsDifferent(const GlfSimpleLight& light1, const GlfSimpleLight
 } // namespace
 
 namespace MAYAHYDRA_NS_DEF {
+
+// Pick handler for Maya data. As the Maya pick handler and the Maya
+// scene index are circularly dependent (the Maya pick handler calls
+// MayaViewportSceneIndex::AddPickHitToSelectionList() in the Maya scene index
+// interface, and the Maya scene index builds the Maya pick handler), they are
+// both defined here in the same implementation file.
+class MayaViewportSceneIndex::MayaPickHandler : public MayaHydra::PickHandler
+{
+    MayaViewportSceneIndex& _mayaViewportSceneIndex;
+
+public:
+    MayaPickHandler(MayaViewportSceneIndex& mayaViewportSceneIndex)
+        : _mayaViewportSceneIndex(mayaViewportSceneIndex)
+    {
+    }
+
+    bool handlePickHit(const Input& pickInput, Output& pickOutput) const override
+    {
+        // Maya does not create Hydra instances, so if the pick hit instancer
+        // ID isn't empty, it's not a Maya pick hit.
+        if (!pickInput.pickHit.hdxPickHit.instancerId.IsEmpty()) {
+            return false;
+        }
+
+        return _mayaViewportSceneIndex.AddPickHitToSelectionList(
+            pickInput.pickHit,
+            pickInput.pickInfo,
+            pickOutput.mayaSelection,
+            pickOutput.mayaWorldSpaceHitPts);
+    }
+
+    bool inSingleNodeComponentsPick(const MayaHydra::PickHit& hit) const override
+    {
+        return _mayaViewportSceneIndex.IsPickedNodeInComponentsPickingMode(hit);
+    }
+};
 
 MayaViewportSceneIndex::MayaViewportSceneIndex(HdSceneIndexBaseRefPtr const& inputSceneIndex, MayaHydraSceneIndexRefPtr const& mayaDataSceneIndex)
     : HdFilteringSceneIndexBase()
