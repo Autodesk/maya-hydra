@@ -16,12 +16,11 @@
 
 #include "mayaViewportSceneIndex.h"
 
-#include "mayaHydraSceneIndexUtils.h"
-
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/pick/mhPickHandler.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
 #include <mayaHydraLib/pick/mhPickHit.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexUtils.h>
 
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
 
