@@ -86,10 +86,8 @@ public:
     };
     template <typename T> using AdapterMap = std::unordered_map<SdfPath, T, SdfPath::Hash>;
 
-    static MayaHydraSceneIndexRefPtr New(
-        MayaHydraInitData& initData,
-        bool interactive) {
-        return TfCreateRefPtr(new MayaHydraSceneIndex(initData, interactive));
+    static MayaHydraSceneIndexRefPtr New(MayaHydraInitData& initData) {
+        return TfCreateRefPtr(new MayaHydraSceneIndex(initData));
     }
 
     ~MayaHydraSceneIndex();
@@ -243,10 +241,6 @@ public:
     /// Is using an environment variable to tell if we should pass normals to Hydra when using the
     /// render item and mesh adapters
     static bool passNormalsToHydra();
-
-    /// Is using an environment variable to tell if we should use the mesh adapter instead of the
-    /// render item adapter for Maya meshes or when we are using batch production rendering it should be always on
-    bool useMeshAdapter();
     
     using LightDagPathMap = std::unordered_map<std::string, MDagPath>;
     LightDagPathMap GetGlobalLightPaths() const;
@@ -257,9 +251,7 @@ public:
     GfBBox3d GetBoundingBox() const;
 
 private:
-    MayaHydraSceneIndex(
-        MayaHydraInitData& initData,
-        bool interactive);
+    MayaHydraSceneIndex(MayaHydraInitData& initData);
 
     template <typename AdapterPtr, typename Map>
     AdapterPtr _CreateAdapter(
@@ -330,8 +322,6 @@ private:
     SdfPath _materialPath;
 
     const Fvp::PathMapperConstPtr _mayaPathMapper {};
-
-    bool _interactive{true};
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

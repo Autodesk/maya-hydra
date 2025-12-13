@@ -389,7 +389,7 @@ private:
 
 } // namespace
 
-MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData, bool interactive)
+MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData)
     : _ID(initData.delegateID.AppendChild(
           TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this))))
     , _renderIndex(initData.renderIndex)
@@ -1473,12 +1473,6 @@ bool MayaHydraSceneIndex::passNormalsToHydra()
 {
     static const bool val = TfGetEnvSetting(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA);
     return val;
-}
-
-bool MayaHydraSceneIndex::useMeshAdapter()
-{
-    static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
-    return (_interactive) ? uma : true;// Batch rendering (=> !_interactive) always uses mesh adapter
 }
 
 void MayaHydraSceneIndex::UpdateLightsShadowCollection()
