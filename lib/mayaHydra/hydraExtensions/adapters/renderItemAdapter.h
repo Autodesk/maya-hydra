@@ -78,7 +78,7 @@ public:
     virtual void RemovePrim() override { }
 
     MAYAHYDRALIB_API
-    virtual void Populate() override { }
+    virtual void Populate() override;
 
     MAYAHYDRALIB_API
     bool HasType(const TfToken& typeId) const override { return typeId == HdPrimTypeTokens->mesh; }

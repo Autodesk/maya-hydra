@@ -71,10 +71,14 @@ MayaHydraRenderItemAdapter::MayaHydraRenderItemAdapter(
     , _cullMode(ri.cullMode())
 #endif
 {
-    _InsertRprim(this);
 }
 
 MayaHydraRenderItemAdapter::~MayaHydraRenderItemAdapter() { _RemoveRprim(); }
+
+void MayaHydraRenderItemAdapter::Populate()
+{
+    _InsertRprim(this);
+}
 
 TfToken MayaHydraRenderItemAdapter::GetRenderTag() const
 {

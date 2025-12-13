@@ -492,14 +492,18 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             ria = std::make_shared<MayaHydraRenderItemAdapter>(
                 dagPath, slowId, fastId, this, ri, GetPurposeRenderTag(ri));
 
-            // Handle custom attribute changes
-            ria->CreateCallbacks();
+            // HYDRA-1992 : Order is important here. Downstream scene indices
+            // might do some operations based on PrimsAdded notifications, which
+            // we send once we call Populate(). These operations might loop back
+            // into the render item adapter and this scene index, so it needs to
+            // be setup properly.
+            _AddRenderItem(ria);
+            ria->Populate();
+            ria->CreateCallbacks(); // Handle custom attribute changes
 
             // Update the render item adapter if this render item is an aiSkydomeLight shape
             ria->SetIsRenderITemAnaiSkydomeLightTriangleShape(
                 isRenderItem_aiSkyDomeLightTriangleShape(ri));
-
-            _AddRenderItem(ria);
         }
 
         SdfPath material;
@@ -1243,7 +1247,7 @@ AdapterPtr MayaHydraSceneIndex::_CreateAdapter(
     if (adapter == nullptr || !adapter->IsSupported()) {
         return {};
     }
-    // Order is important here. We need to add the adapter to the map before populating.
+    // HYDRA-1992 : Order is important here. We need to add the adapter to the map before populating.
     // Why : once we send PrimsAdded notifications, a downstream scene index might query 
     // a prim that uses a MayaHydraDataSource and try to get its material. Since 
     // MayaHydraDataSource::_GetMaterialBindingDataSource() calls MayaHydraSceneIndex::GetMaterialId(), 
@@ -1405,9 +1409,14 @@ bool MayaHydraSceneIndex::CreateMaterial(const SdfPath& id, const MObject& obj)
         return false;
     }
 
+    // HYDRA-1992 : Order is important here. Downstream scene indices
+    // might do some operations based on PrimsAdded notifications, which
+    // we send once we call Populate(). These operations might loop back
+    // into the material adapter and this scene index, so it needs to be
+    // setup properly.
+    _materialAdapters.insert({id, materialAdapter});
     materialAdapter->Populate();
     materialAdapter->CreateCallbacks();
-    _materialAdapters.emplace(id, std::move(materialAdapter));
     return true;
 }
 
