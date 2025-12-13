@@ -181,6 +181,15 @@ MayaViewportSceneIndex::MayaViewportSceneIndex(HdSceneIndexBaseRefPtr const& inp
     _mergingSceneIndex->AddObserver(HdSceneIndexObserverPtr(&_observer));
 }
 
+MayaViewportSceneIndex::~MayaViewportSceneIndex()
+{
+    // Remove our pick handler from the pick handler registry.
+    if (_hasPickHandlerRegistered) {
+        auto& phr = MayaHydra::PickHandlerRegistry::Instance();
+        TF_AXIOM(phr.Unregister(_mayaDataSceneIndex->GetRprimPath()));
+    }
+}
+
 HdSceneIndexPrim MayaViewportSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     HdSceneIndexPrim prim = _mergingSceneIndex->GetPrim(primPath);

@@ -84,6 +84,9 @@ public:
     }
 
     MAYAHYDRALIB_API
+    ~MayaViewportSceneIndex() override;
+
+    MAYAHYDRALIB_API
     PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath& primPath) const override;
 
     MAYAHYDRALIB_API
