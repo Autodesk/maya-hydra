@@ -137,25 +137,6 @@ bool _AreLightParamsDifferent(const GlfSimpleLight& light1, const GlfSimpleLight
         || (light1.GetSpecular() != light2.GetSpecular());
 }
 
-HdMaterialNetworkMap _CreateDefaultMaterialFallback(const SdfPath& materialPath)
-{
-    static const MColor kDefaultGrayColor = MColor(0.5f, 0.5f, 0.5f) * 0.8f;
-
-    HdMaterialNetworkMap networkMap;
-    HdMaterialNetwork    network;
-    HdMaterialNode       node;
-    node.identifier = UsdImagingTokens->UsdPreviewSurface;
-    node.path = materialPath;
-    node.parameters.insert(
-        { _tokens->diffuseColor,
-          VtValue(GfVec3f(kDefaultGrayColor[0], kDefaultGrayColor[1], kDefaultGrayColor[2])) });
-    node.parameters.insert({ _tokens->opacity, VtValue(float(1.0f)) });
-    network.nodes.push_back(std::move(node));
-    networkMap.map.insert({ HdMaterialTerminalTokens->surface, std::move(network) });
-    networkMap.terminals.push_back(materialPath);
-    return networkMap;
-}
-
 } // namespace
 
 namespace MAYAHYDRA_NS_DEF {
@@ -180,7 +161,11 @@ MayaViewportSceneIndex::MayaViewportSceneIndex(HdSceneIndexBaseRefPtr const& inp
 
     // Create the default material
     _defaultMaterialPath = SdfPath::AbsoluteRootPath().AppendChild(_tokens->MayaDefaultMaterial);
-    _CreateDefaultMaterial();
+    // Get the shading group of the default material
+    MObject defaultMaterialShadingGroupObj = MMaterial::defaultMaterial().shadingEngine();
+    if (defaultMaterialShadingGroupObj != MObject::kNullObj) {
+        _mayaDataSceneIndex->CreateMaterial(_defaultMaterialPath, defaultMaterialShadingGroupObj);
+    }
 
     // Add our pick handler to the pick handler registry if there is none.
     auto& phr = MayaHydra::PickHandlerRegistry::Instance();
@@ -395,34 +380,6 @@ void MayaViewportSceneIndex::SetDefaultLight(const GlfSimpleLight& light)
         _defaultLight.SetSpecular(light.GetSpecular());
         _defaultLight.SetPosition(light.GetPosition());
         _viewportDataSceneIndex->DirtyPrims({ { DefaultLightPath(), HdLightSchema::GetDefaultLocator() } });
-    }
-}
-
-void MayaViewportSceneIndex::_CreateDefaultMaterial() 
-{ 
-    bool defaultMaterialCreatedSuccessfully = false;
-
-    // Get the shading group of the default material
-    MObject defaultMaterialShadingGroupObj = MMaterial::defaultMaterial().shadingEngine();
-    if (defaultMaterialShadingGroupObj != MObject::kNullObj) {
-        defaultMaterialCreatedSuccessfully = _mayaDataSceneIndex->CreateMaterial(_defaultMaterialPath, defaultMaterialShadingGroupObj);
-    }
-    
-    if (!defaultMaterialCreatedSuccessfully){
-        TF_WARN("Maya default material and its shading group could not be retrieved, "
-                "using a fallback material");
-        
-        _defaultMaterialFallback = _CreateDefaultMaterialFallback(_defaultMaterialPath);
-        HdContainerDataSourceHandle defaultMaterialDataSource;    
-        if (_defaultMaterialFallback.has_value() && _ConvertHdMaterialNetworkToHdDataSources(_defaultMaterialFallback.value(), &defaultMaterialDataSource)) {
-            HdContainerDataSourceHandle defaultMaterialContainerDataSource = 
-                HdRetainedContainerDataSource::New(HdMaterialSchemaTokens->material, defaultMaterialDataSource);
-            _viewportDataSceneIndex->AddPrims(
-                { { _mayaFacesSelectionMaterialPath, HdPrimTypeTokens->material, defaultMaterialContainerDataSource } }
-            );
-        } else {
-            TF_WARN("Default material fallback could not be created");
-        }
     }
 }
 

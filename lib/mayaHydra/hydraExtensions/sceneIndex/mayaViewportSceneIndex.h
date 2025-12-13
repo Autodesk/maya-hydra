@@ -193,10 +193,6 @@ protected:
     };
     _MergingSceneIndexObserver _observer;
 
-    // Create the default Hydra material from the Maya default material
-    // or create a fallback material if it cannot be found
-    void _CreateDefaultMaterial();
-
     void _UpdateActiveLights(const MDrawContext& viewportDrawContext);
     
     // Input/output scene indices 
@@ -219,7 +215,6 @@ protected:
 
     // Default material
     PXR_NS::SdfPath _defaultMaterialPath;
-    std::optional<PXR_NS::HdMaterialNetworkMap> _defaultMaterialFallback; // Used only if we cannot find the Maya default material
 
     // Pick handling
     bool _unregisterPickHandler{false};
