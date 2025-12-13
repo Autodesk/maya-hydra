@@ -217,7 +217,7 @@ protected:
     PXR_NS::SdfPath _defaultMaterialPath;
 
     // Pick handling
-    bool _unregisterPickHandler{false};
+    bool _hasPickHandlerRegistered{false};
 
     // Playback
     bool _isPlaybackRunning{false};

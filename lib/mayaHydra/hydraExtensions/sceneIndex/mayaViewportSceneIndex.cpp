@@ -169,10 +169,10 @@ MayaViewportSceneIndex::MayaViewportSceneIndex(HdSceneIndexBaseRefPtr const& inp
 
     // Add our pick handler to the pick handler registry if there is none.
     auto& phr = MayaHydra::PickHandlerRegistry::Instance();
-    _unregisterPickHandler = (phr.RegisteredHandler(mayaDataSceneIndex->GetRprimPath()) == nullptr);
-    if (_unregisterPickHandler) {
+    if (phr.RegisteredHandler(mayaDataSceneIndex->GetRprimPath()) == nullptr) {
       auto pickHandler = std::make_shared<MayaPickHandler>(*this);
       TF_AXIOM(phr.Register(mayaDataSceneIndex->GetRprimPath(), pickHandler));
+      _hasPickHandlerRegistered = true;
     }
 
     // Setup the combined scene
