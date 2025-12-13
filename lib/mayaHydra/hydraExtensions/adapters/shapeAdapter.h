@@ -67,13 +67,6 @@ public:
     MAYAHYDRALIB_API
     virtual TfToken GetRenderTag() const override { return HdTokens->geometry; }
 
-    MAYAHYDRALIB_API
-    virtual void PopulateSelectedPaths(
-        const MDagPath&                             selectedDag,
-        SdfPathVector&                              selectedSdfPaths,
-        std::unordered_set<SdfPath, SdfPath::Hash>& selectedMasters,
-        const HdSelectionSharedPtr&                 selection);
-
 protected:
     MAYAHYDRALIB_API
     void _CalculateExtent();
