@@ -206,8 +206,9 @@ protected:
     PXR_NS::HdRetainedSceneIndexRefPtr _viewportDataSceneIndex;
     PXR_NS::HdMergingSceneIndexRefPtr _mergingSceneIndex;
 
-    // Reference to the Maya data scene index. Note that we don't use this reference for its scene index
-    // features, but rather because it is where much of the Maya<->Hydra translation code is contained.
+    // Reference to the Maya data scene index. Note that we don't use this as an input/output scene index
+    // of the scene index chain, but rather because it is where much of the Maya<->Hydra data translation 
+    // code is contained.
     PXR_NS::MayaHydraSceneIndexRefPtr _mayaDataSceneIndex;
 
     // Maya faces selection material (used to display the faces
