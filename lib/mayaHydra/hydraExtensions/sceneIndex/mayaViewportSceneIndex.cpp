@@ -38,7 +38,6 @@
 #include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
-#include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -193,6 +192,8 @@ MayaViewportSceneIndex::~MayaViewportSceneIndex()
 HdSceneIndexPrim MayaViewportSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     HdSceneIndexPrim prim = _mergingSceneIndex->GetPrim(primPath);
+
+    // This is a Maya faces selection prim. Apply the faces selection material.
     if (primPath.GetName().substr(0, _tokens->MayaFacesSelectionPrimPrefix.size()) == _tokens->MayaFacesSelectionPrimPrefix) {
         HdContainerDataSourceEditor dsEditor(prim.dataSource);
         HdDataSourceLocator materialPathLocator = HdMaterialBindingsSchema::GetDefaultLocator()
@@ -201,6 +202,7 @@ HdSceneIndexPrim MayaViewportSceneIndex::GetPrim(const SdfPath& primPath) const
         dsEditor.Set(materialPathLocator, HdRetainedTypedSampledDataSource<SdfPath>::New(_mayaFacesSelectionMaterialPath));
         prim.dataSource = dsEditor.Finish();
     }
+
     return prim;
 }
 

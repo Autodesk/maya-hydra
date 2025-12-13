@@ -71,6 +71,16 @@ typedef PXR_NS::TfRefPtr<const MayaViewportSceneIndex> MayaViewportSceneIndexCon
 
 /**
  * \brief MayaViewportSceneIndex is a scene index to handle Maya viewport functionality.
+ *
+ * Since some viewport features require some custom data to be present in the Hydra scene 
+ * (for example to handle default material, default light, Maya faces selections, etc.),
+ * this scene index creates and maintains a HdRetainedSceneIndex to store this custom data,
+ * on top of the usual input scene index.
+ *
+ * To avoid having to handle two scene indices in GetPrim/GetChildPrimPaths/PrimsXYZed methods,
+ * a utilitary HdMergingSceneIndex is created to merge the input scene index and the HdRetainedSceneIndex.
+ * This merging scene index is then used as if it was the actual input scene index of MayaViewportSceneIndex,
+ * like we see in other single input filtering scene indices.
  */
 class MayaViewportSceneIndex : 
     public PXR_NS::HdFilteringSceneIndexBase,
