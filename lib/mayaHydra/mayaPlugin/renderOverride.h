@@ -408,7 +408,6 @@ private:
     unsigned int _oldDisplayStyle {0};
     int        _oldRefineLevel {0};
     bool       _useDefaultMaterial;
-    bool       _xRayEnabled;
     MFrameContext::LightingMode _lightingMode = MFrameContext::LightingMode::kSceneLights;
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
     long int   _nbViewSelectedChangedCalls{0};
