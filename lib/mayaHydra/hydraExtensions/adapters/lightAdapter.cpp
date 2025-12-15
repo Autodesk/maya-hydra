@@ -18,11 +18,9 @@
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/constantShadowMatrix.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
-#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 #include <mayaHydraLib/adapters/shadowMatrixComputation.h>
 #include <mayaHydraLib/mayaUtils.h>
-
-#include <flowViewport/fvpPurposeRenderTagsForPasses.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/type.h>

@@ -26,7 +26,6 @@ class TestStageInstanceablePrimsSelHighlight(mtohUtils.MayaHydraBaseTestCase): #
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 0.3
-    
 
     def setUp(self):
         super(TestStageInstanceablePrimsSelHighlight, self).setUp()

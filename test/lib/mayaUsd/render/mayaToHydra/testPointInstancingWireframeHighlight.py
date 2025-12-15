@@ -29,7 +29,6 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1
-    imageVersion=None
 
     @classmethod
     def setUpClass(cls):
@@ -47,10 +46,6 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.loadUsdScene()
         self.modifyDefaultLightIntensityByUsdVersion()
         cmds.refresh()
-        # Compute imageVersion once during setup
-        frame_passes_count = self.framePassesCount
-        if frame_passes_count == 2:
-            self.imageVersion = "two_passes"
 
     def test_PointInstancerSelection(self):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')

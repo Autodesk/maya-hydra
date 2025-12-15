@@ -186,7 +186,6 @@ TEST(NurbsSurfaces, nurbsCircle)
     
     DecimalStreamingOverride decimalStreamingOverride({ PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
 
-
     HdSceneIndexPrim circlePrim;
     bool testPassed = false;
     for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {

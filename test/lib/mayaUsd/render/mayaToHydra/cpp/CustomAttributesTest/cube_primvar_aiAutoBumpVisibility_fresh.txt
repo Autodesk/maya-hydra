@@ -1,6 +1,0 @@
-[interpolation]
-	constant
-[primvarValue]
-	1
-[role]
-	

@@ -59,7 +59,7 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
 
         sn.clear()
         sn.append(parentItem)
-        self.assertSnapshotClose("instanceSelection_parent.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
+        self.assertSnapshotClose("instanceSelection_parent.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
     def test_PrototypeSelection(self):
         sn = self.loadUsdScene("instancedCubeHierarchies.usda", 3)
@@ -92,8 +92,7 @@ class TestNativeInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         self.assertSnapshotClose("instanceWireframeColorChange_before.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         sn.append(secondInstanceItem)
-        #The results are wrong with 2 passes, logged as HYDRA-1849
-        self.assertSnapshotClose("instanceWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, self.imageVersion)
+        self.assertSnapshotClose("instanceWireframeColorChange_after.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
     
     def test_PrototypeWireframeColorChange(self):
         sn = self.loadUsdScene("instancedCubeHierarchies.usda", 3)

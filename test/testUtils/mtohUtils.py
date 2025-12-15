@@ -97,9 +97,6 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         #Set the usd version
         cls._usdVersion = Usd.GetVersion()
         
-        # Set the image version for 2 passes once per test file
-        cls._imageVersionFor2Passes = None
-        
     def setUp(self):
         # Maya is not closed/reset between each test of a test suite,
         # so open a new file before each test to minimize leftovers
@@ -109,16 +106,6 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         assert not modified, 'Internal test framework error: scene left as modified by mayaUtils.openNewScene()'
 
         self.setHdStormRenderer()
-
-        # Store the frame passes count as a member variable to avoid repeated command calls
-        self.framePassesCount = cmds.mayaHydraGetFramePassesCount()
-        
-        # Set the image version for 2 passes once per test file
-        if self.__class__._imageVersionFor2Passes is None:
-            if self.framePassesCount == 2:
-                self.__class__._imageVersionFor2Passes = "two_passes"
-            else:
-                self.__class__._imageVersionFor2Passes = None
 
         # We've just opened a new scene, so we should not be modified.  Setting
         # Storm as the renderer should conceptually not change that status, but
@@ -163,16 +150,6 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         cmds.modelEditor(self.activeEditor, e=1, rendererOverrideName="")
         cmds.refresh(f=1)
         self.delegateId = ""
-
-    def setHdArnoldRenderer(self):
-        """Set HdArnold as the current render delegate"""
-        self.activeEditor = cmds.playblast(activeEditor=1)
-        cmds.modelEditor(
-            self.activeEditor, e=1,
-            rendererOverrideName="mayaHydraRenderOverride_HdArnoldRendererPlugin")
-        cmds.refresh(f=1)
-        self.delegateId = cmds.mayaHydra(renderer="HdArnoldRendererPlugin",
-                                    sceneDelegateId="MayaHydraSceneDelegate")
 
     def setBasicCam(self, dist=DEFAULT_CAM_DIST):
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')

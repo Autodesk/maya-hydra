@@ -33,14 +33,6 @@ class TestIsolateSelectWithUsdLighting(mtohUtils.MayaHydraBaseTestCase):
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.01
     IMAGE_DIFF_FAIL_PERCENT = 0.2
-    imageVersion=None
-    
-    def setUp(self):
-        super(TestIsolateSelectWithUsdLighting, self).setUp()
-        # Compute imageVersion once during setup
-        frame_passes_count = self.framePassesCount
-        if frame_passes_count == 2:
-            self.imageVersion = "two_passes"
 
     def test_IsolateSelectWithUsdLighting(self):
         mayaUtils.openTestScene( 
