@@ -22,7 +22,6 @@
 #include <mayaHydraLib/adapters/tokens.h>
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
-#include <mayaHydraLib/mayaUtils.h>
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
