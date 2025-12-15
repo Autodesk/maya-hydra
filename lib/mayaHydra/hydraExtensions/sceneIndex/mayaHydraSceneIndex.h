@@ -94,7 +94,10 @@ public:
 
     // ------------------------------------------------------------------------
     // Maya Hydra scene producer implementations
-    // Propogate scene changes from Maya to Hydra
+
+    // Method to update render item data translation. Code in this method should pertain
+    // ONLY to render items, such that if there is no render item data to be translated,
+    // this method should not need to be called.
     void UpdateRenderItems(const MDataServerOperation::MViewportScene& scene);
 
     // Populate data from Maya
