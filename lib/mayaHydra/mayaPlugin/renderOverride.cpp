@@ -1876,6 +1876,11 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 
     _ClearMayaHydraSceneIndex();
 
+    // HYDRA-2019 : We need to manually call the destruction code, as we have some 
+    // lifetime management issues preventing the destructor from being called.
+    _mayaViewportSceneIndex->Destroy();
+    _mayaViewportSceneIndex.Reset();
+
     _displayStyleSceneIndex = nullptr;
     _pruneTexturesSceneIndex = nullptr;
     _defaultMaterialSceneIndex = nullptr;

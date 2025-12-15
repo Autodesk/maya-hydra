@@ -181,6 +181,11 @@ MayaViewportSceneIndex::MayaViewportSceneIndex(HdSceneIndexBaseRefPtr const& inp
 
 MayaViewportSceneIndex::~MayaViewportSceneIndex()
 {
+    Destroy();
+}
+
+void MayaViewportSceneIndex::Destroy()
+{
     // Remove our pick handler from the pick handler registry.
     if (_hasPickHandlerRegistered) {
         auto& phr = MayaHydra::PickHandlerRegistry::Instance();

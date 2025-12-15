@@ -96,6 +96,12 @@ public:
     MAYAHYDRALIB_API
     ~MayaViewportSceneIndex() override;
 
+    // HYDRA-2019 : This method should not exist and is what the destructor should be. 
+    // However, since we have some lifetime management issues with our scene index chain, 
+    // we need to manually call the dtor for the time being, so we expose it as this method.
+    MAYAHYDRALIB_API
+    void Destroy();
+
     MAYAHYDRALIB_API
     PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath& primPath) const override;
 
