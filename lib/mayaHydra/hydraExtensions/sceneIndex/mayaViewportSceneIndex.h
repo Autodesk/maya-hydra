@@ -17,47 +17,19 @@
 #ifndef MH_MAYA_VIEWPORT_SCENE_INDEX_H
 #define MH_MAYA_VIEWPORT_SCENE_INDEX_H
 
-#include "mayaHydraSceneIndex.h"
-#include "pxr/imaging/hd/dirtyBitsTranslator.h"
-
-#include <mayaHydraLib/adapters/cameraAdapter.h>
-#include <mayaHydraLib/adapters/lightAdapter.h>
-#include <mayaHydraLib/adapters/materialAdapter.h>
-#include <mayaHydraLib/adapters/renderItemAdapter.h>
-#include <mayaHydraLib/adapters/shapeAdapter.h>
 #include <mayaHydraLib/api.h>
-#include <mayaHydraLib/mayaHydraParams.h>
 #include <mayaHydraLib/pick/mhPickHitFwd.h>
-#include <mayaHydraLib/sceneIndex/mayaHydraDefaultLightDataSource.h>
-#include <mayaHydraLib/sceneIndex/mayaHydraMaterialDataSource.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
-#include <pxr/imaging/hd/changeTracker.h>
-#include <pxr/imaging/hd/driver.h>
-#include <pxr/imaging/hd/engine.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hd/mergingSceneIndex.h>
-#include <pxr/imaging/hd/renderIndex.h>
-#include <pxr/imaging/hd/rendererPlugin.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
-#include <pxr/imaging/hd/selection.h>
-#include <pxr/imaging/hdx/pickTask.h>
-#include <pxr/imaging/hdx/taskController.h>
-#include <pxr/pxr.h>
-#include <pxr/usd/sdf/path.h>
 
-#include <maya/MDagPath.h>
 #include <maya/MDrawContext.h>
-#include <maya/MFrameContext.h>
-#include <maya/MObject.h>
 #include <maya/MSelectionList.h>
 #include <ufe/ufe.h>
 
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
-#include <flowViewport/selection/fvpPathMapperFwd.h>
-#include <flowViewport/selection/fvpSelectionTypes.h>
-
-#include <optional>
-#include <unordered_map>
 
 UFE_NS_DEF { class Path; }
 
