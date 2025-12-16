@@ -60,9 +60,8 @@ public:
     virtual MObject GetMaterial();
     MAYAHYDRALIB_API
     virtual bool GetDoubleSided() const override { return true; };
-
     MAYAHYDRALIB_API
-    const GfRange3d& GetExtent();
+    virtual GfBBox3d GetBoundingBox() override;
 
     MAYAHYDRALIB_API
     virtual TfToken GetRenderTag() const override { return HdTokens->geometry; }
@@ -73,14 +72,6 @@ public:
         SdfPathVector&                              selectedSdfPaths,
         std::unordered_set<SdfPath, SdfPath::Hash>& selectedMasters,
         const HdSelectionSharedPtr&                 selection);
-
-protected:
-    MAYAHYDRALIB_API
-    void _CalculateExtent();
-
-private:
-    GfRange3d _extent;
-    bool      _extentDirty;
 };
 
 using MayaHydraShapeAdapterPtr = std::shared_ptr<MayaHydraShapeAdapter>;

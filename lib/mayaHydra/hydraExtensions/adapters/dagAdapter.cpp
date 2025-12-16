@@ -183,7 +183,8 @@ void MayaHydraDagAdapter::CreateCallbacks()
     MDagPathArray dags;
     if (MDagPath::getAllPathsTo(GetDagPath().node(), dags)) {
         const auto numDags = dags.length();
-        auto       dagNodeDirtyCallback = numDags > 1 ? _InstancerNodeDirty : _TransformNodeDirty;
+        const bool instanced = numDags > 1;
+        auto       dagNodeDirtyCallback = instanced ? _InstancerNodeDirty : _TransformNodeDirty;
         for (auto i = decltype(numDags) { 0 }; i < numDags; ++i) {
             auto dag = dags[i];
             for (; dag.length() > 0; dag.pop()) {
@@ -196,8 +197,8 @@ void MayaHydraDagAdapter::CreateCallbacks()
                     }
                     TF_DEBUG(MAYAHYDRALIB_ADAPTER_CALLBACKS)
                         .Msg(
-                            "- Added _InstancerNodeDirty callback for "
-                            "dagPath (%s).\n",
+                            "- Added %s callback for dagPath (%s).\n",
+                            (instanced ? "_InstancerNodeDirty" : "_TransformNodeDirty"),
                             dag.partialPathName().asChar());
                     _AddHierarchyChangedCallbacks(dag);
                 }
@@ -282,7 +283,7 @@ void MayaHydraDagAdapter::_AddHierarchyChangedCallbacks(MDagPath& dag)
         AddCallback(id);
     }
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_CALLBACKS)
-        .Msg("- Added parent added callback for dagPath (%s).\n", dag.partialPathName().asChar());
+        .Msg("- (%s) added parent added callback for inclusive ancestor (%s).\n", _dagPath.partialPathName().asChar(), dag.partialPathName().asChar());
 
     // We need a parent removed callback, even for non-instances,
     // because when an object is removed from the scene due to an
@@ -295,7 +296,7 @@ void MayaHydraDagAdapter::_AddHierarchyChangedCallbacks(MDagPath& dag)
         AddCallback(id);
     }
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_CALLBACKS)
-        .Msg("- Added parent removed callback for dagPath (%s).\n", dag.partialPathName().asChar());
+        .Msg("- (%s) added parent removed callback for inclusive ancestor (%s).\n", _dagPath.partialPathName().asChar(), dag.partialPathName().asChar());
 }
 
 SdfPath MayaHydraDagAdapter::GetInstancerID() const

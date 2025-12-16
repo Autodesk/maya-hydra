@@ -104,7 +104,7 @@ constexpr auto _sceneStats = "-ss";
 constexpr auto _sceneStatsLong = "-sceneStats";
 
 constexpr auto _helpText = R"HELP(For details on args usage please see 
-https://github.com/Autodesk/maya-hydra/tree/dev/doc/mayaHydraCommads.md
+https://github.com/Autodesk/maya-hydra/blob/dev/doc/mayaHydraCommands.md
 )HELP";
 
 } // namespace

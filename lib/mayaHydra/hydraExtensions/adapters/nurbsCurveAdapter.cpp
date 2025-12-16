@@ -142,6 +142,10 @@ public:
         MFnNurbsCurve curve(GetDagPath());
         const auto    pointCount = curve.numCVs();
 
+        if (pointCount <= 0) {
+            return {};
+        }
+
         VtIntArray curveVertexCounts;
         const auto numIndices = (pointCount - 1) * 2;
         curveVertexCounts.push_back(numIndices);

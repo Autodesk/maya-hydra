@@ -31,7 +31,7 @@
  * be used to interface with the main mayaHydra code base to query the state of things.
  * 
  * Current functionality:
- * - Cnecking for convergence
+ * - Checking for convergence
  */
 
 /* Examples

@@ -78,7 +78,8 @@ MayaHydraLightDataSource::Get(const TfToken& name)
 
 bool MayaHydraLightDataSource::_UseGet(const TfToken& name) const {
     if (name == HdLightTokens->params ||
-        name == HdLightTokens->shadowParams ||
+        name == HdLightTokens->shadowParams || 
+        name == HdTokens->transform ||
         name == HdLightTokens->shadowCollection) {
         return true;
     }
