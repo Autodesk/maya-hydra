@@ -21,15 +21,23 @@ namespace FVP_NS_DEF {
 
 void initialize(const InitializationParams& params)
 {
-    params.colorPreferencesNotificationProvider->addObserver(
-        Fvp::ColorPreferences::getInstance().shared_from_this());
-    Fvp::ColorPreferences::getInstance().setTranslator(params.colorPreferencesTranslator);
+    if (params.colorPreferencesNotificationProvider) {
+        params.colorPreferencesNotificationProvider->addObserver(
+            Fvp::ColorPreferences::getInstance().shared_from_this());
+    }
+    // Avoids an already null warning from
+    // Fvp::ColorPreferences::setTranslator().
+    if (params.colorPreferencesTranslator) {
+        Fvp::ColorPreferences::getInstance().setTranslator(params.colorPreferencesTranslator);
+    }
 }
 
 void finalize(const InitializationParams& params)
 {
-    params.colorPreferencesNotificationProvider->removeObserver(
-        Fvp::ColorPreferences::getInstance().shared_from_this());
+    if (params.colorPreferencesNotificationProvider) {
+        params.colorPreferencesNotificationProvider->removeObserver(
+            Fvp::ColorPreferences::getInstance().shared_from_this());
+    }
     Fvp::ColorPreferences::getInstance().setTranslator(nullptr);
 
     Fvp::ColorPreferences::deleteInstance();

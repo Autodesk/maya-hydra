@@ -41,22 +41,7 @@ MayaHydraShapeAdapter::MayaHydraShapeAdapter(
     const MDagPath&       dagPath)
     : MayaHydraDagAdapter(id, mayaHydraSceneIndex, dagPath)
 {
-    _CalculateExtent();
 }
-
-void MayaHydraShapeAdapter::_CalculateExtent()
-{
-    MStatus    status;
-    MFnDagNode dagNode(GetDagPath(), &status);
-    if (status) {
-        const auto bb = dagNode.boundingBox();
-        const auto mn = bb.min();
-        const auto mx = bb.max();
-        _extent.SetMin({ mn.x, mn.y, mn.z });
-        _extent.SetMax({ mx.x, mx.y, mx.z });
-        _extentDirty = false;
-    }
-};
 
 size_t MayaHydraShapeAdapter::SamplePrimvar(
     const TfToken& key,
@@ -83,9 +68,6 @@ PxOsdSubdivTags MayaHydraShapeAdapter::GetSubdivTags() { return {}; }
 void MayaHydraShapeAdapter::MarkDirty(HdDirtyBits dirtyBits)
 {
     MayaHydraDagAdapter::MarkDirty(dirtyBits);
-    if (dirtyBits & HdChangeTracker::DirtyPoints) {
-        _extentDirty = true;
-    }
 }
 
 MObject MayaHydraShapeAdapter::GetMaterial()
@@ -123,12 +105,16 @@ MObject MayaHydraShapeAdapter::GetMaterial()
     return MObject::kNullObj;
 }
 
-const GfRange3d& MayaHydraShapeAdapter::GetExtent()
+GfBBox3d MayaHydraShapeAdapter::GetBoundingBox()
 {
-    if (_extentDirty) {
-        _CalculateExtent();
-    }
-    return _extent;
+    MFnDagNode   node(GetDagPath());
+    MBoundingBox objBB = node.boundingBox();
+    MPoint       minPt = objBB.min();
+    MPoint       maxPt = objBB.max();
+    GfRange3d range(GfVec3d(minPt.x, minPt.y, minPt.z), GfVec3d(maxPt.x, maxPt.y, maxPt.z));
+    GfBBox3d  bbox = GfBBox3d(range, GetTransform());
+
+    return bbox;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
