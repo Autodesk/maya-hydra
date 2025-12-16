@@ -1771,6 +1771,9 @@ void MtohRenderOverride::_InitHydraResources(
     _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
     _inputSceneIndexOfFilteringSceneIndicesChain = _blockPrimRemovalPropagationSceneIndex;
 
+    // Adding the MayaViewportSceneIndex right after _blockPrimRemovalPropagationSceneIndex so that it's very early on in the chain, 
+    // to keep it close to the Maya data it is primarily designed towards. However, in theory its placement shouldn't matter too much, 
+    // as it is not designed around being in a specific place in the chain.
     _mayaViewportSceneIndex = MayaViewportSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain, _mayaHydraSceneIndex);
     _inputSceneIndexOfFilteringSceneIndicesChain = _mayaViewportSceneIndex;
 

@@ -25,8 +25,7 @@
 #include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
 
-#include <maya/MDrawContext.h>
-#include <maya/MSelectionList.h>
+#include <maya/MApiNamespace.h>
 #include <ufe/ufe.h>
 
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>

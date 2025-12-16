@@ -26,9 +26,11 @@
 
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
 
+#include <maya/MDrawContext.h>
 #include <maya/MGlobal.h>
 #include <maya/MItSelectionList.h>
 #include <maya/MMaterial.h>
+#include <maya/MSelectionList.h>
 
 #include <pxr/imaging/hd/containerDataSourceEditor.h>
 #include <pxr/imaging/hd/dataSourceTypeDefs.h>
@@ -303,6 +305,11 @@ void MayaViewportSceneIndex::Update(const MDrawContext& viewportDrawContext)
 
 void MayaViewportSceneIndex::_UpdateActiveLights(const MDrawContext& viewportDrawContext)
 {
+    // 2025-12-16 : This code was ported as-is from where it previously was in MayaHydraSceneIndex,
+    // but it seems a bit overly complex. I'm not sure why we remove the light prims in one case
+    // and disable them through the _lightsManagementSceneIndex in the other. It seems like we 
+    // should always use the _lightsManagementSceneIndex, as that's what it was designed for.
+
     MayaHydraSceneIndex::LightDagPathMap globalLightPaths = _mayaDataSceneIndex->GetGlobalLightPaths();
     MayaHydraSceneIndex::LightDagPathMap activeLightPaths;
     constexpr auto considerAllSceneLights = MHWRender::MDrawContext::kFilteredIgnoreLightLimit;
