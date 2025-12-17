@@ -33,6 +33,10 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+// interface was used as variable name in materialNetworkSchema.h 
+// but defined as struct in basetyps.h included by windows.h, undefine it here to avoid conflicts
+#undef interface
+
 #include "psapi.h"
 #elif defined(__linux__)
 #include <fstream>
