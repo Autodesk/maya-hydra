@@ -30,24 +30,30 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace {
 
 HgiTextureHandle getTextureHandle(
+    HdEngine*      engine,
+    const TfToken& aovToken
+)
+{
+    if (!engine) return {};
+
+    VtValue aov;
+    return (engine->GetTaskContextData(aovToken, &aov) && 
+            aov.IsHolding<HgiTextureHandle>()) ? 
+        aov.Get<HgiTextureHandle>() : HgiTextureHandle();
+}
+
+HgiTextureHandle getTextureHandle(
     const VtDictionary& args,
     const TfToken&      aovToken
 )
 {
 #ifdef VIEWPORT_TOOLBOX
     auto framePass = Fvp::ImageBufferWriter::GetPtr<hvt::FramePass>(args, "framePass");
-    if (framePass) {
-        return framePass ? framePass->GetRenderTexture(aovToken) : HgiTextureHandle();
-    }
+    return framePass ? framePass->GetRenderTexture(aovToken) : HgiTextureHandle();
 #else
     auto engine = Fvp::ImageBufferWriter::GetPtr<HdEngine>(args, "engine");
-    if (engine) {
-        VtValue aov;
-        return (engine->GetTaskContextData(aovToken, &aov) && aov.IsHolding<HgiTextureHandle>()) ? 
-            aov.Get<HgiTextureHandle>() : HgiTextureHandle();
-    }
+    return getTextureHandle(engine, aovToken);
 #endif
-    return {};
 }
 
 }
@@ -56,10 +62,19 @@ namespace FVP_NS_DEF {
 
 TextureBufferWriter::TextureBufferWriter(
     const VtDictionary& args,
-    const TfToken&      aov
+    const TfToken&      aovToken
 ) : ImageBufferWriter(), 
-    _textureHandle(getTextureHandle(args, aov)),
+    _textureHandle(getTextureHandle(args, aovToken)),
     _hgi(Fvp::ImageBufferWriter::GetPtr<Hgi>(args, "hgi"))
+{}
+
+TextureBufferWriter::TextureBufferWriter(
+    HdEngine*      engine,
+    Hgi*           hgi,
+    const TfToken& aovToken
+) : ImageBufferWriter(),
+    _textureHandle(getTextureHandle(engine, aovToken)),
+    _hgi(hgi)
 {}
 
 unsigned int TextureBufferWriter::Dim(unsigned int i) const

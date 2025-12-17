@@ -22,6 +22,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 class HdRenderBuffer;
+class HdxTaskController;
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace FVP_NS_DEF {
@@ -38,7 +39,13 @@ public:
     FVP_API
     RenderBufferWriter(
       const PXR_NS::VtDictionary& args,
-      const PXR_NS::TfToken&      aov
+      const PXR_NS::TfToken&      aovToken
+    );
+
+    FVP_API
+    RenderBufferWriter(
+      PXR_NS::HdxTaskController* taskController,
+      const PXR_NS::TfToken&     aovToken = PXR_NS::HdAovTokens->color
     );
 
     unsigned int Width() const override;
