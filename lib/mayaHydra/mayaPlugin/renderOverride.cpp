@@ -1673,7 +1673,9 @@ void MtohRenderOverride::_InitHydraResources(
         currentPass->params().backgroundColor                   = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);//For clearing
         currentPass->params().backgroundDepth                   = 1.0f;//For clearing
         currentPass->params().renderParams.enableLighting       = true;
+#if PXR_VERSION <= 2508
         currentPass->params().renderParams.enableSceneMaterials = true;
+#endif
         currentPass->params().renderParams.cullStyle            = HdCullStyleBackUnlessDoubleSided;
         currentPass->params().enableColorCorrection             = false; // Disable color correction to let Maya take care of it
         currentPass->params().visualizeAOV                      = HdAovTokens->color;
