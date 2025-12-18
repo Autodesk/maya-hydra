@@ -36,6 +36,7 @@
 #include <mayaHydraLib/mayaHydraParams.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexDataFactoriesSetup.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+#include <mayaHydraLib/sceneIndex/mayaViewportSceneIndex.h>
 #include <mayaHydraLib/mhWireframeColorInterfaceImp.h>
 #include <mayaHydraLib/mhLeadObjectPathTracker.h>
 #include <mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h>
@@ -379,6 +380,7 @@ private:
     GlfSimpleLight _defaultLight;
 
     MayaHydraSceneIndexRefPtr _mayaHydraSceneIndex;
+    MAYAHYDRA_NS::MayaViewportSceneIndexRefPtr _mayaViewportSceneIndex;
 
     //Lead object selection and wireframe color for selection highlight
     std::shared_ptr<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp> _wireframeColorInterfaceImp {nullptr};
@@ -406,7 +408,6 @@ private:
     unsigned int _oldDisplayStyle {0};
     int        _oldRefineLevel {0};
     bool       _useDefaultMaterial;
-    bool       _xRayEnabled;
     MFrameContext::LightingMode _lightingMode = MFrameContext::LightingMode::kSceneLights;
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
     long int   _nbViewSelectedChangedCalls{0};

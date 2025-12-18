@@ -16,11 +16,13 @@
 
 #include "mayaHydraDefaultLightDataSource.h"
 
-#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+#include <mayaHydraLib/sceneIndex/mayaViewportSceneIndex.h>
 
 #include <pxr/imaging/hd/lightSchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/xformSchema.h>
+
+using namespace MayaHydra;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -33,7 +35,7 @@ public:
 
     MayaHydraSimpleLightDataSource(
         const SdfPath& id,
-        MayaHydraSceneIndex* sceneIndex)
+        MayaViewportSceneIndex* sceneIndex)
         : _id(id)
         , _sceneIndex(sceneIndex)
     {
@@ -129,7 +131,7 @@ public:
 
 private:
     SdfPath _id;
-    MayaHydraSceneIndex* _sceneIndex = nullptr;
+    MayaViewportSceneIndex* _sceneIndex = nullptr;
 };
 
 // ----------------------------------------------------------------------------
@@ -137,7 +139,7 @@ private:
 MayaHydraDefaultLightDataSource::MayaHydraDefaultLightDataSource(
     const SdfPath& id,
     TfToken type,
-    MayaHydraSceneIndex* sceneIndex)
+    MayaViewportSceneIndex* sceneIndex)
     : _id(id)
     , _type(type)
     , _sceneIndex(sceneIndex)

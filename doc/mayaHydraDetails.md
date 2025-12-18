@@ -141,12 +141,12 @@ stateDiagram
       InsertHydraPrims --> [*]
   }
         
-  InitHydraResources() --> HandleCompleteViewportScene() : Loops over MRenderItems using DataServer API
+  InitHydraResources() --> UpdateRenderItems() : Loops over MRenderItems using DataServer API
   state RenderItemAdapter {
       [*] --> InsertHydraPrim
       InsertHydraPrim --> [*]
   }      
-  HandleCompleteViewportScene() --> RenderItemAdapter : Handles VP2 updates
+  UpdateRenderItems() --> RenderItemAdapter : Handles VP2 updates
   RenderItemAdapter --> UpdateDirtiedPrims
   UpdateDirtiedPrims --> SetHydraRenderParams : Global values obtained from VP2 and Maya RenderSettings
   SetHydraRenderParams --> HydraExecute()

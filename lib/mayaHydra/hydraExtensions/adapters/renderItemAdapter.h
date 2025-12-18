@@ -78,7 +78,7 @@ public:
     virtual void RemovePrim() override { }
 
     MAYAHYDRALIB_API
-    virtual void Populate() override { }
+    virtual void Populate() override;
 
     MAYAHYDRALIB_API
     bool HasType(const TfToken& typeId) const override { return typeId == HdPrimTypeTokens->mesh; }
@@ -114,13 +114,10 @@ public:
     VtValue GetMaterialResource();
 
     MAYAHYDRALIB_API
-    void SetPlaybackChanged();
+    void SetPlaybackState(bool isPlaybackRunning);
 
     MAYAHYDRALIB_API
     bool GetVisible() override;
-
-    MAYAHYDRALIB_API
-    void SetVisible(bool val) { _visible = val; }
 
     MAYAHYDRALIB_API
     const MColor& GetWireframeColor() const { return _wireframeColor; }
@@ -224,6 +221,7 @@ private:
     bool                        _visible = false;
     MColor                      _wireframeColor = { 1.f, 1.f, 1.f, 1.f };
     bool                        _isHideOnPlayback = false;
+    bool                        _isInPlayback = false;
     bool                        _isArnoldSkyDomeLightTriangleShape = false;
     GfBBox3d                    _bounds;//Bounding box
     TfToken                     _purposeRenderTag;

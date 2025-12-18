@@ -846,7 +846,7 @@ void MtohRenderOverride::_DetectMayaDefaultLighting(const MHWRender::MDrawContex
 #endif
 
                 // Note for devs : if you update more parameters in the default light, don't forget
-                // to update MtohDefaultLightDelegate::SetDefaultLight and MayaHydraSceneIndex::SetDefaultLight, currently there are only 3 :
+                // to update MtohDefaultLightDelegate::SetDefaultLight and MayaViewportSceneIndex::SetDefaultLight, currently there are only 3 :
                 // position, diffuse, specular
                 GfVec3f position;
                 GetDirectionalLightPositionFromDirectionVector(position, {direction.x, direction.y, direction.z});
@@ -941,9 +941,12 @@ MStatus MtohRenderOverride::Render(
 
         if (scene.changed()) {
             if (_mayaHydraSceneIndex) {
-                _mayaHydraSceneIndex->HandleCompleteViewportScene(
-                    scene, static_cast<MFrameContext::DisplayStyle>(drawContext.getDisplayStyle()));
+                _mayaHydraSceneIndex->UpdateRenderItems(scene);
             }
+        }
+
+        if (_mayaViewportSceneIndex) {
+            _mayaViewportSceneIndex->Update(drawContext);
         }
 
         // Update shadow collection for lights
@@ -1193,16 +1196,21 @@ MStatus MtohRenderOverride::Render(
         _hasDefaultLighting = (MFrameContext::kLightDefault == _lightingMode);//Update default lighting
     }
 
+    if (_mayaViewportSceneIndex) {
+        _mayaViewportSceneIndex->SetDefaultLightEnabled(_hasDefaultLighting);
+        _mayaViewportSceneIndex->SetDefaultLight(_defaultLight);
+    }
+
     if (_mayaHydraSceneIndex) {
-        _mayaHydraSceneIndex->SetDefaultLightEnabled(_hasDefaultLighting);
-        _mayaHydraSceneIndex->SetDefaultLight(_defaultLight);
         _mayaHydraSceneIndex->SetParams(delegateParams);
-        _mayaHydraSceneIndex->PreFrame(drawContext);
+        _mayaHydraSceneIndex->FlushPendingUpdates();
 
         auto& manager = Fvp::RenderViewDataManager::Get();
         if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle)){
             _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(true);//Prevent prim removal propagation to keep the current selection.
-            _mayaHydraSceneIndex->SetLightsManagementSceneIndex(nullptr);
+            if (_mayaViewportSceneIndex) {
+                _mayaViewportSceneIndex->SetLightsManagementSceneIndex(nullptr);
+            }
 
             manager.RemoveRenderViewData(panelNameStr);
             TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
@@ -1292,11 +1300,6 @@ MStatus MtohRenderOverride::Render(
     }
 
     if (_defaultMaterialSceneIndex && _useDefaultMaterial != currentUseDefaultMaterial){
-        // Create default material data when switching to the default material in the viewport
-        if (_mayaHydraSceneIndex && !_mayaHydraSceneIndex->DefaultMaterialCreated()) {
-            _mayaHydraSceneIndex->CreateMayaDefaultMaterialData();
-        }
-
         _defaultMaterialSceneIndex->Enable(currentUseDefaultMaterial);
         _useDefaultMaterial = currentUseDefaultMaterial;
     }
@@ -1552,9 +1555,6 @@ MStatus MtohRenderOverride::Render(
     } else {
         renderFrame(true);
     }
-    if (_mayaHydraSceneIndex) {
-        _mayaHydraSceneIndex->PostFrame();
-    }
 
     //Store as old display style
     _oldDisplayStyle = currentDisplayStyle;
@@ -1742,7 +1742,7 @@ void MtohRenderOverride::_InitHydraResources(
 
     _dataProducerMergingSceneIndexProxy = std::make_shared<Fvp::DataProducerMergingSceneIndexProxy>();
 
-    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, !_hasDefaultLighting);
+    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData);
     TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
 
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
@@ -1773,6 +1773,13 @@ void MtohRenderOverride::_InitHydraResources(
 
     //Put BlockPrimRemovalPropagationSceneIndex first as it can block/unblock the prim removal propagation on the whole scene indices chain
     _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
+    _inputSceneIndexOfFilteringSceneIndicesChain = _blockPrimRemovalPropagationSceneIndex;
+
+    // Adding the MayaViewportSceneIndex right after _blockPrimRemovalPropagationSceneIndex so that it's very early on in the chain, 
+    // to keep it close to the Maya data it is primarily designed towards. However, in theory its placement shouldn't matter too much, 
+    // as it is not designed around being in a specific place in the chain.
+    _mayaViewportSceneIndex = MayaViewportSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain, _mayaHydraSceneIndex);
+    _inputSceneIndexOfFilteringSceneIndicesChain = _mayaViewportSceneIndex;
 
     // As of 13-Nov-2025, order of operations in _InitHydraResources() is such
     // that render globals are initialized after this method is called.  Thus
@@ -1780,7 +1787,7 @@ void MtohRenderOverride::_InitHydraResources(
     // defaultRenderGlobals node.  Simply pass in an empty set of included
     // purposes here.
     _purposeFilteringSceneIndex = Fvp::PurposeFilteringSceneIndex::New(
-        _blockPrimRemovalPropagationSceneIndex, {});
+        _inputSceneIndexOfFilteringSceneIndicesChain, {});
         // RenderGlobalsUtils::GetIncludedPurposes());
     _pruningSceneIndex = Fvp::PruningSceneIndex::New(_purposeFilteringSceneIndex);
     _pruningSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya filtering is handled by VP2/OGS.
@@ -1875,6 +1882,11 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _sceneIndexRegistry.reset();
 
     _ClearMayaHydraSceneIndex();
+
+    // HYDRA-2019 : We need to manually call the destruction code, as we have some 
+    // lifetime management issues preventing the destructor from being called.
+    _mayaViewportSceneIndex->Destroy();
+    _mayaViewportSceneIndex.Reset();
 
     _displayStyleSceneIndex = nullptr;
     _pruneTexturesSceneIndex = nullptr;
@@ -1990,8 +2002,8 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 
     // Add default material scene index
     _lastFilteringSceneIndexBeforeCustomFiltering = _defaultMaterialSceneIndex = Fvp::DefaultMaterialSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering,
-                                                                                _mayaHydraSceneIndex ? _mayaHydraSceneIndex->GetDefaultMaterialPath() : SdfPath(),
-                                                                                _mayaHydraSceneIndex ? _mayaHydraSceneIndex->GetDefaultMaterialExclusionPaths(): SdfPathVector());
+                                                                                _mayaViewportSceneIndex ? _mayaViewportSceneIndex->GetDefaultMaterialPath() : SdfPath(),
+                                                                                _mayaViewportSceneIndex ? _mayaViewportSceneIndex->GetDefaultMaterialExclusionPaths(): SdfPathVector());
 
     if(! _leadObjectPathTracker){
         _leadObjectPathTracker = std::make_shared<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker>(_dirtyLeadObjectSceneIndex);
@@ -2043,11 +2055,11 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         _piPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
     }
 
-    TF_AXIOM(_mayaHydraSceneIndex);
+    TF_AXIOM(_mayaViewportSceneIndex);
     _lastFilteringSceneIndexBeforeCustomFiltering = _lightsManagementSceneIndex = Fvp::LightsManagementSceneIndex::New(
-        _lastFilteringSceneIndexBeforeCustomFiltering, _mayaHydraSceneIndex->MayaDefaultLightPath());
+        _lastFilteringSceneIndexBeforeCustomFiltering, _mayaViewportSceneIndex->DefaultLightPath());
     _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(_lightingMode));
-    _mayaHydraSceneIndex->SetLightsManagementSceneIndex(_lightsManagementSceneIndex);
+    _mayaViewportSceneIndex->SetLightsManagementSceneIndex(_lightsManagementSceneIndex);
 
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);//Should this be on the frame pass filtering scene index ?
@@ -2877,7 +2889,7 @@ void MtohRenderOverride::_CreateFramePassesData()
     if (!shouldUseSingleFramePass) {
         auto filteringData = std::make_shared<Fvp::FramePassData>();
         filteringData->_rendererName = MtohTokens->HdStormRendererPlugin;//Storm by default
-        filteringData->_includePaths = { _highlightHierarchyPrefix, MayaHydraSceneIndex::MayaDefaultLightPath() }; // include selection highlight prims.
+        filteringData->_includePaths = { _highlightHierarchyPrefix, MayaViewportSceneIndex::DefaultLightPath() }; // include selection highlight prims.
         filteringData->_excludePaths = { };
         filteringData->_removeLights = true; // Remove lights from this pass except for the default light, kept through the include paths
         filteringData->_supportPrimsWithNoPurposeRenderTag
