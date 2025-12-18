@@ -117,24 +117,4 @@ GfBBox3d MayaHydraShapeAdapter::GetBoundingBox()
     return bbox;
 }
 
-void MayaHydraShapeAdapter::PopulateSelectedPaths(
-    const MDagPath&                             selectedDag,
-    SdfPathVector&                              selectedSdfPaths,
-    std::unordered_set<SdfPath, SdfPath::Hash>& selectedMasters,
-    const HdSelectionSharedPtr&                 selection)
-{
-    VtIntArray indices(1);
-    if (IsInstanced()) {
-        indices[0] = selectedDag.instanceNumber();
-        selection->AddInstance(HdSelection::HighlightModeSelect, _id, indices);
-        if (selectedMasters.find(_id) == selectedMasters.end()) {
-            selectedSdfPaths.push_back(_id);
-            selectedMasters.insert(_id);
-        }
-    } else {
-        selection->AddRprim(HdSelection::HighlightModeSelect, _id);
-        selectedSdfPaths.push_back(_id);
-    }
-}
-
 PXR_NAMESPACE_CLOSE_SCOPE
