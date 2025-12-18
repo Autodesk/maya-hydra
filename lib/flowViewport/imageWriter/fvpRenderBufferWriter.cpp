@@ -30,22 +30,25 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace {
 
 HdRenderBuffer* getRenderBuffer(
+    PXR_NS::HdxTaskController* taskController,
+    const PXR_NS::TfToken&     aovToken
+)
+{
+    return taskController ? taskController->GetRenderOutput(aovToken) : nullptr;
+}
+
+HdRenderBuffer* getRenderBuffer(
     const VtDictionary&    args,
     const PXR_NS::TfToken& aovToken
 )
 {
 #ifdef VIEWPORT_TOOLBOX
     auto framePass = Fvp::ImageBufferWriter::GetPtr<hvt::FramePass>(args, "framePass");
-    if (framePass) {
-        return framePass ? framePass->GetRenderBuffer(aovToken) : nullptr;
-    }
+    return framePass ? framePass->GetRenderBuffer(aovToken) : nullptr;
 #else
     auto taskController = Fvp::ImageBufferWriter::GetPtr<HdxTaskController>(args, "taskController");
-    if (taskController) {
-        return taskController ? taskController->GetRenderOutput(aovToken) : nullptr;
-    }
+    return getRenderBuffer(taskController, aovToken);
 #endif
-    return nullptr;
 }
 
 }
@@ -54,8 +57,15 @@ namespace FVP_NS_DEF {
 
 RenderBufferWriter::RenderBufferWriter(
     const PXR_NS::VtDictionary& args,
-    const TfToken&              aov
-) : ImageBufferWriter(), _renderBuffer(getRenderBuffer(args, aov))
+    const TfToken&              aovToken
+) : ImageBufferWriter(), _renderBuffer(getRenderBuffer(args, aovToken))
+{}
+
+RenderBufferWriter::RenderBufferWriter(
+    PXR_NS::HdxTaskController* taskController,
+    const PXR_NS::TfToken&     aovToken
+) : ImageBufferWriter(), 
+    _renderBuffer(getRenderBuffer(taskController, aovToken))
 {}
 
 unsigned int RenderBufferWriter::Width() const

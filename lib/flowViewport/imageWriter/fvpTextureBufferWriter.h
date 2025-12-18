@@ -23,6 +23,10 @@
 #include <pxr/imaging/hgi/texture.h>
 #include <pxr/imaging/hdSt/textureUtils.h>
 
+PXR_NAMESPACE_OPEN_SCOPE
+class HdEngine;
+PXR_NAMESPACE_CLOSE_SCOPE
+
 namespace FVP_NS_DEF {
 
 /// \class TextureBufferWriter
@@ -37,7 +41,14 @@ public:
     FVP_API
     TextureBufferWriter(
       const PXR_NS::VtDictionary& args,
-      const PXR_NS::TfToken&      aov
+      const PXR_NS::TfToken&      aovToken
+    );
+
+    FVP_API
+    TextureBufferWriter(
+      PXR_NS::HdEngine*      engine,
+      PXR_NS::Hgi*           hgi,
+      const PXR_NS::TfToken& aovToken = PXR_NS::HdAovTokens->color
     );
 
     unsigned int Width() const override;
