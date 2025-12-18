@@ -83,6 +83,16 @@ public:
         const PXR_NS::TfToken&      aov = PXR_NS::HdAovTokens->color
     );
 
+    //! Using the argument image buffer writer write to the file
+    //! path passed in as argument.  Returns false if the file name is
+    //! empty.
+    //! \return true for success.
+    FVP_API
+    static bool Write(
+        const ImageBufferWriter::Ptr& writer,
+        const std::string&            fileName
+    );
+
     //! Utility method to write the content of the image buffer
     //! described by the StorageSpec to the file path passed in as argument.
     //! \return true for success.

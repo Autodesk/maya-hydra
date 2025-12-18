@@ -5,6 +5,7 @@ target_sources(${TARGET_NAME}
     PRIVATE
     registration.cpp
     mayaHydraSceneIndex.cpp
+    mayaViewportSceneIndex.cpp
     mayaHydraDataSource.cpp
     mayaHydraPrimvarDataSource.cpp
     mayaHydraDisplayStyleDataSource.cpp
@@ -25,6 +26,7 @@ target_sources(${TARGET_NAME}
 set(HEADERS
     registration.h
     mayaHydraSceneIndex.h
+    mayaViewportSceneIndex.h
     mayaHydraDataSource.h
     mayaHydraPrimvarDataSource.h
     mayaHydraDisplayStyleDataSource.h

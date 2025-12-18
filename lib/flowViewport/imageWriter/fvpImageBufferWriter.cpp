@@ -68,6 +68,15 @@ bool ImageBufferWriter::Write(
 
 /* static */
 bool ImageBufferWriter::Write(
+    const ImageBufferWriter::Ptr& writer,
+    const std::string&            fileName
+)
+{
+    return (writer ? writer->Write(fileName) : false);
+}
+
+/* static */
+bool ImageBufferWriter::Write(
     const std::string&           fileName, 
     const HioImage::StorageSpec& storageSpec
 )

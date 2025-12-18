@@ -71,10 +71,14 @@ MayaHydraRenderItemAdapter::MayaHydraRenderItemAdapter(
     , _cullMode(ri.cullMode())
 #endif
 {
-    _InsertRprim(this);
 }
 
 MayaHydraRenderItemAdapter::~MayaHydraRenderItemAdapter() { _RemoveRprim(); }
+
+void MayaHydraRenderItemAdapter::Populate()
+{
+    _InsertRprim(this);
+}
 
 TfToken MayaHydraRenderItemAdapter::GetRenderTag() const
 {
@@ -178,7 +182,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     }
 
     if (visibChanged) {
-        SetVisible(visible);
+        _visible = visible;
         dirtyBits |= HdChangeTracker::DirtyVisibility;
     }
 
@@ -553,22 +557,22 @@ bool MayaHydraRenderItemAdapter::GetVisible()
 {
     // Assuming that, if the playback is in the active view only
     // (MAnimControl::kPlaybackViewActive), we are called because we are in the active view
-    if (_isHideOnPlayback) {
-        // MAYA-127216: Remove dependency on parent class MayaHydraAdapter. This will let us use
-        // MayaHydraSceneDelegate directly
-        auto mayaHydraSceneIndex = static_cast<MayaHydraSceneIndex*>(GetMayaHydraSceneIndex());
-        return !mayaHydraSceneIndex->GetPlaybackRunning();
+    if (_isHideOnPlayback && _isInPlayback) {
+        return false;
     }
 
     return _visible;
 }
 
-void MayaHydraRenderItemAdapter::SetPlaybackChanged()
+void MayaHydraRenderItemAdapter::SetPlaybackState(bool isPlaybackRunning)
 {
     // There was a change in the playblack state, it started or stopped running so update any
     // primitive that is dependent on this
-    if (_isHideOnPlayback) {
-        MarkDirty(HdChangeTracker::DirtyVisibility);
+    if (_isInPlayback != isPlaybackRunning) {
+        _isInPlayback = isPlaybackRunning;
+        if (_isHideOnPlayback) {
+            MarkDirty(HdChangeTracker::DirtyVisibility);
+        }
     }
 }
 

@@ -257,8 +257,6 @@ MStatus BatchRenderer::Render(
     // }
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER).Msg("BatchRenderer::Render()\n");
 
-    constexpr auto displayStyle = MFrameContext::kTextured;
-
     auto renderFrame = [&](bool markTime = false) {
         HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
 
@@ -280,8 +278,7 @@ MStatus BatchRenderer::Render(
 
         if (scene.changed()) {
             if (_mayaHydraSceneIndex) {
-                _mayaHydraSceneIndex->HandleCompleteViewportScene(
-                  scene, displayStyle);
+                _mayaHydraSceneIndex->UpdateRenderItems(scene);
             }
         }
 
@@ -579,8 +576,7 @@ void BatchRenderer::_InitHydraResources()
         = std::make_shared<Fvp::DataProducerMergingSceneIndexProxy>();
 
     constexpr bool interactive = false;
-    constexpr bool _hasDefaultLighting = false; // Batch rendering does not use default lighting.
-    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, interactive, !_hasDefaultLighting);
+    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, interactive);
     TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
     
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
