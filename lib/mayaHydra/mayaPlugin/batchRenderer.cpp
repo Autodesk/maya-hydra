@@ -368,7 +368,9 @@ MStatus BatchRenderer::Render(
 
     HdxRenderTaskParams params;
     params.enableLighting = true;
+#if PXR_VERSION <= 2508
     params.enableSceneMaterials = true;
+#endif
 
     // Do not set params.wireframeColor, as this implies reading the
     // FvpColorPreferencesTokens->wireframeSelection from the
