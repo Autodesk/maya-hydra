@@ -1362,7 +1362,9 @@ MStatus MtohRenderOverride::Render(
 #else
     HdxRenderTaskParams params;
     params.enableLighting       = true;
+#if PXR_VERSION <= 2508
     params.enableSceneMaterials = true;
+#endif
     params.cullStyle            = HdCullStyleBackUnlessDoubleSided;
     _taskController->SetSelectionColor(_globals.colorSelectionHighlightColor);// Default color in usdview.
     _taskController->SetEnableSelection(_globals.colorSelectionHighlight);
