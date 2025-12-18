@@ -88,7 +88,7 @@ public:
     //! empty.
     //! \return true for success.
     FVP_API
-    static bool ImageBufferWriter::Write(
+    static bool Write(
         const ImageBufferWriter::Ptr& writer,
         const std::string&            fileName
     );
