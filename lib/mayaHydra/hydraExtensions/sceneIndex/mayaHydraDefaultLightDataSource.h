@@ -17,15 +17,19 @@
 #ifndef MAYAHYDRADEFAULTLIGHTDATASOURCE_H
 #define MAYAHYDRADEFAULTLIGHTDATASOURCE_H
 
+#include <mayaHydraLib/mayaHydra.h>
+
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
 #include <pxr/imaging/hd/dataSource.h>
 #include <pxr/imaging/hd/enums.h>
 #include <pxr/imaging/glf/simpleLight.h>
 
-PXR_NAMESPACE_OPEN_SCOPE
+namespace MAYAHYDRA_NS_DEF {
+    class MayaViewportSceneIndex;
+}
 
-class MayaHydraSceneIndex;
+PXR_NAMESPACE_OPEN_SCOPE
 
 /**
  * \brief A container data source representing data unique to light
@@ -44,7 +48,7 @@ private:
     MayaHydraDefaultLightDataSource(
         const SdfPath& id,
         TfToken type,
-        MayaHydraSceneIndex* sceneIndex);
+        MAYAHYDRA_NS::MayaViewportSceneIndex* sceneIndex);
 
     VtValue _GetLightParamValue(const TfToken& paramName);
 
@@ -52,7 +56,7 @@ private:
     TfToken _type;
 
     const GlfSimpleLight* _light = nullptr;
-    MayaHydraSceneIndex* _sceneIndex = nullptr;
+    MAYAHYDRA_NS::MayaViewportSceneIndex* _sceneIndex = nullptr;
 };
 
 HD_DECLARE_DATASOURCE_HANDLES(MayaHydraDefaultLightDataSource);
