@@ -149,7 +149,6 @@ private:
     PXR_NS::HdRendererPlugin*                 _rendererPlugin = nullptr;
     std::unique_ptr<PXR_NS::HdxTaskController> _taskController;
     PXR_NS::HdPluginRenderDelegateUniqueHandle _renderDelegate = nullptr;
-    PXR_NS::VtDictionary                      _fileWriterArgs{};
     PXR_NS::HdSceneIndexBaseRefPtr            _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
     PXR_NS::HdSceneIndexBaseRefPtr            _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
     PXR_NS::HdRenderIndex*                    _renderIndex = nullptr;

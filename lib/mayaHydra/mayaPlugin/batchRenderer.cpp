@@ -38,7 +38,8 @@
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
-#include <flowViewport/imageWriter/fvpImageBufferWriter.h>
+#include <flowViewport/imageWriter/fvpRenderBufferWriter.h>
+#include <flowViewport/imageWriter/fvpTextureBufferWriter.h>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
@@ -484,7 +485,13 @@ MStatus BatchRenderer::Render(
 
     const auto fileName = Fvp::ImageBufferWriter::GetFileName();
     if (!fileName.empty()) {
-        if (!Fvp::ImageBufferWriter::Write(_fileWriterArgs, fileName)) {
+        using Writer = Fvp::ImageBufferWriter;
+        // TODO_BATCH_RENDER Checking for use of Hydra Storm is not general enough.
+        Writer::Ptr writer = _isUsingHdSt ? Writer::Ptr(
+            std::make_shared<Fvp::TextureBufferWriter>(&_engine, _hgi.get())) :
+            Writer::Ptr(std::make_shared<Fvp::RenderBufferWriter>(_taskController.get()));
+
+        if (!Writer::Write(writer, fileName)) {
             TF_RUNTIME_ERROR("Failed to write image to %s",
                              fileName.c_str());
         }
@@ -552,13 +559,6 @@ void BatchRenderer::_InitHydraResources()
     if (_isUsingHdSt) {
         _taskController->SetRenderOutputs({ HdAovTokens->color });
     }
-
-    // As per https://stackoverflow.com/questions/9982681
-    // an initializer_list cannot be used in a ternary operator.
-    // TODO_BATCH_RENDER Checking for use of Hydra Storm is not general enough.
-    _fileWriterArgs = _isUsingHdSt ? VtDictionary{
-      {{"hgi", VtValue(_hgi.get())}, {"engine", VtValue(&_engine)}}} :
-      VtDictionary{{{"taskController", VtValue(_taskController.get())}}}; 
 
     MayaHydraInitData mhInitData(
         TfToken("MayaHydraSceneIndex"),
@@ -670,7 +670,6 @@ void BatchRenderer::ClearHydraResources(bool fullReset)
     // invalid.
     _engine.ClearTaskContextData();
 
-    _fileWriterArgs.clear();
     _taskController.reset();
 
     if (_renderIndex != nullptr) {
