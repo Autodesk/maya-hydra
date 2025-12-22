@@ -217,7 +217,7 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceName(
 
 #if PXR_VERSION >= 2511
     // Special case for some expected names.
-    // See https://github.com/PixarAnimationStudios/OpenUSD/commit/1d19b1d
+    // See https://github.com/PixarAnimationStudios/OpenUSD/commit/f475246
     if (!dataSourceEntry.locator.IsEmpty()) {
         const PXR_NS::TfToken& lastElement = dataSourceEntry.locator.GetLastElement();
         if (!lastElement.IsEmpty()) {
