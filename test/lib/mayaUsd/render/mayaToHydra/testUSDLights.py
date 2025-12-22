@@ -29,6 +29,11 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
     IMAGE_DIFF_FAIL_PERCENT = 0.2
 
     def verifyLightingModes(self, shadowOn):
+        # Dome lighting change in USD 25.11+
+        imageVersion = None
+        if self._usdVersion >= (0, 25, 11):
+            imageVersion = "usd2511+"
+
         imageSuffix = "_shadowOn" if shadowOn else ""
         panel = mayaUtils.activeModelPanel()
 
@@ -38,7 +43,7 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
         #All Lights mode
         cmds.modelEditor(panel, edit=True, displayLights="all")
         cmds.refresh()
-        self.assertSnapshotClose("allLights" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("allLights" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
         #Default Light mode
         cmds.modelEditor(panel, edit=True, displayLights="default")
@@ -59,12 +64,12 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
 
         cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DomeLight1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("domeLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("domeLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
         #Flat Light mode
         cmds.modelEditor(panel, edit=True, displayLights="flat")
         cmds.refresh()
-        self.assertSnapshotClose("flatLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("flatLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
         #No Light mode
         cmds.modelEditor(panel, edit=True, displayLights="none")

@@ -25,6 +25,8 @@
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/vt/array.h>
 #include <pxr/base/vt/value.h>
+#include <pxr/imaging/hd/materialSchema.h>
+#include <pxr/imaging/hd/materialBindingsSchema.h>
 
 #include <gtest/gtest.h>
 
@@ -131,7 +133,7 @@ void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(
         if (compareDataSourceHierarchy) {
             _primHierarchyWidget->setCurrentItem(primQtItem);
             CompareDataSourceHierarchy( primPath,
-                { primPath.GetNameToken(), prim.dataSource }, compareDataSourceValues);
+                { primPath.GetNameToken(), prim.dataSource, PXR_NS::HdDataSourceLocator() }, compareDataSourceValues);
         }
 
         // Prepare next step (need to pop the stack before pushing the next elements)
@@ -163,9 +165,7 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
         DataSourceEntry  dataSourceEntry = dataSourceStack.top();
 
         // Compare data source name
-        std::string actualDataSourceName = dataSourceQtItem->text(0).toStdString();
-        std::string expectedDataSourceName = dataSourceEntry.name;
-        EXPECT_EQ(actualDataSourceName, expectedDataSourceName) << " for prim " << primPath.GetText();
+        CompareDataSourceName(primPath, dataSourceQtItem, dataSourceEntry);
 
         // Compare data source value
         if (compareValues) {
@@ -189,7 +189,7 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
                 PXR_NS::TfToken                dataSourceName = *itChildNames;
                 PXR_NS::HdDataSourceBaseHandle dataSource = containerDataSource->Get(dataSourceName);
                 if (dataSource) {
-                    dataSourceStack.push({ dataSourceName, dataSource });
+                    dataSourceStack.push({ dataSourceName, dataSource, dataSourceEntry.locator.Append(dataSourceName) });
                 }
             }
         } else if (
@@ -205,6 +205,36 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
             }
         }
     }
+}
+
+void AdskHydraSceneBrowserTestFixture::CompareDataSourceName(
+    const PXR_NS::SdfPath& primPath,
+    const QTreeWidgetItem* dataSourceQtItem,
+    const DataSourceEntry& dataSourceEntry)
+{
+    std::string actualDataSourceName = dataSourceQtItem->text(0).toStdString();
+    std::string expectedDataSourceName = dataSourceEntry.name;
+
+#if PXR_VERSION >= 2511
+    // Special case for some expected names.
+    // See https://github.com/PixarAnimationStudios/OpenUSD/commit/1d19b1d
+    if (!dataSourceEntry.locator.IsEmpty()) {
+        const PXR_NS::TfToken& lastElement = dataSourceEntry.locator.GetLastElement();
+        if (!lastElement.IsEmpty()) {
+            expectedDataSourceName = lastElement.GetText();
+        } else {
+            expectedDataSourceName
+                = dataSourceEntry.locator.HasPrefix(PXR_NS::HdMaterialSchema::GetDefaultLocator())
+                ? PXR_NS::HdMaterialSchemaTokens->_universalRenderContextToken
+                : dataSourceEntry.locator.HasPrefix(
+                      PXR_NS::HdMaterialBindingsSchema::GetDefaultLocator())
+                ? PXR_NS::HdMaterialBindingsSchemaTokens->_allPurposeToken
+                : PXR_NS::TfToken("<empty>");
+        }
+    }
+#endif
+
+    EXPECT_EQ(actualDataSourceName, expectedDataSourceName) << " for prim " << primPath.GetText();
 }
 
 void AdskHydraSceneBrowserTestFixture::CompareDataSourceValue(
