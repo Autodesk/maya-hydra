@@ -40,10 +40,15 @@ class TestArnoldLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.
         #Turn on/off shadows
         cmds.modelEditor(panel, edit=True, shadows=shadowOn)
 
+        # Dome lighting change in USD 25.11+
+        imageVersion = None
+        if self._usdVersion >= (0, 25, 11):
+            imageVersion = "usd2511+"
+
         #All Lights mode
         cmds.modelEditor(panel, edit=True, displayLights="all")
         cmds.refresh()
-        self.assertSnapshotClose("allLights" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("allLights" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
         #TODO: Enable code below when those lighting modes are supported by arnold lights
         #Default Light mode
