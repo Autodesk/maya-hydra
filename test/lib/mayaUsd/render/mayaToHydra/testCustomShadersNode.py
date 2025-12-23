@@ -38,15 +38,21 @@ class TestCustomShadersNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohU
                 "testCustomShadersNode",
                 "testCustomShadersNode.ma")
             cmds.refresh()
-            self.assertSnapshotClose("testCustomShadersNodeDefaultLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+            # Dome lighting change in USD 25.11+
+            imageVersion = None
+            if self._usdVersion >= (0, 25, 11):
+                imageVersion = "usd2511+"
+            
+            self.assertSnapshotClose("testCustomShadersNodeDefaultLight.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
             # Switch the lighting mode to use all scene lights.
             cmds.modelEditor(mayaUtils.activeModelPanel(), edit=True, displayLights = 'all')
-            self.assertSnapshotClose("testCustomShadersNodeUseAllLights.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("testCustomShadersNodeUseAllLights.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
             #Remove the direct lighting to check if the dome light works fine
             cmds.setAttr("pointLightShape1.intensity", 0);
-            self.assertSnapshotClose("testCustomShadersNodeDomeLightOnly.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+            self.assertSnapshotClose("testCustomShadersNodeDomeLightOnly.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersion)
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
