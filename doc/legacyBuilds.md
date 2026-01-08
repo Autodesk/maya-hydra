@@ -7,6 +7,7 @@ If you want to try your hand at building mayaHydra for a Maya version that is no
 | 2024                 | 22.11           |
 | 2025                 | 23.11           |
 | 2026                 | 24.11           |
+| PR                 | 25.11           |
 
 # Example guide on how to build with latest version of openUSD and previous version of Maya such as 2024
 
