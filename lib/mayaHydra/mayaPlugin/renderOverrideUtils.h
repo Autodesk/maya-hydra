@@ -18,6 +18,8 @@
 #ifndef MTOH_VIEW_OVERRIDE_UTILS_H
 #define MTOH_VIEW_OVERRIDE_UTILS_H
 
+#include <maya/MViewport2Renderer.h>
+
 #include <pxr/pxr.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -35,9 +37,15 @@ public:
 
     MUint64 getObjectTypeExclusions() override
     {
-        /// To skip the generation of some unwanted render lists even the kRenderPreSceneUIItems
+        /// To skip the generation of some unwanted render lists even if the kRenderPreSceneUIItems
         /// filter is specified.
-        return MFrameContext::kExcludeManipulators | MFrameContext::kExcludeHUD;
+        static MUint64 sObjectTypeExclusions = []() -> MUint64 {
+            /// Exclude everything as a baseline. Restore grid.
+            MUint64 flags = MFrameContext::kExcludeAll;
+            flags &= ~MFrameContext::kExcludeGrid;
+            return flags;
+        }();
+        return sObjectTypeExclusions;
     }
 
     MSceneFilterOption renderFilterOverride() override { return kRenderPreSceneUIItems; }
