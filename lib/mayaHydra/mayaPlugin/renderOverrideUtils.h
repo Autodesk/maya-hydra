@@ -18,6 +18,7 @@
 #ifndef MTOH_VIEW_OVERRIDE_UTILS_H
 #define MTOH_VIEW_OVERRIDE_UTILS_H
 
+#include <maya/MSelectionList.h>
 #include <maya/MViewport2Renderer.h>
 
 #include <pxr/pxr.h>
@@ -43,10 +44,29 @@ public:
             /// Exclude everything as a baseline. Restore grid.
             MUint64 flags = MFrameContext::kExcludeAll;
             flags &= ~MFrameContext::kExcludeGrid;
+            //flags &= ~MFrameContext::kExcludeMeshes;				
+            //flags &= ~MFrameContext::kExcludePluginShapes;		
+            //flags &= ~MFrameContext::kExcludeNurbsCurves;		
+            //flags &= ~MFrameContext::kExcludeNurbsSurfaces;		
+            //flags &= ~MFrameContext::kExcludePlanes;				
+            //flags &= ~MFrameContext::kExcludeLights;				
+            flags &= ~MFrameContext::kExcludeCameras;			
+            //flags &= ~MFrameContext::kExcludeJoints;				
+            //flags &= ~MFrameContext::kExcludeIkHandles;			
+            //flags &= ~MFrameContext::kExcludeSubdivSurfaces;		
+            //flags &= ~MFrameContext::kExcludeHairSystems;		
+            //flags &= ~MFrameContext::kExcludeGreasePencils;		
             return flags;
         }();
         return sObjectTypeExclusions;
+        //return MFrameContext::kExcludeManipulators | MFrameContext::kExcludeHUD;
     }
+
+    //const MSelectionList * objectSetOverride() override
+    //{
+    //    static MSelectionList emptyList;
+    //    return &emptyList;
+    //}
 
     MSceneFilterOption renderFilterOverride() override { return kRenderPreSceneUIItems; }
 
@@ -80,6 +100,35 @@ public:
     {
         return MSceneFilterOption(kRenderPostSceneUIItems);
     }
+
+    MHWRender::MClearOperation& clearOperation() override { return mClearOperation; }
+};
+
+class MayaHydraDataUpdatePass : public MHWRender::MSceneRender
+{
+public:
+    explicit MayaHydraDataUpdatePass(const MString& name)
+        : MHWRender::MSceneRender(name)
+    {
+        mClearOperation.setMask(MHWRender::MClearOperation::kClearNone);
+    }
+
+    MUint64 getObjectTypeExclusions() override
+    {
+        return MFrameContext::kExcludeGrid 
+            | MFrameContext::kExcludeGreasePencils 
+            | MFrameContext::kExcludeHUD
+            | MFrameContext::kExcludeDimensions 
+            | MFrameContext::kExcludeManipulators;
+    }
+
+    const MSelectionList * objectSetOverride() override
+    {
+        static MSelectionList emptyList;
+        return &emptyList;
+    }
+
+    MSceneFilterOption renderFilterOverride() override { return kNoSceneFilterOverride; }
 
     MHWRender::MClearOperation& clearOperation() override { return mClearOperation; }
 };

@@ -2207,6 +2207,8 @@ MStatus MtohRenderOverride::setup(const MString& destination)
         // Clear and draw pre scene elements (grid not pushed into hydra)
         _operations.push_back(std::make_unique<MayaHydraPreRender>("HydraRenderOverride_PreScene"));
 
+        _operations.push_back(std::make_unique<MayaHydraDataUpdatePass>("HydraRenderOverride_DataUpdatePass"));
+
         // The main hydra render
         // For the data server, This also invokes scene update then sync scene delegate after scene update
         _operations.push_back(std::make_unique<MayaHydraRender>("HydraRenderOverride_DataServer", this));
