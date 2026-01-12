@@ -30,7 +30,7 @@ If you want to <B>be able to import usd data in maya through [MayaUSD](https://g
 
 | | ![](images/pxr.png) | USD version used in Maya | USD source for MayaUSD / MayaHydra |
 |:-: |:-: |:-:|:-:|
-| CommitID/Tags | [v23.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v23.11)<BR>[v24.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.11)<BR>[v25.05](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v25.05) | Maya 2026 = v24.11<br>Maya PR = v25.05 | [v24.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v24.11-MayaUsd-Public)<br>[v25.05-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v25.05-MayaUsd-Public) |
+| CommitID/Tags | [v24.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.11)<BR>[v25.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v25.11) | Maya 2026 = v24.11<br>Maya PR = v25.11 | [v24.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v24.11-MayaUsd-Public)<br>[v25.11](https://github.com/autodesk-forks/USD/releases/tag/v25.11) |
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
 
@@ -54,11 +54,15 @@ To build the project with UFE support, you will need to use the headers and libr
 
 https://www.autodesk.com/developer-network/platform-technologies/maya
 
-#### 5. Download the source code
+#### 5. Hydra Viewport Toolbox (HVT)
+[Hydra Viewport Toolbox](https://github.com/Autodesk/hydra-viewport-toolbox) (HVT) is a set of utilities to help you build hydra-based viewport. HVT is included as a submodule of the maya-hydra repository, and is built automatically when you build maya-hydra.
 
-Start by cloning the repository:
+#### 6. Download the source code
+
+Start by cloning the repository and udpate the sub-modules :
 ```
 git clone https://github.com/Autodesk/maya-hydra 
+git submodule update --init --recursive
 cd maya-hydra
 ```
 
@@ -75,7 +79,7 @@ cd maya-hydra
 | [lib/mayaHydra/ufeExtensions](https://github.com/Autodesk/maya-hydra/tree/dev/lib/mayaHydra/ufeExtensions) | Contains extensions to translate paths between UFE, USD SdfPath and Maya DAGPath |
 
 
-#### 6. How To Use build.py Script
+#### 7. How To Use build.py Script
 
 ##### Arguments
 

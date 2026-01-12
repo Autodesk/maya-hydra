@@ -29,6 +29,19 @@ class TestMayaLightingModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohU
     
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1.5
+
+    def verifySnapshot(self, imageName):
+        cmds.refresh()
+
+         # Dome lighting change in USD 25.11+
+        imageVersion = None
+        if self._usdVersion >= (0, 25, 11):
+            imageVersion = "usd2511+"
+
+        self.assertSnapshotClose(imageName, 
+                                 self.IMAGE_DIFF_FAIL_THRESHOLD,
+                                 self.IMAGE_DIFF_FAIL_PERCENT,
+                                 imageVersion)
     
     def test_MayaUsualLightingModes(self):
         # open the Maya scene
@@ -36,47 +49,42 @@ class TestMayaLightingModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohU
                 "testMayaLightingModes",
                 "AllKindsOfLights.ma", useTestSettings=False)
         cmds.refresh()
-        
+
         #Lighting off
         cmds.modelEditor('modelPanel4', edit=True, displayLights='none')
-        self.assertSnapshotClose("noLighting.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.verifySnapshot("noLighting.png")
         
         #Use all lights
         cmds.modelEditor('modelPanel4', edit=True, displayLights='all')
-        self.assertSnapshotClose("allLights.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.verifySnapshot("allLights.png")
         
         #Lighting default
         cmds.modelEditor('modelPanel4', edit=True, displayLights='default')
-        self.assertSnapshotClose("defaultLighting.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.verifySnapshot("defaultLighting.png")
         
     def test_MayaActiveLightingMode(self):
         testFile = mayaUtils.openTestScene(
                 "testMayaLightingModes",
                 "AllKindsOfLights.ma", useTestSettings=False)
         cmds.refresh()
-        
+
         #Set active/selected lights only
         cmds.modelEditor('modelPanel4', edit=True, shadows=True)
         cmds.modelEditor('modelPanel4', edit=True, displayLights='active')
         cmds.select(clear=True)
-        cmds.refresh()
-        self.assertSnapshotClose("selLights_None.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.verifySnapshot("selLights_None.png")
 
         cmds.select("|stage1|stageShape1,/SphereLight1", replace=True)
-        cmds.refresh()
-        self.assertSnapshotClose("sphereLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.verifySnapshot("sphereLightSelected.png")
 
         cmds.select("pointLight1", replace=True)
-        cmds.refresh()
-        self.assertSnapshotClose("pointLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.verifySnapshot("pointLightSelected.png")
 
         cmds.select("aiSkyDomeLight1", replace=True)
-        cmds.refresh()
-        self.assertSnapshotClose("domeLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.verifySnapshot("domeLightSelected.png")
 
         cmds.select("spotLight1", replace=True)
-        cmds.refresh()
-        self.assertSnapshotClose("spotLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.verifySnapshot("spotLightSelected.png")
 
         cmds.select("directionalLight1", replace=True)
         cmds.refresh()
@@ -84,14 +92,12 @@ class TestMayaLightingModes(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohU
         #self.assertSnapshotClose("dirLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
 
         cmds.select("areaLight1", replace=True)
-        cmds.refresh()
-        self.assertSnapshotClose("areaLightSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.verifySnapshot("areaLightSelected.png")
 
         cmds.select("|stage1|stageShape1,/SphereLight1", replace=True)
         cmds.select("pointLight1", add=True)
         cmds.select("aiSkyDomeLight1", add=True)
-        cmds.refresh()
-        self.assertSnapshotClose("someLightsSelected.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.verifySnapshot("someLightsSelected.png")
     
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
