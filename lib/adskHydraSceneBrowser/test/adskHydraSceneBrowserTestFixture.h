@@ -35,6 +35,7 @@ struct DataSourceEntry
 {
     PXR_NS::TfToken                name;
     PXR_NS::HdDataSourceBaseHandle dataSource;
+    PXR_NS::HdDataSourceLocator    locator;
 };
 
 class AdskHydraSceneBrowserTestFixture : public ::testing::Test
@@ -55,6 +56,9 @@ protected:
 
     void
     CompareDataSourceHierarchy(const PXR_NS::SdfPath& primPath, DataSourceEntry rootDataSourceEntry, bool compareValues = false);
+
+    void
+    CompareDataSourceName(const PXR_NS::SdfPath& primPath, const QTreeWidgetItem* dataSourceQtItem, const DataSourceEntry& dataSourceEntry);
 
     void CompareDataSourceValue(PXR_NS::HdSampledDataSourceHandle sampledDataSource);
 
