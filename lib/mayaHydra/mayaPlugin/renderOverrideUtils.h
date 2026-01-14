@@ -55,7 +55,7 @@ public:
     {
         /// To skip the generation of some unwanted render lists even the kRenderPreSceneUIItems
         /// filter is specified.
-        /// Note that since we implicitly rely on MayaHydraPreRender to update the internal OGS
+        /// 2026-01-14 : Note that since we implicitly rely on MayaHydraPreRender to update the internal OGS
         /// scene, we must keep most elements included so that they are translated by the
         /// DataServer API later.
         return MFrameContext::kExcludeManipulators | MFrameContext::kExcludeHUD;
