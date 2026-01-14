@@ -18,6 +18,12 @@
 #ifndef MTOH_VIEW_OVERRIDE_UTILS_H
 #define MTOH_VIEW_OVERRIDE_UTILS_H
 
+#include <maya/MApiNamespace.h>
+#include <maya/MDagPath.h>
+#include <maya/MFn.h>
+#include <maya/MItDag.h>
+#include <maya/MViewport2Renderer.h>
+
 #include <pxr/pxr.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -40,9 +46,29 @@ public:
         return MFrameContext::kExcludeManipulators | MFrameContext::kExcludeHUD;
     }
 
+    const MSelectionList* objectSetOverride() override
+    {
+        //static MSelectionList emptyList;
+        //return &emptyList;
+        // Populate the selection list with all camera paths in the scene
+        _cameraList.clear();
+        MItDag dagIt(MItDag::kDepthFirst, MFn::kCamera);
+        for (; !dagIt.isDone(); dagIt.next()) {
+            MDagPath cameraPath;
+            if (dagIt.getPath(cameraPath) == MS::kSuccess) {
+                // Add the camera shape path to the selection list
+                _cameraList.add(cameraPath);
+            }
+        }
+        return &_cameraList;
+    }
+
     MSceneFilterOption renderFilterOverride() override { return kRenderPreSceneUIItems; }
 
     MHWRender::MClearOperation& clearOperation() override { return mClearOperation; }
+
+private:
+    MSelectionList _cameraList;
 };
 
 class MayaHydraPostRender : public MHWRender::MSceneRender
