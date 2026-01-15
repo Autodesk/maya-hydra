@@ -30,7 +30,7 @@ If you want to <B>be able to import usd data in maya through [MayaUSD](https://g
 
 | | ![](images/pxr.png) | USD version used in Maya | USD source for MayaUSD / MayaHydra |
 |:-: |:-: |:-:|:-:|
-| CommitID/Tags | [v24.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.11)<BR>[v25.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v25.11) | Maya 2026 = v24.11<br>Maya PR = v25.11 | [v24.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v24.11-MayaUsd-Public)<br>[v25.11](https://github.com/autodesk-forks/USD/releases/tag/v25.11) |
+| CommitID/Tags | [v24.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v24.11)<BR>[v25.11](https://github.com/PixarAnimationStudios/OpenUSD/releases/tag/v25.11) | Maya 2026 = v24.11<br>Maya PR = v25.11 | [v24.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v24.11-MayaUsd-Public)<br>[v25.11-MayaUsd-Public](https://github.com/autodesk-forks/USD/tree/v25.11-MayaUsd-Public) |
 
 For additional information on building Pixar USD, see the ***Additional Build Instruction*** section below.
 
