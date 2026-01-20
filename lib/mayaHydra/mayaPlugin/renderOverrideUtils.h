@@ -18,10 +18,22 @@
 #ifndef MTOH_VIEW_OVERRIDE_UTILS_H
 #define MTOH_VIEW_OVERRIDE_UTILS_H
 
+#include <mayaUsdAPI/utils.h>
+
+#include <maya/MViewport2Renderer.h>
+
 #include <pxr/pxr.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+// 2026-01-14 : The MayaHydraPreRender operation currently does two things :
+// 1. Draw the pre-scene UI, i.e. the grid
+// 2. Update the internal OGS scene
+// This second behavior isn't explicit and obvious, but is necessary for 
+// the DataServer API to properly translate the Maya scene later on.
+// This means that we cannot exclude everything except the grid in 
+// getObjectTypeExclusions(), as that would prevent the render items for
+// other objects in the scene from being created/updated.
 class MayaHydraPreRender : public MHWRender::MSceneRender
 {
 public:
@@ -31,18 +43,37 @@ public:
         /// To keep the colors always sync'ed, reuse same clear colors as global ones instead of set
         /// the same colors explicitly.
         mClearOperation.setOverridesColors(false);
+
+        // 2026-01-14 : MayaUsd data is translated separately by MayaHydra, so we must exclude it from the update.
+        // If we don't, the MayaUsd proxy shape will be processed as part of this operation, and when
+        // using depth peeling, the MayaUsd render items will be drawn to the depth buffer. This later
+        // causes z-fighting issues when compositing the Hydra render on top of the Maya framebuffer.
+        _pluginDisplayFilterExclusions.append(MAYAUSDAPI_NS::getProxyShapeDisplayFilter());
     }
 
     MUint64 getObjectTypeExclusions() override
     {
         /// To skip the generation of some unwanted render lists even the kRenderPreSceneUIItems
         /// filter is specified.
+        /// 2026-01-14 : Note that since we implicitly rely on MayaHydraPreRender to update the internal OGS
+        /// scene, we must keep most elements included so that they are translated by the
+        /// DataServer API later.
         return MFrameContext::kExcludeManipulators | MFrameContext::kExcludeHUD;
     }
+
+#if (MAYA_API_VERSION >= 20270000) // Method is only available in Maya 2027+
+    MStringArray& pluginDisplayFilterExclusions() override
+    {
+        return _pluginDisplayFilterExclusions;
+    }
+#endif
 
     MSceneFilterOption renderFilterOverride() override { return kRenderPreSceneUIItems; }
 
     MHWRender::MClearOperation& clearOperation() override { return mClearOperation; }
+
+private:
+    MStringArray _pluginDisplayFilterExclusions;
 };
 
 class MayaHydraPostRender : public MHWRender::MSceneRender
