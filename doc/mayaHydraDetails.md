@@ -29,7 +29,7 @@ graph LR
 ### Color Management(CM)
 Maya's Color Managment is applied to all applicable viewports including viewport overrides. MayaHydra plugin override inherits this behavior. So the final frame rendered out from Hydra undergoes Maya's CM. All workflows pertaining to CM within Maya remain the same so user can configure CM with MayaHydra as they would for a VP2 viewport. 
 
-Hydra also support CM internally via Hydra Tasks. In the current version of the plugin, Hydra's CM is not applied. There are a couple of blockers for this to implemented at the moment(5th Oct 2023). USD is on OCIO v1 and Maya uses OCIO v2. There are some incompatibities with these two version and can lead to unpredictable behaviour.
+Hydra also support CM internally via Hydra Tasks. In the current version of the plugin, Hydra's CM is not applied. There are a couple of blockers for this to implemented at the moment(5th Oct 2023). USD is on OCIO v1 and Maya uses OCIO v2. There are some incompatibilities with these two version and can lead to unpredictable behaviour.
 
 ### Data Access and Interpretation
 
@@ -47,7 +47,7 @@ We have the flexibility needed to handle other object types outside the MRenderI
 
 ### Adapters for direct translation of Maya data to Hydra
 
-MayaHydra utilizes USD's PluginRegistry mechanism to translate Maya native data to Hydra. Maya meshes/shapes, camera, lights(spot,area, directional), NURBS Curves, materials and, as a special case, Arnold's SkyDomeLight are handled by these adapaters. MRenderItem described above is also handled by this plugin registry adapter mechanism.
+MayaHydra utilizes USD's PluginRegistry mechanism to translate Maya native data to Hydra. Maya meshes/shapes, camera, lights(spot,area, directional), NURBS Curves, materials and, as a special case, Arnold's SkyDomeLight are handled by these adapters. MRenderItem described above is also handled by this plugin registry adapter mechanism.
 
 ```mermaid
 classDiagram
