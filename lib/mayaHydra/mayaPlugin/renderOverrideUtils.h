@@ -61,10 +61,12 @@ public:
         return MFrameContext::kExcludeManipulators | MFrameContext::kExcludeHUD;
     }
 
+#if (MAYA_API_VERSION >= 20270000) // Method is only available in Maya 2027+
     MStringArray& pluginDisplayFilterExclusions() override
     {
         return _pluginDisplayFilterExclusions;
     }
+#endif
 
     MSceneFilterOption renderFilterOverride() override { return kRenderPreSceneUIItems; }
 
