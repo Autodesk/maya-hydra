@@ -162,7 +162,8 @@ MayaFrameRefresh --> MtohRenderOverrideRender
 subgraph MtohRenderOverrideRender["MtohRenderOverride::Render()"]
 subgraph InitHydraResources["If first render : _InitHydraResources()"]
   CreateFramePasses["Create and setup frame passes"] --> PopulateMayaData["Loop over Maya nodes and populate Hydra scene"]
-  PopulateMayaData --> CreateSceneIndexChain["Create scene indices chain for viewport features"]
+  PopulateMayaData --> SceneIndexRegistration["Register plugin scene indices (such as MayaUSD's for USD data)"]
+  SceneIndexRegistration --> CreateSceneIndexChain["Create scene indices chain for viewport features"]
 end
 InitHydraResources --> RenderSetup
 subgraph RenderSetup
