@@ -197,12 +197,9 @@ Run the script with the ```--help``` parameter to see all the possible flags and
 
 Unit tests can be run by setting ```--stages=test``` or by simply calling `ctest` directly from the build directory.
 
-# Rebuilding with the latest version of OpenUSD and with a previous version of Maya
-Please see [Rebuilding with the latest OpenUSD version and with a previous version of Maya](./rebuildingWithLatestOpenUSDAndPreviousMaya.md)
+# Additional Build Instructions
 
-# Additional Build Instruction
-
-##### Python:
+### Python:
 
 It is important to use the Python version shipped with Maya and not the system version when building USD on MacOS. Note that this is primarily an issue on MacOS, where Maya's version of Python is likely to conflict with the version provided by the system. 
 
@@ -235,7 +232,7 @@ setuptools 63.2.0
 shiboken2  5.15.2.1
 ```
 
-##### Dependencies on Linux DSOs when running tests
+### Dependencies on Linux DSOs when running tests:
 
 Normally either runpath or rpath are used on some DSOs in this library to specify explicit on other libraries (such as USD itself)
 
@@ -246,6 +243,10 @@ CMAKE_SKIP_RPATH=TRUE
 To allow your tests to run, you can inject LD_LIBRARY_PATH into any of the mayaHydra_add_test calls by setting the ADDITIONAL_LD_LIBRARY_PATH cmake variable to $ENV{LD_LIBRARY_PATH} or similar.
 
 There is a related ADDITIONAL_PXR_PLUGINPATH_NAME cmake var which can be used if schemas are installed in a non-standard location
+
+### Using Visual Studio as the generator
+
+When using Visual Studio as your generator, the .sln file will be generated in the build folder.
 
 # How to Load Plug-ins in Maya 
 
@@ -259,3 +260,6 @@ export MAYA_MODULE_PATH=/usr/local/workspace/install/RelWithDebInfo
 
 The MAYA_MODULE_PATH environment variable can also be set through the Maya.env file.
 Once MAYA_MODULE_PATH is set, run maya and go to ```Windows -> Setting/Preferences -> Plug-in Manager``` to load the plugins.
+
+# Rebuilding with the latest version of OpenUSD and with a previous version of Maya
+Please see [legacyBuilds.md](./legacyBuilds.md)
