@@ -121,62 +121,36 @@ MayaHydra leverages the [Hydra Viewport Toolbox](https://github.com/Autodesk/hyd
 
 ```mermaid
 
-stateDiagram
-  [MayaFrameRefresh] --> MtohRenderOverride 
-  MtohRenderOverride --> InitHydraResources() : Render()
-
-  state InitHydraResources() {
-      [*] --> HydraResources
-      HydraResources --> MayaHydraSceneIndex() :  RenderDelegate/RenderIndex
-      MayaHydraSceneIndex() --> Populate() : Creates MayaHydra specific Scene Indices internally       
-      Populate() --> MayaHydraAdapter : Loop over Maya native nodes
-      MayaHydraAdapter --> SceneIndexRegistration : Flow Viewport API (WIP) to inject various Scene Indices including USD data and SelectionHighlighting
-      SceneIndexRegistration --> [*]
-  }
-  
-    state MayaHydraAdapter {
-      [*] --> InsertHydraPrims : Shape/Mesh/Light/Material/ArnoldDomelight
-      InsertHydraPrims --> [*]
-  }
-        
-  InitHydraResources() --> UpdateRenderItems() : Loops over MRenderItems using DataServer API
-  state RenderItemAdapter {
-      [*] --> InsertHydraPrim
-      InsertHydraPrim --> [*]
-  }      
-  UpdateRenderItems() --> RenderItemAdapter : Handles VP2 updates
-  RenderItemAdapter --> UpdateDirtiedPrims
-  UpdateDirtiedPrims --> SetHydraRenderParams : Global values obtained from VP2 and Maya RenderSettings
-  SetHydraRenderParams --> HydraExecute()
-  HydraExecute() -->  [MayaFrameRefresh]
-```
-
---------------------------------------
-
-```mermaid
-
 flowchart TD
 
-MayaFrameRefresh
 MayaFrameRefresh --> MtohRenderOverrideRender
+
 subgraph MtohRenderOverrideRender["MtohRenderOverride::Render()"]
+
 subgraph InitHydraResources["If first render : _InitHydraResources()"]
   CreateFramePasses["Create and setup frame passes"] --> PopulateMayaData["Loop over Maya nodes and populate Hydra scene"]
-  PopulateMayaData --> SceneIndexRegistration["Register plugin scene indices (such as MayaUSD's for USD data)"]
-  SceneIndexRegistration --> CreateSceneIndexChain["Create scene indices chain for viewport features"]
+  PopulateMayaData --> SceneIndexRegistration["Register data producer scene indices and populate Hydra scene"]
+  SceneIndexRegistration --> CreateSceneIndexChain["Create chain of filtering scene indices implementing viewport features"]
 end
+
 InitHydraResources --> RenderSetup
-subgraph RenderSetup
+
+subgraph RenderSetup["General render setup"]
 UpdateRenderParams["Update rendering parameters based on viewport settings"]
 UpdateRenderParams --> UpdateRenderItems["Update Hydra scene from Maya render items"]
 UpdateRenderItems --> UpdatePluginData["Update Hydra scene from plugin data"]
 UpdatePluginData --> UpdatePluginFilteringSceneIndices["Update plugin filtering scene indices"]
 end
+
 RenderSetup --> FramePass
+
 subgraph FramePass["For each frame pass"]
 PrepareFramePass["Prepare frame pass"]
 PrepareFramePass --> GetBuffers["Retrieve buffers from previous pass (if applicable)"]
 GetBuffers --> RenderFramePass["Render frame pass"]
 end
+
+FramePass --> FramePass
+
 end
 ```
