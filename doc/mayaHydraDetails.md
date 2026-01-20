@@ -83,21 +83,17 @@ classDiagram
     -_sceneIndexRegistry: std::shared_ptr<MayaHydraSceneIndexRegistry>
     -_hgi: HgiUniquePtr
     -_hgiDriver: HdDriver
-    -_engine: HdEngine
-    -_rendererPlugin: HdRendererPlugin*
-    -_taskController: HdxTaskController*
-    -_renderDelegate: HdPluginRenderDelegateUniqueHandle
+    -_framePassesData: Fvp::FramePassDataPtrVector
     -_dataProducerMergingSceneIndexProxy: std::shared_ptr<Fvp::DataProducerMergingSceneIndexProxy>
-    -_renderIndex: HdRenderIndex*
     -_fvpSelectionTracker: Fvp::SelectionTrackerSharedPtr
     -_selectionSceneIndex: Fvp::SelectionSceneIndexRefPtr
     -_mayaHydraSceneIndex: std::unique_ptr<MayaHydraSceneIndex>
     +Render(const MHWRender::MDrawContext& drawContext, const MHWRender::MDataServerOperation::MViewportScene& scene)
   }
 ```
-The class is contains resources pertaining to both Maya and Hydra. 
+The class contains resources pertaining to both Maya and Hydra. 
 
-We will do a high-level walk through of various execution phases, render loop and corresponding data flow. Please note the plugin is undergoing major design changes with newer APIs being introduced. The diagrams below are relevant as of 5th October 2023. 
+We will do a high-level walk through of various execution phases, render loop and corresponding data flow. Please note the plugin is undergoing major design changes with newer APIs being introduced. The diagrams below are relevant as of January 19th 2026. 
 
 ### Plugin Load
 ```mermaid
@@ -121,6 +117,8 @@ sequenceDiagram
   MtohRenderOverride-->>MayaHydra: MtohRenderOverride Registered
 ```
 ### The Render Loop
+MayaHydra leverages the [Hydra Viewport Toolbox](https://github.com/Autodesk/hydra-viewport-toolbox) (HVT) to implement multi-pass rendering. This multi-pass support allows us to support secondary graphics (such as selection highlighting) for any render delegate, even those that don't support the prim types we use for highlighting. The first pass, the beauty pass, uses the user-selected renderer (in the "Renderer" tab in Maya) to render the main scene data. The second pass, the secondary graphics pass, uses Storm to render secondary graphics.
+
 ```mermaid
 
 stateDiagram
@@ -151,4 +149,33 @@ stateDiagram
   UpdateDirtiedPrims --> SetHydraRenderParams : Global values obtained from VP2 and Maya RenderSettings
   SetHydraRenderParams --> HydraExecute()
   HydraExecute() -->  [MayaFrameRefresh]
+```
+
+--------------------------------------
+
+```mermaid
+
+flowchart TD
+
+MayaFrameRefresh
+MayaFrameRefresh --> MtohRenderOverrideRender
+subgraph MtohRenderOverrideRender["MtohRenderOverride::Render()"]
+subgraph InitHydraResources["If first render : _InitHydraResources()"]
+  CreateFramePasses["Create and setup frame passes"] --> PopulateMayaData["Loop over Maya nodes and populate Hydra scene"]
+  PopulateMayaData --> CreateSceneIndexChain["Create scene indices chain for viewport features"]
+end
+InitHydraResources --> RenderSetup
+subgraph RenderSetup
+UpdateRenderParams["Update rendering parameters based on viewport settings"]
+UpdateRenderParams --> UpdateRenderItems["Update Hydra scene from Maya render items"]
+UpdateRenderItems --> UpdatePluginData["Update Hydra scene from plugin data"]
+UpdatePluginData --> UpdatePluginFilteringSceneIndices["Update plugin filtering scene indices"]
+end
+RenderSetup --> FramePass
+subgraph FramePass["For each frame pass"]
+PrepareFramePass["Prepare frame pass"]
+PrepareFramePass --> GetBuffers["Retrieve buffers from previous pass (if applicable)"]
+GetBuffers --> RenderFramePass["Render frame pass"]
+end
+end
 ```
