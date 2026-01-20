@@ -257,8 +257,6 @@ private:
 
     void _AddPluginSelectionHighlighting();
 
-    bool _NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle);
-
     // Determine the pick handler which should handle a pick hit, to transform
     // the pick hit into a selection.
     MayaHydra::PickHandlerConstPtr _PickHandler(const MayaHydra::PickHit& hit) const;

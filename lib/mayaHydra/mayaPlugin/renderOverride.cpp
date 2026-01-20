@@ -1204,61 +1204,29 @@ MStatus MtohRenderOverride::Render(
     if (_mayaHydraSceneIndex) {
         _mayaHydraSceneIndex->SetParams(delegateParams);
         _mayaHydraSceneIndex->FlushPendingUpdates();
-
-        auto& manager = Fvp::RenderViewDataManager::Get();
-        if (_NeedToRecreateTheSceneIndicesChain(currentDisplayStyle)){
-            _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(true);//Prevent prim removal propagation to keep the current selection.
-            if (_mayaViewportSceneIndex) {
-                _mayaViewportSceneIndex->SetLightsManagementSceneIndex(nullptr);
-            }
-
-            manager.RemoveRenderViewData(panelNameStr);
-            TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
-                .Msg("Re-creating scene index chain to render %s\n", panelNameStr.c_str());
-            _CreateSceneIndicesChainAfterMergingSceneIndex(drawContext);
-            
-            const Fvp::InformationInterface::RenderViewDesc hydraViewportInformation(panelNameStr, true);
-            manager.AddRenderViewData(
-                hydraViewportInformation,
-                renderIndex(),
-                _dataProducerMergingSceneIndexProxy,
-#ifdef VIEWPORT_TOOLBOX
-                _CreatePassFilteringSceneIndex(_framePassesData[0]) // Use the first pass filtering function to
-                                                                    // create the pass filtering scene index
-#else
-                _lastFilteringSceneIndexBeforeCustomFiltering
-#endif
-            );
-
-            _blockPrimRemovalPropagationSceneIndex->setPrimRemovalBlocked(false);//Allow prim removal propagation again.
-        }
-        else {
-            TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
-                .Msg("Re-using existing scene index chain to render %s\n", panelNameStr.c_str());
+    }
 
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
-            // Make sure the isolate selection scene index set to the proper
-            // isolate selection.  We currently have a single scene index tree,
-            // thus a single isolate select scene index is common to and
-            // provides prims to render all viewports.
-            auto& isolateSelectMgr = Fvp::IsolateSelectManager::Get();
-            auto isSi = isolateSelectMgr.GetIsolateSelectSceneIndex();
-            auto isolateSelection = isolateSelectMgr.GetOrCreateIsolateSelection(panelNameStr);
-            if (isSi && (isSi->GetIsolateSelection() != isolateSelection)) {
-                TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
-                    .Msg("Switching scene index to isolate selection %p\n", &*isolateSelection);
-                // Isolate select scene index is being switched to a different
-                // viewport, set its isolate selection.
-                isSi->SetViewport(panelNameStr, isolateSelection);
-            }
-            else {
-                // This case includes disabled (null pointer) isolate selection.
-                TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
-                    .Msg("Re-using isolate selection %p\n", (isolateSelection ? &*isolateSelection : (void*) 0));
-            }
-#endif
+        // Make sure the isolate selection scene index set to the proper
+        // isolate selection.  We currently have a single scene index tree,
+        // thus a single isolate select scene index is common to and
+        // provides prims to render all viewports.
+        auto& isolateSelectMgr = Fvp::IsolateSelectManager::Get();
+        auto isSi = isolateSelectMgr.GetIsolateSelectSceneIndex();
+        auto isolateSelection = isolateSelectMgr.GetOrCreateIsolateSelection(panelNameStr);
+        if (isSi && (isSi->GetIsolateSelection() != isolateSelection)) {
+            TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
+                .Msg("Switching scene index to isolate selection %p\n", &*isolateSelection);
+            // Isolate select scene index is being switched to a different
+            // viewport, set its isolate selection.
+            isSi->SetViewport(panelNameStr, isolateSelection);
         }
-    }
+        else {
+            // This case includes disabled (null pointer) isolate selection.
+            TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_SCENE_INDEX_CHAIN_MGMT)
+                .Msg("Re-using isolate selection %p\n", (isolateSelection ? &*isolateSelection : (void*) 0));
+        }
+#endif
 
     if (_displayStyleSceneIndex) {
        _displayStyleSceneIndex->SetRefineLevel(delegateParams.refineLevel);
@@ -2682,13 +2650,6 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
     isolateSelectMgr.ReplaceIsolateSelection(viewName.asChar(), isolateSelection);
 }
 #endif
-
-// return true if we need to recreate the filtering scene indices chain because of a change, false otherwise.
-bool MtohRenderOverride::_NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle)
-{
-    //Logged HYDRA-1840 to remove usage of this function among others
-    return false;
-}
 
 std::shared_ptr<const MayaHydraSceneIndexRegistry>
 MtohRenderOverride::sceneIndexRegistry() const
