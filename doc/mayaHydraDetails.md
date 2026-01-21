@@ -29,7 +29,7 @@ graph LR
 ### Color Management(CM)
 Maya's Color Managment is applied to all applicable viewports including viewport overrides. MayaHydra plugin override inherits this behavior. So the final frame rendered out from Hydra undergoes Maya's CM. All workflows pertaining to CM within Maya remain the same so user can configure CM with MayaHydra as they would for a VP2 viewport. 
 
-Hydra also support CM internally via Hydra Tasks. In the current version of the plugin, Hydra's CM is not applied. There are a couple of blockers for this to implemented at the moment(5th Oct 2023). USD is on OCIO v1 and Maya uses OCIO v2. There are some incompatibities with these two version and can lead to unpredictable behaviour.
+Hydra also support CM internally via Hydra Tasks. In the current version of the plugin, Hydra's CM is not applied. There are a couple of blockers for this to implemented at the moment(5th Oct 2023). USD is on OCIO v1 and Maya uses OCIO v2. There are some incompatibilities with these two versions and can lead to unpredictable behaviour.
 
 ### Data Access and Interpretation
 
@@ -47,7 +47,7 @@ We have the flexibility needed to handle other object types outside the MRenderI
 
 ### Adapters for direct translation of Maya data to Hydra
 
-MayaHydra utilizes USD's PluginRegistry mechanism to translate Maya native data to Hydra. Maya meshes/shapes, camera, lights(spot,area, directional), NURBS Curves, materials and, as a special case, Arnold's SkyDomeLight are handled by these adapaters. MRenderItem described above is also handled by this plugin registry adapter mechanism.
+MayaHydra utilizes USD's PluginRegistry mechanism to translate Maya native data to Hydra. Maya meshes/shapes, camera, lights(spot,area, directional), NURBS Curves, materials and, as a special case, Arnold's SkyDomeLight are handled by these adapters. MRenderItem described above is also handled by this plugin registry adapter mechanism.
 
 ```mermaid
 classDiagram
@@ -83,21 +83,17 @@ classDiagram
     -_sceneIndexRegistry: std::shared_ptr<MayaHydraSceneIndexRegistry>
     -_hgi: HgiUniquePtr
     -_hgiDriver: HdDriver
-    -_engine: HdEngine
-    -_rendererPlugin: HdRendererPlugin*
-    -_taskController: HdxTaskController*
-    -_renderDelegate: HdPluginRenderDelegateUniqueHandle
+    -_framePassesData: Fvp::FramePassDataPtrVector
     -_dataProducerMergingSceneIndexProxy: std::shared_ptr<Fvp::DataProducerMergingSceneIndexProxy>
-    -_renderIndex: HdRenderIndex*
     -_fvpSelectionTracker: Fvp::SelectionTrackerSharedPtr
     -_selectionSceneIndex: Fvp::SelectionSceneIndexRefPtr
     -_mayaHydraSceneIndex: std::unique_ptr<MayaHydraSceneIndex>
     +Render(const MHWRender::MDrawContext& drawContext, const MHWRender::MDataServerOperation::MViewportScene& scene)
   }
 ```
-The class is contains resources pertaining to both Maya and Hydra. 
+The class contains resources pertaining to both Maya and Hydra. 
 
-We will do a high-level walk through of various execution phases, render loop and corresponding data flow. Please note the plugin is undergoing major design changes with newer APIs being introduced. The diagrams below are relevant as of 5th October 2023. 
+We will do a high-level walk through of various execution phases, render loop and corresponding data flow. Please note the plugin is undergoing major design changes with newer APIs being introduced. The diagrams below are relevant as of January 19th 2026. 
 
 ### Plugin Load
 ```mermaid
@@ -121,34 +117,40 @@ sequenceDiagram
   MtohRenderOverride-->>MayaHydra: MtohRenderOverride Registered
 ```
 ### The Render Loop
+MayaHydra leverages the [Hydra Viewport Toolbox](https://github.com/Autodesk/hydra-viewport-toolbox) (HVT) to implement multi-pass rendering. This multi-pass support allows us to support secondary graphics (such as selection highlighting) for any render delegate, even those that don't support the prim types we use for highlighting. The first pass, the beauty pass, uses the user-selected renderer (in the "Renderer" tab in Maya) to render the main scene data. The second pass, the secondary graphics pass, uses Storm to render secondary graphics.
+
 ```mermaid
 
-stateDiagram
-  [MayaFrameRefresh] --> MtohRenderOverride 
-  MtohRenderOverride --> InitHydraResources() : Render()
+flowchart TD
 
-  state InitHydraResources() {
-      [*] --> HydraResources
-      HydraResources --> MayaHydraSceneIndex() :  RenderDelegate/RenderIndex
-      MayaHydraSceneIndex() --> Populate() : Creates MayaHydra specific Scene Indices internally       
-      Populate() --> MayaHydraAdapter : Loop over Maya native nodes
-      MayaHydraAdapter --> SceneIndexRegistration : Flow Viewport API (WIP) to inject various Scene Indices including USD data and SelectionHighlighting
-      SceneIndexRegistration --> [*]
-  }
-  
-    state MayaHydraAdapter {
-      [*] --> InsertHydraPrims : Shape/Mesh/Light/Material/ArnoldDomelight
-      InsertHydraPrims --> [*]
-  }
-        
-  InitHydraResources() --> UpdateRenderItems() : Loops over MRenderItems using DataServer API
-  state RenderItemAdapter {
-      [*] --> InsertHydraPrim
-      InsertHydraPrim --> [*]
-  }      
-  UpdateRenderItems() --> RenderItemAdapter : Handles VP2 updates
-  RenderItemAdapter --> UpdateDirtiedPrims
-  UpdateDirtiedPrims --> SetHydraRenderParams : Global values obtained from VP2 and Maya RenderSettings
-  SetHydraRenderParams --> HydraExecute()
-  HydraExecute() -->  [MayaFrameRefresh]
+MayaFrameRefresh --> MtohRenderOverrideRender
+
+subgraph MtohRenderOverrideRender["MtohRenderOverride::Render()"]
+
+subgraph InitHydraResources["If first render : _InitHydraResources()"]
+  CreateFramePasses["Create and setup frame passes"] --> PopulateMayaData["Loop over Maya nodes and populate Hydra scene"]
+  PopulateMayaData --> SceneIndexRegistration["Register data producer scene indices and populate Hydra scene"]
+  SceneIndexRegistration --> CreateSceneIndexChain["Create chain of filtering scene indices implementing viewport features"]
+end
+
+InitHydraResources --> RenderSetup
+
+subgraph RenderSetup["General render setup"]
+UpdateRenderParams["Update rendering parameters based on viewport settings"]
+UpdateRenderParams --> UpdateRenderItems["Update Hydra scene from Maya render items"]
+UpdateRenderItems --> UpdatePluginData["Update Hydra scene from plugin data"]
+UpdatePluginData --> UpdatePluginFilteringSceneIndices["Update plugin filtering scene indices"]
+end
+
+RenderSetup --> FramePass
+
+subgraph FramePass["For each frame pass"]
+PrepareFramePass["Prepare frame pass"]
+PrepareFramePass --> GetBuffers["Retrieve buffers from previous pass (if applicable)"]
+GetBuffers --> RenderFramePass["Render frame pass"]
+end
+
+FramePass --> FramePass
+
+end
 ```
