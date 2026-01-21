@@ -8,7 +8,7 @@ supports Hydra rendering in this repository as the Flow Viewport Toolkit (name
 subject to change).
 
 This document will describe the state of Flow Viewport Toolkit selection
-highlighting as of 23-Jan-2025.
+highlighting as of 19-Jan-2026.
 
 ## Behavior
 
@@ -55,7 +55,7 @@ Requirements for selection highlighting are:
 There are at least two approaches to selection highlighting:
 - **Added geometry**: adding secondary geometry that indicates the selected
 status of objects in the scene, e.g. wireframe or bounding box.
-- **Pixed-based modified object appearance**: rendering selected objects in a
+- **Pixel-based modified object appearance**: rendering selected objects in a
 special way, e.g. object contour, modified object color, or object overlay.
 
 The former approach is handled by having a plugin provide a selection
@@ -132,12 +132,16 @@ data source providers have applied their selections.
 ### Hydra Scene and Viewport Selection Result
 
 The resulting wireframe selection highlighting of USD data is shown here:
+
 ![In-viewport wireframe selection highlighting](hydraSelectionHighlighting.png)
 
-The resulting prim selection data source is shown here:
+The resulting prim selection data source is shown here (note that scene data will only be found within the first pass, Pass0) :
+
 ![Prim selection data source](hydraSelectionDataSource.png)
 
-The resulting prim wireframe display style data source is shown here:
+The resulting prim wireframe display style data source is shown here
+(note that highlights will only be found within the second pass, Pass1) :
+
 ![Prim wireframe display style data source](hydraSelectionReprDisplayStyle.png)
 
 ### Flow Viewport Toolkit
@@ -210,7 +214,7 @@ The Flow Viewport Toolkit has a new base class:
 - **PathMapper**: must be provided by data provider plugins so that Hydra
   can translate selected object application paths to selected Hydra
   prim paths. The plugin provides the concrete implementation of this
-  base class, and registers it to the **path mapper registry***.
+  base class, and registers it to the **path mapper registry**.
 
 ### Implementation Classes
 
@@ -277,3 +281,16 @@ SelectionSceneIndex o-- Selection : Read / Write
   propagate across scene index inputs, so that if a Maya Dag ancestor is
   selected, a USD descendant's appearance can change.  This is the same
   situation as global transformation and visibility.
+
+## Selection Highlighting for Maya data
+
+For Maya-native data, the Flow Viewport Toolkit highlighting mechanisms are not used. Instead, the internal OGS highlighting render items are translated over to Hydra and used for highlighting.
+
+Here is a selection example :
+
+![Selection in outliner and viewport](mayaSelectionOutliner.png)
+
+And here what it looks like the scene browser. The StandardShadedItem is the mesh, which will only
+have a type in the first pass (Pass0), and the DormantPolyWire is the highlight, which will only have a type in the second pass (Pass1) :
+
+![Selection highlight in scene browser](mayaSelectionSceneBrowser.png)
