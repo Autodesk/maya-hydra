@@ -13,8 +13,6 @@
 // limitations under the License.
 //
 
-#ifdef VIEWPORT_TOOLBOX
-
 #include "fvpPassFilteringSceneIndex.h"
 #include "flowViewport/fvpUtils.h"
 
@@ -347,5 +345,3 @@ void PassFilteringSceneIndex::_PrimsDirtied(
 }
 
 } // namespace FVP_NS_DEF
-
-#endif // VIEWPORT_TOOLBOX

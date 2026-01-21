@@ -122,14 +122,12 @@ public:
     /// one modelEditor panel.
     static std::vector<MString> AllActiveRendererNames();
 
-#ifdef VIEWPORT_TOOLBOX
     /// Returns the names of all AOVs made available by the render delegates
     /// for a given render pass index.
     /// TODO 2025-08-29 : This currently gathers AOVs from all viewports indiscriminately.
     /// Once we have proper multi-viewport support, we should also be able to
     /// specify which viewport to get the AOVs for.
     static TfTokenVector GetAvailableFramePassAovs(int passIndex);
-#endif
 
     static MtohRenderOverride* GetByName(TfToken rendererName);
 
@@ -215,10 +213,7 @@ private:
     void              _ClearMayaHydraSceneIndex();
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
-#ifdef VIEWPORT_TOOLBOX
-    HdSceneIndexBaseRefPtr
-    _CreatePassFilteringSceneIndex(Fvp::FramePassDataPtr& filteringData);
-#endif
+    HdSceneIndexBaseRefPtr _CreatePassFilteringSceneIndex(Fvp::FramePassDataPtr& filteringData);
     VtValue _GetUsedGPUMemory() const;
 
     void _PickByRegion(
@@ -305,7 +300,6 @@ private:
     HgiUniquePtr _hgi;
     HdDriver     _hgiDriver;
 
-#ifdef VIEWPORT_TOOLBOX
     // Data per pass - each FramePassData contains both configuration data and the actual FramePass
     // This ensures they stay synchronized and eliminates index-based access issues
     Fvp::FramePassDataPtrVector                                _framePassesData;
@@ -322,15 +316,7 @@ private:
                                 const SdfPath&                        passId,
                                 const int passIndex);
     void                    _CreateFramePassesData();
-    
-#else
-    int                                       _GetNumFramePasses() const { return 1; }
-    HdEngine                                  _engine;
-    HdRendererPlugin*                         _rendererPlugin = nullptr;
-    std::unique_ptr<HdxTaskController>        _taskController;
-    HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
-    HdRenderIndex*                            _renderIndex = nullptr;
-#endif
+
     Fvp::DataProducerMergingSceneIndexProxyPtr _dataProducerMergingSceneIndexProxy { nullptr };
     VtDictionary                              _fileWriterArgs{};
     HdSceneIndexBaseRefPtr                    _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
