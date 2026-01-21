@@ -44,7 +44,6 @@
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
 #include <flowViewport/debugCodes.h>
-#include <flowViewport/selection/fvpSelectionTask.h>
 #include <flowViewport/selection/fvpSelection.h>
 #include <flowViewport/API/renderViewData/fvpFilteringSceneIndicesChainManager.h>
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
