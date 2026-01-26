@@ -5,7 +5,6 @@ target_sources(${TARGET_NAME}
     PRIVATE
     fvpSelection.cpp
     fvpSelectionFwd.cpp
-    fvpSelectionTask.cpp
     fvpSelectionTracker.cpp
     fvpSelectionTypes.cpp
     fvpPathMapper.cpp
@@ -18,7 +17,6 @@ target_sources(${TARGET_NAME}
 set(HEADERS
     fvpSelection.h
     fvpSelectionFwd.h
-    fvpSelectionTask.h
     fvpSelectionTracker.h
     fvpSelectionTypes.h
     fvpPathMapper.h

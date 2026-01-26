@@ -38,7 +38,7 @@ target_include_directories(${TARGET_NAME}
         ${PXR_INCLUDE_DIRS}
         ${CMAKE_BINARY_DIR}/include
         ${UFE_INCLUDE_DIR}
-        $<$<BOOL:${BUILD_WITH_VIEWPORT_TOOLBOX}>:${VIEWPORTTOOLBOX_INCLUDE_DIR}>
+        ${VIEWPORTTOOLBOX_INCLUDE_DIR}
 )
 
 # -----------------------------------------------------------------------------
@@ -63,8 +63,8 @@ target_link_libraries(${TARGET_NAME}
         sdf
         usdImaging
         ${UFE_LIBRARY}
-        $<$<BOOL:${BUILD_WITH_VIEWPORT_TOOLBOX}>:${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_LIB}>
-        $<$<BOOL:${BUILD_WITH_VIEWPORT_TOOLBOX}>:${VIEWPORTTOOLBOX_VISUALSTYLES_LIB}>
+        ${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_LIB}
+        ${VIEWPORTTOOLBOX_VISUALSTYLES_LIB}
     PRIVATE
         ar
         gf
@@ -110,9 +110,6 @@ if(IS_WINDOWS)
         install(FILES $<TARGET_PDB_FILE:${TARGET_NAME}> 
                 DESTINATION ${CMAKE_INSTALL_PREFIX}/lib OPTIONAL)
     endif()
-endif()
-
-if (BUILD_WITH_VIEWPORT_TOOLBOX AND IS_WINDOWS)
     install(
         FILES 
             ${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_DLL_PATH}/hvt.dll

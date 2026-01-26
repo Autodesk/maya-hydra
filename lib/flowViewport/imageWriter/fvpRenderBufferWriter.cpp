@@ -16,9 +16,7 @@
 
 #include <flowViewport/imageWriter/fvpRenderBufferWriter.h>
 
-#ifdef VIEWPORT_TOOLBOX
 #include <hvt/engine/framePass.h>
-#endif
 
 #include <pxr/imaging/hdSt/hioConversions.h>
 #include <pxr/imaging/hdx/taskController.h>
@@ -42,13 +40,8 @@ HdRenderBuffer* getRenderBuffer(
     const PXR_NS::TfToken& aovToken
 )
 {
-#ifdef VIEWPORT_TOOLBOX
     auto framePass = Fvp::ImageBufferWriter::GetPtr<hvt::FramePass>(args, "framePass");
     return framePass ? framePass->GetRenderBuffer(aovToken) : nullptr;
-#else
-    auto taskController = Fvp::ImageBufferWriter::GetPtr<HdxTaskController>(args, "taskController");
-    return getRenderBuffer(taskController, aovToken);
-#endif
 }
 
 }

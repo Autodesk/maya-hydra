@@ -16,9 +16,7 @@
 
 #include <flowViewport/imageWriter/fvpTextureBufferWriter.h>
 
-#ifdef VIEWPORT_TOOLBOX
 #include <hvt/engine/framePass.h>
-#endif
 
 #include <pxr/imaging/hd/engine.h>
 #include <pxr/imaging/hdx/types.h>
@@ -47,13 +45,8 @@ HgiTextureHandle getTextureHandle(
     const TfToken&      aovToken
 )
 {
-#ifdef VIEWPORT_TOOLBOX
     auto framePass = Fvp::ImageBufferWriter::GetPtr<hvt::FramePass>(args, "framePass");
     return framePass ? framePass->GetRenderTexture(aovToken) : HgiTextureHandle();
-#else
-    auto engine = Fvp::ImageBufferWriter::GetPtr<HdEngine>(args, "engine");
-    return getTextureHandle(engine, aovToken);
-#endif
 }
 
 }

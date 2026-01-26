@@ -17,8 +17,6 @@
 #include "fvpFramePassData.h"
 #include "flowViewport/sceneIndex/fvpPassFilteringSceneIndex.h"
 
-#ifdef VIEWPORT_TOOLBOX
-
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
@@ -33,4 +31,3 @@ void FramePassData::DirtyPrimsFromPurposeRenderTag(const PXR_NS::TfToken purpose
 }
 
 }; // namespace FVP_NS_DEF
-#endif
