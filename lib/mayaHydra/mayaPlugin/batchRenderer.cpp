@@ -194,9 +194,6 @@ BatchRenderer::~BatchRenderer()
             _rendererDesc.overrideName.GetText(),
             _rendererDesc.displayName.GetText());
 
-    if (_timerCallback)
-        MMessage::removeCallback(_timerCallback);
-
     constexpr bool fullReset = true;
     ClearHydraResources(fullReset);
 
@@ -209,43 +206,8 @@ HdRenderDelegate* BatchRenderer::_GetRenderDelegate()
     return _renderIndex ? _renderIndex->GetRenderDelegate() : nullptr;
 }
 
-VtValue BatchRenderer::_GetUsedGPUMemory() const
-{
-    // Currently, only Storm is the known/tested renderer that provides GPU stats
-    // via the Render Delegate.
-    if (_isUsingHdSt && _renderDelegate)
-    {
-        VtDictionary hdStRenderStat = _renderDelegate->GetRenderStats();
-        return hdStRenderStat[HdPerfTokens->gpuMemoryUsed.GetString()];
-    }
-    return VtValue();
-}
-
-SdfPathVector BatchRenderer::RendererRprims(bool visibleOnly)
-{
-    if (!_renderIndex) {
-        return SdfPathVector();
-    }
-    auto primIds = _renderIndex->GetRprimIds();
-    if (visibleOnly) {
-        primIds.erase(
-            std::remove_if(
-                primIds.begin(),
-                primIds.end(),
-                [this](const SdfPath& primId) {
-                    auto* rprim = _renderIndex->GetRprim(primId);
-                    if (!rprim)
-                        return true;
-                    return !rprim->IsVisible();
-                }),
-            primIds.end());
-    }
-    return primIds;
-}
-
 MStatus BatchRenderer::Render(
-    const InputParams&                                     inputParams,
-    const MHWRender::MDataServerOperation::MViewportScene& scene)
+    const InputParams& inputParams)
 {
     // It would be good to clear the resources of the overrides that are
     // not in active use, but I'm not sure if we have a better way than
@@ -276,12 +238,6 @@ MStatus BatchRenderer::Render(
         // As the existence of either task depends on AOV support, they may not
         // be present, so we may have nothing to replace.  PPT, 11-Aug-2023.
         replaceSelectionTask(&tasks);
-
-        if (scene.changed()) {
-            if (_mayaHydraSceneIndex) {
-                _mayaHydraSceneIndex->UpdateRenderItems(scene);
-            }
-        }
 
         // Update shadow collection for lights
         if (_mayaHydraSceneIndex) {
@@ -719,19 +675,6 @@ void BatchRenderer::_ClearHydraCallback(void* data)
     }
     constexpr bool fullReset = true;
     instance->ClearHydraResources(fullReset);
-}
-
-void BatchRenderer::_TimerCallback(float, float, void* data)
-{
-    auto* instance = reinterpret_cast<BatchRenderer*>(data);
-    if (instance->_isConverged) {
-        return;
-    }
-
-    std::lock_guard<std::mutex> lock(instance->_lastRenderTimeMutex);
-    if ((std::chrono::system_clock::now() - instance->_lastRenderTime) < std::chrono::seconds(5)) {
-        MGlobal::executeCommandOnIdle("refresh -f");
-    }
 }
 
 HdRenderIndex* BatchRenderer::renderIndex() const

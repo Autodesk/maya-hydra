@@ -287,15 +287,6 @@ bool HydraRenderCmd::hydraRender()
             inputParams.projectionMatrix[2][2] = -inputParams.projectionMatrix[2][2];
             inputParams.projectionMatrix[3][2] = -inputParams.projectionMatrix[3][2];
     
-            // Unclear how to translate Maya data.
-            // MHWRender::MDataServerOperation::MViewportScene carries MRenderItem's
-            // created by OGS, and has some level of change notification.  Should
-            // we still somehow rely on OGS?  Seems like the best approach.
-            // Another possibility would be to use in-memory conversion to USD
-            // from Maya USD's duplicate as USD.  For the moment pass in an
-            // empty scene and don't translate Maya data.
-            MHWRender::MDataServerOperation::MViewportScene scene;
-        
             // Set the output filename.
             const auto imageName = renderSettings.getImageName(
                 MCommonRenderSettingsData::kFullPathImage,
@@ -317,7 +308,15 @@ bool HydraRenderCmd::hydraRender()
             TfScoped guard(resetFileName);
             Fvp::ImageBufferWriter::SetFileName(imageName.asChar());
         
-            if (_batchRenderer->Render(inputParams, scene) != MS::kSuccess) {
+            // Unclear how to translate Maya data.
+            // MHWRender::MDataServerOperation::MViewportScene carries MRenderItem's
+            // created by OGS, and has some level of change notification.
+            // That class is used in the viewport renderer to translate Maya data.
+            // Should we do the same here, should we still somehow rely on OGS?
+            // Seems like the best approach. Another possibility would be to use
+            // in-memory conversion to USD from Maya USD's duplicate as USD.
+            // For the moment, don't pass in anything to the renderer.
+            if (_batchRenderer->Render(inputParams) != MS::kSuccess) {
                 return false;
             }
         } // Camera loop

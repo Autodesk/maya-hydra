@@ -93,15 +93,8 @@ public:
     BatchRenderer(const MtohRendererDescription& desc);
     ~BatchRenderer();
 
-    /// Returns a list of rprims in the render index.
-    ///
-    /// Intended mostly for use in debugging and testing.
-    PXR_NS::SdfPathVector RendererRprims(bool visibleOnly = false);
-
     //! Main entry point for rendering, called by Maya.
-    MStatus Render(
-        const InputParams&                                     inputParams,
-        const MHWRender::MDataServerOperation::MViewportScene& scene);
+    MStatus Render(const InputParams& inputParams);
 
     ///When fullReset is true, we remove the data producer scene indices that apply to all viewports and the scene index registry where the usd stages have been loaded.
     ///It means you are doing a full reset of hydra such as when doing "File New".
@@ -121,23 +114,18 @@ private:
 
     void              _SetRenderPurposeTags(const PXR_NS::MayaHydraParams& delegateParams);
     void              _CreateSceneIndicesChainAfterMergingSceneIndex();
-    PXR_NS::VtValue   _GetUsedGPUMemory() const;
 
     void _AddPluginSelectionHighlighting();
 
     // Callbacks
     static void _ClearHydraCallback(void* data);
-    static void _TimerCallback(float, float, void* data);
 
     MtohRendererDescription _rendererDesc;
 
     std::shared_ptr<PXR_NS::MayaHydraSceneIndexRegistry> _sceneIndexRegistry;
     MCallbackIdArray                             _callbacks;
-    MCallbackId                                  _timerCallback = 0;
     const PXR_NS::MtohRenderGlobals&             _globals;
 
-    std::mutex                            _lastRenderTimeMutex;
-    std::chrono::system_clock::time_point _lastRenderTime;
     std::atomic<bool>                     _isConverged = { false };
     std::atomic<bool>                     _needsClear = { false };
 
