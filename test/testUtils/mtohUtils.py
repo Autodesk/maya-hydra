@@ -46,6 +46,8 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     _file = None
     _requiredPlugins = []
     _pluginsToUnload = []
+    _initializeStandalone = False
+    _setHdStormRenderer = True
 
     #The OpenUSD version
     _usdVersion = None
@@ -64,8 +66,11 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             raise ValueError("Subclasses of MayaHydraBaseTestCase must define "
                              "`_file = __file__`")
 
+        # The Python unittest framework does not support passing arguments to
+        # setUpClass, so we use class-level members for _file and
+        # _initializeStandalone.
         inputPath = fixturesUtils.setUpClass(
-            cls._file, 'mayaHydra', initializeStandalone=False, 
+            cls._file, 'mayaHydra', initializeStandalone=cls._initializeStandalone, 
             suffix=('_' + cls.__name__))
 
         if cls._inputDir is None:
@@ -105,7 +110,8 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         modified = cmds.file(query=True, modified=True)
         assert not modified, 'Internal test framework error: scene left as modified by mayaUtils.openNewScene()'
 
-        self.setHdStormRenderer()
+        if self._setHdStormRenderer:
+            self.setHdStormRenderer()
 
         # We've just opened a new scene, so we should not be modified.  Setting
         # Storm as the renderer should conceptually not change that status, but
@@ -129,7 +135,17 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             # So far (2024-03-25), this has only been observed when using LookdevX.
             # Note that the force (/f) flag seems necessary, omitting it did not end up killing
             # the process.
-            subprocess.run(['taskkill', '/f', '/im', 'ADPClientService.exe'])
+            try:
+                subprocess.run(
+                    ['taskkill', '/f', '/im', 'ADPClientService.exe'],
+                    check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as e:
+                # ADPClientService may already have exited, or might not be
+                # running (e.g. mayabatch), which is not an error.
+                notAnError = 'The process "ADPClientService.exe" not found'
+                if notAnError not in e.stderr:
+                    print("taskkill ADPClientService error: %s" % e.stderr, 
+                          file=sys.stderr)
 
     def setHdStormRenderer(self):
         self.activeEditor = cmds.playblast(activeEditor=1)

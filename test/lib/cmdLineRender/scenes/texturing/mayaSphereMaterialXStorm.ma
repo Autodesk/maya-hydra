@@ -379,7 +379,7 @@ select -ne :defaultRenderGlobals;
 	addAttr -ci true -sn "HdArnoldRendererPlugin__texture_auto_generate_tx" -ln "HdArnoldRendererPlugin__texture_auto_generate_tx" 
 		-dv 1 -min 0 -max 1 -at "bool";
 	addAttr -ci true -h true -sn "dss" -ln "defaultSurfaceShader" -dt "string";
-	setAttr ".ren" -type "string" "hydraStorm";
+	setAttr ".ren" -type "string" "HdStormRendererPlugin";
 	setAttr ".mayaHydraRenderPurpose" yes;
 	setAttr ".mayaHydraProxyPurpose" no;
 	setAttr ".HdStormRendererPlugin__domeLightTexturesMaxResolution" 1024;

@@ -292,28 +292,6 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
-    std::array rendererRegistrationScripts = {
-        "mayaHydra_render_Storm.mel",
-        "mayaHydra_register_renderer_Storm.mel",
-        // FIXME Plugin renderer registration should NOT be done here.
-        "mayaHydra_render_Arnold.mel",
-        "mayaHydra_register_renderer_Arnold.mel",
-        "mayaHydra_render_Prman.mel",
-        "mayaHydra_register_renderer_Prman.mel"
-    };
-
-    for (auto rendererRegistrationScript : rendererRegistrationScripts) {
-        if (MGlobal::sourceFile(MString(rendererRegistrationScript)) 
-            != MS::kSuccess) {
-            std::ostringstream msg;
-            msg << "Error sourcing renderer registration script "
-                << rendererRegistrationScript;
-            ret = MS::kFailure;
-            ret.perror(msg.str().c_str());
-            return ret;
-        }
-    }
-
     // Renderer registration must be done after UI registration, as UI
     // registration defines the UI tab in the Maya render settings.  To be
     // re-evaluated as render settings UI requirements are clarified.  PPT,
@@ -329,23 +307,9 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
-    std::array rendererRegistrationCommands = {
-        "registerHydraStormRenderer()", 
-        // FIXME Plugin renderer registration should NOT be done here.
-        "registerHydraArnoldRenderer()",
-        "registerHydraPrmanRenderer()"
-    };
-
-    for (auto rendererRegistrationCommand : rendererRegistrationCommands) {
-        if (MGlobal::executeCommand(MString(rendererRegistrationCommand)) 
-            != MS::kSuccess) {
-            std::ostringstream msg;
-            msg << "Error registering Hydra batch renderer using command "
-                << rendererRegistrationCommand;
-            ret = MS::kFailure;
-            ret.perror(msg.str().c_str());
-            return ret;
-        }
+    // Register Hydra renderers as Maya production renderers.
+    for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {
+        registerRenderer(desc);
     }
 
     auto registerPluginLoadingCallback = [&](MSceneMessage::Message pluginLoadingMessage, MMessage::MStringArrayFunction callback) {

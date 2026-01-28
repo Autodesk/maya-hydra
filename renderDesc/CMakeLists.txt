@@ -1,7 +1,7 @@
 set(RENDER_DESC_FILES
-    hydraArnoldRenderer.xml
-    hydraPrmanRenderer.xml
-    hydraStormRenderer.xml
+    HdArnoldRendererPluginRenderer.xml
+    HdPrmanLoaderRendererPluginRenderer.xml
+    HdStormRendererPluginRenderer.xml
 )
 
 install(

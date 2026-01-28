@@ -521,9 +521,12 @@ except Exception:\\n\
 \")")
             set(COMMAND_CALL ${MAYA_EXECUTABLE} -c ${MEL_PY_EXEC_COMMAND})
         else()
-            set(SCRIPT ${CMAKE_BINARY_DIR}/test/Temporary/scripts/runner_${test_name}.py)
-            FILE(WRITE ${SCRIPT} "${ARG_PYTHON_SCRIPT}")
-            set(COMMAND_CALL ${MAYA_PY_EXECUTABLE} ${SCRIPT})
+            set(SCRIPT_PATH "${ARG_PYTHON_SCRIPT}")
+            if(NOT IS_ABSOLUTE "${SCRIPT_PATH}")
+                set(SCRIPT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/${SCRIPT_PATH}")
+            endif()
+        
+            set(COMMAND_CALL ${MAYA_PY_EXECUTABLE} ${SCRIPT_PATH})
         endif()
     else()
         set(COMMAND_CALL ${ARG_COMMAND})
@@ -658,7 +661,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # 2) Create test
     # --------------
 
-    set(RENDERER "hydraStorm")
+    set(RENDERER "HdStormRendererPlugin")
     if(ARG_RENDERER)
         set(RENDERER "${ARG_RENDERER}")
     endif()

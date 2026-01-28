@@ -26,8 +26,8 @@
         "t" the parameter types, used in help description.
         "h" the help description.
 -->
-<renderer desc="Hydra Storm renderer">
+<renderer desc="Hydra Prman renderer">
     <melheader s='string $opt=""; string $rl=""; string $rp=""; float $resize=-1.; int $interactive=0; loadPlugin -quiet mayaUsdPlugin; loadPlugin -quiet mayaHydra;'/>
-    <meltrailer s='setMayaSoftwareLayers($rl, $rp); setImageSizePercent($resize);mayaBatchRenderProcedure($interactive, "", "", "hydraStorm", $opt); '/>
+    <meltrailer s='setMayaSoftwareLayers($rl, $rp); setImageSizePercent($resize);mayaBatchRenderProcedure($interactive, "", "", "HdPrmanLoaderRendererPlugin", $opt); '/>
     <sep/>
 </renderer>

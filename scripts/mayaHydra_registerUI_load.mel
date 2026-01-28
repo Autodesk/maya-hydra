@@ -17,13 +17,6 @@ global proc mayaHydra_registerUI_load()
 // Callback registered with the MFnPlugin for when the plugin is loaded.
 // Used to initialize any UI we create.
 {
-    print("PPT: in mayaHydra_registerUI_load()\n"); 
-
     source "mayaHydra_GeomSubsetsPickMode.mel";
     mayaHydra_GeomSubsetsPickMode_SetupUI();
-
-    source "mayaHydra_create_globals_tab_Storm.mel";
-    // FIXME Arnold Hydra renderer render settings UI tab should NOT
-    // be done here.
-    source "mayaHydra_create_globals_tab_Arnold.mel";
 }

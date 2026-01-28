@@ -28,6 +28,6 @@
 -->
 <renderer desc="Hydra Arnold renderer">
     <melheader s='string $opt=""; string $rl=""; string $rp=""; float $resize=-1.; int $interactive=0; loadPlugin -quiet mayaUsdPlugin; loadPlugin -quiet mayaHydra; loadPlugin -quiet mtoa;'/>
-    <meltrailer s='setMayaSoftwareLayers($rl, $rp); setImageSizePercent($resize);mayaBatchRenderProcedure($interactive, "", "", "hydraArnold", $opt); '/>
+    <meltrailer s='setMayaSoftwareLayers($rl, $rp); setImageSizePercent($resize);mayaBatchRenderProcedure($interactive, "", "", "HdArnoldRendererPlugin", $opt); '/>
     <sep/>
 </renderer>
