@@ -270,22 +270,10 @@ bool HydraRenderCmd::hydraRender()
                 continue;
             }
     
-            inputParams.cameraPath = cameraPath;
             inputParams.ufeCameraPath = Ufe::Path(
                 UfeExtensions::dagPathToUfePathSegment(cameraPath));
-            inputParams.viewMatrix = GetGfMatrixFromMaya(
-                cameraPath.inclusiveMatrixInverse());
-            inputParams.projectionMatrix = GetGfMatrixFromMaya(
-                MFnCamera(cameraPath).projectionMatrix());
-    
-            // As per MFnCamera::projectionMatrix() documentation:
-            //
-            // The projection matrix that Maya's software renderer uses is
-            // almost identical to the OpenGL projection matrix. The
-            // difference is that Maya uses a left hand coordinate system
-            // and so the entries [2][2] and [3][2] are negated.
-            inputParams.projectionMatrix[2][2] = -inputParams.projectionMatrix[2][2];
-            inputParams.projectionMatrix[3][2] = -inputParams.projectionMatrix[3][2];
+            // View/projection matrices are derived from the UFE camera path
+            // inside BatchRenderer::RenderFromMayaRenderSettings().
     
             // Set the output filename.
             const auto imageName = renderSettings.getImageName(
@@ -316,7 +304,7 @@ bool HydraRenderCmd::hydraRender()
             // Seems like the best approach. Another possibility would be to use
             // in-memory conversion to USD from Maya USD's duplicate as USD.
             // For the moment, don't pass in anything to the renderer.
-            if (_batchRenderer->Render(inputParams) != MS::kSuccess) {
+            if (_batchRenderer->RenderFromMayaRenderSettings(inputParams) != MS::kSuccess) {
                 return false;
             }
         } // Camera loop

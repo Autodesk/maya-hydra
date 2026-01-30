@@ -84,17 +84,15 @@ public:
     struct InputParams {
         unsigned int       width{0};
         unsigned int       height{0};
-        PXR_NS::GfMatrix4d viewMatrix{};
-        PXR_NS::GfMatrix4d projectionMatrix{};
-        MDagPath           cameraPath;
-        Ufe::Path          ufeCameraPath;
+        Ufe::Path          ufeCameraPath; // Is used to get the Maya camera MDagPath to get the view and projection matrices for the task controller.
     };
 
     BatchRenderer(const MtohRendererDescription& desc);
     ~BatchRenderer();
 
-    //! Main entry point for rendering, called by Maya.
-    MStatus Render(const InputParams& inputParams);
+    MStatus RenderFromMayaRenderSettings(const InputParams& inputParams);
+    MStatus RenderFromHydraV1RenderSettings(const InputParams& inputParams);
+    MStatus RenderFromHydraV2RenderSettings();
 
     ///When fullReset is true, we remove the data producer scene indices that apply to all viewports and the scene index registry where the usd stages have been loaded.
     ///It means you are doing a full reset of hydra such as when doing "File New".

@@ -206,7 +206,7 @@ HdRenderDelegate* BatchRenderer::_GetRenderDelegate()
     return _renderIndex ? _renderIndex->GetRenderDelegate() : nullptr;
 }
 
-MStatus BatchRenderer::Render(
+MStatus BatchRenderer::RenderFromMayaRenderSettings(
     const InputParams& inputParams)
 {
     // It would be good to clear the resources of the overrides that are
@@ -218,7 +218,8 @@ MStatus BatchRenderer::Render(
     //         override->ClearHydraResources();
     //     }
     // }
-    TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER).Msg("BatchRenderer::Render()\n");
+    TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
+        .Msg("BatchRenderer::RenderFromMayaRenderSettings()\n");
 
     auto renderFrame = [&](bool markTime = false) {
         HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
@@ -294,10 +295,6 @@ MStatus BatchRenderer::Render(
     const std::string panelName{batchRenderDummyPanelName};
     auto& manager = Fvp::RenderViewDataManager::Get();
     if (!manager.ViewIsAlreadyRegistered(panelName)){
-        // TODO_BATCH_RENDER  Should this string be the whole UFE path, i.e.
-        // Ufe::PathString::string(ufeCameraPath)?
-        auto cameraName{inputParams.ufeCameraPath.back().string()};
-    
         const Fvp::InformationInterface::RenderViewDesc renderViewDesc(panelName, false);
         // The following returns true only if there are non-Maya data producers
         // added.
@@ -364,21 +361,40 @@ MStatus BatchRenderer::Render(
         _taskController->SetRenderOutputSettings(HdAovTokens->depth, depthAovDesc);
     }
 
-    _taskController->SetFreeCameraMatrices(
-        inputParams.viewMatrix, inputParams.projectionMatrix);
+    MDagPath camPath = UfeExtensions::ufeToDagPath(inputParams.ufeCameraPath);
+    if (!camPath.isValid()) {
+        TF_WARN(
+            "Invalid Maya camera UFE path: %s",
+            Ufe::PathString::string(inputParams.ufeCameraPath).c_str());
+        return MStatus::kFailure;
+    }
 
-    if (delegateParams.motionSamplesEnabled()) {
-        MDagPath camPath = inputParams.cameraPath;
-        Ufe::Path ufeCameraPath = inputParams.ufeCameraPath;
-        bool isMayaCamera = ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId();
-        if (isMayaCamera) {
-            if (_mayaHydraSceneIndex) {
-                params.camera = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
-                if (vpDirty)
-                    _mayaHydraSceneIndex->MarkSprimDirty(params.camera, HdCamera::DirtyParams);
-            }
+    if (!camPath.hasFn(MFn::kCamera)) {
+        if (camPath.extendToShape() != MS::kSuccess || !camPath.hasFn(MFn::kCamera)) {
+            TF_WARN(
+                "Failed to resolve camera shape for UFE path: %s",
+                Ufe::PathString::string(inputParams.ufeCameraPath).c_str());
+            return MStatus::kFailure;
         }
     }
+
+    MStatus camStatus;
+    MFnCamera cameraFn(camPath, &camStatus);
+    if (camStatus != MS::kSuccess) {
+        TF_WARN(
+            "Failed to create MFnCamera for UFE path: %s",
+            Ufe::PathString::string(inputParams.ufeCameraPath).c_str());
+        return MStatus::kFailure;
+    }
+
+    GfMatrix4d viewMatrix = GetGfMatrixFromMaya(camPath.inclusiveMatrixInverse());
+    GfMatrix4d projectionMatrix = GetGfMatrixFromMaya(cameraFn.projectionMatrix());
+    // As per MFnCamera::projectionMatrix() documentation:
+    // Maya uses a left hand coordinate system, so the entries [2][2] and [3][2] are negated.
+    projectionMatrix[2][2] = -projectionMatrix[2][2];
+    projectionMatrix[3][2] = -projectionMatrix[3][2];
+
+    _taskController->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
 
     _taskController->SetRenderParams(params);
     if (!params.camera.IsEmpty())
@@ -454,6 +470,18 @@ MStatus BatchRenderer::Render(
         return MStatus::kSuccess;
     }
 
+    return MStatus::kFailure;
+}
+
+MStatus BatchRenderer::RenderFromHydraV1RenderSettings(
+    const InputParams& inputParams)
+{
+    return RenderFromMayaRenderSettings(inputParams);
+}
+
+MStatus BatchRenderer::RenderFromHydraV2RenderSettings()
+{
+    TF_WARN("BatchRenderer::RenderFromHydraV2RenderSettings() not implemented yet.");
     return MStatus::kFailure;
 }
 
