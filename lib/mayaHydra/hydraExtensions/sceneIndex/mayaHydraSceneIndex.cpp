@@ -581,6 +581,16 @@ VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
         id,
         [](MayaHydraMaterialAdapter* a) -> VtValue { return a->GetMaterialResource(); },
         _materialAdapters);
+		
+    // For PRMan lights, the material network is stored in the light adapter
+    if (ret.IsEmpty()) {
+	    ret = _GetValue<MayaHydraLightAdapter, VtValue>(
+		    id,
+		    [](MayaHydraLightAdapter* a) -> VtValue { return a->GetLightMaterialNetwork(); },
+		    _lightAdapters
+        );
+    }
+
     return ret.IsEmpty() ? MayaHydraMaterialAdapter::GetPreviewMaterialResource(id) : ret;
 }
 
