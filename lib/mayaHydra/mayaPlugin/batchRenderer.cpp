@@ -32,7 +32,6 @@
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
 #include <flowViewport/debugCodes.h>
-#include <flowViewport/selection/fvpSelectionTask.h>
 #include <flowViewport/API/renderViewData/fvpFilteringSceneIndicesChainManager.h>
 #include <flowViewport/API/renderViewData/fvpRenderViewDataManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
@@ -121,31 +120,21 @@ const std::string batchRenderDummyPanelName("batchRenderDummyPanel");
 
 const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaData");
 
-// Replace the builtin and fixed colorize selection and selection tasks from
-// Hydra with our own Flow Viewport selection task.  The Hydra tasks are not
-// configurable and cannot be replaced by plugin behavior.  Currently, the Flow
-// Viewport selection task is a no-op.  PPT, 2-Oct-2023.
-
-void replaceSelectionTask(PXR_NS::HdTaskSharedPtrVector* tasks)
+// Remove the builtin and fixed colorize selection and selection tasks from
+// Hydra, as they are unused in batch rendering.
+void removeSelectionTask(PXR_NS::HdTaskSharedPtrVector* tasks)
 {
-    // For TF_WARN and TF_AXIOM macros.
+    // For TF_AXIOM macro.
     PXR_NAMESPACE_USING_DIRECTIVE
 
     TF_AXIOM(tasks);
 
-    auto isSnTask = [](const HdTaskSharedPtr& task) {
+    constexpr auto isSnTask = [](const HdTaskSharedPtr& task) {
         return std::dynamic_pointer_cast<HdxColorizeSelectionTask>(task) || 
             std::dynamic_pointer_cast<HdxSelectionTask>(task);
     };
 
-    auto found = std::find_if(tasks->begin(), tasks->end(), isSnTask);
-
-    if (found == tasks->end()) {
-        TF_WARN("Fvp::SelectionTask not inserted into render task vector!");
-        return;
-    }
-
-    *found = HdTaskSharedPtr(new Fvp::SelectionTask);
+    tasks->erase(std::remove_if(tasks->begin(), tasks->end(), isSnTask), tasks->end());
 }
 
 } // namespace
@@ -233,12 +222,9 @@ MStatus BatchRenderer::RenderFromMayaRenderSettings(
         }
         
 
-        // Replace the existing HdxTaskController selection task (Storm) or
-        // colorize selection task (non-Storm) with our selection task by
-        // editing the task list, since HdxTaskController is not configurable.
-        // As the existence of either task depends on AOV support, they may not
-        // be present, so we may have nothing to replace.  PPT, 11-Aug-2023.
-        replaceSelectionTask(&tasks);
+        // Remove the HdxTaskController selection task (Storm) or colorize
+        // selection task (non-Storm), as they are unused in batch rendering.
+        removeSelectionTask(&tasks);
 
         // Update shadow collection for lights
         if (_mayaHydraSceneIndex) {
@@ -449,7 +435,7 @@ MStatus BatchRenderer::RenderFromMayaRenderSettings(
 
         // See renderFrame() lambda comments.
         HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
-        replaceSelectionTask(&tasks);
+        removeSelectionTask(&tasks);
 
         _engine.Execute(_renderIndex, &tasks);
         _isConverged = isConverged();
