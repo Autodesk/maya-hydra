@@ -8,13 +8,21 @@ add_library(${TARGET_NAME} SHARED)
 target_sources(${TARGET_NAME} 
     PRIVATE
         batchRenderer.cpp
+        batchRendererMayaRenderSettings.cpp
+        batchRendererHydraV1RenderSettings.cpp
+        batchRendererHydraV2RenderSettings.cpp
         colorNotFoundException.cpp
         hydraRenderCmd.cpp
+        hydraRenderCmdHydraV1RenderSettings.cpp
+        hydraRenderCmdHydraV2RenderSettings.cpp
+        hydraRenderCmdMayaRenderSettings.cpp
         envSettings.cpp
         mayaColorPreferencesTranslator.cpp
         plugin.cpp
         pluginDebugCodes.cpp
         pluginUtils.cpp
+        renderVarUtils.cpp
+        renderSettingsUtils.cpp
         renderGlobals.cpp
         renderOverride.cpp
         tokens.cpp

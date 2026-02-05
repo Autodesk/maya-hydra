@@ -16,6 +16,8 @@
 #include "hydraRenderCmd.h"
 
 #include "pluginUtils.h"
+#include "renderSettingsUtils.h"
+#include "renderVarUtils.h"
 #include "pluginDebugCodes.h"
 #include "batchRenderer.h"
 
@@ -34,12 +36,32 @@
 #include <maya/MFileIO.h>
 
 #include <pxr/pxr.h>
+#include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/scoped.h>
 #include <pxr/imaging/glf/diagnostic.h> // For GlfRegisterDefaultDebugOutputMessageCallback()
 #include <pxr/imaging/garch/glApi.h>
 #include <pxr/imaging/garch/glDebugWindow.h>
+#include <pxr/imaging/hd/renderDelegate.h>
+#include <pxr/usd/usdRender/settings.h>
+#include <pxr/usd/usdRender/product.h>
+#include <pxr/usd/usdRender/var.h>
+#include <pxr/usd/usdRender/tokens.h>
+#include <pxr/usd/usdGeom/camera.h>
+#include <pxr/usd/sdf/layer.h>
+#include <pxr/base/gf/frustum.h>
+#include <pxr/base/vt/value.h>
 
+#include <ufe/pathString.h>
+#include <ufe/sceneSegmentHandler.h>
+#include <ufe/sceneItemList.h>
+#include <ufe/runTimeMgr.h>
+
+#include <mayaUsdAPI/proxyStage.h>
+#include <mayaUsdAPI/utils.h>
+
+#include <algorithm>
 #include <filesystem>
+#include <vector>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -53,8 +75,8 @@ constexpr auto _widthLong = "-width";
 constexpr auto _height = "-h";
 constexpr auto _heightLong = "-height";
 
-constexpr auto _camera = "-cam";
-constexpr auto _cameraLong = "-camera";
+constexpr auto _cameraFlagShort = "-cam";
+constexpr auto _cameraFlagLong = "-camera";
 
 constexpr auto _renderer = "-r";
 constexpr auto _rendererLong = "-renderer";
@@ -72,11 +94,12 @@ constexpr auto _layerLong = "-layer";
 constexpr auto _gpuEnabledFlag = "-gpu";
 constexpr auto _gpuEnabledFlagLong = "-gpuEnabled";
 
+using namespace MAYAHYDRA_NS_DEF;
+
 // TODO_BATCH_RENDER  Add documentation for this command.
 constexpr auto _helpText = R"HELP(For details on args usage please see 
 https://github.com/Autodesk/maya-hydra/blob/dev/doc/mayaHydraCommands.md
 )HELP";
-
 } // namespace
 
 namespace MAYAHYDRA_NS_DEF {
@@ -125,7 +148,7 @@ MSyntax HydraRenderCmd::createSyntax()
 
     syntax.addFlag(_width, _widthLong, MSyntax::kUnsigned);
     syntax.addFlag(_height, _heightLong, MSyntax::kUnsigned);
-    syntax.addFlag(_camera, _cameraLong, MSyntax::kString);
+    syntax.addFlag(_cameraFlagShort, _cameraFlagLong, MSyntax::kString);
     syntax.addFlag(_renderer, _rendererLong, MSyntax::kString);
     syntax.addFlag(_currentFrame, _currentFrameLong);
     syntax.addFlag(_gpuEnabledFlag, _gpuEnabledFlagLong, MSyntax::kBoolean);
@@ -186,130 +209,23 @@ bool HydraRenderCmd::hydraPreRender()
 
 bool HydraRenderCmd::hydraRender()
 {
-    MStatus status;
-
-    // Get render settings from Maya.
-    MCommonRenderSettingsData renderSettings;
-    MRenderUtil::getCommonRenderSettings(renderSettings);
-
-    // Unexpectedly renderSettings.name is empty, so parse the scene name
-    // ourselves.
-    std::filesystem::path scenePath{MFileIO::currentFile().asChar()};
-    MString sceneName{scenePath.stem().c_str()};
-
-    BatchRenderer::InputParams inputParams;
-    inputParams.width = renderSettings.width;
-    inputParams.height = renderSettings.height;
-
-    // Get all renderable cameras in the scene.  As of 21-Mar-2025 no
-    // C++ way to retrieve UFE cameras, so go through Maya command.
-    // For Maya cameras only, use
-    // MItDag dagIterCameras(MItDag::kDepthFirst, MFn::kCamera);
-    // to traverse the whole Maya scene.
-    // For now (21-Mar-2025), consider only Maya cameras.
-    MStringArray cameras;
-    // status = MGlobal::executeCommand("listCameras -ufe", cameras);
-    status = MGlobal::executeCommand("listCameras", cameras);
-
-    // Not considering render layers at all: both renderSetup and
-    // legacy render layers are treated as legacy functionality.  Use
-    // default render layer for all render products.
-    const auto renderLayer = MFnRenderLayer::defaultRenderLayer(&status);
-    if (status != MS::kSuccess) {
+    if (!_batchRenderer) {
+        TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_CMD, "_batchRenderer is a nullptr.\n");
         return false;
     }
-    
-    // Loop over all render times.
-    auto timeStart = renderSettings.frameStart;
-    auto timeEnd   = renderSettings.frameEnd;
-    auto timeIncr  = renderSettings.frameBy;
 
-    // If the file naming scheme does not correspond to an animation,
-    // use the current time.
-    if (!renderSettings.isAnimated()) {
-        timeStart = MAnimControl::currentTime();
-        timeIncr = 1.0f;
-        timeEnd = timeStart;
+    // Dispatch to the render path that matches the active render-settings type.
+    const auto renderSettingsType
+        = ReadRenderSettingsTypeFromRenderDelegate(_batchRenderer->GetRendererName());
+
+    if (renderSettingsType == RenderSettingsType::HydraV1) {
+        return hydraRenderFromHydraV1RenderSettings();
+    }
+    if (renderSettingsType == RenderSettingsType::HydraV2) {
+        return hydraRenderFromHydraV2RenderSettings();
     }
 
-    for (MTime time = timeStart; time <= timeEnd; time += timeIncr) {
-
-        const double frameNb = time.as(MTime::uiUnit());
-        if (MAnimControl::currentTime() != time) {
-            MAnimControl::setCurrentTime(time);
-        }
-
-        // Loop over all cameras.  FIXME  Probably ways to compute
-        // non-animated camera data once, for animated renders.
-        auto cameraIt = cameras.cbegin();
-        for (; cameraIt != cameras.cend(); ++cameraIt) {
-            auto camera = *cameraIt;
-    
-            MSelectionList sn;
-            sn.add(camera);
-            MDagPath cameraPath;
-            if (sn.getDagPath(0, cameraPath) != MS::kSuccess) {
-                // Non-Maya UFE path.
-                continue;
-            }
-    
-            // Camera attributes are on shape node beneath transform
-            if (cameraPath.extendToShape() != MS::kSuccess) {
-                return false;
-            }
-    
-            // Is the camera renderable?
-            MFnDagNode cameraFn(cameraPath, &status);
-            // MFnDependencyNode cameraFn(cameraPath.node(), &status);
-            if (status != MS::kSuccess) {
-                return false;
-            }
-    
-            if (!cameraFn.findPlug(
-                    "renderable", /* wantNetworkedPlug = */ true).asBool()) {
-                continue;
-            }
-    
-            inputParams.ufeCameraPath = Ufe::Path(
-                UfeExtensions::dagPathToUfePathSegment(cameraPath));
-            // View/projection matrices are derived from the UFE camera path
-            // inside BatchRenderer::RenderFromMayaRenderSettings().
-    
-            // Set the output filename.
-            const auto imageName = renderSettings.getImageName(
-                MCommonRenderSettingsData::kFullPathImage,
-                frameNb,
-                sceneName,
-                camera,
-                "",                     // Use render settings file format
-                renderLayer,
-                /* createDirectory = */ true,
-                &status);
-            if (status != MS::kSuccess) {
-                return false;
-            }
-
-            TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-                         "Render image name is %s.\n", imageName.asChar());
-
-            auto resetFileName = []() { Fvp::ImageBufferWriter::SetFileName(""); };
-            TfScoped guard(resetFileName);
-            Fvp::ImageBufferWriter::SetFileName(imageName.asChar());
-        
-            // Unclear how to translate Maya data.
-            // MHWRender::MDataServerOperation::MViewportScene carries MRenderItem's
-            // created by OGS, and has some level of change notification.
-            // That class is used in the viewport renderer to translate Maya data.
-            // Should we do the same here, should we still somehow rely on OGS?
-            // Seems like the best approach. Another possibility would be to use
-            // in-memory conversion to USD from Maya USD's duplicate as USD.
-            // For the moment, don't pass in anything to the renderer.
-            if (_batchRenderer->RenderFromMayaRenderSettings(inputParams) != MS::kSuccess) {
-                return false;
-            }
-        } // Camera loop
-    } // Time loop
-    return true;
+    return hydraRenderFromMayaRenderSettings();
 }
 
 MStatus HydraRenderCmd::doIt(const MArgList& args)

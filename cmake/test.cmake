@@ -47,6 +47,118 @@ function(find_labels label_set label_list)
     endif()
 endfunction()
 
+#
+# mayaHydra_add_cmd_line_render_multi_image_test( <scene_file_labeled>
+#                           [RENDERER <renderer_name>]
+#                           [EXPECTED_IMAGES_DIR <dir>]
+#                           [IMAGE_EXTENSION <extension>]
+#                           [FAIL <idiff fail value>]
+#                           [FAILPERCENT <idiff failpercent value>]
+#                           [WORKING_DIRECTORY <dir>]
+#                           [TEST_NAME_SUFFIX <suffix>]
+#                           [ENV <varname>=<varvalue> ...])
+#
+# Similar to mayaHydra_add_cmd_line_render_test but compares multiple output images.
+# The expected images directory is compared against the rendered output directory.
+#
+function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
+    cmake_parse_arguments(ARG
+        ""                                       # No boolean options.
+        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;IMAGE_EXTENSION;FAIL;FAILPERCENT;EXPECTED_IMAGES_DIR;TEST_NAME_SUFFIX"
+        "ENV"
+        ${ARGN}
+    )
+
+    if(ARG_WORKING_DIRECTORY)
+        set(WORKING_DIR ${ARG_WORKING_DIRECTORY})
+    else()
+        set(WORKING_DIR ${CMAKE_CURRENT_BINARY_DIR})
+    endif()
+
+    set(RENDERER "HdStormRendererPlugin")
+    if(ARG_RENDERER)
+        set(RENDERER "${ARG_RENDERER}")
+    endif()
+
+    if(ARG_SCENE_FILE_LABELED)
+        set(SCENE_FILE_LABELED "${ARG_SCENE_FILE_LABELED}")
+    endif()
+
+    get_testfile_and_labels(ALL_LABELS SCENE_FILE ${SCENE_FILE_LABELED})
+    mayaUsd_get_unittest_target(test_name ${SCENE_FILE})
+    if(ARG_TEST_NAME_SUFFIX)
+        set(test_name "${test_name}_${ARG_TEST_NAME_SUFFIX}")
+    endif()
+
+    set(IMAGE_EXTENSION "exr")
+    if(ARG_IMAGE_EXTENSION)
+        set(IMAGE_EXTENSION "${ARG_IMAGE_EXTENSION}")
+    endif()
+
+    set(FAIL "0.01")
+    if(ARG_FAIL)
+        set(FAIL "${ARG_FAIL}")
+    endif()
+
+    set(FAILPERCENT "1.0")
+    if(ARG_FAILPERCENT)
+        set(FAILPERCENT "${ARG_FAILPERCENT}")
+    endif()
+
+    set(SCENE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/scenes)
+    set(SCENE_PATH ${SCENE_DIR}/${SCENE_FILE})
+
+    if(ARG_EXPECTED_IMAGES_DIR)
+        if(IS_ABSOLUTE "${ARG_EXPECTED_IMAGES_DIR}")
+            set(EXPECTED_IMAGES_DIR "${ARG_EXPECTED_IMAGES_DIR}")
+        else()
+            set(EXPECTED_IMAGES_DIR "${SCENE_DIR}/${ARG_EXPECTED_IMAGES_DIR}")
+        endif()
+    else()
+        set(EXPECTED_IMAGES_DIR "${SCENE_DIR}")
+    endif()
+
+    if (IMAGE_DIFF_TOOL)
+        set(IDIFF_CMD "${IMAGE_DIFF_TOOL}")
+    else()
+        message(FATAL_ERROR "idiff binary not discovered. Set IMAGE_DIFF_TOOL (e.g. via OIIO_idiff_BINARY).")
+    endif()
+
+    add_test(
+        NAME "${test_name}"
+        WORKING_DIRECTORY ${WORKING_DIR}
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/renderSettingsMultiImageTest.py
+                ${RENDER_EXECUTABLE}
+                ${RENDERER}
+                ${SCENE_PATH}
+                ${EXPECTED_IMAGES_DIR}
+                ${IDIFF_CMD}
+                ${FAIL}
+                ${FAILPERCENT}
+    )
+
+    _mayaHydra_setup_test_common_path_vars()
+    list(APPEND ALL_PATH_VARS MAYA_RENDER_DESC_PATH)
+
+    _mayaHydra_setup_test_common_defaults("${test_name}")
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "MAYA_DEFAULT_SURFACE_SHADER=standardSurface")
+
+    _mayaHydra_setup_test_plugins()
+    list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
+         "${CMAKE_INSTALL_PREFIX}/renderDesc")
+
+    _mayaHydra_setup_test_USD_paths()
+    _mayaHydra_setup_test_finalize_env("${test_name}")
+
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "MAYA_IGNORE_DIALOGS=1")
+
+    set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
+    apply_labels_to_test("${ALL_LABELS}" ${test_name})
+endfunction()
+
 function(get_testfile_and_labels all_labels test_filename test_script)
     # fetch labels for each test file
     string(REPLACE "|" ";" tests_with_tags ${test_script})

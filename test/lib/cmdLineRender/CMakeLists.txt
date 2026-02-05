@@ -40,6 +40,22 @@ foreach(scene ${ARNOLD_RENDER_SCENES})
 )
 endforeach()
 
+if(IS_WINDOWS)
+    mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
+        EXPECTED_IMAGES_DIR renderSettings/images/storm
+        IMAGE_EXTENSION png
+        TEST_NAME_SUFFIX Storm
+    )
+    mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
+        RENDERER HdArnoldRendererPlugin
+        EXPECTED_IMAGES_DIR renderSettings/images/arnold
+        IMAGE_EXTENSION png
+        TEST_NAME_SUFFIX Arnold
+        FAIL 0.05
+        FAILPERCENT 1.0
+    )
+endif()
+
 if(NOT IS_MACOSX)
 # HYDRA-2031 this test fails only on macOS.
 add_test(

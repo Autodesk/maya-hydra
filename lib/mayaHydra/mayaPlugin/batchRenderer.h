@@ -30,6 +30,7 @@
 #ifndef BATCH_RENDERER_H
 #define BATCH_RENDERER_H
 
+#include "batchRenderTypes.h"
 #include "renderGlobals.h"
 #include "pluginUtils.h"
 
@@ -43,37 +44,36 @@
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
 
-#include <pxr/base/tf/singleton.h>
+#include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/driver.h>
 #include <pxr/imaging/hd/engine.h>
 #include <pxr/imaging/hd/renderIndex.h>
 #include <pxr/imaging/hd/rendererPlugin.h>
 #include <pxr/imaging/hd/rprimCollection.h>
 #include <pxr/imaging/hd/pluginRenderDelegateUniqueHandle.h>
-#include <pxr/imaging/hdSt/renderDelegate.h>
 #include <pxr/imaging/hdx/taskController.h>
 #include <pxr/imaging/hdsi/sceneGlobalsSceneIndex.h>
 #include <pxr/pxr.h>
 
 #include <maya/MCallbackIdArray.h>
-#include <maya/MString.h>
 
 #include <ufe/path.h>
 
 #include <atomic>
-#include <chrono>
 #include <memory>
-#include <mutex>
-#include <vector>
-#include <map>
 
 PXR_NAMESPACE_OPEN_SCOPE
 class MayaHydraSceneIndexRegistry;
+struct HdxRenderTaskParams;
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
 
 using HgiUniquePtr = std::unique_ptr<class PXR_NS::Hgi>;
+
+class BatchRendererMayaRenderSettings;
+class BatchRendererHydraV1RenderSettings;
+class BatchRendererHydraV2RenderSettings;
 
 /*! \brief BatchRenderer performs Maya batch renders through Hydra.
  */
@@ -84,6 +84,7 @@ public:
     struct InputParams {
         unsigned int       width{0};
         unsigned int       height{0};
+        RenderVarsInfo     renderVarsInfo;
         Ufe::Path          ufeCameraPath; // Is used to get the Maya camera MDagPath to get the view and projection matrices for the task controller.
     };
 
@@ -93,6 +94,7 @@ public:
     MStatus RenderFromMayaRenderSettings(const InputParams& inputParams);
     MStatus RenderFromHydraV1RenderSettings(const InputParams& inputParams);
     MStatus RenderFromHydraV2RenderSettings();
+    PXR_NS::TfToken GetRendererName() const { return _rendererDesc.rendererName; }
 
     ///When fullReset is true, we remove the data producer scene indices that apply to all viewports and the scene index registry where the usd stages have been loaded.
     ///It means you are doing a full reset of hydra such as when doing "File New".
@@ -104,6 +106,12 @@ public:
 
 private:
 
+    friend class BatchRendererMayaRenderSettings;
+    friend class BatchRendererHydraV1RenderSettings;
+    friend class BatchRendererHydraV2RenderSettings;
+
+    static constexpr const char* kBatchRenderDummyPanelName = "batchRenderDummyPanel";
+
     void              _InitHydraResources();
     PXR_NS::HdRenderDelegate* _GetRenderDelegate();   
     void              _ClearMayaHydraSceneIndex();
@@ -112,8 +120,12 @@ private:
 
     void              _SetRenderPurposeTags(const PXR_NS::MayaHydraParams& delegateParams);
     void              _CreateSceneIndicesChainAfterMergingSceneIndex();
-
-    void _AddPluginSelectionHighlighting();
+    bool              _PrepareHydraBatchRender(
+        int width,
+        int height,
+        PXR_NS::HdxRenderTaskParams* outParams);
+    void              _FinalizeHydraBatchRender(const PXR_NS::HdxRenderTaskParams& params);
+    void              _ExecuteHydraBatchRenderFrame();
 
     // Callbacks
     static void _ClearHydraCallback(void* data);

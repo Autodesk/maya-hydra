@@ -15,89 +15,51 @@
 //
 
 #include "batchRenderer.h"
+#include "batchRendererHydraV1RenderSettings.h"
+#include "batchRendererHydraV2RenderSettings.h"
+#include "batchRendererMayaRenderSettings.h"
 
-#include "mayaColorPreferencesTranslator.h"
 #include "pluginDebugCodes.h"
+#include "renderSettingsUtils.h"
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
-#include <mayaHydraLib/hydraUtils.h>
-#include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/tokens.h>
 
 #ifdef CODE_COVERAGE_WORKAROUND
 #include <flowViewport/fvpUtils.h>
 #endif
 #include <flowViewport/tokens.h>
-#include <flowViewport/colorPreferences/fvpColorPreferences.h>
-#include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
-#include <flowViewport/debugCodes.h>
-#include <flowViewport/API/renderViewData/fvpFilteringSceneIndicesChainManager.h>
 #include <flowViewport/API/renderViewData/fvpRenderViewDataManager.h>
+#include <flowViewport/API/renderViewData/fvpFilteringSceneIndicesChainManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
-#include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
-#include <flowViewport/imageWriter/fvpRenderBufferWriter.h>
-#include <flowViewport/imageWriter/fvpTextureBufferWriter.h>
-
-#include <pxr/base/plug/plugin.h>
-#include <pxr/base/plug/registry.h>
-#include <pxr/base/tf/type.h>
-#include <pxr/base/gf/vec3f.h>
-#include <pxr/base/tf/staticTokens.h>
 #include <pxr/pxr.h>
 
 #include <ufe/pathString.h>
-#include <ufe/sceneSegmentHandler.h>
 #include <ufe/sceneItemList.h>
-#include <ufe/runTimeMgr.h>
 
-#include <ufeExtensions/Global.h>
-
-#include <pxr/base/gf/matrix4d.h>
-#include <pxr/base/tf/instantiateSingleton.h>
+#include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/vt/value.h>
 #include <pxr/imaging/glf/contextCaps.h>
-#include <pxr/imaging/hd/renderBuffer.h>
-#include <pxr/imaging/hd/camera.h>
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
-#include <pxr/imaging/hd/rprim.h>
-#include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
-#include <pxr/imaging/hdx/selectionTask.h>
-#include <pxr/imaging/hdx/colorizeSelectionTask.h>
 #include <pxr/imaging/hdx/renderTask.h>
+#include <pxr/imaging/hdx/selectionTracker.h>
+#include <pxr/imaging/hdx/shadowTask.h>
 #include <pxr/imaging/hdx/tokens.h>
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
-#include <pxr/usd/kind/registry.h>
-#include <pxr/usd/usd/prim.h>
-#include <pxr/usd/usd/modelAPI.h>
-#include <pxr/usd/usdRender/tokens.h>
 
-#include <mayaUsdAPI/proxyStage.h>
 #include <mayaUsdAPI/utils.h>
 
-#include <maya/M3dView.h>
-#include <maya/MConditionMessage.h>
-#include <maya/MDGMessage.h>
-#include <maya/MEventMessage.h>
-#include <maya/MGlobal.h>
-#include <maya/MNodeMessage.h>
-#include <maya/MObjectHandle.h>
+#include <maya/MMessage.h>
 #include <maya/MProfiler.h>
 #include <maya/MSceneMessage.h>
-#include <maya/MSelectionList.h>
-#include <maya/MTimerMessage.h>
-#include <maya/MUiMessage.h>
-#include <maya/MFnCamera.h>
 #include <maya/MFileIO.h>
-#include <maya/MTypes.h>
+#include <maya/MStatus.h>
 
 #include <atomic>
-#include <chrono>
-#include <exception>
-#include <limits>
-
+#include <string>
 #include <iostream>
 
 int _batchRendererProfilerCategory = MProfiler::addCategory(
@@ -116,26 +78,7 @@ namespace {
 // This should be changed for batch rendering.  For now, use a dummy panel
 // to connect the scene index chain.
 
-const std::string batchRenderDummyPanelName("batchRenderDummyPanel");
-
 const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaData");
-
-// Remove the builtin and fixed colorize selection and selection tasks from
-// Hydra, as they are unused in batch rendering.
-void removeSelectionTask(PXR_NS::HdTaskSharedPtrVector* tasks)
-{
-    // For TF_AXIOM macro.
-    PXR_NAMESPACE_USING_DIRECTIVE
-
-    TF_AXIOM(tasks);
-
-    constexpr auto isSnTask = [](const HdTaskSharedPtr& task) {
-        return std::dynamic_pointer_cast<HdxColorizeSelectionTask>(task) || 
-            std::dynamic_pointer_cast<HdxSelectionTask>(task);
-    };
-
-    tasks->erase(std::remove_if(tasks->begin(), tasks->end(), isSnTask), tasks->end());
-}
 
 } // namespace
 
@@ -198,277 +141,21 @@ HdRenderDelegate* BatchRenderer::_GetRenderDelegate()
 MStatus BatchRenderer::RenderFromMayaRenderSettings(
     const InputParams& inputParams)
 {
-    // It would be good to clear the resources of the overrides that are
-    // not in active use, but I'm not sure if we have a better way than
-    // the idle time we use currently. The approach below would break if
-    // two render overrides were used at the same time.
-    // for (auto* override: _allInstances) {
-    //     if (override != this) {
-    //         override->ClearHydraResources();
-    //     }
-    // }
-    TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
-        .Msg("BatchRenderer::RenderFromMayaRenderSettings()\n");
-
-    auto renderFrame = [&](bool markTime = false) {
-        HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
-
-        if (_mayaHydraSceneIndex) {
-            if (!TF_VERIFY(_mayaHydraSceneIndex->useMeshAdapter(), 
-                    "The environment variable MAYA_HYDRA_USE_MESH_ADAPTER is turned off explicitly. Please either remove that environment variable or turn it on to use production rendering.")) 
-            {
-                return;
-            }
-        }
-        
-
-        // Remove the HdxTaskController selection task (Storm) or colorize
-        // selection task (non-Storm), as they are unused in batch rendering.
-        removeSelectionTask(&tasks);
-
-        // Update shadow collection for lights
-        if (_mayaHydraSceneIndex) {
-            _mayaHydraSceneIndex->UpdateLightsShadowCollection();
-        }
-
-        // Update plugin data producers
-        for (auto& viewData : Fvp::RenderViewDataManager::Get().GetAllViewData()) {
-            for (auto& dataProducer : viewData.GetDataProducerSceneIndicesData()) {
-                dataProducer->UpdateVisibility();
-                dataProducer->UpdateTransform();
-            }
-        }
-
-        // Update plugin filtering scene indices
-        std::string rendererNamesToUpdate;
-        for (auto& sceneFilteringSceneIndexData : Fvp::FilteringSceneIndexInterfaceImp::get().getSceneFilteringSceneIndicesData()) {
-            if (sceneFilteringSceneIndexData->UpdateVisibility()) {
-                rendererNamesToUpdate += sceneFilteringSceneIndexData->GetClient()->getRendererNames();
-            }
-        }
-        for (auto& selectionHighlightFilteringSceneIndexData : Fvp::FilteringSceneIndexInterfaceImp::get().getSelectionHighlightFilteringSceneIndicesData()) {
-            if (selectionHighlightFilteringSceneIndexData->UpdateVisibility()) {
-                rendererNamesToUpdate += selectionHighlightFilteringSceneIndexData->GetClient()->getRendererNames();
-            }
-        }
-        if (!rendererNamesToUpdate.empty()) {
-            Fvp::FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(rendererNamesToUpdate);
-        }
-
-        _engine.Execute(_renderIndex, &tasks);
-
-    }; // End of renderFrame lambda.
-
-    if (_initializationAttempted && !_initializationSucceeded) {
-        // Initialization must have failed already, stop trying.
-        return MStatus::kFailure;
-    }
-
-    if (_needsClear.exchange(false)) {
-        constexpr bool fullReset = false;
-        ClearHydraResources(fullReset);
-    }
-
-    if (!_initializationAttempted) {
-        _InitHydraResources();
-
-        if (!_initializationSucceeded) {
-            return MStatus::kFailure;
-        }
-    }
-
-    // TODO_BATCH_RENDER  Remove this viewport architecture dependency.
-    const std::string panelName{batchRenderDummyPanelName};
-    auto& manager = Fvp::RenderViewDataManager::Get();
-    if (!manager.ViewIsAlreadyRegistered(panelName)){
-        const Fvp::InformationInterface::RenderViewDesc renderViewDesc(panelName, false);
-        // The following returns true only if there are non-Maya data producers
-        // added.
-        manager.AddRenderViewData(
-            renderViewDesc, 
-            renderIndex(),
-            _dataProducerMergingSceneIndexProxy,
-            _lastFilteringSceneIndexBeforeCustomFiltering);
-    }
-
-    if (_needToReplaceSelection){
-        _needToReplaceSelection = false;
-    }
-
-    MayaHydraParams delegateParams = _globals.delegateParams;
-    delegateParams.displaySmoothMeshes = true; // This is the default.
-    
-    if (_mayaHydraSceneIndex) {
-        _mayaHydraSceneIndex->SetParams(delegateParams);
-        // TODO_BATCH_RENDER
-        // Maya Hydra scene index does way too much, viewport render aware.
-        // How do we fix this?  PPT, 3-Mar-2025.
-        // _mayaHydraSceneIndex->PreFrame(drawContext);
-    }
-
-    HdxRenderTaskParams params;
-    params.enableLighting = true;
-#if PXR_VERSION <= 2508
-    params.enableSceneMaterials = true;
-#endif
-
-    // Do not set params.wireframeColor, as this implies reading the
-    // FvpColorPreferencesTokens->wireframeSelection from the
-    // Fvp::ColorPreferences instance, which is unavailable in batch mode.
-
-    params.cullStyle = HdCullStyleBackUnlessDoubleSided;
-
-    int width = static_cast<int>(inputParams.width);
-    int height = static_cast<int>(inputParams.height);
-
-    bool vpDirty;
-    if ((vpDirty = (width != _viewport[2] || height != _viewport[3]))) {
-        _viewport = GfVec4d(0, 0, width, height);
-        _taskController->SetRenderViewport(_viewport);
-    }
-
-    // Set Purpose tags
-    SetRenderPurposeTags(delegateParams);
-
-    // Set MSAA as per Maya AntiAliasing settings
-    if (_isUsingHdSt)
-    {  
-        // Maya's MSAA toggle settings
-        constexpr bool isMultiSampled = true;
-
-        // Set MSAA on Color Buffer
-        HdAovDescriptor colorAovDesc = _taskController->GetRenderOutputSettings(HdAovTokens->color);
-        colorAovDesc.multiSampled = isMultiSampled;
-        _taskController->SetRenderOutputSettings(HdAovTokens->color, colorAovDesc);
-
-        // Set MSAA of Depth buffer
-        HdAovDescriptor depthAovDesc = _taskController->GetRenderOutputSettings(HdAovTokens->depth);
-        depthAovDesc.multiSampled = isMultiSampled;        
-        _taskController->SetRenderOutputSettings(HdAovTokens->depth, depthAovDesc);
-    }
-
-    MDagPath camPath = UfeExtensions::ufeToDagPath(inputParams.ufeCameraPath);
-    if (!camPath.isValid()) {
-        TF_WARN(
-            "Invalid Maya camera UFE path: %s",
-            Ufe::PathString::string(inputParams.ufeCameraPath).c_str());
-        return MStatus::kFailure;
-    }
-
-    if (!camPath.hasFn(MFn::kCamera)) {
-        if (camPath.extendToShape() != MS::kSuccess || !camPath.hasFn(MFn::kCamera)) {
-            TF_WARN(
-                "Failed to resolve camera shape for UFE path: %s",
-                Ufe::PathString::string(inputParams.ufeCameraPath).c_str());
-            return MStatus::kFailure;
-        }
-    }
-
-    MStatus camStatus;
-    MFnCamera cameraFn(camPath, &camStatus);
-    if (camStatus != MS::kSuccess) {
-        TF_WARN(
-            "Failed to create MFnCamera for UFE path: %s",
-            Ufe::PathString::string(inputParams.ufeCameraPath).c_str());
-        return MStatus::kFailure;
-    }
-
-    GfMatrix4d viewMatrix = GetGfMatrixFromMaya(camPath.inclusiveMatrixInverse());
-    GfMatrix4d projectionMatrix = GetGfMatrixFromMaya(cameraFn.projectionMatrix());
-    // As per MFnCamera::projectionMatrix() documentation:
-    // Maya uses a left hand coordinate system, so the entries [2][2] and [3][2] are negated.
-    projectionMatrix[2][2] = -projectionMatrix[2][2];
-    projectionMatrix[3][2] = -projectionMatrix[3][2];
-
-    _taskController->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
-
-    _taskController->SetRenderParams(params);
-    if (!params.camera.IsEmpty())
-        _taskController->SetCameraPath(params.camera);
-
-    // Default color in usdview.
-    _taskController->SetSelectionColor(_globals.colorSelectionHighlightColor);
-    _taskController->SetEnableSelection(_globals.colorSelectionHighlight);
-
-    if (_globals.outlineSelectionWidth != 0.f) {
-        _taskController->SetSelectionOutlineRadius(_globals.outlineSelectionWidth);
-        _taskController->SetSelectionEnableOutline(true);
-    } else
-        _taskController->SetSelectionEnableOutline(false);
-
-    _taskController->SetCollection(_renderCollection);
-
-    // Update all registered plugin before render.
-    for (auto& entry : _sceneIndexRegistry->GetRegistrations()) {
-        entry.second->Update();
-    }
-
-    if (_isUsingHdSt) {
-        constexpr auto enableShadows = true;
-        HdxShadowTaskParams shadowParams;
-        shadowParams.cullStyle = HdCullStyleNothing;
-
-        // The light & shadow parameters currently (19.11-20.08) are only used for tasks specific to
-        // Storm
-        _taskController->SetEnableShadows(enableShadows);
-        _taskController->SetShadowParams(shadowParams);
-    }
-
-    // The renderFrame() lambda does too much to be called in a loop:
-    // all we want is to call it once, then call _Execute() repeatedly.
-    renderFrame(true);
-
-    // For Arnold the following always returns false.
-    // _isConverged = _taskController->IsConverged();
-    auto isConverged = [this]() {
-        auto colorRenderBuffer = _taskController->GetRenderOutput(
-            HdAovTokens->color);
-        TF_AXIOM(colorRenderBuffer);
-        return colorRenderBuffer->IsConverged();
-    };
-    _isConverged = isConverged();
-
-    // Render to convergence.
-    constexpr auto wait100ms = std::chrono::duration<float, std::milli>(100);
-    while (!_isConverged) {
-        std::this_thread::sleep_for(wait100ms);
-
-        // See renderFrame() lambda comments.
-        HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
-        removeSelectionTask(&tasks);
-
-        _engine.Execute(_renderIndex, &tasks);
-        _isConverged = isConverged();
-    }
-
-    const auto fileName = Fvp::ImageBufferWriter::GetFileName();
-    if (!fileName.empty()) {
-        using Writer = Fvp::ImageBufferWriter;
-        // TODO_BATCH_RENDER Checking for use of Hydra Storm is not general enough.
-        Writer::Ptr writer = _isUsingHdSt ? Writer::Ptr(
-            std::make_shared<Fvp::TextureBufferWriter>(&_engine, _hgi.get())) :
-            Writer::Ptr(std::make_shared<Fvp::RenderBufferWriter>(_taskController.get()));
-
-        if (!Writer::Write(writer, fileName)) {
-            TF_RUNTIME_ERROR("Failed to write image to %s",
-                             fileName.c_str());
-        }
-        return MStatus::kSuccess;
-    }
-
-    return MStatus::kFailure;
+    // Delegate the Maya render-settings path to the dedicated implementation.
+    return BatchRendererMayaRenderSettings::Render(*this, inputParams);
 }
-
+  
 MStatus BatchRenderer::RenderFromHydraV1RenderSettings(
     const InputParams& inputParams)
 {
-    return RenderFromMayaRenderSettings(inputParams);
+    // Delegate the Hydra V1 render-settings path to the dedicated implementation.
+    return BatchRendererHydraV1RenderSettings::Render(*this, inputParams);
 }
 
 MStatus BatchRenderer::RenderFromHydraV2RenderSettings()
 {
-    TF_WARN("BatchRenderer::RenderFromHydraV2RenderSettings() not implemented yet.");
-    return MStatus::kFailure;
+    // Delegate the Hydra V2 render-settings path to the dedicated implementation.
+    return BatchRendererHydraV2RenderSettings::Render(*this);
 }
 
 void BatchRenderer::_SetRenderPurposeTags(const MayaHydraParams& delegateParams)
@@ -483,6 +170,165 @@ void BatchRenderer::_SetRenderPurposeTags(const MayaHydraParams& delegateParams)
     _taskController->SetRenderTags(mhRenderTags);
 }
 
+bool BatchRenderer::_PrepareHydraBatchRender(
+    int width,
+    int height,
+    HdxRenderTaskParams* outParams)
+{
+    if (_initializationAttempted && !_initializationSucceeded) {
+        // Initialization must have failed already, stop trying.
+        return false;
+    }
+
+    if (_needsClear.exchange(false)) {
+        constexpr bool fullReset = false;
+        ClearHydraResources(fullReset);
+    }
+
+    if (!_initializationAttempted) {
+        _InitHydraResources();
+        if (!_initializationSucceeded) {
+            return false;
+        }
+    }
+
+    // TODO_BATCH_RENDER  Remove this viewport architecture dependency.
+    const std::string panelName { kBatchRenderDummyPanelName };
+    auto&             manager = Fvp::RenderViewDataManager::Get();
+    if (!manager.ViewIsAlreadyRegistered(panelName)) {
+        const Fvp::InformationInterface::RenderViewDesc renderViewDesc(panelName, false);
+        // The following returns true only if there are non-Maya data producers
+        // added.
+        manager.AddRenderViewData(
+            renderViewDesc,
+            renderIndex(),
+            _dataProducerMergingSceneIndexProxy,
+            _lastFilteringSceneIndexBeforeCustomFiltering);
+    }
+
+    if (_needToReplaceSelection) {
+        _needToReplaceSelection = false;
+    }
+
+    MayaHydraParams delegateParams = _globals.delegateParams;
+    delegateParams.displaySmoothMeshes = true; // This is the default.
+
+    if (_mayaHydraSceneIndex) {
+        _mayaHydraSceneIndex->SetParams(delegateParams);
+        // TODO_BATCH_RENDER
+        // Maya Hydra scene index does way too much, viewport render aware.
+        // How do we fix this?  PPT, 3-Mar-2025.
+        // _mayaHydraSceneIndex->PreFrame(drawContext);
+    }
+
+    _viewport = GfVec4d(0, 0, width, height);
+    _taskController->SetRenderViewport(_viewport);
+
+    // Set Purpose tags.
+    SetRenderPurposeTags(delegateParams);
+
+    HdxRenderTaskParams params;
+    params.enableLighting = true;
+#if PXR_VERSION <= 2508
+    params.enableSceneMaterials = true;
+#endif
+    params.cullStyle = HdCullStyleBackUnlessDoubleSided;
+
+    if (outParams) {
+        *outParams = params;
+    }
+
+    return true;
+}
+
+void BatchRenderer::_FinalizeHydraBatchRender(const HdxRenderTaskParams& params)
+{
+    _taskController->SetRenderParams(params);
+    if (!params.camera.IsEmpty()) {
+        _taskController->SetCameraPath(params.camera);
+    }
+
+    // Default color in usdview.
+    _taskController->SetSelectionColor(_globals.colorSelectionHighlightColor);
+    _taskController->SetEnableSelection(_globals.colorSelectionHighlight);
+
+    if (_globals.outlineSelectionWidth != 0.f) {
+        _taskController->SetSelectionOutlineRadius(_globals.outlineSelectionWidth);
+        _taskController->SetSelectionEnableOutline(true);
+    } else {
+        _taskController->SetSelectionEnableOutline(false);
+    }
+
+    _taskController->SetCollection(_renderCollection);
+
+    // Update all registered plugin before render.
+    for (auto& entry : _sceneIndexRegistry->GetRegistrations()) {
+        entry.second->Update();
+    }
+
+    if (_isUsingHdSt) {
+        constexpr auto      enableShadows = true;
+        HdxShadowTaskParams shadowParams;
+        shadowParams.cullStyle = HdCullStyleNothing;
+
+        // The light & shadow parameters currently (19.11-20.08) are only used for tasks specific
+        // to Storm.
+        _taskController->SetEnableShadows(enableShadows);
+        _taskController->SetShadowParams(shadowParams);
+    }
+}
+
+void BatchRenderer::_ExecuteHydraBatchRenderFrame()
+{
+    HdTaskSharedPtrVector tasks = _taskController->GetRenderingTasks();
+
+    if (_mayaHydraSceneIndex) {
+        if (!TF_VERIFY(
+                _mayaHydraSceneIndex->useMeshAdapter(),
+                "The environment variable MAYA_HYDRA_USE_MESH_ADAPTER is turned off "
+                "explicitly. Please either remove that environment variable or turn it on to "
+                "use production rendering.")) {
+            return;
+        }
+    }
+
+    // Update shadow collection for lights
+    if (_mayaHydraSceneIndex) {
+        _mayaHydraSceneIndex->UpdateLightsShadowCollection();
+    }
+
+    // Update plugin data producers
+    for (auto& viewData : Fvp::RenderViewDataManager::Get().GetAllViewData()) {
+        for (auto& dataProducer : viewData.GetDataProducerSceneIndicesData()) {
+            dataProducer->UpdateVisibility();
+            dataProducer->UpdateTransform();
+        }
+    }
+
+    // Update plugin filtering scene indices
+    std::string rendererNamesToUpdate;
+    for (auto& sceneFilteringSceneIndexData :
+         Fvp::FilteringSceneIndexInterfaceImp::get().getSceneFilteringSceneIndicesData()) {
+        if (sceneFilteringSceneIndexData->UpdateVisibility()) {
+            rendererNamesToUpdate += sceneFilteringSceneIndexData->GetClient()->getRendererNames();
+        }
+    }
+    for (auto& selectionHighlightFilteringSceneIndexData :
+         Fvp::FilteringSceneIndexInterfaceImp::get()
+             .getSelectionHighlightFilteringSceneIndicesData()) {
+        if (selectionHighlightFilteringSceneIndexData->UpdateVisibility()) {
+            rendererNamesToUpdate
+                += selectionHighlightFilteringSceneIndexData->GetClient()->getRendererNames();
+        }
+    }
+    if (!rendererNamesToUpdate.empty()) {
+        Fvp::FilteringSceneIndicesChainManager::get().updateFilteringSceneIndicesChain(
+            rendererNamesToUpdate);
+    }
+
+    _engine.Execute(_renderIndex, &tasks);
+}
+
 void BatchRenderer::_ClearMayaHydraSceneIndex()
 {
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -490,7 +336,9 @@ void BatchRenderer::_ClearMayaHydraSceneIndex()
     // HdRetainedSceneIndex dtor crashes in Windows clang code coverage build.
     _mayaHydraSceneIndex->_Destroy();
 #else
-    _dataProducerMergingSceneIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
+    if (_dataProducerMergingSceneIndexProxy && _mayaHydraSceneIndex) {
+        _dataProducerMergingSceneIndexProxy->RemoveSceneIndex(_mayaHydraSceneIndex);
+    }
 #endif
     _mayaHydraSceneIndex.Reset();
 }
@@ -525,11 +373,7 @@ void BatchRenderer::_InitHydraResources()
             this)))
     );
     _taskController->SetEnableShadows(true);
-    // Initialize the AOV system to render color for Storm
-    if (_isUsingHdSt) {
-        _taskController->SetRenderOutputs({ HdAovTokens->color });
-    }
-
+    
     MayaHydraInitData mhInitData(
         TfToken("MayaHydraSceneIndex"),
         *renderIndex(),
@@ -553,6 +397,10 @@ void BatchRenderer::_InitHydraResources()
     
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
     _engine.SetTaskContextData(FvpTokens->fvpSelectionState, fvpSelectionTrackerValue);
+    // Keep Hdx selection tasks satisfied even when selection replacement is disabled.
+    const HdxSelectionTrackerSharedPtr hdxSelectionTracker
+        = std::make_shared<HdxSelectionTracker>();
+    _engine.SetTaskContextData(HdxTokens->selectionState, VtValue(hdxSelectionTracker));
 
     _mayaHydraSceneIndex->Populate();
     //Add the scene index as an input scene index of the merging scene index
@@ -624,7 +472,7 @@ void BatchRenderer::ClearHydraResources(bool fullReset)
     // as this will affect interactive viewports.  Only remove
     // information for our dummy batch render viewport.  Must remove this
     // viewport architecture dependence.
-    Fvp::RenderViewDataManager::Get().RemoveRenderViewData(batchRenderDummyPanelName);
+    Fvp::RenderViewDataManager::Get().RemoveRenderViewData(kBatchRenderDummyPanelName);
     
     if (fullReset){
         //Remove the data producer scene indices that apply to all views
@@ -706,22 +554,9 @@ void BatchRenderer::_SetActiveRenderSettingsPrimPath(const SdfPath& path)
 
 void BatchRenderer::_SetActiveRenderSettingsPrimFromStageMetadata()
 {
-    // The chosen USD render settings prim path is stored as USD stage-level
-    // metadata (if present).  Find all USD stages in the Maya scene,
-    // under the Maya root node.  The USD stages are accessed through
-    // Maya proxy shape nodes, which are gateway nodes in the UFE root
-    // scene segment.
-    const auto mayaSceneSegmentHandler = Ufe::RunTimeMgr::instance().sceneSegmentHandler(MayaUsdAPI::getMayaRunTimeId());
-    const auto mayaRootPath = mayaSceneSegmentHandler->rootSceneSegmentRootPath();
-    const auto gatewayItems = Ufe::SceneSegmentHandler::findGatewayItems(
-        mayaRootPath, MayaUsdAPI::getUsdRunTimeId());
-
-    // Loop over gateway items to find proxy shape nodes.
-    Ufe::SceneItemList proxyShapes;
-    std::copy_if(
-        gatewayItems.begin(), gatewayItems.end(), 
-        std::back_inserter(proxyShapes), [=](const Ufe::SceneItem::Ptr& item) {
-            return item->nodeType() == std::string("mayaUsdProxyShape"); });
+    // Render settings can be selected via stage metadata. If not present,
+    // traverse the stage to find a render settings prim.
+    const Ufe::SceneItemList proxyShapes = GetAllMayaUsdProxyShapes();
 
     TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
                  "Found %zu MayaUsdProxyShape nodes in scene.\n",
@@ -737,35 +572,30 @@ void BatchRenderer::_SetActiveRenderSettingsPrimFromStageMetadata()
 
         const auto stage = MayaUsdAPI::getStage(psPath);
         if (TF_VERIFY(stage, "No stage found for proxy shape %s", Ufe::PathString::string(psPath).c_str())) {
-            // Check if there is a render settings prim path in the stage
-            // metadata.
-            std::string rsPathStr;
-            if (stage->HasAuthoredMetadata(
-                    UsdRenderTokens->renderSettingsPrimPath)) {
-                stage->GetMetadata(
-                    UsdRenderTokens->renderSettingsPrimPath, &rsPathStr);
-            }
+            UsdRenderSettings usdRenderSettings;
+            if (FindUsdRenderSettingsOnStage(stage, usdRenderSettings)) {
+                const SdfPath rsPath = usdRenderSettings.GetPrim().GetPath();
 
-            // Add the delegateId prefix since the scene globals scene index is
-            // inserted into the merging scene index.
-            if (!rsPathStr.empty()) {
+                // Add the delegateId prefix since the scene globals scene index is
+                // inserted into the merging scene index.
                 // The proper way to do this is to call
                 // MayaHydra::sceneIndexPathPrefix(), which correctly deals
                 // with possible USD proxy shape name duplication in the Maya
                 // Dag.  Unfortunately, at this point, the Hydra scene is not
                 // fully populated.  This level of correctness is beyond the
                 // scope of the production rendering POC.
-                const auto hydraRsPath = SdfPath(rsPathStr).ReplacePrefix(SdfPath::AbsoluteRootPath(), SdfPath("/MayaUsdProxyShape_PluginNode").AppendElementString(ps->nodeName()));
+                const auto hydraRsPath = rsPath.ReplacePrefix(
+                    SdfPath::AbsoluteRootPath(),
+                    SdfPath("/MayaUsdProxyShape_PluginNode").AppendElementString(ps->nodeName()));
 
                 TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
                              "Active render settings set to " +
                              hydraRsPath.GetAsString() + "\n");
 
                 _SetActiveRenderSettingsPrimPath(hydraRsPath);
-            }
-            else {
+            } else {
                 TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
-                             "No stage-level render settings metadata found.\n");
+                             "No render settings prim found on stage.\n");
             }
         }
     }
