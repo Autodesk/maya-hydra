@@ -76,6 +76,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	#testMayaDisplayModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testRenderRegion.py
     testConvergence.py
+    testFramePasses.py
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
@@ -125,11 +126,6 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
         cpp/testUsdPointInstancingIsolateSelect.py
         cpp/testUsdPointInstancingIsolateSelectBBox.py
     )
-endif()
-
-#Viewport tool box render passes tests
-if(BUILD_WITH_VIEWPORT_TOOLBOX)
-    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testFramePasses.py)
 endif()
 
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.

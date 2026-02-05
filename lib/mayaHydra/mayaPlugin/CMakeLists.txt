@@ -22,8 +22,8 @@ target_sources(${TARGET_NAME}
         pluginBuildInfoCommand.cpp
         getFramePassesCountCommand.cpp
         testingCommand.cpp
-        $<$<BOOL:${BUILD_WITH_VIEWPORT_TOOLBOX}>:renderRegionCommand.cpp>
-        $<$<BOOL:${BUILD_WITH_VIEWPORT_TOOLBOX}>:setVisibleFramePassesCommand.cpp>
+        renderRegionCommand.cpp
+        setVisibleFramePassesCommand.cpp
 )
 
 set(HEADERS

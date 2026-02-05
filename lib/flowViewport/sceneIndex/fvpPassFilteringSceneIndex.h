@@ -15,8 +15,6 @@
 #ifndef FVP_PASS_FILTERING_SCENE_INDEX_H
 #define FVP_PASS_FILTERING_SCENE_INDEX_H
 
-#ifdef VIEWPORT_TOOLBOX
-
 #include "flowViewport/api.h"
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 #include "flowViewport/fvpFramePassData.h"
@@ -118,7 +116,5 @@ private:
 };
 
 } // namespace FVP_NS_DEF
-
-#endif // VIEWPORT_TOOLBOX
 
 #endif // FVP_PASS_FILTERING_SCENE_INDEX_H
