@@ -402,7 +402,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 break;
 
             default:
-				TF_RUNTIME_ERROR(
+                TF_RUNTIME_ERROR(
                     "Unsupported render item primitive %d for item '%s' (prim '%s', id '%s').",
                     static_cast<int>(GetPrimitive()),
                     _name.asChar(),
