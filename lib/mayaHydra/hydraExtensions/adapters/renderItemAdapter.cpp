@@ -127,7 +127,12 @@ void MayaHydraRenderItemAdapter::_InsertRprim(MayaHydraAdapter* adapter)
         GetMayaHydraSceneIndex()->InsertPrim(adapter, HdPrimTypeTokens->points, GetID());
         break;
     default:
-        assert(false); // unexpected/unsupported primitive type
+        TF_RUNTIME_ERROR(
+			"Unsupported render item primitive %d for item '%s' (prim '%s', id '%s').",
+			static_cast<int>(GetPrimitive()),
+			_name.asChar(),
+			_dagPath.fullPathName().asChar(),
+			GetID().GetText());
         break;
     }
 }
@@ -397,7 +402,12 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 break;
 
             default:
-                assert(false); // unexpected/unsupported primitive type
+				TF_RUNTIME_ERROR(
+                    "Unsupported render item primitive %d for item '%s' (prim '%s', id '%s').",
+                    static_cast<int>(GetPrimitive()),
+                    _name.asChar(),
+                    _dagPath.fullPathName().asChar(),
+                    GetID().GetText());
                 break;
             }
             indices->unmap();
