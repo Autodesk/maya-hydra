@@ -128,11 +128,11 @@ void MayaHydraRenderItemAdapter::_InsertRprim(MayaHydraAdapter* adapter)
         break;
     default:
         TF_RUNTIME_ERROR(
-			"Unsupported render item primitive %d for item '%s' (prim '%s', id '%s').",
-			static_cast<int>(GetPrimitive()),
-			_name.asChar(),
-			_dagPath.fullPathName().asChar(),
-			GetID().GetText());
+            "Unsupported render item primitive %d for item '%s' (prim '%s', id '%s').",
+            static_cast<int>(GetPrimitive()),
+            _name.asChar(),
+            _dagPath.fullPathName().asChar(),
+            GetID().GetText());
         break;
     }
 }
