@@ -26,6 +26,7 @@
 #include "renderRegionCommand.h"
 #include "setVisibleFramePassesCommand.h"
 #include "hydraRenderCmd.h"
+#include "envSettings.h"
 
 #include <mayaHydraLib/adapters/adapter.h>
 
@@ -36,10 +37,23 @@
 #include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/envSetting.h>
 
+#include <mayaUsdAPI/utils.h>
+
 #include <maya/MFnPlugin.h>
 #include <maya/MGlobal.h>
 #include <maya/MSceneMessage.h>
 #include <maya/MCommandResult.h>
+//======================================================================
+// Example code to create a USD render settings stage, for translation
+// to Hydra v2 render settings.
+//======================================================================
+#include <maya/MDagModifier.h>
+
+#include <ufe/sceneSegmentHandler.h>
+#include <ufe/runTimeMgr.h>
+//======================================================================
+// End example code.
+//======================================================================
 
 #include <memory>
 #include <vector>
@@ -122,6 +136,77 @@ private:
         return (typedResult != 0);
     }
 };
+
+//======================================================================
+// Example code to create a USD render settings stage, for translation
+// to Hydra v2 render settings.
+//======================================================================
+
+static MCallbackId g_renderSettingsFileNewCallbackId = 0;
+static MCallbackId g_renderSettingsFileOpenCallbackId = 0;
+
+bool createRenderSettings()
+{
+    MStatus status;
+    MDagModifier dagMod;
+
+    // Create a transform node as parent
+    MObject transformObj = dagMod.createNode("transform", MObject::kNullObj, &status);
+    if (status != MS::kSuccess || transformObj.isNull()) {
+        return false;
+    }
+
+    // Create the mayaUsdProxyShape node
+    MObject proxyShapeObj = dagMod.createNode("mayaUsdProxyShape", transformObj, &status);
+    if (status != MS::kSuccess || proxyShapeObj.isNull()) {
+        return false;
+    }
+
+    // Rename the proxy shape to "renderSettings"
+    status = dagMod.renameNode(transformObj, "renderSettings");
+    if (status != MS::kSuccess) {
+        return false;
+    }
+
+    status = dagMod.renameNode(proxyShapeObj, "renderSettingsShape");
+    if (status != MS::kSuccess) {
+        return false;
+    }
+    // Execute the DAG modifier operations
+    status = dagMod.doIt();
+    if (status != MS::kSuccess) {
+        return false;
+    }
+
+    return true;
+}
+
+// Callback function to create USD render settings on file new.
+void onFileNewCreateRenderSettings(void* /*clientData*/)
+{
+    // For TF_WARN macro.
+    PXR_NAMESPACE_USING_DIRECTIVE
+
+    if (!createRenderSettings()) {
+        TF_WARN("USD render settings creation failed.");
+    }
+}
+
+// Callback function to check if a stage exists on file open, otherwise create
+// one with usd render settings.
+void onFileOpenCheckOrCreateRenderSettings(void* /*clientData*/)
+{
+    // If there is at least one stage in the Maya scene, render settings will
+    // be taken from one existing stage.
+    const auto mayaSceneSegmentHandler = Ufe::RunTimeMgr::instance().sceneSegmentHandler(MayaUsdAPI::getMayaRunTimeId());
+    const auto mayaRootPath = mayaSceneSegmentHandler->rootSceneSegmentRootPath();
+    const auto gatewayItems = Ufe::SceneSegmentHandler::findGatewayItems(
+        mayaRootPath, MayaUsdAPI::getUsdRunTimeId());
+
+    if (gatewayItems.empty()) {
+        onFileNewCreateRenderSettings(nullptr);
+    }
+}
 
 }
 
@@ -336,11 +421,39 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
     initialize();
 
+    if (addRenderSettingsToScene()) {
+        // Register file new callback to create renderSettings proxy shape
+        g_renderSettingsFileNewCallbackId = MSceneMessage::addCallback(
+            MSceneMessage::kAfterNew, onFileNewCreateRenderSettings, nullptr, &ret);
+        if (!ret) {
+            ret.perror("Unable to register render settings file new callback.");
+            return ret;
+        }
+
+        // Register file open callback
+        g_renderSettingsFileOpenCallbackId = MSceneMessage::addCallback(
+            MSceneMessage::kAfterOpen, onFileOpenCheckOrCreateRenderSettings, nullptr, &ret);
+        if (!ret) {
+            ret.perror("Unable to register render settings file open callback.");
+            return ret;
+        }
+    }
+
     return ret;
 }
 
 PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 {
+    if (g_renderSettingsFileOpenCallbackId != 0) {
+        MMessage::removeCallback(g_renderSettingsFileOpenCallbackId);
+        g_renderSettingsFileOpenCallbackId = 0;
+    }
+
+    if (g_renderSettingsFileNewCallbackId != 0) {
+        MMessage::removeCallback(g_renderSettingsFileNewCallbackId);
+        g_renderSettingsFileNewCallbackId = 0;
+    }
+
     finalize();
 
     for (const auto& callbackId : _pluginLoadingCallbackIds) {

@@ -27,6 +27,7 @@
 #include "mayaColorPreferencesTranslator.h"
 #include "pluginDebugCodes.h"
 #include "renderOverrideUtils.h"
+#include "renderSettingsUtils.h"
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
@@ -99,8 +100,6 @@
 #include <pxr/imaging/hd/mesh.h>
 #include <pxr/imaging/hd/basisCurves.h>
 #include <pxr/imaging/hd/points.h>
-#include <pxr/imaging/hdx/selectionTask.h>
-#include <pxr/imaging/hdx/colorizeSelectionTask.h>
 #include <pxr/imaging/hdx/pickTask.h>
 #include <pxr/imaging/hdx/renderTask.h>
 #include <pxr/imaging/hdx/tokens.h>
@@ -111,10 +110,7 @@
 #include <pxr/imaging/hd/basisCurvesSchema.h>
 #include <pxr/usd/kind/registry.h>
 #include <pxr/usd/usd/prim.h>
-#include <pxr/usd/usd/modelAPI.h>
 #include <pxr/usdImaging/usdImagingGL/engine.h>
-
-#include <mayaUsdAPI/proxyStage.h>
 
 #include <maya/M3dView.h>
 #include <maya/MConditionMessage.h>
@@ -1593,6 +1589,10 @@ void MtohRenderOverride::_InitHydraResources(
         currentPass->params().viewInfo.projectionMatrix = projectionMatrix;
     }
     
+    // For debugging purposes write render settings into the Hydra
+    // viewport scene, as they would be used for command line rendering.
+    _SetActiveRenderSettingsPrimFromScene();
+
     _initializationSucceeded = true;
 }
 
@@ -1768,6 +1768,8 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         _lastFilteringSceneIndexBeforeCustomFiltering, _mayaViewportSceneIndex->DefaultLightPath());
     _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(_lightingMode));
     _mayaViewportSceneIndex->SetLightsManagementSceneIndex(_lightsManagementSceneIndex);
+
+    _lastFilteringSceneIndexBeforeCustomFiltering = _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
 
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);//Should this be on the frame pass filtering scene index ?
@@ -2599,6 +2601,29 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
     }
 
     _purposeFilteringSceneIndex->UpdatePrimsFromIncludedPurposes(RenderGlobalsUtils::GetIncludedPurposes());
+}
+
+void MtohRenderOverride::_SetActiveRenderSettingsPrimPath(const SdfPath& path)
+{
+    if (!TF_VERIFY(_sceneGlobalsSceneIndex, "Scene globals scene index not yet initialized")) {
+        return;
+    }
+    _sceneGlobalsSceneIndex->SetActiveRenderSettingsPrimPath(path);
+}
+
+void MtohRenderOverride::_SetActiveRenderSettingsPrimFromScene()
+{
+    const auto hydraRsPath = GetActiveRenderSettingsPrimHydraPathFromScene();
+    if (hydraRsPath.IsEmpty()) {
+        TF_WARN("Invalid Hydra active render settings prim path.");
+        return;
+    }
+
+    TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
+                 "Active render settings set to " +
+                 hydraRsPath.GetAsString() + "\n");
+
+    _SetActiveRenderSettingsPrimPath(hydraRsPath);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

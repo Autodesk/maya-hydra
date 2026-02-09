@@ -74,6 +74,7 @@
 #include <pxr/imaging/hd/pluginRenderDelegateUniqueHandle.h>
 #include <pxr/imaging/hdSt/renderDelegate.h>
 #include <pxr/imaging/hdx/taskController.h>
+#include <pxr/imaging/hdsi/sceneGlobalsSceneIndex.h>
 #include <pxr/pxr.h>
 
 #include <maya/MCallbackIdArray.h>
@@ -211,6 +212,9 @@ private:
     HdRenderDelegate* _GetRenderDelegate(int renderPassIndex = 0);
     HdRenderDelegate* _GetRenderDelegate(int renderPassIndex = 0) const;
     void              _ClearMayaHydraSceneIndex();
+    void              _SetActiveRenderSettingsPrimFromScene();
+    void              _SetActiveRenderSettingsPrimPath(const PXR_NS::SdfPath& path);
+
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
     HdSceneIndexBaseRefPtr _CreatePassFilteringSceneIndex(Fvp::FramePassDataPtr& filteringData);
@@ -342,6 +346,7 @@ private:
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     Fvp::PurposeFilteringSceneIndexRefPtr     _purposeFilteringSceneIndex;
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
+    HdsiSceneGlobalsSceneIndexRefPtr          _sceneGlobalsSceneIndex;
 
     // Naming this identifier _ufeSelection clashes with UFE's selection.h
     // include guard and produces

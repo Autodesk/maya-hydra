@@ -50,9 +50,7 @@ bool IsPrmanRenderSettingsDriveRenderPassEnabled(const TfToken& rendererName)
 }
 namespace MAYAHYDRA_NS_DEF {
 
-// Extract render settings from all mayaUsdProxyShape nodes
-// returns true if found
-bool ExtractUsdRenderSettingsFromMayaUsdProxyShapes(UsdRenderSettings& usdRenderSettings)
+Ufe::Path ExtractUsdRenderSettingsFromScene(UsdRenderSettings& usdRenderSettings)
 {
     // Find all mayaUsdProxyShape nodes in the scene
     Ufe::SceneItemList proxyShapes = GetAllMayaUsdProxyShapes();
@@ -62,11 +60,11 @@ bool ExtractUsdRenderSettingsFromMayaUsdProxyShapes(UsdRenderSettings& usdRender
         const auto psPath = ps->path();
         const auto stage = MayaUsdAPI::getStage(psPath);
         if (FindUsdRenderSettingsOnStage(stage, usdRenderSettings)) {
-            return true;
+            return psPath;
         }
     }
 
-    return false;
+    return Ufe::Path();
 }
 
 // Read the RenderSettingsType from the render delegate (renderer)
@@ -80,9 +78,8 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
     
     // Check if the scene contains Usd render settings
     UsdRenderSettings dummyUsdRenderSettings;// Pass a dummy UsdRenderSettings to just check for presence
-    const bool bHydraV1RenderSettingsAvailable = ExtractUsdRenderSettingsFromMayaUsdProxyShapes(
-        dummyUsdRenderSettings); 
-    if (bHydraV1RenderSettingsAvailable) {
+    const auto psPath = ExtractUsdRenderSettingsFromScene(dummyUsdRenderSettings); 
+    if (!psPath.empty()) {
         return RenderSettingsType::HydraV1;
     }
 
@@ -91,13 +88,17 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
         
 Ufe::SceneItemList GetAllMayaUsdProxyShapes()
 {
+    Ufe::SceneItemList proxyShapes;
+
     const auto mayaSceneSegmentHandler
         = Ufe::RunTimeMgr::instance().sceneSegmentHandler(MayaUsdAPI::getMayaRunTimeId());
+    if (!mayaSceneSegmentHandler) {
+        return proxyShapes;
+    }
     const auto mayaRootPath = mayaSceneSegmentHandler->rootSceneSegmentRootPath();
     const auto gatewayItems
         = Ufe::SceneSegmentHandler::findGatewayItems(mayaRootPath, MayaUsdAPI::getUsdRunTimeId());
     
-    Ufe::SceneItemList proxyShapes;
     std::copy(
         gatewayItems.begin(),
         gatewayItems.end(),
@@ -133,6 +134,27 @@ bool FindUsdRenderSettingsOnStage(
     }
 
     return false;
+}
+
+SdfPath GetActiveRenderSettingsPrimHydraPathFromScene()
+{
+    UsdRenderSettings usdRenderSettings;
+    auto psPath = ExtractUsdRenderSettingsFromScene(usdRenderSettings);
+    if (psPath.empty()) {
+        TF_WARN("No USD render settings found in scene");
+        return {};
+    }
+
+    const auto usdRsPath = usdRenderSettings.GetPrim().GetPath();
+
+    if (usdRsPath.IsEmpty()) {
+        TF_WARN("Invalid path for USD render settings.");
+        return {};
+    }
+
+    const auto hydraRsPath = usdRsPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), SdfPath("/MayaUsdProxyShape_PluginNode").AppendElementString(psPath.back().string()));
+
+    return hydraRsPath;
 }
 
 } // namespace MAYAHYDRA_NS_DEF

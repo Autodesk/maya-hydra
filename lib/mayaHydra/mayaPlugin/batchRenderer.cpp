@@ -24,7 +24,6 @@
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
-#include <mayaHydraLib/tokens.h>
 
 #ifdef CODE_COVERAGE_WORKAROUND
 #include <flowViewport/fvpUtils.h>
@@ -36,35 +35,19 @@
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
 #include <pxr/pxr.h>
 
-#include <ufe/pathString.h>
-#include <ufe/sceneItemList.h>
-
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/vt/value.h>
 #include <pxr/imaging/glf/contextCaps.h>
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/imaging/hdx/renderTask.h>
-#include <pxr/imaging/hdx/selectionTracker.h>
-#include <pxr/imaging/hdx/shadowTask.h>
-#include <pxr/imaging/hdx/tokens.h>
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
 
-#include <mayaUsdAPI/utils.h>
-
 #include <maya/MMessage.h>
-#include <maya/MProfiler.h>
 #include <maya/MSceneMessage.h>
-#include <maya/MFileIO.h>
 #include <maya/MStatus.h>
 
-#include <atomic>
 #include <string>
-#include <iostream>
-
-int _batchRendererProfilerCategory = MProfiler::addCategory(
-    "BatchRenderer (mayaHydra)",
-    "Events from mayaHydra render override");
 
 using namespace MayaHydra;
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -448,9 +431,8 @@ void BatchRenderer::_InitHydraResources()
     // Support a USD stage providing the render settings through prims in the
     // Hydra scene.  At time of writing (5-Sep-2025) only Hydra Prman does, if
     // the  HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS=true environment
-    // variable is used.  This is done through USD stage-level metadata that
-    // points to a render settings prim in the USD scene.
-    _SetActiveRenderSettingsPrimFromStageMetadata();
+    // variable is used.
+    _SetActiveRenderSettingsPrimFromScene();
 
     _initializationSucceeded = true;
 }
@@ -552,53 +534,19 @@ void BatchRenderer::_SetActiveRenderSettingsPrimPath(const SdfPath& path)
     _sceneGlobalsSceneIndex->SetActiveRenderSettingsPrimPath(path);
 }
 
-void BatchRenderer::_SetActiveRenderSettingsPrimFromStageMetadata()
+void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()
 {
-    // Render settings can be selected via stage metadata. If not present,
-    // traverse the stage to find a render settings prim.
-    const Ufe::SceneItemList proxyShapes = GetAllMayaUsdProxyShapes();
+    const auto hydraRsPath = GetActiveRenderSettingsPrimHydraPathFromScene();
+    if (hydraRsPath.IsEmpty()) {
+        TF_WARN("Invalid Hydra active render settings prim path.");
+        return;
+    }
 
     TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
-                 "Found %zu MayaUsdProxyShape nodes in scene.\n",
-                 proxyShapes.size());
+                 "Active render settings set to " +
+                 hydraRsPath.GetAsString() + "\n");
 
-    // Get the USD stage from the first USD proxy shape node.
-    if (!proxyShapes.empty()) {
-        const auto ps = proxyShapes.front();
-        const auto psPath = ps->path();
-        TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
-                     Ufe::PathString::string(psPath) + 
-                     " chosen to provide render settings.\n");
-
-        const auto stage = MayaUsdAPI::getStage(psPath);
-        if (TF_VERIFY(stage, "No stage found for proxy shape %s", Ufe::PathString::string(psPath).c_str())) {
-            UsdRenderSettings usdRenderSettings;
-            if (FindUsdRenderSettingsOnStage(stage, usdRenderSettings)) {
-                const SdfPath rsPath = usdRenderSettings.GetPrim().GetPath();
-
-                // Add the delegateId prefix since the scene globals scene index is
-                // inserted into the merging scene index.
-                // The proper way to do this is to call
-                // MayaHydra::sceneIndexPathPrefix(), which correctly deals
-                // with possible USD proxy shape name duplication in the Maya
-                // Dag.  Unfortunately, at this point, the Hydra scene is not
-                // fully populated.  This level of correctness is beyond the
-                // scope of the production rendering POC.
-                const auto hydraRsPath = rsPath.ReplacePrefix(
-                    SdfPath::AbsoluteRootPath(),
-                    SdfPath("/MayaUsdProxyShape_PluginNode").AppendElementString(ps->nodeName()));
-
-                TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
-                             "Active render settings set to " +
-                             hydraRsPath.GetAsString() + "\n");
-
-                _SetActiveRenderSettingsPrimPath(hydraRsPath);
-            } else {
-                TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
-                             "No render settings prim found on stage.\n");
-            }
-        }
-    }
+    _SetActiveRenderSettingsPrimPath(hydraRsPath);
 }
 
 }

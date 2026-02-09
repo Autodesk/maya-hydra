@@ -25,6 +25,10 @@
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdRender/settings.h>
 
+namespace UFE_VERSIONED_NS {
+class Path;
+}
+
 namespace MAYAHYDRA_NS_DEF {
 
 enum class RenderSettingsType
@@ -46,7 +50,11 @@ bool FindUsdRenderSettingsOnStage(
     PXR_NS::UsdRenderSettings&    outSettings);
 
 // Extract UsdRenderSettings from all MayaUsdProxyShapes in the scene.
-bool ExtractUsdRenderSettingsFromMayaUsdProxyShapes(PXR_NS::UsdRenderSettings& usdRenderSettings);
+// Returns the path to the proxy shape node if found, empty path if not.
+Ufe::Path ExtractUsdRenderSettingsFromScene(PXR_NS::UsdRenderSettings& usdRenderSettings);
+
+// Get the path to the active Hydra render settings prim from the Maya scene.
+PXR_NS::SdfPath GetActiveRenderSettingsPrimHydraPathFromScene();
 
 } // namespace MAYAHYDRA_NS_DEF
 

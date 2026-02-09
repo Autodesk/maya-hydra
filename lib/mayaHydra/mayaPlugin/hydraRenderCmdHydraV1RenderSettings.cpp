@@ -360,8 +360,8 @@ bool HydraRenderCmd::hydraRenderFromHydraV1RenderSettings()
 
     // Get the render settings from the scene
     UsdRenderSettings usdRenderSettings;
-    const bool bSucceeded = ExtractUsdRenderSettingsFromMayaUsdProxyShapes(usdRenderSettings);
-    if (! bSucceeded) {
+    const auto psPath = ExtractUsdRenderSettingsFromScene(usdRenderSettings);
+    if (psPath.empty()) {
         TF_DEBUG_MSG(
             MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
             "No USD render settings found in Maya USD proxy shapes.\n");
