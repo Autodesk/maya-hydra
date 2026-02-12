@@ -124,6 +124,7 @@
 #include <maya/MEventMessage.h>
 #include <maya/MGlobal.h>
 #include <maya/MNodeMessage.h>
+#include <maya/MAnimControl.h>
 #include <maya/MObjectHandle.h>
 #include <maya/MProfiler.h>
 #include <maya/MSceneMessage.h>
@@ -355,8 +356,19 @@ MtohRenderOverride::~MtohRenderOverride()
             _rendererDesc.overrideName.GetText(),
             _rendererDesc.displayName.GetText());
 
-    if (_timerCallback)
+    if (_timerCallback) {
         MMessage::removeCallback(_timerCallback);
+    }
+
+    if (_timeChangeCallback) {
+        MMessage::removeCallback(_timeChangeCallback);
+        _timeChangeCallback = 0;
+    }
+
+    if (_animationRangeChangeCallback) {
+        MMessage::removeCallback(_animationRangeChangeCallback);
+        _animationRangeChangeCallback = 0;
+    }
 
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
     if (_viewSelectedChangedCb) {
@@ -1520,6 +1532,10 @@ void MtohRenderOverride::_InitHydraResources(
     _mayaViewportSceneIndex = MayaViewportSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain, _mayaHydraSceneIndex);
     _inputSceneIndexOfFilteringSceneIndicesChain = _mayaViewportSceneIndex;
 
+    // Add animated prim invalidation scene index to track and invalidate animated prims when time changes
+    _animatedPrimInvalidationSceneIndex = Fvp::AnimatedPrimInvalidationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
+    _inputSceneIndexOfFilteringSceneIndicesChain = _animatedPrimInvalidationSceneIndex;
+
     // As of 13-Nov-2025, order of operations in _InitHydraResources() is such
     // that render globals are initialized after this method is called.  Thus
     // the included purposes attributes do not yet exist on the
@@ -1765,6 +1781,44 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         _lastFilteringSceneIndexBeforeCustomFiltering, _mayaViewportSceneIndex->DefaultLightPath());
     _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(_lightingMode));
     _mayaViewportSceneIndex->SetLightsManagementSceneIndex(_lightsManagementSceneIndex);
+
+    _lastFilteringSceneIndexBeforeCustomFiltering = _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+
+    // Set animation time range on the animated prim invalidation scene index
+    if (_animatedPrimInvalidationSceneIndex) {
+        const MTime  minTime = MAnimControl::minTime();
+        const MTime  maxTime = MAnimControl::maxTime();
+        const double startTime = minTime.value();
+        const double endTime = maxTime.value();
+        _animatedPrimInvalidationSceneIndex->SetAnimationTimeRange(startTime, endTime);
+
+        // Register animation range change callback if not already registered
+        if (_animationRangeChangeCallback == 0) {
+            MStatus status;
+            _animationRangeChangeCallback = MEventMessage::addEventCallback(
+                "playbackRangeChanged", _AnimationRangeChangedCallback, this, &status);
+            if (!status) {
+                TF_WARN("Failed to register animation range change callback");
+            }
+        }
+    }
+
+    // Set initial frame from Maya when scene globals scene index is created
+    if (_sceneGlobalsSceneIndex) {
+        const MTime currentTime = MAnimControl::currentTime();
+        const double currentFrame = currentTime.value();
+        _SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
+        
+        // Register time change callback if not already registered
+        if (_timeChangeCallback == 0) {
+            MStatus status;
+            _timeChangeCallback = MEventMessage::addEventCallback(
+                "timeChanged", _TimeChangedCallback, this, &status);
+            if (!status) {
+                TF_WARN("Failed to register time change callback");
+            }
+        }
+    }
 
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);//Should this be on the frame pass filtering scene index ?
@@ -2233,6 +2287,49 @@ void MtohRenderOverride::_PanelDeletedCallback(const MString& panelName, void* d
     instance->_RemovePanel(panelName);
 }
 
+void MtohRenderOverride::_TimeChangedCallback(void* data)
+{
+    auto* instance = reinterpret_cast<MtohRenderOverride*>(data);
+    if (!TF_VERIFY(instance)) {
+        return;
+    }
+
+    // Only update if scene globals scene index is initialized
+    if (!instance->_sceneGlobalsSceneIndex) {
+        return;
+    }
+
+    // Get current frame from Maya
+    const MTime currentTime = MAnimControl::currentTime();
+    const double currentFrame = currentTime.value();
+
+    // Update frame in Hydra scene globals scene index
+    instance->_SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
+
+    // Invalidate animated prims at the current frame using the animated prim invalidation scene index
+    // This ensures only prims with time-varying attributes at the current frame are invalidated
+    if (instance->_animatedPrimInvalidationSceneIndex) {
+        instance->_animatedPrimInvalidationSceneIndex->InvalidateAnimatedPrimsAtCurrentFrame(currentFrame);
+    }
+}
+
+void MtohRenderOverride::_AnimationRangeChangedCallback(void* data)
+{
+    auto* instance = reinterpret_cast<MtohRenderOverride*>(data);
+    if (!TF_VERIFY(instance)) {
+        return;
+    }
+
+    // Update animation time range when Maya's playback range changes
+    if (instance->_animatedPrimInvalidationSceneIndex) {
+        const MTime minTime = MAnimControl::minTime();
+        const MTime maxTime = MAnimControl::maxTime();
+        const double startTime = minTime.value();
+        const double endTime = maxTime.value();
+        instance->_animatedPrimInvalidationSceneIndex->SetAnimationTimeRange(startTime, endTime);
+    }
+}
+
 void MtohRenderOverride::_RendererChangedCallback(
     const MString& panelName,
     const MString& oldRenderer,
@@ -2596,6 +2693,15 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
     }
 
     _purposeFilteringSceneIndex->UpdatePrimsFromIncludedPurposes(RenderGlobalsUtils::GetIncludedPurposes());
+}
+
+void MtohRenderOverride::_SetCurrentFrameInHydraGlobalSceneIndex(double currentFrame)
+{
+    if (!TF_VERIFY(_sceneGlobalsSceneIndex, "Scene globals scene index not yet initialized")) {
+        return;
+    }
+
+    _sceneGlobalsSceneIndex->SetCurrentFrame(currentFrame);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
