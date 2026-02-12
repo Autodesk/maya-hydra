@@ -2315,6 +2315,10 @@ void MtohRenderOverride::_TimeChangedCallback(void* data)
 
 void MtohRenderOverride::_AnimationRangeChangedCallback(void* data)
 {
+    if (MFileIO::isOpeningFile()) {
+        return;
+    }
+
     auto* instance = reinterpret_cast<MtohRenderOverride*>(data);
     if (!TF_VERIFY(instance)) {
         return;
