@@ -101,7 +101,7 @@ MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(const HdSceneIndexBaseR
     // Iterate over scene to find out existing node which will miss eventual dagNode added callbacks
     MItDag nodesDagIt(MItDag::kDepthFirst, MFn::kInvalid);
     for (; !nodesDagIt.isDone(); nodesDagIt.next()) {
-        MObject dagNode(nodesDagIt.item(&status));
+        MObject dagNode(nodesDagIt.currentItem(&status));
         //Act only on MayaUsdProxyShapeBase nodes
         MFnDependencyNode  dep(dagNode);
         if (MAYAUSD_PROXYSHAPE_ID != dep.typeId()) {
@@ -182,7 +182,8 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     const MayaHydraSceneIndexRegistrationPtr registration(new MayaUsdSceneIndexRegistration());
 
     MStatus  status;
-    MDagPath dagPath(MDagPath::getAPathTo(dagNode, &status));
+    MDagPath dagPath;
+    status = MDagPath::getAPathTo(dagNode, dagPath);
     if (!TF_VERIFY(status == MS::kSuccess, "Unable to find Dag path to given node")) {
         return;
     }

@@ -106,7 +106,7 @@ TEST(FlowViewportAPI, filterPrimitives)
     //Hide the cube shape node which is the parent node of the filtering scene index, this should disable the filtering and make the big sphere visible.
     MFnDependencyNode depNode(parentShapeMOject, &stat);
     ASSERT_EQ(stat, MS::kSuccess);
-    MPlug visibilityPlug = depNode.findPlug("visibility");
+        MPlug visibilityPlug = depNode.findPlug("visibility", true);
     ASSERT_FALSE(visibilityPlug.isNull());
     visibilityPlug.setBool(false);
 

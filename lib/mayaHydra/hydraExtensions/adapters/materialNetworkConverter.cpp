@@ -1149,10 +1149,9 @@ VtValue MayaHydraMaterialNetworkConverter::ConvertMayaAttrToValue(
     const VtValue*          fallback,
     MPlugArray*             outPlug)
 {
-    MStatus status;
-    auto    p = node.findPlug(plugName, true, &status);
+    auto    p = node.findPlug(plugName, true);
     VtValue val;
-    if (status) {
+    if (!p.isNull()) {
         if (outPlug) {
             outPlug->append(p);
         }
@@ -1179,9 +1178,8 @@ VtValue MayaHydraMaterialNetworkConverter::ConvertMayaAttrToScaledValue(
     MPlugArray*             outPlug)
 {
     VtValue val = ConvertMayaAttrToValue(node, plugName, type, fallback, outPlug);
-    MStatus status;
-    auto    p = node.findPlug(scaleName, true, &status);
-    if (status) {
+    auto    p = node.findPlug(scaleName, true);
+    if (!p.isNull()) {
         if (!p.isNull() && outPlug) {
             outPlug->append(p);
         }

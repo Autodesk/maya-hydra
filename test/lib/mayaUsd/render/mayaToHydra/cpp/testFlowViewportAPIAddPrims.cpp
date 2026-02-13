@@ -107,7 +107,7 @@ TEST(FlowViewportAPI, addPrimitives)
     //Hide the shape node
     MFnDependencyNode depNode(parentSphereShapeMOject, &stat);
     ASSERT_EQ(stat, MS::kSuccess);
-    MPlug visibilityPlug = depNode.findPlug("visibility");
+        MPlug visibilityPlug = depNode.findPlug("visibility", true);
     ASSERT_FALSE(visibilityPlug.isNull());
     visibilityPlug.setBool(false);
 

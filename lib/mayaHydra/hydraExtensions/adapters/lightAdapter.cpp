@@ -330,14 +330,14 @@ MayaHydraLightAdapter::MayaLightParams MayaHydraLightAdapter::GetMayaLightParams
 
     if (status == MS::kSuccess) {
         // Get intensity
-        MPlug intensityPlug = lightDepNode.findPlug("intensity", true, &status);
-        if (status == MS::kSuccess && !intensityPlug.isNull()) {
+        MPlug intensityPlug = lightDepNode.findPlug("intensity", true);
+        if (!intensityPlug.isNull()) {
             params.intensity = intensityPlug.asFloat();
         }
 
         // Get color
-        MPlug colorPlug = lightDepNode.findPlug("color", true, &status);
-        if (status == MS::kSuccess && !colorPlug.isNull()) {
+        MPlug colorPlug = lightDepNode.findPlug("color", true);
+        if (!colorPlug.isNull()) {
             float r = 0.5f, g = 0.5f, b = 0.5f;
             colorPlug.child(0).getValue(r);
             colorPlug.child(1).getValue(g);
@@ -347,8 +347,8 @@ MayaHydraLightAdapter::MayaLightParams MayaHydraLightAdapter::GetMayaLightParams
         }
 
         // Get shadowColor
-        MPlug shadowColorPlug = lightDepNode.findPlug("shadowColor", true, &status);
-        if (status == MS::kSuccess && !shadowColorPlug.isNull()) {
+        MPlug shadowColorPlug = lightDepNode.findPlug("shadowColor", true);
+        if (!shadowColorPlug.isNull()) {
             float r = 0.0f, g = 0.0f, b = 0.0f;
             shadowColorPlug.child(0).getValue(r);
             shadowColorPlug.child(1).getValue(g);
@@ -358,38 +358,38 @@ MayaHydraLightAdapter::MayaLightParams MayaHydraLightAdapter::GetMayaLightParams
         }
 
         // Get exposure
-        MPlug exposurePlug = lightDepNode.findPlug("aiExposure", true, &status);
-        if (status == MS::kSuccess && !exposurePlug.isNull()) {
+        MPlug exposurePlug = lightDepNode.findPlug("aiExposure", true);
+        if (!exposurePlug.isNull()) {
             params.exposure = exposurePlug.asFloat();
         }
 
         // Get normalize
-        MPlug normalizePlug = lightDepNode.findPlug("aiNormalize", true, &status);
-        if (status == MS::kSuccess && !normalizePlug.isNull()) {
+        MPlug normalizePlug = lightDepNode.findPlug("aiNormalize", true);
+        if (!normalizePlug.isNull()) {
             params.normalize = normalizePlug.asBool();
         }
 
         // Get diffuse
-        MPlug diffusePlug = lightDepNode.findPlug("aiDiffuse", true, &status);
-        if (status == MS::kSuccess && !diffusePlug.isNull()) {
+        MPlug diffusePlug = lightDepNode.findPlug("aiDiffuse", true);
+        if (!diffusePlug.isNull()) {
             params.diffuse = diffusePlug.asFloat();
         }
 
         // Get specular
-        MPlug specularPlug = lightDepNode.findPlug("aiSpecular", true, &status);
-        if (status == MS::kSuccess && !specularPlug.isNull()) {
+        MPlug specularPlug = lightDepNode.findPlug("aiSpecular", true);
+        if (!specularPlug.isNull()) {
             params.specular = specularPlug.asFloat();
         }
 
         // Get enableColorTemperature
-        MPlug enableColorTempPlug = lightDepNode.findPlug("aiEnableTemperature", true, &status);
-        if (status == MS::kSuccess && !enableColorTempPlug.isNull()) {
+        MPlug enableColorTempPlug = lightDepNode.findPlug("aiEnableTemperature", true);
+        if (!enableColorTempPlug.isNull()) {
             params.enableColorTemperature = enableColorTempPlug.asBool();
         }
 
         // Get colorTemperature
-        MPlug colorTempPlug = lightDepNode.findPlug("aiColorTemperature", true, &status);
-        if (status == MS::kSuccess && !colorTempPlug.isNull()) {
+        MPlug colorTempPlug = lightDepNode.findPlug("aiColorTemperature", true);
+        if (!colorTempPlug.isNull()) {
             params.colorTemperature = colorTempPlug.asFloat();
         }
     }
@@ -595,8 +595,8 @@ VtValue MayaHydraLightAdapter::GetLightMaterialNetwork() const
 
                 // Set texture format - Get Arnold format and map to USD tokens using correct
                 // UsdLuxTokens
-                MPlug formatPlug = lightDepNode.findPlug("format", true, &status);
-                if (status == MS::kSuccess) {
+                MPlug formatPlug = lightDepNode.findPlug("format", true);
+                if (!formatPlug.isNull()) {
                     const auto format = formatPlug.asShort();
                     // mirrored_ball : 0, angular : 1, latlong : 2
                     if (format == 0) {

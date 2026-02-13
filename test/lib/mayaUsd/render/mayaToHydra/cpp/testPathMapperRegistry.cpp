@@ -40,7 +40,7 @@ public:
     Fvp::PrimSelections
     UfePathToPrimSelections(const Ufe::Path&) const override { return {}; }
 
-    std::string Name() const { return "TestPathMapper"; }
+    std::string Name() const override { return "TestPathMapper"; }
 };
 
 }

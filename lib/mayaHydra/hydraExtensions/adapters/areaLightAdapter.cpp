@@ -73,8 +73,8 @@ public:
             MStatus           status;
             MFnDependencyNode lightDepNode(GetNode(), &status);
             if (status == MS::kSuccess) {
-                MPlug intensityPlug = lightDepNode.findPlug("intensity", true, &status);
-                if (status == MS::kSuccess && !intensityPlug.isNull()) {
+                MPlug intensityPlug = lightDepNode.findPlug("intensity", true);
+                if (!intensityPlug.isNull()) {
                     float overidenIntensity = intensityPlug.asFloat();
                     if (GetMayaHydraSceneIndex()->IsHdSt()) {
                         overidenIntensity /= M_PI; // For Storm only

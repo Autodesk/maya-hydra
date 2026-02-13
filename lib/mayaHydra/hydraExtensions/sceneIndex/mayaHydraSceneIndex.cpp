@@ -380,7 +380,7 @@ public:
         return _piSi.UfePathToPrimSelections(appPath);
     }
 
-    std::string Name() const { return "MayaPathMapper"; }
+    std::string Name() const override { return "MayaPathMapper"; }
 
 private:
     // Non-owning reference to prevent ownership cycle.

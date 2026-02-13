@@ -43,7 +43,7 @@ public:
     PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const override;
 
     FVP_API
-    virtual std::string Name() const;
+    std::string Name() const override;
 
 private:
 
