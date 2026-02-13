@@ -53,6 +53,7 @@ target_sources(${TARGET_NAME}
         testMaterialBlocking.cpp
         testPassFiltering.cpp
         testSceneGlobalsCurrentFrame.cpp
+        testAnimatedPrimInvalidationSceneIndex.cpp
 )
 
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)

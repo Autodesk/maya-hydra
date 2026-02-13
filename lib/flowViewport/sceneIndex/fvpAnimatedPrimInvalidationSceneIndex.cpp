@@ -87,9 +87,10 @@ void AnimatedPrimInvalidationSceneIndex::InvalidateAnimatedPrimsAtCurrentFrame(d
 
 void AnimatedPrimInvalidationSceneIndex::SetAnimationTimeRange(double startTime, double endTime, bool refreshCache)
 {
-    if (_animationStartTime != startTime || _animationEndTime != endTime) {
+    if (!_isAnimationRangeInitialized || _animationStartTime != startTime || _animationEndTime != endTime) {
         _animationStartTime = startTime;
         _animationEndTime = endTime;
+        _isAnimationRangeInitialized = true;
         // Refresh the cache when the range changes, unless explicitly disabled
         if (refreshCache) {
             RefreshAnimatedPrimsCache();
@@ -109,7 +110,7 @@ void AnimatedPrimInvalidationSceneIndex::RefreshAnimatedPrimsCache()
     _animatedPrims.clear();
 
     // Check if input scene index is valid
-    HdSceneIndexBaseRefPtr inputSceneIndex = GetInputSceneIndex();
+    const HdSceneIndexBaseRefPtr inputSceneIndex = GetInputSceneIndex();
     if (!inputSceneIndex) {
         return;
     }
@@ -207,7 +208,7 @@ bool
 AnimatedPrimInvalidationSceneIndex::_IsPrimAnimated(
     const SdfPath &primPath) const
 {
-    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+    const HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     if (!prim.dataSource) {
         return false;
     }
@@ -216,8 +217,9 @@ AnimatedPrimInvalidationSceneIndex::_IsPrimAnimated(
     float startTime = static_cast<float>(_animationStartTime);
     float endTime = static_cast<float>(_animationEndTime);
     
-    // If range is not set, use a default wide range
-    if (startTime == 0.0 && endTime == 0.0) {
+    // If range is not initialized, use a default wide range
+    // This allows us to distinguish between an uninitialized range and a legitimate [0, 0] range
+    if (!_isAnimationRangeInitialized) {
         startTime = -1000.0f;
         endTime = 1000.0f;
     }
@@ -233,15 +235,15 @@ AnimatedPrimInvalidationSceneIndex::_IsPrimAnimatedAtFrame(
     const SdfPath &primPath,
     double frame) const
 {
-    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+    const HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
     if (!prim.dataSource) {
         return false;
     }
 
     // Check if this prim has time samples at the specified frame
     // Use a small tolerance (0.1 frames) to account for floating point precision
-    float frameFloat = static_cast<float>(frame);
-    float tolerance = 0.1f;
+    const float frameFloat = static_cast<float>(frame);
+    constexpr float tolerance = 0.1f;
 
     return _HasTimeSamplesAtFrame(prim.dataSource, frameFloat, tolerance);
 }

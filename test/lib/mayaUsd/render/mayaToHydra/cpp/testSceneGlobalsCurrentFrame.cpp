@@ -55,9 +55,14 @@ TEST(TestSceneGlobalsCurrentFrame, SyncWithMayaTime)
     ASSERT_GT(si.size(), 0u) << "No terminal scene indices found. Make sure Maya Hydra with Storm is active.";
     auto siRoot = si.front();
 
+    // Use a practical tolerance for comparing Maya time / Hydra values.
+    // This accounts for unit conversion and float/double rounding errors.
+    // Using 1e-3 frames (0.001) as a reasonable tolerance for frame comparisons.
+    constexpr double frameTolerance = 1e-3;
+
     // Test that changing Maya's frame automatically updates the scene globals scene index
     // via the timeChanged callback registered in renderOverride
-    const double testFrames[] = {0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 0.0};
+    constexpr double testFrames[] = {0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 0.0};
 
     for (double testFrame : testFrames) {
         // Change Maya's current frame - this should trigger the timeChanged callback
@@ -67,7 +72,7 @@ TEST(TestSceneGlobalsCurrentFrame, SyncWithMayaTime)
         // Verify Maya's frame was set correctly
         const MTime mayaTime = MAnimControl::currentTime();
         const double mayaFrame = mayaTime.value();
-        EXPECT_NEAR(testFrame, mayaFrame, std::numeric_limits<double>::epsilon())
+        EXPECT_NEAR(testFrame, mayaFrame, frameTolerance)
             << "Maya frame mismatch: expected " << testFrame << ", got " << mayaFrame;
 
         // Force a refresh to ensure the callback has been processed
@@ -76,10 +81,10 @@ TEST(TestSceneGlobalsCurrentFrame, SyncWithMayaTime)
 
         // Get the current frame from the scene globals schema
         // This should match Maya's frame if the callback worked correctly
-        double hydraFrame = GetCurrentFrameFromSceneIndex(siRoot);
+        const double hydraFrame = GetCurrentFrameFromSceneIndex(siRoot);
         
         // Verify the frame in Hydra matches Maya's frame
-        EXPECT_NEAR(mayaFrame, hydraFrame, std::numeric_limits<double>::epsilon())
+        EXPECT_NEAR(mayaFrame, hydraFrame, frameTolerance)
             << "Hydra frame (" << hydraFrame << ") does not match Maya frame (" << mayaFrame 
             << ") after changing to frame " << testFrame << ". The timeChanged callback may not be working correctly.";
     }

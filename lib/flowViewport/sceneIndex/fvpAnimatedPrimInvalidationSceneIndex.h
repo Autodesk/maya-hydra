@@ -113,6 +113,10 @@ private:
     /// Animation time range
     double _animationStartTime = 0.0;
     double _animationEndTime = 0.0;
+    
+    /// Flag to track if the animation time range has been initialized.
+    /// This allows us to distinguish between an uninitialized range and a legitimate [0, 0] range.
+    bool _isAnimationRangeInitialized = false;
 };
 
 } //end of namespace FVP_NS_DEF

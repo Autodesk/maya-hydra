@@ -1685,6 +1685,21 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _dataProducerMergingSceneIndexProxy.reset();
 
     _viewport = GfVec4d(0, 0, 0, 0);
+    
+    // Reset scene index refs to prevent use-after-destroy in callbacks
+    _sceneGlobalsSceneIndex.Reset();
+    _animatedPrimInvalidationSceneIndex.Reset();
+    
+    // Unregister Maya event callbacks to prevent them from firing on cleared resources
+    if (_timeChangeCallback) {
+        MMessage::removeCallback(_timeChangeCallback);
+        _timeChangeCallback = 0;
+    }
+    if (_animationRangeChangeCallback) {
+        MMessage::removeCallback(_animationRangeChangeCallback);
+        _animationRangeChangeCallback = 0;
+    }
+    
     _initializationSucceeded = false;
     _initializationAttempted = false;
 
@@ -2294,6 +2309,11 @@ void MtohRenderOverride::_TimeChangedCallback(void* data)
         return;
     }
 
+    // Guard against use-after-destroy: don't access scene indices if Hydra resources are not initialized
+    if (!instance->_initializationSucceeded) {
+        return;
+    }
+
     // Only update if scene globals scene index is initialized
     if (!instance->_sceneGlobalsSceneIndex) {
         return;
@@ -2324,6 +2344,11 @@ void MtohRenderOverride::_AnimationRangeChangedCallback(void* data)
         return;
     }
 
+    // Guard against use-after-destroy: don't access scene indices if Hydra resources are not initialized
+    if (!instance->_initializationSucceeded) {
+        return;
+    }
+
     // Update animation time range when Maya's playback range changes
     if (instance->_animatedPrimInvalidationSceneIndex) {
         const MTime minTime = MAnimControl::minTime();
@@ -2333,7 +2358,7 @@ void MtohRenderOverride::_AnimationRangeChangedCallback(void* data)
         
         // Check if we're doing a "file new" operation
         // During "file new", don't refresh the cache as the scene is being cleared
-        bool isNewingFile = MFileIO::isNewingFile();
+        const bool isNewingFile = MFileIO::isNewingFile();
         
         if (isNewingFile) {
             // During "file new", just update the range and clear the cache

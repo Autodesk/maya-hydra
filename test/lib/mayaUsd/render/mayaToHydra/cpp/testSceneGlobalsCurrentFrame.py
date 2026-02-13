@@ -17,7 +17,6 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 
-import testUtils
 from testUtils import PluginLoaded
 
 class TestSceneGlobalsCurrentFrame(mtohUtils.MayaHydraBaseTestCase):
