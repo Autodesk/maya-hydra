@@ -85,13 +85,15 @@ void AnimatedPrimInvalidationSceneIndex::InvalidateAnimatedPrimsAtCurrentFrame(d
     }
 }
 
-void AnimatedPrimInvalidationSceneIndex::SetAnimationTimeRange(double startTime, double endTime)
+void AnimatedPrimInvalidationSceneIndex::SetAnimationTimeRange(double startTime, double endTime, bool refreshCache)
 {
     if (_animationStartTime != startTime || _animationEndTime != endTime) {
         _animationStartTime = startTime;
         _animationEndTime = endTime;
-        // Refresh the cache when the range changes
-        RefreshAnimatedPrimsCache();
+        // Refresh the cache when the range changes, unless explicitly disabled
+        if (refreshCache) {
+            RefreshAnimatedPrimsCache();
+        }
     }
 }
 
@@ -106,12 +108,24 @@ void AnimatedPrimInvalidationSceneIndex::RefreshAnimatedPrimsCache()
     // Clear the current cache
     _animatedPrims.clear();
 
+    // Check if input scene index is valid
+    HdSceneIndexBaseRefPtr inputSceneIndex = GetInputSceneIndex();
+    if (!inputSceneIndex) {
+        return;
+    }
+
     // Re-check all prims in the scene index to rebuild the cache
-    for (const SdfPath &primPath : HdSceneIndexPrimView(GetInputSceneIndex())) {
+    for (const SdfPath &primPath : HdSceneIndexPrimView(inputSceneIndex)) {
         if (_IsPrimAnimated(primPath)) {
             _animatedPrims.insert(primPath);
         }
     }
+}
+
+void AnimatedPrimInvalidationSceneIndex::ClearAnimatedPrimsCache()
+{
+    // Simply clear the cache without rebuilding it
+    _animatedPrims.clear();
 }
 
 namespace

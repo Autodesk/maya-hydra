@@ -2330,7 +2330,20 @@ void MtohRenderOverride::_AnimationRangeChangedCallback(void* data)
         const MTime maxTime = MAnimControl::maxTime();
         const double startTime = minTime.value();
         const double endTime = maxTime.value();
-        instance->_animatedPrimInvalidationSceneIndex->SetAnimationTimeRange(startTime, endTime);
+        
+        // Check if we're doing a "file new" operation
+        // During "file new", don't refresh the cache as the scene is being cleared
+        bool isNewingFile = MFileIO::isNewingFile();
+        
+        if (isNewingFile) {
+            // During "file new", just update the range and clear the cache
+            // Don't refresh the cache as the scene is being cleared
+            instance->_animatedPrimInvalidationSceneIndex->SetAnimationTimeRange(startTime, endTime, false);
+            instance->_animatedPrimInvalidationSceneIndex->ClearAnimatedPrimsCache();
+        } else {
+            // Normal case: update range and refresh cache
+            instance->_animatedPrimInvalidationSceneIndex->SetAnimationTimeRange(startTime, endTime, true);
+        }
     }
 }
 

@@ -61,8 +61,10 @@ public:
 
     /// Sets the animation time range used for detecting animated prims.
     /// This should be called when Maya's animation range changes.
+    /// @param refreshCache If true (default), refreshes the animated prims cache.
+    ///                     If false, only updates the time range without refreshing.
     FVP_API
-    void SetAnimationTimeRange(double startTime, double endTime);
+    void SetAnimationTimeRange(double startTime, double endTime, bool refreshCache = true);
 
     /// Gets the current animation time range.
     FVP_API
@@ -72,6 +74,11 @@ public:
     /// This should be called when the animation range changes.
     FVP_API
     void RefreshAnimatedPrimsCache();
+
+    /// Clears the cache of animated prims without rebuilding it.
+    /// This should be called during scene operations like "file new".
+    FVP_API
+    void ClearAnimatedPrimsCache();
 
 protected:
     FVP_API
