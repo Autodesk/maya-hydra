@@ -1180,7 +1180,7 @@ VtValue MayaHydraMaterialNetworkConverter::ConvertMayaAttrToScaledValue(
     VtValue val = ConvertMayaAttrToValue(node, plugName, type, fallback, outPlug);
     auto    p = node.findPlug(scaleName, true);
     if (!p.isNull()) {
-        if (!p.isNull() && outPlug) {
+        if (outPlug) {
             outPlug->append(p);
         }
         if (type.GetType() == SdfValueTypeNames->Vector3f.GetType()) {

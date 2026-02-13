@@ -17,18 +17,11 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 
-import testUtils
 from testUtils import PluginLoaded
 
 class TestAnimatedPrimInvalidationSceneIndex(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
-
-    def setUp(self):
-        super(TestAnimatedPrimInvalidationSceneIndex, self).setUp()
-        # Ensure Storm renderer is active for the test
-        self.setHdStormRenderer()
-        cmds.refresh()
 
     def test_CacheBuilding(self):
         with PluginLoaded('mayaHydraCppTests'):

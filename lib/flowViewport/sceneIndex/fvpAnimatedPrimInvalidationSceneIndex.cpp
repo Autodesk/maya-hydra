@@ -20,9 +20,12 @@
 #include "pxr/imaging/hd/xformSchema.h"
 #include "pxr/imaging/hd/meshSchema.h"
 #include "pxr/imaging/hd/primvarsSchema.h"
+#include "pxr/imaging/hd/basisCurvesSchema.h"
 #include "pxr/imaging/hd/dataSource.h"
 #include "pxr/imaging/hd/sceneIndexPrimView.h"
 #include "pxr/usdImaging/usdImaging/usdPrimInfoSchema.h"
+#include <map>
+#include <vector>
 
 namespace FVP_NS_DEF {
 
@@ -66,15 +69,23 @@ void AnimatedPrimInvalidationSceneIndex::InvalidateAnimatedPrimsAtCurrentFrame(d
         return;
     }
 
-    // Mark animated prims dirty with an empty locator set, which means dirty everything.
-    // Only invalidate prims that are actually animated at the current frame.
-    static const HdDataSourceLocatorSet locators;
+    // Mark animated prims dirty with explicit locators for all common animated attributes.
+    // GetContributingSampleTimesForInterval takes shutter offsets relative to the current frame,
+    // so we can check if a prim has samples at the current frame by querying around 0.0.
+    // Only invalidate prims that actually have time samples at the current frame.
+    static const HdDataSourceLocatorSet locators{
+        HdXformSchema::GetDefaultLocator(),      // Transform animation
+        HdMeshSchema::GetDefaultLocator(),        // Mesh topology/points animation
+        HdPrimvarsSchema::GetDefaultLocator(),   // Primvar animation (points, normals, etc.)
+        HdBasisCurvesSchema::GetDefaultLocator() // Curve animation
+    };
 
     HdSceneIndexObserver::DirtiedPrimEntries entries;
     entries.reserve(_animatedPrims.size());
     
     for (const SdfPath &primPath : _animatedPrims) {
-        // Only invalidate if this prim has time samples at the current frame
+        // Check if this prim has time samples at the current frame
+        // (using shutter offsets relative to currentFrame, query around 0.0)
         if (_IsPrimAnimatedAtFrame(primPath, currentFrame)) {
             entries.push_back({primPath, locators});
         }
@@ -102,31 +113,6 @@ void AnimatedPrimInvalidationSceneIndex::GetAnimationTimeRange(double& startTime
 {
     startTime = _animationStartTime;
     endTime = _animationEndTime;
-}
-
-void AnimatedPrimInvalidationSceneIndex::RefreshAnimatedPrimsCache()
-{
-    // Clear the current cache
-    _animatedPrims.clear();
-
-    // Check if input scene index is valid
-    const HdSceneIndexBaseRefPtr inputSceneIndex = GetInputSceneIndex();
-    if (!inputSceneIndex) {
-        return;
-    }
-
-    // Re-check all prims in the scene index to rebuild the cache
-    for (const SdfPath &primPath : HdSceneIndexPrimView(inputSceneIndex)) {
-        if (_IsPrimAnimated(primPath)) {
-            _animatedPrims.insert(primPath);
-        }
-    }
-}
-
-void AnimatedPrimInvalidationSceneIndex::ClearAnimatedPrimsCache()
-{
-    // Simply clear the cache without rebuilding it
-    _animatedPrims.clear();
 }
 
 namespace
@@ -167,24 +153,25 @@ namespace
         return false;
     }
 
-    // Helper function to check if a data source has time samples at a specific frame
-    bool _HasTimeSamplesAtFrame(
+    // Helper function to recursively collect time-varying sampled data source handles
+    void _CollectTimeVaryingDataSourcesRecursive(
         const HdDataSourceBaseHandle &ds,
-        float frame,
-        float tolerance,
+        std::vector<HdSampledDataSourceHandle> &outSampledDataSources,
+        float startTime,
+        float endTime,
         int maxDepth = 10)
     {
         if (!ds || maxDepth <= 0) {
-            return false;
+            return;
         }
 
-        // Check if this is a sampled data source with time samples near the frame
+        // Check if this is a sampled data source with time samples
         if (HdSampledDataSourceHandle sampledDs = HdSampledDataSource::Cast(ds)) {
             std::vector<float> sampleTimes;
-            // Check a small interval around the frame
             if (sampledDs->GetContributingSampleTimesForInterval(
-                    frame - tolerance, frame + tolerance, &sampleTimes) && !sampleTimes.empty()) {
-                return true;
+                    startTime, endTime, &sampleTimes) && !sampleTimes.empty()) {
+                // This data source has time samples in the range, cache it
+                outSampledDataSources.push_back(sampledDs);
             }
         }
 
@@ -193,15 +180,59 @@ namespace
             HdContainerDataSource::Cast(ds)) {
             for (const TfToken &name : containerDs->GetNames()) {
                 if (HdDataSourceBaseHandle childDs = containerDs->Get(name)) {
-                    if (_HasTimeSamplesAtFrame(childDs, frame, tolerance, maxDepth - 1)) {
-                        return true;
-                    }
+                    _CollectTimeVaryingDataSourcesRecursive(
+                        childDs, outSampledDataSources, startTime, endTime, maxDepth - 1);
                 }
             }
         }
-
-        return false;
     }
+
+}
+
+void AnimatedPrimInvalidationSceneIndex::RefreshAnimatedPrimsCache()
+{
+    if (!_IsObserved()) {
+        return;
+    }
+
+    // Clear the existing caches
+    _animatedPrims.clear();
+    _primTimeVaryingDataSources.clear();
+
+    // Determine the time range to use
+    float startTime = static_cast<float>(_animationStartTime);
+    float endTime = static_cast<float>(_animationEndTime);
+    if (!_isAnimationRangeInitialized) {
+        startTime = -1000.0f;
+        endTime = 1000.0f;
+    }
+
+    // Rebuild the cache by checking all prims in the scene index
+    const HdSceneIndexPrimView primView(GetInputSceneIndex());
+    for (const SdfPath &primPath : primView) {
+        const HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+        if (!prim.dataSource) {
+            continue;
+        }
+
+        // Collect time-varying data source handles for this prim
+        std::vector<HdSampledDataSourceHandle> timeVaryingDataSources;
+        _CollectTimeVaryingDataSourcesRecursive(
+            prim.dataSource, timeVaryingDataSources, startTime, endTime);
+
+        // If we found time-varying data sources, cache the prim and its data sources
+        if (!timeVaryingDataSources.empty()) {
+            _animatedPrims.insert(primPath);
+            _primTimeVaryingDataSources[primPath] = std::move(timeVaryingDataSources);
+        }
+    }
+}
+
+void AnimatedPrimInvalidationSceneIndex::ClearAnimatedPrimsCache()
+{
+    // Simply clear the caches without rebuilding them
+    _animatedPrims.clear();
+    _primTimeVaryingDataSources.clear();
 }
 
 bool
@@ -218,7 +249,6 @@ AnimatedPrimInvalidationSceneIndex::_IsPrimAnimated(
     float endTime = static_cast<float>(_animationEndTime);
     
     // If range is not initialized, use a default wide range
-    // This allows us to distinguish between an uninitialized range and a legitimate [0, 0] range
     if (!_isAnimationRangeInitialized) {
         startTime = -1000.0f;
         endTime = 1000.0f;
@@ -230,22 +260,81 @@ AnimatedPrimInvalidationSceneIndex::_IsPrimAnimated(
     return _HasTimeVaryingSamples(prim.dataSource, startTime, endTime);
 }
 
+namespace
+{
+    // Helper function to check if a data source has time samples at the current frame.
+    // GetContributingSampleTimesForInterval takes shutter offsets relative to the current frame
+    // (set in scene globals). Since the current frame is set before calling this function,
+    // we query around 0.0 (current frame) with a tolerance to detect samples at that frame.
+    bool _HasTimeSamplesAtCurrentFrame(
+        const HdDataSourceBaseHandle &ds,
+        float tolerance,
+        int maxDepth = 10)
+    {
+        if (!ds || maxDepth <= 0) {
+            return false;
+        }
+
+        // Query around 0.0 (current frame) with tolerance to detect samples at the current frame.
+        // GetContributingSampleTimesForInterval takes shutter offsets relative to the current frame,
+        // which should be set in scene globals before this is called.
+        if (HdSampledDataSourceHandle sampledDs = HdSampledDataSource::Cast(ds)) {
+            std::vector<float> sampleTimes;
+            // Query shutter window [-tolerance, tolerance] relative to current frame (0.0)
+            if (sampledDs->GetContributingSampleTimesForInterval(
+                    -tolerance, tolerance, &sampleTimes) && !sampleTimes.empty()) {
+                return true;
+            }
+        }
+
+        // Recursively check container data sources
+        if (HdContainerDataSourceHandle containerDs = 
+            HdContainerDataSource::Cast(ds)) {
+            for (const TfToken &name : containerDs->GetNames()) {
+                if (HdDataSourceBaseHandle childDs = containerDs->Get(name)) {
+                    if (_HasTimeSamplesAtCurrentFrame(childDs, tolerance, maxDepth - 1)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+}
+
 bool
 AnimatedPrimInvalidationSceneIndex::_IsPrimAnimatedAtFrame(
     const SdfPath &primPath,
     double frame) const
 {
-    const HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
-    if (!prim.dataSource) {
+    // Use cached time-varying data source handles for fast per-frame queries
+    // instead of re-traversing the data source tree
+    auto it = _primTimeVaryingDataSources.find(primPath);
+    if (it == _primTimeVaryingDataSources.end()) {
         return false;
     }
 
-    // Check if this prim has time samples at the specified frame
-    // Use a small tolerance (0.1 frames) to account for floating point precision
-    const float frameFloat = static_cast<float>(frame);
+    // Check if any of the cached time-varying data sources have samples at the current frame.
+    // GetContributingSampleTimesForInterval takes shutter offsets relative to the current frame
+    // (set in scene globals). The current frame should be set to 'frame' before this is called,
+    // so we query around 0.0 (current frame) with a tolerance.
+    // Use a small tolerance (0.1 frames) to account for floating point precision.
     constexpr float tolerance = 0.1f;
 
-    return _HasTimeSamplesAtFrame(prim.dataSource, frameFloat, tolerance);
+    for (const HdSampledDataSourceHandle &sampledDs : it->second) {
+        if (!sampledDs) {
+            continue;
+        }
+        std::vector<float> sampleTimes;
+        // Query around 0.0 (current frame) with tolerance
+        if (sampledDs->GetContributingSampleTimesForInterval(
+                -tolerance, tolerance, &sampleTimes) && !sampleTimes.empty()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void
@@ -257,10 +346,30 @@ AnimatedPrimInvalidationSceneIndex::_PrimsAdded(
         return;
     }
 
-    // Check each added prim to see if it's animated
+    // Determine the time range to use
+    float startTime = static_cast<float>(_animationStartTime);
+    float endTime = static_cast<float>(_animationEndTime);
+    if (!_isAnimationRangeInitialized) {
+        startTime = -1000.0f;
+        endTime = 1000.0f;
+    }
+
+    // Check each added prim to see if it's animated and cache its time-varying data sources
     for (const auto &entry : entries) {
-        if (_IsPrimAnimated(entry.primPath)) {
+        const HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+        if (!prim.dataSource) {
+            continue;
+        }
+
+        // Collect time-varying data source handles for this prim
+        std::vector<HdSampledDataSourceHandle> timeVaryingDataSources;
+        _CollectTimeVaryingDataSourcesRecursive(
+            prim.dataSource, timeVaryingDataSources, startTime, endTime);
+
+        // If we found time-varying data sources, cache the prim and its data sources
+        if (!timeVaryingDataSources.empty()) {
             _animatedPrims.insert(entry.primPath);
+            _primTimeVaryingDataSources[entry.primPath] = std::move(timeVaryingDataSources);
         }
     }
 
@@ -276,9 +385,10 @@ AnimatedPrimInvalidationSceneIndex::_PrimsRemoved(
         return;
     }
 
-    // Remove prims from our tracking set
+    // Remove prims from both caches
     for (const auto &entry : entries) {
         _animatedPrims.erase(entry.primPath);
+        _primTimeVaryingDataSources.erase(entry.primPath);
     }
 
     _SendPrimsRemoved(entries);
@@ -293,20 +403,45 @@ AnimatedPrimInvalidationSceneIndex::_PrimsDirtied(
         return;
     }
 
+    // Determine the time range to use
+    float startTime = static_cast<float>(_animationStartTime);
+    float endTime = static_cast<float>(_animationEndTime);
+    if (!_isAnimationRangeInitialized) {
+        startTime = -1000.0f;
+        endTime = 1000.0f;
+    }
+
     // Re-check dirtied prims to update the animation cache
     // Handle both cases: prims that become animated and prims that are no longer animated
     for (const auto &entry : entries) {
-        const bool isCurrentlyAnimated = _IsPrimAnimated(entry.primPath);
+        const HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+        if (!prim.dataSource) {
+            // Prim no longer exists, remove from caches
+            _animatedPrims.erase(entry.primPath);
+            _primTimeVaryingDataSources.erase(entry.primPath);
+            continue;
+        }
+
+        // Collect time-varying data source handles for this prim
+        std::vector<HdSampledDataSourceHandle> timeVaryingDataSources;
+        _CollectTimeVaryingDataSourcesRecursive(
+            prim.dataSource, timeVaryingDataSources, startTime, endTime);
+
+        const bool isCurrentlyAnimated = !timeVaryingDataSources.empty();
         const bool wasInCache = _animatedPrims.find(entry.primPath) != _animatedPrims.end();
 
         if (isCurrentlyAnimated && !wasInCache) {
             // Prim became animated - add to cache
             _animatedPrims.insert(entry.primPath);
+            _primTimeVaryingDataSources[entry.primPath] = std::move(timeVaryingDataSources);
         } else if (!isCurrentlyAnimated && wasInCache) {
             // Prim was animated but is no longer animated - remove from cache
             _animatedPrims.erase(entry.primPath);
+            _primTimeVaryingDataSources.erase(entry.primPath);
+        } else if (isCurrentlyAnimated && wasInCache) {
+            // Prim is still animated, update cached data sources in case they changed
+            _primTimeVaryingDataSources[entry.primPath] = std::move(timeVaryingDataSources);
         }
-        // If both are true or both are false, no change needed
     }
 
     _SendPrimsDirtied(entries);

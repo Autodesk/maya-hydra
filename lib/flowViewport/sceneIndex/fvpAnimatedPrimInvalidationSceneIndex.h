@@ -22,6 +22,8 @@
 #include "pxr/base/tf/declarePtrs.h"
 
 #include <set>
+#include <map>
+#include <vector>
 
 namespace FVP_NS_DEF {
 
@@ -34,7 +36,7 @@ typedef PXR_NS::TfRefPtr<const AnimatedPrimInvalidationSceneIndex> AnimatedPrimI
 ///
 /// A filtering scene index that tracks animated prims and provides a method
 /// to invalidate them when the animation time changes. This ensures that
-/// time-dependent content is properly redrawn when the applications time changes.
+/// time-dependent content is properly redrawn when the application's time changes.
 ///
 class AnimatedPrimInvalidationSceneIndex :
     public PXR_NS::HdSingleInputFilteringSceneIndexBase
@@ -53,8 +55,11 @@ public:
     FVP_API
     PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath &primPath) const override;
 
-    /// Invalidates animated prims at the specified current frame.
-    /// Only prims that have time samples at the current frame will be invalidated.
+    /// Invalidates animated prims that have time samples at the specified current frame.
+    /// Only prims with samples at the current frame (within tolerance) will be invalidated.
+    /// GetContributingSampleTimesForInterval takes shutter offsets relative to the current frame,
+    /// so we query around 0.0 (current frame) with a tolerance to detect samples at that frame.
+    /// @param currentFrame The current animation frame to check for time samples.
     /// This should be called when the animation time changes.
     FVP_API
     void InvalidateAnimatedPrimsAtCurrentFrame(double currentFrame);
@@ -104,18 +109,30 @@ private:
     /// Checks if a prim has time-varying attributes (is animated) within the current time range
     bool _IsPrimAnimated(const PXR_NS::SdfPath &primPath) const;
 
-    /// Checks if a prim has time samples at the specified frame
+    /// Checks if a prim has time samples at the specified frame.
+    /// Uses shutter offsets relative to the current frame (query around 0.0).
+    /// Uses cached time-varying data source handles for performance.
     bool _IsPrimAnimatedAtFrame(const PXR_NS::SdfPath &primPath, double frame) const;
+
+    /// Collects time-varying data source handles from a prim's data source tree.
+    /// Stores them in the provided vector for later fast queries.
+    void _CollectTimeVaryingDataSources(
+        const PXR_NS::HdDataSourceBaseHandle &ds,
+        std::vector<PXR_NS::HdSampledDataSourceHandle> &outSampledDataSources,
+        int maxDepth = 10) const;
 
     /// Tracks the set of animated prim paths
     std::set<PXR_NS::SdfPath> _animatedPrims;
+    
+    /// Cache of time-varying data source handles per prim for fast per-frame queries.
+    /// This avoids re-traversing the data source tree on every frame change.
+    std::map<PXR_NS::SdfPath, std::vector<PXR_NS::HdSampledDataSourceHandle>> _primTimeVaryingDataSources;
 
     /// Animation time range
     double _animationStartTime = 0.0;
     double _animationEndTime = 0.0;
     
     /// Flag to track if the animation time range has been initialized.
-    /// This allows us to distinguish between an uninitialized range and a legitimate [0, 0] range.
     bool _isAnimationRangeInitialized = false;
 };
 

@@ -23,12 +23,6 @@ class TestSceneGlobalsCurrentFrame(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    def setUp(self):
-        super(TestSceneGlobalsCurrentFrame, self).setUp()
-        # Ensure Storm renderer is active for the test
-        self.setHdStormRenderer()
-        cmds.refresh()
-
     def test_SyncWithMayaTime(self):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest("", f="TestSceneGlobalsCurrentFrame.SyncWithMayaTime")
