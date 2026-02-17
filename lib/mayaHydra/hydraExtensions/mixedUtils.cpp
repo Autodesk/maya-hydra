@@ -24,6 +24,8 @@
 #include <mayaHydraLib/tokens.h>
 #include <mayaHydraLib/debugCodes.h>
 
+#include <array>
+
 #include <pxr/base/gf/vec2d.h>
 #include <pxr/base/gf/vec2f.h>
 #include <pxr/base/gf/vec2i.h>
@@ -114,42 +116,453 @@ MPlug FindPlugWithFallback(
     return plug;
 }
 
-// Extract array data from an MObject if possible.
-template <typename ArrayType, typename FnDataType>
-ArrayType GetArrayFromObject(const MObject& obj)
+// Convert typed array data from an MObject to Vt array.
+template <typename ArrayType, typename FnDataType, typename VtArrayType>
+VtArrayType GetVtArrayFromObject(const MObject& obj, VtArrayType (*convert)(const ArrayType&))
 {
-    ArrayType array;
-    if (!obj.isNull()) {
-        MStatus status;
-        FnDataType data(obj, &status);
-        if (status) {
-            array = data.array();
-        }
+    if (obj.isNull()) {
+        return VtArrayType();
     }
-    return array;
+
+    MStatus status;
+    FnDataType data(obj, &status);
+    if (!status) {
+        return VtArrayType();
+    }
+
+    return convert(data.array());
 }
 
-// Extract array data from a plug, falling back to the data handle when needed.
-template <typename ArrayType, typename FnDataType>
-ArrayType GetArrayFromPlug(const MPlug& plug)
+// Convert typed array data from a plug to Vt array, keeping the handle alive.
+template <typename ArrayType, typename FnDataType, typename VtArrayType>
+VtArrayType GetVtArrayFromPlug(const MPlug& plug, VtArrayType (*convert)(const ArrayType&))
 {
     MObject dataObj = plug.asMObject();
-    if (!dataObj.isNull()) {
-        return GetArrayFromObject<ArrayType, FnDataType>(dataObj);
-    }
-
-    MStatus     status;
-    MDataHandle handle = plug.asMDataHandle(&status);
-    if (!status) {
-        return ArrayType();
-    }
-
-    dataObj = handle.data();
     if (dataObj.isNull()) {
-        return ArrayType();
+        MStatus getStatus;
+        plug.getValue(dataObj);
+        if (dataObj.isNull()) {
+            MStatus     handleStatus;
+            MDataHandle handle = plug.asMDataHandle(&handleStatus);
+            if (handleStatus) {
+                dataObj = handle.data();
+            }
+        }
     }
 
-    return GetArrayFromObject<ArrayType, FnDataType>(dataObj);
+    return GetVtArrayFromObject<ArrayType, FnDataType, VtArrayType>(dataObj, convert);
+}
+
+// Read scalar value from a plug.
+template <typename Scalar>
+Scalar ReadPlugValue(const MPlug& plug);
+
+template <>
+short ReadPlugValue<short>(const MPlug& plug)
+{
+    return plug.asShort();
+}
+
+template <>
+int ReadPlugValue<int>(const MPlug& plug)
+{
+    return plug.asInt();
+}
+
+template <>
+float ReadPlugValue<float>(const MPlug& plug)
+{
+    return plug.asFloat();
+}
+
+template <>
+double ReadPlugValue<double>(const MPlug& plug)
+{
+    return plug.asDouble();
+}
+
+// Extract numeric tuple data from an MFnNumericData.
+template <typename Scalar, size_t N>
+struct NumericDataExtractor;
+
+template <>
+struct NumericDataExtractor<short, 2> {
+    static bool Get(MFnNumericData& data, std::array<short, 2>& out)
+    {
+        return data.getData2Short(out[0], out[1]);
+    }
+};
+
+template <>
+struct NumericDataExtractor<short, 3> {
+    static bool Get(MFnNumericData& data, std::array<short, 3>& out)
+    {
+        return data.getData3Short(out[0], out[1], out[2]);
+    }
+};
+
+template <>
+struct NumericDataExtractor<int, 2> {
+    static bool Get(MFnNumericData& data, std::array<int, 2>& out)
+    {
+        return data.getData2Int(out[0], out[1]);
+    }
+};
+
+template <>
+struct NumericDataExtractor<int, 3> {
+    static bool Get(MFnNumericData& data, std::array<int, 3>& out)
+    {
+        return data.getData3Int(out[0], out[1], out[2]);
+    }
+};
+
+template <>
+struct NumericDataExtractor<float, 2> {
+    static bool Get(MFnNumericData& data, std::array<float, 2>& out)
+    {
+        return data.getData2Float(out[0], out[1]);
+    }
+};
+
+template <>
+struct NumericDataExtractor<float, 3> {
+    static bool Get(MFnNumericData& data, std::array<float, 3>& out)
+    {
+        return data.getData3Float(out[0], out[1], out[2]);
+    }
+};
+
+template <>
+struct NumericDataExtractor<double, 2> {
+    static bool Get(MFnNumericData& data, std::array<double, 2>& out)
+    {
+        return data.getData2Double(out[0], out[1]);
+    }
+};
+
+template <>
+struct NumericDataExtractor<double, 3> {
+    static bool Get(MFnNumericData& data, std::array<double, 3>& out)
+    {
+        return data.getData3Double(out[0], out[1], out[2]);
+    }
+};
+
+template <>
+struct NumericDataExtractor<double, 4> {
+    static bool Get(MFnNumericData& data, std::array<double, 4>& out)
+    {
+        return data.getData4Double(out[0], out[1], out[2], out[3]);
+    }
+};
+
+// Extract default numeric tuple values from an MFnNumericAttribute.
+template <typename Scalar, size_t N>
+struct NumericDefaultExtractor;
+
+template <>
+struct NumericDefaultExtractor<short, 2> {
+    static void Get(MFnNumericAttribute& attr, std::array<short, 2>& out)
+    {
+        int x = 0;
+        int y = 0;
+        attr.getDefault(x, y);
+        out[0] = static_cast<short>(x);
+        out[1] = static_cast<short>(y);
+    }
+};
+
+template <>
+struct NumericDefaultExtractor<short, 3> {
+    static void Get(MFnNumericAttribute& attr, std::array<short, 3>& out)
+    {
+        int x = 0;
+        int y = 0;
+        int z = 0;
+        attr.getDefault(x, y, z);
+        out[0] = static_cast<short>(x);
+        out[1] = static_cast<short>(y);
+        out[2] = static_cast<short>(z);
+    }
+};
+
+template <>
+struct NumericDefaultExtractor<int, 2> {
+    static void Get(MFnNumericAttribute& attr, std::array<int, 2>& out)
+    {
+        attr.getDefault(out[0], out[1]);
+    }
+};
+
+template <>
+struct NumericDefaultExtractor<int, 3> {
+    static void Get(MFnNumericAttribute& attr, std::array<int, 3>& out)
+    {
+        attr.getDefault(out[0], out[1], out[2]);
+    }
+};
+
+template <>
+struct NumericDefaultExtractor<float, 2> {
+    static void Get(MFnNumericAttribute& attr, std::array<float, 2>& out)
+    {
+        attr.getDefault(out[0], out[1]);
+    }
+};
+
+template <>
+struct NumericDefaultExtractor<float, 3> {
+    static void Get(MFnNumericAttribute& attr, std::array<float, 3>& out)
+    {
+        attr.getDefault(out[0], out[1], out[2]);
+    }
+};
+
+template <>
+struct NumericDefaultExtractor<double, 2> {
+    static void Get(MFnNumericAttribute& attr, std::array<double, 2>& out)
+    {
+        attr.getDefault(out[0], out[1]);
+    }
+};
+
+template <>
+struct NumericDefaultExtractor<double, 3> {
+    static void Get(MFnNumericAttribute& attr, std::array<double, 3>& out)
+    {
+        attr.getDefault(out[0], out[1], out[2]);
+    }
+};
+
+template <>
+struct NumericDefaultExtractor<double, 4> {
+    static void Get(MFnNumericAttribute& attr, std::array<double, 4>& out)
+    {
+        attr.getDefault(out[0], out[1], out[2], out[3]);
+    }
+};
+
+// Build the matching GfVec type from tuple values.
+template <typename Scalar, size_t N>
+struct VecBuilder;
+
+template <>
+struct VecBuilder<short, 2> {
+    using VecType = GfVec2i;
+    static VecType Make(const std::array<short, 2>& v)
+    {
+        return GfVec2i(static_cast<int>(v[0]), static_cast<int>(v[1]));
+    }
+};
+
+template <>
+struct VecBuilder<short, 3> {
+    using VecType = GfVec3i;
+    static VecType Make(const std::array<short, 3>& v)
+    {
+        return GfVec3i(static_cast<int>(v[0]), static_cast<int>(v[1]), static_cast<int>(v[2]));
+    }
+};
+
+template <>
+struct VecBuilder<int, 2> {
+    using VecType = GfVec2i;
+    static VecType Make(const std::array<int, 2>& v)
+    {
+        return GfVec2i(v[0], v[1]);
+    }
+};
+
+template <>
+struct VecBuilder<int, 3> {
+    using VecType = GfVec3i;
+    static VecType Make(const std::array<int, 3>& v)
+    {
+        return GfVec3i(v[0], v[1], v[2]);
+    }
+};
+
+template <>
+struct VecBuilder<float, 2> {
+    using VecType = GfVec2f;
+    static VecType Make(const std::array<float, 2>& v)
+    {
+        return GfVec2f(v[0], v[1]);
+    }
+};
+
+template <>
+struct VecBuilder<float, 3> {
+    using VecType = GfVec3f;
+    static VecType Make(const std::array<float, 3>& v)
+    {
+        return GfVec3f(v[0], v[1], v[2]);
+    }
+};
+
+template <>
+struct VecBuilder<double, 2> {
+    using VecType = GfVec2d;
+    static VecType Make(const std::array<double, 2>& v)
+    {
+        return GfVec2d(v[0], v[1]);
+    }
+};
+
+template <>
+struct VecBuilder<double, 3> {
+    using VecType = GfVec3d;
+    static VecType Make(const std::array<double, 3>& v)
+    {
+        return GfVec3d(v[0], v[1], v[2]);
+    }
+};
+
+template <>
+struct VecBuilder<double, 4> {
+    using VecType = GfVec4d;
+    static VecType Make(const std::array<double, 4>& v)
+    {
+        return GfVec4d(v[0], v[1], v[2], v[3]);
+    }
+};
+
+static const std::array<const char*, 2> kNumericSuffixes01 = {{ "0", "1" }};
+static const std::array<const char*, 3> kNumericSuffixes012 = {{ "0", "1", "2" }};
+static const std::array<const char*, 4> kNumericSuffixesXYZW = {{ "X", "Y", "Z", "W" }};
+
+// Extract a single default value from a numeric attribute.
+template <typename Scalar>
+struct ChildDefaultExtractor;
+
+template <>
+struct ChildDefaultExtractor<short> {
+    static bool Get(MFnNumericAttribute& attr, short& out)
+    {
+        int temp = 0;
+        if (!attr.getDefault(temp)) {
+            return false;
+        }
+        out = static_cast<short>(temp);
+        return true;
+    }
+};
+
+template <>
+struct ChildDefaultExtractor<int> {
+    static bool Get(MFnNumericAttribute& attr, int& out)
+    {
+        return attr.getDefault(out);
+    }
+};
+
+template <>
+struct ChildDefaultExtractor<float> {
+    static bool Get(MFnNumericAttribute& attr, float& out)
+    {
+        return attr.getDefault(out);
+    }
+};
+
+template <>
+struct ChildDefaultExtractor<double> {
+    static bool Get(MFnNumericAttribute& attr, double& out)
+    {
+        return attr.getDefault(out);
+    }
+};
+
+// Extract compound child values and defaults from child plugs.
+template <typename Scalar, size_t N>
+bool GetCompoundChildValues(
+    const MPlug& attrPlug,
+    std::array<Scalar, N>& values,
+    std::array<Scalar, N>& defaults)
+{
+    if (attrPlug.numChildren() < N) {
+        return false;
+    }
+
+    for (size_t i = 0; i < N; ++i) {
+        const MPlug child = attrPlug.child(static_cast<unsigned int>(i));
+        values[i] = ReadPlugValue<Scalar>(child);
+        MStatus numericStatus;
+        MFnNumericAttribute childAttr(child.attribute(), &numericStatus);
+        if (!numericStatus || !ChildDefaultExtractor<Scalar>::Get(childAttr, defaults[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Extract numeric tuple values using child plugs or numeric data fallbacks.
+template <typename Scalar, size_t N>
+bool GetNumericTupleValue(
+    const MPlug& attrPlug,
+    const MFnDependencyNode& nodeFn,
+    const MFnAttribute& attrFn,
+    const std::array<const char*, N>& suffixes,
+    std::array<Scalar, N>& outValues)
+{
+    if (attrPlug.numChildren() >= N) {
+        for (size_t i = 0; i < N; ++i) {
+            outValues[i] = ReadPlugValue<Scalar>(attrPlug.child(static_cast<unsigned int>(i)));
+        }
+        return true;
+    }
+
+    const MString baseName = attrFn.name();
+    MStatus       childStatus;
+    bool          foundAll = true;
+    for (size_t i = 0; i < N; ++i) {
+        MPlug child = FindPlugWithFallback(nodeFn, baseName + suffixes[i], childStatus);
+        if (!childStatus) {
+            foundAll = false;
+            break;
+        }
+        outValues[i] = ReadPlugValue<Scalar>(child);
+    }
+    if (foundAll) {
+        return true;
+    }
+
+    MStatus     handleStatus;
+    MDataHandle handle = attrPlug.asMDataHandle(&handleStatus);
+    if (handleStatus) {
+        MObject       dataObj = handle.data();
+        MFnNumericData numericData(dataObj, &handleStatus);
+        if (handleStatus && NumericDataExtractor<Scalar, N>::Get(numericData, outValues)) {
+            return true;
+        }
+    }
+
+    MStatus       dataStatus;
+    MObject       dataObj = attrPlug.asMObject();
+    MFnNumericData numericData(dataObj, &dataStatus);
+    if (dataStatus && NumericDataExtractor<Scalar, N>::Get(numericData, outValues)) {
+        return true;
+    }
+
+    return false;
+}
+
+// Update attribute dictionary for numeric tuple types.
+template <typename Scalar, size_t N>
+void UpdateNumericTupleAttr(
+    const char* attrName,
+    const std::array<Scalar, N>& value,
+    const std::array<Scalar, N>& defaultValue,
+    const bool ignoreDefault,
+    VtDictionary& attrs)
+{
+    UpdateAttrsValue(
+        attrName,
+        VtValue(VecBuilder<Scalar, N>::Make(value)),
+        VtValue(VecBuilder<Scalar, N>::Make(defaultValue)),
+        !ignoreDefault,
+        attrs);
 }
 
 // Convert Maya string array to VtStringArray.
@@ -659,108 +1072,134 @@ void GetExtensionAttributesFromNode(
                         attrs);
                 } break;
                 case MFnData::kStringArray: {
-                    const auto valueArray
-                        = GetArrayFromPlug<MStringArray, MFnStringArrayData>(attrPlug);
+                    const auto valueArray = GetVtArrayFromPlug<
+                        MStringArray,
+                        MFnStringArrayData,
+                        VtStringArray>(attrPlug, ToVtStringArray);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
-                    const auto defaultArray
-                        = GetArrayFromObject<MStringArray, MFnStringArrayData>(defaultObj);
+                    const auto defaultArray = GetVtArrayFromObject<
+                        MStringArray,
+                        MFnStringArrayData,
+                        VtStringArray>(defaultObj, ToVtStringArray);
 
                     UpdateAttrsValue(
                         attrName,
-                        VtValue(ToVtStringArray(valueArray)),
-                        VtValue(ToVtStringArray(defaultArray)),
+                        VtValue(valueArray),
+                        VtValue(defaultArray),
                         !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kIntArray: {
-                    const auto valueArray
-                        = GetArrayFromPlug<MIntArray, MFnIntArrayData>(attrPlug);
+                    const auto valueArray = GetVtArrayFromPlug<
+                        MIntArray,
+                        MFnIntArrayData,
+                        VtIntArray>(attrPlug, ToVtIntArray);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
-                    const auto defaultArray
-                        = GetArrayFromObject<MIntArray, MFnIntArrayData>(defaultObj);
+                    const auto defaultArray = GetVtArrayFromObject<
+                        MIntArray,
+                        MFnIntArrayData,
+                        VtIntArray>(defaultObj, ToVtIntArray);
 
                     UpdateAttrsValue(
                         attrName,
-                        VtValue(ToVtIntArray(valueArray)),
-                        VtValue(ToVtIntArray(defaultArray)),
+                        VtValue(valueArray),
+                        VtValue(defaultArray),
                         !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kFloatArray: {
-                    const auto valueArray
-                        = GetArrayFromPlug<MFloatArray, MFnFloatArrayData>(attrPlug);
+                    const auto valueArray = GetVtArrayFromPlug<
+                        MFloatArray,
+                        MFnFloatArrayData,
+                        VtFloatArray>(attrPlug, ToVtFloatArray);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
-                    const auto defaultArray
-                        = GetArrayFromObject<MFloatArray, MFnFloatArrayData>(defaultObj);
+                    const auto defaultArray = GetVtArrayFromObject<
+                        MFloatArray,
+                        MFnFloatArrayData,
+                        VtFloatArray>(defaultObj, ToVtFloatArray);
 
                     UpdateAttrsValue(
                         attrName,
-                        VtValue(ToVtFloatArray(valueArray)),
-                        VtValue(ToVtFloatArray(defaultArray)),
+                        VtValue(valueArray),
+                        VtValue(defaultArray),
                         !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kDoubleArray: {
-                    const auto valueArray
-                        = GetArrayFromPlug<MDoubleArray, MFnDoubleArrayData>(attrPlug);
+                    const auto valueArray = GetVtArrayFromPlug<
+                        MDoubleArray,
+                        MFnDoubleArrayData,
+                        VtDoubleArray>(attrPlug, ToVtDoubleArray);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
-                    const auto defaultArray
-                        = GetArrayFromObject<MDoubleArray, MFnDoubleArrayData>(defaultObj);
+                    const auto defaultArray = GetVtArrayFromObject<
+                        MDoubleArray,
+                        MFnDoubleArrayData,
+                        VtDoubleArray>(defaultObj, ToVtDoubleArray);
 
                     UpdateAttrsValue(
                         attrName,
-                        VtValue(ToVtDoubleArray(valueArray)),
-                        VtValue(ToVtDoubleArray(defaultArray)),
+                        VtValue(valueArray),
+                        VtValue(defaultArray),
                         !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kVectorArray: {
-                    const auto valueArray
-                        = GetArrayFromPlug<MVectorArray, MFnVectorArrayData>(attrPlug);
+                    const auto valueArray = GetVtArrayFromPlug<
+                        MVectorArray,
+                        MFnVectorArrayData,
+                        VtArray<GfVec3d>>(attrPlug, ToVtVec3dArray);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
-                    const auto defaultArray
-                        = GetArrayFromObject<MVectorArray, MFnVectorArrayData>(defaultObj);
+                    const auto defaultArray = GetVtArrayFromObject<
+                        MVectorArray,
+                        MFnVectorArrayData,
+                        VtArray<GfVec3d>>(defaultObj, ToVtVec3dArray);
 
                     UpdateAttrsValue(
                         attrName,
-                        VtValue(ToVtVec3dArray(valueArray)),
-                        VtValue(ToVtVec3dArray(defaultArray)),
+                        VtValue(valueArray),
+                        VtValue(defaultArray),
                         !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kPointArray: {
-                    const auto valueArray
-                        = GetArrayFromPlug<MPointArray, MFnPointArrayData>(attrPlug);
+                    const auto valueArray = GetVtArrayFromPlug<
+                        MPointArray,
+                        MFnPointArrayData,
+                        VtArray<GfVec4d>>(attrPlug, ToVtVec4dArray);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
-                    const auto defaultArray
-                        = GetArrayFromObject<MPointArray, MFnPointArrayData>(defaultObj);
+                    const auto defaultArray = GetVtArrayFromObject<
+                        MPointArray,
+                        MFnPointArrayData,
+                        VtArray<GfVec4d>>(defaultObj, ToVtVec4dArray);
 
                     UpdateAttrsValue(
                         attrName,
-                        VtValue(ToVtVec4dArray(valueArray)),
-                        VtValue(ToVtVec4dArray(defaultArray)),
+                        VtValue(valueArray),
+                        VtValue(defaultArray),
                         !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kMatrix: {
-                    MStatus     handleStatus;
-                    MDataHandle handle;
-                    MObject     dataObj = attrPlug.asMObject();
                     MStatus matrixStatus;
+                    MObject dataObj = attrPlug.asMObject();
                     if (dataObj.isNull()) {
-                        handle = attrPlug.asMDataHandle(&handleStatus);
+                        attrPlug.getValue(dataObj);
+                    }
+                    if (dataObj.isNull()) {
+                        MStatus     handleStatus;
+                        MDataHandle handle = attrPlug.asMDataHandle(&handleStatus);
                         if (handleStatus) {
                             dataObj = handle.data();
                         }
@@ -798,18 +1237,22 @@ void GetExtensionAttributesFromNode(
                         attrs);
                 } break;
                 case MFnData::kMatrixArray: {
-                    const auto valueArray
-                        = GetArrayFromPlug<MMatrixArray, MFnMatrixArrayData>(attrPlug);
+                    const auto valueArray = GetVtArrayFromPlug<
+                        MMatrixArray,
+                        MFnMatrixArrayData,
+                        VtArray<GfMatrix4d>>(attrPlug, ToVtMatrix4dArray);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
-                    const auto defaultArray
-                        = GetArrayFromObject<MMatrixArray, MFnMatrixArrayData>(defaultObj);
+                    const auto defaultArray = GetVtArrayFromObject<
+                        MMatrixArray,
+                        MFnMatrixArrayData,
+                        VtArray<GfMatrix4d>>(defaultObj, ToVtMatrix4dArray);
 
                     UpdateAttrsValue(
                         attrName,
-                        VtValue(ToVtMatrix4dArray(valueArray)),
-                        VtValue(ToVtMatrix4dArray(defaultArray)),
+                        VtValue(valueArray),
+                        VtValue(defaultArray),
                         !ignoreDefault,
                         attrs);
                 } break;
@@ -871,174 +1314,87 @@ void GetExtensionAttributesFromNode(
                 case MFnNumericData::kInt: {
                     const bool isShort = (unitType == MFnNumericData::kShort);
                     if (childCount == 2) {
-                        int valueX = isShort ? attrPlug.child(0).asShort() : attrPlug.child(0).asInt();
-                        int valueY = isShort ? attrPlug.child(1).asShort() : attrPlug.child(1).asInt();
-                        int defaultX = 0;
-                        int defaultY = 0;
-                        MFnNumericAttribute childAttrX(attrPlug.child(0).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrX.getDefault(defaultX);
+                        if (isShort) {
+                            std::array<short, 2> value = {{ 0, 0 }};
+                            std::array<short, 2> defaultValue = {{ 0, 0 }};
+                            if (!GetCompoundChildValues<short, 2>(attrPlug, value, defaultValue)) {
+                                break;
+                            }
+                            UpdateNumericTupleAttr<short, 2>(
+                                attrName, value, defaultValue, ignoreDefault, attrs);
+                        } else {
+                            std::array<int, 2> value = {{ 0, 0 }};
+                            std::array<int, 2> defaultValue = {{ 0, 0 }};
+                            if (!GetCompoundChildValues<int, 2>(attrPlug, value, defaultValue)) {
+                                break;
+                            }
+                            UpdateNumericTupleAttr<int, 2>(
+                                attrName, value, defaultValue, ignoreDefault, attrs);
                         }
-                        MFnNumericAttribute childAttrY(attrPlug.child(1).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrY.getDefault(defaultY);
-                        }
-                        UpdateAttrsValue(
-                            attrName,
-                            VtValue(GfVec2i(valueX, valueY)),
-                            VtValue(GfVec2i(defaultX, defaultY)),
-                            !ignoreDefault,
-                            attrs);
                     } else if (childCount == 3) {
-                        int valueX = isShort ? attrPlug.child(0).asShort() : attrPlug.child(0).asInt();
-                        int valueY = isShort ? attrPlug.child(1).asShort() : attrPlug.child(1).asInt();
-                        int valueZ = isShort ? attrPlug.child(2).asShort() : attrPlug.child(2).asInt();
-                        int defaultX = 0;
-                        int defaultY = 0;
-                        int defaultZ = 0;
-                        MFnNumericAttribute childAttrX(attrPlug.child(0).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrX.getDefault(defaultX);
+                        if (isShort) {
+                            std::array<short, 3> value = {{ 0, 0, 0 }};
+                            std::array<short, 3> defaultValue = {{ 0, 0, 0 }};
+                            if (!GetCompoundChildValues<short, 3>(attrPlug, value, defaultValue)) {
+                                break;
+                            }
+                            UpdateNumericTupleAttr<short, 3>(
+                                attrName, value, defaultValue, ignoreDefault, attrs);
+                        } else {
+                            std::array<int, 3> value = {{ 0, 0, 0 }};
+                            std::array<int, 3> defaultValue = {{ 0, 0, 0 }};
+                            if (!GetCompoundChildValues<int, 3>(attrPlug, value, defaultValue)) {
+                                break;
+                            }
+                            UpdateNumericTupleAttr<int, 3>(
+                                attrName, value, defaultValue, ignoreDefault, attrs);
                         }
-                        MFnNumericAttribute childAttrY(attrPlug.child(1).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrY.getDefault(defaultY);
-                        }
-                        MFnNumericAttribute childAttrZ(attrPlug.child(2).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrZ.getDefault(defaultZ);
-                        }
-                        UpdateAttrsValue(
-                            attrName,
-                            VtValue(GfVec3i(valueX, valueY, valueZ)),
-                            VtValue(GfVec3i(defaultX, defaultY, defaultZ)),
-                            !ignoreDefault,
-                            attrs);
                     }
                 } break;
                 case MFnNumericData::kFloat: {
                     if (childCount == 2) {
-                        float valueX = attrPlug.child(0).asFloat();
-                        float valueY = attrPlug.child(1).asFloat();
-                        float defaultX = 0.0f;
-                        float defaultY = 0.0f;
-                        MFnNumericAttribute childAttrX(attrPlug.child(0).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrX.getDefault(defaultX);
+                        std::array<float, 2> value = {{ 0.0f, 0.0f }};
+                        std::array<float, 2> defaultValue = {{ 0.0f, 0.0f }};
+                        if (!GetCompoundChildValues<float, 2>(attrPlug, value, defaultValue)) {
+                            break;
                         }
-                        MFnNumericAttribute childAttrY(attrPlug.child(1).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrY.getDefault(defaultY);
-                        }
-                        UpdateAttrsValue(
-                            attrName,
-                            VtValue(GfVec2f(valueX, valueY)),
-                            VtValue(GfVec2f(defaultX, defaultY)),
-                            !ignoreDefault,
-                            attrs);
+                        UpdateNumericTupleAttr<float, 2>(
+                            attrName, value, defaultValue, ignoreDefault, attrs);
                     } else if (childCount == 3) {
-                        float valueX = attrPlug.child(0).asFloat();
-                        float valueY = attrPlug.child(1).asFloat();
-                        float valueZ = attrPlug.child(2).asFloat();
-                        float defaultX = 0.0f;
-                        float defaultY = 0.0f;
-                        float defaultZ = 0.0f;
-                        MFnNumericAttribute childAttrX(attrPlug.child(0).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrX.getDefault(defaultX);
+                        std::array<float, 3> value = {{ 0.0f, 0.0f, 0.0f }};
+                        std::array<float, 3> defaultValue = {{ 0.0f, 0.0f, 0.0f }};
+                        if (!GetCompoundChildValues<float, 3>(attrPlug, value, defaultValue)) {
+                            break;
                         }
-                        MFnNumericAttribute childAttrY(attrPlug.child(1).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrY.getDefault(defaultY);
-                        }
-                        MFnNumericAttribute childAttrZ(attrPlug.child(2).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrZ.getDefault(defaultZ);
-                        }
-                        UpdateAttrsValue(
-                            attrName,
-                            VtValue(GfVec3f(valueX, valueY, valueZ)),
-                            VtValue(GfVec3f(defaultX, defaultY, defaultZ)),
-                            !ignoreDefault,
-                            attrs);
+                        UpdateNumericTupleAttr<float, 3>(
+                            attrName, value, defaultValue, ignoreDefault, attrs);
                     }
                 } break;
                 case MFnNumericData::kDouble: {
                     if (childCount == 2) {
-                        double valueX = attrPlug.child(0).asDouble();
-                        double valueY = attrPlug.child(1).asDouble();
-                        double defaultX = 0.0;
-                        double defaultY = 0.0;
-                        MFnNumericAttribute childAttrX(attrPlug.child(0).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrX.getDefault(defaultX);
+                        std::array<double, 2> value = {{ 0.0, 0.0 }};
+                        std::array<double, 2> defaultValue = {{ 0.0, 0.0 }};
+                        if (!GetCompoundChildValues<double, 2>(attrPlug, value, defaultValue)) {
+                            break;
                         }
-                        MFnNumericAttribute childAttrY(attrPlug.child(1).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrY.getDefault(defaultY);
-                        }
-                        UpdateAttrsValue(
-                            attrName,
-                            VtValue(GfVec2d(valueX, valueY)),
-                            VtValue(GfVec2d(defaultX, defaultY)),
-                            !ignoreDefault,
-                            attrs);
+                        UpdateNumericTupleAttr<double, 2>(
+                            attrName, value, defaultValue, ignoreDefault, attrs);
                     } else if (childCount == 3) {
-                        double valueX = attrPlug.child(0).asDouble();
-                        double valueY = attrPlug.child(1).asDouble();
-                        double valueZ = attrPlug.child(2).asDouble();
-                        double defaultX = 0.0;
-                        double defaultY = 0.0;
-                        double defaultZ = 0.0;
-                        MFnNumericAttribute childAttrX(attrPlug.child(0).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrX.getDefault(defaultX);
+                        std::array<double, 3> value = {{ 0.0, 0.0, 0.0 }};
+                        std::array<double, 3> defaultValue = {{ 0.0, 0.0, 0.0 }};
+                        if (!GetCompoundChildValues<double, 3>(attrPlug, value, defaultValue)) {
+                            break;
                         }
-                        MFnNumericAttribute childAttrY(attrPlug.child(1).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrY.getDefault(defaultY);
-                        }
-                        MFnNumericAttribute childAttrZ(attrPlug.child(2).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrZ.getDefault(defaultZ);
-                        }
-                        UpdateAttrsValue(
-                            attrName,
-                            VtValue(GfVec3d(valueX, valueY, valueZ)),
-                            VtValue(GfVec3d(defaultX, defaultY, defaultZ)),
-                            !ignoreDefault,
-                            attrs);
+                        UpdateNumericTupleAttr<double, 3>(
+                            attrName, value, defaultValue, ignoreDefault, attrs);
                     } else if (childCount == 4) {
-                        double valueX = attrPlug.child(0).asDouble();
-                        double valueY = attrPlug.child(1).asDouble();
-                        double valueZ = attrPlug.child(2).asDouble();
-                        double valueW = attrPlug.child(3).asDouble();
-                        double defaultX = 0.0;
-                        double defaultY = 0.0;
-                        double defaultZ = 0.0;
-                        double defaultW = 0.0;
-                        MFnNumericAttribute childAttrX(attrPlug.child(0).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrX.getDefault(defaultX);
+                        std::array<double, 4> value = {{ 0.0, 0.0, 0.0, 0.0 }};
+                        std::array<double, 4> defaultValue = {{ 0.0, 0.0, 0.0, 0.0 }};
+                        if (!GetCompoundChildValues<double, 4>(attrPlug, value, defaultValue)) {
+                            break;
                         }
-                        MFnNumericAttribute childAttrY(attrPlug.child(1).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrY.getDefault(defaultY);
-                        }
-                        MFnNumericAttribute childAttrZ(attrPlug.child(2).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrZ.getDefault(defaultZ);
-                        }
-                        MFnNumericAttribute childAttrW(attrPlug.child(3).attribute(), &numericStatus);
-                        if (numericStatus) {
-                            childAttrW.getDefault(defaultW);
-                        }
-                        UpdateAttrsValue(
-                            attrName,
-                            VtValue(GfVec4d(valueX, valueY, valueZ, valueW)),
-                            VtValue(GfVec4d(defaultX, defaultY, defaultZ, defaultW)),
-                            !ignoreDefault,
-                            attrs);
+                        UpdateNumericTupleAttr<double, 4>(
+                            attrName, value, defaultValue, ignoreDefault, attrs);
                     }
                 } break;
                 default:
@@ -1130,616 +1486,103 @@ void GetExtensionAttributesFromNode(
                         attrs);
                 } break;
                 case MFnNumericData::k2Short: {
-                    short x = 0;
-                    short y = 0;
-                    bool gotValue = false;
-                    bool gotChild = false;
-                    if (attrPlug.numChildren() >= 2) {
-                        x = attrPlug.child(0).asShort();
-                        y = attrPlug.child(1).asShort();
-                        gotChild = true;
-                    }
-                    if (!gotChild) {
-                        const MString baseName = attrFn.name();
-                        MStatus       childStatus;
-                        bool          found0 = false;
-                        bool          found1 = false;
-                        MPlug         child0 = FindPlugWithFallback(nodeFn, baseName + "0", childStatus);
-                        if (childStatus) {
-                            x = child0.asShort();
-                            found0 = true;
-                        }
-                        MPlug child1 = FindPlugWithFallback(nodeFn, baseName + "1", childStatus);
-                        if (childStatus) {
-                            y = child1.asShort();
-                            found1 = true;
-                        }
-                        gotChild = found0 && found1;
-                    }
-                    if (gotChild) {
-                        gotValue = true;
-                    }
-                    if (!gotValue) {
-                        MStatus     handleStatus;
-                        MDataHandle handle = attrPlug.asMDataHandle(&handleStatus);
-                        if (handleStatus) {
-                            MObject       dataObj = handle.data();
-                            MFnNumericData numericData(dataObj, &handleStatus);
-                            if (handleStatus && numericData.getData2Short(x, y)) {
-                                gotValue = true;
-                            }
-                        }
-                    }
-                    if (!gotValue) {
-                        MStatus       dataStatus;
-                        MObject       dataObj = attrPlug.asMObject();
-                        MFnNumericData numericData(dataObj, &dataStatus);
-                        if (dataStatus && numericData.getData2Short(x, y)) {
-                            gotValue = true;
-                        }
-                    }
-                    if (!gotValue) {
+                    std::array<short, 2> value = {{ 0, 0 }};
+                    if (!GetNumericTupleValue<short, 2>(
+                            attrPlug, nodeFn, attrFn, kNumericSuffixes01, value)) {
                         break;
                     }
-                    int defaultX = 0;
-                    int defaultY = 0;
-                    numericAttr.getDefault(defaultX, defaultY);
-                    UpdateAttrsValue(
-                        attrName,
-                        VtValue(GfVec2i(static_cast<int>(x), static_cast<int>(y))),
-                        VtValue(GfVec2i(defaultX, defaultY)),
-                        !ignoreDefault,
-                        attrs);
+                    std::array<short, 2> defaultValue = {{ 0, 0 }};
+                    NumericDefaultExtractor<short, 2>::Get(numericAttr, defaultValue);
+                    UpdateNumericTupleAttr<short, 2>(
+                        attrName, value, defaultValue, ignoreDefault, attrs);
                 } break;
                 case MFnNumericData::k3Short: {
-                    short x = 0;
-                    short y = 0;
-                    short z = 0;
-                    bool gotValue = false;
-                    bool gotChild = false;
-                    if (attrPlug.numChildren() >= 3) {
-                        x = attrPlug.child(0).asShort();
-                        y = attrPlug.child(1).asShort();
-                        z = attrPlug.child(2).asShort();
-                        gotChild = true;
-                    }
-                    if (!gotChild) {
-                        const MString baseName = attrFn.name();
-                        MStatus       childStatus;
-                        bool          found0 = false;
-                        bool          found1 = false;
-                        bool          found2 = false;
-                        MPlug         child0 = FindPlugWithFallback(nodeFn, baseName + "0", childStatus);
-                        if (childStatus) {
-                            x = child0.asShort();
-                            found0 = true;
-                        }
-                        MPlug child1 = FindPlugWithFallback(nodeFn, baseName + "1", childStatus);
-                        if (childStatus) {
-                            y = child1.asShort();
-                            found1 = true;
-                        }
-                        MPlug child2 = FindPlugWithFallback(nodeFn, baseName + "2", childStatus);
-                        if (childStatus) {
-                            z = child2.asShort();
-                            found2 = true;
-                        }
-                        gotChild = found0 && found1 && found2;
-                    }
-                    if (gotChild) {
-                        gotValue = true;
-                    }
-                    if (!gotValue) {
-                        MStatus     handleStatus;
-                        MDataHandle handle = attrPlug.asMDataHandle(&handleStatus);
-                        if (handleStatus) {
-                            MObject       dataObj = handle.data();
-                            MFnNumericData numericData(dataObj, &handleStatus);
-                            if (handleStatus && numericData.getData3Short(x, y, z)) {
-                                gotValue = true;
-                            }
-                        }
-                    }
-                    if (!gotValue) {
-                        MStatus       dataStatus;
-                        MObject       dataObj = attrPlug.asMObject();
-                        MFnNumericData numericData(dataObj, &dataStatus);
-                        if (dataStatus && numericData.getData3Short(x, y, z)) {
-                            gotValue = true;
-                        }
-                    }
-                    if (!gotValue) {
+                    std::array<short, 3> value = {{ 0, 0, 0 }};
+                    if (!GetNumericTupleValue<short, 3>(
+                            attrPlug, nodeFn, attrFn, kNumericSuffixes012, value)) {
                         break;
                     }
-                    int defaultX = 0;
-                    int defaultY = 0;
-                    int defaultZ = 0;
-                    numericAttr.getDefault(defaultX, defaultY, defaultZ);
-                    UpdateAttrsValue(
-                        attrName,
-                        VtValue(GfVec3i(static_cast<int>(x), static_cast<int>(y), static_cast<int>(z))),
-                        VtValue(GfVec3i(defaultX, defaultY, defaultZ)),
-                        !ignoreDefault,
-                        attrs);
+                    std::array<short, 3> defaultValue = {{ 0, 0, 0 }};
+                    NumericDefaultExtractor<short, 3>::Get(numericAttr, defaultValue);
+                    UpdateNumericTupleAttr<short, 3>(
+                        attrName, value, defaultValue, ignoreDefault, attrs);
                 } break;
                 case MFnNumericData::k2Int: {
-                    int x = 0;
-                    int y = 0;
-                    bool gotValue = false;
-                    bool gotChild = false;
-                    if (attrPlug.numChildren() >= 2) {
-                        x = attrPlug.child(0).asInt();
-                        y = attrPlug.child(1).asInt();
-                        gotChild = true;
-                    }
-                    if (!gotChild) {
-                        const MString baseName = attrFn.name();
-                        MStatus       childStatus;
-                        bool          found0 = false;
-                        bool          found1 = false;
-                        MPlug         child0 = FindPlugWithFallback(nodeFn, baseName + "0", childStatus);
-                        if (childStatus) {
-                            x = child0.asInt();
-                            found0 = true;
-                        }
-                        MPlug child1 = FindPlugWithFallback(nodeFn, baseName + "1", childStatus);
-                        if (childStatus) {
-                            y = child1.asInt();
-                            found1 = true;
-                        }
-                        gotChild = found0 && found1;
-                    }
-                    if (gotChild) {
-                        gotValue = true;
-                    }
-                    if (!gotValue) {
-                        MStatus     handleStatus;
-                        MDataHandle handle = attrPlug.asMDataHandle(&handleStatus);
-                        if (handleStatus) {
-                            MObject       dataObj = handle.data();
-                            MFnNumericData numericData(dataObj, &handleStatus);
-                            if (handleStatus && numericData.getData2Int(x, y)) {
-                                gotValue = true;
-                            }
-                        }
-                    }
-                    if (!gotValue) {
-                        MStatus       dataStatus;
-                        MObject       dataObj = attrPlug.asMObject();
-                        MFnNumericData numericData(dataObj, &dataStatus);
-                        if (dataStatus && numericData.getData2Int(x, y)) {
-                            gotValue = true;
-                        }
-                    }
-                    if (!gotValue) {
+                    std::array<int, 2> value = {{ 0, 0 }};
+                    if (!GetNumericTupleValue<int, 2>(
+                            attrPlug, nodeFn, attrFn, kNumericSuffixes01, value)) {
                         break;
                     }
-                    int defaultX = 0;
-                    int defaultY = 0;
-                    numericAttr.getDefault(defaultX, defaultY);
-                    UpdateAttrsValue(
-                        attrName,
-                        VtValue(GfVec2i(x, y)),
-                        VtValue(GfVec2i(defaultX, defaultY)),
-                        !ignoreDefault,
-                        attrs);
+                    std::array<int, 2> defaultValue = {{ 0, 0 }};
+                    NumericDefaultExtractor<int, 2>::Get(numericAttr, defaultValue);
+                    UpdateNumericTupleAttr<int, 2>(
+                        attrName, value, defaultValue, ignoreDefault, attrs);
                 } break;
                 case MFnNumericData::k3Int: {
-                    int x = 0;
-                    int y = 0;
-                    int z = 0;
-                    bool gotValue = false;
-                    bool gotChild = false;
-                    if (attrPlug.numChildren() >= 3) {
-                        x = attrPlug.child(0).asInt();
-                        y = attrPlug.child(1).asInt();
-                        z = attrPlug.child(2).asInt();
-                        gotChild = true;
-                    }
-                    if (!gotChild) {
-                        const MString baseName = attrFn.name();
-                        MStatus       childStatus;
-                        bool          found0 = false;
-                        bool          found1 = false;
-                        bool          found2 = false;
-                        MPlug         child0 = FindPlugWithFallback(nodeFn, baseName + "0", childStatus);
-                        if (childStatus) {
-                            x = child0.asInt();
-                            found0 = true;
-                        }
-                        MPlug child1 = FindPlugWithFallback(nodeFn, baseName + "1", childStatus);
-                        if (childStatus) {
-                            y = child1.asInt();
-                            found1 = true;
-                        }
-                        MPlug child2 = FindPlugWithFallback(nodeFn, baseName + "2", childStatus);
-                        if (childStatus) {
-                            z = child2.asInt();
-                            found2 = true;
-                        }
-                        gotChild = found0 && found1 && found2;
-                    }
-                    if (gotChild) {
-                        gotValue = true;
-                    }
-                    if (!gotValue) {
-                        MStatus     handleStatus;
-                        MDataHandle handle = attrPlug.asMDataHandle(&handleStatus);
-                        if (handleStatus) {
-                            MObject       dataObj = handle.data();
-                            MFnNumericData numericData(dataObj, &handleStatus);
-                            if (handleStatus && numericData.getData3Int(x, y, z)) {
-                                gotValue = true;
-                            }
-                        }
-                    }
-                    if (!gotValue) {
-                        MStatus       dataStatus;
-                        MObject       dataObj = attrPlug.asMObject();
-                        MFnNumericData numericData(dataObj, &dataStatus);
-                        if (dataStatus && numericData.getData3Int(x, y, z)) {
-                            gotValue = true;
-                        }
-                    }
-                    if (!gotValue) {
+                    std::array<int, 3> value = {{ 0, 0, 0 }};
+                    if (!GetNumericTupleValue<int, 3>(
+                            attrPlug, nodeFn, attrFn, kNumericSuffixes012, value)) {
                         break;
                     }
-                    int defaultX = 0;
-                    int defaultY = 0;
-                    int defaultZ = 0;
-                    numericAttr.getDefault(defaultX, defaultY, defaultZ);
-                    UpdateAttrsValue(
-                        attrName,
-                        VtValue(GfVec3i(x, y, z)),
-                        VtValue(GfVec3i(defaultX, defaultY, defaultZ)),
-                        !ignoreDefault,
-                        attrs);
+                    std::array<int, 3> defaultValue = {{ 0, 0, 0 }};
+                    NumericDefaultExtractor<int, 3>::Get(numericAttr, defaultValue);
+                    UpdateNumericTupleAttr<int, 3>(
+                        attrName, value, defaultValue, ignoreDefault, attrs);
                 } break;
                 case MFnNumericData::k2Float: {
-                    float x = 0.0f;
-                    float y = 0.0f;
-                    bool gotValue = false;
-                    bool gotChild = false;
-                    if (attrPlug.numChildren() >= 2) {
-                        x = attrPlug.child(0).asFloat();
-                        y = attrPlug.child(1).asFloat();
-                        gotChild = true;
-                    }
-                    if (!gotChild) {
-                        const MString baseName = attrFn.name();
-                        MStatus       childStatus;
-                        bool          found0 = false;
-                        bool          found1 = false;
-                        MPlug         child0 = FindPlugWithFallback(nodeFn, baseName + "0", childStatus);
-                        if (childStatus) {
-                            x = child0.asFloat();
-                            found0 = true;
-                        }
-                        MPlug child1 = FindPlugWithFallback(nodeFn, baseName + "1", childStatus);
-                        if (childStatus) {
-                            y = child1.asFloat();
-                            found1 = true;
-                        }
-                        gotChild = found0 && found1;
-                    }
-                    if (gotChild) {
-                        gotValue = true;
-                    }
-                    if (!gotValue) {
-                        MStatus     handleStatus;
-                        MDataHandle handle = attrPlug.asMDataHandle(&handleStatus);
-                        if (handleStatus) {
-                            MObject       dataObj = handle.data();
-                            MFnNumericData numericData(dataObj, &handleStatus);
-                            if (handleStatus && numericData.getData2Float(x, y)) {
-                                gotValue = true;
-                            }
-                        }
-                    }
-                    if (!gotValue) {
-                        MStatus       dataStatus;
-                        MObject       dataObj = attrPlug.asMObject();
-                        MFnNumericData numericData(dataObj, &dataStatus);
-                        if (dataStatus && numericData.getData2Float(x, y)) {
-                            gotValue = true;
-                        }
-                    }
-                    if (!gotValue) {
+                    std::array<float, 2> value = {{ 0.0f, 0.0f }};
+                    if (!GetNumericTupleValue<float, 2>(
+                            attrPlug, nodeFn, attrFn, kNumericSuffixes01, value)) {
                         break;
                     }
-                    float defaultX = 0.0f;
-                    float defaultY = 0.0f;
-                    numericAttr.getDefault(defaultX, defaultY);
-                    UpdateAttrsValue(
-                        attrName,
-                        VtValue(GfVec2f(x, y)),
-                        VtValue(GfVec2f(defaultX, defaultY)),
-                        !ignoreDefault,
-                        attrs);
+                    std::array<float, 2> defaultValue = {{ 0.0f, 0.0f }};
+                    NumericDefaultExtractor<float, 2>::Get(numericAttr, defaultValue);
+                    UpdateNumericTupleAttr<float, 2>(
+                        attrName, value, defaultValue, ignoreDefault, attrs);
                 } break;
                 case MFnNumericData::k3Float: {
-                    float x = 0.0f;
-                    float y = 0.0f;
-                    float z = 0.0f;
-                    bool gotValue = false;
-                    bool gotChild = false;
-                    if (attrPlug.numChildren() >= 3) {
-                        x = attrPlug.child(0).asFloat();
-                        y = attrPlug.child(1).asFloat();
-                        z = attrPlug.child(2).asFloat();
-                        gotChild = true;
-                    }
-                    if (!gotChild) {
-                        const MString baseName = attrFn.name();
-                        MStatus       childStatus;
-                        bool          found0 = false;
-                        bool          found1 = false;
-                        bool          found2 = false;
-                        MPlug         child0 = FindPlugWithFallback(nodeFn, baseName + "0", childStatus);
-                        if (childStatus) {
-                            x = child0.asFloat();
-                            found0 = true;
-                        }
-                        MPlug child1 = FindPlugWithFallback(nodeFn, baseName + "1", childStatus);
-                        if (childStatus) {
-                            y = child1.asFloat();
-                            found1 = true;
-                        }
-                        MPlug child2 = FindPlugWithFallback(nodeFn, baseName + "2", childStatus);
-                        if (childStatus) {
-                            z = child2.asFloat();
-                            found2 = true;
-                        }
-                        gotChild = found0 && found1 && found2;
-                    }
-                    if (gotChild) {
-                        gotValue = true;
-                    }
-                    if (!gotValue) {
-                        MStatus     handleStatus;
-                        MDataHandle handle = attrPlug.asMDataHandle(&handleStatus);
-                        if (handleStatus) {
-                            MObject       dataObj = handle.data();
-                            MFnNumericData numericData(dataObj, &handleStatus);
-                            if (handleStatus && numericData.getData3Float(x, y, z)) {
-                                gotValue = true;
-                            }
-                        }
-                    }
-                    if (!gotValue) {
-                        MStatus       dataStatus;
-                        MObject       dataObj = attrPlug.asMObject();
-                        MFnNumericData numericData(dataObj, &dataStatus);
-                        if (dataStatus && numericData.getData3Float(x, y, z)) {
-                            gotValue = true;
-                        }
-                    }
-                    if (!gotValue) {
+                    std::array<float, 3> value = {{ 0.0f, 0.0f, 0.0f }};
+                    if (!GetNumericTupleValue<float, 3>(
+                            attrPlug, nodeFn, attrFn, kNumericSuffixes012, value)) {
                         break;
                     }
-                    float defaultX = 0.0f;
-                    float defaultY = 0.0f;
-                    float defaultZ = 0.0f;
-                    numericAttr.getDefault(defaultX, defaultY, defaultZ);
-                    UpdateAttrsValue(
-                        attrName,
-                        VtValue(GfVec3f(x, y, z)),
-                        VtValue(GfVec3f(defaultX, defaultY, defaultZ)),
-                        !ignoreDefault,
-                        attrs);
+                    std::array<float, 3> defaultValue = {{ 0.0f, 0.0f, 0.0f }};
+                    NumericDefaultExtractor<float, 3>::Get(numericAttr, defaultValue);
+                    UpdateNumericTupleAttr<float, 3>(
+                        attrName, value, defaultValue, ignoreDefault, attrs);
                 } break;
                 case MFnNumericData::k2Double: {
-                    double x = 0.0;
-                    double y = 0.0;
-                    bool gotValue = false;
-                    bool gotChild = false;
-                    if (attrPlug.numChildren() >= 2) {
-                        x = attrPlug.child(0).asDouble();
-                        y = attrPlug.child(1).asDouble();
-                        gotChild = true;
-                    }
-                    if (!gotChild) {
-                        const MString baseName = attrFn.name();
-                        MStatus       childStatus;
-                        bool          found0 = false;
-                        bool          found1 = false;
-                        MPlug         child0 = FindPlugWithFallback(nodeFn, baseName + "0", childStatus);
-                        if (childStatus) {
-                            x = child0.asDouble();
-                            found0 = true;
-                        }
-                        MPlug child1 = FindPlugWithFallback(nodeFn, baseName + "1", childStatus);
-                        if (childStatus) {
-                            y = child1.asDouble();
-                            found1 = true;
-                        }
-                        gotChild = found0 && found1;
-                    }
-                    if (gotChild) {
-                        gotValue = true;
-                    }
-                    if (!gotValue) {
-                        MStatus     handleStatus;
-                        MDataHandle handle = attrPlug.asMDataHandle(&handleStatus);
-                        if (handleStatus) {
-                            MObject       dataObj = handle.data();
-                            MFnNumericData numericData(dataObj, &handleStatus);
-                            if (handleStatus && numericData.getData2Double(x, y)) {
-                                gotValue = true;
-                            }
-                        }
-                    }
-                    if (!gotValue) {
-                        MStatus       dataStatus;
-                        MObject       dataObj = attrPlug.asMObject();
-                        MFnNumericData numericData(dataObj, &dataStatus);
-                        if (dataStatus && numericData.getData2Double(x, y)) {
-                            gotValue = true;
-                        }
-                    }
-                    if (!gotValue) {
+                    std::array<double, 2> value = {{ 0.0, 0.0 }};
+                    if (!GetNumericTupleValue<double, 2>(
+                            attrPlug, nodeFn, attrFn, kNumericSuffixes01, value)) {
                         break;
                     }
-                    double defaultX = 0.0;
-                    double defaultY = 0.0;
-                    numericAttr.getDefault(defaultX, defaultY);
-                    UpdateAttrsValue(
-                        attrName,
-                        VtValue(GfVec2d(x, y)),
-                        VtValue(GfVec2d(defaultX, defaultY)),
-                        !ignoreDefault,
-                        attrs);
+                    std::array<double, 2> defaultValue = {{ 0.0, 0.0 }};
+                    NumericDefaultExtractor<double, 2>::Get(numericAttr, defaultValue);
+                    UpdateNumericTupleAttr<double, 2>(
+                        attrName, value, defaultValue, ignoreDefault, attrs);
                 } break;
                 case MFnNumericData::k3Double: {
-                    double x = 0.0;
-                    double y = 0.0;
-                    double z = 0.0;
-                    bool gotValue = false;
-                    bool gotChild = false;
-                    if (attrPlug.numChildren() >= 3) {
-                        x = attrPlug.child(0).asDouble();
-                        y = attrPlug.child(1).asDouble();
-                        z = attrPlug.child(2).asDouble();
-                        gotChild = true;
-                    }
-                    if (!gotChild) {
-                        const MString baseName = attrFn.name();
-                        MStatus       childStatus;
-                        bool          found0 = false;
-                        bool          found1 = false;
-                        bool          found2 = false;
-                        MPlug         child0 = FindPlugWithFallback(nodeFn, baseName + "0", childStatus);
-                        if (childStatus) {
-                            x = child0.asDouble();
-                            found0 = true;
-                        }
-                        MPlug child1 = FindPlugWithFallback(nodeFn, baseName + "1", childStatus);
-                        if (childStatus) {
-                            y = child1.asDouble();
-                            found1 = true;
-                        }
-                        MPlug child2 = FindPlugWithFallback(nodeFn, baseName + "2", childStatus);
-                        if (childStatus) {
-                            z = child2.asDouble();
-                            found2 = true;
-                        }
-                        gotChild = found0 && found1 && found2;
-                    }
-                    if (gotChild) {
-                        gotValue = true;
-                    }
-                    if (!gotValue) {
-                        MStatus     handleStatus;
-                        MDataHandle handle = attrPlug.asMDataHandle(&handleStatus);
-                        if (handleStatus) {
-                            MObject       dataObj = handle.data();
-                            MFnNumericData numericData(dataObj, &handleStatus);
-                            if (handleStatus && numericData.getData3Double(x, y, z)) {
-                                gotValue = true;
-                            }
-                        }
-                    }
-                    if (!gotValue) {
-                        MStatus       dataStatus;
-                        MObject       dataObj = attrPlug.asMObject();
-                        MFnNumericData numericData(dataObj, &dataStatus);
-                        if (dataStatus && numericData.getData3Double(x, y, z)) {
-                            gotValue = true;
-                        }
-                    }
-                    if (!gotValue) {
+                    std::array<double, 3> value = {{ 0.0, 0.0, 0.0 }};
+                    if (!GetNumericTupleValue<double, 3>(
+                            attrPlug, nodeFn, attrFn, kNumericSuffixes012, value)) {
                         break;
                     }
-                    double defaultX = 0.0;
-                    double defaultY = 0.0;
-                    double defaultZ = 0.0;
-                    numericAttr.getDefault(defaultX, defaultY, defaultZ);
-                    UpdateAttrsValue(
-                        attrName,
-                        VtValue(GfVec3d(x, y, z)),
-                        VtValue(GfVec3d(defaultX, defaultY, defaultZ)),
-                        !ignoreDefault,
-                        attrs);
+                    std::array<double, 3> defaultValue = {{ 0.0, 0.0, 0.0 }};
+                    NumericDefaultExtractor<double, 3>::Get(numericAttr, defaultValue);
+                    UpdateNumericTupleAttr<double, 3>(
+                        attrName, value, defaultValue, ignoreDefault, attrs);
                 } break;
                 case MFnNumericData::k4Double: {
-                    double x = 0.0;
-                    double y = 0.0;
-                    double z = 0.0;
-                    double w = 0.0;
-                    bool gotValue = false;
-                    bool gotChild = false;
-                    if (attrPlug.numChildren() >= 4) {
-                        x = attrPlug.child(0).asDouble();
-                        y = attrPlug.child(1).asDouble();
-                        z = attrPlug.child(2).asDouble();
-                        w = attrPlug.child(3).asDouble();
-                        gotChild = true;
-                    }
-                    if (!gotChild) {
-                        const MString baseName = attrFn.name();
-                        MStatus       childStatus;
-                        bool          foundX = false;
-                        bool          foundY = false;
-                        bool          foundZ = false;
-                        bool          foundW = false;
-                        MPlug         childX = FindPlugWithFallback(nodeFn, baseName + "X", childStatus);
-                        if (childStatus) {
-                            x = childX.asDouble();
-                            foundX = true;
-                        }
-                        MPlug childY = FindPlugWithFallback(nodeFn, baseName + "Y", childStatus);
-                        if (childStatus) {
-                            y = childY.asDouble();
-                            foundY = true;
-                        }
-                        MPlug childZ = FindPlugWithFallback(nodeFn, baseName + "Z", childStatus);
-                        if (childStatus) {
-                            z = childZ.asDouble();
-                            foundZ = true;
-                        }
-                        MPlug childW = FindPlugWithFallback(nodeFn, baseName + "W", childStatus);
-                        if (childStatus) {
-                            w = childW.asDouble();
-                            foundW = true;
-                        }
-                        gotChild = foundX && foundY && foundZ && foundW;
-                    }
-                    if (gotChild) {
-                        gotValue = true;
-                    }
-                    if (!gotValue) {
-                        MStatus     handleStatus;
-                        MDataHandle handle = attrPlug.asMDataHandle(&handleStatus);
-                        if (handleStatus) {
-                            MObject       dataObj = handle.data();
-                            MFnNumericData numericData(dataObj, &handleStatus);
-                            if (handleStatus && numericData.getData4Double(x, y, z, w)) {
-                                gotValue = true;
-                            }
-                        }
-                    }
-                    if (!gotValue) {
-                        MStatus       dataStatus;
-                        MObject       dataObj = attrPlug.asMObject();
-                        MFnNumericData numericData(dataObj, &dataStatus);
-                        if (dataStatus && numericData.getData4Double(x, y, z, w)) {
-                            gotValue = true;
-                        }
-                    }
-                    if (!gotValue) {
+                    std::array<double, 4> value = {{ 0.0, 0.0, 0.0, 0.0 }};
+                    if (!GetNumericTupleValue<double, 4>(
+                            attrPlug, nodeFn, attrFn, kNumericSuffixesXYZW, value)) {
                         break;
                     }
-                    double defaultX = 0.0;
-                    double defaultY = 0.0;
-                    double defaultZ = 0.0;
-                    double defaultW = 0.0;
-                    numericAttr.getDefault(defaultX, defaultY, defaultZ, defaultW);
-                    UpdateAttrsValue(
-                        attrName,
-                        VtValue(GfVec4d(x, y, z, w)),
-                        VtValue(GfVec4d(defaultX, defaultY, defaultZ, defaultW)),
-                        !ignoreDefault,
-                        attrs);
+                    std::array<double, 4> defaultValue = {{ 0.0, 0.0, 0.0, 0.0 }};
+                    NumericDefaultExtractor<double, 4>::Get(numericAttr, defaultValue);
+                    UpdateNumericTupleAttr<double, 4>(
+                        attrName, value, defaultValue, ignoreDefault, attrs);
                 } break;
                 default:
                     // TODO: Add more types if necessary

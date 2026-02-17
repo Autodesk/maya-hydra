@@ -454,7 +454,7 @@ def _set_custom_attribute_values(shape_name):
         list(matrix_attr_values),
         "extMatrixAttr")
 
-class TestCustomAttrubutes(mtohUtils.MayaHydraBaseTestCase):
+class TestCustomAttributes(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
     _requiredPlugins = ['mtoa']
