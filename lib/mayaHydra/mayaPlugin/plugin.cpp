@@ -439,6 +439,15 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         }
     }
 
+    constexpr const char* melRsUtils = "mayaHydra_renderSettings_utils";
+    if (MGlobal::sourceFile(MString(melRsUtils)) != MS::kSuccess) {
+        std::ostringstream msg;
+        msg << "Error sourcing script " << melRsUtils;
+        ret = MS::kFailure;
+        ret.perror(msg.str().c_str());
+        return ret;
+    }
+
     return ret;
 }
 

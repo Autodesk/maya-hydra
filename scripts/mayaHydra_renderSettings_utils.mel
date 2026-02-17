@@ -1,0 +1,9 @@
+global proc mayaHydraSetRenderWidth(int $width)
+{
+    python("import mayaHydra.renderSettings.resolution as mhResolution; mhResolution.setWidth(" + $width + ")");
+}
+
+global proc mayaHydraSetRenderHeight(int $height)
+{
+    python("import mayaHydra.renderSettings.resolution as mhResolution; mhResolution.setHeight(" + $height + ")");
+}

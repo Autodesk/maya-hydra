@@ -1,4 +1,4 @@
-set(MAYA_USD_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(MAYA_HYDRA_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(MayaUsd_FOUND)
     if(IS_MACOSX OR IS_LINUX) 
@@ -690,7 +690,7 @@ finally:
     endif()
 
     # Adjust PYTHONPATH to include the path to our test utilities.
-    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_USD_DIR}/test/testUtils")
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/test/testUtils")
 
     # Adjust PYTHONPATH to include the path to our test.
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -731,6 +731,8 @@ endfunction()
 #                           [FAIL <idiff fail value>]
 #                           [FAILPERCENT <idiff failpercent value>]
 #                           [WORKING_DIRECTORY <dir>]
+#                           [RENDERER_ARGS <extra_args>]
+#                           [COPY_SCENE]
 #                           [ENV <varname>=<varvalue> ...])
 #
 # Similar to mayaUsd_add_test but uses the Render executable instead of Maya or
@@ -746,6 +748,10 @@ endfunction()
 #   FAIL               - idiff fail value (default 0.01)
 #   FAILPERCENT        - idiff failpercent value idiff (default 1.0)
 #   WORKING_DIRECTORY  - Directory from which the test executable will be called.
+#   RENDERER_ARGS      - Additional command line arguments to pass to the
+#                        renderer.
+#   COPY_SCENE         - If set, copies the scene file to the temporary project
+#                        before rendering.
 #   ENV                - Set or append the indicated environment variables;
 #                        Similar to mayaUsd_add_test, this function manages
 #                        the same environment variables.
@@ -756,8 +762,8 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # -----------------
 
     cmake_parse_arguments(ARG
-        ""                                       # No boolean options.
-        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;IMAGE_EXTENSION;FAIL;FAILPERCENT" # one_value keywords
+        "COPY_SCENE"             # Boolean options.
+        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;IMAGE_EXTENSION;FAIL;FAILPERCENT;RENDERER_ARGS" # one_value keywords
         "ENV"                                    # multi_value keywords
         ${ARGN}
     )
@@ -803,9 +809,14 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     endif()
 
     # Prepend the scene directory to the argument scene file.
-    set(SCENE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/scenes)
-
-    set(SCENE_PATH ${SCENE_DIR}/${SCENE_FILE})
+    set(SRC_SCENE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/scenes/${SCENE_FILE})
+    if(ARG_COPY_SCENE)
+        string(REGEX REPLACE "[:<>\|]" "_" SANITIZED_TEST_NAME ${test_name})
+        cmake_path(GET SCENE_FILE FILENAME SCENE_FILE_NAME)
+        set(SCENE_PATH "${CMAKE_BINARY_DIR}/test/Temporary/${SANITIZED_TEST_NAME}/projects/default/scenes/${SCENE_FILE_NAME}")
+    else()
+        set(SCENE_PATH ${SRC_SCENE_PATH})
+    endif()
 
     # Our test command is a trivial script that invokes the Render executable
     # to render an image, then invokes idiff to compare the rendered result
@@ -814,7 +825,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # The command needs to be the name of an executable, without any 
     # arguments, as CMake calls an executable with that string unparsed.
 
-    set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" \"${SCENE_PATH}\"")
+    set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
 
     # Replace illegal characters in test_name with _.  Rendered images are
     # written here.
@@ -822,7 +833,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     set(MAYA_APP_TEMP_DIR "${CMAKE_BINARY_DIR}/test/Temporary/${SANITIZED_TEST_NAME}")
 
     set(RENDERED_IMAGE_PATH "${MAYA_APP_TEMP_DIR}/projects/default/images/${SANITIZED_TEST_NAME}.${IMAGE_EXTENSION}")
-    cmake_path(REPLACE_EXTENSION SCENE_PATH ".${IMAGE_EXTENSION}" OUTPUT_VARIABLE EXPECTED_IMAGE_PATH)
+    cmake_path(REPLACE_EXTENSION SRC_SCENE_PATH ".${IMAGE_EXTENSION}" OUTPUT_VARIABLE EXPECTED_IMAGE_PATH)
 
     # Always use the discovered idiff binary; do not fall back to PATH
     if (IMAGE_DIFF_TOOL)
@@ -840,7 +851,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     if (WIN32)
         set(CMD PowerShell)
 		# Windows (PowerShell)
-		set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" \"${SCENE_PATH}\"")
+		set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
 		set(IDIFF_ARGS  "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
 		set(CMD_ARGS -Command "${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE")
     else()
@@ -871,11 +882,21 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
          "${CMAKE_INSTALL_PREFIX}/renderDesc")
 
+    # Adjust PYTHONPATH to include the path to our Python modules
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
+
     # Adjust PATH and PYTHONPATH to include USD.
     _mayaHydra_setup_test_USD_paths()
     
     # Set environment variables as test properties.
     _mayaHydra_setup_test_finalize_env("${test_name}")
+
+    if(ARG_COPY_SCENE)
+        configure_file(${SRC_SCENE_PATH} ${SCENE_PATH} COPYONLY)
+        cmake_path(REMOVE_EXTENSION SRC_SCENE_PATH OUTPUT_VARIABLE SRC_SCENE_PATH_USD)
+        cmake_path(REMOVE_EXTENSION SCENE_PATH OUTPUT_VARIABLE SCENE_PATH_USD)
+        configure_file("${SRC_SCENE_PATH_USD}.usda" "${SCENE_PATH_USD}.usda" COPYONLY)
+    endif()
 
     # For render tests, we don't want interactive UI elements
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT

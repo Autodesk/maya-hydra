@@ -69,6 +69,7 @@ bool ApplyUsdRenderSettingsToRenderDelegate(
                 "nothing to apply.\n");
         return false;
     }
+
     if (!renderDelegate) {
         TF_WARN("ApplyUsdRenderSettingsToRenderDelegate: Render delegate unavailable; "
                 "cannot apply USD render settings.\n");
@@ -81,7 +82,14 @@ bool ApplyUsdRenderSettingsToRenderDelegate(
         if (!attr.Get(&value, timeCode) || value.IsEmpty()) {
             continue;
         }
-        renderDelegate->SetRenderSetting(TfToken(attr.GetName()), value);
+
+        // HYDRA-2110: setting the resolution render setting onto
+        // Hydra Arnold causes black frames to be rendered.
+        if (attr.HasAuthoredValue() && 
+            (attr.GetName() != UsdRenderTokens->resolution)) {
+            renderDelegate->SetRenderSetting(TfToken(attr.GetName()), value);
+        }
+
         TF_DEBUG_MSG(
             MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
             "Applied render setting: %s\n",
@@ -418,6 +426,15 @@ bool HydraRenderCmd::hydraRenderFromHydraV1RenderSettings()
         renderTimes = GetRenderTimesFromStage(renderSettingsStage);
     }
 
+    // If there are no render times specified in the stage, use the
+    // current time.
+    if (renderTimes.empty()) {
+        TF_DEBUG_MSG(
+            MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+            "USD stage has no authored time range; rendering current frame.\n");
+        renderTimes.push_back(MAnimControl::currentTime());
+    }
+
     TF_DEBUG_MSG(
         MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
         "Render times count: %zu\n",
@@ -425,10 +442,10 @@ bool HydraRenderCmd::hydraRenderFromHydraV1RenderSettings()
 
     // Loop over all render times.
     for (const MTime& time : renderTimes) {
-        const double frameNb = time.as(MTime::uiUnit());
         if (MAnimControl::currentTime() != time) {
             MAnimControl::setCurrentTime(time);
         }
+        const double frameNb = time.as(MTime::uiUnit());
         const UsdTimeCode usdTimeCode(frameNb);
 
         ApplyUsdRenderSettingsToRenderDelegate(

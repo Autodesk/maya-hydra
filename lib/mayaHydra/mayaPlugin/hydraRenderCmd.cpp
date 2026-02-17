@@ -170,7 +170,12 @@ bool HydraRenderCmd::parseDatabase(const MArgDatabase& db)
 
 bool HydraRenderCmd::initialize()
 {
-    return true;
+    if (!_batchRenderer) {
+        TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_CMD, "_batchRenderer is a nullptr.\n");
+        return false;
+    }
+
+    return _batchRenderer->Initialize();
 }
 
 bool HydraRenderCmd::render()
@@ -185,10 +190,6 @@ bool HydraRenderCmd::render()
     if (!hydraRender()) {
         return false;
     }
-
-    // Do we need this one?  Or just write to disk using the new image write
-    // functionality?
-    // hydraPresentTarget();
 
     return true;
 }

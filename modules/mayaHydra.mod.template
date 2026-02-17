@@ -17,3 +17,4 @@ scripts: scripts
 resources: 
 ${PXR_OVERRIDE_PLUGINPATH_NAME}+:=lib/usd
 MAYA_RENDER_DESC_PATH+:=renderDesc
+PYTHONPATH+:=scripts

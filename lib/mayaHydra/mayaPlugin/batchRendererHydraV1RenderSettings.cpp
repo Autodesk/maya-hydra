@@ -137,23 +137,12 @@ MStatus BatchRendererHydraV1RenderSettings::Render(
     const BatchRenderer::InputParams& inputParams)
 {
     // Hydra V1 render settings path: uses USD render settings and UFE camera.
-    // It would be good to clear the resources of the overrides that are
-    // not in active use, but I'm not sure if we have a better way than
-    // the idle time we use currently. The approach below would break if
-    // two render overrides were used at the same time.
-    // for (auto* override: _allInstances) {
-    //     if (override != this) {
-    //         override->ClearHydraResources();
-    //     }
-    // }
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
         .Msg("BatchRenderer::RenderFromMayaRenderSettings()\n");
 
     HdxRenderTaskParams params;
-    if (!renderer._PrepareHydraBatchRender(
-            static_cast<int>(inputParams.width),
-            static_cast<int>(inputParams.height),
-            &params)) {
+    if (!renderer._PrepareRender(
+            inputParams.width, inputParams.height, params)) {
         return MStatus::kFailure;
     }
 

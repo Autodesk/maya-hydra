@@ -41,6 +41,21 @@ foreach(scene ${ARNOLD_RENDER_SCENES})
 endforeach()
 
 if(IS_WINDOWS)
+mayaHydra_add_cmd_line_render_test(renderSettings/stormResolution.ma
+    COPY_SCENE
+    RENDERER HdStormRendererPlugin
+    RENDERER_ARGS "-x 720 -y 480"
+)
+
+# Use a small vertical resolution to avoid the Arnold watermark.
+mayaHydra_add_cmd_line_render_test(renderSettings/arnoldResolution.ma
+    COPY_SCENE
+    RENDERER HdArnoldRendererPlugin
+    RENDERER_ARGS "-x 720 -y 128"
+)
+endif()
+
+if(IS_WINDOWS)
     mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
         EXPECTED_IMAGES_DIR renderSettings/images/storm
         IMAGE_EXTENSION png

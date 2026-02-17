@@ -30,4 +30,9 @@
     <melheader s='string $opt=""; string $rl=""; string $rp=""; float $resize=-1.; int $interactive=0; loadPlugin -quiet mayaUsdPlugin; loadPlugin -quiet mayaHydra;'/>
     <meltrailer s='setMayaSoftwareLayers($rl, $rp); setImageSizePercent($resize);mayaBatchRenderProcedure($interactive, "", "", "HdPrmanLoaderRendererPlugin", $opt); '/>
     <sep/>
+    <!-- ______________________________________________________________ -->
+    <sep desc="Resolution options"/>
+    <mel n="x" s="mayaHydraSetRenderWidth(%1)" t="int" p="1" h="Set X resolution of the final image"/>
+    <mel n="y" s="mayaHydraSetRenderHeight(%1)" t="int" p="1" h="Set Y resolution of the final image"/>
+    <sep/>
 </renderer>

@@ -56,15 +56,6 @@ MStatus BatchRendererMayaRenderSettings::Render(
     const BatchRenderer::InputParams& inputParams)
 {
     // Maya render settings path: render directly from Maya scene state and input params.
-    // It would be good to clear the resources of the overrides that are
-    // not in active use, but I'm not sure if we have a better way than
-    // the idle time we use currently. The approach below would break if
-    // two render overrides were used at the same time.
-    // for (auto* override: _allInstances) {
-    //     if (override != this) {
-    //         override->ClearHydraResources();
-    //     }
-    // }
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
         .Msg("BatchRenderer::RenderFromMayaRenderSettings()\n");
 
@@ -116,69 +107,11 @@ MStatus BatchRendererMayaRenderSettings::Render(
         renderer._engine.Execute(renderer._renderIndex, &tasks);
     }; // End of renderFrame lambda.
 
-    if (renderer._initializationAttempted && !renderer._initializationSucceeded) {
-        // Initialization must have failed already, stop trying.
+    HdxRenderTaskParams params;
+    if (!renderer._PrepareRender(
+            inputParams.width, inputParams.height, params)) {
         return MStatus::kFailure;
     }
-
-    if (renderer._needsClear.exchange(false)) {
-        constexpr bool fullReset = false;
-        renderer.ClearHydraResources(fullReset);
-    }
-
-    if (!renderer._initializationAttempted) {
-        renderer._InitHydraResources();
-
-        if (!renderer._initializationSucceeded) {
-            return MStatus::kFailure;
-        }
-    }
-
-    // TODO_BATCH_RENDER  Remove this viewport architecture dependency.
-    const std::string panelName{BatchRenderer::kBatchRenderDummyPanelName};
-    auto& manager = Fvp::RenderViewDataManager::Get();
-    if (!manager.ViewIsAlreadyRegistered(panelName)) {
-        const Fvp::InformationInterface::RenderViewDesc renderViewDesc(panelName, false);
-        // The following returns true only if there are non-Maya data producers
-        // added.
-        manager.AddRenderViewData(
-            renderViewDesc,
-            renderer.renderIndex(),
-            renderer._dataProducerMergingSceneIndexProxy,
-            renderer._lastFilteringSceneIndexBeforeCustomFiltering);
-    }
-
-    if (renderer._needToReplaceSelection) {
-        renderer._needToReplaceSelection = false;
-    }
-
-    MayaHydraParams delegateParams = renderer._globals.delegateParams;
-    delegateParams.displaySmoothMeshes = true; // This is the default.
-
-    if (renderer._mayaHydraSceneIndex) {
-        renderer._mayaHydraSceneIndex->SetParams(delegateParams);
-        // TODO_BATCH_RENDER
-        // Maya Hydra scene index does way too much, viewport render aware.
-        // How do we fix this?  PPT, 3-Mar-2025.
-        // _mayaHydraSceneIndex->PreFrame(drawContext);
-    }
-
-    HdxRenderTaskParams params;
-    params.enableLighting = true;
-#if PXR_VERSION <= 2508
-    params.enableSceneMaterials = true;
-#endif
-
-    // Do not set params.wireframeColor, as this implies reading the
-    // FvpColorPreferencesTokens->wireframeSelection from the
-    // Fvp::ColorPreferences instance, which is unavailable in batch mode.
-
-    params.cullStyle = HdCullStyleBackUnlessDoubleSided;
-
-    const int width = static_cast<int>(inputParams.width);
-    const int height = static_cast<int>(inputParams.height);
-    renderer._viewport = GfVec4d(0, 0, width, height);
-    renderer._taskController->SetRenderViewport(renderer._viewport);
 
     // Convert any aov named "Ci" to "color", "z" to "depth"
     auto normalizeAovToken = [](const TfToken& token) {
@@ -215,9 +148,6 @@ MStatus BatchRendererMayaRenderSettings::Render(
     };
     const bool hasColorAov = hasToken(HdAovTokens->color);
     const bool hasDepthAov = hasToken(HdAovTokens->depth);
-
-    // Set Purpose tags
-    renderer.SetRenderPurposeTags(delegateParams);
 
     // Set MSAA as per Maya AntiAliasing settings
     if (renderer._isUsingHdSt) {
@@ -276,39 +206,7 @@ MStatus BatchRendererMayaRenderSettings::Render(
 
     renderer._taskController->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
 
-    renderer._taskController->SetRenderParams(params);
-    if (!params.camera.IsEmpty()) {
-        renderer._taskController->SetCameraPath(params.camera);
-    }
-
-    // Default color in usdview.
-    renderer._taskController->SetSelectionColor(renderer._globals.colorSelectionHighlightColor);
-    renderer._taskController->SetEnableSelection(renderer._globals.colorSelectionHighlight);
-
-    if (renderer._globals.outlineSelectionWidth != 0.f) {
-        renderer._taskController->SetSelectionOutlineRadius(renderer._globals.outlineSelectionWidth);
-        renderer._taskController->SetSelectionEnableOutline(true);
-    } else {
-        renderer._taskController->SetSelectionEnableOutline(false);
-    }
-
-    renderer._taskController->SetCollection(renderer._renderCollection);
-
-    // Update all registered plugin before render.
-    for (auto& entry : renderer._sceneIndexRegistry->GetRegistrations()) {
-        entry.second->Update();
-    }
-
-    if (renderer._isUsingHdSt) {
-        constexpr auto enableShadows = true;
-        HdxShadowTaskParams shadowParams;
-        shadowParams.cullStyle = HdCullStyleNothing;
-
-        // The light & shadow parameters currently (19.11-20.08) are only used for tasks specific to
-        // Storm
-        renderer._taskController->SetEnableShadows(enableShadows);
-        renderer._taskController->SetShadowParams(shadowParams);
-    }
+    renderer._FinalizeHydraBatchRender(params);
 
     // The renderFrame() lambda does too much to be called in a loop:
     // all we want is to call it once, then call _Execute() repeatedly.

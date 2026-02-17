@@ -109,8 +109,7 @@ BatchRenderer::~BatchRenderer()
             _rendererDesc.overrideName.GetText(),
             _rendererDesc.displayName.GetText());
 
-    constexpr bool fullReset = true;
-    ClearHydraResources(fullReset);
+    _ClearHydraResources();
 
     MMessage::removeCallbacks(_callbacks);
     _callbacks.clear();
@@ -153,19 +152,11 @@ void BatchRenderer::_SetRenderPurposeTags(const MayaHydraParams& delegateParams)
     _taskController->SetRenderTags(mhRenderTags);
 }
 
-bool BatchRenderer::_PrepareHydraBatchRender(
-    int width,
-    int height,
-    HdxRenderTaskParams* outParams)
+bool BatchRenderer::Initialize()
 {
     if (_initializationAttempted && !_initializationSucceeded) {
         // Initialization must have failed already, stop trying.
         return false;
-    }
-
-    if (_needsClear.exchange(false)) {
-        constexpr bool fullReset = false;
-        ClearHydraResources(fullReset);
     }
 
     if (!_initializationAttempted) {
@@ -189,26 +180,26 @@ bool BatchRenderer::_PrepareHydraBatchRender(
             _lastFilteringSceneIndexBeforeCustomFiltering);
     }
 
-    if (_needToReplaceSelection) {
-        _needToReplaceSelection = false;
-    }
-
     MayaHydraParams delegateParams = _globals.delegateParams;
     delegateParams.displaySmoothMeshes = true; // This is the default.
 
     if (_mayaHydraSceneIndex) {
         _mayaHydraSceneIndex->SetParams(delegateParams);
-        // TODO_BATCH_RENDER
-        // Maya Hydra scene index does way too much, viewport render aware.
-        // How do we fix this?  PPT, 3-Mar-2025.
-        // _mayaHydraSceneIndex->PreFrame(drawContext);
     }
 
+    // Set Purpose tags.
+    _SetRenderPurposeTags(delegateParams);
+
+    return true;
+}
+
+bool BatchRenderer::_PrepareRender(
+    unsigned int         width,
+    unsigned int         height,
+    HdxRenderTaskParams& outParams)
+{
     _viewport = GfVec4d(0, 0, width, height);
     _taskController->SetRenderViewport(_viewport);
-
-    // Set Purpose tags.
-    SetRenderPurposeTags(delegateParams);
 
     HdxRenderTaskParams params;
     params.enableLighting = true;
@@ -217,9 +208,7 @@ bool BatchRenderer::_PrepareHydraBatchRender(
 #endif
     params.cullStyle = HdCullStyleBackUnlessDoubleSided;
 
-    if (outParams) {
-        *outParams = params;
-    }
+    outParams = params;
 
     return true;
 }
@@ -229,17 +218,6 @@ void BatchRenderer::_FinalizeHydraBatchRender(const HdxRenderTaskParams& params)
     _taskController->SetRenderParams(params);
     if (!params.camera.IsEmpty()) {
         _taskController->SetCameraPath(params.camera);
-    }
-
-    // Default color in usdview.
-    _taskController->SetSelectionColor(_globals.colorSelectionHighlightColor);
-    _taskController->SetEnableSelection(_globals.colorSelectionHighlight);
-
-    if (_globals.outlineSelectionWidth != 0.f) {
-        _taskController->SetSelectionOutlineRadius(_globals.outlineSelectionWidth);
-        _taskController->SetSelectionEnableOutline(true);
-    } else {
-        _taskController->SetSelectionEnableOutline(false);
     }
 
     _taskController->SetCollection(_renderCollection);
@@ -406,9 +384,6 @@ void BatchRenderer::_InitHydraResources()
     _pruningSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya filtering is handled by VP2/OGS.
     _inputSceneIndexOfFilteringSceneIndicesChain = _pruningSceneIndex;
 
-    // Set the initial selection onto the selection scene index later. 
-    _needToReplaceSelection = true;
-
     _CreateSceneIndicesChainAfterMergingSceneIndex();
     
     if (auto* renderDelegate = _GetRenderDelegate()) {
@@ -437,17 +412,15 @@ void BatchRenderer::_InitHydraResources()
     _initializationSucceeded = true;
 }
 
-//When fullReset is true, we remove the data producer scene indices that apply to all views.
-//It means you are doing a full reset of hydra such as when doing "File New".
-//Use fullReset = false when you still want to see the previously registered data producer scene indices when using an hydra viewport.
-void BatchRenderer::ClearHydraResources(bool fullReset)
+// Perform a full reset of Hydra and remove the data producer scene indices.
+void BatchRenderer::_ClearHydraResources()
 {
     if (!_initializationAttempted) {
         return;
     }
 
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
-        .Msg("BatchRenderer::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
+        .Msg("BatchRenderer::_ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
     // TODO_BATCH_RENDER  Do not call 
     // Fvp::RenderViewDataManager::Get().RemoveAllViewportsInformation()
@@ -456,10 +429,8 @@ void BatchRenderer::ClearHydraResources(bool fullReset)
     // viewport architecture dependence.
     Fvp::RenderViewDataManager::Get().RemoveRenderViewData(kBatchRenderDummyPanelName);
     
-    if (fullReset){
-        //Remove the data producer scene indices that apply to all views
-        Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViews();
-    }
+    //Remove the data producer scene indices that apply to all views
+    Fvp::DataProducerSceneIndexInterfaceImp::get().ClearDataProducerSceneIndicesThatApplyToAllViews();
 
     // Remove the scene index registry
     _sceneIndexRegistry.reset();
@@ -517,8 +488,7 @@ void BatchRenderer::_ClearHydraCallback(void* data)
     if (!TF_VERIFY(instance)) {
         return;
     }
-    constexpr bool fullReset = true;
-    instance->ClearHydraResources(fullReset);
+    instance->_ClearHydraResources();
 }
 
 HdRenderIndex* BatchRenderer::renderIndex() const

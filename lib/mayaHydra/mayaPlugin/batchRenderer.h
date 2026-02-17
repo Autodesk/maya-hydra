@@ -96,11 +96,7 @@ public:
     MStatus RenderFromHydraV2RenderSettings();
     PXR_NS::TfToken GetRendererName() const { return _rendererDesc.rendererName; }
 
-    ///When fullReset is true, we remove the data producer scene indices that apply to all viewports and the scene index registry where the usd stages have been loaded.
-    ///It means you are doing a full reset of hydra such as when doing "File New".
-    ///Use fullReset = false when you still want to see the previously registered data producer scene indices when using an hydra viewport.
-    void ClearHydraResources(bool fullReset);
-    void SetRenderPurposeTags(const PXR_NS::MayaHydraParams& delegateParams) { _SetRenderPurposeTags(delegateParams); };
+    bool Initialize();
 
     PXR_NS::HdRenderIndex* renderIndex() const;
 
@@ -113,6 +109,7 @@ private:
     static constexpr const char* kBatchRenderDummyPanelName = "batchRenderDummyPanel";
 
     void              _InitHydraResources();
+    void              _ClearHydraResources();
     PXR_NS::HdRenderDelegate* _GetRenderDelegate();   
     void              _ClearMayaHydraSceneIndex();
     void              _SetActiveRenderSettingsPrimFromScene();
@@ -120,10 +117,10 @@ private:
 
     void              _SetRenderPurposeTags(const PXR_NS::MayaHydraParams& delegateParams);
     void              _CreateSceneIndicesChainAfterMergingSceneIndex();
-    bool              _PrepareHydraBatchRender(
-        int width,
-        int height,
-        PXR_NS::HdxRenderTaskParams* outParams);
+    bool              _PrepareRender(
+        unsigned int width,
+        unsigned int height,
+        PXR_NS::HdxRenderTaskParams& outParams);
     void              _FinalizeHydraBatchRender(const PXR_NS::HdxRenderTaskParams& params);
     void              _ExecuteHydraBatchRenderFrame();
 
@@ -137,7 +134,6 @@ private:
     const PXR_NS::MtohRenderGlobals&             _globals;
 
     std::atomic<bool>                     _isConverged = { false };
-    std::atomic<bool>                     _needsClear = { false };
 
     /// Hgi and HdDriver should be constructed before HdEngine to ensure they
     /// are destructed last. Hgi may be used during engine/delegate destruction.
@@ -176,7 +172,6 @@ private:
 
     int _currentOperation = -1;
 
-    bool _needToReplaceSelection = false;
     const bool _isUsingHdSt = false;
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;

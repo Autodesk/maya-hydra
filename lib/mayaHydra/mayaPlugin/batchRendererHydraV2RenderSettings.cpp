@@ -18,10 +18,7 @@
 
 #include "pluginDebugCodes.h"
 
-#include <mayaHydraLib/sceneIndex/registration.h>
-
 #include <pxr/base/tf/diagnostic.h>
-#include <pxr/imaging/hdx/renderTask.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -34,11 +31,11 @@ MStatus BatchRendererHydraV2RenderSettings::Render(BatchRenderer& renderer)
         .Msg("BatchRenderer::RenderFromMayaRenderSettings()\n");
 
     // Use dummy values; the render delegate reads render settings directly in Hydra.
-    constexpr int width   = 640;
-    constexpr int  height = 480;
+    constexpr unsigned int width  = 640;
+    constexpr unsigned int height = 480;
 
     HdxRenderTaskParams params;
-    if (!renderer._PrepareHydraBatchRender(width, height, &params)) {
+    if (!renderer._PrepareRender(width, height, params)) {
         return MStatus::kFailure;
     }
 
