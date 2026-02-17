@@ -612,7 +612,12 @@ void GetExtensionAttributesFromNode(
                 short            value = attrPlug.asShort();
                 short            defaultVal = 0;
                 enumAttr.getDefault(defaultVal);
-                UpdateAttrs<short>(attrName, value, defaultVal, attrs);
+                UpdateAttrsValue(
+                    attrName,
+                    VtValue(value),
+                    VtValue(defaultVal),
+                    !ignoreDefault,
+                    attrs);
             } break;
             case MFn::kTypedAttribute: {
                 MFnTypedAttribute typeAttr(attrObj);
@@ -623,7 +628,12 @@ void GetExtensionAttributesFromNode(
                     typeAttr.getDefault(defaultValObj);
                     MFnStringData defaultStringData(defaultValObj);
                     MString       defaultVal = defaultStringData.string();
-                    UpdateAttrs<MString>(attrName, value, defaultVal, attrs);
+                    UpdateAttrsValue(
+                        attrName,
+                        VtValue(value),
+                        VtValue(defaultVal),
+                        !ignoreDefault,
+                        attrs);
                 } break;
                 case MFnData::kStringArray: {
                     const auto valueArray
@@ -634,10 +644,11 @@ void GetExtensionAttributesFromNode(
                     const auto defaultArray
                         = GetArrayFromObject<MStringArray, MFnStringArrayData>(defaultObj);
 
-                    UpdateAttrs<VtStringArray>(
+                    UpdateAttrsValue(
                         attrName,
-                        ToVtStringArray(valueArray),
-                        ToVtStringArray(defaultArray),
+                        VtValue(ToVtStringArray(valueArray)),
+                        VtValue(ToVtStringArray(defaultArray)),
+                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kIntArray: {
@@ -649,10 +660,11 @@ void GetExtensionAttributesFromNode(
                     const auto defaultArray
                         = GetArrayFromObject<MIntArray, MFnIntArrayData>(defaultObj);
 
-                    UpdateAttrs<VtIntArray>(
+                    UpdateAttrsValue(
                         attrName,
-                        ToVtIntArray(valueArray),
-                        ToVtIntArray(defaultArray),
+                        VtValue(ToVtIntArray(valueArray)),
+                        VtValue(ToVtIntArray(defaultArray)),
+                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kFloatArray: {
@@ -664,10 +676,11 @@ void GetExtensionAttributesFromNode(
                     const auto defaultArray
                         = GetArrayFromObject<MFloatArray, MFnFloatArrayData>(defaultObj);
 
-                    UpdateAttrs<VtFloatArray>(
+                    UpdateAttrsValue(
                         attrName,
-                        ToVtFloatArray(valueArray),
-                        ToVtFloatArray(defaultArray),
+                        VtValue(ToVtFloatArray(valueArray)),
+                        VtValue(ToVtFloatArray(defaultArray)),
+                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kDoubleArray: {
@@ -679,10 +692,11 @@ void GetExtensionAttributesFromNode(
                     const auto defaultArray
                         = GetArrayFromObject<MDoubleArray, MFnDoubleArrayData>(defaultObj);
 
-                    UpdateAttrs<VtDoubleArray>(
+                    UpdateAttrsValue(
                         attrName,
-                        ToVtDoubleArray(valueArray),
-                        ToVtDoubleArray(defaultArray),
+                        VtValue(ToVtDoubleArray(valueArray)),
+                        VtValue(ToVtDoubleArray(defaultArray)),
+                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kVectorArray: {
@@ -694,10 +708,11 @@ void GetExtensionAttributesFromNode(
                     const auto defaultArray
                         = GetArrayFromObject<MVectorArray, MFnVectorArrayData>(defaultObj);
 
-                    UpdateAttrs<VtArray<GfVec3d>>(
+                    UpdateAttrsValue(
                         attrName,
-                        ToVtVec3dArray(valueArray),
-                        ToVtVec3dArray(defaultArray),
+                        VtValue(ToVtVec3dArray(valueArray)),
+                        VtValue(ToVtVec3dArray(defaultArray)),
+                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kPointArray: {
@@ -709,10 +724,11 @@ void GetExtensionAttributesFromNode(
                     const auto defaultArray
                         = GetArrayFromObject<MPointArray, MFnPointArrayData>(defaultObj);
 
-                    UpdateAttrs<VtArray<GfVec4d>>(
+                    UpdateAttrsValue(
                         attrName,
-                        ToVtVec4dArray(valueArray),
-                        ToVtVec4dArray(defaultArray),
+                        VtValue(ToVtVec4dArray(valueArray)),
+                        VtValue(ToVtVec4dArray(defaultArray)),
+                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kMatrix: {
@@ -743,7 +759,12 @@ void GetExtensionAttributesFromNode(
                     }
 
                     GfMatrix4d defaultVal = GetGfMatrixFromMaya(defaultData.matrix(&matrixStatus));
-                    UpdateAttrs<GfMatrix4d>(attrName, value, defaultVal, attrs);
+                    UpdateAttrsValue(
+                        attrName,
+                        VtValue(value),
+                        VtValue(defaultVal),
+                        !ignoreDefault,
+                        attrs);
                 } break;
                 case MFnData::kMatrixArray: {
                     const auto valueArray
@@ -754,10 +775,11 @@ void GetExtensionAttributesFromNode(
                     const auto defaultArray
                         = GetArrayFromObject<MMatrixArray, MFnMatrixArrayData>(defaultObj);
 
-                    UpdateAttrs<VtArray<GfMatrix4d>>(
+                    UpdateAttrsValue(
                         attrName,
-                        ToVtMatrix4dArray(valueArray),
-                        ToVtMatrix4dArray(defaultArray),
+                        VtValue(ToVtMatrix4dArray(valueArray)),
+                        VtValue(ToVtMatrix4dArray(defaultArray)),
+                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kNumeric: {
@@ -774,7 +796,8 @@ void GetExtensionAttributesFromNode(
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
                     VtValue defaultVal;
-                    bool    hasDefault = supportsDefault && ExtractNumericDataFromObject(defaultObj, defaultVal);
+                    bool    hasDefault = !ignoreDefault && supportsDefault
+                        && ExtractNumericDataFromObject(defaultObj, defaultVal);
 
                     UpdateAttrsValue(attrName, value, defaultVal, hasDefault, attrs);
                 } break;
@@ -1761,7 +1784,12 @@ void GetExtensionAttributesFromNode(
                 matrixAttr.getDefault(defaultMatrix);
                 GfMatrix4d defaultVal = GetGfMatrixFromMaya(defaultMatrix);
 
-                UpdateAttrs<GfMatrix4d>(attrName, value, defaultVal, attrs);
+                UpdateAttrsValue(
+                    attrName,
+                    VtValue(value),
+                    VtValue(defaultVal),
+                    !ignoreDefault,
+                    attrs);
             } break;
             default:
                 // TODO: Add more types if necessary

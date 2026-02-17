@@ -65,7 +65,6 @@
 
 #include <gtest/gtest.h>
 
-#include <cstring>
 #include <iostream>
 #include <string>
 
@@ -93,7 +92,11 @@ FindPrimPredicate getPrimPredicate(const std::string& primName, const TfToken& p
 GfMatrix4d ToGfMatrix(const MMatrix& mayaMat)
 {
     GfMatrix4d mat;
-    memcpy(mat.GetArray(), mayaMat[0], sizeof(double) * 16);
+    for (int row = 0; row < 4; ++row) {
+        for (int col = 0; col < 4; ++col) {
+            mat[row][col] = mayaMat[row][col];
+        }
+    }
     return mat;
 }
 
@@ -142,7 +145,6 @@ TEST(CustomAttributes, extensionAttributeTypes)
 {
     MObject cubeNode;
     ASSERT_TRUE(GetDependNodeFromNodeName("pCubeShape1", cubeNode));
-    MFnDependencyNode depNode(cubeNode);
 
     // Values are authored in testCustomAttributes.py. This test only verifies
     // the Hydra translation against the expected values.
