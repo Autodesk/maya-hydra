@@ -50,6 +50,7 @@ target_sources(${TARGET_NAME}
         testWriteFile.cpp
         testCamera.cpp
         testCustomAttributes.cpp
+        testCustomAttributeTypes.cpp
         testMaterialBlocking.cpp
         testPassFiltering.cpp
 )

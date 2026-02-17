@@ -155,7 +155,7 @@ void MayaHydraAdapter::HandleExtensionAttributesDirty(const MPlug& plug)
     MObject attrObj = plug.attribute(&status);
     if (status) {
         MFnAttribute fnAttr(attrObj);
-        if (fnAttr.isExtension()) {
+        if (fnAttr.isExtension() || fnAttr.isDynamic()) {
             _extAttrMapNeedUpdate = true;
             // Notify the change tracker that the primvars have changed.
             // Note there's no fine grained dirty notification mechanism on primvars yet,
