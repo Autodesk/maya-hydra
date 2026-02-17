@@ -25,6 +25,7 @@
 #include <mayaHydraLib/debugCodes.h>
 
 #include <array>
+#include <string>
 
 #include <pxr/base/gf/vec2d.h>
 #include <pxr/base/gf/vec2f.h>
@@ -1067,11 +1068,11 @@ void GetExtensionAttributesFromNode(
                 MFnTypedAttribute typeAttr(attrObj);
                 switch (typeAttr.attrType()) {
                 case MFnData::kString: {
-                    MString value = attrPlug.asString();
+                    std::string value = attrPlug.asString().asChar();
                     MObject defaultValObj;
                     typeAttr.getDefault(defaultValObj);
                     MFnStringData defaultStringData(defaultValObj);
-                    MString       defaultVal = defaultStringData.string();
+                    std::string   defaultVal = defaultStringData.string().asChar();
                     UpdateAttrsValue(
                         attrName,
                         VtValue(value),

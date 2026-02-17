@@ -198,7 +198,7 @@ TEST(CustomAttributes, extensionAttributeTypes)
     ASSERT_TRUE(testPassed);
 
     ExpectPrimvarValue(prim, TfToken("extEnum"), static_cast<short>(2));
-    ExpectPrimvarValue(prim, TfToken("extString"), MString("hello"));
+    ExpectPrimvarValue(prim, TfToken("extString"), std::string("hello"));
 
     VtStringArray expectedStringArray;
     expectedStringArray.push_back("alpha");
