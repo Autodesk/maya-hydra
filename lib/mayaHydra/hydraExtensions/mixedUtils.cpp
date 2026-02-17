@@ -743,6 +743,7 @@ bool ExtractNumericDataFromPlug(
             return false;
         }
         outValue = VtValue(handle.asBool());
+        supportsDefault = true;
         return true;
     }
     case MFnNumericData::kByte:
@@ -753,6 +754,7 @@ bool ExtractNumericDataFromPlug(
             return false;
         }
         outValue = VtValue(static_cast<int>(handle.asChar()));
+        supportsDefault = true;
         return true;
     }
     case MFnNumericData::kShort: {
@@ -762,6 +764,7 @@ bool ExtractNumericDataFromPlug(
             return false;
         }
         outValue = VtValue(handle.asShort());
+        supportsDefault = true;
         return true;
     }
     case MFnNumericData::kInt: {
@@ -771,6 +774,7 @@ bool ExtractNumericDataFromPlug(
             return false;
         }
         outValue = VtValue(handle.asInt());
+        supportsDefault = true;
         return true;
     }
     case MFnNumericData::kInt64: {
@@ -780,6 +784,7 @@ bool ExtractNumericDataFromPlug(
             return false;
         }
         outValue = VtValue(handle.asInt64());
+        supportsDefault = true;
         return true;
     }
     case MFnNumericData::kFloat: {
@@ -789,6 +794,7 @@ bool ExtractNumericDataFromPlug(
             return false;
         }
         outValue = VtValue(handle.asFloat());
+        supportsDefault = true;
         return true;
     }
     case MFnNumericData::kDouble: {
@@ -798,6 +804,7 @@ bool ExtractNumericDataFromPlug(
             return false;
         }
         outValue = VtValue(handle.asDouble());
+        supportsDefault = true;
         return true;
     }
     case MFnNumericData::kAddr: {
@@ -809,6 +816,7 @@ bool ExtractNumericDataFromPlug(
         void*  ptr = handle.asAddr();
         MInt64 val = static_cast<MInt64>(reinterpret_cast<intptr_t>(ptr));
         outValue = VtValue(val);
+        supportsDefault = true;
         return true;
     }
     default:
@@ -1644,6 +1652,16 @@ void GetExtensionAttributesFromNode(
             case MFn::kMatrixAttribute: {
                 MStatus          matrixStatus;
                 MObject          dataObj = attrPlug.asMObject();
+                if (dataObj.isNull()) {
+                    attrPlug.getValue(dataObj);
+                }
+                if (dataObj.isNull()) {
+                    MStatus     handleStatus;
+                    MDataHandle handle = attrPlug.asMDataHandle(&handleStatus);
+                    if (handleStatus) {
+                        dataObj = handle.data();
+                    }
+                }
                 if (dataObj.isNull()) {
                     break;
                 }

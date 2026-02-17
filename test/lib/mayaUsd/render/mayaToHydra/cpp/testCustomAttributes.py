@@ -88,7 +88,21 @@ def _create_numeric_attr(node_fn, name, numeric_type, default_value=None):
             name + "W", name + "W", om.MFnNumericData.kDouble, 0.0)
         attr_obj = numeric_attr.create(name, name, child1, child2, child3, child4)
     else:
-        default_val = 0.0 if default_value is None else default_value
+        if default_value is None:
+            # Use integer-like defaults for boolean/integer types,
+            # and floating defaults for float/double types.
+            if numeric_type in (
+                om.MFnNumericData.kBoolean,
+                om.MFnNumericData.kByte,
+                om.MFnNumericData.kShort,
+                om.MFnNumericData.kInt,
+                om.MFnNumericData.kInt64,
+            ):
+                default_val = 0
+            else:
+                default_val = 0.0
+        else:
+            default_val = default_value
         attr_obj = numeric_attr.create(name, name, numeric_type, default_val)
     numeric_attr.keyable = True
     numeric_attr.storable = True
@@ -463,7 +477,8 @@ class TestCustomAttributes(mtohUtils.MayaHydraBaseTestCase):
     def setUp(self):
         mayaUtils.openNewScene()
         modified = cmds.file(query=True, modified=True)
-        assert not modified, (
+        self.assertFalse(
+            modified,
             'Internal test framework error: scene left as modified by mayaUtils.openNewScene()')
         cmds.file(modified=False)
 
