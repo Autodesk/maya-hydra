@@ -129,6 +129,29 @@ ArrayType GetArrayFromObject(const MObject& obj)
     return array;
 }
 
+// Extract array data from a plug, falling back to the data handle when needed.
+template <typename ArrayType, typename FnDataType>
+ArrayType GetArrayFromPlug(const MPlug& plug)
+{
+    MObject dataObj = plug.asMObject();
+    if (!dataObj.isNull()) {
+        return GetArrayFromObject<ArrayType, FnDataType>(dataObj);
+    }
+
+    MStatus     status;
+    MDataHandle handle = plug.asMDataHandle(&status);
+    if (!status) {
+        return ArrayType();
+    }
+
+    dataObj = handle.data();
+    if (dataObj.isNull()) {
+        return ArrayType();
+    }
+
+    return GetArrayFromObject<ArrayType, FnDataType>(dataObj);
+}
+
 // Convert Maya string array to VtStringArray.
 VtStringArray ToVtStringArray(const MStringArray& arr)
 {
@@ -637,7 +660,7 @@ void GetExtensionAttributesFromNode(
                 } break;
                 case MFnData::kStringArray: {
                     const auto valueArray
-                        = GetArrayFromObject<MStringArray, MFnStringArrayData>(attrPlug.asMObject());
+                        = GetArrayFromPlug<MStringArray, MFnStringArrayData>(attrPlug);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
@@ -653,7 +676,7 @@ void GetExtensionAttributesFromNode(
                 } break;
                 case MFnData::kIntArray: {
                     const auto valueArray
-                        = GetArrayFromObject<MIntArray, MFnIntArrayData>(attrPlug.asMObject());
+                        = GetArrayFromPlug<MIntArray, MFnIntArrayData>(attrPlug);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
@@ -669,7 +692,7 @@ void GetExtensionAttributesFromNode(
                 } break;
                 case MFnData::kFloatArray: {
                     const auto valueArray
-                        = GetArrayFromObject<MFloatArray, MFnFloatArrayData>(attrPlug.asMObject());
+                        = GetArrayFromPlug<MFloatArray, MFnFloatArrayData>(attrPlug);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
@@ -685,7 +708,7 @@ void GetExtensionAttributesFromNode(
                 } break;
                 case MFnData::kDoubleArray: {
                     const auto valueArray
-                        = GetArrayFromObject<MDoubleArray, MFnDoubleArrayData>(attrPlug.asMObject());
+                        = GetArrayFromPlug<MDoubleArray, MFnDoubleArrayData>(attrPlug);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
@@ -701,7 +724,7 @@ void GetExtensionAttributesFromNode(
                 } break;
                 case MFnData::kVectorArray: {
                     const auto valueArray
-                        = GetArrayFromObject<MVectorArray, MFnVectorArrayData>(attrPlug.asMObject());
+                        = GetArrayFromPlug<MVectorArray, MFnVectorArrayData>(attrPlug);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
@@ -717,7 +740,7 @@ void GetExtensionAttributesFromNode(
                 } break;
                 case MFnData::kPointArray: {
                     const auto valueArray
-                        = GetArrayFromObject<MPointArray, MFnPointArrayData>(attrPlug.asMObject());
+                        = GetArrayFromPlug<MPointArray, MFnPointArrayData>(attrPlug);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
@@ -732,8 +755,16 @@ void GetExtensionAttributesFromNode(
                         attrs);
                 } break;
                 case MFnData::kMatrix: {
-                    MObject dataObj = attrPlug.asMObject();
+                    MStatus     handleStatus;
+                    MDataHandle handle;
+                    MObject     dataObj = attrPlug.asMObject();
                     MStatus matrixStatus;
+                    if (dataObj.isNull()) {
+                        handle = attrPlug.asMDataHandle(&handleStatus);
+                        if (handleStatus) {
+                            dataObj = handle.data();
+                        }
+                    }
                     if (dataObj.isNull()) {
                         break;
                     }
@@ -768,7 +799,7 @@ void GetExtensionAttributesFromNode(
                 } break;
                 case MFnData::kMatrixArray: {
                     const auto valueArray
-                        = GetArrayFromObject<MMatrixArray, MFnMatrixArrayData>(attrPlug.asMObject());
+                        = GetArrayFromPlug<MMatrixArray, MFnMatrixArrayData>(attrPlug);
 
                     MObject defaultObj;
                     typeAttr.getDefault(defaultObj);
@@ -823,13 +854,15 @@ void GetExtensionAttributesFromNode(
                     break;
                 }
                 const auto unitType = firstChild.unitType();
+                bool       allSame = true;
                 for (unsigned int i = 1; i < childCount; ++i) {
                     MFnNumericAttribute childAttr(attrPlug.child(i).attribute(), &numericStatus);
                     if (!numericStatus || childAttr.unitType() != unitType) {
+                        allSame = false;
                         break;
                     }
                 }
-                if (!numericStatus) {
+                if (!numericStatus || !allSame) {
                     break;
                 }
 
