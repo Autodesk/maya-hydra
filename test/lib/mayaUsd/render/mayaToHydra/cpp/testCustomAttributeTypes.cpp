@@ -75,6 +75,35 @@ using namespace MayaHydra;
 // Unit test: verifies custom Maya extension attributes are translated into Hydra primvars.
 namespace {
 
+// OptionVar to emit enum primvars as label tokens.
+const char* kEnumLabelOptionVar = "mayaHydraExtensionEnumUseLabels";
+
+class ScopedOptionVarInt
+{
+public:
+    ScopedOptionVarInt(const char* name, int value)
+        : _name(name)
+        , _hadValue(MGlobal::optionVarExists(name))
+        , _oldValue(_hadValue ? MGlobal::optionVarIntValue(name) : 0)
+    {
+        MGlobal::setOptionVarValue(name, value);
+    }
+
+    ~ScopedOptionVarInt()
+    {
+        if (_hadValue) {
+            MGlobal::setOptionVarValue(_name.c_str(), _oldValue);
+        } else {
+            MGlobal::removeOptionVar(_name.c_str());
+        }
+    }
+
+private:
+    std::string _name;
+    bool        _hadValue;
+    int         _oldValue;
+};
+
 // Build a predicate to find a prim by name and type.
 FindPrimPredicate getPrimPredicate(const std::string& primName, const TfToken& primType)
 {
@@ -262,6 +291,36 @@ TEST(CustomAttributes, extensionAttributeTypes)
     ExpectPrimvarValue(prim, TfToken("extTime"), 1.25);
 
     ExpectPrimvarValue(prim, TfToken("extMatrixAttr"), ToGfMatrix(matrixAttrValue));
+}
+
+// Validate enum primvars can emit labels when configured.
+TEST(CustomAttributes, extensionAttributeEnumLabels)
+{
+    ScopedOptionVarInt enumLabels(kEnumLabelOptionVar, 1);
+    MGlobal::executeCommand("setAttr \"pCubeShape1.extEnum\" 2");
+    MGlobal::executeCommand("dgdirty -a");
+    MGlobal::executeCommand("refresh");
+
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+
+    HdSceneIndexPrim prim;
+    bool             testPassed = false;
+    for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
+        SceneIndexInspector inspector(sceneIndex);
+        PrimEntriesVector foundPrims
+            = inspector.FindPrims(getPrimPredicate("pCube1", HdPrimTypeTokens->mesh));
+        if (foundPrims.size() == 1u) {
+            prim = foundPrims.front().prim;
+            ASSERT_EQ(prim.primType, HdPrimTypeTokens->mesh);
+            ASSERT_NE(prim.dataSource, nullptr);
+            testPassed = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(testPassed);
+
+    ExpectPrimvarValue(prim, TfToken("extEnum"), TfToken("two"));
 }
 
 // Validate typed numeric attributes are translated into primvars.

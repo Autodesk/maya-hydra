@@ -78,6 +78,17 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
 
+// OptionVar to emit enum primvars as label tokens instead of integer values.
+constexpr const char* kExtEnumUseLabelsOptionVar = "mayaHydraExtensionEnumUseLabels";
+
+bool UseEnumLabelsForExtensionAttrs()
+{
+    if (MGlobal::optionVarExists(kExtEnumUseLabelsOptionVar)) {
+        return MGlobal::optionVarIntValue(kExtEnumUseLabelsOptionVar) != 0;
+    }
+    return false;
+}
+
 // Store value only when it differs from the default.
 template<typename T> 
 void UpdateAttrs(const char* attrName, const T& val, const T& defaultVal, VtDictionary& attrs)
@@ -1057,12 +1068,32 @@ void GetExtensionAttributesFromNode(
                 short            value = attrPlug.asShort();
                 short            defaultVal = 0;
                 enumAttr.getDefault(defaultVal);
-                UpdateAttrsValue(
-                    attrName,
-                    VtValue(value),
-                    VtValue(defaultVal),
-                    !ignoreDefault,
-                    attrs);
+                if (UseEnumLabelsForExtensionAttrs()) {
+                    const MString label = enumAttr.fieldName(value);
+                    const MString defaultLabel = enumAttr.fieldName(defaultVal);
+                    if (!label.length() || !defaultLabel.length()) {
+                        UpdateAttrsValue(
+                            attrName,
+                            VtValue(value),
+                            VtValue(defaultVal),
+                            !ignoreDefault,
+                            attrs);
+                    } else {
+                        UpdateAttrsValue(
+                            attrName,
+                            VtValue(TfToken(label.asChar())),
+                            VtValue(TfToken(defaultLabel.asChar())),
+                            !ignoreDefault,
+                            attrs);
+                    }
+                } else {
+                    UpdateAttrsValue(
+                        attrName,
+                        VtValue(value),
+                        VtValue(defaultVal),
+                        !ignoreDefault,
+                        attrs);
+                }
             } break;
             case MFn::kTypedAttribute: {
                 MFnTypedAttribute typeAttr(attrObj);
