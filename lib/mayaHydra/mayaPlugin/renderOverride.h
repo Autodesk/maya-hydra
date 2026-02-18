@@ -64,7 +64,6 @@
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPurposeFilteringSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
-#include <flowViewport/sceneIndex/fvpAnimatedPrimInvalidationSceneIndex.h>
 
 #include <pxr/base/tf/singleton.h>
 #include <pxr/imaging/hd/driver.h>
@@ -266,7 +265,6 @@ private:
     static void _PlayblastingChanged(bool state, void*);
     static void _PanelDeletedCallback(const MString& panelName, void* data);
     static void _TimeChangedCallback(void* data);
-    static void _AnimationRangeChangedCallback(void* data);
     static void _RendererChangedCallback(
         const MString& panelName,
         const MString& oldRenderer,
@@ -289,7 +287,6 @@ private:
     MCallbackIdArray                                          _callbacks;
     MCallbackId                                               _timerCallback = 0;
     MCallbackId                                               _timeChangeCallback = 0;
-    MCallbackId                                               _animationRangeChangeCallback = 0;
     PanelCallbacksList                                        _renderPanelCallbacks;
     const MtohRenderGlobals&                                  _globals;
 
@@ -351,8 +348,6 @@ private:
     Fvp::PurposeFilteringSceneIndexRefPtr     _purposeFilteringSceneIndex;
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
     HdsiSceneGlobalsSceneIndexRefPtr                  _sceneGlobalsSceneIndex;
-    Fvp::AnimatedPrimInvalidationSceneIndexRefPtr _animatedPrimInvalidationSceneIndex;
-    
 
     // Naming this identifier _ufeSelection clashes with UFE's selection.h
     // include guard and produces

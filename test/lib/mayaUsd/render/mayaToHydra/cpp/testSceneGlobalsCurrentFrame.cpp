@@ -55,6 +55,10 @@ TEST(TestSceneGlobalsCurrentFrame, SyncWithMayaTime)
     ASSERT_GT(si.size(), 0u) << "No terminal scene indices found. Make sure Maya Hydra with Storm is active.";
     auto siRoot = si.front();
 
+    // Set up an observer to track dirty notifications
+    // This will verify that SetCurrentFrame sends dirty notifications
+    SceneIndexNotificationsAccumulator observer(siRoot);
+
     // Use a practical tolerance for comparing Maya time / Hydra values.
     // This accounts for unit conversion and float/double rounding errors.
     // Using 1e-3 frames (0.001) as a reasonable tolerance for frame comparisons.
@@ -64,7 +68,14 @@ TEST(TestSceneGlobalsCurrentFrame, SyncWithMayaTime)
     // via the timeChanged callback registered in renderOverride
     constexpr double testFrames[] = {0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 0.0};
 
+    // Get the expected scene globals path and locator for dirty notifications
+    const SdfPath sceneGlobalsPath = HdSceneGlobalsSchema::GetDefaultPrimPath();
+    const HdDataSourceLocator currentFrameLocator = HdSceneGlobalsSchema::GetCurrentFrameLocator();
+
     for (double testFrame : testFrames) {
+        // Track the number of dirty notifications before changing frame
+        const size_t dirtiedCountBefore = observer.GetDirtiedPrimEntries().size();
+        
         // Change Maya's current frame - this should trigger the timeChanged callback
         // which calls _SetCurrentFrameInHydraGlobalSceneIndex()
         ASSERT_EQ(MGlobal::viewFrame(testFrame), MS::kSuccess);
@@ -87,5 +98,32 @@ TEST(TestSceneGlobalsCurrentFrame, SyncWithMayaTime)
         EXPECT_NEAR(mayaFrame, hydraFrame, frameTolerance)
             << "Hydra frame (" << hydraFrame << ") does not match Maya frame (" << mayaFrame 
             << ") after changing to frame " << testFrame << ". The timeChanged callback may not be working correctly.";
+
+        // Verify that we received a dirty notification for the scene globals prim
+        // When SetCurrentFrame is called on the scene globals scene index, it should send:
+        // _SendPrimsDirtied({{HdSceneGlobalsSchema::GetDefaultPrimPath(), HdSceneGlobalsSchema::GetCurrentFrameLocator()}})
+        const auto& dirtiedEntries = observer.GetDirtiedPrimEntries();
+        
+        // Check if we received new dirty notifications
+        EXPECT_GT(dirtiedEntries.size(), dirtiedCountBefore)
+            << "Expected new dirty notifications after changing to frame " << testFrame 
+            << ". SetCurrentFrame should send dirty notifications.";
+        
+        // Find dirty notifications for the scene globals prim with the currentFrame locator
+        bool foundSceneGlobalsDirty = false;
+        for (const auto& dirtiedEntry : dirtiedEntries) {
+            if (dirtiedEntry.primPath == sceneGlobalsPath) {
+                // Check if the currentFrame locator is in the dirty locators
+                if (dirtiedEntry.dirtyLocators.Contains(currentFrameLocator)) {
+                    foundSceneGlobalsDirty = true;
+                    break;
+                }
+            }
+        }
+        
+        EXPECT_TRUE(foundSceneGlobalsDirty)
+            << "Expected dirty notification for scene globals prim (" << sceneGlobalsPath 
+            << ") with currentFrame locator (" << currentFrameLocator << ") after changing to frame " 
+            << testFrame << ". SetCurrentFrame should send a dirty notification.";
     }
 }

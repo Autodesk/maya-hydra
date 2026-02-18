@@ -365,11 +365,6 @@ MtohRenderOverride::~MtohRenderOverride()
         _timeChangeCallback = 0;
     }
 
-    if (_animationRangeChangeCallback) {
-        MMessage::removeCallback(_animationRangeChangeCallback);
-        _animationRangeChangeCallback = 0;
-    }
-
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
     if (_viewSelectedChangedCb) {
         MMessage::removeCallback(_viewSelectedChangedCb);
@@ -1532,10 +1527,6 @@ void MtohRenderOverride::_InitHydraResources(
     _mayaViewportSceneIndex = MayaViewportSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain, _mayaHydraSceneIndex);
     _inputSceneIndexOfFilteringSceneIndicesChain = _mayaViewportSceneIndex;
 
-    // Add animated prim invalidation scene index to track and invalidate animated prims when time changes
-    _animatedPrimInvalidationSceneIndex = Fvp::AnimatedPrimInvalidationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
-    _inputSceneIndexOfFilteringSceneIndicesChain = _animatedPrimInvalidationSceneIndex;
-
     // As of 13-Nov-2025, order of operations in _InitHydraResources() is such
     // that render globals are initialized after this method is called.  Thus
     // the included purposes attributes do not yet exist on the
@@ -1688,16 +1679,11 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     
     // Reset scene index refs to prevent use-after-destroy in callbacks
     _sceneGlobalsSceneIndex.Reset();
-    _animatedPrimInvalidationSceneIndex.Reset();
     
     // Unregister Maya event callbacks to prevent them from firing on cleared resources
     if (_timeChangeCallback) {
         MMessage::removeCallback(_timeChangeCallback);
         _timeChangeCallback = 0;
-    }
-    if (_animationRangeChangeCallback) {
-        MMessage::removeCallback(_animationRangeChangeCallback);
-        _animationRangeChangeCallback = 0;
     }
     
     _initializationSucceeded = false;
@@ -1798,25 +1784,6 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _mayaViewportSceneIndex->SetLightsManagementSceneIndex(_lightsManagementSceneIndex);
 
     _lastFilteringSceneIndexBeforeCustomFiltering = _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
-
-    // Set animation time range on the animated prim invalidation scene index
-    if (_animatedPrimInvalidationSceneIndex) {
-        const MTime  minTime = MAnimControl::minTime();
-        const MTime  maxTime = MAnimControl::maxTime();
-        const double startTime = minTime.value();
-        const double endTime = maxTime.value();
-        _animatedPrimInvalidationSceneIndex->SetAnimationTimeRange(startTime, endTime);
-
-        // Register animation range change callback if not already registered
-        if (_animationRangeChangeCallback == 0) {
-            MStatus status;
-            _animationRangeChangeCallback = MEventMessage::addEventCallback(
-                "playbackRangeChanged", _AnimationRangeChangedCallback, this, &status);
-            if (!status) {
-                TF_WARN("Failed to register animation range change callback");
-            }
-        }
-    }
 
     // Set initial frame from Maya when scene globals scene index is created
     if (_sceneGlobalsSceneIndex) {
@@ -2325,51 +2292,6 @@ void MtohRenderOverride::_TimeChangedCallback(void* data)
 
     // Update frame in Hydra scene globals scene index
     instance->_SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
-
-    // Invalidate animated prims at the current frame using the animated prim invalidation scene index
-    // This ensures only prims with time-varying attributes at the current frame are invalidated
-    if (instance->_animatedPrimInvalidationSceneIndex) {
-        instance->_animatedPrimInvalidationSceneIndex->InvalidateAnimatedPrimsAtCurrentFrame(currentFrame);
-    }
-}
-
-void MtohRenderOverride::_AnimationRangeChangedCallback(void* data)
-{
-    if (MFileIO::isOpeningFile()) {
-        return;
-    }
-
-    auto* instance = reinterpret_cast<MtohRenderOverride*>(data);
-    if (!TF_VERIFY(instance)) {
-        return;
-    }
-
-    // Guard against use-after-destroy: don't access scene indices if Hydra resources are not initialized
-    if (!instance->_initializationSucceeded) {
-        return;
-    }
-
-    // Update animation time range when Maya's playback range changes
-    if (instance->_animatedPrimInvalidationSceneIndex) {
-        const MTime minTime = MAnimControl::minTime();
-        const MTime maxTime = MAnimControl::maxTime();
-        const double startTime = minTime.value();
-        const double endTime = maxTime.value();
-        
-        // Check if we're doing a "file new" operation
-        // During "file new", don't refresh the cache as the scene is being cleared
-        const bool isNewingFile = MFileIO::isNewingFile();
-        
-        if (isNewingFile) {
-            // During "file new", just update the range and clear the cache
-            // Don't refresh the cache as the scene is being cleared
-            instance->_animatedPrimInvalidationSceneIndex->SetAnimationTimeRange(startTime, endTime, false);
-            instance->_animatedPrimInvalidationSceneIndex->ClearAnimatedPrimsCache();
-        } else {
-            // Normal case: update range and refresh cache
-            instance->_animatedPrimInvalidationSceneIndex->SetAnimationTimeRange(startTime, endTime, true);
-        }
-    }
 }
 
 void MtohRenderOverride::_RendererChangedCallback(
