@@ -315,43 +315,6 @@ GfVec2i GetResolutionFromUsdRenderSettings(const UsdRenderSettings& usdRenderSet
     return resolution;
 }
 
-std::vector<MTime> GetRenderTimesFromStage(const UsdStageRefPtr& stage)
-{
-    std::vector<MTime> times;
-    if (!stage || !stage->HasAuthoredTimeCodeRange()) {
-        TF_DEBUG_MSG(
-            MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-            "USD stage has no authored time range; returning empty.\n");
-        return {};
-    }
-
-    const double startTimeCode = stage->GetStartTimeCode();
-    const double endTimeCode = stage->GetEndTimeCode();
-    const double timeCodesPerSecond = stage->GetTimeCodesPerSecond();
-    const double framesPerSecond = stage->GetFramesPerSecond();
-
-    TF_DEBUG_MSG(
-        MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-        "USD time range from stage: start=%f end=%f tcps=%f fps=%f\n",
-        startTimeCode,
-        endTimeCode,
-        timeCodesPerSecond,
-        framesPerSecond);
-
-    if (endTimeCode < startTimeCode) {
-        TF_WARN("GetRenderTimesFromStage: USD time range invalid; "
-                "endTimeCode < startTimeCode.\n");
-        return times;
-    }
-
-    const double timeStep = 1.0;
-    for (double timeCode = startTimeCode; timeCode <= endTimeCode; timeCode += timeStep) {
-        times.emplace_back(timeCode, MTime::uiUnit());
-    }
-
-    return times;
-}
-
 } // namespace
 
 namespace MAYAHYDRA_NS_DEF {

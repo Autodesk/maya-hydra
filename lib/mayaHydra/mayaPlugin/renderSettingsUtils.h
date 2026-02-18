@@ -19,15 +19,24 @@
 
 #include <mayaHydraLib/mayaHydra.h>
 
+#include <maya/MTime.h>
+
 #include <ufe/sceneItemList.h>
 
 #include <pxr/pxr.h>
+#include <pxr/base/tf/token.h>
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdRender/settings.h>
+
+#include <vector>
 
 namespace UFE_VERSIONED_NS {
 class Path;
 }
+
+PXR_NAMESPACE_OPEN_SCOPE
+class HdRenderIndex;
+PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
 
@@ -55,6 +64,13 @@ Ufe::Path ExtractUsdRenderSettingsFromScene(PXR_NS::UsdRenderSettings& usdRender
 
 // Get the path to the active Hydra render settings prim from the Maya scene.
 PXR_NS::SdfPath GetActiveRenderSettingsPrimHydraPathFromScene();
+
+// Get render output tokens from the active Hydra render settings prim.
+PXR_NS::TfTokenVector GetRenderOutputsFromActiveRenderSettings(
+    const PXR_NS::HdRenderIndex* renderIndex);
+
+// Get render times from the USD stage time range.
+std::vector<MTime> GetRenderTimesFromStage(const PXR_NS::UsdStageRefPtr& stage);
 
 } // namespace MAYAHYDRA_NS_DEF
 

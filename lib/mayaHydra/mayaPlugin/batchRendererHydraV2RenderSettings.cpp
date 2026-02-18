@@ -17,8 +17,12 @@
 #include "batchRendererHydraV2RenderSettings.h"
 
 #include "pluginDebugCodes.h"
+#include "renderSettingsUtils.h"
 
 #include <pxr/base/tf/diagnostic.h>
+#include <pxr/imaging/hd/renderBuffer.h>
+#include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hdx/renderTask.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -45,6 +49,40 @@ MStatus BatchRendererHydraV2RenderSettings::Render(BatchRenderer& renderer)
     // all we want is to call it once, then call _Execute() repeatedly.
     renderer._ExecuteHydraBatchRenderFrame();
 
+    //Need to check for convergence and repeatedly call renderer._engine.Execute
+    TfTokenVector renderOutputs = GetRenderOutputsFromActiveRenderSettings(renderer.renderIndex());
+    if (renderOutputs.empty()) {
+        renderOutputs = { HdAovTokens->color };
+        TF_WARN("No render outputs found; defaulting to '%s'.", HdAovTokens->color.GetText());
+    }
+
+    auto isConverged = [&renderer, &renderOutputs]() {
+        // All AOVs must be converged
+        for (const TfToken& aovToken : renderOutputs) {
+            auto renderBuffer = renderer._taskController->GetRenderOutput(aovToken);
+            if (!renderBuffer) {
+                TF_WARN("Render output '%s' not found; ignoring.", aovToken.GetText());
+                continue;
+            }
+            if (!renderBuffer->IsConverged()) {
+                return false;
+            }
+        }
+        return true;
+    };
+    renderer._isConverged = isConverged();
+
+    // Render to convergence.
+    constexpr auto wait100ms = std::chrono::duration<float, std::milli>(100);
+    while (!renderer._isConverged) {
+        std::this_thread::sleep_for(wait100ms);
+
+        // See _ExecuteHydraBatchRenderFrame() comment.
+        HdTaskSharedPtrVector tasks = renderer._taskController->GetRenderingTasks();
+
+        renderer._engine.Execute(renderer._renderIndex, &tasks);
+        renderer._isConverged = isConverged();
+    }
     return MStatus::kSuccess;
 }
 
