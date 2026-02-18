@@ -33,6 +33,7 @@ target_sources(${TARGET_NAME}
         testFlowViewportAPIAddPrims.cpp
         testUsdStageLayerMuting.cpp
         testMeshAdapterTransform.cpp
+        testCustomAttributeDirtying.cpp
         testFlowViewportAPIFilterPrims.cpp
         testSceneCorrectness.cpp
         testSelection.cpp
