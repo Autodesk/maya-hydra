@@ -129,6 +129,115 @@ GfMatrix4d ToGfMatrix(const MMatrix& mayaMat)
     return mat;
 }
 
+constexpr double kDoubleEps = 1e-6;
+constexpr float  kFloatEps = 1e-5f;
+
+template <typename T>
+void ExpectNearScalar(const T& actual, const T& expected, double eps)
+{
+    EXPECT_NEAR(actual, expected, eps);
+}
+
+template <typename T>
+void ComparePrimvarValue(const T& actual, const T& expected)
+{
+    EXPECT_EQ(actual, expected);
+}
+
+void ComparePrimvarValue(const float& actual, const float& expected)
+{
+    ExpectNearScalar(actual, expected, kFloatEps);
+}
+
+void ComparePrimvarValue(const double& actual, const double& expected)
+{
+    ExpectNearScalar(actual, expected, kDoubleEps);
+}
+
+void ComparePrimvarValue(const GfVec2f& actual, const GfVec2f& expected)
+{
+    for (int i = 0; i < 2; ++i) {
+        ExpectNearScalar(actual[i], expected[i], kFloatEps);
+    }
+}
+
+void ComparePrimvarValue(const GfVec3f& actual, const GfVec3f& expected)
+{
+    for (int i = 0; i < 3; ++i) {
+        ExpectNearScalar(actual[i], expected[i], kFloatEps);
+    }
+}
+
+void ComparePrimvarValue(const GfVec2d& actual, const GfVec2d& expected)
+{
+    for (int i = 0; i < 2; ++i) {
+        ExpectNearScalar(actual[i], expected[i], kDoubleEps);
+    }
+}
+
+void ComparePrimvarValue(const GfVec3d& actual, const GfVec3d& expected)
+{
+    for (int i = 0; i < 3; ++i) {
+        ExpectNearScalar(actual[i], expected[i], kDoubleEps);
+    }
+}
+
+void ComparePrimvarValue(const GfVec4d& actual, const GfVec4d& expected)
+{
+    for (int i = 0; i < 4; ++i) {
+        ExpectNearScalar(actual[i], expected[i], kDoubleEps);
+    }
+}
+
+void ComparePrimvarValue(const GfMatrix4d& actual, const GfMatrix4d& expected)
+{
+    for (int row = 0; row < 4; ++row) {
+        for (int col = 0; col < 4; ++col) {
+            ExpectNearScalar(actual[row][col], expected[row][col], kDoubleEps);
+        }
+    }
+}
+
+void ComparePrimvarValue(const VtFloatArray& actual, const VtFloatArray& expected)
+{
+    ASSERT_EQ(actual.size(), expected.size());
+    for (size_t i = 0; i < actual.size(); ++i) {
+        ExpectNearScalar(actual[i], expected[i], kFloatEps);
+    }
+}
+
+void ComparePrimvarValue(const VtDoubleArray& actual, const VtDoubleArray& expected)
+{
+    ASSERT_EQ(actual.size(), expected.size());
+    for (size_t i = 0; i < actual.size(); ++i) {
+        ExpectNearScalar(actual[i], expected[i], kDoubleEps);
+    }
+}
+
+void ComparePrimvarValue(const VtArray<GfVec3d>& actual, const VtArray<GfVec3d>& expected)
+{
+    ASSERT_EQ(actual.size(), expected.size());
+    for (size_t i = 0; i < actual.size(); ++i) {
+        ComparePrimvarValue(actual[i], expected[i]);
+    }
+}
+
+void ComparePrimvarValue(const VtArray<GfVec4d>& actual, const VtArray<GfVec4d>& expected)
+{
+    ASSERT_EQ(actual.size(), expected.size());
+    for (size_t i = 0; i < actual.size(); ++i) {
+        ComparePrimvarValue(actual[i], expected[i]);
+    }
+}
+
+void ComparePrimvarValue(const VtArray<GfMatrix4d>& actual, const VtArray<GfMatrix4d>& expected)
+{
+    ASSERT_EQ(actual.size(), expected.size());
+    for (size_t i = 0; i < actual.size(); ++i) {
+        ComparePrimvarValue(actual[i], expected[i]);
+    }
+}
+
 // Assert that a primvar exists and matches the expected value.
 template <typename T>
 void ExpectPrimvarValue(const HdSceneIndexPrim& prim, const TfToken& name, const T& expected)
@@ -153,7 +262,7 @@ void ExpectPrimvarValue(const HdSceneIndexPrim& prim, const TfToken& name, const
     ASSERT_TRUE(valueDs);
     VtValue value = valueDs->GetValue(0.0f);
     ASSERT_TRUE(value.IsHolding<T>());
-    EXPECT_EQ(value.UncheckedGet<T>(), expected);
+    ComparePrimvarValue(value.UncheckedGet<T>(), expected);
 }
 
 // Fetch a typed attribute plug if present.

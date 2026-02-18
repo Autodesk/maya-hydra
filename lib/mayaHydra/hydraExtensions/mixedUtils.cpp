@@ -1468,6 +1468,8 @@ void GetExtensionAttributesFromNode(
                 } break;
                 case MFnNumericData::kShort: {
                     auto  value = attrPlug.asShort();
+                    // Maya has no default value as a short, so use an int and cast it later into a
+                    // short
                     int defaultVal = 0;
                     numericAttr.getDefault(defaultVal);
                     UpdateAttrs<short>(

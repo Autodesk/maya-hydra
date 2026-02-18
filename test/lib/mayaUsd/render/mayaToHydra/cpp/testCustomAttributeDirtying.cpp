@@ -48,15 +48,6 @@ std::string GetOptionVarOrDefault(const char* optionVar, const char* fallback)
     return fallback;
 }
 
-bool AttrExists(const std::string& nodeName)
-{
-    int exists = 0;
-    const std::string cmd = std::string("attributeQuery -exists -node \"")
-        + nodeName + "\" " + kAttrName;
-    MGlobal::executeCommand(cmd.c_str(), exists);
-    return exists != 0;
-}
-
 void SetAttrAndRefresh(const std::string& nodeName, double value)
 {
     const std::string cmd = std::string("setAttr \"")
