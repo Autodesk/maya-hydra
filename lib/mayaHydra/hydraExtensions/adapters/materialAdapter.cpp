@@ -270,8 +270,8 @@ private:
 
         // Fetch the "renderDocument" attribute from the node
         static const MString renderDocumentStr("renderDocument");  
-        auto mtlxDocPlug = node.findPlug(renderDocumentStr, true, &status);
-        if (!status) {
+        auto mtlxDocPlug = node.findPlug(renderDocumentStr, true);
+        if (mtlxDocPlug.isNull()) {
             return false;
         }
 

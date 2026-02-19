@@ -62,8 +62,8 @@ bool IsUfeItemFromMayaUsd(const MDagPath& dagPath, MStatus* returnStatus)
     static const MString mayaUsdUfeRuntimeName = "USD";
 
     MFnDagNode dagNode(dagPath);
-    MStatus    ufePlugSearchStatus;
-    MPlug ufeRuntimePlug = dagNode.findPlug(ufeRuntimeAttributeName, false, &ufePlugSearchStatus);
+    MPlug ufeRuntimePlug = dagNode.findPlug(ufeRuntimeAttributeName, false);
+    MStatus ufePlugSearchStatus = ufeRuntimePlug.isNull() ? MS::kFailure : MS::kSuccess;
     if (returnStatus) {
         *returnStatus = ufePlugSearchStatus;
     }
