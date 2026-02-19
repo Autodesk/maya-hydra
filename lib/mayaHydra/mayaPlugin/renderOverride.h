@@ -74,6 +74,7 @@
 #include <pxr/imaging/hd/pluginRenderDelegateUniqueHandle.h>
 #include <pxr/imaging/hdSt/renderDelegate.h>
 #include <pxr/imaging/hdx/taskController.h>
+#include <pxr/imaging/hdsi/sceneGlobalsSceneIndex.h>
 #include <pxr/pxr.h>
 
 #include <maya/MCallbackIdArray.h>
@@ -211,6 +212,8 @@ private:
     HdRenderDelegate* _GetRenderDelegate(int renderPassIndex = 0);
     HdRenderDelegate* _GetRenderDelegate(int renderPassIndex = 0) const;
     void              _ClearMayaHydraSceneIndex();
+    void              _SetCurrentFrameInHydraGlobalSceneIndex(double currentFrame);
+
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
     HdSceneIndexBaseRefPtr _CreatePassFilteringSceneIndex(Fvp::FramePassDataPtr& filteringData);
@@ -261,6 +264,7 @@ private:
     static void _TimerCallback(float, float, void* data);
     static void _PlayblastingChanged(bool state, void*);
     static void _PanelDeletedCallback(const MString& panelName, void* data);
+    static void _TimeChangedCallback(void* data);
     static void _RendererChangedCallback(
         const MString& panelName,
         const MString& oldRenderer,
@@ -282,6 +286,7 @@ private:
     std::vector<std::unique_ptr<MHWRender::MRenderOperation>> _operations;
     MCallbackIdArray                                          _callbacks;
     MCallbackId                                               _timerCallback = 0;
+    MCallbackId                                               _timeChangeCallback = 0;
     PanelCallbacksList                                        _renderPanelCallbacks;
     const MtohRenderGlobals&                                  _globals;
 
@@ -342,6 +347,7 @@ private:
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     Fvp::PurposeFilteringSceneIndexRefPtr     _purposeFilteringSceneIndex;
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
+    HdsiSceneGlobalsSceneIndexRefPtr                  _sceneGlobalsSceneIndex;
 
     // Naming this identifier _ufeSelection clashes with UFE's selection.h
     // include guard and produces
