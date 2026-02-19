@@ -109,9 +109,12 @@ TEST(TestSceneGlobalsCurrentFrame, SyncWithMayaTime)
             << "Expected new dirty notifications after changing to frame " << testFrame 
             << ". SetCurrentFrame should send dirty notifications.";
         
-        // Find dirty notifications for the scene globals prim with the currentFrame locator
+        // Only check newly-added dirty entries since dirtiedCountBefore to verify per-frame behavior
+        // This ensures we're checking the dirty notification for this specific frame change,
+        // not accumulated entries from previous iterations
         bool foundSceneGlobalsDirty = false;
-        for (const auto& dirtiedEntry : dirtiedEntries) {
+        for (size_t i = dirtiedCountBefore; i < dirtiedEntries.size(); ++i) {
+            const auto& dirtiedEntry = dirtiedEntries[i];
             if (dirtiedEntry.primPath == sceneGlobalsPath) {
                 // Check if the currentFrame locator is in the dirty locators
                 if (dirtiedEntry.dirtyLocators.Contains(currentFrameLocator)) {

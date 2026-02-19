@@ -24,8 +24,9 @@ class TestSceneGlobalsCurrentFrame(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     def test_SyncWithMayaTime(self):
+        self.setHdStormRenderer()
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest("", f="TestSceneGlobalsCurrentFrame.SyncWithMayaTime")
+            cmds.mayaHydraCppTest(f="TestSceneGlobalsCurrentFrame.SyncWithMayaTime")
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

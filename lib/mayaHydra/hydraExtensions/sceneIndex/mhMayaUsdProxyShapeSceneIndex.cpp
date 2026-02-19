@@ -320,7 +320,10 @@ Ufe::Path MayaUsdProxyShapeSceneIndex::InterpretRprimPath(
 {
     if (MayaUsdProxyShapeSceneIndexRefPtr proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(sceneIndex)) {
         MDagPath dagPath;
-        MDagPath::getAPathTo(proxyShapeSceneIndex->_dagNodeHandle.object(), dagPath);
+        MStatus status = MDagPath::getAPathTo(proxyShapeSceneIndex->_dagNodeHandle.object(), dagPath);
+        if (status != MS::kSuccess || !dagPath.isValid()) {
+            return Ufe::Path();
+        }
         return Ufe::Path(
             { UfeExtensions::dagPathToUfePathSegment(dagPath), UfeExtensions::sdfPathToUfePathSegment(path,  UfeExtensions::getUsdRunTimeId()) });
     }
