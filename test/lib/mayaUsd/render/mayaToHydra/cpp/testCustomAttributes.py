@@ -503,5 +503,10 @@ class TestCustomAttributes(mtohUtils.MayaHydraBaseTestCase):
         if self._has_typed_numeric:
             self.runCppTest("CustomAttributes.extensionAttributeTypedNumeric")
 
+    # Run the C++ test that validates enum label primvars.
+    def test_extensionAttributeEnumLabels(self):
+        self.setupScene()
+        self.runCppTest("CustomAttributes.extensionAttributeEnumLabels")
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
