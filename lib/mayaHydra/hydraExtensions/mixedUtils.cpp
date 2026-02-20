@@ -81,7 +81,9 @@ namespace MAYAHYDRA_NS_DEF {
 // OptionVar to emit enum primvars as label tokens instead of integer values.
 constexpr const char* kExtEnumUseLabelsOptionVar = "mayaHydraExtensionEnumUseLabels";
 
-bool UseEnumLabelsForExtensionAttrs()
+// Extension attributes are defined on node types (often by plugins). Dynamic attributes
+// are user-authored per-node (e.g., via addAttr) and are not part of the type definition.
+bool UseEnumLabelsForExtensionAndDynamicAttrs()
 {
     if (MGlobal::optionVarExists(kExtEnumUseLabelsOptionVar)) {
         return MGlobal::optionVarIntValue(kExtEnumUseLabelsOptionVar) != 0;
@@ -1043,7 +1045,9 @@ PXR_NS::TfToken GetGeomSubsetsPickMode()
 }
 
 // Populate a dictionary with extension/dynamic attribute values.
-void GetExtensionAttributesFromNode(
+// Extension attributes are defined on node types (often by plugins). Dynamic attributes
+// are user-authored per-node (e.g., via addAttr) and are not part of the type definition.
+void GetExtensionAndDynamicAttributesFromNode(
     const MObject& node, PXR_NS::VtDictionary& attrs)
 {
     MStatus           status;
@@ -1068,7 +1072,7 @@ void GetExtensionAttributesFromNode(
                 short            value = attrPlug.asShort();
                 short            defaultVal = 0;
                 enumAttr.getDefault(defaultVal);
-                if (UseEnumLabelsForExtensionAttrs()) {
+                if (UseEnumLabelsForExtensionAndDynamicAttrs()) {
                     const MString label = enumAttr.fieldName(value);
                     const MString defaultLabel = enumAttr.fieldName(defaultVal);
                     if (!label.length() || !defaultLabel.length()) {

@@ -136,7 +136,9 @@ HdPrimvarDescriptorVector MayaHydraAdapter::GetPrimvarDescriptors(HdInterpolatio
         if (_extAttrMapNeedUpdate) {
             // Apply a global lock to avoid race condition while doing parallel DG node evaluation.
             std::lock_guard<LockType> lock(dg_access_mutex);
-            MAYAHYDRA_NS::GetExtensionAttributesFromNode(GetNode(), _extAttrNameToValueMap);
+            MAYAHYDRA_NS::GetExtensionAndDynamicAttributesFromNode(
+                GetNode(),
+                _extAttrNameToValueMap);
             _extAttrMapNeedUpdate = false;
         }
         // Use constant interpolation and none role for all primvars
@@ -149,6 +151,8 @@ HdPrimvarDescriptorVector MayaHydraAdapter::GetPrimvarDescriptors(HdInterpolatio
     return HdPrimvarDescriptorVector();
 }
 
+// Extension attributes are defined on node types (often by plugins). Dynamic attributes
+// are user-authored per-node (e.g., via addAttr) and are not part of the type definition.
 void MayaHydraAdapter::HandleExtensionAndDynamicAttributesDirty(const MPlug& plug)
 {
     MStatus status;
