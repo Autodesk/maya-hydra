@@ -149,7 +149,7 @@ HdPrimvarDescriptorVector MayaHydraAdapter::GetPrimvarDescriptors(HdInterpolatio
     return HdPrimvarDescriptorVector();
 }
 
-void MayaHydraAdapter::HandleExtensionAttributesDirty(const MPlug& plug)
+void MayaHydraAdapter::HandleExtensionAndDynamicAttributesDirty(const MPlug& plug)
 {
     MStatus status;
     MObject attrObj = plug.attribute(&status);

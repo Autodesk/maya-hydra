@@ -625,7 +625,7 @@ void MayaHydraRenderItemAdapter::CreateCallbacks()
         +[](MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
             auto* adapter = reinterpret_cast<MayaHydraRenderItemAdapter*>(clientData);
             // Handle extension attributes change
-            adapter->HandleExtensionAttributesDirty(plug);
+            adapter->HandleExtensionAndDynamicAttributesDirty(plug);
         },
         reinterpret_cast<void*>(this),
         &status);

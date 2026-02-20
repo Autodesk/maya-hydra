@@ -211,7 +211,7 @@ private:
     {
         auto* adapter = reinterpret_cast<MayaHydraShadingEngineAdapter*>(clientData);
         // Handle extension attributes change
-        adapter->HandleExtensionAttributesDirty(plug);
+        adapter->HandleExtensionAndDynamicAttributesDirty(plug);
     }
     static void _DirtyShaderParams(MObject& /*node*/, void* clientData)
     {

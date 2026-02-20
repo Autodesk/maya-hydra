@@ -77,7 +77,7 @@ void _changeVisibility(
     }
 
     // Handle extension attributes change
-    adapter->HandleExtensionAttributesDirty(plug);
+    adapter->HandleExtensionAndDynamicAttributesDirty(plug);
 }
 
 void _dirtyTransform(MObject& node, void* clientData)
