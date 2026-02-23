@@ -226,7 +226,7 @@ private:
         }
 
         // Handle extension attributes change
-        adapter->HandleExtensionAttributesDirty(plug);
+        adapter->HandleExtensionAndDynamicAttributesDirty(plug);
     }
 
     static void TopologyChangedCallback(MObject& node, void* clientData)

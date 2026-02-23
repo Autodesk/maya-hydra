@@ -87,7 +87,7 @@ public:
 
     bool IsPopulated() const { return _isPopulated; }
 
-    void HandleExtensionAttributesDirty(const MPlug& plug);
+    void HandleExtensionAndDynamicAttributesDirty(const MPlug& plug);
 
     MAYAHYDRALIB_API
     virtual HdMeshTopology GetMeshTopology() { return {}; }

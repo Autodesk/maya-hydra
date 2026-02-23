@@ -100,6 +100,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testGeomSubsetsPicking.py
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
+    cpp/testCustomAttributeDirtying.py
     cpp/testUsdStageInvalidate.py
     cpp/testCamera.py
     cpp/testCustomAttributes.py|depOnPlugins:mtoa

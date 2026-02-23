@@ -27,6 +27,7 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
 
 #include <pxr/base/tf/envSetting.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
@@ -903,6 +904,9 @@ void MayaHydraSceneIndex::_MarkPrimDirty(
     HdSceneIndexPrim       prim = GetPrim(id);
     HdDataSourceLocatorSet locators;
     dirtyBitsToLocatorsFunc(prim.primType, dirtyBits, &locators);
+    if (dirtyBits & HdChangeTracker::DirtyPrimvar) {
+        locators.append(HdPrimvarsSchema::GetDefaultLocator());
+    }
     if (!locators.IsEmpty()) {
         DirtyPrims({ { id, locators } });
     }

@@ -27,9 +27,11 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace MayaHydra;
 
+// Unit test: validates default Arnold attributes are exposed as Hydra primvars.
 namespace {
 HdDataSourceLocator primvarsLocator = HdPrimvarsSchema::GetDefaultLocator();
 
+// Build a predicate to find a prim by name and type.
 FindPrimPredicate getPrimPredicate(const std::string& primName, const TfToken& primType)
 {
     return [primName,
@@ -42,6 +44,7 @@ FindPrimPredicate getPrimPredicate(const std::string& primName, const TfToken& p
     };
 }
 
+// Validate default Arnold attributes are exposed as primvars.
 TEST(CustomAttributes, defaultArnoldCustomAttributes)
 { 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();

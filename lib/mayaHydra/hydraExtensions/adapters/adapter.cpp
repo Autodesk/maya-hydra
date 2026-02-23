@@ -136,7 +136,9 @@ HdPrimvarDescriptorVector MayaHydraAdapter::GetPrimvarDescriptors(HdInterpolatio
         if (_extAttrMapNeedUpdate) {
             // Apply a global lock to avoid race condition while doing parallel DG node evaluation.
             std::lock_guard<LockType> lock(dg_access_mutex);
-            MAYAHYDRA_NS::GetExtensionAttributesFromNode(GetNode(), _extAttrNameToValueMap);
+            MAYAHYDRA_NS::GetExtensionAndDynamicAttributesFromNode(
+                GetNode(),
+                _extAttrNameToValueMap);
             _extAttrMapNeedUpdate = false;
         }
         // Use constant interpolation and none role for all primvars
@@ -149,13 +151,15 @@ HdPrimvarDescriptorVector MayaHydraAdapter::GetPrimvarDescriptors(HdInterpolatio
     return HdPrimvarDescriptorVector();
 }
 
-void MayaHydraAdapter::HandleExtensionAttributesDirty(const MPlug& plug)
+// Extension attributes are defined on node types (often by plugins). Dynamic attributes
+// are user-authored per-node (e.g., via addAttr) and are not part of the type definition.
+void MayaHydraAdapter::HandleExtensionAndDynamicAttributesDirty(const MPlug& plug)
 {
     MStatus status;
     MObject attrObj = plug.attribute(&status);
     if (status) {
         MFnAttribute fnAttr(attrObj);
-        if (fnAttr.isExtension()) {
+        if (fnAttr.isExtension() || fnAttr.isDynamic()) {
             _extAttrMapNeedUpdate = true;
             // Notify the change tracker that the primvars have changed.
             // Note there's no fine grained dirty notification mechanism on primvars yet,
