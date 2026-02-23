@@ -25,6 +25,7 @@
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/light.h>
+#include <pxr/imaging/hd/changeTracker.h>
 #include <pxr/imaging/hdx/simpleLightTask.h>
 #include <pxr/usd/usdLux/tokens.h>
 
@@ -76,7 +77,7 @@ void _changeVisibility(
     }
 
     // Handle extension attributes change
-    adapter->HandleExtensionAttributesDirty(plug);
+    adapter->HandleExtensionAndDynamicAttributesDirty(plug);
 }
 
 void _dirtyTransform(MObject& node, void* clientData)
@@ -138,6 +139,10 @@ void MayaHydraLightAdapter::Populate()
 void MayaHydraLightAdapter::MarkDirty(HdDirtyBits dirtyBits)
 {
     if (_isPopulated && dirtyBits != 0) {
+        // We support extension-attribute primvars on lights, so keep DirtyPrimvar even though
+        // lights are sprims and normally only expose HdLight dirty bits.
+        const HdDirtyBits primvarBits = dirtyBits & HdChangeTracker::DirtyPrimvar;
+        dirtyBits = (dirtyBits & HdLight::AllDirty) | primvarBits;
         GetMayaHydraSceneIndex()->MarkSprimDirty(GetID(), dirtyBits);
     }
 }

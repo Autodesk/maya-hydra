@@ -22,6 +22,7 @@
 
 #include <pxr/base/gf/interval.h>
 #include <pxr/imaging/hd/camera.h>
+#include <pxr/imaging/hd/changeTracker.h>
 
 #include <maya/MDagMessage.h>
 #include <maya/MFnCamera.h>
@@ -79,7 +80,10 @@ void MayaHydraCameraAdapter::Populate()
 void MayaHydraCameraAdapter::MarkDirty(HdDirtyBits dirtyBits)
 {
     if (_isPopulated && dirtyBits != 0) {
-        dirtyBits = dirtyBits & HdCamera::AllDirty;
+        // We support extension-attribute primvars on cameras, so keep DirtyPrimvar even though
+        // cameras are sprims and normally only expose HdCamera dirty bits.
+        const HdDirtyBits primvarBits = dirtyBits & HdChangeTracker::DirtyPrimvar;
+        dirtyBits = (dirtyBits & HdCamera::AllDirty) | primvarBits;
         GetMayaHydraSceneIndex()->MarkSprimDirty(GetID(), dirtyBits);
     }
 }
@@ -108,7 +112,7 @@ void MayaHydraCameraAdapter::CreateCallbacks()
         +[](MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
             auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
             // Handle extension attributes change
-            adapter->HandleExtensionAttributesDirty(plug);
+            adapter->HandleExtensionAndDynamicAttributesDirty(plug);
         },
         reinterpret_cast<void*>(this),
         &status);
