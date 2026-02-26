@@ -115,10 +115,30 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
     HdSceneIndexPrim prim = inputSceneIndex->GetPrim(primPath);
 
     if (!isRprimType(prim.primType)) {
-        if (prim.primType == HdPrimTypeTokens->material 
-            && _materialUseCounts.find(primPath) == _materialUseCounts.end()) {
-            // Filter out unused materials
-            return true;
+        if (prim.primType == HdPrimTypeTokens->material) {
+            // With Hydra Generative Procedurals, the materials are still considered "unused" 
+            // by this step because the geometry hasn't been expanded yet. This ensures
+            // that materials that will be bound to procedural geometry are not filtered out.
+            bool                 hasProceduralParent = false;
+            static const TfToken generativeProceduralToken("hydraGenerativeProcedural");
+            static const TfToken resolvedGenerativeProceduralToken(
+                "resolvedHydraGenerativeProcedural");
+
+            SdfPath ancestorPath = primPath.GetParentPath();
+            while (!ancestorPath.IsAbsoluteRootPath() && !hasProceduralParent
+                   && !ancestorPath.IsEmpty()) {
+                const TfToken& ancestorType = inputSceneIndex->GetPrim(ancestorPath).primType;
+                if (ancestorType == generativeProceduralToken
+                    || ancestorType == resolvedGenerativeProceduralToken) {
+                    hasProceduralParent = true;
+                }
+                ancestorPath = ancestorPath.GetParentPath();
+            }
+        
+            if (_materialUseCounts.find(primPath) == _materialUseCounts.end() && !hasProceduralParent) {
+                // Filter out unused materials
+                return true;
+            }
         }
 
         if (_framePassData->_removeLights && HdPrimTypeIsLight(prim.primType)) {
