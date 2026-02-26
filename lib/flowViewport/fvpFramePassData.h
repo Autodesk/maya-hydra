@@ -18,8 +18,6 @@
 
 #include "flowViewport/api.h"
 
-#ifdef VIEWPORT_TOOLBOX
-
 #include <pxr/pxr.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/usd/sdf/path.h>
@@ -100,7 +98,5 @@ using FramePassConstDataPtr = std::shared_ptr<const FramePassData>;
 using FramePassDataPtrVector = std::vector<FramePassDataPtr>;
 
 }; // namespace FVP_NS_DEF
-
-#endif // VIEWPORT_TOOLBOX
 
 #endif // FLOW_VIEWPORT_FRAME_PASS_FILTERING_DATA_H

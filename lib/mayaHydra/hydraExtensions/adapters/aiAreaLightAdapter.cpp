@@ -69,7 +69,7 @@ void _lightShapeChangedCallBack(
     }
 
     // Handle extension attributes change
-    adapter->HandleExtensionAttributesDirty(plug);
+    adapter->HandleExtensionAndDynamicAttributesDirty(plug);
 }
 
 void _dirtyTransform(MObject& node, void* clientData)
@@ -119,8 +119,8 @@ public:
         }
 
         MString primitiveType = "quad";
-        MPlug   plug = depNode.findPlug("aiTranslator", true, &status);
-        if (status && !plug.isNull()) {
+        MPlug   plug = depNode.findPlug("aiTranslator", true);
+        if (!plug.isNull()) {
             primitiveType = plug.asString();
             if (primitiveType.length() == 0) {
                 return defaultLightType;
@@ -157,9 +157,9 @@ public:
         MString primitiveType = "quad";
         double  scale2[3] = { 1.0, 1.0, 1.0 };
 
-        MPlug                 plug = depNode.findPlug("aiTranslator", true, &status);
+        MPlug                 plug = depNode.findPlug("aiTranslator", true);
         MTransformationMatrix modelMatrix(GetDagPath().inclusiveMatrix());
-        if (status && !plug.isNull()) {
+        if (!plug.isNull()) {
             primitiveType = plug.asString();
             if (primitiveType.length() == 0)
                 primitiveType = "quad";

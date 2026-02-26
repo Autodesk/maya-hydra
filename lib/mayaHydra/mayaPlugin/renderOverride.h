@@ -74,6 +74,7 @@
 #include <pxr/imaging/hd/pluginRenderDelegateUniqueHandle.h>
 #include <pxr/imaging/hdSt/renderDelegate.h>
 #include <pxr/imaging/hdx/taskController.h>
+#include <pxr/imaging/hdsi/sceneGlobalsSceneIndex.h>
 #include <pxr/pxr.h>
 
 #include <maya/MCallbackIdArray.h>
@@ -122,14 +123,12 @@ public:
     /// one modelEditor panel.
     static std::vector<MString> AllActiveRendererNames();
 
-#ifdef VIEWPORT_TOOLBOX
     /// Returns the names of all AOVs made available by the render delegates
     /// for a given render pass index.
     /// TODO 2025-08-29 : This currently gathers AOVs from all viewports indiscriminately.
     /// Once we have proper multi-viewport support, we should also be able to
     /// specify which viewport to get the AOVs for.
     static TfTokenVector GetAvailableFramePassAovs(int passIndex);
-#endif
 
     static MtohRenderOverride* GetByName(TfToken rendererName);
 
@@ -213,12 +212,11 @@ private:
     HdRenderDelegate* _GetRenderDelegate(int renderPassIndex = 0);
     HdRenderDelegate* _GetRenderDelegate(int renderPassIndex = 0) const;
     void              _ClearMayaHydraSceneIndex();
+    void              _SetCurrentFrameInHydraGlobalSceneIndex(double currentFrame);
+
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
-#ifdef VIEWPORT_TOOLBOX
-    HdSceneIndexBaseRefPtr
-    _CreatePassFilteringSceneIndex(Fvp::FramePassDataPtr& filteringData);
-#endif
+    HdSceneIndexBaseRefPtr _CreatePassFilteringSceneIndex(Fvp::FramePassDataPtr& filteringData);
     VtValue _GetUsedGPUMemory() const;
 
     void _PickByRegion(
@@ -257,8 +255,6 @@ private:
 
     void _AddPluginSelectionHighlighting();
 
-    bool _NeedToRecreateTheSceneIndicesChain(unsigned int currentDisplayStyle);
-
     // Determine the pick handler which should handle a pick hit, to transform
     // the pick hit into a selection.
     MayaHydra::PickHandlerConstPtr _PickHandler(const MayaHydra::PickHit& hit) const;
@@ -268,6 +264,7 @@ private:
     static void _TimerCallback(float, float, void* data);
     static void _PlayblastingChanged(bool state, void*);
     static void _PanelDeletedCallback(const MString& panelName, void* data);
+    static void _TimeChangedCallback(void* data);
     static void _RendererChangedCallback(
         const MString& panelName,
         const MString& oldRenderer,
@@ -289,6 +286,7 @@ private:
     std::vector<std::unique_ptr<MHWRender::MRenderOperation>> _operations;
     MCallbackIdArray                                          _callbacks;
     MCallbackId                                               _timerCallback = 0;
+    MCallbackId                                               _timeChangeCallback = 0;
     PanelCallbacksList                                        _renderPanelCallbacks;
     const MtohRenderGlobals&                                  _globals;
 
@@ -307,7 +305,6 @@ private:
     HgiUniquePtr _hgi;
     HdDriver     _hgiDriver;
 
-#ifdef VIEWPORT_TOOLBOX
     // Data per pass - each FramePassData contains both configuration data and the actual FramePass
     // This ensures they stay synchronized and eliminates index-based access issues
     Fvp::FramePassDataPtrVector                                _framePassesData;
@@ -324,15 +321,7 @@ private:
                                 const SdfPath&                        passId,
                                 const int passIndex);
     void                    _CreateFramePassesData();
-    
-#else
-    int                                       _GetNumFramePasses() const { return 1; }
-    HdEngine                                  _engine;
-    HdRendererPlugin*                         _rendererPlugin = nullptr;
-    std::unique_ptr<HdxTaskController>        _taskController;
-    HdPluginRenderDelegateUniqueHandle        _renderDelegate = nullptr;
-    HdRenderIndex*                            _renderIndex = nullptr;
-#endif
+
     Fvp::DataProducerMergingSceneIndexProxyPtr _dataProducerMergingSceneIndexProxy { nullptr };
     VtDictionary                              _fileWriterArgs{};
     HdSceneIndexBaseRefPtr                    _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
@@ -358,6 +347,7 @@ private:
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     Fvp::PurposeFilteringSceneIndexRefPtr     _purposeFilteringSceneIndex;
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
+    HdsiSceneGlobalsSceneIndexRefPtr                  _sceneGlobalsSceneIndex;
 
     // Naming this identifier _ufeSelection clashes with UFE's selection.h
     // include guard and produces

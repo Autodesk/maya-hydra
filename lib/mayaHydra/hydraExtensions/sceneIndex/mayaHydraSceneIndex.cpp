@@ -27,6 +27,7 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
 
 #include <pxr/base/tf/envSetting.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
@@ -380,7 +381,7 @@ public:
         return _piSi.UfePathToPrimSelections(appPath);
     }
 
-    std::string Name() const { return "MayaPathMapper"; }
+    std::string Name() const override { return "MayaPathMapper"; }
 
 private:
     // Non-owning reference to prevent ownership cycle.
@@ -581,6 +582,16 @@ VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
         id,
         [](MayaHydraMaterialAdapter* a) -> VtValue { return a->GetMaterialResource(); },
         _materialAdapters);
+
+    // For PRMan lights, the material network is stored in the light adapter
+    if (ret.IsEmpty()) {
+        ret = _GetValue<MayaHydraLightAdapter, VtValue>(
+            id,
+            [](MayaHydraLightAdapter* a) -> VtValue { return a->GetLightMaterialNetwork(); },
+            _lightAdapters
+        );
+    }
+
     return ret.IsEmpty() ? MayaHydraMaterialAdapter::GetPreviewMaterialResource(id) : ret;
 }
 
@@ -893,6 +904,9 @@ void MayaHydraSceneIndex::_MarkPrimDirty(
     HdSceneIndexPrim       prim = GetPrim(id);
     HdDataSourceLocatorSet locators;
     dirtyBitsToLocatorsFunc(prim.primType, dirtyBits, &locators);
+    if (dirtyBits & HdChangeTracker::DirtyPrimvar) {
+        locators.append(HdPrimvarsSchema::GetDefaultLocator());
+    }
     if (!locators.IsEmpty()) {
         DirtyPrims({ { id, locators } });
     }
