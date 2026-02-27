@@ -117,20 +117,22 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
             // With Hydra Generative Procedurals, the materials are still considered "unused" 
             // by this step because the geometry hasn't been expanded yet. This ensures
             // that materials that will be bound to procedural geometry are not filtered out.
-            bool                 hasProceduralParent = false;
-            static const TfToken generativeProceduralToken("hydraGenerativeProcedural");
-            static const TfToken resolvedGenerativeProceduralToken(
-                "resolvedHydraGenerativeProcedural");
+            bool hasProceduralParent = false;
+            if (!_generativeProceduralPaths.empty()) {
+                static const TfToken generativeProceduralToken("hydraGenerativeProcedural");
+                static const TfToken resolvedGenerativeProceduralToken(
+                    "resolvedHydraGenerativeProcedural");
 
-            SdfPath ancestorPath = primPath.GetParentPath();
-            while (!ancestorPath.IsAbsoluteRootPath() && !hasProceduralParent
-                   && !ancestorPath.IsEmpty()) {
-                const TfToken& ancestorType = inputSceneIndex->GetPrim(ancestorPath).primType;
-                if (ancestorType == generativeProceduralToken
-                    || ancestorType == resolvedGenerativeProceduralToken) {
-                    hasProceduralParent = true;
+                SdfPath ancestorPath = primPath.GetParentPath();
+                while (!ancestorPath.IsAbsoluteRootPath() && !hasProceduralParent
+                       && !ancestorPath.IsEmpty()) {
+                    const TfToken& ancestorType = inputSceneIndex->GetPrim(ancestorPath).primType;
+                    if (ancestorType == generativeProceduralToken
+                        || ancestorType == resolvedGenerativeProceduralToken) {
+                        hasProceduralParent = true;
+                    }
+                    ancestorPath = ancestorPath.GetParentPath();
                 }
-                ancestorPath = ancestorPath.GetParentPath();
             }
         
             if (_materialUseCounts.find(primPath) == _materialUseCounts.end() && !hasProceduralParent) {
@@ -292,8 +294,14 @@ void PassFilteringSceneIndex::_PrimsAdded(
     const HdSceneIndexObserver::AddedPrimEntries &entries)
 {
     HdSceneIndexObserver::AddedPrimEntries addedEntries;
+    static const TfToken generativeProceduralToken("hydraGenerativeProcedural");
+    static const TfToken resolvedGenerativeProceduralToken("resolvedHydraGenerativeProcedural");
 
     for (const auto& addedEntry : entries) {
+        if (addedEntry.primType == generativeProceduralToken
+            || addedEntry.primType == resolvedGenerativeProceduralToken) {
+            _generativeProceduralPaths.insert(addedEntry.primPath);
+        }
         auto updatedPrims = _UpdateFilteringStatus(addedEntry.primPath, true, true);
         addedEntries.insert(addedEntries.end(), updatedPrims.begin(), updatedPrims.end());
     }
@@ -309,6 +317,7 @@ void PassFilteringSceneIndex::_PrimsRemoved(
 {
     // 1. Update the scene filtering
     HdSceneIndexObserver::AddedPrimEntries updatedEntries;
+
     for (const auto& removedEntry : entries) {
         // Remove the prim and its children from our filtered prims data 
         for (auto it = _filteredPrims.begin(); it != _filteredPrims.end();) {
@@ -325,6 +334,15 @@ void PassFilteringSceneIndex::_PrimsRemoved(
             if (primPath.HasPrefix(removedEntry.primPath)) {
                 auto materialUpdates = _RemoveMaterialEntry(primPath);
                 updatedEntries.insert(updatedEntries.end(), materialUpdates.begin(), materialUpdates.end());
+            }
+        }
+
+        // Remove generative procedural entries on the prim and its children
+        for (auto it = _generativeProceduralPaths.begin(); it != _generativeProceduralPaths.end();) {
+            if ((*it).HasPrefix(removedEntry.primPath)) {
+                it = _generativeProceduralPaths.erase(it);
+            } else {
+                ++it;
             }
         }
     }
