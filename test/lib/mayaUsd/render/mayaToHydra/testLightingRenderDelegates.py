@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 
+import os
 import platform
 import time
 
@@ -22,7 +23,7 @@ import maya.cmds as cmds
 import fixturesUtils
 import mayaUtils
 import mtohUtils
-from testUtils import PluginLoaded
+from testUtils import PluginLoaded, getTestScene
 
 
 # Maya light names in the test scene (transform names; intensity is on the shape).
@@ -76,7 +77,21 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 7.0 #Images are non deterministic for shadows even with Storm.
 
+    def _setTextureSearchPathForPRMan(self):
+        """Add the test scene directory to PRMan's texture search path.
+        The scene uses relative paths (./diffuse.png, ./UVChecker.png) which
+        PRMan resolves via RMAN_TEXTUREPATH. Without this, textures fail on
+        build machines where the working directory differs from the scene path.
+        """
+        scenePath = getTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
+        sceneDir = os.path.dirname(os.path.abspath(scenePath))
+        sep = ";" if platform.system() == "Windows" else ":"
+        existing = os.environ.get("RMAN_TEXTUREPATH", "")
+        newPath = sceneDir + (sep + existing if existing else "")
+        os.environ["RMAN_TEXTUREPATH"] = newPath
+
     def loadScene(self):
+        self._setTextureSearchPathForPRMan()
         mayaUtils.openTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
         cmds.refresh(force=True)
 

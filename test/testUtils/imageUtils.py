@@ -205,7 +205,17 @@ class ImageDiffingTestCase:
         #Enable undo again
         cmds.undoInfo(stateWithoutFlush=True)
         if proc.returncode not in (0, 1):
-            self.fail(str(proc.stdout))
+            # Include absolute paths so CI (e.g. Jenkins) can link to images.
+            # Format is parseable for post-build scripts that add artifact links.
+            abs1 = os.path.abspath(imagePath1)
+            abs2 = os.path.abspath(imagePath2)
+            msg = (
+                str(proc.stdout) +
+                "\n\nImage comparison failed. Paths for CI/artifact linking:\n"
+                "  BASELINE_IMAGE: {}\n"
+                "  ACTUAL_IMAGE:   {}\n"
+            ).format(abs1, abs2)
+            self.fail(msg)
         return proc.returncode
     
     def assertImagesEqual(self, imagePath1, imagePath2):
