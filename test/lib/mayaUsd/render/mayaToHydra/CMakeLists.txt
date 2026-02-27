@@ -35,6 +35,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa
+	testLightingRenderDelegates.py|depOnPlugins:mtoa
 	testBifrostGraphUpdate.py|depOnPlugins:bifrost
 	#End of tests that have a dependency on other plugins
     testLookThrough.py

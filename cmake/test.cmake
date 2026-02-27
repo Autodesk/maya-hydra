@@ -1,5 +1,17 @@
 set(MAYA_USD_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
+# Paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold plugin).
+# Sources (first wins): -DADDITIONAL_PXR_PLUGINPATH_NAME=... or $ENV{ADDITIONAL_PXR_PLUGINPATH_NAME}
+# On Windows use forward slashes or escaped backslashes.
+if(NOT DEFINED ADDITIONAL_PXR_PLUGINPATH_NAME)
+    set(ADDITIONAL_PXR_PLUGINPATH_NAME "" CACHE STRING
+        "Semicolon-separated paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold)")
+endif()
+if(NOT ADDITIONAL_PXR_PLUGINPATH_NAME AND DEFINED ENV{ADDITIONAL_PXR_PLUGINPATH_NAME})
+    set(ADDITIONAL_PXR_PLUGINPATH_NAME "$ENV{ADDITIONAL_PXR_PLUGINPATH_NAME}" CACHE STRING
+        "Semicolon-separated paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold)" FORCE)
+endif()
+
 if(MayaUsd_FOUND)
     if(IS_MACOSX OR IS_LINUX) 
         #When MayaUsd_FOUND is true, MAYAUSDAPI_LIBRARY exists as it is required. 
@@ -381,6 +393,14 @@ finally:
         list(APPEND MAYAUSD_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
              "${MAYAUSD_LOCATION}/libraries")
     endif()
+
+    # Additional plugin paths (e.g. HdArnold) for tests that need them
+    if(ADDITIONAL_PXR_PLUGINPATH_NAME)
+        foreach(extra_path ${ADDITIONAL_PXR_PLUGINPATH_NAME})
+            list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
+        endforeach()
+        message(STATUS "ADDITIONAL_PXR_PLUGINPATH_NAME for tests: ${ADDITIONAL_PXR_PLUGINPATH_NAME}")
+    endif()
     
     # mtoa
     if(DEFINED MTOA_LOCATION)
@@ -392,7 +412,48 @@ finally:
         # like having a locally installed MtoA fixed it, but we can't rely on that.
         list(APPEND MAYAUSD_VARNAME_MAYA_MODULE_PATH
              "${MTOA_LOCATION}")
+        # Hydra Arnold render delegate plugin path. Try both layouts: newer Arnold
+        # uses usd/bundle/<version>, older uses usd/hydra/<version>. Version is USD
+        # without "." (e.g. 2511 for USD 0.25.11). Add only the path that contains
+        # plugInfo.json.
+        if(DEFINED USD_VERSION)
+            string(REGEX REPLACE "^0\\.([0-9]+)\\.([0-9]+)$" "\\1\\2" MTOA_USD_VERSION_HYDRA "${USD_VERSION}")
+            set(MTOA_HYDRA_BUNDLE "${MTOA_LOCATION}/usd/bundle/${MTOA_USD_VERSION_HYDRA}")
+            set(MTOA_HYDRA_LEGACY "${MTOA_LOCATION}/usd/hydra/${MTOA_USD_VERSION_HYDRA}")
+            if(EXISTS "${MTOA_HYDRA_BUNDLE}/plugInfo.json")
+                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${MTOA_HYDRA_BUNDLE}")
+            elseif(EXISTS "${MTOA_HYDRA_LEGACY}/plugInfo.json")
+                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${MTOA_HYDRA_LEGACY}")
+            endif()
+        endif()
     endif()
+
+    # prman: delegate path (extracted package, not merged into USD) and runtime
+    # Platform selection driven by .yaml; if vars are set, configure test env.
+    if(DEFINED PRMAN_DELEGATE_PLUGIN_PATH AND NOT "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
+        list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+             "${PRMAN_DELEGATE_PLUGIN_PATH}")
+    endif()
+    if(DEFINED RMANTREE AND NOT "${RMANTREE}" STREQUAL "")
+        list(APPEND ALL_TEST_VARS RMANTREE)
+        set(MAYAUSD_VARNAME_RMANTREE "${RMANTREE}")
+        list(APPEND MAYAUSD_VARNAME_PATH "${RMANTREE}/bin")
+        list(APPEND MAYAUSD_VARNAME_PATH "${RMANTREE}/lib")
+    endif()
+    if(DEFINED RENDERMAN_LOCATION AND NOT "${RENDERMAN_LOCATION}" STREQUAL "")
+        list(APPEND ALL_TEST_VARS RENDERMAN_LOCATION)
+        set(MAYAUSD_VARNAME_RENDERMAN_LOCATION "${RENDERMAN_LOCATION}")
+    endif()
+    if(DEFINED PIXAR_LICENSE_FILE AND NOT "${PIXAR_LICENSE_FILE}" STREQUAL "")
+        list(APPEND ALL_TEST_VARS PIXAR_LICENSE_FILE)
+        set(MAYAUSD_VARNAME_PIXAR_LICENSE_FILE "${PIXAR_LICENSE_FILE}")
+    endif()
+    foreach(testvar RMANTREE RENDERMAN_LOCATION PIXAR_LICENSE_FILE)
+        if("${testvar}" IN_LIST ALL_TEST_VARS)
+            set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+                "${testvar}=${MAYAUSD_VARNAME_${testvar}}")
+        endif()
+    endforeach()
     
     # lookdevx
     if(DEFINED LOOKDEVX_LOCATION)
@@ -460,6 +521,22 @@ finally:
     # system entries.
     list(APPEND MAYAUSD_VARNAME_PATH $ENV{PATH})
     list(APPEND MAYAUSD_VARNAME_PYTHONPATH $ENV{PYTHONPATH})
+
+    # Inherit PXR_PLUGINPATH_NAME and MAYA_PXR_PLUGINPATH_NAME from the
+    # configure-time environment so locally-installed Hydra plugins
+    # (e.g. HdArnold, HdPrman) are discovered when running tests.
+    if(DEFINED ENV{PXR_PLUGINPATH_NAME})
+        list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} $ENV{PXR_PLUGINPATH_NAME})
+    endif()
+    if(DEFINED ENV{MAYA_PXR_PLUGINPATH_NAME})
+        list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} $ENV{MAYA_PXR_PLUGINPATH_NAME})
+    endif()
+
+    # Maya USD's Plug may read MAYA_PXR_PLUGINPATH_NAME (when built with
+    # PXR_OVERRIDE_PLUGINPATH_NAME=MAYA_PXR_PLUGINPATH_NAME). Set it to the same
+    # value so HdArnold and other Hydra plugins are discovered regardless.
+    list(APPEND ALL_PATH_VARS MAYA_PXR_PLUGINPATH_NAME)
+    set(MAYAUSD_VARNAME_MAYA_PXR_PLUGINPATH_NAME ${MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}})
 
     # convert the internally-processed envs from cmake list
     foreach(pathvar ${ALL_PATH_VARS})

@@ -71,22 +71,21 @@ MtohInitializeRenderPlugins()
                 GlfContextCaps::InitInstance();
             }
 
-            HdRenderDelegate* delegate
-                = plugin->IsSupported() ? plugin->CreateRenderDelegate() : nullptr;
-
-            // No 'delete plugin', should plugin be cached as well?
-            if (!delegate) {
+            if (!plugin->IsSupported()) {
                 continue;
             }
 
-            auto& rendererSettingDescriptors
-                = store.second.emplace(renderer, delegate->GetRenderSettingDescriptors())
-                      .first->second;
+            // CreateRenderDelegate may fail without GPU context (e.g. Arnold from
+            // PXR_PLUGINPATH_NAME). Still register the override; delegate is created
+            // at render time. Use empty settings when delegate creation fails.
+            HdRenderDelegate* delegate = plugin->CreateRenderDelegate();
+            HdRenderSettingDescriptorList rendererSettingDescriptors;
+            if (delegate) {
+                rendererSettingDescriptors = delegate->GetRenderSettingDescriptors();
+                plugin->DeleteRenderDelegate(delegate);
+            }
 
-            // We only needed the delegate for the settings, so release
-            plugin->DeleteRenderDelegate(delegate);
-            // Null it out to make any possible usage later obv, wrong!
-            delegate = nullptr;
+            auto& settingDescriptors = store.second.emplace(renderer, std::move(rendererSettingDescriptors)).first->second;
 
             store.first.emplace_back(
                 renderer,
@@ -95,7 +94,7 @@ MtohInitializeRenderPlugins()
                 TfToken(TfStringPrintf(
                     "(Technology Preview) Hydra %s",
                     PXR_NS::UsdImagingGLEngine::GetRendererDisplayName(pluginDesc.id).c_str())));
-            MtohRenderGlobals::BuildOptionsMenu(store.first.back(), rendererSettingDescriptors);
+            MtohRenderGlobals::BuildOptionsMenu(store.first.back(), settingDescriptors);
         }
 
         // Make sure the static's size doesn't have any extra overhead
