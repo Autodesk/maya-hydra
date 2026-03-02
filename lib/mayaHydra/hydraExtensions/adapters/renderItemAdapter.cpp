@@ -321,7 +321,9 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     }
 
     // Indices
-    if (topoChanged && vertexBuffercount) {
+    // Line strips do not make use of the index buffer, so we can skip this block.
+    // See "Line strips indices are implicitly defined" comment.
+    if (topoChanged && vertexBuffercount && GetPrimitive() != MHWRender::MGeometry::Primitive::kLineStrip) {
         // Assume first stream contains the positions.
         MIndexBuffer* indices = geom->indexBuffer(0);
         if (indices) {
