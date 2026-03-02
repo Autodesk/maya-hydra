@@ -1,0 +1,17 @@
+#usda 1.0
+
+def GenerativeProcedural "MyGenerativeProcedural" (
+    prepend apiSchemas = ["HydraGenerativeProceduralAPI"]
+)
+{
+    token primvars:hdGp:proceduralType = "HydraGenerativeProceduralPlugin"
+    token primvars:materialPath = "Materials"
+
+    def Material "Materials" (
+        add references = [
+            @./materials/simpleMat.usda@</simpleMat>
+	]
+    ) 
+	{
+	}
+}
