@@ -1028,8 +1028,9 @@ MStatus MtohRenderOverride::Render(
                         HdRenderBuffer* buffer = currentPass->GetRenderBuffer(aovToken);
                         if (!buffer) {
                             TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
-                                .Msg("Render output '%s' not found; ignoring.\n", aovToken.GetText());
-                            continue;
+                                .Msg("Render output '%s' not found; assuming not converged.\n",
+                                     aovToken.GetText());
+                            return false;
                         }
                         if (!buffer->IsConverged()) {
                             return false;

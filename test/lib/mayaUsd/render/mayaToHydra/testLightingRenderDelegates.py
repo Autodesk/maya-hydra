@@ -73,7 +73,7 @@ RENDER_DELEGATES = [
 class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
-    _requiredPlugins = ["mtoa"]
+    _requiredPlugins = []
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 7.0 #Images are non deterministic for shadows even with Storm.
@@ -90,10 +90,20 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         try:
             scenePath = getTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
             sceneDir = os.path.dirname(os.path.abspath(scenePath))
+            # Use forward slashes for RMAN_TEXTUREPATH (RenderMan accepts both, forward is more portable)
+            sceneDirNorm = sceneDir.replace("\\", "/")
             sep = ";" if platform.system() == "Windows" else ":"
             existing = saved or ""
-            newPath = sceneDir + (sep + existing if existing else "")
+            newPath = sceneDirNorm + (sep + existing if existing else "")
             os.environ["RMAN_TEXTUREPATH"] = newPath
+            # Debug: log texture path and verify files exist (helps diagnose CI failures)
+            diffusePath = os.path.join(sceneDir, "diffuse.png")
+            uvCheckerPath = os.path.join(sceneDir, "UVChecker.png")
+            print(
+                "PRMan texture path: RMAN_TEXTUREPATH={} | sceneDir={} | diffuse.png exists={} | UVChecker.png exists={}".format(
+                    newPath, sceneDirNorm, os.path.isfile(diffusePath), os.path.isfile(uvCheckerPath)
+                )
+            )
             yield
         finally:
             if saved is not None:
