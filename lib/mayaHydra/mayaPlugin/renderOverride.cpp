@@ -978,49 +978,69 @@ MStatus MtohRenderOverride::Render(
                                  fileName.c_str());
             }
         }
-        
-        // Check if all AOVs are converged for each visible pass.
-        // Get the AOVs and check each render buffer's IsConverged().
-        // Note: For Arnold, _taskController->IsConverged() always returns false; we must check
-        // each AOV buffer directly.
-        auto isConverged = [this, &framePassesVisible, numVisibleFramePasses]() {
-            for (int visibleIdx = 0; visibleIdx < numVisibleFramePasses; ++visibleIdx) {
-                const int                 i           = framePassesVisible[visibleIdx];
-                const hvt::FramePassPtr& currentPass = _GetFramePass(i);
-                if (!currentPass) {
-                    continue;
-                }
 
-                const auto* bufferManager = currentPass->GetRenderBufferManager().get();
-                if (!bufferManager) {
-                    continue;
-                }
+        // Check convergence from the tasks first
+        _isConverged = true;
+        for (int visibleIdx = 0; visibleIdx < numVisibleFramePasses; ++visibleIdx) {
+            const int i = framePassesVisible[visibleIdx]; // Get the actual pass index
+            const hvt::FramePassPtr& currentPass = _GetFramePass(i);
+            if (!currentPass) {
+                continue;
+            }
 
-                TfTokenVector renderOutputs = bufferManager->GetRenderOutputs();
-                if (renderOutputs.empty()) {
-                    renderOutputs = GetAvailableFramePassAovs(i);
-                }
-                if (renderOutputs.empty()) {
-                    TF_WARN("RenderOutputs list is empty; assuming converged.");
-                    continue;
-                }
+            if (!currentPass->IsConverged()) {
+                _isConverged = false;
+                break;
+            }
+        }
 
-                for (const TfToken& aovToken : renderOutputs) {
-                    HdRenderBuffer* buffer = currentPass->GetRenderBuffer(aovToken);
-                    if (!buffer) {
-                        TF_WARN(
-                            "Render output '%s' not found; ignoring.",
-                            aovToken.GetText());
+        if (!_isConverged) {
+            // Check with AOVs as a second step, as some renderers may not properly set convergence
+            // on the tasks
+            // Check if all AOVs are converged for each visible pass.
+            // Get the AOVs and check each render buffer's IsConverged().
+            // Note: For Arnold, _taskController->IsConverged() always returns false; we must check
+            // each AOV buffer directly.
+            auto isConverged = [this, &framePassesVisible, numVisibleFramePasses]() {
+                for (int visibleIdx = 0; visibleIdx < numVisibleFramePasses; ++visibleIdx) {
+                    const int                i = framePassesVisible[visibleIdx];
+                    const hvt::FramePassPtr& currentPass = _GetFramePass(i);
+                    if (!currentPass) {
                         continue;
                     }
-                    if (!buffer->IsConverged()) {
+
+                    const auto* bufferManager = currentPass->GetRenderBufferManager().get();
+                    if (!bufferManager) {
                         return false;
                     }
+
+                    TfTokenVector renderOutputs = bufferManager->GetRenderOutputs();
+                    if (renderOutputs.empty()) {
+                        renderOutputs = GetAvailableFramePassAovs(i);
+                    }
+                    if (renderOutputs.empty()) {
+                        TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
+                            .Msg("RenderOutputs list is empty; assuming not converged.\n");
+                        return false;
+                    }
+
+                    for (const TfToken& aovToken : renderOutputs) {
+                        HdRenderBuffer* buffer = currentPass->GetRenderBuffer(aovToken);
+                        if (!buffer) {
+                            TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
+                                .Msg("Render output '%s' not found; ignoring.\n", aovToken.GetText());
+                            continue;
+                        }
+                        if (!buffer->IsConverged()) {
+                            return false;
+                        }
+                    }
                 }
-            }
-            return true;
-        };
-        _isConverged = isConverged();
+                return true;
+            };
+
+            _isConverged = isConverged();
+        }
 
         if (markTime) {
             std::lock_guard<std::mutex> lock(_lastRenderTimeMutex);

@@ -17,6 +17,7 @@
 import os
 import platform
 import time
+from contextlib import contextmanager
 
 import maya.cmds as cmds
 
@@ -77,21 +78,30 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 7.0 #Images are non deterministic for shadows even with Storm.
 
-    def _setTextureSearchPathForPRMan(self):
-        """Add the test scene directory to PRMan's texture search path.
+    @contextmanager
+    def _prmanTexturePath(self):
+        """Temporarily add the test scene directory to PRMan's texture search path.
         The scene uses relative paths (./diffuse.png, ./UVChecker.png) which
         PRMan resolves via RMAN_TEXTUREPATH. Without this, textures fail on
         build machines where the working directory differs from the scene path.
+        Saves and restores the previous value to avoid leaking state into other tests.
         """
-        scenePath = getTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
-        sceneDir = os.path.dirname(os.path.abspath(scenePath))
-        sep = ";" if platform.system() == "Windows" else ":"
-        existing = os.environ.get("RMAN_TEXTUREPATH", "")
-        newPath = sceneDir + (sep + existing if existing else "")
-        os.environ["RMAN_TEXTUREPATH"] = newPath
+        saved = os.environ.get("RMAN_TEXTUREPATH", None)
+        try:
+            scenePath = getTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
+            sceneDir = os.path.dirname(os.path.abspath(scenePath))
+            sep = ";" if platform.system() == "Windows" else ":"
+            existing = saved or ""
+            newPath = sceneDir + (sep + existing if existing else "")
+            os.environ["RMAN_TEXTUREPATH"] = newPath
+            yield
+        finally:
+            if saved is not None:
+                os.environ["RMAN_TEXTUREPATH"] = saved
+            elif "RMAN_TEXTUREPATH" in os.environ:
+                del os.environ["RMAN_TEXTUREPATH"]
 
     def loadScene(self):
-        self._setTextureSearchPathForPRMan()
         mayaUtils.openTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
         cmds.refresh(force=True)
 
@@ -173,25 +183,39 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
     def test_EachLight_PerRenderDelegate(self):
         """For each render delegate (Storm, Arnold, PRMan), enable each Maya light one by one and compare snapshots to baseline."""
+        def runDelegate(delegate):
+            self.loadScene()
+            mayaPlugin = delegate.get("mayaPlugin")
+            if mayaPlugin:
+                with PluginLoaded(mayaPlugin):
+                    self.assertTrue(
+                        cmds.pluginInfo(mayaPlugin, query=True, loaded=True),
+                        "{} plugin ({}) failed to load".format(
+                            delegate["name"], mayaPlugin
+                        ),
+                    )
+                    self._runLightSnapshots(delegate)
+            else:
+                self._runLightSnapshots(delegate)
+
         try:
             for delegate in RENDER_DELEGATES:
                 if not self._delegateRunsOnPlatform(delegate):
                     continue
-                self.loadScene()
-                mayaPlugin = delegate.get("mayaPlugin")
-                if mayaPlugin:
-                    with PluginLoaded(mayaPlugin):
-                        self.assertTrue(
-                            cmds.pluginInfo(mayaPlugin, query=True, loaded=True),
-                            "{} plugin ({}) failed to load".format(delegate["name"], mayaPlugin),
-                        )
-                        self._runLightSnapshots(delegate)
+                # Only set RMAN_TEXTUREPATH for PRMan; save/restore to avoid leaking state.
+                if delegate["name"] == "PRMan":
+                    with self._prmanTexturePath():
+                        runDelegate(delegate)
                 else:
-                    self._runLightSnapshots(delegate)
+                    runDelegate(delegate)
         finally:
             # Switch back to Storm before teardown to avoid PRMan/mtoa shutdown
             # hangs when Maya quits (similar to HYDRA-1242 isolate-select issue).
-            self._setRenderer(RENDER_DELEGATES[0])
+            # Guard cleanup so it doesn't mask the original assertion/error.
+            try:
+                self._setRenderer(RENDER_DELEGATES[0])
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
