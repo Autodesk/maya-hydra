@@ -127,7 +127,12 @@ void MayaHydraRenderItemAdapter::_InsertRprim(MayaHydraAdapter* adapter)
         GetMayaHydraSceneIndex()->InsertPrim(adapter, HdPrimTypeTokens->points, GetID());
         break;
     default:
-        assert(false); // unexpected/unsupported primitive type
+        TF_RUNTIME_ERROR(
+            "Unsupported render item primitive %d for item '%s' (prim '%s', id '%s').",
+            static_cast<int>(GetPrimitive()),
+            _name.asChar(),
+            _dagPath.fullPathName().asChar(),
+            GetID().GetText());
         break;
     }
 }
@@ -316,7 +321,9 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     }
 
     // Indices
-    if (topoChanged && vertexBuffercount) {
+    // Line strips do not make use of the index buffer, so we can skip this block.
+    // See "Line strips indices are implicitly defined" comment.
+    if (topoChanged && vertexBuffercount && GetPrimitive() != MHWRender::MGeometry::Primitive::kLineStrip) {
         // Assume first stream contains the positions.
         MIndexBuffer* indices = geom->indexBuffer(0);
         if (indices) {
@@ -397,7 +404,12 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 break;
 
             default:
-                assert(false); // unexpected/unsupported primitive type
+                TF_RUNTIME_ERROR(
+                    "Unsupported render item primitive %d for item '%s' (prim '%s', id '%s').",
+                    static_cast<int>(GetPrimitive()),
+                    _name.asChar(),
+                    _dagPath.fullPathName().asChar(),
+                    GetID().GetText());
                 break;
             }
             indices->unmap();
@@ -615,7 +627,7 @@ void MayaHydraRenderItemAdapter::CreateCallbacks()
         +[](MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
             auto* adapter = reinterpret_cast<MayaHydraRenderItemAdapter*>(clientData);
             // Handle extension attributes change
-            adapter->HandleExtensionAttributesDirty(plug);
+            adapter->HandleExtensionAndDynamicAttributesDirty(plug);
         },
         reinterpret_cast<void*>(this),
         &status);

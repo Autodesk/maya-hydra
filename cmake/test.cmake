@@ -211,6 +211,7 @@ function(_mayaHydra_setup_test_common_path_vars)
         XBMLANGPATH
         ${PXR_OVERRIDE_PLUGINPATH_NAME}
         PXR_MTLX_STDLIB_SEARCH_PATHS
+        MATERIALX_SEARCH_PATH
     )
 
     if(IS_WINDOWS)
@@ -345,6 +346,12 @@ function(_mayaHydra_setup_test_plugins)
              "${LOOKDEVX_LOCATION}/python")
         list(APPEND MAYAHYDRA_VARNAME_MAYA_PLUG_IN_PATH
              "${LOOKDEVX_LOCATION}/plug-ins")
+        list(APPEND MAYAUSD_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
+             "${LOOKDEVX_LOCATION}/libraries-lookdevx")
+        list(APPEND MAYAUSD_VARNAME_MATERIALX_SEARCH_PATH
+             "${LOOKDEVX_LOCATION}/libraries")
+        list(APPEND MAYAUSD_VARNAME_MATERIALX_SEARCH_PATH
+             "${LOOKDEVX_LOCATION}/libraries-lookdevx")
     endif()
 
     if(DEFINED BIFROST_LOCATION)

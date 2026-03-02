@@ -120,6 +120,7 @@
 #include <maya/MEventMessage.h>
 #include <maya/MGlobal.h>
 #include <maya/MNodeMessage.h>
+#include <maya/MAnimControl.h>
 #include <maya/MObjectHandle.h>
 #include <maya/MProfiler.h>
 #include <maya/MSceneMessage.h>
@@ -351,8 +352,14 @@ MtohRenderOverride::~MtohRenderOverride()
             _rendererDesc.overrideName.GetText(),
             _rendererDesc.displayName.GetText());
 
-    if (_timerCallback)
+    if (_timerCallback) {
         MMessage::removeCallback(_timerCallback);
+    }
+
+    if (_timeChangeCallback) {
+        MMessage::removeCallback(_timeChangeCallback);
+        _timeChangeCallback = 0;
+    }
 
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
     if (_viewSelectedChangedCb) {
@@ -1589,10 +1596,6 @@ void MtohRenderOverride::_InitHydraResources(
         currentPass->params().viewInfo.projectionMatrix = projectionMatrix;
     }
     
-    // For debugging purposes write render settings into the Hydra
-    // viewport scene, as they would be used for command line rendering.
-    _SetActiveRenderSettingsPrimFromScene();
-
     _initializationSucceeded = true;
 }
 
@@ -1672,6 +1675,16 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _dataProducerMergingSceneIndexProxy.reset();
 
     _viewport = GfVec4d(0, 0, 0, 0);
+    
+    // Reset scene index refs to prevent use-after-destroy in callbacks
+    _sceneGlobalsSceneIndex.Reset();
+    
+    // Unregister Maya event callbacks to prevent them from firing on cleared resources
+    if (_timeChangeCallback) {
+        MMessage::removeCallback(_timeChangeCallback);
+        _timeChangeCallback = 0;
+    }
+    
     _initializationSucceeded = false;
     _initializationAttempted = false;
 
@@ -1770,6 +1783,23 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _mayaViewportSceneIndex->SetLightsManagementSceneIndex(_lightsManagementSceneIndex);
 
     _lastFilteringSceneIndexBeforeCustomFiltering = _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+
+    // Set initial frame from Maya when scene globals scene index is created
+    if (_sceneGlobalsSceneIndex) {
+        const MTime currentTime = MAnimControl::currentTime();
+        const double currentFrame = currentTime.value();
+        _SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
+        
+        // Register time change callback if not already registered
+        if (_timeChangeCallback == 0) {
+            MStatus status;
+            _timeChangeCallback = MEventMessage::addEventCallback(
+                "timeChanged", _TimeChangedCallback, this, &status);
+            if (!status) {
+                TF_WARN("Failed to register time change callback");
+            }
+        }
+    }
 
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);//Should this be on the frame pass filtering scene index ?
@@ -2238,6 +2268,31 @@ void MtohRenderOverride::_PanelDeletedCallback(const MString& panelName, void* d
     instance->_RemovePanel(panelName);
 }
 
+void MtohRenderOverride::_TimeChangedCallback(void* data)
+{
+    auto* instance = reinterpret_cast<MtohRenderOverride*>(data);
+    if (!TF_VERIFY(instance)) {
+        return;
+    }
+
+    // Guard against use-after-destroy: don't access scene indices if Hydra resources are not initialized
+    if (!instance->_initializationSucceeded) {
+        return;
+    }
+
+    // Only update if scene globals scene index is initialized
+    if (!instance->_sceneGlobalsSceneIndex) {
+        return;
+    }
+
+    // Get current frame from Maya
+    const MTime currentTime = MAnimControl::currentTime();
+    const double currentFrame = currentTime.value();
+
+    // Update frame in Hydra scene globals scene index
+    instance->_SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
+}
+
 void MtohRenderOverride::_RendererChangedCallback(
     const MString& panelName,
     const MString& oldRenderer,
@@ -2603,27 +2658,13 @@ void MtohRenderOverride::_SetRenderPurposeTags(const MayaHydraParams& delegatePa
     _purposeFilteringSceneIndex->UpdatePrimsFromIncludedPurposes(RenderGlobalsUtils::GetIncludedPurposes());
 }
 
-void MtohRenderOverride::_SetActiveRenderSettingsPrimPath(const SdfPath& path)
+void MtohRenderOverride::_SetCurrentFrameInHydraGlobalSceneIndex(double currentFrame)
 {
     if (!TF_VERIFY(_sceneGlobalsSceneIndex, "Scene globals scene index not yet initialized")) {
         return;
     }
-    _sceneGlobalsSceneIndex->SetActiveRenderSettingsPrimPath(path);
-}
 
-void MtohRenderOverride::_SetActiveRenderSettingsPrimFromScene()
-{
-    const auto hydraRsPath = GetActiveRenderSettingsPrimHydraPathFromScene();
-    if (hydraRsPath.IsEmpty()) {
-        TF_WARN("Invalid Hydra active render settings prim path.");
-        return;
-    }
-
-    TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
-                 "Active render settings set to " +
-                 hydraRsPath.GetAsString() + "\n");
-
-    _SetActiveRenderSettingsPrimPath(hydraRsPath);
+    _sceneGlobalsSceneIndex->SetCurrentFrame(currentFrame);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

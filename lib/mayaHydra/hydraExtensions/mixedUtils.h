@@ -257,16 +257,16 @@ MAYAHYDRALIB_API
 PXR_NS::TfToken GetGeomSubsetsPickMode();
 
 /**
- * @brief Get the extension attributes from a Maya node.
+ * @brief Get the extension and dynamic attributes from a Maya node.
  *
- * This function retrieves all the extension attributes of a given Maya node and stores them in a map.
- * The keys of the map are the attribute names, and the values are the attribute values.
+ * This function retrieves all the extension and dynamic attributes of a given Maya node and stores
+ * them in a map. The keys of the map are the attribute names, and the values are the attribute values.
  *
  * @param[in] node is the node in the Maya scene graph.
  * @param[out] attrs is a map that will contain the attribute names and their corresponding values.
  */
 MAYAHYDRALIB_API
-void GetExtensionAttributesFromNode(
+void GetExtensionAndDynamicAttributesFromNode(
     const MObject& node,
     PXR_NS::VtDictionary& attrs);
 
