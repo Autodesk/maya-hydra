@@ -346,11 +346,11 @@ function(_mayaHydra_setup_test_plugins)
              "${LOOKDEVX_LOCATION}/python")
         list(APPEND MAYAHYDRA_VARNAME_MAYA_PLUG_IN_PATH
              "${LOOKDEVX_LOCATION}/plug-ins")
-        list(APPEND MAYAUSD_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
+        list(APPEND MAYAHYDRA_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
              "${LOOKDEVX_LOCATION}/libraries-lookdevx")
-        list(APPEND MAYAUSD_VARNAME_MATERIALX_SEARCH_PATH
+        list(APPEND MAYAHYDRA_VARNAME_MATERIALX_SEARCH_PATH
              "${LOOKDEVX_LOCATION}/libraries")
-        list(APPEND MAYAUSD_VARNAME_MATERIALX_SEARCH_PATH
+        list(APPEND MAYAHYDRA_VARNAME_MATERIALX_SEARCH_PATH
              "${LOOKDEVX_LOCATION}/libraries-lookdevx")
     endif()
 
@@ -374,7 +374,9 @@ function(_mayaHydra_setup_test_plugins)
         MAYA_SCRIPT_PATH
         XBMLANGPATH
         ${PXR_OVERRIDE_PLUGINPATH_NAME}
-        PXR_MTLX_STDLIB_SEARCH_PATHS)
+        PXR_MTLX_STDLIB_SEARCH_PATHS
+        MATERIALX_SEARCH_PATH
+    )
 
     foreach(pathvar ${ALL_PATH_VARS})
         set(MAYAHYDRA_VARNAME_${pathvar} ${MAYAHYDRA_VARNAME_${pathvar}} PARENT_SCOPE)
