@@ -430,6 +430,19 @@ finally:
 
     # prman: delegate path (extracted package, not merged into USD) and runtime
     # Platform selection driven by .yaml; if vars are set, configure test env.
+    # Sources (first wins): -DVar=... or $ENV{Var} (ENV fallback for CI/standard RenderMan setup)
+    if((NOT DEFINED PRMAN_DELEGATE_PLUGIN_PATH OR "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "") AND DEFINED ENV{PRMAN_DELEGATE_PLUGIN_PATH} AND NOT "$ENV{PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
+        set(PRMAN_DELEGATE_PLUGIN_PATH "$ENV{PRMAN_DELEGATE_PLUGIN_PATH}" CACHE PATH "Path containing HdPrman plugInfo.json" FORCE)
+    endif()
+    if((NOT DEFINED RMANTREE OR "${RMANTREE}" STREQUAL "") AND DEFINED ENV{RMANTREE} AND NOT "$ENV{RMANTREE}" STREQUAL "")
+        set(RMANTREE "$ENV{RMANTREE}" CACHE PATH "RenderMan installation root" FORCE)
+    endif()
+    if((NOT DEFINED RENDERMAN_LOCATION OR "${RENDERMAN_LOCATION}" STREQUAL "") AND DEFINED ENV{RENDERMAN_LOCATION} AND NOT "$ENV{RENDERMAN_LOCATION}" STREQUAL "")
+        set(RENDERMAN_LOCATION "$ENV{RENDERMAN_LOCATION}" CACHE PATH "RenderMan location (optional)" FORCE)
+    endif()
+    if((NOT DEFINED PIXAR_LICENSE_FILE OR "${PIXAR_LICENSE_FILE}" STREQUAL "") AND DEFINED ENV{PIXAR_LICENSE_FILE} AND NOT "$ENV{PIXAR_LICENSE_FILE}" STREQUAL "")
+        set(PIXAR_LICENSE_FILE "$ENV{PIXAR_LICENSE_FILE}" CACHE STRING "Pixar license server (port@hostname)" FORCE)
+    endif()
     if(DEFINED PRMAN_DELEGATE_PLUGIN_PATH AND NOT "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
         list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
              "${PRMAN_DELEGATE_PLUGIN_PATH}")

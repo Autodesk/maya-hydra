@@ -252,7 +252,7 @@ The same variable can be set in the environment before running CMake (e.g. from 
 
 **Arnold (MtoA):** When `MTOA_LOCATION` and `USD_VERSION` are defined, the HdArnold plugin path is added only if `plugInfo.json` is found: `${MTOA_LOCATION}/usd/bundle/<version>` (newer Arnold) is tried first, then `${MTOA_LOCATION}/usd/hydra/<version>` (older).
 
-**RenderMan (PRMan):** For HdPrman tests, set `RMANTREE`, `RENDERMAN_LOCATION` (optional), `PIXAR_LICENSE_FILE` (license server, format: `port@hostname`), and `PRMAN_DELEGATE_PLUGIN_PATH` (path containing HdPrman plugInfo.json). On Windows, `RMANTREE/bin` and `RMANTREE/lib` are added to PATH.
+**RenderMan (PRMan):** For HdPrman tests, provide the RenderMan locations via CMake cache variables (`-DRMANTREE=...`, `-DRENDERMAN_LOCATION=...` (optional), `-DPIXAR_LICENSE_FILE=...` (license server, format: `port@hostname`), `-DPRMAN_DELEGATE_PLUGIN_PATH=...` (path containing HdPrman `plugInfo.json`)) or via environment variables of the same names. CMake variables take precedence. On Windows, the test harness adds `${RMANTREE}/bin` and `${RMANTREE}/lib` to `PATH` when `RMANTREE` is set.
 
 **Local development:** If `PXR_PLUGINPATH_NAME` or `MAYA_PXR_PLUGINPATH_NAME` is set in your environment when you run CMake, those paths are automatically appended to the test environment. This allows locally-installed Hydra plugins (e.g. HdArnold, HdPrman) to be discovered when running tests. On Windows, use forward slashes or escaped backslashes in the path.
 
