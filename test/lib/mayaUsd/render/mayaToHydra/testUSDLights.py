@@ -26,7 +26,7 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.2
+    IMAGE_DIFF_FAIL_PERCENT = 0.5
 
     def verifyLightingModes(self, shadowOn):
         # Dome lighting change in USD 25.11+

@@ -193,6 +193,11 @@ void PurposeFilteringSceneIndex::UpdatePrimsFromIncludedPurposes(
     const Purposes& includedPurposes
 )
 {
+    if (includedPurposes == _includedPurposes) {
+        // Purposes did not change, we can skip updating prims
+        // and avoid an expensive tree traversal.
+        return;
+    }
     _includedPurposes = includedPurposes;
     auto& inputSceneIndex = GetInputSceneIndex();
     for (const SdfPath& primPath : HdSceneIndexPrimView(inputSceneIndex)) {

@@ -212,8 +212,7 @@ private:
     HdRenderDelegate* _GetRenderDelegate(int renderPassIndex = 0);
     HdRenderDelegate* _GetRenderDelegate(int renderPassIndex = 0) const;
     void              _ClearMayaHydraSceneIndex();
-    void              _SetActiveRenderSettingsPrimFromScene();
-    void              _SetActiveRenderSettingsPrimPath(const PXR_NS::SdfPath& path);
+    void              _SetCurrentFrameInHydraGlobalSceneIndex(double currentFrame);
 
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
@@ -265,6 +264,7 @@ private:
     static void _TimerCallback(float, float, void* data);
     static void _PlayblastingChanged(bool state, void*);
     static void _PanelDeletedCallback(const MString& panelName, void* data);
+    static void _TimeChangedCallback(void* data);
     static void _RendererChangedCallback(
         const MString& panelName,
         const MString& oldRenderer,
@@ -286,6 +286,7 @@ private:
     std::vector<std::unique_ptr<MHWRender::MRenderOperation>> _operations;
     MCallbackIdArray                                          _callbacks;
     MCallbackId                                               _timerCallback = 0;
+    MCallbackId                                               _timeChangeCallback = 0;
     PanelCallbacksList                                        _renderPanelCallbacks;
     const MtohRenderGlobals&                                  _globals;
 

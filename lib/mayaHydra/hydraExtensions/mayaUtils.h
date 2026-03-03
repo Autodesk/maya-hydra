@@ -134,9 +134,8 @@ bool SetNodeAttribute(MObject node, std::string attrName, AttrType newValue)
     if (!dependencyNodeStatus) {
         return false;
     }
-    MStatus plugStatus;
-    MPlug   plug = dependencyNode.findPlug(attrName.c_str(), true, &plugStatus);
-    if (!plugStatus) {
+    MPlug plug = dependencyNode.findPlug(attrName.c_str(), true);
+    if (plug.isNull()) {
         return false;
     }
     return plug.setValue(newValue);

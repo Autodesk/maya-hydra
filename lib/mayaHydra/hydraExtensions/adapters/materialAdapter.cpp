@@ -27,6 +27,7 @@
 #include <pxr/base/tf/token.h>
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/material.h>
+#include <pxr/imaging/hd/changeTracker.h>
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/types.h>
 #include <pxr/usd/usd/prim.h>
@@ -85,6 +86,10 @@ bool MayaHydraMaterialAdapter::HasType(const TfToken& typeId) const
 
 void MayaHydraMaterialAdapter::MarkDirty(HdDirtyBits dirtyBits)
 {
+    // We support extension-attribute primvars on materials, so keep DirtyPrimvar even though
+    // materials are sprims and normally only expose HdMaterial dirty bits.
+    const HdDirtyBits primvarBits = dirtyBits & HdChangeTracker::DirtyPrimvar;
+    dirtyBits = (dirtyBits & HdMaterial::AllDirty) | primvarBits;
     GetMayaHydraSceneIndex()->MarkSprimDirty(GetID(), dirtyBits);
 }
 
@@ -206,7 +211,7 @@ private:
     {
         auto* adapter = reinterpret_cast<MayaHydraShadingEngineAdapter*>(clientData);
         // Handle extension attributes change
-        adapter->HandleExtensionAttributesDirty(plug);
+        adapter->HandleExtensionAndDynamicAttributesDirty(plug);
     }
     static void _DirtyShaderParams(MObject& /*node*/, void* clientData)
     {
@@ -270,8 +275,8 @@ private:
 
         // Fetch the "renderDocument" attribute from the node
         static const MString renderDocumentStr("renderDocument");  
-        auto mtlxDocPlug = node.findPlug(renderDocumentStr, true, &status);
-        if (!status) {
+        auto mtlxDocPlug = node.findPlug(renderDocumentStr, true);
+        if (mtlxDocPlug.isNull()) {
             return false;
         }
 

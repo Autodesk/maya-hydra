@@ -27,6 +27,7 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
 
 #include <pxr/base/tf/envSetting.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
@@ -374,7 +375,7 @@ public:
         return _piSi.UfePathToPrimSelections(appPath);
     }
 
-    std::string Name() const { return "MayaPathMapper"; }
+    std::string Name() const override { return "MayaPathMapper"; }
 
 private:
     // Non-owning reference to prevent ownership cycle.
@@ -898,6 +899,9 @@ void MayaHydraSceneIndex::_MarkPrimDirty(
     HdSceneIndexPrim       prim = GetPrim(id);
     HdDataSourceLocatorSet locators;
     dirtyBitsToLocatorsFunc(prim.primType, dirtyBits, &locators);
+    if (dirtyBits & HdChangeTracker::DirtyPrimvar) {
+        locators.append(HdPrimvarsSchema::GetDefaultLocator());
+    }
     if (!locators.IsEmpty()) {
         DirtyPrims({ { id, locators } });
     }

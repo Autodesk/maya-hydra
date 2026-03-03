@@ -159,8 +159,10 @@ bool _RestoreValue(
     bool     valid = false;
     PrefType mayaPref = getter(attrName, &valid);
     if (valid) {
-        auto plug = node.findPlug(attrName);
-        plug.setValue(HydraType(mayaPref));
+        auto plug = node.findPlug(attrName, true);
+        if (!plug.isNull()) {
+            plug.setValue(HydraType(mayaPref));
+        }
     }
     return valid;
 }
@@ -220,8 +222,10 @@ void _CreateEnumAttribute(
 
     for (int i = 0, n = values.size(); i < n; ++i) {
         if (mayaPref == values[i]) {
-            auto plug = node.findPlug(attrName);
-            plug.setValue(i);
+            auto plug = node.findPlug(attrName, true);
+            if (!plug.isNull()) {
+                plug.setValue(i);
+            }
             return;
         }
     }
