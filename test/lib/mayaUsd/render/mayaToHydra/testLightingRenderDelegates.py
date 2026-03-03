@@ -252,7 +252,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         return platform.system().lower() == required.lower()
 
     def test_EachLight_PerRenderDelegate(self):
-        """For each render delegate (Storm, Arnold, PRMan), enable each Maya light one by one and compare snapshots to baseline."""
+        """For each configured render delegate, enable each Maya light one by one and compare snapshots to baseline."""
         def runDelegate(delegate):
             self.loadScene()
             mayaPlugin = delegate.get("mayaPlugin")
