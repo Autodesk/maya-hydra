@@ -76,46 +76,98 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
     _requiredPlugins = []
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
-    IMAGE_DIFF_FAIL_PERCENT = 7.0 #Images are non deterministic for shadows even with Storm.
-
+    IMAGE_DIFF_FAIL_PERCENT = 7.0  # Images are non-deterministic for shadows even with Storm.
     @contextmanager
     def _prmanTexturePath(self):
-        """Temporarily add the test scene directory to PRMan's texture search path.
-        The scene uses relative paths (./diffuse.png, ./UVChecker.png) which
-        PRMan resolves via RMAN_TEXTUREPATH. Without this, textures fail on
-        build machines where the working directory differs from the scene path.
-        Saves and restores the previous value to avoid leaking state into other tests.
+        """Prepare a robust search context for PRMan on CI/build machines.
+
+        Why this exists:
+          - The scene uses relative texture paths (./diffuse.png, ./UVChecker.png).
+          - In Jenkins, the process working directory is typically the workspace,
+            not the scene directory, so ./... breaks.
+          - Depending on how paths flow through Maya->Hydra->hdPrman, relative
+            paths may be resolved by:
+              * Maya file nodes / workspace (project)
+              * the process current working directory
+              * USD's default resolver search path (PXR_AR_DEFAULT_SEARCH_PATH)
+              * PRMan's own RMAN_TEXTUREPATH
+
+        This context manager makes all of the above consistent for the duration
+        of the PRMan render and restores previous state afterwards.
         """
-        saved = os.environ.get("RMAN_TEXTUREPATH", None)
+        saved_env = {
+            "RMAN_TEXTUREPATH": os.environ.get("RMAN_TEXTUREPATH"),
+            "PXR_AR_DEFAULT_SEARCH_PATH": os.environ.get("PXR_AR_DEFAULT_SEARCH_PATH"),
+        }
+        saved_cwd = os.getcwd()
+        saved_workspace = cmds.workspace(q=True, rd=True)
+
         try:
             scenePath = getTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
             sceneDir = os.path.dirname(os.path.abspath(scenePath))
-            # Use forward slashes for RMAN_TEXTUREPATH (RenderMan accepts both, forward is more portable)
+            sep = os.pathsep  # ';' on Windows, ':' elsewhere
+
+            # 1) Make relative ./... resolve to the scene directory.
+            os.chdir(sceneDir)
+
+            # 2) Ensure Maya resolves relative file-node paths via the scene directory.
+            cmds.workspace(sceneDir, o=True)
+
+            # 3) Help USD's ArDefaultResolver (if assets flow through as SdfAssetPath).
+            prev_ar = saved_env["PXR_AR_DEFAULT_SEARCH_PATH"] or ""
+            os.environ["PXR_AR_DEFAULT_SEARCH_PATH"] = sceneDir + (sep + prev_ar if prev_ar else "")
+
+            # 4) Help PRMan find textures if they still arrive as relative paths.
+            prev_rman = saved_env["RMAN_TEXTUREPATH"] or ""
             sceneDirNorm = sceneDir.replace("\\", "/")
-            sep = ";" if platform.system() == "Windows" else ":"
-            existing = saved or ""
-            newPath = sceneDirNorm + (sep + existing if existing else "")
-            os.environ["RMAN_TEXTUREPATH"] = newPath
-            # Debug: log texture path and verify files exist (helps diagnose CI failures)
+            os.environ["RMAN_TEXTUREPATH"] = sceneDirNorm + (sep + prev_rman if prev_rman else "")
+
+            # Debug: log current state and verify files exist (helps diagnose CI failures)
             diffusePath = os.path.join(sceneDir, "diffuse.png")
             uvCheckerPath = os.path.join(sceneDir, "UVChecker.png")
             print(
-                "PRMan texture path: RMAN_TEXTUREPATH={} | sceneDir={} | diffuse.png exists={} | UVChecker.png exists={}".format(
-                    newPath, sceneDirNorm, os.path.isfile(diffusePath), os.path.isfile(uvCheckerPath)
+                "PRMan context: cwd={} | workspace={} | RMAN_TEXTUREPATH={} | PXR_AR_DEFAULT_SEARCH_PATH={} | diffuse.png exists={} | UVChecker.png exists={}".format(
+                    os.getcwd(),
+                    cmds.workspace(q=True, rd=True),
+                    os.environ.get("RMAN_TEXTUREPATH", ""),
+                    os.environ.get("PXR_AR_DEFAULT_SEARCH_PATH", ""),
+                    os.path.isfile(diffusePath),
+                    os.path.isfile(uvCheckerPath),
                 )
             )
+
             yield
         finally:
-            if saved is not None:
-                os.environ["RMAN_TEXTUREPATH"] = saved
-            elif "RMAN_TEXTUREPATH" in os.environ:
-                del os.environ["RMAN_TEXTUREPATH"]
+            # Restore Maya workspace and cwd first (some tools read these lazily).
+            try:
+                cmds.workspace(saved_workspace, o=True)
+            except Exception as e:
+                print("Warning: failed to restore Maya workspace: {}".format(e))
+            try:
+                os.chdir(saved_cwd)
+            except Exception as e:
+                print("Warning: failed to restore cwd: {}".format(e))
+
+            for k, v in saved_env.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
 
     def loadScene(self):
+        # Open the test scene.
         mayaUtils.openTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
-        cmds.refresh(force=True)
 
-    def _setRenderer(self, delegate):
+        # Set Maya workspace (project) to the scene directory so that any relative
+        # file-node paths like ./diffuse.png resolve correctly in all environments,
+        # including CI where the process working directory differs.
+        scenePath = getTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
+        sceneDir = os.path.dirname(os.path.abspath(scenePath))
+        cmds.workspace(sceneDir, o=True)
+
+        cmds.refresh(force=True)
+def _setRenderer(self, delegate):
         """Switch the viewport to the given Hydra renderer."""
         panel = cmds.playblast(activeEditor=1)
         cmds.modelEditor(panel, edit=True, rendererOverrideName=delegate["override"])
@@ -160,7 +212,14 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 cmds.refresh(force=True)
                 return
             time.sleep(0.5)
+        # If we exit the loop, the renderer never reported convergence within the timeout.
         cmds.refresh(force=True)
+        elapsed = time.time() - start
+        rendererName = delegate.get("name", rendererPlugin)
+        self.fail(
+            "Renderer '{}' ({}) did not report convergence within {:.1f} seconds; "
+            "snapshot may be invalid.".format(rendererName, rendererPlugin, elapsed)
+        )
 
     def _setLightIntensities(self, activeLight, intensity):
         """Set all lights to 0 except activeLight, which gets the given intensity."""
