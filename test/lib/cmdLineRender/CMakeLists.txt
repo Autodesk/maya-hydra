@@ -9,18 +9,14 @@ if(IS_WINDOWS)
 set(STORM_RENDER_SCENES
     basic/sphere.ma
     texturing/mayaSphereMayaMaterialStorm.ma
-# HYDRA-2076
-# Disabled because loaded MaterialX file cannot be relative to Maya file.
-#   texturing/mayaSphereMaterialXStorm.ma
+    texturing/mayaSphereMaterialXStorm.ma
     texturing/usdSphereMaterialXStorm.ma
     texturing/usdSphereUsdMaterialStorm.ma
 )
 
 set(ARNOLD_RENDER_SCENES
     texturing/mayaSphereMayaMaterialArnold.ma
-# HYDRA-2076
-# Disabled because loaded MaterialX file cannot be relative to Maya file.
-#   texturing/mayaSphereMaterialXArnold.ma
+    texturing/mayaSphereMaterialXArnold.ma
     texturing/usdSphereMaterialXArnold.ma
     texturing/usdSphereUsdMaterialArnold.ma
 )
