@@ -167,7 +167,8 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         cmds.workspace(sceneDir, o=True)
 
         cmds.refresh(force=True)
-def _setRenderer(self, delegate):
+
+    def _setRenderer(self, delegate):
         """Switch the viewport to the given Hydra renderer."""
         panel = cmds.playblast(activeEditor=1)
         cmds.modelEditor(panel, edit=True, rendererOverrideName=delegate["override"])
