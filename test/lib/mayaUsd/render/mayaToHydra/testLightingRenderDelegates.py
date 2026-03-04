@@ -238,11 +238,26 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             cmds.refresh(force=True)
             self._waitForConvergence(delegate)
             baselineName = "{}_{}.png".format(delegate["name"], lightName)
-            self.assertSnapshotClose(
-                baselineName,
-                self.IMAGE_DIFF_FAIL_THRESHOLD,
-                self.IMAGE_DIFF_FAIL_PERCENT,
-            )
+            # PRMan: _prmanTexturePath does os.chdir(sceneDir), so getSnapshotDir()
+            # (which uses os.path.abspath('.')) writes to the wrong directory.
+            # Restore cwd so snapshots go to the same output dir as Storm.
+            if delegate["name"] == "PRMan":
+                saved_cwd = os.getcwd()
+                try:
+                    os.chdir(self._testDir)
+                    self.assertSnapshotClose(
+                        baselineName,
+                        self.IMAGE_DIFF_FAIL_THRESHOLD,
+                        self.IMAGE_DIFF_FAIL_PERCENT,
+                    )
+                finally:
+                    os.chdir(saved_cwd)
+            else:
+                self.assertSnapshotClose(
+                    baselineName,
+                    self.IMAGE_DIFF_FAIL_THRESHOLD,
+                    self.IMAGE_DIFF_FAIL_PERCENT,
+                )
 
     def _delegateRunsOnPlatform(self, delegate):
         """Return True if the delegate's platform restriction allows running on the current platform."""
