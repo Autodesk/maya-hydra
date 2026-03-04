@@ -111,16 +111,6 @@ void _dirtyTransform(MObject& node, void* clientData)
     }
 }
 
-void _dirtyParams(MObject& node, void* clientData)
-{
-    TF_UNUSED(node);
-    auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
-    if (adapter->IsVisible()) {
-        adapter->InvalidateTransform();
-        adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
-    }
-}
-
 const MString defaultLightSet("defaultLightSet");
 
 } // namespace
