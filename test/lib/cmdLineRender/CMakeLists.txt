@@ -5,25 +5,35 @@
 # See accompanying README.md for currently supported list of label mapping.
 # only single platform exclusion is supported currently.
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
-if(IS_WINDOWS)
-set(STORM_RENDER_SCENES
-    basic/sphere.ma
-    texturing/mayaSphereMayaMaterialStorm.ma
-    texturing/mayaSphereMaterialXStorm.ma
-    texturing/usdSphereMaterialXStorm.ma
-    texturing/usdSphereUsdMaterialStorm.ma
-)
+if(NOT IS_MACOSX)
+    set(STORM_RENDER_SCENES
+        basic/sphere.ma
+    )
+endif()
 
-set(ARNOLD_RENDER_SCENES
-    texturing/mayaSphereMayaMaterialArnold.ma
-    texturing/mayaSphereMaterialXArnold.ma
-    texturing/usdSphereMaterialXArnold.ma
-    texturing/usdSphereUsdMaterialArnold.ma
-)
-else()
-# HYDRA-2031 cmdLineRender tests fail on macOS and Linux.
-set(STORM_RENDER_SCENES "")
-set(ARNOLD_RENDER_SCENES "")
+# HYDRA-2139 image differences on some HdStorm tests on Linux and macOS.
+if(IS_WINDOWS)
+    list(APPEND STORM_RENDER_SCENES
+        texturing/mayaSphereMayaMaterialStorm.ma
+        texturing/usdSphereMaterialXStorm.ma
+        texturing/usdSphereUsdMaterialStorm.ma
+    )
+    # Relative paths for MaterialX documents in Maya files added in Maya 2027.
+    if(MAYA_APP_VERSION VERSION_GREATER 2026)
+        list(APPEND STORM_RENDER_SCENES texturing/mayaSphereMaterialXStorm.ma)
+    endif()
+endif()
+
+if(NOT IS_MACOSX)
+    set(ARNOLD_RENDER_SCENES
+        texturing/mayaSphereMayaMaterialArnold.ma
+        texturing/usdSphereMaterialXArnold.ma
+        texturing/usdSphereUsdMaterialArnold.ma
+    )
+    # Relative paths for MaterialX documents in Maya files added in Maya 2027.
+    if(MAYA_APP_VERSION VERSION_GREATER 2026)
+        list(APPEND ARNOLD_RENDER_SCENES texturing/mayaSphereMaterialXArnold.ma)
+    endif()
 endif()
 
 foreach(scene ${STORM_RENDER_SCENES})
@@ -36,7 +46,6 @@ foreach(scene ${ARNOLD_RENDER_SCENES})
 )
 endforeach()
 
-if(IS_WINDOWS)
 mayaHydra_add_cmd_line_render_test(renderSettings/stormResolution.ma
     COPY_SCENE
     RENDERER HdStormRendererPlugin
@@ -49,23 +58,24 @@ mayaHydra_add_cmd_line_render_test(renderSettings/arnoldResolution.ma
     RENDERER HdArnoldRendererPlugin
     RENDERER_ARGS "-x 720 -y 128"
 )
-endif()
 
-if(IS_WINDOWS)
+# Failure with HdStorm on macOS entered as HYDRA-2139.
+if(NOT IS_MACOSX)
     mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
         EXPECTED_IMAGES_DIR renderSettings/images/storm
         IMAGE_EXTENSION png
         TEST_NAME_SUFFIX Storm
     )
-    mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
-        RENDERER HdArnoldRendererPlugin
-        EXPECTED_IMAGES_DIR renderSettings/images/arnold
-        IMAGE_EXTENSION png
-        TEST_NAME_SUFFIX Arnold
-        FAIL 0.05
-        FAILPERCENT 1.0
-    )
 endif()
+
+mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
+    RENDERER HdArnoldRendererPlugin
+    EXPECTED_IMAGES_DIR renderSettings/images/arnold
+    IMAGE_EXTENSION png
+    TEST_NAME_SUFFIX Arnold
+    FAIL 0.05
+    FAILPERCENT 1.0
+)
 
 if(NOT IS_MACOSX)
 # HYDRA-2031 this test fails only on macOS.
@@ -98,7 +108,10 @@ endif()
 # As there are no plans to support Hydra production rendering on Maya 2026,
 # we will not investigate this problem.
 
-if(IS_WINDOWS AND MAYA_APP_VERSION VERSION_EQUAL 2026)
+# registeredMayaRenderers fails on Linux and macOS.
+if(IS_LINUX
+   OR IS_MACOSX
+   OR (IS_WINDOWS AND MAYA_APP_VERSION VERSION_EQUAL 2026))
 set(MAYABATCH_TEST_SCRIPT_FILES "")
 else()
 set(MAYABATCH_TEST_SCRIPT_FILES
@@ -112,6 +125,8 @@ foreach(script ${MAYABATCH_TEST_SCRIPT_FILES})
     mayaUsd_get_unittest_target(target ${test_filename})
     mayaUsd_add_test(${target}
         PYTHON_SCRIPT ${test_filename}
+        ENV
+            "DISPLAY=:0"
     )
 
     # Add a ctest label to these tests for easy filtering.

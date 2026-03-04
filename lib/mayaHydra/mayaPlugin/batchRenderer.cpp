@@ -85,9 +85,6 @@ BatchRenderer::BatchRenderer(const MtohRendererDescription& desc)
     _ID = MAYA_NATIVE_ROOT.AppendChild(
                   TfToken(TfStringPrintf("_MayaHydra_%s_%p", desc.rendererName.GetText(), this)));
 
-    std::cout << "PPT: _isUsingHdSt is " << (_isUsingHdSt ? "true" : "false")
-              << std::endl;
-
     MStatus status;
     auto    id
         = MSceneMessage::addCallback(MSceneMessage::kBeforeNew, _ClearHydraCallback, this, &status);
