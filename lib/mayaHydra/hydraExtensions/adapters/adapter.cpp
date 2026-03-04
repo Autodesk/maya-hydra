@@ -151,6 +151,17 @@ HdPrimvarDescriptorVector MayaHydraAdapter::GetPrimvarDescriptors(HdInterpolatio
     return HdPrimvarDescriptorVector();
 }
 
+bool MayaHydraAdapter::IsExtensionOrDynamicAttribute(const MPlug& plug)
+{
+    MStatus status;
+    MObject attrObj = plug.attribute(&status);
+    if (!status) {
+        return false;
+    }
+    MFnAttribute fnAttr(attrObj);
+    return fnAttr.isExtension() || fnAttr.isDynamic();
+}
+
 // Extension attributes are defined on node types (often by plugins). Dynamic attributes
 // are user-authored per-node (e.g., via addAttr) and are not part of the type definition.
 void MayaHydraAdapter::HandleExtensionAndDynamicAttributesDirty(const MPlug& plug)

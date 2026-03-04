@@ -80,6 +80,26 @@ void _changeVisibility(
     adapter->HandleExtensionAndDynamicAttributesDirty(plug);
 }
 
+void _lightShapeAttributeChanged(
+    MNodeMessage::AttributeMessage msg,
+    MPlug&                         plug,
+    MPlug&                         otherPlug,
+    void*                          clientData)
+{
+    TF_UNUSED(msg);
+    TF_UNUSED(otherPlug);
+
+    auto* adapter = reinterpret_cast<MayaHydraLightAdapter*>(clientData);
+    if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
+        adapter->HandleExtensionAndDynamicAttributesDirty(plug);
+        return;
+    }
+    if (adapter->IsVisible()) {
+        adapter->InvalidateTransform();
+        adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
+    }
+}
+
 void _dirtyTransform(MObject& node, void* clientData)
 {
     TF_UNUSED(node);
@@ -772,7 +792,9 @@ void MayaHydraLightAdapter::CreateCallbacks()
     MStatus status;
     auto    dag = GetDagPath();
     auto    obj = dag.node();
-    auto    id = MNodeMessage::addNodeDirtyCallback(obj, _dirtyParams, this, &status);
+    // Use attribute-changed on shape (not node-dirty) to avoid redundant light+primvars dirtying
+    // when only custom attributes change.
+    auto id = MNodeMessage::addAttributeChangedCallback(obj, _lightShapeAttributeChanged, this, &status);
     if (status) {
         AddCallback(id);
     }

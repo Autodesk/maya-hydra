@@ -94,25 +94,18 @@ void MayaHydraCameraAdapter::CreateCallbacks()
     auto    dag = GetDagPath();
     auto    obj = dag.node();
 
-    auto paramsChanged = MNodeMessage::addNodeDirtyCallback(
-        obj,
-        +[](MObject& obj, void* clientData) {
-            auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
-            // Dirty everything rather than track complex param and fit to projection dependencies.
-            adapter->MarkDirty(HdCamera::DirtyParams | HdCamera::DirtyWindowPolicy);
-        },
-        reinterpret_cast<void*>(this),
-        &status);
-    if (status) {
-        AddCallback(paramsChanged);
-    }
-
+    // Use attribute-changed only (not node-dirty) to avoid redundant camera+primvars dirtying.
+    // For extension/dynamic attrs: only dirty primvars. For camera params: dirty params.
     auto attributesChanged = MNodeMessage::addAttributeChangedCallback(
         obj,
         +[](MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
             auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
-            // Handle extension attributes change
-            adapter->HandleExtensionAndDynamicAttributesDirty(plug);
+            if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
+                adapter->HandleExtensionAndDynamicAttributesDirty(plug);
+                return;
+            }
+            // Camera param changed; dirty params rather than track complex dependencies.
+            adapter->MarkDirty(HdCamera::DirtyParams | HdCamera::DirtyWindowPolicy);
         },
         reinterpret_cast<void*>(this),
         &status);

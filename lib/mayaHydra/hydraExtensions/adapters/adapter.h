@@ -89,6 +89,11 @@ public:
 
     void HandleExtensionAndDynamicAttributesDirty(const MPlug& plug);
 
+    /// Returns true if \p plug is an extension or dynamic attribute. Used by adapters
+    /// to route extension/dynamic attribute changes to HandleExtensionAndDynamicAttributesDirty
+    /// instead of marking schema params dirty.
+    static bool IsExtensionOrDynamicAttribute(const MPlug& plug);
+
     MAYAHYDRALIB_API
     virtual HdMeshTopology GetMeshTopology() { return {}; }
     MAYAHYDRALIB_API
