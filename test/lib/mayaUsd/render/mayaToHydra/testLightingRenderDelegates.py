@@ -77,6 +77,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 7.0  # Images are non-deterministic for shadows even with Storm.
+
     @contextmanager
     def _prmanTexturePath(self):
         """Prepare a robust search context for PRMan on CI/build machines.
@@ -218,7 +219,8 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         cmds.workspace(sceneDir, o=True)
 
         cmds.refresh(force=True)
-def _setRenderer(self, delegate):
+
+    def _setRenderer(self, delegate):
         """Switch the viewport to the given Hydra renderer."""
         panel = cmds.playblast(activeEditor=1)
         cmds.modelEditor(panel, edit=True, rendererOverrideName=delegate["override"])
