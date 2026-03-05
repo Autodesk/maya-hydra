@@ -32,7 +32,7 @@ class TestUsdDeleteCamera(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1.0
 
-    @unittest.skipUnless(mayaUtils.hydraFixLevel() > 3, "Requires UFE MRenderItem camera delete bug fix.")
+    @unittest.skipUnless(mayaUtils.hydraFixLevel() >= 5, "Requires UFE MRenderItem camera delete bug fix and UFE observers removal bug fix.")
     def test_UsdDeleteCamera(self):
         """
         Test that creates a USD stage with a single USD camera, verifies it is
