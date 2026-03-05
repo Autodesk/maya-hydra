@@ -26,8 +26,18 @@
 
 #include <maya/MFnLight.h>
 #include <maya/MFnNonExtendedLight.h>
+#include <maya/MNodeMessage.h>
+#include <maya/MPlug.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+/// Callback for parent node attribute changes. Shared by MayaHydraLightAdapter and subclasses
+/// (e.g. MayaHydraAiAreaLightAdapter). Use with MNodeMessage::addAttributeChangedCallback.
+void LightAdapterParentAttributeChanged(
+    MNodeMessage::AttributeMessage msg,
+    MPlug&                         plug,
+    MPlug&                         otherPlug,
+    void*                          clientData);
 
 class MayaHydraSceneIndex;
 
@@ -87,6 +97,10 @@ public:
     void GetGlfSimpleLightPosAndDirFromMFnLight(MFnLight& light, GlfSimpleLight& outSimpleLight);
 
 protected:
+    /// Override to handle shape attribute changes before the default logic. Return true if fully
+    /// handled (e.g. ai_translator on aiAreaLight). Default returns false.
+    virtual bool OnShapeAttributeChanged(const MPlug& plug);
+
     MAYAHYDRALIB_API
     virtual void _CalculateLightParams(GlfSimpleLight& light) { }
     MAYAHYDRALIB_API
