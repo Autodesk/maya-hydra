@@ -66,6 +66,7 @@ kExcludeGreasePencils      = 1 << 35
 kExcludeControllers        = 1 << 36
 kExcludeBluePencil         = 1 << 37
 
+@unittest.skipUnless(mayaUtils.hydraFixLevel() >= 5, "Requires UFE observers removal bug fix")
 class TestViewportFilters(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
