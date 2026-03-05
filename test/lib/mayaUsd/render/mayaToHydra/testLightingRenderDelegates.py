@@ -113,6 +113,10 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             # 2) Ensure Maya resolves relative file-node paths via the scene directory.
             cmds.workspace(sceneDir, o=True)
 
+            # Rewrite Maya file-node texture paths to absolute paths so Hydra/hdPrman
+            # never sees an unanchored relative path.
+            saved_file_nodes = self._absolutizeFileTextures(sceneDir)
+
             # 3) Help USD's ArDefaultResolver (if assets flow through as SdfAssetPath).
             prev_ar = saved_env["PXR_AR_DEFAULT_SEARCH_PATH"] or ""
             os.environ["PXR_AR_DEFAULT_SEARCH_PATH"] = sceneDir + (sep + prev_ar if prev_ar else "")
@@ -138,6 +142,12 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
             yield
         finally:
+            # Restore any file-node edits first.
+            try:
+                self._restoreFileTextures(locals().get('saved_file_nodes'))
+            except Exception:
+                pass
+
             # Restore Maya workspace and cwd first (some tools read these lazily).
             try:
                 cmds.workspace(saved_workspace, o=True)
@@ -155,6 +165,47 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                     os.environ[k] = v
 
 
+    def _absolutizeFileTextures(self, sceneDir):
+        """Rewrite Maya file-node texture paths to absolute paths for reliable CI runs.
+
+        Maya ASCII scenes often store fileTextureName as a relative string (e.g. ./diffuse.png).
+        Depending on the Maya->Hydra adapter, these strings may be passed through without
+        being anchored to the Maya project/workspace or USD resolver context.
+
+        By converting to absolute paths in the scene graph, we guarantee that Hydra/hdPrman
+        receives a resolvable path regardless of the process working directory.
+
+        Returns:
+            dict[str,str]: file-node name -> original fileTextureName
+        """
+        saved = {}
+        file_nodes = cmds.ls(type="file") or []
+        for n in file_nodes:
+            try:
+                p = cmds.getAttr(n + ".fileTextureName") or ""
+            except Exception:
+                continue
+            if not p or os.path.isabs(p):
+                continue
+            abs_p = os.path.normpath(os.path.join(sceneDir, p))
+            if p.startswith("./") or os.path.isfile(abs_p):
+                saved[n] = p
+                cmds.setAttr(n + ".fileTextureName", abs_p, type="string")
+
+        if saved:
+            print("PRMan context: rewrote {} file-node texture path(s) to absolute.".format(len(saved)))
+        return saved
+
+    def _restoreFileTextures(self, saved):
+        """Restore original fileTextureName values saved by _absolutizeFileTextures."""
+        if not saved:
+            return
+        for n, p in saved.items():
+            try:
+                cmds.setAttr(n + ".fileTextureName", p, type="string")
+            except Exception:
+                pass
+
     def loadScene(self):
         # Open the test scene.
         mayaUtils.openTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
@@ -167,8 +218,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         cmds.workspace(sceneDir, o=True)
 
         cmds.refresh(force=True)
-
-    def _setRenderer(self, delegate):
+def _setRenderer(self, delegate):
         """Switch the viewport to the given Hydra renderer."""
         panel = cmds.playblast(activeEditor=1)
         cmds.modelEditor(panel, edit=True, rendererOverrideName=delegate["override"])
@@ -213,14 +263,14 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 cmds.refresh(force=True)
                 return
             time.sleep(0.5)
-        # Timeout reached; take snapshot anyway. Image comparison will reveal if invalid.
+        # If we exit the loop, the renderer never reported convergence within the timeout.
+        cmds.refresh(force=True)
         elapsed = time.time() - start
         rendererName = delegate.get("name", rendererPlugin)
-        print(
-            "Renderer '{}' ({}) did not report convergence within {:.1f}s; "
-            "taking snapshot anyway.".format(rendererName, rendererPlugin, elapsed)
+        self.fail(
+            "Renderer '{}' ({}) did not report convergence within {:.1f} seconds; "
+            "snapshot may be invalid.".format(rendererName, rendererPlugin, elapsed)
         )
-        cmds.refresh(force=True)
 
     def _setLightIntensities(self, activeLight, intensity):
         """Set all lights to 0 except activeLight, which gets the given intensity."""
@@ -238,26 +288,11 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             cmds.refresh(force=True)
             self._waitForConvergence(delegate)
             baselineName = "{}_{}.png".format(delegate["name"], lightName)
-            # PRMan: _prmanTexturePath does os.chdir(sceneDir), so getSnapshotDir()
-            # (which uses os.path.abspath('.')) writes to the wrong directory.
-            # Restore cwd so snapshots go to the same output dir as Storm.
-            if delegate["name"] == "PRMan":
-                saved_cwd = os.getcwd()
-                try:
-                    os.chdir(self._testDir)
-                    self.assertSnapshotClose(
-                        baselineName,
-                        self.IMAGE_DIFF_FAIL_THRESHOLD,
-                        self.IMAGE_DIFF_FAIL_PERCENT,
-                    )
-                finally:
-                    os.chdir(saved_cwd)
-            else:
-                self.assertSnapshotClose(
-                    baselineName,
-                    self.IMAGE_DIFF_FAIL_THRESHOLD,
-                    self.IMAGE_DIFF_FAIL_PERCENT,
-                )
+            self.assertSnapshotClose(
+                baselineName,
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT,
+            )
 
     def _delegateRunsOnPlatform(self, delegate):
         """Return True if the delegate's platform restriction allows running on the current platform."""
@@ -267,7 +302,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         return platform.system().lower() == required.lower()
 
     def test_EachLight_PerRenderDelegate(self):
-        """For each configured render delegate, enable each Maya light one by one and compare snapshots to baseline."""
+        """For each render delegate, enable each Maya light one by one and compare snapshots to baseline."""
         def runDelegate(delegate):
             self.loadScene()
             mayaPlugin = delegate.get("mayaPlugin")

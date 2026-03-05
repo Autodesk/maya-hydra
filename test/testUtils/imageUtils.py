@@ -205,16 +205,51 @@ class ImageDiffingTestCase:
         #Enable undo again
         cmds.undoInfo(stateWithoutFlush=True)
         if proc.returncode not in (0, 1):
-            # Include absolute paths so CI (e.g. Jenkins) can link to images.
-            # Format is parseable for post-build scripts that add artifact links.
-            abs1 = os.path.abspath(imagePath1)
-            abs2 = os.path.abspath(imagePath2)
-            msg = (
-                str(proc.stdout) +
-                "\n\nImage comparison failed. Paths for CI/artifact linking:\n"
-                "  BASELINE_IMAGE: {}\n"
-                "  ACTUAL_IMAGE:   {}\n"
-            ).format(abs1, abs2)
+            abs1 = os.path.abspath(imagePath1).replace('\\', '/')
+            abs2 = os.path.abspath(imagePath2).replace('\\', '/')
+
+            artifact_base = os.environ.get('JENKINS_ARTIFACT_BASE', '').rstrip('/')
+            workspace = os.environ.get('WORKSPACE', '')
+            if workspace:
+                workspace = os.path.normpath(workspace)
+
+            if artifact_base and workspace:
+                def _artifact_url(abs_path):
+                    try:
+                        rel = os.path.relpath(
+                            os.path.normpath(abs_path.replace('/', os.sep)),
+                            workspace
+                        )
+                        return artifact_base + '/' + rel.replace('\\', '/')
+                    except ValueError:
+                        return None
+
+                url1 = _artifact_url(abs1)
+                url2 = _artifact_url(abs2)
+                if url1 or url2:
+                    msg = str(proc.stdout) + "\n\nImage comparison failed.\n"
+                    if url1:
+                        msg += "  BASELINE_ARTIFACT_URL: {}\n".format(url1)
+                    if url2:
+                        msg += "  ACTUAL_ARTIFACT_URL:   {}\n".format(url2)
+                    if not (url1 and url2):
+                        msg += "  (Browse all artifacts: {})\n".format(artifact_base + '/')
+                else:
+                    msg = (
+                        str(proc.stdout) +
+                        "\n\nImage comparison failed. Paths for CI/artifact linking:\n"
+                        "  BASELINE_IMAGE: {}\n"
+                        "  ACTUAL_IMAGE:   {}\n"
+                    ).format(abs1, abs2)
+            else:
+                msg = (
+                    str(proc.stdout) +
+                    "\n\nImage comparison failed. Paths for CI/artifact linking:\n"
+                    "  BASELINE_IMAGE: {}\n"
+                    "  ACTUAL_IMAGE:   {}\n"
+                ).format(abs1, abs2)
+                if artifact_base:
+                    msg += "  Browse artifacts: {}/\n".format(artifact_base)
             self.fail(msg)
         return proc.returncode
     
