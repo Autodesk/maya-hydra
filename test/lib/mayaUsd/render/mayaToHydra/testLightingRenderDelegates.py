@@ -78,22 +78,19 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 7.0  # Images are non-deterministic for shadows even with Storm.
+
     @classmethod
     def setUpClass(cls):
-        """Prime PRMan/USD search paths and enable RenderMan/Maya logging early.
+        """Prime PRMan/USD search paths and enable useful logging early.
 
-        Why:
-          - Some components snapshot the environment during initialization.
-          - On CI, we want deterministic texture resolution and actionable diagnostics.
+        Some components may snapshot environment variables during initialization,
+        so we set key vars once at class setup time (before any renders).
 
-        What we do:
-          1) Prepend the test-scene directory to:
-             - RMAN_TEXTUREPATH
-             - PXR_AR_DEFAULT_SEARCH_PATH
-          2) Create a per-run log directory and enable higher verbosity where possible:
-             - RMAN_DUMP_DEFAULTS=1 (debug; prints defaults)
-             - RMAN_CONFIG_OVERRIDE=<logdir> with a minimal rendermn.ini that sets loglevel=4
-          3) Tell Maya to write Script Editor history to a file so we capture delegate output.
+        - RMAN_TEXTUREPATH: RenderMan texture search path
+        - PXR_AR_DEFAULT_SEARCH_PATH: USD default resolver search path
+        - TF_DEBUG: enable hdPrman image asset resolution debug
+        - Maya Script Editor history: capture delegate output and dump to CI logs
+        - RenderMan config override: bump verbosity via a minimal rendermn.ini
         """
         super(TestLightingRenderDelegates, cls).setUpClass()
 
@@ -110,7 +107,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             "TF_DEBUG": os.environ.get("TF_DEBUG"),
         }
 
-        # (1) Search paths
+        # Prepend scene directory so relative ./... has a consistent anchor.
         prev_rman = cls._saved_env["RMAN_TEXTUREPATH"] or ""
         sceneDirNorm = sceneDir.replace("\\", "/")
         os.environ["RMAN_TEXTUREPATH"] = sceneDirNorm + (sep + prev_rman if prev_rman else "")
@@ -118,14 +115,19 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         prev_ar = cls._saved_env["PXR_AR_DEFAULT_SEARCH_PATH"] or ""
         os.environ["PXR_AR_DEFAULT_SEARCH_PATH"] = sceneDir + (sep + prev_ar if prev_ar else "")
 
-        # (2) RenderMan logging knobs (best-effort; harmless if ignored)
+        # Enable hdPrman image asset resolution debug output (USD/TF debug system).
+        prev_tf = cls._saved_env.get("TF_DEBUG") or ""
+        tf_tokens = [t.strip() for t in prev_tf.split(",") if t.strip()]
+        if "HDPRMAN_IMAGE_ASSET_RESOLVE" not in tf_tokens:
+            tf_tokens.append("HDPRMAN_IMAGE_ASSET_RESOLVE")
+        os.environ["TF_DEBUG"] = ",".join(tf_tokens)
+
+        # RenderMan logging knobs (best-effort; harmless if ignored).
         log_root = os.path.join(tempfile.gettempdir(), "mayaHydra_prman_logs")
         os.makedirs(log_root, exist_ok=True)
         cls._prman_log_dir = log_root
 
         # Minimal override file to bump prman log verbosity.
-        # RenderMan reads rendermn.ini; RMAN_CONFIG_OVERRIDE adds a directory to search for overrides.
-        # (See RenderMan docs for RMAN_CONFIG_OVERRIDE and rendermn.ini.)
         ini_path = os.path.join(log_root, "rendermn.ini")
         try:
             with open(ini_path, "w", encoding="utf-8") as f:
@@ -136,15 +138,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         os.environ["RMAN_CONFIG_OVERRIDE"] = log_root
         os.environ["RMAN_DUMP_DEFAULTS"] = "1"
 
-        # Enable hdPrman image asset resolution debug output (USD/TF debug system).
-        # TF_DEBUG is a comma-separated list of debug symbols.
-        prev_tf = cls._saved_env.get("TF_DEBUG") or ""
-        tf_tokens = [t.strip() for t in prev_tf.split(",") if t.strip()]
-        if "HDPRMAN_IMAGE_ASSET_RESOLVE" not in tf_tokens:
-            tf_tokens.append("HDPRMAN_IMAGE_ASSET_RESOLVE")
-        os.environ["TF_DEBUG"] = ",".join(tf_tokens)
-
-        # (3) Capture Maya Script Editor output (includes many delegate/prman messages)
+        # Capture Maya Script Editor output (includes many delegate/prman messages).
         try:
             cls._saved_script_editor = {
                 "writeHistory": cmds.scriptEditorInfo(q=True, writeHistory=True),
@@ -171,12 +165,11 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        # Dump captured Maya/Render delegate output into the CI log before cleanup.
+        # Dump captured output into CI log before cleanup.
         try:
-            history = getattr(cls, '_maya_history_file', None)
-            # Use an instance-less helper: replicate minimal tail print here.
+            history = getattr(cls, "_maya_history_file", None)
             if history and os.path.isfile(history):
-                with open(history, 'r', encoding='utf-8', errors='replace') as f:
+                with open(history, "r", encoding="utf-8", errors="replace") as f:
                     lines = f.read().splitlines()
                 tail = lines[-400:] if len(lines) > 400 else lines
                 print("\n===== Maya Script Editor history (last {} lines): {} =====".format(len(tail), history))
@@ -210,24 +203,18 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
         super(TestLightingRenderDelegates, cls).tearDownClass()
 
-        # Restore environment variables.
-        saved = getattr(cls, "_saved_env", None) or {}
-        for k, v in saved.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
-
-        super(TestLightingRenderDelegates, cls).tearDownClass()
     @contextmanager
     def _prmanTexturePath(self):
-        """Prepare a robust per-render context for PRMan on CI/build machines.
+        """Per-render context for PRMan/hdPrman texture resolution and diagnostics.
 
-        Note: RMAN_TEXTUREPATH and PXR_AR_DEFAULT_SEARCH_PATH are primed in setUpClass()
-        to avoid being set too late (some components may snapshot env during init).
-        This context manager focuses on per-render state:
-          - cwd + Maya workspace set to scene directory
-          - rewrite Maya file-node paths to absolute for reliability
+        Environment (RMAN_TEXTUREPATH / PXR_AR_DEFAULT_SEARCH_PATH / TF_DEBUG) is primed
+        in setUpClass() to ensure it is applied before renderer initialization.
+
+        Here we ensure:
+          - cwd is the scene directory (so ./foo.png works)
+          - Maya workspace (project) is the scene directory
+          - Maya file-node paths are temporarily rewritten to absolute paths
+          - we dump the Script Editor history tail to stdout for CI visibility
         """
         saved_cwd = os.getcwd()
         saved_workspace = cmds.workspace(q=True, rd=True)
@@ -236,27 +223,22 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             scenePath = getTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
             sceneDir = os.path.dirname(os.path.abspath(scenePath))
 
-            # 1) Make relative ./... resolve to the scene directory.
             os.chdir(sceneDir)
-
-            # 2) Ensure Maya resolves relative file-node paths via the scene directory.
             cmds.workspace(sceneDir, o=True)
 
-            # 3) Rewrite Maya file-node texture paths to absolute paths so Hydra/hdPrman
-            # never sees an unanchored relative path.
             saved_file_nodes = self._absolutizeFileTextures(sceneDir)
 
-            # Debug: log current state and verify files exist (helps diagnose CI failures)
             diffusePath = os.path.join(sceneDir, "diffuse.png")
             uvCheckerPath = os.path.join(sceneDir, "UVChecker.png")
             print(
-                "PRMan context: cwd={} | workspace={} | RMAN_TEXTUREPATH={} | PXR_AR_DEFAULT_SEARCH_PATH={} | diffuse.png exists={} | UVChecker.png exists={}".format(
+                "PRMan context: cwd={} | workspace={} | diffuse.png exists={} | UVChecker.png exists={} | RMAN_TEXTUREPATH={} | PXR_AR_DEFAULT_SEARCH_PATH={} | TF_DEBUG={}".format(
                     os.getcwd(),
                     cmds.workspace(q=True, rd=True),
-                    os.environ.get("RMAN_TEXTUREPATH", ""),
-                    os.environ.get("PXR_AR_DEFAULT_SEARCH_PATH", ""),
                     os.path.isfile(diffusePath),
                     os.path.isfile(uvCheckerPath),
+                    os.environ.get("RMAN_TEXTUREPATH", ""),
+                    os.environ.get("PXR_AR_DEFAULT_SEARCH_PATH", ""),
+                    os.environ.get("TF_DEBUG", ""),
                 )
             )
 
@@ -264,7 +246,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         finally:
             # Restore any file-node edits first.
             try:
-                self._restoreFileTextures(locals().get("saved_file_nodes"))
+                self._restoreFileTextures(saved_file_nodes)
             except Exception:
                 pass
 
@@ -284,8 +266,6 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 os.chdir(saved_cwd)
             except Exception as e:
                 print("Warning: failed to restore cwd: {}".format(e))
-
-
 
     def _absolutizeFileTextures(self, sceneDir):
         """Rewrite Maya file-node texture paths to absolute paths for reliable CI runs.
@@ -328,7 +308,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             except Exception:
                 pass
 
-        def _print_log_tail(self, path, title, max_lines=300):
+    def _print_log_tail(self, path, title, max_lines=200):
         """Print the tail of a log file to stdout so CI logs capture it."""
         if not path:
             return
@@ -345,19 +325,6 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             print("===== end {} =====\n".format(title))
         except Exception as e:
             print("Warning: failed to print {} tail ({}): {}".format(title, path, e))
-
-def loadScene(self):
-        # Open the test scene.
-        mayaUtils.openTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
-
-        # Set Maya workspace (project) to the scene directory so that any relative
-        # file-node paths like ./diffuse.png resolve correctly in all environments,
-        # including CI where the process working directory differs.
-        scenePath = getTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
-        sceneDir = os.path.dirname(os.path.abspath(scenePath))
-        cmds.workspace(sceneDir, o=True)
-
-        cmds.refresh(force=True)
 
     def _setRenderer(self, delegate):
         """Switch the viewport to the given Hydra renderer."""
