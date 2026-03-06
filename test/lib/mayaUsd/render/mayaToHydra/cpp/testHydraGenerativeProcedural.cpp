@@ -17,12 +17,6 @@
 
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
-#include <pxr/usdImaging/usdImaging/collectionMaterialBindingSchema.h>
-
-#if PXR_VERSION >= 2505
-#include <pxr/usdImaging/usdImaging/materialBindingSchema.h>
-#include <pxr/usdImaging/usdImaging/materialBindingsSchema.h>
-#endif
 
 #include <gtest/gtest.h>
 

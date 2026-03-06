@@ -119,16 +119,10 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
             // that materials that will be bound to procedural geometry are not filtered out.
             bool hasProceduralParent = false;
             if (!_generativeProceduralPaths.empty()) {
-                static const TfToken generativeProceduralToken("hydraGenerativeProcedural");
-                static const TfToken resolvedGenerativeProceduralToken(
-                    "resolvedHydraGenerativeProcedural");
-
                 SdfPath ancestorPath = primPath.GetParentPath();
                 while (!ancestorPath.IsAbsoluteRootPath() && !hasProceduralParent
                        && !ancestorPath.IsEmpty()) {
-                    const TfToken& ancestorType = inputSceneIndex->GetPrim(ancestorPath).primType;
-                    if (ancestorType == generativeProceduralToken
-                        || ancestorType == resolvedGenerativeProceduralToken) {
+                    if (_generativeProceduralPaths.count(ancestorPath) != 0) {
                         hasProceduralParent = true;
                     }
                     ancestorPath = ancestorPath.GetParentPath();

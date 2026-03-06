@@ -24,6 +24,7 @@
 #include <pxr/imaging/hd/sceneIndexObserver.h>
 
 #include <map>
+#include <set>
 
 namespace FVP_NS_DEF {
 
