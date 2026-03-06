@@ -48,9 +48,6 @@ private:
     static const TfToken _cube0Name; 
     static const TfToken _cube1Name;   
 
-    static const SdfPath _cube0Path; 
-    static const SdfPath _cube1Path;   
-
     HdSceneIndexPrim _BuildCubePrim(
         float halfSize,
         const GfMatrix4d &transform,
