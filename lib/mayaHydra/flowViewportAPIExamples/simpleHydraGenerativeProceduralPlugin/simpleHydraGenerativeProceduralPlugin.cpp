@@ -14,14 +14,14 @@
 // limitations under the License.
 //
 
-#include "hydraGenerativeProceduralPlugin.h"
-#include "hydraGenerativeProcedural.h"
+#include "simpleHydraGenerativeProceduralPlugin.h"
+#include "simpleHydraGenerativeProcedural.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
-    ((sceneIndexPluginName, "HydraGenerativeProceduralPlugin"))
+    ((sceneIndexPluginName, "SimpleHydraGenerativeProceduralPlugin"))
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -31,7 +31,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 TF_REGISTRY_FUNCTION(TfType)
 {
     HdGpGenerativeProceduralPluginRegistry::Define<
-        HydraGenerativeProceduralPlugin,
+        SimpleHydraGenerativeProceduralPlugin,
         HdGpGenerativeProceduralPlugin>();
 }
 
@@ -39,16 +39,16 @@ TF_REGISTRY_FUNCTION(TfType)
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////
 
-HydraGenerativeProceduralPlugin::
-HydraGenerativeProceduralPlugin() = default;
+SimpleHydraGenerativeProceduralPlugin::
+SimpleHydraGenerativeProceduralPlugin() = default;
 
-HydraGenerativeProceduralPlugin::~HydraGenerativeProceduralPlugin() = default;
+SimpleHydraGenerativeProceduralPlugin::~SimpleHydraGenerativeProceduralPlugin() = default;
 
 HdGpGenerativeProcedural *
-HydraGenerativeProceduralPlugin::Construct(
+SimpleHydraGenerativeProceduralPlugin::Construct(
     const SdfPath &proceduralPrimPath)
 {
-    return new HydraGenerativeProcedural(proceduralPrimPath);
+    return new SimpleHydraGenerativeProcedural(proceduralPrimPath);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

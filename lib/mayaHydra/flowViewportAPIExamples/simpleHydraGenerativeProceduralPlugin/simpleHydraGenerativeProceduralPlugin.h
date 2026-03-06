@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef MAYA_HYDRA_HYDRA_GENERATIVE_PROCEDURAL_PLUGIN_H
-#define MAYA_HYDRA_HYDRA_GENERATIVE_PROCEDURAL_PLUGIN_H
+#ifndef MAYA_HYDRA_SIMPLE_HYDRA_GENERATIVE_PROCEDURAL_PLUGIN_H
+#define MAYA_HYDRA_SIMPLE_HYDRA_GENERATIVE_PROCEDURAL_PLUGIN_H
 
 #include <pxr/pxr.h>
 #include <pxr/imaging/hdGp/generativeProceduralPlugin.h>
@@ -23,12 +23,12 @@
 
 PXR_NAMESPACE_OPEN_SCOPE 
 
-/// \class HydraGenerativeProceduralPlugin
-class HydraGenerativeProceduralPlugin : public HdGpGenerativeProceduralPlugin
+/// \class SimpleHydraGenerativeProceduralPlugin
+class SimpleHydraGenerativeProceduralPlugin : public HdGpGenerativeProceduralPlugin
 {
 public:
-    HydraGenerativeProceduralPlugin();
-    ~HydraGenerativeProceduralPlugin() override;
+    SimpleHydraGenerativeProceduralPlugin();
+    ~SimpleHydraGenerativeProceduralPlugin() override;
 
     HdGpGenerativeProcedural *Construct(
         const SdfPath &proceduralPrimPath) override;
@@ -36,4 +36,4 @@ public:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif //MAYA_HYDRA_HYDRA_GENERATIVE_PROCEDURAL_PLUGIN_H
+#endif //MAYA_HYDRA_SIMPLE_HYDRA_GENERATIVE_PROCEDURAL_PLUGIN_H

@@ -3,10 +3,10 @@
         {
             "Info": {
                 "Types": {
-                    "HydraGenerativeProceduralPlugin" : {
+                    "SimpleHydraGenerativeProceduralPlugin" : {
                         "bases": ["HdGpGenerativeProceduralPlugin"],
                         "priority": 0,
-                        "displayName": "Hydra Generative Procedural"
+                        "displayName": "Simple Hydra Generative Procedural"
                     }
                 }
             },

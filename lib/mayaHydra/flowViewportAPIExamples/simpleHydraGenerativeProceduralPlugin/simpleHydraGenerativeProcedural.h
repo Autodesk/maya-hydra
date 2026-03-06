@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef MAYA_HYDRA_HYDRA_GENERATIVE_PROCEDURAL_H
-#define MAYA_HYDRA_HYDRA_GENERATIVE_PROCEDURAL_H
+#ifndef MAYA_HYDRA_SIMPLE_HYDRA_GENERATIVE_PROCEDURAL_H
+#define MAYA_HYDRA_SIMPLE_HYDRA_GENERATIVE_PROCEDURAL_H
 
 #include <pxr/pxr.h>
 #include <pxr/imaging/hdGp/generativeProceduralPlugin.h>
@@ -25,11 +25,11 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 /// Generates two cube mesh prims and injects them into the scene.
-class HydraGenerativeProcedural final : public HdGpGenerativeProcedural
+class SimpleHydraGenerativeProcedural final : public HdGpGenerativeProcedural
 {
 public:
-    HydraGenerativeProcedural(const SdfPath &proceduralPrimPath);
-    ~HydraGenerativeProcedural() override;
+    SimpleHydraGenerativeProcedural(const SdfPath &proceduralPrimPath);
+    ~SimpleHydraGenerativeProcedural() override;
 
     DependencyMap UpdateDependencies(
         const HdSceneIndexBaseRefPtr &inputScene) override;
@@ -45,11 +45,11 @@ public:
         const SdfPath &childPrimPath) override;
 
 private:
-    static const TfToken _cube0Name;   // "cube0"
-    static const TfToken _cube1Name;   // "cube1"
+    static const TfToken _cube0Name; 
+    static const TfToken _cube1Name;   
 
-    static const SdfPath _cube0Path;   // "cube0"
-    static const SdfPath _cube1Path;   // "cube1"
+    static const SdfPath _cube0Path; 
+    static const SdfPath _cube1Path;   
 
     HdSceneIndexPrim _BuildCubePrim(
         float halfSize,

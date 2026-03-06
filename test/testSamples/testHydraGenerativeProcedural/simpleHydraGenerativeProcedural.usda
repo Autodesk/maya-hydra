@@ -4,7 +4,7 @@ def GenerativeProcedural "MyGenerativeProcedural" (
     prepend apiSchemas = ["HydraGenerativeProceduralAPI"]
 )
 {
-    token primvars:hdGp:proceduralType = "HydraGenerativeProceduralPlugin"
+    token primvars:hdGp:proceduralType = "SimpleHydraGenerativeProceduralPlugin"
     token primvars:materialPath = "Materials"
 
     def Material "Materials" (

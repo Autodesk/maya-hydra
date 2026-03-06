@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-#include "hydraGenerativeProcedural.h"
+#include "simpleHydraGenerativeProcedural.h"
 
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/meshTopologySchema.h>
@@ -32,21 +32,21 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-const SdfPath HydraGenerativeProcedural::_cube0Path("/cube0");
-const SdfPath HydraGenerativeProcedural::_cube1Path("/cube1");
+const SdfPath SimpleHydraGenerativeProcedural::_cube0Path("/cube0");
+const SdfPath SimpleHydraGenerativeProcedural::_cube1Path("/cube1");
 
-const TfToken HydraGenerativeProcedural::_cube0Name("cube0");
-const TfToken HydraGenerativeProcedural::_cube1Name("cube1");
+const TfToken SimpleHydraGenerativeProcedural::_cube0Name("cube0");
+const TfToken SimpleHydraGenerativeProcedural::_cube1Name("cube1");
 
-HydraGenerativeProcedural::HydraGenerativeProcedural(
+SimpleHydraGenerativeProcedural::SimpleHydraGenerativeProcedural(
     const SdfPath &proceduralPrimPath)
     : HdGpGenerativeProcedural(proceduralPrimPath)
 {}
 
-HydraGenerativeProcedural::~HydraGenerativeProcedural() = default;
+SimpleHydraGenerativeProcedural::~SimpleHydraGenerativeProcedural() = default;
 
-HydraGenerativeProcedural::DependencyMap
-HydraGenerativeProcedural::UpdateDependencies(
+SimpleHydraGenerativeProcedural::DependencyMap
+SimpleHydraGenerativeProcedural::UpdateDependencies(
     const HdSceneIndexBaseRefPtr &)
 {
     DependencyMap result;
@@ -54,8 +54,8 @@ HydraGenerativeProcedural::UpdateDependencies(
     return result;
 }
 
-HydraGenerativeProcedural::ChildPrimTypeMap
-HydraGenerativeProcedural::Update(
+SimpleHydraGenerativeProcedural::ChildPrimTypeMap
+SimpleHydraGenerativeProcedural::Update(
     const HdSceneIndexBaseRefPtr &,
     const ChildPrimTypeMap &previousResult,
     const DependencyMap &,
@@ -69,7 +69,7 @@ HydraGenerativeProcedural::Update(
 }
 
 HdSceneIndexPrim
-HydraGenerativeProcedural::GetChildPrim(
+SimpleHydraGenerativeProcedural::GetChildPrim(
     const HdSceneIndexBaseRefPtr &inputScene,
     const SdfPath &childPrimPath)
 {
@@ -104,7 +104,7 @@ HydraGenerativeProcedural::GetChildPrim(
 }
 
 HdSceneIndexPrim
-HydraGenerativeProcedural::_BuildCubePrim(
+SimpleHydraGenerativeProcedural::_BuildCubePrim(
     float halfSize,
     const GfMatrix4d &transform,
     const SdfPath &materialPath) const

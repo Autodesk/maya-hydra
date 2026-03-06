@@ -1,4 +1,4 @@
-set(TARGET_NAME mayaHydraHydraGenerativeProceduralPlugin)
+set(TARGET_NAME mayaHydraSimpleHydraGenerativeProcedural)
 
 add_library(${TARGET_NAME} SHARED)
 
@@ -7,13 +7,13 @@ add_library(${TARGET_NAME} SHARED)
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME} 
     PRIVATE
-        hydraGenerativeProceduralPlugin.cpp
-        hydraGenerativeProcedural.cpp
+        simpleHydraGenerativeProceduralPlugin.cpp
+        simpleHydraGenerativeProcedural.cpp
 )
 
 set(HEADERS
-        hydraGenerativeProceduralPlugin.h
-        hydraGenerativeProcedural.h
+        simpleHydraGenerativeProceduralPlugin.h
+        simpleHydraGenerativeProcedural.h
 )
 
 # -----------------------------------------------------------------------------
@@ -95,13 +95,13 @@ set(PLUG_INFO_RESOURCE_PATH "resources")
 configure_file(${PLUG_INFO_PATH} ${CMAKE_CURRENT_BINARY_DIR}/${PLUG_INFO_PATH})
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PLUG_INFO_PATH} 
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/hydraGenerativeProceduralPlugin/resources)
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/simpleHydraGenerativeProcedural/resources)
 
 install(TARGETS ${TARGET_NAME}
         LIBRARY
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/hydraGenerativeProceduralPlugin
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/simpleHydraGenerativeProcedural
         RUNTIME
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/hydraGenerativeProceduralPlugin
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/simpleHydraGenerativeProcedural
 )
 
 if(IS_WINDOWS)
