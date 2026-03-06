@@ -25,75 +25,9 @@
 #include <pxr/imaging/hd/light.h>
 #include <pxr/usd/usdLux/tokens.h>
 
-#include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-namespace {
-
-void _changeVisibility(
-    MNodeMessage::AttributeMessage msg,
-    MPlug&                         plug,
-    MPlug&                         otherPlug,
-    void*                          clientData)
-{
-    TF_UNUSED(msg);
-    TF_UNUSED(otherPlug);
-    if (plug == MayaAttrs::dagNode::visibility) {
-        auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
-        if (adapter->UpdateVisibility()) {
-            adapter->RemovePrim();
-            adapter->Populate();
-            adapter->InvalidateTransform();
-        }
-    }
-}
-
-void _lightShapeChangedCallBack(
-    MNodeMessage::AttributeMessage msg,
-    MPlug&                         plug,
-    MPlug&                         otherPlug,
-    void*                          clientData)
-{
-    TF_UNUSED(msg);
-    TF_UNUSED(otherPlug);
-
-    auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
-    auto  plugPartialName = plug.partialName();
-    if (plugPartialName == MString("ai_translator")) {
-        // This is changing the light type, we need to remove the prim and add it again
-        adapter->RemovePrim();
-        adapter->Populate();
-        adapter->InvalidateTransform();
-    }
-
-    // Handle extension attributes change
-    adapter->HandleExtensionAndDynamicAttributesDirty(plug);
-}
-
-void _dirtyTransform(MObject& node, void* clientData)
-{
-    TF_UNUSED(node);
-    auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
-    if (adapter->IsVisible()) {
-        adapter->InvalidateTransform();
-        adapter->MarkDirty(
-            HdLight::DirtyTransform | HdLight::DirtyParams | HdLight::DirtyShadowParams);
-    }
-}
-
-void _dirtyParams(MObject& node, void* clientData)
-{
-    TF_UNUSED(node);
-    auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
-    if (adapter->IsVisible()) {
-        adapter->InvalidateTransform();
-        adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
-    }
-}
-
-} // namespace
 
 /**
  * \brief MayaHydraAiAreaLightAdapter is used to handle the translation from a Maya area light to
@@ -231,48 +165,15 @@ public:
         return MayaHydraLightAdapter::GetLightParamValue(paramName);
     }
 
-    // We need a special case when the user changes the light type, we need to repopulate the prim
-    void CreateCallbacks() override
+    bool OnShapeAttributeChanged(const MPlug& plug) override
     {
-        TF_DEBUG(MAYAHYDRALIB_ADAPTER_CALLBACKS)
-            .Msg("Creating light adapter callbacks for prim (%s).\n", GetID().GetText());
-
-        MStatus status;
-        auto    dag = GetDagPath();
-        auto    obj = dag.node();
-
-        // This is what is new compared to MayaHydraLightAdapter::CreateCallbacks()
-        auto id = MNodeMessage::addAttributeChangedCallback(
-            obj, _lightShapeChangedCallBack, this, &status);
-        if (status) {
-            AddCallback(id);
+        if (plug.partialName() == MString("ai_translator")) {
+            RemovePrim();
+            Populate();
+            InvalidateTransform();
+            return true;
         }
-
-        // This is the same as in MayaHydraLightAdapter::CreateCallbacks()
-        id = MNodeMessage::addNodeDirtyCallback(obj, _dirtyParams, this, &status);
-        if (status) {
-            AddCallback(id);
-        }
-
-        dag.pop();
-        for (; dag.length() > 0; dag.pop()) {
-            // The adapter itself will free the callbacks, so we don't have to worry
-            // about passing raw pointers to the callbacks. Hopefully.
-            obj = dag.node();
-            if (obj != MObject::kNullObj) {
-                id = MNodeMessage::addAttributeChangedCallback(
-                    obj, _changeVisibility, this, &status);
-                if (status) {
-                    AddCallback(id);
-                }
-                id = MNodeMessage::addNodeDirtyCallback(obj, _dirtyTransform, this, &status);
-                if (status) {
-                    AddCallback(id);
-                }
-                _AddHierarchyChangedCallbacks(dag);
-            }
-        }
-        MayaHydraAdapter::CreateCallbacks();
+        return MayaHydraLightAdapter::OnShapeAttributeChanged(plug);
     }
 };
 
