@@ -210,42 +210,67 @@ class ImageDiffingTestCase:
             abs2 = os.path.abspath(imagePath2).replace('\\', '/')
 
             artifact_base = os.environ.get('JENKINS_ARTIFACT_BASE', '').rstrip('/')
-            workspace = os.environ.get('WORKSPACE', '')
+            # Prefer explicit workspace; fall back to WORKSPACE (Jenkins); then infer from paths
+            workspace = os.environ.get('JENKINS_ARTIFACT_WORKSPACE', '') or os.environ.get('WORKSPACE', '')
             if workspace:
                 workspace = os.path.normpath(workspace)
 
-            if artifact_base and workspace:
-                def _artifact_url(abs_path):
+            if artifact_base:
+                def _resolve(p):
                     try:
-                        # Resolve paths to handle Windows drive aliases (e.g. W: -> D:\jenkins\...)
-                        try:
-                            resolved_path = str(pathlib.Path(abs_path).resolve())
-                            resolved_ws = str(pathlib.Path(workspace).resolve())
-                        except (OSError, RuntimeError):
-                            resolved_path = os.path.normpath(abs_path.replace('/', os.sep))
-                            resolved_ws = workspace
+                        return str(pathlib.Path(p).resolve())
+                    except (OSError, RuntimeError):
+                        return os.path.normpath(p.replace('/', os.sep))
+
+                def _artifact_url(abs_path, workspace_dir):
+                    if not workspace_dir:
+                        return None
+                    try:
+                        resolved_path = _resolve(abs_path)
+                        resolved_ws = _resolve(workspace_dir)
                         rel = os.path.relpath(resolved_path, resolved_ws)
+                        if rel.startswith('..'):
+                            return None
                         return artifact_base + '/' + rel.replace('\\', '/')
                     except ValueError:
                         return None
 
-                url1 = _artifact_url(abs1)
-                url2 = _artifact_url(abs2)
-                if url1 or url2:
-                    msg = str(proc.stdout) + "\n\nImage comparison failed.\n"
-                    if url1:
-                        msg += "  BASELINE_ARTIFACT_URL: {}\n".format(url1)
-                    if url2:
-                        msg += "  ACTUAL_ARTIFACT_URL:   {}\n".format(url2)
-                    if not (url1 and url2):
-                        msg += "  (Browse all artifacts: {})\n".format(artifact_base + '/')
-                else:
-                    msg = (
-                        str(proc.stdout) +
-                        "\n\nImage comparison failed. Paths for CI/artifact linking:\n"
-                        "  BASELINE_IMAGE: {}\n"
-                        "  ACTUAL_IMAGE:   {}\n"
-                    ).format(abs1, abs2)
+                # Try workspace first; if relpath fails (e.g. different drives on Windows),
+                # use common ancestor of both image paths as fallback workspace
+                used_ws = None
+                url1 = _artifact_url(abs1, workspace) if workspace else None
+                url2 = _artifact_url(abs2, workspace) if workspace else None
+                if workspace and (url1 or url2):
+                    used_ws = _resolve(workspace)
+                if (url1 is None or url2 is None) and abs1 and abs2:
+                    try:
+                        r1 = _resolve(abs1)
+                        r2 = _resolve(abs2)
+                        common = os.path.commonpath([r1, r2])
+                        if common:
+                            if url1 is None:
+                                url1 = _artifact_url(abs1, common)
+                            if url2 is None:
+                                url2 = _artifact_url(abs2, common)
+                            used_ws = common
+                    except (ValueError, OSError):
+                        pass
+
+                browse_url = artifact_base + '/'
+                baseline_name = os.path.basename(abs1)
+                actual_name = os.path.basename(abs2)
+                msg = str(proc.stdout) + "\n\nImage comparison failed.\n"
+                msg += "  Browse artifacts (search for {} or {}): {}\n".format(
+                    baseline_name, actual_name, browse_url)
+                if used_ws:
+                    msg += "  imageUtils workspace (for path comparison): {}\n".format(used_ws)
+                if url1:
+                    msg += "  BASELINE_ARTIFACT_URL: {}\n".format(url1)
+                if url2:
+                    msg += "  ACTUAL_ARTIFACT_URL:   {}\n".format(url2)
+                if not url1 or not url2:
+                    msg += "  If direct links fail, use the browse URL above.\n"
+                msg += "\n  BASELINE_IMAGE: {}\n  ACTUAL_IMAGE:   {}\n".format(abs1, abs2)
             else:
                 msg = (
                     str(proc.stdout) +
