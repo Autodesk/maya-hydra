@@ -881,6 +881,13 @@ void MayaHydraSceneIndex::MarkRprimDirty(const SdfPath& id, HdDirtyBits dirtyBit
     _MarkPrimDirty(id, dirtyBits, HdDirtyBitsTranslator::RprimDirtyBitsToLocatorSet);
 }
 
+void MayaHydraSceneIndex::MarkRprimDirtyWithLocators(const SdfPath& id, const HdDataSourceLocatorSet& locators)
+{
+    if (!locators.IsEmpty()) {
+        DirtyPrims({ { id, locators } });
+    }
+}
+
 void MayaHydraSceneIndex::MarkSprimDirty(const SdfPath& id, HdDirtyBits dirtyBits)
 {
     _MarkPrimDirty(id, dirtyBits, HdDirtyBitsTranslator::SprimDirtyBitsToLocatorSet);

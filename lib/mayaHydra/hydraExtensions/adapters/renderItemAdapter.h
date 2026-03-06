@@ -223,6 +223,8 @@ private:
     bool                        _isHideOnPlayback = false;
     bool                        _isInPlayback = false;
     bool                        _isArnoldSkyDomeLightTriangleShape = false;
+    bool                        _hasDeformation = false;
+    bool                        _deformationCached = false;
     GfBBox3d                    _bounds;//Bounding box
     TfToken                     _purposeRenderTag;
 #ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API

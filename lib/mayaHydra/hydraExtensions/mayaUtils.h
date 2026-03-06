@@ -203,6 +203,21 @@ std::string GetDomeLightTexture(const MFnDependencyNode& lightNode);
  */
 bool IsDagPathOfGivenType(const MDagPath& dagPath, const MString& type);
 
+/**
+ * @brief Returns true if the mesh at \p dagPath has deformation (blend shape or skinning) upstream.
+ *
+ * Traverses the Maya dependency graph from the shape's inMesh plug to find blend shape or
+ * skin cluster nodes. Used to determine whether to route Hydra updates via extCompPrimvars
+ * (deformation) vs primvars/points (static geometry).
+ *
+ * Only valid for mesh shapes (MFn::kMesh). Returns false for non-mesh or on error.
+ *
+ * @param[in] dagPath is the DAG path of the mesh shape
+ * @return true if the mesh has deformation upstream, false otherwise
+ */
+MAYAHYDRALIB_API
+bool HasDeformation(const MDagPath& dagPath);
+
 } // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRALIB_MAYA_UTILS_H

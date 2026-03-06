@@ -18,6 +18,7 @@
 
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
+#include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
@@ -26,6 +27,8 @@
 #include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/registryManager.h>
 #include <pxr/base/tf/type.h>
+#include <pxr/imaging/hd/extComputationPrimvarsSchema.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hdx/renderTask.h>
 #include <pxr/usd/sdr/registry.h>
@@ -199,6 +202,15 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     }
     if (geomChanged) {
         dirtyBits |= (HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent | HdChangeTracker::DirtyNormals);
+    }
+    if ((geomChanged || topoChanged) && _primitive == MHWRender::MGeometry::Primitive::kTriangles) {
+        if (topoChanged) {
+            _deformationCached = false; // Invalidate cache when topology changes (deformer chain may have changed)
+        }
+        if (!_deformationCached) {
+            _hasDeformation = HasDeformation(_dagPath);
+            _deformationCached = true;
+        }
     }
     if (topoChanged) {
         dirtyBits |= (HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyExtent);
@@ -507,6 +519,33 @@ VtValue MayaHydraRenderItemAdapter::Get(const TfToken& key)
 
 void MayaHydraRenderItemAdapter::MarkDirty(HdDirtyBits dirtyBits)
 {
+    if (dirtyBits == 0) {
+        return;
+    }
+
+    // When mesh has deformation (blend shape/skinning), dirty both primvars (for current
+    // path) and extCompPrimvars (for future GPU deformation) via a single locator call.
+    // Strip DirtyPoints/DirtyNormals so MarkRprimDirty does not emit duplicate primvars.
+    if (_hasDeformation && _primitive == MHWRender::MGeometry::Primitive::kTriangles) {
+        if (dirtyBits & (HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyNormals)) {
+            HdDataSourceLocatorSet locators;
+            const auto primvarsLocator = HdPrimvarsSchema::GetDefaultLocator();
+            const auto extCompLocator = HdExtComputationPrimvarsSchema::GetDefaultLocator();
+            if (dirtyBits & HdChangeTracker::DirtyPoints) {
+                locators.append(primvarsLocator.Append(HdPrimvarsSchemaTokens->points));
+                locators.append(extCompLocator.Append(HdPrimvarsSchemaTokens->points));
+            }
+            if (dirtyBits & HdChangeTracker::DirtyNormals) {
+                locators.append(primvarsLocator.Append(HdPrimvarsSchemaTokens->normals));
+                locators.append(extCompLocator.Append(HdPrimvarsSchemaTokens->normals));
+            }
+            if (!locators.IsEmpty()) {
+                GetMayaHydraSceneIndex()->MarkRprimDirtyWithLocators(GetID(), locators);
+            }
+            dirtyBits &= ~(HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyNormals);
+        }
+    }
+
     if (dirtyBits != 0) {
         GetMayaHydraSceneIndex()->MarkRprimDirty(GetID(), dirtyBits);
     }

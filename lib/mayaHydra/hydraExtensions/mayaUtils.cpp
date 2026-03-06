@@ -20,6 +20,10 @@
 
 #include <maya/MDagPath.h>
 #include <maya/MFnDagNode.h>
+#include <maya/MFnMesh.h>
+#include <maya/MItDependencyGraph.h>
+#include <maya/MObject.h>
+#include <maya/MPlug.h>
 #include <maya/MMatrix.h>
 #include <maya/MObjectArray.h>
 #include <maya/MPlug.h>
@@ -167,6 +171,43 @@ bool IsDagPathOfGivenType(const MDagPath& dagPath, const MString& type)
     auto shapeDagPath = dagPath;
     shapeDagPath.extendToShape();
     return type == MFnDependencyNode(shapeDagPath.node()).typeName();
+}
+
+bool HasDeformation(const MDagPath& dagPath)
+{
+    if (!dagPath.hasFn(MFn::kMesh)) {
+        return false;
+    }
+
+    MStatus status;
+    MFnMesh mesh(dagPath, &status);
+    if (!status) {
+        return false;
+    }
+
+    MPlug inMeshPlug = mesh.findPlug("inMesh", true, &status);
+    if (!status || inMeshPlug.isNull()) {
+        return false;
+    }
+
+    MItDependencyGraph it(
+        inMeshPlug, MFn::kInvalid, MItDependencyGraph::kUpstream, MItDependencyGraph::kDepthFirst,
+        MItDependencyGraph::kNodeLevel, &status);
+    if (!status) {
+        return false;
+    }
+
+    for (; !it.isDone(); it.next()) {
+        MObject node = it.currentItem(&status);
+        if (!status) {
+            continue;
+        }
+        if (node.hasFn(MFn::kBlendShape) || node.hasFn(MFn::kSkinClusterFilter)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 } // namespace MAYAHYDRA_NS_DEF

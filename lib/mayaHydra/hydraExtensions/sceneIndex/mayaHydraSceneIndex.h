@@ -110,6 +110,7 @@ public:
     void RemovePrim(const SdfPath& id);
 
     void MarkRprimDirty(const SdfPath& id, HdDirtyBits dirtyBits);
+    void MarkRprimDirtyWithLocators(const SdfPath& id, const HdDataSourceLocatorSet& locators);
     void MarkSprimDirty(const SdfPath& id, HdDirtyBits dirtyBits);
     void MarkBprimDirty(const SdfPath& id, HdDirtyBits dirtyBits);
     void MarkInstancerDirty(const SdfPath& id, HdDirtyBits dirtyBits);

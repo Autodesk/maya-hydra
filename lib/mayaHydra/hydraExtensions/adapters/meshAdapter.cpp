@@ -15,6 +15,7 @@
 //
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
+#include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/shapeAdapter.h>
 #include <mayaHydraLib/adapters/tokens.h>
@@ -22,6 +23,8 @@
 
 #include <pxr/base/gf/interval.h>
 #include <pxr/base/tf/type.h>
+#include <pxr/imaging/hd/extComputationPrimvarsSchema.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/pxOsd/tokens.h>
 #include <pxr/pxr.h>
@@ -473,12 +476,50 @@ public:
 
     TfToken GetRenderTag() const override { return HdRenderTagTokens->geometry; }
 
+    void MarkDirty(HdDirtyBits dirtyBits) override
+    {
+        if (dirtyBits == 0) {
+            return;
+        }
+
+        // When mesh has deformation (blend shape/skinning), dirty both primvars (for current
+        // path) and extCompPrimvars (for future GPU deformation) via a single locator call.
+        // Strip DirtyPoints/DirtyNormals so MarkDirty does not emit duplicate primvars.
+        if (_hasDeformation && (dirtyBits & (HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyNormals))) {
+            HdDataSourceLocatorSet locators;
+            const auto primvarsLocator = HdPrimvarsSchema::GetDefaultLocator();
+            const auto extCompLocator = HdExtComputationPrimvarsSchema::GetDefaultLocator();
+            if (dirtyBits & HdChangeTracker::DirtyPoints) {
+                locators.append(primvarsLocator.Append(HdPrimvarsSchemaTokens->points));
+                locators.append(extCompLocator.Append(HdPrimvarsSchemaTokens->points));
+            }
+            if (dirtyBits & HdChangeTracker::DirtyNormals) {
+                locators.append(primvarsLocator.Append(HdPrimvarsSchemaTokens->normals));
+                locators.append(extCompLocator.Append(HdPrimvarsSchemaTokens->normals));
+            }
+            if (!locators.IsEmpty()) {
+                GetMayaHydraSceneIndex()->MarkRprimDirtyWithLocators(GetID(), locators);
+            }
+            dirtyBits &= ~(HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyNormals);
+        }
+
+        if (dirtyBits != 0) {
+            MayaHydraShapeAdapter::MarkDirty(dirtyBits);
+        }
+    }
+
 private:
     static void NodeDirtiedCallback(MObject& node, MPlug& plug, void* clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
         for (const auto& it : _dirtyBits) {
             if (it.first == plug) {
+                if (it.first == MayaAttrs::mesh::inMesh || it.first == MayaAttrs::mesh::pnts) {
+                    if (!adapter->_deformationCached) {
+                        adapter->_hasDeformation = MAYAHYDRA_NS_DEF::HasDeformation(adapter->GetDagPath());
+                        adapter->_deformationCached = true;
+                    }
+                }
                 adapter->MarkDirty(it.second);
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_MESH_PLUG_DIRTY)
                     .Msg(
@@ -524,6 +565,9 @@ private:
     static void TopologyChangedCallback(MObject& node, void* clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
+        adapter->_deformationCached = false; // Invalidate cache when topology changes (deformer chain may have changed)
+        adapter->_hasDeformation = MAYAHYDRA_NS_DEF::HasDeformation(adapter->GetDagPath());
+        adapter->_deformationCached = true;
         adapter->MarkDirty(
             HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar
             | HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyNormals);
@@ -546,6 +590,9 @@ private:
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
         adapter->MarkDirty(HdChangeTracker::DirtyPrimvar);
     }
+
+    bool _hasDeformation = false;
+    bool _deformationCached = false;
 
     // Maya has a bug with removing some MPolyMessage callbacks. Known
     // problem callbacks include:
