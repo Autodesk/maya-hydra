@@ -32,9 +32,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-const SdfPath SimpleHydraGenerativeProcedural::_cube0Path("/cube0");
-const SdfPath SimpleHydraGenerativeProcedural::_cube1Path("/cube1");
-
 const TfToken SimpleHydraGenerativeProcedural::_cube0Name("cube0");
 const TfToken SimpleHydraGenerativeProcedural::_cube1Name("cube1");
 

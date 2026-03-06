@@ -208,7 +208,7 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL})
         ENV
             "MAYA_HYDRA_USE_MESH_ADAPTER=1"
             "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
-           "HDGP_INCLUDE_DEFAULT_RESOLVER=1"
+            "HDGP_INCLUDE_DEFAULT_RESOLVER=1"
     )
 
     # Assign a CTest label to these tests for easy filtering.
