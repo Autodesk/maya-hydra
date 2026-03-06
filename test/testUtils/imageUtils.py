@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 import os
+import pathlib
 import maya.cmds as cmds
 import shutil
 import subprocess
@@ -216,10 +217,14 @@ class ImageDiffingTestCase:
             if artifact_base and workspace:
                 def _artifact_url(abs_path):
                     try:
-                        rel = os.path.relpath(
-                            os.path.normpath(abs_path.replace('/', os.sep)),
-                            workspace
-                        )
+                        # Resolve paths to handle Windows drive aliases (e.g. W: -> D:\jenkins\...)
+                        try:
+                            resolved_path = str(pathlib.Path(abs_path).resolve())
+                            resolved_ws = str(pathlib.Path(workspace).resolve())
+                        except (OSError, RuntimeError):
+                            resolved_path = os.path.normpath(abs_path.replace('/', os.sep))
+                            resolved_ws = workspace
+                        rel = os.path.relpath(resolved_path, resolved_ws)
                         return artifact_base + '/' + rel.replace('\\', '/')
                     except ValueError:
                         return None

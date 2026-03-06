@@ -252,8 +252,8 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
     def _waitForConvergence(self, delegate):
         """Wait for progressive renderers to converge before taking a snapshot.
         Uses mayaHydraTesting(converged=True). Skips when convergenceTimeout is 0 (e.g. Storm).
-        Times out after convergenceTimeout seconds for delegates that may not report convergence.
-        """
+        If the renderer does not report convergence within the timeout (e.g. PRMan in interactive
+        mode), we proceed anyway and take the snapshot."""
         timeoutSeconds = delegate.get("convergenceTimeout", 0)
         if timeoutSeconds <= 0:
             return
@@ -265,14 +265,8 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 cmds.refresh(force=True)
                 return
             time.sleep(0.5)
-        # If we exit the loop, the renderer never reported convergence within the timeout.
+        # Timeout reached; some renderers (e.g. PRMan) never report convergence in interactive mode.
         cmds.refresh(force=True)
-        elapsed = time.time() - start
-        rendererName = delegate.get("name", rendererPlugin)
-        self.fail(
-            "Renderer '{}' ({}) did not report convergence within {:.1f} seconds; "
-            "snapshot may be invalid.".format(rendererName, rendererPlugin, elapsed)
-        )
 
     def _setLightIntensities(self, activeLight, intensity):
         """Set all lights to 0 except activeLight, which gets the given intensity."""
