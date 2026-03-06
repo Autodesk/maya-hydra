@@ -87,7 +87,11 @@ void LightAdapterParentAttributeChanged(
 
 namespace {
 
-void _lightShapeAttributeChanged(
+const MString defaultLightSet("defaultLightSet");
+
+} // namespace
+
+void MayaHydraLightAdapter::_LightShapeAttributeChanged(
     MNodeMessage::AttributeMessage msg,
     MPlug&                         plug,
     MPlug&                         otherPlug,
@@ -109,10 +113,6 @@ void _lightShapeAttributeChanged(
         adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
     }
 }
-
-const MString defaultLightSet("defaultLightSet");
-
-} // namespace
 
 // MayaHydraLightAdapter is the base class for any light adapter used to handle the translation from
 // a light to hydra.
@@ -783,7 +783,7 @@ void MayaHydraLightAdapter::CreateCallbacks()
     auto    obj = dag.node();
     // Use attribute-changed on shape (not node-dirty) to avoid redundant light+primvars dirtying
     // when only custom attributes change.
-    auto id = MNodeMessage::addAttributeChangedCallback(obj, _lightShapeAttributeChanged, this, &status);
+    auto id = MNodeMessage::addAttributeChangedCallback(obj, _LightShapeAttributeChanged, this, &status);
     if (status) {
         AddCallback(id);
     }

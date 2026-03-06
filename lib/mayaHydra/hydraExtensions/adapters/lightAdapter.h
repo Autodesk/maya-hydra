@@ -101,6 +101,13 @@ protected:
     /// handled (e.g. ai_translator on aiAreaLight). Default returns false.
     virtual bool OnShapeAttributeChanged(const MPlug& plug);
 
+    /// Static callback for MNodeMessage::addAttributeChangedCallback on the shape node.
+    static void _LightShapeAttributeChanged(
+        MNodeMessage::AttributeMessage msg,
+        MPlug&                         plug,
+        MPlug&                         otherPlug,
+        void*                          clientData);
+
     MAYAHYDRALIB_API
     virtual void _CalculateLightParams(GlfSimpleLight& light) { }
     MAYAHYDRALIB_API
