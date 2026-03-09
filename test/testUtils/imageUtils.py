@@ -149,6 +149,21 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail,
 
     return None # Running of imageDiff failed.
 
+def _generateDiffImage(imagePath1, imagePath2, outputPath):
+    """Generate a visual diff image using idiff -o -abs. Returns output path if successful, else None."""
+    image_diff_tool = os.environ.get('IMAGE_DIFF_TOOL')
+    if not image_diff_tool:
+        return None
+    os.makedirs(os.path.dirname(outputPath), exist_ok=True)
+    cmd = [image_diff_tool, '-o', outputPath, '-abs', '-scale', '10', imagePath1, imagePath2]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, shell=False, env=os.environ.copy())
+        if proc.returncode in (0, 1, 2) and os.path.isfile(outputPath):
+            return outputPath
+    except OSError:
+        pass
+    return None
+
 def convertToSilhouette(imagePath):
     # 2024-06-13 : Tried to use oiiotool instead of PySide for this to be more efficient,
     # however it did not work under certain circumstances, for example when trying to
@@ -237,11 +252,8 @@ class ImageDiffingTestCase:
 
                 # Try workspace first; if relpath fails (e.g. different drives on Windows),
                 # use common ancestor of both image paths as fallback workspace
-                used_ws = None
                 url1 = _artifact_url(abs1, workspace) if workspace else None
                 url2 = _artifact_url(abs2, workspace) if workspace else None
-                if workspace and (url1 or url2):
-                    used_ws = _resolve(workspace)
                 if (url1 is None or url2 is None) and abs1 and abs2:
                     try:
                         r1 = _resolve(abs1)
@@ -252,34 +264,45 @@ class ImageDiffingTestCase:
                                 url1 = _artifact_url(abs1, common)
                             if url2 is None:
                                 url2 = _artifact_url(abs2, common)
-                            used_ws = common
                     except (ValueError, OSError):
                         pass
 
                 browse_url = artifact_base + '/'
-                baseline_name = os.path.basename(abs1)
-                actual_name = os.path.basename(abs2)
+                diff_path = None
+                base2, ext2 = os.path.splitext(os.path.basename(abs2))
+                diff_output = os.path.join(os.path.dirname(abs2), base2 + '_diff' + (ext2 or '.png'))
+                diff_path = _generateDiffImage(abs1, abs2, diff_output)
+                if diff_path:
+                    diff_abs = os.path.abspath(diff_path).replace('\\', '/')
+                    url_diff = _artifact_url(diff_abs, workspace) if workspace else None
+                    if url_diff is None and abs1 and abs2:
+                        try:
+                            r_diff = _resolve(diff_abs)
+                            r1 = _resolve(abs1)
+                            r2 = _resolve(abs2)
+                            common = os.path.commonpath([r1, r2])
+                            if common:
+                                url_diff = _artifact_url(diff_abs, common)
+                        except (ValueError, OSError):
+                            pass
+                else:
+                    url_diff = None
+
                 msg = str(proc.stdout) + "\n\nImage comparison failed.\n"
-                msg += "  Browse artifacts (search for {} or {}): {}\n".format(
-                    baseline_name, actual_name, browse_url)
-                if used_ws:
-                    msg += "  imageUtils workspace (for path comparison): {}\n".format(used_ws)
                 if url1:
-                    msg += "  BASELINE_ARTIFACT_URL: {}\n".format(url1)
+                    msg += "  Baseline: {}\n".format(url1)
                 if url2:
-                    msg += "  ACTUAL_ARTIFACT_URL:   {}\n".format(url2)
-                if not url1 or not url2:
-                    msg += "  If direct links fail, use the browse URL above.\n"
-                msg += "\n  BASELINE_IMAGE: {}\n  ACTUAL_IMAGE:   {}\n".format(abs1, abs2)
+                    msg += "  Actual:   {}\n".format(url2)
+                if url_diff:
+                    msg += "  Diff:     {}\n".format(url_diff)
+                msg += "  Browse:   {}\n".format(browse_url)
             else:
-                msg = (
-                    str(proc.stdout) +
-                    "\n\nImage comparison failed. Paths for CI/artifact linking:\n"
-                    "  BASELINE_IMAGE: {}\n"
-                    "  ACTUAL_IMAGE:   {}\n"
-                ).format(abs1, abs2)
-                if artifact_base:
-                    msg += "  Browse artifacts: {}/\n".format(artifact_base)
+                msg = str(proc.stdout) + "\n\nImage comparison failed.\n"
+                base2, ext2 = os.path.splitext(os.path.basename(abs2))
+                diff_output = os.path.join(os.path.dirname(abs2), base2 + '_diff' + (ext2 or '.png'))
+                diff_path = _generateDiffImage(abs1, abs2, diff_output)
+                if diff_path:
+                    msg += "  Diff:     {}\n".format(os.path.abspath(diff_path).replace('\\', '/'))
             self.fail(msg)
         return proc.returncode
     

@@ -29,6 +29,25 @@ def _log(msg):
     sys.__stdout__.write(msg + "\n")
     sys.__stdout__.flush()
 
+
+def _print_log_tail_static(path, title, max_lines=200):
+    """Print the tail of a log file to stdout so CI logs capture it (module-level helper)."""
+    if not path:
+        return
+    try:
+        if not os.path.isfile(path):
+            _log("{}: (missing) {}".format(title, path))
+            return
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.read().splitlines()
+        tail = lines[-max_lines:] if len(lines) > max_lines else lines
+        _log("\n===== {} (last {} lines): {} =====".format(title, len(tail), path))
+        for ln in tail:
+            _log(ln)
+        _log("===== end {} =====\n".format(title))
+    except Exception as e:
+        _log("Warning: failed to print {} tail ({}): {}".format(title, path, e))
+
 import fixturesUtils
 import mayaUtils
 import mtohUtils
@@ -111,6 +130,8 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             "PXR_AR_DEFAULT_SEARCH_PATH": os.environ.get("PXR_AR_DEFAULT_SEARCH_PATH"),
             "RMAN_CONFIG_OVERRIDE": os.environ.get("RMAN_CONFIG_OVERRIDE"),
             "RMAN_DUMP_DEFAULTS": os.environ.get("RMAN_DUMP_DEFAULTS"),
+            "RDIR": os.environ.get("RDIR"),
+            "RMAN_LOGFILE": os.environ.get("RMAN_LOGFILE"),
             "TF_DEBUG": os.environ.get("TF_DEBUG"),
         }
 
@@ -143,6 +164,13 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
         os.environ["RMAN_CONFIG_OVERRIDE"] = log_root
         os.environ["RMAN_DUMP_DEFAULTS"] = "1"
+        # RDIR: alternate config dir (some RenderMan versions use this).
+        os.environ["RDIR"] = log_root
+        # RMAN_LOGFILE: redirect PRMan log to file so we can dump it to CI (if supported).
+        prman_log = os.path.join(log_root, "prman.log")
+        cls._prman_log_file = prman_log
+        cls._prman_log_root = log_root
+        os.environ["RMAN_LOGFILE"] = prman_log
 
         # Capture Maya Script Editor output (includes many delegate/prman messages).
         try:
@@ -159,11 +187,13 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             cls._maya_history_file = None
 
         _log(
-            "PRMan setUpClass: sceneDir={} | RMAN_TEXTUREPATH={} | PXR_AR_DEFAULT_SEARCH_PATH={} | RMAN_CONFIG_OVERRIDE={} | TF_DEBUG={} | MayaHistory={}".format(
+            "PRMan setUpClass: sceneDir={} | RMAN_TEXTUREPATH={} | PXR_AR_DEFAULT_SEARCH_PATH={} | RMAN_CONFIG_OVERRIDE={} | RDIR={} | RMAN_LOGFILE={} | TF_DEBUG={} | MayaHistory={}".format(
                 sceneDir,
                 os.environ.get("RMAN_TEXTUREPATH", ""),
                 os.environ.get("PXR_AR_DEFAULT_SEARCH_PATH", ""),
                 os.environ.get("RMAN_CONFIG_OVERRIDE", ""),
+                os.environ.get("RDIR", ""),
+                os.environ.get("RMAN_LOGFILE", ""),
                 os.environ.get("TF_DEBUG", ""),
                 getattr(cls, "_maya_history_file", None),
             )
@@ -186,6 +216,23 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 _log("Maya Script Editor history: (missing) {}".format(history))
         except Exception as e:
             _log("Warning: failed to dump Maya Script Editor history: {}".format(e))
+
+        # Dump PRMan log file if it exists (RMAN_LOGFILE redirects PRMan output to file).
+        try:
+            prman_log = getattr(cls, "_prman_log_file", None)
+            log_root = getattr(cls, "_prman_log_root", None)
+            if prman_log and os.path.isfile(prman_log):
+                _print_log_tail_static(prman_log, "PRMan log", max_lines=500)
+            else:
+                _log("PRMan log: (not found) {} ".format(prman_log or "(RMAN_LOGFILE not set)"))
+            # Also dump any other .log files in the PRMan log dir (PRMan may use different names).
+            if log_root and os.path.isdir(log_root):
+                for name in sorted(os.listdir(log_root)):
+                    if name.endswith(".log") and os.path.join(log_root, name) != prman_log:
+                        p = os.path.join(log_root, name)
+                        _print_log_tail_static(p, "PRMan log ({})".format(name), max_lines=300)
+        except Exception as e:
+            _log("Warning: failed to dump PRMan log: {}".format(e))
 
         # Restore Script Editor capture settings.
         try:
