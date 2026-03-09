@@ -125,7 +125,6 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         # RenderMan logging knobs (best-effort; harmless if ignored).
         log_root = os.path.join(tempfile.gettempdir(), "mayaHydra_prman_logs")
         os.makedirs(log_root, exist_ok=True)
-        cls._prman_log_dir = log_root
 
         # Minimal override file to bump prman log verbosity.
         ini_path = os.path.join(log_root, "rendermn.ini")
@@ -402,6 +401,11 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         if required == "all":
             return True
         return platform.system().lower() == required.lower()
+
+    def loadScene(self):
+        """Load the test scene and set the base renderer state."""
+        mayaUtils.openTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
+        self.setHdStormRenderer()
 
     def test_EachLight_PerRenderDelegate(self):
         """For each render delegate, enable each Maya light one by one and compare snapshots to baseline."""
