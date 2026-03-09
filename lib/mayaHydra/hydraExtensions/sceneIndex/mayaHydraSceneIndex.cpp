@@ -24,6 +24,7 @@
 #include <mayaHydraLib/hydraUtils.h>
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
+#include <mayaHydraLib/profilingUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
 
 #include <pxr/base/tf/envSetting.h>
@@ -441,6 +442,8 @@ void MayaHydraSceneIndex::_Destroy()
 
 void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewportScene& scene)
 {
+    MH_PROFILE_FUNCTION();
+
     // First loop to get rid of removed items
     constexpr int kInvalidId = 0;
     for (size_t i = 0; i < scene.mRemovalCount; i++) {
@@ -538,6 +541,8 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
 
 void MayaHydraSceneIndex::Populate()
 {
+    MH_PROFILE_FUNCTION();
+
     MayaHydraAdapterRegistry::LoadAllPlugin();
 
     MStatus status;
