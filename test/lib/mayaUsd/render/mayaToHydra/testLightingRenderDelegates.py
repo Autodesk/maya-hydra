@@ -16,11 +16,18 @@
 
 import os
 import platform
+import sys
 import time
 import tempfile
 from contextlib import contextmanager
 
 import maya.cmds as cmds
+
+
+def _log(msg):
+    """Write to original stdout so CI logs capture it (Maya may redirect sys.stdout)."""
+    sys.__stdout__.write(msg + "\n")
+    sys.__stdout__.flush()
 
 import fixturesUtils
 import mayaUtils
@@ -88,7 +95,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
         - RMAN_TEXTUREPATH: RenderMan texture search path
         - PXR_AR_DEFAULT_SEARCH_PATH: USD default resolver search path
-        - TF_DEBUG: enable hdPrman image asset resolution debug
+        - TF_DEBUG: append HDPRMAN_IMAGE_ASSET_RESOLVE for hdPrman image asset resolution debug
         - Maya Script Editor history: capture delegate output and dump to CI logs
         - RenderMan config override: bump verbosity via a minimal rendermn.ini
         """
@@ -132,7 +139,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             with open(ini_path, "w", encoding="utf-8") as f:
                 f.write("loglevel 4\n")
         except Exception as e:
-            print("Warning: failed to write rendermn.ini override: {}".format(e))
+            _log("Warning: failed to write rendermn.ini override: {}".format(e))
 
         os.environ["RMAN_CONFIG_OVERRIDE"] = log_root
         os.environ["RMAN_DUMP_DEFAULTS"] = "1"
@@ -147,11 +154,11 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             cmds.scriptEditorInfo(edit=True, writeHistory=True, historyFilename=history_file)
             cls._maya_history_file = history_file
         except Exception as e:
-            print("Warning: failed to enable Script Editor history capture: {}".format(e))
+            _log("Warning: failed to enable Script Editor history capture: {}".format(e))
             cls._saved_script_editor = None
             cls._maya_history_file = None
 
-        print(
+        _log(
             "PRMan setUpClass: sceneDir={} | RMAN_TEXTUREPATH={} | PXR_AR_DEFAULT_SEARCH_PATH={} | RMAN_CONFIG_OVERRIDE={} | TF_DEBUG={} | MayaHistory={}".format(
                 sceneDir,
                 os.environ.get("RMAN_TEXTUREPATH", ""),
@@ -171,14 +178,14 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 with open(history, "r", encoding="utf-8", errors="replace") as f:
                     lines = f.read().splitlines()
                 tail = lines[-400:] if len(lines) > 400 else lines
-                print("\n===== Maya Script Editor history (last {} lines): {} =====".format(len(tail), history))
+                _log("\n===== Maya Script Editor history (last {} lines): {} =====".format(len(tail), history))
                 for ln in tail:
-                    print(ln)
-                print("===== end Maya Script Editor history =====\n")
+                    _log(ln)
+                _log("===== end Maya Script Editor history =====\n")
             else:
-                print("Maya Script Editor history: (missing) {}".format(history))
+                _log("Maya Script Editor history: (missing) {}".format(history))
         except Exception as e:
-            print("Warning: failed to dump Maya Script Editor history: {}".format(e))
+            _log("Warning: failed to dump Maya Script Editor history: {}".format(e))
 
         # Restore Script Editor capture settings.
         try:
@@ -190,7 +197,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                     historyFilename=saved.get("historyFilename", ""),
                 )
         except Exception as e:
-            print("Warning: failed to restore Script Editor settings: {}".format(e))
+            _log("Warning: failed to restore Script Editor settings: {}".format(e))
 
         # Restore environment variables.
         saved_env = getattr(cls, "_saved_env", None) or {}
@@ -229,7 +236,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
             diffusePath = os.path.join(sceneDir, "diffuse.png")
             uvCheckerPath = os.path.join(sceneDir, "UVChecker.png")
-            print(
+            _log(
                 "PRMan context: cwd={} | workspace={} | diffuse.png exists={} | UVChecker.png exists={} | RMAN_TEXTUREPATH={} | PXR_AR_DEFAULT_SEARCH_PATH={} | TF_DEBUG={}".format(
                     os.getcwd(),
                     cmds.workspace(q=True, rd=True),
@@ -260,11 +267,11 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             try:
                 cmds.workspace(saved_workspace, o=True)
             except Exception as e:
-                print("Warning: failed to restore Maya workspace: {}".format(e))
+                _log("Warning: failed to restore Maya workspace: {}".format(e))
             try:
                 os.chdir(saved_cwd)
             except Exception as e:
-                print("Warning: failed to restore cwd: {}".format(e))
+                _log("Warning: failed to restore cwd: {}".format(e))
 
     def _absolutizeFileTextures(self, sceneDir):
         """Rewrite Maya file-node texture paths to absolute paths for reliable CI runs.
@@ -294,7 +301,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 cmds.setAttr(n + ".fileTextureName", abs_p, type="string")
 
         if saved:
-            print("PRMan context: rewrote {} file-node texture path(s) to absolute.".format(len(saved)))
+            _log("PRMan context: rewrote {} file-node texture path(s) to absolute.".format(len(saved)))
         return saved
 
     def _restoreFileTextures(self, saved):
@@ -313,17 +320,17 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             return
         try:
             if not os.path.isfile(path):
-                print("{}: (missing) {}".format(title, path))
+                _log("{}: (missing) {}".format(title, path))
                 return
             with open(path, "r", encoding="utf-8", errors="replace") as f:
                 lines = f.read().splitlines()
             tail = lines[-max_lines:] if len(lines) > max_lines else lines
-            print("\n===== {} (last {} lines): {} =====".format(title, len(tail), path))
+            _log("\n===== {} (last {} lines): {} =====".format(title, len(tail), path))
             for ln in tail:
-                print(ln)
-            print("===== end {} =====\n".format(title))
+                _log(ln)
+            _log("===== end {} =====\n".format(title))
         except Exception as e:
-            print("Warning: failed to print {} tail ({}): {}".format(title, path, e))
+            _log("Warning: failed to print {} tail ({}): {}".format(title, path, e))
 
     def _setRenderer(self, delegate):
         """Switch the viewport to the given Hydra renderer."""
@@ -333,7 +340,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
         # Validate via mayaHydra (modelEditor query can be unreliable when MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1)
         activeRenderers = cmds.mayaHydra(listActiveRenderers=True)
-        print("Active renderers: {}".format(activeRenderers))
+        _log("Active renderers: {}".format(activeRenderers))
         self.assertIn(
             delegate["plugin"],
             activeRenderers,
