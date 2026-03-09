@@ -70,7 +70,17 @@ PassFilteringSceneIndex::PassFilteringSceneIndex(
     , InputSceneIndexUtils(inputSceneIndex)
     , _framePassData(framePassData)
 {
+    static const TfToken generativeProceduralToken("hydraGenerativeProcedural");
+    static const TfToken resolvedGenerativeProceduralToken("resolvedHydraGenerativeProcedural");
+
+    auto inputIndex = GetInputSceneIndex();
+
     for (const SdfPath& primPath : HdSceneIndexPrimView(GetInputSceneIndex())) {
+        HdSceneIndexPrim prim = inputIndex->GetPrim(primPath);
+        if (prim.primType == generativeProceduralToken
+            || prim.primType == resolvedGenerativeProceduralToken) {
+            _generativeProceduralPaths.insert(primPath);
+        }
         _UpdateFilteringStatus(primPath);
     }
 }
