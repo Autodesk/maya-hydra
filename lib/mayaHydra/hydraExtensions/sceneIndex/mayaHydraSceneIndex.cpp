@@ -1496,6 +1496,11 @@ bool MayaHydraSceneIndex::passNormalsToHydra()
     return val;
 }
 
+bool MayaHydraSceneIndex::SupportsExtComputation() const
+{
+    return _renderIndex.IsSprimTypeSupported(HdPrimTypeTokens->extComputation);
+}
+
 void MayaHydraSceneIndex::UpdateLightsShadowCollection()
 {
     // Mark shadowCollection as dirty if any render prim is added/removed

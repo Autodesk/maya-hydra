@@ -482,20 +482,25 @@ public:
             return;
         }
 
-        // When mesh has deformation (blend shape/skinning), dirty both primvars (for current
-        // path) and extCompPrimvars (for future GPU deformation) via a single locator call.
+        // When mesh has deformation (blend shape/skinning), dirty primvars (required for viewport)
+        // and extCompPrimvars only if the render delegate supports extComputation.
         // Strip DirtyPoints/DirtyNormals so MarkDirty does not emit duplicate primvars.
         if (_hasDeformation && (dirtyBits & (HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyNormals))) {
             HdDataSourceLocatorSet locators;
             const auto primvarsLocator = HdPrimvarsSchema::GetDefaultLocator();
             const auto extCompLocator = HdExtComputationPrimvarsSchema::GetDefaultLocator();
+            const bool supportsExtComp = GetMayaHydraSceneIndex()->SupportsExtComputation();
             if (dirtyBits & HdChangeTracker::DirtyPoints) {
                 locators.append(primvarsLocator.Append(HdPrimvarsSchemaTokens->points));
-                locators.append(extCompLocator.Append(HdPrimvarsSchemaTokens->points));
+                if (supportsExtComp) {
+                    locators.append(extCompLocator.Append(HdPrimvarsSchemaTokens->points));
+                }
             }
             if (dirtyBits & HdChangeTracker::DirtyNormals) {
                 locators.append(primvarsLocator.Append(HdPrimvarsSchemaTokens->normals));
-                locators.append(extCompLocator.Append(HdPrimvarsSchemaTokens->normals));
+                if (supportsExtComp) {
+                    locators.append(extCompLocator.Append(HdPrimvarsSchemaTokens->normals));
+                }
             }
             if (!locators.IsEmpty()) {
                 GetMayaHydraSceneIndex()->MarkRprimDirtyWithLocators(GetID(), locators);

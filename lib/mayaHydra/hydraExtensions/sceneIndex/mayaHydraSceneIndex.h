@@ -32,6 +32,7 @@
 #include <pxr/imaging/hd/driver.h>
 #include <pxr/imaging/hd/engine.h>
 #include <pxr/imaging/hd/renderIndex.h>
+#include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/rendererPlugin.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
 #include <pxr/imaging/hdx/taskController.h>
@@ -196,6 +197,10 @@ public:
     SdfPath GetRprimPath() const { return _rprimPath; }
 
     bool IsHdSt() const { return _isHdSt; }
+
+    /// Returns true if the render delegate supports extComputation sprims (used for
+    /// extComputationPrimvars / GPU deformation). When false, we only dirty primvars.
+    bool SupportsExtComputation() const;
 
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
     Fvp::PrimSelections UfePathToPrimSelectionsLit(const Ufe::Path& appPath) const;
