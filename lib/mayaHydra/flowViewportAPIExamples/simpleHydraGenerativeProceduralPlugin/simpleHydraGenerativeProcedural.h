@@ -44,6 +44,14 @@ public:
         const HdSceneIndexBaseRefPtr &inputScene,
         const SdfPath &childPrimPath) override;
 
+    bool AsyncBegin(bool asyncEnabled) override;
+
+    AsyncState AsyncUpdate(
+        const ChildPrimTypeMap& previousResult,
+        ChildPrimTypeMap* outputPrimTypes,
+        HdSceneIndexObserver::DirtiedPrimEntries* outputDirtiedPrims) override;
+
+
 private:
     static const TfToken _cube0Name; 
     static const TfToken _cube1Name;   

@@ -100,6 +100,18 @@ SimpleHydraGenerativeProcedural::GetChildPrim(
     return { TfToken(), nullptr };
 }
 
+bool SimpleHydraGenerativeProcedural::AsyncBegin(bool /* asyncEnabled */) { 
+    return false; 
+}
+
+HdGpGenerativeProcedural::AsyncState SimpleHydraGenerativeProcedural::AsyncUpdate(
+    const ChildPrimTypeMap& /* previousResult */,
+    ChildPrimTypeMap* /* outputPrimTypes */,
+    HdSceneIndexObserver::DirtiedPrimEntries* /* outputDirtiedPrims */)
+{
+    return HdGpGenerativeProcedural::Finished;
+}
+
 HdSceneIndexPrim
 SimpleHydraGenerativeProcedural::_BuildCubePrim(
     float halfSize,
