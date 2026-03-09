@@ -21,20 +21,47 @@
 #include <maya/MArgDatabase.h>
 #include <maya/MSyntax.h>
 
+/**
+ * mayaHydraProfiling command
+ * 
+ * This command allows the user to start/stop both the Maya profiler and USD tracing system at the same time.
+ * When stopping profiling, a file path for where to store the USD tracing results can optionally be passed. 
+ * The command also allows for querying whether profiling is currently active or not.
+ * 
+ * Functionality:
+ * - Start/Stop Maya and USD profiling
+ * - Set where to store USD tracing results
+ * - Query if profiling is active
+ */
+
+/* Examples
+    // Start profiling
+    MEL : mayaHydraProfiling -a 1
+    Python : maya.cmds.mayaHydraProfiling(active=True)
+
+    // Stop profiling
+    MEL : mayaHydraProfiling -a 0 -utf "D:/dev/traces/mayaHydraUsdTrace.json"
+    Python : maya.cmds.mayaHydraProfiling(active=False, usdTraceFile="D:/dev/traces/mayaHydraUsdTrace.json")
+
+    // Query if profiling is active
+    MEL : mayaHydraProfiling -ia
+    Python : maya.cmds.mayaHydraProfiling(isActive=True)
+*/
+
 namespace MAYAHYDRA_NS_DEF {
 
 const MString MayaHydraProfilingCommand::commandName("mayaHydraProfiling");
 
 namespace {
 
-constexpr auto kEnabled = "-e";
-constexpr auto kEnabledLong = "-enabled";
+constexpr auto kActive = "-a";
+constexpr auto kActiveLong = "-active";
 
 constexpr auto kUsdTraceFile = "-utf";
 constexpr auto kUsdTraceFileLong = "-usdTraceFile";
 
-constexpr auto kIsEnabled = "-ie";
-constexpr auto kIsEnabledLong = "-isEnabled";
+constexpr auto kIsActive = "-ia";
+constexpr auto kIsActiveLong = "-isActive";
 
 } // namespace
 
@@ -42,9 +69,9 @@ MSyntax MayaHydraProfilingCommand::createSyntax()
 {
     MSyntax syntax;
 
-    syntax.addFlag(kEnabled, kEnabledLong, MSyntax::kBoolean);
+    syntax.addFlag(kActive, kActiveLong, MSyntax::kBoolean);
     syntax.addFlag(kUsdTraceFile, kUsdTraceFileLong, MSyntax::kString);
-    syntax.addFlag(kIsEnabled, kIsEnabledLong);
+    syntax.addFlag(kIsActive, kIsActiveLong);
 
     return syntax;
 }
@@ -58,10 +85,10 @@ MStatus MayaHydraProfilingCommand::doIt(const MArgList& args)
         return status;
     }
 
-    if (db.isFlagSet(kEnabled)) {
-        bool enabled = false;
-        CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(kEnabled, 0, enabled));
-        if (enabled) {
+    if (db.isFlagSet(kActive)) {
+        bool active = false;
+        CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(kActive, 0, active));
+        if (active) {
             StartProfiling();
         } else {
             MString filePath;
@@ -73,7 +100,7 @@ MStatus MayaHydraProfilingCommand::doIt(const MArgList& args)
         return MS::kSuccess;
     }
 
-    if (db.isFlagSet(kIsEnabled)) {
+    if (db.isFlagSet(kIsActive)) {
         setResult(IsProfilingActive());
         return MS::kSuccess;
     }
