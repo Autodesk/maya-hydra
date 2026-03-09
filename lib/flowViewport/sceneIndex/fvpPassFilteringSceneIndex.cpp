@@ -70,17 +70,7 @@ PassFilteringSceneIndex::PassFilteringSceneIndex(
     , InputSceneIndexUtils(inputSceneIndex)
     , _framePassData(framePassData)
 {
-    static const TfToken generativeProceduralToken("hydraGenerativeProcedural");
-    static const TfToken resolvedGenerativeProceduralToken("resolvedHydraGenerativeProcedural");
-
-    auto inputIndex = GetInputSceneIndex();
-
     for (const SdfPath& primPath : HdSceneIndexPrimView(GetInputSceneIndex())) {
-        HdSceneIndexPrim prim = inputIndex->GetPrim(primPath);
-        if (prim.primType == generativeProceduralToken
-            || prim.primType == resolvedGenerativeProceduralToken) {
-            _generativeProceduralPaths.insert(primPath);
-        }
         _UpdateFilteringStatus(primPath);
     }
 }
@@ -122,7 +112,16 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
 
     HdSceneIndexPrim prim = inputSceneIndex->GetPrim(primPath);
 
+    static const TfToken generativeProceduralToken("hydraGenerativeProcedural");
+    static const TfToken resolvedGenerativeProceduralToken("resolvedHydraGenerativeProcedural");
+
     if (!isRprimType(prim.primType)) {
+        if ((prim.primType == generativeProceduralToken
+            || prim.primType == resolvedGenerativeProceduralToken) 
+            && _generativeProceduralPaths.find(primPath) == _generativeProceduralPaths.end()) {
+            _generativeProceduralPaths.insert(primPath);
+        }
+
         if (prim.primType == HdPrimTypeTokens->material) {
             // With Hydra Generative Procedurals, the materials are still considered "unused" 
             // by this step because the geometry hasn't been expanded yet. This ensures
@@ -298,14 +297,8 @@ void PassFilteringSceneIndex::_PrimsAdded(
     const HdSceneIndexObserver::AddedPrimEntries &entries)
 {
     HdSceneIndexObserver::AddedPrimEntries addedEntries;
-    static const TfToken generativeProceduralToken("hydraGenerativeProcedural");
-    static const TfToken resolvedGenerativeProceduralToken("resolvedHydraGenerativeProcedural");
-
+    
     for (const auto& addedEntry : entries) {
-        if (addedEntry.primType == generativeProceduralToken
-            || addedEntry.primType == resolvedGenerativeProceduralToken) {
-            _generativeProceduralPaths.insert(addedEntry.primPath);
-        }
         auto updatedPrims = _UpdateFilteringStatus(addedEntry.primPath, true, true);
         addedEntries.insert(addedEntries.end(), updatedPrims.begin(), updatedPrims.end());
     }

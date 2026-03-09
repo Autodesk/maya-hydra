@@ -114,7 +114,7 @@ private:
     // Used to track the materials required by the prims that will actually be rendered in the pass 
     std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _primsToMaterialPaths;
     std::map<PXR_NS::SdfPath, int> _materialUseCounts;
-    std::set<PXR_NS::SdfPath> _generativeProceduralPaths;
+    mutable std::set<PXR_NS::SdfPath> _generativeProceduralPaths;
 };
 
 } // namespace FVP_NS_DEF
