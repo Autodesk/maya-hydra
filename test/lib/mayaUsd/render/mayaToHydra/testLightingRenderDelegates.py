@@ -165,11 +165,13 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             cls._maya_history_file = None
 
         _log(
-            "PRMan setUpClass: sceneDir={} | RMAN_CONFIG_OVERRIDE={} | RDIR={} | RMAN_LOGFILE={} | MayaHistory={}".format(
+            "PRMan setUpClass: sceneDir={} | RMAN_CONFIG_OVERRIDE={} | RDIR={} | RMAN_LOGFILE={} | RMAN_SHADERPATH={} | PRMAN_DELEGATE_PLUGIN_PATH={} | MayaHistory={}".format(
                 sceneDir,
                 os.environ.get("RMAN_CONFIG_OVERRIDE", ""),
                 os.environ.get("RDIR", ""),
                 os.environ.get("RMAN_LOGFILE", ""),
+                os.environ.get("RMAN_SHADERPATH", ""),
+                os.environ.get("PRMAN_DELEGATE_PLUGIN_PATH", ""),
                 getattr(cls, "_maya_history_file", None),
             )
         )
