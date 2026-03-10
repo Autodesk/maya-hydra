@@ -24,6 +24,7 @@
 #include "getFramePassesCountCommand.h"
 #include "testingCommand.h"
 #include "renderRegionCommand.h"
+#include "profilingCommand.h"
 #include "setVisibleFramePassesCommand.h"
 
 #include <mayaHydraLib/adapters/adapter.h>
@@ -249,6 +250,15 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
+    if (!plugin.registerCommand(
+            MayaHydraProfilingCommand::commandName,
+            MayaHydraProfilingCommand::creator,
+            MayaHydraProfilingCommand::createSyntax)) {
+        ret = MS::kFailure;
+        ret.perror("Error registering mayaHydraProfiling command!");
+        return ret;
+    }
+
     // Set the path where maya hydra is loaded to be used later
     //This must be called before the renderoverride is created
     MtohSetMayaHydraPluginLocation(std::filesystem::path(plugin.loadPath().asChar())); 
@@ -363,6 +373,11 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     if (!plugin.deregisterCommand(MayaHydraGetFramePassesCount::commandName)) {
         ret = MS::kFailure;
         ret.perror("Error deregistering MayaHydraGetFramePassesCount command!");
+    }
+
+    if (!plugin.deregisterCommand(MayaHydraProfilingCommand::commandName)) {
+        ret = MS::kFailure;
+        ret.perror("Error deregistering mayaHydraProfiling command!");
     }
 
     return ret;

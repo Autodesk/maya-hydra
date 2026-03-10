@@ -33,6 +33,8 @@
 #include <mayaHydraLib/pick/mhPickHit.h>
 #include <mayaHydraLib/pick/mhPickHandler.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
+
+#include <mayaHydraLib/profilingUtils.h>
 #include <mayaHydraLib/hydraUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/tokens.h>
@@ -126,7 +128,6 @@
 #include <maya/MNodeMessage.h>
 #include <maya/MAnimControl.h>
 #include <maya/MObjectHandle.h>
-#include <maya/MProfiler.h>
 #include <maya/MSceneMessage.h>
 #include <maya/MSelectionList.h>
 #include <maya/MTimerMessage.h>
@@ -143,10 +144,6 @@
 #include <pxr/base/tf/getenv.h>
 #include <pxr/base/tf/envSetting.h>
 #include "envSettings.h"
-
-int _profilerCategory = MProfiler::addCategory(
-    "MtohRenderOverride (mayaHydra)",
-    "Events from mayaHydra render override");
 
 using namespace MayaHydra;
 
@@ -831,10 +828,12 @@ MStatus MtohRenderOverride::Render(
     //         override->ClearHydraResources();
     //     }
     // }
+    MH_PROFILE_FUNCTION();
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER).Msg("MtohRenderOverride::Render()\n");
     // We can use the mayaHydraSetVisibleFramePasses command to set the visible passes
 
     auto renderFrame = [&](bool markTime = false) {
+        MH_PROFILE_SCOPE("MtohRenderOverride::Render renderFrame lambda");
         if (scene.changed()) {
             if (_mayaHydraSceneIndex) {
                 _mayaHydraSceneIndex->UpdateRenderItems(scene);
@@ -895,7 +894,7 @@ MStatus MtohRenderOverride::Render(
 
         // Iterate over visible passes
         for (int visibleIdx = 0; visibleIdx < numVisibleFramePasses; ++visibleIdx) {
-
+            MH_PROFILE_SCOPE("MayaHydra frame pass");
             const int actualPassIndex = framePassesVisible[visibleIdx]; // Get the actual pass index
             const hvt::FramePassPtr& currentPass = _GetFramePass(actualPassIndex);
             if (!currentPass) {
@@ -1375,6 +1374,7 @@ void MtohRenderOverride::_InitHydraResources(
     const MHWRender::MDrawContext& drawContext,
     const MayaHydraParams& delegateParams)
 {
+    MH_PROFILE_FUNCTION();
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::_InitHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
@@ -1605,6 +1605,7 @@ void MtohRenderOverride::_InitHydraResources(
 //Use fullReset = false when you still want to see the previously registered data producer scene indices when using an hydra viewport.
 void MtohRenderOverride::ClearHydraResources(bool fullReset)
 {
+    MH_PROFILE_FUNCTION();
     if (!_initializationAttempted) {
         return;
     }
@@ -1829,6 +1830,7 @@ void MtohRenderOverride::SelectionChanged(
     const Ufe::SelectionChanged& notification
 )
 {
+    MH_PROFILE_FUNCTION();
     TF_DEBUG(FVP_APP_SELECTION_CHANGE)
         .Msg("MtohRenderOverride::SelectionChanged(Ufe::SelectionChanged) called.\n");
 
@@ -2117,13 +2119,7 @@ bool MtohRenderOverride::select(
     MSelectionList& selectionList,
     MPointArray&    worldSpaceHitPts)
 {
-#ifdef MAYAHYDRA_PROFILERS_ENABLED
-    MProfilingScope profilingScopeForEval(
-        _profilerCategory,
-        MProfiler::kColorD_L1,
-        "MtohRenderOverride::select",
-        "MtohRenderOverride::select");
-#endif
+    MH_PROFILE_FUNCTION();
     /*
     * There are 2 modes of selection picking for components in maya :
     * 1) You can be in components picking mode, this setting is global.This is detected in the function "isInComponentsPickingMode(selectInfo)"

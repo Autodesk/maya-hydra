@@ -20,6 +20,7 @@ target_sources(${TARGET_NAME}
         pluginBuildInfoCommand.cpp
         getFramePassesCountCommand.cpp
         testingCommand.cpp
+        profilingCommand.cpp
         renderRegionCommand.cpp
         setVisibleFramePassesCommand.cpp
 )
