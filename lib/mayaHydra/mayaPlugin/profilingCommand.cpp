@@ -25,8 +25,10 @@
  * mayaHydraProfiling command
  * 
  * This command allows the user to start/stop both the Maya profiler and USD tracing system at the same time.
- * When stopping profiling, a file path for where to store the USD tracing results can optionally be passed. 
+ * When stopping profiling, a .json file path for where to store the USD tracing results can optionally be passed. 
  * The command also allows for querying whether profiling is currently active or not.
+ * Information on the USD tracing system can be found at https://openusd.org/release/api/trace_page_front.html
+ * USD traces can be visualized and analyzed with a tool like https://ui.perfetto.dev/
  * 
  * Functionality:
  * - Start/Stop Maya and USD profiling

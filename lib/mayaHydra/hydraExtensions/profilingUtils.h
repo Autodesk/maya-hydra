@@ -27,6 +27,13 @@
 
 #include <string>
 
+/// Utilities for managing both the Maya profiler and USD tracing system simultaneously.
+/// After profiling is done, profiling results for Maya can be viewed by opening the profiling
+/// window under Window > General Editors > Profiler.
+/// The USD tracing system produces .json files following the Chrome tracing format, which
+/// can be viewed and analyzed through a tool like https://ui.perfetto.dev/
+/// More info can be found in the official docs : https://openusd.org/release/api/trace_page_front.html
+
 namespace MAYAHYDRA_NS_DEF {
 
 /// Returns the MProfiler category ID registered for MayaHydra.
@@ -41,6 +48,7 @@ void StartProfiling();
 /// Disables both the Maya profiler and USD trace collector, then writes
 /// the collected USD trace data to \p chromeTraceFile in Chrome tracing format.
 /// If \p chromeTraceFile is empty, the trace data is not written out.
+/// The trace file can be visualized and analyzed with a tool like https://ui.perfetto.dev/
 MAYAHYDRALIB_API
 void StopProfiling(const std::string& chromeTraceFile);
 
