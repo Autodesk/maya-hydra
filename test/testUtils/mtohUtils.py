@@ -98,6 +98,17 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         cls._usdVersion = Usd.GetVersion()
         
     def setUp(self):
+        # Enable Maya Script Editor history capture for all tests (dumped on image failure).
+        try:
+            prev_write = cmds.scriptEditorInfo(q=True, writeHistory=True)
+            prev_file = cmds.scriptEditorInfo(q=True, historyFilename=True) or ""
+            self._saved_script_editor = {"writeHistory": prev_write, "historyFilename": prev_file}
+            if not prev_write:
+                history_file = os.path.join(self._testDir, "maya_scriptEditor_history.txt")
+                cmds.scriptEditorInfo(edit=True, writeHistory=True, historyFilename=history_file)
+        except Exception:
+            self._saved_script_editor = None
+
         # Maya is not closed/reset between each test of a test suite,
         # so open a new file before each test to minimize leftovers
         # from previous tests.
@@ -112,6 +123,19 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         # unfortunately in automated tests it does (see setHdStormRender()
         # method documentation).  Restore modified status to false.
         cmds.file(modified=False)
+
+    def tearDown(self):
+        # Restore Script Editor capture if we enabled it in setUp.
+        try:
+            saved = getattr(self, "_saved_script_editor", None)
+            if saved and not saved.get("writeHistory", True):
+                cmds.scriptEditorInfo(
+                    edit=True,
+                    writeHistory=saved["writeHistory"],
+                    historyFilename=saved.get("historyFilename", ""),
+                )
+        except Exception:
+            pass
 
     @classmethod
     def tearDownClass(cls):

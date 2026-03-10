@@ -149,13 +149,34 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail,
 
     return None # Running of imageDiff failed.
 
+def _getMayaScriptEditorHistoryTail(max_lines=200):
+    """Return the tail of Maya Script Editor history as a string, or empty if unavailable."""
+    try:
+        if not cmds.scriptEditorInfo(q=True, writeHistory=True):
+            return ""
+        hist_file = cmds.scriptEditorInfo(q=True, historyFilename=True) or ""
+        if not hist_file or not os.path.isfile(hist_file):
+            return ""
+        with open(hist_file, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.read().splitlines()
+        tail = lines[-max_lines:] if len(lines) > max_lines else lines
+        if not tail:
+            return ""
+        return "\n".join(
+            ["", "===== Maya Script Editor history (last {} lines) =====".format(len(tail))]
+            + tail
+            + ["===== end Maya Script Editor history ====="]
+        )
+    except Exception:
+        return ""
+
 def _generateDiffImage(imagePath1, imagePath2, outputPath):
-    """Generate a visual diff image using idiff -o -abs. Returns output path if successful, else None."""
+    """Generate a visual diff image using idiff -o -abs (raw pixel-by-pixel diff, no scaling). Returns output path if successful, else None."""
     image_diff_tool = os.environ.get('IMAGE_DIFF_TOOL')
     if not image_diff_tool:
         return None
     os.makedirs(os.path.dirname(outputPath), exist_ok=True)
-    cmd = [image_diff_tool, '-o', outputPath, '-abs', '-scale', '10', imagePath1, imagePath2]
+    cmd = [image_diff_tool, '-o', outputPath, '-abs', imagePath1, imagePath2]
     try:
         proc = subprocess.run(cmd, capture_output=True, shell=False, env=os.environ.copy())
         if proc.returncode in (0, 1, 2) and os.path.isfile(outputPath):
@@ -200,7 +221,7 @@ class ImageDiffingTestCase:
                     warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         """ 
         The method will return idiff's return code if the comparison passes with 
-        a return code of 0 or 1. 
+        a return code of 0 or 1.
         0 -- OK: the images match within the warning and error thresholds.
         1 -- Warning: the errors differ a little, but within error thresholds.
         
@@ -303,6 +324,10 @@ class ImageDiffingTestCase:
                 diff_path = _generateDiffImage(abs1, abs2, diff_output)
                 if diff_path:
                     msg += "  Diff:     {}\n".format(os.path.abspath(diff_path).replace('\\', '/'))
+
+            script_editor_tail = _getMayaScriptEditorHistoryTail(max_lines=200)
+            if script_editor_tail:
+                msg += script_editor_tail + "\n"
             self.fail(msg)
         return proc.returncode
     

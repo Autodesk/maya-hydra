@@ -112,9 +112,6 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         Some components may snapshot environment variables during initialization,
         so we set key vars once at class setup time (before any renders).
 
-        - RMAN_TEXTUREPATH: RenderMan texture search path
-        - PXR_AR_DEFAULT_SEARCH_PATH: USD default resolver search path
-        - TF_DEBUG: append HDPRMAN_IMAGE_ASSET_RESOLVE for hdPrman image asset resolution debug
         - Maya Script Editor history: capture delegate output and dump to CI logs
         - RenderMan config override: bump verbosity via a minimal rendermn.ini
         """
@@ -122,33 +119,14 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
         scenePath = getTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
         sceneDir = os.path.dirname(os.path.abspath(scenePath))
-        sep = os.pathsep  # ';' on Windows, ':' elsewhere
 
         # Save env we will modify.
         cls._saved_env = {
-            "RMAN_TEXTUREPATH": os.environ.get("RMAN_TEXTUREPATH"),
-            "PXR_AR_DEFAULT_SEARCH_PATH": os.environ.get("PXR_AR_DEFAULT_SEARCH_PATH"),
             "RMAN_CONFIG_OVERRIDE": os.environ.get("RMAN_CONFIG_OVERRIDE"),
             "RMAN_DUMP_DEFAULTS": os.environ.get("RMAN_DUMP_DEFAULTS"),
             "RDIR": os.environ.get("RDIR"),
             "RMAN_LOGFILE": os.environ.get("RMAN_LOGFILE"),
-            "TF_DEBUG": os.environ.get("TF_DEBUG"),
         }
-
-        # Prepend scene directory so relative ./... has a consistent anchor.
-        prev_rman = cls._saved_env["RMAN_TEXTUREPATH"] or ""
-        sceneDirNorm = sceneDir.replace("\\", "/")
-        os.environ["RMAN_TEXTUREPATH"] = sceneDirNorm + (sep + prev_rman if prev_rman else "")
-
-        prev_ar = cls._saved_env["PXR_AR_DEFAULT_SEARCH_PATH"] or ""
-        os.environ["PXR_AR_DEFAULT_SEARCH_PATH"] = sceneDir + (sep + prev_ar if prev_ar else "")
-
-        # Enable hdPrman image asset resolution debug output (USD/TF debug system).
-        prev_tf = cls._saved_env.get("TF_DEBUG") or ""
-        tf_tokens = [t.strip() for t in prev_tf.split(",") if t.strip()]
-        if "HDPRMAN_IMAGE_ASSET_RESOLVE" not in tf_tokens:
-            tf_tokens.append("HDPRMAN_IMAGE_ASSET_RESOLVE")
-        os.environ["TF_DEBUG"] = ",".join(tf_tokens)
 
         # RenderMan logging knobs (best-effort; harmless if ignored).
         log_root = os.path.join(tempfile.gettempdir(), "mayaHydra_prman_logs")
@@ -187,14 +165,11 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             cls._maya_history_file = None
 
         _log(
-            "PRMan setUpClass: sceneDir={} | RMAN_TEXTUREPATH={} | PXR_AR_DEFAULT_SEARCH_PATH={} | RMAN_CONFIG_OVERRIDE={} | RDIR={} | RMAN_LOGFILE={} | TF_DEBUG={} | MayaHistory={}".format(
+            "PRMan setUpClass: sceneDir={} | RMAN_CONFIG_OVERRIDE={} | RDIR={} | RMAN_LOGFILE={} | MayaHistory={}".format(
                 sceneDir,
-                os.environ.get("RMAN_TEXTUREPATH", ""),
-                os.environ.get("PXR_AR_DEFAULT_SEARCH_PATH", ""),
                 os.environ.get("RMAN_CONFIG_OVERRIDE", ""),
                 os.environ.get("RDIR", ""),
                 os.environ.get("RMAN_LOGFILE", ""),
-                os.environ.get("TF_DEBUG", ""),
                 getattr(cls, "_maya_history_file", None),
             )
         )
@@ -257,18 +232,8 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         super(TestLightingRenderDelegates, cls).tearDownClass()
 
     @contextmanager
-    def _prmanTexturePath(self):
-        """Per-render context for PRMan/hdPrman texture resolution and diagnostics.
-
-        Environment (RMAN_TEXTUREPATH / PXR_AR_DEFAULT_SEARCH_PATH / TF_DEBUG) is primed
-        in setUpClass() to ensure it is applied before renderer initialization.
-
-        Here we ensure:
-          - cwd is the scene directory (so ./foo.png works)
-          - Maya workspace (project) is the scene directory
-          - Maya file-node paths are temporarily rewritten to absolute paths
-          - we dump the Script Editor history tail to stdout for CI visibility
-        """
+    def _prmanContext(self):
+        """Per-render context for PRMan: set cwd and workspace to scene dir, dump Script Editor on exit."""
         saved_cwd = os.getcwd()
         saved_workspace = cmds.workspace(q=True, rd=True)
 
@@ -279,30 +244,8 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             os.chdir(sceneDir)
             cmds.workspace(sceneDir, o=True)
 
-            saved_file_nodes = self._absolutizeFileTextures(sceneDir)
-
-            diffusePath = os.path.join(sceneDir, "diffuse.png")
-            uvCheckerPath = os.path.join(sceneDir, "UVChecker.png")
-            _log(
-                "PRMan context: cwd={} | workspace={} | diffuse.png exists={} | UVChecker.png exists={} | RMAN_TEXTUREPATH={} | PXR_AR_DEFAULT_SEARCH_PATH={} | TF_DEBUG={}".format(
-                    os.getcwd(),
-                    cmds.workspace(q=True, rd=True),
-                    os.path.isfile(diffusePath),
-                    os.path.isfile(uvCheckerPath),
-                    os.environ.get("RMAN_TEXTUREPATH", ""),
-                    os.environ.get("PXR_AR_DEFAULT_SEARCH_PATH", ""),
-                    os.environ.get("TF_DEBUG", ""),
-                )
-            )
-
             yield
         finally:
-            # Restore any file-node edits first.
-            try:
-                self._restoreFileTextures(saved_file_nodes)
-            except Exception:
-                pass
-
             # Dump latest Script Editor history tail to stdout for CI visibility.
             try:
                 hist = getattr(self.__class__, "_maya_history_file", None)
@@ -319,47 +262,6 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 os.chdir(saved_cwd)
             except Exception as e:
                 _log("Warning: failed to restore cwd: {}".format(e))
-
-    def _absolutizeFileTextures(self, sceneDir):
-        """Rewrite Maya file-node texture paths to absolute paths for reliable CI runs.
-
-        Maya ASCII scenes often store fileTextureName as a relative string (e.g. ./diffuse.png).
-        Depending on the Maya->Hydra adapter, these strings may be passed through without
-        being anchored to the Maya project/workspace or USD resolver context.
-
-        By converting to absolute paths in the scene graph, we guarantee that Hydra/hdPrman
-        receives a resolvable path regardless of the process working directory.
-
-        Returns:
-            dict[str,str]: file-node name -> original fileTextureName
-        """
-        saved = {}
-        file_nodes = cmds.ls(type="file") or []
-        for n in file_nodes:
-            try:
-                p = cmds.getAttr(n + ".fileTextureName") or ""
-            except Exception:
-                continue
-            if not p or os.path.isabs(p):
-                continue
-            abs_p = os.path.normpath(os.path.join(sceneDir, p))
-            if p.startswith("./") or os.path.isfile(abs_p):
-                saved[n] = p
-                cmds.setAttr(n + ".fileTextureName", abs_p, type="string")
-
-        if saved:
-            _log("PRMan context: rewrote {} file-node texture path(s) to absolute.".format(len(saved)))
-        return saved
-
-    def _restoreFileTextures(self, saved):
-        """Restore original fileTextureName values saved by _absolutizeFileTextures."""
-        if not saved:
-            return
-        for n, p in saved.items():
-            try:
-                cmds.setAttr(n + ".fileTextureName", p, type="string")
-            except Exception:
-                pass
 
     def _print_log_tail(self, path, title, max_lines=200):
         """Print the tail of a log file to stdout so CI logs capture it."""
@@ -482,9 +384,8 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             for delegate in RENDER_DELEGATES:
                 if not self._delegateRunsOnPlatform(delegate):
                     continue
-                # Only set RMAN_TEXTUREPATH for PRMan; save/restore to avoid leaking state.
                 if delegate["name"] == "PRMan":
-                    with self._prmanTexturePath():
+                    with self._prmanContext():
                         runDelegate(delegate)
                 else:
                     runDelegate(delegate)
