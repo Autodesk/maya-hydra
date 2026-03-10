@@ -15,6 +15,7 @@ target_sources(${TARGET_NAME}
         mixedUtils.cpp
         mhWireframeColorInterfaceImp.cpp
         mhLeadObjectPathTracker.cpp
+        profilingUtils.cpp
         tokens.cpp
 )
 
@@ -29,6 +30,7 @@ set(HEADERS
     mixedUtils.h
     mhWireframeColorInterfaceImp.h
     mhLeadObjectPathTracker.h
+    profilingUtils.h
     tokens.h
 )
 
