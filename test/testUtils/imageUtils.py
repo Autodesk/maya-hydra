@@ -171,12 +171,14 @@ def _getMayaScriptEditorHistoryTail(max_lines=200):
         return ""
 
 def _generateDiffImage(imagePath1, imagePath2, outputPath):
-    """Generate a visual diff image using idiff -o -abs (raw pixel-by-pixel diff, no scaling). Returns output path if successful, else None."""
+    """Generate a visual diff image using idiff -o -abs -scale 1 (raw pixel-by-pixel diff, no value scaling). Returns output path if successful, else None."""
     image_diff_tool = os.environ.get('IMAGE_DIFF_TOOL')
     if not image_diff_tool:
         return None
     os.makedirs(os.path.dirname(outputPath), exist_ok=True)
-    cmd = [image_diff_tool, '-o', outputPath, '-abs', imagePath1, imagePath2]
+    # -abs: absolute value of differences (no signed output)
+    # -scale 1: no value scaling; raw pixel difference (idiff may default to scale>1 in some builds)
+    cmd = [image_diff_tool, '-o', outputPath, '-abs', '-scale', '1', imagePath1, imagePath2]
     try:
         proc = subprocess.run(cmd, capture_output=True, shell=False, env=os.environ.copy())
         if proc.returncode in (0, 1, 2) and os.path.isfile(outputPath):
