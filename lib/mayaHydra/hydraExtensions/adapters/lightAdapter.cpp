@@ -56,9 +56,7 @@ TF_REGISTRY_FUNCTION(TfType)
     TfType::Define<MayaHydraLightAdapter, TfType::Bases<MayaHydraDagAdapter>>();
 }
 
-namespace {
-
-void _changeVisibility(
+void LightAdapterParentAttributeChanged(
     MNodeMessage::AttributeMessage msg,
     MPlug&                         plug,
     MPlug&                         otherPlug,
@@ -74,16 +72,12 @@ void _changeVisibility(
             adapter->Populate();
             adapter->InvalidateTransform();
         }
+        return;
     }
-
-    // Handle extension attributes change
-    adapter->HandleExtensionAndDynamicAttributesDirty(plug);
-}
-
-void _dirtyTransform(MObject& node, void* clientData)
-{
-    TF_UNUSED(node);
-    auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
+    if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
+        adapter->HandleExtensionAndDynamicAttributesDirty(plug);
+        return;
+    }
     if (adapter->IsVisible()) {
         adapter->InvalidateTransform();
         adapter->MarkDirty(
@@ -91,19 +85,34 @@ void _dirtyTransform(MObject& node, void* clientData)
     }
 }
 
-void _dirtyParams(MObject& node, void* clientData)
+namespace {
+
+const MString defaultLightSet("defaultLightSet");
+
+} // namespace
+
+void MayaHydraLightAdapter::_LightShapeAttributeChanged(
+    MNodeMessage::AttributeMessage msg,
+    MPlug&                         plug,
+    MPlug&                         otherPlug,
+    void*                          clientData)
 {
-    TF_UNUSED(node);
-    auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
+    TF_UNUSED(msg);
+    TF_UNUSED(otherPlug);
+
+    auto* adapter = reinterpret_cast<MayaHydraLightAdapter*>(clientData);
+    if (adapter->OnShapeAttributeChanged(plug)) {
+        return;
+    }
+    if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
+        adapter->HandleExtensionAndDynamicAttributesDirty(plug);
+        return;
+    }
     if (adapter->IsVisible()) {
         adapter->InvalidateTransform();
         adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
     }
 }
-
-const MString defaultLightSet("defaultLightSet");
-
-} // namespace
 
 // MayaHydraLightAdapter is the base class for any light adapter used to handle the translation from
 // a light to hydra.
@@ -772,7 +781,9 @@ void MayaHydraLightAdapter::CreateCallbacks()
     MStatus status;
     auto    dag = GetDagPath();
     auto    obj = dag.node();
-    auto    id = MNodeMessage::addNodeDirtyCallback(obj, _dirtyParams, this, &status);
+    // Use attribute-changed on shape (not node-dirty) to avoid redundant light+primvars dirtying
+    // when only custom attributes change.
+    auto id = MNodeMessage::addAttributeChangedCallback(obj, _LightShapeAttributeChanged, this, &status);
     if (status) {
         AddCallback(id);
     }
@@ -782,11 +793,7 @@ void MayaHydraLightAdapter::CreateCallbacks()
         // about passing raw pointers to the callbacks. Hopefully.
         obj = dag.node();
         if (obj != MObject::kNullObj) {
-            id = MNodeMessage::addAttributeChangedCallback(obj, _changeVisibility, this, &status);
-            if (status) {
-                AddCallback(id);
-            }
-            id = MNodeMessage::addNodeDirtyCallback(obj, _dirtyTransform, this, &status);
+            id = MNodeMessage::addAttributeChangedCallback(obj, LightAdapterParentAttributeChanged, this, &status);
             if (status) {
                 AddCallback(id);
             }
@@ -864,6 +871,12 @@ void MayaHydraLightAdapter::_CalculateShadowParams(MFnLight& light, HdxShadowPar
         std::cout << "Resulting HdxShadowParams:\n";
         std::cout << params << "\n";
     }
+}
+
+bool MayaHydraLightAdapter::OnShapeAttributeChanged(const MPlug& plug)
+{
+    TF_UNUSED(plug);
+    return false;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

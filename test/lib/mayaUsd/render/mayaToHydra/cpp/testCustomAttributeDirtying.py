@@ -67,6 +67,21 @@ class TestCustomAttributeDirtying(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="CustomAttributeDirtying.testDirtyPrimvars")
 
+    def test_noDuplicateCameraDirtyOnExtAttrChange(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="CustomAttributeDirtying.testNoDuplicateCameraDirtyOnExtAttrChange")
+
+    def test_noDuplicateLightDirtyOnExtAttrChange(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="CustomAttributeDirtying.testNoDuplicateLightDirtyOnExtAttrChange")
+
+    def test_noDuplicateMeshDirtyOnExtAttrChange(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="CustomAttributeDirtying.testNoDuplicateMeshDirtyOnExtAttrChange")
+
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
