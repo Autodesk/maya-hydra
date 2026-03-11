@@ -138,7 +138,7 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
                 }
             }
         
-            if (_materialUseCounts.find(primPath) == _materialUseCounts.end() && !hasProceduralParent) {
+            if (!hasProceduralParent && _materialUseCounts.find(primPath) == _materialUseCounts.end()) {
                 // Filter out unused materials
                 return true;
             }
