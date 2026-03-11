@@ -619,11 +619,11 @@ finally:
         "MAYA_DISABLE_CER=1")
 
     if(IS_MACOSX)
-        # LC_ALL/LANG: Avoid locale.Error: unsupported locale setting on macOS CI
-        # when LANG/LC_* inherit a value (e.g. en_US.UTF-8) not installed on the agent.
+        # LC_ALL/LANG: Use UTF-8 locale. Qt requires UTF-8; LC_ALL=C causes Qt to try
+        # switching to "UTF-8" which fails on macOS. en_US.UTF-8 is standard on macOS.
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-            "LC_ALL=C"
-            "LANG=C")
+            "LC_ALL=en_US.UTF-8"
+            "LANG=en_US.UTF-8")
         # Necessary for tests like DiffCore to find python
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
             "DYLD_LIBRARY_PATH=${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")

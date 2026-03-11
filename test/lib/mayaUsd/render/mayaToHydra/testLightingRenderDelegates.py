@@ -244,7 +244,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
     def _setRenderer(self, delegate):
         """Switch the viewport to the given Hydra renderer."""
-        panel = cmds.playblast(activeEditor=1)
+        panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, rendererOverrideName=delegate["override"])
         cmds.refresh(force=True)
 
@@ -303,7 +303,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         if delegate["name"] == "PRMan":
             reg = Sdr.Registry()
             for ident in ["UsdUVTexture", "UsdPrimvarReader_float2", "UsdPreviewSurface", "UsdPreviewSurfaceParameters"]:
-                status = "FOUND" if reg.GetNodeByIdentifier(ident) else "MISSING"
+                status = "FOUND" if reg.GetShaderNodeByIdentifier(ident) else "MISSING"
                 _log("[SDR][PRMan] {} => {}".format(ident, status))
         for lightName in LIGHTS:
             intensity = self._getIntensityForLight(lightName, delegate)
