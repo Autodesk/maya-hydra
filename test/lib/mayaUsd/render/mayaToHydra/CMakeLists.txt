@@ -159,6 +159,11 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
 	testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
 )
 
+# Interactive unit test scripts for Hydra Generative Procedurals.
+set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
+    cpp/testHydraGenerativeProcedural.py
+)
+
 # Use mesh adapter for mesh support instead of MRenderItem. using Interactive (Maya.exe with UI)
 foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
     get_testfile_and_labels(all_labels test_filename ${script})
@@ -186,6 +191,22 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE})
         PYTHON_SCRIPT ${test_filename}
         ENV
             "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
+    )
+
+    # Assign a CTest label to these tests for easy filtering.
+    apply_labels_to_test("${all_labels}" ${target})
+
+endforeach()
+
+#  Test for Hydra Generative Procedurals using Interactive (Maya.exe with UI)
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL})
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaUsd_get_unittest_target(target ${test_filename})
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        PYTHON_SCRIPT ${test_filename}
+        ENV
+            "HDGP_INCLUDE_DEFAULT_RESOLVER=1"
     )
 
     # Assign a CTest label to these tests for easy filtering.

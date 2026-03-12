@@ -24,6 +24,7 @@
 #include <pxr/imaging/hd/sceneIndexObserver.h>
 
 #include <map>
+#include <set>
 
 namespace FVP_NS_DEF {
 
@@ -113,6 +114,7 @@ private:
     // Used to track the materials required by the prims that will actually be rendered in the pass 
     std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _primsToMaterialPaths;
     std::map<PXR_NS::SdfPath, int> _materialUseCounts;
+    mutable std::set<PXR_NS::SdfPath> _generativeProceduralPaths;
 };
 
 } // namespace FVP_NS_DEF

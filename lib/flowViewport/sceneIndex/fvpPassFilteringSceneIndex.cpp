@@ -112,11 +112,36 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
 
     HdSceneIndexPrim prim = inputSceneIndex->GetPrim(primPath);
 
+    static const TfToken generativeProceduralToken("hydraGenerativeProcedural");
+    static const TfToken resolvedGenerativeProceduralToken("resolvedHydraGenerativeProcedural");
+
     if (!isRprimType(prim.primType)) {
-        if (prim.primType == HdPrimTypeTokens->material 
-            && _materialUseCounts.find(primPath) == _materialUseCounts.end()) {
-            // Filter out unused materials
-            return true;
+        if ((prim.primType == generativeProceduralToken
+            || prim.primType == resolvedGenerativeProceduralToken) 
+            && _generativeProceduralPaths.find(primPath) == _generativeProceduralPaths.end()) {
+            _generativeProceduralPaths.insert(primPath);
+        }
+
+        if (prim.primType == HdPrimTypeTokens->material) {
+            // With Hydra Generative Procedurals, the materials are still considered "unused" 
+            // by this step because the geometry hasn't been expanded yet. This ensures
+            // that materials that will be bound to procedural geometry are not filtered out.
+            bool hasProceduralParent = false;
+            if (!_generativeProceduralPaths.empty()) {
+                SdfPath ancestorPath = primPath.GetParentPath();
+                while (!ancestorPath.IsAbsoluteRootPath() && !hasProceduralParent
+                       && !ancestorPath.IsEmpty()) {
+                    if (_generativeProceduralPaths.count(ancestorPath) != 0) {
+                        hasProceduralParent = true;
+                    }
+                    ancestorPath = ancestorPath.GetParentPath();
+                }
+            }
+        
+            if (!hasProceduralParent && _materialUseCounts.find(primPath) == _materialUseCounts.end()) {
+                // Filter out unused materials
+                return true;
+            }
         }
 
         if (_framePassData->_removeLights && HdPrimTypeIsLight(prim.primType)) {
@@ -272,7 +297,7 @@ void PassFilteringSceneIndex::_PrimsAdded(
     const HdSceneIndexObserver::AddedPrimEntries &entries)
 {
     HdSceneIndexObserver::AddedPrimEntries addedEntries;
-
+    
     for (const auto& addedEntry : entries) {
         auto updatedPrims = _UpdateFilteringStatus(addedEntry.primPath, true, true);
         addedEntries.insert(addedEntries.end(), updatedPrims.begin(), updatedPrims.end());
@@ -289,6 +314,7 @@ void PassFilteringSceneIndex::_PrimsRemoved(
 {
     // 1. Update the scene filtering
     HdSceneIndexObserver::AddedPrimEntries updatedEntries;
+
     for (const auto& removedEntry : entries) {
         // Remove the prim and its children from our filtered prims data 
         for (auto it = _filteredPrims.begin(); it != _filteredPrims.end();) {
@@ -305,6 +331,15 @@ void PassFilteringSceneIndex::_PrimsRemoved(
             if (primPath.HasPrefix(removedEntry.primPath)) {
                 auto materialUpdates = _RemoveMaterialEntry(primPath);
                 updatedEntries.insert(updatedEntries.end(), materialUpdates.begin(), materialUpdates.end());
+            }
+        }
+
+        // Remove generative procedural entries on the prim and its children
+        for (auto it = _generativeProceduralPaths.begin(); it != _generativeProceduralPaths.end();) {
+            if ((*it).HasPrefix(removedEntry.primPath)) {
+                it = _generativeProceduralPaths.erase(it);
+            } else {
+                ++it;
             }
         }
     }
