@@ -55,6 +55,7 @@ target_sources(${TARGET_NAME}
         testMaterialBlocking.cpp
         testPassFiltering.cpp
         testSceneGlobalsCurrentFrame.cpp
+        testHydraGenerativeProcedural.cpp
 )
 
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)

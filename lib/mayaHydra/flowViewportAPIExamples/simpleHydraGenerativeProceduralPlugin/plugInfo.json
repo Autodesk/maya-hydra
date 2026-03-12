@@ -1,0 +1,19 @@
+{
+    "Plugins": [
+        {
+            "Info": {
+                "Types": {
+                    "SimpleHydraGenerativeProceduralPlugin" : {
+                        "bases": ["HdGpGenerativeProceduralPlugin"],
+                        "priority": 0,
+                        "displayName": "Simple Hydra Generative Procedural"
+                    }
+                }
+            },
+            "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",
+            "Name": "@TARGET_NAME@",
+            "Root": "..",
+            "Type": "library"
+        }
+    ]
+}
