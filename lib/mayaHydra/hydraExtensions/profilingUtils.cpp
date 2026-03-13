@@ -36,7 +36,11 @@ int ProfilingCategory()
 
 void StartProfiling()
 {
+    TraceReporter::GetGlobalReporter()->ClearTree();
+    TraceCollector::GetInstance().Clear();
     TraceCollector::GetInstance().SetEnabled(true);
+
+    // Will implicitly clear the previous profiling results
     MProfiler::setRecordingActive(true);
 }
 
