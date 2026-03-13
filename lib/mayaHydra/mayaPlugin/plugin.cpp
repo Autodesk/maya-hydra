@@ -76,6 +76,8 @@ namespace {
 
     std::vector<MCallbackId> _pluginLoadingCallbackIds;
 
+    MCallbackId _mayaExitCallbackId;
+
     void setEnv(const std::string& name, const std::string& value)
     {
     #if defined(_WIN32)
@@ -172,6 +174,12 @@ void beforePluginUnloadCallback( const MStringArray& strs, void* clientData )
             break;
         }
     }
+}
+
+void mayaExitCallback(void* _) {
+    // We want to remove UFE observers cleanly, so we must call this not just on plugin unload,
+    // but on Maya exit as well.
+    finalize();
 }
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
@@ -308,11 +316,15 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
     initialize();
 
+    _mayaExitCallbackId = MSceneMessage::addCallback(MSceneMessage::kMayaExiting, mayaExitCallback);
+
     return ret;
 }
 
 PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 {
+    MSceneMessage::removeCallback(_mayaExitCallbackId);
+
     finalize();
 
     for (const auto& callbackId : _pluginLoadingCallbackIds) {
