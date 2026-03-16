@@ -115,14 +115,7 @@ public:
     template <size_t N>
     static const std::unordered_set<std::string>& GetParamAttributeSet(const char* const (&names)[N])
     {
-        static std::unordered_set<std::string> s;
-        static bool init = false;
-        if (!init) {
-            for (const char* name : names) {
-                s.insert(name);
-            }
-            init = true;
-        }
+        static const std::unordered_set<std::string> s(names, names + N);
         return s;
     }
 

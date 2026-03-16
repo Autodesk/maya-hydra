@@ -1293,9 +1293,10 @@ void GetAttributesFromNode(
     for (size_t i = 0; i < nodeFn.attributeCount(); i++) {
         MObject      attrObj = nodeFn.attribute(i);
         MFnAttribute attrFn(attrObj);
-        auto         attrName = attrFn.name().asChar();
-        MStatus      plugStatus;
-        MPlug        attrPlug = FindPlugWithFallback(nodeFn, attrFn.name(), plugStatus);
+        const MString attrNameStr = attrFn.name();
+        const char*   attrName = attrNameStr.asChar();
+        MStatus       plugStatus;
+        MPlug         attrPlug = FindPlugWithFallback(nodeFn, attrNameStr, plugStatus);
         if (!plugStatus || attrPlug.isNull())
             continue;
         if (attrPlug.isChild())

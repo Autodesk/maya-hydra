@@ -109,9 +109,9 @@ TEST(CustomAttributes, defaultArnoldCustomAttributes)
         << " See " << getDataSourceComparisonOutputPath(getPathToSample("cube_primvar_aiSubdivIterations_modified.txt")).string() << " for actual output";
 }
 
-// What: camera compound attributes should only emit primvars when non-default.
-// How: locate a camera prim, verify aiLookAt is absent at default, then set a non-default value.
-// Expect: default (0,0,0) has no primvar; non-default value produces the primvar output.
+// What: camera compound attributes should not emit primvars at default values.
+// How: locate a camera prim, verify aiLookAt is absent at default, then author a value.
+// Expect: default has no primvar; authored value produces the primvar output.
 TEST(CustomAttributes, defaultArnoldCameraCompoundAttributes)
 {
 #ifdef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
@@ -140,12 +140,12 @@ TEST(CustomAttributes, defaultArnoldCameraCompoundAttributes)
     ASSERT_EQ(prim.primType, HdPrimTypeTokens->camera);
     ASSERT_NE(prim.dataSource, nullptr);
 
-    // At default (0,0,0): aiLookAt should be absent.
+    // At default: aiLookAt should be absent (default may vary by plugin/environment).
     EXPECT_TRUE(dataSourceMatchesReference(
         HdContainerDataSource::Get(prim.dataSource, lookAtLocator), absentReference))
         << " See " << getDataSourceComparisonOutputPath(absentReference).string() << " for actual";
 
-    // Set aiLookAt to (1, 0, 0) (non-default): should appear as primvar.
+    // Author aiLookAt with a stable value (0, 0, 0) to force primvar emission.
     // aiLookAt is a multi attribute; elements must be set individually via MPlug.
     MObject cameraNode;
     ASSERT_TRUE(GetDependNodeFromNodeName(primPath.GetName().c_str(), cameraNode));
@@ -179,8 +179,8 @@ TEST(CustomAttributes, defaultArnoldCameraCompoundAttributes)
         const double y = elementPlug.child(1).asDouble();
         const double z = elementPlug.child(2).asDouble();
         if (std::abs(x) > 1e-9 || std::abs(y) > 1e-9 || std::abs(z) > 1e-9) {
-            GTEST_SKIP() << "aiLookAt could not be set (current value is " << x << ", " << y
-                         << ", " << z << ").";
+            GTEST_SKIP() << "aiLookAt could not be set to (0, 0, 0) (current value is " << x
+                         << ", " << y << ", " << z << ").";
         }
     } else {
         GTEST_SKIP() << "aiLookAt structure not as expected (compound with 3 children).";
