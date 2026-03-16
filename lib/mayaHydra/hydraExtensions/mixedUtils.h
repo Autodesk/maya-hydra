@@ -257,18 +257,21 @@ MAYAHYDRALIB_API
 PXR_NS::TfToken GetGeomSubsetsPickMode();
 
 /**
- * @brief Get the extension and dynamic attributes from a Maya node.
+ * @brief Get attributes from a Maya node for translation to Hydra primvars.
  *
- * This function retrieves all the extension and dynamic attributes of a given Maya node and stores
- * them in a map. The keys of the map are the attribute names, and the values are the attribute values.
+ * When includeAllAttributes is false, only extension and dynamic attributes are retrieved. When true, all non-builtin
+ * attributes are retrieved (e.g. for lights to translate plugin attributes like Arnold ai*).
  *
  * @param[in] node is the node in the Maya scene graph.
  * @param[out] attrs is a map that will contain the attribute names and their corresponding values.
+ * @param[in] includeAllAttributes when true, process all non-builtin attributes; when false, only
+ *            extension and dynamic attributes.
  */
 MAYAHYDRALIB_API
-void GetExtensionAndDynamicAttributesFromNode(
+void GetAttributesFromNode(
     const MObject& node,
-    PXR_NS::VtDictionary& attrs);
+    PXR_NS::VtDictionary& attrs,
+    bool includeAllAttributes = false);
 
 } // namespace MAYAHYDRA_NS_DEF
 

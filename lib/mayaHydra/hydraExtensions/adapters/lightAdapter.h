@@ -29,6 +29,9 @@
 #include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
 
+#include <string>
+#include <unordered_set>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 /// Callback for parent node attribute changes. Shared by MayaHydraLightAdapter and subclasses
@@ -92,9 +95,24 @@ public:
     MAYAHYDRALIB_API
     TfToken GetRenderTag() const override;
 
+    MAYAHYDRALIB_API
+    bool IncludeAllAttributesInPrimvars() const override { return true; }
+
+    bool ShouldMarkPrimvarDirtyForAttributeChange(const MPlug& plug) const override;
+    HdDirtyBits GetExtraDirtyBitsForPrimvarAttributeChange(const MPlug& plug) const override;
+
     bool GetShadowsEnabled(MFnLight& light) const;
 
     void GetGlfSimpleLightPosAndDirFromMFnLight(MFnLight& light, GlfSimpleLight& outSimpleLight);
+
+    /// For plug dirty callbacks: marks DirtyParams/DirtyShadowParams only when the plug affects
+    /// light params. Primvar-only attrs (e.g. aiShadowDensity) skip this to avoid over-dirtying.
+    static void MarkDirtyIfPlugAffectsLightParams(MayaHydraLightAdapter* adapter, const MPlug& plug);
+
+    /// For unit tests: returns the param attribute names that trigger DirtyParams.
+    /// Use with LightPrimvars.ParamAttributesMatchGetLogic to ensure the list stays in sync.
+    MAYAHYDRALIB_API
+    static const std::unordered_set<std::string>& GetLightParamAttributeNamesForTest();
 
 protected:
     /// Override to handle shape attribute changes before the default logic. Return true if fully

@@ -23,6 +23,9 @@
 
 #include <pxr/pxr.h>
 
+#include <string>
+#include <unordered_set>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class MayaHydraSceneIndex;
@@ -68,6 +71,12 @@ public:
 
     MAYAHYDRALIB_API
     TfToken GetRenderTag() const override { return Fvp::secondaryGraphicsRenderTagToken; }
+
+    bool ShouldMarkPrimvarDirtyForAttributeChange(const MPlug& plug) const override;
+
+    /// Exposed for unit tests to verify kCameraParamAttributeNames stays in sync with GetCameraParamValue.
+    MAYAHYDRALIB_API
+    static const std::unordered_set<std::string>& GetCameraParamAttributeNamesForTest();
 
 protected:
     static TfToken CameraType();

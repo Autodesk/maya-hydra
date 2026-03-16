@@ -34,6 +34,7 @@
 
 #include <maya/MAnimControl.h>
 #include <maya/MDGContextGuard.h>
+#include <maya/MFn.h>
 #include <maya/MNodeMessage.h>
 
 #include <functional>
@@ -328,7 +329,6 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         MIndexBuffer* indices = geom->indexBuffer(0);
         if (indices) {
             int indexCount = indices->size();
-            vertexIndices.resize(indexCount);
             int* indicesData = (int*)indices->map();
             // USD spamming the "topology references only upto element" message is super
             // slow.  Scanning the index array to look for an incompletely used vertex
@@ -402,7 +402,6 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 vertexCounts.resize(indexCount);
                 vertexCounts.assign(indexCount / 2, 2);
                 break;
-
             default:
                 TF_RUNTIME_ERROR(
                     "Unsupported render item primitive %d for item '%s' (prim '%s', id '%s').",
@@ -626,8 +625,17 @@ void MayaHydraRenderItemAdapter::CreateCallbacks()
         obj,
         +[](MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
             auto* adapter = reinterpret_cast<MayaHydraRenderItemAdapter*>(clientData);
-            // Handle extension attributes change
-            adapter->HandleExtensionAndDynamicAttributesDirty(plug);
+            TF_UNUSED(otherPlug);
+            if (!(msg & MNodeMessage::kAttributeSet)) {
+                return;
+            }
+            MObject node = adapter->GetNode();
+            // Skip extension/dynamic primvars on camera/light render items to avoid duplicate
+            // dirty notifications alongside the sprim updates.
+            if (node.hasFn(MFn::kCamera) || node.hasFn(MFn::kLight)) {
+                return;
+            }
+            adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
         },
         reinterpret_cast<void*>(this),
         &status);

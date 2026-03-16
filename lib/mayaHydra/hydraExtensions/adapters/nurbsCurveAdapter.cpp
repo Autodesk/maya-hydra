@@ -225,8 +225,7 @@ private:
                     plug.name().asChar());
         }
 
-        // Handle extension attributes change
-        adapter->HandleExtensionAndDynamicAttributesDirty(plug);
+        adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
     }
 
     static void TopologyChangedCallback(MObject& node, void* clientData)

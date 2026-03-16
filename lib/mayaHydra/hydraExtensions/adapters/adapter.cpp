@@ -18,6 +18,7 @@
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/materialNetworkConverter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
+#include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/tf/type.h>
@@ -26,6 +27,28 @@
 #include <maya/MFnAttribute.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+bool MayaHydraAdapter::IsParamAttribute(const MPlug& plug, const std::unordered_set<std::string>& paramAttrs)
+{
+    MStatus      status;
+    MFnAttribute attrFn(plug.attribute(&status));
+    if (!status) {
+        return false;
+    }
+    return paramAttrs.count(attrFn.name().asChar()) != 0;
+}
+
+MPlug MayaHydraAdapter::GetTopPlug(const MPlug& plug)
+{
+    MPlug topPlug = plug;
+    while (topPlug.isChild()) {
+        topPlug = topPlug.parent();
+    }
+    if (topPlug.isElement()) {
+        topPlug = topPlug.array();
+    }
+    return topPlug;
+}
 
 TF_REGISTRY_FUNCTION(TfType) { TfType::Define<MayaHydraAdapter>(); }
 
@@ -136,9 +159,10 @@ HdPrimvarDescriptorVector MayaHydraAdapter::GetPrimvarDescriptors(HdInterpolatio
         if (_extAttrMapNeedUpdate) {
             // Apply a global lock to avoid race condition while doing parallel DG node evaluation.
             std::lock_guard<LockType> lock(dg_access_mutex);
-            MAYAHYDRA_NS::GetExtensionAndDynamicAttributesFromNode(
+            MAYAHYDRA_NS::GetAttributesFromNode(
                 GetNode(),
-                _extAttrNameToValueMap);
+                _extAttrNameToValueMap,
+                IncludeAllAttributesInPrimvars());
             _extAttrMapNeedUpdate = false;
         }
         // Use constant interpolation and none role for all primvars
@@ -166,18 +190,43 @@ bool MayaHydraAdapter::IsExtensionOrDynamicAttribute(const MPlug& plug)
 // are user-authored per-node (e.g., via addAttr) and are not part of the type definition.
 void MayaHydraAdapter::HandleExtensionAndDynamicAttributesDirty(const MPlug& plug)
 {
+    if (!IsExtensionOrDynamicAttribute(plug)) {
+        return;
+    }
+    MaybeMarkPrimvarDirtyForAttributeChange(plug);
+}
+
+void MayaHydraAdapter::MaybeMarkPrimvarDirtyForAttributeChange(const MPlug& plug)
+{
+    // Trace to top-level plug: when a compound/array element's child changes
+    // (e.g. aiLookAt[0].child(0)), Maya may only fire for the child. We must
+    // still mark primvars dirty so the scene browser refreshes when resetting
+    // to default (primvar removal). Duplicate MarkDirty calls are idempotent.
+    MPlug topPlug = GetTopPlug(plug);
+    if (ShouldMarkPrimvarDirtyForAttributeChange(topPlug)) {
+        MarkPrimvarDirtyForAttributeChange(topPlug);
+    }
+}
+
+// Marks primvars dirty when an attribute changes that affects primvar data. This includes:
+// extension attributes (plugin-defined on node types), dynamic attributes (user addAttr), and
+// when IncludeAllAttributesInPrimvars() is true (e.g. lights) any attribute including built-in.
+void MayaHydraAdapter::MarkPrimvarDirtyForAttributeChange(const MPlug& plug)
+{
     MStatus status;
     MObject attrObj = plug.attribute(&status);
     if (status) {
         MFnAttribute fnAttr(attrObj);
-        if (fnAttr.isExtension() || fnAttr.isDynamic()) {
+        const bool   markDirty = IncludeAllAttributesInPrimvars()
+            || fnAttr.isExtension()
+            || fnAttr.isDynamic();
+        if (markDirty) {
             _extAttrMapNeedUpdate = true;
-            // Notify the change tracker that the primvars have changed.
-            // Note there's no fine grained dirty notification mechanism on primvars yet,
-            // like dirty flags for adding/removing/changing a specific primvar, only
-            // DirtyPrimvar for all changes. Currently, no performance bottleneck was spotted
-            // around this. This could be improved if a more fine grained mechanism is provided.
-            MarkDirty(HdChangeTracker::DirtyPrimvar);
+            // Notify the change tracker. Include extra bits from subclass (e.g. light param attrs
+            // need DirtyParams|DirtyShadowParams) to consolidate into one MarkDirty and avoid
+            // redundant scene index notifications.
+            MarkDirty(
+                HdChangeTracker::DirtyPrimvar | GetExtraDirtyBitsForPrimvarAttributeChange(plug));
         }
     }
 }

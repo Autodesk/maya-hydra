@@ -38,8 +38,11 @@
 #include <maya/MDrawContext.h>
 #include <maya/MPointArray.h>
 #include <maya/MSelectionContext.h>
+#include <maya/MPlug.h>
 #include <maya/MSelectionList.h>
 
+#include <string>
+#include <unordered_set>
 #include <vector>
 #include <map>
 
@@ -87,12 +90,64 @@ public:
 
     bool IsPopulated() const { return _isPopulated; }
 
-    void HandleExtensionAndDynamicAttributesDirty(const MPlug& plug);
+    void MarkPrimvarDirtyForAttributeChange(const MPlug& plug);
+
+    /// Override to add extra dirty bits when a primvar-affecting attr changes (e.g. light param
+    /// attrs need DirtyParams|DirtyShadowParams). Consolidating into one MarkDirty reduces
+    /// redundant scene index notifications.
+    virtual HdDirtyBits GetExtraDirtyBitsForPrimvarAttributeChange(const MPlug& plug) const
+    {
+        return 0;
+    }
+
+    /// Call from attribute-changed callbacks when an attr change should mark primvars dirty.
+    /// Skips child plugs to avoid duplicate notifications for compound attrs (e.g. color.r).
+    /// Override ShouldMarkPrimvarDirtyForAttributeChange to return false when another callback
+    /// already marks DirtyPrimvar (e.g. mesh _dirtyBits, light param attr list).
+    void MaybeMarkPrimvarDirtyForAttributeChange(const MPlug& plug);
+    virtual bool ShouldMarkPrimvarDirtyForAttributeChange(const MPlug& plug) const { return true; }
+
+    /// Helper for adapters with param attribute lists. Returns true if plug's attribute is in the set.
+    /// Use: ShouldMarkPrimvarDirtyForAttributeChange returns !IsParamAttribute(plug, paramAttrs).
+    static bool IsParamAttribute(const MPlug& plug, const std::unordered_set<std::string>& paramAttrs);
+
+    /// Build a static param attribute set from an array. Each instantiation caches its own set.
+    template <size_t N>
+    static const std::unordered_set<std::string>& GetParamAttributeSet(const char* const (&names)[N])
+    {
+        static std::unordered_set<std::string> s;
+        static bool init = false;
+        if (!init) {
+            for (const char* name : names) {
+                s.insert(name);
+            }
+            init = true;
+        }
+        return s;
+    }
+
+    /// Helper for adapters with param attribute lists. Use in ShouldMarkPrimvarDirtyForAttributeChange
+    /// override: return ShouldMarkPrimvarDirtyForParamAttrs(plug, kXxxParamAttributeNames).
+    template <size_t N>
+    static bool ShouldMarkPrimvarDirtyForParamAttrs(const MPlug& plug, const char* const (&names)[N])
+    {
+        return !IsParamAttribute(plug, GetParamAttributeSet(names));
+    }
+
+    /// Return the top-level plug for a child/array element plug.
+    /// (e.g. aiLookAt[0].child(0) -> aiLookAt)
+    static MPlug GetTopPlug(const MPlug& plug);
+
+    /// When true, all non-builtin attributes are translated to primvars (e.g. for lights).
+    /// When false, only extension and dynamic attributes. Default is false.
+    virtual bool IncludeAllAttributesInPrimvars() const { return false; }
 
     /// Returns true if \p plug is an extension or dynamic attribute. Used by adapters
     /// to route extension/dynamic attribute changes to HandleExtensionAndDynamicAttributesDirty
     /// instead of marking schema params dirty.
     static bool IsExtensionOrDynamicAttribute(const MPlug& plug);
+    /// Mark primvars dirty for extension or dynamic attributes without touching schema params.
+    void HandleExtensionAndDynamicAttributesDirty(const MPlug& plug);
 
     MAYAHYDRALIB_API
     virtual HdMeshTopology GetMeshTopology() { return {}; }

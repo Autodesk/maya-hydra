@@ -14,6 +14,7 @@
 // limitations under the License.
 //
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
+#include <mayaHydraLib/adapters/meshAdapterTestUtils.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/shapeAdapter.h>
@@ -22,6 +23,7 @@
 
 #include <pxr/base/gf/interval.h>
 #include <pxr/base/tf/type.h>
+#include <pxr/imaging/hd/changeTracker.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/pxOsd/tokens.h>
 #include <pxr/pxr.h>
@@ -29,6 +31,7 @@
 
 #include <maya/MCallbackIdArray.h>
 #include <maya/MFloatArray.h>
+#include <maya/MFnAttribute.h>
 #include <maya/MFnMesh.h>
 #include <maya/MIntArray.h>
 #include <maya/MItMeshPolygon.h>
@@ -36,6 +39,9 @@
 #include <maya/MObjectHandle.h>
 #include <maya/MPlug.h>
 #include <maya/MPolyMessage.h>
+
+#include <string>
+#include <unordered_set>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -47,6 +53,23 @@ PXR_NAMESPACE_OPEN_SCOPE
  * We can also translate from a MRenderitem to Hydra using the
  * MayaHydraRenderItemAdapter class.
  */
+
+namespace {
+
+// Attributes handled by NodeDirtiedCallback or specially in AttributeChangedCallback.
+// When these change, we avoid duplicate primvar dirty by returning false from
+// ShouldMarkPrimvarDirtyForAttributeChange.
+static const char* const kMeshParamAttributeNames[] = {
+    "pnts", "inMesh", "worldMatrix", "doubleSided", "intermediateObject",
+    "uvPivot", "displaySmoothMesh", "smoothLevel", "instObjGroups"
+};
+
+} // namespace
+
+const std::unordered_set<std::string>& GetMeshParamAttributeNamesForTest()
+{
+    return MayaHydraAdapter::GetParamAttributeSet(kMeshParamAttributeNames);
+}
 
 namespace {
 
@@ -473,12 +496,34 @@ public:
 
     TfToken GetRenderTag() const override { return HdRenderTagTokens->geometry; }
 
+    bool ShouldMarkPrimvarDirtyForAttributeChange(const MPlug& plug) const override
+    {
+        // Always return true so AttributeChangedCallback marks primvars dirty. NodeDirtyPlugCallback
+        // may not fire when resetting to default, causing primvar removal to only appear after
+        // selecting away and back. Duplicate MarkDirty from NodeDirtiedCallback is idempotent.
+        TF_UNUSED(plug);
+        return true;
+    }
+
 private:
     static void NodeDirtiedCallback(MObject& node, MPlug& plug, void* clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
+        MStatus status;
+        // For compound attrs (e.g. uvPivot), Maya fires once per child. Only process the first
+        // child to avoid duplicate dirty notifications.
+        if (plug.isChild()) {
+            MPlug firstChild = plug.parent().child(0, &status);
+            if (status && plug != firstChild) {
+                return;
+            }
+        }
+        MObject plugAttr = plug.isChild() ? plug.parent().attribute(&status) : plug.attribute(&status);
+        if (!status) {
+            return;
+        }
         for (const auto& it : _dirtyBits) {
-            if (it.first == plug) {
+            if (it.first == plugAttr) {
                 adapter->MarkDirty(it.second);
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_MESH_PLUG_DIRTY)
                     .Msg(
@@ -517,8 +562,7 @@ private:
                     plug.name().asChar());
         }
 
-        // Handle extension attributes change
-        adapter->HandleExtensionAndDynamicAttributesDirty(plug);
+        adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
     }
 
     static void TopologyChangedCallback(MObject& node, void* clientData)
