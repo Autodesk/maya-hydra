@@ -34,11 +34,13 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace MayaHydra;
 
-// Unit test: validates that only non-default Arnold attributes are exposed as Hydra primvars.
+// Unit test: validates that only non-default extension/custom attributes are exposed as Hydra primvars.
 namespace {
 HdDataSourceLocator primvarsLocator = HdPrimvarsSchema::GetDefaultLocator();
 
-// Validate default-value Arnold attributes are NOT exposed; non-default attrs are exposed.
+// What: default-valued extension/custom attributes should not emit primvars.
+// How: read aiAutobumpVisibility/aiSubdivIterations at default, then set non-default values.
+// Expect: default values yield no primvars; non-default values match reference primvar outputs.
 TEST(CustomAttributes, defaultArnoldCustomAttributes)
 { 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
@@ -107,8 +109,9 @@ TEST(CustomAttributes, defaultArnoldCustomAttributes)
         << " See " << getDataSourceComparisonOutputPath(getPathToSample("cube_primvar_aiSubdivIterations_modified.txt")).string() << " for actual output";
 }
 
-// Validate that Arnold camera compound attributes (aiLookAt, aiScreenWindowMin/Max, etc.)
-// with default values (0,0) or (0,0,0) are NOT exposed; non-default values are exposed.
+// What: camera compound attributes should only emit primvars when non-default.
+// How: locate a camera prim, verify aiLookAt is absent at default, then set a non-default value.
+// Expect: default (0,0,0) has no primvar; non-default value produces the primvar output.
 TEST(CustomAttributes, defaultArnoldCameraCompoundAttributes)
 {
 #ifdef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
@@ -194,8 +197,9 @@ TEST(CustomAttributes, defaultArnoldCameraCompoundAttributes)
 #endif
 }
 
-// Comprehensive test: mesh, camera, and light ai* attributes appear when set to non-default
-// and are removed when reset to default. Covers primvar appear/remove for all adapter types.
+// What: primvars appear for non-default ai* attrs and disappear when reset.
+// How: set and reset ai* attributes on mesh, camera, and light, then inspect data sources.
+// Expect: primvars appear on non-default values and are absent after reset to defaults.
 TEST(CustomAttributes, aiPrimvarsAppearAndRemovedWhenReset)
 {
 #ifdef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE

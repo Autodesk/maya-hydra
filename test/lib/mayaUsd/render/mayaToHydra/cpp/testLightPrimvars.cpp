@@ -38,36 +38,7 @@ namespace {
 const char* kLightShapeOptionVar = "mhLightShape";
 const char* kLightShapeFallback = "aiSkyDomeLightShape1";
 
-std::string GetOptionVarOrDefault(const char* optionVar, const char* fallback)
-{
-    if (MGlobal::optionVarExists(optionVar)) {
-        return MGlobal::optionVarStringValue(optionVar).asChar();
-    }
-    return fallback;
-}
-
-FindPrimPredicate getDomeLightPredicate(const std::string& shapeNamePart)
-{
-    return [shapeNamePart](const HdSceneIndexBasePtr& sceneIndex,
-                           const SdfPath&            primPath) -> bool {
-        if (primPath.GetAsString().find(shapeNamePart) == std::string::npos) {
-            return false;
-        }
-        HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
-        return prim.primType == HdPrimTypeTokens->domeLight;
-    };
-}
-
-// Extract shape name for path matching (e.g. "|aiSkyDomeLight1|aiSkyDomeLightShape1" -> "aiSkyDomeLightShape1")
-std::string getShapeNameFromFullPath(const std::string& fullPath)
-{
-    size_t lastPipe = fullPath.rfind('|');
-    if (lastPipe != std::string::npos && lastPipe + 1 < fullPath.size()) {
-        return fullPath.substr(lastPipe + 1);
-    }
-    return fullPath;
-}
-
+// Search for a primvars-dirty entry whose primvar value matches an expected float.
 bool FindDirtyPrimWithPrimvarValueSince(
     SceneIndexNotificationsAccumulator& accumulator,
     size_t                              startIndex,
@@ -111,8 +82,7 @@ bool FindDirtyPrimWithPrimvarValueSince(
     return false;
 }
 
-// For a dirtied light prim since startIndex: returns true if we got primvars dirty,
-// and sets outHadLightSchemaDirty to true if we also got HdLightSchema (DirtyParams).
+// Scan dirtied entries for a light prim and report primvars vs light-schema dirty.
 void CheckLightDirtySince(
     SceneIndexNotificationsAccumulator& accumulator,
     size_t                              startIndex,
@@ -139,7 +109,7 @@ void CheckLightDirtySince(
     }
 }
 
-// Count how many dirtied entries for lightPrimPath contain primvars in dirtyLocators.
+// Count primvars-dirty notices for the light prim since a starting index.
 size_t CountPrimvarsDirtyEntriesSince(
     SceneIndexNotificationsAccumulator& accumulator,
     size_t                              startIndex,
@@ -160,12 +130,13 @@ size_t CountPrimvarsDirtyEntriesSince(
 
 } // namespace
 
-// Unit test: verify non-default Arnold light attributes appear as primvars, default-value attrs
-// are absent, and dirty notification + value update when attribute changes.
+// What: non-default extension attrs appear as primvars; defaults remain absent.
+// How: validate initial primvars, then update aiExposure and observe dirtied primvar values.
+// Expect: aiExposure/aiDiffuse primvars exist at non-default values; default aiSpecular absent.
 TEST(LightPrimvars, testTranslationAndDirtying)
 {
     const std::string lightShapeFull = GetOptionVarOrDefault(kLightShapeOptionVar, kLightShapeFallback);
-    const std::string shapeNamePart = getShapeNameFromFullPath(lightShapeFull);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(lightShapeFull);
 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
@@ -173,54 +144,48 @@ TEST(LightPrimvars, testTranslationAndDirtying)
     // ----- Test case 1: Translation (non-default present, default absent) -----
     // Find which scene index contains the light - we must observe that same index for dirty
     // notifications, since different terminal indices may not all receive Maya light data.
-    HdSceneIndexBaseRefPtr sceneIndexWithLight(nullptr);
-    bool                  foundLight = false;
-    for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
-        SceneIndexInspector inspector(sceneIndex);
-        PrimEntriesVector   foundPrims
-            = inspector.FindPrims(getDomeLightPredicate(shapeNamePart), 1);
+    HdSceneIndexBaseRefPtr sceneIndexWithLight = FindTerminalSceneIndexWithPrim(
+        sceneIndices, shapeNamePart, HdPrimTypeTokens->domeLight);
+    ASSERT_TRUE(sceneIndexWithLight) << "aiSkyDomeLight prim not found in scene index";
 
-        if (foundPrims.size() >= 1u) {
-            sceneIndexWithLight = sceneIndex;
-            HdSceneIndexPrim prim = foundPrims.front().prim;
-            ASSERT_EQ(prim.primType, HdPrimTypeTokens->domeLight);
-            ASSERT_NE(prim.dataSource, nullptr);
+    SceneIndexInspector inspector(sceneIndexWithLight);
+    PrimEntriesVector   foundPrims
+        = inspector.FindPrims(CreatePrimPredicate(shapeNamePart, HdPrimTypeTokens->domeLight), 1);
+    ASSERT_GE(foundPrims.size(), 1u);
 
-            HdPrimvarsSchema primvarsSchema = HdPrimvarsSchema::GetFromParent(prim.dataSource);
+    HdSceneIndexPrim prim = foundPrims.front().prim;
+    ASSERT_EQ(prim.primType, HdPrimTypeTokens->domeLight);
+    ASSERT_NE(prim.dataSource, nullptr);
 
-            // Non-default attrs present: aiExposure=2.0, aiDiffuse=0.5
-            HdPrimvarSchema aiExposureSchema = primvarsSchema.GetPrimvar(TfToken("aiExposure"));
-            ASSERT_TRUE(aiExposureSchema.GetPrimvarValue())
-                << "aiExposure (non-default) should appear as primvar";
-            VtValue aiExposureVal = aiExposureSchema.GetPrimvarValue()->GetValue(0.0f);
-            ASSERT_TRUE(aiExposureVal.IsHolding<float>() || aiExposureVal.IsHolding<double>())
-                << "aiExposure should be float or double";
-            const float aiExposureFloat = aiExposureVal.IsHolding<float>()
-                ? aiExposureVal.UncheckedGet<float>()
-                : static_cast<float>(aiExposureVal.UncheckedGet<double>());
-            EXPECT_FLOAT_EQ(aiExposureFloat, 2.0f);
+    HdPrimvarsSchema primvarsSchema = HdPrimvarsSchema::GetFromParent(prim.dataSource);
 
-            HdPrimvarSchema aiDiffuseSchema = primvarsSchema.GetPrimvar(TfToken("aiDiffuse"));
-            ASSERT_TRUE(aiDiffuseSchema.GetPrimvarValue())
-                << "aiDiffuse (non-default) should appear as primvar";
-            VtValue aiDiffuseVal = aiDiffuseSchema.GetPrimvarValue()->GetValue(0.0f);
-            ASSERT_TRUE(aiDiffuseVal.IsHolding<float>() || aiDiffuseVal.IsHolding<double>())
-                << "aiDiffuse should be float or double";
-            const float aiDiffuseFloat = aiDiffuseVal.IsHolding<float>()
-                ? aiDiffuseVal.UncheckedGet<float>()
-                : static_cast<float>(aiDiffuseVal.UncheckedGet<double>());
-            EXPECT_FLOAT_EQ(aiDiffuseFloat, 0.5f);
+    // Non-default attrs present: aiExposure=2.0, aiDiffuse=0.5
+    HdPrimvarSchema aiExposureSchema = primvarsSchema.GetPrimvar(TfToken("aiExposure"));
+    ASSERT_TRUE(aiExposureSchema.GetPrimvarValue())
+        << "aiExposure (non-default) should appear as primvar";
+    VtValue aiExposureVal = aiExposureSchema.GetPrimvarValue()->GetValue(0.0f);
+    ASSERT_TRUE(aiExposureVal.IsHolding<float>() || aiExposureVal.IsHolding<double>())
+        << "aiExposure should be float or double";
+    const float aiExposureFloat = aiExposureVal.IsHolding<float>()
+        ? aiExposureVal.UncheckedGet<float>()
+        : static_cast<float>(aiExposureVal.UncheckedGet<double>());
+    EXPECT_FLOAT_EQ(aiExposureFloat, 2.0f);
 
-            // Default-value attr absent: aiSpecular at 1.0
-            HdPrimvarSchema aiSpecularSchema = primvarsSchema.GetPrimvar(TfToken("aiSpecular"));
-            EXPECT_FALSE(aiSpecularSchema.GetPrimvarValue())
-                << "aiSpecular (default) should NOT appear as primvar";
+    HdPrimvarSchema aiDiffuseSchema = primvarsSchema.GetPrimvar(TfToken("aiDiffuse"));
+    ASSERT_TRUE(aiDiffuseSchema.GetPrimvarValue())
+        << "aiDiffuse (non-default) should appear as primvar";
+    VtValue aiDiffuseVal = aiDiffuseSchema.GetPrimvarValue()->GetValue(0.0f);
+    ASSERT_TRUE(aiDiffuseVal.IsHolding<float>() || aiDiffuseVal.IsHolding<double>())
+        << "aiDiffuse should be float or double";
+    const float aiDiffuseFloat = aiDiffuseVal.IsHolding<float>()
+        ? aiDiffuseVal.UncheckedGet<float>()
+        : static_cast<float>(aiDiffuseVal.UncheckedGet<double>());
+    EXPECT_FLOAT_EQ(aiDiffuseFloat, 0.5f);
 
-            foundLight = true;
-            break;
-        }
-    }
-    ASSERT_TRUE(foundLight) << "aiSkyDomeLight prim not found in scene index";
+    // Default-value attr absent: aiSpecular at 1.0
+    HdPrimvarSchema aiSpecularSchema = primvarsSchema.GetPrimvar(TfToken("aiSpecular"));
+    EXPECT_FALSE(aiSpecularSchema.GetPrimvarValue())
+        << "aiSpecular (default) should NOT appear as primvar";
 
     // ----- Test case 2: Dirty notification and value update -----
     // Observe MayaHydraSceneIndex - it's the one that sends dirty when Maya attrs change.
@@ -243,27 +208,20 @@ TEST(LightPrimvars, testTranslationAndDirtying)
         << "Dirty notification with updated aiExposure=3.5 should have been received";
 }
 
-// Verify that changing a non-param attribute (e.g. aiShadowDensity) triggers ONLY
-// DirtyPrimvar, not DirtyParams. Param attrs trigger both; primvar-only attrs must not.
+// What: non-param light attributes should dirty primvars only.
+// How: set aiShadowDensity (primvar-only) and inspect dirtied locators.
+// Expect: primvars dirty is present; light schema dirty is absent.
 TEST(LightPrimvars, NonParamAttrTriggersOnlyPrimvarDirty)
 {
     const std::string lightShapeFull = GetOptionVarOrDefault(kLightShapeOptionVar, kLightShapeFallback);
-    const std::string shapeNamePart = getShapeNameFromFullPath(lightShapeFull);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(lightShapeFull);
 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
     // Find which scene index contains the light - observe that same index for dirty notifications
-    HdSceneIndexBaseRefPtr sceneIndexWithLight(nullptr);
-    for (const HdSceneIndexBaseRefPtr& si : sceneIndices) {
-        SceneIndexInspector inspector(si);
-        PrimEntriesVector   foundPrims
-            = inspector.FindPrims(getDomeLightPredicate(shapeNamePart), 1);
-        if (foundPrims.size() >= 1u) {
-            sceneIndexWithLight = si;
-            break;
-        }
-    }
+    HdSceneIndexBaseRefPtr sceneIndexWithLight = FindTerminalSceneIndexWithPrim(
+        sceneIndices, shapeNamePart, HdPrimTypeTokens->domeLight);
     ASSERT_TRUE(sceneIndexWithLight) << "aiSkyDomeLight prim not found in any scene index";
 
     // Observe MayaHydraSceneIndex - it sends dirty when Maya attrs change.
@@ -273,7 +231,7 @@ TEST(LightPrimvars, NonParamAttrTriggersOnlyPrimvarDirty)
     // Get light path from MayaHydraSceneIndex (paths may differ from terminal)
     SceneIndexInspector inspector(mayaSceneIndex);
     PrimEntriesVector   foundPrims
-        = inspector.FindPrims(getDomeLightPredicate(shapeNamePart), 1);
+        = inspector.FindPrims(CreatePrimPredicate(shapeNamePart, HdPrimTypeTokens->domeLight), 1);
     ASSERT_GE(foundPrims.size(), 1u) << "aiSkyDomeLight not found in MayaHydraSceneIndex";
     const SdfPath lightPrimPath = foundPrims.front().primPath;
 
@@ -297,26 +255,19 @@ TEST(LightPrimvars, NonParamAttrTriggersOnlyPrimvarDirty)
            "only primvars dirty expected";
 }
 
-// Verify that updating intensity (aiExposure for Arnold lights) does not produce duplicate
-// primvars dirty notifications - we should receive exactly one.
+// What: param attribute updates should not duplicate primvars dirty notices.
+// How: change aiExposure and count primvars dirty entries since the change.
+// Expect: exactly one primvars dirty entry for the light.
 TEST(LightPrimvars, IntensityUpdateNoDuplicatePrimvarsDirty)
 {
     const std::string lightShapeFull = GetOptionVarOrDefault(kLightShapeOptionVar, kLightShapeFallback);
-    const std::string shapeNamePart = getShapeNameFromFullPath(lightShapeFull);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(lightShapeFull);
 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
-    HdSceneIndexBaseRefPtr sceneIndexWithLight(nullptr);
-    for (const HdSceneIndexBaseRefPtr& si : sceneIndices) {
-        SceneIndexInspector inspector(si);
-        PrimEntriesVector   foundPrims
-            = inspector.FindPrims(getDomeLightPredicate(shapeNamePart), 1);
-        if (foundPrims.size() >= 1u) {
-            sceneIndexWithLight = si;
-            break;
-        }
-    }
+    HdSceneIndexBaseRefPtr sceneIndexWithLight = FindTerminalSceneIndexWithPrim(
+        sceneIndices, shapeNamePart, HdPrimTypeTokens->domeLight);
     ASSERT_TRUE(sceneIndexWithLight) << "aiSkyDomeLight prim not found in any scene index";
 
     auto mayaSceneIndex = FindMayaHydraSceneIndex(sceneIndexWithLight);
@@ -324,7 +275,7 @@ TEST(LightPrimvars, IntensityUpdateNoDuplicatePrimvarsDirty)
 
     SceneIndexInspector inspector(mayaSceneIndex);
     PrimEntriesVector   foundPrims
-        = inspector.FindPrims(getDomeLightPredicate(shapeNamePart), 1);
+        = inspector.FindPrims(CreatePrimPredicate(shapeNamePart, HdPrimTypeTokens->domeLight), 1);
     ASSERT_GE(foundPrims.size(), 1u) << "aiSkyDomeLight not found in MayaHydraSceneIndex";
     const SdfPath lightPrimPath = foundPrims.front().primPath;
 
@@ -344,10 +295,9 @@ TEST(LightPrimvars, IntensityUpdateNoDuplicatePrimvarsDirty)
            "notification, got " << primvarsDirtyCount << " (duplicate notifications)";
 }
 
-// Consistency check: every attribute read by GetMayaLightParams, GetLightParamValue,
-// _CalculateShadowParams, _CalculateShadowProjectionMatrix, or GetLightMaterialNetwork must be
-// in the light param attribute list (kLightParamAttributeNames). When you add a new attribute to
-// any of those, add it here first - the test will fail until you also add it to kLightParamAttributeNames.
+// What: light param attributes list must match the adapter's attribute usage.
+// How: compare an expected list against the adapter's param attribute set.
+// Expect: all attributes used by the light adapter logic are present in the set.
 TEST(LightPrimvars, ParamAttributesMatchGetLogic)
 {
     static const std::vector<std::string> kAttrsUsedInGetLogic = {

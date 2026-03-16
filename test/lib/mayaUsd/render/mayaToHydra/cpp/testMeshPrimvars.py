@@ -21,6 +21,8 @@ from testUtils import PluginLoaded
 class TestMeshPrimvars(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
+    # Create a minimal mesh scene for the C++ primvars tests.
+    # Adds a non-param custom attribute and stores the mesh shape for C++ lookup.
     def setupScene(self):
         cmds.file(new=True, force=True)
         # Create a polygon cube (mesh)
@@ -34,16 +36,25 @@ class TestMeshPrimvars(mtohUtils.MayaHydraBaseTestCase):
         cmds.optionVar(stringValue=("mhMeshShape", mesh_shape))
         cmds.refresh()
 
+    # What: non-param mesh attribute changes should dirty primvars only.
+    # How: build the scene, then run the C++ test that edits testCustomAttr.
+    # Expect: primvars dirty without points dirty.
     def test_nonParamAttrTriggersOnlyPrimvarDirty(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="MeshPrimvars.NonParamAttrTriggersOnlyPrimvarDirty")
 
+    # What: param attribute updates should not duplicate primvars notices.
+    # How: build the scene, then run the C++ test that edits uvPivot.
+    # Expect: exactly one primvars dirty entry for the mesh.
     def test_uvPivotUpdateNoDuplicatePrimvarsDirty(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="MeshPrimvars.UvPivotUpdateNoDuplicatePrimvarsDirty")
 
+    # What: mesh param attributes list must match the adapter's attribute usage.
+    # How: build the scene, then run the C++ consistency test.
+    # Expect: all attributes handled by the mesh adapter are present in the param list.
     def test_paramAttributesMatchGetLogic(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):

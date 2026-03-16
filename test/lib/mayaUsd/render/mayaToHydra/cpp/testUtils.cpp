@@ -122,6 +122,62 @@ FindPrimPredicate CreatePrimPredicate(
     };
 }
 
+HdSceneIndexBaseRefPtr FindTerminalSceneIndexWithPrim(
+    const SceneIndicesVector& sceneIndices,
+    FindPrimPredicate         predicate,
+    size_t                    maxPrims)
+{
+    for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
+        SceneIndexInspector inspector(sceneIndex);
+        PrimEntriesVector   foundPrims = inspector.FindPrims(predicate, maxPrims);
+        if (!foundPrims.empty()) {
+            return sceneIndex;
+        }
+    }
+    return nullptr;
+}
+
+HdSceneIndexBaseRefPtr FindTerminalSceneIndexWithPrim(
+    const SceneIndicesVector& sceneIndices,
+    const std::string&        primNamePart,
+    const TfToken&            primType,
+    size_t                    maxPrims)
+{
+    return FindTerminalSceneIndexWithPrim(
+        sceneIndices, CreatePrimPredicate(primNamePart, primType), maxPrims);
+}
+
+std::string GetOptionVarOrDefault(const char* optionVar, const char* fallback)
+{
+    if (MGlobal::optionVarExists(optionVar)) {
+        return MGlobal::optionVarStringValue(optionVar).asChar();
+    }
+    return fallback;
+}
+
+std::string GetShapeNameFromFullPath(const std::string& fullPath)
+{
+    const size_t lastPipe = fullPath.rfind('|');
+    if (lastPipe != std::string::npos && lastPipe + 1 < fullPath.size()) {
+        return fullPath.substr(lastPipe + 1);
+    }
+    return fullPath;
+}
+
+std::string GetParentNameFromFullPath(const std::string& fullPath)
+{
+    const size_t lastPipe = fullPath.rfind('|');
+    if (lastPipe == std::string::npos || lastPipe == 0) {
+        return {};
+    }
+    const size_t prevPipe = fullPath.rfind('|', lastPipe - 1);
+    const size_t start = (prevPipe == std::string::npos) ? 0 : prevPipe + 1;
+    if (lastPipe <= start) {
+        return {};
+    }
+    return fullPath.substr(start, lastPipe - start);
+}
+
 SceneIndexInspector::SceneIndexInspector(HdSceneIndexBasePtr sceneIndex)
     : _sceneIndex(sceneIndex)
 {

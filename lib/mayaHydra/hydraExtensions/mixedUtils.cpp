@@ -40,7 +40,6 @@
 #include <pxr/base/vt/types.h>
 
 #include <cstdint>
-#include <cstring>
 
 #include <maya/MDagPath.h>
 #include <maya/MGlobal.h>
@@ -96,7 +95,7 @@ bool UseEnumLabelsForExtensionAndDynamicAttrs()
 
 // Store value in attrs. Default check is done via MPlug::isDefaultValue() before calling.
 template<typename T>
-void UpdateAttrs(const char* attrName, const T& val, const T& /* defaultVal */, VtDictionary& attrs)
+void UpdateAttrs(const char* attrName, const T& val, VtDictionary& attrs)
 {
     attrs[attrName] = VtValue(val);
 }
@@ -562,8 +561,6 @@ template <typename Scalar, size_t N>
 void UpdateNumericTupleAttr(
     const char* attrName,
     const std::array<Scalar, N>& value,
-    const std::array<Scalar, N>& /* defaultValue */,
-    const bool /* ignoreDefault */,
     VtDictionary& attrs)
 {
     attrs[attrName] = VtValue(VecBuilder<Scalar, N>::Make(value));
@@ -1107,30 +1104,8 @@ static const std::unordered_set<std::string>& _GetBuiltInAttributeSkipSet()
     return skipSet;
 }
 
-// Known Arnold attribute defaults when Maya's getDefault() fails (e.g. plugin doesn't
-// implement it). Used as fallback so primvars are correctly removed when reset to default.
-static bool ArnoldAttrValueEqualsKnownDefault(const char* attrName, const MPlug& attrPlug, const MObject& attrObj)
-{
-    if (!attrName) {
-        return false;
-    }
-    // aiColorTemperature (Kelvin): Arnold default is 6500
-    if (strcmp(attrName, "aiColorTemperature") == 0) {
-        if (attrObj.apiType() == MFn::kNumericAttribute
-            || attrObj.apiType() == MFn::kAttribute2Float
-            || attrObj.apiType() == MFn::kAttribute2Double
-            || attrObj.apiType() == MFn::kAttribute3Float
-            || attrObj.apiType() == MFn::kAttribute3Double
-            || attrObj.apiType() == MFn::kAttribute4Double) {
-            const double value = attrPlug.asDouble();
-            return std::abs(value - 6500.0) < 1e-6;
-        }
-    }
-    return false;
-}
-
 // Manual default-value check for extension attributes. MPlug::isDefaultValue() can be
-// unreliable for plugin-defined attributes (e.g. Arnold), so we compare against the
+// unreliable for plugin-defined attributes, so we compare against the
 // attribute's registered default. Returns true if value equals default; false if not
 // or if we cannot determine.
 static bool ExtensionAttrValueEqualsDefault(const MPlug& attrPlug, const MObject& attrObj)
@@ -1196,8 +1171,6 @@ static bool ExtensionAttrValueEqualsDefault(const MPlug& attrPlug, const MObject
         case MFn::kAttribute3Int:
         case MFn::kNumericAttribute: {
             MFnNumericAttribute numericAttr(attrObj);
-            MFnAttribute        attrFn(attrObj);
-            const char*         attrName = attrFn.name().asChar();
             switch (numericAttr.unitType()) {
                 case MFnNumericData::kBoolean: {
                     bool def = false;
@@ -1222,7 +1195,7 @@ static bool ExtensionAttrValueEqualsDefault(const MPlug& attrPlug, const MObject
                         && std::abs(attrPlug.asFloat() - def) < 1e-6f) {
                         return true;
                     }
-                    return ArnoldAttrValueEqualsKnownDefault(attrName, attrPlug, attrObj);
+                    return false;
                 }
                 case MFnNumericData::kDouble: {
                     double def = 0.0;
@@ -1230,7 +1203,7 @@ static bool ExtensionAttrValueEqualsDefault(const MPlug& attrPlug, const MObject
                         && std::abs(attrPlug.asDouble() - def) < 1e-9) {
                         return true;
                     }
-                    return ArnoldAttrValueEqualsKnownDefault(attrName, attrPlug, attrObj);
+                    return false;
                 }
                 default:
                     return false;
@@ -1644,16 +1617,14 @@ void GetAttributesFromNode(
                             if (!GetCompoundChildValues<short, 2>(compoundPlug, value, defaultValue)) {
                                 break;
                             }
-                            UpdateNumericTupleAttr<short, 2>(
-                                attrName, value, defaultValue, ignoreDefault, attrs);
+                            UpdateNumericTupleAttr<short, 2>(attrName, value, attrs);
                         } else {
                             std::array<int, 2> value = {{ 0, 0 }};
                             std::array<int, 2> defaultValue = {{ 0, 0 }};
                             if (!GetCompoundChildValues<int, 2>(compoundPlug, value, defaultValue)) {
                                 break;
                             }
-                            UpdateNumericTupleAttr<int, 2>(
-                                attrName, value, defaultValue, ignoreDefault, attrs);
+                            UpdateNumericTupleAttr<int, 2>(attrName, value, attrs);
                         }
                     } else if (childCount == 3) {
                         if (isShort) {
@@ -1662,16 +1633,14 @@ void GetAttributesFromNode(
                             if (!GetCompoundChildValues<short, 3>(compoundPlug, value, defaultValue)) {
                                 break;
                             }
-                            UpdateNumericTupleAttr<short, 3>(
-                                attrName, value, defaultValue, ignoreDefault, attrs);
+                            UpdateNumericTupleAttr<short, 3>(attrName, value, attrs);
                         } else {
                             std::array<int, 3> value = {{ 0, 0, 0 }};
                             std::array<int, 3> defaultValue = {{ 0, 0, 0 }};
                             if (!GetCompoundChildValues<int, 3>(compoundPlug, value, defaultValue)) {
                                 break;
                             }
-                            UpdateNumericTupleAttr<int, 3>(
-                                attrName, value, defaultValue, ignoreDefault, attrs);
+                            UpdateNumericTupleAttr<int, 3>(attrName, value, attrs);
                         }
                     }
                 } break;
@@ -1682,16 +1651,14 @@ void GetAttributesFromNode(
                         if (!GetCompoundChildValues<float, 2>(compoundPlug, value, defaultValue)) {
                             break;
                         }
-                        UpdateNumericTupleAttr<float, 2>(
-                            attrName, value, defaultValue, ignoreDefault, attrs);
+                        UpdateNumericTupleAttr<float, 2>(attrName, value, attrs);
                     } else if (childCount == 3) {
                         std::array<float, 3> value = {{ 0.0f, 0.0f, 0.0f }};
                         std::array<float, 3> defaultValue = {{ 0.0f, 0.0f, 0.0f }};
                         if (!GetCompoundChildValues<float, 3>(compoundPlug, value, defaultValue)) {
                             break;
                         }
-                        UpdateNumericTupleAttr<float, 3>(
-                            attrName, value, defaultValue, ignoreDefault, attrs);
+                        UpdateNumericTupleAttr<float, 3>(attrName, value, attrs);
                     }
                 } break;
                 case MFnNumericData::kDouble: {
@@ -1701,24 +1668,21 @@ void GetAttributesFromNode(
                         if (!GetCompoundChildValues<double, 2>(compoundPlug, value, defaultValue)) {
                             break;
                         }
-                        UpdateNumericTupleAttr<double, 2>(
-                            attrName, value, defaultValue, ignoreDefault, attrs);
+                        UpdateNumericTupleAttr<double, 2>(attrName, value, attrs);
                     } else if (childCount == 3) {
                         std::array<double, 3> value = {{ 0.0, 0.0, 0.0 }};
                         std::array<double, 3> defaultValue = {{ 0.0, 0.0, 0.0 }};
                         if (!GetCompoundChildValues<double, 3>(compoundPlug, value, defaultValue)) {
                             break;
                         }
-                        UpdateNumericTupleAttr<double, 3>(
-                            attrName, value, defaultValue, ignoreDefault, attrs);
+                        UpdateNumericTupleAttr<double, 3>(attrName, value, attrs);
                     } else if (childCount == 4) {
                         std::array<double, 4> value = {{ 0.0, 0.0, 0.0, 0.0 }};
                         std::array<double, 4> defaultValue = {{ 0.0, 0.0, 0.0, 0.0 }};
                         if (!GetCompoundChildValues<double, 4>(compoundPlug, value, defaultValue)) {
                             break;
                         }
-                        UpdateNumericTupleAttr<double, 4>(
-                            attrName, value, defaultValue, ignoreDefault, attrs);
+                        UpdateNumericTupleAttr<double, 4>(attrName, value, attrs);
                     }
                 } break;
                 default:
@@ -1739,46 +1703,28 @@ void GetAttributesFromNode(
                 switch (numericAttr.unitType()) {
                 case MFnNumericData::kBoolean: {
                     auto value = attrPlug.asBool();
-                    bool defaultVal = false;
-                    numericAttr.getDefault(defaultVal);
-                    UpdateAttrs<bool>(attrName, value, defaultVal, attrs);
+                    UpdateAttrs<bool>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::kByte:
                 case MFnNumericData::kChar: {
                     auto value = static_cast<int>(attrPlug.asChar());
-                    char defaultVal = 0;
-                    numericAttr.getDefault(defaultVal);
-                    UpdateAttrs<int>(attrName, value, static_cast<int>(defaultVal), attrs);
+                    UpdateAttrs<int>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::kShort: {
                     auto  value = attrPlug.asShort();
-                    // Maya has no default value as a short, so use an int and cast it later into a
-                    // short
-                    int defaultVal = 0;
-                    numericAttr.getDefault(defaultVal);
-                    UpdateAttrs<short>(
-                        attrName,
-                        value,
-                        static_cast<short>(defaultVal),
-                        attrs);
+                    UpdateAttrs<short>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::kInt: {
                     auto value = attrPlug.asInt();
-                    int  defaultVal = 0;
-                    numericAttr.getDefault(defaultVal);
-                    UpdateAttrs<int>(attrName, value, defaultVal, attrs);
+                    UpdateAttrs<int>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::kFloat: {
                     auto  value = attrPlug.asFloat();
-                    float defaultVal = 0.0f;
-                    numericAttr.getDefault(defaultVal);
-                    UpdateAttrs<float>(attrName, value, defaultVal, attrs);
+                    UpdateAttrs<float>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::kDouble: {
                     auto   value = attrPlug.asDouble();
-                    double defaultVal = 0.0;
-                    numericAttr.getDefault(defaultVal);
-                    UpdateAttrs<double>(attrName, value, defaultVal, attrs);
+                    UpdateAttrs<double>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::kInt64: {
                     MInt64 value = attrPlug.asInt64();
@@ -1817,10 +1763,7 @@ void GetAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes01, value)) {
                         break;
                     }
-                    std::array<short, 2> defaultValue = {{ 0, 0 }};
-                    NumericDefaultExtractor<short, 2>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<short, 2>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<short, 2>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k3Short: {
                     std::array<short, 3> value = {{ 0, 0, 0 }};
@@ -1828,10 +1771,7 @@ void GetAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes012, value)) {
                         break;
                     }
-                    std::array<short, 3> defaultValue = {{ 0, 0, 0 }};
-                    NumericDefaultExtractor<short, 3>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<short, 3>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<short, 3>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k2Int: {
                     std::array<int, 2> value = {{ 0, 0 }};
@@ -1839,10 +1779,7 @@ void GetAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes01, value)) {
                         break;
                     }
-                    std::array<int, 2> defaultValue = {{ 0, 0 }};
-                    NumericDefaultExtractor<int, 2>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<int, 2>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<int, 2>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k3Int: {
                     std::array<int, 3> value = {{ 0, 0, 0 }};
@@ -1850,10 +1787,7 @@ void GetAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes012, value)) {
                         break;
                     }
-                    std::array<int, 3> defaultValue = {{ 0, 0, 0 }};
-                    NumericDefaultExtractor<int, 3>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<int, 3>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<int, 3>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k2Float: {
                     std::array<float, 2> value = {{ 0.0f, 0.0f }};
@@ -1861,10 +1795,7 @@ void GetAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes01, value)) {
                         break;
                     }
-                    std::array<float, 2> defaultValue = {{ 0.0f, 0.0f }};
-                    NumericDefaultExtractor<float, 2>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<float, 2>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<float, 2>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k3Float: {
                     std::array<float, 3> value = {{ 0.0f, 0.0f, 0.0f }};
@@ -1872,10 +1803,7 @@ void GetAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes012, value)) {
                         break;
                     }
-                    std::array<float, 3> defaultValue = {{ 0.0f, 0.0f, 0.0f }};
-                    NumericDefaultExtractor<float, 3>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<float, 3>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<float, 3>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k2Double: {
                     std::array<double, 2> value = {{ 0.0, 0.0 }};
@@ -1883,10 +1811,7 @@ void GetAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes01, value)) {
                         break;
                     }
-                    std::array<double, 2> defaultValue = {{ 0.0, 0.0 }};
-                    NumericDefaultExtractor<double, 2>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<double, 2>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<double, 2>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k3Double: {
                     std::array<double, 3> value = {{ 0.0, 0.0, 0.0 }};
@@ -1894,10 +1819,7 @@ void GetAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes012, value)) {
                         break;
                     }
-                    std::array<double, 3> defaultValue = {{ 0.0, 0.0, 0.0 }};
-                    NumericDefaultExtractor<double, 3>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<double, 3>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<double, 3>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k4Double: {
                     std::array<double, 4> value = {{ 0.0, 0.0, 0.0, 0.0 }};
@@ -1905,10 +1827,7 @@ void GetAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixesXYZW, value)) {
                         break;
                     }
-                    std::array<double, 4> defaultValue = {{ 0.0, 0.0, 0.0, 0.0 }};
-                    NumericDefaultExtractor<double, 4>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<double, 4>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<double, 4>(attrName, value, attrs);
                 } break;
                 default:
                     // TODO: Add more types if necessary

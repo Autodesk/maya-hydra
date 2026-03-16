@@ -49,41 +49,6 @@ const char* kCameraShapeOptionVar = "mhDirtyCameraShape";
 const char* kLightShapeOptionVar = "mhDirtyLightShape";
 const char* kMaterialSgOptionVar = "mhDirtyMaterialSg";
 
-// OptionVars are set by the Python harness to point to test scene nodes.
-// Fall back to hard-coded names when the optionVar is not present.
-std::string GetOptionVarOrDefault(const char* optionVar, const char* fallback)
-{
-    if (MGlobal::optionVarExists(optionVar)) {
-        return MGlobal::optionVarStringValue(optionVar).asChar();
-    }
-    return fallback;
-}
-
-// Maya DAG paths can be |parent|shape; tests match prim paths using the shape name.
-std::string GetShapeNameFromFullPath(const std::string& fullPath)
-{
-    size_t lastPipe = fullPath.rfind('|');
-    if (lastPipe != std::string::npos && lastPipe + 1 < fullPath.size()) {
-        return fullPath.substr(lastPipe + 1);
-    }
-    return fullPath;
-}
-
-// Extract the parent transform name for cases where a prim path uses the transform name.
-std::string GetParentNameFromFullPath(const std::string& fullPath)
-{
-    const size_t lastPipe = fullPath.rfind('|');
-    if (lastPipe == std::string::npos || lastPipe == 0) {
-        return {};
-    }
-    const size_t prevPipe = fullPath.rfind('|', lastPipe - 1);
-    const size_t start = (prevPipe == std::string::npos) ? 0 : prevPipe + 1;
-    if (lastPipe <= start) {
-        return {};
-    }
-    return fullPath.substr(start, lastPipe - start);
-}
-
 // Guard tests when Arnold attributes are missing (e.g., plugin not loaded).
 bool PlugExists(const std::string& nodeName, const char* plugName)
 {
@@ -103,28 +68,13 @@ bool PlugExists(const std::string& nodeName, const char* plugName)
     return status == MStatus::kSuccess;
 }
 
-// Locate the terminal scene index that contains a prim matching the shape name.
-HdSceneIndexBaseRefPtr FindTerminalSceneIndexWithPrim(
-    const SceneIndicesVector& sceneIndices,
-    const std::string&        shapeName)
-{
-    for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
-        SceneIndexInspector inspector(sceneIndex);
-        PrimEntriesVector   foundPrims = inspector.FindPrims(PrimNamePredicate(shapeName), 1);
-        if (!foundPrims.empty()) {
-            return sceneIndex;
-        }
-    }
-    return nullptr;
-}
-
 // Traverse terminal indices to find the MayaHydraSceneIndex that owns the prim.
 HdSceneIndexBaseRefPtr FindMayaSceneIndexForShape(
     const SceneIndicesVector& sceneIndices,
     const std::string&        shapeNamePart)
 {
-    HdSceneIndexBaseRefPtr sceneIndexWithShape
-        = FindTerminalSceneIndexWithPrim(sceneIndices, shapeNamePart);
+    HdSceneIndexBaseRefPtr sceneIndexWithShape = FindTerminalSceneIndexWithPrim(
+        sceneIndices, PrimNamePredicate(shapeNamePart));
     if (!sceneIndexWithShape) {
         return nullptr;
     }
@@ -234,7 +184,7 @@ DirtyNoticeSummary SummarizeDirtyNoticesSince(
     return summary;
 }
 
-// Summarize dirtied entries for light params, expecting only light-schema locators.
+// Summarize dirtied entries for light params, allowing light/primvars/visibility/collections.
 LightParamNoticeSummary SummarizeLightParamNoticesSince(
     SceneIndexNotificationsAccumulator& accumulator,
     size_t                              startIndex,
@@ -339,7 +289,8 @@ std::string DescribeDirtyEntriesSince(
     return out.str();
 }
 
-// Validate a light param update: exactly one notice, light schema only, no primvars.
+// Validate a light param update: exactly one notice, light schema plus USD extra locators,
+// and no extComputationPrimvars.
 void ExpectLightParamNotice(
     const LightParamNoticeSummary&      summary,
     SceneIndexNotificationsAccumulator& accumulator,

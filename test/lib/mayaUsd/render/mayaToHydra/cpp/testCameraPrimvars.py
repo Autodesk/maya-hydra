@@ -21,6 +21,8 @@ from testUtils import PluginLoaded
 class TestCameraPrimvars(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
+    # Create a minimal camera scene for the C++ primvars tests.
+    # Adds a non-param custom attribute and stores the camera shape for C++ lookup.
     def setupScene(self):
         cmds.file(new=True, force=True)
         # Create a camera and get its shape
@@ -34,16 +36,25 @@ class TestCameraPrimvars(mtohUtils.MayaHydraBaseTestCase):
         cmds.optionVar(stringValue=("mhCameraShape", camera_shape))
         cmds.refresh()
 
+    # What: non-param custom attribute changes should dirty primvars only.
+    # How: build the scene, then run the C++ test that edits testCustomAttr.
+    # Expect: a primvars-only dirty notice (no camera schema).
     def test_nonParamAttrTriggersOnlyPrimvarDirty(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="CameraPrimvars.NonParamAttrTriggersOnlyPrimvarDirty")
 
+    # What: focalLength updates should not produce duplicate primvars notices.
+    # How: build the scene, then run the C++ test that edits focalLength.
+    # Expect: exactly one primvars dirty entry for the camera.
     def test_focalLengthUpdateNoDuplicatePrimvarsDirty(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="CameraPrimvars.FocalLengthUpdateNoDuplicatePrimvarsDirty")
 
+    # What: param attribute list must match the attributes read by GetCameraParamValue.
+    # How: build the scene, then run the C++ consistency test.
+    # Expect: all attributes used by GetCameraParamValue are in the param list.
     def test_paramAttributesMatchGetLogic(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):

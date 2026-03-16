@@ -23,6 +23,8 @@ class TestLightPrimvars(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
     _requiredPlugins = ['mtoa']
 
+    # Create a minimal Arnold light scene for the C++ primvars tests.
+    # Sets known default/non-default attributes and records the light shape path.
     def setupScene(self):
         cmds.file(new=True, force=True)
         with PluginLoaded('mtoa'):
@@ -48,16 +50,25 @@ class TestLightPrimvars(mtohUtils.MayaHydraBaseTestCase):
         cmds.optionVar(stringValue=("mhLightShape", light_shape))
         cmds.refresh()
 
+    # What: translation and dirtying for non-default light primvars.
+    # How: build the scene, then run the C++ test that inspects primvars and updates aiExposure.
+    # Expect: non-default primvars exist; default primvars are absent; dirty notice carries new value.
     def test_lightPrimvars(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="LightPrimvars.testTranslationAndDirtying")
 
+    # What: non-param light attribute changes should dirty primvars only.
+    # How: build the scene, then run the C++ test that edits aiShadowDensity.
+    # Expect: primvars dirty without light schema dirty.
     def test_nonParamAttrTriggersOnlyPrimvarDirty(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="LightPrimvars.NonParamAttrTriggersOnlyPrimvarDirty")
 
+    # What: param attribute updates should not duplicate primvars notices.
+    # How: build the scene, then run the C++ test that edits aiExposure.
+    # Expect: exactly one primvars dirty entry for the light.
     def test_intensityUpdateNoDuplicatePrimvarsDirty(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):

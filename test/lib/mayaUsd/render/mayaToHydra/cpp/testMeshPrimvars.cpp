@@ -36,35 +36,7 @@ namespace {
 const char* kMeshShapeOptionVar = "mhMeshShape";
 const char* kMeshShapeFallback = "testCubeShape";
 
-std::string GetOptionVarOrDefault(const char* optionVar, const char* fallback)
-{
-    if (MGlobal::optionVarExists(optionVar)) {
-        return MGlobal::optionVarStringValue(optionVar).asChar();
-    }
-    return fallback;
-}
-
-FindPrimPredicate getMeshPredicate(const std::string& shapeNamePart)
-{
-    return [shapeNamePart](const HdSceneIndexBasePtr& sceneIndex,
-                          const SdfPath&            primPath) -> bool {
-        if (primPath.GetAsString().find(shapeNamePart) == std::string::npos) {
-            return false;
-        }
-        HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
-        return prim.primType == HdPrimTypeTokens->mesh;
-    };
-}
-
-std::string getShapeNameFromFullPath(const std::string& fullPath)
-{
-    size_t lastPipe = fullPath.rfind('|');
-    if (lastPipe != std::string::npos && lastPipe + 1 < fullPath.size()) {
-        return fullPath.substr(lastPipe + 1);
-    }
-    return fullPath;
-}
-
+// Scan dirtied entries for a mesh prim and report primvars vs points dirty.
 void CheckMeshDirtySince(
     SceneIndexNotificationsAccumulator& accumulator,
     size_t                              startIndex,
@@ -91,6 +63,7 @@ void CheckMeshDirtySince(
     }
 }
 
+// Count primvars-dirty notices for the mesh prim since a starting index.
 size_t CountPrimvarsDirtyEntriesSince(
     SceneIndexNotificationsAccumulator& accumulator,
     size_t                              startIndex,
@@ -111,33 +84,27 @@ size_t CountPrimvarsDirtyEntriesSince(
 
 } // namespace
 
-// Verify that changing a non-param attribute (custom attr) triggers ONLY DirtyPrimvar,
-// not schema dirty from NodeDirtiedCallback. Param attrs trigger NodeDirtiedCallback;
-// primvar-only attrs must not.
+// What: non-param attribute changes should dirty primvars only.
+// How: set a custom mesh attribute and inspect notices since the change.
+// Expect: primvars dirty is present; points dirty is absent.
 TEST(MeshPrimvars, NonParamAttrTriggersOnlyPrimvarDirty)
 {
     const std::string meshShapeFull = GetOptionVarOrDefault(kMeshShapeOptionVar, kMeshShapeFallback);
-    const std::string shapeNamePart = getShapeNameFromFullPath(meshShapeFull);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(meshShapeFull);
 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
-    HdSceneIndexBaseRefPtr sceneIndexWithMesh(nullptr);
-    for (const HdSceneIndexBaseRefPtr& si : sceneIndices) {
-        SceneIndexInspector inspector(si);
-        PrimEntriesVector   foundPrims = inspector.FindPrims(getMeshPredicate(shapeNamePart), 1);
-        if (foundPrims.size() >= 1u) {
-            sceneIndexWithMesh = si;
-            break;
-        }
-    }
+    HdSceneIndexBaseRefPtr sceneIndexWithMesh = FindTerminalSceneIndexWithPrim(
+        sceneIndices, shapeNamePart, HdPrimTypeTokens->mesh);
     ASSERT_TRUE(sceneIndexWithMesh) << "Mesh prim not found in any scene index (ensure MAYA_HYDRA_USE_MESH_ADAPTER=1)";
 
     auto mayaSceneIndex = FindMayaHydraSceneIndex(sceneIndexWithMesh);
     ASSERT_TRUE(mayaSceneIndex) << "MayaHydraSceneIndex not found in scene index tree";
 
     SceneIndexInspector inspector(mayaSceneIndex);
-    PrimEntriesVector   foundPrims = inspector.FindPrims(getMeshPredicate(shapeNamePart), 1);
+    PrimEntriesVector   foundPrims
+        = inspector.FindPrims(CreatePrimPredicate(shapeNamePart, HdPrimTypeTokens->mesh), 1);
     ASSERT_GE(foundPrims.size(), 1u) << "Mesh not found in MayaHydraSceneIndex";
     const SdfPath meshPrimPath = foundPrims.front().primPath;
 
@@ -161,32 +128,27 @@ TEST(MeshPrimvars, NonParamAttrTriggersOnlyPrimvarDirty)
            "only primvars dirty expected";
 }
 
-// Verify that updating uvPivot (param attr) does not produce duplicate
-// primvars dirty notifications - we should receive exactly one.
+// What: param attribute updates should not duplicate primvars dirty notices.
+// How: change uvPivot and count primvars dirty entries since the change.
+// Expect: exactly one primvars dirty entry for the mesh.
 TEST(MeshPrimvars, UvPivotUpdateNoDuplicatePrimvarsDirty)
 {
     const std::string meshShapeFull = GetOptionVarOrDefault(kMeshShapeOptionVar, kMeshShapeFallback);
-    const std::string shapeNamePart = getShapeNameFromFullPath(meshShapeFull);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(meshShapeFull);
 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
-    HdSceneIndexBaseRefPtr sceneIndexWithMesh(nullptr);
-    for (const HdSceneIndexBaseRefPtr& si : sceneIndices) {
-        SceneIndexInspector inspector(si);
-        PrimEntriesVector   foundPrims = inspector.FindPrims(getMeshPredicate(shapeNamePart), 1);
-        if (foundPrims.size() >= 1u) {
-            sceneIndexWithMesh = si;
-            break;
-        }
-    }
+    HdSceneIndexBaseRefPtr sceneIndexWithMesh = FindTerminalSceneIndexWithPrim(
+        sceneIndices, shapeNamePart, HdPrimTypeTokens->mesh);
     ASSERT_TRUE(sceneIndexWithMesh) << "Mesh prim not found in any scene index (ensure MAYA_HYDRA_USE_MESH_ADAPTER=1)";
 
     auto mayaSceneIndex = FindMayaHydraSceneIndex(sceneIndexWithMesh);
     ASSERT_TRUE(mayaSceneIndex) << "MayaHydraSceneIndex not found in scene index tree";
 
     SceneIndexInspector inspector(mayaSceneIndex);
-    PrimEntriesVector   foundPrims = inspector.FindPrims(getMeshPredicate(shapeNamePart), 1);
+    PrimEntriesVector   foundPrims
+        = inspector.FindPrims(CreatePrimPredicate(shapeNamePart, HdPrimTypeTokens->mesh), 1);
     ASSERT_GE(foundPrims.size(), 1u) << "Mesh not found in MayaHydraSceneIndex";
     const SdfPath meshPrimPath = foundPrims.front().primPath;
 
@@ -206,8 +168,9 @@ TEST(MeshPrimvars, UvPivotUpdateNoDuplicatePrimvarsDirty)
            "notification, got " << primvarsDirtyCount << " (duplicate notifications)";
 }
 
-// Consistency check: every attribute in NodeDirtiedCallback _dirtyBits or handled
-// in AttributeChangedCallback must be in kMeshParamAttributeNames.
+// What: mesh param attributes list must match the adapter's attribute usage.
+// How: compare an expected list against the adapter's param attribute set.
+// Expect: all attributes handled by the mesh adapter are present in the set.
 TEST(MeshPrimvars, ParamAttributesMatchGetLogic)
 {
     static const std::vector<std::string> kAttrsHandledByCallbacks = {

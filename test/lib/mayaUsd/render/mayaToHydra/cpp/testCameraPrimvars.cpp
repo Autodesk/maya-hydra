@@ -37,35 +37,7 @@ namespace {
 const char* kCameraShapeOptionVar = "mhCameraShape";
 const char* kCameraShapeFallback = "cameraShape1";
 
-std::string GetOptionVarOrDefault(const char* optionVar, const char* fallback)
-{
-    if (MGlobal::optionVarExists(optionVar)) {
-        return MGlobal::optionVarStringValue(optionVar).asChar();
-    }
-    return fallback;
-}
-
-FindPrimPredicate getCameraPredicate(const std::string& shapeNamePart)
-{
-    return [shapeNamePart](const HdSceneIndexBasePtr& sceneIndex,
-                          const SdfPath&            primPath) -> bool {
-        if (primPath.GetAsString().find(shapeNamePart) == std::string::npos) {
-            return false;
-        }
-        HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
-        return prim.primType == HdPrimTypeTokens->camera;
-    };
-}
-
-std::string getShapeNameFromFullPath(const std::string& fullPath)
-{
-    size_t lastPipe = fullPath.rfind('|');
-    if (lastPipe != std::string::npos && lastPipe + 1 < fullPath.size()) {
-        return fullPath.substr(lastPipe + 1);
-    }
-    return fullPath;
-}
-
+// Scan dirty entries and report whether primvars or camera schema were dirtied.
 void CheckCameraDirtySince(
     SceneIndexNotificationsAccumulator& accumulator,
     size_t                              startIndex,
@@ -92,6 +64,7 @@ void CheckCameraDirtySince(
     }
 }
 
+// Count primvars-dirty notices for the camera prim since a starting index.
 size_t CountPrimvarsDirtyEntriesSince(
     SceneIndexNotificationsAccumulator& accumulator,
     size_t                              startIndex,
@@ -112,32 +85,27 @@ size_t CountPrimvarsDirtyEntriesSince(
 
 } // namespace
 
-// Verify that changing a non-param attribute (custom attr) triggers ONLY DirtyPrimvar,
-// not DirtyParams. Param attrs trigger both; primvar-only attrs must not.
+// What: non-param attribute changes should dirty primvars only.
+// How: set a custom camera attribute and inspect notices since the change.
+// Expect: primvars dirty is present; camera schema dirty is absent.
 TEST(CameraPrimvars, NonParamAttrTriggersOnlyPrimvarDirty)
 {
     const std::string cameraShapeFull = GetOptionVarOrDefault(kCameraShapeOptionVar, kCameraShapeFallback);
-    const std::string shapeNamePart = getShapeNameFromFullPath(cameraShapeFull);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(cameraShapeFull);
 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
-    HdSceneIndexBaseRefPtr sceneIndexWithCamera(nullptr);
-    for (const HdSceneIndexBaseRefPtr& si : sceneIndices) {
-        SceneIndexInspector inspector(si);
-        PrimEntriesVector   foundPrims = inspector.FindPrims(getCameraPredicate(shapeNamePart), 1);
-        if (foundPrims.size() >= 1u) {
-            sceneIndexWithCamera = si;
-            break;
-        }
-    }
+    HdSceneIndexBaseRefPtr sceneIndexWithCamera = FindTerminalSceneIndexWithPrim(
+        sceneIndices, shapeNamePart, HdPrimTypeTokens->camera);
     ASSERT_TRUE(sceneIndexWithCamera) << "Camera prim not found in any scene index";
 
     auto mayaSceneIndex = FindMayaHydraSceneIndex(sceneIndexWithCamera);
     ASSERT_TRUE(mayaSceneIndex) << "MayaHydraSceneIndex not found in scene index tree";
 
     SceneIndexInspector inspector(mayaSceneIndex);
-    PrimEntriesVector   foundPrims = inspector.FindPrims(getCameraPredicate(shapeNamePart), 1);
+    PrimEntriesVector   foundPrims
+        = inspector.FindPrims(CreatePrimPredicate(shapeNamePart, HdPrimTypeTokens->camera), 1);
     ASSERT_GE(foundPrims.size(), 1u) << "Camera not found in MayaHydraSceneIndex";
     const SdfPath cameraPrimPath = foundPrims.front().primPath;
 
@@ -161,32 +129,27 @@ TEST(CameraPrimvars, NonParamAttrTriggersOnlyPrimvarDirty)
            "only primvars dirty expected";
 }
 
-// Verify that updating focalLength (param attr) does not produce duplicate
-// primvars dirty notifications - we should receive exactly one.
+// What: param attribute updates should not duplicate primvars dirty notices.
+// How: change focalLength and count primvars dirty entries since the change.
+// Expect: exactly one primvars dirty entry for the camera.
 TEST(CameraPrimvars, FocalLengthUpdateNoDuplicatePrimvarsDirty)
 {
     const std::string cameraShapeFull = GetOptionVarOrDefault(kCameraShapeOptionVar, kCameraShapeFallback);
-    const std::string shapeNamePart = getShapeNameFromFullPath(cameraShapeFull);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(cameraShapeFull);
 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
-    HdSceneIndexBaseRefPtr sceneIndexWithCamera(nullptr);
-    for (const HdSceneIndexBaseRefPtr& si : sceneIndices) {
-        SceneIndexInspector inspector(si);
-        PrimEntriesVector   foundPrims = inspector.FindPrims(getCameraPredicate(shapeNamePart), 1);
-        if (foundPrims.size() >= 1u) {
-            sceneIndexWithCamera = si;
-            break;
-        }
-    }
+    HdSceneIndexBaseRefPtr sceneIndexWithCamera = FindTerminalSceneIndexWithPrim(
+        sceneIndices, shapeNamePart, HdPrimTypeTokens->camera);
     ASSERT_TRUE(sceneIndexWithCamera) << "Camera prim not found in any scene index";
 
     auto mayaSceneIndex = FindMayaHydraSceneIndex(sceneIndexWithCamera);
     ASSERT_TRUE(mayaSceneIndex) << "MayaHydraSceneIndex not found in scene index tree";
 
     SceneIndexInspector inspector(mayaSceneIndex);
-    PrimEntriesVector   foundPrims = inspector.FindPrims(getCameraPredicate(shapeNamePart), 1);
+    PrimEntriesVector   foundPrims
+        = inspector.FindPrims(CreatePrimPredicate(shapeNamePart, HdPrimTypeTokens->camera), 1);
     ASSERT_GE(foundPrims.size(), 1u) << "Camera not found in MayaHydraSceneIndex";
     const SdfPath cameraPrimPath = foundPrims.front().primPath;
 
@@ -206,8 +169,9 @@ TEST(CameraPrimvars, FocalLengthUpdateNoDuplicatePrimvarsDirty)
            "notification, got " << primvarsDirtyCount << " (duplicate notifications)";
 }
 
-// Consistency check: every attribute read by GetCameraParamValue must be in the
-// camera param attribute list (kCameraParamAttributeNames).
+// What: camera param attributes list must cover GetCameraParamValue usage.
+// How: compare the expected list against the adapter's param attribute set.
+// Expect: every attribute used in GetCameraParamValue is present in the set.
 TEST(CameraPrimvars, ParamAttributesMatchGetLogic)
 {
     static const std::vector<std::string> kAttrsUsedInGetLogic = {
