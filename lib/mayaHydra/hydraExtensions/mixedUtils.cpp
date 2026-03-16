@@ -1276,8 +1276,8 @@ static bool ExtensionAttrValueEqualsDefault(const MPlug& attrPlug, const MObject
 }
 
 // Populate a dictionary with attribute values for translation to Hydra primvars.
-// When includeAllAttributes is false: only extension and dynamic attributes.
-// When true: all non-builtin attributes (skip default values in both cases).
+// When includeAllAttributes is false: only extension and dynamic attributes (dynamic defaults kept).
+// When true: only non-builtin (extension/dynamic) attributes, and defaults are skipped.
 void GetAttributesFromNode(
     const MObject& node, PXR_NS::VtDictionary& attrs, bool includeAllAttributes)
 {
@@ -1303,7 +1303,7 @@ void GetAttributesFromNode(
             continue;
 
         const bool isExtOrDynamic = attrFn.isExtension() || attrFn.isDynamic();
-        if (!includeAllAttributes && !isExtOrDynamic)
+        if (!isExtOrDynamic)
             continue;
         if (includeAllAttributes && builtInSkipSet.count(attrName) > 0)
             continue;

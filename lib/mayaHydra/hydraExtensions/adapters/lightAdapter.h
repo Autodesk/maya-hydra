@@ -95,6 +95,8 @@ public:
     MAYAHYDRALIB_API
     TfToken GetRenderTag() const override;
 
+    /// Lights opt in so extension/dynamic attrs are included in primvars.
+    /// Built-in light attrs are still filtered by GetAttributesFromNode.
     MAYAHYDRALIB_API
     bool IncludeAllAttributesInPrimvars() const override { return true; }
 

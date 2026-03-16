@@ -209,8 +209,7 @@ void MayaHydraAdapter::MaybeMarkPrimvarDirtyForAttributeChange(const MPlug& plug
 }
 
 // Marks primvars dirty when an attribute changes that affects primvar data. This includes:
-// extension attributes (plugin-defined on node types), dynamic attributes (user addAttr), and
-// when IncludeAllAttributesInPrimvars() is true (e.g. lights) any attribute including built-in.
+// extension attributes (plugin-defined on node types) and dynamic attributes (user addAttr).
 void MayaHydraAdapter::MarkPrimvarDirtyForAttributeChange(const MPlug& plug)
 {
     MStatus status;

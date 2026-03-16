@@ -397,9 +397,15 @@ TEST(MayaNodesAttributesDirtying, testDirtyPrimvars)
 {
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
-    SceneIndexNotificationsAccumulator notifsAccumulator(sceneIndices.front());
 
     auto checkDirty = [&](const std::string& nodeName, double value) {
+        const std::string shapeNamePart = GetShapeNameFromFullPath(nodeName);
+        auto              mayaSceneIndex = FindMayaSceneIndexForShape(sceneIndices, shapeNamePart);
+        if (!mayaSceneIndex) {
+            ADD_FAILURE() << "Prim not found in MayaHydraSceneIndex for node " << nodeName;
+            return;
+        }
+        SceneIndexNotificationsAccumulator notifsAccumulator(mayaSceneIndex);
         const size_t startIndex = notifsAccumulator.GetDirtiedPrimEntries().size();
         SetAttrAndRefresh(nodeName, value);
         EXPECT_TRUE(FindDirtyPrimWithPrimvarValueSince(notifsAccumulator, startIndex, value));

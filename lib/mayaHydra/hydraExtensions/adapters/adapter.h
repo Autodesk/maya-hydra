@@ -101,9 +101,12 @@ public:
     }
 
     /// Call from attribute-changed callbacks when an attr change should mark primvars dirty.
-    /// Skips child plugs to avoid duplicate notifications for compound attrs (e.g. color.r).
+    /// Resolves \p plug to the appropriate parent/root plug before marking primvars dirty.
+    /// This can still be invoked for child plugs of compound/array attributes (e.g. color.r),
+    /// so callers may see multiple invocations that coalesce to the same top plug.
     /// Override ShouldMarkPrimvarDirtyForAttributeChange to return false when another callback
-    /// already marks DirtyPrimvar (e.g. mesh _dirtyBits, light param attr list).
+    /// already marks DirtyPrimvar (e.g. mesh _dirtyBits, light param attr list) to avoid
+    /// duplicate notifications.
     void MaybeMarkPrimvarDirtyForAttributeChange(const MPlug& plug);
     virtual bool ShouldMarkPrimvarDirtyForAttributeChange(const MPlug& plug) const { return true; }
 
