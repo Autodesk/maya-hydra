@@ -461,7 +461,32 @@ finally:
         list(APPEND ALL_TEST_VARS PIXAR_LICENSE_FILE)
         set(MAYAUSD_VARNAME_PIXAR_LICENSE_FILE "${PIXAR_LICENSE_FILE}")
     endif()
-    foreach(testvar RMANTREE RENDERMAN_LOCATION PIXAR_LICENSE_FILE)
+    # RMAN_SHADERPATH: hdPrman/rmanOslParser needs this to find OSL shaders (UsdPreviewSurfaceParameters.oso, etc.)
+    # Artifact layout: plugin/usd/resources/shaders with .oso files
+    if(DEFINED PRMAN_DELEGATE_PLUGIN_PATH AND NOT "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
+        set(RMAN_SHADERPATH "${PRMAN_DELEGATE_PLUGIN_PATH}/usd/resources/shaders")
+        if(DEFINED RMANTREE AND NOT "${RMANTREE}" STREQUAL "")
+            # Prepend RenderMan lib/shaders; use platform path separator
+            if(IS_WINDOWS)
+                set(RMAN_SHADERPATH "${RMANTREE}/lib/shaders;${RMAN_SHADERPATH}")
+            else()
+                set(RMAN_SHADERPATH "${RMANTREE}/lib/shaders:${RMAN_SHADERPATH}")
+            endif()
+        endif()
+        list(APPEND ALL_TEST_VARS RMAN_SHADERPATH)
+        set(MAYAUSD_VARNAME_RMAN_SHADERPATH "${RMAN_SHADERPATH}")
+    elseif(DEFINED RMANTREE AND NOT "${RMANTREE}" STREQUAL "")
+        # Fallback: only RMANTREE, no delegate shaders
+        set(RMAN_SHADERPATH "${RMANTREE}/lib/shaders")
+        list(APPEND ALL_TEST_VARS RMAN_SHADERPATH)
+        set(MAYAUSD_VARNAME_RMAN_SHADERPATH "${RMAN_SHADERPATH}")
+    endif()
+    # Escape semicolons in RMAN_SHADERPATH so set_property ENVIRONMENT receives
+    # a single value (path1;path2) instead of splitting on CMake list separator.
+    if("RMAN_SHADERPATH" IN_LIST ALL_TEST_VARS)
+        separate_argument_list(MAYAUSD_VARNAME_RMAN_SHADERPATH)
+    endif()
+    foreach(testvar RMANTREE RENDERMAN_LOCATION PIXAR_LICENSE_FILE RMAN_SHADERPATH)
         if("${testvar}" IN_LIST ALL_TEST_VARS)
             set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
                 "${testvar}=${MAYAUSD_VARNAME_${testvar}}")
