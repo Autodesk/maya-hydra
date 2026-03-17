@@ -74,7 +74,7 @@ RENDER_DELEGATES = [
         "plugin": "HdPrmanLoaderRendererPlugin",
         "override": "mayaHydraRenderOverride_HdPrmanLoaderRendererPlugin",
         "mayaPlugin": None,
-        "convergenceTimeout": 30,  # Wait up to 30s for convergence before snapshot
+        "convergenceTimeout": 15,  # Wait up to 15s for convergence before snapshot
         "platform": "windows",  # Image comparison runs on Windows only
     },
 ]
@@ -194,15 +194,13 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
     @contextmanager
     def _prmanContext(self):
-        """Per-render context for PRMan: set cwd and workspace to scene dir, dump Script Editor on exit."""
-        saved_cwd = os.getcwd()
+        """Per-render context for PRMan: set Maya workspace to scene dir (no chdir, so snapshots stay in output folder), dump Script Editor on exit."""
         saved_workspace = cmds.workspace(q=True, rd=True)
 
         try:
             scenePath = getTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
             sceneDir = os.path.dirname(os.path.abspath(scenePath))
 
-            os.chdir(sceneDir)
             cmds.workspace(sceneDir, o=True)
 
             yield
@@ -214,15 +212,11 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             except Exception:
                 pass
 
-            # Restore Maya workspace and cwd.
+            # Restore Maya workspace.
             try:
                 cmds.workspace(saved_workspace, o=True)
             except Exception as e:
                 _log("Warning: failed to restore Maya workspace: {}".format(e))
-            try:
-                os.chdir(saved_cwd)
-            except Exception as e:
-                _log("Warning: failed to restore cwd: {}".format(e))
 
     def _print_log_tail(self, path, title, max_lines=200):
         """Print the tail of a log file to stdout so CI logs capture it."""
