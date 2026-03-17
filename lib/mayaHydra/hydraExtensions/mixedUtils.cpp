@@ -27,7 +27,6 @@
 #include <array>
 #include <cmath>
 #include <string>
-#include <unordered_set>
 
 #include <pxr/base/gf/vec2d.h>
 #include <pxr/base/gf/vec2f.h>
@@ -1090,20 +1089,6 @@ PXR_NS::TfToken GetGeomSubsetsPickMode()
     return GeomSubsetsPickModeTokens->None;
 }
 
-// Built-in Maya attributes (and light-specific non-meaningful attrs) to skip when
-// includeAllAttributes is true (e.g. lights). worldPosition and isHierarchicalConnection
-// are derived/internal and not meaningful to translate to Hydra primvars.
-static const std::unordered_set<std::string>& _GetBuiltInAttributeSkipSet()
-{
-    static const std::unordered_set<std::string> skipSet = {
-        "caching", "nodeState", "message", "visibility", "worldMatrix",
-        "parentMatrix", "xformMatrix", "matrix", "instObjGroups",
-        "intermediateObject", "overrideEnabled", "overrideVisibility",
-        "inverseMatrix", "isHistoricallyInteresting",
-        "worldPosition", "isHierarchicalConnection"};
-    return skipSet;
-}
-
 // Manual default-value check for extension attributes. MPlug::isDefaultValue() can be
 // unreliable for plugin-defined attributes, so we compare against the
 // attribute's registered default. Returns true if value equals default; false if not
@@ -1288,8 +1273,6 @@ void GetAttributesFromNode(
         return;
     }
 
-    const auto& builtInSkipSet = _GetBuiltInAttributeSkipSet();
-
     for (size_t i = 0; i < nodeFn.attributeCount(); i++) {
         MObject      attrObj = nodeFn.attribute(i);
         MFnAttribute attrFn(attrObj);
@@ -1305,9 +1288,6 @@ void GetAttributesFromNode(
         const bool isExtOrDynamic = attrFn.isExtension() || attrFn.isDynamic();
         if (!isExtOrDynamic)
             continue;
-        if (includeAllAttributes && builtInSkipSet.count(attrName) > 0)
-            continue;
-
         // When includeAllAttributes: always check default (skip if at default).
         // When ext/dynamic only: dynamic attrs don't check default.
         // For extension attributes, MPlug::isDefaultValue() can be unreliable
