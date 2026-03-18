@@ -66,17 +66,18 @@ def snapshot(outputPath, width=400, height=None):
     #Enable undo again
     cmds.undoInfo(stateWithoutFlush=True)
 
-def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail, 
-                warn, warnpercent, hardwarn, perceptual):    
+def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail=None,
+                warn=None, warnpercent=None, hardwarn=None, perceptual=False):    
     """ Returns the completed process instance after running idiff or None if
         execution of process failed.
     
     imagePath1   -- First image to compare.
     imagePath2   -- Second image to compare.
     verbose      -- If enabled, the image diffing command will be printed to log.
-    fail         -- The threshold for the acceptable difference (relatively to the mean of 
-                    the two values) of a pixel for failure.    
+    fail         -- The threshold for absolute pixel difference for failure.
     failpercent  -- The percentage of pixels that can be different before failure.
+    failrelative -- If set, uses relative difference (scaled by mean of two values). Use 0 for
+                    strict pixel-per-pixel absolute comparison only.
     hardfail     -- Triggers a failure if any pixels are above this threshold (if the absolute 
                     difference is below this threshold).
     warn         -- The threshold for the acceptable difference of a pixel for a warning.
@@ -171,13 +172,17 @@ def _getMayaScriptEditorHistoryTail(max_lines=200):
         return ""
 
 def _generateDiffImage(imagePath1, imagePath2, outputPath):
-    """Generate a visual diff image using idiff -o -abs -scale 1 (raw pixel-by-pixel diff, no value scaling). Returns output path if successful, else None."""
+    """Generate a pixel-per-pixel diff image with no value scaling.
+
+    Uses idiff -o -abs -scale 1. Output format matches the outputPath extension
+    (same as the images being compared). Returns output path if successful, else None.
+    """
     image_diff_tool = os.environ.get('IMAGE_DIFF_TOOL')
     if not image_diff_tool:
         return None
     os.makedirs(os.path.dirname(outputPath), exist_ok=True)
-    # -abs: absolute value of differences (no signed output)
-    # -scale 1: no value scaling; raw pixel difference (idiff may default to scale>1 in some builds)
+    # -abs: absolute value of differences
+    # -scale 1: no value scaling; raw pixel-by-pixel difference
     cmd = [image_diff_tool, '-o', outputPath, '-abs', '-scale', '1', imagePath1, imagePath2]
     try:
         proc = subprocess.run(cmd, capture_output=True, shell=False, env=os.environ.copy())

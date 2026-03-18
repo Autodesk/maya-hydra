@@ -23,6 +23,15 @@ from contextlib import contextmanager
 
 import maya.cmds as cmds
 
+# Ensure testUtils (with imageUtils) is on path *before* mtohUtils imports imageUtils.
+# Otherwise PYTHONPATH order (maya-usd install first) may load a different imageUtils.
+_test_utils = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..", "..", "..", "..", "testUtils"
+))
+if os.path.isdir(_test_utils) and _test_utils not in sys.path:
+    sys.path.insert(0, _test_utils)
+
 
 def _log(msg):
     """Write to original stdout so CI logs capture it (Maya may redirect sys.stdout)."""
@@ -34,7 +43,12 @@ import fixturesUtils
 import mayaUtils
 import mtohUtils
 from testUtils import PluginLoaded, getTestScene
-from pxr import Sdr
+from imageUtils import (
+    snapshot,
+    imageDiff,
+    _generateDiffImage,
+    _getMayaScriptEditorHistoryTail,
+)
 
 
 # Maya light names in the test scene (transform names; intensity is on the shape).
@@ -244,7 +258,6 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
         # Validate via mayaHydra (modelEditor query can be unreliable when MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1)
         activeRenderers = cmds.mayaHydra(listActiveRenderers=True)
-        _log("Active renderers: {}".format(activeRenderers))
         self.assertIn(
             delegate["plugin"],
             activeRenderers,
@@ -292,24 +305,80 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             cmds.setAttr("{}.intensity".format(shape), value)
 
     def _runLightSnapshots(self, delegate):
-        """For each light, enable it alone, take a snapshot, and compare to baseline."""
+        """For each light, enable it alone, take a snapshot, and compare to baseline.
+        For PRMan: capture all images first, then compare. This ensures all images are
+        available for manual baseline copying when run on CI, even if a comparison fails."""
         self._setRenderer(delegate)
         if delegate["name"] == "PRMan":
-            reg = Sdr.Registry()
-            for ident in ["UsdUVTexture", "UsdPrimvarReader_float2", "UsdPreviewSurface", "UsdPreviewSurfaceParameters"]:
-                status = "FOUND" if reg.GetShaderNodeByIdentifier(ident) else "MISSING"
-                _log("[SDR][PRMan] {} => {}".format(ident, status))
-        for lightName in LIGHTS:
-            intensity = self._getIntensityForLight(lightName, delegate)
-            self._setLightIntensities(lightName, intensity)
-            cmds.refresh(force=True)
-            self._waitForConvergence(delegate)
-            baselineName = "{}_{}.png".format(delegate["name"], lightName)
-            self.assertSnapshotClose(
-                baselineName,
-                self.IMAGE_DIFF_FAIL_THRESHOLD,
-                self.IMAGE_DIFF_FAIL_PERCENT,
-            )
+            snapshotDir = self.getSnapshotDir()
+            _log("[PRMan] Phase 1: capturing all {} images to {}".format(len(LIGHTS), snapshotDir))
+            for lightName in LIGHTS:
+                intensity = self._getIntensityForLight(lightName, delegate)
+                self._setLightIntensities(lightName, intensity)
+                cmds.refresh(force=True)
+                self._waitForConvergence(delegate)
+                baselineName = "{}_{}.png".format(delegate["name"], lightName)
+                snapPath = os.path.join(snapshotDir, baselineName)
+                snapshot(snapPath)
+                _log("[PRMan] Captured {} -> {}".format(lightName, snapPath))
+            _log("[PRMan] Phase 2: comparing all images to baselines")
+            failures = []
+            allRefPaths = []
+            allSnapPaths = []
+            for lightName in LIGHTS:
+                baselineName = "{}_{}.png".format(delegate["name"], lightName)
+                refPath = self.resolveRefImage(baselineName, None)
+                snapPath = os.path.join(snapshotDir, baselineName)
+                allRefPaths.append((lightName, refPath))
+                allSnapPaths.append((lightName, snapPath))
+                proc = imageDiff(
+                    refPath, snapPath, verbose=False,
+                    fail=self.IMAGE_DIFF_FAIL_THRESHOLD,
+                    failpercent=self.IMAGE_DIFF_FAIL_PERCENT,
+                    hardfail=None,
+                    warn=None,
+                    warnpercent=None,
+                    hardwarn=None,
+                    perceptual=False,
+                )
+                if proc is None:
+                    failures.append((lightName, "idiff execution failed", None))
+                elif proc.returncode not in (0, 1):
+                    base2, ext2 = os.path.splitext(os.path.basename(snapPath))
+                    diffPath = _generateDiffImage(
+                        refPath, snapPath,
+                        os.path.join(snapshotDir, base2 + "_diff" + (ext2 or ".png")))
+                    failures.append((lightName, proc.stdout, diffPath))
+            if failures:
+                msg = "PRMan image comparison failed for {} of {} images.\n\n".format(
+                    len(failures), len(LIGHTS))
+                msg += "All images (copy actuals to baseline folder):\n"
+                for lightName, refPath in allRefPaths:
+                    msg += "  Baseline {}: {}\n".format(lightName, os.path.abspath(refPath))
+                for lightName, snapPath in allSnapPaths:
+                    msg += "  Actual {}:   {}\n".format(lightName, os.path.abspath(snapPath))
+                msg += "\nFailures:\n"
+                for lightName, out, diffPath in failures:
+                    outStr = (out.decode("utf-8", errors="replace")[:200] if out else "(no output)")
+                    msg += "  {}: {}\n".format(lightName, outStr)
+                    if diffPath and os.path.isfile(diffPath):
+                        msg += "    Diff: {}\n".format(os.path.abspath(diffPath))
+                scriptTail = _getMayaScriptEditorHistoryTail(max_lines=200)
+                if scriptTail:
+                    msg += scriptTail
+                self.fail(msg)
+        else:
+            for lightName in LIGHTS:
+                intensity = self._getIntensityForLight(lightName, delegate)
+                self._setLightIntensities(lightName, intensity)
+                cmds.refresh(force=True)
+                self._waitForConvergence(delegate)
+                baselineName = "{}_{}.png".format(delegate["name"], lightName)
+                self.assertSnapshotClose(
+                    baselineName,
+                    self.IMAGE_DIFF_FAIL_THRESHOLD,
+                    self.IMAGE_DIFF_FAIL_PERCENT,
+                )
 
     def _delegateRunsOnPlatform(self, delegate):
         """Return True if the delegate's platform restriction allows running on the current platform."""

@@ -443,7 +443,10 @@ finally:
     if((NOT DEFINED PIXAR_LICENSE_FILE OR "${PIXAR_LICENSE_FILE}" STREQUAL "") AND DEFINED ENV{PIXAR_LICENSE_FILE} AND NOT "$ENV{PIXAR_LICENSE_FILE}" STREQUAL "")
         set(PIXAR_LICENSE_FILE "$ENV{PIXAR_LICENSE_FILE}" CACHE STRING "Pixar license server (port@hostname)" FORCE)
     endif()
-    if(DEFINED PRMAN_DELEGATE_PLUGIN_PATH AND NOT "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
+    # Only add PRMan delegate on Windows: testLightingRenderDelegates runs PRMan there.
+    # On OSX/Linux, loading the PRMan artifact causes TfType redefinition errors
+    # (UsdSkelImaging* already defined) due to conflicting USD plugin loads.
+    if(IS_WINDOWS AND DEFINED PRMAN_DELEGATE_PLUGIN_PATH AND NOT "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
         list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
              "${PRMAN_DELEGATE_PLUGIN_PATH}")
     endif()
