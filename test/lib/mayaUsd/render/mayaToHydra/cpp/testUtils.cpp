@@ -49,6 +49,7 @@
 #include <QApplication>
 
 #include <algorithm>
+#include <cctype>
 #include <exception>
 #include <iostream>
 #include <cstring>
@@ -485,13 +486,11 @@ bool dataSourceMatchesReference(
         std::remove(referenceString.begin(), referenceString.end(), '\r'), referenceString.end());
 
     auto trimTrailingWhitespace = [](std::string& value) {
-        while (!value.empty()) {
-            const char ch = value.back();
-            if (ch != ' ' && ch != '\t' && ch != '\n' && ch != '\v' && ch != '\f') {
-                break;
-            }
-            value.pop_back();
-        }
+        auto it = std::find_if_not(
+            value.rbegin(),
+            value.rend(),
+            [](unsigned char c) { return std::isspace(c) != 0; });
+        value.erase(it.base(), value.end());
     };
     trimTrailingWhitespace(outputString);
     trimTrailingWhitespace(referenceString);

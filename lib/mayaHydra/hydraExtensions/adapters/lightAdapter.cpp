@@ -116,7 +116,7 @@ void _dirtyParamsPlug(MObject& node, MPlug& plug, void* clientData)
     auto* adapter = reinterpret_cast<MayaHydraLightAdapter*>(clientData);
     // For non-param attrs, only rely on NodeDirtyPlugCallback when the plug is driven.
     // Direct setAttr changes are handled by AttributeChangedCallback.
-    MPlug topPlug = MayaHydraAdapter::GetTopPlug(plug);
+    MPlug topPlug = MayaHydra::GetTopPlug(plug);
     if (!topPlug.isConnected()) {
         return;
     }
@@ -156,7 +156,7 @@ void MayaHydraLightAdapter::_LightShapeAttributeChanged(
         return;
     }
 
-    MPlug topPlug = MayaHydraAdapter::GetTopPlug(plug);
+    MPlug topPlug = MayaHydra::GetTopPlug(plug);
     // Driven plug changes are handled by the node-dirty callback.
     if (topPlug.isConnected()) {
         return;
@@ -907,7 +907,7 @@ bool MayaHydraLightAdapter::ShouldMarkPrimvarDirtyForAttributeChange(const MPlug
     return MayaHydraAdapter::ShouldMarkPrimvarDirtyForParamAttrs(plug, kLightParamAttributeNames);
 }
 
-HdDirtyBits MayaHydraLightAdapter::GetExtraDirtyBitsForPrimvarAttributeChange(const MPlug& plug) const
+HdDirtyBits MayaHydraLightAdapter::GetConsolidatedDirtyBitsForPrimvarAttributeChange(const MPlug& plug) const
 {
     if (MayaHydraAdapter::IsParamAttribute(plug,
             MayaHydraAdapter::GetParamAttributeSet(kLightParamAttributeNames))) {
@@ -930,7 +930,8 @@ void MayaHydraLightAdapter::MarkDirtyIfPlugAffectsLightParams(MayaHydraLightAdap
     }
     adapter->InvalidateTransform();
     if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
-        // Single MarkDirty call (primvar + params + shadows) via GetExtraDirtyBitsForPrimvarAttributeChange
+        // Single MarkDirty call (primvar + params + shadows) via
+        // GetConsolidatedDirtyBitsForPrimvarAttributeChange
         // to reduce redundant scene index notifications when updating ai attributes.
         adapter->MarkPrimvarDirtyForAttributeChange(plug);
     } else {

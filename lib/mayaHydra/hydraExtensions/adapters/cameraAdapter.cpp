@@ -18,6 +18,7 @@
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
+#include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/gf/interval.h>
@@ -50,7 +51,7 @@ static void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)
     if (plug.isChild()) {
         return;
     }
-    MPlug topPlug = MayaHydraAdapter::GetTopPlug(plug);
+    MPlug topPlug = MayaHydra::GetTopPlug(plug);
     // Only handle driven plugs here; direct setAttr changes are handled in the
     // attribute-changed callback to avoid duplicate dirty notifications.
     if (!topPlug.isConnected()) {
@@ -80,7 +81,7 @@ static void _cameraAttributeChanged(
     if (!(msg & MNodeMessage::kAttributeSet)) {
         return;
     }
-    MPlug topPlug = MayaHydraAdapter::GetTopPlug(plug);
+    MPlug topPlug = MayaHydra::GetTopPlug(plug);
     // Driven plug changes are handled by the node-dirty callback.
     if (topPlug.isConnected()) {
         return;

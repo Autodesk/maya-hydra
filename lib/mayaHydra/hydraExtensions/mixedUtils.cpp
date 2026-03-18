@@ -1260,11 +1260,10 @@ static bool ExtensionAttrValueEqualsDefault(const MPlug& attrPlug, const MObject
     }
 }
 
-// Populate a dictionary with attribute values for translation to Hydra primvars.
-// When includeAllAttributes is false: only extension and dynamic attributes (dynamic defaults kept).
-// When true: only non-builtin (extension/dynamic) attributes, and defaults are skipped.
-void GetAttributesFromNode(
-    const MObject& node, PXR_NS::VtDictionary& attrs, bool includeAllAttributes)
+// Populate a dictionary with extension/dynamic attribute values for translation to Hydra primvars.
+// Only non-default values are included (dynamic attrs skip default checks).
+void GetExtensionAndDynamicAttributesFromNode(
+    const MObject& node, PXR_NS::VtDictionary& attrs)
 {
     attrs.clear();
     MStatus           status;
@@ -1288,11 +1287,10 @@ void GetAttributesFromNode(
         const bool isExtOrDynamic = attrFn.isExtension() || attrFn.isDynamic();
         if (!isExtOrDynamic)
             continue;
-        // When includeAllAttributes: always check default (skip if at default).
-        // When ext/dynamic only: dynamic attrs don't check default.
+        // Extension attrs always check defaults; dynamic attrs do not.
         // For extension attributes, MPlug::isDefaultValue() can be unreliable
         // (plugins may not implement it), so we also use manual comparison.
-        const bool ignoreDefault = includeAllAttributes ? false : attrFn.isDynamic();
+        const bool ignoreDefault = attrFn.isDynamic();
         if (!ignoreDefault) {
             if (attrPlug.isDefaultValue()) {
                 continue;
