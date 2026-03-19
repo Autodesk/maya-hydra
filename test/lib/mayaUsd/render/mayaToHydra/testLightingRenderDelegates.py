@@ -21,19 +21,6 @@ import time
 import tempfile
 from contextlib import contextmanager
 
-# On OSX, PRMan delegate causes TfType redefinition errors (UsdSkelImaging* already
-# defined) when present in the plugin path. Clear/filter before Maya imports so
-# parent CI env (PXR_PLUGINPATH_NAME, etc.) does not trigger the incompatibility.
-if platform.system() == "Darwin":
-    # PRMAN_DELEGATE_PLUGIN_PATH: always clear on OSX (PRMan not supported there).
-    os.environ.pop("PRMAN_DELEGATE_PLUGIN_PATH", None)
-    for var in ("PXR_PLUGINPATH_NAME", "MAYA_PXR_PLUGINPATH_NAME"):
-        val = os.environ.get(var)
-        if val and "prman" in val.lower():
-            sep = ";" if ";" in val else ":"
-            kept = [p for p in val.split(sep) if "prman" not in p.lower()]
-            os.environ[var] = sep.join(kept) if kept else ""
-
 import maya.cmds as cmds
 
 # Ensure testUtils (with imageUtils) is on path *before* mtohUtils imports imageUtils.
