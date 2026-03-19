@@ -158,5 +158,16 @@ find_program(OIIO_idiff_BINARY
     PATH_SUFFIXES
         bin/
     DOC
-        "OIIO's idiff binary"  
+        "OIIO's idiff binary"
+)
+
+find_program(OIIO_oiiotool_BINARY
+        oiiotool
+    HINTS
+        ${PXR_USD_LOCATION}
+        $ENV{PXR_USD_LOCATION}
+    PATH_SUFFIXES
+        bin/
+    DOC
+        "OIIO's oiiotool binary (for diff images)"
 )

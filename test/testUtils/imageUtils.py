@@ -172,17 +172,40 @@ def _getMayaScriptEditorHistoryTail(max_lines=200):
         return ""
 
 def _generateDiffImage(imagePath1, imagePath2, outputPath):
-    """Generate a pixel-per-pixel diff image with no value scaling.
-
-    Uses idiff -o -abs -scale 1. Output format matches the outputPath extension
-    (same as the images being compared). Returns output path if successful, else None.
-    """
+    """Generate a visual diff image. Prefers oiiotool --absdiff --maxchan; falls back to idiff.
+    Returns output path if successful, else None."""
+    import sys
     image_diff_tool = os.environ.get('IMAGE_DIFF_TOOL')
     if not image_diff_tool:
         return None
     os.makedirs(os.path.dirname(outputPath), exist_ok=True)
-    # -abs: absolute value of differences
-    # -scale 1: no value scaling; raw pixel-by-pixel difference
+
+    # Prefer oiiotool: --absdiff --maxchan --powc 0.5 --mulc 40 --clamp:max=1
+    oiiotool_exe = (
+        os.environ.get('OIIOTOOL') or
+        (os.path.join(os.path.dirname(image_diff_tool),
+          'oiiotool.exe' if sys.platform == 'win32' else 'oiiotool')
+         if os.path.dirname(image_diff_tool) else None) or
+        (shutil.which('oiiotool') if shutil.which else None)
+    )
+    if oiiotool_exe and os.path.isfile(oiiotool_exe):
+        cmd = [
+            oiiotool_exe, imagePath1, imagePath2,
+            '--absdiff', '--maxchan', '--powc', '0.5', '--mulc', '40',
+            '--clamp:max=1', '-o', outputPath
+        ]
+        env = os.environ.copy()
+        oiio_dir = os.path.dirname(oiiotool_exe)
+        if oiio_dir:
+            env['PATH'] = oiio_dir + os.pathsep + env.get('PATH', '')
+        try:
+            proc = subprocess.run(cmd, capture_output=True, shell=False, env=env)
+            if proc.returncode == 0 and os.path.isfile(outputPath):
+                return outputPath
+        except OSError:
+            pass
+
+    # Fallback: idiff -o -abs -scale 1
     cmd = [image_diff_tool, '-o', outputPath, '-abs', '-scale', '1', imagePath1, imagePath2]
     try:
         proc = subprocess.run(cmd, capture_output=True, shell=False, env=os.environ.copy())
@@ -297,8 +320,10 @@ class ImageDiffingTestCase:
 
                 browse_url = artifact_base + '/'
                 diff_path = None
+                _, ext1 = os.path.splitext(os.path.basename(abs1))
                 base2, ext2 = os.path.splitext(os.path.basename(abs2))
-                diff_output = os.path.join(os.path.dirname(abs2), base2 + '_diff' + (ext2 or '.png'))
+                ext = ext1 or ext2 or '.png'
+                diff_output = os.path.join(os.path.dirname(abs2), base2 + '_diff' + ext)
                 diff_path = _generateDiffImage(abs1, abs2, diff_output)
                 if diff_path:
                     diff_abs = os.path.abspath(diff_path).replace('\\', '/')
@@ -326,8 +351,12 @@ class ImageDiffingTestCase:
                 msg += "  Browse:   {}\n".format(browse_url)
             else:
                 msg = str(proc.stdout) + "\n\nImage comparison failed.\n"
+                msg += "  Baseline: {}\n".format(abs1)
+                msg += "  Actual:   {}\n".format(abs2)
+                _, ext1 = os.path.splitext(os.path.basename(abs1))
                 base2, ext2 = os.path.splitext(os.path.basename(abs2))
-                diff_output = os.path.join(os.path.dirname(abs2), base2 + '_diff' + (ext2 or '.png'))
+                ext = ext1 or ext2 or '.png'
+                diff_output = os.path.join(os.path.dirname(abs2), base2 + '_diff' + ext)
                 diff_path = _generateDiffImage(abs1, abs2, diff_output)
                 if diff_path:
                     msg += "  Diff:     {}\n".format(os.path.abspath(diff_path).replace('\\', '/'))

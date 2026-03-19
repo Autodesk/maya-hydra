@@ -100,6 +100,9 @@ endfunction()
 if (OIIO_idiff_BINARY)
     set(IMAGE_DIFF_TOOL ${OIIO_idiff_BINARY} CACHE STRING "Use idiff for image comparison")
 endif()
+if (OIIO_oiiotool_BINARY)
+    set(OIIOTOOL ${OIIO_oiiotool_BINARY} CACHE STRING "Use oiiotool for diff images (--absdiff --maxchan)")
+endif()
 
 #
 # mayaUsd_add_test( <test_name>
@@ -338,10 +341,12 @@ finally:
     # Set up environment for overall test and Maya defaults. 
     set(ALL_TEST_VARS
         IMAGE_DIFF_TOOL
+        OIIOTOOL
         MAYA_HAS_RENDER_ITEM_CULL_MODE_API
     )
 
     set(MAYAUSD_VARNAME_IMAGE_DIFF_TOOL "${IMAGE_DIFF_TOOL}")
+    set(MAYAUSD_VARNAME_OIIOTOOL "${OIIOTOOL}")
 
     set(MAYAUSD_VARNAME_MAYA_HAS_RENDER_ITEM_CULL_MODE_API "${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}")
 
@@ -394,10 +399,19 @@ finally:
              "${MAYAUSD_LOCATION}/libraries")
     endif()
 
-    # Additional plugin paths (e.g. HdArnold) for tests that need them
+    # Additional plugin paths (e.g. HdArnold) for tests that need them.
+    # On OSX/Linux, exclude PRMan paths to avoid TfType redefinition errors.
     if(ADDITIONAL_PXR_PLUGINPATH_NAME)
         foreach(extra_path ${ADDITIONAL_PXR_PLUGINPATH_NAME})
-            list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
+            if(IS_WINDOWS)
+                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
+            else()
+                string(TOLOWER "${extra_path}" _path_lower)
+                string(FIND "${_path_lower}" "prman" _idx)
+                if(_idx EQUAL -1)
+                    list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
+                endif()
+            endif()
         endforeach()
         message(STATUS "ADDITIONAL_PXR_PLUGINPATH_NAME for tests: ${ADDITIONAL_PXR_PLUGINPATH_NAME}")
     endif()
@@ -566,12 +580,25 @@ finally:
     # Inherit PXR_PLUGINPATH_NAME and MAYA_PXR_PLUGINPATH_NAME from the
     # configure-time environment so locally-installed Hydra plugins
     # (e.g. HdArnold, HdPrman) are discovered when running tests.
-    if(DEFINED ENV{PXR_PLUGINPATH_NAME})
-        list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} $ENV{PXR_PLUGINPATH_NAME})
-    endif()
-    if(DEFINED ENV{MAYA_PXR_PLUGINPATH_NAME})
-        list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} $ENV{MAYA_PXR_PLUGINPATH_NAME})
-    endif()
+    # On OSX/Linux, filter out PRMan delegate paths to avoid TfType redefinition
+    # errors (UsdSkelImaging* already defined) when the parent CI sets them.
+    foreach(_inherit_var PXR_PLUGINPATH_NAME MAYA_PXR_PLUGINPATH_NAME)
+        if(DEFINED ENV{${_inherit_var}} AND NOT "$ENV{${_inherit_var}}" STREQUAL "")
+            if(IS_WINDOWS)
+                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} $ENV{${_inherit_var}})
+            else()
+                string(REPLACE ":" ";" _path_list "$ENV{${_inherit_var}}")
+                string(REPLACE ";" ";" _path_list "${_path_list}")
+                foreach(_path ${_path_list})
+                    string(TOLOWER "${_path}" _path_lower)
+                    string(FIND "${_path_lower}" "prman" _idx)
+                    if(_idx EQUAL -1)
+                        list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${_path}")
+                    endif()
+                endforeach()
+            endif()
+        endif()
+    endforeach()
 
     # Maya USD's Plug may read MAYA_PXR_PLUGINPATH_NAME (when built with
     # PXR_OVERRIDE_PLUGINPATH_NAME=MAYA_PXR_PLUGINPATH_NAME). Set it to the same
