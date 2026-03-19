@@ -17,17 +17,16 @@
 #define MAYAHYDRALIB_MESH_ADAPTER_TEST_UTILS_H
 
 #include <mayaHydraLib/api.h>
-#include <pxr/pxr.h>
 
 #include <string>
 #include <unordered_set>
 
-PXR_NAMESPACE_OPEN_SCOPE
+namespace MAYAHYDRA_NS_DEF {
 
 /// Exposed for unit tests to verify kMeshParamAttributeNames stays in sync with NodeDirtiedCallback.
 MAYAHYDRALIB_API
 const std::unordered_set<std::string>& GetMeshParamAttributeNamesForTest();
 
-PXR_NAMESPACE_CLOSE_SCOPE
+} // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRALIB_MESH_ADAPTER_TEST_UTILS_H

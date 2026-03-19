@@ -43,16 +43,7 @@
 #include <string>
 #include <unordered_set>
 
-PXR_NAMESPACE_OPEN_SCOPE
-
-/**
- * This file contains the MayaHydraMeshAdapter class to translate from a Maya mesh to hydra.
- * Please note that, as of May 2023, this is optionally used by mayaHydra, with
- * a compile-time switch (see sceneDelegate.h).
- *
- * We can also translate from a MRenderitem to Hydra using the
- * MayaHydraRenderItemAdapter class.
- */
+namespace MAYAHYDRA_NS_DEF {
 
 namespace {
 
@@ -68,8 +59,21 @@ static const char* const kMeshParamAttributeNames[] = {
 
 const std::unordered_set<std::string>& GetMeshParamAttributeNamesForTest()
 {
-    return MayaHydraAdapter::GetParamAttributeSet(kMeshParamAttributeNames);
+    return PXR_NS::MayaHydraAdapter::GetParamAttributeSet(kMeshParamAttributeNames);
 }
+
+} // namespace MAYAHYDRA_NS_DEF
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+/**
+ * This file contains the MayaHydraMeshAdapter class to translate from a Maya mesh to hydra.
+ * Please note that, as of May 2023, this is optionally used by mayaHydra, with
+ * a compile-time switch (see sceneDelegate.h).
+ *
+ * We can also translate from a MRenderitem to Hydra using the
+ * MayaHydraRenderItemAdapter class.
+ */
 
 namespace {
 

@@ -390,6 +390,10 @@ Fvp::SelectionSceneIndexRefPtr findSelectionSceneIndexInTree(
 HdSceneIndexBaseRefPtr FindMayaHydraSceneIndex(
     const HdSceneIndexBaseRefPtr& terminalSceneIndex)
 {
+    // Two-step lookup is intentional: find the Data Producer Merging Scene Index first,
+    // then pick the MayaHydraSceneIndex from its inputs. This anchors the search to the
+    // Maya-authored branch of the tree and avoids accidentally selecting a similarly
+    // named scene index from another branch if multiple exist.
     auto isDataProducerMerging = SceneIndexDisplayNamePred("Data Producer Merging Scene Index");
     auto mergingSiBase = findSceneIndexInTree(terminalSceneIndex, isDataProducerMerging);
     if (!mergingSiBase) {

@@ -103,8 +103,6 @@ void UpdateAttrs(const char* attrName, const T& val, VtDictionary& attrs)
 void UpdateAttrsValue(
     const char* attrName,
     const VtValue& val,
-    const VtValue& /* defaultVal */,
-    const bool /* hasDefault */,
     VtDictionary& attrs)
 {
     attrs[attrName] = val;
@@ -1313,23 +1311,17 @@ void GetExtensionAndDynamicAttributesFromNode(
                         UpdateAttrsValue(
                             attrName,
                             VtValue(value),
-                            VtValue(defaultVal),
-                            !ignoreDefault,
                             attrs);
                     } else {
                         UpdateAttrsValue(
                             attrName,
                             VtValue(TfToken(label.asChar())),
-                            VtValue(TfToken(defaultLabel.asChar())),
-                            !ignoreDefault,
                             attrs);
                     }
                 } else {
                     UpdateAttrsValue(
                         attrName,
                         VtValue(value),
-                        VtValue(defaultVal),
-                        !ignoreDefault,
                         attrs);
                 }
             } break;
@@ -1338,15 +1330,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                 switch (typeAttr.attrType()) {
                 case MFnData::kString: {
                     std::string value = attrPlug.asString().asChar();
-                    MObject defaultValObj;
-                    typeAttr.getDefault(defaultValObj);
-                    MFnStringData defaultStringData(defaultValObj);
-                    std::string   defaultVal = defaultStringData.string().asChar();
                     UpdateAttrsValue(
                         attrName,
                         VtValue(value),
-                        VtValue(defaultVal),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kStringArray: {
@@ -1355,18 +1341,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnStringArrayData,
                         VtStringArray>(attrPlug, ToVtStringArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MStringArray,
-                        MFnStringArrayData,
-                        VtStringArray>(defaultObj, ToVtStringArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kIntArray: {
@@ -1375,18 +1352,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnIntArrayData,
                         VtIntArray>(attrPlug, ToVtIntArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MIntArray,
-                        MFnIntArrayData,
-                        VtIntArray>(defaultObj, ToVtIntArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kFloatArray: {
@@ -1395,18 +1363,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnFloatArrayData,
                         VtFloatArray>(attrPlug, ToVtFloatArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MFloatArray,
-                        MFnFloatArrayData,
-                        VtFloatArray>(defaultObj, ToVtFloatArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kDoubleArray: {
@@ -1415,18 +1374,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnDoubleArrayData,
                         VtDoubleArray>(attrPlug, ToVtDoubleArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MDoubleArray,
-                        MFnDoubleArrayData,
-                        VtDoubleArray>(defaultObj, ToVtDoubleArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kVectorArray: {
@@ -1435,18 +1385,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnVectorArrayData,
                         VtArray<GfVec3d>>(attrPlug, ToVtVec3dArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MVectorArray,
-                        MFnVectorArrayData,
-                        VtArray<GfVec3d>>(defaultObj, ToVtVec3dArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kPointArray: {
@@ -1455,18 +1396,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnPointArrayData,
                         VtArray<GfVec4d>>(attrPlug, ToVtVec4dArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MPointArray,
-                        MFnPointArrayData,
-                        VtArray<GfVec4d>>(defaultObj, ToVtVec4dArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kMatrix: {
@@ -1492,26 +1424,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                     }
 
                     GfMatrix4d value = GetGfMatrixFromMaya(matrixData.matrix(&matrixStatus));
-
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    if (defaultObj.isNull()) {
-                        UpdateAttrsValue(attrName, VtValue(value), VtValue(), false, attrs);
-                        break;
-                    }
-
-                    MFnMatrixData defaultData(defaultObj, &matrixStatus);
-                    if (!matrixStatus) {
-                        UpdateAttrsValue(attrName, VtValue(value), VtValue(), false, attrs);
-                        break;
-                    }
-
-                    GfMatrix4d defaultVal = GetGfMatrixFromMaya(defaultData.matrix(&matrixStatus));
                     UpdateAttrsValue(
                         attrName,
                         VtValue(value),
-                        VtValue(defaultVal),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kMatrixArray: {
@@ -1520,18 +1435,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnMatrixArrayData,
                         VtArray<GfMatrix4d>>(attrPlug, ToVtMatrix4dArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MMatrixArray,
-                        MFnMatrixArrayData,
-                        VtArray<GfMatrix4d>>(defaultObj, ToVtMatrix4dArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kNumeric: {
@@ -1707,13 +1613,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                 } break;
                 case MFnNumericData::kInt64: {
                     MInt64 value = attrPlug.asInt64();
-                    MInt64 defaultVal = 0;
-                    numericAttr.getDefault(defaultVal);
                     UpdateAttrsValue(
                         attrName,
                         VtValue(value),
-                        VtValue(defaultVal),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnNumericData::kAddr: {
@@ -1732,8 +1634,6 @@ void GetExtensionAndDynamicAttributesFromNode(
                     UpdateAttrsValue(
                         attrName,
                         VtValue(value),
-                        VtValue(defaultVal),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnNumericData::k2Short: {
@@ -1861,8 +1761,6 @@ void GetExtensionAndDynamicAttributesFromNode(
                 UpdateAttrsValue(
                     attrName,
                     VtValue(value),
-                    VtValue(defaultVal),
-                    !ignoreDefault,
                     attrs);
             } break;
             case MFn::kMatrixAttribute: {
@@ -1889,16 +1787,9 @@ void GetExtensionAndDynamicAttributesFromNode(
 
                 GfMatrix4d value = GetGfMatrixFromMaya(matrixData.matrix(&matrixStatus));
 
-                MFnMatrixAttribute matrixAttr(attrObj);
-                MMatrix            defaultMatrix;
-                matrixAttr.getDefault(defaultMatrix);
-                GfMatrix4d defaultVal = GetGfMatrixFromMaya(defaultMatrix);
-
                 UpdateAttrsValue(
                     attrName,
                     VtValue(value),
-                    VtValue(defaultVal),
-                    !ignoreDefault,
                     attrs);
             } break;
             default:
