@@ -178,7 +178,7 @@ TEST(MeshPrimvars, ParamAttributesMatchGetLogic)
         "uvPivot", "displaySmoothMesh", "smoothLevel", "instObjGroups"
     };
 
-    const auto& paramAttrs = MAYAHYDRA_NS_DEF::GetMeshParamAttributeNamesForTest();
+    const auto& paramAttrs = MayaHydra::GetMeshParamAttributeNamesForTest();
     for (const std::string& attr : kAttrsHandledByCallbacks) {
         EXPECT_TRUE(paramAttrs.count(attr)) << "Attribute '" << attr
             << "' is handled by NodeDirtiedCallback or AttributeChangedCallback but is missing "
