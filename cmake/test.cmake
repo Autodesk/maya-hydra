@@ -260,9 +260,25 @@ except Exception:\\n\
             mayaUsd_indent(indented_PYTEST_CODE "${PYTEST_CODE}")
             # then wrap in try/finally, and call maya.standalone.[un]initialize()
             set(PYTEST_CODE "
+import os
+import sys
 import maya.standalone
 maya.standalone.initialize(name='python')
 try:
+    _usd_env_keys = [
+        \"PXR_USD_LOCATION\",
+        \"USD_INSTALL_LOCATION\",
+        \"PXR_PLUGINPATH_NAME\",
+        \"MAYA_PXR_PLUGINPATH_NAME\",
+        \"PXR_OVERRIDE_PLUGINPATH_NAME\",
+        \"LD_LIBRARY_PATH\",
+        \"DYLD_LIBRARY_PATH\",
+        \"RMANTREE\",
+        \"PRMAN_DELEGATE_PLUGIN_PATH\",
+    ]
+    _usd_env_parts = [\"{}={}\".format(k, os.environ.get(k, \"\")) for k in _usd_env_keys]
+    sys.__stdout__.write(\"USD env: {}\\n\".format(\" | \".join(_usd_env_parts)))
+    sys.__stdout__.flush()
 ${indented_PYTEST_CODE}
 finally:
     maya.standalone.uninitialize()
