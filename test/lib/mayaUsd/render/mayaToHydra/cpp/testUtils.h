@@ -38,6 +38,7 @@
 #include <fstream>
 #include <functional>
 #include <limits>
+#include <string>
 #include <string_view>
 
 UFE_NS_DEF {
@@ -108,6 +109,77 @@ using FindPrimPredicate
     = std::function<bool(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)>;
 
 using PrimEntriesVector = std::vector<PrimEntry>;
+
+/**
+ * @brief Create a predicate that matches prims whose path contains primNamePart and whose type
+ *        equals primType. Shared by mesh, camera, and light tests.
+ *
+ * @param[in] primNamePart Substring to match in the prim path (e.g. "pCube1", "perspShape").
+ * @param[in] primType The expected prim type (e.g. HdPrimTypeTokens->mesh, HdPrimTypeTokens->camera).
+ *
+ * @return A FindPrimPredicate that can be passed to SceneIndexInspector::FindPrims.
+ */
+FindPrimPredicate CreatePrimPredicate(
+    const std::string&     primNamePart,
+    const PXR_NS::TfToken& primType);
+
+/**
+ * @brief Find the first terminal scene index containing a prim that matches the predicate.
+ *
+ * @param[in] sceneIndices Terminal scene indices to search.
+ * @param[in] predicate Predicate used to match a prim.
+ * @param[in] maxPrims Maximum prims to fetch per scene index (default 1).
+ *
+ * @return The first matching terminal scene index, or nullptr if none match.
+ */
+HdSceneIndexBaseRefPtr FindTerminalSceneIndexWithPrim(
+    const SceneIndicesVector& sceneIndices,
+    FindPrimPredicate         predicate,
+    size_t                    maxPrims = 1);
+
+/**
+ * @brief Find the first terminal scene index containing a prim with name substring and type.
+ *
+ * @param[in] sceneIndices Terminal scene indices to search.
+ * @param[in] primNamePart Substring to match in the prim path.
+ * @param[in] primType Expected prim type token.
+ * @param[in] maxPrims Maximum prims to fetch per scene index (default 1).
+ *
+ * @return The first matching terminal scene index, or nullptr if none match.
+ */
+HdSceneIndexBaseRefPtr FindTerminalSceneIndexWithPrim(
+    const SceneIndicesVector& sceneIndices,
+    const std::string&        primNamePart,
+    const PXR_NS::TfToken&    primType,
+    size_t                    maxPrims = 1);
+
+/**
+ * @brief Retrieve an optionVar string value or return a fallback.
+ *
+ * @param[in] optionVar The optionVar name to read.
+ * @param[in] fallback The fallback string if the optionVar does not exist.
+ *
+ * @return The optionVar value as a std::string, or the fallback.
+ */
+std::string GetOptionVarOrDefault(const char* optionVar, const char* fallback);
+
+/**
+ * @brief Extract the leaf shape name from a Maya DAG path.
+ *
+ * @param[in] fullPath Full DAG path (e.g. "|parent|shape").
+ *
+ * @return The leaf name (e.g. "shape"), or the full string if no pipe is found.
+ */
+std::string GetShapeNameFromFullPath(const std::string& fullPath);
+
+/**
+ * @brief Extract the parent transform name from a Maya DAG path.
+ *
+ * @param[in] fullPath Full DAG path (e.g. "|parent|shape").
+ *
+ * @return The parent transform name (e.g. "parent"), or empty if none.
+ */
+std::string GetParentNameFromFullPath(const std::string& fullPath);
 
 class SceneIndexInspector
 {
@@ -288,6 +360,21 @@ Fvp::SelectionSceneIndexRefPtr findSelectionSceneIndexInTree(
 );
 
 /**
+ * @brief Find the MayaHydraSceneIndex in the scene index tree.
+ *
+ * The MayaHydraSceneIndex is where Maya-to-Hydra adapters write prim data.
+ * Use this when reading primvars to get the adapter output directly, bypassing
+ * any filtering in downstream scene indices (e.g. delegate-specific terminals).
+ *
+ * @param[in] terminalSceneIndex A terminal scene index from GetTerminalSceneIndices().
+ *
+ * @return MayaHydraSceneIndex pointer if found, otherwise nullptr.
+ */
+HdSceneIndexBaseRefPtr FindMayaHydraSceneIndex(
+    const HdSceneIndexBaseRefPtr& terminalSceneIndex
+);
+
+/**
 * @class A utility class to accumulate and read SceneIndex notifications sent by a SceneIndex.
 */
 class SceneIndexNotificationsAccumulator : public HdSceneIndexObserver
@@ -411,6 +498,12 @@ std::filesystem::path getPathToSample(std::string filename);
 bool dataSourceMatchesReference(
     PXR_NS::HdDataSourceBaseHandle dataSource,
     std::filesystem::path          referencePath);
+
+/**
+ * @brief Returns the path where dataSourceMatchesReference writes the actual output.
+ * Use in failure messages to help developers locate and diff the actual output.
+ */
+std::filesystem::path getDataSourceComparisonOutputPath(std::filesystem::path referencePath);
 
 #ifdef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
 /**

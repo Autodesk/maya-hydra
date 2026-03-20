@@ -1,6 +1,7 @@
 [interpolation]
 	constant
 [primvarValue]
-	1
+	2
 [role]
 	
+

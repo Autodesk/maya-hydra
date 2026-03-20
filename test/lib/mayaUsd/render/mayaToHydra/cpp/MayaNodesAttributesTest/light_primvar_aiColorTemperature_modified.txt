@@ -1,0 +1,7 @@
+[interpolation]
+	constant
+[primvarValue]
+	2000.00000
+[role]
+	
+

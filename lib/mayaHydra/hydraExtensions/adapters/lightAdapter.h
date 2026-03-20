@@ -29,6 +29,9 @@
 #include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
 
+#include <string>
+#include <unordered_set>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 /// Callback for parent node attribute changes. Shared by MayaHydraLightAdapter and subclasses
@@ -49,28 +52,40 @@ class MayaHydraLightAdapter : public MayaHydraDagAdapter
 {
 public:
     MAYAHYDRALIB_API
+    /// Create a light adapter for the given DAG path.
     MayaHydraLightAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag);
     MAYAHYDRALIB_API
+    /// Destroy the light adapter and remove callbacks.
     virtual ~MayaHydraLightAdapter();
     MAYAHYDRALIB_API
+    /// Return the Hydra light type token for this adapter.
     virtual const TfToken& LightType() const = 0;
     MAYAHYDRALIB_API
+    /// Return whether this light type is supported by the render index.
     bool IsSupported() const override;
     MAYAHYDRALIB_API
+    /// Insert the light prim into the scene index.
     void Populate() override;
     MAYAHYDRALIB_API
+    /// Mark this light prim dirty with the given bits.
     void MarkDirty(HdDirtyBits dirtyBits) override;
     MAYAHYDRALIB_API
+    /// Remove the light prim from the scene index.
     virtual void RemovePrim() override;
     MAYAHYDRALIB_API
+    /// Return whether this adapter matches the given Hydra type id.
     bool HasType(const TfToken& typeId) const override;
     MAYAHYDRALIB_API
+    /// Return a specific Hydra light parameter value.
     virtual VtValue GetLightParamValue(const TfToken& paramName);
     MAYAHYDRALIB_API
+    /// Return a value for the requested Hydra data source key.
     VtValue Get(const TfToken& key) override;
     MAYAHYDRALIB_API
+    /// Return a light material network (used by PRMan).
     virtual VtValue GetLightMaterialNetwork() const; // Is for PRMan
     MAYAHYDRALIB_API
+    /// Register Maya callbacks for light changes.
     virtual void CreateCallbacks() override;
 
     // Helper struct and method for Maya light parameters
@@ -88,13 +103,31 @@ public:
     };
 
     MAYAHYDRALIB_API
+    /// Return the current Maya light parameter bundle.
     MayaLightParams GetMayaLightParams() const;
     MAYAHYDRALIB_API
+    /// Return the Hydra render tag for this light.
     TfToken GetRenderTag() const override;
 
+    /// Suppress primvar dirtying for built-in light params that already dirty schema bits.
+    bool ShouldMarkPrimvarDirtyForAttributeChange(const MPlug& plug) const override;
+    /// Add extra dirty bits for light-param primvar changes.
+    HdDirtyBits GetConsolidatedDirtyBitsForPrimvarAttributeChange(const MPlug& plug) const override;
+
+    /// Return whether shadows are enabled for this light.
     bool GetShadowsEnabled(MFnLight& light) const;
 
+    /// Compute GlfSimpleLight position/direction from a Maya light.
     void GetGlfSimpleLightPosAndDirFromMFnLight(MFnLight& light, GlfSimpleLight& outSimpleLight);
+
+    /// For plug dirty callbacks: marks DirtyParams/DirtyShadowParams only when the plug affects
+    /// light params. Primvar-only attrs (e.g. aiShadowDensity) skip this to avoid over-dirtying.
+    static void MarkDirtyIfPlugAffectsLightParams(MayaHydraLightAdapter* adapter, const MPlug& plug);
+
+    /// For unit tests: returns the param attribute names that trigger DirtyParams.
+    /// Use with LightPrimvars.ParamAttributesMatchGetLogic to ensure the list stays in sync.
+    MAYAHYDRALIB_API
+    static const std::unordered_set<std::string>& GetLightParamAttributeNamesForTest();
 
 protected:
     /// Override to handle shape attribute changes before the default logic. Return true if fully
@@ -109,12 +142,16 @@ protected:
         void*                          clientData);
 
     MAYAHYDRALIB_API
+    /// Populate the GlfSimpleLight params from the Maya light.
     virtual void _CalculateLightParams(GlfSimpleLight& light) { }
     MAYAHYDRALIB_API
+    /// Populate HdxShadowParams from the Maya light.
     void _CalculateShadowParams(MFnLight& light, HdxShadowParams& params);
     MAYAHYDRALIB_API
+    /// Return the visibility state for this light.
     bool _GetVisibility() const override;
 
+    /// Compute the shadow projection matrix for this light.
     GfMatrix4d _CalculateShadowProjectionMatrix();
 
     bool _isLightingOn = true;

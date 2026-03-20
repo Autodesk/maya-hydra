@@ -100,10 +100,12 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testGeomSubsetsPicking.py
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
-    cpp/testCustomAttributeDirtying.py
+    cpp/testMayaNodesAttributesDirtying.py|depOnPlugins:mtoa
+    cpp/testLightPrimvars.py|depOnPlugins:mtoa
+    cpp/testCameraPrimvars.py
     cpp/testUsdStageInvalidate.py
     cpp/testCamera.py
-    cpp/testCustomAttributes.py|depOnPlugins:mtoa
+    cpp/testMayaNodesAttributes.py|depOnPlugins:mtoa
     cpp/testUsdAnim.py
     cpp/testUsdStageFromFile.py
     cpp/testSceneGlobalsCurrentFrame.py
@@ -146,6 +148,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshes.py
     testTransformMeshAdapter.py
     cpp/testMeshAdapterTransform.py
+    cpp/testMeshPrimvars.py
 )
 
 # The following tests incorrectly depend on having the VP2 render delegate

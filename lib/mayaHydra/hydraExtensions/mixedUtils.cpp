@@ -25,6 +25,7 @@
 #include <mayaHydraLib/debugCodes.h>
 
 #include <array>
+#include <cmath>
 #include <string>
 
 #include <pxr/base/gf/vec2d.h>
@@ -91,30 +92,20 @@ bool UseEnumLabelsForExtensionAndDynamicAttrs()
     return false;
 }
 
-// Store value only when it differs from the default.
-template<typename T> 
-void UpdateAttrs(const char* attrName, const T& val, const T& defaultVal, VtDictionary& attrs)
+// Store value in attrs. Default check is done via MPlug::isDefaultValue() before calling.
+template<typename T>
+void UpdateAttrs(const char* attrName, const T& val, VtDictionary& attrs)
 {
-    if (defaultVal != val) {
-        attrs[attrName] = VtValue(val);
-    } else {
-        attrs.erase(attrName);
-    }
+    attrs[attrName] = VtValue(val);
 }
 
-// Update attribute dictionary with optional default comparison.
+// Store value in attrs. Default check is done via MPlug::isDefaultValue() before calling.
 void UpdateAttrsValue(
     const char* attrName,
     const VtValue& val,
-    const VtValue& defaultVal,
-    const bool hasDefault,
     VtDictionary& attrs)
 {
-    if (hasDefault && (defaultVal == val)) {
-        attrs.erase(attrName);
-    } else {
-        attrs[attrName] = val;
-    }
+    attrs[attrName] = val;
 }
 
 // Try non-networked first, then networked plug lookup.
@@ -562,21 +553,14 @@ bool GetNumericTupleValue(
     return false;
 }
 
-// Update attribute dictionary for numeric tuple types.
+// Update attribute dictionary for numeric tuple types. Default check done via MPlug::isDefaultValue().
 template <typename Scalar, size_t N>
 void UpdateNumericTupleAttr(
     const char* attrName,
     const std::array<Scalar, N>& value,
-    const std::array<Scalar, N>& defaultValue,
-    const bool ignoreDefault,
     VtDictionary& attrs)
 {
-    UpdateAttrsValue(
-        attrName,
-        VtValue(VecBuilder<Scalar, N>::Make(value)),
-        VtValue(VecBuilder<Scalar, N>::Make(defaultValue)),
-        !ignoreDefault,
-        attrs);
+    attrs[attrName] = VtValue(VecBuilder<Scalar, N>::Make(value));
 }
 
 // Convert Maya string array to VtStringArray.
@@ -724,6 +708,65 @@ bool ExtractNumericDataFromObject(const MObject& dataObj, VtValue& outValue)
         double x = 0.0, y = 0.0, z = 0.0, w = 0.0;
         numericData.getData4Double(x, y, z, w);
         outValue = VtValue(GfVec4d(x, y, z, w));
+        return true;
+    }
+    // Scalar types (e.g. Arnold aiSubdivIterations, aiAutobumpVisibility).
+    // MFnNumericData lacks single-value getters; use getData2* and use first component.
+    case MFnNumericData::kBoolean: {
+        int x = 0, y = 0;
+        if (numericData.getData2Int(x, y) != MStatus::kSuccess) {
+            return false;
+        }
+        outValue = VtValue(static_cast<bool>(x));
+        return true;
+    }
+    case MFnNumericData::kByte:
+    case MFnNumericData::kChar: {
+        int x = 0, y = 0;
+        if (numericData.getData2Int(x, y) != MStatus::kSuccess) {
+            return false;
+        }
+        outValue = VtValue(static_cast<int>(static_cast<char>(x)));
+        return true;
+    }
+    case MFnNumericData::kShort: {
+        short x = 0, y = 0;
+        if (numericData.getData2Short(x, y) != MStatus::kSuccess) {
+            return false;
+        }
+        outValue = VtValue(x);
+        return true;
+    }
+    case MFnNumericData::kInt: {
+        int x = 0, y = 0;
+        if (numericData.getData2Int(x, y) != MStatus::kSuccess) {
+            return false;
+        }
+        outValue = VtValue(x);
+        return true;
+    }
+    case MFnNumericData::kInt64: {
+        double x = 0.0, y = 0.0;
+        if (numericData.getData2Double(x, y) != MStatus::kSuccess) {
+            return false;
+        }
+        outValue = VtValue(static_cast<MInt64>(x));
+        return true;
+    }
+    case MFnNumericData::kFloat: {
+        float x = 0.0f, y = 0.0f;
+        if (numericData.getData2Float(x, y) != MStatus::kSuccess) {
+            return false;
+        }
+        outValue = VtValue(x);
+        return true;
+    }
+    case MFnNumericData::kDouble: {
+        double x = 0.0, y = 0.0;
+        if (numericData.getData2Double(x, y) != MStatus::kSuccess) {
+            return false;
+        }
+        outValue = VtValue(x);
         return true;
     }
     default:
@@ -1044,12 +1087,183 @@ PXR_NS::TfToken GetGeomSubsetsPickMode()
     return GeomSubsetsPickModeTokens->None;
 }
 
-// Populate a dictionary with extension/dynamic attribute values.
-// Extension attributes are defined on node types (often by plugins). Dynamic attributes
-// are user-authored per-node (e.g., via addAttr) and are not part of the type definition.
+// Manual default-value check for extension attributes. MPlug::isDefaultValue() can be
+// unreliable for plugin-defined attributes, so we compare against the
+// attribute's registered default. Returns true if value equals default; false if not
+// or if we cannot determine.
+static bool ExtensionAttrValueEqualsDefault(const MPlug& attrPlug, const MObject& attrObj)
+{
+    MStatus status;
+    // Multi/array attributes: empty array is typically default.
+    if (attrPlug.isArray()) {
+        if (attrPlug.numElements() == 0) {
+            return true;
+        }
+        // Single element: compare against the attribute's registered default.
+        if (attrPlug.numElements() == 1) {
+            MPlug elementPlug = attrPlug.elementByLogicalIndex(0);
+            const unsigned int n = elementPlug.numChildren();
+            if (n >= 2 && n <= 4) {
+                MStatus numericStatus;
+                MFnNumericAttribute firstChild(elementPlug.child(0).attribute(), &numericStatus);
+                if (numericStatus) {
+                    const auto unitType = firstChild.unitType();
+                    if (n == 3 && unitType == MFnNumericData::kFloat) {
+                        std::array<float, 3> value = {{ 0.0f, 0.0f, 0.0f }};
+                        std::array<float, 3> defaultValue = {{ 0.0f, 0.0f, 0.0f }};
+                        if (GetCompoundChildValues<float, 3>(elementPlug, value, defaultValue)) {
+                            for (size_t i = 0; i < 3; ++i) {
+                                if (std::abs(value[i] - defaultValue[i]) > 1e-6f) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        }
+                    } else if (n == 3 && unitType == MFnNumericData::kDouble) {
+                        std::array<double, 3> value = {{ 0.0, 0.0, 0.0 }};
+                        std::array<double, 3> defaultValue = {{ 0.0, 0.0, 0.0 }};
+                        if (GetCompoundChildValues<double, 3>(elementPlug, value, defaultValue)) {
+                            for (size_t i = 0; i < 3; ++i) {
+                                if (std::abs(value[i] - defaultValue[i]) > 1e-9) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        }
+                    } else if (n == 3 && (unitType == MFnNumericData::kShort || unitType == MFnNumericData::kInt)) {
+                        std::array<int, 3> value = {{ 0, 0, 0 }};
+                        std::array<int, 3> defaultValue = {{ 0, 0, 0 }};
+                        if (GetCompoundChildValues<int, 3>(elementPlug, value, defaultValue)) {
+                            return value == defaultValue;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    switch (attrObj.apiType()) {
+        case MFn::kEnumAttribute: {
+            MFnEnumAttribute enumAttr(attrObj);
+            short value = attrPlug.asShort();
+            short defaultVal = 0;
+            return enumAttr.getDefault(defaultVal) && value == defaultVal;
+        }
+        case MFn::kAttribute2Short:
+        case MFn::kAttribute2Int:
+        case MFn::kAttribute3Short:
+        case MFn::kAttribute3Int:
+        case MFn::kNumericAttribute: {
+            MFnNumericAttribute numericAttr(attrObj);
+            switch (numericAttr.unitType()) {
+                case MFnNumericData::kBoolean: {
+                    bool def = false;
+                    return numericAttr.getDefault(def) && attrPlug.asBool() == def;
+                }
+                case MFnNumericData::kByte:
+                case MFnNumericData::kChar: {
+                    char def = 0;
+                    return numericAttr.getDefault(def) && attrPlug.asChar() == def;
+                }
+                case MFnNumericData::kShort: {
+                    int def = 0;
+                    return numericAttr.getDefault(def) && attrPlug.asShort() == static_cast<short>(def);
+                }
+                case MFnNumericData::kInt: {
+                    int def = 0;
+                    return numericAttr.getDefault(def) && attrPlug.asInt() == def;
+                }
+                case MFnNumericData::kFloat: {
+                    float def = 0.0f;
+                    if (numericAttr.getDefault(def)
+                        && std::abs(attrPlug.asFloat() - def) < 1e-6f) {
+                        return true;
+                    }
+                    return false;
+                }
+                case MFnNumericData::kDouble: {
+                    double def = 0.0;
+                    if (numericAttr.getDefault(def)
+                        && std::abs(attrPlug.asDouble() - def) < 1e-9) {
+                        return true;
+                    }
+                    return false;
+                }
+                default:
+                    return false;
+            }
+        }
+        case MFn::kTypedAttribute: {
+            MFnTypedAttribute typeAttr(attrObj);
+            if (typeAttr.attrType() != MFnData::kNumeric) {
+                return false;
+            }
+            MObject valueObj = attrPlug.asMObject();
+            if (valueObj.isNull()) {
+                MStatus getStatus;
+                attrPlug.getValue(valueObj);
+            }
+            if (valueObj.isNull()) {
+                return false;
+            }
+            MObject defaultObj;
+            if (!typeAttr.getDefault(defaultObj) || defaultObj.isNull()) {
+                return false;
+            }
+            VtValue value;
+            VtValue defaultVal;
+            if (!ExtractNumericDataFromObject(valueObj, value)
+                || !ExtractNumericDataFromObject(defaultObj, defaultVal)) {
+                return false;
+            }
+            return value == defaultVal;
+        }
+        case MFn::kCompoundAttribute: {
+            const unsigned int childCount = attrPlug.numChildren();
+            if (childCount < 2 || childCount > 4) {
+                return false;
+            }
+            MFnNumericAttribute firstChild(attrPlug.child(0).attribute(), &status);
+            if (!status) {
+                return false;
+            }
+            const auto unitType = firstChild.unitType();
+            if (unitType == MFnNumericData::kShort || unitType == MFnNumericData::kInt) {
+                if (childCount == 3) {
+                    std::array<int, 3> value = {{ 0, 0, 0 }};
+                    std::array<int, 3> defaultValue = {{ 0, 0, 0 }};
+                    if (!GetCompoundChildValues<int, 3>(attrPlug, value, defaultValue)) {
+                        return false;
+                    }
+                    return value == defaultValue;
+                }
+            } else if (unitType == MFnNumericData::kFloat || unitType == MFnNumericData::kDouble) {
+                if (childCount == 3) {
+                    std::array<double, 3> value = {{ 0.0, 0.0, 0.0 }};
+                    std::array<double, 3> defaultValue = {{ 0.0, 0.0, 0.0 }};
+                    if (!GetCompoundChildValues<double, 3>(attrPlug, value, defaultValue)) {
+                        return false;
+                    }
+                    for (size_t i = 0; i < 3; ++i) {
+                        if (std::abs(value[i] - defaultValue[i]) > 1e-9) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+        default:
+            return false;
+    }
+}
+
+// Populate a dictionary with extension/dynamic attribute values for translation to Hydra primvars.
+// Only non-default values are included (dynamic attrs skip default checks).
 void GetExtensionAndDynamicAttributesFromNode(
     const MObject& node, PXR_NS::VtDictionary& attrs)
 {
+    attrs.clear();
     MStatus           status;
     MFnDependencyNode nodeFn(node, &status);
     if (ARCH_UNLIKELY(!status)) {
@@ -1059,14 +1273,32 @@ void GetExtensionAndDynamicAttributesFromNode(
     for (size_t i = 0; i < nodeFn.attributeCount(); i++) {
         MObject      attrObj = nodeFn.attribute(i);
         MFnAttribute attrFn(attrObj);
-        auto         attrName = attrFn.name().asChar();
-        MPlug        attrPlug(node, attrObj);
+        const MString attrNameStr = attrFn.name();
+        const char*   attrName = attrNameStr.asChar();
+        MStatus       plugStatus;
+        MPlug         attrPlug = FindPlugWithFallback(nodeFn, attrNameStr, plugStatus);
+        if (!plugStatus || attrPlug.isNull())
+            continue;
         if (attrPlug.isChild())
             continue;
 
-        if (attrFn.isExtension() || attrFn.isDynamic()) {
-            const bool ignoreDefault = attrFn.isDynamic();
-            switch (attrObj.apiType()) {
+        const bool isExtOrDynamic = attrFn.isExtension() || attrFn.isDynamic();
+        if (!isExtOrDynamic)
+            continue;
+        // Extension attrs always check defaults; dynamic attrs do not.
+        // For extension attributes, MPlug::isDefaultValue() can be unreliable
+        // (plugins may not implement it), so we also use manual comparison.
+        const bool ignoreDefault = attrFn.isDynamic();
+        if (!ignoreDefault) {
+            if (attrPlug.isDefaultValue()) {
+                continue;
+            }
+            if (attrFn.isExtension() && ExtensionAttrValueEqualsDefault(attrPlug, attrObj)) {
+                continue;
+            }
+        }
+
+        switch (attrObj.apiType()) {
             case MFn::kEnumAttribute: {
                 MFnEnumAttribute enumAttr(attrObj);
                 short            value = attrPlug.asShort();
@@ -1079,23 +1311,17 @@ void GetExtensionAndDynamicAttributesFromNode(
                         UpdateAttrsValue(
                             attrName,
                             VtValue(value),
-                            VtValue(defaultVal),
-                            !ignoreDefault,
                             attrs);
                     } else {
                         UpdateAttrsValue(
                             attrName,
                             VtValue(TfToken(label.asChar())),
-                            VtValue(TfToken(defaultLabel.asChar())),
-                            !ignoreDefault,
                             attrs);
                     }
                 } else {
                     UpdateAttrsValue(
                         attrName,
                         VtValue(value),
-                        VtValue(defaultVal),
-                        !ignoreDefault,
                         attrs);
                 }
             } break;
@@ -1104,15 +1330,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                 switch (typeAttr.attrType()) {
                 case MFnData::kString: {
                     std::string value = attrPlug.asString().asChar();
-                    MObject defaultValObj;
-                    typeAttr.getDefault(defaultValObj);
-                    MFnStringData defaultStringData(defaultValObj);
-                    std::string   defaultVal = defaultStringData.string().asChar();
                     UpdateAttrsValue(
                         attrName,
                         VtValue(value),
-                        VtValue(defaultVal),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kStringArray: {
@@ -1121,18 +1341,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnStringArrayData,
                         VtStringArray>(attrPlug, ToVtStringArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MStringArray,
-                        MFnStringArrayData,
-                        VtStringArray>(defaultObj, ToVtStringArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kIntArray: {
@@ -1141,18 +1352,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnIntArrayData,
                         VtIntArray>(attrPlug, ToVtIntArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MIntArray,
-                        MFnIntArrayData,
-                        VtIntArray>(defaultObj, ToVtIntArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kFloatArray: {
@@ -1161,18 +1363,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnFloatArrayData,
                         VtFloatArray>(attrPlug, ToVtFloatArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MFloatArray,
-                        MFnFloatArrayData,
-                        VtFloatArray>(defaultObj, ToVtFloatArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kDoubleArray: {
@@ -1181,18 +1374,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnDoubleArrayData,
                         VtDoubleArray>(attrPlug, ToVtDoubleArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MDoubleArray,
-                        MFnDoubleArrayData,
-                        VtDoubleArray>(defaultObj, ToVtDoubleArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kVectorArray: {
@@ -1201,18 +1385,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnVectorArrayData,
                         VtArray<GfVec3d>>(attrPlug, ToVtVec3dArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MVectorArray,
-                        MFnVectorArrayData,
-                        VtArray<GfVec3d>>(defaultObj, ToVtVec3dArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kPointArray: {
@@ -1221,18 +1396,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnPointArrayData,
                         VtArray<GfVec4d>>(attrPlug, ToVtVec4dArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MPointArray,
-                        MFnPointArrayData,
-                        VtArray<GfVec4d>>(defaultObj, ToVtVec4dArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kMatrix: {
@@ -1258,26 +1424,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                     }
 
                     GfMatrix4d value = GetGfMatrixFromMaya(matrixData.matrix(&matrixStatus));
-
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    if (defaultObj.isNull()) {
-                        UpdateAttrsValue(attrName, VtValue(value), VtValue(), false, attrs);
-                        break;
-                    }
-
-                    MFnMatrixData defaultData(defaultObj, &matrixStatus);
-                    if (!matrixStatus) {
-                        UpdateAttrsValue(attrName, VtValue(value), VtValue(), false, attrs);
-                        break;
-                    }
-
-                    GfMatrix4d defaultVal = GetGfMatrixFromMaya(defaultData.matrix(&matrixStatus));
                     UpdateAttrsValue(
                         attrName,
                         VtValue(value),
-                        VtValue(defaultVal),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kMatrixArray: {
@@ -1286,18 +1435,9 @@ void GetExtensionAndDynamicAttributesFromNode(
                         MFnMatrixArrayData,
                         VtArray<GfMatrix4d>>(attrPlug, ToVtMatrix4dArray);
 
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    const auto defaultArray = GetVtArrayFromObject<
-                        MMatrixArray,
-                        MFnMatrixArrayData,
-                        VtArray<GfMatrix4d>>(defaultObj, ToVtMatrix4dArray);
-
                     UpdateAttrsValue(
                         attrName,
                         VtValue(valueArray),
-                        VtValue(defaultArray),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnData::kNumeric: {
@@ -1310,14 +1450,7 @@ void GetExtensionAndDynamicAttributesFromNode(
                                 attrFn.name().asChar());
                         break;
                     }
-
-                    MObject defaultObj;
-                    typeAttr.getDefault(defaultObj);
-                    VtValue defaultVal;
-                    bool    hasDefault = !ignoreDefault && supportsDefault
-                        && ExtractNumericDataFromObject(defaultObj, defaultVal);
-
-                    UpdateAttrsValue(attrName, value, defaultVal, hasDefault, attrs);
+                    attrs[attrName] = value;
                 } break;
                 default:
                     // TODO: Add more types if necessary
@@ -1330,20 +1463,25 @@ void GetExtensionAndDynamicAttributesFromNode(
                 break;
             } break;
             case MFn::kCompoundAttribute: {
-                const unsigned int childCount = attrPlug.numChildren();
+                // For multi attributes (e.g. aiLookAt), use first element if array has one.
+                MPlug compoundPlug = attrPlug;
+                if (attrPlug.isArray() && attrPlug.numElements() >= 1) {
+                    compoundPlug = attrPlug.elementByLogicalIndex(0);
+                }
+                const unsigned int childCount = compoundPlug.numChildren();
                 if (childCount < 2) {
                     break;
                 }
 
                 MStatus numericStatus;
-                MFnNumericAttribute firstChild(attrPlug.child(0).attribute(), &numericStatus);
+                MFnNumericAttribute firstChild(compoundPlug.child(0).attribute(), &numericStatus);
                 if (!numericStatus) {
                     break;
                 }
                 const auto unitType = firstChild.unitType();
                 bool       allSame = true;
                 for (unsigned int i = 1; i < childCount; ++i) {
-                    MFnNumericAttribute childAttr(attrPlug.child(i).attribute(), &numericStatus);
+                    MFnNumericAttribute childAttr(compoundPlug.child(i).attribute(), &numericStatus);
                     if (!numericStatus || childAttr.unitType() != unitType) {
                         allSame = false;
                         break;
@@ -1361,37 +1499,33 @@ void GetExtensionAndDynamicAttributesFromNode(
                         if (isShort) {
                             std::array<short, 2> value = {{ 0, 0 }};
                             std::array<short, 2> defaultValue = {{ 0, 0 }};
-                            if (!GetCompoundChildValues<short, 2>(attrPlug, value, defaultValue)) {
+                            if (!GetCompoundChildValues<short, 2>(compoundPlug, value, defaultValue)) {
                                 break;
                             }
-                            UpdateNumericTupleAttr<short, 2>(
-                                attrName, value, defaultValue, ignoreDefault, attrs);
+                            UpdateNumericTupleAttr<short, 2>(attrName, value, attrs);
                         } else {
                             std::array<int, 2> value = {{ 0, 0 }};
                             std::array<int, 2> defaultValue = {{ 0, 0 }};
-                            if (!GetCompoundChildValues<int, 2>(attrPlug, value, defaultValue)) {
+                            if (!GetCompoundChildValues<int, 2>(compoundPlug, value, defaultValue)) {
                                 break;
                             }
-                            UpdateNumericTupleAttr<int, 2>(
-                                attrName, value, defaultValue, ignoreDefault, attrs);
+                            UpdateNumericTupleAttr<int, 2>(attrName, value, attrs);
                         }
                     } else if (childCount == 3) {
                         if (isShort) {
                             std::array<short, 3> value = {{ 0, 0, 0 }};
                             std::array<short, 3> defaultValue = {{ 0, 0, 0 }};
-                            if (!GetCompoundChildValues<short, 3>(attrPlug, value, defaultValue)) {
+                            if (!GetCompoundChildValues<short, 3>(compoundPlug, value, defaultValue)) {
                                 break;
                             }
-                            UpdateNumericTupleAttr<short, 3>(
-                                attrName, value, defaultValue, ignoreDefault, attrs);
+                            UpdateNumericTupleAttr<short, 3>(attrName, value, attrs);
                         } else {
                             std::array<int, 3> value = {{ 0, 0, 0 }};
                             std::array<int, 3> defaultValue = {{ 0, 0, 0 }};
-                            if (!GetCompoundChildValues<int, 3>(attrPlug, value, defaultValue)) {
+                            if (!GetCompoundChildValues<int, 3>(compoundPlug, value, defaultValue)) {
                                 break;
                             }
-                            UpdateNumericTupleAttr<int, 3>(
-                                attrName, value, defaultValue, ignoreDefault, attrs);
+                            UpdateNumericTupleAttr<int, 3>(attrName, value, attrs);
                         }
                     }
                 } break;
@@ -1399,46 +1533,41 @@ void GetExtensionAndDynamicAttributesFromNode(
                     if (childCount == 2) {
                         std::array<float, 2> value = {{ 0.0f, 0.0f }};
                         std::array<float, 2> defaultValue = {{ 0.0f, 0.0f }};
-                        if (!GetCompoundChildValues<float, 2>(attrPlug, value, defaultValue)) {
+                        if (!GetCompoundChildValues<float, 2>(compoundPlug, value, defaultValue)) {
                             break;
                         }
-                        UpdateNumericTupleAttr<float, 2>(
-                            attrName, value, defaultValue, ignoreDefault, attrs);
+                        UpdateNumericTupleAttr<float, 2>(attrName, value, attrs);
                     } else if (childCount == 3) {
                         std::array<float, 3> value = {{ 0.0f, 0.0f, 0.0f }};
                         std::array<float, 3> defaultValue = {{ 0.0f, 0.0f, 0.0f }};
-                        if (!GetCompoundChildValues<float, 3>(attrPlug, value, defaultValue)) {
+                        if (!GetCompoundChildValues<float, 3>(compoundPlug, value, defaultValue)) {
                             break;
                         }
-                        UpdateNumericTupleAttr<float, 3>(
-                            attrName, value, defaultValue, ignoreDefault, attrs);
+                        UpdateNumericTupleAttr<float, 3>(attrName, value, attrs);
                     }
                 } break;
                 case MFnNumericData::kDouble: {
                     if (childCount == 2) {
                         std::array<double, 2> value = {{ 0.0, 0.0 }};
                         std::array<double, 2> defaultValue = {{ 0.0, 0.0 }};
-                        if (!GetCompoundChildValues<double, 2>(attrPlug, value, defaultValue)) {
+                        if (!GetCompoundChildValues<double, 2>(compoundPlug, value, defaultValue)) {
                             break;
                         }
-                        UpdateNumericTupleAttr<double, 2>(
-                            attrName, value, defaultValue, ignoreDefault, attrs);
+                        UpdateNumericTupleAttr<double, 2>(attrName, value, attrs);
                     } else if (childCount == 3) {
                         std::array<double, 3> value = {{ 0.0, 0.0, 0.0 }};
                         std::array<double, 3> defaultValue = {{ 0.0, 0.0, 0.0 }};
-                        if (!GetCompoundChildValues<double, 3>(attrPlug, value, defaultValue)) {
+                        if (!GetCompoundChildValues<double, 3>(compoundPlug, value, defaultValue)) {
                             break;
                         }
-                        UpdateNumericTupleAttr<double, 3>(
-                            attrName, value, defaultValue, ignoreDefault, attrs);
+                        UpdateNumericTupleAttr<double, 3>(attrName, value, attrs);
                     } else if (childCount == 4) {
                         std::array<double, 4> value = {{ 0.0, 0.0, 0.0, 0.0 }};
                         std::array<double, 4> defaultValue = {{ 0.0, 0.0, 0.0, 0.0 }};
-                        if (!GetCompoundChildValues<double, 4>(attrPlug, value, defaultValue)) {
+                        if (!GetCompoundChildValues<double, 4>(compoundPlug, value, defaultValue)) {
                             break;
                         }
-                        UpdateNumericTupleAttr<double, 4>(
-                            attrName, value, defaultValue, ignoreDefault, attrs);
+                        UpdateNumericTupleAttr<double, 4>(attrName, value, attrs);
                     }
                 } break;
                 default:
@@ -1459,56 +1588,34 @@ void GetExtensionAndDynamicAttributesFromNode(
                 switch (numericAttr.unitType()) {
                 case MFnNumericData::kBoolean: {
                     auto value = attrPlug.asBool();
-                    bool defaultVal = false;
-                    numericAttr.getDefault(defaultVal);
-                    UpdateAttrs<bool>(attrName, value, defaultVal, attrs);
+                    UpdateAttrs<bool>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::kByte:
                 case MFnNumericData::kChar: {
                     auto value = static_cast<int>(attrPlug.asChar());
-                    char defaultVal = 0;
-                    numericAttr.getDefault(defaultVal);
-                    UpdateAttrs<int>(attrName, value, static_cast<int>(defaultVal), attrs);
+                    UpdateAttrs<int>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::kShort: {
                     auto  value = attrPlug.asShort();
-                    // Maya has no default value as a short, so use an int and cast it later into a
-                    // short
-                    int defaultVal = 0;
-                    numericAttr.getDefault(defaultVal);
-                    UpdateAttrs<short>(
-                        attrName,
-                        value,
-                        static_cast<short>(defaultVal),
-                        attrs);
+                    UpdateAttrs<short>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::kInt: {
                     auto value = attrPlug.asInt();
-                    int  defaultVal = 0;
-                    numericAttr.getDefault(defaultVal);
-                    UpdateAttrs<int>(attrName, value, defaultVal, attrs);
+                    UpdateAttrs<int>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::kFloat: {
                     auto  value = attrPlug.asFloat();
-                    float defaultVal = 0.0f;
-                    numericAttr.getDefault(defaultVal);
-                    UpdateAttrs<float>(attrName, value, defaultVal, attrs);
+                    UpdateAttrs<float>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::kDouble: {
                     auto   value = attrPlug.asDouble();
-                    double defaultVal = 0.0;
-                    numericAttr.getDefault(defaultVal);
-                    UpdateAttrs<double>(attrName, value, defaultVal, attrs);
+                    UpdateAttrs<double>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::kInt64: {
                     MInt64 value = attrPlug.asInt64();
-                    MInt64 defaultVal = 0;
-                    numericAttr.getDefault(defaultVal);
                     UpdateAttrsValue(
                         attrName,
                         VtValue(value),
-                        VtValue(defaultVal),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnNumericData::kAddr: {
@@ -1527,8 +1634,6 @@ void GetExtensionAndDynamicAttributesFromNode(
                     UpdateAttrsValue(
                         attrName,
                         VtValue(value),
-                        VtValue(defaultVal),
-                        !ignoreDefault,
                         attrs);
                 } break;
                 case MFnNumericData::k2Short: {
@@ -1537,10 +1642,7 @@ void GetExtensionAndDynamicAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes01, value)) {
                         break;
                     }
-                    std::array<short, 2> defaultValue = {{ 0, 0 }};
-                    NumericDefaultExtractor<short, 2>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<short, 2>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<short, 2>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k3Short: {
                     std::array<short, 3> value = {{ 0, 0, 0 }};
@@ -1548,10 +1650,7 @@ void GetExtensionAndDynamicAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes012, value)) {
                         break;
                     }
-                    std::array<short, 3> defaultValue = {{ 0, 0, 0 }};
-                    NumericDefaultExtractor<short, 3>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<short, 3>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<short, 3>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k2Int: {
                     std::array<int, 2> value = {{ 0, 0 }};
@@ -1559,10 +1658,7 @@ void GetExtensionAndDynamicAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes01, value)) {
                         break;
                     }
-                    std::array<int, 2> defaultValue = {{ 0, 0 }};
-                    NumericDefaultExtractor<int, 2>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<int, 2>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<int, 2>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k3Int: {
                     std::array<int, 3> value = {{ 0, 0, 0 }};
@@ -1570,10 +1666,7 @@ void GetExtensionAndDynamicAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes012, value)) {
                         break;
                     }
-                    std::array<int, 3> defaultValue = {{ 0, 0, 0 }};
-                    NumericDefaultExtractor<int, 3>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<int, 3>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<int, 3>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k2Float: {
                     std::array<float, 2> value = {{ 0.0f, 0.0f }};
@@ -1581,10 +1674,7 @@ void GetExtensionAndDynamicAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes01, value)) {
                         break;
                     }
-                    std::array<float, 2> defaultValue = {{ 0.0f, 0.0f }};
-                    NumericDefaultExtractor<float, 2>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<float, 2>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<float, 2>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k3Float: {
                     std::array<float, 3> value = {{ 0.0f, 0.0f, 0.0f }};
@@ -1592,10 +1682,7 @@ void GetExtensionAndDynamicAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes012, value)) {
                         break;
                     }
-                    std::array<float, 3> defaultValue = {{ 0.0f, 0.0f, 0.0f }};
-                    NumericDefaultExtractor<float, 3>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<float, 3>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<float, 3>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k2Double: {
                     std::array<double, 2> value = {{ 0.0, 0.0 }};
@@ -1603,10 +1690,7 @@ void GetExtensionAndDynamicAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes01, value)) {
                         break;
                     }
-                    std::array<double, 2> defaultValue = {{ 0.0, 0.0 }};
-                    NumericDefaultExtractor<double, 2>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<double, 2>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<double, 2>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k3Double: {
                     std::array<double, 3> value = {{ 0.0, 0.0, 0.0 }};
@@ -1614,10 +1698,7 @@ void GetExtensionAndDynamicAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixes012, value)) {
                         break;
                     }
-                    std::array<double, 3> defaultValue = {{ 0.0, 0.0, 0.0 }};
-                    NumericDefaultExtractor<double, 3>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<double, 3>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<double, 3>(attrName, value, attrs);
                 } break;
                 case MFnNumericData::k4Double: {
                     std::array<double, 4> value = {{ 0.0, 0.0, 0.0, 0.0 }};
@@ -1625,10 +1706,7 @@ void GetExtensionAndDynamicAttributesFromNode(
                             attrPlug, nodeFn, attrFn, kNumericSuffixesXYZW, value)) {
                         break;
                     }
-                    std::array<double, 4> defaultValue = {{ 0.0, 0.0, 0.0, 0.0 }};
-                    NumericDefaultExtractor<double, 4>::Get(numericAttr, defaultValue);
-                    UpdateNumericTupleAttr<double, 4>(
-                        attrName, value, defaultValue, ignoreDefault, attrs);
+                    UpdateNumericTupleAttr<double, 4>(attrName, value, attrs);
                 } break;
                 default:
                     // TODO: Add more types if necessary
@@ -1683,8 +1761,6 @@ void GetExtensionAndDynamicAttributesFromNode(
                 UpdateAttrsValue(
                     attrName,
                     VtValue(value),
-                    VtValue(defaultVal),
-                    !ignoreDefault,
                     attrs);
             } break;
             case MFn::kMatrixAttribute: {
@@ -1711,16 +1787,9 @@ void GetExtensionAndDynamicAttributesFromNode(
 
                 GfMatrix4d value = GetGfMatrixFromMaya(matrixData.matrix(&matrixStatus));
 
-                MFnMatrixAttribute matrixAttr(attrObj);
-                MMatrix            defaultMatrix;
-                matrixAttr.getDefault(defaultMatrix);
-                GfMatrix4d defaultVal = GetGfMatrixFromMaya(defaultMatrix);
-
                 UpdateAttrsValue(
                     attrName,
                     VtValue(value),
-                    VtValue(defaultVal),
-                    !ignoreDefault,
                     attrs);
             } break;
             default:
@@ -1732,7 +1801,6 @@ void GetExtensionAndDynamicAttributesFromNode(
                         attrObj.apiType());
                 break;
             }
-        }
     }
 }
 } // namespace MAYAHYDRA_NS_DEF

@@ -14,6 +14,7 @@
 // limitations under the License.
 //
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
+#include <mayaHydraLib/adapters/meshAdapterTestUtils.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/shapeAdapter.h>
@@ -22,6 +23,7 @@
 
 #include <pxr/base/gf/interval.h>
 #include <pxr/base/tf/type.h>
+#include <pxr/imaging/hd/changeTracker.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/pxOsd/tokens.h>
 #include <pxr/pxr.h>
@@ -29,6 +31,7 @@
 
 #include <maya/MCallbackIdArray.h>
 #include <maya/MFloatArray.h>
+#include <maya/MFnAttribute.h>
 #include <maya/MFnMesh.h>
 #include <maya/MIntArray.h>
 #include <maya/MItMeshPolygon.h>
@@ -36,6 +39,30 @@
 #include <maya/MObjectHandle.h>
 #include <maya/MPlug.h>
 #include <maya/MPolyMessage.h>
+
+#include <string>
+#include <unordered_set>
+
+namespace MAYAHYDRA_NS_DEF {
+
+namespace {
+
+// Attributes handled by NodeDirtiedCallback or specially in AttributeChangedCallback.
+// When these change, we avoid duplicate primvar dirty by returning false from
+// ShouldMarkPrimvarDirtyForAttributeChange.
+static const char* const kMeshParamAttributeNames[] = {
+    "pnts", "inMesh", "worldMatrix", "doubleSided", "intermediateObject",
+    "uvPivot", "displaySmoothMesh", "smoothLevel", "instObjGroups"
+};
+
+} // namespace
+
+const std::unordered_set<std::string>& GetMeshParamAttributeNamesForTest()
+{
+    return PXR_NS::MayaHydraAdapter::GetParamAttributeSet(kMeshParamAttributeNames);
+}
+
+} // namespace MAYAHYDRA_NS_DEF
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -78,13 +105,16 @@ const std::pair<MObject&, HdDirtyBits> _dirtyBits[] {
 class MayaHydraMeshAdapter : public MayaHydraShapeAdapter
 {
 public:
+    /// Create a mesh adapter for the given DAG path.
     MayaHydraMeshAdapter(MayaHydraSceneIndex* mayaHydraSceneIndex, const MDagPath& dag)
         : MayaHydraShapeAdapter(mayaHydraSceneIndex->GetPrimPath(dag, false), mayaHydraSceneIndex, dag)
     {
     }
 
+    /// Destroy the mesh adapter.
     ~MayaHydraMeshAdapter() = default;
 
+    /// Insert the mesh prim into the scene index.
     void Populate() override
     {
         if (_isPopulated) {
@@ -94,8 +124,10 @@ public:
         _isPopulated = true;
     }
 
+    /// Track callbacks that require special removal handling.
     void AddBuggyCallback(MCallbackId id) { _buggyCallbacks.append(id); }
 
+    /// Register Maya callbacks for mesh changes.
     void CreateCallbacks() override
     {
         MStatus status;
@@ -134,6 +166,7 @@ public:
     }
 
     MAYAHYDRALIB_API
+    /// Remove registered callbacks, including buggy poly callbacks.
     void RemoveCallbacks() override
     {
         if (_buggyCallbacks.length() > 0) {
@@ -147,11 +180,13 @@ public:
         MayaHydraAdapter::RemoveCallbacks();
     }
 
+    /// Return whether mesh prims are supported by the render index.
     bool IsSupported() const override
     {
         return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->mesh);
     }
 
+    /// Return face-varying UVs as a primvar value.
     VtValue GetUVs()
     {
         MStatus status;
@@ -182,6 +217,7 @@ public:
         return VtValue(uvs);
     }
 
+    /// Return face-varying tangents as a primvar value.
     VtValue GetTangents()
     {
         MStatus status;
@@ -209,6 +245,7 @@ public:
         return VtValue(ret);
     }
 
+    /// Return vertex positions as a primvar value.
     VtValue GetPoints()
     {
         MStatus status;
@@ -226,6 +263,7 @@ public:
         return VtValue(ret);
     }
 
+    /// Return vertex normals as a primvar value.
     VtValue GetNormals()
     {
         MStatus status;
@@ -244,6 +282,7 @@ public:
         return VtValue(ret);
     }
 
+    /// Return a value for the requested Hydra data source key.
     VtValue Get(const TfToken& key) override
     {
         TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
@@ -272,6 +311,7 @@ public:
         return MayaHydraShapeAdapter::Get(key);
     }
 
+    /// Sample time-varying primvars for the given key.
     size_t SamplePrimvar(const TfToken& key, size_t maxSampleCount, float* times, VtValue* samples)
         override
     {
@@ -304,6 +344,7 @@ public:
         return 0;
     }
 
+    /// Build the mesh topology from the Maya mesh.
     HdMeshTopology GetMeshTopology() override
     {
         MFnMesh    mesh(GetDagPath());
@@ -336,6 +377,7 @@ public:
             faceVertexIndices);
     }
 
+    /// Return display style based on smooth mesh settings.
     HdDisplayStyle GetDisplayStyle() override
     {
         MStatus           status;
@@ -353,6 +395,7 @@ public:
         return { smoothLevel, false, false };
     }
 
+    /// Return subdivision tags (creases/corners) for smooth meshes.
     PxOsdSubdivTags GetSubdivTags() override
     {
         PxOsdSubdivTags tags;
@@ -416,6 +459,7 @@ public:
         return tags;
     }
 
+    /// Return primvar descriptors for the requested interpolation.
     HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation) override
     {
         // Base descriptors
@@ -457,6 +501,7 @@ public:
         return descs;
     }
 
+    /// Return whether the mesh is double-sided.
     bool GetDoubleSided() const override
     {
         MFnMesh mesh(GetDagPath());
@@ -469,16 +514,42 @@ public:
         return doubleSided;
     }
 
+    /// Return whether this adapter matches the mesh Hydra type id.
     bool HasType(const TfToken& typeId) const override { return typeId == HdPrimTypeTokens->mesh; }
 
+    /// Return the render tag for mesh geometry.
     TfToken GetRenderTag() const override { return HdRenderTagTokens->geometry; }
 
+    /// Allow primvar dirtying for extension/dynamic mesh attributes.
+    bool ShouldMarkPrimvarDirtyForAttributeChange(const MPlug& plug) const override
+    {
+        // Always return true so AttributeChangedCallback marks primvars dirty. NodeDirtyPlugCallback
+        // may not fire when resetting to default, causing primvar removal to only appear after
+        // selecting away and back. Duplicate MarkDirty from NodeDirtiedCallback is idempotent.
+        TF_UNUSED(plug);
+        return true;
+    }
+
 private:
+    /// Handle node dirtied callbacks for mesh parameter changes.
     static void NodeDirtiedCallback(MObject& node, MPlug& plug, void* clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
+        MStatus status;
+        // For compound attrs (e.g. uvPivot), Maya fires once per child. Only process the first
+        // child to avoid duplicate dirty notifications.
+        if (plug.isChild()) {
+            MPlug firstChild = plug.parent().child(0, &status);
+            if (status && plug != firstChild) {
+                return;
+            }
+        }
+        MObject plugAttr = plug.isChild() ? plug.parent().attribute(&status) : plug.attribute(&status);
+        if (!status) {
+            return;
+        }
         for (const auto& it : _dirtyBits) {
-            if (it.first == plug) {
+            if (it.first == plugAttr) {
                 adapter->MarkDirty(it.second);
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_MESH_PLUG_DIRTY)
                     .Msg(
@@ -498,7 +569,7 @@ private:
                 plug.partialName().asChar());
     }
 
-    // For material assignments for now.
+    /// Handle attribute changes used for material assignments and primvar dirtying.
     static void AttributeChangedCallback(
         MNodeMessage::AttributeMessage msg,
         MPlug&                         plug,
@@ -517,10 +588,10 @@ private:
                     plug.name().asChar());
         }
 
-        // Handle extension attributes change
-        adapter->HandleExtensionAndDynamicAttributesDirty(plug);
+        adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
     }
 
+    /// Handle topology changes from the poly API callbacks.
     static void TopologyChangedCallback(MObject& node, void* clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
@@ -529,6 +600,7 @@ private:
             | HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyNormals);
     }
 
+    /// Handle component id changes from the poly API callbacks.
     static void ComponentIdChanged(MUintArray componentIds[], unsigned int count, void* clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
@@ -537,6 +609,7 @@ private:
             | HdChangeTracker::DirtyPoints);
     }
 
+    /// Handle UV set changes and mark primvars dirty.
     static void UVSetChangedCallback(
         MObject&                  node,
         const MString&            name,

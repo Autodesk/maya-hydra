@@ -28,18 +28,6 @@ using namespace MayaHydra;
 
 namespace {
 
-FindPrimPredicate getCameraPrimPredicate(const std::string& cameraName, const TfToken& primType)
-{
-    return [cameraName,
-            primType](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
-        if (primPath.GetAsString().find(cameraName) == std::string::npos) {
-            return false;
-        }
-        HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
-        return prim.primType == primType;
-    };
-}
-
 void VerifyCameraPrims(const std::string& prefix, size_t primCount)
 {
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
@@ -47,7 +35,7 @@ void VerifyCameraPrims(const std::string& prefix, size_t primCount)
     SceneIndexInspector inspector(sceneIndices.front());
 
     PrimEntriesVector cameraPrims
-        = inspector.FindPrims(getCameraPrimPredicate(prefix, HdPrimTypeTokens->camera));
+        = inspector.FindPrims(CreatePrimPredicate(prefix, HdPrimTypeTokens->camera));
     ASSERT_EQ(cameraPrims.size(), primCount);
     auto testCameraPrims = [cameraPrims]() -> void {
         for (PrimEntry cameraPrim : cameraPrims) {

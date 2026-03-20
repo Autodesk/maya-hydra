@@ -18,6 +18,8 @@
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/materialNetworkConverter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
+#include <mayaHydraLib/mayaUtils.h>
+#include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/tf/type.h>
@@ -26,6 +28,17 @@
 #include <maya/MFnAttribute.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+// Check if a plug maps to a parameter attribute name.
+bool MayaHydraAdapter::IsParamAttribute(const MPlug& plug, const std::unordered_set<std::string>& paramAttrs)
+{
+    MStatus      status;
+    MFnAttribute attrFn(plug.attribute(&status));
+    if (!status) {
+        return false;
+    }
+    return paramAttrs.count(attrFn.name().asChar()) != 0;
+}
 
 TF_REGISTRY_FUNCTION(TfType) { TfType::Define<MayaHydraAdapter>(); }
 
@@ -86,9 +99,10 @@ void MayaHydraAdapter::RemoveCallbacks()
     std::vector<MCallbackId>().swap(_callbacks);
 }
 
+// Retrieve the primvar value from the cached extension/dynamic attribute map.
 VtValue MayaHydraAdapter::Get(const TfToken& key)
 {
-    // Get extension attributes
+    // Get extension/dynamic attributes stored as primvars.
     auto it = _extAttrNameToValueMap.find(key.GetText());
     if (it != _extAttrNameToValueMap.end()) {
         return it->second;
@@ -102,6 +116,7 @@ bool MayaHydraAdapter::HasType(const TfToken& typeId) const
     return false;
 }
 
+// Register generic adapter callbacks (pre-remove and rename).
 void MayaHydraAdapter::CreateCallbacks()
 {
     if (_node != MObject::kNullObj) {
@@ -120,6 +135,7 @@ void MayaHydraAdapter::CreateCallbacks()
     }
 }
 
+// Initialize shared adapter state (Maya attribute tables, converters).
 MStatus MayaHydraAdapter::Initialize()
 {
     auto status = MayaAttrs::initialize();
@@ -129,9 +145,10 @@ MStatus MayaHydraAdapter::Initialize()
     return status;
 }
 
+// Build primvar descriptors from the cached extension/dynamic attribute map.
 HdPrimvarDescriptorVector MayaHydraAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
 {
-    // All extension attributes as custom primvars
+    // All extension/dynamic attributes as custom primvars.
     if (interpolation == HdInterpolationConstant) {
         if (_extAttrMapNeedUpdate) {
             // Apply a global lock to avoid race condition while doing parallel DG node evaluation.
@@ -151,6 +168,7 @@ HdPrimvarDescriptorVector MayaHydraAdapter::GetPrimvarDescriptors(HdInterpolatio
     return HdPrimvarDescriptorVector();
 }
 
+// Classify a plug's attribute as extension/dynamic (plugin-defined or user addAttr).
 bool MayaHydraAdapter::IsExtensionOrDynamicAttribute(const MPlug& plug)
 {
     MStatus status;
@@ -162,9 +180,26 @@ bool MayaHydraAdapter::IsExtensionOrDynamicAttribute(const MPlug& plug)
     return fnAttr.isExtension() || fnAttr.isDynamic();
 }
 
-// Extension attributes are defined on node types (often by plugins). Dynamic attributes
-// are user-authored per-node (e.g., via addAttr) and are not part of the type definition.
-void MayaHydraAdapter::HandleExtensionAndDynamicAttributesDirty(const MPlug& plug)
+// Normalize the plug, filter non extension/dynamic attrs, then mark primvars dirty if allowed.
+void MayaHydraAdapter::MaybeMarkPrimvarDirtyForAttributeChange(const MPlug& plug)
+{
+    // Trace to top-level plug: when a compound/array element's child changes
+    // (e.g. aiLookAt[0].child(0)), Maya may only fire for the child. We must
+    // still mark primvars dirty so the scene browser refreshes when resetting
+    // to default (primvar removal). Duplicate MarkDirty calls are idempotent.
+    MPlug topPlug = MayaHydra::GetTopPlug(plug);
+    if (!IsExtensionOrDynamicAttribute(topPlug)) {
+        return;
+    }
+    if (ShouldMarkPrimvarDirtyForAttributeChange(topPlug)) {
+        MarkPrimvarDirtyForAttributeChange(topPlug);
+    }
+}
+
+// Marks primvars dirty when an attribute changes that affects primvar data. This includes:
+// extension attributes (plugin-defined on node types) and dynamic attributes (user addAttr).
+// Mark primvars dirty for an extension/dynamic attribute change and coalesce extra bits.
+void MayaHydraAdapter::MarkPrimvarDirtyForAttributeChange(const MPlug& plug)
 {
     MStatus status;
     MObject attrObj = plug.attribute(&status);
@@ -172,12 +207,11 @@ void MayaHydraAdapter::HandleExtensionAndDynamicAttributesDirty(const MPlug& plu
         MFnAttribute fnAttr(attrObj);
         if (fnAttr.isExtension() || fnAttr.isDynamic()) {
             _extAttrMapNeedUpdate = true;
-            // Notify the change tracker that the primvars have changed.
-            // Note there's no fine grained dirty notification mechanism on primvars yet,
-            // like dirty flags for adding/removing/changing a specific primvar, only
-            // DirtyPrimvar for all changes. Currently, no performance bottleneck was spotted
-            // around this. This could be improved if a more fine grained mechanism is provided.
-            MarkDirty(HdChangeTracker::DirtyPrimvar);
+            // Notify the change tracker. Include extra bits from subclass (e.g. light param attrs
+            // need DirtyParams|DirtyShadowParams) to consolidate into one MarkDirty and avoid
+            // redundant scene index notifications.
+            MarkDirty(
+                HdChangeTracker::DirtyPrimvar | GetConsolidatedDirtyBitsForPrimvarAttributeChange(plug));
         }
     }
 }
