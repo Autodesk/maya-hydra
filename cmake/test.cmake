@@ -227,6 +227,20 @@ import os\\n\
 import sys\\n\
 import time\\n\
 import traceback\\n\
+_usd_env_keys = [\\n\
+    \\\"PXR_USD_LOCATION\\\",\\n\
+    \\\"USD_INSTALL_LOCATION\\\",\\n\
+    \\\"PXR_PLUGINPATH_NAME\\\",\\n\
+    \\\"MAYA_PXR_PLUGINPATH_NAME\\\",\\n\
+    \\\"PXR_OVERRIDE_PLUGINPATH_NAME\\\",\\n\
+    \\\"LD_LIBRARY_PATH\\\",\\n\
+    \\\"DYLD_LIBRARY_PATH\\\",\\n\
+    \\\"RMANTREE\\\",\\n\
+    \\\"PRMAN_DELEGATE_PLUGIN_PATH\\\",\\n\
+]\\n\
+_usd_env_parts = [\\\"{}={}\\\".format(k, os.environ.get(k, \\\"\\\")) for k in _usd_env_keys]\\n\
+sys.__stdout__.write(\\\"USD env: {}\\\\n\\\".format(\\\" | \\\".join(_usd_env_parts)))\\n\
+sys.__stdout__.flush()\\n\
 file = ${QUOTE}${PREFIX_PYTHON_SCRIPT}${QUOTE}\\n\
 if not os.path.isabs(file):\\n\
     file = os.path.join(${QUOTE}${CMAKE_CURRENT_SOURCE_DIR}${QUOTE}, file)\\n\
