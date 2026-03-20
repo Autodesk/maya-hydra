@@ -385,8 +385,18 @@ finally:
         endif()
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH 
              "${MAYAUSD_LOCATION}/lib/python")
-        list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-             "${MAYAUSD_LOCATION}/lib/usd")
+        # USD plugin paths:
+        # - Prefer PXR_USD_LOCATION (OpenUSD) on all platforms to keep results consistent.
+        # - Fall back to MayaUSD's lib/usd only when OpenUSD is unavailable.
+        if(DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
+            list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                 "${PXR_USD_LOCATION}/lib/usd")
+            message(STATUS "Using OpenUSD plugin path from PXR_USD_LOCATION.")
+        else()
+            list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                 "${MAYAUSD_LOCATION}/lib/usd")
+            message(STATUS "Using MayaUSD lib/usd plugin path (PXR_USD_LOCATION not available).")
+        endif()
         list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
              "${MAYAUSD_LOCATION}/plugin/adsk/plugin")
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH

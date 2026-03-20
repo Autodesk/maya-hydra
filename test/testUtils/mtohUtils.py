@@ -49,6 +49,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
 
     #The OpenUSD version
     _usdVersion = None
+    _usdEnvLogged = False
 
     # Unloading mayaHydraFlowViewportAPILocator crashes Maya (HYDRA-1304).
     # Unloading mtoa succeeds on Linux, but fails on Windows and macOS
@@ -94,8 +95,38 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                 cls._pluginsToUnload.append(p)
                 cmds.loadPlugin(p, quiet=True)
 
-        #Set the usd version
+        # Set the usd version
         cls._usdVersion = Usd.GetVersion()
+        cls._logUsdEnvironment()
+
+    @classmethod
+    def _logUsdEnvironment(cls):
+        """Log USD-related environment details for debugging."""
+        if cls._usdEnvLogged:
+            return
+        cls._usdEnvLogged = True
+        keys = [
+            "PXR_USD_LOCATION",
+            "USD_INSTALL_LOCATION",
+            "PXR_PLUGINPATH_NAME",
+            "MAYA_PXR_PLUGINPATH_NAME",
+            "PXR_OVERRIDE_PLUGINPATH_NAME",
+            "LD_LIBRARY_PATH",
+            "DYLD_LIBRARY_PATH",
+            "RMANTREE",
+            "PRMAN_DELEGATE_PLUGIN_PATH",
+        ]
+        env_parts = []
+        for key in keys:
+            env_parts.append("{}={}".format(key, os.environ.get(key, "")))
+        sys.__stdout__.write("USD env: {}\n".format(" | ".join(env_parts)))
+        sys.__stdout__.write("USD version: {}\n".format(cls._usdVersion))
+        try:
+            plugin_path = cmds.pluginInfo(MAYAUSD_PLUGIN_NAME, q=True, path=True)
+            sys.__stdout__.write("mayaUsdPlugin path: {}\n".format(plugin_path))
+        except Exception as e:
+            sys.__stdout__.write("mayaUsdPlugin path: (unavailable) {}\n".format(e))
+        sys.__stdout__.flush()
         
     def setUp(self):
         # Enable Maya Script Editor history capture for all tests (dumped on image failure).
