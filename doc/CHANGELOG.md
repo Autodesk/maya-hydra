@@ -1,5 +1,70 @@
 # Changelog
 
+## [v0.8.0] - 2026-02-10
+
+**Features:**
+* Integrated Hydra Viewport Toolbox in MayaHydra [#320](https://github.com/Autodesk/maya-hydra/pull/320)
+* Implementation to translate custom Maya attributes to Hydra [#323](https://github.com/Autodesk/maya-hydra/pull/323)
+* Display purpose filtering for selection highlighting [#343](https://github.com/Autodesk/maya-hydra/pull/343)
+* Allow only one AOV to be visualized [#353](https://github.com/Autodesk/maya-hydra/pull/353)
+* Fixed logic, added proper initialization, and added OpenPBR support [#350](https://github.com/Autodesk/maya-hydra/pull/350)
+* Allow passing image writer object to image write method [#362](https://github.com/Autodesk/maya-hydra/pull/362)
+
+**Performance:**
+* Minimize shader compilations for selection highlights [#328](https://github.com/Autodesk/maya-hydra/pull/328)
+* Improve pass filtering scene index [#341](https://github.com/Autodesk/maya-hydra/pull/341)
+
+**Bugfix:**
+* Fix render purpose when using HVT [#324](https://github.com/Autodesk/maya-hydra/pull/324)
+* Fix z-fighting for selection highlighting [#330](https://github.com/Autodesk/maya-hydra/pull/330)
+* Fix the viewport constantly refreshing when using HVT [#331](https://github.com/Autodesk/maya-hydra/pull/331)
+* Sanitize render region to avoid crash for some renderers (e.g., HdPrman-26) [#333](https://github.com/Autodesk/maya-hydra/pull/333)
+* Fix picking crash on instance with guide purpose [#335](https://github.com/Autodesk/maya-hydra/pull/335)
+* Prevent crashes in multi-viewport mode [#337](https://github.com/Autodesk/maya-hydra/pull/337)
+* Remove shadows for non simple and distant lights [#339](https://github.com/Autodesk/maya-hydra/pull/339)
+* Prim filtering must not change Hydra selection [#347](https://github.com/Autodesk/maya-hydra/pull/347)
+* Fix MSAA with 2 passes [#349](https://github.com/Autodesk/maya-hydra/pull/349)
+* Fix Maya lights crash when using HdArnold [#352](https://github.com/Autodesk/maya-hydra/pull/352)
+* Fix AOV sharing crash [#345](https://github.com/Autodesk/maya-hydra/pull/345)
+* Sync HVT with depth AOV sharing fix [#357](https://github.com/Autodesk/maya-hydra/pull/357)
+* Bring fixes from POC branch [#360](https://github.com/Autodesk/maya-hydra/pull/360)
+* Fix camera parameter translations and simplify code [#302](https://github.com/Autodesk/maya-hydra/pull/302)
+* Fix depth peeling with USD data [#370](https://github.com/Autodesk/maya-hydra/pull/370)
+* Added null check to prevent crashes when an "instance" or "prototype" prim has no matrices [#319](https://github.com/Autodesk/maya-hydra/pull/319)
+* Point lights don't cast shadows with Storm [#327](https://github.com/Autodesk/maya-hydra/pull/327)
+
+**Build:**
+* Remove gulrak [#318](https://github.com/Autodesk/maya-hydra/pull/318)
+* Update to USD 25.08 for Maya PR using Python 3.13 [#317](https://github.com/Autodesk/maya-hydra/pull/317)
+* Work around a bug in Maya PR or in MayaUsd with USD 25.08 and Python 3.13 [#322](https://github.com/Autodesk/maya-hydra/pull/322)
+* MSVC 14.3 fixes (adding `<optional>` includes) [#254](https://github.com/Autodesk/maya-hydra/pull/254)
+* Replaced `pxr::` namespace with `PXR_NS::` [#338](https://github.com/Autodesk/maya-hydra/pull/338)
+* Fix configure step failing after clean build [#351](https://github.com/Autodesk/maya-hydra/pull/351)
+* Fix compiler error [#354](https://github.com/Autodesk/maya-hydra/pull/354)
+* Fix 2 build errors for USD 25.11 [#361](https://github.com/Autodesk/maya-hydra/pull/361)
+* Fix compiler error when building against USD v25.11 [#363](https://github.com/Autodesk/maya-hydra/pull/363)
+* Sync HVT to latest main [#364](https://github.com/Autodesk/maya-hydra/pull/364)
+* Fix local compilation with Visual Studio as the generator [#369](https://github.com/Autodesk/maya-hydra/pull/369)
+* Fix typo and surplus include [#321](https://github.com/Autodesk/maya-hydra/pull/321)
+* Split MayaHydraSceneIndex viewport features into separate scene index [#359](https://github.com/Autodesk/maya-hydra/pull/359)
+* Flow Viewport Toolkit viewport "dependency" removal [#358](https://github.com/Autodesk/maya-hydra/pull/358)
+
+**Documentation:**
+* Add the limitation for DX11 [#356](https://github.com/Autodesk/maya-hydra/pull/356)
+* Remove any reference to Maya 2025 and update a few things in the doc [#367](https://github.com/Autodesk/maya-hydra/pull/367)
+* Update build.md USD link [#371](https://github.com/Autodesk/maya-hydra/pull/371)
+* Update selection docs [#373](https://github.com/Autodesk/maya-hydra/pull/373)
+* Update build.md with comment on using Visual Studio [#374](https://github.com/Autodesk/maya-hydra/pull/374)
+* Update docs for HVT [#372](https://github.com/Autodesk/maya-hydra/pull/372)
+
+**Tests:**
+* Update test comment and image for point instance highlighting [#344](https://github.com/Autodesk/maya-hydra/pull/344)
+* Moved environment setting into CMake test function [#326](https://github.com/Autodesk/maya-hydra/pull/326)
+* Add unit test to check for rendering convergence with Storm [#332](https://github.com/Autodesk/maya-hydra/pull/332)
+* Most tests don't depend on VP2 [#334](https://github.com/Autodesk/maya-hydra/pull/334)
+* Added unit test for camera delete [#336](https://github.com/Autodesk/maya-hydra/pull/336)
+* Update tests to adapt to USD 25.11 [#365](https://github.com/Autodesk/maya-hydra/pull/365)
+
 ## [v0.7.3] - 2025-10-01
 
 **Added:**
