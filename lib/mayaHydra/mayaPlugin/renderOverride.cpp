@@ -1776,6 +1776,14 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 
         _lastFilteringSceneIndexBeforeCustomFiltering = _piPrototypeWhSi = Fvp::PiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _piPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+        
+        _lastFilteringSceneIndexBeforeCustomFiltering = _generativeProceduralWhSi = Fvp::GenerativeProceduralWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+        _generativeProceduralWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+
+        _generativeProceduralWhSi->SetTerminalSceneIndexGetter([this]() -> HdSceneIndexBaseRefPtr {
+            auto* ri = renderIndex();
+            return ri ? ri->GetTerminalSceneIndex() : nullptr;
+        });
     }
 
     TF_AXIOM(_mayaViewportSceneIndex);

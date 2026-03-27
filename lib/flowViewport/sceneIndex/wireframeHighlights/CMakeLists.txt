@@ -10,6 +10,7 @@ target_sources(${TARGET_NAME}
     fvpNiPrototypeWhSi.cpp
     fvpPiInstancerWhSi.cpp
     fvpPiPrototypeWhSi.cpp
+    fvpGenerativeProceduralWhSi.cpp
 )
 
 set(HEADERS
@@ -20,6 +21,7 @@ set(HEADERS
     fvpNiPrototypeWhSi.h
     fvpPiInstancerWhSi.h
     fvpPiPrototypeWhSi.h
+    fvpGenerativeProceduralWhSi.h
 )
 
 # -----------------------------------------------------------------------------

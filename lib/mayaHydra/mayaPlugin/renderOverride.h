@@ -60,6 +60,7 @@
 #include <flowViewport/sceneIndex/wireframeHighlights/fvpNiPrototypeWhSi.h>
 #include <flowViewport/sceneIndex/wireframeHighlights/fvpPiInstancerWhSi.h>
 #include <flowViewport/sceneIndex/wireframeHighlights/fvpPiPrototypeWhSi.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpGenerativeProceduralWhSi.h>
 #include <flowViewport/sceneIndex/fvpLightsManagementSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPurposeFilteringSceneIndex.h>
@@ -216,6 +217,7 @@ private:
 
     void              _SetRenderPurposeTags(const MayaHydraParams& delegateParams);
     void _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
+    void _CreateSelectionHighlightsSceneIndices();
     HdSceneIndexBaseRefPtr _CreatePassFilteringSceneIndex(Fvp::FramePassDataPtr& filteringData);
     VtValue _GetUsedGPUMemory() const;
 
@@ -343,6 +345,7 @@ private:
     Fvp::NiPrototypeWhSiRefPtr                _niPrototypeWhSi;
     Fvp::PiInstancerWhSiRefPtr                _piInstancerWhSi;
     Fvp::PiPrototypeWhSiRefPtr                _piPrototypeWhSi;
+    Fvp::GenerativeProceduralWhSiRefPtr       _generativeProceduralWhSi;
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     Fvp::PurposeFilteringSceneIndexRefPtr     _purposeFilteringSceneIndex;
