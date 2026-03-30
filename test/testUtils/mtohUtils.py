@@ -126,6 +126,41 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             sys.__stdout__.write("mayaUsdPlugin path: {}\n".format(plugin_path))
         except Exception as e:
             sys.__stdout__.write("mayaUsdPlugin path: (unavailable) {}\n".format(e))
+        try:
+            if platform.system() == "Darwin":
+                def _print_rpaths(label, path):
+                    if not path or not os.path.isfile(path):
+                        sys.__stdout__.write("{} rpath: (missing) {}\n".format(label, path))
+                        return
+                    try:
+                        output = subprocess.check_output(
+                            ["otool", "-l", path],
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                        )
+                        lines = []
+                        capture = False
+                        for line in output.splitlines():
+                            if "cmd LC_RPATH" in line:
+                                capture = True
+                                lines.append(line.strip())
+                            elif capture and "path " in line:
+                                lines.append(line.strip())
+                                capture = False
+                        sys.__stdout__.write("{} rpath:\n".format(label))
+                        for ln in lines:
+                            sys.__stdout__.write("  {}\n".format(ln))
+                    except Exception as err:
+                        sys.__stdout__.write("{} rpath: (error) {}\n".format(label, err))
+
+                _print_rpaths("mayaUsdPlugin", plugin_path)
+                try:
+                    mtoa_path = cmds.pluginInfo("mtoa", q=True, path=True)
+                    _print_rpaths("mtoa", mtoa_path)
+                except Exception:
+                    pass
+        except Exception as e:
+            sys.__stdout__.write("rpath dump failed: {}\n".format(e))
         sys.__stdout__.flush()
         
     def setUp(self):

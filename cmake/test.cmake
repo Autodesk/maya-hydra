@@ -745,8 +745,13 @@ finally:
             "LC_ALL=en_US.UTF-8"
             "LANG=en_US.UTF-8")
         # Necessary for tests like DiffCore to find python
-        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-            "DYLD_LIBRARY_PATH=${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
+        if(DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib")
+            set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+                "DYLD_LIBRARY_PATH=${PXR_USD_LOCATION}/lib:${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
+        else()
+            set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+                "DYLD_LIBRARY_PATH=${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
+        endif()
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
             "DYLD_FRAMEWORK_PATH=${MAYA_LOCATION}/Maya.app/Contents/Frameworks")
     endif()
