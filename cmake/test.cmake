@@ -18,9 +18,20 @@ if(MayaUsd_FOUND)
         #MAYAUSDAPI_LIBRARY is the full path name of the maya USD API shared library, so get only its directory into MAYAUSDAPI_LIBRARY_PATH
         get_filename_component(MAYAUSDAPI_LIBRARY_PATH "${MAYAUSDAPI_LIBRARY}" DIRECTORY)
 
-        #So add MAYAUSDAPI_LIBRARY_PATH to the ADDITIONAL_LD_LIBRARY_PATH which is used to run the tests
+        # So add OpenUSD lib paths (if available) then MAYAUSDAPI_LIBRARY_PATH
+        # to the ADDITIONAL_LD_LIBRARY_PATH which is used to run the tests.
+        # OpenUSD should be found first to avoid loading multiple USD copies.
         set(CURRENT_ADDITIONAL_LD_LIBRARY_PATH $ENV{ADDITIONAL_LD_LIBRARY_PATH})
-        set(ADDITIONAL_LD_LIBRARY_PATH "${CURRENT_ADDITIONAL_LD_LIBRARY_PATH}:${MAYAUSDAPI_LIBRARY_PATH}")
+        set(ADDITIONAL_LD_LIBRARY_PATH "${CURRENT_ADDITIONAL_LD_LIBRARY_PATH}")
+        if(DEFINED PXR_USD_LOCATION)
+            if(EXISTS "${PXR_USD_LOCATION}/lib")
+                set(ADDITIONAL_LD_LIBRARY_PATH "${ADDITIONAL_LD_LIBRARY_PATH}:${PXR_USD_LOCATION}/lib")
+            endif()
+            if(EXISTS "${PXR_USD_LOCATION}/lib64")
+                set(ADDITIONAL_LD_LIBRARY_PATH "${ADDITIONAL_LD_LIBRARY_PATH}:${PXR_USD_LOCATION}/lib64")
+            endif()
+        endif()
+        set(ADDITIONAL_LD_LIBRARY_PATH "${ADDITIONAL_LD_LIBRARY_PATH}:${MAYAUSDAPI_LIBRARY_PATH}")
         # Export the new value to the environment
         set(ENV{ADDITIONAL_LD_LIBRARY_PATH} ${ADDITIONAL_LD_LIBRARY_PATH})
         message(STATUS "ADDITIONAL_LD_LIBRARY_PATH is now : ${ADDITIONAL_LD_LIBRARY_PATH}")
@@ -605,6 +616,10 @@ finally:
     else()
         set(USD_INSTALL_LOCATION ${PXR_USD_LOCATION})
     endif()
+    # Export OpenUSD location for runtime debugging and plugin discovery.
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "PXR_USD_LOCATION=${USD_INSTALL_LOCATION}"
+        "USD_INSTALL_LOCATION=${USD_INSTALL_LOCATION}")
     # Inherit any existing PYTHONPATH, but keep it at the end.
     list(APPEND MAYAUSD_VARNAME_PYTHONPATH
         "${USD_INSTALL_LOCATION}/lib/python")
