@@ -431,29 +431,24 @@ finally:
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH 
              "${MAYAUSD_LOCATION}/lib/python")
         # USD plugin paths:
-        # - Prefer PXR_USD_LOCATION (OpenUSD) on all platforms to keep results consistent.
-        # - Add MayaUSD's AdskAssetResolver plugin path when present (needed on Linux/OSX).
-        # - Fall back to MayaUSD's lib/usd only when OpenUSD is unavailable.
+        # - Always add PXR_USD_LOCATION first so its plugins take priority.
+        # - Always add MAYAUSD_LOCATION/lib/usd second so MayaUSD-specific plugins
+        #   (e.g. AdskAssetResolver) are discovered. Duplicate type registrations
+        #   from standard OpenUSD plugins are harmless warnings since MayaUSD is
+        #   built against the same OpenUSD. The TfType redefinition errors that
+        #   prompted the original exclusion were caused by the PRMan artifact's
+        #   separate OpenUSD build, which is already filtered out on non-Windows.
         if(DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
             list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                  "${PXR_USD_LOCATION}/lib/usd")
-            message(STATUS "Using OpenUSD plugin path from PXR_USD_LOCATION.")
-        else()
+            message(STATUS "Using OpenUSD plugin path from PXR_USD_LOCATION: ${PXR_USD_LOCATION}/lib/usd")
+        endif()
+        if(EXISTS "${MAYAUSD_LOCATION}/lib/usd")
             list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                  "${MAYAUSD_LOCATION}/lib/usd")
-            message(STATUS "Using MayaUSD lib/usd plugin path (PXR_USD_LOCATION not available).")
-        endif()
-
-        set(_mayausd_adsk_resolver_dir "")
-        if(EXISTS "${MAYAUSD_LOCATION}/lib/usd/ar/plugInfo.json")
-            set(_mayausd_adsk_resolver_dir "${MAYAUSD_LOCATION}/lib/usd/ar")
-        elseif(EXISTS "${MAYAUSD_LOCATION}/lib/usd/Ar/plugInfo.json")
-            set(_mayausd_adsk_resolver_dir "${MAYAUSD_LOCATION}/lib/usd/Ar")
-        endif()
-        if(_mayausd_adsk_resolver_dir)
-            list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-                 "${_mayausd_adsk_resolver_dir}")
-            message(STATUS "Adding MayaUSD AdskAssetResolver plugin path: ${_mayausd_adsk_resolver_dir}")
+            message(STATUS "Adding MayaUSD plugin path: ${MAYAUSD_LOCATION}/lib/usd")
+        else()
+            message(STATUS "MayaUSD lib/usd not found at: ${MAYAUSD_LOCATION}/lib/usd")
         endif()
         list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
              "${MAYAUSD_LOCATION}/plugin/adsk/plugin")
