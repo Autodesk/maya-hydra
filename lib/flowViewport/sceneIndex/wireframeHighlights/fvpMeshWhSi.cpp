@@ -16,6 +16,8 @@
 #include "fvpMeshWhSi.h"
 #include <flowViewport/tokens.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
+#include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
+#include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/tokens.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -39,6 +41,21 @@ HdSceneIndexPrim MeshWhSi::GetHighlightPrim(const SdfPath &selectionPath, const 
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
     if (prim.primType == HdPrimTypeTokens->mesh) {
+        // GP-cooked meshes may lack a displayStyle schema if the
+        // procedural plugin doesn't add one. Without it, SetWireframeRepr
+        // cannot apply a wire repr. Inject a default reprSelector so that the
+        // wireframe highlight becomes visible.
+        if (!HdLegacyDisplayStyleSchema::GetFromParent(prim.dataSource)) {
+            static const HdRetainedContainerDataSourceHandle defaultDisplayStyle
+                = HdRetainedContainerDataSource::New(
+                    HdLegacyDisplayStyleSchemaTokens->displayStyle,
+                    HdRetainedContainerDataSource::New(
+                        HdLegacyDisplayStyleSchemaTokens->reprSelector,
+                        HdRetainedTypedSampledDataSource<VtArray<TfToken>>::New(
+                            { HdReprTokens->refined, TfToken(), TfToken() })));
+            prim.dataSource
+                = HdOverlayContainerDataSource::New({ defaultDisplayStyle, prim.dataSource });
+        }
         prim.dataSource = SetWireframeRepr(prim.dataSource, _wireframeColorInterface->getWireframeColor(selectionKey.first));
     }
     prim.dataSource = RepathInstancingDataSources(prim.dataSource, SdfPath::AbsoluteRootPath(), selectionPath);

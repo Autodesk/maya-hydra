@@ -15,7 +15,6 @@
 
 #include "fvpWhSiSceneIndexPlugin.h"
 
-#include "fvpGenerativeProceduralWhSi.h"
 #include "fvpGeomSubsetWhSi.h"
 #include "fvpMeshWhSi.h"
 #include "fvpNiInstanceWhSi.h"
@@ -82,11 +81,6 @@ TF_REGISTRY_FUNCTION(HdSceneIndexPlugin)
                 = Fvp::PiPrototypeWhSi::New(lastSceneIndex, kHighlightHierarchyPrefix, wireframeColorInterface);
             piPrototypeWhSi->AddExcludedPath(kMayaNativeRoot);
             lastSceneIndex = piPrototypeWhSi;
-
-            auto gpWhSi
-                = Fvp::GenerativeProceduralWhSi::New(lastSceneIndex, kHighlightHierarchyPrefix, wireframeColorInterface);
-            gpWhSi->AddExcludedPath(kMayaNativeRoot);
-            lastSceneIndex = gpWhSi;
 
             return lastSceneIndex;
         },
