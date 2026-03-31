@@ -146,8 +146,6 @@
 #include <pxr/base/tf/envSetting.h>
 #include "envSettings.h"
 
-#include <iostream>
-
 using namespace MayaHydra;
 
 namespace {
