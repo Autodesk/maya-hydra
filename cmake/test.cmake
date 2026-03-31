@@ -18,24 +18,9 @@ if(MayaUsd_FOUND)
         #MAYAUSDAPI_LIBRARY is the full path name of the maya USD API shared library, so get only its directory into MAYAUSDAPI_LIBRARY_PATH
         get_filename_component(MAYAUSDAPI_LIBRARY_PATH "${MAYAUSDAPI_LIBRARY}" DIRECTORY)
 
-        # So add OpenUSD lib paths (if available) then MAYAUSDAPI_LIBRARY_PATH
-        # to the ADDITIONAL_LD_LIBRARY_PATH which is used to run the tests.
-        # OpenUSD should be found first to avoid loading multiple USD copies.
+        #So add MAYAUSDAPI_LIBRARY_PATH to the ADDITIONAL_LD_LIBRARY_PATH which is used to run the tests
         set(CURRENT_ADDITIONAL_LD_LIBRARY_PATH $ENV{ADDITIONAL_LD_LIBRARY_PATH})
-        set(ADDITIONAL_LD_LIBRARY_PATH "${CURRENT_ADDITIONAL_LD_LIBRARY_PATH}")
-        if(DEFINED PXR_USD_LOCATION)
-            if(EXISTS "${PXR_USD_LOCATION}/lib")
-                set(ADDITIONAL_LD_LIBRARY_PATH "${ADDITIONAL_LD_LIBRARY_PATH}:${PXR_USD_LOCATION}/lib")
-            endif()
-            if(EXISTS "${PXR_USD_LOCATION}/lib64")
-                set(ADDITIONAL_LD_LIBRARY_PATH "${ADDITIONAL_LD_LIBRARY_PATH}:${PXR_USD_LOCATION}/lib64")
-            endif()
-        endif()
-        if(DEFINED PXR_USD_LOCATION AND NOT "${PXR_USD_LOCATION}" STREQUAL "")
-            message(STATUS "Skipping MayaUSD lib path in LD_LIBRARY_PATH to avoid duplicate USD libs (OpenUSD is set).")
-        else()
-            set(ADDITIONAL_LD_LIBRARY_PATH "${ADDITIONAL_LD_LIBRARY_PATH}:${MAYAUSDAPI_LIBRARY_PATH}")
-        endif()
+        set(ADDITIONAL_LD_LIBRARY_PATH "${CURRENT_ADDITIONAL_LD_LIBRARY_PATH}:${MAYAUSDAPI_LIBRARY_PATH}")
         # Export the new value to the environment
         set(ENV{ADDITIONAL_LD_LIBRARY_PATH} ${ADDITIONAL_LD_LIBRARY_PATH})
         message(STATUS "ADDITIONAL_LD_LIBRARY_PATH is now : ${ADDITIONAL_LD_LIBRARY_PATH}")
@@ -431,25 +416,21 @@ finally:
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH 
              "${MAYAUSD_LOCATION}/lib/python")
         # USD plugin paths:
-        # - Always add PXR_USD_LOCATION first so its plugins take priority.
-        # - Always add MAYAUSD_LOCATION/lib/usd second so MayaUSD-specific plugins
-        #   (e.g. AdskAssetResolver) are discovered. Duplicate type registrations
-        #   from standard OpenUSD plugins are harmless warnings since MayaUSD is
-        #   built against the same OpenUSD. The TfType redefinition errors that
-        #   prompted the original exclusion were caused by the PRMan artifact's
-        #   separate OpenUSD build, which is already filtered out on non-Windows.
-        if(DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
+        # MayaUSD bundles standard OpenUSD plugins alongside MayaUSD-specific ones
+        # (e.g. AdskAssetResolver) in lib/usd, so that single path is sufficient
+        # on all platforms.
+        # On Windows we also prepend the standalone PXR_USD_LOCATION/lib/usd so
+        # PRMan (built against that exact OpenUSD) picks up matching plugins.
+        # On OSX/Linux we must NOT add PXR_USD_LOCATION/lib/usd because the
+        # standalone OpenUSD may ship incompatible HdSt/Storm shaders (e.g. Metal
+        # shader compilation failures on Apple Silicon).
+        if(IS_WINDOWS AND DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
             list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                  "${PXR_USD_LOCATION}/lib/usd")
             message(STATUS "Using OpenUSD plugin path from PXR_USD_LOCATION: ${PXR_USD_LOCATION}/lib/usd")
         endif()
-        if(EXISTS "${MAYAUSD_LOCATION}/lib/usd")
-            list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-                 "${MAYAUSD_LOCATION}/lib/usd")
-            message(STATUS "Adding MayaUSD plugin path: ${MAYAUSD_LOCATION}/lib/usd")
-        else()
-            message(STATUS "MayaUSD lib/usd not found at: ${MAYAUSD_LOCATION}/lib/usd")
-        endif()
+        list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+             "${MAYAUSD_LOCATION}/lib/usd")
         list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
              "${MAYAUSD_LOCATION}/plugin/adsk/plugin")
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH
@@ -752,14 +733,13 @@ finally:
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
             "LC_ALL=en_US.UTF-8"
             "LANG=en_US.UTF-8")
-        # Necessary for tests like DiffCore to find python
-        if(DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib")
-            set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-                "DYLD_LIBRARY_PATH=${PXR_USD_LOCATION}/lib:${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
-        else()
-            set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-                "DYLD_LIBRARY_PATH=${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
-        endif()
+        # Necessary for tests like DiffCore to find python.
+        # Do NOT prepend PXR_USD_LOCATION/lib here: the standalone OpenUSD may
+        # ship HdSt/Storm built with an incompatible Metal backend, causing
+        # shader compilation failures on Apple Silicon.  Maya's bundled USD
+        # libraries in MacOS/ are the correct ones to use.
+        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+            "DYLD_LIBRARY_PATH=${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
             "DYLD_FRAMEWORK_PATH=${MAYA_LOCATION}/Maya.app/Contents/Frameworks")
     endif()
