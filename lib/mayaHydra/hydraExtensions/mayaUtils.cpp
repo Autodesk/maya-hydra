@@ -49,6 +49,18 @@ MStatus GetDependNodeFromNodeName(const MString& nodeName, MObject& outDependNod
     return status;
 }
 
+MPlug GetTopPlug(const MPlug& plug)
+{
+    MPlug topPlug = plug;
+    while (topPlug.isChild()) {
+        topPlug = topPlug.parent();
+    }
+    if (topPlug.isElement()) {
+        topPlug = topPlug.array();
+    }
+    return topPlug;
+}
+
 MStatus GetMayaMatrixFromDagPath(const MDagPath& dagPath, MMatrix& outMatrix)
 {
     MStatus status;

@@ -468,7 +468,7 @@ def _set_custom_attribute_values(shape_name):
         list(matrix_attr_values),
         "extMatrixAttr")
 
-class TestCustomAttributes(mtohUtils.MayaHydraBaseTestCase):
+class TestMayaNodesAttributes(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
     _requiredPlugins = ['mtoa']
@@ -491,10 +491,33 @@ class TestCustomAttributes(mtohUtils.MayaHydraBaseTestCase):
         self.setHdStormRenderer()
         cmds.refresh()
 
+    # Create scene with mesh, camera (persp), and aiSkyDomeLight for comprehensive primvar tests.
+    def setupSceneWithLight(self):
+        cmds.polyCube()
+        shape_name = "pCubeShape1"
+        self._has_typed_numeric = _create_custom_attributes(shape_name)
+        _set_custom_attribute_values(shape_name)
+        # Create aiSkyDomeLight (Arnold light) for light adapter primvar tests.
+        light_transform = cmds.createNode('transform', name='aiSkyDomeLight1')
+        cmds.createNode('aiSkyDomeLight', name='aiSkyDomeLightShape1', parent=light_transform)
+        self.setHdStormRenderer()
+        cmds.refresh()
+
     # Run the C++ test that validates Arnold defaults.
     def test_defaultArnoldCustomAttributes(self):
         self.setupScene()
         self.runCppTest("CustomAttributes.defaultArnoldCustomAttributes")
+
+    # Run the C++ test that validates Arnold camera compound attributes (aiLookAt, etc.).
+    def test_defaultArnoldCameraCompoundAttributes(self):
+        self.setupScene()
+        self.runCppTest("CustomAttributes.defaultArnoldCameraCompoundAttributes")
+
+    # Run the comprehensive C++ test: mesh, camera, light ai* attrs appear when non-default,
+    # primvars removed when reset to default.
+    def test_aiPrimvarsAppearAndRemovedWhenReset(self):
+        self.setupSceneWithLight()
+        self.runCppTest("CustomAttributes.aiPrimvarsAppearAndRemovedWhenReset")
 
     # Run the C++ tests that validate extension attribute types.
     def test_extensionAttributeTypes(self):

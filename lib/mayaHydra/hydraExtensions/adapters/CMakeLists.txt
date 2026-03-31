@@ -31,6 +31,7 @@ set(HEADERS
     adapterDebugCodes.h
     adapterRegistry.h
     cameraAdapter.h
+    meshAdapterTestUtils.h
     constantShadowMatrix.h
     dagAdapter.h
     renderItemAdapter.h

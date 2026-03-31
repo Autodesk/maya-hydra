@@ -72,6 +72,14 @@ MAYAHYDRALIB_API
 MStatus GetDependNodeFromNodeName(const MString& nodeName, MObject& outDependNode);
 
 /**
+ * @brief Return the top-level plug for a child/array element plug.
+ *
+ * (e.g. aiLookAt[0].child(0) -> aiLookAt)
+ */
+MAYAHYDRALIB_API
+MPlug GetTopPlug(const MPlug& plug);
+
+/**
  * @brief Get the Maya transform matrix of a node from its DAG path
  *
  * The output transform matrix is the resultant ("flattened") matrix from it and

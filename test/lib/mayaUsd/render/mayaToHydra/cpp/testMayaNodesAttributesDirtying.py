@@ -18,10 +18,13 @@ import mtohUtils
 from testUtils import PluginLoaded
 
 
-class TestCustomAttributeDirtying(mtohUtils.MayaHydraBaseTestCase):
+class TestMayaNodesAttributesDirtying(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
+    _requiredPlugins = ['mtoa']
 
+    # Create a minimal scene with mesh/camera/light/material and a shared extension attribute.
+    # This scene is used by the C++ tests to assert primvar dirtying behavior.
     def setupScene(self):
         cmds.file(new=True, force=True)
         mesh_transform, mesh_shape = cmds.polyCube(name="dirtyMesh")
@@ -62,25 +65,46 @@ class TestCustomAttributeDirtying(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.refresh()
 
-    def test_customAttributeDirtying(self):
+    # What: extension attribute changes on mesh/camera/light/material should dirty primvars.
+    # How: setup the scene, then run the C++ test that drives extDirty and checks notices.
+    # Expect: each node produces a primvar dirty entry containing the new value.
+    def test_extDirtyPrimvars(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(f="CustomAttributeDirtying.testDirtyPrimvars")
+            cmds.mayaHydraCppTest(f="MayaNodesAttributesDirtying.testDirtyPrimvars")
 
-    def test_noDuplicateCameraDirtyOnExtAttrChange(self):
+    # What: camera aiUScale (Arnold extension) should dirty primvars only.
+    # How: setup the scene, run the C++ test that sets aiUScale and inspects notices.
+    # Expect: exactly one primvar notice for the camera prim.
+    def test_cameraAiUScalePrimvarsNotices(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(f="CustomAttributeDirtying.testNoDuplicateCameraDirtyOnExtAttrChange")
+            cmds.mayaHydraCppTest(f="MayaNodesAttributesDirtying.testCameraAiUScaleDirtying")
 
-    def test_noDuplicateLightDirtyOnExtAttrChange(self):
+    # What: mesh aiUseSubFrame should dirty primvars + extComputationPrimvars.
+    # How: setup the scene, run the C++ test that sets aiUseSubFrame and inspects notices.
+    # Expect: exactly one notice containing both primvars and extComputationPrimvars.
+    def test_meshAiUseSubFramePrimvarsNotices(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(f="CustomAttributeDirtying.testNoDuplicateLightDirtyOnExtAttrChange")
+            cmds.mayaHydraCppTest(f="MayaNodesAttributesDirtying.testMeshAiUseSubFrameDirtying")
 
-    def test_noDuplicateMeshDirtyOnExtAttrChange(self):
+    # What: light aiShadowDensity (Arnold extension) should dirty primvars only.
+    # How: setup the scene, run the C++ test that sets aiShadowDensity and inspects notices.
+    # Expect: exactly one primvar notice for the light prim.
+    def test_lightAiShadowDensityPrimvarsNotices(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(f="CustomAttributeDirtying.testNoDuplicateMeshDirtyOnExtAttrChange")
+            cmds.mayaHydraCppTest(f="MayaNodesAttributesDirtying.testLightAiShadowDensityDirtying")
+
+    # What: built-in light params (color, intensity) should dirty light params.
+    # How: setup the scene, run the C++ test that changes intensity and color.
+    # Expect: exactly one notice per change; light schema with USD's extra locators
+    #         (primvars/visibility/collections) and no extComputationPrimvars.
+    def test_lightParamsDirtying(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="MayaNodesAttributesDirtying.testLightParamDirtying")
 
 
 if __name__ == '__main__':

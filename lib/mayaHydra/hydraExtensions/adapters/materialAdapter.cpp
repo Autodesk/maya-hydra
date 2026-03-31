@@ -203,7 +203,7 @@ private:
     {
         auto* adapter = reinterpret_cast<MayaHydraShadingEngineAdapter*>(clientData);
         if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
-            adapter->HandleExtensionAndDynamicAttributesDirty(plug);
+            adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
             return;
         }
         adapter->_CreateSurfaceMaterialCallback();
@@ -219,7 +219,7 @@ private:
         TF_UNUSED(otherPlug);
         auto* adapter = reinterpret_cast<MayaHydraShadingEngineAdapter*>(clientData);
         if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
-            adapter->HandleExtensionAndDynamicAttributesDirty(plug);
+            adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
             return;
         }
         adapter->MarkDirty(HdMaterial::AllDirty);
