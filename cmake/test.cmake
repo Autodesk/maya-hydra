@@ -432,6 +432,7 @@ finally:
              "${MAYAUSD_LOCATION}/lib/python")
         # USD plugin paths:
         # - Prefer PXR_USD_LOCATION (OpenUSD) on all platforms to keep results consistent.
+        # - Add MayaUSD's AdskAssetResolver plugin path when present (needed on Linux/OSX).
         # - Fall back to MayaUSD's lib/usd only when OpenUSD is unavailable.
         if(DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
             list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
@@ -441,6 +442,18 @@ finally:
             list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                  "${MAYAUSD_LOCATION}/lib/usd")
             message(STATUS "Using MayaUSD lib/usd plugin path (PXR_USD_LOCATION not available).")
+        endif()
+
+        set(_mayausd_adsk_resolver_dir "")
+        if(EXISTS "${MAYAUSD_LOCATION}/lib/usd/ar/plugInfo.json")
+            set(_mayausd_adsk_resolver_dir "${MAYAUSD_LOCATION}/lib/usd/ar")
+        elseif(EXISTS "${MAYAUSD_LOCATION}/lib/usd/Ar/plugInfo.json")
+            set(_mayausd_adsk_resolver_dir "${MAYAUSD_LOCATION}/lib/usd/Ar")
+        endif()
+        if(_mayausd_adsk_resolver_dir)
+            list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                 "${_mayausd_adsk_resolver_dir}")
+            message(STATUS "Adding MayaUSD AdskAssetResolver plugin path: ${_mayausd_adsk_resolver_dir}")
         endif()
         list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
              "${MAYAUSD_LOCATION}/plugin/adsk/plugin")
