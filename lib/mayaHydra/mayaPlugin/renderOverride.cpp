@@ -59,6 +59,7 @@
 #include <flowViewport/sceneIndex/fvpBBoxSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpReprSelectorSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPassFilteringSceneIndex.h>
+#include <flowViewport/sceneIndex/wireframeHighlights/fvpWhSiSceneIndexPlugin.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
@@ -144,6 +145,8 @@
 #include <pxr/base/tf/getenv.h>
 #include <pxr/base/tf/envSetting.h>
 #include "envSettings.h"
+
+#include <iostream>
 
 using namespace MayaHydra;
 
@@ -1736,6 +1739,11 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         _wireframeColorInterfaceImp = std::make_shared<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp>(_selection, _leadObjectPathTracker);
     }
 
+    // Configure the WhSi plugin with the real wireframe color interface.
+    // The plugin was already instantiated by Hydra during HdRenderIndex::New(),
+    // with a deferred proxy that needs the real implementation.
+    Fvp::SetWhSiWireframeColorInterface(_wireframeColorInterfaceImp);
+
     // Insert the bounding box filtering scene index which converts geometries into a bounding box
     // using the extent attribute
     _bboxSceneIndex = Fvp::BboxSceneIndex::New(
@@ -1750,41 +1758,6 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
                                                  _wireframeColorInterfaceImp);
     _reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
     _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false, _globals.delegateParams.refineLevel);
-
-    // Setup selection highlight scene indices
-    {
-        //// At time of writing, wireframe selection highlighting of Maya native data
-        //// is done by Maya at render item creation time, so avoid double wireframe
-        //// selection highlighting by excluding MAYA_NATIVE_ROOT.
-
-#if PXR_VERSION >= 2405
-        _lastFilteringSceneIndexBeforeCustomFiltering = _geomSubsetWhSi = Fvp::GeomSubsetWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _geomSubsetWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-#endif
-
-        _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _meshWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-
-        _lastFilteringSceneIndexBeforeCustomFiltering = _niInstanceWhSi = Fvp::NiInstanceWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _niInstanceWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-
-        _lastFilteringSceneIndexBeforeCustomFiltering = _niPrototypeWhSi = Fvp::NiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _niPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-
-        _lastFilteringSceneIndexBeforeCustomFiltering = _piInstancerWhSi = Fvp::PiInstancerWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _piInstancerWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-
-        _lastFilteringSceneIndexBeforeCustomFiltering = _piPrototypeWhSi = Fvp::PiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _piPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-        
-        _lastFilteringSceneIndexBeforeCustomFiltering = _generativeProceduralWhSi = Fvp::GenerativeProceduralWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _generativeProceduralWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-
-        _generativeProceduralWhSi->SetTerminalSceneIndexGetter([this]() -> HdSceneIndexBaseRefPtr {
-            auto* ri = renderIndex();
-            return ri ? ri->GetTerminalSceneIndex() : nullptr;
-        });
-    }
 
     TF_AXIOM(_mayaViewportSceneIndex);
     _lastFilteringSceneIndexBeforeCustomFiltering = _lightsManagementSceneIndex = Fvp::LightsManagementSceneIndex::New(

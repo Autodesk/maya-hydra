@@ -28,6 +28,7 @@ set(HEADERS
     fvpWireframeColorInterface.h
 	fvpPurposeRenderTagsForPasses.h
 	fvpFramePassData.h
+    fvpDeferredWireframeColorInterface.h
 )
 
 # -----------------------------------------------------------------------------
@@ -47,6 +48,7 @@ target_include_directories(${TARGET_NAME}
 target_compile_definitions(${TARGET_NAME} 
     PRIVATE
         FVP_EXPORT
+        MFB_ALT_PACKAGE_NAME="${TARGET_NAME}"
         $<$<BOOL:${IS_MACOSX}>:OSMac_>
         # Copy-pasted from lib/mayaUsd/CMakeLists.txt
 )

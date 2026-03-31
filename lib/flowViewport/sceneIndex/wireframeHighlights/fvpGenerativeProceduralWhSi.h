@@ -45,10 +45,6 @@ public:
     FVP_API
     ~GenerativeProceduralWhSi() override = default;
 
-    FVP_API
-    void SetTerminalSceneIndexGetter(std::function<PXR_NS::HdSceneIndexBaseRefPtr()> getter);
-
-
 protected:
 
     FVP_API

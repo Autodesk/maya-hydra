@@ -11,6 +11,7 @@ target_sources(${TARGET_NAME}
     fvpPiInstancerWhSi.cpp
     fvpPiPrototypeWhSi.cpp
     fvpGenerativeProceduralWhSi.cpp
+    fvpWhSiSceneIndexPlugin.cpp
 )
 
 set(HEADERS
@@ -22,6 +23,7 @@ set(HEADERS
     fvpPiInstancerWhSi.h
     fvpPiPrototypeWhSi.h
     fvpGenerativeProceduralWhSi.h
+    fvpWhSiSceneIndexPlugin.h
 )
 
 # -----------------------------------------------------------------------------

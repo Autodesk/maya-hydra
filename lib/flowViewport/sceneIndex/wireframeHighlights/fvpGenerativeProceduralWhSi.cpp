@@ -73,13 +73,7 @@ HdSceneIndexPrim GenerativeProceduralWhSi::GetHighlightPrim(
     SelectionKey selectionKey = SelectionKeyFromPath(selectionPath);
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
    
-    HdSceneIndexPrim prim;
-    if (_terminalSceneIndexGetter) {
-        auto terminalSi = _terminalSceneIndexGetter();
-        if (terminalSi != nullptr) {
-            prim = terminalSi->GetPrim(originalPath);
-        }
-    }
+    HdSceneIndexPrim prim = GetPrim(originalPath);
     // For now we are assuming that all GP are generating meshes. 
     // If a GP is generating prims from a different type, then 
     // we will need to add additional support for those prim types. 
@@ -115,19 +109,14 @@ SdfPathVector GenerativeProceduralWhSi::GetHighlightChildPrimPaths(
     SelectionKey selectionKey = SelectionKeyFromPath(selectionPath);
 
     SdfPathVector childPaths;
-    auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
-    if (_terminalSceneIndexGetter) {
-        auto terminalSi = _terminalSceneIndexGetter();
-        if (terminalSi != nullptr) {
-            auto originalChildPaths = terminalSi->GetChildPrimPaths(originalPath);
-            for (const auto& originalChildPath : originalChildPaths) {
-                bool isRelevantPath = originalChildPath.HasPrefix(selectionKey.first)
-                    || selectionKey.first.HasPrefix(originalChildPath);
-                if (isRelevantPath) {
-                    childPaths.emplace_back(originalChildPath.ReplacePrefix(
-                        SdfPath::AbsoluteRootPath(), selectionPath));
-                }
-            }
+    auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());    
+    auto originalChildPaths = GetChildPrimPaths(originalPath);
+    for (const auto& originalChildPath : originalChildPaths) {
+        bool isRelevantPath = originalChildPath.HasPrefix(selectionKey.first)
+            || selectionKey.first.HasPrefix(originalChildPath);
+        if (isRelevantPath) {
+            childPaths.emplace_back(
+                originalChildPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
         }
     }
     return childPaths;
@@ -208,24 +197,15 @@ void GenerativeProceduralWhSi::ProcessFullySelectedChange(
 }
 
 void GenerativeProceduralWhSi::_CreateSelectionHighlight(const SdfPath& generativeProceduralPath) {
-    if (!_terminalSceneIndexGetter) {
-        return;
-    }
-    auto terminalSi = _terminalSceneIndexGetter();
-    if (!terminalSi) {
-        return;
-    }
     const SelectionKey key { generativeProceduralPath, "" };
     const SdfPath selectionPath = RegisterSelection(key);
     HdSceneIndexObserver::AddedPrimEntries entries;
-    // Discover cooked children that only exist after
-    // the generative procedural resolver has run.
     std::function<void(const SdfPath&)> walkChildren;
     walkChildren = [&](const SdfPath& path) {
-        HdSceneIndexPrim prim = terminalSi->GetPrim(path);
+        HdSceneIndexPrim prim = GetPrim(path);
         entries.emplace_back(
             path.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath), prim.primType);
-        for (const auto& childPath : terminalSi->GetChildPrimPaths(path)) {
+        for (const auto& childPath : GetChildPrimPaths(path)) {
             walkChildren(childPath);
         }
     };
@@ -235,36 +215,22 @@ void GenerativeProceduralWhSi::_CreateSelectionHighlight(const SdfPath& generati
 }
 
 void GenerativeProceduralWhSi::_DeleteSelectionHighlight(const SdfPath& generativeProceduralPath) {
-    if (!_terminalSceneIndexGetter) {
-        return;
-    }
-    auto terminalSi = _terminalSceneIndexGetter();
-    if (!terminalSi) {
-        return;
-    }
-
     const SelectionKey key { generativeProceduralPath, "" };
     const SdfPath selectionPath = UnregisterSelection(key);
     HdSceneIndexObserver::RemovedPrimEntries entries;
 
     std::function<void(const SdfPath&)> walkChildren;
     walkChildren = [&](const SdfPath& path) {
-        HdSceneIndexPrim prim = terminalSi->GetPrim(path);
+        HdSceneIndexPrim prim = GetPrim(path);
         entries.emplace_back(
             path.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath));
-        for (const auto& childPath : terminalSi->GetChildPrimPaths(path)) {
+        for (const auto& childPath : GetChildPrimPaths(path)) {
             walkChildren(childPath);
         }
     };
     walkChildren(generativeProceduralPath);
 
     _SendPrimsRemoved(entries);
-}
-
-void GenerativeProceduralWhSi::SetTerminalSceneIndexGetter(
-    std::function<PXR_NS::HdSceneIndexBaseRefPtr()> getter)
-{
-    _terminalSceneIndexGetter = std::move(getter);
 }
 
 }
