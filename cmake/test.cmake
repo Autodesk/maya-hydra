@@ -380,6 +380,11 @@ finally:
 
     set(MAYAUSD_VARNAME_MAYA_HAS_RENDER_ITEM_CULL_MODE_API "${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}")
 
+    if(CODE_COVERAGE)
+        list(APPEND ALL_TEST_VARS MAYAHYDRA_CODE_COVERAGE)
+        set(MAYAUSD_VARNAME_MAYAHYDRA_CODE_COVERAGE "1")
+    endif()
+
     foreach(testvar ${ALL_TEST_VARS})
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
             "${testvar}=${MAYAUSD_VARNAME_${testvar}}")
@@ -398,6 +403,7 @@ finally:
          "${CMAKE_INSTALL_PREFIX}/scripts")
 
     # mayaUsdPlugin
+    set(_use_pxr_usd_plugins FALSE)
     if(DEFINED MAYAUSD_LOCATION)
         list(APPEND MAYAUSD_VARNAME_PATH
              "${MAYAUSD_LOCATION}/lib")
@@ -416,21 +422,53 @@ finally:
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH 
              "${MAYAUSD_LOCATION}/lib/python")
         # USD plugin paths:
-        # MayaUSD bundles standard OpenUSD plugins alongside MayaUSD-specific ones
-        # (e.g. AdskAssetResolver) in lib/usd, so that single path is sufficient
-        # on all platforms.
-        # On Windows we also prepend the standalone PXR_USD_LOCATION/lib/usd so
-        # PRMan (built against that exact OpenUSD) picks up matching plugins.
-        # On OSX/Linux we must NOT add PXR_USD_LOCATION/lib/usd because the
-        # standalone OpenUSD may ship incompatible HdSt/Storm shaders (e.g. Metal
-        # shader compilation failures on Apple Silicon).
-        if(IS_WINDOWS AND DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
+        # - Prefer PXR_USD_LOCATION (OpenUSD) on all platforms to keep results consistent.
+        # - If OpenUSD isn't available, fall back to MayaUSD's lib/usd.
+        if(DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
             list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                  "${PXR_USD_LOCATION}/lib/usd")
+            set(_use_pxr_usd_plugins TRUE)
             message(STATUS "Using OpenUSD plugin path from PXR_USD_LOCATION: ${PXR_USD_LOCATION}/lib/usd")
+        else()
+            list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                 "${MAYAUSD_LOCATION}/lib/usd")
+            message(STATUS "Using MayaUSD lib/usd plugin path (PXR_USD_LOCATION not available).")
         endif()
-        list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-             "${MAYAUSD_LOCATION}/lib/usd")
+
+        # Add MayaUSD's AdskAssetResolver plugin path when using OpenUSD plugins.
+        # This avoids pulling in MayaUSD's full lib/usd (which can reintroduce
+        # duplicate TfType definitions) while still enabling Adsk resolvers.
+        if(NOT IS_WINDOWS AND _use_pxr_usd_plugins)
+            set(_mayausd_adsk_resolver_dir "")
+            set(_mayausd_usd_root "${MAYAUSD_LOCATION}/lib/usd")
+            if(EXISTS "${_mayausd_usd_root}/ar/plugInfo.json")
+                set(_mayausd_adsk_resolver_dir "${_mayausd_usd_root}/ar")
+            elseif(EXISTS "${_mayausd_usd_root}/Ar/plugInfo.json")
+                set(_mayausd_adsk_resolver_dir "${_mayausd_usd_root}/Ar")
+            elseif(EXISTS "${_mayausd_usd_root}/adsk/plugInfo.json")
+                set(_mayausd_adsk_resolver_dir "${_mayausd_usd_root}/adsk")
+            endif()
+
+            if(NOT _mayausd_adsk_resolver_dir)
+                file(GLOB_RECURSE _mayausd_plug_infos "${_mayausd_usd_root}/*/plugInfo.json")
+                foreach(_plug_info ${_mayausd_plug_infos})
+                    file(READ "${_plug_info}" _plug_info_contents LIMIT 20000)
+                    string(FIND "${_plug_info_contents}" "AdskAssetResolver" _adsk_found)
+                    if(NOT _adsk_found EQUAL -1)
+                        get_filename_component(_mayausd_adsk_resolver_dir "${_plug_info}" DIRECTORY)
+                        break()
+                    endif()
+                endforeach()
+            endif()
+
+            if(_mayausd_adsk_resolver_dir)
+                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                     "${_mayausd_adsk_resolver_dir}")
+                message(STATUS "Adding MayaUSD AdskAssetResolver plugin path: ${_mayausd_adsk_resolver_dir}")
+            else()
+                message(WARNING "MayaUSD AdskAssetResolver plugInfo.json not found under ${_mayausd_usd_root}")
+            endif()
+        endif()
         list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
              "${MAYAUSD_LOCATION}/plugin/adsk/plugin")
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH
@@ -637,6 +675,10 @@ finally:
     # (e.g. HdArnold, HdPrman) are discovered when running tests.
     # On OSX/Linux, filter out PRMan delegate paths to avoid TfType redefinition
     # errors (UsdSkelImaging* already defined) when the parent CI sets them.
+    set(_mayausd_usd_root_lower "")
+    if(NOT IS_WINDOWS AND _use_pxr_usd_plugins AND DEFINED MAYAUSD_LOCATION)
+        string(TOLOWER "${MAYAUSD_LOCATION}/lib/usd" _mayausd_usd_root_lower)
+    endif()
     foreach(_inherit_var PXR_PLUGINPATH_NAME MAYA_PXR_PLUGINPATH_NAME)
         if(DEFINED ENV{${_inherit_var}} AND NOT "$ENV{${_inherit_var}}" STREQUAL "")
             if(IS_WINDOWS)
@@ -646,7 +688,16 @@ finally:
                 string(REPLACE ";" ";" _path_list "${_path_list}")
                 foreach(_path ${_path_list})
                     string(TOLOWER "${_path}" _path_lower)
-                    if(NOT _path_lower MATCHES "prman|hdprman|renderman|rman")
+                    set(_skip_path FALSE)
+                    if(_path_lower MATCHES "prman|hdprman|renderman|rman")
+                        set(_skip_path TRUE)
+                    elseif(_mayausd_usd_root_lower)
+                        string(FIND "${_path_lower}" "${_mayausd_usd_root_lower}" _mayausd_root_pos)
+                        if(_mayausd_root_pos EQUAL 0)
+                            set(_skip_path TRUE)
+                        endif()
+                    endif()
+                    if(NOT _skip_path)
                         list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${_path}")
                     endif()
                 endforeach()
