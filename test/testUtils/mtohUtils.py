@@ -122,10 +122,53 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         sys.__stdout__.write("USD env: {}\n".format(" | ".join(env_parts)))
         sys.__stdout__.write("USD version: {}\n".format(cls._usdVersion))
         try:
+            sep = ";" if platform.system() == "Windows" else ":"
+            plugin_path = os.environ.get("PXR_PLUGINPATH_NAME", "")
+            plugin_entries = [p for p in plugin_path.split(sep) if p]
+            sys.__stdout__.write("USD plugin path entries ({}):\n".format(len(plugin_entries)))
+            for idx, p in enumerate(plugin_entries):
+                sys.__stdout__.write("  {}: {}\n".format(idx, p))
+        except Exception as e:
+            sys.__stdout__.write("USD plugin path entries: (unavailable) {}\n".format(e))
+        try:
             plugin_path = cmds.pluginInfo(MAYAUSD_PLUGIN_NAME, q=True, path=True)
             sys.__stdout__.write("mayaUsdPlugin path: {}\n".format(plugin_path))
         except Exception as e:
             sys.__stdout__.write("mayaUsdPlugin path: (unavailable) {}\n".format(e))
+        try:
+            from pxr import Plug
+
+            registry = Plug.Registry()
+            plugins = registry.GetAllPlugins()
+            sys.__stdout__.write("USD plugins discovered: {}\n".format(len(plugins)))
+
+            name_to_paths = {}
+            for plugin in plugins:
+                name = getattr(plugin, "name", None)
+                if not name and hasattr(plugin, "GetName"):
+                    name = plugin.GetName()
+                path = getattr(plugin, "path", None)
+                if not path and hasattr(plugin, "GetPath"):
+                    path = plugin.GetPath()
+                if not name:
+                    continue
+                name_to_paths.setdefault(name, []).append(path or "")
+
+            dup_names = {
+                name: paths for name, paths in name_to_paths.items()
+                if len(set([p for p in paths if p])) > 1
+            }
+            if dup_names:
+                sys.__stdout__.write("USD plugin duplicates detected:\n")
+                for name in sorted(dup_names.keys()):
+                    sys.__stdout__.write("  {}\n".format(name))
+                    for p in dup_names[name]:
+                        if p:
+                            sys.__stdout__.write("    {}\n".format(p))
+            else:
+                sys.__stdout__.write("USD plugin duplicates detected: none\n")
+        except Exception as e:
+            sys.__stdout__.write("USD plugin registry logging failed: {}\n".format(e))
         try:
             if platform.system() == "Darwin":
                 def _print_rpaths(label, path):

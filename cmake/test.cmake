@@ -446,17 +446,32 @@ finally:
                  "${MAYAUSD_LOCATION}/lib/usd")
         endif()
         if(IS_MACOSX AND _osx_use_pxr_usd_plugins)
-            set(_adsk_resolver_path "${MAYAUSD_LOCATION}/lib/usd/adskassetresolver/resources")
-            set(_adsk_resolver_path_alt "${MAYAUSD_LOCATION}/lib/usd/adskAssetResolver/resources")
+            set(_mayausd_usd_root "${MAYAUSD_LOCATION}/lib/usd")
+            set(_mayausd_plugin_dirs "")
+
+            set(_adsk_resolver_path "${_mayausd_usd_root}/adskassetresolver/resources")
+            set(_adsk_resolver_path_alt "${_mayausd_usd_root}/adskAssetResolver/resources")
             if(EXISTS "${_adsk_resolver_path}/plugInfo.json")
-                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-                     "${_adsk_resolver_path}")
-                message(STATUS "Adding MayaUSD AdskAssetResolver plugin path: ${_adsk_resolver_path}")
+                list(APPEND _mayausd_plugin_dirs "${_adsk_resolver_path}")
             elseif(EXISTS "${_adsk_resolver_path_alt}/plugInfo.json")
-                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-                     "${_adsk_resolver_path_alt}")
-                message(STATUS "Adding MayaUSD AdskAssetResolver plugin path: ${_adsk_resolver_path_alt}")
+                list(APPEND _mayausd_plugin_dirs "${_adsk_resolver_path_alt}")
             endif()
+
+            # Add MayaUSD schema/translator USD plugins without pulling in full MayaUSD lib/usd.
+            file(GLOB_RECURSE _mayausd_plug_infos "${_mayausd_usd_root}/*/plugInfo.json")
+            foreach(_plug_info ${_mayausd_plug_infos})
+                file(READ "${_plug_info}" _plug_info_contents LIMIT 20000)
+                if(_plug_info_contents MATCHES "mayaUsd_Schemas" OR _plug_info_contents MATCHES "mayaUsd_Translators")
+                    get_filename_component(_plug_dir "${_plug_info}" DIRECTORY)
+                    list(APPEND _mayausd_plugin_dirs "${_plug_dir}")
+                endif()
+            endforeach()
+
+            list(REMOVE_DUPLICATES _mayausd_plugin_dirs)
+            foreach(_plug_dir ${_mayausd_plugin_dirs})
+                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${_plug_dir}")
+                message(STATUS "Adding MayaUSD USD plugin path: ${_plug_dir}")
+            endforeach()
         endif()
         list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
              "${MAYAUSD_LOCATION}/plugin/adsk/plugin")
