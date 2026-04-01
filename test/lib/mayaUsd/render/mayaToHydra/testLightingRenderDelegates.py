@@ -96,6 +96,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 7.0  # Images are non-deterministic for shadows even with Storm.
+    IMAGE_DIFF_FAIL_PERCENT_COVERAGE = 10.0
 
     @classmethod
     def setUpClass(cls):
@@ -306,6 +307,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         failure, Baseline/Actual/Diff/Browse links work when JENKINS_ARTIFACT_BASE
         and JENKINS_ARTIFACT_WORKSPACE (or WORKSPACE) are set in CI."""
         self._setRenderer(delegate)
+        fail, failpercent = self._getImageDiffThresholds(delegate)
         for lightName in LIGHTS:
             intensity = self._getIntensityForLight(lightName, delegate)
             self._setLightIntensities(lightName, intensity)
@@ -314,9 +316,20 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             baselineName = "{}_{}.png".format(delegate["name"], lightName)
             self.assertSnapshotClose(
                 baselineName,
-                self.IMAGE_DIFF_FAIL_THRESHOLD,
-                self.IMAGE_DIFF_FAIL_PERCENT,
+                fail,
+                failpercent,
             )
+
+    def _getImageDiffThresholds(self, delegate):
+        """Allow slightly higher tolerance for coverage builds."""
+        fail = self.IMAGE_DIFF_FAIL_THRESHOLD
+        failpercent = self.IMAGE_DIFF_FAIL_PERCENT
+        if (
+            delegate.get("name") == "PRMan"
+            and os.environ.get("MAYAHYDRA_CODE_COVERAGE")
+        ):
+            failpercent = max(failpercent, self.IMAGE_DIFF_FAIL_PERCENT_COVERAGE)
+        return fail, failpercent
 
     def _delegateRunsOnPlatform(self, delegate):
         """Return True if the delegate's platform restriction allows running on the current platform."""

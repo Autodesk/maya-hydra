@@ -380,6 +380,11 @@ finally:
 
     set(MAYAUSD_VARNAME_MAYA_HAS_RENDER_ITEM_CULL_MODE_API "${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}")
 
+    if(CODE_COVERAGE)
+        list(APPEND ALL_TEST_VARS MAYAHYDRA_CODE_COVERAGE)
+        set(MAYAUSD_VARNAME_MAYAHYDRA_CODE_COVERAGE "1")
+    endif()
+
     foreach(testvar ${ALL_TEST_VARS})
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
             "${testvar}=${MAYAUSD_VARNAME_${testvar}}")
@@ -398,6 +403,7 @@ finally:
          "${CMAKE_INSTALL_PREFIX}/scripts")
 
     # mayaUsdPlugin
+    set(_osx_use_pxr_usd_plugins FALSE)
     if(DEFINED MAYAUSD_LOCATION)
         list(APPEND MAYAUSD_VARNAME_PATH
              "${MAYAUSD_LOCATION}/lib")
@@ -416,21 +422,42 @@ finally:
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH 
              "${MAYAUSD_LOCATION}/lib/python")
         # USD plugin paths:
-        # MayaUSD bundles standard OpenUSD plugins alongside MayaUSD-specific ones
-        # (e.g. AdskAssetResolver) in lib/usd, so that single path is sufficient
-        # on all platforms.
-        # On Windows we also prepend the standalone PXR_USD_LOCATION/lib/usd so
-        # PRMan (built against that exact OpenUSD) picks up matching plugins.
-        # On OSX/Linux we must NOT add PXR_USD_LOCATION/lib/usd because the
-        # standalone OpenUSD may ship incompatible HdSt/Storm shaders (e.g. Metal
-        # shader compilation failures on Apple Silicon).
+        # - Windows: prepend OpenUSD for PRMan, then MayaUSD lib/usd.
+        # - macOS: prefer OpenUSD plugin path to avoid duplicate TfType definitions;
+        #   add only the AdskAssetResolver plugin from MayaUSD if present.
+        # - Linux: keep MayaUSD lib/usd (do not change Linux behavior).
         if(IS_WINDOWS AND DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
             list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                  "${PXR_USD_LOCATION}/lib/usd")
             message(STATUS "Using OpenUSD plugin path from PXR_USD_LOCATION: ${PXR_USD_LOCATION}/lib/usd")
         endif()
-        list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-             "${MAYAUSD_LOCATION}/lib/usd")
+        if(IS_MACOSX)
+            if(DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
+                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                     "${PXR_USD_LOCATION}/lib/usd")
+                set(_osx_use_pxr_usd_plugins TRUE)
+                message(STATUS "Using OpenUSD plugin path from PXR_USD_LOCATION on macOS.")
+            else()
+                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                     "${MAYAUSD_LOCATION}/lib/usd")
+            endif()
+        else()
+            list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                 "${MAYAUSD_LOCATION}/lib/usd")
+        endif()
+        if(IS_MACOSX AND _osx_use_pxr_usd_plugins)
+            set(_adsk_resolver_path "${MAYAUSD_LOCATION}/lib/usd/adskassetresolver/resources")
+            set(_adsk_resolver_path_alt "${MAYAUSD_LOCATION}/lib/usd/adskAssetResolver/resources")
+            if(EXISTS "${_adsk_resolver_path}/plugInfo.json")
+                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                     "${_adsk_resolver_path}")
+                message(STATUS "Adding MayaUSD AdskAssetResolver plugin path: ${_adsk_resolver_path}")
+            elseif(EXISTS "${_adsk_resolver_path_alt}/plugInfo.json")
+                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                     "${_adsk_resolver_path_alt}")
+                message(STATUS "Adding MayaUSD AdskAssetResolver plugin path: ${_adsk_resolver_path_alt}")
+            endif()
+        endif()
         list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
              "${MAYAUSD_LOCATION}/plugin/adsk/plugin")
         list(APPEND MAYAUSD_VARNAME_PYTHONPATH
@@ -738,8 +765,13 @@ finally:
         # ship HdSt/Storm built with an incompatible Metal backend, causing
         # shader compilation failures on Apple Silicon.  Maya's bundled USD
         # libraries in MacOS/ are the correct ones to use.
-        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-            "DYLD_LIBRARY_PATH=${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
+        if(_osx_use_pxr_usd_plugins AND DEFINED PXR_USD_LOCATION)
+            set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+                "DYLD_LIBRARY_PATH=${PXR_USD_LOCATION}/lib:${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
+        else()
+            set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+                "DYLD_LIBRARY_PATH=${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
+        endif()
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
             "DYLD_FRAMEWORK_PATH=${MAYA_LOCATION}/Maya.app/Contents/Frameworks")
     endif()
