@@ -169,29 +169,35 @@ HdGenericNodeTranslationSceneIndex::_TranslatePhotometricLight(
 
     // Build UsdLux-compatible data source overlaid on the original
     // (keeps xform, visibility from maya-hydra).
+    // Split into two containers because HdRetainedContainerDataSource::New
+    // has a limited number of overloaded arguments.
+    auto lightCoreDs = HdRetainedContainerDataSource::New(
+        UsdLuxTokens->inputsIntensity,
+        HdRetainedTypedSampledDataSource<float>::New(intensity),
+        UsdLuxTokens->inputsColor,
+        HdRetainedTypedSampledDataSource<GfVec3f>::New(color),
+        UsdLuxTokens->inputsExposure,
+        HdRetainedTypedSampledDataSource<float>::New(exposure),
+        UsdLuxTokens->inputsShapingIesFile,
+        HdRetainedTypedSampledDataSource<SdfAssetPath>::New(
+            SdfAssetPath(iesFile)),
+        UsdLuxTokens->inputsRadius,
+        HdRetainedTypedSampledDataSource<float>::New(radius));
+
+    auto lightExtraDs = HdRetainedContainerDataSource::New(
+        UsdLuxTokens->inputsNormalize,
+        HdRetainedTypedSampledDataSource<bool>::New(normalize),
+        UsdLuxTokens->inputsDiffuse,
+        HdRetainedTypedSampledDataSource<float>::New(diffuse),
+        UsdLuxTokens->inputsSpecular,
+        HdRetainedTypedSampledDataSource<float>::New(specular),
+        UsdLuxTokens->inputsShadowEnable,
+        HdRetainedTypedSampledDataSource<bool>::New(castShadows),
+        UsdLuxTokens->inputsShadowColor,
+        HdRetainedTypedSampledDataSource<GfVec3f>::New(shadowColor));
+
     result.dataSource = HdOverlayContainerDataSource::New(
-        HdRetainedContainerDataSource::New(
-            UsdLuxTokens->inputsIntensity,
-            HdRetainedTypedSampledDataSource<float>::New(intensity),
-            UsdLuxTokens->inputsColor,
-            HdRetainedTypedSampledDataSource<GfVec3f>::New(color),
-            UsdLuxTokens->inputsExposure,
-            HdRetainedTypedSampledDataSource<float>::New(exposure),
-            UsdLuxTokens->inputsShapingIesFile,
-            HdRetainedTypedSampledDataSource<SdfAssetPath>::New(
-                SdfAssetPath(iesFile)),
-            UsdLuxTokens->inputsRadius,
-            HdRetainedTypedSampledDataSource<float>::New(radius),
-            UsdLuxTokens->inputsNormalize,
-            HdRetainedTypedSampledDataSource<bool>::New(normalize),
-            UsdLuxTokens->inputsDiffuse,
-            HdRetainedTypedSampledDataSource<float>::New(diffuse),
-            UsdLuxTokens->inputsSpecular,
-            HdRetainedTypedSampledDataSource<float>::New(specular),
-            UsdLuxTokens->inputsShadowEnable,
-            HdRetainedTypedSampledDataSource<bool>::New(castShadows),
-            UsdLuxTokens->inputsShadowColor,
-            HdRetainedTypedSampledDataSource<GfVec3f>::New(shadowColor)),
+        HdOverlayContainerDataSource::New(lightCoreDs, lightExtraDs),
         inputPrim.dataSource);
 
     return result;

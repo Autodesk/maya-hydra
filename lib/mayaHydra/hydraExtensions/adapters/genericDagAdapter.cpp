@@ -76,7 +76,8 @@ void _GenericNodeAttrChanged(
     }
 
     MFnAttribute attr(plug.attribute());
-    const char* name = attr.name().asChar();
+    MString attrNameStr = attr.name();
+    const char* name = attrNameStr.asChar();
 
     // Skip Maya built-in base class attributes (visibility, castsShadows,
     // objectColorRGB, worldPosition, etc.). These are never included in the
@@ -240,7 +241,8 @@ void MayaHydraGenericDagAdapter::RemovePrim()
 
 bool MayaHydraGenericDagAdapter::GetVisible()
 {
-    return GetDagPath().isVisible();
+    UpdateVisibility();
+    return IsVisible(false);
 }
 
 VtDictionary MayaHydraGenericDagAdapter::GetNonDefaultMayaAttributes() const

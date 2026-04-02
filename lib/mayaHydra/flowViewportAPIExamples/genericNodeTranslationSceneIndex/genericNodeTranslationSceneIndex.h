@@ -33,6 +33,7 @@
 #define MAYA_HYDRA_GENERIC_NODE_TRANSLATION_SCENE_INDEX_H
 
 #include <pxr/pxr.h>
+#include <pxr/base/vt/dictionary.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
