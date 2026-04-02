@@ -102,6 +102,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testSceneIndexDirtying.py
     cpp/testMayaNodesAttributesDirtying.py|depOnPlugins:mtoa
     cpp/testLightPrimvars.py|depOnPlugins:mtoa
+    cpp/testGenericDagNodeTranslation.py|depOnPlugins:mtoa
     cpp/testCameraPrimvars.py
     cpp/testUsdStageInvalidate.py
     cpp/testCamera.py

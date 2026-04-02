@@ -20,9 +20,12 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraPrimvarDataSource.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraCameraDataSource.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraLightDataSource.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraGenericNodeDataSource.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexUtils.h>
 #include <mayaHydraLib/adapters/adapter.h>
+#include <mayaHydraLib/adapters/genericDagAdapter.h>
+#include <mayaHydraLib/adapters/tokens.h>
 
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/basisCurvesSchema.h>
@@ -103,7 +106,14 @@ MayaHydraDataSource::GetNames()
     if (_type == HdPrimTypeTokens->camera) {
         result.push_back(HdCameraSchemaTokens->camera);
         result.push_back(HdXformSchemaTokens->xform);
-        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
+        result.push_back(HdPurposeSchemaTokens->purpose);
+    }
+
+    if (_type == MayaHydraAdapterTokens->mayaCustomDagNode) {
+        result.push_back(HdXformSchemaTokens->xform);
+        result.push_back(HdVisibilitySchemaTokens->visibility);
+        result.push_back(MayaHydraAdapterTokens->mayaNode);
+        result.push_back(HdPurposeSchemaTokens->purpose);
     }
 
     return result;
@@ -201,6 +211,12 @@ MayaHydraDataSource::Get(const TfToken& name)
                     .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
                         _adapter->GetRenderTag()))
                     .Build();
+    } else if (name == MayaHydraAdapterTokens->mayaNode
+               && _type == MayaHydraAdapterTokens->mayaCustomDagNode) {
+        auto* genericAdapter = dynamic_cast<MayaHydraGenericDagAdapter*>(_adapter);
+        if (genericAdapter) {
+            return MayaHydraGenericNodeDataSource::New(genericAdapter);
+        }
     }
 
     return nullptr;

@@ -11,6 +11,7 @@ target_sources(${TARGET_NAME}
         areaLightAdapter.cpp
         cameraAdapter.cpp
         dagAdapter.cpp
+        genericDagAdapter.cpp
         renderItemAdapter.cpp
         directionalLightAdapter.cpp
         lightAdapter.cpp
@@ -34,6 +35,7 @@ set(HEADERS
     meshAdapterTestUtils.h
     constantShadowMatrix.h
     dagAdapter.h
+    genericDagAdapter.h
     renderItemAdapter.h
     lightAdapter.h
     materialAdapter.h

@@ -37,6 +37,8 @@
 #include <maya/MDagPath.h>
 #include <maya/MDagPathArray.h>
 #include <maya/MFnComponent.h>
+#include <maya/MFnDependencyNode.h>
+#include <maya/MNodeClass.h>
 #include <maya/MItDag.h>
 #include <maya/MMaterial.h>
 #include <maya/MObjectArray.h>
@@ -427,7 +429,8 @@ void MayaHydraSceneIndex::_Destroy()
         _shapeAdapters,
         _lightAdapters,
         _cameraAdapters,
-        _materialAdapters);
+        _materialAdapters,
+        _genericAdapters);
 
     _renderItemsAdapters.clear();
     _shapeAdapters.clear();
@@ -435,6 +438,7 @@ void MayaHydraSceneIndex::_Destroy()
     _materialAdapters.clear();
     _cameraAdapters.clear();
     _renderItemsAdaptersFast.clear();
+    _genericAdapters.clear();
 
     // Unregister the fallback path mapper.
     Fvp::PathMapperRegistry::Instance().SetFallbackMapper(nullptr);
@@ -776,6 +780,23 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
         _addedNodes.clear();
     }
 
+    if (!_genericsToAdd.empty()) {
+        for (const auto& obj : _genericsToAdd) {
+            if (obj.isNull()) {
+                continue;
+            }
+            MDagPath dag;
+            MStatus  status = MDagPath::getAPathTo(obj, dag);
+            if (!status) {
+                continue;
+            }
+            if (!dag.hasFn(MFn::kTransform)) {
+                CreateGenericAdapter(dag);
+            }
+        }
+        _genericsToAdd.clear();
+    }
+
     // We don't need to rebuild something that's already being recreated.
     // Since we have a few elements, linear search over vectors is going to
     // be okay.
@@ -1063,7 +1084,8 @@ void MayaHydraSceneIndex::RemoveAdapter(const SdfPath& id)
             _shapeAdapters,
             _lightAdapters,
             _cameraAdapters,
-            _materialAdapters)) {
+            _materialAdapters,
+            _genericAdapters)) {
         TF_WARN("MayaHydraSceneIndex::RemoveAdapter(%s) -- Adapter does not exists", id.GetText());
     }
 }
@@ -1218,6 +1240,22 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
         return;
     }
 
+    if (_RemoveAdapter<MayaHydraAdapter>(
+            id,
+            [](MayaHydraAdapter* a) {
+                a->RemoveCallbacks();
+                a->RemovePrim();
+            },
+            _genericAdapters)) {
+        MFnDagNode dgNode(obj);
+        MDagPath   path;
+        dgNode.getPath(path);
+        if (path.isValid() && MObjectHandle(obj).isValid()) {
+            InsertDag(path);
+        }
+        return;
+    }
+
     if (_RemoveAdapter<MayaHydraMaterialAdapter>(
             id,
             [](MayaHydraMaterialAdapter* a) {
@@ -1296,6 +1334,25 @@ MayaHydraShapeAdapterPtr MayaHydraSceneIndex::CreateShapeAdapter(const MDagPath&
     return _CreateAdapter(dagPath, shapeCreatorFunc, _shapeAdapters);
 }
 
+MayaHydraGenericDagAdapterPtr MayaHydraSceneIndex::CreateGenericAdapter(const MDagPath& dagPath)
+{
+    MFnDependencyNode depNode(dagPath.node());
+    MNodeClass nodeClass(depNode.typeName());
+    if (nodeClass.pluginName().length() == 0) {
+        return {};
+    }
+
+    auto creator = [](MayaHydraSceneIndex* si, const MDagPath& dag)
+        -> MayaHydraGenericDagAdapterPtr {
+        return std::make_shared<MayaHydraGenericDagAdapter>(si, dag);
+    };
+    return _CreateAdapter<MayaHydraGenericDagAdapterPtr>(
+        dagPath,
+        std::function<MayaHydraGenericDagAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>(creator),
+        _genericAdapters,
+        false);
+}
+
 void MayaHydraSceneIndex::OnDagNodeAdded(const MObject& obj)
 {
     if (obj.isNull())
@@ -1315,6 +1372,8 @@ void MayaHydraSceneIndex::OnDagNodeAdded(const MObject& obj)
         _camerasToAdd.push_back({ obj, cameraFn });
     } else if (useMeshAdapter()) {
         _addedNodes.push_back(obj);
+    } else {
+        _genericsToAdd.push_back(obj);
     }
 }
 
@@ -1347,6 +1406,16 @@ void MayaHydraSceneIndex::OnDagNodeRemoved(const MObject& obj)
 
         if (it != _addedNodes.end()) {
             _addedNodes.erase(it, _addedNodes.end());
+        }
+    }
+
+    {
+        const auto itGeneric
+            = std::remove_if(_genericsToAdd.begin(), _genericsToAdd.end(), [&obj](const auto& item) {
+                  return item == obj;
+              });
+        if (itGeneric != _genericsToAdd.end()) {
+            _genericsToAdd.erase(itGeneric, _genericsToAdd.end());
         }
     }
 }
@@ -1391,7 +1460,10 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
                 CreateMaterial(materialId, material);
             }
         }
+        return;
     }
+
+    CreateGenericAdapter(dag);
 }
 
 void MayaHydraSceneIndex::UpdateLightVisibility(const MDagPath& dag)
