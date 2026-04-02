@@ -88,6 +88,7 @@ target_link_libraries(${TARGET_NAME}
         mayaHydraLib
         ufeExtensions
         flowViewport
+        hdGp
         $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSDAPI_LIBRARY}>
 )

@@ -20,6 +20,7 @@ target_sources(${TARGET_NAME}
     mayaHydraMayaFilteringSceneIndexDataConcreteFactory.cpp
     mhMayaUsdProxyShapeSceneIndex.cpp
     mhDirtyLeadObjectSceneIndex.cpp
+    mhGenerativeProceduralResolvingSceneIndex.cpp
 )
 
 set(HEADERS
@@ -41,6 +42,7 @@ set(HEADERS
     mayaHydraMayaFilteringSceneIndexDataConcreteFactory.h
     mhMayaUsdProxyShapeSceneIndex.h
     mhDirtyLeadObjectSceneIndex.h
+    mhGenerativeProceduralResolvingSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------
