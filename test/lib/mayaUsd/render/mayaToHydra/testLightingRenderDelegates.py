@@ -246,14 +246,65 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         except Exception as e:
             _log("Warning: failed to print {} tail ({}): {}".format(title, path, e))
 
+    def _log_prman_diagnostics(self, stage):
+        """Log PRMan-related diagnostics to help debug delegate init failures."""
+        _log("PRMan diagnostics [{}]".format(stage))
+        keys = [
+            "MAYAHYDRA_CODE_COVERAGE",
+            "RMANTREE",
+            "RENDERMAN_LOCATION",
+            "PRMAN_DELEGATE_PLUGIN_PATH",
+            "PIXAR_LICENSE_FILE",
+            "RMAN_SHADERPATH",
+            "RMAN_CONFIG_OVERRIDE",
+            "RDIR",
+            "RMAN_DUMP_DEFAULTS",
+            "CUDA_VISIBLE_DEVICES",
+            "CUDA_DEVICE_ORDER",
+            "NV_GPU",
+        ]
+        for key in keys:
+            _log("  {}={}".format(key, os.environ.get(key, "")))
+
+        # Inspect delegate plugin path entries.
+        plugin_path = os.environ.get("PRMAN_DELEGATE_PLUGIN_PATH", "")
+        if plugin_path:
+            sep = ";" if platform.system() == "Windows" else ":"
+            for entry in [p for p in plugin_path.split(sep) if p]:
+                _log("  PRMAN_DELEGATE_PLUGIN_PATH entry: {} (exists={})".format(
+                    entry, os.path.isdir(entry)))
+                plug_info = os.path.join(entry, "plugInfo.json")
+                _log("    plugInfo.json: {} (exists={})".format(
+                    plug_info, os.path.isfile(plug_info)))
+
+        # Report renderer/override registration state.
+        try:
+            _log("  mayaHydra listRenderers: {}".format(cmds.mayaHydra(listRenderers=True)))
+        except Exception as e:
+            _log("  mayaHydra listRenderers failed: {}".format(e))
+        try:
+            _log("  mayaHydra listActiveRenderers: {}".format(
+                cmds.mayaHydra(listActiveRenderers=True)))
+        except Exception as e:
+            _log("  mayaHydra listActiveRenderers failed: {}".format(e))
+        try:
+            _log("  mayaHydra listRegisteredOverrides: {}".format(
+                cmds.mayaHydra(listRegisteredOverrides=True)))
+        except Exception as e:
+            _log("  mayaHydra listRegisteredOverrides failed: {}".format(e))
+
     def _setRenderer(self, delegate):
         """Switch the viewport to the given Hydra renderer."""
+        if delegate.get("name") == "PRMan":
+            self._log_prman_diagnostics("before renderer switch")
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, rendererOverrideName=delegate["override"])
         cmds.refresh(force=True)
 
         # Validate via mayaHydra (modelEditor query can be unreliable when MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1)
         activeRenderers = cmds.mayaHydra(listActiveRenderers=True)
+        if delegate.get("name") == "PRMan" and delegate["plugin"] not in activeRenderers:
+            self._log_prman_diagnostics("after renderer switch - not active")
         self.assertIn(
             delegate["plugin"],
             activeRenderers,
@@ -281,16 +332,28 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         mode), we proceed anyway and take the snapshot."""
         timeoutSeconds = delegate.get("convergenceTimeout", 0)
         if timeoutSeconds <= 0:
+            _log("Convergence wait skipped for {} (timeoutSeconds={})".format(
+                delegate.get("name"), timeoutSeconds))
             return
         rendererPlugin = delegate["plugin"]
         start = time.time()
+        last_log = 0
         while (time.time() - start) < timeoutSeconds:
             cmds.refresh(force=True)
             if cmds.mayaHydraTesting(converged=True, rendererName=rendererPlugin):
                 cmds.refresh(force=True)
+                _log("Convergence reached for {} after {:.2f}s".format(
+                    delegate.get("name"), time.time() - start))
                 return
+            elapsed = time.time() - start
+            if elapsed - last_log >= 5:
+                last_log = elapsed
+                _log("Waiting for convergence: {} {:.1f}s/{}s".format(
+                    delegate.get("name"), elapsed, timeoutSeconds))
             time.sleep(0.5)
         # Timeout reached; some renderers (e.g. PRMan) never report convergence in interactive mode.
+        _log("Convergence timeout for {} after {:.2f}s (continuing)".format(
+            delegate.get("name"), time.time() - start))
         cmds.refresh(force=True)
 
     def _setLightIntensities(self, activeLight, intensity):
@@ -309,6 +372,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         self._setRenderer(delegate)
         fail, failpercent = self._getImageDiffThresholds(delegate)
         for lightName in LIGHTS:
+            _log("LightingRenderDelegates: {} -> {}".format(delegate.get("name"), lightName))
             intensity = self._getIntensityForLight(lightName, delegate)
             self._setLightIntensities(lightName, intensity)
             cmds.refresh(force=True)
@@ -319,6 +383,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 fail,
                 failpercent,
             )
+        _log("LightingRenderDelegates: {} completed".format(delegate.get("name")))
 
     def _getImageDiffThresholds(self, delegate):
         """Allow slightly higher tolerance for coverage builds."""
