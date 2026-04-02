@@ -113,6 +113,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             "PXR_OVERRIDE_PLUGINPATH_NAME",
             "LD_LIBRARY_PATH",
             "DYLD_LIBRARY_PATH",
+            "TF_DEBUG",
             "RMANTREE",
             "PRMAN_DELEGATE_PLUGIN_PATH",
         ]

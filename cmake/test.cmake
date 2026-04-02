@@ -385,6 +385,18 @@ finally:
         set(MAYAUSD_VARNAME_MAYAHYDRA_CODE_COVERAGE "1")
     endif()
 
+    if(IS_MACOSX)
+        # Dump failing HdSt shader sources to help diagnose Metal compilation issues.
+        set(_tf_debug "$ENV{TF_DEBUG}")
+        if(_tf_debug)
+            set(_tf_debug "${_tf_debug},HDST_DUMP_FAILING_SHADER_SOURCEFILE")
+        else()
+            set(_tf_debug "HDST_DUMP_FAILING_SHADER_SOURCEFILE")
+        endif()
+        list(APPEND ALL_TEST_VARS TF_DEBUG)
+        set(MAYAUSD_VARNAME_TF_DEBUG "${_tf_debug}")
+    endif()
+
     foreach(testvar ${ALL_TEST_VARS})
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
             "${testvar}=${MAYAUSD_VARNAME_${testvar}}")

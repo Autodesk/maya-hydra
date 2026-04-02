@@ -325,6 +325,7 @@ def RunCMake(context, extraArgs=None, stages=None):
 
     if (context.buildCoverage):
         # Use RelWithDebInfo as underlying variant to build
+        context.isCoverageBuild = True
         context.buildCoverage = False
         add_coverage_flags = True
     
@@ -375,10 +376,11 @@ def RunCTest(context, extraArgs=None, runOnlyFailed=False):
         Run(context,
             'ctest '
             '--output-on-failure ' 
-            '--timeout 500 '
+            '--timeout {timeout} '
             '-C {variant} {rerun} '
             '{extraArgs} '
             .format(variant=variant,
+                    timeout=(900 if getattr(context, "isCoverageBuild", False) else 500),
                     rerun = '--rerun-failed' if runOnlyFailed else '',
                     extraArgs=(" ".join(extraArgs) if extraArgs else "")))
 
@@ -734,6 +736,7 @@ class InstallContext:
         self.buildRelease = args.build_release
         self.buildRelWithDebug = args.build_relwithdebug
         self.buildCoverage = args.build_coverage
+        self.isCoverageBuild = args.build_coverage
 
         self.debugPython = args.debug_python
 
