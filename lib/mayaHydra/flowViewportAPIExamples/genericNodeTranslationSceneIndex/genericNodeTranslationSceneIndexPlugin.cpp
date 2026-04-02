@@ -58,7 +58,7 @@ HdGenericNodeTranslationSceneIndexPlugin() = default;
 HdSceneIndexBaseRefPtr
 HdGenericNodeTranslationSceneIndexPlugin::_AppendSceneIndex(
     const HdSceneIndexBaseRefPtr& inputScene,
-    const HdContainerDataSourceHandle& inputArgs)
+    const HdContainerDataSourceHandle& /*inputArgs*/)
 {
     return HdGenericNodeTranslationSceneIndex::New(inputScene);
 }

@@ -1382,9 +1382,11 @@ void MayaHydraSceneIndex::OnDagNodeAdded(const MObject& obj)
         return;
     }
 
-    // When not using the mesh adapter we care only about lights and cameras for this
-    // callback.  It is used to create a LightAdapter/CameraAdapter when adding a new light/camera
-    // in the scene for Hydra rendering.
+    // Queue newly added DAG nodes for adapter creation during the next
+    // FlushPendingUpdates().  Lights and cameras always get their dedicated
+    // adapters.  When the mesh adapter is active, all other shapes go through
+    // it.  Otherwise, unrecognized plugin shapes are queued for generic
+    // adapter creation (_genericsToAdd).
     if (auto lightFn = MayaHydraAdapterRegistry::GetLightAdapterCreator(obj)) {
         _lightsToAdd.push_back({ obj, lightFn });
     } else if (auto cameraFn = MayaHydraAdapterRegistry::GetCameraAdapterCreator(obj)) {

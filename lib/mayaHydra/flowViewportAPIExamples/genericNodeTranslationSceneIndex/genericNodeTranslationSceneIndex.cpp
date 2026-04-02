@@ -31,6 +31,7 @@
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/staticTokens.h>
 #include <pxr/base/vt/dictionary.h>
+#include <pxr/imaging/hd/dataSourceLocator.h>
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/tokens.h>
@@ -233,12 +234,30 @@ void HdGenericNodeTranslationSceneIndex::_PrimsRemoved(
     _SendPrimsRemoved(entries);
 }
 
+// For translated prims, upstream dirty locators (e.g.
+// mayaNode.mayaAttributes.intensity) don't match the translated schema
+// (e.g. inputs:intensity). Conservatively dirty the entire prim so
+// downstream consumers re-read all data sources after re-typing.
 void HdGenericNodeTranslationSceneIndex::_PrimsDirtied(
     const HdSceneIndexBase& /*sender*/,
     const HdSceneIndexObserver::DirtiedPrimEntries& entries)
 {
     if (!_IsObserved()) return;
-    _SendPrimsDirtied(entries);
+
+    static const HdDataSourceLocator mayaAttrsLocator(
+        _tokens->mayaNode, _tokens->mayaAttributes);
+
+    HdSceneIndexObserver::DirtiedPrimEntries translated;
+    translated.reserve(entries.size());
+    for (const auto& entry : entries) {
+        if (entry.dirtyLocators.Intersects(mayaAttrsLocator)) {
+            translated.push_back(
+                { entry.primPath, HdDataSourceLocatorSet::UniversalSet() });
+        } else {
+            translated.push_back(entry);
+        }
+    }
+    _SendPrimsDirtied(translated);
 }
 
 } // namespace MAYAHYDRA_NS_DEF
