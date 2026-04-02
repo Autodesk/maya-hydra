@@ -790,9 +790,17 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
             if (!status) {
                 continue;
             }
-            if (!dag.hasFn(MFn::kTransform)) {
-                CreateGenericAdapter(dag);
+            if (dag.hasFn(MFn::kTransform)) {
+                continue;
             }
+            MFnDagNode dagNode(dag);
+            if (dagNode.isIntermediateObject()) {
+                continue;
+            }
+            if (dag.isInstanced() && dag.instanceNumber() > 0) {
+                continue;
+            }
+            CreateGenericAdapter(dag);
         }
         _genericsToAdd.clear();
     }
