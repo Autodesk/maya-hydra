@@ -32,6 +32,7 @@
 #include <pxr/base/vt/dictionary.h>
 #include <pxr/imaging/hd/dataSourceLocator.h>
 #include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/xformSchema.h>
 
 #include <maya/MGlobal.h>
 
@@ -252,6 +253,64 @@ TEST(GenericDagNodeTranslation, verifyNoDuplicateDirtyNotices)
         << "Expected exactly one dirty notice for aiExposure, got " << exposureCount;
     EXPECT_FALSE(intensityDirtied)
         << "Changing aiExposure should NOT dirty the intensity locator";
+}
+
+// Verify that changing a plugin attribute does NOT produce a spurious xform
+// dirty notice. Only the per-attribute locator should be dirtied.
+TEST(GenericDagNodeTranslation, verifyNoSpuriousXformDirty)
+{
+    const std::string shapeFull
+        = GetOptionVarOrDefault(kGenericShapeOptionVar, kGenericShapeFallback);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(shapeFull);
+
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+
+    HdSceneIndexBaseRefPtr siWithPrim = FindTerminalSceneIndexWithPrim(
+        sceneIndices, shapeNamePart, MayaHydraAdapterTokens->mayaCustomDagNode);
+    ASSERT_TRUE(siWithPrim);
+
+    auto mayaSI = FindMayaHydraSceneIndex(siWithPrim);
+    ASSERT_TRUE(mayaSI) << "MayaHydraSceneIndex not found";
+
+    SceneIndexInspector inspector(mayaSI);
+    PrimEntriesVector   found = inspector.FindPrims(
+        CreatePrimPredicate(shapeNamePart, MayaHydraAdapterTokens->mayaCustomDagNode), 1);
+    ASSERT_GE(found.size(), 1u);
+    const SdfPath primPath = found.front().primPath;
+
+    SceneIndexNotificationsAccumulator accumulator(mayaSI);
+    const size_t startIndex = accumulator.GetDirtiedPrimEntries().size();
+
+    MGlobal::executeCommand(
+        ("setAttr \"" + shapeFull + ".intensity\" 9.0").c_str());
+    MGlobal::executeCommand("refresh");
+
+    const HdDataSourceLocator xformLocator = HdXformSchema::GetDefaultLocator();
+    const HdDataSourceLocator intensityLocator(
+        MayaHydraAdapterTokens->mayaNode,
+        MayaHydraAdapterTokens->mayaAttributes,
+        TfToken("intensity"));
+
+    bool xformDirtied = false;
+    bool intensityDirtied = false;
+    const auto& entries = accumulator.GetDirtiedPrimEntries();
+    for (size_t i = startIndex; i < entries.size(); ++i) {
+        if (entries[i].primPath != primPath) {
+            continue;
+        }
+        if (entries[i].dirtyLocators.Intersects(xformLocator)) {
+            xformDirtied = true;
+        }
+        if (entries[i].dirtyLocators.Intersects(intensityLocator)) {
+            intensityDirtied = true;
+        }
+    }
+
+    EXPECT_TRUE(intensityDirtied)
+        << "Expected dirty notice for intensity attribute";
+    EXPECT_FALSE(xformDirtied)
+        << "Changing a plugin attribute should NOT dirty the xform locator";
 }
 
 // Verify that attributes left at their default value are NOT included in mayaAttributes.

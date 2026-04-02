@@ -201,7 +201,7 @@ HdGenericNodeTranslationSceneIndex::_TranslatePhotometricLight(
 // (including the render delegate) see the translated type rather than
 // the raw mayaCustomDagNode type.
 void HdGenericNodeTranslationSceneIndex::_PrimsAdded(
-    const HdSceneIndexBase& sender,
+    const HdSceneIndexBase& /*sender*/,
     const HdSceneIndexObserver::AddedPrimEntries& entries)
 {
     if (!_IsObserved()) return;
@@ -220,7 +220,7 @@ void HdGenericNodeTranslationSceneIndex::_PrimsAdded(
 }
 
 void HdGenericNodeTranslationSceneIndex::_PrimsRemoved(
-    const HdSceneIndexBase& sender,
+    const HdSceneIndexBase& /*sender*/,
     const HdSceneIndexObserver::RemovedPrimEntries& entries)
 {
     if (!_IsObserved()) return;
@@ -228,7 +228,7 @@ void HdGenericNodeTranslationSceneIndex::_PrimsRemoved(
 }
 
 void HdGenericNodeTranslationSceneIndex::_PrimsDirtied(
-    const HdSceneIndexBase& sender,
+    const HdSceneIndexBase& /*sender*/,
     const HdSceneIndexObserver::DirtiedPrimEntries& entries)
 {
     if (!_IsObserved()) return;

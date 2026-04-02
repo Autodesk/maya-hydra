@@ -76,6 +76,12 @@ class TestGenericDagNodeTranslation(mtohUtils.MayaHydraBaseTestCase):
             cmds.mayaHydraCppTest(
                 f="GenericDagNodeTranslation.verifyNoDuplicateDirtyNotices")
 
+    def test_noSpuriousXformDirty(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(
+                f="GenericDagNodeTranslation.verifyNoSpuriousXformDirty")
+
     def test_defaultValuesNotTranslated(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):

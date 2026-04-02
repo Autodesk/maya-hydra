@@ -1274,9 +1274,8 @@ static bool ExtensionAttrValueEqualsDefault(const MPlug& attrPlug, const MObject
 // (e.g. surfaceShape), add those type names to the baseTypes array.
 static const std::set<std::string>& GetBaseClassAttrNames()
 {
-    static std::set<std::string> names;
-    static bool initialized = false;
-    if (!initialized) {
+    static const std::set<std::string> names = []() {
+        std::set<std::string> result;
         const char* baseTypes[] = { "locator" };
         for (const char* typeName : baseTypes) {
             MNodeClass cls(typeName);
@@ -1284,12 +1283,12 @@ static const std::set<std::string>& GetBaseClassAttrNames()
                 MStatus fnStatus;
                 MFnAttribute fn(cls.attribute(i), &fnStatus);
                 if (fnStatus) {
-                    names.insert(fn.name().asChar());
+                    result.insert(fn.name().asChar());
                 }
             }
         }
-        initialized = true;
-    }
+        return result;
+    }();
     return names;
 }
 
@@ -1875,6 +1874,12 @@ void GetNonDefaultMayaAttributesFromNode(
     const MObject& node, PXR_NS::VtDictionary& attrs)
 {
     GetAttributesFromNodeImpl(node, attrs, /*onlyExtensionAndDynamic=*/false);
+}
+
+bool IsBaseClassAttrName(const char* attrName)
+{
+    const auto& names = GetBaseClassAttrNames();
+    return names.find(attrName) != names.end();
 }
 
 } // namespace MAYAHYDRA_NS_DEF

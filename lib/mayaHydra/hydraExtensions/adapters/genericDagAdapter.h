@@ -112,9 +112,15 @@ public:
     MAYAHYDRALIB_API
     void MarkDirty(HdDirtyBits dirtyBits) override;
 
-    /// Registers a Maya attribute-changed callback that fires per-attribute
-    /// dirty locators (mayaNode.mayaAttributes.<attrName>), plus the base class
-    /// transform/visibility callbacks inherited from MayaHydraDagAdapter.
+    /// Registers Maya callbacks for this adapter. Unlike the base class which
+    /// registers a transform-dirty callback on every node in the DAG path
+    /// (including the shape), this override separates concerns:
+    ///   - Shape node: attribute-changed callback for per-attribute dirty
+    ///     locators, plus a visibility-only plug-dirty callback.
+    ///   - Parent transforms: standard transform-dirty callback for xform
+    ///     and visibility changes.
+    /// This prevents spurious xform dirty notices when plugin attributes
+    /// (e.g. intensity) change on the shape node.
     MAYAHYDRALIB_API
     void CreateCallbacks() override;
 

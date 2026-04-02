@@ -19,7 +19,10 @@ This is useful for plugin-defined node types such as `aiPhotometricLight`, `aiLi
         |  3. Try shape adapter   -> no match
         |  4. Is it a plugin node? (MNodeClass::pluginName() non-empty?)
         |     - No  -> skip (Maya built-in node)
-        |     - Yes -> create MayaHydraGenericDagAdapter
+        |     - Yes -> does it already provide its own scene index?
+        |              (e.g. mayaUsdProxyShape)
+        |       - Yes -> skip (already in Hydra via its own scene index)
+        |       - No  -> create MayaHydraGenericDagAdapter
         |
         v
  Hydra Scene Index
@@ -38,7 +41,7 @@ This is useful for plugin-defined node types such as `aiPhotometricLight`, `aiLi
 
 ### Maya-Hydra Side
 
-1. **Detection**: When `MayaHydraSceneIndex::InsertDag()` encounters a DAG leaf node that no registered adapter claims, it checks if the node was registered by a plugin using `MNodeClass(typeName).pluginName()`. Only plugin-registered nodes are translated; Maya built-in nodes (locators, joints, constraints, etc.) are always skipped.
+1. **Detection**: When `MayaHydraSceneIndex::InsertDag()` encounters a DAG leaf node that no registered adapter claims, it checks if the node was registered by a plugin using `MNodeClass(typeName).pluginName()`. Only plugin-registered nodes are translated; Maya built-in nodes (locators, joints, constraints, etc.) are always skipped. Plugin nodes that already provide their own Hydra scene index (e.g., `mayaUsdProxyShape`) are also excluded to avoid duplicate prims.
 
 2. **Adapter creation**: A `MayaHydraGenericDagAdapter` is created. This adapter:
    - Caches the Maya node type name (e.g., `"aiPhotometricLight"`).

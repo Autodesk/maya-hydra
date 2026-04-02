@@ -266,6 +266,9 @@ private:
     MayaHydraLightAdapterPtr      CreateLightAdapter(const MDagPath& dagPath);
     MayaHydraCameraAdapterPtr     CreateCameraAdapter(const MDagPath& dagPath);
     MayaHydraShapeAdapterPtr      CreateShapeAdapter(const MDagPath& dagPath);
+    /// Creates a generic adapter for plugin DAG nodes that have no registered
+    /// adapter. Returns null for Maya built-in nodes and for plugin nodes that
+    /// already provide their own Hydra scene index (e.g. mayaUsdProxyShape).
     MayaHydraGenericDagAdapterPtr CreateGenericAdapter(const MDagPath& dagPath);
 
     // Utilites

@@ -34,6 +34,10 @@
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
 
+#include <mayaHydraLib/adapters/mayaAttrs.h>
+
+#include <maya/MDagPath.h>
+#include <maya/MDagPathArray.h>
 #include <maya/MFnAttribute.h>
 #include <maya/MFnDagNode.h>
 #include <maya/MFnDependencyNode.h>
@@ -57,7 +61,7 @@ namespace {
 void _GenericNodeAttrChanged(
     MNodeMessage::AttributeMessage msg,
     MPlug& plug,
-    MPlug& otherPlug,
+    MPlug& /*otherPlug*/,
     void* clientData)
 {
     if (!(msg & MNodeMessage::kAttributeSet)) {
@@ -71,15 +75,63 @@ void _GenericNodeAttrChanged(
         return;
     }
 
+    MFnAttribute attr(plug.attribute());
+    const char* name = attr.name().asChar();
+
+    // Skip Maya built-in base class attributes (visibility, castsShadows,
+    // objectColorRGB, worldPosition, etc.). These are never included in the
+    // mayaAttributes dictionary by GetNonDefaultMayaAttributesFromNode(), so
+    // dirtying them would cause a pointless re-read with no data change.
+    if (IsBaseClassAttrName(name)) {
+        return;
+    }
+
     auto* adapter = reinterpret_cast<MayaHydraGenericDagAdapter*>(clientData);
 
-    MFnAttribute attr(plug.attribute());
-    TfToken attrName(attr.name().asChar());
+    TfToken attrName(name);
     HdDataSourceLocator locator(
         MayaHydraAdapterTokens->mayaNode,
         MayaHydraAdapterTokens->mayaAttributes,
         attrName);
     adapter->GetMayaHydraSceneIndex()->DirtyPrims({{ adapter->GetID(), HdDataSourceLocatorSet(locator) }});
+}
+
+// Visibility-only callback for the shape node itself. Unlike the base class
+// _TransformNodeDirty which fires DirtyTransform for any non-visibility plug,
+// this callback only reacts to visibility-related plugs. Plugin attribute
+// changes are handled separately by _GenericNodeAttrChanged.
+void _GenericShapePlugDirty(MObject& node, MPlug& plug, void* clientData)
+{
+    auto* adapter = reinterpret_cast<MayaHydraGenericDagAdapter*>(clientData);
+    if (plug == MayaAttrs::dagNode::visibility
+        || plug == MayaAttrs::dagNode::intermediateObject
+        || plug == MayaAttrs::dagNode::overrideEnabled
+        || plug == MayaAttrs::dagNode::overrideVisibility) {
+        adapter->MarkDirty(HdChangeTracker::DirtyVisibility);
+    }
+}
+
+// Transform-dirty callback for parent transform nodes only. Replicates the
+// base class _TransformNodeDirty behavior: visibility plugs fire
+// DirtyVisibility, all other plugs fire DirtyTransform.
+void _GenericParentTransformDirty(MObject& node, MPlug& plug, void* clientData)
+{
+    auto* adapter = reinterpret_cast<MayaHydraGenericDagAdapter*>(clientData);
+    if (plug == MayaAttrs::dagNode::visibility
+        || plug == MayaAttrs::dagNode::intermediateObject
+        || plug == MayaAttrs::dagNode::overrideEnabled
+        || plug == MayaAttrs::dagNode::overrideVisibility) {
+        if (adapter->IsVisible(false)) {
+            adapter->InvalidateTransform();
+            adapter->MarkDirty(
+                HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyTransform);
+        } else {
+            adapter->MarkDirty(HdChangeTracker::DirtyVisibility);
+        }
+    } else if (adapter->IsVisible(false)) {
+        adapter->InvalidateTransform();
+        adapter->MarkDirty(HdChangeTracker::DirtyTransform);
+    }
 }
 
 } // namespace
@@ -132,13 +184,49 @@ void MayaHydraGenericDagAdapter::MarkDirty(HdDirtyBits dirtyBits)
 void MayaHydraGenericDagAdapter::CreateCallbacks()
 {
     MStatus status;
+
+    // Per-attribute dirty callback on the shape node.
     auto obj = GetNode();
-    auto id = MNodeMessage::addAttributeChangedCallback(
+    auto cbId = MNodeMessage::addAttributeChangedCallback(
         obj, _GenericNodeAttrChanged, this, &status);
     if (status) {
-        AddCallback(id);
+        AddCallback(cbId);
     }
-    MayaHydraDagAdapter::CreateCallbacks();
+
+    // Visibility-only plug-dirty callback on the shape node. We do NOT use
+    // the base class _TransformNodeDirty here because it fires DirtyTransform
+    // for every non-visibility plug change (e.g. intensity), which is wrong
+    // for plugin attribute changes that we handle via _GenericNodeAttrChanged.
+    cbId = MNodeMessage::addNodeDirtyPlugCallback(
+        obj, _GenericShapePlugDirty, this, &status);
+    if (status) {
+        AddCallback(cbId);
+    }
+
+    // Walk the DAG hierarchy ABOVE the shape (parent transforms only) and
+    // register transform-dirty callbacks. This mirrors what the base class
+    // MayaHydraDagAdapter::CreateCallbacks() does, but skips the shape node.
+    MDagPathArray dags;
+    if (MDagPath::getAllPathsTo(GetDagPath().node(), dags)) {
+        for (unsigned int i = 0; i < dags.length(); ++i) {
+            auto dag = dags[i];
+            _AddHierarchyChangedCallbacks(dag);
+            dag.pop(); // skip the shape node
+            for (; dag.length() > 0; dag.pop()) {
+                MObject parentObj = dag.node();
+                if (parentObj != MObject::kNullObj) {
+                    cbId = MNodeMessage::addNodeDirtyPlugCallback(
+                        parentObj, _GenericParentTransformDirty, this, &status);
+                    if (status) {
+                        AddCallback(cbId);
+                    }
+                    _AddHierarchyChangedCallbacks(dag);
+                }
+            }
+        }
+    }
+
+    MayaHydraAdapter::CreateCallbacks();
 }
 
 void MayaHydraGenericDagAdapter::RemovePrim()

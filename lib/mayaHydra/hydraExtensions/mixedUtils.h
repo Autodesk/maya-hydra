@@ -286,6 +286,17 @@ void GetNonDefaultMayaAttributesFromNode(
     const MObject& node,
     PXR_NS::VtDictionary& attrs);
 
+/**
+ * @brief Check if an attribute name belongs to Maya's built-in DAG base classes.
+ *
+ * Returns true for attributes defined on locator, shape, dagNode, dependNode,
+ * etc. Used by the generic adapter's attribute-changed callback to avoid
+ * sending dirty notices for base class attributes that are never included
+ * in the mayaAttributes dictionary.
+ */
+MAYAHYDRALIB_API
+bool IsBaseClassAttrName(const char* attrName);
+
 } // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRALIB_MIXED_UTILS_H
