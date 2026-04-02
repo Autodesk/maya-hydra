@@ -120,7 +120,7 @@ def loadTestsFromDict(namespace_dict):
     return unittest.TestLoader().loadTestsFromModule(dummyModule)
 
 def runTests(globals_dict, stream=sys.__stderr__,
-             verbosity=1):
+             verbosity=1, coverage_quit_workaround=False):
     '''
     Run the unittests within the given namespace
 
@@ -138,6 +138,28 @@ def runTests(globals_dict, stream=sys.__stderr__,
     else:
         exitCode = 1
 
+    # Coverage builds sometimes hang during Maya shutdown; add diagnostics.
+    if coverage_quit_workaround and os.environ.get("MAYAHYDRA_CODE_COVERAGE"):
+        try:
+            import faulthandler
+            faulthandler.dump_traceback_later(120, repeat=True, file=sys.__stderr__)
+            sys.__stdout__.write("MayaHydra: coverage quit watchdog armed (120s)\n")
+        except Exception as e:
+            sys.__stdout__.write("MayaHydra: failed to arm quit watchdog: {}\n".format(e))
+        try:
+            sys.__stdout__.write("MayaHydra: pre-quit diagnostics\n")
+            sys.__stdout__.write("  MAYAHYDRA_CODE_COVERAGE={}\n".format(
+                os.environ.get("MAYAHYDRA_CODE_COVERAGE")))
+            sys.__stdout__.write("  listRenderers={}\n".format(
+                cmds.mayaHydra(listRenderers=True)))
+            sys.__stdout__.write("  listActiveRenderers={}\n".format(
+                cmds.mayaHydra(listActiveRenderers=True)))
+            sys.__stdout__.write("  listRegisteredOverrides={}\n".format(
+                cmds.mayaHydra(listRegisteredOverrides=True)))
+        except Exception as e:
+            sys.__stdout__.write("MayaHydra: pre-quit diagnostics failed: {}\n".format(e))
+        sys.__stdout__.flush()
+
     # cmds.quit will not flush the streams - make sure we do so!
     # ...flush all of the standard ones just to be sure, as well as the stream
     # given (which probably means it will be flushed twice, but that's fine)
@@ -146,6 +168,14 @@ def runTests(globals_dict, stream=sys.__stderr__,
     sys.__stdout__.flush()
     sys.__stderr__.flush()
     stream.flush()
+
+    # Coverage builds may hang during Maya shutdown; force exit with test status.
+    if coverage_quit_workaround and os.environ.get("MAYAHYDRA_CODE_COVERAGE"):
+        sys.__stdout__.write(
+            "MayaHydra: coverage build forcing exit (exitCode={})\n".format(exitCode)
+        )
+        sys.__stdout__.flush()
+        os._exit(exitCode)
 
     # maya running interactively will absorb much of the output. comment out the
     # following to prevent maya from exiting and open the script editor to look

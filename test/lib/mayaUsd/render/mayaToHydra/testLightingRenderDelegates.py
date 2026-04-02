@@ -445,4 +445,5 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
 
 if __name__ == "__main__":
-    fixturesUtils.runTests(globals())
+    # Coverage builds can hang during Maya shutdown for this test; force exit with status.
+    fixturesUtils.runTests(globals(), coverage_quit_workaround=True)
