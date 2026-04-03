@@ -38,6 +38,8 @@
 #include <pxr/usd/sdf/assetPath.h>
 #include <pxr/usd/usdLux/tokens.h>
 
+#include <type_traits>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -127,43 +129,31 @@ HdGenericNodeTranslationSceneIndex::_TranslatePhotometricLight(
     const HdSceneIndexPrim& inputPrim,
     const VtDictionary& mayaAttrs) const
 {
-    auto getFloat = [&](const char* key, float def) -> float {
+    // Maya internally stores many numeric attributes as doubles, but Hydra
+    // light schemas expect floats, so the float specialization also accepts
+    // double values and narrows them.
+    auto getAttr = [&](const char* key, auto def) {
+        using T = decltype(def);
         auto it = mayaAttrs.find(key);
-        if (it != mayaAttrs.end() && it->second.IsHolding<float>())
-            return it->second.UncheckedGet<float>();
-        if (it != mayaAttrs.end() && it->second.IsHolding<double>())
-            return static_cast<float>(it->second.UncheckedGet<double>());
-        return def;
-    };
-    auto getVec3f = [&](const char* key, GfVec3f def) -> GfVec3f {
-        auto it = mayaAttrs.find(key);
-        if (it != mayaAttrs.end() && it->second.IsHolding<GfVec3f>())
-            return it->second.UncheckedGet<GfVec3f>();
-        return def;
-    };
-    auto getString = [&](const char* key, std::string def) -> std::string {
-        auto it = mayaAttrs.find(key);
-        if (it != mayaAttrs.end() && it->second.IsHolding<std::string>())
-            return it->second.UncheckedGet<std::string>();
-        return def;
-    };
-    auto getBool = [&](const char* key, bool def) -> bool {
-        auto it = mayaAttrs.find(key);
-        if (it != mayaAttrs.end() && it->second.IsHolding<bool>())
-            return it->second.UncheckedGet<bool>();
+        if (it != mayaAttrs.end() && it->second.IsHolding<T>())
+            return it->second.UncheckedGet<T>();
+        if constexpr (std::is_same_v<T, float>) {
+            if (it != mayaAttrs.end() && it->second.IsHolding<double>())
+                return static_cast<float>(it->second.UncheckedGet<double>());
+        }
         return def;
     };
 
-    float       intensity   = getFloat("intensity", 1.0f);
-    GfVec3f     color       = getVec3f("color", GfVec3f(1.0f));
-    float       exposure    = getFloat("aiExposure", 0.0f);
-    std::string iesFile     = getString("aiFilename", "");
-    float       radius      = getFloat("aiRadius", 0.0f);
-    bool        normalize   = getBool("aiNormalize", true);
-    float       diffuse     = getFloat("aiDiffuse", 1.0f);
-    float       specular    = getFloat("aiSpecular", 1.0f);
-    bool        castShadows = getBool("aiCastShadows", true);
-    GfVec3f     shadowColor = getVec3f("aiShadowColor", GfVec3f(0.0f));
+    float       intensity   = getAttr("intensity", 1.0f);
+    GfVec3f     color       = getAttr("color", GfVec3f(1.0f));
+    float       exposure    = getAttr("aiExposure", 0.0f);
+    std::string iesFile     = getAttr("aiFilename", std::string());
+    float       radius      = getAttr("aiRadius", 0.0f);
+    bool        normalize   = getAttr("aiNormalize", true);
+    float       diffuse     = getAttr("aiDiffuse", 1.0f);
+    float       specular    = getAttr("aiSpecular", 1.0f);
+    bool        castShadows = getAttr("aiCastShadows", true);
+    GfVec3f     shadowColor = getAttr("aiShadowColor", GfVec3f(0.0f));
 
     HdSceneIndexPrim result;
     result.primType = HdPrimTypeTokens->sphereLight;

@@ -29,7 +29,6 @@ class TestGenericDagNodeTranslation(mtohUtils.MayaHydraBaseTestCase):
     _requiredPlugins = ['mtoa']
 
     def setupScene(self):
-        cmds.file(new=True, force=True)
         with PluginLoaded('mtoa'):
             xform = cmds.createNode('transform', name='photometric1')
             shape = cmds.createNode(
@@ -52,7 +51,8 @@ class TestGenericDagNodeTranslation(mtohUtils.MayaHydraBaseTestCase):
             )
             shapeDefaults = cmds.ls(shapeDefaults, long=True)[0]
 
-        self.setHdStormRenderer()
+        # Pass node paths to the C++ GTest side via optionVars.
+        # This is a test-only mechanism, not needed in production.
         cmds.optionVar(stringValue=("mhGenericShape", shape))
         cmds.optionVar(stringValue=("mhGenericShapeDefaults",
                                     shapeDefaults))

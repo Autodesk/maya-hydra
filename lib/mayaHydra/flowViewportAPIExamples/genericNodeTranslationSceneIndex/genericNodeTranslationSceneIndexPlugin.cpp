@@ -15,10 +15,12 @@
 //
 // Registers HdGenericNodeTranslationSceneIndex as a scene index plugin for
 // the "Arnold" renderer via HdSceneIndexPluginRegistry::RegisterSceneIndexForRenderer.
-// To adapt this example for another render delegate, change the renderer name
-// string ("Arnold") to the target renderer's registered name (e.g., "Prman")
-// and handle the relevant Maya node types in the
-// filtering scene index.
+// Arnold is used here as an example. To adapt for another render delegate,
+// change BOTH:
+//   1. The "Arnold" string in RegisterSceneIndexForRenderer() below.
+//   2. The "loadWithRenderer" value in plugInfo.json.
+// to the target renderer's registered name (e.g., "Prman"), and handle the
+// relevant Maya node types in the filtering scene index.
 //
 
 #include "genericNodeTranslationSceneIndexPlugin.h"

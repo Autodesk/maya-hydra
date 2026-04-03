@@ -49,7 +49,7 @@ This is useful for plugin-defined node types such as `aiPhotometricLight`, `aiLi
    - Makes no assumption about what the node represents (light, mesh, camera, etc.).
 
 3. **Prim insertion**: The adapter inserts a Hydra prim with type `mayaCustomDagNode` into the scene index. The prim carries these data sources:
-   - `xform` -- standard Hydra transform from the DAG path.
+   - `xform` -- world-space transform (flattened inclusive matrix from the complete DAG path).
    - `visibility` -- standard Hydra visibility from the DAG path.
    - `purpose` -- standard Hydra purpose.
    - `mayaNode` -- a custom container data source (`MayaHydraGenericNodeDataSource`) with:
