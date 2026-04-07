@@ -38,6 +38,7 @@
 #include <maya/MDrawContext.h>
 #include <maya/MPointArray.h>
 #include <maya/MSelectionContext.h>
+#include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
 #include <maya/MSelectionList.h>
 
@@ -169,6 +170,10 @@ public:
 
     /// Return true if \p plug is an extension or dynamic attribute.
     static bool IsExtensionOrDynamicAttribute(const MPlug& plug);
+
+    /// True for attribute-changed messages that should refresh extension/dynamic primvars: value
+    /// changes (kAttributeSet) and DG structure (add/remove/rename).
+    static bool AttributeMessageAffectsExtensionPrimvars(MNodeMessage::AttributeMessage msg);
 
     MAYAHYDRALIB_API
     /// Return the mesh topology for this prim (if applicable).

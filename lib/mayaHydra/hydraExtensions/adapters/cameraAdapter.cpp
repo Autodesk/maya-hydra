@@ -67,18 +67,17 @@ static void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)
     }
 }
 
-// Fires when any attribute value changes (including reset to default). Ensures extension
-// attrs like aiUScale trigger primvar dirty so the scene browser updates when resetting.
+// Fires on attribute value changes and DG structure changes (add/remove/rename). Ensures
+// extension attrs like aiUScale trigger primvar dirty, and undo/redo of addAttr refreshes primvars.
 static void _cameraAttributeChanged(
     MNodeMessage::AttributeMessage msg,
     MPlug&                        plug,
     MPlug&                        otherPlug,
     void*                         clientData)
 {
-    TF_UNUSED(msg);
     TF_UNUSED(otherPlug);
     auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
-    if (!(msg & MNodeMessage::kAttributeSet)) {
+    if (!MayaHydraAdapter::AttributeMessageAffectsExtensionPrimvars(msg)) {
         return;
     }
     MPlug topPlug = MayaHydra::GetTopPlug(plug);
