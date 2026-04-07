@@ -112,7 +112,6 @@
 #include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/basisCurvesSchema.h>
-#include <pxr/imaging/hdGp/generativeProceduralResolvingSceneIndex.h>
 #include <pxr/usd/kind/registry.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/modelAPI.h>
@@ -1563,9 +1562,7 @@ void MtohRenderOverride::_InitHydraResources(
 
     // Create GP resolving scene index before selection so generated prims
     // are visible to selection highlighting infrastructure
-    auto pixarGpResolver
-        = HdGpGenerativeProceduralResolvingSceneIndex::New(_sceneGlobalsSceneIndex);
-    _gpResolvingSceneIndex = MhGenerativeProceduralResolvingSceneIndex::New(pixarGpResolver);
+    _gpResolvingSceneIndex = MhGenerativeProceduralResolvingSceneIndex::New(_sceneGlobalsSceneIndex);
     _gpResolvingSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT);
 
     _selection = std::make_shared<Fvp::Selection>();

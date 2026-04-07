@@ -19,8 +19,9 @@
 
 #include "mayaHydraLib/api.h"
 
-#include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/usd/sdf/path.h>
+#include <pxr/imaging/hd/filteringSceneIndex.h>
+#include <pxr/imaging/hdGp/generativeProceduralResolvingSceneIndex.h>
 
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 
@@ -40,8 +41,8 @@ public:
     static MhGenerativeProceduralResolvingSceneIndexRefPtr
     New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex)
     {
-        return PXR_NS::TfCreateRefPtr(
-            new MhGenerativeProceduralResolvingSceneIndex(inputSceneIndex));
+        return PXR_NS::TfCreateRefPtr(new MhGenerativeProceduralResolvingSceneIndex(
+            PXR_NS::HdGpGenerativeProceduralResolvingSceneIndex::New(inputSceneIndex)));
     }
 
     PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath& primPath) const override
