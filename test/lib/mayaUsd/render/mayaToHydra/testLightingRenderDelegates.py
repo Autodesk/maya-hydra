@@ -167,14 +167,8 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         # Dump captured output into CI log before cleanup.
         try:
             history = getattr(cls, "_maya_history_file", None)
-            if history and os.path.isfile(history):
-                with open(history, "r", encoding="utf-8", errors="replace") as f:
-                    lines = f.read().splitlines()
-                tail = lines[-400:] if len(lines) > 400 else lines
-                _log("\n===== Maya Script Editor history (last {} lines): {} =====".format(len(tail), history))
-                for ln in tail:
-                    _log(ln)
-                _log("===== end Maya Script Editor history =====\n")
+            if history:
+                cls._print_log_tail(history, "Maya Script Editor history", max_lines=400)
             else:
                 _log("Maya Script Editor history: (missing) {}".format(history))
         except Exception as e:
@@ -236,15 +230,35 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             if not os.path.isfile(path):
                 _log("{}: (missing) {}".format(title, path))
                 return
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
-                lines = f.read().splitlines()
-            tail = lines[-max_lines:] if len(lines) > max_lines else lines
+            tail = self._tail_lines(path, max_lines)
             _log("\n===== {} (last {} lines): {} =====".format(title, len(tail), path))
             for ln in tail:
                 _log(ln)
             _log("===== end {} =====\n".format(title))
         except Exception as e:
             _log("Warning: failed to print {} tail ({}): {}".format(title, path, e))
+
+    def _tail_lines(self, path, max_lines, chunk_size=8192):
+        """Read the last N lines without loading whole file."""
+        try:
+            with open(path, "rb") as f:
+                f.seek(0, os.SEEK_END)
+                end = f.tell()
+                if end == 0:
+                    return []
+                buffer = b""
+                lines = []
+                while end > 0 and len(lines) <= max_lines:
+                    read_size = min(chunk_size, end)
+                    end -= read_size
+                    f.seek(end)
+                    buffer = f.read(read_size) + buffer
+                    lines = buffer.splitlines()
+                tail = lines[-max_lines:] if len(lines) > max_lines else lines
+                return [ln.decode("utf-8", "replace") for ln in tail]
+        except Exception as e:
+            _log("Warning: failed to read {} tail: {}".format(path, e))
+            return []
 
     def _log_prman_diagnostics(self, stage):
         """Log PRMan-related diagnostics to help debug delegate init failures."""
