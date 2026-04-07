@@ -369,7 +369,7 @@ TEST(CustomAttributes, dynamicAttributeUndoRedoRefreshesPrimvars)
     MStatus             status;
     MFnNumericAttribute nAttr;
     MObject attrObj = nAttr.create(
-        "mhUndoRedoPrimvarTest", "mhURPT", MFnNumericData::kLong, 0.0, &status);
+        "mhUndoRedoPrimvarTest", "mhURPT", MFnNumericData::kLong, 0, &status);
     ASSERT_TRUE(status) << "Failed to create numeric attribute";
     MDGModifier mod;
     status = mod.addAttribute(cubeNode, attrObj);
