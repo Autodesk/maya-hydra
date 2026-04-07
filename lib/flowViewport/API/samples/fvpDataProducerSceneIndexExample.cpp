@@ -93,8 +93,8 @@ namespace PrototypeInstancing
             HdPrimvarSchema::BuildInterpolationDataSource(interpolation),
             HdPrimvarSchema::BuildInterpolationDataSource(role)
 #if PXR_VERSION >= 2505
-#if PXR_VERSION > 2511
-            // const HdTokenDataSourceHandle& colorSpace added after USD 25.11
+#if PXR_VERSION >= 2602
+            // const HdTokenDataSourceHandle& colorSpace added in USD 26.02
             , nullptr
 #endif
             // const HdIntDataSourceHandle& elementSize added in USD 25.05
