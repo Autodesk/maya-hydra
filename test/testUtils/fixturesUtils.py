@@ -17,6 +17,7 @@
 import os
 import shutil
 import sys
+import time
 import unittest
 
 def _setUpClass(modulePathName, pluginName, initializeStandalone):
@@ -132,14 +133,29 @@ def runTests(globals_dict, stream=sys.__stderr__,
     import maya.cmds as cmds
     suite = loadTestsFromDict(globals_dict)
     runner = unittest.TextTestRunner(stream=stream, verbosity=verbosity)
+    coverage_enabled = coverage_quit_workaround and os.environ.get("MAYAHYDRA_CODE_COVERAGE")
+    coverage_start = None
+    if coverage_enabled:
+        coverage_start = time.monotonic()
+        sys.__stdout__.write(
+            "MayaHydra: coverage timing start (pid={}, t={:.3f})\n".format(
+                os.getpid(), coverage_start)
+        )
+        sys.__stdout__.flush()
     results = runner.run(suite)
+    if coverage_enabled and coverage_start is not None:
+        sys.__stdout__.write(
+            "MayaHydra: coverage timing after tests (dt={:.3f}s)\n".format(
+                time.monotonic() - coverage_start)
+        )
+        sys.__stdout__.flush()
     if results.wasSuccessful():
         exitCode = 0
     else:
         exitCode = 1
 
     # Coverage builds sometimes hang during Maya shutdown; add diagnostics.
-    if coverage_quit_workaround and os.environ.get("MAYAHYDRA_CODE_COVERAGE"):
+    if coverage_enabled:
         try:
             import faulthandler
             faulthandler.dump_traceback_later(120, repeat=True, file=sys.__stderr__)
@@ -158,6 +174,11 @@ def runTests(globals_dict, stream=sys.__stderr__,
                 cmds.mayaHydra(listRegisteredOverrides=True)))
         except Exception as e:
             sys.__stdout__.write("MayaHydra: pre-quit diagnostics failed: {}\n".format(e))
+        if coverage_start is not None:
+            sys.__stdout__.write(
+                "MayaHydra: coverage timing pre-quit (dt={:.3f}s)\n".format(
+                    time.monotonic() - coverage_start)
+            )
         sys.__stdout__.flush()
 
     # cmds.quit will not flush the streams - make sure we do so!
@@ -170,7 +191,12 @@ def runTests(globals_dict, stream=sys.__stderr__,
     stream.flush()
 
     # Coverage builds may hang during Maya shutdown; force exit with test status.
-    if coverage_quit_workaround and os.environ.get("MAYAHYDRA_CODE_COVERAGE"):
+    if coverage_enabled:
+        if coverage_start is not None:
+            sys.__stdout__.write(
+                "MayaHydra: coverage timing before force-exit (dt={:.3f}s)\n".format(
+                    time.monotonic() - coverage_start)
+            )
         sys.__stdout__.write(
             "MayaHydra: coverage build forcing exit (exitCode={})\n".format(exitCode)
         )

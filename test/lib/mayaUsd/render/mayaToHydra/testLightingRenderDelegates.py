@@ -222,7 +222,8 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             except Exception as e:
                 _log("Warning: failed to restore Maya workspace: {}".format(e))
 
-    def _print_log_tail(self, path, title, max_lines=200):
+    @classmethod
+    def _print_log_tail(cls, path, title, max_lines=200):
         """Print the tail of a log file to stdout so CI logs capture it."""
         if not path:
             return
@@ -230,7 +231,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             if not os.path.isfile(path):
                 _log("{}: (missing) {}".format(title, path))
                 return
-            tail = self._tail_lines(path, max_lines)
+            tail = cls._tail_lines(path, max_lines)
             _log("\n===== {} (last {} lines): {} =====".format(title, len(tail), path))
             for ln in tail:
                 _log(ln)
@@ -238,7 +239,8 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         except Exception as e:
             _log("Warning: failed to print {} tail ({}): {}".format(title, path, e))
 
-    def _tail_lines(self, path, max_lines, chunk_size=8192):
+    @staticmethod
+    def _tail_lines(path, max_lines, chunk_size=8192):
         """Read the last N lines without loading whole file."""
         try:
             with open(path, "rb") as f:
