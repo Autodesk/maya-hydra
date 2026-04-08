@@ -339,8 +339,10 @@ TEST(CustomAttributes, aiPrimvarsAppearAndRemovedWhenReset)
 #endif
 }
 
-// What: undo/redo of addAttr must refresh Hydra primvars (kAttributeRemoved / kAttributeAdded).
-// How: add a dynamic long on pCubeShape1 via MDGModifier; undo; redo; compare primvar data sources.
+// What: undo/redo after adding a dynamic attr must refresh Hydra primvars (kAttributeRemoved /
+// kAttributeAdded).
+// How: add a dynamic long on pCubeShape1 via MDGModifier; undo/redo with the same MDGModifier
+// (global undo does not record bare MDGModifier::doIt()).
 // Expect: primvar present after add and redo; matches absent reference after undo.
 TEST(CustomAttributes, dynamicAttributeUndoRedoRefreshesPrimvars)
 {
@@ -390,23 +392,25 @@ TEST(CustomAttributes, dynamicAttributeUndoRedoRefreshesPrimvars)
         << "Dynamic attr should expose primvar after add. See "
         << getDataSourceComparisonOutputPath(presentRef).string() << " for actual";
 
-    MGlobal::executeCommand("undo");
+    status = mod.undoIt();
+    ASSERT_TRUE(status) << "MDGModifier::undoIt failed";
     MGlobal::executeCommand("refresh");
     prim = mayaSceneIndex->GetPrim(primPath);
     EXPECT_TRUE(dataSourceMatchesReference(
         HdContainerDataSource::Get(
             prim.dataSource, primvarsLocator.Append(TfToken("mhUndoRedoPrimvarTest"))),
         absentReference))
-        << "Primvar should disappear after undo of addAttr";
+        << "Primvar should disappear after MDGModifier::undoIt (addAttribute)";
 
-    MGlobal::executeCommand("redo");
+    status = mod.doIt();
+    ASSERT_TRUE(status) << "MDGModifier::doIt failed (redo addAttribute)";
     MGlobal::executeCommand("refresh");
     prim = mayaSceneIndex->GetPrim(primPath);
     EXPECT_TRUE(dataSourceMatchesReference(
         HdContainerDataSource::Get(
             prim.dataSource, primvarsLocator.Append(TfToken("mhUndoRedoPrimvarTest"))),
         presentRef))
-        << "Primvar should return after redo";
+        << "Primvar should return after MDGModifier::doIt redo";
 
     MGlobal::executeCommand("catchQuiet(`deleteAttr -at mhUndoRedoPrimvarTest pCubeShape1`);");
 #else
