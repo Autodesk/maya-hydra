@@ -25,6 +25,12 @@ void MhGenerativeProceduralResolvingSceneIndex::AddExcludedSceneRoot(const SdfPa
     _excludedSceneRoots.emplace(sceneRoot);
 }
 
-
+MAYAHYDRALIB_API
+MhGenerativeProceduralResolvingSceneIndexRefPtr
+MhGenerativeProceduralResolvingSceneIndex::New(const HdSceneIndexBaseRefPtr& inputSceneIndex)
+{
+    return TfCreateRefPtr(new MhGenerativeProceduralResolvingSceneIndex(
+        HdGpGenerativeProceduralResolvingSceneIndex::New(inputSceneIndex)));
+}
 
 } // namespace MAYAHYDRA_NS_DEF

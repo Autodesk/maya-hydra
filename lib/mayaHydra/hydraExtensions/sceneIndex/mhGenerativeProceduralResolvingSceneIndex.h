@@ -17,12 +17,15 @@
 #ifndef MAYA_HYDRA_GENERATIVE_PROCEDURAL_RESOLVING_SCENE_INDEX_H
 #define MAYA_HYDRA_GENERATIVE_PROCEDURAL_RESOLVING_SCENE_INDEX_H
 
+// MayaHydra headers
 #include "mayaHydraLib/api.h"
 
+// Usd/Hydra headers 
 #include <pxr/usd/sdf/path.h>
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/imaging/hdGp/generativeProceduralResolvingSceneIndex.h>
 
+// Flow viewport toolkit headers
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 
 namespace MAYAHYDRA_NS_DEF {
@@ -31,6 +34,10 @@ class MhGenerativeProceduralResolvingSceneIndex;
 typedef PXR_NS::TfRefPtr<MhGenerativeProceduralResolvingSceneIndex>
     MhGenerativeProceduralResolvingSceneIndexRefPtr;
 
+/// \class MhGenerativeProceduralResolvingSceneIndex
+/// Single-input filtering scene index that wraps the scene index produced by 
+/// HdGpGenerativeProceduralResolvingSceneIndex.
+/// Forwards GetPrim / child paths to the input and relays prim notifications downstream.
 class MhGenerativeProceduralResolvingSceneIndex
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
     , public Fvp::InputSceneIndexUtils<MhGenerativeProceduralResolvingSceneIndex>
@@ -38,13 +45,11 @@ class MhGenerativeProceduralResolvingSceneIndex
 public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
+    MAYAHYDRALIB_API
     static MhGenerativeProceduralResolvingSceneIndexRefPtr
-    New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex)
-    {
-        return PXR_NS::TfCreateRefPtr(new MhGenerativeProceduralResolvingSceneIndex(
-            PXR_NS::HdGpGenerativeProceduralResolvingSceneIndex::New(inputSceneIndex)));
-    }
+    New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex);
 
+    // HdSceneIndexBase: delegate to the wrapped input
     PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath& primPath) const override
     {
         return GetInputSceneIndex()->GetPrim(primPath);
@@ -67,6 +72,7 @@ protected:
     {
     }
 
+    // From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(
         const PXR_NS::HdSceneIndexBase& sender,
         const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override
