@@ -41,7 +41,6 @@ class TestHydraGenerativeProcedural(mtohUtils.MayaHydraBaseTestCase):
         cmds.refresh()
 
     def test_MaterialBinding(self):
-        self.loadUsdScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="HydraGenerativeProcedural.testMaterialBinding")
 
