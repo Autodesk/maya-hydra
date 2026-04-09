@@ -29,8 +29,14 @@ MAYAHYDRALIB_API
 MhGenerativeProceduralResolvingSceneIndexRefPtr
 MhGenerativeProceduralResolvingSceneIndex::New(const HdSceneIndexBaseRefPtr& inputSceneIndex)
 {
+#if defined(_WIN32) && PXR_VERSION < 2511
+    // HdGp protected constructors are not exported from usd_hdGp.dll.
+    return TfCreateRefPtr(new MhGenerativeProceduralResolvingSceneIndex(inputSceneIndex));
+#else
     return TfCreateRefPtr(new MhGenerativeProceduralResolvingSceneIndex(
         HdGpGenerativeProceduralResolvingSceneIndex::New(inputSceneIndex)));
+#endif
+
 }
 
 } // namespace MAYAHYDRA_NS_DEF

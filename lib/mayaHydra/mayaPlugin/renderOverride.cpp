@@ -1560,8 +1560,10 @@ void MtohRenderOverride::_InitHydraResources(
         }
     }
 
-    // Create GP resolving scene index before selection so generated prims
-    // are visible to selection highlighting infrastructure
+    // Create HdGp before selection so generated prims are selectable/highlightable.
+    // Use MhGenerativeProceduralResolvingSceneIndex so we match other MayaHydra
+    // scene indices, can ApplyExcludedSceneRoot for Maya native content, and keep
+    // HdGp usage centralized in mayaHydraLib.
     _gpResolvingSceneIndex = MhGenerativeProceduralResolvingSceneIndex::New(_sceneGlobalsSceneIndex);
     _gpResolvingSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT);
 

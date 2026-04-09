@@ -35,9 +35,12 @@ typedef PXR_NS::TfRefPtr<MhGenerativeProceduralResolvingSceneIndex>
     MhGenerativeProceduralResolvingSceneIndexRefPtr;
 
 /// \class MhGenerativeProceduralResolvingSceneIndex
-/// Single-input filtering scene index that wraps the scene index produced by 
-/// HdGpGenerativeProceduralResolvingSceneIndex.
-/// Forwards GetPrim / child paths to the input and relays prim notifications downstream.
+/// Wraps HdGp's generative-procedural resolving scene index for the MayaHydra viewport chain.
+///
+/// Render setup places scene globals before this index (procedurals need the current frame)
+/// and selection after (generated prims must exist for highlighting). The `Mh*` wrapper keeps
+/// HdGp construction in mayaHydraLib and aligns with other MayaHydra indices (e.g. excluded roots),
+/// instead of inlining `HdGpGenerativeProceduralResolvingSceneIndex::New` in the plugin.
 class MhGenerativeProceduralResolvingSceneIndex
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
     , public Fvp::InputSceneIndexUtils<MhGenerativeProceduralResolvingSceneIndex>

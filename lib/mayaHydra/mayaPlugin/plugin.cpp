@@ -191,8 +191,14 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
     // For now this is required for the HdSt backend to use lights.
     setEnv("USDIMAGING_ENABLE_SCENE_LIGHTS", "1");
-    // Force to false to prevent duplicate scene indices (custom GP resolver and OpenUSD's GP resolver)
+#if defined(_WIN32) && PXR_VERSION < 2511
+    // This is required to see Hydra Generative Procedurals in the viewport
+    setEnv("HDGP_INCLUDE_DEFAULT_RESOLVER", "1");
+#else
+    // Force to false to prevent duplicate scene indices (custom GP resolver and OpenUSD's GP
+    // resolver)
     setEnv("HDGP_INCLUDE_DEFAULT_RESOLVER", "0");
+#endif
 
     // Set dome light textures maximum resolution default to 1024.  A proper
     // solution with a Hydra preferences category in the Maya
