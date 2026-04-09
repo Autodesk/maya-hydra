@@ -21,7 +21,7 @@
 // mayaAttributes dictionary.
 //
 // The Python counterpart (testGenericDagNodeTranslation.py) sets up the Maya
-// scene and passes node paths via optionVars before invoking these tests.
+// scene and passes node paths as positional arguments to mayaHydraCppTest.
 //
 
 #include "testUtils.h"
@@ -42,21 +42,14 @@
 #include <string>
 
 PXR_NAMESPACE_USING_DIRECTIVE
-
-namespace {
-
-const char* kGenericShapeOptionVar = "mhGenericShape";
-const char* kGenericShapeFallback = "photometricShape1";
-const char* kGenericShapeDefaultsOptionVar = "mhGenericShapeDefaults";
-const char* kGenericShapeDefaultsFallback = "photometricShapeDefaults1";
-
-} // namespace
+using namespace MayaHydra;
 
 // Verify prim type is mayaCustomDagNode and data source contains expected values.
 TEST(GenericDagNodeTranslation, verifyPrimTypeAndDataSource)
 {
-    const std::string shapeFull
-        = GetOptionVarOrDefault(kGenericShapeOptionVar, kGenericShapeFallback);
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_GE(argc, 1);
+    const std::string shapeFull(argv[0]);
     const std::string shapeNamePart = GetShapeNameFromFullPath(shapeFull);
 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
@@ -126,8 +119,9 @@ TEST(GenericDagNodeTranslation, verifyPrimTypeAndDataSource)
 // and the updated value is readable.
 TEST(GenericDagNodeTranslation, verifyAttributeDirtyAndUpdate)
 {
-    const std::string shapeFull
-        = GetOptionVarOrDefault(kGenericShapeOptionVar, kGenericShapeFallback);
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_GE(argc, 1);
+    const std::string shapeFull(argv[0]);
     const std::string shapeNamePart = GetShapeNameFromFullPath(shapeFull);
 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
@@ -197,8 +191,9 @@ TEST(GenericDagNodeTranslation, verifyAttributeDirtyAndUpdate)
 // and does not dirty other attributes.
 TEST(GenericDagNodeTranslation, verifyNoDuplicateDirtyNotices)
 {
-    const std::string shapeFull
-        = GetOptionVarOrDefault(kGenericShapeOptionVar, kGenericShapeFallback);
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_GE(argc, 1);
+    const std::string shapeFull(argv[0]);
     const std::string shapeNamePart = GetShapeNameFromFullPath(shapeFull);
 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
@@ -259,8 +254,9 @@ TEST(GenericDagNodeTranslation, verifyNoDuplicateDirtyNotices)
 // dirty notice. Only the per-attribute locator should be dirtied.
 TEST(GenericDagNodeTranslation, verifyNoSpuriousXformDirty)
 {
-    const std::string shapeFull
-        = GetOptionVarOrDefault(kGenericShapeOptionVar, kGenericShapeFallback);
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_GE(argc, 1);
+    const std::string shapeFull(argv[0]);
     const std::string shapeNamePart = GetShapeNameFromFullPath(shapeFull);
 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
@@ -316,8 +312,9 @@ TEST(GenericDagNodeTranslation, verifyNoSpuriousXformDirty)
 // Verify that attributes left at their default value are NOT included in mayaAttributes.
 TEST(GenericDagNodeTranslation, verifyDefaultValuesNotTranslated)
 {
-    const std::string shapeFull
-        = GetOptionVarOrDefault(kGenericShapeOptionVar, kGenericShapeFallback);
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_GE(argc, 1);
+    const std::string shapeFull(argv[0]);
     const std::string shapeNamePart = GetShapeNameFromFullPath(shapeFull);
 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
@@ -367,8 +364,9 @@ TEST(GenericDagNodeTranslation, verifyDefaultValuesNotTranslated)
 // dictionary is empty.
 TEST(GenericDagNodeTranslation, verifyDefaultOnlyNodeInHydraWithEmptyAttrs)
 {
-    const std::string shapeFull
-        = GetOptionVarOrDefault(kGenericShapeDefaultsOptionVar, kGenericShapeDefaultsFallback);
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_GE(argc, 1);
+    const std::string shapeFull(argv[0]);
     const std::string shapeNamePart = GetShapeNameFromFullPath(shapeFull);
 
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();

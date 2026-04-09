@@ -268,7 +268,8 @@ private:
     MayaHydraShapeAdapterPtr      CreateShapeAdapter(const MDagPath& dagPath);
     /// Creates a generic adapter for plugin DAG nodes that have no registered
     /// adapter. Returns null for Maya built-in nodes and for plugin nodes that
-    /// already provide their own Hydra scene index (e.g. mayaUsdProxyShape).
+    /// already provide their own Hydra data through the Flow Viewport data
+    /// producer API (checked via DataProducersNodeHashCodeToSdfPathRegistry).
     MayaHydraGenericDagAdapterPtr CreateGenericAdapter(const MDagPath& dagPath);
 
     // Utilites

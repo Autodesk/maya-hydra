@@ -1350,15 +1350,14 @@ MayaHydraGenericDagAdapterPtr MayaHydraSceneIndex::CreateGenericAdapter(const MD
         return {};
     }
 
-    // Skip plugin nodes that already provide their own Hydra scene index
-    // (e.g. mayaUsdProxyShape contributes USD data through registration.cpp).
-    // Translating them generically would create duplicate prims in the scene.
-    static const char* kSceneIndexProviderTypes[] = { "mayaUsdProxyShape" };
-    const MString typeName = depNode.typeName();
-    for (const char* providerType : kSceneIndexProviderTypes) {
-        if (typeName == providerType) {
-            return {};
-        }
+    // Skip plugin nodes that already provide their own Hydra data through
+    // the Flow Viewport data producer API.  Their MObjectHandle hash code
+    // is registered in DataProducersNodeHashCodeToSdfPathRegistry when
+    // they call addDataProducerSceneIndex() with a dccNode pointer.
+    MObjectHandle nodeHandle(dagPath.node());
+    if (!Fvp::DataProducersNodeHashCodeToSdfPathRegistry::Instance()
+             .GetPath(nodeHandle.hashCode()).IsEmpty()) {
+        return {};
     }
 
     auto creator = [](MayaHydraSceneIndex* si, const MDagPath& dag)

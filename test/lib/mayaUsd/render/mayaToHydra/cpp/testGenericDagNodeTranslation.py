@@ -16,7 +16,8 @@
 # Sets up a Maya scene with two aiPhotometricLight nodes:
 #   1. photometricShape1: has non-default attribute values (intensity, aiExposure, aiFilename)
 #   2. photometricShapeDefaults1: all attributes at default values
-# Then delegates verification to C++ GTest functions via cmds.mayaHydraCppTest.
+# Then delegates verification to C++ GTest functions via cmds.mayaHydraCppTest,
+# passing node paths as positional arguments.
 #
 import maya.cmds as cmds
 import fixturesUtils
@@ -36,10 +37,10 @@ class TestGenericDagNodeTranslation(mtohUtils.MayaHydraBaseTestCase):
                 name='photometricShape1',
                 parent=xform,
             )
-            shape = cmds.ls(shape, long=True)[0]
-            cmds.setAttr(shape + ".intensity", 2.5)
-            cmds.setAttr(shape + ".aiExposure", 3.0)
-            cmds.setAttr(shape + ".aiFilename",
+            self._shape = cmds.ls(shape, long=True)[0]
+            cmds.setAttr(self._shape + ".intensity", 2.5)
+            cmds.setAttr(self._shape + ".aiExposure", 3.0)
+            cmds.setAttr(self._shape + ".aiFilename",
                          "/path/to/test.ies", type="string")
 
             xformDefaults = cmds.createNode('transform',
@@ -49,49 +50,50 @@ class TestGenericDagNodeTranslation(mtohUtils.MayaHydraBaseTestCase):
                 name='photometricShapeDefaults1',
                 parent=xformDefaults,
             )
-            shapeDefaults = cmds.ls(shapeDefaults, long=True)[0]
+            self._shapeDefaults = cmds.ls(shapeDefaults, long=True)[0]
 
-        # Pass node paths to the C++ GTest side via optionVars.
-        # This is a test-only mechanism, not needed in production.
-        cmds.optionVar(stringValue=("mhGenericShape", shape))
-        cmds.optionVar(stringValue=("mhGenericShapeDefaults",
-                                    shapeDefaults))
         cmds.refresh()
 
     def test_photometricLightTranslation(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
+                self._shape,
                 f="GenericDagNodeTranslation.verifyPrimTypeAndDataSource")
 
     def test_photometricLightAttributeDirty(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
+                self._shape,
                 f="GenericDagNodeTranslation.verifyAttributeDirtyAndUpdate")
 
     def test_photometricLightNoDuplicateDirty(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
+                self._shape,
                 f="GenericDagNodeTranslation.verifyNoDuplicateDirtyNotices")
 
     def test_noSpuriousXformDirty(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
+                self._shape,
                 f="GenericDagNodeTranslation.verifyNoSpuriousXformDirty")
 
     def test_defaultValuesNotTranslated(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
+                self._shape,
                 f="GenericDagNodeTranslation.verifyDefaultValuesNotTranslated")
 
     def test_defaultOnlyNodeInHydraWithEmptyAttrs(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
+                self._shapeDefaults,
                 f="GenericDagNodeTranslation.verifyDefaultOnlyNodeInHydraWithEmptyAttrs")
 
 
