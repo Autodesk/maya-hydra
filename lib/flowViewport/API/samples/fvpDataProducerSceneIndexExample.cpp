@@ -92,7 +92,12 @@ namespace PrototypeInstancing
             emptyArray, //is an indexer on the primVars which we don't use, primVars are not indexed in our case.
             HdPrimvarSchema::BuildInterpolationDataSource(interpolation),
             HdPrimvarSchema::BuildInterpolationDataSource(role)
-#if PXR_VERSION >= 2505 // const HdIntDataSourceHandle& elementSize added in USD 25.05
+#if PXR_VERSION >= 2505
+#if PXR_VERSION >= 2602
+            // const HdTokenDataSourceHandle& colorSpace added in USD 26.02
+            , nullptr
+#endif
+            // const HdIntDataSourceHandle& elementSize added in USD 25.05
             , nullptr
 #endif
         );
