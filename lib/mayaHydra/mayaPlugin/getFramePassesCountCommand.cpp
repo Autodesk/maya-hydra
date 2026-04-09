@@ -47,7 +47,7 @@
  *     Python : maya.cmds.mayaHydraGetFramePassesCount(rendererName="HdStormRendererPlugin")
  */
 
-using namespace PXR_NS;
+PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
 
