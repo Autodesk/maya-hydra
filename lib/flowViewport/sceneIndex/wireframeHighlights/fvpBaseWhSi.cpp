@@ -366,7 +366,7 @@ public:
         HdContainerDataSourceHandle const &inputDataSource,
         HdSceneIndexBaseRefPtr const &inputSceneIndex,
         const TfToken& materialPathToken, 
-        std::unordered_map<SdfPath, bool, SdfPath::Hash>* displacementCache);
+        std::unordered_map<SdfPath, bool, SdfPath::Hash>& displacementCache);
 
     TfTokenVector GetNames() override;
 
@@ -376,7 +376,7 @@ private:
     HdContainerDataSourceHandle const _inputDataSource;
     HdSceneIndexBaseRefPtr const _inputSceneIndex;
     TfToken const _materialPathToken;
-    std::unordered_map<SdfPath, bool, SdfPath::Hash>* _displacementCache;
+    std::unordered_map<SdfPath, bool, SdfPath::Hash>& _displacementCache;
 };
 
 class _MaterialBlockingVectorDataSource : public HdVectorDataSource {
@@ -387,7 +387,7 @@ public:
         HdVectorDataSourceHandle const &inputDataSource,
         HdSceneIndexBaseRefPtr const &inputSceneIndex,
         const TfToken& materialPathToken, 
-        std::unordered_map<SdfPath, bool, SdfPath::Hash>* displacementCache);
+        std::unordered_map<SdfPath, bool, SdfPath::Hash>& displacementCache);
 
     size_t GetNumElements() override;
 
@@ -397,14 +397,14 @@ private:
     HdVectorDataSourceHandle const _inputDataSource;
     HdSceneIndexBaseRefPtr const _inputSceneIndex;
     TfToken const _materialPathToken;
-    std::unordered_map<SdfPath, bool, SdfPath::Hash>* _displacementCache;
+    std::unordered_map<SdfPath, bool, SdfPath::Hash>& _displacementCache;
 };
 
 _MaterialBlockingContainerDataSource::_MaterialBlockingContainerDataSource(
     HdContainerDataSourceHandle const &inputDataSource,
     HdSceneIndexBaseRefPtr const &inputSceneIndex,
     const TfToken&                                    materialPathToken,
-    std::unordered_map<SdfPath, bool, SdfPath::Hash>* displacementCache)
+    std::unordered_map<SdfPath, bool, SdfPath::Hash>& displacementCache)
   : _inputDataSource(inputDataSource),
     _inputSceneIndex(inputSceneIndex),
     _materialPathToken(materialPathToken), 
@@ -446,19 +446,16 @@ HdDataSourceBaseHandle _MaterialBlockingContainerDataSource::Get(const TfToken& 
         if (childPathDataSource) {
             auto materialPath = childPathDataSource->GetTypedValue(0);
             bool hasDisplacement = false;
-            if (_displacementCache) {
-                auto cacheIt = _displacementCache->find(materialPath);
-                if (cacheIt != _displacementCache->end()) {
-                    hasDisplacement = cacheIt->second;
-                } else {
-                    auto materialPrim = _inputSceneIndex->GetPrim(materialPath);
-                    hasDisplacement = Fvp::MaterialHasDisplacement(materialPrim);
-                    _displacementCache->emplace(materialPath, hasDisplacement);
-                }
+            
+            auto cacheIt = _displacementCache.find(materialPath);
+            if (cacheIt != _displacementCache.end()) {
+                hasDisplacement = cacheIt->second;
             } else {
                 auto materialPrim = _inputSceneIndex->GetPrim(materialPath);
                 hasDisplacement = Fvp::MaterialHasDisplacement(materialPrim);
+                _displacementCache.emplace(materialPath, hasDisplacement);
             }
+            
             if (hasDisplacement) {
                 return childDataSource;
             }
@@ -473,7 +470,7 @@ _MaterialBlockingVectorDataSource::_MaterialBlockingVectorDataSource(
     HdVectorDataSourceHandle const &inputDataSource,
     HdSceneIndexBaseRefPtr const &inputSceneIndex,
     const TfToken& materialPathToken, 
-    std::unordered_map<SdfPath, bool, SdfPath::Hash>* displacementCache)
+    std::unordered_map<SdfPath, bool, SdfPath::Hash>& displacementCache)
   : _inputDataSource(inputDataSource),
     _inputSceneIndex(inputSceneIndex),
     _materialPathToken(materialPathToken), 
@@ -971,7 +968,7 @@ BaseWhSi::SetWireframeRepr(const HdContainerDataSourceHandle& dataSource, const 
                 hdMaterialBindings.GetContainer(),
                 GetInputSceneIndex(),
                 HdMaterialBindingSchemaTokens->path,
-                &_materialDisplacementCache)
+                _materialDisplacementCache)
         );
     }
 #if PXR_VERSION >= 2505
@@ -983,7 +980,7 @@ BaseWhSi::SetWireframeRepr(const HdContainerDataSourceHandle& dataSource, const 
                 usdMaterialBindings.GetContainer(),
                 GetInputSceneIndex(),
                 TfToken("materialPath"),
-                &_materialDisplacementCache)
+                _materialDisplacementCache)
         );
     }
 #else
@@ -995,7 +992,7 @@ BaseWhSi::SetWireframeRepr(const HdContainerDataSourceHandle& dataSource, const 
                 usdMaterialBindings.GetContainer(),
                 GetInputSceneIndex(),
                 TfToken("materialPath"),
-                &_materialDisplacementCache)
+                _materialDisplacementCache)
         );
     }
 #endif
