@@ -626,7 +626,7 @@ void MayaHydraRenderItemAdapter::CreateCallbacks()
         +[](MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
             auto* adapter = reinterpret_cast<MayaHydraRenderItemAdapter*>(clientData);
             TF_UNUSED(otherPlug);
-            if (!(msg & MNodeMessage::kAttributeSet)) {
+            if (!MayaHydraAdapter::AttributeMessageAffectsExtensionPrimvars(msg)) {
                 return;
             }
             MObject node = adapter->GetNode();

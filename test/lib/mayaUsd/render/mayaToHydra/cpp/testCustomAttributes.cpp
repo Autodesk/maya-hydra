@@ -21,11 +21,13 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 
+#include <maya/MDGModifier.h>
 #include <maya/MGlobal.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnNumericData.h>
 #include <maya/MPlug.h>
+#include <maya/MStatus.h>
 #include <maya/MString.h>
 
 #include <gtest/gtest.h>
@@ -34,15 +36,18 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace MayaHydra;
 
-// Unit test: validates that only non-default extension/custom attributes are exposed as Hydra primvars.
+// Unit test: extension attributes (e.g. Arnold ai*): primvars appear for non-default values and
+// are omitted at default. User-added dynamic attrs skip default suppression in
+// GetExtensionAndDynamicAttributesFromNode; dynamicAttributeUndoRedoRefreshesPrimvars covers undo/redo.
 namespace {
 HdDataSourceLocator primvarsLocator = HdPrimvarsSchema::GetDefaultLocator();
 
-// What: default-valued extension/custom attributes should not emit primvars.
+// What: default-valued extension attributes should not emit primvars.
 // How: read aiAutobumpVisibility/aiSubdivIterations at default, then set non-default values.
 // Expect: default values yield no primvars; non-default values match reference primvar outputs.
 TEST(CustomAttributes, defaultArnoldCustomAttributes)
-{ 
+{
+#ifdef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
@@ -107,6 +112,9 @@ TEST(CustomAttributes, defaultArnoldCustomAttributes)
         HdContainerDataSource::Get(prim.dataSource, iterLocator),
         getPathToSample("cube_primvar_aiSubdivIterations_modified.txt")))
         << " See " << getDataSourceComparisonOutputPath(getPathToSample("cube_primvar_aiSubdivIterations_modified.txt")).string() << " for actual output";
+#else
+    GTEST_SKIP() << "Skipping test, configurable decimal streaming is unavailable.";
+#endif
 }
 
 // What: camera compound attributes should not emit primvars at default values.
@@ -330,6 +338,85 @@ TEST(CustomAttributes, aiPrimvarsAppearAndRemovedWhenReset)
             absentReference))
             << "Light aiColorTemperature primvar should be removed when reset";
     }
+#else
+    GTEST_SKIP() << "Skipping test, configurable decimal streaming is unavailable.";
+#endif
+}
+
+// What: undo/redo after adding a dynamic attr must refresh Hydra primvars (kAttributeRemoved /
+// kAttributeAdded).
+// How: add a dynamic long on pCubeShape1 via MDGModifier; undo/redo with the same MDGModifier
+// (global undo does not record bare MDGModifier::doIt()).
+// Expect: primvar present after add and redo; matches absent reference after undo.
+TEST(CustomAttributes, dynamicAttributeUndoRedoRefreshesPrimvars)
+{
+#ifdef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
+    DecimalStreamingOverride decimalStreamingOverride(
+        { PXR_NS::TfDecimalToStringMode::FIXED, 5, false });
+
+    MGlobal::executeCommand("catchQuiet(`deleteAttr -at mhUndoRedoPrimvarTest pCubeShape1`);");
+
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+
+    auto mayaSceneIndex = FindMayaHydraSceneIndex(sceneIndices.front());
+    ASSERT_TRUE(mayaSceneIndex) << "MayaHydraSceneIndex not found in scene index tree";
+
+    SceneIndexInspector sceneInspector(mayaSceneIndex);
+
+    PrimEntriesVector meshPrims
+        = sceneInspector.FindPrims(CreatePrimPredicate("pCube1", HdPrimTypeTokens->mesh));
+    ASSERT_EQ(meshPrims.size(), 1u) << "Mesh prim (pCube1) not found";
+    const SdfPath primPath = meshPrims.front().primPath;
+
+    MObject cubeNode;
+    ASSERT_TRUE(GetDependNodeFromNodeName("pCubeShape1", cubeNode));
+
+    MStatus             status;
+    MFnNumericAttribute nAttr;
+    MObject attrObj = nAttr.create(
+        "mhUndoRedoPrimvarTest", "mhURPT", MFnNumericData::kLong, 0, &status);
+    ASSERT_TRUE(status) << "Failed to create numeric attribute";
+    MDGModifier mod;
+    status = mod.addAttribute(cubeNode, attrObj);
+    ASSERT_TRUE(status) << "MDGModifier::addAttribute failed";
+    status = mod.doIt();
+    ASSERT_TRUE(status) << "MDGModifier::doIt failed";
+
+    const std::filesystem::path absentReference = getPathToSample("cube_primvar_absent.txt");
+    const std::filesystem::path presentRef
+        = getPathToSample("cube_primvar_mhUndoRedoPrimvarTest_present.txt");
+
+    MGlobal::executeCommand("refresh");
+    HdSceneIndexPrim prim = mayaSceneIndex->GetPrim(primPath);
+    EXPECT_TRUE(dataSourceMatchesReference(
+        HdContainerDataSource::Get(
+            prim.dataSource, primvarsLocator.Append(TfToken("mhUndoRedoPrimvarTest"))),
+        presentRef))
+        << "Dynamic attr should expose primvar after add. See "
+        << getDataSourceComparisonOutputPath(presentRef).string() << " for actual";
+
+    status = mod.undoIt();
+    ASSERT_TRUE(status) << "MDGModifier::undoIt failed";
+    MGlobal::executeCommand("refresh");
+    prim = mayaSceneIndex->GetPrim(primPath);
+    EXPECT_TRUE(dataSourceMatchesReference(
+        HdContainerDataSource::Get(
+            prim.dataSource, primvarsLocator.Append(TfToken("mhUndoRedoPrimvarTest"))),
+        absentReference))
+        << "Primvar should disappear after MDGModifier::undoIt (addAttribute)";
+
+    status = mod.doIt();
+    ASSERT_TRUE(status) << "MDGModifier::doIt failed (redo addAttribute)";
+    MGlobal::executeCommand("refresh");
+    prim = mayaSceneIndex->GetPrim(primPath);
+    EXPECT_TRUE(dataSourceMatchesReference(
+        HdContainerDataSource::Get(
+            prim.dataSource, primvarsLocator.Append(TfToken("mhUndoRedoPrimvarTest"))),
+        presentRef))
+        << "Primvar should return after MDGModifier::doIt redo";
+
+    MGlobal::executeCommand("catchQuiet(`deleteAttr -at mhUndoRedoPrimvarTest pCubeShape1`);");
 #else
     GTEST_SKIP() << "Skipping test, configurable decimal streaming is unavailable.";
 #endif
