@@ -29,8 +29,8 @@ MAYAHYDRALIB_API
 MhGenerativeProceduralResolvingSceneIndexRefPtr
 MhGenerativeProceduralResolvingSceneIndex::New(const HdSceneIndexBaseRefPtr& inputSceneIndex)
 {
-#if defined(_WIN32) && PXR_VERSION < 2511
-    // Only Windows fails to link mayaHydraLib against shared usd_hdGp here: the import
+#if PXR_VERSION < 2511
+    // Windows fails to link mayaHydraLib against shared usd_hdGp here: the import
     // library exposes only exported DLL symbols. HdGpGenerativeProceduralResolvingSceneIndex::New()
     // needs ctor symbols that are not exported before USD 25.11;
     return TfCreateRefPtr(new MhGenerativeProceduralResolvingSceneIndex(inputSceneIndex));

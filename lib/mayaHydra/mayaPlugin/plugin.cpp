@@ -192,9 +192,9 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     // For now this is required for the HdSt backend to use lights.
     setEnv("USDIMAGING_ENABLE_SCENE_LIGHTS", "1");
     
-#if defined(_WIN32) && PXR_VERSION < 2511
+#if PXR_VERSION < 2511
     // We can't instantiate our early Mh/HdGp resolving scene index in mayaHydraLib (missing
-    // usd_hdGp exports on Windows). Enable USD's default GP resolver so resolution still happens, later
+    // usd_hdGp exports). Enable USD's default GP resolver so resolution still happens, later
     // in the imaging chain.
     // See mhGenerativeProceduralResolvingSceneIndex.cpp for more details. 
     setEnv("HDGP_INCLUDE_DEFAULT_RESOLVER", "1");

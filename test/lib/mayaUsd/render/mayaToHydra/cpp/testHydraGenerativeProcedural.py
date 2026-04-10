@@ -17,7 +17,6 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 import ufe
-import platform
 import unittest
 
 import testUtils
@@ -47,10 +46,10 @@ class TestHydraGenerativeProcedural(mtohUtils.MayaHydraBaseTestCase):
             cmds.mayaHydraCppTest(f="HydraGenerativeProcedural.testMaterialBinding")
 
     def test_SelectionWireframeHighlight(self):
-        if platform.system() == "Windows" and self._usdVersion < (0, 25, 11):
+        if self._usdVersion < (0, 25, 11):
             self.skipTest(
                 "Selection highlight for generative procedural requires HdGp resolving SI "
-                "instantiation earlier; skipped on Windows for USD < 25.11 (DLL export / link limitation)."
+                "instantiation earlier; skipped for USD < 25.11 (DLL export / link limitation)."
             )
 
         sn = ufe.GlobalSelection.get()
