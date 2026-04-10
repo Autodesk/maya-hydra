@@ -46,7 +46,8 @@ HdDataSourceLocator primvarsLocator = HdPrimvarsSchema::GetDefaultLocator();
 // How: read aiAutobumpVisibility/aiSubdivIterations at default, then set non-default values.
 // Expect: default values yield no primvars; non-default values match reference primvar outputs.
 TEST(CustomAttributes, defaultArnoldCustomAttributes)
-{ 
+{
+#ifdef CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
@@ -111,6 +112,9 @@ TEST(CustomAttributes, defaultArnoldCustomAttributes)
         HdContainerDataSource::Get(prim.dataSource, iterLocator),
         getPathToSample("cube_primvar_aiSubdivIterations_modified.txt")))
         << " See " << getDataSourceComparisonOutputPath(getPathToSample("cube_primvar_aiSubdivIterations_modified.txt")).string() << " for actual output";
+#else
+    GTEST_SKIP() << "Skipping test, configurable decimal streaming is unavailable.";
+#endif
 }
 
 // What: camera compound attributes should not emit primvars at default values.
