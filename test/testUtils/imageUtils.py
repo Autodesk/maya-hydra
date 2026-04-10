@@ -150,27 +150,6 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail=None,
 
     return None # Running of imageDiff failed.
 
-def _getMayaScriptEditorHistoryTail(max_lines=200):
-    """Return the tail of Maya Script Editor history as a string, or empty if unavailable."""
-    try:
-        if not cmds.scriptEditorInfo(q=True, writeHistory=True):
-            return ""
-        hist_file = cmds.scriptEditorInfo(q=True, historyFilename=True) or ""
-        if not hist_file or not os.path.isfile(hist_file):
-            return ""
-        with open(hist_file, "r", encoding="utf-8", errors="replace") as f:
-            lines = f.read().splitlines()
-        tail = lines[-max_lines:] if len(lines) > max_lines else lines
-        if not tail:
-            return ""
-        return "\n".join(
-            ["", "===== Maya Script Editor history (last {} lines) =====".format(len(tail))]
-            + tail
-            + ["===== end Maya Script Editor history ====="]
-        )
-    except Exception:
-        return ""
-
 def _generateDiffImage(imagePath1, imagePath2, outputPath):
     """Generate a visual diff image. Prefers oiiotool --absdiff --maxchan; falls back to idiff.
     Returns output path if successful, else None."""
@@ -361,9 +340,6 @@ class ImageDiffingTestCase:
                 if diff_path:
                     msg += "  Diff:     {}\n".format(os.path.abspath(diff_path).replace('\\', '/'))
 
-            script_editor_tail = _getMayaScriptEditorHistoryTail(max_lines=200)
-            if script_editor_tail:
-                msg += script_editor_tail + "\n"
             self.fail(msg)
         return proc.returncode
     

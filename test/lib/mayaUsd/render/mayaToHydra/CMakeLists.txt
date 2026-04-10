@@ -35,7 +35,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa
-    testLightingRenderDelegates.py|skipOnPlatform:osx # HYDRA-2209: re-enable on OSX
+    testLightingRenderDelegates.py|depOnPlugins:prman|skipOnPlatform:osx # HYDRA-2209: re-enable on OSX
 	testBifrostGraphUpdate.py|depOnPlugins:bifrost
 	#End of tests that have a dependency on other plugins
     testLookThrough.py

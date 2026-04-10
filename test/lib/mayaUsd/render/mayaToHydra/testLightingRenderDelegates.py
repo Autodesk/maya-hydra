@@ -84,7 +84,6 @@ RENDER_DELEGATES = [
         "override": "mayaHydraRenderOverride_HdPrmanLoaderRendererPlugin",
         "mayaPlugin": None,
         "convergenceTimeout": 15,  # Wait up to 15s for convergence before snapshot
-        "platform": "windows",  # Image comparison runs on Windows only
     },
 ]
 
@@ -137,20 +136,6 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         # RDIR: alternate config dir (some RenderMan versions use this).
         os.environ["RDIR"] = log_root
 
-        # Capture Maya Script Editor output (includes many delegate/prman messages).
-        try:
-            cls._saved_script_editor = {
-                "writeHistory": cmds.scriptEditorInfo(q=True, writeHistory=True),
-                "historyFilename": cmds.scriptEditorInfo(q=True, historyFilename=True),
-            }
-            history_file = os.path.join(log_root, "maya_scriptEditor_history.txt")
-            cmds.scriptEditorInfo(edit=True, writeHistory=True, historyFilename=history_file)
-            cls._maya_history_file = history_file
-        except Exception as e:
-            _log("Warning: failed to enable Script Editor history capture: {}".format(e))
-            cls._saved_script_editor = None
-            cls._maya_history_file = None
-
         _log(
             "PRMan setUpClass: sceneDir={} | RMAN_CONFIG_OVERRIDE={} | RDIR={} | RMAN_SHADERPATH={} | PRMAN_DELEGATE_PLUGIN_PATH={} | MayaHistory={}".format(
                 sceneDir,
@@ -158,34 +143,12 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 os.environ.get("RDIR", ""),
                 os.environ.get("RMAN_SHADERPATH", ""),
                 os.environ.get("PRMAN_DELEGATE_PLUGIN_PATH", ""),
-                getattr(cls, "_maya_history_file", None),
+                getattr(cls, "_script_editor_history_file", None),
             )
         )
 
     @classmethod
     def tearDownClass(cls):
-        # Dump captured output into CI log before cleanup.
-        try:
-            history = getattr(cls, "_maya_history_file", None)
-            if history:
-                cls._print_log_tail(history, "Maya Script Editor history", max_lines=400)
-            else:
-                _log("Maya Script Editor history: (missing) {}".format(history))
-        except Exception as e:
-            _log("Warning: failed to dump Maya Script Editor history: {}".format(e))
-
-        # Restore Script Editor capture settings.
-        try:
-            saved = getattr(cls, "_saved_script_editor", None)
-            if saved:
-                cmds.scriptEditorInfo(
-                    edit=True,
-                    writeHistory=saved.get("writeHistory", False),
-                    historyFilename=saved.get("historyFilename", ""),
-                )
-        except Exception as e:
-            _log("Warning: failed to restore Script Editor settings: {}".format(e))
-
         # Restore environment variables.
         saved_env = getattr(cls, "_saved_env", None) or {}
         for k, v in saved_env.items():
@@ -193,6 +156,17 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 os.environ.pop(k, None)
             else:
                 os.environ[k] = v
+
+        # MayaHydraBaseTestCase.tearDownClass runs cmds.file(new=True, force=True) and
+        # unloads plugins; that can hang indefinitely after a failed PRMan test. Coverage
+        # runs use fixturesUtils.runTests(..., coverage_quit_workaround=True) and os._exit,
+        # so skipping base teardown is safe for this single-class module.
+        if os.environ.get("MAYAHYDRA_CODE_COVERAGE"):
+            _log(
+                "LightingRenderDelegates: skipping MayaHydraBaseTestCase.tearDownClass "
+                "(file new / unloadPlugin can hang after PRMan failure)"
+            )
+            return
 
         super(TestLightingRenderDelegates, cls).tearDownClass()
 
@@ -209,58 +183,11 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
             yield
         finally:
-            # Dump latest Script Editor history tail to stdout for CI visibility.
-            try:
-                hist = getattr(self.__class__, "_maya_history_file", None)
-                self._print_log_tail(hist, "Maya Script Editor history", max_lines=200)
-            except Exception:
-                pass
-
             # Restore Maya workspace.
             try:
                 cmds.workspace(saved_workspace, o=True)
             except Exception as e:
                 _log("Warning: failed to restore Maya workspace: {}".format(e))
-
-    @classmethod
-    def _print_log_tail(cls, path, title, max_lines=200):
-        """Print the tail of a log file to stdout so CI logs capture it."""
-        if not path:
-            return
-        try:
-            if not os.path.isfile(path):
-                _log("{}: (missing) {}".format(title, path))
-                return
-            tail = cls._tail_lines(path, max_lines)
-            _log("\n===== {} (last {} lines): {} =====".format(title, len(tail), path))
-            for ln in tail:
-                _log(ln)
-            _log("===== end {} =====\n".format(title))
-        except Exception as e:
-            _log("Warning: failed to print {} tail ({}): {}".format(title, path, e))
-
-    @staticmethod
-    def _tail_lines(path, max_lines, chunk_size=8192):
-        """Read the last N lines without loading whole file."""
-        try:
-            with open(path, "rb") as f:
-                f.seek(0, os.SEEK_END)
-                end = f.tell()
-                if end == 0:
-                    return []
-                buffer = b""
-                lines = []
-                while end > 0 and len(lines) <= max_lines:
-                    read_size = min(chunk_size, end)
-                    end -= read_size
-                    f.seek(end)
-                    buffer = f.read(read_size) + buffer
-                    lines = buffer.splitlines()
-                tail = lines[-max_lines:] if len(lines) > max_lines else lines
-                return [ln.decode("utf-8", "replace") for ln in tail]
-        except Exception as e:
-            _log("Warning: failed to read {} tail: {}".format(path, e))
-            return []
 
     def _log_prman_diagnostics(self, stage):
         """Log PRMan-related diagnostics to help debug delegate init failures."""
@@ -419,6 +346,61 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             return True
         return platform.system().lower() == required.lower()
 
+    def _get_prman_allowed_platforms(self):
+        """Return the configured PRMan allowed platforms from the environment."""
+        raw = os.environ.get("MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS", "")
+        if not raw:
+            return []
+        normalized = raw.replace(";", ",")
+        platforms = [p.strip().lower() for p in normalized.split(",") if p.strip()]
+        return platforms
+
+    def _is_ci_build(self):
+        """Return True when running under Jenkins/CI."""
+        return bool(os.environ.get("JENKINS_URL") or os.environ.get("BUILD_ID"))
+
+    def _is_prman_platform_allowed(self):
+        """Return True if the current platform is allowed for PRMan."""
+        allowed = self._get_prman_allowed_platforms()
+        return platform.system().lower() in allowed
+
+    def _is_prman_renderer_available(self):
+        """Return True if PRMan renderer is available via mayaHydra."""
+        try:
+            renderers = cmds.mayaHydra(listRenderers=True) or []
+            self._prman_renderer_list = renderers
+        except Exception as e:
+            _log("PRMan availability check failed: {}".format(e))
+            self._prman_renderer_list = []
+            return False
+        return "HdPrmanLoaderRendererPlugin" in renderers
+
+    def _should_run_prman_delegate(self):
+        """Return True if PRMan delegate should run in this environment."""
+        allowed = self._get_prman_allowed_platforms()
+        if not allowed:
+            msg = "PRMan delegate skipped: MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS not set."
+            # On Windows CI, PRMan is expected to be installed.
+            if self._is_ci_build() and platform.system().lower() == "windows":
+                self.fail("PRMan delegate required on CI but {}"
+                          .format(msg.replace("skipped: ", "")))
+            _log(msg)
+            return False
+        if not self._is_prman_platform_allowed():
+            _log("PRMan delegate skipped: unsupported platform {} (allowed={}).".format(
+                platform.system(), ",".join(allowed)))
+            return False
+        if not self._is_prman_renderer_available():
+            renderers = getattr(self, "_prman_renderer_list", [])
+            if self._is_ci_build():
+                self.fail(
+                    "PRMan delegate required on CI but renderer not available. "
+                    "listRenderers={}".format(renderers)
+                )
+            _log("PRMan delegate skipped: renderer not available.")
+            return False
+        return True
+
     def loadScene(self):
         """Load the test scene and set the base renderer state."""
         mayaUtils.openTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
@@ -446,6 +428,8 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 if not self._delegateRunsOnPlatform(delegate):
                     continue
                 if delegate["name"] == "PRMan":
+                    if not self._should_run_prman_delegate():
+                        continue
                     with self._prmanContext():
                         runDelegate(delegate)
                 else:
@@ -454,8 +438,25 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             # Switch back to Storm before teardown to avoid PRMan/mtoa shutdown
             # hangs when Maya quits (similar to HYDRA-1242 isolate-select issue).
             # Guard cleanup so it doesn't mask the original assertion/error.
+            #
+            # After a failed image compare under PRMan, modelEditor/refresh can block
+            # indefinitely here; unittest never returns and coverage never reaches
+            # fixturesUtils.runTests (os._exit). Skip reset when unwinding with an
+            # exception in coverage builds — shutdown uses os._exit, so delegate
+            # state does not need to be clean.
             try:
-                self._setRenderer(RENDER_DELEGATES[0])
+                if (
+                    os.environ.get("MAYAHYDRA_CODE_COVERAGE")
+                    and sys.exc_info()[0] is not None
+                ):
+                    _log(
+                        "LightingRenderDelegates: skipping Storm reset in finally "
+                        "(coverage build, unwinding with {})".format(
+                            sys.exc_info()[0].__name__
+                        )
+                    )
+                else:
+                    self._setRenderer(RENDER_DELEGATES[0])
             except Exception:
                 pass
 
