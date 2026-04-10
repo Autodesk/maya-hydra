@@ -72,7 +72,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace MayaHydra;
 
-// Unit test: verifies custom Maya extension attributes are translated into Hydra primvars.
+// Unit test: verifies Maya extension attributes (plugin-defined) are translated into Hydra primvars.
 namespace {
 
 // OptionVar to emit enum primvars as label tokens.

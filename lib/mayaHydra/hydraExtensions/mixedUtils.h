@@ -259,6 +259,9 @@ PXR_NS::TfToken GetGeomSubsetsPickMode();
 /**
  * @brief Get extension/dynamic attributes from a Maya node for translation to Hydra primvars.
  *
+ * Extension attributes are skipped while at their default. Dynamic attributes (user addAttr) are
+ * always collected regardless of default value.
+ *
  * @param[in] node is the node in the Maya scene graph.
  * @param[out] attrs is a map that will contain the attribute names and their corresponding values.
  */

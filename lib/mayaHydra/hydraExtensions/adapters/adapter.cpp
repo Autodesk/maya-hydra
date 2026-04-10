@@ -180,6 +180,14 @@ bool MayaHydraAdapter::IsExtensionOrDynamicAttribute(const MPlug& plug)
     return fnAttr.isExtension() || fnAttr.isDynamic();
 }
 
+bool MayaHydraAdapter::AttributeMessageAffectsExtensionPrimvars(MNodeMessage::AttributeMessage msg)
+{
+    const MNodeMessage::AttributeMessage mask = static_cast<MNodeMessage::AttributeMessage>(
+        MNodeMessage::kAttributeSet | MNodeMessage::kAttributeRemoved | MNodeMessage::kAttributeAdded
+        | MNodeMessage::kAttributeRenamed);
+    return (msg & mask) != 0;
+}
+
 // Normalize the plug, filter non extension/dynamic attrs, then mark primvars dirty if allowed.
 void MayaHydraAdapter::MaybeMarkPrimvarDirtyForAttributeChange(const MPlug& plug)
 {
@@ -188,6 +196,13 @@ void MayaHydraAdapter::MaybeMarkPrimvarDirtyForAttributeChange(const MPlug& plug
     // still mark primvars dirty so the scene browser refreshes when resetting
     // to default (primvar removal). Duplicate MarkDirty calls are idempotent.
     MPlug topPlug = MayaHydra::GetTopPlug(plug);
+    MStatus attrStatus;
+    topPlug.attribute(&attrStatus);
+    if (!attrStatus) {
+        // During kAttributeRemoved the plug may no longer resolve; still invalidate primvar cache.
+        MarkPrimvarDirtyForAttributeChange(topPlug);
+        return;
+    }
     if (!IsExtensionOrDynamicAttribute(topPlug)) {
         return;
     }
@@ -203,16 +218,23 @@ void MayaHydraAdapter::MarkPrimvarDirtyForAttributeChange(const MPlug& plug)
 {
     MStatus status;
     MObject attrObj = plug.attribute(&status);
-    if (status) {
-        MFnAttribute fnAttr(attrObj);
-        if (fnAttr.isExtension() || fnAttr.isDynamic()) {
-            _extAttrMapNeedUpdate = true;
-            // Notify the change tracker. Include extra bits from subclass (e.g. light param attrs
-            // need DirtyParams|DirtyShadowParams) to consolidate into one MarkDirty and avoid
-            // redundant scene index notifications.
-            MarkDirty(
-                HdChangeTracker::DirtyPrimvar | GetConsolidatedDirtyBitsForPrimvarAttributeChange(plug));
-        }
+    if (!status) {
+        // Plug may be invalid during kAttributeRemoved; still refresh cached extension/dynamic map.
+        _extAttrMapNeedUpdate = true;
+        MPlug emptyPlug;
+        MarkDirty(
+            HdChangeTracker::DirtyPrimvar
+            | GetConsolidatedDirtyBitsForPrimvarAttributeChange(emptyPlug));
+        return;
+    }
+    MFnAttribute fnAttr(attrObj);
+    if (fnAttr.isExtension() || fnAttr.isDynamic()) {
+        _extAttrMapNeedUpdate = true;
+        // Notify the change tracker. Include extra bits from subclass (e.g. light param attrs
+        // need DirtyParams|DirtyShadowParams) to consolidate into one MarkDirty and avoid
+        // redundant scene index notifications.
+        MarkDirty(
+            HdChangeTracker::DirtyPrimvar | GetConsolidatedDirtyBitsForPrimvarAttributeChange(plug));
     }
 }
 

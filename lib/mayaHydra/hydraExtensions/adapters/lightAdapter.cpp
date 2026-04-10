@@ -165,8 +165,8 @@ void MayaHydraLightAdapter::_LightShapeAttributeChanged(
     // For param attributes, rely on attribute-changed notifications to avoid duplicate
     // dirtying from NodeDirtyPlugCallback.
     if (_IsLightParamAttribute(topPlug)) {
-        // Reduce duplicate notifications: only react to kAttributeSet.
-        if (msg & MNodeMessage::kAttributeSet) {
+        // Reduce duplicate notifications: value changes and structural attr changes (undo addAttr).
+        if (MayaHydraAdapter::AttributeMessageAffectsExtensionPrimvars(msg)) {
             if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(topPlug)) {
                 adapter->MarkPrimvarDirtyForAttributeChange(topPlug);
             } else {
@@ -176,7 +176,7 @@ void MayaHydraLightAdapter::_LightShapeAttributeChanged(
         return;
     }
 
-    if (!(msg & MNodeMessage::kAttributeSet)) {
+    if (!MayaHydraAdapter::AttributeMessageAffectsExtensionPrimvars(msg)) {
         return;
     }
 

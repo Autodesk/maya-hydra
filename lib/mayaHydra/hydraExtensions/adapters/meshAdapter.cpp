@@ -570,12 +570,19 @@ private:
     }
 
     /// Handle attribute changes used for material assignments and primvar dirtying.
+    // Extension and dynamic (user addAttr) attributes are exposed as constant primvars via
+    // MayaHydraAdapter (see GetPrimvarDescriptors / GetExtensionAndDynamicAttributesFromNode).
+    // We do not filter on msg here: kAttributeRemoved / kAttributeAdded (e.g. undo/redo of
+    // addAttr) must reach MaybeMarkPrimvarDirtyForAttributeChange; invalid plugs during removal
+    // are handled in MayaHydraAdapter::MaybeMarkPrimvarDirtyForAttributeChange.
     static void AttributeChangedCallback(
         MNodeMessage::AttributeMessage msg,
         MPlug&                         plug,
         MPlug&                         otherPlug,
         void*                          clientData)
     {
+        TF_UNUSED(msg);
+        TF_UNUSED(otherPlug);
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
         if (plug == MayaAttrs::mesh::instObjGroups) {
             adapter->MarkDirty(HdChangeTracker::DirtyMaterialId);
