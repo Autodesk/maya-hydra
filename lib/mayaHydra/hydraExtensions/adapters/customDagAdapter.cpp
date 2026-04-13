@@ -22,8 +22,10 @@
 
 #include "customDagAdapter.h"
 
+#include <mayaHydraLib/adapters/adapter.h>
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/tokens.h>
+#include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
@@ -31,6 +33,7 @@
 #include <pxr/imaging/hd/dataSourceLocator.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
 
@@ -55,27 +58,45 @@ TF_REGISTRY_FUNCTION(TfType)
 
 namespace {
 
-// Maya callback invoked when any attribute on the custom plugin node is modified.
-// Fires a per-attribute dirty locator (mayaNode.mayaAttributes.<attrName>)
-// so downstream scene indices can react to specific attribute changes.
+// Maya callback invoked when any attribute on the custom plugin node is modified,
+// added, removed, or renamed. For value changes (kAttributeSet), fires a
+// per-attribute dirty locator (mayaNode.mayaAttributes.<attrName>). For
+// structural changes (add/remove/rename), dirties the parent locator
+// (mayaNode.mayaAttributes) so downstream scene indices re-read the full
+// dictionary.
 void _CustomNodeAttrChanged(
     MNodeMessage::AttributeMessage msg,
     MPlug& plug,
     MPlug& /*otherPlug*/,
     void* clientData)
 {
-    if (!(msg & MNodeMessage::kAttributeSet)) {
-        return;
-    }
-    if (plug.isChild()) {
-        return;
-    }
-    // Message attributes are connection-only with no data value; skip them.
-    if (plug.attribute().apiType() == MFn::kMessageAttribute) {
+    if (!MayaHydraAdapter::AttributeMessageAffectsExtensionPrimvars(msg)) {
         return;
     }
 
-    MFnAttribute attr(plug.attribute());
+    // Normalize compound/array child plugs to their top-level parent
+    // (e.g. colorR -> color) so we dirty the correct attribute name.
+    MPlug topPlug = MayaHydra::GetTopPlug(plug);
+
+    // Message attributes are connection-only with no data value; skip them.
+    MStatus attrStatus;
+    MObject attrObj = topPlug.attribute(&attrStatus);
+    if (!attrStatus || attrObj.isNull()) {
+        // During kAttributeRemoved the plug may no longer resolve; dirty the
+        // entire mayaAttributes container so the dictionary is re-read.
+        auto* adapter = reinterpret_cast<MayaHydraCustomDagAdapter*>(clientData);
+        HdDataSourceLocator locator(
+            MayaHydraAdapterTokens->mayaNode,
+            MayaHydraAdapterTokens->mayaAttributes);
+        adapter->GetMayaHydraSceneIndex()->DirtyPrims(
+            {{ adapter->GetID(), HdDataSourceLocatorSet(locator) }});
+        return;
+    }
+    if (attrObj.apiType() == MFn::kMessageAttribute) {
+        return;
+    }
+
+    MFnAttribute attr(attrObj);
     MString attrNameStr = attr.name();
     const char* name = attrNameStr.asChar();
 
@@ -89,12 +110,25 @@ void _CustomNodeAttrChanged(
 
     auto* adapter = reinterpret_cast<MayaHydraCustomDagAdapter*>(clientData);
 
+    // Structural changes (add/remove/rename) affect the dictionary key set;
+    // dirty the parent locator so downstream re-reads the full dictionary.
+    if (msg & (MNodeMessage::kAttributeAdded | MNodeMessage::kAttributeRemoved
+               | MNodeMessage::kAttributeRenamed)) {
+        HdDataSourceLocator locator(
+            MayaHydraAdapterTokens->mayaNode,
+            MayaHydraAdapterTokens->mayaAttributes);
+        adapter->GetMayaHydraSceneIndex()->DirtyPrims(
+            {{ adapter->GetID(), HdDataSourceLocatorSet(locator) }});
+        return;
+    }
+
     TfToken attrName(name);
     HdDataSourceLocator locator(
         MayaHydraAdapterTokens->mayaNode,
         MayaHydraAdapterTokens->mayaAttributes,
         attrName);
-    adapter->GetMayaHydraSceneIndex()->DirtyPrims({{ adapter->GetID(), HdDataSourceLocatorSet(locator) }});
+    adapter->GetMayaHydraSceneIndex()->DirtyPrims(
+        {{ adapter->GetID(), HdDataSourceLocatorSet(locator) }});
 }
 
 // Visibility-only callback for the shape node itself. Unlike the base class
@@ -175,6 +209,9 @@ void MayaHydraCustomDagAdapter::MarkDirty(HdDirtyBits dirtyBits)
     }
     if (dirtyBits & HdChangeTracker::DirtyVisibility) {
         locators.append(HdVisibilitySchema::GetDefaultLocator());
+    }
+    if (dirtyBits & HdChangeTracker::DirtyPrimvar) {
+        locators.append(HdPrimvarsSchema::GetDefaultLocator());
     }
 
     if (!locators.IsEmpty()) {
