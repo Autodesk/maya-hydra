@@ -13,13 +13,13 @@
 // limitations under the License.
 //
 //
-// Hydra container data source for generic Maya plugin nodes. Sits under
+// Hydra container data source for custom Maya plugin nodes. Sits under
 // the "mayaNode" token on a mayaCustomDagNode prim and exposes the Maya
 // node type name and all non-default attribute values as Hydra data sources.
 //
 
-#ifndef MAYAHYDRA_GENERIC_NODE_DATASOURCE_H
-#define MAYAHYDRA_GENERIC_NODE_DATASOURCE_H
+#ifndef MAYAHYDRA_CUSTOM_NODE_DATASOURCE_H
+#define MAYAHYDRA_CUSTOM_NODE_DATASOURCE_H
 
 #include <mayaHydraLib/api.h>
 
@@ -28,20 +28,20 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class MayaHydraGenericDagAdapter;
+class MayaHydraCustomDagAdapter;
 
 /**
- * \brief Container data source exposing a generic Maya plugin node's type name
+ * \brief Container data source exposing a custom Maya plugin node's type name
  *        and all attributes under the "mayaNode" schema token.
  *
  * Children:
  *   - "mayaTypeName" -> HdTypedSampledDataSource<TfToken>
  *   - "mayaAttributes" -> HdTypedSampledDataSource<VtDictionary>
  */
-class MayaHydraGenericNodeDataSource : public HdContainerDataSource
+class MayaHydraCustomNodeDataSource : public HdContainerDataSource
 {
 public:
-    HD_DECLARE_DATASOURCE(MayaHydraGenericNodeDataSource);
+    HD_DECLARE_DATASOURCE(MayaHydraCustomNodeDataSource);
 
     /// Returns the child data source names: "mayaTypeName" and "mayaAttributes".
     TfTokenVector GetNames() override;
@@ -52,13 +52,13 @@ public:
     HdDataSourceBaseHandle Get(const TfToken& name) override;
 
 private:
-    MayaHydraGenericNodeDataSource(MayaHydraGenericDagAdapter* adapter);
+    MayaHydraCustomNodeDataSource(MayaHydraCustomDagAdapter* adapter);
 
-    MayaHydraGenericDagAdapter* _adapter;
+    MayaHydraCustomDagAdapter* _adapter;
 };
 
-HD_DECLARE_DATASOURCE_HANDLES(MayaHydraGenericNodeDataSource);
+HD_DECLARE_DATASOURCE_HANDLES(MayaHydraCustomNodeDataSource);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // MAYAHYDRA_GENERIC_NODE_DATASOURCE_H
+#endif // MAYAHYDRA_CUSTOM_NODE_DATASOURCE_H

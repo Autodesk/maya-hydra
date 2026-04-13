@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 //
-// Registers HdGenericNodeTranslationSceneIndex as a scene index plugin for
+// Registers HdCustomNodeTranslationSceneIndex as a scene index plugin for
 // the "Arnold" renderer via HdSceneIndexPluginRegistry::RegisterSceneIndexForRenderer.
 // Arnold is used here as an example. To adapt for another render delegate,
 // change BOTH:
@@ -23,8 +23,8 @@
 // relevant Maya node types in the filtering scene index.
 //
 
-#include "genericNodeTranslationSceneIndexPlugin.h"
-#include "genericNodeTranslationSceneIndex.h"
+#include "customNodeTranslationSceneIndexPlugin.h"
+#include "customNodeTranslationSceneIndex.h"
 
 #include <pxr/imaging/hd/sceneIndexPluginRegistry.h>
 
@@ -34,12 +34,12 @@ namespace MAYAHYDRA_NS_DEF {
 
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
-    ((sceneIndexPluginName, "HdGenericNodeTranslationSceneIndexPlugin"))
+    ((sceneIndexPluginName, "HdCustomNodeTranslationSceneIndexPlugin"))
 );
 
 TF_REGISTRY_FUNCTION(TfType)
 {
-    HdSceneIndexPluginRegistry::Define<HdGenericNodeTranslationSceneIndexPlugin>();
+    HdSceneIndexPluginRegistry::Define<HdCustomNodeTranslationSceneIndexPlugin>();
 }
 
 TF_REGISTRY_FUNCTION(HdSceneIndexPlugin)
@@ -54,15 +54,15 @@ TF_REGISTRY_FUNCTION(HdSceneIndexPlugin)
         HdSceneIndexPluginRegistry::InsertionOrderAtEnd);
 }
 
-HdGenericNodeTranslationSceneIndexPlugin::
-HdGenericNodeTranslationSceneIndexPlugin() = default;
+HdCustomNodeTranslationSceneIndexPlugin::
+HdCustomNodeTranslationSceneIndexPlugin() = default;
 
 HdSceneIndexBaseRefPtr
-HdGenericNodeTranslationSceneIndexPlugin::_AppendSceneIndex(
+HdCustomNodeTranslationSceneIndexPlugin::_AppendSceneIndex(
     const HdSceneIndexBaseRefPtr& inputScene,
     const HdContainerDataSourceHandle& /*inputArgs*/)
 {
-    return HdGenericNodeTranslationSceneIndex::New(inputScene);
+    return HdCustomNodeTranslationSceneIndex::New(inputScene);
 }
 
 } // namespace MAYAHYDRA_NS_DEF

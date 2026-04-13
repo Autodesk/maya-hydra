@@ -1,4 +1,4 @@
-set(TARGET_NAME mayaHydraGenericNodeTranslationSceneIndex)
+set(TARGET_NAME mayaHydraCustomNodeTranslationSceneIndex)
 
 add_library(${TARGET_NAME} SHARED)
 
@@ -7,13 +7,13 @@ add_library(${TARGET_NAME} SHARED)
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME} 
     PRIVATE
-        genericNodeTranslationSceneIndexPlugin.cpp
-        genericNodeTranslationSceneIndex.cpp
+        customNodeTranslationSceneIndexPlugin.cpp
+        customNodeTranslationSceneIndex.cpp
 )
 
 set(HEADERS
-        genericNodeTranslationSceneIndexPlugin.h
-        genericNodeTranslationSceneIndex.h
+        customNodeTranslationSceneIndexPlugin.h
+        customNodeTranslationSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------
@@ -92,13 +92,13 @@ set(PLUG_INFO_RESOURCE_PATH "resources")
 configure_file(${PLUG_INFO_PATH} ${CMAKE_CURRENT_BINARY_DIR}/${PLUG_INFO_PATH})
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PLUG_INFO_PATH} 
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/genericNodeTranslationSceneIndex/resources)
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/customNodeTranslationSceneIndex/resources)
 
 install(TARGETS ${TARGET_NAME}
         LIBRARY
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/genericNodeTranslationSceneIndex
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/customNodeTranslationSceneIndex
         RUNTIME
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/genericNodeTranslationSceneIndex
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/usd/customNodeTranslationSceneIndex
 )
 
 if(IS_WINDOWS)

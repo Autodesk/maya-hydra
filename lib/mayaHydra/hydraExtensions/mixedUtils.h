@@ -271,7 +271,7 @@ void GetExtensionAndDynamicAttributesFromNode(
     PXR_NS::VtDictionary& attrs);
 
 /**
- * @brief Get non-default plugin-specific attributes from a Maya node for generic Hydra translation.
+ * @brief Get non-default plugin-specific attributes from a Maya node for custom Hydra translation.
  *
  * Unlike GetExtensionAndDynamicAttributesFromNode, this reads attributes beyond the
  * standard Maya built-in base classes (locator, shape, dagNode, dependNode, etc.).
@@ -293,7 +293,7 @@ void GetNonDefaultMayaAttributesFromNode(
  * @brief Check if an attribute name belongs to Maya's built-in DAG base classes.
  *
  * Returns true for attributes defined on locator, shape, dagNode, dependNode,
- * etc. Used by the generic adapter's attribute-changed callback to avoid
+ * etc. Used by the custom adapter's attribute-changed callback to avoid
  * sending dirty notices for base class attributes that are never included
  * in the mayaAttributes dictionary.
  */

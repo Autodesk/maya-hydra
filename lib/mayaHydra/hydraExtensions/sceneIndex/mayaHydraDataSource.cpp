@@ -20,11 +20,11 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraPrimvarDataSource.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraCameraDataSource.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraLightDataSource.h>
-#include <mayaHydraLib/sceneIndex/mayaHydraGenericNodeDataSource.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraCustomNodeDataSource.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexUtils.h>
 #include <mayaHydraLib/adapters/adapter.h>
-#include <mayaHydraLib/adapters/genericDagAdapter.h>
+#include <mayaHydraLib/adapters/customDagAdapter.h>
 #include <mayaHydraLib/adapters/tokens.h>
 
 #include <pxr/imaging/hd/retainedDataSource.h>
@@ -213,9 +213,9 @@ MayaHydraDataSource::Get(const TfToken& name)
                     .Build();
     } else if (name == MayaHydraAdapterTokens->mayaNode
                && _type == MayaHydraAdapterTokens->mayaCustomDagNode) {
-        auto* genericAdapter = dynamic_cast<MayaHydraGenericDagAdapter*>(_adapter);
-        if (genericAdapter) {
-            return MayaHydraGenericNodeDataSource::New(genericAdapter);
+        auto* customAdapter = dynamic_cast<MayaHydraCustomDagAdapter*>(_adapter);
+        if (customAdapter) {
+            return MayaHydraCustomNodeDataSource::New(customAdapter);
         }
     }
 

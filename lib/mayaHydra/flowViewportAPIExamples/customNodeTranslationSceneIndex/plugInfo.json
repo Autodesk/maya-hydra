@@ -3,11 +3,11 @@
         {
             "Info": {
                 "Types": {
-                    "HdGenericNodeTranslationSceneIndexPlugin" : {
+                    "HdCustomNodeTranslationSceneIndexPlugin" : {
                         "bases": ["HdSceneIndexPlugin"],
                         "loadWithRenderer": "Arnold",
                         "priority": 0,
-                        "displayName": "Translate generic Maya plugin nodes"
+                        "displayName": "Translate custom Maya plugin nodes"
                     }
                 }
             },

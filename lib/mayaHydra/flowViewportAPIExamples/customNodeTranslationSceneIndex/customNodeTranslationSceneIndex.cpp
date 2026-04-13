@@ -26,7 +26,7 @@
 // recognises while passing through the rest.
 //
 
-#include "genericNodeTranslationSceneIndex.h"
+#include "customNodeTranslationSceneIndex.h"
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/staticTokens.h>
@@ -54,27 +54,27 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((aiPhotometricLight, "aiPhotometricLight"))
 );
 
-HdGenericNodeTranslationSceneIndexRefPtr
-HdGenericNodeTranslationSceneIndex::New(
+HdCustomNodeTranslationSceneIndexRefPtr
+HdCustomNodeTranslationSceneIndex::New(
     const HdSceneIndexBaseRefPtr& inputSceneIndex)
 {
     return TfCreateRefPtr(
-        new HdGenericNodeTranslationSceneIndex(inputSceneIndex));
+        new HdCustomNodeTranslationSceneIndex(inputSceneIndex));
 }
 
-HdGenericNodeTranslationSceneIndex::HdGenericNodeTranslationSceneIndex(
+HdCustomNodeTranslationSceneIndex::HdCustomNodeTranslationSceneIndex(
     const HdSceneIndexBaseRefPtr& inputSceneIndex)
     : HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
 {
 }
 
-HdGenericNodeTranslationSceneIndex::~HdGenericNodeTranslationSceneIndex() = default;
+HdCustomNodeTranslationSceneIndex::~HdCustomNodeTranslationSceneIndex() = default;
 
 // Intercepts mayaCustomDagNode prims: reads the mayaNode data source to
 // determine the Maya type name, then dispatches to the appropriate
 // translation function. Prims with unrecognized types are passed through.
 HdSceneIndexPrim
-HdGenericNodeTranslationSceneIndex::GetPrim(const SdfPath& primPath) const
+HdCustomNodeTranslationSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     HdSceneIndexPrim prim = _GetInputSceneIndex()->GetPrim(primPath);
     if (prim.primType != _tokens->mayaCustomDagNode) {
@@ -113,7 +113,7 @@ HdGenericNodeTranslationSceneIndex::GetPrim(const SdfPath& primPath) const
 }
 
 SdfPathVector
-HdGenericNodeTranslationSceneIndex::GetChildPrimPaths(
+HdCustomNodeTranslationSceneIndex::GetChildPrimPaths(
     const SdfPath& primPath) const
 {
     return _GetInputSceneIndex()->GetChildPrimPaths(primPath);
@@ -125,7 +125,7 @@ HdGenericNodeTranslationSceneIndex::GetChildPrimPaths(
 // The original xform and visibility data sources from maya-hydra are preserved
 // via HdOverlayContainerDataSource.
 HdSceneIndexPrim
-HdGenericNodeTranslationSceneIndex::_TranslatePhotometricLight(
+HdCustomNodeTranslationSceneIndex::_TranslatePhotometricLight(
     const HdSceneIndexPrim& inputPrim,
     const VtDictionary& mayaAttrs) const
 {
@@ -197,7 +197,7 @@ HdGenericNodeTranslationSceneIndex::_TranslatePhotometricLight(
 // For added prims, translate the prim type so that downstream observers
 // (including the render delegate) see the translated type rather than
 // the raw mayaCustomDagNode type.
-void HdGenericNodeTranslationSceneIndex::_PrimsAdded(
+void HdCustomNodeTranslationSceneIndex::_PrimsAdded(
     const HdSceneIndexBase& /*sender*/,
     const HdSceneIndexObserver::AddedPrimEntries& entries)
 {
@@ -216,7 +216,7 @@ void HdGenericNodeTranslationSceneIndex::_PrimsAdded(
     _SendPrimsAdded(translated);
 }
 
-void HdGenericNodeTranslationSceneIndex::_PrimsRemoved(
+void HdCustomNodeTranslationSceneIndex::_PrimsRemoved(
     const HdSceneIndexBase& /*sender*/,
     const HdSceneIndexObserver::RemovedPrimEntries& entries)
 {
@@ -228,7 +228,7 @@ void HdGenericNodeTranslationSceneIndex::_PrimsRemoved(
 // mayaNode.mayaAttributes.intensity) don't match the translated schema
 // (e.g. inputs:intensity). Conservatively dirty the entire prim so
 // downstream consumers re-read all data sources after re-typing.
-void HdGenericNodeTranslationSceneIndex::_PrimsDirtied(
+void HdCustomNodeTranslationSceneIndex::_PrimsDirtied(
     const HdSceneIndexBase& /*sender*/,
     const HdSceneIndexObserver::DirtiedPrimEntries& entries)
 {

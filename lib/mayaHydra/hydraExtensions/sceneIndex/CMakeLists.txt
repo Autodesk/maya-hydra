@@ -7,7 +7,7 @@ target_sources(${TARGET_NAME}
     mayaHydraSceneIndex.cpp
     mayaViewportSceneIndex.cpp
     mayaHydraDataSource.cpp
-    mayaHydraGenericNodeDataSource.cpp
+    mayaHydraCustomNodeDataSource.cpp
     mayaHydraPrimvarDataSource.cpp
     mayaHydraDisplayStyleDataSource.cpp
     mayaHydraCameraDataSource.cpp
@@ -28,7 +28,7 @@ set(HEADERS
     mayaHydraSceneIndex.h
     mayaViewportSceneIndex.h
     mayaHydraDataSource.h
-    mayaHydraGenericNodeDataSource.h
+    mayaHydraCustomNodeDataSource.h
     mayaHydraPrimvarDataSource.h
     mayaHydraDisplayStyleDataSource.h
     mayaHydraCameraDataSource.h

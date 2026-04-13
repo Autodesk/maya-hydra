@@ -430,7 +430,7 @@ void MayaHydraSceneIndex::_Destroy()
         _lightAdapters,
         _cameraAdapters,
         _materialAdapters,
-        _genericAdapters);
+        _customAdapters);
 
     _renderItemsAdapters.clear();
     _shapeAdapters.clear();
@@ -438,7 +438,7 @@ void MayaHydraSceneIndex::_Destroy()
     _materialAdapters.clear();
     _cameraAdapters.clear();
     _renderItemsAdaptersFast.clear();
-    _genericAdapters.clear();
+    _customAdapters.clear();
 
     // Unregister the fallback path mapper.
     Fvp::PathMapperRegistry::Instance().SetFallbackMapper(nullptr);
@@ -780,8 +780,8 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
         _addedNodes.clear();
     }
 
-    if (!_genericsToAdd.empty()) {
-        for (const auto& obj : _genericsToAdd) {
+    if (!_customNodesToAdd.empty()) {
+        for (const auto& obj : _customNodesToAdd) {
             if (obj.isNull()) {
                 continue;
             }
@@ -800,9 +800,9 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
             if (dag.isInstanced() && dag.instanceNumber() > 0) {
                 continue;
             }
-            CreateGenericAdapter(dag);
+            CreateCustomAdapter(dag);
         }
-        _genericsToAdd.clear();
+        _customNodesToAdd.clear();
     }
 
     // We don't need to rebuild something that's already being recreated.
@@ -849,7 +849,8 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
                     _shapeAdapters,
                     _lightAdapters,
                     _cameraAdapters,
-                    _materialAdapters);
+                    _materialAdapters,
+                    _customAdapters);
             }
             _adaptersToRebuild.clear();
         }
@@ -1004,7 +1005,8 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
             },
             _shapeAdapters,
             _lightAdapters,
-            _cameraAdapters);
+            _cameraAdapters,
+            _customAdapters);
     }
     // We need to trigger rebuilding shaders.
     if (oldParams.textureMemoryPerTexture != params.textureMemoryPerTexture) {
@@ -1093,7 +1095,7 @@ void MayaHydraSceneIndex::RemoveAdapter(const SdfPath& id)
             _lightAdapters,
             _cameraAdapters,
             _materialAdapters,
-            _genericAdapters)) {
+            _customAdapters)) {
         TF_WARN("MayaHydraSceneIndex::RemoveAdapter(%s) -- Adapter does not exists", id.GetText());
     }
 }
@@ -1254,7 +1256,7 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
                 a->RemoveCallbacks();
                 a->RemovePrim();
             },
-            _genericAdapters)) {
+            _customAdapters)) {
         MFnDagNode dgNode(obj);
         MDagPath   path;
         dgNode.getPath(path);
@@ -1342,7 +1344,7 @@ MayaHydraShapeAdapterPtr MayaHydraSceneIndex::CreateShapeAdapter(const MDagPath&
     return _CreateAdapter(dagPath, shapeCreatorFunc, _shapeAdapters);
 }
 
-MayaHydraGenericDagAdapterPtr MayaHydraSceneIndex::CreateGenericAdapter(const MDagPath& dagPath)
+MayaHydraCustomDagAdapterPtr MayaHydraSceneIndex::CreateCustomAdapter(const MDagPath& dagPath)
 {
     MFnDependencyNode depNode(dagPath.node());
     MNodeClass nodeClass(depNode.typeName());
@@ -1361,13 +1363,13 @@ MayaHydraGenericDagAdapterPtr MayaHydraSceneIndex::CreateGenericAdapter(const MD
     }
 
     auto creator = [](MayaHydraSceneIndex* si, const MDagPath& dag)
-        -> MayaHydraGenericDagAdapterPtr {
-        return std::make_shared<MayaHydraGenericDagAdapter>(si, dag);
+        -> MayaHydraCustomDagAdapterPtr {
+        return std::make_shared<MayaHydraCustomDagAdapter>(si, dag);
     };
-    return _CreateAdapter<MayaHydraGenericDagAdapterPtr>(
+    return _CreateAdapter<MayaHydraCustomDagAdapterPtr>(
         dagPath,
-        std::function<MayaHydraGenericDagAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>(creator),
-        _genericAdapters,
+        std::function<MayaHydraCustomDagAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>(creator),
+        _customAdapters,
         false);
 }
 
@@ -1384,8 +1386,8 @@ void MayaHydraSceneIndex::OnDagNodeAdded(const MObject& obj)
     // Queue newly added DAG nodes for adapter creation during the next
     // FlushPendingUpdates().  Lights and cameras always get their dedicated
     // adapters.  When the mesh adapter is active, all other shapes go through
-    // it.  Otherwise, unrecognized plugin shapes are queued for generic
-    // adapter creation (_genericsToAdd).
+    // it.  Otherwise, unrecognized plugin shapes are queued for custom
+    // adapter creation (_customNodesToAdd).
     if (auto lightFn = MayaHydraAdapterRegistry::GetLightAdapterCreator(obj)) {
         _lightsToAdd.push_back({ obj, lightFn });
     } else if (auto cameraFn = MayaHydraAdapterRegistry::GetCameraAdapterCreator(obj)) {
@@ -1393,7 +1395,7 @@ void MayaHydraSceneIndex::OnDagNodeAdded(const MObject& obj)
     } else if (useMeshAdapter()) {
         _addedNodes.push_back(obj);
     } else {
-        _genericsToAdd.push_back(obj);
+        _customNodesToAdd.push_back(obj);
     }
 }
 
@@ -1430,12 +1432,12 @@ void MayaHydraSceneIndex::OnDagNodeRemoved(const MObject& obj)
     }
 
     {
-        const auto itGeneric
-            = std::remove_if(_genericsToAdd.begin(), _genericsToAdd.end(), [&obj](const auto& item) {
+        const auto itCustom
+            = std::remove_if(_customNodesToAdd.begin(), _customNodesToAdd.end(), [&obj](const auto& item) {
                   return item == obj;
               });
-        if (itGeneric != _genericsToAdd.end()) {
-            _genericsToAdd.erase(itGeneric, _genericsToAdd.end());
+        if (itCustom != _customNodesToAdd.end()) {
+            _customNodesToAdd.erase(itCustom, _customNodesToAdd.end());
         }
     }
 }
@@ -1483,7 +1485,7 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
         return;
     }
 
-    CreateGenericAdapter(dag);
+    CreateCustomAdapter(dag);
 }
 
 void MayaHydraSceneIndex::UpdateLightVisibility(const MDagPath& dag)

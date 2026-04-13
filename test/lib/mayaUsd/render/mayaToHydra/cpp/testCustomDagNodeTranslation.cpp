@@ -13,14 +13,14 @@
 // limitations under the License.
 //
 //
-// C++ GTest tests for the generic plugin DAG node translation feature.
+// C++ GTest tests for the custom plugin DAG node translation feature.
 // Validates that unrecognized Maya plugin nodes (using aiPhotometricLight as
 // the concrete example) are correctly translated to Hydra as mayaCustomDagNode
 // prims with the right type name, non-default attributes, per-attribute dirty
 // locators, and that nodes with all-default attributes have an empty
 // mayaAttributes dictionary.
 //
-// The Python counterpart (testGenericDagNodeTranslation.py) sets up the Maya
+// The Python counterpart (testCustomDagNodeTranslation.py) sets up the Maya
 // scene and passes node paths as positional arguments to mayaHydraCppTest.
 //
 
@@ -45,7 +45,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 using namespace MayaHydra;
 
 // Verify prim type is mayaCustomDagNode and data source contains expected values.
-TEST(GenericDagNodeTranslation, verifyPrimTypeAndDataSource)
+TEST(CustomDagNodeTranslation, verifyPrimTypeAndDataSource)
 {
     auto [argc, argv] = getTestingArgs();
     ASSERT_GE(argc, 1);
@@ -117,7 +117,7 @@ TEST(GenericDagNodeTranslation, verifyPrimTypeAndDataSource)
 
 // Verify that changing an attribute produces the correct per-attribute dirty notice
 // and the updated value is readable.
-TEST(GenericDagNodeTranslation, verifyAttributeDirtyAndUpdate)
+TEST(CustomDagNodeTranslation, verifyAttributeDirtyAndUpdate)
 {
     auto [argc, argv] = getTestingArgs();
     ASSERT_GE(argc, 1);
@@ -189,7 +189,7 @@ TEST(GenericDagNodeTranslation, verifyAttributeDirtyAndUpdate)
 
 // Verify that setting one attribute does not produce duplicate dirty notices
 // and does not dirty other attributes.
-TEST(GenericDagNodeTranslation, verifyNoDuplicateDirtyNotices)
+TEST(CustomDagNodeTranslation, verifyNoDuplicateDirtyNotices)
 {
     auto [argc, argv] = getTestingArgs();
     ASSERT_GE(argc, 1);
@@ -252,7 +252,7 @@ TEST(GenericDagNodeTranslation, verifyNoDuplicateDirtyNotices)
 
 // Verify that changing a plugin attribute does NOT produce a spurious xform
 // dirty notice. Only the per-attribute locator should be dirtied.
-TEST(GenericDagNodeTranslation, verifyNoSpuriousXformDirty)
+TEST(CustomDagNodeTranslation, verifyNoSpuriousXformDirty)
 {
     auto [argc, argv] = getTestingArgs();
     ASSERT_GE(argc, 1);
@@ -310,7 +310,7 @@ TEST(GenericDagNodeTranslation, verifyNoSpuriousXformDirty)
 }
 
 // Verify that attributes left at their default value are NOT included in mayaAttributes.
-TEST(GenericDagNodeTranslation, verifyDefaultValuesNotTranslated)
+TEST(CustomDagNodeTranslation, verifyDefaultValuesNotTranslated)
 {
     auto [argc, argv] = getTestingArgs();
     ASSERT_GE(argc, 1);
@@ -362,7 +362,7 @@ TEST(GenericDagNodeTranslation, verifyDefaultValuesNotTranslated)
 // Verify that a plugin node with ALL attributes at default is still added to
 // Hydra (so attribute changes are tracked from creation), but its mayaAttributes
 // dictionary is empty.
-TEST(GenericDagNodeTranslation, verifyDefaultOnlyNodeInHydraWithEmptyAttrs)
+TEST(CustomDagNodeTranslation, verifyDefaultOnlyNodeInHydraWithEmptyAttrs)
 {
     auto [argc, argv] = getTestingArgs();
     ASSERT_GE(argc, 1);

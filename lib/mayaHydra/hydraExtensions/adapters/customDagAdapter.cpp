@@ -13,14 +13,14 @@
 // limitations under the License.
 //
 //
-// Implements MayaHydraGenericDagAdapter: the fallback adapter for unrecognized
+// Implements MayaHydraCustomDagAdapter: the fallback adapter for unrecognized
 // Maya plugin DAG nodes. When InsertDag() finds no light/camera/shape adapter
 // for a plugin node, it creates one of these. The adapter exposes the node as
 // a "mayaCustomDagNode" Hydra prim with its type name and all non-default
-// attributes available through MayaHydraGenericNodeDataSource.
+// attributes available through MayaHydraCustomNodeDataSource.
 //
 
-#include "genericDagAdapter.h"
+#include "customDagAdapter.h"
 
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/tokens.h>
@@ -50,15 +50,15 @@ using namespace MayaHydra;
 
 TF_REGISTRY_FUNCTION(TfType)
 {
-    TfType::Define<MayaHydraGenericDagAdapter, TfType::Bases<MayaHydraDagAdapter>>();
+    TfType::Define<MayaHydraCustomDagAdapter, TfType::Bases<MayaHydraDagAdapter>>();
 }
 
 namespace {
 
-// Maya callback invoked when any attribute on the generic node is modified.
+// Maya callback invoked when any attribute on the custom plugin node is modified.
 // Fires a per-attribute dirty locator (mayaNode.mayaAttributes.<attrName>)
 // so downstream scene indices can react to specific attribute changes.
-void _GenericNodeAttrChanged(
+void _CustomNodeAttrChanged(
     MNodeMessage::AttributeMessage msg,
     MPlug& plug,
     MPlug& /*otherPlug*/,
@@ -87,7 +87,7 @@ void _GenericNodeAttrChanged(
         return;
     }
 
-    auto* adapter = reinterpret_cast<MayaHydraGenericDagAdapter*>(clientData);
+    auto* adapter = reinterpret_cast<MayaHydraCustomDagAdapter*>(clientData);
 
     TfToken attrName(name);
     HdDataSourceLocator locator(
@@ -100,10 +100,10 @@ void _GenericNodeAttrChanged(
 // Visibility-only callback for the shape node itself. Unlike the base class
 // _TransformNodeDirty which fires DirtyTransform for any non-visibility plug,
 // this callback only reacts to visibility-related plugs. Plugin attribute
-// changes are handled separately by _GenericNodeAttrChanged.
-void _GenericShapePlugDirty(MObject& node, MPlug& plug, void* clientData)
+// changes are handled separately by _CustomNodeAttrChanged.
+void _CustomShapePlugDirty(MObject& node, MPlug& plug, void* clientData)
 {
-    auto* adapter = reinterpret_cast<MayaHydraGenericDagAdapter*>(clientData);
+    auto* adapter = reinterpret_cast<MayaHydraCustomDagAdapter*>(clientData);
     if (plug == MayaAttrs::dagNode::visibility
         || plug == MayaAttrs::dagNode::intermediateObject
         || plug == MayaAttrs::dagNode::overrideEnabled
@@ -115,9 +115,9 @@ void _GenericShapePlugDirty(MObject& node, MPlug& plug, void* clientData)
 // Transform-dirty callback for parent transform nodes only. Replicates the
 // base class _TransformNodeDirty behavior: visibility plugs fire
 // DirtyVisibility, all other plugs fire DirtyTransform.
-void _GenericParentTransformDirty(MObject& node, MPlug& plug, void* clientData)
+void _CustomParentTransformDirty(MObject& node, MPlug& plug, void* clientData)
 {
-    auto* adapter = reinterpret_cast<MayaHydraGenericDagAdapter*>(clientData);
+    auto* adapter = reinterpret_cast<MayaHydraCustomDagAdapter*>(clientData);
     if (plug == MayaAttrs::dagNode::visibility
         || plug == MayaAttrs::dagNode::intermediateObject
         || plug == MayaAttrs::dagNode::overrideEnabled
@@ -137,7 +137,7 @@ void _GenericParentTransformDirty(MObject& node, MPlug& plug, void* clientData)
 
 } // namespace
 
-MayaHydraGenericDagAdapter::MayaHydraGenericDagAdapter(
+MayaHydraCustomDagAdapter::MayaHydraCustomDagAdapter(
     MayaHydraSceneIndex* mayaHydraSceneIndex,
     const MDagPath& dagPath)
     : MayaHydraDagAdapter(
@@ -149,12 +149,12 @@ MayaHydraGenericDagAdapter::MayaHydraGenericDagAdapter(
     _mayaTypeName = TfToken(depNode.typeName().asChar());
 }
 
-bool MayaHydraGenericDagAdapter::IsSupported() const
+bool MayaHydraCustomDagAdapter::IsSupported() const
 {
     return true;
 }
 
-void MayaHydraGenericDagAdapter::Populate()
+void MayaHydraCustomDagAdapter::Populate()
 {
     GetMayaHydraSceneIndex()->InsertPrim(
         this,
@@ -163,7 +163,7 @@ void MayaHydraGenericDagAdapter::Populate()
     _isPopulated = true;
 }
 
-void MayaHydraGenericDagAdapter::MarkDirty(HdDirtyBits dirtyBits)
+void MayaHydraCustomDagAdapter::MarkDirty(HdDirtyBits dirtyBits)
 {
     if (dirtyBits == 0) {
         return;
@@ -182,14 +182,14 @@ void MayaHydraGenericDagAdapter::MarkDirty(HdDirtyBits dirtyBits)
     }
 }
 
-void MayaHydraGenericDagAdapter::CreateCallbacks()
+void MayaHydraCustomDagAdapter::CreateCallbacks()
 {
     MStatus status;
 
     // Per-attribute dirty callback on the shape node.
     auto obj = GetNode();
     auto cbId = MNodeMessage::addAttributeChangedCallback(
-        obj, _GenericNodeAttrChanged, this, &status);
+        obj, _CustomNodeAttrChanged, this, &status);
     if (status) {
         AddCallback(cbId);
     }
@@ -197,9 +197,9 @@ void MayaHydraGenericDagAdapter::CreateCallbacks()
     // Visibility-only plug-dirty callback on the shape node. We do NOT use
     // the base class _TransformNodeDirty here because it fires DirtyTransform
     // for every non-visibility plug change (e.g. intensity), which is wrong
-    // for plugin attribute changes that we handle via _GenericNodeAttrChanged.
+    // for plugin attribute changes that we handle via _CustomNodeAttrChanged.
     cbId = MNodeMessage::addNodeDirtyPlugCallback(
-        obj, _GenericShapePlugDirty, this, &status);
+        obj, _CustomShapePlugDirty, this, &status);
     if (status) {
         AddCallback(cbId);
     }
@@ -217,7 +217,7 @@ void MayaHydraGenericDagAdapter::CreateCallbacks()
                 MObject parentObj = dag.node();
                 if (parentObj != MObject::kNullObj) {
                     cbId = MNodeMessage::addNodeDirtyPlugCallback(
-                        parentObj, _GenericParentTransformDirty, this, &status);
+                        parentObj, _CustomParentTransformDirty, this, &status);
                     if (status) {
                         AddCallback(cbId);
                     }
@@ -230,7 +230,7 @@ void MayaHydraGenericDagAdapter::CreateCallbacks()
     MayaHydraAdapter::CreateCallbacks();
 }
 
-void MayaHydraGenericDagAdapter::RemovePrim()
+void MayaHydraCustomDagAdapter::RemovePrim()
 {
     if (!_isPopulated) {
         return;
@@ -239,13 +239,13 @@ void MayaHydraGenericDagAdapter::RemovePrim()
     _isPopulated = false;
 }
 
-bool MayaHydraGenericDagAdapter::GetVisible()
+bool MayaHydraCustomDagAdapter::GetVisible()
 {
     UpdateVisibility();
     return IsVisible(false);
 }
 
-VtDictionary MayaHydraGenericDagAdapter::GetNonDefaultMayaAttributes() const
+VtDictionary MayaHydraCustomDagAdapter::GetNonDefaultMayaAttributes() const
 {
     VtDictionary attrs;
     GetNonDefaultMayaAttributesFromNode(GetNode(), attrs);

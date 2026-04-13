@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Python test for the generic plugin DAG node translation feature.
+# Python test for the custom plugin DAG node translation feature.
 # Sets up a Maya scene with two aiPhotometricLight nodes:
 #   1. photometricShape1: has non-default attribute values (intensity, aiExposure, aiFilename)
 #   2. photometricShapeDefaults1: all attributes at default values
@@ -25,7 +25,7 @@ import mtohUtils
 from testUtils import PluginLoaded
 
 
-class TestGenericDagNodeTranslation(mtohUtils.MayaHydraBaseTestCase):
+class TestCustomDagNodeTranslation(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
     _requiredPlugins = ['mtoa']
 
@@ -59,42 +59,42 @@ class TestGenericDagNodeTranslation(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 self._shape,
-                f="GenericDagNodeTranslation.verifyPrimTypeAndDataSource")
+                f="CustomDagNodeTranslation.verifyPrimTypeAndDataSource")
 
     def test_photometricLightAttributeDirty(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 self._shape,
-                f="GenericDagNodeTranslation.verifyAttributeDirtyAndUpdate")
+                f="CustomDagNodeTranslation.verifyAttributeDirtyAndUpdate")
 
     def test_photometricLightNoDuplicateDirty(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 self._shape,
-                f="GenericDagNodeTranslation.verifyNoDuplicateDirtyNotices")
+                f="CustomDagNodeTranslation.verifyNoDuplicateDirtyNotices")
 
     def test_noSpuriousXformDirty(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 self._shape,
-                f="GenericDagNodeTranslation.verifyNoSpuriousXformDirty")
+                f="CustomDagNodeTranslation.verifyNoSpuriousXformDirty")
 
     def test_defaultValuesNotTranslated(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 self._shape,
-                f="GenericDagNodeTranslation.verifyDefaultValuesNotTranslated")
+                f="CustomDagNodeTranslation.verifyDefaultValuesNotTranslated")
 
     def test_defaultOnlyNodeInHydraWithEmptyAttrs(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 self._shapeDefaults,
-                f="GenericDagNodeTranslation.verifyDefaultOnlyNodeInHydraWithEmptyAttrs")
+                f="CustomDagNodeTranslation.verifyDefaultOnlyNodeInHydraWithEmptyAttrs")
 
 
 if __name__ == '__main__':

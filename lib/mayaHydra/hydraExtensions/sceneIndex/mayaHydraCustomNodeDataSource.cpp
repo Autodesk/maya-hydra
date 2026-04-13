@@ -13,14 +13,14 @@
 // limitations under the License.
 //
 //
-// Implements MayaHydraGenericNodeDataSource: the Hydra data source that
-// exposes a generic Maya plugin node's type name and non-default attribute
-// values. Delegates attribute reading to MayaHydraGenericDagAdapter.
+// Implements MayaHydraCustomNodeDataSource: the Hydra data source that
+// exposes a custom Maya plugin node's type name and non-default attribute
+// values. Delegates attribute reading to MayaHydraCustomDagAdapter.
 //
 
-#include "mayaHydraGenericNodeDataSource.h"
+#include "mayaHydraCustomNodeDataSource.h"
 
-#include <mayaHydraLib/adapters/genericDagAdapter.h>
+#include <mayaHydraLib/adapters/customDagAdapter.h>
 #include <mayaHydraLib/adapters/tokens.h>
 
 #include <pxr/base/vt/dictionary.h>
@@ -28,13 +28,13 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-MayaHydraGenericNodeDataSource::MayaHydraGenericNodeDataSource(
-    MayaHydraGenericDagAdapter* adapter)
+MayaHydraCustomNodeDataSource::MayaHydraCustomNodeDataSource(
+    MayaHydraCustomDagAdapter* adapter)
     : _adapter(adapter)
 {
 }
 
-TfTokenVector MayaHydraGenericNodeDataSource::GetNames()
+TfTokenVector MayaHydraCustomNodeDataSource::GetNames()
 {
     return {
         MayaHydraAdapterTokens->mayaTypeName,
@@ -42,7 +42,7 @@ TfTokenVector MayaHydraGenericNodeDataSource::GetNames()
     };
 }
 
-HdDataSourceBaseHandle MayaHydraGenericNodeDataSource::Get(const TfToken& name)
+HdDataSourceBaseHandle MayaHydraCustomNodeDataSource::Get(const TfToken& name)
 {
     if (name == MayaHydraAdapterTokens->mayaTypeName) {
         return HdRetainedTypedSampledDataSource<TfToken>::New(

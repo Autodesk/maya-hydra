@@ -13,8 +13,8 @@
 // limitations under the License.
 //
 
-#ifndef MAYAHYDRALIB_GENERIC_DAG_ADAPTER_H
-#define MAYAHYDRALIB_GENERIC_DAG_ADAPTER_H
+#ifndef MAYAHYDRALIB_CUSTOM_DAG_ADAPTER_H
+#define MAYAHYDRALIB_CUSTOM_DAG_ADAPTER_H
 
 #include <mayaHydraLib/adapters/dagAdapter.h>
 
@@ -26,9 +26,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 class MayaHydraSceneIndex;
 
 /**
- * \brief Generic adapter for translating custom Maya plugin nodes to Hydra.
+ * \brief Adapter for translating custom Maya plugin nodes to Hydra.
  *
- * This adapter provides a generic translation mechanism for custom DAG nodes
+ * This adapter provides a translation mechanism for custom DAG nodes
  * created by third-party Maya plugins (Arnold, RenderMan, etc.) that have no
  * specific registered adapter in maya-hydra. It enables these plugin nodes to
  * participate in the Hydra scene without maya-hydra needing any knowledge of
@@ -45,7 +45,7 @@ class MayaHydraSceneIndex;
  * The adapter inserts a Hydra prim of type "mayaCustomDagNode" into the scene
  * index. This prim carries:
  *   - Standard xform, visibility, and purpose data sources (from MayaHydraDagAdapter).
- *   - A custom "mayaNode" data source (MayaHydraGenericNodeDataSource) containing:
+ *   - A custom "mayaNode" data source (MayaHydraCustomNodeDataSource) containing:
  *     - "mayaTypeName": the Maya node type name (e.g. "aiPhotometricLight").
  *     - "mayaAttributes": a VtDictionary of all non-default attribute values.
  *
@@ -61,7 +61,7 @@ class MayaHydraSceneIndex;
  *   4. Ignores types it does not recognize (passes them through).
  *
  * This design keeps the render delegate free of any maya-hydra dependency.
- * See flowViewportAPIExamples/genericNodeTranslationSceneIndex/ for a complete
+ * See flowViewportAPIExamples/customNodeTranslationSceneIndex/ for a complete
  * example that translates aiPhotometricLight to a UsdLux sphereLight for Arnold.
  *
  * \section defaults Attribute Filtering
@@ -86,16 +86,16 @@ class MayaHydraSceneIndex;
  * delegate's scene index to react to specific attribute changes without
  * recomputing everything.
  */
-class MayaHydraGenericDagAdapter : public MayaHydraDagAdapter
+class MayaHydraCustomDagAdapter : public MayaHydraDagAdapter
 {
 public:
     MAYAHYDRALIB_API
-    MayaHydraGenericDagAdapter(
+    MayaHydraCustomDagAdapter(
         MayaHydraSceneIndex* mayaHydraSceneIndex,
         const MDagPath& dagPath);
 
     MAYAHYDRALIB_API
-    ~MayaHydraGenericDagAdapter() override = default;
+    ~MayaHydraCustomDagAdapter() override = default;
 
     /// Always returns true for plugin nodes. The adapter is created for all
     /// plugin DAG nodes so that attribute changes are tracked from the start.
@@ -145,8 +145,8 @@ private:
     TfToken _mayaTypeName;  ///< Cached Maya node type name.
 };
 
-using MayaHydraGenericDagAdapterPtr = std::shared_ptr<MayaHydraGenericDagAdapter>;
+using MayaHydraCustomDagAdapterPtr = std::shared_ptr<MayaHydraCustomDagAdapter>;
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // MAYAHYDRALIB_GENERIC_DAG_ADAPTER_H
+#endif // MAYAHYDRALIB_CUSTOM_DAG_ADAPTER_H

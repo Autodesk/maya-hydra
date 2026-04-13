@@ -1,8 +1,8 @@
-# Generic Plugin Node Translation to Hydra
+# Custom Plugin Node Translation to Hydra
 
 ## Overview
 
-Maya-hydra provides a generic translation mechanism that allows custom DAG nodes created by third-party Maya plugins (Arnold, RenderMan, custom in-house plugins, etc.) to participate in the Hydra scene without maya-hydra needing any knowledge of the plugin's node types.
+Maya-hydra provides a translation mechanism that allows custom DAG nodes created by third-party Maya plugins (Arnold, RenderMan, custom in-house plugins, etc.) to participate in the Hydra scene without maya-hydra needing any knowledge of the plugin's node types.
 
 This is useful for plugin-defined node types such as `aiPhotometricLight`, `aiLightBlocker`, `PxrDomeLight`, or any custom node that has no dedicated adapter registered in `MayaHydraAdapterRegistry`.
 
@@ -22,7 +22,7 @@ This is useful for plugin-defined node types such as `aiPhotometricLight`, `aiLi
         |     - Yes -> does it already have a Flow Viewport data producer?
         |              (checked via DataProducersNodeHashCodeToSdfPathRegistry)
         |       - Yes -> skip (already in Hydra via its own scene index)
-        |       - No  -> create MayaHydraGenericDagAdapter
+        |       - No  -> create MayaHydraCustomDagAdapter
         |
         v
  Hydra Scene Index
@@ -43,7 +43,7 @@ This is useful for plugin-defined node types such as `aiPhotometricLight`, `aiLi
 
 1. **Detection**: When `MayaHydraSceneIndex::InsertDag()` encounters a DAG leaf node that no registered adapter claims, it checks if the node was registered by a plugin using `MNodeClass(typeName).pluginName()`. Only plugin-registered nodes are translated; Maya built-in nodes (locators, joints, constraints, etc.) are always skipped. Plugin nodes that already provide their own Hydra data through the Flow Viewport data producer API are also excluded to avoid duplicate prims. This is detected automatically by querying `Fvp::DataProducersNodeHashCodeToSdfPathRegistry`: if the node's `MObjectHandle` hash code is registered there, it means a data producer scene index is already handling it.
 
-2. **Adapter creation**: A `MayaHydraGenericDagAdapter` is created. This adapter:
+2. **Adapter creation**: A `MayaHydraCustomDagAdapter` is created. This adapter:
    - Caches the Maya node type name (e.g., `"aiPhotometricLight"`).
    - Reads all non-default attribute values into a `VtDictionary`.
    - Makes no assumption about what the node represents (light, mesh, camera, etc.).
@@ -52,7 +52,7 @@ This is useful for plugin-defined node types such as `aiPhotometricLight`, `aiLi
    - `xform` -- world-space transform (flattened inclusive matrix from the complete DAG path).
    - `visibility` -- standard Hydra visibility from the DAG path.
    - `purpose` -- standard Hydra purpose.
-   - `mayaNode` -- a custom container data source (`MayaHydraGenericNodeDataSource`) with:
+   - `mayaNode` -- a custom container data source (`MayaHydraCustomNodeDataSource`) with:
      - `mayaTypeName` (`TfToken`): the Maya node type name.
      - `mayaAttributes` (`VtDictionary`): all non-default attribute name/value pairs.
 
@@ -82,8 +82,8 @@ static const TfToken kMayaAttributes("mayaAttributes");
 
 | Token | Type | Description |
 |---|---|---|
-| `mayaCustomDagNode` | Prim type | The Hydra prim type used for all generic plugin nodes. |
-| `mayaNode` | Data source key | Top-level container on the prim holding the generic node data. |
+| `mayaCustomDagNode` | Prim type | The Hydra prim type used for all custom plugin nodes. |
+| `mayaNode` | Data source key | Top-level container on the prim holding the custom node data. |
 | `mayaTypeName` | Data source key | Child of `mayaNode`. `TfToken` with the Maya node type name. |
 | `mayaAttributes` | Data source key | Child of `mayaNode`. `VtDictionary` with non-default attribute values. |
 
@@ -119,7 +119,7 @@ if (entry.dirtyLocators.Intersects(anyAttrLoc)) {
 
 Arnold is used here as a concrete illustration, but the same pattern applies to **any render delegate** (RenderMan, custom engines, etc.). Each render delegate would provide its own scene index plugin registered for its renderer name, handling the Maya node types it cares about and passing through the rest.
 
-A complete example is provided in `lib/mayaHydra/flowViewportAPIExamples/genericNodeTranslationSceneIndex/`. It demonstrates how a render delegate's scene index would translate an `aiPhotometricLight` into a `sphereLight` with UsdLux-compatible attributes.
+A complete example is provided in `lib/mayaHydra/flowViewportAPIExamples/customNodeTranslationSceneIndex/`. It demonstrates how a render delegate's scene index would translate an `aiPhotometricLight` into a `sphereLight` with UsdLux-compatible attributes.
 
 ### What maya-hydra produces
 
@@ -131,7 +131,7 @@ When an `aiPhotometricLight` node with `intensity=2.5`, `aiExposure=3.0`, and `a
 
 ### What the example scene index does
 
-The `HdGenericNodeTranslationSceneIndex` intercepts this prim in `GetPrim()`, recognizes `"aiPhotometricLight"`, and returns:
+The `HdCustomNodeTranslationSceneIndex` intercepts this prim in `GetPrim()`, recognizes `"aiPhotometricLight"`, and returns:
 
 - **Prim type**: `sphereLight`
 - **Data sources**: UsdLux-compatible tokens (`inputs:intensity`, `inputs:exposure`, `inputs:shaping:ies:file`, etc.) overlaid on the original xform/visibility.
@@ -174,8 +174,8 @@ No maya-hydra changes are needed. As soon as a plugin registers a new Maya node 
 
 | File | Description |
 |---|---|
-| `lib/mayaHydra/hydraExtensions/adapters/genericDagAdapter.h/.cpp` | The generic adapter that translates plugin DAG nodes. |
-| `lib/mayaHydra/hydraExtensions/sceneIndex/mayaHydraGenericNodeDataSource.h/.cpp` | Hydra data source exposing mayaTypeName and mayaAttributes. |
+| `lib/mayaHydra/hydraExtensions/adapters/customDagAdapter.h/.cpp` | The custom adapter that translates plugin DAG nodes. |
+| `lib/mayaHydra/hydraExtensions/sceneIndex/mayaHydraCustomNodeDataSource.h/.cpp` | Hydra data source exposing mayaTypeName and mayaAttributes. |
 | `lib/mayaHydra/hydraExtensions/adapters/tokens.h` | Token definitions (mayaCustomDagNode, mayaNode, etc.). |
 | `lib/mayaHydra/hydraExtensions/mixedUtils.h/.cpp` | `GetNonDefaultMayaAttributesFromNode()` utility for reading non-default attributes. |
 
@@ -183,18 +183,18 @@ No maya-hydra changes are needed. As soon as a plugin registers a new Maya node 
 
 | File | Description |
 |---|---|
-| `lib/mayaHydra/hydraExtensions/sceneIndex/mayaHydraSceneIndex.h/.cpp` | `CreateGenericAdapter()`, `_genericAdapters` map, `_genericsToAdd` queue. |
+| `lib/mayaHydra/hydraExtensions/sceneIndex/mayaHydraSceneIndex.h/.cpp` | `CreateCustomAdapter()`, `_customAdapters` map, `_customNodesToAdd` queue. |
 | `lib/mayaHydra/hydraExtensions/sceneIndex/mayaHydraDataSource.cpp` | Exposes `mayaNode` data source for `mayaCustomDagNode` prim type. |
 
 ### Example
 
 | File | Description |
 |---|---|
-| `lib/mayaHydra/flowViewportAPIExamples/genericNodeTranslationSceneIndex/` | Complete example of a render delegate scene index translating aiPhotometricLight. |
+| `lib/mayaHydra/flowViewportAPIExamples/customNodeTranslationSceneIndex/` | Complete example of a render delegate scene index translating aiPhotometricLight. |
 
 ### Tests
 
 | File | Description |
 |---|---|
-| `test/.../cpp/testGenericDagNodeTranslation.py` | Python test: scene setup with mtoa's aiPhotometricLight. |
-| `test/.../cpp/testGenericDagNodeTranslation.cpp` | C++ GTest: prim type, attributes, dirty locators, default filtering. |
+| `test/.../cpp/testCustomDagNodeTranslation.py` | Python test: scene setup with mtoa's aiPhotometricLight. |
+| `test/.../cpp/testCustomDagNodeTranslation.cpp` | C++ GTest: prim type, attributes, dirty locators, default filtering. |

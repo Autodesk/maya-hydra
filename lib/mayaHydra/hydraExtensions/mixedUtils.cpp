@@ -1262,7 +1262,7 @@ static bool ExtensionAttrValueEqualsDefault(const MPlug& attrPlug, const MObject
 
 // Returns the set of attribute names defined on Maya's built-in DAG shape
 // base classes (locator, and all ancestors: shape, dagNode, entity, dependNode).
-// Used to filter out standard Maya attributes from generic plugin node
+// Used to filter out standard Maya attributes from custom plugin node
 // translation, since maya-hydra already handles xform, visibility, and
 // purpose through dedicated data sources.
 //

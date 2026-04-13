@@ -91,7 +91,7 @@
                       ],
                       "displayName": "arnold area lights in Hydra for Maya."
                     },
-                    "MayaHydraGenericDagAdapter": {
+                    "MayaHydraCustomDagAdapter": {
                         "bases": [
                             "MayaHydraDagAdapter"
                         ],

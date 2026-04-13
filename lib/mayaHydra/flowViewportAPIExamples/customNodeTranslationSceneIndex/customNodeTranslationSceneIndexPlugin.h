@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 //
-// Example HdSceneIndexPlugin that registers HdGenericNodeTranslationSceneIndex
+// Example HdSceneIndexPlugin that registers HdCustomNodeTranslationSceneIndex
 // for a specific renderer. This example uses Arnold, but the same approach
 // works for any render delegate: replace the renderer name in
 // RegisterSceneIndexForRenderer and handle the Maya node types relevant to
@@ -22,8 +22,8 @@
 // when the matching render delegate is active.
 //
 
-#ifndef MAYA_HYDRA_GENERIC_NODE_TRANSLATION_SCENE_INDEX_PLUGIN_H
-#define MAYA_HYDRA_GENERIC_NODE_TRANSLATION_SCENE_INDEX_PLUGIN_H
+#ifndef MAYA_HYDRA_CUSTOM_NODE_TRANSLATION_SCENE_INDEX_PLUGIN_H
+#define MAYA_HYDRA_CUSTOM_NODE_TRANSLATION_SCENE_INDEX_PLUGIN_H
 
 #include <pxr/pxr.h>
 #include <pxr/imaging/hd/sceneIndexPlugin.h>
@@ -32,20 +32,20 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
 
-/// \class HdGenericNodeTranslationSceneIndexPlugin
+/// \class HdCustomNodeTranslationSceneIndexPlugin
 ///
 /// Example Hydra scene index plugin that translates mayaCustomDagNode prims
 /// into renderer-specific Hydra prim types. Arnold (aiPhotometricLight) is
 /// used as an example; any render delegate would create its own plugin
 /// following this same pattern.
 ///
-class HdGenericNodeTranslationSceneIndexPlugin : public HdSceneIndexPlugin
+class HdCustomNodeTranslationSceneIndexPlugin : public HdSceneIndexPlugin
 {
 public:
-    HdGenericNodeTranslationSceneIndexPlugin();
+    HdCustomNodeTranslationSceneIndexPlugin();
 
 protected:
-    /// Creates and returns the HdGenericNodeTranslationSceneIndex wrapping
+    /// Creates and returns the HdCustomNodeTranslationSceneIndex wrapping
     /// the input scene.
     HdSceneIndexBaseRefPtr _AppendSceneIndex(
         const HdSceneIndexBaseRefPtr& inputScene,
@@ -54,4 +54,4 @@ protected:
 
 } // namespace MAYAHYDRA_NS_DEF
 
-#endif // MAYA_HYDRA_GENERIC_NODE_TRANSLATION_SCENE_INDEX_PLUGIN_H
+#endif // MAYA_HYDRA_CUSTOM_NODE_TRANSLATION_SCENE_INDEX_PLUGIN_H

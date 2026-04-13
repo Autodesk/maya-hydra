@@ -14,7 +14,7 @@
 //
 //
 // Example filtering scene index that shows how a render delegate would
-// consume mayaCustomDagNode prims produced by maya-hydra's generic adapter
+// consume mayaCustomDagNode prims produced by maya-hydra's custom adapter
 // and translate them into renderer-specific Hydra prim types.
 //
 // This code has ZERO dependency on maya-hydra headers or libraries. It only
@@ -29,8 +29,8 @@
 // passing through the rest.
 //
 
-#ifndef MAYA_HYDRA_GENERIC_NODE_TRANSLATION_SCENE_INDEX_H
-#define MAYA_HYDRA_GENERIC_NODE_TRANSLATION_SCENE_INDEX_H
+#ifndef MAYA_HYDRA_CUSTOM_NODE_TRANSLATION_SCENE_INDEX_H
+#define MAYA_HYDRA_CUSTOM_NODE_TRANSLATION_SCENE_INDEX_H
 
 #include <pxr/pxr.h>
 #include <pxr/base/vt/dictionary.h>
@@ -40,17 +40,17 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
 
-TF_DECLARE_REF_PTRS(HdGenericNodeTranslationSceneIndex);
+TF_DECLARE_REF_PTRS(HdCustomNodeTranslationSceneIndex);
 
 /// Example filtering scene index that translates mayaCustomDagNode prims
 /// into renderer-specific types. Demonstrates how any render delegate would
-/// consume generic Maya plugin nodes without any maya-hydra dependency.
+/// consume custom Maya plugin nodes without any maya-hydra dependency.
 /// Arnold is used as an example; the same approach works for any renderer.
-class HdGenericNodeTranslationSceneIndex final
+class HdCustomNodeTranslationSceneIndex final
     : public HdSingleInputFilteringSceneIndexBase
 {
 public:
-    static HdGenericNodeTranslationSceneIndexRefPtr New(
+    static HdCustomNodeTranslationSceneIndexRefPtr New(
         const HdSceneIndexBaseRefPtr& inputSceneIndex);
 
     /// Intercepts mayaCustomDagNode prims and translates recognized Maya node
@@ -62,9 +62,9 @@ public:
     SdfPathVector    GetChildPrimPaths(const SdfPath& primPath) const override;
 
 private:
-    HdGenericNodeTranslationSceneIndex(
+    HdCustomNodeTranslationSceneIndex(
         const HdSceneIndexBaseRefPtr& inputSceneIndex);
-    ~HdGenericNodeTranslationSceneIndex() override;
+    ~HdCustomNodeTranslationSceneIndex() override;
 
     /// Translates an aiPhotometricLight's Maya attributes into a sphereLight
     /// prim with UsdLux-compatible data sources. The Arnold render delegate
@@ -92,4 +92,4 @@ private:
 
 } // namespace MAYAHYDRA_NS_DEF
 
-#endif // MAYA_HYDRA_GENERIC_NODE_TRANSLATION_SCENE_INDEX_H
+#endif // MAYA_HYDRA_CUSTOM_NODE_TRANSLATION_SCENE_INDEX_H
