@@ -1,5 +1,4 @@
 import mayaUsd.ufe as mayaUsdUfe
-import ufe
 
 from pxr import Sdf, UsdRender, Gf
 
@@ -7,6 +6,7 @@ DEFAULT_WIDTH  = 960
 DEFAULT_HEIGHT = 540
 
 # Don't know where Python standard output is going, Render gobbles it up.
+# Use open() "a" to append after initial "w" for creation.
 #
 # with open("c:/temp/RenderOutput.txt", "w", encoding="utf-8") as f:
 #     print("PPT: setWidth %s called." % str(width), file=f)
@@ -17,7 +17,7 @@ def getResolutionAttr():
     stage = mayaUsdUfe.getStage(rsStagePathStr)
 
     if not stage:
-        raise RuntimeError("No stage found at %s, setWidth() failed." % rsStagePathStr)
+        raise RuntimeError("No stage found at %s, getResolutionAttr() failed." % rsStagePathStr)
 
     # Get the render settings prim.  Could also use
     #

@@ -742,6 +742,8 @@ endfunction()
 #                           [FAIL <idiff fail value>]
 #                           [FAILPERCENT <idiff failpercent value>]
 #                           [WORKING_DIRECTORY <dir>]
+#                           [RENDERED_IMAGE_SUBDIR <dir>]
+#                           [RENDERED_IMAGE_NAME <file_name>]
 #                           [RENDERER_ARGS <extra_args>]
 #                           [COPY_SCENE]
 #                           [ENV <varname>=<varvalue> ...])
@@ -759,6 +761,8 @@ endfunction()
 #   FAIL               - idiff fail value (default 0.01)
 #   FAILPERCENT        - idiff failpercent value idiff (default 1.0)
 #   WORKING_DIRECTORY  - Directory from which the test executable will be called.
+#   RENDERED_IMAGE_SUBDIR - Rendered image root sub-directory (default "projects/default/images")
+#   RENDERED_IMAGE_NAME - Rendered image file name (default test name)
 #   RENDERER_ARGS      - Additional command line arguments to pass to the
 #                        renderer.
 #   COPY_SCENE         - If set, copies the scene file to the temporary project
@@ -774,7 +778,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
 
     cmake_parse_arguments(ARG
         "COPY_SCENE"             # Boolean options.
-        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;IMAGE_EXTENSION;FAIL;FAILPERCENT;RENDERER_ARGS" # one_value keywords
+        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;RENDERED_IMAGE_SUBDIR;RENDERED_IMAGE_NAME;IMAGE_EXTENSION;FAIL;FAILPERCENT;RENDERER_ARGS" # one_value keywords
         "ENV"                                    # multi_value keywords
         ${ARGN}
     )
@@ -843,7 +847,19 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     string(REGEX REPLACE "[:<>\|]" "_" SANITIZED_TEST_NAME ${test_name})
     set(MAYA_APP_TEMP_DIR "${CMAKE_BINARY_DIR}/test/Temporary/${SANITIZED_TEST_NAME}")
 
-    set(RENDERED_IMAGE_PATH "${MAYA_APP_TEMP_DIR}/projects/default/images/${SANITIZED_TEST_NAME}.${IMAGE_EXTENSION}")
+    set(RENDERED_IMAGE_ROOT_DIR "${MAYA_APP_TEMP_DIR}")
+    set(RENDERED_IMAGE_SUBDIR "projects/default/images")
+    if(ARG_RENDERED_IMAGE_SUBDIR)
+        set(RENDERED_IMAGE_SUBDIR "${ARG_RENDERED_IMAGE_SUBDIR}")
+    endif()
+
+    set(RENDERED_IMAGE_NAME "${SANITIZED_TEST_NAME}")
+    if(ARG_RENDERED_IMAGE_NAME)
+        set(RENDERED_IMAGE_NAME "${ARG_RENDERED_IMAGE_NAME}")
+    endif()
+
+    set(RENDERED_IMAGE_DIR "${RENDERED_IMAGE_ROOT_DIR}/${RENDERED_IMAGE_SUBDIR}")
+    set(RENDERED_IMAGE_PATH "${RENDERED_IMAGE_DIR}/${RENDERED_IMAGE_NAME}.${IMAGE_EXTENSION}")
     cmake_path(REPLACE_EXTENSION SRC_SCENE_PATH ".${IMAGE_EXTENSION}" OUTPUT_VARIABLE EXPECTED_IMAGE_PATH)
 
     # Always use the discovered idiff binary; do not fall back to PATH
@@ -863,12 +879,13 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
         set(CMD PowerShell)
 		# Windows (PowerShell)
 		set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
-		set(IDIFF_ARGS  "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
-		set(CMD_ARGS -Command "${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE")
+		set(IDIFF_ARGS "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
+        set(RM_ARGS "Remove-Item \"${RENDERED_IMAGE_DIR}/*\" -Recurse -Force -ErrorAction SilentlyContinue")
+		set(CMD_ARGS -Command "${RM_ARGS} \; ${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE")
     else()
         # Use POSIX shell; '&&' ensures idiff runs only on successful render
         set(CMD /bin/sh)
-        set(CMD_ARGS -c "${RENDER_ARGS} && ${IDIFF_ARGS}")
+        set(CMD_ARGS -c "rm -rf ${RENDERED_IMAGE_DIR}/*; ${RENDER_ARGS} && ${IDIFF_ARGS}")
     endif()
 
     add_test(

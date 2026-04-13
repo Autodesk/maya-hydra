@@ -1,6 +1,7 @@
 set(PYTHON_FILES
     __init__.py
     resolution.py
+    output.py
 )
 
 install(

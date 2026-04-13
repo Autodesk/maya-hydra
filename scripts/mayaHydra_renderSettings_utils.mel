@@ -7,3 +7,19 @@ global proc mayaHydraSetRenderHeight(int $height)
 {
     python("import mayaHydra.renderSettings.resolution as mhResolution; mhResolution.setHeight(" + $height + ")");
 }
+
+global proc mayaHydraSetRenderDirectory(string $rd)
+{
+    // Use Python raw string to support Windows path backslashes.
+    python("import mayaHydra.renderSettings.output as mhOutput; mhOutput.setRenderDirectory(" + "r\"" + $rd + "\")");
+}
+
+global proc mayaHydraSetRenderImageName(string $im)
+{
+    python("import mayaHydra.renderSettings.output as mhOutput; mhOutput.setImageName(" + "\"" + $im + "\")");
+}
+
+global proc mayaHydraSetRenderOutputFormat(string $of)
+{
+    python("import mayaHydra.renderSettings.output as mhOutput; mhOutput.setOutputFormat(" + "\"" + $of + "\")");
+}

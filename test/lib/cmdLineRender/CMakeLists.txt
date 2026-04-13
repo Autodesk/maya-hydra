@@ -59,6 +59,49 @@ mayaHydra_add_cmd_line_render_test(renderSettings/arnoldResolution.ma
     RENDERER_ARGS "-x 720 -y 128"
 )
 
+# Test output overrides
+mayaHydra_add_cmd_line_render_test(renderSettings/stormRenderDir.ma
+    COPY_SCENE
+    RENDERER HdStormRendererPlugin
+    RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
+    RENDERER_ARGS "-x 720 -y 480 -rd ../images/aSubDirectory"
+)
+
+mayaHydra_add_cmd_line_render_test(renderSettings/arnoldRenderDir.ma
+    COPY_SCENE
+    RENDERER HdArnoldRendererPlugin
+    RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
+    RENDERER_ARGS "-x 720 -y 128 -rd ../images/aSubDirectory"
+)
+
+mayaHydra_add_cmd_line_render_test(renderSettings/stormImageName.ma
+    COPY_SCENE
+    RENDERER HdStormRendererPlugin
+    RENDERED_IMAGE_NAME aNewStormImageName
+    RENDERER_ARGS "-x 720 -y 480 -im aNewStormImageName"
+)
+
+mayaHydra_add_cmd_line_render_test(renderSettings/arnoldImageName.ma
+    COPY_SCENE
+    RENDERER HdArnoldRendererPlugin
+    RENDERED_IMAGE_NAME aNewArnoldImageName
+    RENDERER_ARGS "-x 720 -y 128 -im aNewArnoldImageName"
+)
+
+mayaHydra_add_cmd_line_render_test(renderSettings/stormOutputFormat.ma
+    COPY_SCENE
+    RENDERER HdStormRendererPlugin
+    IMAGE_EXTENSION jpg
+    RENDERER_ARGS "-x 720 -y 480 -of jpg"
+)
+
+mayaHydra_add_cmd_line_render_test(renderSettings/arnoldOutputFormat.ma
+    COPY_SCENE
+    RENDERER HdArnoldRendererPlugin
+    IMAGE_EXTENSION jpg
+    RENDERER_ARGS "-x 720 -y 128 -of jpg"
+)
+
 # Failure with HdStorm on macOS entered as HYDRA-2139.
 if(NOT IS_MACOSX)
     mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
