@@ -270,6 +270,36 @@ void GetExtensionAndDynamicAttributesFromNode(
     const MObject& node,
     PXR_NS::VtDictionary& attrs);
 
+/**
+ * @brief Get non-default plugin-specific attributes from a Maya node for custom Hydra translation.
+ *
+ * Unlike GetExtensionAndDynamicAttributesFromNode, this reads attributes beyond the
+ * standard Maya built-in base classes (locator, shape, dagNode, dependNode, etc.).
+ * Standard Maya attributes (visibility, objectColorRGB, castsShadows, worldPosition,
+ * etc.) are excluded since maya-hydra handles those through dedicated xform,
+ * visibility, and purpose data sources. Message attributes are also excluded.
+ * Attributes at their default value are skipped. Child plugs of compound attributes
+ * are skipped (only top-level plugs are included).
+ *
+ * @param[in] node is the node in the Maya scene graph.
+ * @param[out] attrs is a map that will contain the attribute names and their corresponding values.
+ */
+MAYAHYDRALIB_API
+void GetNonDefaultMayaAttributesFromNode(
+    const MObject& node,
+    PXR_NS::VtDictionary& attrs);
+
+/**
+ * @brief Check if an attribute name belongs to Maya's built-in DAG base classes.
+ *
+ * Returns true for attributes defined on locator, shape, dagNode, dependNode,
+ * etc. Used by the custom adapter's attribute-changed callback to avoid
+ * sending dirty notices for base class attributes that are never included
+ * in the mayaAttributes dictionary.
+ */
+MAYAHYDRALIB_API
+bool IsBaseClassAttrName(const char* attrName);
+
 } // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRALIB_MIXED_UTILS_H

@@ -1,0 +1,20 @@
+{
+    "Plugins": [
+        {
+            "Info": {
+                "Types": {
+                    "HdCustomNodeTranslationSceneIndexPlugin" : {
+                        "bases": ["HdSceneIndexPlugin"],
+                        "loadWithRenderer": "Arnold",
+                        "priority": 0,
+                        "displayName": "Translate custom Maya plugin nodes"
+                    }
+                }
+            },
+            "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",
+            "Name": "@TARGET_NAME@",
+            "Root": "..",
+            "Type": "library"
+        }
+    ]
+}
