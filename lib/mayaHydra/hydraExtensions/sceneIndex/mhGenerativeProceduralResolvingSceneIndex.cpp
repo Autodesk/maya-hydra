@@ -21,11 +21,6 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace MAYAHYDRA_NS_DEF {
 
 MAYAHYDRALIB_API
-void MhGenerativeProceduralResolvingSceneIndex::AddExcludedSceneRoot(const SdfPath& sceneRoot) {
-    _excludedSceneRoots.emplace(sceneRoot);
-}
-
-MAYAHYDRALIB_API
 MhGenerativeProceduralResolvingSceneIndexRefPtr
 MhGenerativeProceduralResolvingSceneIndex::New(const HdSceneIndexBaseRefPtr& inputSceneIndex)
 {

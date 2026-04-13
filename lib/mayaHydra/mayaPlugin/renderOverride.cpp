@@ -1565,7 +1565,6 @@ void MtohRenderOverride::_InitHydraResources(
     // scene indices, can ApplyExcludedSceneRoot for Maya native content, and keep
     // HdGp usage centralized in mayaHydraLib.
     _gpResolvingSceneIndex = MhGenerativeProceduralResolvingSceneIndex::New(_sceneGlobalsSceneIndex);
-    _gpResolvingSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT);
 
     _selection = std::make_shared<Fvp::Selection>();
     _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_gpResolvingSceneIndex, _selection);

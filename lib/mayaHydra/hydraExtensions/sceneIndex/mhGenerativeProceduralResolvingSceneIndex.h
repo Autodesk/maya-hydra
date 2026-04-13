@@ -65,9 +65,6 @@ public:
 
     ~MhGenerativeProceduralResolvingSceneIndex() override = default;
 
-    MAYAHYDRALIB_API
-    void AddExcludedSceneRoot(const PXR_NS::SdfPath& sceneRoot);
-
 protected:
     MhGenerativeProceduralResolvingSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex)
         : PXR_NS::HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
@@ -103,8 +100,6 @@ protected:
         _SendPrimsDirtied(entries);
     }
 
-private:
-    std::set<PXR_NS::SdfPath> _excludedSceneRoots;
 };
 
 } // namespace MAYAHYDRA_NS_DEF
