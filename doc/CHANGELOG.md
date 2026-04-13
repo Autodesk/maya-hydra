@@ -1,5 +1,41 @@
 # Changelog
 
+## [v0.8.1] - 2026-04-08
+
+**Added:**
+* Add MayaHydra profiling utilities [#395](https://github.com/Autodesk/maya-hydra/pull/395)
+
+**Fixed:**
+* Fix PRMan lighting with Maya lights [#377](https://github.com/Autodesk/maya-hydra/pull/377)
+* Handle invalid primitives from MRenderItems [#378](https://github.com/Autodesk/maya-hydra/pull/378)
+* Fix extra notifications when changing custom attribute values on cameras and lights [#390](https://github.com/Autodesk/maya-hydra/pull/390)
+* Fix material bindings lost with Hydra Generative Procedurals [#394](https://github.com/Autodesk/maya-hydra/pull/394)
+* Clear USD trace when beginning a new trace [#396](https://github.com/Autodesk/maya-hydra/pull/396)
+
+**Performance:**
+* Fix tumble performance drop [#384](https://github.com/Autodesk/maya-hydra/pull/384)
+
+**Features:**
+* Pass current frame information to Hydra [#381](https://github.com/Autodesk/maya-hydra/pull/381)
+* Support more custom attributes from Maya in Hydra translation [#383](https://github.com/Autodesk/maya-hydra/pull/383)
+* Support translation of Maya extension attributes to Hydra for lights, cameras, and meshes [#398](https://github.com/Autodesk/maya-hydra/pull/398)
+
+**Build / Dependencies:**
+* Update version to 0.8.1 [#375](https://github.com/Autodesk/maya-hydra/pull/375)
+* Add `HDGP_INCLUDE_DEFAULT_RESOLVER` by default [#397](https://github.com/Autodesk/maya-hydra/pull/397)
+
+**Tests:**
+* Remove camera sequencer popup in testUSDLights scene [#385](https://github.com/Autodesk/maya-hydra/pull/385)
+* Update image comparison threshold on macOS [#386](https://github.com/Autodesk/maya-hydra/pull/386)
+* Fix environment variables for LookdevX unit test [#387](https://github.com/Autodesk/maya-hydra/pull/387)
+* Fix unsupported primitive in testViewportFilters [#389](https://github.com/Autodesk/maya-hydra/pull/389)
+* Add test skipping based on hydraFixLevel [#392](https://github.com/Autodesk/maya-hydra/pull/392)
+* Make Bifrost update test conditional on USD versions above 0.24.x [#391](https://github.com/Autodesk/maya-hydra/pull/391)
+
+**Miscellaneous:**
+* Remove non-HVT code path [#376](https://github.com/Autodesk/maya-hydra/pull/376)
+* Merge `release_v0.8.0` into dev [#399](https://github.com/Autodesk/maya-hydra/pull/399)
+
 ## [v0.8.0] - 2026-02-10
 
 **Features:**
