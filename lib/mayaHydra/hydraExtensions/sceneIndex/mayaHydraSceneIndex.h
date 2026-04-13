@@ -20,6 +20,7 @@
 #include "pxr/imaging/hd/dirtyBitsTranslator.h"
 
 #include <mayaHydraLib/adapters/cameraAdapter.h>
+#include <mayaHydraLib/adapters/customDagAdapter.h>
 #include <mayaHydraLib/adapters/lightAdapter.h>
 #include <mayaHydraLib/adapters/materialAdapter.h>
 #include <mayaHydraLib/adapters/renderItemAdapter.h>
@@ -262,9 +263,14 @@ private:
         const std::function<AdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>& adapterCreator,
         Map&                                                                    adapterMap,
         bool                                                                    isSprim = false);
-    MayaHydraLightAdapterPtr  CreateLightAdapter(const MDagPath& dagPath);
-    MayaHydraCameraAdapterPtr CreateCameraAdapter(const MDagPath& dagPath);
-    MayaHydraShapeAdapterPtr  CreateShapeAdapter(const MDagPath& dagPath);
+    MayaHydraLightAdapterPtr      CreateLightAdapter(const MDagPath& dagPath);
+    MayaHydraCameraAdapterPtr     CreateCameraAdapter(const MDagPath& dagPath);
+    MayaHydraShapeAdapterPtr      CreateShapeAdapter(const MDagPath& dagPath);
+    /// Creates a custom adapter for plugin DAG nodes that have no registered
+    /// adapter. Returns null for Maya built-in nodes and for plugin nodes that
+    /// already provide their own Hydra data through the Flow Viewport data
+    /// producer API (checked via DataProducersNodeHashCodeToSdfPathRegistry).
+    MayaHydraCustomDagAdapterPtr CreateCustomAdapter(const MDagPath& dagPath);
 
     // Utilites
     bool _GetRenderItem(int fastId, MayaHydraRenderItemAdapterPtr& adapter);
@@ -301,6 +307,7 @@ private:
     AdapterMap<MayaHydraRenderItemAdapterPtr>              _renderItemsAdapters;
     std::unordered_map<int, MayaHydraRenderItemAdapterPtr> _renderItemsAdaptersFast;
     AdapterMap<MayaHydraMaterialAdapterPtr>                _materialAdapters;
+    AdapterMap<MayaHydraCustomDagAdapterPtr>              _customAdapters;
     std::vector<MCallbackId>                               _callbacks;
     std::vector<std::tuple<SdfPath, MObject>>              _adaptersToRecreate;
     std::vector<std::tuple<SdfPath, uint32_t>>             _adaptersToRebuild;
@@ -312,6 +319,7 @@ private:
     using CameraAdapterCreator
         = std::function<MayaHydraCameraAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>;
     std::vector<std::pair<MObject, CameraAdapterCreator>> _camerasToAdd;
+    std::vector<MObject>                                  _customNodesToAdd;
     std::vector<SdfPath>                                  _materialTagsChanged;
 
     static SdfPath _fallbackMaterial;

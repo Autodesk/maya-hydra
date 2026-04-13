@@ -26,6 +26,7 @@
 
 #include <array>
 #include <cmath>
+#include <set>
 #include <string>
 
 #include <pxr/base/gf/vec2d.h>
@@ -67,6 +68,7 @@
 #include <maya/MFnStringArrayData.h>
 #include <maya/MFnUnitAttribute.h>
 #include <maya/MFnVectorArrayData.h>
+#include <maya/MNodeClass.h>
 #include <maya/MDoubleArray.h>
 #include <maya/MFloatArray.h>
 #include <maya/MIntArray.h>
@@ -1258,11 +1260,48 @@ static bool ExtensionAttrValueEqualsDefault(const MPlug& attrPlug, const MObject
     }
 }
 
-// Populate a dictionary with extension/dynamic attribute values for translation to Hydra primvars.
-// Extension attributes: omit when still at default (isDefaultValue / manual default compare).
-// Dynamic attributes (e.g. Add Attribute UI): always included; default suppression is not applied.
-void GetExtensionAndDynamicAttributesFromNode(
-    const MObject& node, PXR_NS::VtDictionary& attrs)
+// Returns the set of attribute names defined on Maya's built-in DAG shape
+// base classes (locator, and all ancestors: shape, dagNode, entity, dependNode).
+// Used to filter out standard Maya attributes from custom plugin node
+// translation, since maya-hydra already handles xform, visibility, and
+// purpose through dedicated data sources.
+//
+// We use "locator" (concrete type) instead of "shape" (abstract) because
+// MNodeClass may return zero attributes for abstract types. Since locator
+// inherits from shape, all shape/dagNode/dependNode attributes are included,
+// plus locator-specific ones (e.g. worldPosition). Most custom plugin shapes
+// inherit from MPxLocatorNode. If future plugins use other base types
+// (e.g. surfaceShape), add those type names to the baseTypes array.
+static const std::set<std::string>& GetBaseClassAttrNames()
+{
+    static const std::set<std::string> names = []() {
+        std::set<std::string> result;
+        const char* baseTypes[] = { "locator" };
+        for (const char* typeName : baseTypes) {
+            MNodeClass cls(typeName);
+            for (unsigned int i = 0; i < cls.attributeCount(); ++i) {
+                MStatus fnStatus;
+                MFnAttribute fn(cls.attribute(i), &fnStatus);
+                if (fnStatus) {
+                    result.insert(fn.name().asChar());
+                }
+            }
+        }
+        return result;
+    }();
+    return names;
+}
+
+// Shared implementation: read attributes from a Maya node into a VtDictionary.
+// When onlyExtensionAndDynamic is true, only extension/dynamic attrs are included
+// and default-value checks are applied (original behavior).
+// When false, only attributes beyond Maya's built-in base classes (locator,
+// shape, dagNode, etc.) are included, and default-valued attributes are still
+// skipped. This avoids translating standard Maya attributes (castsShadows,
+// worldPosition, objectColorRGB, visibility, etc.) that maya-hydra already
+// handles through other data sources.
+static void GetAttributesFromNodeImpl(
+    const MObject& node, PXR_NS::VtDictionary& attrs, bool onlyExtensionAndDynamic)
 {
     attrs.clear();
     MStatus           status;
@@ -1271,8 +1310,17 @@ void GetExtensionAndDynamicAttributesFromNode(
         return;
     }
 
+    const std::set<std::string>* baseClassAttrs = nullptr;
+    if (!onlyExtensionAndDynamic) {
+        baseClassAttrs = &GetBaseClassAttrNames();
+    }
+
     for (size_t i = 0; i < nodeFn.attributeCount(); i++) {
         MObject      attrObj = nodeFn.attribute(i);
+        // Message attributes are connection-only (no data value). Calling
+        // isDefaultValue() on them triggers an internal Maya assertion.
+        if (attrObj.apiType() == MFn::kMessageAttribute)
+            continue;
         MFnAttribute attrFn(attrObj);
         const MString attrNameStr = attrFn.name();
         const char*   attrName = attrNameStr.asChar();
@@ -1283,18 +1331,29 @@ void GetExtensionAndDynamicAttributesFromNode(
         if (attrPlug.isChild())
             continue;
 
-        const bool isExtOrDynamic = attrFn.isExtension() || attrFn.isDynamic();
-        if (!isExtOrDynamic)
-            continue;
-        // Extension attrs always check defaults; dynamic attrs do not.
-        // For extension attributes, MPlug::isDefaultValue() can be unreliable
-        // (plugins may not implement it), so we also use manual comparison.
-        const bool ignoreDefault = attrFn.isDynamic();
-        if (!ignoreDefault) {
+        if (onlyExtensionAndDynamic) {
+            const bool isExtOrDynamic = attrFn.isExtension() || attrFn.isDynamic();
+            if (!isExtOrDynamic)
+                continue;
+            const bool ignoreDefault = attrFn.isDynamic();
+            if (!ignoreDefault) {
+                if (attrPlug.isDefaultValue()) {
+                    continue;
+                }
+                if (attrFn.isExtension() && ExtensionAttrValueEqualsDefault(attrPlug, attrObj)) {
+                    continue;
+                }
+            }
+        } else {
+            if (baseClassAttrs->count(attrName))
+                continue;
             if (attrPlug.isDefaultValue()) {
                 continue;
             }
-            if (attrFn.isExtension() && ExtensionAttrValueEqualsDefault(attrPlug, attrObj)) {
+            // Plugins may set attributes to their registered default in
+            // postConstructor(), making isDefaultValue() return false even
+            // though the value matches the default. Compare explicitly.
+            if (ExtensionAttrValueEqualsDefault(attrPlug, attrObj)) {
                 continue;
             }
         }
@@ -1804,4 +1863,23 @@ void GetExtensionAndDynamicAttributesFromNode(
             }
     }
 }
+
+void GetExtensionAndDynamicAttributesFromNode(
+    const MObject& node, PXR_NS::VtDictionary& attrs)
+{
+    GetAttributesFromNodeImpl(node, attrs, /*onlyExtensionAndDynamic=*/true);
+}
+
+void GetNonDefaultMayaAttributesFromNode(
+    const MObject& node, PXR_NS::VtDictionary& attrs)
+{
+    GetAttributesFromNodeImpl(node, attrs, /*onlyExtensionAndDynamic=*/false);
+}
+
+bool IsBaseClassAttrName(const char* attrName)
+{
+    const auto& names = GetBaseClassAttrNames();
+    return names.find(attrName) != names.end();
+}
+
 } // namespace MAYAHYDRA_NS_DEF
