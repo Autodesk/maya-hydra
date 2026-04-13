@@ -6,6 +6,8 @@ Maya-hydra provides a translation mechanism that allows custom DAG nodes created
 
 This is useful for plugin-defined node types such as `aiPhotometricLight`, `aiLightBlocker`, `PxrDomeLight`, or any custom node that has no dedicated adapter registered in `MayaHydraAdapterRegistry`.
 
+**Important**: Only DAG nodes (nodes that appear in the Maya DAG hierarchy with a transform and a shape) are translated. Pure dependency graph (DG) nodes — such as shading nodes, utility nodes, or custom DG-only nodes that do not have a DAG path — are not translated by this mechanism, because the detection and adapter creation is driven by `MayaHydraSceneIndex::InsertDag()` which only processes DAG paths.
+
 ## Architecture
 
 ```
