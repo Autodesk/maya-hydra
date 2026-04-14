@@ -43,7 +43,6 @@ import fixturesUtils
 import mayaUtils
 import mtohUtils
 from testUtils import PluginLoaded, getTestScene
-from imageUtils import snapshot
 
 
 # Maya light names in the test scene (transform names; intensity is on the shape).

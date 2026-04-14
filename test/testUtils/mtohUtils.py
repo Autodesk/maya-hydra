@@ -140,11 +140,11 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             return
         self._script_editor_dumped = True
         try:
-            sys.__stdout__.write("\n===== BEGIN MAYA SCRIPT EDITOR CONTENT ({}) =====\n".format(path))
+            sys.__stdout__.write("\n===== BEGIN {} ({}) =====\n".format(title, path))
             with open(path, "r", encoding="utf-8", errors="replace") as f:
                 for ln in f:
                     sys.__stdout__.write(ln)
-            sys.__stdout__.write("===== END MAYA SCRIPT EDITOR CONTENT =====\n")
+            sys.__stdout__.write("===== END {} =====\n".format(title))
             sys.__stdout__.flush()
         except Exception:
             pass
@@ -181,6 +181,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                 sys.__stdout__.write("  {}: {}\n".format(idx, p))
         except Exception as e:
             sys.__stdout__.write("USD plugin path entries: (unavailable) {}\n".format(e))
+        plugin_path = None
         try:
             plugin_path = cmds.pluginInfo(MAYAUSD_PLUGIN_NAME, q=True, path=True)
             sys.__stdout__.write("mayaUsdPlugin path: {}\n".format(plugin_path))
@@ -247,7 +248,8 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                     except Exception as err:
                         sys.__stdout__.write("{} rpath: (error) {}\n".format(label, err))
 
-                _print_rpaths("mayaUsdPlugin", plugin_path)
+                if plugin_path:
+                    _print_rpaths("mayaUsdPlugin", plugin_path)
                 try:
                     mtoa_path = cmds.pluginInfo("mtoa", q=True, path=True)
                     _print_rpaths("mtoa", mtoa_path)

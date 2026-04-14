@@ -67,7 +67,8 @@ def snapshot(outputPath, width=400, height=None):
     cmds.undoInfo(stateWithoutFlush=True)
 
 def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail=None,
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False):    
+                failrelative=None, warn=None, warnpercent=None, hardwarn=None,
+                perceptual=False):    
     """ Returns the completed process instance after running idiff or None if
         execution of process failed.
     
@@ -109,6 +110,8 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail=None,
         cmdArgs.extend(['-fail', str(fail)])
     if failpercent is not None:
         cmdArgs.extend(['-failpercent', str(failpercent)])
+    if failrelative is not None:
+        cmdArgs.extend(['-failrelative', str(failrelative)])
     if hardfail is not None:
         cmdArgs.extend(['-hardfail', str(hardfail)])
     if perceptual:
@@ -227,7 +230,8 @@ class ImageDiffingTestCase:
         return snapshotDir
 
     def assertImagesClose(self, imagePath1, imagePath2, fail, failpercent, hardfail=None,
-                    warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                    failrelative=None, warn=None, warnpercent=None, hardwarn=None,
+                    perceptual=False):
         """ 
         The method will return idiff's return code if the comparison passes with 
         a return code of 0 or 1.
@@ -243,6 +247,7 @@ class ImageDiffingTestCase:
         cmds.undoInfo(stateWithoutFlush=False)
         proc = imageDiff(imagePath1, imagePath2, verbose=True, 
                             fail=fail, failpercent=failpercent, hardfail=hardfail,
+                            failrelative=failrelative,
                             warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, 
                             perceptual=perceptual)
         if proc is None:
@@ -347,7 +352,8 @@ class ImageDiffingTestCase:
         self.assertImagesClose(imagePath1, imagePath2, fail=None, failpercent=None)
     
     def assertSnapshotClose(self, refImagePath, fail, failpercent, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False, *, imageVersion=None):
+                failrelative=None, warn=None, warnpercent=None, hardwarn=None,
+                perceptual=False, *, imageVersion=None):
         if imageVersion is not None:
             snapImagePath = os.path.join(self.getSnapshotDir(), imageVersion, os.path.basename(refImagePath))
         else:
@@ -356,6 +362,7 @@ class ImageDiffingTestCase:
         
         return self.assertImagesClose(refImagePath, snapImagePath, 
                fail=fail, failpercent=failpercent, hardfail=hardfail,
+               failrelative=failrelative,
                warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, 
                perceptual=perceptual)
         
@@ -364,7 +371,8 @@ class ImageDiffingTestCase:
         return self.assertSnapshotClose(refImagePath, fail=None, failpercent=None)
 
     def assertSnapshotSilhouetteClose(self, refImagePath, fail, failpercent, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                failrelative=None, warn=None, warnpercent=None, hardwarn=None,
+                perceptual=False):
         refImageName, refImageExtension = os.path.splitext(os.path.basename(refImagePath))
 
         refSilhouetteImagePath = os.path.join(self.getSnapshotDir(), refImageName + "_ReferenceSilhouette" + refImageExtension)
@@ -377,5 +385,6 @@ class ImageDiffingTestCase:
 
         return self.assertImagesClose(refSilhouetteImagePath, snapSilhouetteImagePath, 
                fail=fail, failpercent=failpercent, hardfail=hardfail,
+               failrelative=failrelative,
                warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, 
                perceptual=perceptual)
