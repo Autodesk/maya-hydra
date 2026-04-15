@@ -947,9 +947,13 @@ bool MayaHydraLightAdapter::GetShadowsEnabled(MFnLight& light) const
         // false. Use the Arnold-specific attribute instead.
         // Use GetNode() to get the shape node where Arnold dynamic attributes live,
         // as light.object() may return the transform node.
-        MFnDependencyNode depNode(GetNode());
-        const auto plug = depNode.findPlug("aiCastShadows", true);
-        return !plug.isNull() && plug.asBool();
+        MStatus status;
+        MFnDependencyNode depNode(GetNode(), &status);
+        if (status) {
+            const auto plug = depNode.findPlug("aiCastShadows", true);
+            return !plug.isNull() && plug.asBool();
+        }
+        return false;
     }
 
     if (light.useRayTraceShadows()) {
