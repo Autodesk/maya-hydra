@@ -431,13 +431,14 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         return refImage
 
     def assertImagesClose(self, image1, image2, fail, failpercent, image1Version=None, image2Version=None, 
-                hardfail=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                hardfail=None, failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         imagePath1 = self.resolveRefImage(image1, image1Version)
         imagePath2 = self.resolveRefImage(image2, image2Version)
         try:
             super(MayaHydraBaseTestCase, self).assertImagesClose(
-                imagePath1, imagePath2, fail, failpercent, hardfail,
-                warn, warnpercent, hardwarn, perceptual)
+                imagePath1, imagePath2, fail, failpercent, hardfail=hardfail,
+                failrelative=failrelative, warn=warn, warnpercent=warnpercent,
+                hardwarn=hardwarn, perceptual=perceptual)
         except AssertionError:
             self._dump_script_editor_history("Maya Script Editor history (image diff)")
             raise
@@ -452,12 +453,13 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             raise
 
     def assertSnapshotClose(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         refImagePath = self.resolveRefImage(refImage, imageVersion)
         try:
             super(MayaHydraBaseTestCase, self).assertSnapshotClose(
-                refImagePath, fail, failpercent, hardfail,
-                warn, warnpercent, hardwarn, perceptual, imageVersion=imageVersion)
+                refImagePath, fail, failpercent, hardfail=hardfail,
+                failrelative=failrelative, warn=warn, warnpercent=warnpercent,
+                hardwarn=hardwarn, perceptual=perceptual, imageVersion=imageVersion)
         except AssertionError:
             self._dump_script_editor_history("Maya Script Editor history (image diff)")
             raise
@@ -472,22 +474,26 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             raise
     
     def assertSnapshotSilhouetteClose(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         refImagePath = self.resolveRefImage(refImage, imageVersion)
         try:
             super(MayaHydraBaseTestCase, self).assertSnapshotSilhouetteClose(
-                refImagePath, fail, failpercent, hardfail, warn, warnpercent, hardwarn, perceptual)
+                refImagePath, fail, failpercent, hardfail=hardfail,
+                failrelative=failrelative, warn=warn, warnpercent=warnpercent,
+                hardwarn=hardwarn, perceptual=perceptual)
         except AssertionError:
             self._dump_script_editor_history("Maya Script Editor history (image diff)")
             raise
 
     def assertSnapshotAndCompareVp2(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         self.setHdStormRenderer()
-        self.assertSnapshotClose(refImage, fail, failpercent, imageVersion, hardfail, warn, warnpercent, hardwarn, perceptual)
+        self.assertSnapshotClose(refImage, fail, failpercent, imageVersion, hardfail=hardfail,
+            failrelative=failrelative, warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, perceptual=perceptual)
 
         self.setViewport2Renderer()
-        self.assertSnapshotSilhouetteClose(refImage, fail, failpercent, imageVersion, hardfail, warn, warnpercent, hardwarn, perceptual)
+        self.assertSnapshotSilhouetteClose(refImage, fail, failpercent, imageVersion, hardfail=hardfail,
+            failrelative=failrelative, warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, perceptual=perceptual)
 
         self.setHdStormRenderer()
 
