@@ -572,7 +572,7 @@ VtValue MayaHydraLightAdapter::GetLightMaterialNetwork() const
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET).Msg("Maya light parameters:\n");
 
     const auto inclusiveMatrix = GetDagPath().inclusiveMatrix();
-    const bool shadowsEnabled = mayaLight.useRayTraceShadows();
+    const bool shadowsEnabled = GetShadowsEnabled(mayaLight);
 
     // Get Maya parameters (including Arnold attributes with "ai" prefix)
     MayaLightParams mayaParams = GetMayaLightParams();
@@ -941,6 +941,21 @@ void MayaHydraLightAdapter::MarkDirtyIfPlugAffectsLightParams(MayaHydraLightAdap
 
 bool MayaHydraLightAdapter::GetShadowsEnabled(MFnLight& light) const
 {
+    if (IsDagPathAnArnoldSkyDomeLight(GetDagPath())) {
+        // aiSkyDomeLight doesn't inherit from MFnNonExtendedLight, so the
+        // native useRayTraceShadows/useDepthMapShadows checks always return
+        // false. Use the Arnold-specific attribute instead.
+        // Use GetNode() to get the shape node where Arnold dynamic attributes live,
+        // as light.object() may return the transform node.
+        MStatus status;
+        MFnDependencyNode depNode(GetNode(), &status);
+        if (status) {
+            const auto plug = depNode.findPlug("aiCastShadows", true);
+            return !plug.isNull() && plug.asBool();
+        }
+        return false;
+    }
+
     if (light.useRayTraceShadows()) {
         return true;
     }
