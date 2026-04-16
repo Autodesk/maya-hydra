@@ -197,7 +197,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     // This is required to see Hydra Generative Procedurals in the viewport
     setEnv("HDGP_INCLUDE_DEFAULT_RESOLVER", "1");
 
-    // Isolate-select diagnostics: env MAYA_HYDRA_ISOLATE_SELECT_TF_DEBUG (default on) controls this.
+    // Isolate-select diagnostics: set MAYA_HYDRA_ISOLATE_SELECT_TF_DEBUG=1 to enable (off by default).
     if (MAYAHYDRA_NS_DEF::isolateSelectTfDebugEnabled()) {
         PXR_NS::TfDebug::Enable(PXR_NS::FVP_ISOLATE_SELECT_VIEW_SELECTED);
         PXR_NS::TfDebug::Enable(PXR_NS::FVP_ISOLATE_SELECT_SCENE_INDEX);

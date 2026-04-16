@@ -99,14 +99,11 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
 
         # Snapshot the full scene before any isolate select to verify all
         # four shapes are present and visible.
-        try:
-            self.assertSnapshotClose(
-                "isolateSelectPerShape_fullScene.png",
-                self.IMAGE_DIFF_FAIL_THRESHOLD,
-                self.IMAGE_DIFF_FAIL_PERCENT,
-            )
-        except Exception:
-            pass
+        self.assertSnapshotClose(
+            "isolateSelectPerShape_fullScene.png",
+            self.IMAGE_DIFF_FAIL_THRESHOLD,
+            self.IMAGE_DIFF_FAIL_PERCENT,
+        )
 
         modelPanel = "modelPanel4"
         stagePath = "|stage1|stageShape1"
@@ -165,7 +162,6 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
              "isolateSelectPerShape_usdCamera_usdLight"),
         ]
 
-        failures = []
         for selectPaths, visiblePaths, snapshotName in cases:
             cmds.select(selectPaths)
             enableIsolateSelect(modelPanel)
@@ -177,20 +173,14 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
             cmds.select(clear=True)
             cmds.refresh()
 
-            try:
-                self.assertSnapshotClose(
-                    snapshotName + ".png",
-                    self.IMAGE_DIFF_FAIL_THRESHOLD,
-                    self.IMAGE_DIFF_FAIL_PERCENT,
-                )
-            except Exception as e:
-                failures.append("%s: %s" % (snapshotName, e))
+            self.assertSnapshotClose(
+                snapshotName + ".png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT,
+            )
 
             disableIsolateSelect(modelPanel)
             cmds.refresh()
-
-        if failures:
-            self.fail("Snapshot failures:\n" + "\n".join(failures))
 
 
 if __name__ == "__main__":

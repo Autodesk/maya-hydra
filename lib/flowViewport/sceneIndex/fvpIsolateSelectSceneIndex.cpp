@@ -218,12 +218,14 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
             .Set(HdVisibilitySchema::GetDefaultLocator(), visOff)
             .Finish();
     }
-    else if (included) {
+    else if (included && !isGeomSubset(inputPrim)) {
         // Force visibility ON for included prims so that upstream
         // visibility=false (e.g. from Maya's internal scene management
         // filtering render items during isolate select) is overridden.
         // This makes IsolateSelectSceneIndex the authoritative source of
         // visibility when isolate select is active in Hydra Storm.
+        // HYDRA-1242: skip GeomSubset prims here as well — setting
+        // visibility on them hangs Hydra Storm.
         inputPrim.dataSource = HdContainerDataSourceEditor(inputPrim.dataSource)
             .Set(HdVisibilitySchema::GetDefaultLocator(), visOn)
             .Finish();

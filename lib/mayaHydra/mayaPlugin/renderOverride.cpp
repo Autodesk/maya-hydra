@@ -2416,7 +2416,7 @@ bool DagPathFromString(const std::string& dagPathStr, MDagPath& outDagPath)
 // Invoked from _ViewSelectedChangedCb on the same MtohRenderOverride instance as the callback's
 // clientData: multiple overrides each register a view-selected callback, and a single global
 // expander would capture the wrong `this`.
-void MtohRenderOverride::_ExpandIsolateSelectionForUsdCameras(
+void MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
     Fvp::Selection&                        selection,
     const std::vector<std::string>&        viewSelectedUfePathStrings,
     const MDagPath&                        panelCameraDag)
@@ -2543,6 +2543,26 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdCameras(
 
     bool needDefaultUfeProxyCamera = false;
     const SdfPath rprimRoot = MAYA_NATIVE_ROOT.AppendChild(TfToken("rprims"));
+
+    // Pre-collect all native rprim paths once from both the render index
+    // and the scene index tree so the per-selected-prim matching below is
+    // O(numSelected * numCachedNativeRprims) without repeated full scans.
+    std::vector<SdfPath> nativeRprims;
+    {
+        std::unordered_set<SdfPath, SdfPath::Hash> seen;
+        for (const SdfPath& id : renderIndexForScan->GetRprimIds()) {
+            if (id.HasPrefix(MAYA_NATIVE_ROOT) && seen.insert(id).second) {
+                nativeRprims.push_back(id);
+            }
+        }
+        for (const SdfPath& p :
+             HdSceneIndexPrimView(_mayaHydraSceneIndex, rprimRoot)) {
+            if (seen.insert(p).second) {
+                nativeRprims.push_back(p);
+            }
+        }
+    }
+
     for (const auto& ufeStr : viewSelectedUfePathStrings) {
         const Ufe::Path path = Ufe::PathString::path(ufeStr.c_str());
         if (path.empty() || path.runTimeId() != MayaUsdAPI::getUsdRunTimeId()) {
@@ -2588,11 +2608,7 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdCameras(
                 .Msg("    _Expand: searching for primNamePrefix='%s' proxyPathToken='%s'\n",
                      primNamePrefix.c_str(), proxyPathToken.c_str());
 
-            // Scan GetRprimIds() for matching native rprims.
-            for (const SdfPath& id : renderIndexForScan->GetRprimIds()) {
-                if (!id.HasPrefix(MAYA_NATIVE_ROOT)) {
-                    continue;
-                }
+            for (const SdfPath& id : nativeRprims) {
                 if (id.GetNameToken().GetString().compare(
                         0, primNamePrefix.size(), primNamePrefix) != 0) {
                     continue;
@@ -2606,32 +2622,8 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdCameras(
                     }
                 }
                 TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
-                    .Msg("    _Expand: GetRprimIds match: %s\n", id.GetText());
+                    .Msg("    _Expand: native rprim match: %s\n", id.GetText());
                 addPrimPath(id);
-            }
-
-            // The rprim may be absent from GetRprimIds() at this point
-            // (different render index, timing). Search the scene index
-            // tree directly for matching rprims.
-            for (const SdfPath& p :
-                 HdSceneIndexPrimView(_mayaHydraSceneIndex, rprimRoot)) {
-                const std::string& leafName = p.GetNameToken().GetString();
-
-                if (leafName.compare(
-                        0, primNamePrefix.size(), primNamePrefix) != 0) {
-                    continue;
-                }
-                if (!proxyPathToken.empty()) {
-                    const std::string proxyComponent = "/" + proxyPathToken;
-                    const std::string& pathStr = p.GetString();
-                    if (pathStr.find(proxyComponent + "_") == std::string::npos
-                        && pathStr.find(proxyComponent + "/") == std::string::npos) {
-                        continue;
-                    }
-                }
-                TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
-                    .Msg("    _Expand: scene index leaf match: %s\n", p.GetText());
-                addPrimPath(p);
             }
         }
 
@@ -2652,25 +2644,12 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdCameras(
         if (prim.HasAPI<UsdLuxLightAPI>()) {
             static const std::string kUfeLightProxy("ufeLightProxy");
 
-            for (const SdfPath& id : renderIndexForScan->GetRprimIds()) {
-                if (!id.HasPrefix(MAYA_NATIVE_ROOT)) {
-                    continue;
-                }
+            for (const SdfPath& id : nativeRprims) {
                 if (id.GetString().find(kUfeLightProxy) != std::string::npos) {
                     TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
                         .Msg("    _Expand: ufeLightProxy rprim match: %s\n",
                              id.GetText());
                     addPrimPath(id);
-                }
-            }
-
-            for (const SdfPath& p :
-                 HdSceneIndexPrimView(_mayaHydraSceneIndex, rprimRoot)) {
-                if (p.GetString().find(kUfeLightProxy) != std::string::npos) {
-                    TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
-                        .Msg("    _Expand: ufeLightProxy scene index match: "
-                             "%s\n", p.GetText());
-                    addPrimPath(p);
                 }
             }
         }
@@ -2867,7 +2846,7 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
         panelCameraDag = MDagPath();
     }
 
-    instance->_ExpandIsolateSelectionForUsdCameras(*isolateSelection, viewSelectedUfePathStrings, panelCameraDag);
+    instance->_ExpandIsolateSelectionForUsdPrims(*isolateSelection, viewSelectedUfePathStrings, panelCameraDag);
 
     isolateSelectMgr.ReplaceIsolateSelection(viewName.asChar(), isolateSelection);
 }

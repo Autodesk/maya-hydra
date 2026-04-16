@@ -287,7 +287,7 @@ private:
     /// otherwise be hidden by isolate's prefix-based visibility.
     /// \param panelCameraDag Shape DAG path of the model panel camera (from M3dView::getCamera); used
     /// to include native rprims under that camera's Hydra branch (e.g. cameraShape_1/.../Camera1_cameraBody_*).
-    void _ExpandIsolateSelectionForUsdCameras(
+    void _ExpandIsolateSelectionForUsdPrims(
         Fvp::Selection&                        selection,
         const std::vector<std::string>&        viewSelectedUfePathStrings,
         const MDagPath&                        panelCameraDag);
