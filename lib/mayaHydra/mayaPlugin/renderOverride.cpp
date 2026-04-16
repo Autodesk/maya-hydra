@@ -2355,11 +2355,21 @@ _LogPrimSelectionsForViewSelectedIsolate(const char* ufePathCStr, const Fvp::Pri
         for (const auto& nested : ps.nestedInstanceIndices) {
             TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
                 .Msg(
-                    "        nested instancer=%s prototypeIndex=%d\n",
+                    "        nested instancer=%s prototypeIndex=%d instanceIndexCount=%zu\n",
                     nested.instancerPath.GetText(),
-                    nested.prototypeIndex);
+                    nested.prototypeIndex,
+                    nested.instanceIndices.size());
+            constexpr size_t kMaxLoggedInstanceIndices = 16;
+            size_t loggedCount = 0;
             for (int instIdx : nested.instanceIndices) {
+                if (loggedCount >= kMaxLoggedInstanceIndices) {
+                    TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
+                        .Msg("          ... and %zu more\n",
+                             nested.instanceIndices.size() - kMaxLoggedInstanceIndices);
+                    break;
+                }
                 TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED).Msg("          instanceIndex=%d\n", instIdx);
+                ++loggedCount;
             }
         }
     }
