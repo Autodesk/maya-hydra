@@ -40,6 +40,7 @@
 #include <mayaHydraLib/mhWireframeColorInterfaceImp.h>
 #include <mayaHydraLib/mhLeadObjectPathTracker.h>
 #include <mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h>
+#include <mayaHydraLib/sceneIndex/mhGenerativeProceduralResolvingSceneIndex.h>
 #include <mayaHydraLib/pick/mhPickHandlerFwd.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
 #include <mayaHydraLib/pick/mhPickHitFwd.h>
@@ -347,6 +348,7 @@ private:
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     Fvp::PurposeFilteringSceneIndexRefPtr     _purposeFilteringSceneIndex;
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
+    MAYAHYDRA_NS_DEF::MhGenerativeProceduralResolvingSceneIndexRefPtr _gpResolvingSceneIndex;
     HdsiSceneGlobalsSceneIndexRefPtr                  _sceneGlobalsSceneIndex;
 
     // Naming this identifier _ufeSelection clashes with UFE's selection.h

@@ -211,6 +211,8 @@ protected:
 
     std::map<PXR_NS::SdfPath, std::set<SelectionKey>> _primPathsToSelections;
     std::set<PXR_NS::SdfPath> _selectionPaths;
+
+    mutable std::unordered_map<PXR_NS::SdfPath, bool, PXR_NS::SdfPath::Hash> _materialDisplacementCache;
 };
 
 // Repath instancing-related data sources by replacing srcPrefix with dstPrefix.

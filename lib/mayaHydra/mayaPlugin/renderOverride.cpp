@@ -30,6 +30,7 @@
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
+#include <mayaHydraLib/sceneIndex/mhGenerativeProceduralResolvingSceneIndex.h>
 #include <mayaHydraLib/pick/mhPickHit.h>
 #include <mayaHydraLib/pick/mhPickHandler.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
@@ -1537,8 +1538,36 @@ void MtohRenderOverride::_InitHydraResources(
         // RenderGlobalsUtils::GetIncludedPurposes());
     _pruningSceneIndex = Fvp::PruningSceneIndex::New(_purposeFilteringSceneIndex);
     _pruningSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya filtering is handled by VP2/OGS.
+
+    // Scene globals must be before the GP resolver so procedurals can
+    // read the current frame during cooking
+    _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_pruningSceneIndex);
+
+    // Set initial frame from Maya when scene globals scene index is created
+    if (_sceneGlobalsSceneIndex) {
+        const MTime  currentTime = MAnimControl::currentTime();
+        const double currentFrame = currentTime.value();
+        _SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
+
+        // Register time change callback if not already registered
+        if (_timeChangeCallback == 0) {
+            MStatus status;
+            _timeChangeCallback = MEventMessage::addEventCallback(
+                "timeChanged", _TimeChangedCallback, this, &status);
+            if (!status) {
+                TF_WARN("Failed to register time change callback");
+            }
+        }
+    }
+
+    // Create HdGp before selection so generated prims are selectable/highlightable.
+    // Use MhGenerativeProceduralResolvingSceneIndex so we match other MayaHydra
+    // scene indices, can ApplyExcludedSceneRoot for Maya native content, and keep
+    // HdGp usage centralized in mayaHydraLib.
+    _gpResolvingSceneIndex = MhGenerativeProceduralResolvingSceneIndex::New(_sceneGlobalsSceneIndex);
+
     _selection = std::make_shared<Fvp::Selection>();
-    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_pruningSceneIndex, _selection);
+    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_gpResolvingSceneIndex, _selection);
     _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
     _inputSceneIndexOfFilteringSceneIndicesChain = _selectionSceneIndex;
 
@@ -1783,25 +1812,6 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         _lastFilteringSceneIndexBeforeCustomFiltering, _mayaViewportSceneIndex->DefaultLightPath());
     _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(_lightingMode));
     _mayaViewportSceneIndex->SetLightsManagementSceneIndex(_lightsManagementSceneIndex);
-
-    _lastFilteringSceneIndexBeforeCustomFiltering = _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
-
-    // Set initial frame from Maya when scene globals scene index is created
-    if (_sceneGlobalsSceneIndex) {
-        const MTime currentTime = MAnimControl::currentTime();
-        const double currentFrame = currentTime.value();
-        _SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
-        
-        // Register time change callback if not already registered
-        if (_timeChangeCallback == 0) {
-            MStatus status;
-            _timeChangeCallback = MEventMessage::addEventCallback(
-                "timeChanged", _TimeChangedCallback, this, &status);
-            if (!status) {
-                TF_WARN("Failed to register time change callback");
-            }
-        }
-    }
 
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);//Should this be on the frame pass filtering scene index ?

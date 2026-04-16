@@ -17,6 +17,7 @@ import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
 import ufe
+import unittest
 
 import testUtils
 from testUtils import PluginLoaded
@@ -25,19 +26,44 @@ class TestHydraGenerativeProcedural(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.05
+    IMAGE_DIFF_FAIL_PERCENT = 1 
+
     def loadUsdScene(self):
         import usdUtils
         usdScenePath = testUtils.getTestScene('testHydraGenerativeProcedural', 'simpleHydraGenerativeProcedural.usda')
         usdUtils.createStageFromFile(usdScenePath)
-        self.setHdStormRenderer()
-        sn = ufe.GlobalSelection.get()
-        sn.clear()
+
+    def setUp(self):
+        super(TestHydraGenerativeProcedural, self).setUp()
+        self.loadUsdScene()
+        self.setBasicCam(10)
+        self.modifyDefaultLightIntensityByUsdVersion()
         cmds.refresh()
 
     def test_MaterialBinding(self):
-        self.loadUsdScene()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="HydraGenerativeProcedural.testMaterialBinding")
+
+    def test_SelectionWireframeHighlight(self):
+        if self._usdVersion < (0, 25, 11):
+            self.skipTest(
+                "Selection highlight for generative procedural requires HdGp resolving SI "
+                "instantiation earlier; skipped for USD < 25.11 (DLL export / link limitation)."
+            )
+
+        sn = ufe.GlobalSelection.get()
+        sn.clear()
+
+        stagePathSegment = "|simpleHydraGenerativeProcedural|simpleHydraGenerativeProceduralShape"
+        proceduralPath = stagePathSegment + "," + "/MyGenerativeProcedural"
+        proceduralItem = ufe.Hierarchy.createItem(ufe.PathString.path(proceduralPath))
+        self.assertIsNotNone(proceduralItem)
+
+        sn.append(proceduralItem)
+        self.assertSnapshotClose("selHighlight_procedural.png",
+            self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
