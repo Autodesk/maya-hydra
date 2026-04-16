@@ -11,6 +11,7 @@
 * Fix extra notifications when changing custom attribute values on cameras and lights [#390](https://github.com/Autodesk/maya-hydra/pull/390)
 * Fix material bindings lost with Hydra Generative Procedurals [#394](https://github.com/Autodesk/maya-hydra/pull/394)
 * Clear USD trace when beginning a new trace [#396](https://github.com/Autodesk/maya-hydra/pull/396)
+* Fix the shadows enabled parameter under Hydra Arnold and PRMan [#409](https://github.com/Autodesk/maya-hydra/pull/409)	
 
 **Performance:**
 * Fix tumble performance drop [#384](https://github.com/Autodesk/maya-hydra/pull/384)
