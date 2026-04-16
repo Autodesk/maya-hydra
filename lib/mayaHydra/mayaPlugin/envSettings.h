@@ -21,6 +21,11 @@
 
 namespace MAYAHYDRA_NS_DEF {
     bool useSingleFramePass();
+
+    /// When true (default), mayaHydra enables isolate-select TF_DEBUG symbols at plugin load so
+    /// isolate / view-selected diagnostics appear without setting TF_DEBUG. Set
+    /// MAYA_HYDRA_ISOLATE_SELECT_TF_DEBUG=0 to disable.
+    bool isolateSelectTfDebugEnabled();
 }
 
 #endif // MAYAHYDRA_ENV_SETTINGS_H

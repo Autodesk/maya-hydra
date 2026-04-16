@@ -23,6 +23,12 @@ TF_DEFINE_ENV_SETTING(
     MAYA_HYDRA_SINGLE_FRAME_PASS,
     false,
     "Use single frame pass when using the same renderer for all passes.");
+
+TF_DEFINE_ENV_SETTING(
+    MAYA_HYDRA_ISOLATE_SELECT_TF_DEBUG,
+    false,
+    "When true, mayaHydra enables FVP_ISOLATE_SELECT_VIEW_SELECTED and FVP_ISOLATE_SELECT_SCENE_INDEX at "
+    "plugin load. Set to 1 to enable isolate-select TF_DEBUG output.");
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -32,5 +38,12 @@ namespace MAYAHYDRA_NS_DEF {
         static const bool _useSingleFramePass
             = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_SINGLE_FRAME_PASS);
         return _useSingleFramePass;
+    }
+
+    bool isolateSelectTfDebugEnabled()
+    {
+        static const bool enabled
+            = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_ISOLATE_SELECT_TF_DEBUG);
+        return enabled;
     }
 } // namespace MAYAHYDRA_NS_DEF

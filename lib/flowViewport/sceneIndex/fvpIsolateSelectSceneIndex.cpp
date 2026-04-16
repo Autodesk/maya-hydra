@@ -40,6 +40,10 @@ const HdContainerDataSourceHandle visOff =
     HdVisibilitySchema::BuildRetained(
         HdRetainedTypedSampledDataSource<bool>::New(false));
 
+const HdContainerDataSourceHandle visOn =
+    HdVisibilitySchema::BuildRetained(
+        HdRetainedTypedSampledDataSource<bool>::New(true));
+
 const HdDataSourceLocator instancerMaskLocator(
     HdInstancerTopologySchemaTokens->instancerTopology,
     HdInstancerTopologySchemaTokens->mask
@@ -189,6 +193,13 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
     // HYDRA-1242: setting visibility on GeomSubset prim causes hang in Hydra
     // Storm.
     if (!included && !isGeomSubset(inputPrim)) {
+        // Lights keep contributing lighting even when excluded from isolate
+        // select, matching VP2 behavior.  Skip visOff for them.
+        auto lightSchema = HdLightSchema::GetFromParent(inputPrim.dataSource);
+        if (lightSchema.IsDefined()) {
+            return inputPrim;
+        }
+
         // If an instancer is not included, none of its instances are, so set
         // an instance mask that is entirely false.
         if (inputPrim.primType == HdPrimTypeTokens->instancer) {
@@ -205,6 +216,16 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
 
         inputPrim.dataSource = HdContainerDataSourceEditor(inputPrim.dataSource)
             .Set(HdVisibilitySchema::GetDefaultLocator(), visOff)
+            .Finish();
+    }
+    else if (included) {
+        // Force visibility ON for included prims so that upstream
+        // visibility=false (e.g. from Maya's internal scene management
+        // filtering render items during isolate select) is overridden.
+        // This makes IsolateSelectSceneIndex the authoritative source of
+        // visibility when isolate select is active in Hydra Storm.
+        inputPrim.dataSource = HdContainerDataSourceEditor(inputPrim.dataSource)
+            .Set(HdVisibilitySchema::GetDefaultLocator(), visOn)
             .Finish();
     }
 
@@ -402,6 +423,18 @@ void IsolateSelectSceneIndex::SetViewport(
     // marked as invisible.
     _AddDependencies(newIsolateSelection);
 
+    TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
+        .Msg(
+            "%s: SetViewport after _AddDependencies: %zu fully-selected path(s).\n",
+            viewportId.c_str(),
+            newIsolateSelection ? newIsolateSelection->GetFullySelectedPaths().size() : 0u);
+    if (newIsolateSelection) {
+        for (const auto& p : newIsolateSelection->GetFullySelectedPaths()) {
+            TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
+                .Msg("    fully-selected path: %s\n", p.GetText());
+        }
+    }
+
     _DirtyIsolateSelection(newIsolateSelection);
 
     // Collect all the instancers from the new isolate selection.
@@ -465,13 +498,6 @@ void IsolateSelectSceneIndex::_DirtyVisibilityRecursive(
     // relevant for materials
     auto prim = GetInputSceneIndex()->GetPrim(primPath);
     if (prim.primType == HdPrimTypeTokens->material) {
-        return;
-    }
-
-    // If the prim is a light, early out: setting its visibility to false means
-    // it won't contribute lighting to the scene, not what we want.
-    auto lightSchema = HdLightSchema::GetFromParent(prim.dataSource);
-    if (lightSchema.IsDefined()) {
         return;
     }
 

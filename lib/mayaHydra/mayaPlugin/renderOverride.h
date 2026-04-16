@@ -78,12 +78,14 @@
 #include <pxr/pxr.h>
 
 #include <maya/MCallbackIdArray.h>
+#include <maya/MDagPath.h>
 #include <maya/MString.h>
 
 #include <atomic>
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <vector>
 #include <map>
 
@@ -278,6 +280,17 @@ private:
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
     static void
     _ViewSelectedChangedCb(const MString& panelName, bool viewSelectedObjectsChanged, void* data);
+
+    /// After building isolate selection from UFE paths, append Maya-native Hydra paths for the camera
+    /// frustum/body drawables that correspond to selected UsdGeomCamera prims. Those rprims live
+    /// under MAYA_NATIVE_ROOT with a different path prefix than the USD proxy camera, so they would
+    /// otherwise be hidden by isolate's prefix-based visibility.
+    /// \param panelCameraDag Shape DAG path of the model panel camera (from M3dView::getCamera); used
+    /// to include native rprims under that camera's Hydra branch (e.g. cameraShape_1/.../Camera1_cameraBody_*).
+    void _ExpandIsolateSelectionForUsdCameras(
+        Fvp::Selection&                        selection,
+        const std::vector<std::string>&        viewSelectedUfePathStrings,
+        const MDagPath&                        panelCameraDag);
 #endif
 
     MtohRendererDescription _rendererDesc;

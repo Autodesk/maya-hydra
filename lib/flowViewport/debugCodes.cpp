@@ -48,6 +48,11 @@ TF_REGISTRY_FUNCTION(TfDebug)
     TF_DEBUG_ENVIRONMENT_SYMBOL(
         PXR_NS::FVP_ISOLATE_SELECT_SCENE_INDEX,
         "Print information about the Flow Viewport isolate select scene index.");
+
+    TF_DEBUG_ENVIRONMENT_SYMBOL(
+        PXR_NS::FVP_ISOLATE_SELECT_VIEW_SELECTED,
+        "Print view-selected to prim-path mapping used when building isolate selection (mayaHydra can enable "
+        "this via MAYA_HYDRA_ISOLATE_SELECT_TF_DEBUG).");
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
