@@ -14,6 +14,8 @@
 // limitations under the License.
 //
 
+#include "flowViewport/tokens.h"
+
 #include <mayaHydraLib/pick/mhPickHit.h>
 #include <mayaHydraLib/pick/mhUsdPickHandler.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
@@ -332,13 +334,11 @@ SdfPath resolveGenerativeProceduralAncestorPath(
     const HdSceneIndexBaseRefPtr& sceneIndex,
     const SdfPath&                primPath)
 {
-    static const TfToken gpToken("hydraGenerativeProcedural");
-    static const TfToken resolvedGpToken("resolvedHydraGenerativeProcedural");
-
     for (SdfPath path = primPath.GetParentPath(); !path.IsEmpty() && !path.IsAbsoluteRootPath();
          path = path.GetParentPath()) {
         HdSceneIndexPrim prim = sceneIndex->GetPrim(path);
-        if (prim.primType == gpToken || prim.primType == resolvedGpToken) {
+        if (prim.primType == FvpGenerativeProceduralTokens->hydraGenerativeProcedural
+            || prim.primType == FvpGenerativeProceduralTokens->resolvedHydraGenerativeProcedural) {
             // Found the GP procedural ancestor.
             // Get its original USD scene path from HdPrimOriginSchema.
             HdPrimOriginSchema originSchema = HdPrimOriginSchema::GetFromParent(prim.dataSource);
