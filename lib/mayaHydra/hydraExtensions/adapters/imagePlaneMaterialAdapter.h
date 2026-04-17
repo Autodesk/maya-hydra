@@ -51,13 +51,20 @@ public:
         const MObject&        obj);
 
     MAYAHYDRALIB_API
-    ~MayaHydraImagePlaneMaterialAdapter() override = default;
+    ~MayaHydraImagePlaneMaterialAdapter() override;
 
     MAYAHYDRALIB_API
     void CreateCallbacks() override;
 
     MAYAHYDRALIB_API
     VtValue GetMaterialResource() override;
+
+    /// Add or remove the timeChanged event callback depending on
+    /// whether useFrameExtension is currently enabled.
+    void UpdateTimeChangeCallback();
+
+private:
+    MCallbackId _timeCallbackId = 0;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

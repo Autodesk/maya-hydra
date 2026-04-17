@@ -458,6 +458,11 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                             break;
                         }
                     }
+                } else {
+                    vertexCounts.clear();
+                    vertexIndices.clear();
+                    _uvs.clear();
+                    _tangents.clear();
                 }
                 break;
             }
@@ -502,6 +507,8 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                         vertexCounts,
                         vertexIndices));
                 }
+            } else {
+                _topology.reset();
             }
             }
             break;

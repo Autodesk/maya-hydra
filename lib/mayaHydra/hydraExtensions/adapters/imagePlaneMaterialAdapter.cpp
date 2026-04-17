@@ -89,23 +89,23 @@ void _AttributeChangedCallback(
         || attr == MayaAttrs::imagePlane::frameExtension) {
         adapter->MarkDirty(HdMaterial::AllDirty);
     }
+
+    if (attr == MayaAttrs::imagePlane::useFrameExtension) {
+        adapter->UpdateTimeChangeCallback();
+    }
 }
 
 // Maya's addAttributeChangedCallback does not reliably fire for
 // expression-driven attributes (such as frameExtension connected to
 // the time node) during playback.  This event callback ensures the
 // material is re-evaluated whenever the current frame changes.
+// Only registered while useFrameExtension is enabled (see
+// UpdateTimeChangeCallback).
 void _TimeChangedCallback(void* clientData)
 {
     auto* adapter
         = reinterpret_cast<MayaHydraImagePlaneMaterialAdapter*>(clientData);
-
-    MStatus status;
-    MPlug useFrameExtPlug(
-        adapter->GetNode(), MayaAttrs::imagePlane::useFrameExtension);
-    if (useFrameExtPlug.asBool(&status) && status) {
-        adapter->MarkDirty(HdMaterial::AllDirty);
-    }
+    adapter->MarkDirty(HdMaterial::AllDirty);
 }
 
 } // anonymous namespace
@@ -116,6 +116,32 @@ MayaHydraImagePlaneMaterialAdapter::MayaHydraImagePlaneMaterialAdapter(
     const MObject&        obj)
     : MayaHydraMaterialAdapter(id, mayaHydraSceneIndex, obj)
 {
+}
+
+MayaHydraImagePlaneMaterialAdapter::~MayaHydraImagePlaneMaterialAdapter()
+{
+    if (_timeCallbackId != 0) {
+        MMessage::removeCallback(_timeCallbackId);
+        _timeCallbackId = 0;
+    }
+}
+
+void MayaHydraImagePlaneMaterialAdapter::UpdateTimeChangeCallback()
+{
+    MStatus status;
+    MPlug useFrameExtPlug(GetNode(), MayaAttrs::imagePlane::useFrameExtension);
+    bool needsCallback = useFrameExtPlug.asBool(&status) && status;
+
+    if (needsCallback && _timeCallbackId == 0) {
+        _timeCallbackId = MEventMessage::addEventCallback(
+            "timeChanged", _TimeChangedCallback, this, &status);
+        if (!status) {
+            _timeCallbackId = 0;
+        }
+    } else if (!needsCallback && _timeCallbackId != 0) {
+        MMessage::removeCallback(_timeCallbackId);
+        _timeCallbackId = 0;
+    }
 }
 
 void MayaHydraImagePlaneMaterialAdapter::CreateCallbacks()
@@ -132,11 +158,7 @@ void MayaHydraImagePlaneMaterialAdapter::CreateCallbacks()
         AddCallback(id);
     }
 
-    auto timeId = MEventMessage::addEventCallback(
-        "timeChanged", _TimeChangedCallback, this, &status);
-    if (status) {
-        AddCallback(timeId);
-    }
+    UpdateTimeChangeCallback();
 
     MayaHydraAdapter::CreateCallbacks();
 }
