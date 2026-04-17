@@ -479,6 +479,14 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             continue;
         }
 
+        // VP2 image planes emit a DepthPrepass render item that uses a special
+        // shader writing only to the depth buffer with alpha-tested discard.
+        // Hydra has no equivalent; rendering it as a regular textured mesh
+        // creates a second overlapping layer that causes visual artifacts.
+        if (riName == "imagePlane_ColorImage_DepthPrepass") {
+            continue;
+        }
+
         // Meshes can optionally be handled by the mesh adapter, rather than by
         // render items.
         if (filterMesh(ri)) {
@@ -537,6 +545,7 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
 
         const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColor);
         ria->UpdateFromDelta(data);
+
         if (flags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
             ria->UpdateTransform(ri);
         }
@@ -1168,6 +1177,18 @@ bool MayaHydraSceneIndex::_GetRenderItemMaterial(
         || MHWRender::MGeometry::Primitive::kLineStrip == ri.primitive()) {
         material = _fallbackMaterial; // Use fallbackMaterial + constantLighting + displayColor
         return true;
+    }
+
+    // Image planes use a dedicated material adapter that reads the imageName
+    // attribute directly, rather than going through shading engine lookup.
+    MDagPath dagPath = ri.sourceDagPath();
+    if (dagPath.isValid() && dagPath.node().hasFn(MFn::kImagePlane)) {
+        material = GetMaterialPath(dagPath.node());
+        if (TfMapLookupPtr(_materialAdapters, material) != nullptr) {
+            return true;
+        }
+        shadingEngineNode = dagPath.node();
+        return false;
     }
 
     if (GetShadingEngineNode(ri, shadingEngineNode))
