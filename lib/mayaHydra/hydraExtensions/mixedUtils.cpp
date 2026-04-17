@@ -25,6 +25,7 @@
 #include <mayaHydraLib/debugCodes.h>
 
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <set>
 #include <string>

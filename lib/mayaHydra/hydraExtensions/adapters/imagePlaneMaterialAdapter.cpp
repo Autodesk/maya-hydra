@@ -61,6 +61,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (imagePlaneSurface)
     (imagePlaneTexture)
     (imagePlanePrimvar)
+    (opacityThreshold)
     // Signals PruneTexturesSceneIndex to keep textures visible even when
     // the viewport "Textured" mode is off, matching VP2 image plane behaviour.
     (_alwaysShowTextures)
@@ -188,6 +189,10 @@ VtValue MayaHydraImagePlaneMaterialAdapter::GetMaterialResource()
     // visible reflections that lighten dark areas of the texture).
     surfaceNode.parameters[MayaHydraAdapterTokens->roughness]
         = VtValue(1.0f);
+    // VP2 uses AlphaDiscardThreshold = 0.05 for image planes; match that
+    // behaviour via the UsdPreviewSurface masked material tag.
+    surfaceNode.parameters[_tokens->opacityThreshold]
+        = VtValue(0.05f);
     surfaceNode.parameters[_tokens->_alwaysShowTextures] = VtValue(true);
     network.nodes.push_back(surfaceNode);
 
@@ -208,6 +213,16 @@ VtValue MayaHydraImagePlaneMaterialAdapter::GetMaterialResource()
         rel.inputName = MayaHydraAdapterTokens->rgb;
         rel.outputId = surfacePath;
         rel.outputName = MayaHydraAdapterTokens->emissiveColor;
+        network.relationships.push_back(rel);
+    }
+
+    // texture:a -> surface:opacity (preserve image transparency)
+    {
+        HdMaterialRelationship rel;
+        rel.inputId = texturePath;
+        rel.inputName = MayaHydraAdapterTokens->a;
+        rel.outputId = surfacePath;
+        rel.outputName = MayaHydraAdapterTokens->opacity;
         network.relationships.push_back(rel);
     }
 
