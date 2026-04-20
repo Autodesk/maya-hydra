@@ -458,7 +458,12 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         if (_GetRenderItem(fastId, ria)) {
             _RemoveRenderItem(ria);
         }
-        assert(ria != nullptr);
+        // The removal list can contain duplicate fastIds.  After the first
+        // removal succeeds, subsequent duplicates will not be found — skip
+        // them.
+        if (ria == nullptr) {
+            continue;
+        }
     }
 
     // My version, does minimal update
