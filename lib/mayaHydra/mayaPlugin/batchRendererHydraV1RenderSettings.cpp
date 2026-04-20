@@ -138,7 +138,7 @@ MStatus BatchRendererHydraV1RenderSettings::Render(
 {
     // Hydra V1 render settings path: uses USD render settings and UFE camera.
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
-        .Msg("BatchRenderer::RenderFromMayaRenderSettings()\n");
+        .Msg("BatchRendererHydraV1RenderSettings::Render()\n");
 
     HdxRenderTaskParams params;
     if (!renderer._PrepareRender(

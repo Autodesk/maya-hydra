@@ -14,16 +14,22 @@
 // limitations under the License.
 //
 
-#ifndef BATCH_RENDERER_MAYA_RENDER_SETTINGS_H
-#define BATCH_RENDERER_MAYA_RENDER_SETTINGS_H
+#ifndef MAYAHYDRA_BATCH_RENDERER_MAYA_RENDER_SETTINGS_H
+#define MAYAHYDRA_BATCH_RENDERER_MAYA_RENDER_SETTINGS_H
 
 #include "batchRenderer.h"
 
 namespace MAYAHYDRA_NS_DEF {
 
+/*! \brief Batch rendering strategy using Maya render settings.
+ *
+ *  Renders using traditional Maya render settings (resolution, camera,
+ *  output format, etc.) translated into Hydra task controller parameters.
+ */
 class BatchRendererMayaRenderSettings
 {
 public:
+    /// Perform a batch render using Maya render settings.
     static MStatus Render(
         BatchRenderer& renderer,
         const BatchRenderer::InputParams& inputParams);
@@ -31,4 +37,4 @@ public:
 
 } // namespace MAYAHYDRA_NS_DEF
 
-#endif // BATCH_RENDERER_MAYA_RENDER_SETTINGS_H
+#endif // MAYAHYDRA_BATCH_RENDERER_MAYA_RENDER_SETTINGS_H

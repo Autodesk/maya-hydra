@@ -96,7 +96,6 @@ constexpr auto _gpuEnabledFlagLong = "-gpuEnabled";
 
 using namespace MAYAHYDRA_NS_DEF;
 
-// TODO_BATCH_RENDER  Add documentation for this command.
 constexpr auto _helpText = R"HELP(For details on args usage please see 
 https://github.com/Autodesk/maya-hydra/blob/dev/doc/mayaHydraCommands.md
 )HELP";
@@ -122,7 +121,7 @@ public:
 };
 
 GLRenderWindow::GLRenderWindow()
-    : GarchGLDebugWindow("Maya Hydra Render", 100, 100) // Width, height relevance?
+    : GarchGLDebugWindow("Maya Hydra Render", 100, 100)
 {}
 
 /* virtual */
@@ -131,10 +130,6 @@ GLRenderWindow::OnInitializeGL()
 {
     GarchGLApiLoad();
     GlfRegisterDefaultDebugOutputMessageCallback();
-
-    std::cout << glGetString(GL_VENDOR) << "\n";
-    std::cout << glGetString(GL_RENDERER) << "\n";
-    std::cout << glGetString(GL_VERSION) << "\n";
 }
 const MString HydraRenderCmd::name("hydraRender");
 

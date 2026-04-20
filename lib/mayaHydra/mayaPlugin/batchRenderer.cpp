@@ -54,12 +54,10 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-// TODO_BATCH_RENDER
-// Fvp::RenderViewDataManager::AddRenderViewData
-// connects a custom data producer scene index chain with the Hydra Flow
-// Viewport Toolkit merging scene index, depending on the Hydra renderer.
-// This should be changed for batch rendering.  For now, use a dummy panel
-// to connect the scene index chain.
+// Fvp::RenderViewDataManager::AddRenderViewData connects a custom data
+// producer scene index chain with the Hydra Flow Viewport Toolkit merging
+// scene index, depending on the Hydra renderer.  A dummy panel name is
+// used to connect the scene index chain for batch rendering.
 
 const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaData");
 
@@ -163,7 +161,6 @@ bool BatchRenderer::Initialize()
         }
     }
 
-    // TODO_BATCH_RENDER  Remove this viewport architecture dependency.
     const std::string panelName { kBatchRenderDummyPanelName };
     auto&             manager = Fvp::RenderViewDataManager::Get();
     if (!manager.ViewIsAlreadyRegistered(panelName)) {
@@ -401,9 +398,9 @@ void BatchRenderer::_InitHydraResources()
         HdRenderSettingsTokens->enableInteractive, VtValue(false));
 
     // Support a USD stage providing the render settings through prims in the
-    // Hydra scene.  At time of writing (5-Sep-2025) only Hydra Prman does, if
-    // the  HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS=true environment
-    // variable is used.
+    // Hydra scene.  Hydra Prman supports this when the
+    // HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS=true environment variable
+    // is set.
     _SetActiveRenderSettingsPrimFromScene();
 
     _initializationSucceeded = true;
@@ -419,11 +416,8 @@ void BatchRenderer::_ClearHydraResources()
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("BatchRenderer::_ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
-    // TODO_BATCH_RENDER  Do not call 
-    // Fvp::RenderViewDataManager::Get().RemoveAllViewportsInformation()
-    // as this will affect interactive viewports.  Only remove
-    // information for our dummy batch render viewport.  Must remove this
-    // viewport architecture dependence.
+    // Only remove information for our dummy batch render viewport, to avoid
+    // affecting interactive viewports.
     Fvp::RenderViewDataManager::Get().RemoveRenderViewData(kBatchRenderDummyPanelName);
     
     //Remove the data producer scene indices that apply to all views
@@ -443,8 +437,8 @@ void BatchRenderer::_ClearHydraResources()
     if (_renderIndex != nullptr) {
         GetMayaHydraLibInterface().UnregisterTerminalSceneIndex(_renderIndex->GetTerminalSceneIndex());
 #ifndef CODE_COVERAGE_WORKAROUND
-        // Leak the render index, as its destructor crashes under Windows clang
-        // code coverage build.
+        // The render index destructor crashes under Windows clang code
+        // coverage builds, so deletion is skipped in that configuration.
         delete _renderIndex;
 #endif
         _renderIndex = nullptr;

@@ -124,8 +124,7 @@ MStatus BatchRendererMayaRenderSettings::Render(
         return token;
     };
 
-    // Apply AOVs (RenderVars)
-    // TODO
+    // Apply AOVs (RenderVars).
     TfTokenVector renderOutputs = inputParams.renderVarsInfo.renderVars;
     if (renderOutputs.empty()) {
         renderOutputs = { HdAovTokens->color };

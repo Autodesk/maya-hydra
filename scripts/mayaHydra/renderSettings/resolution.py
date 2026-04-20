@@ -1,15 +1,24 @@
+# Copyright 2026 Autodesk, Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 import mayaUsd.ufe as mayaUsdUfe
 
 from pxr import Sdf, UsdRender, Gf
 
 DEFAULT_WIDTH  = 960
 DEFAULT_HEIGHT = 540
-
-# Don't know where Python standard output is going, Render gobbles it up.
-# Use open() "a" to append after initial "w" for creation.
-#
-# with open("c:/temp/RenderOutput.txt", "w", encoding="utf-8") as f:
-#     print("PPT: setWidth %s called." % str(width), file=f)
 
 def getResolutionAttr():
     # Open the render settings stage.
@@ -54,7 +63,7 @@ def setWidth(width):
 
     # Passing a Python integer 2-tuple directly to Set() causes
     # a Gf.Vec2d() to be created, and a type mismatch when the
-    # Python C++ binding is called.  PPT, 3-Feb-2026.
+    # Python C++ binding is called.
     newRes = Gf.Vec2i(width, h)
     resAttr.Set(newRes)
 

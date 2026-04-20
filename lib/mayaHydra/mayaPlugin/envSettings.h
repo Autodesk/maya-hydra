@@ -23,7 +23,7 @@ namespace MAYAHYDRA_NS_DEF {
     bool useSingleFramePass();
 
     // Experimental functionality to enforce the presence of USD render
-    // settings in the Maya scene.  PPT, 5-Feb-2026.
+    // settings in the Maya scene.
     bool addRenderSettingsToScene();
 }
 

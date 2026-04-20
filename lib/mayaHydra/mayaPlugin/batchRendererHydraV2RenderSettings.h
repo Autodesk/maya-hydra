@@ -14,19 +14,27 @@
 // limitations under the License.
 //
 
-#ifndef BATCH_RENDERER_HYDRA_V2_RENDER_SETTINGS_H
-#define BATCH_RENDERER_HYDRA_V2_RENDER_SETTINGS_H
+#ifndef MAYAHYDRA_BATCH_RENDERER_HYDRA_V2_RENDER_SETTINGS_H
+#define MAYAHYDRA_BATCH_RENDERER_HYDRA_V2_RENDER_SETTINGS_H
 
 #include "batchRenderer.h"
 
 namespace MAYAHYDRA_NS_DEF {
 
+/*! \brief Batch rendering strategy using Hydra V2 render settings.
+ *
+ *  The render delegate itself reads the USD render settings prims
+ *  directly from the Hydra scene and drives the render pass internally.
+ *  The batch renderer only provides the execution environment;
+ *  configuration and output are handled entirely by the render delegate.
+ */
 class BatchRendererHydraV2RenderSettings
 {
 public:
+    /// Perform a batch render using Hydra V2 render settings.
     static MStatus Render(BatchRenderer& renderer);
 };
 
 } // namespace MAYAHYDRA_NS_DEF
 
-#endif // BATCH_RENDERER_HYDRA_V2_RENDER_SETTINGS_H
+#endif // MAYAHYDRA_BATCH_RENDERER_HYDRA_V2_RENDER_SETTINGS_H

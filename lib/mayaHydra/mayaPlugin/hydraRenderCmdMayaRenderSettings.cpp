@@ -129,14 +129,9 @@ bool HydraRenderCmd::hydraRenderFromMayaRenderSettings()
         return false;
     }
 
-     // Get all renderable cameras in the scene.  As of 21-Mar-2025 no
-    // C++ way to retrieve UFE cameras, so go through Maya command.
-    // For Maya cameras only, use
-    // MItDag dagIterCameras(MItDag::kDepthFirst, MFn::kCamera);
-    // to traverse the whole Maya scene.
-    // For now (21-Mar-2025), consider only Maya cameras.
+    // Get all renderable cameras in the scene.
+    // Currently considers only Maya cameras, retrieved through Maya command.
     MStringArray cameras;
-    // status = MGlobal::executeCommand("listCameras -ufe", cameras);
     status = MGlobal::executeCommand("listCameras", cameras);
     TF_DEBUG_MSG(
         MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
@@ -173,8 +168,8 @@ bool HydraRenderCmd::hydraRenderFromMayaRenderSettings()
             MAnimControl::setCurrentTime(time);
         }
 
-        // Loop over all cameras.  FIXME  Probably ways to compute
-        // non-animated camera data once, for animated renders.
+        // Loop over all cameras.  Non-animated camera data could be
+        // computed once for animated renders as a future optimization.
         auto cameraIt = cameras.cbegin();
         for (; cameraIt != cameras.cend(); ++cameraIt) {
             auto camera = *cameraIt;

@@ -288,7 +288,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     // Set dome light textures maximum resolution default to 1024.  A proper
     // solution with a Hydra preferences category in the Maya
     // preferences UI is preferable, but at time of writing is not in
-    // scope.  PPT, 17-Jan-2025.
+    // scope.
     MGlobal::executeCommand("if (!`optionVar -exists HdStormRendererPlugin__domeLightTexturesMaxResolution`) { optionVar -iv HdStormRendererPlugin__domeLightTexturesMaxResolution 1024; }");
 
     MFnPlugin plugin(obj, "Autodesk", PLUGIN_VERSION, "Any");
@@ -375,8 +375,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
     // Renderer registration must be done after UI registration, as UI
     // registration defines the UI tab in the Maya render settings.  To be
-    // re-evaluated as render settings UI requirements are clarified.  PPT,
-    // 1-Aug-2025.
+    // re-evaluated as render settings UI requirements are clarified.
     if (!plugin.registerUI(
         "mayaHydra_registerUI_load",
         "mayaHydra_registerUI_unload",

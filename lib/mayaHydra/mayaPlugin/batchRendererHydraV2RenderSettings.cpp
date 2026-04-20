@@ -24,6 +24,9 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hdx/renderTask.h>
 
+#include <chrono>
+#include <thread>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -32,7 +35,7 @@ MStatus BatchRendererHydraV2RenderSettings::Render(BatchRenderer& renderer)
 {
     // Hydra V2 render settings path: render delegate owns render-settings logic.
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER)
-        .Msg("BatchRenderer::RenderFromMayaRenderSettings()\n");
+        .Msg("BatchRendererHydraV2RenderSettings::Render()\n");
 
     // Use dummy values; the render delegate reads render settings directly in Hydra.
     constexpr unsigned int width  = 640;

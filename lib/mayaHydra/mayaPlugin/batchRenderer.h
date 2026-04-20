@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Copyright 2025 Autodesk
+// Copyright 2025 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,8 +27,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#ifndef BATCH_RENDERER_H
-#define BATCH_RENDERER_H
+#ifndef MAYAHYDRA_BATCH_RENDERER_H
+#define MAYAHYDRA_BATCH_RENDERER_H
 
 #include "batchRenderTypes.h"
 #include "renderGlobals.h"
@@ -146,7 +146,7 @@ private:
     PXR_NS::HdSceneIndexBaseRefPtr            _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
     PXR_NS::HdSceneIndexBaseRefPtr            _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
     PXR_NS::HdRenderIndex*                    _renderIndex = nullptr;
-    // Required by selection task, figure out how to remove this data member.
+    // Required by selection task.
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
@@ -179,4 +179,4 @@ private:
 
 }
 
-#endif // BATCH_RENDERER_H
+#endif // MAYAHYDRA_BATCH_RENDERER_H

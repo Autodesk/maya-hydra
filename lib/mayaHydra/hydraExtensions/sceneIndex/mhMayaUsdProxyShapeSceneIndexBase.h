@@ -1,5 +1,5 @@
 //
-// Copyright 2025 Autodesk
+// Copyright 2025 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -50,9 +50,8 @@ class MayaUsdProxyShapeSceneIndexBase;
 typedef PXR_NS::TfRefPtr<MayaUsdProxyShapeSceneIndexBase> MayaUsdProxyShapeSceneIndexBaseRefPtr;
 typedef PXR_NS::TfRefPtr<const MayaUsdProxyShapeSceneIndexBase> MayaUsdProxyShapeSceneIndexBaseConstRefPtr;
 
-/// <summary>
-/// Simply wraps single stage scene index for initial stage assignment and population
-/// </summary>
+/*! \brief Wraps a single stage scene index for initial stage assignment and population.
+ */
 class MayaUsdProxyShapeSceneIndexBase : public HdSingleInputFilteringSceneIndexBase
     , public Fvp::InputSceneIndexUtils<MayaUsdProxyShapeSceneIndexBase>
 {

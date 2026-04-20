@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Autodesk
+// Copyright 2026 Autodesk, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,6 +40,33 @@ PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
 
+/*! \brief Determines how render settings are sourced for batch rendering.
+ *
+ *  MayaHydra supports three render settings strategies:
+ *
+ *  - **Maya**: Traditional Maya render settings (defaultRenderGlobals,
+ *    defaultResolution, etc.) are read and translated into Hydra task
+ *    controller parameters.  The batch renderer manages the render loop,
+ *    convergence, and image output.
+ *
+ *  - **HydraV1**: The batch renderer reads USD render settings prims
+ *    (UsdRenderSettings, UsdRenderProduct, UsdRenderVar) from a USD
+ *    stage in the scene, extracts resolution, camera, AOVs, and render
+ *    products, and applies them to the Hydra task controller.  The batch
+ *    renderer still manages the render loop, convergence, and image
+ *    output.
+ *
+ *  - **HydraV2**: The render delegate itself reads the USD render
+ *    settings prims directly from the Hydra scene and drives the render
+ *    pass internally.  The batch renderer only provides the execution
+ *    environment; configuration and output are handled entirely by the
+ *    render delegate (e.g. Hydra Prman with
+ *    HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS enabled).
+ *
+ *  The strategy is selected automatically based on the render delegate
+ *  capabilities and the presence of USD render settings in the scene.
+ *  See ReadRenderSettingsTypeFromRenderDelegate().
+ */
 enum class RenderSettingsType
 {
     Unknown = 0,
@@ -48,7 +75,7 @@ enum class RenderSettingsType
     HydraV2,
 };
 
-// Determine the RenderSettingsType from the render delegate.
+/// Determine the RenderSettingsType from the render delegate.
 RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const PXR_NS::TfToken& rendererName);
 
 Ufe::SceneItemList GetAllMayaUsdProxyShapes();

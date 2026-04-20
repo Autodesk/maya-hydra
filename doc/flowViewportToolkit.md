@@ -122,5 +122,5 @@ Here is an example on performance and scene indices : we created N Flow viewport
 |10 000          | 10 000 scene indices, time : <B>Aborted after 1 Hour</B> | 1 scene index, time : <B>0.27</B> sec|
 
 ## Note on UFE implementation and scene index
-A potential issue is that if a plugin both implements [UFE](https://git.autodesk.com/media-and-entertainment/ufe) and registers a custom Hydra scene index to add Hydra primitives using the Flow viewport toolkit, items that are represented in both will get added twice to the viewport, once by MayaHydra converting the UFE item, and once by the plugin through its custom scene index.<BR>
+A potential issue is that if a plugin both implements UFE and registers a custom Hydra scene index to add Hydra primitives using the Flow viewport toolkit, items that are represented in both will get added twice to the viewport, once by MayaHydra converting the UFE item, and once by the plugin through its custom scene index.<BR>
 So please keep in mind to only implement one or the other.

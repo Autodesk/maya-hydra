@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-#ifndef HYDRA_RENDER_CMD_H
-#define HYDRA_RENDER_CMD_H
+#ifndef MAYAHYDRA_HYDRA_RENDER_CMD_H
+#define MAYAHYDRA_HYDRA_RENDER_CMD_H
 
 #include <mayaHydraLib/mayaHydra.h>
 
@@ -59,4 +59,4 @@ private:
 
 }
 
-#endif // HYDRA_RENDER_CMD_H
+#endif // MAYAHYDRA_HYDRA_RENDER_CMD_H

@@ -1524,10 +1524,9 @@ void MtohRenderOverride::_InitHydraResources(
     _mayaViewportSceneIndex = MayaViewportSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain, _mayaHydraSceneIndex);
     _inputSceneIndexOfFilteringSceneIndicesChain = _mayaViewportSceneIndex;
 
-    // As of 13-Nov-2025, order of operations in _InitHydraResources() is such
-    // that render globals are initialized after this method is called.  Thus
-    // the included purposes attributes do not yet exist on the
-    // defaultRenderGlobals node.  Simply pass in an empty set of included
+    // Render globals are initialized after this method is called, so
+    // included purposes attributes do not yet exist on the
+    // defaultRenderGlobals node.  Pass in an empty set of included
     // purposes here.
     _purposeFilteringSceneIndex = Fvp::PurposeFilteringSceneIndex::New(
         _inputSceneIndexOfFilteringSceneIndicesChain, {});
