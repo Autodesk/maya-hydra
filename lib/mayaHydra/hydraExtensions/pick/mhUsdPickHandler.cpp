@@ -14,6 +14,8 @@
 // limitations under the License.
 //
 
+#include "flowViewport/tokens.h"
+
 #include <mayaHydraLib/pick/mhPickHit.h>
 #include <mayaHydraLib/pick/mhUsdPickHandler.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
@@ -328,6 +330,26 @@ UsdPickHandler::HitPath resolveInstancePicking(HdRenderIndex& renderIndex, const
     return pickFn[GetPointInstancesPickMode()](primOrigin, pickHit);
 }
 
+SdfPath resolveGenerativeProceduralAncestorPath(
+    const HdSceneIndexBaseRefPtr& sceneIndex,
+    const SdfPath&                primPath)
+{
+    for (SdfPath path = primPath.GetParentPath(); !path.IsEmpty() && !path.IsAbsoluteRootPath();
+         path = path.GetParentPath()) {
+        HdSceneIndexPrim prim = sceneIndex->GetPrim(path);
+        if (prim.primType == FvpGenerativeProceduralTokens->hydraGenerativeProcedural
+            || prim.primType == FvpGenerativeProceduralTokens->resolvedHydraGenerativeProcedural) {
+            // Found the GP procedural ancestor.
+            // Get its original USD scene path from HdPrimOriginSchema.
+            HdPrimOriginSchema originSchema = HdPrimOriginSchema::GetFromParent(prim.dataSource);
+            if (originSchema.IsDefined()) {
+                return originSchema.GetOriginPath(HdPrimOriginSchemaTokens->scenePath);
+            }
+        }
+    }
+    return SdfPath();
+}
+
 }
 
 namespace MAYAHYDRA_NS_DEF {
@@ -378,9 +400,22 @@ bool UsdPickHandler::handlePickHit(
 
     size_t nbSelectedUfeItems = 0;
     for (const auto& [pickedUsdPath, instanceNdx] : hitPaths) {
+        SdfPath effectiveUsdPath = pickedUsdPath;
+
+        // HdGp: generated prims have no HdPrimOriginSchema,
+        // resolve to the GP procedural parent instead.
+        if (effectiveUsdPath.IsEmpty()) {
+            effectiveUsdPath = resolveGenerativeProceduralAncestorPath(
+                renderIndex(pickInput.pickHit.passIndex)->GetTerminalSceneIndex(),
+                pickInput.pickHit.hdxPickHit.objectId);
+            if (effectiveUsdPath.IsEmpty()) {
+                continue;
+            }
+        }
+
         // For the USD pick handler pick results are directly returned with USD
         // scene paths, so no need to remove scene index plugin path prefix.
-        const auto pickedMayaPath = usdPathToUfePath(registration, pickedUsdPath);
+        const auto pickedMayaPath = usdPathToUfePath(registration, effectiveUsdPath);
         const auto snMayaPath =
             // As per https://stackoverflow.com/questions/46114214
             // structured bindings cannot be captured by a lambda in C++ 17,

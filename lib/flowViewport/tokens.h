@@ -48,6 +48,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DECLARE_PUBLIC_TOKENS(FvpTokens, FVP_API, FVP_TOKENS);
 
+#define FVP_GENERATIVE_PROCEDURAL_TOKENS \
+    (hydraGenerativeProcedural)(resolvedHydraGenerativeProcedural)
+
+TF_DECLARE_PUBLIC_TOKENS(FvpGenerativeProceduralTokens, FVP_API, FVP_GENERATIVE_PROCEDURAL_TOKENS);
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 // FLOW_VIEWPORT_TODO  Figure out how to put tokens into non-Pixar namespace.
