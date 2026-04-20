@@ -25,6 +25,8 @@
 #include <pxr/base/tf/stringUtils.h>
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
+#include <pxr/imaging/hd/selectionSchema.h>
+#include <pxr/imaging/hd/selectionsSchema.h>
 
 #include <maya/MStatus.h>
 #include <maya/MApiNamespace.h>
@@ -598,6 +600,21 @@ bool visibility(const PXR_NS::HdSceneIndexBasePtr& sceneIndex, const PXR_NS::Sdf
  * @brief Return whether argument path vector contains the argument path.
  */
 bool contains(const PXR_NS::SdfPathVector& paths, const PXR_NS::SdfPath& path);
+
+/**
+ * @brief Asserts that at least one prim matching the predicate carries a fully-selected
+ * HdSelectionsSchema entry. Tolerates up to two matching prims.
+ */
+void ensureSelected(
+    const PXR_NS::SceneIndexInspector& inspector,
+    const PXR_NS::FindPrimPredicate&   primPredicate);
+
+/**
+ * @brief Asserts that no prim matching the predicate has an HdSelectionsSchema defined.
+ */
+void ensureUnselected(
+    const PXR_NS::SceneIndexInspector& inspector,
+    const PXR_NS::FindPrimPredicate&   primPredicate);
 
 } // namespace MAYAHYDRA_NS_DEF
 
