@@ -16,6 +16,15 @@
 
 #include "mhGenerativeProceduralResolvingSceneIndex.h"
 
+#include "flowViewport/tokens.h"
+
+#include <pxr/base/gf/matrix4d.h>
+#include <pxr/imaging/hd/overlayContainerDataSource.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/imaging/hd/xformSchema.h>
+
+#include <algorithm>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -34,6 +43,113 @@ MhGenerativeProceduralResolvingSceneIndex::New(const HdSceneIndexBaseRefPtr& inp
         HdGpGenerativeProceduralResolvingSceneIndex::New(inputSceneIndex)));
 #endif
 
+}
+
+// Composes the parent procedural's world matrix into generated children's transform, 
+// so the generated geometry moves correctly when the procedural root is transformed.
+// Returns the modified prim with the overlaid world-space transform.
+HdSceneIndexPrim MhGenerativeProceduralResolvingSceneIndex::GetPrim(const SdfPath& primPath) const
+{
+    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+
+    SdfPath parentPath = primPath.GetParentPath();
+
+    // Skip parent lookup if parent is not a known GP root
+    if (parentPath.IsEmpty() || parentPath.IsAbsoluteRootPath()
+        || _generativeProceduralPaths.find(parentPath) == _generativeProceduralPaths.end())
+        return prim;
+
+    // Parent is a GP root
+    HdSceneIndexPrim parentPrim = GetInputSceneIndex()->GetPrim(parentPath);
+    if (!parentPrim.dataSource)
+        return prim;
+
+    // Read parent world matrix and child local matrix
+    GfMatrix4d parentMat(1.0), childMat(1.0);
+    if (auto dataSource = HdXformSchema::GetFromParent(parentPrim.dataSource).GetMatrix())
+        parentMat = dataSource->GetTypedValue(0);
+    if (prim.dataSource) {
+        if (auto dataSource = HdXformSchema::GetFromParent(prim.dataSource).GetMatrix())
+            childMat = dataSource->GetTypedValue(0);
+    }
+
+    prim.dataSource = HdOverlayContainerDataSource::New(
+        HdRetainedContainerDataSource::New(
+            HdXformSchemaTokens->xform,
+            HdXformSchema::Builder()
+                .SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(childMat * parentMat))
+                .Build()),
+        prim.dataSource);
+
+    return prim;
+}
+
+void MhGenerativeProceduralResolvingSceneIndex::_PrimsAdded(
+    const PXR_NS::HdSceneIndexBase&                       sender,
+    const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries)
+{
+    if (!_IsObserved())
+        return;
+    // Cache primPaths of GP roots to reduce GetPrim calls 
+    for (const auto& entry : entries) {
+        if (entry.primType == FvpGenerativeProceduralTokens->resolvedHydraGenerativeProcedural
+            || entry.primType == FvpGenerativeProceduralTokens->hydraGenerativeProcedural) {
+            _generativeProceduralPaths.insert(entry.primPath);
+        }
+    }
+    _SendPrimsAdded(entries);
+}
+
+void MhGenerativeProceduralResolvingSceneIndex::_PrimsRemoved(
+    const PXR_NS::HdSceneIndexBase&                         sender,
+    const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& entries)
+{
+    if (!_IsObserved())
+        return;
+    for (const auto& entry : entries) {
+        // Remove generative procedural entries on the prim and its children
+        for (auto it = _generativeProceduralPaths.begin();
+             it != _generativeProceduralPaths.end();) {
+            if ((*it).HasPrefix(entry.primPath)) {
+                it = _generativeProceduralPaths.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+    _SendPrimsRemoved(entries);
+}
+
+// Forwards dirty notifications to generated meshes.
+// Allows the generated meshes to move when there is a transformed applied
+// to the root. 
+void MhGenerativeProceduralResolvingSceneIndex::_PrimsDirtied(
+    const HdSceneIndexBase&                         sender,
+    const HdSceneIndexObserver::DirtiedPrimEntries& entries)
+{
+    if (!_IsObserved())
+        return;
+
+    static const HdDataSourceLocatorSet xformLocatorSet { HdXformSchema::GetDefaultLocator() };
+
+    HdSceneIndexObserver::DirtiedPrimEntries expandedEntries;
+    expandedEntries.reserve(entries.size());
+
+    for (const auto& entry : entries) {
+        expandedEntries.push_back(entry);
+
+        if (!entry.dirtyLocators.Intersects(HdXformSchema::GetDefaultLocator()))
+            continue;
+
+        if (_generativeProceduralPaths.find(entry.primPath) == _generativeProceduralPaths.end())
+            continue;
+
+        for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(entry.primPath)) {
+            expandedEntries.emplace_back(childPath, xformLocatorSet);
+        }
+    }
+
+    _SendPrimsDirtied(expandedEntries);
 }
 
 } // namespace MAYAHYDRA_NS_DEF

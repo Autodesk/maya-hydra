@@ -28,6 +28,8 @@
 // Flow viewport toolkit headers
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 
+#include <set>
+
 namespace MAYAHYDRA_NS_DEF {
 
 class MhGenerativeProceduralResolvingSceneIndex;
@@ -52,11 +54,8 @@ public:
     static MhGenerativeProceduralResolvingSceneIndexRefPtr
     New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex);
 
-    // HdSceneIndexBase: delegate to the wrapped input
-    PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath& primPath) const override
-    {
-        return GetInputSceneIndex()->GetPrim(primPath);
-    }
+    MAYAHYDRALIB_API
+    PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath& primPath) const override;
 
     PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath& primPath) const override
     {
@@ -72,33 +71,20 @@ protected:
     {
     }
 
-    // From HdSingleInputFilteringSceneIndexBase
     void _PrimsAdded(
-        const PXR_NS::HdSceneIndexBase& sender,
-        const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override
-    {
-        if (!_IsObserved())
-            return;
-        _SendPrimsAdded(entries);
-    }
+        const PXR_NS::HdSceneIndexBase&                       sender,
+        const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override;
 
     void _PrimsRemoved(
-        const PXR_NS::HdSceneIndexBase& sender,
-        const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& entries) override
-    {
-        if (!_IsObserved())
-            return;
-        _SendPrimsRemoved(entries);
-    }
+        const PXR_NS::HdSceneIndexBase&                         sender,
+        const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& entries) override;
 
     void _PrimsDirtied(
-        const PXR_NS::HdSceneIndexBase& sender,
-        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override
-    {
-        if (!_IsObserved())
-            return;
-        _SendPrimsDirtied(entries);
-    }
+        const PXR_NS::HdSceneIndexBase&                         sender,
+        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
+
+private:
+    std::set<PXR_NS::SdfPath> _generativeProceduralPaths;
 
 };
 
