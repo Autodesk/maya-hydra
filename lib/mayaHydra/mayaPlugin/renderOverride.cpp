@@ -1396,6 +1396,10 @@ void MtohRenderOverride::_InitHydraResources(
     //Using passes data
     _CreateFramePasses();
   
+    // The SkydomeTask is Storm-specific. HdxSkydomeTask::Execute will cast 
+    // the render pass state to HdStRenderPassState and return if it's not
+    // of that type.
+    if (_isUsingHdSt)
     {
         // Add the 'SkyDome' task to the frame pass.
         // Get the first render task path.
