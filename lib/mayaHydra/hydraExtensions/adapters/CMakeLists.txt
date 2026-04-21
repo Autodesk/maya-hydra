@@ -12,6 +12,7 @@ target_sources(${TARGET_NAME}
         cameraAdapter.cpp
         dagAdapter.cpp
         customDagAdapter.cpp
+        imagePlaneMaterialAdapter.cpp
         renderItemAdapter.cpp
         directionalLightAdapter.cpp
         lightAdapter.cpp
@@ -36,6 +37,7 @@ set(HEADERS
     constantShadowMatrix.h
     dagAdapter.h
     customDagAdapter.h
+    imagePlaneMaterialAdapter.h
     renderItemAdapter.h
     lightAdapter.h
     materialAdapter.h

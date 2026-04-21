@@ -104,6 +104,7 @@ bool MayaHydraRenderItemAdapter::IsSupported() const
 {
     switch (_primitive) {
     case MHWRender::MGeometry::Primitive::kTriangles:
+    case MHWRender::MGeometry::Primitive::kTriangleStrip:
         return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->mesh);
     case MHWRender::MGeometry::Primitive::kLines:
     case MHWRender::MGeometry::Primitive::kLineStrip:
@@ -118,6 +119,7 @@ void MayaHydraRenderItemAdapter::_InsertRprim(MayaHydraAdapter* adapter)
 {
     switch (GetPrimitive()) {
     case MHWRender::MGeometry::Primitive::kTriangles:
+    case MHWRender::MGeometry::Primitive::kTriangleStrip:
         GetMayaHydraSceneIndex()->InsertPrim(adapter, HdPrimTypeTokens->mesh, GetID());
         break;
     case MHWRender::MGeometry::Primitive::kLines:
@@ -145,6 +147,7 @@ void MayaHydraRenderItemAdapter::_RemoveRprim() { GetMayaHydraSceneIndex()->Remo
 void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data)
 {
     if (_primitive != MHWRender::MGeometry::Primitive::kTriangles
+        && _primitive != MHWRender::MGeometry::Primitive::kTriangleStrip
         && _primitive != MHWRender::MGeometry::Primitive::kLines
         && _primitive != MHWRender::MGeometry::Primitive::kLineStrip) {
         return;
@@ -398,6 +401,71 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                     }
                 }
                 break;
+            case MHWRender::MGeometry::Primitive::kTriangleStrip: {
+                // Convert triangle strip indices to individual triangles.
+                // For N strip indices we get N-2 triangles, with alternating
+                // winding to maintain consistent face orientation.
+                if (indexCount >= 3) {
+                    const int numTriangles = indexCount - 2;
+                    vertexCounts.assign(numTriangles, 3);
+                    VtIntArray expandedIndices;
+                    expandedIndices.reserve(numTriangles * 3);
+                    for (int i = 0; i < numTriangles; ++i) {
+                        if (i % 2 == 0) {
+                            expandedIndices.push_back(indicesData[i]);
+                            expandedIndices.push_back(indicesData[i + 1]);
+                            expandedIndices.push_back(indicesData[i + 2]);
+                        } else {
+                            expandedIndices.push_back(indicesData[i + 1]);
+                            expandedIndices.push_back(indicesData[i]);
+                            expandedIndices.push_back(indicesData[i + 2]);
+                        }
+                    }
+                    vertexIndices = std::move(expandedIndices);
+
+                    // Get face varying data (UVs, tangents) using the expanded triangle indices
+                    for (int vbIdx = 0; vbIdx < vertexBuffercount; vbIdx++) {
+                        MVertexBuffer* mvb = geom->vertexBuffer(vbIdx);
+                        if (!mvb)
+                            continue;
+
+                        const MVertexBufferDescriptor& desc = mvb->descriptor();
+                        const auto semantic = desc.semantic();
+                        switch (semantic) {
+                            case MGeometry::Semantic::kTexture: {
+                                _uvs.clear();
+                                const int faceVertexCount = numTriangles * 3;
+                                _uvs.resize(faceVertexCount);
+                                float* uvs = (float*)mvb->map();
+                                for (int i = 0; i < faceVertexCount; ++i) {
+                                    _uvs[i].Set(&uvs[vertexIndices[i] * 2]);
+                                }
+                                mvb->unmap();
+                            }
+                            break;
+                            case MHWRender::MGeometry::kTangent: {
+                                _tangents.clear();
+                                const int faceVertexCount = numTriangles * 3;
+                                _tangents.resize(faceVertexCount);
+                                float* tangents = (float*)mvb->map();
+                                for (int i = 0; i < faceVertexCount; ++i) {
+                                    _tangents[i].Set(&tangents[vertexIndices[i] * 2]);
+                                }
+                                mvb->unmap();
+                            }
+                            break;
+                            default:
+                            break;
+                        }
+                    }
+                } else {
+                    vertexCounts.clear();
+                    vertexIndices.clear();
+                    _uvs.clear();
+                    _tangents.clear();
+                }
+                break;
+            }
             case MHWRender::MGeometry::Primitive::kLines:
                 vertexCounts.resize(indexCount);
                 vertexCounts.assign(indexCount / 2, 2);
@@ -417,6 +485,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
 
     if (topoChanged) {
         switch (GetPrimitive()) {
+        case MGeometry::Primitive::kTriangleStrip:
         case MGeometry::Primitive::kTriangles:{
             static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
             if (vertexCounts.size()) {
@@ -438,6 +507,8 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                         vertexCounts,
                         vertexIndices));
                 }
+            } else {
+                _topology.reset();
             }
             }
             break;
@@ -535,7 +606,8 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
     } 
     else if (interpolation == HdInterpolationFaceVarying) {
         // UVs and tangents are face varying in maya.
-        if (_primitive == MGeometry::Primitive::kTriangles) {
+        if (_primitive == MGeometry::Primitive::kTriangles
+            || _primitive == MGeometry::Primitive::kTriangleStrip) {
             localDescs = {
                 {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate},//uvs
                 {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate},//tangents

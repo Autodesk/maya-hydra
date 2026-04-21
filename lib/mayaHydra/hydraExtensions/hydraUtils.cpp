@@ -217,6 +217,16 @@ void SanitizeNameForSdfPath(std::string& inoutPathString, bool doStripNamespaces
         inoutPathString = StripNamespaces(inoutPathString);
     }
 
+    // Remove Maya's image-plane connection delimiter ("->"). The "|" that
+    // follows it already provides the hierarchy separation.
+    {
+        const std::string arrow("->");
+        std::string::size_type pos = 0;
+        while ((pos = inoutPathString.find(arrow, pos)) != std::string::npos) {
+            inoutPathString.erase(pos, arrow.size());
+        }
+    }
+
     std::replace(
         inoutPathString.begin(),
         inoutPathString.end(),

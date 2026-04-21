@@ -74,6 +74,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testRenderRegion.py
     testConvergence.py
     testFramePasses.py
+    testImagePlanes.py
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py

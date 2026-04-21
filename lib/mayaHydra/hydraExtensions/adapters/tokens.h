@@ -77,6 +77,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (uvCoord)                                 \
     (rgb)                                     \
     (r)                                       \
+    (a)                                       \
     (xyz)                                     \
     (x)                                       \
     (varname)                                 \
