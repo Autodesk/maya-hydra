@@ -25,6 +25,7 @@
 #include <mayaHydraLib/debugCodes.h>
 
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <set>
 #include <string>
@@ -903,6 +904,48 @@ TfToken GetFileTexturePath(const MFnDependencyNode& fileNode)
                                              .asChar() }
                              : ret;
     }
+}
+
+namespace {
+
+bool _IsMovieFile(const std::string& path)
+{
+    auto dotPos = path.rfind('.');
+    if (dotPos == std::string::npos) {
+        return false;
+    }
+    std::string ext = path.substr(dotPos + 1);
+    for (auto& c : ext) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return ext == "mov" || ext == "avi" || ext == "qt" || ext == "webm";
+}
+
+} // anonymous namespace
+
+// Resolve the image plane texture path using Maya's own resolution logic.
+std::string GetImagePlaneTexturePath(const MObject& imagePlaneNode)
+{
+    MStatus status;
+    MString resolvedPath = MRenderUtil::exactImagePlaneFileName(imagePlaneNode, &status);
+    if (!status || resolvedPath.length() == 0) {
+        return {};
+    }
+
+    std::string imagePath = resolvedPath.asChar();
+
+    if (_IsMovieFile(imagePath)) {
+        MFnDependencyNode node(imagePlaneNode);
+        TF_WARN(
+            "Image plane '%s' references a movie file ('%s'). "
+            "Movie textures are not supported in Hydra; "
+            "only static image formats (png, jpg, exr, tiff, etc.) are supported.",
+            node.name().asChar(),
+            imagePath.c_str());
+        return {};
+    }
+
+    return imagePath;
 }
 
 // Check whether the DAG path refers to a shape with transform parent.
