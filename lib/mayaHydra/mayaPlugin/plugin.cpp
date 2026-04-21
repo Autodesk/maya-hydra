@@ -25,7 +25,7 @@
 #include "testingCommand.h"
 #include "renderRegionCommand.h"
 #include "setVisibleFramePassesCommand.h"
-#include "hydraRenderCmd.h"
+#include "batchRendering/hydraRenderCmd.h"
 #include "envSettings.h"
 
 #include <mayaHydraLib/adapters/adapter.h>
