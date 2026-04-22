@@ -52,6 +52,10 @@ HdSceneIndexPrim MhGenerativeProceduralResolvingSceneIndex::GetPrim(const SdfPat
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
 
+    if (_generativeProceduralPaths.empty()) {
+        return prim;
+    }
+
     // Walk up from the prim to find the nearest GP root ancestor.
     SdfPath generativeProceduralRoot;
     {
