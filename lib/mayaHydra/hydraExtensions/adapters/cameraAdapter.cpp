@@ -18,6 +18,7 @@
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
+#include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/gf/interval.h>
@@ -25,12 +26,77 @@
 #include <pxr/imaging/hd/changeTracker.h>
 
 #include <maya/MDagMessage.h>
+#include <maya/MFnAttribute.h>
 #include <maya/MFnCamera.h>
 #include <maya/MNodeMessage.h>
+#include <maya/MPlug.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
+
+// Attributes that affect HdCamera params (from GetCameraParamValue). When these change,
+// we mark DirtyParams | DirtyPrimvar in one call to avoid duplicates.
+static const char* const kCameraParamAttributeNames[] = {
+    "nearClipPlane", "farClipPlane", "shutterAngle", "focusDistance", "focalLength",
+    "fStop", "horizontalFilmAperture", "verticalFilmAperture", "lensSqueezeRatio",
+    "shakeEnabled", "horizontalFilmOffset", "horizontalShake", "verticalFilmOffset",
+    "verticalShake", "filmFit", "depthOfField", "orthographic",
+};
+
+static void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)
+{
+    TF_UNUSED(node);
+    auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
+    if (plug.isChild()) {
+        return;
+    }
+    MPlug topPlug = MayaHydra::GetTopPlug(plug);
+    // Only handle driven plugs here; direct setAttr changes are handled in the
+    // attribute-changed callback to avoid duplicate dirty notifications.
+    if (!topPlug.isConnected()) {
+        return;
+    }
+    if (MayaHydraAdapter::IsParamAttribute(
+            topPlug,
+            MayaHydraAdapter::GetParamAttributeSet(kCameraParamAttributeNames))) {
+        adapter->MarkDirty(
+            HdCamera::DirtyParams | HdCamera::DirtyWindowPolicy | HdChangeTracker::DirtyPrimvar);
+    } else {
+        adapter->MaybeMarkPrimvarDirtyForAttributeChange(topPlug);
+    }
+}
+
+// Fires on attribute value changes and DG structure changes (add/remove/rename). Ensures
+// extension attrs like aiUScale trigger primvar dirty, and undo/redo of addAttr refreshes primvars.
+static void _cameraAttributeChanged(
+    MNodeMessage::AttributeMessage msg,
+    MPlug&                        plug,
+    MPlug&                        otherPlug,
+    void*                         clientData)
+{
+    TF_UNUSED(otherPlug);
+    auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
+    if (!MayaHydraAdapter::AttributeMessageAffectsExtensionPrimvars(msg)) {
+        return;
+    }
+    MPlug topPlug = MayaHydra::GetTopPlug(plug);
+    // Driven plug changes are handled by the node-dirty callback.
+    if (topPlug.isConnected()) {
+        return;
+    }
+    if (MayaHydraAdapter::IsParamAttribute(
+            topPlug,
+            MayaHydraAdapter::GetParamAttributeSet(kCameraParamAttributeNames))) {
+        adapter->MarkDirty(
+            HdCamera::DirtyParams | HdCamera::DirtyWindowPolicy | HdChangeTracker::DirtyPrimvar);
+        return;
+    }
+    if (!adapter->ShouldMarkPrimvarDirtyForAttributeChange(topPlug)) {
+        return;
+    }
+    adapter->MaybeMarkPrimvarDirtyForAttributeChange(topPlug);
+}
 
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
@@ -94,30 +160,14 @@ void MayaHydraCameraAdapter::CreateCallbacks()
     auto    dag = GetDagPath();
     auto    obj = dag.node();
 
-    auto paramsChanged = MNodeMessage::addNodeDirtyCallback(
-        obj,
-        +[](MObject& obj, void* clientData) {
-            auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
-            // Dirty everything rather than track complex param and fit to projection dependencies.
-            adapter->MarkDirty(HdCamera::DirtyParams | HdCamera::DirtyWindowPolicy);
-        },
-        reinterpret_cast<void*>(this),
-        &status);
+    auto plugDirty = MNodeMessage::addNodeDirtyPlugCallback(obj, _cameraPlugDirty, this, &status);
     if (status) {
-        AddCallback(paramsChanged);
+        AddCallback(plugDirty);
     }
 
-    auto attributesChanged = MNodeMessage::addAttributeChangedCallback(
-        obj,
-        +[](MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
-            auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
-            // Handle extension attributes change
-            adapter->HandleExtensionAndDynamicAttributesDirty(plug);
-        },
-        reinterpret_cast<void*>(this),
-        &status);
+    auto attrChanged = MNodeMessage::addAttributeChangedCallback(obj, _cameraAttributeChanged, this, &status);
     if (status) {
-        AddCallback(attributesChanged);
+        AddCallback(attrChanged);
     }
 
     auto xformChanged = MDagMessage::addWorldMatrixModifiedCallback(
@@ -289,6 +339,16 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         return VtValue(depthOfField);
     }
     return {};
+}
+
+bool MayaHydraCameraAdapter::ShouldMarkPrimvarDirtyForAttributeChange(const MPlug& plug) const
+{
+    return MayaHydraAdapter::ShouldMarkPrimvarDirtyForParamAttrs(plug, kCameraParamAttributeNames);
+}
+
+const std::unordered_set<std::string>& MayaHydraCameraAdapter::GetCameraParamAttributeNamesForTest()
+{
+    return MayaHydraAdapter::GetParamAttributeSet(kCameraParamAttributeNames);
 }
 
 void MayaHydraCameraAdapter::SetViewport(const GfVec4d& viewport)

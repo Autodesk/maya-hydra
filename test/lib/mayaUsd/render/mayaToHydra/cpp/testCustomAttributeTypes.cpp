@@ -72,7 +72,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace MayaHydra;
 
-// Unit test: verifies custom Maya extension attributes are translated into Hydra primvars.
+// Unit test: verifies Maya extension attributes (plugin-defined) are translated into Hydra primvars.
 namespace {
 
 // OptionVar to emit enum primvars as label tokens.
@@ -103,19 +103,6 @@ private:
     bool        _hadValue;
     int         _oldValue;
 };
-
-// Build a predicate to find a prim by name and type.
-FindPrimPredicate getPrimPredicate(const std::string& primName, const TfToken& primType)
-{
-    return [primName,
-            primType](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
-        if (primPath.GetAsString().find(primName) == std::string::npos) {
-            return false;
-        }
-        HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
-        return prim.primType == primType;
-    };
-}
 
 // Convert an MMatrix to a GfMatrix4d.
 GfMatrix4d ToGfMatrix(const MMatrix& mayaMat)
@@ -284,7 +271,7 @@ TEST(CustomAttributes, extensionAttributeTypes)
     MObject cubeNode;
     ASSERT_TRUE(GetDependNodeFromNodeName("pCubeShape1", cubeNode));
 
-    // Values are authored in testCustomAttributes.py. This test only verifies
+    // Values are authored in testMayaNodesAttributes.py. This test only verifies
     // the Hydra translation against the expected values.
     MMatrix typedMatrix;
     typedMatrix[0][0] = 1.0;
@@ -324,7 +311,7 @@ TEST(CustomAttributes, extensionAttributeTypes)
     for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
         SceneIndexInspector inspector(sceneIndex);
         PrimEntriesVector foundPrims
-            = inspector.FindPrims(getPrimPredicate("pCube1", HdPrimTypeTokens->mesh));
+            = inspector.FindPrims(CreatePrimPredicate("pCube1", HdPrimTypeTokens->mesh));
         if (foundPrims.size() == 1u) {
             prim = foundPrims.front().prim;
             ASSERT_EQ(prim.primType, HdPrimTypeTokens->mesh);
@@ -418,7 +405,7 @@ TEST(CustomAttributes, extensionAttributeEnumLabels)
     for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
         SceneIndexInspector inspector(sceneIndex);
         PrimEntriesVector foundPrims
-            = inspector.FindPrims(getPrimPredicate("pCube1", HdPrimTypeTokens->mesh));
+            = inspector.FindPrims(CreatePrimPredicate("pCube1", HdPrimTypeTokens->mesh));
         if (foundPrims.size() == 1u) {
             prim = foundPrims.front().prim;
             ASSERT_EQ(prim.primType, HdPrimTypeTokens->mesh);
@@ -461,7 +448,7 @@ TEST(CustomAttributes, extensionAttributeTypedNumeric)
     for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
         SceneIndexInspector inspector(sceneIndex);
         PrimEntriesVector foundPrims
-            = inspector.FindPrims(getPrimPredicate("pCube1", HdPrimTypeTokens->mesh));
+            = inspector.FindPrims(CreatePrimPredicate("pCube1", HdPrimTypeTokens->mesh));
         if (foundPrims.size() == 1u) {
             prim = foundPrims.front().prim;
             ASSERT_EQ(prim.primType, HdPrimTypeTokens->mesh);

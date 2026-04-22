@@ -27,6 +27,7 @@
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
+#include <pxr/imaging/hd/mergingSceneIndex.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/xformSchema.h>
@@ -48,6 +49,7 @@
 #include <QApplication>
 
 #include <algorithm>
+#include <cctype>
 #include <exception>
 #include <iostream>
 #include <cstring>
@@ -105,6 +107,76 @@ const HdSceneIndexBasePtr GetSecondaryGraphicsPassSceneIndex()
 bool MatricesAreClose(const GfMatrix4d& hydraMatrix, const MMatrix& mayaMatrix, double tolerance)
 {
     return GfIsClose(hydraMatrix, GetGfMatrixFromMaya(mayaMatrix), tolerance);
+}
+
+FindPrimPredicate CreatePrimPredicate(
+    const std::string& primNamePart,
+    const TfToken&     primType)
+{
+    return [primNamePart,
+            primType](const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) -> bool {
+        if (primPath.GetAsString().find(primNamePart) == std::string::npos) {
+            return false;
+        }
+        HdSceneIndexPrim prim = sceneIndex->GetPrim(primPath);
+        return prim.primType == primType;
+    };
+}
+
+HdSceneIndexBaseRefPtr FindTerminalSceneIndexWithPrim(
+    const SceneIndicesVector& sceneIndices,
+    FindPrimPredicate         predicate,
+    size_t                    maxPrims)
+{
+    for (const HdSceneIndexBaseRefPtr& sceneIndex : sceneIndices) {
+        SceneIndexInspector inspector(sceneIndex);
+        PrimEntriesVector   foundPrims = inspector.FindPrims(predicate, maxPrims);
+        if (!foundPrims.empty()) {
+            return sceneIndex;
+        }
+    }
+    return nullptr;
+}
+
+HdSceneIndexBaseRefPtr FindTerminalSceneIndexWithPrim(
+    const SceneIndicesVector& sceneIndices,
+    const std::string&        primNamePart,
+    const TfToken&            primType,
+    size_t                    maxPrims)
+{
+    return FindTerminalSceneIndexWithPrim(
+        sceneIndices, CreatePrimPredicate(primNamePart, primType), maxPrims);
+}
+
+std::string GetOptionVarOrDefault(const char* optionVar, const char* fallback)
+{
+    if (MGlobal::optionVarExists(optionVar)) {
+        return MGlobal::optionVarStringValue(optionVar).asChar();
+    }
+    return fallback;
+}
+
+std::string GetShapeNameFromFullPath(const std::string& fullPath)
+{
+    const size_t lastPipe = fullPath.rfind('|');
+    if (lastPipe != std::string::npos && lastPipe + 1 < fullPath.size()) {
+        return fullPath.substr(lastPipe + 1);
+    }
+    return fullPath;
+}
+
+std::string GetParentNameFromFullPath(const std::string& fullPath)
+{
+    const size_t lastPipe = fullPath.rfind('|');
+    if (lastPipe == std::string::npos || lastPipe == 0) {
+        return {};
+    }
+    const size_t prevPipe = fullPath.rfind('|', lastPipe - 1);
+    const size_t start = (prevPipe == std::string::npos) ? 0 : prevPipe + 1;
+    if (lastPipe <= start) {
+        return {};
+    }
+    return fullPath.substr(start, lastPipe - start);
 }
 
 SceneIndexInspector::SceneIndexInspector(HdSceneIndexBasePtr sceneIndex)
@@ -315,6 +387,28 @@ Fvp::SelectionSceneIndexRefPtr findSelectionSceneIndexInTree(
     return TfDynamic_cast<Fvp::SelectionSceneIndexRefPtr>(selectionSiBase);
 }
 
+HdSceneIndexBaseRefPtr FindMayaHydraSceneIndex(
+    const HdSceneIndexBaseRefPtr& terminalSceneIndex)
+{
+    // Two-step lookup is intentional: find the Data Producer Merging Scene Index first,
+    // then pick the MayaHydraSceneIndex from its inputs. This anchors the search to the
+    // Maya-authored branch of the tree and avoids accidentally selecting a similarly
+    // named scene index from another branch if multiple exist.
+    auto isDataProducerMerging = SceneIndexDisplayNamePred("Data Producer Merging Scene Index");
+    auto mergingSiBase = findSceneIndexInTree(terminalSceneIndex, isDataProducerMerging);
+    if (!mergingSiBase) {
+        return nullptr;
+    }
+    auto mergingSi = TfDynamic_cast<HdMergingSceneIndexRefPtr>(mergingSiBase);
+    if (!mergingSi) {
+        return nullptr;
+    }
+    auto isMayaProducer = SceneIndexDisplayNamePred("MayaHydraSceneIndex");
+    auto producers = mergingSi->GetInputScenes();
+    auto found = std::find_if(producers.begin(), producers.end(), isMayaProducer);
+    return (found != producers.end()) ? *found : nullptr;
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -380,6 +474,10 @@ bool dataSourceMatchesReference(
     outputDump << outputFile.rdbuf();
     std::string outputString = outputDump.str();
 
+    // Normalize line endings: strip carriage returns for consistent comparison across platforms.
+    outputString.erase(
+        std::remove(outputString.begin(), outputString.end(), '\r'), outputString.end());
+
     std::ifstream     referenceFile(referencePath);
     std::stringstream referenceDump;
     referenceDump << referenceFile.rdbuf();
@@ -391,10 +489,25 @@ bool dataSourceMatchesReference(
     referenceString.erase(
         std::remove(referenceString.begin(), referenceString.end(), '\r'), referenceString.end());
 
+    auto trimTrailingWhitespace = [](std::string& value) {
+        auto it = std::find_if_not(
+            value.rbegin(),
+            value.rend(),
+            [](unsigned char c) { return std::isspace(c) != 0; });
+        value.erase(it.base(), value.end());
+    };
+    trimTrailingWhitespace(outputString);
+    trimTrailingWhitespace(referenceString);
+
     // We return a boolean instead of using something like EXPECT_EQ, as that would print the
     // entire dumps to stdout and pollute the logs in case of a test failure. Using EXPECT_TRUE
     // at the callsites still logs exactly which comparison failed, but keeps logs readable.
     return outputString == referenceString;
+}
+
+std::filesystem::path getDataSourceComparisonOutputPath(std::filesystem::path referencePath)
+{
+    return getOutputDir() / referencePath.filename();
 }
 
 bool testingArgsEmpty()

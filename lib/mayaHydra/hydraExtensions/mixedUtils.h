@@ -132,6 +132,21 @@ MAYAHYDRALIB_API
 PXR_NS::TfToken GetFileTexturePath(const MFnDependencyNode& fileNode);
 
 /**
+ * @brief Returns the resolved texture file path from an image plane node.
+ *
+ * Uses MRenderUtil::exactImagePlaneFileName to resolve the path exactly as
+ * Maya does internally (project-relative lookup, image-sequence frame
+ * substitution with correct padding, all format patterns).
+ *
+ * @param[in] imagePlaneNode The image plane MObject.
+ *
+ * @return Resolved absolute path, or empty string if the image cannot be
+ *         resolved or is a movie file (unsupported by Hydra).
+ */
+MAYAHYDRALIB_API
+std::string GetImagePlaneTexturePath(const MObject& imagePlaneNode);
+
+/**
  * @brief Determines whether or not a given DagPath refers to a shape.
  *
  * @param[in] dagPath is the DagPath to the potential shape.
@@ -257,10 +272,10 @@ MAYAHYDRALIB_API
 PXR_NS::TfToken GetGeomSubsetsPickMode();
 
 /**
- * @brief Get the extension and dynamic attributes from a Maya node.
+ * @brief Get extension/dynamic attributes from a Maya node for translation to Hydra primvars.
  *
- * This function retrieves all the extension and dynamic attributes of a given Maya node and stores
- * them in a map. The keys of the map are the attribute names, and the values are the attribute values.
+ * Extension attributes are skipped while at their default. Dynamic attributes (user addAttr) are
+ * always collected regardless of default value.
  *
  * @param[in] node is the node in the Maya scene graph.
  * @param[out] attrs is a map that will contain the attribute names and their corresponding values.
@@ -269,6 +284,36 @@ MAYAHYDRALIB_API
 void GetExtensionAndDynamicAttributesFromNode(
     const MObject& node,
     PXR_NS::VtDictionary& attrs);
+
+/**
+ * @brief Get non-default plugin-specific attributes from a Maya node for custom Hydra translation.
+ *
+ * Unlike GetExtensionAndDynamicAttributesFromNode, this reads attributes beyond the
+ * standard Maya built-in base classes (locator, shape, dagNode, dependNode, etc.).
+ * Standard Maya attributes (visibility, objectColorRGB, castsShadows, worldPosition,
+ * etc.) are excluded since maya-hydra handles those through dedicated xform,
+ * visibility, and purpose data sources. Message attributes are also excluded.
+ * Attributes at their default value are skipped. Child plugs of compound attributes
+ * are skipped (only top-level plugs are included).
+ *
+ * @param[in] node is the node in the Maya scene graph.
+ * @param[out] attrs is a map that will contain the attribute names and their corresponding values.
+ */
+MAYAHYDRALIB_API
+void GetNonDefaultMayaAttributesFromNode(
+    const MObject& node,
+    PXR_NS::VtDictionary& attrs);
+
+/**
+ * @brief Check if an attribute name belongs to Maya's built-in DAG base classes.
+ *
+ * Returns true for attributes defined on locator, shape, dagNode, dependNode,
+ * etc. Used by the custom adapter's attribute-changed callback to avoid
+ * sending dirty notices for base class attributes that are never included
+ * in the mayaAttributes dictionary.
+ */
+MAYAHYDRALIB_API
+bool IsBaseClassAttrName(const char* attrName);
 
 } // namespace MAYAHYDRA_NS_DEF
 

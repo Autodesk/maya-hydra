@@ -29,6 +29,9 @@ TF_DEFINE_PRIVATE_TOKENS(
     (UsdPreviewSurface)
     (ND_standard_surface_surfaceshader)
     (ND_open_pbr_surface_surfaceshader)
+    // Surface nodes that carry this parameter (set to true) keep their
+    // texture connections even when the viewport "Textured" mode is off.
+    (_alwaysShowTextures)
 );
 
 namespace {
@@ -44,7 +47,15 @@ _PruneTexturesFromMatNetwork(HdMaterialNetworkInterface *networkInterface)
         const TfToken nodeType = networkInterface->GetNodeType(nodeName);
         if (nodeType == _tokens->ND_standard_surface_surfaceshader ||
             nodeType == _tokens->ND_open_pbr_surface_surfaceshader ||
-            nodeType == _tokens->UsdPreviewSurface) {                
+            nodeType == _tokens->UsdPreviewSurface) {
+            // Materials that must always display their textures (e.g. image
+            // planes) set this parameter to opt out of pruning.
+            VtValue alwaysShow = networkInterface->GetNodeParameterValue(
+                nodeName, _tokens->_alwaysShowTextures);
+            if (alwaysShow.IsHolding<bool>() && alwaysShow.UncheckedGet<bool>()) {
+                continue;
+            }
+
             // Look for incoming connection(textures) to surface shader params
             TfTokenVector inputConnections = networkInterface->GetNodeInputConnectionNames(nodeName);
             for (TfToken const &connection : inputConnections) {

@@ -24,6 +24,7 @@
 #include "getFramePassesCountCommand.h"
 #include "testingCommand.h"
 #include "renderRegionCommand.h"
+#include "profilingCommand.h"
 #include "setVisibleFramePassesCommand.h"
 #include "batchRendering/hydraRenderCmd.h"
 #include "envSettings.h"
@@ -284,6 +285,18 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
     // For now this is required for the HdSt backend to use lights.
     setEnv("USDIMAGING_ENABLE_SCENE_LIGHTS", "1");
+    
+#if PXR_VERSION < 2511
+    // We can't instantiate our early Mh/HdGp resolving scene index in mayaHydraLib (missing
+    // usd_hdGp exports). Enable USD's default GP resolver so resolution still happens, later
+    // in the imaging chain.
+    // See mhGenerativeProceduralResolvingSceneIndex.cpp for more details. 
+    setEnv("HDGP_INCLUDE_DEFAULT_RESOLVER", "1");
+#else
+    // We insert our own resolving scene index before selection; disable USD's default resolver
+    // so GP isn't resolved twice.
+    setEnv("HDGP_INCLUDE_DEFAULT_RESOLVER", "0");
+#endif
 
     // Set dome light textures maximum resolution default to 1024.  A proper
     // solution with a Hydra preferences category in the Maya
@@ -519,6 +532,11 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     if (!plugin.deregisterCommand(MayaHydraGetFramePassesCount::commandName)) {
         ret = MS::kFailure;
         ret.perror("Error deregistering MayaHydraGetFramePassesCount command!");
+    }
+
+    if (!plugin.deregisterCommand(MayaHydraProfilingCommand::commandName)) {
+        ret = MS::kFailure;
+        ret.perror("Error deregistering mayaHydraProfiling command!");
     }
 
     return ret;

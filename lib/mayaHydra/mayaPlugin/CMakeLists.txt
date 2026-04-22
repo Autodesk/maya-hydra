@@ -30,6 +30,7 @@ target_sources(${TARGET_NAME}
         pluginBuildInfoCommand.cpp
         getFramePassesCountCommand.cpp
         testingCommand.cpp
+        profilingCommand.cpp
         renderRegionCommand.cpp
         setVisibleFramePassesCommand.cpp
 )
@@ -99,6 +100,7 @@ target_link_libraries(${TARGET_NAME}
         mayaHydraLib
         ufeExtensions
         flowViewport
+        hdGp
         $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSDAPI_LIBRARY}>
 )

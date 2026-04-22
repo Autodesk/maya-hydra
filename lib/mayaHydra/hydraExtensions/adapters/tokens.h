@@ -77,6 +77,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (uvCoord)                                 \
     (rgb)                                     \
     (r)                                       \
+    (a)                                       \
     (xyz)                                     \
     (x)                                       \
     (varname)                                 \
@@ -89,7 +90,11 @@ PXR_NAMESPACE_OPEN_SCOPE
     (MayaHydraBlinnShader)                    \
 	(MayaHydraStippleShader)                  \
     (MayaHydraSolidColorShader)               \
-    (tangents)
+    (tangents)                                \
+    (mayaCustomDagNode)                       \
+    (mayaNode)                                \
+    (mayaTypeName)                            \
+    (mayaAttributes)
 
 // clang-format on
 

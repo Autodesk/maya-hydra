@@ -33,7 +33,11 @@ target_sources(${TARGET_NAME}
         testFlowViewportAPIAddPrims.cpp
         testUsdStageLayerMuting.cpp
         testMeshAdapterTransform.cpp
-        testCustomAttributeDirtying.cpp
+        testMayaNodesAttributesDirtying.cpp
+        testLightPrimvars.cpp
+        testCustomDagNodeTranslation.cpp
+        testCameraPrimvars.cpp
+        testMeshPrimvars.cpp
         testFlowViewportAPIFilterPrims.cpp
         testSceneCorrectness.cpp
         testSelection.cpp
@@ -55,6 +59,7 @@ target_sources(${TARGET_NAME}
         testMaterialBlocking.cpp
         testPassFiltering.cpp
         testSceneGlobalsCurrentFrame.cpp
+        testHydraGenerativeProcedural.cpp
 )
 
 if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
