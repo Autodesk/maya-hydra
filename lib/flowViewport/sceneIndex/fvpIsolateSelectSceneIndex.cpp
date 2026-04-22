@@ -218,14 +218,15 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
             .Set(HdVisibilitySchema::GetDefaultLocator(), visOff)
             .Finish();
     }
-    else if (included && !isGeomSubset(inputPrim)) {
-        // Force visibility ON for included prims so that upstream
-        // visibility=false (e.g. from Maya's internal scene management
-        // filtering render items during isolate select) is overridden.
-        // This makes IsolateSelectSceneIndex the authoritative source of
-        // visibility when isolate select is active in Hydra Storm.
-        // HYDRA-1242: skip GeomSubset prims here as well — setting
-        // visibility on them hangs Hydra Storm.
+    else if (included && !isGeomSubset(inputPrim)
+             && _forceVisiblePaths.count(primPath)) {
+        // USD camera/light gizmo render items: VP2's isolate-select filtering
+        // sets their MVS_visible to false because VP2 does not know that the
+        // Hydra pipeline has included them.  Force visibility ON so these
+        // gizmos are drawn when their owning USD prim is isolate-selected.
+        // All other included prims keep their upstream visibility as-is.
+        // HYDRA-1242: skip GeomSubset prims — setting visibility on them
+        // hangs Hydra Storm.
         inputPrim.dataSource = HdContainerDataSourceEditor(inputPrim.dataSource)
             .Set(HdVisibilitySchema::GetDefaultLocator(), visOn)
             .Finish();
@@ -463,6 +464,17 @@ void IsolateSelectSceneIndex::SetIsolateSelection(
 SelectionPtr IsolateSelectSceneIndex::GetIsolateSelection() const
 {
     return _isolateSelection;
+}
+
+void IsolateSelectSceneIndex::SetForceVisiblePaths(
+    std::unordered_set<SdfPath, SdfPath::Hash>&& paths)
+{
+    _forceVisiblePaths = std::move(paths);
+}
+
+void IsolateSelectSceneIndex::ClearForceVisiblePaths()
+{
+    _forceVisiblePaths.clear();
 }
 
 void IsolateSelectSceneIndex::_DirtyVisibility(

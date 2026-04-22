@@ -182,6 +182,31 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
             disableIsolateSelect(modelPanel)
             cmds.refresh()
 
+        # Hidden-objects case: hide the Maya sphere and the USD camera, then
+        # isolate-select both together with the (visible) USD sphere.  The
+        # hidden objects must stay hidden while the USD sphere remains visible
+        # (matching VP2 behavior for explicitly hidden objects).
+        cmds.setAttr(mayaSphereShapePath + ".visibility", False)
+        usdCamPrim = stage.GetPrimAtPath("/camera1")
+        UsdGeom.Imageable(usdCamPrim).GetVisibilityAttr().Set(
+            UsdGeom.Tokens.invisible)
+        cmds.refresh()
+
+        cmds.select([mayaSpherePath, usdCamPath, usdSpherePath])
+        enableIsolateSelect(modelPanel)
+        cmds.refresh()
+
+        cmds.select(clear=True)
+        cmds.refresh()
+
+        self.assertSnapshotClose(
+            "isolateSelectPerShape_hiddenObjects.png",
+            self.IMAGE_DIFF_FAIL_THRESHOLD,
+            self.IMAGE_DIFF_FAIL_PERCENT,
+        )
+
+        disableIsolateSelect(modelPanel)
+        cmds.refresh()
 
 
 if __name__ == "__main__":

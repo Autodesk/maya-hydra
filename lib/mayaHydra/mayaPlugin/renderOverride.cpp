@@ -77,6 +77,7 @@
 #include <pxr/base/tf/staticTokens.h>
 #include <pxr/base/tf/token.h>
 
+#include <ufe/camera.h>
 #include <ufe/hierarchy.h>
 #include <ufe/selection.h>
 #include <ufe/namedSelection.h>
@@ -115,12 +116,11 @@
 #include <pxr/usd/kind/registry.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/modelAPI.h>
+#include <pxr/usd/usdGeom/imageable.h>
+#include <pxr/usd/usdLux/lightAPI.h>
 #include <pxr/usdImaging/usdImagingGL/engine.h>
 
 #include <mayaUsdAPI/proxyStage.h>
-
-#include <pxr/usd/usdGeom/camera.h>
-#include <pxr/usd/usdLux/lightAPI.h>
 
 #include <maya/MDagPath.h>
 #include <maya/M3dView.h>
@@ -2395,22 +2395,16 @@ bool ReadMayaDagPathFromUsdPullMetadata(const UsdPrim& prim, MDagPath& outDagPat
     return sel.getDagPath(0, outDagPath) == MS::kSuccess && outDagPath.isValid();
 }
 
-bool DagPathFromString(const std::string& dagPathStr, MDagPath& outDagPath)
-{
-    if (dagPathStr.empty()) {
-        return false;
-    }
-    MSelectionList sel;
-    if (sel.add(dagPathStr.c_str()) != MS::kSuccess) {
-        return false;
-    }
-    return sel.getDagPath(0, outDagPath) == MS::kSuccess && outDagPath.isValid();
-}
-
 } // namespace
 
-// When isolate select is built from view-selected UFE paths, certain USD prim types (cameras, lights,
-// etc.) have native Maya visual representations (gizmo rprims, HdCamera sprims) drawn under
+struct MtohRenderOverride::SelectedUsdGizmoPrim {
+    Ufe::Path   ufePath;
+    UsdPrim     prim;
+    bool        isCamera; // true = camera, false = light
+};
+
+// When isolate select is built from view-selected UFE paths, USD cameras and lights
+// have native Maya visual representations (gizmo rprims, HdCamera sprims) drawn under
 // MAYA_NATIVE_ROOT. These native rprims are render items whose paths include the source DAG path:
 //   MAYA_NATIVE_ROOT/rprims/{source_dag}/{proxy_dag_}/{PrimName}_<suffix>_<id>
 // Because {source_dag} is prepended, the native rprim lives under a different SdfPath subtree than
@@ -2420,61 +2414,49 @@ bool DagPathFromString(const std::string& dagPathStr, MDagPath& outDagPath)
 // This function searches the scene index tree for native rprims whose leaf name starts with the
 // selected USD prim name and whose path contains the proxy shape name, then adds them to the isolate
 // selection. Camera-specific handling (panel camera drawables, defaultUfeProxyCamera) is also
-// performed for UsdGeomCamera prims. Light-specific handling adds ufeLightProxy gizmo rprims
-// created by the drawUfe plugin for UsdLux light prims.
+// performed for camera prims. Light-specific handling adds ufeLightProxy gizmo rprims
+// created by the drawUfe plugin for light prims.
 //
 // Invoked from _ViewSelectedChangedCb on the same MtohRenderOverride instance as the callback's
 // clientData: multiple overrides each register a view-selected callback, and a single global
 // expander would capture the wrong `this`.
 void MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
-    Fvp::Selection&                        selection,
-    const std::vector<std::string>&        viewSelectedUfePathStrings,
-    const MDagPath&                        panelCameraDag)
+    Fvp::Selection&                                              selection,
+    const std::vector<MtohRenderOverride::SelectedUsdGizmoPrim>& selectedGizmoPrims,
+    const MDagPath&                                              panelCameraDag,
+    std::unordered_set<SdfPath, SdfPath::Hash>&                  outForceVisiblePaths)
 {
-    if (!_mayaHydraSceneIndex) {
-        return;
-    }
-
-    // Quick check: skip all work when no view-selected object lives in a
-    // USD proxy.  USD prims are identified by the MayaUsd UFE runtime id;
-    // pure Maya DAG objects use a different runtime and don't need the
-    // native-rprim expansion performed below.
-    bool anyUsdPrimFromProxy = false;
-    for (const auto& ufeStr : viewSelectedUfePathStrings) {
-        const Ufe::Path path = Ufe::PathString::path(ufeStr.c_str());
-        if (path.empty()) {
-            continue;
-        }
-        if (path.runTimeId() != MayaUsdAPI::getUsdRunTimeId()) {
-            continue;
-        }
-        anyUsdPrimFromProxy = true;
-        break;
-    }
-    if (!anyUsdPrimFromProxy) {
+    if (!_mayaHydraSceneIndex || selectedGizmoPrims.empty()) {
         return;
     }
 
     std::unordered_set<SdfPath, SdfPath::Hash> added;
 
-    auto addPrimPath = [&](const SdfPath& p) {
+    // When forceVis is true, paths added via addPrimPath are also inserted
+    // into outForceVisiblePaths so the IsolateSelectSceneIndex forces their
+    // visibility ON.  Callers pass false for user-hidden USD prims so their
+    // gizmo render items stay hidden during isolate select.
+    auto addPrimPath = [&](const SdfPath& p, bool forceVis) {
         if (p.IsEmpty() || added.count(p) != 0) {
             return;
         }
         if (selection.Add(Fvp::PrimSelection { p })) {
             added.insert(p);
+            if (forceVis) {
+                outForceVisiblePaths.insert(p);
+            }
         }
     };
 
-    auto addMayaUsdProxyShapeNativePrefixFromUfe = [&](const std::string& ufeStr) {
-        const size_t commaPos = ufeStr.find(',');
-        if (commaPos == std::string::npos || commaPos == 0) {
-            return;
+    auto resolveProxyDag = [](const Ufe::Path& ufePath) -> MDagPath {
+        if (ufePath.nbSegments() < 2) {
+            return MDagPath();
         }
+        return UfeExtensions::ufeToDagPath(Ufe::Path(ufePath.getSegments()[0]));
+    };
 
-        const std::string proxyDagStr = ufeStr.substr(0, commaPos);
-        MDagPath proxyDag;
-        if (!DagPathFromString(proxyDagStr, proxyDag)) {
+    auto addMayaUsdProxyShapeNativePrefix = [&](const MDagPath& proxyDag, bool forceVis) {
+        if (!proxyDag.isValid()) {
             return;
         }
 
@@ -2483,80 +2465,24 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
             return;
         }
 
-        addPrimPath(proxyRprimPrefix);
+        addPrimPath(proxyRprimPrefix, forceVis);
         const TfToken underscoredName(proxyRprimPrefix.GetNameToken().GetString() + "_");
-        addPrimPath(proxyRprimPrefix.GetParentPath().AppendChild(underscoredName));
+        addPrimPath(proxyRprimPrefix.GetParentPath().AppendChild(underscoredName), forceVis);
     };
 
-    // Native visual rprims (camera gizmos, light shapes, etc.) live in the frame-pass render index
+    // Native visual rprims (camera gizmos, light shapes) live in the frame-pass render index
     // that feeds the viewport; MayaHydraSceneIndex::GetRenderIndex() may not list them.
     HdRenderIndex* renderIndexForScan = renderIndex(0);
     if (!renderIndexForScan) {
         renderIndexForScan = &_mayaHydraSceneIndex->GetRenderIndex();
     }
 
-    auto addMayaCameraDrawables = [&](const MDagPath& camShapeDag) {
-        if (!camShapeDag.isValid() || !camShapeDag.hasFn(MFn::kCamera)) {
-            return;
-        }
-        const SdfPath cameraSprimPath = _mayaHydraSceneIndex->GetPrimPath(camShapeDag, true);
-        addPrimPath(cameraSprimPath);
-
-        MDagPath xfDag = camShapeDag;
-        xfDag.pop();
-        const SdfPath xfRprimPrefix = _mayaHydraSceneIndex->GetPrimPath(xfDag, false);
-        const SdfPath shapeRprimPrefix = _mayaHydraSceneIndex->GetPrimPath(camShapeDag, false);
-
-        // Isolate visibility matches via ancestor/descendant prefix on paths in the selection map.
-        // Always register these Hydra prefixes, not only concrete rprim ids from GetRprimIds():
-        // USD camera frustum/body rprims (e.g. .../Camera1_cameraBody_*) are often absent from
-        // GetRprimIds() at isolate-build time, or may appear in a different HdRenderIndex than
-        // renderIndexForScan, but still resolve under the same DAG-derived prefixes at draw time.
-        if (!xfRprimPrefix.IsEmpty()) {
-            addPrimPath(xfRprimPrefix);
-        }
-        if (!shapeRprimPrefix.IsEmpty()) {
-            addPrimPath(shapeRprimPrefix);
-        }
-
-        for (const SdfPath& id : renderIndexForScan->GetRprimIds()) {
-            if (!id.HasPrefix(MAYA_NATIVE_ROOT)) {
-                continue;
-            }
-            bool match = false;
-            if (!xfRprimPrefix.IsEmpty() && id.HasPrefix(xfRprimPrefix)) {
-                match = true;
-            }
-            if (!match && !shapeRprimPrefix.IsEmpty() && id.HasPrefix(shapeRprimPrefix)) {
-                match = true;
-            }
-            if (!match) {
-                static const std::string kDefaultUfeProxyToken("defaultUfeProxyCamera");
-                if (id.GetString().find(kDefaultUfeProxyToken) != std::string::npos) {
-                    match = true;
-                }
-            }
-            if (match) {
-                addPrimPath(id);
-            }
-        }
-    };
-
-    // Frustum/body gizmos for a selected USD camera are authored under the *panel* camera's branch
-    // in Hydra (e.g. .../cameraShape_1/.../mayaUsdProxyShape1_/Camera1_cameraBody_*), not only under
-    // defaultUfeProxyCamera. We add the DAG-derived rprim prefix paths themselves (see
-    // addMayaCameraDrawables) so isolate select matches descendants even when GetRprimIds() is
-    // incomplete at selection time; we still scan ids for any additional paths under those prefixes.
-    if (panelCameraDag.isValid() && panelCameraDag.hasFn(MFn::kCamera)) {
-        addMayaCameraDrawables(panelCameraDag);
-    }
-
     bool needDefaultUfeProxyCamera = false;
     const SdfPath rprimRoot = MAYA_NATIVE_ROOT.AppendChild(TfToken("rprims"));
 
     // Pre-collect all native rprim paths once from both the render index
-    // and the scene index tree so the per-selected-prim matching below is
-    // O(numSelected * numCachedNativeRprims) without repeated full scans.
+    // and the scene index tree so all subsequent matching is
+    // O(numCachedNativeRprims) without repeated full scans of all rprims.
     std::vector<SdfPath> nativeRprims;
     {
         std::unordered_set<SdfPath, SdfPath::Hash> seen;
@@ -2573,17 +2499,63 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
         }
     }
 
-    for (const auto& ufeStr : viewSelectedUfePathStrings) {
-        const Ufe::Path path = Ufe::PathString::path(ufeStr.c_str());
-        if (path.empty() || path.runTimeId() != MayaUsdAPI::getUsdRunTimeId()) {
-            continue;
+    static const std::string kDefaultUfeProxyToken("defaultUfeProxyCamera");
+    static const std::string kUfeLightProxy("ufeLightProxy");
+
+    auto addMayaCameraDrawables = [&](const MDagPath& camShapeDag, bool forceVis) {
+        if (!camShapeDag.isValid() || !camShapeDag.hasFn(MFn::kCamera)) {
+            return;
         }
-        const UsdPrim prim = MayaUsdAPI::ufePathToPrim(path);
-        if (!prim.IsValid()) {
-            continue;
+        const SdfPath cameraSprimPath = _mayaHydraSceneIndex->GetPrimPath(camShapeDag, true);
+        addPrimPath(cameraSprimPath, forceVis);
+
+        MDagPath xfDag = camShapeDag;
+        xfDag.pop();
+        const SdfPath xfRprimPrefix = _mayaHydraSceneIndex->GetPrimPath(xfDag, false);
+        const SdfPath shapeRprimPrefix = _mayaHydraSceneIndex->GetPrimPath(camShapeDag, false);
+
+        // Isolate visibility matches via ancestor/descendant prefix on paths in the selection map.
+        // Always register these Hydra prefixes, not only concrete rprim ids from GetRprimIds():
+        // USD camera frustum/body rprims (e.g. .../Camera1_cameraBody_*) are often absent from
+        // GetRprimIds() at isolate-build time, or may appear in a different HdRenderIndex than
+        // renderIndexForScan, but still resolve under the same DAG-derived prefixes at draw time.
+        if (!xfRprimPrefix.IsEmpty()) {
+            addPrimPath(xfRprimPrefix, forceVis);
+        }
+        if (!shapeRprimPrefix.IsEmpty()) {
+            addPrimPath(shapeRprimPrefix, forceVis);
         }
 
-        const bool isCamera = prim.IsA<UsdGeomCamera>();
+        for (const SdfPath& id : nativeRprims) {
+            if ((!xfRprimPrefix.IsEmpty() && id.HasPrefix(xfRprimPrefix))
+                || (!shapeRprimPrefix.IsEmpty() && id.HasPrefix(shapeRprimPrefix))
+                || id.GetString().find(kDefaultUfeProxyToken) != std::string::npos)
+            {
+                addPrimPath(id, forceVis);
+            }
+        }
+    };
+
+    // Frustum/body gizmos for a selected USD camera are authored under the *panel* camera's branch
+    // in Hydra (e.g. .../cameraShape_1/.../mayaUsdProxyShape1_/Camera1_cameraBody_*), not only under
+    // defaultUfeProxyCamera. We add the DAG-derived rprim prefix paths themselves (see
+    // addMayaCameraDrawables) so isolate select matches descendants even when GetRprimIds() is
+    // incomplete at selection time; we still scan ids for any additional paths under those prefixes.
+    if (panelCameraDag.isValid() && panelCameraDag.hasFn(MFn::kCamera)) {
+        addMayaCameraDrawables(panelCameraDag, /*forceVis=*/true);
+    }
+
+    for (const auto& selected : selectedGizmoPrims) {
+        const auto& ufePath  = selected.ufePath;
+        const auto& prim     = selected.prim;
+        const bool  isCamera = selected.isCamera;
+
+        // Only force gizmo render items visible when the USD prim itself
+        // is visible.  If the user has hidden the prim, its gizmo should
+        // stay hidden during isolate select (matching VP2 behavior).
+        UsdGeomImageable imageable(prim);
+        const bool forceVis = !imageable
+            || imageable.ComputeVisibility() != UsdGeomTokens->invisible;
 
         // Include the MayaUsd proxy shape's native Hydra rprim prefix so
         // the proxy shape itself stays visible during isolate select.
@@ -2591,11 +2563,12 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
         // ancestor of individual camera/light body rprims (which live
         // under a different source-DAG branch), so it does not make
         // unrelated native rprims visible.
-        addMayaUsdProxyShapeNativePrefixFromUfe(ufeStr);
+        const MDagPath proxyDag = resolveProxyDag(ufePath);
+        addMayaUsdProxyShapeNativePrefix(proxyDag, forceVis);
 
-        // Generic native rprim search for camera gizmos, light shapes,
-        // and any other visual representation that Maya creates as a
-        // render item under MAYA_NATIVE_ROOT. These rprims have paths:
+        // Generic native rprim search for camera gizmos and light shapes
+        // that Maya creates as render items under MAYA_NATIVE_ROOT.
+        // These rprims have paths:
         //   rprims/{source_dag}/{proxy_dag_}/{PrimName}_<suffix>_<id>
         // Search all native rprims for paths whose leaf name starts with
         // the USD prim name and whose path contains the proxy shape name.
@@ -2603,15 +2576,18 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
             const std::string primNamePrefix = prim.GetName().GetString() + "_";
 
             std::string proxyPathToken;
-            const size_t commaPos = ufeStr.find(',');
-            if (commaPos != std::string::npos && commaPos > 0) {
-                MDagPath proxyDag;
-                if (DagPathFromString(ufeStr.substr(0, commaPos), proxyDag)) {
-                    const SdfPath proxyRprimPfx = _mayaHydraSceneIndex->GetPrimPath(proxyDag, false);
-                    if (!proxyRprimPfx.IsEmpty() && proxyRprimPfx.HasPrefix(rprimRoot)) {
-                        proxyPathToken = proxyRprimPfx.GetNameToken().GetString();
-                    }
+            if (proxyDag.isValid()) {
+                const SdfPath proxyRprimPfx = _mayaHydraSceneIndex->GetPrimPath(proxyDag, false);
+                if (!proxyRprimPfx.IsEmpty() && proxyRprimPfx.HasPrefix(rprimRoot)) {
+                    proxyPathToken = proxyRprimPfx.GetNameToken().GetString();
                 }
+            }
+
+            std::string proxySlash;
+            std::string proxyUnderscore;
+            if (!proxyPathToken.empty()) {
+                proxySlash      = "/" + proxyPathToken + "/";
+                proxyUnderscore = "/" + proxyPathToken + "_";
             }
 
             TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
@@ -2624,55 +2600,48 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
                     continue;
                 }
                 if (!proxyPathToken.empty()) {
-                    const std::string proxyComponent = "/" + proxyPathToken;
                     const std::string& pathStr = id.GetString();
-                    if (pathStr.find(proxyComponent + "_") == std::string::npos
-                        && pathStr.find(proxyComponent + "/") == std::string::npos) {
+                    if (pathStr.find(proxyUnderscore) == std::string::npos
+                        && pathStr.find(proxySlash) == std::string::npos) {
                         continue;
                     }
                 }
                 TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
                     .Msg("    _Expand: native rprim match: %s\n", id.GetText());
-                addPrimPath(id);
+                addPrimPath(id, forceVis);
             }
         }
 
-        // Light-specific handling: ufeLightProxy gizmo rprims.
-        // The drawUfe plugin creates internal Maya proxy light nodes
-        // (ufeLightProxy{N} / ufeLightProxyGizmo{N}) for each USD light.
-        // Their rprim paths follow the pattern:
-        //   rprims/ufeLightProxy{N}/ufeLightProxyGizmo{N}/Gizmo_{id}
-        // which does not match the generic primNamePrefix search above.
-        // Search for all native rprims whose path contains "ufeLightProxy"
-        // and add them to the isolate selection.
-        // NOTE: when multiple USD lights exist this currently includes all
-        // proxy gizmos, not only the one for the selected light, because the
-        // proxy nodes carry no attribute linking them back to a specific
-        // USD prim.  This is acceptable: the IsolateSelectSceneIndex already
-        // keeps excluded lights contributing lighting (visOff is skipped for
-        // light prims), so extra gizmo geometry is the only side-effect.
-        if (prim.HasAPI<UsdLuxLightAPI>()) {
-            static const std::string kUfeLightProxy("ufeLightProxy");
-
+        if (isCamera) {
+            // Camera-specific handling: pulled cameras and defaultUfeProxyCamera.
+            MDagPath pulledDag;
+            const bool pulledOk = ReadMayaDagPathFromUsdPullMetadata(
+                prim, pulledDag) && pulledDag.isValid();
+            if (pulledOk && pulledDag.hasFn(MFn::kCamera)) {
+                addMayaCameraDrawables(pulledDag, forceVis);
+            } else {
+                needDefaultUfeProxyCamera = true;
+            }
+        } else {
+            // Light-specific handling: ufeLightProxy gizmo rprims.
+            // The drawUfe plugin creates internal Maya proxy light nodes
+            // (ufeLightProxy{N} / ufeLightProxyGizmo{N}) for each USD light.
+            // Their rprim paths follow the pattern:
+            //   rprims/ufeLightProxy{N}/ufeLightProxyGizmo{N}/Gizmo_{id}
+            // which does not match the generic primNamePrefix search above.
+            // NOTE: when multiple USD lights exist this currently includes all
+            // proxy gizmos, not only the one for the selected light, because the
+            // proxy nodes carry no attribute linking them back to a specific
+            // USD prim.  This is acceptable: the IsolateSelectSceneIndex already
+            // keeps excluded lights contributing lighting (visOff is skipped for
+            // light prims), so extra gizmo geometry is the only side-effect.
             for (const SdfPath& id : nativeRprims) {
                 if (id.GetString().find(kUfeLightProxy) != std::string::npos) {
                     TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
                         .Msg("    _Expand: ufeLightProxy rprim match: %s\n",
                              id.GetText());
-                    addPrimPath(id);
+                    addPrimPath(id, forceVis);
                 }
-            }
-        }
-
-        // Camera-specific handling: pulled cameras and defaultUfeProxyCamera.
-        if (isCamera) {
-            MDagPath pulledDag;
-            const bool pulledOk = ReadMayaDagPathFromUsdPullMetadata(
-                prim, pulledDag) && pulledDag.isValid();
-            if (pulledOk && pulledDag.hasFn(MFn::kCamera)) {
-                addMayaCameraDrawables(pulledDag);
-            } else {
-                needDefaultUfeProxyCamera = true;
             }
         }
     }
@@ -2691,7 +2660,7 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
     if (sl.getDagPath(0, camDag) != MS::kSuccess || !camDag.isValid()) {
         return;
     }
-    addMayaCameraDrawables(camDag);
+    addMayaCameraDrawables(camDag, /*forceVis=*/true);
 }
 
 /* static */
@@ -2775,6 +2744,9 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
         TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
             .Msg("  isolate select disabled for panel=%s\n", viewName.asChar());
         isolateSelectMgr.DisableIsolateSelection(viewName.asChar());
+        if (auto isSi = isolateSelectMgr.GetIsolateSelectSceneIndex()) {
+            isSi->ClearForceVisiblePaths();
+        }
         found->second = IsolateSelectState::IsolateSelectOff;
         return;
     }
@@ -2828,8 +2800,7 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
     const auto nbObjects = view.numViewSelectedObjects();
     TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
         .Msg("  building isolate selection from %u view-selected object(s)\n", nbObjects);
-    std::vector<std::string> viewSelectedUfePathStrings;
-    viewSelectedUfePathStrings.reserve(nbObjects);
+    std::vector<MtohRenderOverride::SelectedUsdGizmoPrim> selectedGizmoPrims;
     for (unsigned int i = 0; i < nbObjects; ++i) {
         MStringArray objectStrings;
         TF_VERIFY(view.viewSelectedObject(i, objectStrings) == MS::kSuccess);
@@ -2842,13 +2813,32 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
         const char* ufeStr = objectStrings[0].asChar();
         TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
             .Msg("  [%u] viewSelectedObject UFE string: %s\n", i, ufeStr);
-        viewSelectedUfePathStrings.emplace_back(ufeStr);
         auto path = Ufe::PathString::path(ufeStr);
         auto primSelections = Fvp::ufePathToPrimSelections(path);
         _LogPrimSelectionsForViewSelectedIsolate(ufeStr, primSelections);
         for (const auto& primSelection : primSelections) {
             isolateSelection->Add(primSelection);
         }
+
+        if (path.empty() || path.runTimeId() != MayaUsdAPI::getUsdRunTimeId()) {
+            continue;
+        }
+        const UsdPrim prim = MayaUsdAPI::ufePathToPrim(path);
+        if (!prim.IsValid()) {
+            continue;
+        }
+        // UsdLuxLightAPI covers all USD light types.  Ufe::Light2::light()
+        // cannot be used here because its handler only supports RectLight.
+        const bool isLight = prim.HasAPI<UsdLuxLightAPI>();
+        bool isCamera = false;
+        if (!isLight) {
+            auto sceneItem = Ufe::Hierarchy::createItem(path);
+            isCamera = sceneItem && (Ufe::Camera::camera(sceneItem) != nullptr);
+            if (!isCamera) {
+                continue;
+            }
+        }
+        selectedGizmoPrims.push_back({ std::move(path), prim, isCamera });
     }
 
     MDagPath panelCameraDag;
@@ -2856,9 +2846,15 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
         panelCameraDag = MDagPath();
     }
 
-    instance->_ExpandIsolateSelectionForUsdPrims(*isolateSelection, viewSelectedUfePathStrings, panelCameraDag);
+    std::unordered_set<SdfPath, SdfPath::Hash> forceVisiblePaths;
+    instance->_ExpandIsolateSelectionForUsdPrims(
+        *isolateSelection, selectedGizmoPrims, panelCameraDag, forceVisiblePaths);
 
     isolateSelectMgr.ReplaceIsolateSelection(viewName.asChar(), isolateSelection);
+
+    if (auto isSi = isolateSelectMgr.GetIsolateSelectSceneIndex()) {
+        isSi->SetForceVisiblePaths(std::move(forceVisiblePaths));
+    }
 }
 #endif
 

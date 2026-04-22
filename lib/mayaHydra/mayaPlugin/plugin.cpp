@@ -16,7 +16,6 @@
 // Copyright 2023 Autodesk, Inc. All rights reserved.
 //
 #include "mayaColorPreferencesTranslator.h"
-#include "envSettings.h"
 #include "pluginUtils.h"
 #include "renderGlobals.h"
 #include "renderOverride.h"
@@ -30,14 +29,11 @@
 
 #include <mayaHydraLib/adapters/adapter.h>
 
-#include <flowViewport/debugCodes.h>
 #include <flowViewport/global.h>
 #include <filesystem>
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
-#include <pxr/base/tf/debug.h>
-#include <pxr/base/tf/envSetting.h>
 
 #include <maya/MFnPlugin.h>
 #include <maya/MGlobal.h>
@@ -196,12 +192,6 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     setEnv("USDIMAGING_ENABLE_SCENE_LIGHTS", "1");
     // This is required to see Hydra Generative Procedurals in the viewport
     setEnv("HDGP_INCLUDE_DEFAULT_RESOLVER", "1");
-
-    // Isolate-select diagnostics: set MAYA_HYDRA_ISOLATE_SELECT_TF_DEBUG=1 to enable (off by default).
-    if (MAYAHYDRA_NS_DEF::isolateSelectTfDebugEnabled()) {
-        PXR_NS::TfDebug::Enable(PXR_NS::FVP_ISOLATE_SELECT_VIEW_SELECTED);
-        PXR_NS::TfDebug::Enable(PXR_NS::FVP_ISOLATE_SELECT_SCENE_INDEX);
-    }
 
     // Set dome light textures maximum resolution default to 1024.  A proper
     // solution with a Hydra preferences category in the Maya
