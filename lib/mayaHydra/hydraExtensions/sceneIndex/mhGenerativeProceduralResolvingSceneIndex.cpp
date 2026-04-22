@@ -52,32 +52,38 @@ HdSceneIndexPrim MhGenerativeProceduralResolvingSceneIndex::GetPrim(const SdfPat
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
 
-    SdfPath parentPath = primPath.GetParentPath();
-
-    // Skip parent lookup if parent is not a known GP root
-    if (parentPath.IsEmpty() || parentPath.IsAbsoluteRootPath()
-        || _generativeProceduralPaths.find(parentPath) == _generativeProceduralPaths.end())
+    // Walk up from the prim to find the nearest GP root ancestor.
+    SdfPath generativeProceduralRoot;
+    {
+        SdfPath parentPath = primPath.GetParentPath();
+        while (!parentPath.IsEmpty() && !parentPath.IsAbsoluteRootPath()) {
+            if (_generativeProceduralPaths.count(parentPath)) {
+                generativeProceduralRoot = parentPath;
+                break;
+            }
+            parentPath = parentPath.GetParentPath();
+        }
+    }
+    if (generativeProceduralRoot.IsEmpty())
         return prim;
 
-    // Parent is a GP root
-    HdSceneIndexPrim parentPrim = GetInputSceneIndex()->GetPrim(parentPath);
-    if (!parentPrim.dataSource)
-        return prim;
-
-    // Read parent world matrix and child local matrix
-    GfMatrix4d parentMat(1.0), childMat(1.0);
-    if (auto dataSource = HdXformSchema::GetFromParent(parentPrim.dataSource).GetMatrix())
-        parentMat = dataSource->GetTypedValue(0);
-    if (prim.dataSource) {
-        if (auto dataSource = HdXformSchema::GetFromParent(prim.dataSource).GetMatrix())
-            childMat = dataSource->GetTypedValue(0);
+    // Compose transforms from the prim up through all ancestors to the GP root.
+    GfMatrix4d result(1.0);
+    SdfPath path = primPath;
+    while (path != generativeProceduralRoot.GetParentPath() && !path.IsEmpty() && !path.IsAbsoluteRootPath()) {
+        const HdSceneIndexPrim ancestorPrim = (path == primPath) ? prim : GetInputSceneIndex()->GetPrim(path);
+        if (ancestorPrim.dataSource) {
+            if (auto matDataSource = HdXformSchema::GetFromParent(ancestorPrim.dataSource).GetMatrix())
+                result = result * matDataSource->GetTypedValue(0);
+        }
+        path = path.GetParentPath();
     }
 
     prim.dataSource = HdOverlayContainerDataSource::New(
         HdRetainedContainerDataSource::New(
             HdXformSchemaTokens->xform,
             HdXformSchema::Builder()
-                .SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(childMat * parentMat))
+                .SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(result))
                 .Build()),
         prim.dataSource);
 
@@ -144,12 +150,21 @@ void MhGenerativeProceduralResolvingSceneIndex::_PrimsDirtied(
         if (_generativeProceduralPaths.find(entry.primPath) == _generativeProceduralPaths.end())
             continue;
 
-        for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(entry.primPath)) {
-            expandedEntries.emplace_back(childPath, xformLocatorSet);
-        }
+        _DirtyDescendantsXform(entry.primPath, xformLocatorSet, expandedEntries);
     }
 
     _SendPrimsDirtied(expandedEntries);
+}
+
+void MhGenerativeProceduralResolvingSceneIndex::_DirtyDescendantsXform(
+    const SdfPath&                            path,
+    const HdDataSourceLocatorSet&             locators,
+    HdSceneIndexObserver::DirtiedPrimEntries& entries)
+{
+    for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(path)) {
+        entries.emplace_back(childPath, locators);
+        _DirtyDescendantsXform(childPath, locators, entries);
+    }
 }
 
 } // namespace MAYAHYDRA_NS_DEF

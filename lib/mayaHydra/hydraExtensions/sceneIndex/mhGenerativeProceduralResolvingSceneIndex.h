@@ -83,6 +83,11 @@ protected:
         const PXR_NS::HdSceneIndexBase&                         sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
 
+    void _DirtyDescendantsXform(
+        const PXR_NS::SdfPath&                            path,
+        const PXR_NS::HdDataSourceLocatorSet&             locators,
+        PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries);
+
 private:
     std::set<PXR_NS::SdfPath> _generativeProceduralPaths;
 
