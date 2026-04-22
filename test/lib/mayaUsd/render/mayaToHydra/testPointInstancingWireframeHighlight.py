@@ -15,6 +15,7 @@
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
+import mayaUtils
 import testUtils
 import ufe
 from testUtils import PluginLoaded
@@ -48,6 +49,9 @@ class TestPointInstancingWireframeHighlight(mtohUtils.MayaHydraBaseTestCase):
         cmds.refresh()
 
     def test_PointInstancerSelection(self):
+        if mayaUtils.mayaMajorVersion() != 2026 and mayaUtils.mayaMajorVersion() != 2027:
+            self.fail("test_PointInstancerSelection is expected to fail on Maya > 2027")
+
         cmds.setAttr('persp.rotate', -30, 45, 0, type='float3')
         cmds.setAttr('persp.translate', 10, 10, 10, type='float3')
 
