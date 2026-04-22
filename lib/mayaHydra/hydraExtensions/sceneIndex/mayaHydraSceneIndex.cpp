@@ -548,12 +548,15 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             // point
         }
 
-        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColor);
-        ria->UpdateFromDelta(data);
-
+        // Call UpdateTransform before UpdateFromDelta, as UpdateTransform
+        // updates the stored transform value, and UpdateFromDelta sends out
+        // PrimsDirtied notifications. If an observer receiving the PrimsDirtied 
+        // notifications pulls on the transform, it needs to be up to date.
         if (flags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
             ria->UpdateTransform(ri);
         }
+        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColor);
+        ria->UpdateFromDelta(data);
     }
 }
 
