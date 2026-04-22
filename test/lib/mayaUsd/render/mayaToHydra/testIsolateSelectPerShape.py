@@ -91,9 +91,12 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
         cmds.refresh()
 
         self.setBasicCam(dist=6)
-        panel = mayaUtils.activeModelPanel()
-        cmds.modelEditor(panel, edit=True, displayAppearance='smoothShaded')
-        cmds.modelEditor(panel, edit=True, displayLights='all')
+        # Use the same panel for modelEditor configuration, snapshots and
+        # isolate-select toggling, so we can't end up configuring one panel
+        # while isolate-selecting another.
+        modelPanel = mayaUtils.activeModelPanel()
+        cmds.modelEditor(modelPanel, edit=True, displayAppearance='smoothShaded')
+        cmds.modelEditor(modelPanel, edit=True, displayLights='all')
         cmds.select(clear=True)
         cmds.refresh()
 
@@ -105,7 +108,6 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
             self.IMAGE_DIFF_FAIL_PERCENT,
         )
 
-        modelPanel = "modelPanel4"
         stagePath = "|stage1|stageShape1"
         mayaSpherePath = "|pSphere1"
         mayaSphereShapePath = "|pSphere1|pSphereShape1"

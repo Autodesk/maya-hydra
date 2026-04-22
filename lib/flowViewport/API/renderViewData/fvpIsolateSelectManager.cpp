@@ -54,7 +54,11 @@ void
 IsolateSelectManager::DisableIsolateSelection(const std::string& viewportId)
 {
     _isolateSelection[viewportId] = nullptr;
+    // Disabling isolate select on a viewport also clears its force-visible
+    // paths so that re-enabling starts from a clean state.
+    _forceVisiblePaths.erase(viewportId);
     _isolateSelectSceneIndex->SetViewport(viewportId, nullptr);
+    _PushForceVisiblePathsToSceneIndex(viewportId);
 }
 
 SelectionPtr
@@ -108,6 +112,39 @@ IsolateSelectManager::ReplaceIsolateSelection(
 
     _isolateSelection[viewportId] = isolateSelection;
     _isolateSelectSceneIndex->SetViewport(viewportId, isolateSelection);
+    _PushForceVisiblePathsToSceneIndex(viewportId);
+}
+
+void
+IsolateSelectManager::SetForceVisiblePaths(
+    const std::string&                                            viewportId,
+    std::unordered_set<SdfPath, SdfPath::Hash>&&                  paths)
+{
+    if (!TF_VERIFY(_isolateSelectSceneIndex, "No isolate select scene index set.")) {
+        return;
+    }
+
+    _forceVisiblePaths[viewportId] = std::move(paths);
+    // If this viewport is the active one on the shared scene index, push the
+    // updated set immediately.  Otherwise the set will be pushed when the
+    // viewport becomes active (via ReplaceIsolateSelection /
+    // _EnableIsolateSelectAndSetViewport).
+    if (_isolateSelectSceneIndex->GetViewportId() == viewportId) {
+        _PushForceVisiblePathsToSceneIndex(viewportId);
+    }
+}
+
+void
+IsolateSelectManager::ClearForceVisiblePaths(const std::string& viewportId)
+{
+    if (!TF_VERIFY(_isolateSelectSceneIndex, "No isolate select scene index set.")) {
+        return;
+    }
+
+    _forceVisiblePaths.erase(viewportId);
+    if (_isolateSelectSceneIndex->GetViewportId() == viewportId) {
+        _isolateSelectSceneIndex->ClearForceVisiblePaths();
+    }
 }
 
 void
@@ -129,6 +166,7 @@ IsolateSelectManager::SetIsolateSelectSceneIndex(
     // If we're resetting the isolate select scene index, we're starting anew,
     // so clear out existing isolate selections.
     _isolateSelection.clear();
+    _forceVisiblePaths.clear();
 }
 
 IsolateSelectSceneIndexRefPtr
@@ -148,18 +186,36 @@ IsolateSelectManager::_EnableIsolateSelectAndSetViewport(
     // do a viewport switch.
     if (_isolateSelectSceneIndex->GetViewportId() != viewportId) {
         _isolateSelectSceneIndex->SetViewport(viewportId, isolateSelection);
+        _PushForceVisiblePathsToSceneIndex(viewportId);
     }
     else if (!enabled) {
         // Same viewport, so no viewport switch, but must move from disabled to
         // enabled for that viewport.
         _isolateSelectSceneIndex->SetIsolateSelection(isolateSelection);
+        _PushForceVisiblePathsToSceneIndex(viewportId);
     }
+}
+
+void
+IsolateSelectManager::_PushForceVisiblePathsToSceneIndex(
+    const std::string& viewportId)
+{
+    auto found = _forceVisiblePaths.find(viewportId);
+    if (found == _forceVisiblePaths.end()) {
+        _isolateSelectSceneIndex->ClearForceVisiblePaths();
+        return;
+    }
+    // Copy because the scene index moves the set in.  We must keep our
+    // per-viewport copy so we can re-push it after a future viewport switch.
+    auto copy = found->second;
+    _isolateSelectSceneIndex->SetForceVisiblePaths(std::move(copy));
 }
 
 void
 IsolateSelectManager::Reset()
 {
     _isolateSelection.clear();
+    _forceVisiblePaths.clear();
     _isolateSelectSceneIndex = nullptr;
 }
 

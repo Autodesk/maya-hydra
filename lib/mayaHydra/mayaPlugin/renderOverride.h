@@ -88,6 +88,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_set>
 
 #include <ufe/ufe.h>
 UFE_NS_DEF {

@@ -2743,10 +2743,9 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
     if (!view.viewSelected()) {
         TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
             .Msg("  isolate select disabled for panel=%s\n", viewName.asChar());
+        // DisableIsolateSelection also clears the per-viewport force-visible
+        // paths inside the manager, so no separate Clear call is needed.
         isolateSelectMgr.DisableIsolateSelection(viewName.asChar());
-        if (auto isSi = isolateSelectMgr.GetIsolateSelectSceneIndex()) {
-            isSi->ClearForceVisiblePaths();
-        }
         found->second = IsolateSelectState::IsolateSelectOff;
         return;
     }
@@ -2850,11 +2849,12 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
     instance->_ExpandIsolateSelectionForUsdPrims(
         *isolateSelection, selectedGizmoPrims, panelCameraDag, forceVisiblePaths);
 
+    // Store the force-visible paths in the manager BEFORE calling
+    // ReplaceIsolateSelection: ReplaceIsolateSelection switches the shared
+    // scene index to this viewport and pushes the corresponding per-viewport
+    // force-visible set, so it must already be present in the manager.
+    isolateSelectMgr.SetForceVisiblePaths(viewName.asChar(), std::move(forceVisiblePaths));
     isolateSelectMgr.ReplaceIsolateSelection(viewName.asChar(), isolateSelection);
-
-    if (auto isSi = isolateSelectMgr.GetIsolateSelectSceneIndex()) {
-        isSi->SetForceVisiblePaths(std::move(forceVisiblePaths));
-    }
 }
 #endif
 

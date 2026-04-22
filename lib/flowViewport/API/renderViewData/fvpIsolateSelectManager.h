@@ -22,8 +22,11 @@
 #include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/selection/fvpSelectionTypes.h"
 
+#include <pxr/usd/sdf/path.h>
+
 #include <map>
 #include <string>
+#include <unordered_set>
 
 namespace FVP_NS_DEF {
 
@@ -52,6 +55,18 @@ public:
         const SelectionPtr& selection);
     void ClearIsolateSelection(const std::string& viewportId);
 
+    // Per-viewport force-visible path set.  These are paths whose visibility
+    // must be forced ON when included in isolate select (typically the
+    // Maya-native gizmo render items for selected USD cameras and lights).
+    // The manager keeps a map keyed by viewportId and pushes the active
+    // viewport's set to the shared isolate select scene index whenever the
+    // viewport changes, so a callback from one panel cannot overwrite or
+    // clear another panel's force-visible paths.
+    void SetForceVisiblePaths(
+        const std::string&                                                viewportId,
+        std::unordered_set<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash>&&      paths);
+    void ClearForceVisiblePaths(const std::string& viewportId);
+
     // Get and set the isolate select scene index.  This scene index provides
     // isolate select services for all viewports.
     IsolateSelectSceneIndexRefPtr GetIsolateSelectSceneIndex() const;
@@ -68,11 +83,23 @@ private:
     SelectionPtr _EnableIsolateSelection(const std::string& viewportId);
     void _EnableIsolateSelectAndSetViewport(const std::string& viewportId);
 
+    // Push the viewportId's force-visible paths (or an empty set if none) to
+    // the shared scene index, so its active set always matches the active
+    // viewport.  Must be called after any operation that switches the scene
+    // index's active viewport.
+    void _PushForceVisiblePathsToSceneIndex(const std::string& viewportId);
+
     // Isolate selection, keyed by viewportId.  A null selection pointer means
     // isolate select for that viewport is disabled.  Disabling isolate select
     // on a viewport clears its isolate selection, so that at next isolate
     // select enable for that viewport its isolate selection is empty.
     std::map<std::string, SelectionPtr> _isolateSelection;
+
+    // Force-visible paths keyed by viewportId.  An entry is removed when
+    // isolate select is disabled for the viewport (DisableIsolateSelection)
+    // or explicitly via ClearForceVisiblePaths().
+    std::map<std::string, std::unordered_set<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash>>
+        _forceVisiblePaths;
 
     // Isolate select scene index.
     IsolateSelectSceneIndexRefPtr _isolateSelectSceneIndex;
