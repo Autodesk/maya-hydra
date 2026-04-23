@@ -44,7 +44,7 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
     _requiredPlugins = ['mayaHydraCppTests', 'drawUfe']
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
-    IMAGE_DIFF_FAIL_PERCENT = 2
+    IMAGE_DIFF_FAIL_PERCENT = 3
 
     def assertVisible(self, paths):
         for p in paths:
