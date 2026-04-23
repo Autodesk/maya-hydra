@@ -16,10 +16,83 @@
 
 import os
 import shutil
-import subprocess
+# subprocess is required to launch Maya's Render executable and OpenImageIO's
+# idiff binary for this CTest unit test. Bandit B404 (PYTH-INJC-30) flags any
+# subprocess import as a command-injection candidate, but in this script all
+# argv entries are supplied by CTest itself (see
+# test/lib/cmdLineRender/CMakeLists.txt) and every subprocess.run() call uses
+# the argument list form without shell=True, so the shell is never invoked
+# and no command-injection vector exists. The two executable paths are also
+# validated below to be absolute paths to existing executable regular files
+# before they are passed to subprocess.run().
+import subprocess  # nosec B404
 import sys
 import tempfile
 from pathlib import Path
+
+
+def _validate_executable(label, raw_path):
+    """Return a resolved absolute Path for an executable supplied on argv.
+
+    Rejects relative paths (so subprocess.run() can never search PATH for a
+    same-named binary), missing files, non-regular files (directories,
+    dangling symlinks) and non-executable files. Exits the process with a
+    descriptive message on any failure. This is the runtime mitigation for
+    Bandit B603 / PYTH-INJC-30 on the subprocess.run() call sites below.
+    """
+    candidate = Path(raw_path)
+    if not candidate.is_absolute():
+        print("%s path must be absolute: %s" % (label, raw_path), file=sys.stderr)
+        sys.exit(1)
+    try:
+        resolved = candidate.resolve(strict=True)
+    except (FileNotFoundError, OSError) as exc:
+        print("%s not found: %s (%s)" % (label, raw_path, exc), file=sys.stderr)
+        sys.exit(1)
+    if not resolved.is_file():
+        print("%s is not a regular file: %s" % (label, resolved), file=sys.stderr)
+        sys.exit(1)
+    if not os.access(str(resolved), os.X_OK):
+        print("%s is not executable: %s" % (label, resolved), file=sys.stderr)
+        sys.exit(1)
+    return resolved
+
+
+def _validate_existing_file(label, raw_path):
+    """Resolve a required input file path, exiting on any validation failure."""
+    candidate = Path(raw_path)
+    try:
+        resolved = candidate.resolve(strict=True)
+    except (FileNotFoundError, OSError) as exc:
+        print("%s not found: %s (%s)" % (label, raw_path, exc), file=sys.stderr)
+        sys.exit(1)
+    if not resolved.is_file():
+        print("%s is not a regular file: %s" % (label, resolved), file=sys.stderr)
+        sys.exit(1)
+    return resolved
+
+
+def _validate_existing_dir(label, raw_path):
+    """Resolve a required input directory path, exiting on any failure."""
+    candidate = Path(raw_path)
+    try:
+        resolved = candidate.resolve(strict=True)
+    except (FileNotFoundError, OSError) as exc:
+        print("%s not found: %s (%s)" % (label, raw_path, exc), file=sys.stderr)
+        sys.exit(1)
+    if not resolved.is_dir():
+        print("%s is not a directory: %s" % (label, resolved), file=sys.stderr)
+        sys.exit(1)
+    return resolved
+
+
+def _validate_float(label, raw_value):
+    """Parse a numeric threshold supplied on argv, exiting on failure."""
+    try:
+        return float(raw_value)
+    except ValueError:
+        print("%s must be a number, got: %s" % (label, raw_value), file=sys.stderr)
+        sys.exit(1)
 
 #Is used because we use relative paths render products for rendered images
 def _copy_scene_and_usd(scene_path, work_dir):
@@ -38,8 +111,12 @@ def _copy_scene_and_usd(scene_path, work_dir):
 
 
 def _run_render(render_exe, renderer, scene_copy, work_dir):
-    result = subprocess.run(
-        [render_exe, "-renderer", renderer, str(scene_copy)],
+    # render_exe has been validated by _validate_executable() in main(): it
+    # is an absolute path to an existing executable regular file. Combined
+    # with the argument list form (no shell=True), this satisfies Bandit
+    # B603 / PYTH-INJC-30.
+    result = subprocess.run(  # nosec B603
+        [str(render_exe), "-renderer", renderer, str(scene_copy)],
         cwd=str(work_dir),
         capture_output=True,
         text=True,
@@ -74,9 +151,13 @@ def _compare_images(idiff, fail, failpercent, expected_dir, output_dir):
             success = False
             continue
 
-        result = subprocess.run(
+        # idiff has been validated by _validate_executable() in main(): it
+        # is an absolute path to an existing executable regular file.
+        # Combined with the argument list form (no shell=True), this
+        # satisfies Bandit B603 / PYTH-INJC-30.
+        result = subprocess.run(  # nosec B603
             [
-                idiff,
+                str(idiff),
                 "-fail",
                 str(fail),
                 "-failpercent",
@@ -118,13 +199,17 @@ def main(argv):
         )
         return 1
 
-    render_exe = argv[1]
-    renderer = argv[2]
-    scene_path = argv[3]
-    expected_dir = argv[4]
-    idiff = argv[5]
-    fail = argv[6]
-    failpercent = argv[7]
+    # Validate every argv entry up front so that downstream code (and in
+    # particular the two subprocess.run() calls below) only ever sees
+    # well-formed, existing paths and parsed numeric values. This is the
+    # runtime mitigation for Bandit B603 / PYTH-INJC-30.
+    render_exe   = _validate_executable("Render executable", argv[1])
+    renderer     = argv[2]
+    scene_path   = _validate_existing_file("Scene path", argv[3])
+    expected_dir = _validate_existing_dir("Expected images directory", argv[4])
+    idiff        = _validate_executable("idiff executable", argv[5])
+    fail         = _validate_float("fail threshold", argv[6])
+    failpercent  = _validate_float("failpercent threshold", argv[7])
 
     base_dir = Path(os.environ.get("MAYA_APP_DIR") or tempfile.gettempdir())
     work_dir = base_dir / "projects" / "default"

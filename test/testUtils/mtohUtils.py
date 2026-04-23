@@ -27,7 +27,15 @@ from testUtils import PluginLoaded
 from pxr import Usd
 
 import platform
-import subprocess
+# subprocess is required to invoke the Windows taskkill utility from
+# tearDownClass() to terminate ADPClientService, which can otherwise hold a
+# handle on the temporary test directory and prevent cleanup. Bandit B404
+# (PYTH-INJC-30) flags any subprocess import as a command-injection
+# candidate, but the single subprocess.run() call in this module uses an
+# absolute, validated path to taskkill.exe (see tearDownClass()), the
+# argument list form, and no shell=True, so command injection is
+# structurally impossible.
+import subprocess  # nosec B404
 import sys
 import math
 
@@ -135,17 +143,36 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             # So far (2024-03-25), this has only been observed when using LookdevX.
             # Note that the force (/f) flag seems necessary, omitting it did not end up killing
             # the process.
-            try:
-                subprocess.run(
-                    ['taskkill', '/f', '/im', 'ADPClientService.exe'],
-                    check=True, capture_output=True, text=True)
-            except subprocess.CalledProcessError as e:
-                # ADPClientService may already have exited, or might not be
-                # running (e.g. mayabatch), which is not an error.
-                notAnError = 'The process "ADPClientService.exe" not found'
-                if notAnError not in e.stderr:
-                    print("taskkill ADPClientService error: %s" % e.stderr, 
-                          file=sys.stderr)
+            #
+            # Use the absolute path to taskkill.exe (resolved via the
+            # SystemRoot environment variable that Windows itself sets) rather
+            # than relying on a PATH lookup. This addresses Bandit B607
+            # (start_process_with_partial_path / PYTH-INJC-30): a partial
+            # executable name would let a poisoned PATH redirect this call to
+            # a malicious binary. The argument list form (no shell=True) plus
+            # the resolved absolute path together also satisfy B603, so the
+            # subprocess.run call below is safe by construction.
+            system_root = os.environ.get('SystemRoot', r'C:\Windows')
+            taskkill_exe = os.path.join(system_root, 'System32', 'taskkill.exe')
+            if not os.path.isfile(taskkill_exe):
+                # If the system taskkill.exe cannot be located, skip the
+                # cleanup rather than fall back to a PATH lookup. The
+                # ADPClientService process will simply linger; this is not a
+                # correctness issue for the tests themselves.
+                print("Skipping ADPClientService cleanup: %s not found" % taskkill_exe,
+                      file=sys.stderr)
+            else:
+                try:
+                    subprocess.run(  # nosec B603
+                        [taskkill_exe, '/f', '/im', 'ADPClientService.exe'],
+                        check=True, capture_output=True, text=True)
+                except subprocess.CalledProcessError as e:
+                    # ADPClientService may already have exited, or might not be
+                    # running (e.g. mayabatch), which is not an error.
+                    notAnError = 'The process "ADPClientService.exe" not found'
+                    if notAnError not in e.stderr:
+                        print("taskkill ADPClientService error: %s" % e.stderr,
+                              file=sys.stderr)
 
     def setHdStormRenderer(self):
         self.activeEditor = cmds.playblast(activeEditor=1)

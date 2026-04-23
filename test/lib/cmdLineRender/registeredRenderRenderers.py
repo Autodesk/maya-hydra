@@ -31,27 +31,75 @@
 # Here we check Render command line executable renderer registration
 # for Hydra Storm and Hydra Arnold.
 
-import subprocess
+# subprocess is required to launch Maya's Render executable for this CTest
+# unit test. Bandit B404 (PYTH-INJC-30) flags any subprocess import as a
+# command-injection candidate, but in this script all argv entries are
+# supplied by CTest itself (see test/lib/cmdLineRender/CMakeLists.txt) and
+# subprocess.run() is called with a list of arguments and without
+# shell=True, so the shell is never invoked and no command-injection
+# vector exists.
+import os
+import subprocess  # nosec B404
 import sys
+from pathlib import Path
 
 if __name__ == "__main__":
-    # Path to Render executable required.
-    if len(sys.argv) == 1:
-        print("Missing test arguments.", file=sys.stderr)
+    # Validate argv arity up front so a missing argument gives a clear
+    # message instead of a downstream IndexError / ValueError. All three
+    # arguments are mandatory and supplied by the CTest invocation.
+    if len(sys.argv) < 4:
+        print(
+            "Usage: registeredRenderRenderers.py <RenderPath> <RenderArg> <ExpectedExitCode>",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
-    RenderPath     = sys.argv[1]
-    RenderArg      = sys.argv[2]
-    RenderExitCode = int(sys.argv[3])
+    RenderPath = sys.argv[1]
+    RenderArg  = sys.argv[2]
+    try:
+        RenderExitCode = int(sys.argv[3])
+    except ValueError:
+        print(
+            "Expected exit code must be an integer, got: %s" % sys.argv[3],
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
-    result = subprocess.run(
-        [RenderPath, RenderArg],
+    # Validate the Render executable path before invoking subprocess
+    # (Bandit B603 / PYTH-INJC-30). Requiring an absolute path to an
+    # existing, executable regular file means subprocess.run() can never
+    # be tricked into searching PATH for a same-named binary or into
+    # executing a directory / dangling symlink. Combined with the list
+    # argument form (no shell=True) below, this makes command injection
+    # structurally impossible.
+    render_exe = Path(RenderPath)
+    if not render_exe.is_absolute():
+        print("Render executable path must be absolute: %s" % RenderPath, file=sys.stderr)
+        sys.exit(1)
+    try:
+        render_exe = render_exe.resolve(strict=True)
+    except (FileNotFoundError, OSError) as exc:
+        print("Render executable not found: %s (%s)" % (RenderPath, exc), file=sys.stderr)
+        sys.exit(1)
+    if not render_exe.is_file():
+        print("Render executable is not a regular file: %s" % render_exe, file=sys.stderr)
+        sys.exit(1)
+    if not os.access(str(render_exe), os.X_OK):
+        print("Render executable is not executable: %s" % render_exe, file=sys.stderr)
+        sys.exit(1)
+
+    # Safe usage of subprocess.run: argument list form (no shell=True), so
+    # arguments are passed verbatim to the child process and shell
+    # metacharacters cannot trigger command injection (PYTH-INJC-30). The
+    # executable is the validated absolute path computed above.
+    result = subprocess.run(  # nosec B603
+        [str(render_exe), RenderArg],
         capture_output=True,
-        text=True
+        text=True,
     )
 
     if result.returncode != RenderExitCode:
-        print("%s %s failed." % (RenderPath, RenderArg), file=sys.stderr)
+        print("%s %s failed." % (render_exe, RenderArg), file=sys.stderr)
         sys.exit(1)
 
     # Render places its output into stderr.

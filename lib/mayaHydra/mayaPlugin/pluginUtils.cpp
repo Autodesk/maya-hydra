@@ -40,7 +40,13 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-    constexpr auto TECHNOLOGY_PREVIEW_PREFIX = "(Technology Preview) ";
+    // Declared as a char array (not const char*) so its length is a
+    // compile-time constant via sizeof(), removing the need for std::strlen()
+    // and avoiding any risk of an over-read on a non-\0-terminated buffer
+    // (CWE-126 / CCPP-STRG-30).
+    constexpr char TECHNOLOGY_PREVIEW_PREFIX[] = "(Technology Preview) ";
+    constexpr std::size_t TECHNOLOGY_PREVIEW_PREFIX_LEN
+        = sizeof(TECHNOLOGY_PREVIEW_PREFIX) - 1; // -1 to drop the trailing '\0'
     constexpr auto CMD_RENDER_SUFFIX   = "CmdRender";
     constexpr auto BATCH_RENDER_SUFFIX = "BatchRender";
     constexpr auto RENDER_SUFFIX       = "Render";
@@ -118,7 +124,9 @@ std::string_view prettyDisplayName(const std::string& srcDisplayName)
 {
     auto dn = std::string_view(srcDisplayName);
     // Awkwardly rework what MtohInitializeRenderPlugins() has created.
-    dn.remove_prefix(std::strlen(TECHNOLOGY_PREVIEW_PREFIX));
+    // Use the compile-time length of the prefix instead of std::strlen()
+    // so we can never over-read past a non-\0-terminated buffer.
+    dn.remove_prefix(TECHNOLOGY_PREVIEW_PREFIX_LEN);
     return dn;
 }
 
