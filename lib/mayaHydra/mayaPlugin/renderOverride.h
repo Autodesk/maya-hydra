@@ -88,10 +88,12 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <unordered_set>
+
+#include <pxr/base/tf/hashset.h>
 
 #include <ufe/ufe.h>
 UFE_NS_DEF {
+class Path;
 class SelectionChanged;
 class Selection;
 }
@@ -282,32 +284,31 @@ private:
     static void
     _ViewSelectedChangedCb(const MString& panelName, bool viewSelectedObjectsChanged, void* data);
 
-    /// A USD camera or light whose native Maya gizmo rprims need to be
-    /// included in isolate selection.  Built in _ViewSelectedChangedCb
-    /// and consumed by _ExpandIsolateSelectionForUsdPrims.
-    struct SelectedUsdGizmoPrim;
-
     /// After building isolate selection from UFE paths, append Maya-native
-    /// Hydra paths for camera/light gizmo drawables that correspond to
-    /// selected USD camera and light prims.  Those rprims live under
-    /// MAYA_NATIVE_ROOT with a different path prefix than the USD proxy, so
-    /// they would otherwise be hidden by isolate's prefix-based visibility.
+    /// Hydra paths for camera/light gizmo drawables that correspond to the
+    /// selected UFE camera and light prims.  Those rprims live under
+    /// MAYA_NATIVE_ROOT with a different path prefix than the source proxy,
+    /// so they would otherwise be hidden by isolate's prefix-based
+    /// visibility.
     ///
-    /// Every path added to \p selection is also inserted into
-    /// \p outForceVisiblePaths so that the IsolateSelectSceneIndex can force
-    /// their visibility ON (VP2's isolate-select filtering incorrectly hides
-    /// these render items because VP2 is unaware that Hydra has included them).
+    /// Returns the set of paths whose visibility must be forced ON by the
+    /// IsolateSelectSceneIndex (every such path is also added to \p selection).
+    /// VP2's isolate-select filtering incorrectly hides these render items
+    /// because VP2 is unaware that Hydra has included them.
     ///
-    /// \param selectedGizmoPrims Pre-filtered list of USD cameras/lights
-    ///        from the view-selected objects (built by the caller).
+    /// USD is the only UFE client this function currently understands; non-USD
+    /// view-selected paths are ignored.  The function inspects each path
+    /// itself, so callers can pass through every view-selected UFE path.
+    ///
+    /// \param selectedUfePaths Raw view-selected UFE paths (from
+    ///        M3dView::viewSelectedObject).
     /// \param panelCameraDag Shape DAG path of the model panel camera
     ///        (from M3dView::getCamera); used to include native rprims under
     ///        that camera's Hydra branch.
-    void _ExpandIsolateSelectionForUsdPrims(
-        Fvp::Selection&                              selection,
-        const std::vector<SelectedUsdGizmoPrim>&     selectedGizmoPrims,
-        const MDagPath&                              panelCameraDag,
-        std::unordered_set<SdfPath, SdfPath::Hash>&  outForceVisiblePaths);
+    TfHashSet<SdfPath, SdfPath::Hash> _ExpandIsolateSelectionForUsdPrims(
+        Fvp::Selection&               selection,
+        const std::vector<Ufe::Path>& selectedUfePaths,
+        const MDagPath&               panelCameraDag);
 #endif
 
     MtohRendererDescription _rendererDesc;

@@ -117,8 +117,8 @@ IsolateSelectManager::ReplaceIsolateSelection(
 
 void
 IsolateSelectManager::SetForceVisiblePaths(
-    const std::string&                                            viewportId,
-    std::unordered_set<SdfPath, SdfPath::Hash>&&                  paths)
+    const std::string&     viewportId,
+    TfHashSet<SdfPath, SdfPath::Hash>&& paths)
 {
     if (!TF_VERIFY(_isolateSelectSceneIndex, "No isolate select scene index set.")) {
         return;

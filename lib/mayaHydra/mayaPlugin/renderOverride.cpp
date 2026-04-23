@@ -145,10 +145,10 @@
 #include <chrono>
 #include <exception>
 #include <limits>
-#include <unordered_set>
 
 #include <pxr/base/tf/getenv.h>
 #include <pxr/base/tf/envSetting.h>
+#include <pxr/base/tf/hashset.h>
 #include "envSettings.h"
 
 using namespace MayaHydra;
@@ -2397,12 +2397,6 @@ bool ReadMayaDagPathFromUsdPullMetadata(const UsdPrim& prim, MDagPath& outDagPat
 
 } // namespace
 
-struct MtohRenderOverride::SelectedUsdGizmoPrim {
-    Ufe::Path   ufePath;
-    UsdPrim     prim;
-    bool        isCamera; // true = camera, false = light
-};
-
 // When isolate select is built from view-selected UFE paths, USD cameras and lights
 // have native Maya visual representations (gizmo rprims, HdCamera sprims) drawn under
 // MAYA_NATIVE_ROOT. These native rprims are render items whose paths include the source DAG path:
@@ -2420,20 +2414,20 @@ struct MtohRenderOverride::SelectedUsdGizmoPrim {
 // Invoked from _ViewSelectedChangedCb on the same MtohRenderOverride instance as the callback's
 // clientData: multiple overrides each register a view-selected callback, and a single global
 // expander would capture the wrong `this`.
-void MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
-    Fvp::Selection&                                              selection,
-    const std::vector<MtohRenderOverride::SelectedUsdGizmoPrim>& selectedGizmoPrims,
-    const MDagPath&                                              panelCameraDag,
-    std::unordered_set<SdfPath, SdfPath::Hash>&                  outForceVisiblePaths)
+TfHashSet<SdfPath, SdfPath::Hash> MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
+    Fvp::Selection&               selection,
+    const std::vector<Ufe::Path>& selectedUfePaths,
+    const MDagPath&               panelCameraDag)
 {
-    if (!_mayaHydraSceneIndex || selectedGizmoPrims.empty()) {
-        return;
+    TfHashSet<SdfPath, SdfPath::Hash> forceVisiblePaths;
+    if (!_mayaHydraSceneIndex || selectedUfePaths.empty()) {
+        return forceVisiblePaths;
     }
 
-    std::unordered_set<SdfPath, SdfPath::Hash> added;
+    TfHashSet<SdfPath, SdfPath::Hash> added;
 
     // When forceVis is true, paths added via addPrimPath are also inserted
-    // into outForceVisiblePaths so the IsolateSelectSceneIndex forces their
+    // into forceVisiblePaths so the IsolateSelectSceneIndex forces their
     // visibility ON.  Callers pass false for user-hidden USD prims so their
     // gizmo render items stay hidden during isolate select.
     auto addPrimPath = [&](const SdfPath& p, bool forceVis) {
@@ -2443,7 +2437,7 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
         if (selection.Add(Fvp::PrimSelection { p })) {
             added.insert(p);
             if (forceVis) {
-                outForceVisiblePaths.insert(p);
+                forceVisiblePaths.insert(p);
             }
         }
     };
@@ -2485,7 +2479,7 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
     // O(numCachedNativeRprims) without repeated full scans of all rprims.
     std::vector<SdfPath> nativeRprims;
     {
-        std::unordered_set<SdfPath, SdfPath::Hash> seen;
+        TfHashSet<SdfPath, SdfPath::Hash> seen;
         for (const SdfPath& id : renderIndexForScan->GetRprimIds()) {
             if (id.HasPrefix(MAYA_NATIVE_ROOT) && seen.insert(id).second) {
                 nativeRprims.push_back(id);
@@ -2545,10 +2539,28 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
         addMayaCameraDrawables(panelCameraDag, /*forceVis=*/true);
     }
 
-    for (const auto& selected : selectedGizmoPrims) {
-        const auto& ufePath  = selected.ufePath;
-        const auto& prim     = selected.prim;
-        const bool  isCamera = selected.isCamera;
+    for (const Ufe::Path& ufePath : selectedUfePaths) {
+        // Filter to the USD UFE clients we know how to expand for.  Non-USD
+        // view-selected paths are handled by upstream isolate-selection only.
+        if (ufePath.empty()
+            || ufePath.runTimeId() != MayaUsdAPI::getUsdRunTimeId()) {
+            continue;
+        }
+        const UsdPrim prim = MayaUsdAPI::ufePathToPrim(ufePath);
+        if (!prim.IsValid()) {
+            continue;
+        }
+        // UsdLuxLightAPI covers all USD light types.  Ufe::Light2::light()
+        // cannot be used here because its handler only supports RectLight.
+        const bool isLight = prim.HasAPI<UsdLuxLightAPI>();
+        bool isCamera = false;
+        if (!isLight) {
+            auto sceneItem = Ufe::Hierarchy::createItem(ufePath);
+            isCamera = sceneItem && (Ufe::Camera::camera(sceneItem) != nullptr);
+            if (!isCamera) {
+                continue;
+            }
+        }
 
         // Only force gizmo render items visible when the USD prim itself
         // is visible.  If the user has hidden the prim, its gizmo should
@@ -2647,20 +2659,21 @@ void MtohRenderOverride::_ExpandIsolateSelectionForUsdPrims(
     }
 
     if (!needDefaultUfeProxyCamera) {
-        return;
+        return forceVisiblePaths;
     }
 
     static const MString kDefaultUfeProxyCameraShapePath(
         "|defaultUfeProxyCameraTransformParent|defaultUfeProxyCameraTransform|defaultUfeProxyCameraShape");
     MSelectionList sl;
     if (sl.add(kDefaultUfeProxyCameraShapePath) != MS::kSuccess) {
-        return;
+        return forceVisiblePaths;
     }
     MDagPath camDag;
     if (sl.getDagPath(0, camDag) != MS::kSuccess || !camDag.isValid()) {
-        return;
+        return forceVisiblePaths;
     }
     addMayaCameraDrawables(camDag, /*forceVis=*/true);
+    return forceVisiblePaths;
 }
 
 /* static */
@@ -2799,7 +2812,8 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
     const auto nbObjects = view.numViewSelectedObjects();
     TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
         .Msg("  building isolate selection from %u view-selected object(s)\n", nbObjects);
-    std::vector<MtohRenderOverride::SelectedUsdGizmoPrim> selectedGizmoPrims;
+    std::vector<Ufe::Path> selectedUfePaths;
+    selectedUfePaths.reserve(nbObjects);
     for (unsigned int i = 0; i < nbObjects; ++i) {
         MStringArray objectStrings;
         TF_VERIFY(view.viewSelectedObject(i, objectStrings) == MS::kSuccess);
@@ -2818,26 +2832,9 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
         for (const auto& primSelection : primSelections) {
             isolateSelection->Add(primSelection);
         }
-
-        if (path.empty() || path.runTimeId() != MayaUsdAPI::getUsdRunTimeId()) {
-            continue;
+        if (!path.empty()) {
+            selectedUfePaths.push_back(std::move(path));
         }
-        const UsdPrim prim = MayaUsdAPI::ufePathToPrim(path);
-        if (!prim.IsValid()) {
-            continue;
-        }
-        // UsdLuxLightAPI covers all USD light types.  Ufe::Light2::light()
-        // cannot be used here because its handler only supports RectLight.
-        const bool isLight = prim.HasAPI<UsdLuxLightAPI>();
-        bool isCamera = false;
-        if (!isLight) {
-            auto sceneItem = Ufe::Hierarchy::createItem(path);
-            isCamera = sceneItem && (Ufe::Camera::camera(sceneItem) != nullptr);
-            if (!isCamera) {
-                continue;
-            }
-        }
-        selectedGizmoPrims.push_back({ std::move(path), prim, isCamera });
     }
 
     MDagPath panelCameraDag;
@@ -2845,9 +2842,8 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
         panelCameraDag = MDagPath();
     }
 
-    std::unordered_set<SdfPath, SdfPath::Hash> forceVisiblePaths;
-    instance->_ExpandIsolateSelectionForUsdPrims(
-        *isolateSelection, selectedGizmoPrims, panelCameraDag, forceVisiblePaths);
+    TfHashSet<SdfPath, SdfPath::Hash> forceVisiblePaths = instance->_ExpandIsolateSelectionForUsdPrims(
+        *isolateSelection, selectedUfePaths, panelCameraDag);
 
     // Store the force-visible paths in the manager BEFORE calling
     // ReplaceIsolateSelection: ReplaceIsolateSelection switches the shared

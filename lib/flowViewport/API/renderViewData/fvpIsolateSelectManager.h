@@ -22,11 +22,11 @@
 #include "flowViewport/selection/fvpSelectionFwd.h"
 #include "flowViewport/selection/fvpSelectionTypes.h"
 
+#include <pxr/base/tf/hashset.h>
 #include <pxr/usd/sdf/path.h>
 
 #include <map>
 #include <string>
-#include <unordered_set>
 
 namespace FVP_NS_DEF {
 
@@ -57,14 +57,15 @@ public:
 
     // Per-viewport force-visible path set.  These are paths whose visibility
     // must be forced ON when included in isolate select (typically the
-    // Maya-native gizmo render items for selected USD cameras and lights).
+    // Maya-native gizmo render items for selected UFE cameras and lights;
+    // USD being the primary UFE client).
     // The manager keeps a map keyed by viewportId and pushes the active
     // viewport's set to the shared isolate select scene index whenever the
     // viewport changes, so a callback from one panel cannot overwrite or
     // clear another panel's force-visible paths.
     void SetForceVisiblePaths(
-        const std::string&                                                viewportId,
-        std::unordered_set<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash>&&      paths);
+        const std::string&                   viewportId,
+        PXR_NS::TfHashSet<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash>&& paths);
     void ClearForceVisiblePaths(const std::string& viewportId);
 
     // Get and set the isolate select scene index.  This scene index provides
@@ -98,8 +99,7 @@ private:
     // Force-visible paths keyed by viewportId.  An entry is removed when
     // isolate select is disabled for the viewport (DisableIsolateSelection)
     // or explicitly via ClearForceVisiblePaths().
-    std::map<std::string, std::unordered_set<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash>>
-        _forceVisiblePaths;
+    std::map<std::string, PXR_NS::TfHashSet<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash>> _forceVisiblePaths;
 
     // Isolate select scene index.
     IsolateSelectSceneIndexRefPtr _isolateSelectSceneIndex;

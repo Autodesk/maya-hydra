@@ -220,11 +220,12 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
     }
     else if (included && !isGeomSubset(inputPrim)
              && _forceVisiblePaths.count(primPath)) {
-        // USD camera/light gizmo render items: VP2's isolate-select filtering
-        // sets their MVS_visible to false because VP2 does not know that the
-        // Hydra pipeline has included them.  Force visibility ON so these
-        // gizmos are drawn when their owning USD prim is isolate-selected.
-        // All other included prims keep their upstream visibility as-is.
+        // UFE camera/light gizmo render items (USD being the primary UFE
+        // client): VP2's isolate-select filtering sets their MVS_visible to
+        // false because VP2 does not know that the Hydra pipeline has
+        // included them.  Force visibility ON so these gizmos are drawn when
+        // their owning UFE prim is isolate-selected.  All other included
+        // prims keep their upstream visibility as-is.
         // HYDRA-1242: skip GeomSubset prims — setting visibility on them
         // hangs Hydra Storm.
         inputPrim.dataSource = HdContainerDataSourceEditor(inputPrim.dataSource)
@@ -467,7 +468,7 @@ SelectionPtr IsolateSelectSceneIndex::GetIsolateSelection() const
 }
 
 void IsolateSelectSceneIndex::SetForceVisiblePaths(
-    std::unordered_set<SdfPath, SdfPath::Hash>&& paths)
+    TfHashSet<SdfPath, SdfPath::Hash>&& paths)
 {
     _forceVisiblePaths = std::move(paths);
 }
