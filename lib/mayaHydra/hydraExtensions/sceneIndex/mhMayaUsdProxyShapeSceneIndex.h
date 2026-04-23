@@ -19,27 +19,12 @@
 //MayaHydra headers
 #include "mayaHydraLib/api.h"
 
-//MayaUsdAPI headers
-#include <mayaUsdAPI/proxyStage.h>
-#include <mayaUsdAPI/proxyShapeNotice.h>
+#include <mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndexBase.h>
 
 // Flow Viewport Toolkit headers.
-#include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
 #include <flowViewport/selection/fvpPathMapper.h>
 
-//Usd/Hydra headers
-#include <pxr/base/tf/declarePtrs.h>
-#include <pxr/usdImaging/usdImaging/stageSceneIndex.h>
-#include <pxr/usdImaging/usdImaging/sceneIndices.h>// In USD 23.11+
-#include <pxr/imaging/hd/filteringSceneIndex.h>
-
-//Maya headers
-#include <maya/MObjectHandle.h>
-
 #include <ufe/observer.h>
-#include <ufe/path.h>
-
-#include <memory>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -55,14 +40,10 @@ typedef PXR_NS::TfRefPtr<const MayaUsdProxyShapeSceneIndex> MayaUsdProxyShapeSce
 /// <summary>
 /// Simply wraps single stage scene index for initial stage assignment and population
 /// </summary>
-class MayaUsdProxyShapeSceneIndex : public HdSingleInputFilteringSceneIndexBase
-    , public Fvp::InputSceneIndexUtils<MayaUsdProxyShapeSceneIndex>
+class MayaUsdProxyShapeSceneIndex : public MayaUsdProxyShapeSceneIndexBase
 {
 public:
-    using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
-    using ParentClass = HdSingleInputFilteringSceneIndexBase;
-
-    static constexpr char kNbPopulateCalls[] = "MayaUsdProxyShapeSceneIndex:NbPopulateCalls";
+    using ParentClass = MayaUsdProxyShapeSceneIndexBase;
 
     static MayaUsdProxyShapeSceneIndexRefPtr
     New(const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
@@ -70,70 +51,29 @@ public:
         const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
         const MObjectHandle&                   dagNodeHandle,
         const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
-        const Ufe::Path&                       sceneIndexAppPath
-    );
+        const Ufe::Path&                       sceneIndexAppPath);
 
-    // From HdSceneIndexBase
-    HdSceneIndexPrim GetPrim(const SdfPath& primPath) const override;
-    SdfPathVector GetChildPrimPaths(const SdfPath& primPath) const override;
-
-    MayaUsdProxyShapeSceneIndex(const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
-                                const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
-                                const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
-                                const MObjectHandle&                   dagNodeHandle,
-                                const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
-                                const Ufe::Path&                       sceneIndexAppPath);
-
-    virtual ~MayaUsdProxyShapeSceneIndex();
-
-    // When we receive a stage invalidate we remove the stage and set populate to false
-    // We need to re-populate to see the changes
-    //HasPendingUpdates() is true when this is the case
-    bool HasPendingUpdates() const;
-    void PopulateAndApplyPendingChanges();
-
-    void Populate();
-    void UpdateTime();
-    static Ufe::Path InterpretRprimPath(const HdSceneIndexBaseRefPtr& sceneIndex,const SdfPath& path);
+    ~MayaUsdProxyShapeSceneIndex() override;
 
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
 
     const Ufe::Path& GetSceneIndexAppPath() const { return _sceneIndexAppPath; }
-    void SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath) { 
+    void             SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath)
+    {
         _sceneIndexAppPath = sceneIndexAppPath;
     }
 
-    //From HdSingleInputFilteringSceneIndexBase
-    void _PrimsAdded(const HdSceneIndexBase& sender, const HdSceneIndexObserver::AddedPrimEntries& entries) override{
-        _SendPrimsAdded(entries);
-    }
-    void _PrimsRemoved(const HdSceneIndexBase& sender, const HdSceneIndexObserver::RemovedPrimEntries& entries)override{
-        _SendPrimsRemoved(entries);
-    }
-    void _PrimsDirtied(const HdSceneIndexBase& sender, const HdSceneIndexObserver::DirtiedPrimEntries& entries)override{
-        _SendPrimsDirtied(entries);
-    }
-
-#ifndef CODE_COVERAGE_WORKAROUND
 private:
-#endif
-    void _Destroy();
+    MayaUsdProxyShapeSceneIndex(
+        const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
+        const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
+        const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
+        const MObjectHandle&                   dagNodeHandle,
+        const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
+        const Ufe::Path&                       sceneIndexAppPath);
 
-private:
-    void _ObjectsChanged(const MAYAUSDAPI_NS::ProxyStageObjectsChangedNotice& notice);
-    void _StageSet(const MAYAUSDAPI_NS::ProxyStageSetNotice& notice);
-    void _StageInvalidate(const MAYAUSDAPI_NS::ProxyStageInvalidateNotice& notice);
-
-private:
-
-    UsdImagingStageSceneIndexRefPtr _usdImagingStageSceneIndex {nullptr};
-    MAYAUSDAPI_NS::ProxyStage       _proxyStage;
-    std::atomic<bool>               _populated { false };
-    MObjectHandle                   _dagNodeHandle;
-    TfNotice::Key                   _stageSetNoticeKey;
-    TfNotice::Key                   _stageInvalidateNoticeKey;
-    TfNotice::Key                   _objectsChangedNoticeKey;
-    long int                        _nbPopulateCalls{0};
+    void _Destroy() override;
+    void _DestroyDerived();
 
     // Path mapper support.
     const SdfPath                   _sceneIndexPathPrefix;
@@ -147,4 +87,4 @@ private:
 
 } // namespace MAYAHYDRA_NS_DEF
 
-#endif //MAYA_HYDRA_MAYAUSD_PROXY_SHAPE_SCENE_INDEX_PLUGIN_H
+#endif // MAYA_HYDRA_MAYAUSD_PROXY_SHAPE_SCENE_INDEX_PLUGIN_H

@@ -1,5 +1,6 @@
 //
 // Copyright 2019 Luma Pictures
+// Copyright 2026 Autodesk
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,6 +39,12 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
+
+    constexpr auto TECHNOLOGY_PREVIEW_PREFIX = "(Technology Preview) ";
+    constexpr auto CMD_RENDER_SUFFIX   = "CmdRender";
+    constexpr auto BATCH_RENDER_SUFFIX = "BatchRender";
+    constexpr auto RENDER_SUFFIX       = "Render";
+    constexpr auto OPTIONS_SUFFIX      = "BatchRenderOptionsString";
 
     std::filesystem::path _mayaHydraPluginLocation;
 
@@ -93,7 +100,8 @@ MtohInitializeRenderPlugins()
                 TfToken(TfStringPrintf(
                     "%s%s", MayaHydra::MTOH_RENDER_OVERRIDE_PREFIX, renderer.GetText())),
                 TfToken(TfStringPrintf(
-                    "(Technology Preview) Hydra %s",
+                    "%sHydra %s",
+                    TECHNOLOGY_PREVIEW_PREFIX,
                     PXR_NS::UsdImagingGLEngine::GetRendererDisplayName(pluginDesc.id).c_str())));
             MtohRenderGlobals::BuildOptionsMenu(store.first.back(), rendererSettingDescriptors);
         }
@@ -104,6 +112,14 @@ MtohInitializeRenderPlugins()
         return store;
     }();
     return ret;
+}
+
+std::string_view prettyDisplayName(const std::string& srcDisplayName)
+{
+    auto dn = std::string_view(srcDisplayName);
+    // Awkwardly rework what MtohInitializeRenderPlugins() has created.
+    dn.remove_prefix(std::strlen(TECHNOLOGY_PREVIEW_PREFIX));
+    return dn;
 }
 
 } // namespace
@@ -138,6 +154,88 @@ void MtohSetMayaHydraPluginLocation(const std::filesystem::path& mayaHydraLocati
 std::filesystem::path MtohGetMayaHydraPluginLocation() 
 { 
     return _mayaHydraPluginLocation;
+}
+
+bool registerRenderer(const MtohRendererDescription& desc)
+{
+    // Renderer registration in Maya is done through the renderer MEL
+    // command, with MEL callbacks that implement the various
+    // rendering scenarios.  Each Hydra renderer will have its own MEL
+    // callbacks, to account for potential differences in the
+    // hydraRender MEL command arguments (e.g. Storm requires an
+    // OpenGL context).
+
+    // We therefore first call the renderer command with the proper
+    // renderer-specific callback names.  We do not add tabs to the
+    // render settings UI ("renderer -addGlobalsTab"), nor do we add a
+    // Maya renderer settings global node ("renderer
+    // -addGlobalsNode"), as these two capabilities are unused by Maya
+    // Hydra renderers and will be replaced.
+
+    std::ostringstream cmdStr;
+    constexpr auto dq = '"';
+    const auto& rn = desc.rendererName;
+    cmdStr << "renderer"
+           << " -rendererUIName " 
+           << dq << prettyDisplayName(desc.displayName.GetString()) << dq
+           // Called during command line renders with the Render executable.
+           << " -commandRenderProcedure " << rn << CMD_RENDER_SUFFIX
+           // Called during batch rendering launched interactively from Maya.
+           << " -batchRenderProcedure " << rn << BATCH_RENDER_SUFFIX
+           // Called for render current frame launched interactively from Maya.
+           << " -renderProcedure " << rn << RENDER_SUFFIX
+           // Returns the Hydra-specific command line arguments to the Render
+           // executable on batch render from interactive mode.
+           << " -batchRenderOptionsStringProcedure " << rn << OPTIONS_SUFFIX
+           << " -cancelBatchRenderProcedure batchRender"
+           << " -showBatchRenderProcedure " << dq << "batchRender -showImage true" << dq
+           << " -renderSequenceProcedure mayaRenderSequence"
+           << " -supportColorManagement true"
+           // To avoid breaking the render settings UI we add the Common tab,
+           // even though we don't use it.
+           << " -addGlobalsTab Common createMayaSoftwareCommonGlobalsTab updateMayaSoftwareCommonGlobalsTab"
+           << " " << desc.rendererName;
+
+    if (MGlobal::executeCommand(cmdStr.str().c_str()) != MS::kSuccess) {
+        return false;
+    }
+
+    // Next, define the callback procedures themselves.
+
+    //
+    // HYDRA-2025: we need a mechanism so that a renderer can describe its
+    // requirements to MayaHydra.  Could be a MayaHydra-specific JSON file.
+    // For now (27-Jan-2026) hard-code Storm requirement for an OpenGL context.
+    //
+    const bool needsGpu = (rn.GetString().find("Storm") != std::string::npos);
+
+    std::ostringstream cbStr;
+    cbStr << "global proc " << rn << CMD_RENDER_SUFFIX << "(string $option)\n"
+          << "{\n" 
+          << "hydraRender -renderer " << rn 
+          << (needsGpu ? " -gpu 1" : "") << ";\n"
+          << "}\n\n"
+          << "global proc " << rn << BATCH_RENDER_SUFFIX << "(string $option)\n"
+          << "{\n"
+          << "hydraRender -renderer " << rn
+          << (needsGpu ? " -gpu 1" : "") << ";\n"
+          << "}\n\n"
+          << "global proc " << rn << RENDER_SUFFIX 
+          << "(int $width, int $height, int $doShadows, int $doGlowPass, string $camera, string $option)\n"
+          << "{\n"
+          // Interactive Maya provides OpenGL context if renderer requires it.
+          << "hydraRender -renderer " << rn << ";\n"
+          << "}\n\n"
+          << "global proc string " << rn << OPTIONS_SUFFIX << "()\n"
+          << "{\n"
+          << "return " << dq << " -r " << rn << " " << dq << ";\n"
+          << "}\n";
+
+    if (MGlobal::executeCommand(cbStr.str().c_str()) != MS::kSuccess) {
+        return false;
+    }
+
+    return true;
 }
 
 } // namespace MAYAHYDRA_NS_DEF

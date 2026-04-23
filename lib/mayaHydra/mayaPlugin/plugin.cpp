@@ -26,6 +26,8 @@
 #include "renderRegionCommand.h"
 #include "profilingCommand.h"
 #include "setVisibleFramePassesCommand.h"
+#include "batchRendering/hydraRenderCmd.h"
+#include "envSettings.h"
 
 #include <mayaHydraLib/adapters/adapter.h>
 
@@ -36,10 +38,23 @@
 #include <pxr/base/plug/registry.h>
 #include <pxr/base/tf/envSetting.h>
 
+#include <mayaUsdAPI/utils.h>
+
 #include <maya/MFnPlugin.h>
 #include <maya/MGlobal.h>
 #include <maya/MSceneMessage.h>
 #include <maya/MCommandResult.h>
+//======================================================================
+// Example code to create a USD render settings stage, for translation
+// to Hydra v2 render settings.
+//======================================================================
+#include <maya/MDagModifier.h>
+
+#include <ufe/sceneSegmentHandler.h>
+#include <ufe/runTimeMgr.h>
+//======================================================================
+// End example code.
+//======================================================================
 
 #include <memory>
 #include <vector>
@@ -123,25 +138,104 @@ private:
     }
 };
 
+//======================================================================
+// Example code to create a USD render settings stage, for translation
+// to Hydra v2 render settings.
+//======================================================================
+
+static MCallbackId g_renderSettingsFileNewCallbackId = 0;
+static MCallbackId g_renderSettingsFileOpenCallbackId = 0;
+
+bool createRenderSettings()
+{
+    MStatus status;
+    MDagModifier dagMod;
+
+    // Create a transform node as parent
+    MObject transformObj = dagMod.createNode("transform", MObject::kNullObj, &status);
+    if (status != MS::kSuccess || transformObj.isNull()) {
+        return false;
+    }
+
+    // Create the mayaUsdProxyShape node
+    MObject proxyShapeObj = dagMod.createNode("mayaUsdProxyShape", transformObj, &status);
+    if (status != MS::kSuccess || proxyShapeObj.isNull()) {
+        return false;
+    }
+
+    // Rename the proxy shape to "renderSettings"
+    status = dagMod.renameNode(transformObj, "renderSettings");
+    if (status != MS::kSuccess) {
+        return false;
+    }
+
+    status = dagMod.renameNode(proxyShapeObj, "renderSettingsShape");
+    if (status != MS::kSuccess) {
+        return false;
+    }
+    // Execute the DAG modifier operations
+    status = dagMod.doIt();
+    if (status != MS::kSuccess) {
+        return false;
+    }
+
+    return true;
+}
+
+// Callback function to create USD render settings on file new.
+void onFileNewCreateRenderSettings(void* /*clientData*/)
+{
+    // For TF_WARN macro.
+    PXR_NAMESPACE_USING_DIRECTIVE
+
+    if (!createRenderSettings()) {
+        TF_WARN("USD render settings creation failed.");
+    }
+}
+
+// Callback function to check if a stage exists on file open, otherwise create
+// one with usd render settings.
+void onFileOpenCheckOrCreateRenderSettings(void* /*clientData*/)
+{
+    // If there is at least one stage in the Maya scene, render settings will
+    // be taken from one existing stage.
+    const auto mayaSceneSegmentHandler = Ufe::RunTimeMgr::instance().sceneSegmentHandler(MayaUsdAPI::getMayaRunTimeId());
+    const auto mayaRootPath = mayaSceneSegmentHandler->rootSceneSegmentRootPath();
+    const auto gatewayItems = Ufe::SceneSegmentHandler::findGatewayItems(
+        mayaRootPath, MayaUsdAPI::getUsdRunTimeId());
+
+    if (gatewayItems.empty()) {
+        onFileNewCreateRenderSettings(nullptr);
+    }
+}
+
 }
 
 void initialize()
 {
     Fvp::InitializationParams fvpInitParams;
-    fvpInitParams.colorPreferencesNotificationProvider
-        = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
-    fvpInitParams.colorPreferencesTranslator
-        = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+    if (MGlobal::mayaState() != MGlobal::kBatch) {
+        // MayaColorPreferencesTranslator ctor will throw an exception
+        // on construction in batch mode, as 
+        // MayaHydra::getRGBAColorPreferenceValue() fails because
+        // the Maya displayRGBColor command is unavailable in batch mode.
+        fvpInitParams.colorPreferencesNotificationProvider
+            = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+        fvpInitParams.colorPreferencesTranslator
+            = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+    }
     Fvp::initialize(fvpInitParams);
 }
 
 void finalize()
 {
     Fvp::InitializationParams fvpInitParams;
-    fvpInitParams.colorPreferencesNotificationProvider
-        = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
-    fvpInitParams.colorPreferencesTranslator
-        = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+    if (MGlobal::mayaState() != MGlobal::kBatch) {
+        fvpInitParams.colorPreferencesNotificationProvider
+            = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+        fvpInitParams.colorPreferencesTranslator
+            = MayaHydra::MayaColorPreferencesTranslator::getInstance().shared_from_this();
+    }
     Fvp::finalize(fvpInitParams);
     MayaHydra::MayaColorPreferencesTranslator::deleteInstance();
 }
@@ -207,7 +301,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     // Set dome light textures maximum resolution default to 1024.  A proper
     // solution with a Hydra preferences category in the Maya
     // preferences UI is preferable, but at time of writing is not in
-    // scope.  PPT, 17-Jan-2025.
+    // scope.
     MGlobal::executeCommand("if (!`optionVar -exists HdStormRendererPlugin__domeLightTexturesMaxResolution`) { optionVar -iv HdStormRendererPlugin__domeLightTexturesMaxResolution 1024; }");
 
     MFnPlugin plugin(obj, "Autodesk", PLUGIN_VERSION, "Any");
@@ -271,6 +365,16 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
+    // *** FIXME ***  Have a single templated function for all 3 commands. 
+    if (!plugin.registerCommand(
+            HydraRenderCmd::name, HydraRenderCmd::creator, HydraRenderCmd::createSyntax)) {
+        ret = MS::kFailure;
+        std::ostringstream msg;
+        msg << "Error registering " << HydraRenderCmd::name << " command!";
+        ret.perror(msg.str().c_str());
+        return ret;
+    }
+
     // Set the path where maya hydra is loaded to be used later
     //This must be called before the renderoverride is created
     MtohSetMayaHydraPluginLocation(std::filesystem::path(plugin.loadPath().asChar())); 
@@ -291,6 +395,9 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
+    // Renderer registration must be done after UI registration, as UI
+    // registration defines the UI tab in the Maya render settings.  To be
+    // re-evaluated as render settings UI requirements are clarified.
     if (!plugin.registerUI(
         "mayaHydra_registerUI_load",
         "mayaHydra_registerUI_unload",
@@ -300,6 +407,11 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         ret = MS::kFailure;
         ret.perror("Error registering mayaHydra UI procedures.");
         return ret;
+    }
+
+    // Register Hydra renderers as Maya production renderers.
+    for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {
+        registerRenderer(desc);
     }
 
     auto registerPluginLoadingCallback = [&](MSceneMessage::Message pluginLoadingMessage, MMessage::MStringArrayFunction callback) {
@@ -330,11 +442,48 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
     initialize();
 
+    if (addRenderSettingsToScene()) {
+        // Register file new callback to create renderSettings proxy shape
+        g_renderSettingsFileNewCallbackId = MSceneMessage::addCallback(
+            MSceneMessage::kAfterNew, onFileNewCreateRenderSettings, nullptr, &ret);
+        if (!ret) {
+            ret.perror("Unable to register render settings file new callback.");
+            return ret;
+        }
+
+        // Register file open callback
+        g_renderSettingsFileOpenCallbackId = MSceneMessage::addCallback(
+            MSceneMessage::kAfterOpen, onFileOpenCheckOrCreateRenderSettings, nullptr, &ret);
+        if (!ret) {
+            ret.perror("Unable to register render settings file open callback.");
+            return ret;
+        }
+    }
+
+    constexpr const char* melRsUtils = "mayaHydra_renderSettings_utils";
+    if (MGlobal::sourceFile(MString(melRsUtils)) != MS::kSuccess) {
+        std::ostringstream msg;
+        msg << "Error sourcing script " << melRsUtils;
+        ret = MS::kFailure;
+        ret.perror(msg.str().c_str());
+        return ret;
+    }
+
     return ret;
 }
 
 PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 {
+    if (g_renderSettingsFileOpenCallbackId != 0) {
+        MMessage::removeCallback(g_renderSettingsFileOpenCallbackId);
+        g_renderSettingsFileOpenCallbackId = 0;
+    }
+
+    if (g_renderSettingsFileNewCallbackId != 0) {
+        MMessage::removeCallback(g_renderSettingsFileNewCallbackId);
+        g_renderSettingsFileNewCallbackId = 0;
+    }
+
     finalize();
 
     for (const auto& callbackId : _pluginLoadingCallbackIds) {
@@ -356,6 +505,13 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 
     // Clear any registered callbacks
     MGlobal::executeCommand("callbacks -cc -owner mayaHydra;");
+
+    if (!plugin.deregisterCommand(HydraRenderCmd::name)) {
+        ret = MS::kFailure;
+        std::ostringstream msg;
+        msg << "Error deregistering " << HydraRenderCmd::name << " command!";
+        ret.perror(msg.str().c_str());
+    }
 
     if (!plugin.deregisterCommand(MtohViewCmd::name)) {
         ret = MS::kFailure;

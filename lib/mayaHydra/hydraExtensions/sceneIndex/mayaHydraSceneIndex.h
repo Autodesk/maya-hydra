@@ -50,6 +50,9 @@
 
 UFE_NS_DEF { class Path; }
 
+// Forward declaration so that qualified friend declaration is valid.
+namespace MAYAHYDRA_NS_DEF { class BatchRenderer; }
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 struct MayaHydraInitData
@@ -87,8 +90,10 @@ public:
     };
     template <typename T> using AdapterMap = std::unordered_map<SdfPath, T, SdfPath::Hash>;
 
-    static MayaHydraSceneIndexRefPtr New(MayaHydraInitData& initData) {
-        return TfCreateRefPtr(new MayaHydraSceneIndex(initData));
+    static MayaHydraSceneIndexRefPtr New(
+        MayaHydraInitData& initData,
+        bool interactive) {
+        return TfCreateRefPtr(new MayaHydraSceneIndex(initData, interactive));
     }
 
     ~MayaHydraSceneIndex();
@@ -245,6 +250,10 @@ public:
     /// Is using an environment variable to tell if we should pass normals to Hydra when using the
     /// render item and mesh adapters
     static bool passNormalsToHydra();
+
+    /// Is using an environment variable to tell if we should use the mesh adapter instead of the
+    /// render item adapter for Maya meshes or when we are using batch production rendering it should be always on
+    bool useMeshAdapter();
     
     using LightDagPathMap = std::unordered_map<std::string, MDagPath>;
     LightDagPathMap GetGlobalLightPaths() const;
@@ -255,7 +264,10 @@ public:
     GfBBox3d GetBoundingBox() const;
 
 private:
-    MayaHydraSceneIndex(MayaHydraInitData& initData);
+
+    MayaHydraSceneIndex(
+        MayaHydraInitData& initData,
+        bool interactive);
 
     template <typename AdapterPtr, typename Map>
     AdapterPtr _CreateAdapter(
@@ -291,6 +303,7 @@ private:
 
 #ifdef CODE_COVERAGE_WORKAROUND
     friend class MtohRenderOverride;
+    friend class MAYAHYDRA_NS_DEF::BatchRenderer;
 #endif
     void _Destroy();
 
@@ -333,6 +346,8 @@ private:
     SdfPath _materialPath;
 
     const Fvp::PathMapperConstPtr _mayaPathMapper {};
+
+    bool _interactive{true};
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
