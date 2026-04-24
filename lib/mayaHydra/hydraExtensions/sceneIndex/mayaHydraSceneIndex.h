@@ -20,6 +20,7 @@
 #include "pxr/imaging/hd/dirtyBitsTranslator.h"
 
 #include <mayaHydraLib/adapters/cameraAdapter.h>
+#include <mayaHydraLib/adapters/customDagAdapter.h>
 #include <mayaHydraLib/adapters/lightAdapter.h>
 #include <mayaHydraLib/adapters/materialAdapter.h>
 #include <mayaHydraLib/adapters/renderItemAdapter.h>
@@ -48,6 +49,9 @@
 #include <unordered_map>
 
 UFE_NS_DEF { class Path; }
+
+// Forward declaration so that qualified friend declaration is valid.
+namespace MAYAHYDRA_NS_DEF { class BatchRenderer; }
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -86,8 +90,10 @@ public:
     };
     template <typename T> using AdapterMap = std::unordered_map<SdfPath, T, SdfPath::Hash>;
 
-    static MayaHydraSceneIndexRefPtr New(MayaHydraInitData& initData) {
-        return TfCreateRefPtr(new MayaHydraSceneIndex(initData));
+    static MayaHydraSceneIndexRefPtr New(
+        MayaHydraInitData& initData,
+        bool interactive) {
+        return TfCreateRefPtr(new MayaHydraSceneIndex(initData, interactive));
     }
 
     ~MayaHydraSceneIndex();
@@ -244,6 +250,10 @@ public:
     /// Is using an environment variable to tell if we should pass normals to Hydra when using the
     /// render item and mesh adapters
     static bool passNormalsToHydra();
+
+    /// Is using an environment variable to tell if we should use the mesh adapter instead of the
+    /// render item adapter for Maya meshes or when we are using batch production rendering it should be always on
+    bool useMeshAdapter();
     
     using LightDagPathMap = std::unordered_map<std::string, MDagPath>;
     LightDagPathMap GetGlobalLightPaths() const;
@@ -254,7 +264,10 @@ public:
     GfBBox3d GetBoundingBox() const;
 
 private:
-    MayaHydraSceneIndex(MayaHydraInitData& initData);
+
+    MayaHydraSceneIndex(
+        MayaHydraInitData& initData,
+        bool interactive);
 
     template <typename AdapterPtr, typename Map>
     AdapterPtr _CreateAdapter(
@@ -262,9 +275,14 @@ private:
         const std::function<AdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>& adapterCreator,
         Map&                                                                    adapterMap,
         bool                                                                    isSprim = false);
-    MayaHydraLightAdapterPtr  CreateLightAdapter(const MDagPath& dagPath);
-    MayaHydraCameraAdapterPtr CreateCameraAdapter(const MDagPath& dagPath);
-    MayaHydraShapeAdapterPtr  CreateShapeAdapter(const MDagPath& dagPath);
+    MayaHydraLightAdapterPtr      CreateLightAdapter(const MDagPath& dagPath);
+    MayaHydraCameraAdapterPtr     CreateCameraAdapter(const MDagPath& dagPath);
+    MayaHydraShapeAdapterPtr      CreateShapeAdapter(const MDagPath& dagPath);
+    /// Creates a custom adapter for plugin DAG nodes that have no registered
+    /// adapter. Returns null for Maya built-in nodes and for plugin nodes that
+    /// already provide their own Hydra data through the Flow Viewport data
+    /// producer API (checked via DataProducersNodeHashCodeToSdfPathRegistry).
+    MayaHydraCustomDagAdapterPtr CreateCustomAdapter(const MDagPath& dagPath);
 
     // Utilites
     bool _GetRenderItem(int fastId, MayaHydraRenderItemAdapterPtr& adapter);
@@ -285,6 +303,7 @@ private:
 
 #ifdef CODE_COVERAGE_WORKAROUND
     friend class MtohRenderOverride;
+    friend class MAYAHYDRA_NS_DEF::BatchRenderer;
 #endif
     void _Destroy();
 
@@ -301,6 +320,7 @@ private:
     AdapterMap<MayaHydraRenderItemAdapterPtr>              _renderItemsAdapters;
     std::unordered_map<int, MayaHydraRenderItemAdapterPtr> _renderItemsAdaptersFast;
     AdapterMap<MayaHydraMaterialAdapterPtr>                _materialAdapters;
+    AdapterMap<MayaHydraCustomDagAdapterPtr>              _customAdapters;
     std::vector<MCallbackId>                               _callbacks;
     std::vector<std::tuple<SdfPath, MObject>>              _adaptersToRecreate;
     std::vector<std::tuple<SdfPath, uint32_t>>             _adaptersToRebuild;
@@ -312,6 +332,7 @@ private:
     using CameraAdapterCreator
         = std::function<MayaHydraCameraAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>;
     std::vector<std::pair<MObject, CameraAdapterCreator>> _camerasToAdd;
+    std::vector<MObject>                                  _customNodesToAdd;
     std::vector<SdfPath>                                  _materialTagsChanged;
 
     static SdfPath _fallbackMaterial;
@@ -325,6 +346,8 @@ private:
     SdfPath _materialPath;
 
     const Fvp::PathMapperConstPtr _mayaPathMapper {};
+
+    bool _interactive{true};
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

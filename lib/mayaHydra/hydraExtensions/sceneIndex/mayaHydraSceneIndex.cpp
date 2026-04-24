@@ -24,6 +24,7 @@
 #include <mayaHydraLib/hydraUtils.h>
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mixedUtils.h>
+#include <mayaHydraLib/profilingUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
 
 #include <pxr/base/tf/envSetting.h>
@@ -36,6 +37,8 @@
 #include <maya/MDagPath.h>
 #include <maya/MDagPathArray.h>
 #include <maya/MFnComponent.h>
+#include <maya/MFnDependencyNode.h>
+#include <maya/MNodeClass.h>
 #include <maya/MItDag.h>
 #include <maya/MMaterial.h>
 #include <maya/MObjectArray.h>
@@ -107,15 +110,9 @@ TfToken GetPurposeRenderTag(const MRenderItem& ri)
     return HdRenderTagTokens->geometry;
 }
 
-bool useMeshAdapter()
+bool filterMesh(const MRenderItem& ri, bool useMeshAdapter)
 {
-    static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
-    return uma;
-}
-
-bool filterMesh(const MRenderItem& ri)
-{
-    return useMeshAdapter() ?
+    return useMeshAdapter ?
                             // Filter our mesh render items, and let the mesh adapter handle Maya
                             // meshes.  The MRenderItem::name() for meshes is "StandardShadedItem",
                             // their MRenderItem::type() is InternalMaterialItem, but
@@ -390,7 +387,7 @@ private:
 
 } // namespace
 
-MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData)
+MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData, bool interactive)
     : _ID(initData.delegateID.AppendChild(
           TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this))))
     , _renderIndex(initData.renderIndex)
@@ -399,6 +396,7 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData)
     , _sprimPath(initData.delegateID.AppendPath(SdfPath(std::string("sprims"))))
     , _materialPath(initData.delegateID.AppendPath(SdfPath(std::string("materials"))))
     , _mayaPathMapper(std::make_shared<MayaPathMapper>(*this))
+    , _interactive(interactive)
 {
     static std::once_flag once;
     std::call_once(once, []() {
@@ -426,7 +424,8 @@ void MayaHydraSceneIndex::_Destroy()
         _shapeAdapters,
         _lightAdapters,
         _cameraAdapters,
-        _materialAdapters);
+        _materialAdapters,
+        _customAdapters);
 
     _renderItemsAdapters.clear();
     _shapeAdapters.clear();
@@ -434,6 +433,7 @@ void MayaHydraSceneIndex::_Destroy()
     _materialAdapters.clear();
     _cameraAdapters.clear();
     _renderItemsAdaptersFast.clear();
+    _customAdapters.clear();
 
     // Unregister the fallback path mapper.
     Fvp::PathMapperRegistry::Instance().SetFallbackMapper(nullptr);
@@ -441,6 +441,8 @@ void MayaHydraSceneIndex::_Destroy()
 
 void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewportScene& scene)
 {
+    MH_PROFILE_FUNCTION();
+
     // First loop to get rid of removed items
     constexpr int kInvalidId = 0;
     for (size_t i = 0; i < scene.mRemovalCount; i++) {
@@ -451,7 +453,12 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         if (_GetRenderItem(fastId, ria)) {
             _RemoveRenderItem(ria);
         }
-        assert(ria != nullptr);
+        // The removal list can contain duplicate fastIds.  After the first
+        // removal succeeds, subsequent duplicates will not be found — skip
+        // them.
+        if (ria == nullptr) {
+            continue;
+        }
     }
 
     // My version, does minimal update
@@ -472,9 +479,17 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             continue;
         }
 
+        // VP2 image planes emit a DepthPrepass render item that uses a special
+        // shader writing only to the depth buffer with alpha-tested discard.
+        // Hydra has no equivalent; rendering it as a regular textured mesh
+        // creates a second overlapping layer that causes visual artifacts.
+        if (riName == "imagePlane_ColorImage_DepthPrepass") {
+            continue;
+        }
+
         // Meshes can optionally be handled by the mesh adapter, rather than by
         // render items.
-        if (filterMesh(ri)) {
+        if (filterMesh(ri, useMeshAdapter())) {
             continue;
         }
 
@@ -528,16 +543,22 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             // point
         }
 
-        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColor);
-        ria->UpdateFromDelta(data);
+        // Call UpdateTransform before UpdateFromDelta, as UpdateTransform
+        // updates the stored transform value, and UpdateFromDelta sends out
+        // PrimsDirtied notifications. If an observer receiving the PrimsDirtied 
+        // notifications pulls on the transform, it needs to be up to date.
         if (flags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
             ria->UpdateTransform(ri);
         }
+        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColor);
+        ria->UpdateFromDelta(data);
     }
 }
 
 void MayaHydraSceneIndex::Populate()
 {
+    MH_PROFILE_FUNCTION();
+
     MayaHydraAdapterRegistry::LoadAllPlugin();
 
     MStatus status;
@@ -771,6 +792,31 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
         _addedNodes.clear();
     }
 
+    if (!_customNodesToAdd.empty()) {
+        for (const auto& obj : _customNodesToAdd) {
+            if (obj.isNull()) {
+                continue;
+            }
+            MDagPath dag;
+            MStatus  status = MDagPath::getAPathTo(obj, dag);
+            if (!status) {
+                continue;
+            }
+            if (dag.hasFn(MFn::kTransform)) {
+                continue;
+            }
+            MFnDagNode dagNode(dag);
+            if (dagNode.isIntermediateObject()) {
+                continue;
+            }
+            if (dag.isInstanced() && dag.instanceNumber() > 0) {
+                continue;
+            }
+            CreateCustomAdapter(dag);
+        }
+        _customNodesToAdd.clear();
+    }
+
     // We don't need to rebuild something that's already being recreated.
     // Since we have a few elements, linear search over vectors is going to
     // be okay.
@@ -815,7 +861,8 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
                     _shapeAdapters,
                     _lightAdapters,
                     _cameraAdapters,
-                    _materialAdapters);
+                    _materialAdapters,
+                    _customAdapters);
             }
             _adaptersToRebuild.clear();
         }
@@ -970,7 +1017,8 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
             },
             _shapeAdapters,
             _lightAdapters,
-            _cameraAdapters);
+            _cameraAdapters,
+            _customAdapters);
     }
     // We need to trigger rebuilding shaders.
     if (oldParams.textureMemoryPerTexture != params.textureMemoryPerTexture) {
@@ -1058,7 +1106,8 @@ void MayaHydraSceneIndex::RemoveAdapter(const SdfPath& id)
             _shapeAdapters,
             _lightAdapters,
             _cameraAdapters,
-            _materialAdapters)) {
+            _materialAdapters,
+            _customAdapters)) {
         TF_WARN("MayaHydraSceneIndex::RemoveAdapter(%s) -- Adapter does not exists", id.GetText());
     }
 }
@@ -1133,6 +1182,18 @@ bool MayaHydraSceneIndex::_GetRenderItemMaterial(
         return true;
     }
 
+    // Image planes use a dedicated material adapter that reads the imageName
+    // attribute directly, rather than going through shading engine lookup.
+    MDagPath dagPath = ri.sourceDagPath();
+    if (dagPath.isValid() && dagPath.node().hasFn(MFn::kImagePlane)) {
+        material = GetMaterialPath(dagPath.node());
+        if (TfMapLookupPtr(_materialAdapters, material) != nullptr) {
+            return true;
+        }
+        shadingEngineNode = dagPath.node();
+        return false;
+    }
+
     if (GetShadingEngineNode(ri, shadingEngineNode))
     // Else try to find associated material node if this is a material shader.
     // NOTE: The existing maya material support in hydra expects a shading engine node
@@ -1204,6 +1265,22 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
                 a->RemovePrim();
             },
             _shapeAdapters)) {
+        MFnDagNode dgNode(obj);
+        MDagPath   path;
+        dgNode.getPath(path);
+        if (path.isValid() && MObjectHandle(obj).isValid()) {
+            InsertDag(path);
+        }
+        return;
+    }
+
+    if (_RemoveAdapter<MayaHydraAdapter>(
+            id,
+            [](MayaHydraAdapter* a) {
+                a->RemoveCallbacks();
+                a->RemovePrim();
+            },
+            _customAdapters)) {
         MFnDagNode dgNode(obj);
         MDagPath   path;
         dgNode.getPath(path);
@@ -1291,6 +1368,35 @@ MayaHydraShapeAdapterPtr MayaHydraSceneIndex::CreateShapeAdapter(const MDagPath&
     return _CreateAdapter(dagPath, shapeCreatorFunc, _shapeAdapters);
 }
 
+MayaHydraCustomDagAdapterPtr MayaHydraSceneIndex::CreateCustomAdapter(const MDagPath& dagPath)
+{
+    MFnDependencyNode depNode(dagPath.node());
+    MNodeClass nodeClass(depNode.typeName());
+    if (nodeClass.pluginName().length() == 0) {
+        return {};
+    }
+
+    // Skip plugin nodes that already provide their own Hydra data through
+    // the Flow Viewport data producer API.  Their MObjectHandle hash code
+    // is registered in DataProducersNodeHashCodeToSdfPathRegistry when
+    // they call addDataProducerSceneIndex() with a dccNode pointer.
+    MObjectHandle nodeHandle(dagPath.node());
+    if (!Fvp::DataProducersNodeHashCodeToSdfPathRegistry::Instance()
+             .GetPath(nodeHandle.hashCode()).IsEmpty()) {
+        return {};
+    }
+
+    auto creator = [](MayaHydraSceneIndex* si, const MDagPath& dag)
+        -> MayaHydraCustomDagAdapterPtr {
+        return std::make_shared<MayaHydraCustomDagAdapter>(si, dag);
+    };
+    return _CreateAdapter<MayaHydraCustomDagAdapterPtr>(
+        dagPath,
+        std::function<MayaHydraCustomDagAdapterPtr(MayaHydraSceneIndex*, const MDagPath&)>(creator),
+        _customAdapters,
+        false);
+}
+
 void MayaHydraSceneIndex::OnDagNodeAdded(const MObject& obj)
 {
     if (obj.isNull())
@@ -1301,15 +1407,19 @@ void MayaHydraSceneIndex::OnDagNodeAdded(const MObject& obj)
         return;
     }
 
-    // When not using the mesh adapter we care only about lights and cameras for this
-    // callback.  It is used to create a LightAdapter/CameraAdapter when adding a new light/camera
-    // in the scene for Hydra rendering.
+    // Queue newly added DAG nodes for adapter creation during the next
+    // FlushPendingUpdates().  Lights and cameras always get their dedicated
+    // adapters.  When the mesh adapter is active, all other shapes go through
+    // it.  Otherwise, unrecognized plugin shapes are queued for custom
+    // adapter creation (_customNodesToAdd).
     if (auto lightFn = MayaHydraAdapterRegistry::GetLightAdapterCreator(obj)) {
         _lightsToAdd.push_back({ obj, lightFn });
     } else if (auto cameraFn = MayaHydraAdapterRegistry::GetCameraAdapterCreator(obj)) {
         _camerasToAdd.push_back({ obj, cameraFn });
     } else if (useMeshAdapter()) {
         _addedNodes.push_back(obj);
+    } else {
+        _customNodesToAdd.push_back(obj);
     }
 }
 
@@ -1342,6 +1452,16 @@ void MayaHydraSceneIndex::OnDagNodeRemoved(const MObject& obj)
 
         if (it != _addedNodes.end()) {
             _addedNodes.erase(it, _addedNodes.end());
+        }
+    }
+
+    {
+        const auto itCustom
+            = std::remove_if(_customNodesToAdd.begin(), _customNodesToAdd.end(), [&obj](const auto& item) {
+                  return item == obj;
+              });
+        if (itCustom != _customNodesToAdd.end()) {
+            _customNodesToAdd.erase(itCustom, _customNodesToAdd.end());
         }
     }
 }
@@ -1386,7 +1506,10 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
                 CreateMaterial(materialId, material);
             }
         }
+        return;
     }
+
+    CreateCustomAdapter(dag);
 }
 
 void MayaHydraSceneIndex::UpdateLightVisibility(const MDagPath& dag)
@@ -1487,6 +1610,12 @@ bool MayaHydraSceneIndex::passNormalsToHydra()
 {
     static const bool val = TfGetEnvSetting(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA);
     return val;
+}
+
+bool MayaHydraSceneIndex::useMeshAdapter()
+{
+    static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
+    return (_interactive) ? uma : true;// Batch rendering (=> !_interactive) always uses mesh adapter
 }
 
 void MayaHydraSceneIndex::UpdateLightsShadowCollection()

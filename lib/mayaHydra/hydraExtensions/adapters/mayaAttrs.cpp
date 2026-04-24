@@ -66,7 +66,6 @@ namespace nonExtendedLightShapeNode {
 MObject dmapResolution;
 MObject dmapBias;
 MObject dmapFilterSize;
-MObject useDepthMapShadows;
 MObject useDmapAutoFocus;
 MObject dmapWidthFocus;
 MObject dmapFarClipPlane;

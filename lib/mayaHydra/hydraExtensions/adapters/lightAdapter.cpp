@@ -30,6 +30,7 @@
 #include <pxr/usd/usdLux/tokens.h>
 
 #include <maya/MColor.h>
+#include <maya/MFnAttribute.h>
 #include <maya/MFnAreaLight.h>
 #include <maya/MFnLight.h>
 #include <maya/MFnPointLight.h>
@@ -42,6 +43,8 @@
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 
 #include <iostream>
+#include <string>
+#include <unordered_set>
 
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
@@ -56,9 +59,7 @@ TF_REGISTRY_FUNCTION(TfType)
     TfType::Define<MayaHydraLightAdapter, TfType::Bases<MayaHydraDagAdapter>>();
 }
 
-namespace {
-
-void _changeVisibility(
+void LightAdapterParentAttributeChanged(
     MNodeMessage::AttributeMessage msg,
     MPlug&                         plug,
     MPlug&                         otherPlug,
@@ -75,9 +76,27 @@ void _changeVisibility(
             adapter->InvalidateTransform();
         }
     }
+}
 
-    // Handle extension attributes change
-    adapter->HandleExtensionAndDynamicAttributesDirty(plug);
+namespace {
+
+// Single source of truth for attributes that affect HdLight params or shadow params.
+// When adding an attribute to GetMayaLightParams, GetLightParamValue, _CalculateShadowParams,
+// _CalculateShadowProjectionMatrix, or GetLightMaterialNetwork, ADD IT HERE. The unit test
+// LightPrimvars.ParamAttributesMatchGetLogic verifies this list stays in sync.
+static const char* const kLightParamAttributeNames[] = {
+    "intensity", "color", "shadowColor", "decayRate", "emitDiffuse", "emitSpecular",
+    "dmapResolution", "dmapBias", "dmapFilterSize", "useDmapAutoFocus", "dmapWidthFocus",
+    "dmapFarClipPlane", "dmapNearClipPlane", "coneAngle", "dropoff", "lightAngle",
+    "aiExposure", "aiDiffuse", "aiSpecular", "aiNormalize", "aiEnableTemperature",
+    "aiColorTemperature", "format", "aiCastVolumetricShadows", "aiVolumeSamples", "aiCastShadows",
+};
+
+bool _IsLightParamAttribute(const MPlug& plug)
+{
+    return MayaHydraAdapter::IsParamAttribute(
+        plug,
+        MayaHydraAdapter::GetParamAttributeSet(kLightParamAttributeNames));
 }
 
 void _dirtyTransform(MObject& node, void* clientData)
@@ -91,19 +110,80 @@ void _dirtyTransform(MObject& node, void* clientData)
     }
 }
 
-void _dirtyParams(MObject& node, void* clientData)
+void _dirtyParamsPlug(MObject& node, MPlug& plug, void* clientData)
 {
     TF_UNUSED(node);
-    auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
-    if (adapter->IsVisible()) {
-        adapter->InvalidateTransform();
-        adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
+    auto* adapter = reinterpret_cast<MayaHydraLightAdapter*>(clientData);
+    // For non-param attrs, only rely on NodeDirtyPlugCallback when the plug is driven.
+    // Direct setAttr changes are handled by AttributeChangedCallback.
+    MPlug topPlug = MayaHydra::GetTopPlug(plug);
+    if (!topPlug.isConnected()) {
+        return;
     }
+    if (_IsLightParamAttribute(topPlug)) {
+        if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(topPlug)) {
+            adapter->MarkPrimvarDirtyForAttributeChange(topPlug);
+        } else {
+            adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
+        }
+        return;
+    }
+    adapter->MaybeMarkPrimvarDirtyForAttributeChange(topPlug);
 }
 
 const MString defaultLightSet("defaultLightSet");
 
 } // namespace
+
+void MayaHydraLightAdapter::_LightShapeAttributeChanged(
+    MNodeMessage::AttributeMessage msg,
+    MPlug&                         plug,
+    MPlug&                         otherPlug,
+    void*                          clientData)
+{
+    TF_UNUSED(otherPlug);
+
+    auto* adapter = reinterpret_cast<MayaHydraLightAdapter*>(clientData);
+    if (plug == MayaAttrs::dagNode::visibility) {
+        if (adapter->UpdateVisibility()) {
+            adapter->RemovePrim();
+            adapter->Populate();
+            adapter->InvalidateTransform();
+        }
+        return;
+    }
+    if (adapter->OnShapeAttributeChanged(plug)) {
+        return;
+    }
+
+    MPlug topPlug = MayaHydra::GetTopPlug(plug);
+    // Driven plug changes are handled by the node-dirty callback.
+    if (topPlug.isConnected()) {
+        return;
+    }
+
+    // For param attributes, rely on attribute-changed notifications to avoid duplicate
+    // dirtying from NodeDirtyPlugCallback.
+    if (_IsLightParamAttribute(topPlug)) {
+        // Reduce duplicate notifications: value changes and structural attr changes (undo addAttr).
+        if (MayaHydraAdapter::AttributeMessageAffectsExtensionPrimvars(msg)) {
+            if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(topPlug)) {
+                adapter->MarkPrimvarDirtyForAttributeChange(topPlug);
+            } else {
+                adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
+            }
+        }
+        return;
+    }
+
+    if (!MayaHydraAdapter::AttributeMessageAffectsExtensionPrimvars(msg)) {
+        return;
+    }
+
+    if (adapter->ShouldMarkPrimvarDirtyForAttributeChange(topPlug)) {
+        adapter->MaybeMarkPrimvarDirtyForAttributeChange(topPlug);
+    }
+}
 
 // MayaHydraLightAdapter is the base class for any light adapter used to handle the translation from
 // a light to hydra.
@@ -492,7 +572,7 @@ VtValue MayaHydraLightAdapter::GetLightMaterialNetwork() const
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET).Msg("Maya light parameters:\n");
 
     const auto inclusiveMatrix = GetDagPath().inclusiveMatrix();
-    const bool shadowsEnabled = mayaLight.useRayTraceShadows();
+    const bool shadowsEnabled = GetShadowsEnabled(mayaLight);
 
     // Get Maya parameters (including Arnold attributes with "ai" prefix)
     MayaLightParams mayaParams = GetMayaLightParams();
@@ -772,7 +852,13 @@ void MayaHydraLightAdapter::CreateCallbacks()
     MStatus status;
     auto    dag = GetDagPath();
     auto    obj = dag.node();
-    auto    id = MNodeMessage::addNodeDirtyCallback(obj, _dirtyParams, this, &status);
+    auto id = MNodeMessage::addNodeDirtyPlugCallback(obj, _dirtyParamsPlug, this, &status);
+    if (status) {
+        AddCallback(id);
+    }
+    // AttributeChangedCallback fires on value change including reset to default; NodeDirtyPlugCallback
+    // may not. Ensures primvars are removed immediately in scene browser when ai attrs are reset.
+    id = MNodeMessage::addAttributeChangedCallback(obj, _LightShapeAttributeChanged, this, &status);
     if (status) {
         AddCallback(id);
     }
@@ -782,7 +868,7 @@ void MayaHydraLightAdapter::CreateCallbacks()
         // about passing raw pointers to the callbacks. Hopefully.
         obj = dag.node();
         if (obj != MObject::kNullObj) {
-            id = MNodeMessage::addAttributeChangedCallback(obj, _changeVisibility, this, &status);
+            id = MNodeMessage::addAttributeChangedCallback(obj, LightAdapterParentAttributeChanged, this, &status);
             if (status) {
                 AddCallback(id);
             }
@@ -810,8 +896,66 @@ void MayaHydraLightAdapter::GetGlfSimpleLightPosAndDirFromMFnLight(
     outSimpleLight.SetSpotDirection(GfVec3f(lightDirection.x, lightDirection.y, lightDirection.z));
 }
 
+const std::unordered_set<std::string>& MayaHydraLightAdapter::GetLightParamAttributeNamesForTest()
+{
+    return MayaHydraAdapter::GetParamAttributeSet(kLightParamAttributeNames);
+}
+
+
+bool MayaHydraLightAdapter::ShouldMarkPrimvarDirtyForAttributeChange(const MPlug& plug) const
+{
+    return MayaHydraAdapter::ShouldMarkPrimvarDirtyForParamAttrs(plug, kLightParamAttributeNames);
+}
+
+HdDirtyBits MayaHydraLightAdapter::GetConsolidatedDirtyBitsForPrimvarAttributeChange(const MPlug& plug) const
+{
+    if (MayaHydraAdapter::IsParamAttribute(plug,
+            MayaHydraAdapter::GetParamAttributeSet(kLightParamAttributeNames))) {
+        return HdLight::DirtyParams | HdLight::DirtyShadowParams;
+    }
+    return 0;
+}
+
+void MayaHydraLightAdapter::MarkDirtyIfPlugAffectsLightParams(MayaHydraLightAdapter* adapter, const MPlug& plug)
+{
+    if (!adapter->IsVisible()) {
+        return;
+    }
+    if (plug.isChild()) {
+        return;
+    }
+    if (!MayaHydraAdapter::IsParamAttribute(plug,
+            MayaHydraAdapter::GetParamAttributeSet(kLightParamAttributeNames))) {
+        return;
+    }
+    adapter->InvalidateTransform();
+    if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
+        // Single MarkDirty call (primvar + params + shadows) via
+        // GetConsolidatedDirtyBitsForPrimvarAttributeChange
+        // to reduce redundant scene index notifications when updating ai attributes.
+        adapter->MarkPrimvarDirtyForAttributeChange(plug);
+    } else {
+        adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
+    }
+}
+
 bool MayaHydraLightAdapter::GetShadowsEnabled(MFnLight& light) const
 {
+    if (IsDagPathAnArnoldSkyDomeLight(GetDagPath())) {
+        // aiSkyDomeLight doesn't inherit from MFnNonExtendedLight, so the
+        // native useRayTraceShadows/useDepthMapShadows checks always return
+        // false. Use the Arnold-specific attribute instead.
+        // Use GetNode() to get the shape node where Arnold dynamic attributes live,
+        // as light.object() may return the transform node.
+        MStatus status;
+        MFnDependencyNode depNode(GetNode(), &status);
+        if (status) {
+            const auto plug = depNode.findPlug("aiCastShadows", true);
+            return !plug.isNull() && plug.asBool();
+        }
+        return false;
+    }
+
     if (light.useRayTraceShadows()) {
         return true;
     }
@@ -864,6 +1008,12 @@ void MayaHydraLightAdapter::_CalculateShadowParams(MFnLight& light, HdxShadowPar
         std::cout << "Resulting HdxShadowParams:\n";
         std::cout << params << "\n";
     }
+}
+
+bool MayaHydraLightAdapter::OnShapeAttributeChanged(const MPlug& plug)
+{
+    TF_UNUSED(plug);
+    return false;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

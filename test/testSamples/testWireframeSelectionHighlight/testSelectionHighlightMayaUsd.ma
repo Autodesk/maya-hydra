@@ -84,7 +84,7 @@ createNode mayaUsdProxyShape -n "sample_usdShape" -p "sample_usd";
 	setAttr -k off ".v";
 	setAttr ".covm[0]"  0 1 1;
 	setAttr ".cdvm[0]"  0 1 1;
-	setAttr ".fp" -type "string" "X:/GIT/maya-hydra-opensource/test/testSamples/testWireframeSelectionHighlight/sample_usd.usda";
+	setAttr ".fp" -type "string" "sample_usd.usda";
 	setAttr ".pp" -type "string" "";
 	setAttr ".epp" -type "string" "";
 	setAttr ".forceCompute" yes;

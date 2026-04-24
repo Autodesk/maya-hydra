@@ -20,9 +20,12 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraPrimvarDataSource.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraCameraDataSource.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraLightDataSource.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraCustomNodeDataSource.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexUtils.h>
 #include <mayaHydraLib/adapters/adapter.h>
+#include <mayaHydraLib/adapters/customDagAdapter.h>
+#include <mayaHydraLib/adapters/tokens.h>
 
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/basisCurvesSchema.h>
@@ -48,6 +51,10 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+namespace {
+    using LockType = std::recursive_mutex;
+    LockType dg_access_mutex;
+}
 
 MayaHydraDataSource::MayaHydraDataSource(
     const SdfPath& id,
@@ -103,7 +110,14 @@ MayaHydraDataSource::GetNames()
     if (_type == HdPrimTypeTokens->camera) {
         result.push_back(HdCameraSchemaTokens->camera);
         result.push_back(HdXformSchemaTokens->xform);
-        result.push_back(HdPurposeSchemaTokens->purpose); // add a purpose render tag
+        result.push_back(HdPurposeSchemaTokens->purpose);
+    }
+
+    if (_type == MayaHydraAdapterTokens->mayaCustomDagNode) {
+        result.push_back(HdXformSchemaTokens->xform);
+        result.push_back(HdVisibilitySchemaTokens->visibility);
+        result.push_back(MayaHydraAdapterTokens->mayaNode);
+        result.push_back(HdPurposeSchemaTokens->purpose);
     }
 
     return result;
@@ -112,6 +126,9 @@ MayaHydraDataSource::GetNames()
 HdDataSourceBaseHandle
 MayaHydraDataSource::Get(const TfToken& name)
 {
+    // Apply a global lock to avoid race condition while doing parallel DG node evaluation.
+    std::lock_guard<LockType> lock(dg_access_mutex);
+
     if (name == HdMeshSchemaTokens->mesh) {
         if (_type == HdPrimTypeTokens->mesh) {
             auto topology = _adapter->GetMeshTopology();
@@ -201,6 +218,12 @@ MayaHydraDataSource::Get(const TfToken& name)
                     .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
                         _adapter->GetRenderTag()))
                     .Build();
+    } else if (name == MayaHydraAdapterTokens->mayaNode
+               && _type == MayaHydraAdapterTokens->mayaCustomDagNode) {
+        auto* customAdapter = dynamic_cast<MayaHydraCustomDagAdapter*>(_adapter);
+        if (customAdapter) {
+            return MayaHydraCustomNodeDataSource::New(customAdapter);
+        }
     }
 
     return nullptr;

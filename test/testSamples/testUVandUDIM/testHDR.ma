@@ -409,7 +409,7 @@ createNode standardSurface -n "standardSurface2";
 	rename -uid "EA6F98CB-4009-1153-2FFE-CDB110A6F0B5";
 createNode file -n "file1";
 	rename -uid "95AD65E7-44A2-3EF3-877A-52BE10CE16D7";
-	setAttr ".ftn" -type "string" "D:/Maya/ecg-maya-hydra/maya-hydra/test/testSamples/testUVandUDIM/001.hdr";
+	setAttr ".ftn" -type "string" "001.hdr";
 	setAttr ".cs" -type "string" "Raw";
 createNode place2dTexture -n "place2dTexture4";
 	rename -uid "5A73DFA1-4794-DBAF-248F-029B7E4694F3";

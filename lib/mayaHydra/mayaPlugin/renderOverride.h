@@ -40,6 +40,7 @@
 #include <mayaHydraLib/mhWireframeColorInterfaceImp.h>
 #include <mayaHydraLib/mhLeadObjectPathTracker.h>
 #include <mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h>
+#include <mayaHydraLib/sceneIndex/mhGenerativeProceduralResolvingSceneIndex.h>
 #include <mayaHydraLib/pick/mhPickHandlerFwd.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
 #include <mayaHydraLib/pick/mhPickHitFwd.h>
@@ -78,17 +79,22 @@
 #include <pxr/pxr.h>
 
 #include <maya/MCallbackIdArray.h>
+#include <maya/MDagPath.h>
 #include <maya/MString.h>
 
 #include <atomic>
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <vector>
 #include <map>
 
+#include <pxr/base/tf/hashset.h>
+
 #include <ufe/ufe.h>
 UFE_NS_DEF {
+class Path;
 class SelectionChanged;
 class Selection;
 }
@@ -125,8 +131,8 @@ public:
 
     /// Returns the names of all AOVs made available by the render delegates
     /// for a given render pass index.
-    /// TODO 2025-08-29 : This currently gathers AOVs from all viewports indiscriminately.
-    /// Once we have proper multi-viewport support, we should also be able to
+    /// This currently gathers AOVs from all viewports indiscriminately.
+    /// With proper multi-viewport support, it should also be possible to
     /// specify which viewport to get the AOVs for.
     static TfTokenVector GetAvailableFramePassAovs(int passIndex);
 
@@ -145,9 +151,9 @@ public:
     static SdfPath RendererSceneDelegateId(TfToken rendererName, TfToken sceneDelegateName);
 
     /// Returns whether the given renderer has converged.
-    /// TODO 2025-10-21 : This currently only checks the first viewport found
-    /// that uses the given renderer. Once we have proper multi-viewport support, 
-    /// we should also be able to specify which viewport to check the convergence for.
+    /// This currently only checks the first viewport found that uses the
+    /// given renderer. With proper multi-viewport support, it should also
+    /// be possible to specify which viewport to check the convergence for.
     ///
     /// Intended mostly for use in debugging and testing.
     static bool HasConverged(TfToken rendererName);
@@ -278,6 +284,32 @@ private:
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
     static void
     _ViewSelectedChangedCb(const MString& panelName, bool viewSelectedObjectsChanged, void* data);
+
+    /// After building isolate selection from UFE paths, append Maya-native
+    /// Hydra paths for camera/light gizmo drawables that correspond to the
+    /// selected UFE camera and light prims.  Those rprims live under
+    /// MAYA_NATIVE_ROOT with a different path prefix than the source proxy,
+    /// so they would otherwise be hidden by isolate's prefix-based
+    /// visibility.
+    ///
+    /// Returns the set of paths whose visibility must be forced ON by the
+    /// IsolateSelectSceneIndex (every such path is also added to \p selection).
+    /// VP2's isolate-select filtering incorrectly hides these render items
+    /// because VP2 is unaware that Hydra has included them.
+    ///
+    /// USD is the only UFE client this function currently understands; non-USD
+    /// view-selected paths are ignored.  The function inspects each path
+    /// itself, so callers can pass through every view-selected UFE path.
+    ///
+    /// \param selectedUfePaths Raw view-selected UFE paths (from
+    ///        M3dView::viewSelectedObject).
+    /// \param panelCameraDag Shape DAG path of the model panel camera
+    ///        (from M3dView::getCamera); used to include native rprims under
+    ///        that camera's Hydra branch.
+    TfHashSet<SdfPath, SdfPath::Hash> _ExpandIsolateSelectionForUsdPrims(
+        Fvp::Selection&               selection,
+        const std::vector<Ufe::Path>& selectedUfePaths,
+        const MDagPath&               panelCameraDag);
 #endif
 
     MtohRendererDescription _rendererDesc;
@@ -347,6 +379,7 @@ private:
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     Fvp::PurposeFilteringSceneIndexRefPtr     _purposeFilteringSceneIndex;
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
+    MAYAHYDRA_NS_DEF::MhGenerativeProceduralResolvingSceneIndexRefPtr _gpResolvingSceneIndex;
     HdsiSceneGlobalsSceneIndexRefPtr                  _sceneGlobalsSceneIndex;
 
     // Naming this identifier _ufeSelection clashes with UFE's selection.h

@@ -7,6 +7,7 @@ target_sources(${TARGET_NAME}
     mayaHydraSceneIndex.cpp
     mayaViewportSceneIndex.cpp
     mayaHydraDataSource.cpp
+    mayaHydraCustomNodeDataSource.cpp
     mayaHydraPrimvarDataSource.cpp
     mayaHydraDisplayStyleDataSource.cpp
     mayaHydraCameraDataSource.cpp
@@ -18,8 +19,10 @@ target_sources(${TARGET_NAME}
     mayaHydraSceneIndexDataFactoriesSetup.cpp
     mayaHydraMayaFilteringSceneIndexData.cpp
     mayaHydraMayaFilteringSceneIndexDataConcreteFactory.cpp
+    mhMayaUsdProxyShapeSceneIndexBase.cpp
     mhMayaUsdProxyShapeSceneIndex.cpp
     mhDirtyLeadObjectSceneIndex.cpp
+    mhGenerativeProceduralResolvingSceneIndex.cpp
 )
 
 set(HEADERS
@@ -27,6 +30,7 @@ set(HEADERS
     mayaHydraSceneIndex.h
     mayaViewportSceneIndex.h
     mayaHydraDataSource.h
+    mayaHydraCustomNodeDataSource.h
     mayaHydraPrimvarDataSource.h
     mayaHydraDisplayStyleDataSource.h
     mayaHydraCameraDataSource.h
@@ -39,8 +43,10 @@ set(HEADERS
     mayaHydraSceneIndexDataFactoriesSetup.h
     mayaHydraMayaFilteringSceneIndexData.h
     mayaHydraMayaFilteringSceneIndexDataConcreteFactory.h
+    mhMayaUsdProxyShapeSceneIndexBase.h
     mhMayaUsdProxyShapeSceneIndex.h
     mhDirtyLeadObjectSceneIndex.h
+    mhGenerativeProceduralResolvingSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------

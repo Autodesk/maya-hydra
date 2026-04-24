@@ -31,6 +31,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testUSDLights.py
     testUVandUDIM.py
 	testPurposeRenderTag.py
+
 	#Tests that have a dependency on other plugins
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
@@ -75,6 +76,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testRenderRegion.py
     testConvergence.py
     testFramePasses.py
+    testImagePlanes.py
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
@@ -101,10 +103,13 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testGeomSubsetsPicking.py
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
-    cpp/testCustomAttributeDirtying.py
+    cpp/testMayaNodesAttributesDirtying.py|depOnPlugins:mtoa
+    cpp/testLightPrimvars.py|depOnPlugins:mtoa
+    cpp/testCustomDagNodeTranslation.py|depOnPlugins:mtoa
+    cpp/testCameraPrimvars.py
     cpp/testUsdStageInvalidate.py
     cpp/testCamera.py
-    cpp/testCustomAttributes.py|depOnPlugins:mtoa
+    cpp/testMayaNodesAttributes.py|depOnPlugins:mtoa
     cpp/testUsdAnim.py
     cpp/testUsdStageFromFile.py
     cpp/testSceneGlobalsCurrentFrame.py
@@ -125,6 +130,7 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
         cpp/testUsdNativeInstancingIsolateSelect.py
         cpp/testUsdPointInstancingIsolateSelect.py
         cpp/testUsdPointInstancingIsolateSelectBBox.py
+        testIsolateSelectPerShape.py
     )
 endif()
 
@@ -147,6 +153,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshes.py
     testTransformMeshAdapter.py
     cpp/testMeshAdapterTransform.py
+    cpp/testMeshPrimvars.py
 )
 
 # The following tests incorrectly depend on having the VP2 render delegate
@@ -158,6 +165,11 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
     testBoundingBox.py
 	#Disabled tests on OSX
 	testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
+)
+
+# Interactive unit test scripts for Hydra Generative Procedurals.
+set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
+    cpp/testHydraGenerativeProcedural.py
 )
 
 # Use mesh adapter for mesh support instead of MRenderItem. using Interactive (Maya.exe with UI)
@@ -187,6 +199,22 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE})
         PYTHON_SCRIPT ${test_filename}
         ENV
             "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
+    )
+
+    # Assign a CTest label to these tests for easy filtering.
+    apply_labels_to_test("${all_labels}" ${target})
+
+endforeach()
+
+#  Test for Hydra Generative Procedurals using Interactive (Maya.exe with UI)
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL})
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaUsd_get_unittest_target(target ${test_filename})
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        PYTHON_SCRIPT ${test_filename}
+        ENV
+            "HDGP_INCLUDE_DEFAULT_RESOLVER=1"
     )
 
     # Assign a CTest label to these tests for easy filtering.

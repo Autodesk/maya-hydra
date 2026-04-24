@@ -176,11 +176,9 @@ public:
 
         MStatus status;
         auto    obj = GetNode();
-        auto    id = MNodeMessage::addNodeDirtyCallback(obj, _DirtyMaterialParams, this, &status);
-        if (status) {
-            AddCallback(id);
-        }
-        id = MNodeMessage::addAttributeChangedCallback(obj, _AttributeChangedCallback, this, &status);
+        // Use attribute-changed only (not node-dirty) to avoid redundant material+primvars dirtying
+        // when only custom attributes change.
+        auto id = MNodeMessage::addAttributeChangedCallback(obj, _AttributeChangedCallback, this, &status);
         if (status) {
             AddCallback(id);
         }
@@ -197,12 +195,6 @@ public:
     }
 
 private:
-    static void _DirtyMaterialParams(MObject& /*node*/, void* clientData)
-    {
-        auto* adapter = reinterpret_cast<MayaHydraShadingEngineAdapter*>(clientData);
-        adapter->_CreateSurfaceMaterialCallback();
-        adapter->MarkDirty(HdMaterial::AllDirty);
-    }
     static void _AttributeChangedCallback(
         MNodeMessage::AttributeMessage msg,
         MPlug&                         plug,
@@ -210,12 +202,26 @@ private:
         void*                          clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraShadingEngineAdapter*>(clientData);
-        // Handle extension attributes change
-        adapter->HandleExtensionAndDynamicAttributesDirty(plug);
+        if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
+            adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
+            return;
+        }
+        adapter->_CreateSurfaceMaterialCallback();
+        adapter->MarkDirty(HdMaterial::AllDirty);
     }
-    static void _DirtyShaderParams(MObject& /*node*/, void* clientData)
+    static void _ShaderAttributeChangedCallback(
+        MNodeMessage::AttributeMessage msg,
+        MPlug&                         plug,
+        MPlug&                         otherPlug,
+        void*                          clientData)
     {
+        TF_UNUSED(msg);
+        TF_UNUSED(otherPlug);
         auto* adapter = reinterpret_cast<MayaHydraShadingEngineAdapter*>(clientData);
+        if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
+            adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
+            return;
+        }
         adapter->MarkDirty(HdMaterial::AllDirty);
         if (adapter->GetMayaHydraSceneIndex()->IsHdSt()) {
             adapter->GetMayaHydraSceneIndex()->MaterialTagChanged(adapter->GetID());
@@ -259,8 +265,12 @@ private:
         }
 
         if (_surfaceShader != MObject::kNullObj) {
-            _surfaceShaderCallback
-                = MNodeMessage::addNodeDirtyCallback(_surfaceShader, _DirtyShaderParams, this);
+            MStatus status;
+            _surfaceShaderCallback = MNodeMessage::addAttributeChangedCallback(
+                _surfaceShader, _ShaderAttributeChangedCallback, this, &status);
+            if (!status) {
+                _surfaceShaderCallback = 0;
+            }
         }
     }
 

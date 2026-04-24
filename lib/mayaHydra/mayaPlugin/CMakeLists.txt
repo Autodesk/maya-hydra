@@ -7,12 +7,22 @@ add_library(${TARGET_NAME} SHARED)
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME} 
     PRIVATE
+        batchRendering/batchRenderer.cpp
+        batchRendering/batchRendererMayaRenderSettings.cpp
+        batchRendering/batchRendererHydraV1RenderSettings.cpp
+        batchRendering/batchRendererHydraV2RenderSettings.cpp
+        batchRendering/hydraRenderCmd.cpp
+        batchRendering/hydraRenderCmdHydraV1RenderSettings.cpp
+        batchRendering/hydraRenderCmdHydraV2RenderSettings.cpp
+        batchRendering/hydraRenderCmdMayaRenderSettings.cpp
+        batchRendering/renderVarUtils.cpp
         colorNotFoundException.cpp
         envSettings.cpp
         mayaColorPreferencesTranslator.cpp
         plugin.cpp
         pluginDebugCodes.cpp
         pluginUtils.cpp
+        renderSettingsUtils.cpp
         renderGlobals.cpp
         renderOverride.cpp
         tokens.cpp
@@ -20,6 +30,7 @@ target_sources(${TARGET_NAME}
         pluginBuildInfoCommand.cpp
         getFramePassesCountCommand.cpp
         testingCommand.cpp
+        profilingCommand.cpp
         renderRegionCommand.cpp
         setVisibleFramePassesCommand.cpp
 )
@@ -59,6 +70,8 @@ endif()
 # -----------------------------------------------------------------------------
 target_include_directories(${TARGET_NAME} 
     PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/batchRendering
         $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSD_INCLUDE_DIR}>
 )
@@ -87,6 +100,7 @@ target_link_libraries(${TARGET_NAME}
         mayaHydraLib
         ufeExtensions
         flowViewport
+        hdGp
         $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSDAPI_LIBRARY}>
 )

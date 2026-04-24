@@ -26,6 +26,7 @@
 //Hydra headers
 #include <pxr/imaging/hd/filteringSceneIndex.h>
 #include <pxr/base/vt/array.h>
+#include <pxr/base/tf/hashset.h>
 
 namespace FVP_NS_DEF {
 
@@ -146,6 +147,17 @@ public:
     FVP_API
     SelectionPtr GetIsolateSelection() const;
 
+    /// Prim paths explicitly added by the native-rprim expansion for UFE
+    /// camera/light gizmos (USD being the primary UFE client).  Maya's VP2
+    /// isolate-select filtering incorrectly hides these render items because
+    /// VP2 is unaware that the Hydra pipeline has included them.  GetPrim()
+    /// forces visibility ON for any included prim whose path is in this set.
+    FVP_API
+    void SetForceVisiblePaths(PXR_NS::TfHashSet<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash>&& paths);
+
+    FVP_API
+    void ClearForceVisiblePaths();
+
 protected:
     void _PrimsAdded(
         const PXR_NS::HdSceneIndexBase&                       sender,
@@ -210,6 +222,11 @@ private:
     SelectionPtr _isolateSelection{};
 
     InstancerMasks _instancerMasks{};
+
+    // Paths whose visibility must be forced ON when they are included in
+    // isolate select.  Populated by callers that expand isolate selection to
+    // include native rprims for UFE camera/light gizmos.
+    PXR_NS::TfHashSet<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash> _forceVisiblePaths;
 };
 
 }//end of namespace FVP_NS_DEF
