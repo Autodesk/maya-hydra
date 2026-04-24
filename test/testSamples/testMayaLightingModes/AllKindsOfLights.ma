@@ -196,7 +196,7 @@ createNode aiImagerDenoiserOidn -s -n "defaultArnoldDenoiser";
 	rename -uid "F3377A5A-4A07-7C62-07C5-D68E104F2CB2";
 createNode file -n "file1";
 	rename -uid "6E5F111E-40E1-79BC-D1C7-2588F65A88E1";
-	setAttr ".ftn" -type "string" "D:/GIT/maya-hydra-opensource/test/testSamples/testMayaLightingModes/UVChecker.png";
+	setAttr ".ftn" -type "string" "UVChecker.png";
 	setAttr ".cs" -type "string" "sRGB";
 createNode place2dTexture -n "place2dTexture1";
 	rename -uid "3F424059-41AE-54E4-E565-BD894C4D3DF1";

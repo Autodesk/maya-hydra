@@ -271,6 +271,21 @@ find_program(MAYA_PY_EXECUTABLE
         "Maya's Python executable path"
 )
 
+# Find Render
+set(RENDER_EXE Render)
+find_program(RENDER_EXECUTABLE
+        ${RENDER_EXE}
+    HINTS
+        "${MAYA_LOCATION}"
+        "$ENV{MAYA_LOCATION}"
+        "${MAYA_BASE_DIR}"
+    PATH_SUFFIXES
+        Maya.app/Contents/bin/
+        bin/
+    DOC
+        "Maya's command line Render executable path"
+)
+
 set(MAYA_LIGHTAPI_VERSION 1)
 if(IS_MACOSX)
     set(MAYA_DSO_SUFFIX ".dylib")
