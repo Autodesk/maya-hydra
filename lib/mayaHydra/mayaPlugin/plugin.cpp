@@ -365,7 +365,6 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
-    // *** FIXME ***  Have a single templated function for all 3 commands. 
     if (!plugin.registerCommand(
             HydraRenderCmd::name, HydraRenderCmd::creator, HydraRenderCmd::createSyntax)) {
         ret = MS::kFailure;
