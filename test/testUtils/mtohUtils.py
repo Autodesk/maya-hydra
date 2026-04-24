@@ -27,7 +27,6 @@ from imageUtils import ImageDiffingTestCase
 from testUtils import PluginLoaded
 from pxr import Usd
 
-import platform
 # subprocess is required to invoke the Windows taskkill utility from
 # tearDownClass() to terminate ADPClientService, which can otherwise hold a
 # handle on the temporary test directory and prevent cleanup. Bandit B404

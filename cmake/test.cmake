@@ -210,225 +210,6 @@ function(mayaUsd_get_unittest_target unittest_target unittest_basename)
     get_filename_component(unittest_name ${unittest_basename} NAME_WE)
     set(${unittest_target} "${unittest_name}" PARENT_SCOPE)
 endfunction()
-
-if (OIIO_idiff_BINARY)
-    set(IMAGE_DIFF_TOOL ${OIIO_idiff_BINARY} CACHE STRING "Use idiff for image comparison")
-endif()
-if (OIIO_oiiotool_BINARY)
-    set(OIIOTOOL ${OIIO_oiiotool_BINARY} CACHE STRING "Use oiiotool for diff images (--absdiff --maxchan)")
-endif()
-
-#
-# mayaUsd_add_test( <test_name>
-#                   {PYTHON_MODULE <python_module_name> |
-#                    PYTHON_COMMAND <python_code> |
-#                    PYTHON_SCRIPT <python_script_file> |
-#                    COMMAND <cmd> [<cmdarg> ...] }
-#                   [NO_STANDALONE_INIT]
-#                   [INTERACTIVE]
-#                   [ENV <varname>=<varvalue> ...])
-#
-#   PYTHON_MODULE      - Module to import and test with unittest.main.
-#   PYTHON_COMMAND     - Python code to execute; should call sys.exit
-#                        with an appropriate exitcode to indicate success
-#                        or failure.
-#   PYTHON_SCRIPT      - Python script file to execute; should exit with an
-#                        appropriate exitcode to indicate success or failure.
-#   WORKING_DIRECTORY  - Directory from which the test executable will be called.
-#   COMMAND            - Command line to execute as a test
-#   NO_STANDALONE_INIT - Only allowable with PYTHON_MODULE or
-#                        PYTHON_COMMAND. With those modes, this
-#                        command will generally add some boilerplate code
-#                        to ensure that maya is initialized and exits
-#                        correctly. Use this option to NOT add that code.
-#   INTERACTIVE        - Only allowable with PYTHON_SCRIPT.
-#                        The test is run using an interactive (non-standalone)
-#                        session of Maya, including the UI.
-#                        Tests run in this way should finish by calling Maya's
-#                        quit command and returning an exit code of 0 for
-#                        success or 1 for failure:
-#                            cmds.quit(abort=True, exitCode=exitCode)
-#   ENV                - Set or append the indicated environment variables;
-#                        Since mayaUsd_add_test internally makes changes to
-#                        some environment variables, if a value is given
-#                        for these variables, it is appended; all other
-#                        variables are set exactly as given. The variables
-#                        that mayaUsd_add_test manages (and will append) are:
-#                            PATH
-#                            PYTHONPATH
-#                            MAYA_PLUG_IN_PATH
-#                            MAYA_SCRIPT_PATH
-#                            PXR_PLUGINPATH_NAME
-#                            XBMLANGPATH
-#                            LD_LIBRARY_PATH
-#                        Note that the format of these name/value pairs should
-#                        be the same as that used with
-#                        `set_property(TEST test_name APPEND PROPERTY ENVIRONMENT ...)`
-#                        That means that if the passed in env var is a "list", it
-#                        must already be separated by platform-appropriate
-#                        path-separators, escaped if needed - ie, ":" on
-#                        Linux/MacOS, and "\;" on Windows. Use
-#                        separate_argument_list before passing to this func
-#                        if you start with a cmake-style list.
-#
-function(mayaUsd_add_test test_name)    
-    # -----------------
-    # 1) Arg processing
-    # -----------------
-
-    cmake_parse_arguments(PREFIX
-        "NO_STANDALONE_INIT;INTERACTIVE"                                # options
-        "PYTHON_MODULE;PYTHON_COMMAND;PYTHON_SCRIPT;WORKING_DIRECTORY"  # one_value keywords
-        "COMMAND;ENV"                                                   # multi_value keywords
-        ${ARGN}
-    )
-
-    # check that they provided one and ONLY 1 of:
-    #     PYTHON_MODULE / PYTHON_COMMAND / PYTHON_SCRIPT / COMMAND
-    set(NUM_EXCLUSIVE_ITEMS 0)
-    foreach(option_name PYTHON_MODULE PYTHON_COMMAND PYTHON_SCRIPT COMMAND)
-        if(PREFIX_${option_name})
-            math(EXPR NUM_EXCLUSIVE_ITEMS "${NUM_EXCLUSIVE_ITEMS} + 1")
-        endif()
-    endforeach()
-    if(NOT NUM_EXCLUSIVE_ITEMS EQUAL 1)
-        message(FATAL_ERROR "mayaUsd_add_test: must be called with exactly "
-            "one of PYTHON_MODULE, PYTHON_COMMAND, PYTHON_SCRIPT, or COMMAND")
-    endif()
-
-    if(PREFIX_NO_STANDALONE_INIT AND NOT (PREFIX_PYTHON_MODULE
-                                          OR PREFIX_PYTHON_COMMAND))
-        message(FATAL_ERROR "mayaUsd_add_test: NO_STANDALONE_INIT may only be "
-            "used with PYTHON_MODULE or PYTHON_COMMAND")
-    endif()
-
-    if(PREFIX_INTERACTIVE AND NOT PREFIX_PYTHON_SCRIPT)
-        message(FATAL_ERROR "mayaUsd_add_test: INTERACTIVE may only be "
-            "used with PYTHON_SCRIPT")
-    endif()
-
-    # set the working_dir
-    if(PREFIX_WORKING_DIRECTORY)
-        set(WORKING_DIR ${PREFIX_WORKING_DIRECTORY})
-    else()
-        set(WORKING_DIR ${CMAKE_CURRENT_BINARY_DIR})
-    endif()
-
-    # --------------
-    # 2) Create test
-    # --------------
-
-    set(PYTEST_CODE "")
-    if(PREFIX_PYTHON_MODULE)
-        set(MODULE_NAME "${PREFIX_PYTHON_MODULE}")
-        set(PYTEST_CODE "
-import sys
-from unittest import main
-import ${MODULE_NAME}
-main(module=${MODULE_NAME})
-")
-    elseif(PREFIX_PYTHON_COMMAND)
-        set(PYTEST_CODE "${PREFIX_PYTHON_COMMAND}")
-    elseif(PREFIX_PYTHON_SCRIPT)
-        if (PREFIX_INTERACTIVE)
-            if(WIN32)
-                set(QUOTE "'")
-            else()
-                set(QUOTE "\\\"")
-            endif()
-            set(MEL_PY_EXEC_COMMAND "python(\"\\n\
-import os\\n\
-import sys\\n\
-import time\\n\
-import traceback\\n\
-_usd_env_keys = [\\n\
-    \\\"PXR_USD_LOCATION\\\",\\n\
-    \\\"USD_INSTALL_LOCATION\\\",\\n\
-    \\\"PXR_PLUGINPATH_NAME\\\",\\n\
-    \\\"MAYA_PXR_PLUGINPATH_NAME\\\",\\n\
-    \\\"PXR_OVERRIDE_PLUGINPATH_NAME\\\",\\n\
-    \\\"LD_LIBRARY_PATH\\\",\\n\
-    \\\"DYLD_LIBRARY_PATH\\\",\\n\
-    \\\"RMANTREE\\\",\\n\
-    \\\"PRMAN_DELEGATE_PLUGIN_PATH\\\",\\n\
-]\\n\
-_usd_env_parts = [\\\"{}={}\\\".format(k, os.environ.get(k, \\\"\\\")) for k in _usd_env_keys]\\n\
-sys.__stdout__.write(\\\"USD env: {}\\\\n\\\".format(\\\" | \\\".join(_usd_env_parts)))\\n\
-sys.__stdout__.flush()\\n\
-file = ${QUOTE}${PREFIX_PYTHON_SCRIPT}${QUOTE}\\n\
-if not os.path.isabs(file):\\n\
-    file = os.path.join(${QUOTE}${CMAKE_CURRENT_SOURCE_DIR}${QUOTE}, file)\\n\
-openMode = ${QUOTE}rb${QUOTE}\\n\
-compileMode = ${QUOTE}exec${QUOTE}\\n\
-globals = {${QUOTE}__file__${QUOTE}: file, ${QUOTE}__name__${QUOTE}: ${QUOTE}__main__${QUOTE}}\\n\
-try:\\n\
-    exec(compile(open(file, openMode).read(), file, compileMode), globals)\\n\
-except Exception:\\n\
-    sys.__stderr__.write(traceback.format_exc() + os.linesep)\\n\
-    sys.__stderr__.flush()\\n\
-    sys.__stdout__.flush()\\n\
-    # sleep to give the output streams time to finish flushing - otherwise,\\n\
-    # os._exit quits so hard + fast, flush may not happen!\\n\
-    time.sleep(.1)\\n\
-    os._exit(1)\\n\
-\")")
-            set(COMMAND_CALL ${MAYA_EXECUTABLE} -c ${MEL_PY_EXEC_COMMAND})
-        else()
-            set(SCRIPT ${CMAKE_BINARY_DIR}/test/Temporary/scripts/runner_${test_name}.py)
-            FILE(WRITE ${SCRIPT} "${PREFIX_PYTHON_SCRIPT}")
-            set(COMMAND_CALL ${MAYA_PY_EXECUTABLE} ${SCRIPT})
-        endif()
-    else()
-        set(COMMAND_CALL ${PREFIX_COMMAND})
-    endif()
-
-    if(PYTEST_CODE)
-        if(NOT PREFIX_NO_STANDALONE_INIT)
-            # first, indent pycode
-            mayaUsd_indent(indented_PYTEST_CODE "${PYTEST_CODE}")
-            # then wrap in try/finally, and call maya.standalone.[un]initialize()
-            set(PYTEST_CODE "
-import os
-import sys
-import maya.standalone
-maya.standalone.initialize(name='python')
-try:
-    _usd_env_keys = [
-        \"PXR_USD_LOCATION\",
-        \"USD_INSTALL_LOCATION\",
-        \"PXR_PLUGINPATH_NAME\",
-        \"MAYA_PXR_PLUGINPATH_NAME\",
-        \"PXR_OVERRIDE_PLUGINPATH_NAME\",
-        \"LD_LIBRARY_PATH\",
-        \"DYLD_LIBRARY_PATH\",
-        \"RMANTREE\",
-        \"PRMAN_DELEGATE_PLUGIN_PATH\",
-    ]
-    _usd_env_parts = [\"{}={}\".format(k, os.environ.get(k, \"\")) for k in _usd_env_keys]
-    sys.__stdout__.write(\"USD env: {}\\n\".format(\" | \".join(_usd_env_parts)))
-    sys.__stdout__.flush()
-${indented_PYTEST_CODE}
-finally:
-    maya.standalone.uninitialize()
-"
-            )
-        endif()
-
-        set(SCRIPT ${CMAKE_BINARY_DIR}/test/Temporary/scripts/runner_${test_name}.py)
-        FILE(WRITE ${SCRIPT} "${PYTEST_CODE}")
-        set(COMMAND_CALL ${MAYA_PY_EXECUTABLE} ${SCRIPT})
-    endif()
-
-    add_test(
-        NAME "${test_name}"
-        WORKING_DIRECTORY ${WORKING_DIR}
-        COMMAND ${COMMAND_CALL}
-    )
-
-    # -----------------
-    # 3) Set up environ
-    # -----------------
-
 # Set up common path environment variables for Maya Hydra tests
 function(_mayaHydra_setup_test_common_path_vars)
     set(ALL_PATH_VARS
@@ -496,19 +277,19 @@ function(_mayaHydra_setup_test_common_defaults test_name)
     # Configure default PRMan allowed platforms for tests.
     list(APPEND ALL_TEST_VARS MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS)
     if(IS_WINDOWS)
-        set(MAYAUSD_VARNAME_MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS "windows")
+        set(MAYAHYDRA_VARNAME_MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS "windows")
     else()
-        set(MAYAUSD_VARNAME_MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS "")
+        set(MAYAHYDRA_VARNAME_MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS "")
     endif()
 
-    set(MAYAUSD_VARNAME_IMAGE_DIFF_TOOL "${IMAGE_DIFF_TOOL}")
-    set(MAYAUSD_VARNAME_OIIOTOOL "${OIIOTOOL}")
+    set(MAYAHYDRA_VARNAME_IMAGE_DIFF_TOOL "${IMAGE_DIFF_TOOL}")
+    set(MAYAHYDRA_VARNAME_OIIOTOOL "${OIIOTOOL}")
 
     set(MAYAHYDRA_VARNAME_MAYA_HAS_RENDER_ITEM_CULL_MODE_API "${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}")
 
     if(CODE_COVERAGE)
         list(APPEND ALL_TEST_VARS MAYAHYDRA_CODE_COVERAGE)
-        set(MAYAUSD_VARNAME_MAYAHYDRA_CODE_COVERAGE "1")
+        set(MAYAHYDRA_VARNAME_MAYAHYDRA_CODE_COVERAGE "1")
     endif()
 
     if(IS_MACOSX)
@@ -520,7 +301,7 @@ function(_mayaHydra_setup_test_common_defaults test_name)
             set(_tf_debug "HDST_DUMP_FAILING_SHADER_SOURCEFILE")
         endif()
         list(APPEND ALL_TEST_VARS TF_DEBUG)
-        set(MAYAUSD_VARNAME_TF_DEBUG "${_tf_debug}")
+        set(MAYAHYDRA_VARNAME_TF_DEBUG "${_tf_debug}")
     endif()
 
     foreach(testvar ${ALL_TEST_VARS})
@@ -567,22 +348,22 @@ function(_mayaHydra_setup_test_plugins)
         #   add only the AdskAssetResolver plugin from MayaUSD if present.
         # - Linux: keep MayaUSD lib/usd (do not change Linux behavior).
         if(IS_WINDOWS AND DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
-            list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+            list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                  "${PXR_USD_LOCATION}/lib/usd")
             message(STATUS "Using OpenUSD plugin path from PXR_USD_LOCATION: ${PXR_USD_LOCATION}/lib/usd")
         endif()
         if(IS_MACOSX)
             if(DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
-                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                      "${PXR_USD_LOCATION}/lib/usd")
                 set(_osx_use_pxr_usd_plugins TRUE)
                 message(STATUS "Using OpenUSD plugin path from PXR_USD_LOCATION on macOS.")
             else()
-                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                      "${MAYAUSD_LOCATION}/lib/usd")
             endif()
         else()
-            list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+            list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                  "${MAYAUSD_LOCATION}/lib/usd")
         endif()
         if(IS_MACOSX AND _osx_use_pxr_usd_plugins)
@@ -609,11 +390,11 @@ function(_mayaHydra_setup_test_plugins)
 
             list(REMOVE_DUPLICATES _mayausd_plugin_dirs)
             foreach(_plug_dir ${_mayausd_plugin_dirs})
-                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${_plug_dir}")
+                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${_plug_dir}")
                 message(STATUS "Adding MayaUSD USD plugin path: ${_plug_dir}")
             endforeach()
         endif()
-        list(APPEND MAYAUSD_VARNAME_MAYA_PLUG_IN_PATH
+        list(APPEND MAYAHYDRA_VARNAME_MAYA_PLUG_IN_PATH
              "${MAYAUSD_LOCATION}/plugin/adsk/plugin")
         list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
              "${MAYAUSD_LOCATION}/plugin/adsk/scripts")
@@ -630,11 +411,11 @@ function(_mayaHydra_setup_test_plugins)
     if(ADDITIONAL_PXR_PLUGINPATH_NAME)
         foreach(extra_path ${ADDITIONAL_PXR_PLUGINPATH_NAME})
             if(IS_WINDOWS)
-                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
+                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
             else()
                 string(TOLOWER "${extra_path}" _path_lower)
                 if(NOT _path_lower MATCHES "prman|hdprman|renderman|rman")
-                    list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
+                    list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
                 endif()
             endif()
         endforeach()
@@ -660,9 +441,9 @@ function(_mayaHydra_setup_test_plugins)
             set(MTOA_HYDRA_BUNDLE "${MTOA_LOCATION}/usd/bundle/${MTOA_USD_VERSION_HYDRA}")
             set(MTOA_HYDRA_LEGACY "${MTOA_LOCATION}/usd/hydra/${MTOA_USD_VERSION_HYDRA}")
             if(EXISTS "${MTOA_HYDRA_BUNDLE}/plugInfo.json")
-                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${MTOA_HYDRA_BUNDLE}")
+                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${MTOA_HYDRA_BUNDLE}")
             elseif(EXISTS "${MTOA_HYDRA_LEGACY}/plugInfo.json")
-                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${MTOA_HYDRA_LEGACY}")
+                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${MTOA_HYDRA_LEGACY}")
             endif()
         endif()
     endif()
@@ -687,24 +468,24 @@ function(_mayaHydra_setup_test_plugins)
     # (UsdSkelImaging* already defined) due to conflicting USD plugin loads.
     if(IS_WINDOWS)
         if(DEFINED PRMAN_DELEGATE_PLUGIN_PATH AND NOT "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
-            list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+            list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                  "${PRMAN_DELEGATE_PLUGIN_PATH}")
             list(APPEND ALL_TEST_VARS PRMAN_DELEGATE_PLUGIN_PATH)
-            set(MAYAUSD_VARNAME_PRMAN_DELEGATE_PLUGIN_PATH "${PRMAN_DELEGATE_PLUGIN_PATH}")
+            set(MAYAHYDRA_VARNAME_PRMAN_DELEGATE_PLUGIN_PATH "${PRMAN_DELEGATE_PLUGIN_PATH}")
         endif()
         if(DEFINED RMANTREE AND NOT "${RMANTREE}" STREQUAL "")
             list(APPEND ALL_TEST_VARS RMANTREE)
-            set(MAYAUSD_VARNAME_RMANTREE "${RMANTREE}")
-            list(APPEND MAYAUSD_VARNAME_PATH "${RMANTREE}/bin")
-            list(APPEND MAYAUSD_VARNAME_PATH "${RMANTREE}/lib")
+            set(MAYAHYDRA_VARNAME_RMANTREE "${RMANTREE}")
+            list(APPEND MAYAHYDRA_VARNAME_PATH "${RMANTREE}/bin")
+            list(APPEND MAYAHYDRA_VARNAME_PATH "${RMANTREE}/lib")
         endif()
         if(DEFINED RENDERMAN_LOCATION AND NOT "${RENDERMAN_LOCATION}" STREQUAL "")
             list(APPEND ALL_TEST_VARS RENDERMAN_LOCATION)
-            set(MAYAUSD_VARNAME_RENDERMAN_LOCATION "${RENDERMAN_LOCATION}")
+            set(MAYAHYDRA_VARNAME_RENDERMAN_LOCATION "${RENDERMAN_LOCATION}")
         endif()
         if(DEFINED PIXAR_LICENSE_FILE AND NOT "${PIXAR_LICENSE_FILE}" STREQUAL "")
             list(APPEND ALL_TEST_VARS PIXAR_LICENSE_FILE)
-            set(MAYAUSD_VARNAME_PIXAR_LICENSE_FILE "${PIXAR_LICENSE_FILE}")
+            set(MAYAHYDRA_VARNAME_PIXAR_LICENSE_FILE "${PIXAR_LICENSE_FILE}")
         endif()
         # RMAN_SHADERPATH: hdPrman/rmanOslParser needs this to find OSL shaders (UsdPreviewSurfaceParameters.oso, etc.)
         # Artifact layout: plugin/usd/resources/shaders with .oso files
@@ -715,31 +496,31 @@ function(_mayaHydra_setup_test_plugins)
                 set(RMAN_SHADERPATH "${RMANTREE}/lib/shaders;${RMAN_SHADERPATH}")
             endif()
             list(APPEND ALL_TEST_VARS RMAN_SHADERPATH)
-            set(MAYAUSD_VARNAME_RMAN_SHADERPATH "${RMAN_SHADERPATH}")
+            set(MAYAHYDRA_VARNAME_RMAN_SHADERPATH "${RMAN_SHADERPATH}")
         elseif(DEFINED RMANTREE AND NOT "${RMANTREE}" STREQUAL "")
             # Fallback: only RMANTREE, no delegate shaders
             set(RMAN_SHADERPATH "${RMANTREE}/lib/shaders")
             list(APPEND ALL_TEST_VARS RMAN_SHADERPATH)
-            set(MAYAUSD_VARNAME_RMAN_SHADERPATH "${RMAN_SHADERPATH}")
+            set(MAYAHYDRA_VARNAME_RMAN_SHADERPATH "${RMAN_SHADERPATH}")
         endif()
     else()
         # Explicitly clear PRMan env vars on non-Windows to avoid accidental loads.
         list(APPEND ALL_TEST_VARS PRMAN_DELEGATE_PLUGIN_PATH RMANTREE RENDERMAN_LOCATION PIXAR_LICENSE_FILE RMAN_SHADERPATH)
-        set(MAYAUSD_VARNAME_PRMAN_DELEGATE_PLUGIN_PATH "")
-        set(MAYAUSD_VARNAME_RMANTREE "")
-        set(MAYAUSD_VARNAME_RENDERMAN_LOCATION "")
-        set(MAYAUSD_VARNAME_PIXAR_LICENSE_FILE "")
-        set(MAYAUSD_VARNAME_RMAN_SHADERPATH "")
+        set(MAYAHYDRA_VARNAME_PRMAN_DELEGATE_PLUGIN_PATH "")
+        set(MAYAHYDRA_VARNAME_RMANTREE "")
+        set(MAYAHYDRA_VARNAME_RENDERMAN_LOCATION "")
+        set(MAYAHYDRA_VARNAME_PIXAR_LICENSE_FILE "")
+        set(MAYAHYDRA_VARNAME_RMAN_SHADERPATH "")
     endif()
     # Escape semicolons in RMAN_SHADERPATH so set_property ENVIRONMENT receives
     # a single value (path1;path2) instead of splitting on CMake list separator.
     if("RMAN_SHADERPATH" IN_LIST ALL_TEST_VARS)
-        separate_argument_list(MAYAUSD_VARNAME_RMAN_SHADERPATH)
+        separate_argument_list(MAYAHYDRA_VARNAME_RMAN_SHADERPATH)
     endif()
     foreach(testvar PRMAN_DELEGATE_PLUGIN_PATH RMANTREE RENDERMAN_LOCATION PIXAR_LICENSE_FILE RMAN_SHADERPATH)
         if("${testvar}" IN_LIST ALL_TEST_VARS)
             set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-                "${testvar}=${MAYAUSD_VARNAME_${testvar}}")
+                "${testvar}=${MAYAHYDRA_VARNAME_${testvar}}")
         endif()
     endforeach()
     
@@ -842,14 +623,14 @@ function(_mayaHydra_setup_test_finalize_env test_name)
     foreach(_inherit_var PXR_PLUGINPATH_NAME MAYA_PXR_PLUGINPATH_NAME)
         if(DEFINED ENV{${_inherit_var}} AND NOT "$ENV{${_inherit_var}}" STREQUAL "")
             if(IS_WINDOWS)
-                list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} $ENV{${_inherit_var}})
+                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} $ENV{${_inherit_var}})
             else()
                 set(_path_list "$ENV{${_inherit_var}}")
                 string(REPLACE ":" ";" _path_list "${_path_list}")
                 foreach(_path ${_path_list})
                     string(TOLOWER "${_path}" _path_lower)
                     if(NOT _path_lower MATCHES "prman|hdprman|renderman|rman")
-                        list(APPEND MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${_path}")
+                        list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${_path}")
                     endif()
                 endforeach()
             endif()
@@ -860,7 +641,7 @@ function(_mayaHydra_setup_test_finalize_env test_name)
     # PXR_OVERRIDE_PLUGINPATH_NAME=MAYA_PXR_PLUGINPATH_NAME). Set it to the same
     # value so HdArnold and other Hydra plugins are discovered regardless.
     list(APPEND ALL_PATH_VARS MAYA_PXR_PLUGINPATH_NAME)
-    set(MAYAUSD_VARNAME_MAYA_PXR_PLUGINPATH_NAME ${MAYAUSD_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}})
+    set(MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME ${MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}})
 
     # convert the internally-processed envs from cmake list
     foreach(pathvar ${ALL_PATH_VARS})
@@ -956,6 +737,10 @@ endfunction()
 if (OIIO_idiff_BINARY)
     set(IMAGE_DIFF_TOOL ${OIIO_idiff_BINARY} CACHE STRING "Use idiff for image comparison")
 endif()
+if (OIIO_oiiotool_BINARY)
+    set(OIIOTOOL ${OIIO_oiiotool_BINARY} CACHE STRING "Use oiiotool for diff images (--absdiff --maxchan)")
+endif()
+
 
 #
 # mayaUsd_add_test( <test_name>
