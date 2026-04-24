@@ -352,3 +352,22 @@ TEST(TestIsolateSelection, disable)
     isolateSelectMgr.DisableIsolateSelection(viewportId);
 }
 
+// Regression: isolate may hold a USD camera prim and point-instancer selections together.
+// Fvp::Selection must treat them as independent keys (both visible under isolate).
+TEST(TestIsolateSelection, selectionIncludesIndependentCameraAndInstancerPaths)
+{
+    auto isolateSelect = Fvp::Selection::New();
+
+    const SdfPath cameraPath("/SceneRoot/UsdCamera");
+    isolateSelect->Add(Fvp::PrimSelection { cameraPath });
+
+    Fvp::InstancesSelection instanceSel;
+    instanceSel.instancerPath    = SdfPath("/SceneRoot/PointInstancer");
+    instanceSel.prototypeIndex   = 0;
+    instanceSel.instanceIndices  = { 2 };
+    isolateSelect->Add(Fvp::PrimSelection { SdfPath("/SceneRoot/PointInstancer"), { instanceSel } });
+
+    ASSERT_TRUE(isolateSelect->HasAncestorOrDescendantInclusive(cameraPath));
+    ASSERT_TRUE(isolateSelect->HasAncestorOrDescendantInclusive(SdfPath("/SceneRoot/PointInstancer")));
+}
+

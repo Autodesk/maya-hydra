@@ -79,17 +79,22 @@
 #include <pxr/pxr.h>
 
 #include <maya/MCallbackIdArray.h>
+#include <maya/MDagPath.h>
 #include <maya/MString.h>
 
 #include <atomic>
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <vector>
 #include <map>
 
+#include <pxr/base/tf/hashset.h>
+
 #include <ufe/ufe.h>
 UFE_NS_DEF {
+class Path;
 class SelectionChanged;
 class Selection;
 }
@@ -279,6 +284,32 @@ private:
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
     static void
     _ViewSelectedChangedCb(const MString& panelName, bool viewSelectedObjectsChanged, void* data);
+
+    /// After building isolate selection from UFE paths, append Maya-native
+    /// Hydra paths for camera/light gizmo drawables that correspond to the
+    /// selected UFE camera and light prims.  Those rprims live under
+    /// MAYA_NATIVE_ROOT with a different path prefix than the source proxy,
+    /// so they would otherwise be hidden by isolate's prefix-based
+    /// visibility.
+    ///
+    /// Returns the set of paths whose visibility must be forced ON by the
+    /// IsolateSelectSceneIndex (every such path is also added to \p selection).
+    /// VP2's isolate-select filtering incorrectly hides these render items
+    /// because VP2 is unaware that Hydra has included them.
+    ///
+    /// USD is the only UFE client this function currently understands; non-USD
+    /// view-selected paths are ignored.  The function inspects each path
+    /// itself, so callers can pass through every view-selected UFE path.
+    ///
+    /// \param selectedUfePaths Raw view-selected UFE paths (from
+    ///        M3dView::viewSelectedObject).
+    /// \param panelCameraDag Shape DAG path of the model panel camera
+    ///        (from M3dView::getCamera); used to include native rprims under
+    ///        that camera's Hydra branch.
+    TfHashSet<SdfPath, SdfPath::Hash> _ExpandIsolateSelectionForUsdPrims(
+        Fvp::Selection&               selection,
+        const std::vector<Ufe::Path>& selectedUfePaths,
+        const MDagPath&               panelCameraDag);
 #endif
 
     MtohRendererDescription _rendererDesc;

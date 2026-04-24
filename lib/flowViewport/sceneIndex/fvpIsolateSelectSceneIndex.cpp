@@ -40,6 +40,10 @@ const HdContainerDataSourceHandle visOff =
     HdVisibilitySchema::BuildRetained(
         HdRetainedTypedSampledDataSource<bool>::New(false));
 
+const HdContainerDataSourceHandle visOn =
+    HdVisibilitySchema::BuildRetained(
+        HdRetainedTypedSampledDataSource<bool>::New(true));
+
 const HdDataSourceLocator instancerMaskLocator(
     HdInstancerTopologySchemaTokens->instancerTopology,
     HdInstancerTopologySchemaTokens->mask
@@ -189,6 +193,13 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
     // HYDRA-1242: setting visibility on GeomSubset prim causes hang in Hydra
     // Storm.
     if (!included && !isGeomSubset(inputPrim)) {
+        // Lights keep contributing lighting even when excluded from isolate
+        // select, matching VP2 behavior.  Skip visOff for them.
+        auto lightSchema = HdLightSchema::GetFromParent(inputPrim.dataSource);
+        if (lightSchema.IsDefined()) {
+            return inputPrim;
+        }
+
         // If an instancer is not included, none of its instances are, so set
         // an instance mask that is entirely false.
         if (inputPrim.primType == HdPrimTypeTokens->instancer) {
@@ -205,6 +216,20 @@ HdSceneIndexPrim IsolateSelectSceneIndex::GetPrim(const SdfPath& primPath) const
 
         inputPrim.dataSource = HdContainerDataSourceEditor(inputPrim.dataSource)
             .Set(HdVisibilitySchema::GetDefaultLocator(), visOff)
+            .Finish();
+    }
+    else if (included && !isGeomSubset(inputPrim)
+             && _forceVisiblePaths.count(primPath)) {
+        // UFE camera/light gizmo render items (USD being the primary UFE
+        // client): VP2's isolate-select filtering sets their MVS_visible to
+        // false because VP2 does not know that the Hydra pipeline has
+        // included them.  Force visibility ON so these gizmos are drawn when
+        // their owning UFE prim is isolate-selected.  All other included
+        // prims keep their upstream visibility as-is.
+        // HYDRA-1242: skip GeomSubset prims — setting visibility on them
+        // hangs Hydra Storm.
+        inputPrim.dataSource = HdContainerDataSourceEditor(inputPrim.dataSource)
+            .Set(HdVisibilitySchema::GetDefaultLocator(), visOn)
             .Finish();
     }
 
@@ -402,6 +427,18 @@ void IsolateSelectSceneIndex::SetViewport(
     // marked as invisible.
     _AddDependencies(newIsolateSelection);
 
+    TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
+        .Msg(
+            "%s: SetViewport after _AddDependencies: %zu fully-selected path(s).\n",
+            viewportId.c_str(),
+            newIsolateSelection ? newIsolateSelection->GetFullySelectedPaths().size() : 0u);
+    if (newIsolateSelection) {
+        for (const auto& p : newIsolateSelection->GetFullySelectedPaths()) {
+            TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
+                .Msg("    fully-selected path: %s\n", p.GetText());
+        }
+    }
+
     _DirtyIsolateSelection(newIsolateSelection);
 
     // Collect all the instancers from the new isolate selection.
@@ -428,6 +465,17 @@ void IsolateSelectSceneIndex::SetIsolateSelection(
 SelectionPtr IsolateSelectSceneIndex::GetIsolateSelection() const
 {
     return _isolateSelection;
+}
+
+void IsolateSelectSceneIndex::SetForceVisiblePaths(
+    TfHashSet<SdfPath, SdfPath::Hash>&& paths)
+{
+    _forceVisiblePaths = std::move(paths);
+}
+
+void IsolateSelectSceneIndex::ClearForceVisiblePaths()
+{
+    _forceVisiblePaths.clear();
 }
 
 void IsolateSelectSceneIndex::_DirtyVisibility(
@@ -465,13 +513,6 @@ void IsolateSelectSceneIndex::_DirtyVisibilityRecursive(
     // relevant for materials
     auto prim = GetInputSceneIndex()->GetPrim(primPath);
     if (prim.primType == HdPrimTypeTokens->material) {
-        return;
-    }
-
-    // If the prim is a light, early out: setting its visibility to false means
-    // it won't contribute lighting to the scene, not what we want.
-    auto lightSchema = HdLightSchema::GetFromParent(prim.dataSource);
-    if (lightSchema.IsDefined()) {
         return;
     }
 
