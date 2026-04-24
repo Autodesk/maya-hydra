@@ -63,6 +63,48 @@ class TestHydraGenerativeProcedural(mtohUtils.MayaHydraBaseTestCase):
         sn.append(proceduralItem)
         self.assertSnapshotClose("selHighlight_procedural.png",
             self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+    def test_PickGeneratedChild(self):
+        if self._usdVersion < (0, 25, 11):
+            self.skipTest(
+                "GP picking requires HdGp resolving SI instantiation "
+                "earlier; skipped for USD < 25.11 (DLL export / link limitation)."
+            )
+
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(
+                "cube0", "mesh",                   
+                "MyGenerativeProcedural",
+                f="HydraGenerativeProcedural.testPickGeneratedChild")
+
+    def test_Transforms(self):
+        import mayaUsd
+        from pxr import UsdGeom, Gf
+
+        if self._usdVersion < (0, 25, 11):
+            self.skipTest(
+                "Transforms for generative procedural requires HdGp resolving SI "
+                "instantiation earlier; skipped for USD < 25.11 (DLL export / link limitation)."
+            )
+
+        stagePathSegment = "|simpleHydraGenerativeProcedural|simpleHydraGenerativeProceduralShape"
+        stage = mayaUsd.lib.GetPrim(stagePathSegment).GetStage()
+        proceduralPrim = stage.GetPrimAtPath("/MyGenerativeProcedural")
+        
+        UsdGeom.XformCommonAPI(proceduralPrim).SetTranslate((2, 1, 2))
+        cmds.refresh()
+        self.assertSnapshotClose("translate_procedural.png",
+            self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        UsdGeom.XformCommonAPI(proceduralPrim).SetScale((2, 1, 2))
+        cmds.refresh()
+        self.assertSnapshotClose("scale_procedural.png",
+            self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        UsdGeom.XformCommonAPI(proceduralPrim).SetRotate(Gf.Vec3f(0, 45, 0))
+        cmds.refresh()
+        self.assertSnapshotClose("rotate_procedural.png",
+            self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
 
 if __name__ == '__main__':

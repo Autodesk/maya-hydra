@@ -18,9 +18,14 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
 
+#include <maya/M3dView.h>
+#include <maya/MPoint.h>
+
 #include <gtest/gtest.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
+
+using namespace MayaHydra;
 
 TEST(HydraGenerativeProcedural, testMaterialBinding)
 {
@@ -52,4 +57,35 @@ TEST(HydraGenerativeProcedural, testMaterialBinding)
     // Check the material primType
     HdSceneIndexPrim materialPrim = beautyPassSceneIndex->GetPrim(materialPath);
     ASSERT_EQ(materialPrim.primType, HdPrimTypeTokens->material);
+}
+
+TEST(HydraGenerativeProcedural, testPickGeneratedChild)
+{
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+    SceneIndexInspector inspector(sceneIndices.front());
+
+    auto [argc, argv] = getTestingArgs();
+    ASSERT_EQ(argc, 3);
+    const std::string childName(argv[0]); 
+    const TfToken     childType(argv[1]);
+    const std::string proceduralName(argv[2]);
+
+    // Find the generated child to get click coordinates
+    FindPrimPredicate findChild = [&](const HdSceneIndexBaseRefPtr& si, const SdfPath& path) {
+        return path.GetElementString() == childName && si->GetPrim(path).primType == childType;
+    };
+    PrimEntriesVector childPrims = inspector.FindPrims(findChild);
+    ASSERT_GE(childPrims.size(), 1u);
+
+    ensureUnselected(inspector, PrimNamePredicate(proceduralName));
+
+    // Click on the child mesh
+    M3dView active3dView = M3dView::active3dView();
+    auto    childCoords = getPrimMouseCoords(childPrims.front().prim, active3dView);
+    mouseClick(Qt::MouseButton::LeftButton, active3dView.widget(), childCoords);
+    active3dView.refresh();
+
+    // Verify the procedural parent is selected, not the child directly.
+    ensureSelected(inspector, PrimNamePredicate(proceduralName));
 }

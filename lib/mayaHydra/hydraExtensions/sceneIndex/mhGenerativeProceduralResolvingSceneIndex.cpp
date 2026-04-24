@@ -16,6 +16,15 @@
 
 #include "mhGenerativeProceduralResolvingSceneIndex.h"
 
+#include "flowViewport/tokens.h"
+
+#include <pxr/base/gf/matrix4d.h>
+#include <pxr/imaging/hd/overlayContainerDataSource.h>
+#include <pxr/imaging/hd/retainedDataSource.h>
+#include <pxr/imaging/hd/xformSchema.h>
+
+#include <algorithm>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -34,6 +43,132 @@ MhGenerativeProceduralResolvingSceneIndex::New(const HdSceneIndexBaseRefPtr& inp
         HdGpGenerativeProceduralResolvingSceneIndex::New(inputSceneIndex)));
 #endif
 
+}
+
+// Composes the parent procedural's world matrix into generated children's transform, 
+// so the generated geometry moves correctly when the procedural root is transformed.
+// Returns the modified prim with the overlaid world-space transform.
+HdSceneIndexPrim MhGenerativeProceduralResolvingSceneIndex::GetPrim(const SdfPath& primPath) const
+{
+    HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
+
+    if (_generativeProceduralPaths.empty()) {
+        return prim;
+    }
+
+    // Walk up from the prim to find the nearest GP root ancestor.
+    SdfPath generativeProceduralRoot;
+    {
+        SdfPath parentPath = primPath.GetParentPath();
+        while (!parentPath.IsEmpty() && !parentPath.IsAbsoluteRootPath()) {
+            if (_generativeProceduralPaths.count(parentPath)) {
+                generativeProceduralRoot = parentPath;
+                break;
+            }
+            parentPath = parentPath.GetParentPath();
+        }
+    }
+    if (generativeProceduralRoot.IsEmpty())
+        return prim;
+
+    // Compose transforms from the prim up through all ancestors to the GP root.
+    GfMatrix4d result(1.0);
+    SdfPath path = primPath;
+    while (path != generativeProceduralRoot.GetParentPath() && !path.IsEmpty() && !path.IsAbsoluteRootPath()) {
+        const HdSceneIndexPrim ancestorPrim = (path == primPath) ? prim : GetInputSceneIndex()->GetPrim(path);
+        if (ancestorPrim.dataSource) {
+            if (auto matDataSource = HdXformSchema::GetFromParent(ancestorPrim.dataSource).GetMatrix())
+                result = result * matDataSource->GetTypedValue(0);
+        }
+        path = path.GetParentPath();
+    }
+
+    prim.dataSource = HdOverlayContainerDataSource::New(
+        HdRetainedContainerDataSource::New(
+            HdXformSchemaTokens->xform,
+            HdXformSchema::Builder()
+                .SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(result))
+                .Build()),
+        prim.dataSource);
+
+    return prim;
+}
+
+void MhGenerativeProceduralResolvingSceneIndex::_PrimsAdded(
+    const PXR_NS::HdSceneIndexBase&                       sender,
+    const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries)
+{
+    if (!_IsObserved())
+        return;
+    // Cache primPaths of GP roots to reduce GetPrim calls 
+    for (const auto& entry : entries) {
+        if (entry.primType == FvpGenerativeProceduralTokens->resolvedHydraGenerativeProcedural
+            || entry.primType == FvpGenerativeProceduralTokens->hydraGenerativeProcedural) {
+            _generativeProceduralPaths.insert(entry.primPath);
+        }
+    }
+    _SendPrimsAdded(entries);
+}
+
+void MhGenerativeProceduralResolvingSceneIndex::_PrimsRemoved(
+    const PXR_NS::HdSceneIndexBase&                         sender,
+    const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& entries)
+{
+    if (!_IsObserved())
+        return;
+    for (const auto& entry : entries) {
+        // Remove generative procedural entries on the prim and its children
+        for (auto it = _generativeProceduralPaths.begin();
+             it != _generativeProceduralPaths.end();) {
+            if ((*it).HasPrefix(entry.primPath)) {
+                it = _generativeProceduralPaths.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+    _SendPrimsRemoved(entries);
+}
+
+// Forwards dirty notifications to generated meshes.
+// Allows the generated meshes to move when there is a transformed applied
+// to the root. 
+void MhGenerativeProceduralResolvingSceneIndex::_PrimsDirtied(
+    const HdSceneIndexBase&                         sender,
+    const HdSceneIndexObserver::DirtiedPrimEntries& entries)
+{
+    if (!_IsObserved())
+        return;
+
+    static const HdDataSourceLocatorSet xformLocatorSet { HdXformSchema::GetDefaultLocator() };
+
+    HdSceneIndexObserver::DirtiedPrimEntries expandedEntries;
+    expandedEntries.reserve(entries.size());
+
+    for (const auto& entry : entries) {
+        expandedEntries.push_back(entry);
+
+        if (!entry.dirtyLocators.Intersects(HdXformSchema::GetDefaultLocator()))
+            continue;
+
+        if (_generativeProceduralPaths.find(entry.primPath) == _generativeProceduralPaths.end())
+            continue;
+
+        _DirtyDescendantsXform(entry.primPath, xformLocatorSet, expandedEntries);
+    }
+
+    _SendPrimsDirtied(expandedEntries);
+}
+
+void MhGenerativeProceduralResolvingSceneIndex::_DirtyDescendantsXform(
+    const SdfPath&                            path,
+    const HdDataSourceLocatorSet&             locators,
+    HdSceneIndexObserver::DirtiedPrimEntries& entries)
+{
+    for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(path)) {
+        entries.emplace_back(childPath, locators);
+        _DirtyDescendantsXform(childPath, locators, entries);
+    }
 }
 
 } // namespace MAYAHYDRA_NS_DEF
