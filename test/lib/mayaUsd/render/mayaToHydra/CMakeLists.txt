@@ -31,10 +31,13 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testUSDLights.py
     testUVandUDIM.py
 	testPurposeRenderTag.py
+
 	#Tests that have a dependency on other plugins
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa
+    # Failing, HYDRA-2031.
+	# testLightingByRenderDelegate.py|depOnPlugins:mtoa
 	testBifrostGraphUpdate.py|depOnPlugins:bifrost
 	#End of tests that have a dependency on other plugins
     testLookThrough.py

@@ -30,8 +30,7 @@ class TestStage(mtohUtils.MayaHydraBaseTestCase):
         psPathStr = mayaUsd_createStageWithNewLayer.createStageWithNewLayer()
         
         # create a new Maya scene.
-        # See https://jira.autodesk.com/browse/HYDRA-496
-        # prior to this fix, Maya would crash
+        # HYDRA-496: prior to this fix, Maya would crash.
         cmds.file( f=True, new=True )     
         
         # sanity check

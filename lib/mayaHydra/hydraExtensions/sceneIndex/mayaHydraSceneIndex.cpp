@@ -110,15 +110,9 @@ TfToken GetPurposeRenderTag(const MRenderItem& ri)
     return HdRenderTagTokens->geometry;
 }
 
-bool useMeshAdapter()
+bool filterMesh(const MRenderItem& ri, bool useMeshAdapter)
 {
-    static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
-    return uma;
-}
-
-bool filterMesh(const MRenderItem& ri)
-{
-    return useMeshAdapter() ?
+    return useMeshAdapter ?
                             // Filter our mesh render items, and let the mesh adapter handle Maya
                             // meshes.  The MRenderItem::name() for meshes is "StandardShadedItem",
                             // their MRenderItem::type() is InternalMaterialItem, but
@@ -393,7 +387,7 @@ private:
 
 } // namespace
 
-MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData)
+MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData, bool interactive)
     : _ID(initData.delegateID.AppendChild(
           TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this))))
     , _renderIndex(initData.renderIndex)
@@ -402,6 +396,7 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData)
     , _sprimPath(initData.delegateID.AppendPath(SdfPath(std::string("sprims"))))
     , _materialPath(initData.delegateID.AppendPath(SdfPath(std::string("materials"))))
     , _mayaPathMapper(std::make_shared<MayaPathMapper>(*this))
+    , _interactive(interactive)
 {
     static std::once_flag once;
     std::call_once(once, []() {
@@ -494,7 +489,7 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
 
         // Meshes can optionally be handled by the mesh adapter, rather than by
         // render items.
-        if (filterMesh(ri)) {
+        if (filterMesh(ri, useMeshAdapter())) {
             continue;
         }
 
@@ -1615,6 +1610,12 @@ bool MayaHydraSceneIndex::passNormalsToHydra()
 {
     static const bool val = TfGetEnvSetting(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA);
     return val;
+}
+
+bool MayaHydraSceneIndex::useMeshAdapter()
+{
+    static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
+    return (_interactive) ? uma : true;// Batch rendering (=> !_interactive) always uses mesh adapter
 }
 
 void MayaHydraSceneIndex::UpdateLightsShadowCollection()

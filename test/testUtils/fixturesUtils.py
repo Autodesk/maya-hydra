@@ -150,4 +150,9 @@ def runTests(globals_dict, stream=sys.__stderr__,
     # maya running interactively will absorb much of the output. comment out the
     # following to prevent maya from exiting and open the script editor to look
     # at failures.
-    cmds.quit(abort=True, exitCode=exitCode)
+    if cmds.about(batch=True):
+        # In mayabatch 'quit -abort' does not reliably produce the proper exit
+        # code, so use Python instead.
+        sys.exit(exitCode)
+    else:
+        cmds.quit(abort=True, exitCode=exitCode)

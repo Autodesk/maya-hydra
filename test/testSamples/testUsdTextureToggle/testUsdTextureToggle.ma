@@ -84,7 +84,7 @@ createNode mayaUsdProxyShape -n "usdStageWithTextureShape" -p "usdStageWithTextu
 	setAttr -k off ".v";
 	setAttr ".covm[0]"  0 1 1;
 	setAttr ".cdvm[0]"  0 1 1;
-	setAttr ".fp" -type "string" "D:/repos/mayaHydra/ecg-maya-hydra/maya-hydra/test/testSamples/testUsdTextureToggle/usdStageWithTexture.usd";
+	setAttr ".fp" -type "string" "usdStageWithTexture.usd";
 	setAttr ".pp" -type "string" "";
 	setAttr ".epp" -type "string" "";
 	setAttr ".forceCompute" yes;

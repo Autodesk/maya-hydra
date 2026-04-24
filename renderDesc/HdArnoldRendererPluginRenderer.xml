@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<!--
+  Copyright 2026 Autodesk, Inc. All rights reserved.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<!DOCTYPE renderer SYSTEM "renderer.dtd">
+<!--
+  Top level tag, mandatory:
+    <renderer>: "desc" gives a one line description.
+
+  Header tags, not mandatory, must be specified only once.
+    <melheader>: "s" is a mel script executed just after the file is read
+    <meltrailer>: "s" is a mel script executed after all flags are converted
+        to mel. Should contain at least the rendering command.
+
+  Other tags:
+    <sep>: "desc" produces a line in the help. Blank if desc is missing.
+    <attr>: produces a setAttr line.
+        "n" is the flag name.
+        "s" the attribute name.
+        "t" the parameter type, used in help description.
+        "h" the help description.
+    <attrString>: produces a setAttr line for a string attribute.
+        Same parameters as <attr>, but for string attributes.
+    <mel>: Calls a mel script.
+        "n" is the flag name.
+        "p" the number of parameters.
+        "s" the string defining the action %1 ... %p are replaced with values
+                read after the flag.
+        "t" the parameter types, used in help description.
+        "h" the help description.
+-->
+<renderer desc="Hydra Arnold renderer">
+    <melheader s='string $opt=""; string $rl=""; string $rp=""; float $resize=-1.; int $interactive=0; loadPlugin -quiet mayaUsdPlugin; loadPlugin -quiet mayaHydra; loadPlugin -quiet mtoa;'/>
+    <meltrailer s='setMayaSoftwareLayers($rl, $rp); setImageSizePercent($resize);mayaBatchRenderProcedure($interactive, "", "", "HdArnoldRendererPlugin", $opt); '/>
+    <sep/>
+    <!-- ______________________________________________________________ -->
+    <sep desc="Resolution options"/>
+    <mel n="x" s="mayaHydraSetRenderWidth(%1)" t="int" p="1" h="Set X resolution of the final image"/>
+    <mel n="y" s="mayaHydraSetRenderHeight(%1)" t="int" p="1" h="Set Y resolution of the final image"/>
+    <sep/>
+    <!-- ______________________________________________________________ -->
+    <sep desc="General purpose flags:"/>
+    <mel n="rd" p="1" s='mayaHydraSetRenderDirectory("%1")' t="path" h="Directory in which to store image files"/>
+    <mel n="im" p="1" s='mayaHydraSetRenderImageName("%1")' t="filename" h="Image file output name"/>
+    <mel n="of" p="1" s='mayaHydraSetRenderOutputFormat("%1")' t="format" h="Output image file format. See the Render Settings window to\n\tfind available formats"/>
+    <sep/>
+</renderer>

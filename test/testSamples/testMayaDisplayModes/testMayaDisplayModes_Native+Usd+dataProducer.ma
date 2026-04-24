@@ -110,7 +110,7 @@ createNode mayaUsdProxyShape -n "PoolBallFlat_animatedShape" -p "PoolBallFlat_an
 	setAttr -k off ".v";
 	setAttr ".covm[0]"  0 1 1;
 	setAttr ".cdvm[0]"  0 1 1;
-	setAttr ".fp" -type "string" "X:/GIT/maya-hydra-opensource/test/testSamples/testMayaDisplayModes/PoolBallFlat_animated.usdz";
+	setAttr ".fp" -type "string" "PoolBallFlat_animated.usdz";
 	setAttr ".pp" -type "string" "";
 	setAttr ".epp" -type "string" "";
 	setAttr ".usdStageLoadRules" -type "string" "/=all";

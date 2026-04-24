@@ -1,3 +1,5 @@
+add_subdirectory(mayaHydra)
+
 set(MEL_SCRIPT_FILES
     mayaHydra_registerUIStrings.mel
     mayaHydra_registerUI_load.mel
@@ -5,6 +7,7 @@ set(MEL_SCRIPT_FILES
     mayaHydra_registerUI_batch_load.mel
     mayaHydra_registerUI_batch_unload.mel
     mayaHydra_GeomSubsetsPickMode.mel
+    mayaHydra_renderSettings_utils.mel
 )
 
 install(

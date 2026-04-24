@@ -27,6 +27,7 @@
 #include "mayaColorPreferencesTranslator.h"
 #include "pluginDebugCodes.h"
 #include "renderOverrideUtils.h"
+#include "renderSettingsUtils.h"
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
@@ -102,8 +103,6 @@
 #include <pxr/imaging/hd/mesh.h>
 #include <pxr/imaging/hd/basisCurves.h>
 #include <pxr/imaging/hd/points.h>
-#include <pxr/imaging/hdx/selectionTask.h>
-#include <pxr/imaging/hdx/colorizeSelectionTask.h>
 #include <pxr/imaging/hdx/pickTask.h>
 #include <pxr/imaging/hdx/renderTask.h>
 #include <pxr/imaging/hdx/tokens.h>
@@ -114,10 +113,7 @@
 #include <pxr/imaging/hd/basisCurvesSchema.h>
 #include <pxr/usd/kind/registry.h>
 #include <pxr/usd/usd/prim.h>
-#include <pxr/usd/usd/modelAPI.h>
 #include <pxr/usdImaging/usdImagingGL/engine.h>
-
-#include <mayaUsdAPI/proxyStage.h>
 
 #include <maya/M3dView.h>
 #include <maya/MConditionMessage.h>
@@ -1497,7 +1493,8 @@ void MtohRenderOverride::_InitHydraResources(
 
     _dataProducerMergingSceneIndexProxy = std::make_shared<Fvp::DataProducerMergingSceneIndexProxy>();
 
-    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData);
+    constexpr bool interactive = true;
+    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, interactive);
     TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
 
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
@@ -1532,16 +1529,17 @@ void MtohRenderOverride::_InitHydraResources(
     _mayaViewportSceneIndex = MayaViewportSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain, _mayaHydraSceneIndex);
     _inputSceneIndexOfFilteringSceneIndicesChain = _mayaViewportSceneIndex;
 
-    // As of 13-Nov-2025, order of operations in _InitHydraResources() is such
-    // that render globals are initialized after this method is called.  Thus
-    // the included purposes attributes do not yet exist on the
-    // defaultRenderGlobals node.  Simply pass in an empty set of included
+    // Render globals are initialized after this method is called, so
+    // included purposes attributes do not yet exist on the
+    // defaultRenderGlobals node.  Pass in an empty set of included
     // purposes here.
     _purposeFilteringSceneIndex = Fvp::PurposeFilteringSceneIndex::New(
         _inputSceneIndexOfFilteringSceneIndicesChain, {});
         // RenderGlobalsUtils::GetIncludedPurposes());
     _pruningSceneIndex = Fvp::PruningSceneIndex::New(_purposeFilteringSceneIndex);
-    _pruningSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya filtering is handled by VP2/OGS.
+    if (!_mayaHydraSceneIndex ->useMeshAdapter()) {
+        _pruningSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya filtering is handled by VP2/OGS.
+    }
 
     // Scene globals must be before the GP resolver so procedurals can
     // read the current frame during cooking

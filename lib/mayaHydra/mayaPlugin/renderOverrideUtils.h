@@ -26,14 +26,13 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-// 2026-01-14 : The MayaHydraPreRender operation currently does two things :
+// The MayaHydraPreRender operation does two things:
 // 1. Draw the pre-scene UI, i.e. the grid
 // 2. Update the internal OGS scene
-// This second behavior isn't explicit and obvious, but is necessary for 
-// the DataServer API to properly translate the Maya scene later on.
-// This means that we cannot exclude everything except the grid in 
-// getObjectTypeExclusions(), as that would prevent the render items for
-// other objects in the scene from being created/updated.
+// The second behavior is necessary for the DataServer API to properly
+// translate the Maya scene later on.  We cannot exclude everything except
+// the grid in getObjectTypeExclusions(), as that would prevent the render
+// items for other objects in the scene from being created/updated.
 class MayaHydraPreRender : public MHWRender::MSceneRender
 {
 public:
@@ -44,7 +43,7 @@ public:
         /// the same colors explicitly.
         mClearOperation.setOverridesColors(false);
 
-        // 2026-01-14 : MayaUsd data is translated separately by MayaHydra, so we must exclude it from the update.
+        // MayaUsd data is translated separately by MayaHydra, so we must exclude it from the update.
         // If we don't, the MayaUsd proxy shape will be processed as part of this operation, and when
         // using depth peeling, the MayaUsd render items will be drawn to the depth buffer. This later
         // causes z-fighting issues when compositing the Hydra render on top of the Maya framebuffer.

@@ -46,7 +46,7 @@ class TestUsdStageFromFile(mtohUtils.MayaHydraBaseTestCase):
             # and data in the second scene file should appear in the Hydra
             # scene index scene.
 
-            populateCallsPre = cmds.mayaHydraInstruments("MayaUsdProxyShapeSceneIndex:NbPopulateCalls", q=True)
+            populateCallsPre = cmds.mayaHydraInstruments("MayaUsdProxyShapeSceneIndexBase:NbPopulateCalls", q=True)
 
             usdScenePath = testUtils.getTestScene('testStagePayloadsReferences', 'cone.usda')
 
@@ -54,7 +54,7 @@ class TestUsdStageFromFile(mtohUtils.MayaHydraBaseTestCase):
 
             cmds.refresh()
 
-            populateCallsPost = cmds.mayaHydraInstruments("MayaUsdProxyShapeSceneIndex:NbPopulateCalls", q=True)
+            populateCallsPost = cmds.mayaHydraInstruments("MayaUsdProxyShapeSceneIndexBase:NbPopulateCalls", q=True)
 
             self.assertEqual(populateCallsPre+1, populateCallsPost)
 
