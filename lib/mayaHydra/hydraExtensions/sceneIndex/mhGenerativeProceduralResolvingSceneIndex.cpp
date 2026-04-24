@@ -22,6 +22,7 @@
 #include <pxr/imaging/hd/overlayContainerDataSource.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/xformSchema.h>
+#include <pxr/imaging/hd/visibilitySchema.h>
 
 #include <algorithm>
 
@@ -74,17 +75,29 @@ HdSceneIndexPrim MhGenerativeProceduralResolvingSceneIndex::GetPrim(const SdfPat
     // Compose transforms from the prim up through all ancestors to the GP root.
     GfMatrix4d result(1.0);
     SdfPath path = primPath;
+    bool isVisible = true;
     while (path != generativeProceduralRoot.GetParentPath() && !path.IsEmpty() && !path.IsAbsoluteRootPath()) {
         const HdSceneIndexPrim ancestorPrim = (path == primPath) ? prim : GetInputSceneIndex()->GetPrim(path);
         if (ancestorPrim.dataSource) {
-            if (auto matDataSource = HdXformSchema::GetFromParent(ancestorPrim.dataSource).GetMatrix())
+            if (auto matDataSource
+                = HdXformSchema::GetFromParent(ancestorPrim.dataSource).GetMatrix()) {
                 result = result * matDataSource->GetTypedValue(0);
+            }
+            auto visibilityDataSource
+                = HdVisibilitySchema::GetFromParent(ancestorPrim.dataSource).GetVisibility();
+            if (visibilityDataSource && !visibilityDataSource->GetTypedValue(0)) {
+                isVisible = false;
+            }
         }
         path = path.GetParentPath();
     }
 
     prim.dataSource = HdOverlayContainerDataSource::New(
         HdRetainedContainerDataSource::New(
+            HdVisibilitySchemaTokens->visibility,
+            HdVisibilitySchema::Builder()
+                .SetVisibility(HdRetainedTypedSampledDataSource<bool>::New(isVisible))
+                .Build(),
             HdXformSchemaTokens->xform,
             HdXformSchema::Builder()
                 .SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(result))
@@ -141,6 +154,7 @@ void MhGenerativeProceduralResolvingSceneIndex::_PrimsDirtied(
         return;
 
     static const HdDataSourceLocatorSet xformLocatorSet { HdXformSchema::GetDefaultLocator() };
+    static const HdDataSourceLocatorSet visibilityLocatorSet { HdVisibilitySchema::GetDefaultLocator() };
 
     HdSceneIndexObserver::DirtiedPrimEntries expandedEntries;
     expandedEntries.reserve(entries.size());
@@ -148,26 +162,27 @@ void MhGenerativeProceduralResolvingSceneIndex::_PrimsDirtied(
     for (const auto& entry : entries) {
         expandedEntries.push_back(entry);
 
-        if (!entry.dirtyLocators.Intersects(HdXformSchema::GetDefaultLocator()))
-            continue;
-
         if (_generativeProceduralPaths.find(entry.primPath) == _generativeProceduralPaths.end())
             continue;
 
-        _DirtyDescendantsXform(entry.primPath, xformLocatorSet, expandedEntries);
+        if (entry.dirtyLocators.Intersects(HdXformSchema::GetDefaultLocator()))
+            _DirtyDescendantsLocator(entry.primPath, xformLocatorSet, expandedEntries);
+
+        if (entry.dirtyLocators.Intersects(HdVisibilitySchema::GetDefaultLocator()))
+            _DirtyDescendantsLocator(entry.primPath, visibilityLocatorSet, expandedEntries);
     }
 
     _SendPrimsDirtied(expandedEntries);
 }
 
-void MhGenerativeProceduralResolvingSceneIndex::_DirtyDescendantsXform(
+void MhGenerativeProceduralResolvingSceneIndex::_DirtyDescendantsLocator(
     const SdfPath&                            path,
     const HdDataSourceLocatorSet&             locators,
     HdSceneIndexObserver::DirtiedPrimEntries& entries)
 {
     for (const auto& childPath : GetInputSceneIndex()->GetChildPrimPaths(path)) {
         entries.emplace_back(childPath, locators);
-        _DirtyDescendantsXform(childPath, locators, entries);
+        _DirtyDescendantsLocator(childPath, locators, entries);
     }
 }
 
