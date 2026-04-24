@@ -40,6 +40,7 @@
 #include <mayaHydraLib/mhWireframeColorInterfaceImp.h>
 #include <mayaHydraLib/mhLeadObjectPathTracker.h>
 #include <mayaHydraLib/sceneIndex/mhDirtyLeadObjectSceneIndex.h>
+#include <mayaHydraLib/sceneIndex/mhGenerativeProceduralResolvingSceneIndex.h>
 #include <mayaHydraLib/pick/mhPickHandlerFwd.h>
 #include <mayaHydraLib/pick/mhPickContext.h>
 #include <mayaHydraLib/pick/mhPickHitFwd.h>
@@ -130,8 +131,8 @@ public:
 
     /// Returns the names of all AOVs made available by the render delegates
     /// for a given render pass index.
-    /// TODO 2025-08-29 : This currently gathers AOVs from all viewports indiscriminately.
-    /// Once we have proper multi-viewport support, we should also be able to
+    /// This currently gathers AOVs from all viewports indiscriminately.
+    /// With proper multi-viewport support, it should also be possible to
     /// specify which viewport to get the AOVs for.
     static TfTokenVector GetAvailableFramePassAovs(int passIndex);
 
@@ -150,9 +151,9 @@ public:
     static SdfPath RendererSceneDelegateId(TfToken rendererName, TfToken sceneDelegateName);
 
     /// Returns whether the given renderer has converged.
-    /// TODO 2025-10-21 : This currently only checks the first viewport found
-    /// that uses the given renderer. Once we have proper multi-viewport support, 
-    /// we should also be able to specify which viewport to check the convergence for.
+    /// This currently only checks the first viewport found that uses the
+    /// given renderer. With proper multi-viewport support, it should also
+    /// be possible to specify which viewport to check the convergence for.
     ///
     /// Intended mostly for use in debugging and testing.
     static bool HasConverged(TfToken rendererName);
@@ -378,6 +379,7 @@ private:
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     Fvp::PurposeFilteringSceneIndexRefPtr     _purposeFilteringSceneIndex;
     Fvp::LightsManagementSceneIndexRefPtr _lightsManagementSceneIndex;
+    MAYAHYDRA_NS_DEF::MhGenerativeProceduralResolvingSceneIndexRefPtr _gpResolvingSceneIndex;
     HdsiSceneGlobalsSceneIndexRefPtr                  _sceneGlobalsSceneIndex;
 
     // Naming this identifier _ufeSelection clashes with UFE's selection.h

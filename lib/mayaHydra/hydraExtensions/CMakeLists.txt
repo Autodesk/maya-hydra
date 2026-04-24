@@ -104,6 +104,7 @@ target_link_libraries(${TARGET_NAME}
         ar
         gf
         hd
+        hdGp
         hdx
         js
         kind

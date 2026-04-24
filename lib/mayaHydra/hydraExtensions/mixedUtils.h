@@ -132,6 +132,21 @@ MAYAHYDRALIB_API
 PXR_NS::TfToken GetFileTexturePath(const MFnDependencyNode& fileNode);
 
 /**
+ * @brief Returns the resolved texture file path from an image plane node.
+ *
+ * Uses MRenderUtil::exactImagePlaneFileName to resolve the path exactly as
+ * Maya does internally (project-relative lookup, image-sequence frame
+ * substitution with correct padding, all format patterns).
+ *
+ * @param[in] imagePlaneNode The image plane MObject.
+ *
+ * @return Resolved absolute path, or empty string if the image cannot be
+ *         resolved or is a movie file (unsupported by Hydra).
+ */
+MAYAHYDRALIB_API
+std::string GetImagePlaneTexturePath(const MObject& imagePlaneNode);
+
+/**
  * @brief Determines whether or not a given DagPath refers to a shape.
  *
  * @param[in] dagPath is the DagPath to the potential shape.

@@ -27,9 +27,11 @@
 #include "mayaColorPreferencesTranslator.h"
 #include "pluginDebugCodes.h"
 #include "renderOverrideUtils.h"
+#include "renderSettingsUtils.h"
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
+#include <mayaHydraLib/sceneIndex/mhGenerativeProceduralResolvingSceneIndex.h>
 #include <mayaHydraLib/pick/mhPickHit.h>
 #include <mayaHydraLib/pick/mhPickHandler.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
@@ -103,8 +105,6 @@
 #include <pxr/imaging/hd/mesh.h>
 #include <pxr/imaging/hd/basisCurves.h>
 #include <pxr/imaging/hd/points.h>
-#include <pxr/imaging/hdx/selectionTask.h>
-#include <pxr/imaging/hdx/colorizeSelectionTask.h>
 #include <pxr/imaging/hdx/pickTask.h>
 #include <pxr/imaging/hdx/renderTask.h>
 #include <pxr/imaging/hdx/tokens.h>
@@ -115,6 +115,7 @@
 #include <pxr/imaging/hd/basisCurvesSchema.h>
 #include <pxr/usd/kind/registry.h>
 #include <pxr/usd/usd/prim.h>
+
 #include <pxr/usd/usd/modelAPI.h>
 #include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usdLux/lightAPI.h>
@@ -1407,6 +1408,10 @@ void MtohRenderOverride::_InitHydraResources(
     //Using passes data
     _CreateFramePasses();
   
+    // The SkydomeTask is Storm-specific. HdxSkydomeTask::Execute will cast 
+    // the render pass state to HdStRenderPassState and return if it's not
+    // of that type.
+    if (_isUsingHdSt)
     {
         // Add the 'SkyDome' task to the frame pass.
         // Get the first render task path.
@@ -1504,7 +1509,8 @@ void MtohRenderOverride::_InitHydraResources(
 
     _dataProducerMergingSceneIndexProxy = std::make_shared<Fvp::DataProducerMergingSceneIndexProxy>();
 
-    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData);
+    constexpr bool interactive = true;
+    _mayaHydraSceneIndex = MayaHydraSceneIndex::New(mhInitData, interactive);
     TF_VERIFY(_mayaHydraSceneIndex, "Maya Hydra scene index not found, check mayaHydra plugin installation.");
 
     VtValue fvpSelectionTrackerValue(_fvpSelectionTracker);
@@ -1539,18 +1545,47 @@ void MtohRenderOverride::_InitHydraResources(
     _mayaViewportSceneIndex = MayaViewportSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain, _mayaHydraSceneIndex);
     _inputSceneIndexOfFilteringSceneIndicesChain = _mayaViewportSceneIndex;
 
-    // As of 13-Nov-2025, order of operations in _InitHydraResources() is such
-    // that render globals are initialized after this method is called.  Thus
-    // the included purposes attributes do not yet exist on the
-    // defaultRenderGlobals node.  Simply pass in an empty set of included
+    // Render globals are initialized after this method is called, so
+    // included purposes attributes do not yet exist on the
+    // defaultRenderGlobals node.  Pass in an empty set of included
     // purposes here.
     _purposeFilteringSceneIndex = Fvp::PurposeFilteringSceneIndex::New(
         _inputSceneIndexOfFilteringSceneIndicesChain, {});
         // RenderGlobalsUtils::GetIncludedPurposes());
     _pruningSceneIndex = Fvp::PruningSceneIndex::New(_purposeFilteringSceneIndex);
-    _pruningSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya filtering is handled by VP2/OGS.
+    if (!_mayaHydraSceneIndex ->useMeshAdapter()) {
+        _pruningSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya filtering is handled by VP2/OGS.
+    }
+
+    // Scene globals must be before the GP resolver so procedurals can
+    // read the current frame during cooking
+    _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_pruningSceneIndex);
+
+    // Set initial frame from Maya when scene globals scene index is created
+    if (_sceneGlobalsSceneIndex) {
+        const MTime  currentTime = MAnimControl::currentTime();
+        const double currentFrame = currentTime.value();
+        _SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
+
+        // Register time change callback if not already registered
+        if (_timeChangeCallback == 0) {
+            MStatus status;
+            _timeChangeCallback = MEventMessage::addEventCallback(
+                "timeChanged", _TimeChangedCallback, this, &status);
+            if (!status) {
+                TF_WARN("Failed to register time change callback");
+            }
+        }
+    }
+
+    // Create HdGp before selection so generated prims are selectable/highlightable.
+    // Use MhGenerativeProceduralResolvingSceneIndex so we match other MayaHydra
+    // scene indices, can ApplyExcludedSceneRoot for Maya native content, and keep
+    // HdGp usage centralized in mayaHydraLib.
+    _gpResolvingSceneIndex = MhGenerativeProceduralResolvingSceneIndex::New(_sceneGlobalsSceneIndex);
+
     _selection = std::make_shared<Fvp::Selection>();
-    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_pruningSceneIndex, _selection);
+    _selectionSceneIndex = Fvp::SelectionSceneIndex::New(_gpResolvingSceneIndex, _selection);
     _selectionSceneIndex->SetDisplayName("Flow Viewport Selection Scene Index");
     _inputSceneIndexOfFilteringSceneIndicesChain = _selectionSceneIndex;
 
@@ -1795,25 +1830,6 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
         _lastFilteringSceneIndexBeforeCustomFiltering, _mayaViewportSceneIndex->DefaultLightPath());
     _lightsManagementSceneIndex->SetLightingMode(convertFromMayaLightingModeToFlowViewportLightMode(_lightingMode));
     _mayaViewportSceneIndex->SetLightsManagementSceneIndex(_lightsManagementSceneIndex);
-
-    _lastFilteringSceneIndexBeforeCustomFiltering = _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
-
-    // Set initial frame from Maya when scene globals scene index is created
-    if (_sceneGlobalsSceneIndex) {
-        const MTime currentTime = MAnimControl::currentTime();
-        const double currentFrame = currentTime.value();
-        _SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
-        
-        // Register time change callback if not already registered
-        if (_timeChangeCallback == 0) {
-            MStatus status;
-            _timeChangeCallback = MEventMessage::addEventCallback(
-                "timeChanged", _TimeChangedCallback, this, &status);
-            if (!status) {
-                TF_WARN("Failed to register time change callback");
-            }
-        }
-    }
 
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);//Should this be on the frame pass filtering scene index ?

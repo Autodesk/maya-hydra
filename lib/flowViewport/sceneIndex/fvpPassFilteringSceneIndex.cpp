@@ -15,6 +15,7 @@
 
 #include "fvpPassFilteringSceneIndex.h"
 #include "flowViewport/fvpUtils.h"
+#include "flowViewport/tokens.h"
 
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
 #include <pxr/imaging/hd/repr.h>
@@ -112,12 +113,9 @@ bool PassFilteringSceneIndex::_ShouldBeFilteredOut(const SdfPath& primPath) cons
 
     HdSceneIndexPrim prim = inputSceneIndex->GetPrim(primPath);
 
-    static const TfToken generativeProceduralToken("hydraGenerativeProcedural");
-    static const TfToken resolvedGenerativeProceduralToken("resolvedHydraGenerativeProcedural");
-
     if (!isRprimType(prim.primType)) {
-        if ((prim.primType == generativeProceduralToken
-            || prim.primType == resolvedGenerativeProceduralToken) 
+        if ((prim.primType == FvpGenerativeProceduralTokens->hydraGenerativeProcedural
+             || prim.primType == FvpGenerativeProceduralTokens->resolvedHydraGenerativeProcedural) 
             && _generativeProceduralPaths.find(primPath) == _generativeProceduralPaths.end()) {
             _generativeProceduralPaths.insert(primPath);
         }

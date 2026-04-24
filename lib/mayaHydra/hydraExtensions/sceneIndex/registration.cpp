@@ -58,13 +58,14 @@ using namespace MayaHydra;
 struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
 {
     void Update() override {
-        auto proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(pluginSceneIndex);
+        auto proxyShapeSceneIndex
+            = TfDynamic_cast<::MayaHydra::MayaUsdProxyShapeSceneIndexBaseRefPtr>(pluginSceneIndex);
         proxyShapeSceneIndex->UpdateTime();
     }
 
 #ifdef CODE_COVERAGE_WORKAROUND
     void Destroy() override {
-        auto proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexRefPtr>(pluginSceneIndex);
+        auto proxyShapeSceneIndex = TfDynamic_cast<MayaUsdProxyShapeSceneIndexBaseRefPtr>(pluginSceneIndex);
         proxyShapeSceneIndex->_Destroy();
     }
 #endif
@@ -72,8 +73,11 @@ struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
 
 // MayaHydraSceneIndexRegistration is used to register a scene index for
 // mayaUsdPlugin proxy shape nodes.
-MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(const HdSceneIndexBaseRefPtr& dataProducerMergingSceneIndex)
+    MayaHydraSceneIndexRegistry::MayaHydraSceneIndexRegistry(
+          const HdSceneIndexBaseRefPtr& dataProducerMergingSceneIndex,
+          bool                          interactive)
     : _dataProducerMergingSceneIndex(dataProducerMergingSceneIndex)
+    , _interactive(interactive)
 {
     if (!MFnPlugin::isNodeRegistered(kMayaUsdProxyShapeNode)) {
         MGlobal::displayWarning("mayaUsdPlugin not loaded, cannot be registered to Maya Hydra.  Please load mayaUsdPlugin, then switch back to a Maya Hydra viewport renderer.");
@@ -229,9 +233,11 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     // contains Maya data, it cannot be added by the Flow Viewport API.
     // Pass in the scene index prefix for the proxy shape scene index, so it
     // can register a pick handler.
-    auto mayaUsdProxyShapeSceneIndex = MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode), registration->sceneIndexPathPrefix, Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath)));
+    auto mayaUsdProxyShapeSceneIndex = _interactive ? 
+        MayaUsdProxyShapeSceneIndexBaseRefPtr(MayaUsdProxyShapeSceneIndex::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode), registration->sceneIndexPathPrefix, Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath)))) :
+        MayaUsdProxyShapeSceneIndexBase::New(proxyStage, finalSceneIndex, stageSceneIndex, MObjectHandle(dagNode));
     registration->pluginSceneIndex = mayaUsdProxyShapeSceneIndex;
-    registration->interpretRprimPathFn = &(MAYAHYDRA_NS_DEF::MayaUsdProxyShapeSceneIndex::InterpretRprimPath);
+    registration->interpretRprimPathFn = &(MayaUsdProxyShapeSceneIndex::InterpretRprimPath);
     mayaUsdProxyShapeSceneIndex->Populate();
 
     // This sets the required prefix just downstream (after) the

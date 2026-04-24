@@ -110,15 +110,9 @@ TfToken GetPurposeRenderTag(const MRenderItem& ri)
     return HdRenderTagTokens->geometry;
 }
 
-bool useMeshAdapter()
+bool filterMesh(const MRenderItem& ri, bool useMeshAdapter)
 {
-    static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
-    return uma;
-}
-
-bool filterMesh(const MRenderItem& ri)
-{
-    return useMeshAdapter() ?
+    return useMeshAdapter ?
                             // Filter our mesh render items, and let the mesh adapter handle Maya
                             // meshes.  The MRenderItem::name() for meshes is "StandardShadedItem",
                             // their MRenderItem::type() is InternalMaterialItem, but
@@ -393,7 +387,7 @@ private:
 
 } // namespace
 
-MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData)
+MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData, bool interactive)
     : _ID(initData.delegateID.AppendChild(
           TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this))))
     , _renderIndex(initData.renderIndex)
@@ -402,6 +396,7 @@ MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData)
     , _sprimPath(initData.delegateID.AppendPath(SdfPath(std::string("sprims"))))
     , _materialPath(initData.delegateID.AppendPath(SdfPath(std::string("materials"))))
     , _mayaPathMapper(std::make_shared<MayaPathMapper>(*this))
+    , _interactive(interactive)
 {
     static std::once_flag once;
     std::call_once(once, []() {
@@ -458,7 +453,12 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         if (_GetRenderItem(fastId, ria)) {
             _RemoveRenderItem(ria);
         }
-        assert(ria != nullptr);
+        // The removal list can contain duplicate fastIds.  After the first
+        // removal succeeds, subsequent duplicates will not be found — skip
+        // them.
+        if (ria == nullptr) {
+            continue;
+        }
     }
 
     // My version, does minimal update
@@ -479,9 +479,17 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             continue;
         }
 
+        // VP2 image planes emit a DepthPrepass render item that uses a special
+        // shader writing only to the depth buffer with alpha-tested discard.
+        // Hydra has no equivalent; rendering it as a regular textured mesh
+        // creates a second overlapping layer that causes visual artifacts.
+        if (riName == "imagePlane_ColorImage_DepthPrepass") {
+            continue;
+        }
+
         // Meshes can optionally be handled by the mesh adapter, rather than by
         // render items.
-        if (filterMesh(ri)) {
+        if (filterMesh(ri, useMeshAdapter())) {
             continue;
         }
 
@@ -535,11 +543,15 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             // point
         }
 
-        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColor);
-        ria->UpdateFromDelta(data);
+        // Call UpdateTransform before UpdateFromDelta, as UpdateTransform
+        // updates the stored transform value, and UpdateFromDelta sends out
+        // PrimsDirtied notifications. If an observer receiving the PrimsDirtied 
+        // notifications pulls on the transform, it needs to be up to date.
         if (flags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
             ria->UpdateTransform(ri);
         }
+        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColor);
+        ria->UpdateFromDelta(data);
     }
 }
 
@@ -1170,6 +1182,18 @@ bool MayaHydraSceneIndex::_GetRenderItemMaterial(
         return true;
     }
 
+    // Image planes use a dedicated material adapter that reads the imageName
+    // attribute directly, rather than going through shading engine lookup.
+    MDagPath dagPath = ri.sourceDagPath();
+    if (dagPath.isValid() && dagPath.node().hasFn(MFn::kImagePlane)) {
+        material = GetMaterialPath(dagPath.node());
+        if (TfMapLookupPtr(_materialAdapters, material) != nullptr) {
+            return true;
+        }
+        shadingEngineNode = dagPath.node();
+        return false;
+    }
+
     if (GetShadingEngineNode(ri, shadingEngineNode))
     // Else try to find associated material node if this is a material shader.
     // NOTE: The existing maya material support in hydra expects a shading engine node
@@ -1586,6 +1610,12 @@ bool MayaHydraSceneIndex::passNormalsToHydra()
 {
     static const bool val = TfGetEnvSetting(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA);
     return val;
+}
+
+bool MayaHydraSceneIndex::useMeshAdapter()
+{
+    static const bool uma = TfGetEnvSetting(MAYA_HYDRA_USE_MESH_ADAPTER);
+    return (_interactive) ? uma : true;// Batch rendering (=> !_interactive) always uses mesh adapter
 }
 
 void MayaHydraSceneIndex::UpdateLightsShadowCollection()

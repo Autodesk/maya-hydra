@@ -19,8 +19,10 @@ target_sources(${TARGET_NAME}
     mayaHydraSceneIndexDataFactoriesSetup.cpp
     mayaHydraMayaFilteringSceneIndexData.cpp
     mayaHydraMayaFilteringSceneIndexDataConcreteFactory.cpp
+    mhMayaUsdProxyShapeSceneIndexBase.cpp
     mhMayaUsdProxyShapeSceneIndex.cpp
     mhDirtyLeadObjectSceneIndex.cpp
+    mhGenerativeProceduralResolvingSceneIndex.cpp
 )
 
 set(HEADERS
@@ -41,8 +43,10 @@ set(HEADERS
     mayaHydraSceneIndexDataFactoriesSetup.h
     mayaHydraMayaFilteringSceneIndexData.h
     mayaHydraMayaFilteringSceneIndexDataConcreteFactory.h
+    mhMayaUsdProxyShapeSceneIndexBase.h
     mhMayaUsdProxyShapeSceneIndex.h
     mhDirtyLeadObjectSceneIndex.h
+    mhGenerativeProceduralResolvingSceneIndex.h
 )
 
 # -----------------------------------------------------------------------------
