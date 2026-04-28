@@ -29,6 +29,7 @@
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 
 #include <set>
+#include <unordered_map>
 
 namespace MAYAHYDRA_NS_DEF {
 
@@ -83,14 +84,14 @@ protected:
         const PXR_NS::HdSceneIndexBase&                         sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
 
-    void _DirtyDescendantsXform(
+    void _DirtyDescendantsLocator(
         const PXR_NS::SdfPath&                            path,
         const PXR_NS::HdDataSourceLocatorSet&             locators,
         PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries);
 
 private:
-    std::set<PXR_NS::SdfPath> _generativeProceduralPaths;
 
+    std::set<PXR_NS::SdfPath> _generativeProceduralPaths;
 };
 
 } // namespace MAYAHYDRA_NS_DEF
