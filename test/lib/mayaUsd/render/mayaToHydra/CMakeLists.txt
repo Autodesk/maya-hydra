@@ -78,6 +78,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testConvergence.py
     testFramePasses.py
     testImagePlanes.py
+    testNurbsCurvesMeshAdapter.py
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
