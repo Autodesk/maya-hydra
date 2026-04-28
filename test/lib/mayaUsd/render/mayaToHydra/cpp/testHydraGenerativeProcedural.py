@@ -105,6 +105,39 @@ class TestHydraGenerativeProcedural(mtohUtils.MayaHydraBaseTestCase):
         cmds.refresh()
         self.assertSnapshotClose("rotate_procedural.png",
             self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+    def test_Visibility(self):
+        import mayaUsd
+        from pxr import UsdGeom
+
+        if self._usdVersion < (0, 25, 11):
+            self.skipTest(
+                "Visibility for generative procedural requires HdGp resolving SI "
+                "instantiation earlier; skipped for USD < 25.11 (DLL export / link limitation)."
+            )
+
+        stagePathSegment = "|simpleHydraGenerativeProcedural|simpleHydraGenerativeProceduralShape"
+        stage = mayaUsd.lib.GetPrim(stagePathSegment).GetStage()
+        proceduralPrim = stage.GetPrimAtPath("/MyGenerativeProcedural")
+        imageable = UsdGeom.Imageable(proceduralPrim)
+        self.assertIsNotNone(imageable)
+
+        # Initially visible
+        cmds.refresh()
+        self.assertSnapshotClose("visibility_visible.png",
+            self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        # Make invisible
+        imageable.MakeInvisible()
+        cmds.refresh()
+        self.assertSnapshotClose("visibility_invisible.png",
+            self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+        # Make visible again
+        imageable.MakeVisible()
+        cmds.refresh()
+        self.assertSnapshotClose("visibility_visible.png",
+            self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
         
 
 if __name__ == '__main__':
