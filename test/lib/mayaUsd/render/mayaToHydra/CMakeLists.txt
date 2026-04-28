@@ -78,7 +78,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testConvergence.py
     testFramePasses.py
     testImagePlanes.py
-    testNurbsCurvesMeshAdapter.py
 	#CPP tests
     cpp/testColorPreferences.py
     cpp/testCppFramework.py
@@ -154,6 +153,7 @@ endif()
 set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshes.py
     testTransformMeshAdapter.py
+    testNurbsCurvesMeshAdapter.py
     cpp/testMeshAdapterTransform.py
     cpp/testMeshPrimvars.py
 )
