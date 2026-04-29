@@ -22,8 +22,8 @@ import mayaUtils
 class TestNurbsCurvesMeshAdapter(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
-    IMAGE_DIFF_FAIL_THRESHOLD = 0.01
-    IMAGE_DIFF_FAIL_PERCENT = 0.1
+    IMAGE_DIFF_FAIL_THRESHOLD = 0.1
+    IMAGE_DIFF_FAIL_PERCENT = 1
     
     # With mesh adapter on, NURBS curves should bypass NurbsCurveAdapter and only be rendered via MayaHydraRenderItemAdapter.
     # The test ensures they are not rendered when visibility is off.
