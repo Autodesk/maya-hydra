@@ -153,7 +153,6 @@ endif()
 set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshes.py
     testTransformMeshAdapter.py
-    testNurbsCurvesMeshAdapter.py
     cpp/testMeshAdapterTransform.py
     cpp/testMeshPrimvars.py
 )

@@ -22,7 +22,7 @@ class TestTransformMeshAdapter(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     IMAGEDIFF_FAIL_THRESHOLD = 0.01
-    IMAGEDIFF_FAIL_PERCENT = 0.5
+    IMAGEDIFF_FAIL_PERCENT = 0.2
 
     def verifySnapshot(self, imageName):
         cmds.refresh()
@@ -55,9 +55,11 @@ class TestTransformMeshAdapter(mtohUtils.MayaHydraBaseTestCase):
         cmds.scale(2, 2, 2, cubeParent, absolute=True)
         self.verifySnapshot("cube_parent_moved_rotated_scaled.png")
 
+    # When mesh adapter is enabled, NURBS curves should bypass NurbsCurveAdapter and only be rendered
+    # via MayaHydraRenderItemAdapter. The test verifies there aren't unexpected curves shown by the NurbsCurveAdapter.
     def test_mayaNurbsCurve(self):
         mayaUtils.openNewScene()
-        self.setBasicCam(10)
+        self.setBasicCam(5)
         self.setHdStormRenderer()
 
         curveTrans = cmds.circle(name="mayaNurbsCurve")
