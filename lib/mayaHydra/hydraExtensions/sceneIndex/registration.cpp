@@ -16,6 +16,8 @@
 
 #include "mayaHydraLib/mixedUtils.h"
 #include "mayaHydraLib/sceneIndex/registration.h"
+#include "mayaHydraLib/sceneIndex/mhExternalCameraOverrideSceneIndex.h"
+#include "mayaHydraLib/sceneIndex/mhExternalCameraResolvingSceneIndex.h"
 #include "mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndex.h"
 
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
@@ -206,7 +208,10 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     //With this callback you can insert some scene indices which will be applied before the prototype scene indices.
     //This will be done inside Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageSceneIndex later
     UsdImagingCreateSceneIndicesInfo createInfo;
-        
+    createInfo.overridesSceneIndexCallback = [](HdSceneIndexBaseRefPtr const& inputSi) {
+        return MayaHydra::MhExternalCameraOverrideSceneIndex::New(inputSi);
+    };
+
     auto stage = proxyStage.getUsdStage();
     // Check whether the pseudo-root has children
     if (stage && (!stage->GetPseudoRoot().GetChildren().empty())) {
@@ -246,6 +251,8 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
         registration->pluginSceneIndex,
         registration->sceneIndexPathPrefix);
 
+    auto externalCameraResolvingSi = MayaHydra::ExternalCameraResolvingSceneIndex::New(pfsi);
+
     // Add a scene index that enforces a coherent prim removal + prim retrieval behavior.
     // This is to work around a bug in OpenUSD with the UsdImagingDrawModeSceneIndex where 
     // it can send PrimsRemoved notifications, but still return valid prims and prim paths 
@@ -254,7 +261,7 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     // change in HdMergingSceneIndex : 
     // https://github.com/PixarAnimationStudios/OpenUSD/blob/v25.08/pxr/imaging/hd/mergingSceneIndex.cpp#L507-L533
     // See fvpPrimRemovalEnforcingSceneIndex.h for a more detailed breakdown of the issue.
-    auto primRemovalSi = Fvp::PrimRemovalEnforcingSceneIndex::New(pfsi);
+    auto primRemovalSi = Fvp::PrimRemovalEnforcingSceneIndex::New(externalCameraResolvingSi);
 
     registration->rootSceneIndex = primRemovalSi;
 

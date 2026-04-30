@@ -177,6 +177,17 @@ bool IsDagPathAnArnoldAreaLight(const MDagPath& dagPath);
 bool IsDagPathALight(const MDagPath& dagPath);
 
 /**
+ * @brief Get if this MDagPath is a camera.
+ *
+ * Works whether dagPath points to the camera shape or its parent transform.
+ *
+ * @param[in] dagPath is a MDagPath
+ *
+ * @return true if the object is a camera, false otherwise
+ */
+bool IsDagPathACamera(const MDagPath& dagPath);
+
+/**
  * @brief Retrieves the texture file path from a dome light node.
  *
  * This function extracts the texture file path from a Maya dome light node,

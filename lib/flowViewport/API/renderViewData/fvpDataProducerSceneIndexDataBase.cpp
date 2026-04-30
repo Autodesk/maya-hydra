@@ -107,7 +107,15 @@ void DataProducerSceneIndexDataBase::_CreateSceneIndexChainForUsdStageSceneIndex
     if (params._dccNode){
         //Set the overridesSceneIndexCallback to insert our scene indices chain after the stage scene index and before the flatten scene index
         //If we don't do so, we cannot modify the transform or visibility to the children because of the flatten scene index in the usd stage chain.
-        params._createInfo.overridesSceneIndexCallback = std::bind(&DataProducerSceneIndexDataBase::_CreateUsdStageSceneIndexChain, this, std::placeholders::_1);
+        auto clientCallback = params._createInfo.overridesSceneIndexCallback;
+        params._createInfo.overridesSceneIndexCallback =
+            [this, clientCallback](HdSceneIndexBaseRefPtr const& input) {
+                auto si = input;
+                if (clientCallback) {
+                    si = clientCallback(si);
+                }
+                return _CreateUsdStageSceneIndexChain(si);
+            };
     }
 
     //Create the scene indices chain
