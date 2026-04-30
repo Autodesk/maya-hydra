@@ -32,39 +32,39 @@ class TestTransformMeshAdapter(mtohUtils.MayaHydraBaseTestCase):
                                  self.IMAGEDIFF_FAIL_PERCENT,
                                  imageVersion=imageVersion)
 
-    # def test_mayaMesh(self):
-    #     self.makeCubeScene(camDist=6)
-    #     cubeParent = cmds.group(self.cubeTrans, name='cubeParent')
-    #     cmds.select(clear=1)
+    def test_mayaMesh(self):
+        self.makeCubeScene(camDist=6)
+        cubeParent = cmds.group(self.cubeTrans, name='cubeParent')
+        cmds.select(clear=1)
         
-    #     self.verifySnapshot("cube_untransformed.png")
+        self.verifySnapshot("cube_untransformed.png")
 
-    #     cmds.scale(3, 1, 3, self.cubeTrans, absolute=True)
-    #     self.verifySnapshot("cube_scaled.png")
+        cmds.scale(3, 1, 3, self.cubeTrans, absolute=True)
+        self.verifySnapshot("cube_scaled.png")
 
-    #     cmds.move(0, 2, 0, self.cubeTrans, absolute=True)
-    #     self.verifySnapshot("cube_scaled_moved.png")
+        cmds.move(0, 2, 0, self.cubeTrans, absolute=True)
+        self.verifySnapshot("cube_scaled_moved.png")
 
-    #     cmds.rotate(0, 45, 0, self.cubeTrans, absolute=True)
-    #     self.verifySnapshot("cube_scaled_moved_rotated.png")
+        cmds.rotate(0, 45, 0, self.cubeTrans, absolute=True)
+        self.verifySnapshot("cube_scaled_moved_rotated.png")
 
-    #     cmds.move(0, -3, 0, cubeParent, absolute=True)
-    #     self.verifySnapshot("cube_parent_moved.png")
+        cmds.move(0, -3, 0, cubeParent, absolute=True)
+        self.verifySnapshot("cube_parent_moved.png")
 
-    #     cmds.rotate(0, 0, 45, cubeParent, absolute=True)
-    #     self.verifySnapshot("cube_parent_moved_rotated.png")
+        cmds.rotate(0, 0, 45, cubeParent, absolute=True)
+        self.verifySnapshot("cube_parent_moved_rotated.png")
 
-    #     cmds.scale(2, 2, 2, cubeParent, absolute=True)
-    #     self.verifySnapshot("cube_parent_moved_rotated_scaled.png")
+        cmds.scale(2, 2, 2, cubeParent, absolute=True)
+        self.verifySnapshot("cube_parent_moved_rotated_scaled.png")
 
     # When mesh adapter is enabled, NURBS curves should bypass NurbsCurveAdapter and only be rendered
     # via MayaHydraRenderItemAdapter. The test verifies there aren't unexpected curves shown by the NurbsCurveAdapter.
+    # On OSX, NURBS curves fail image diffing even with generous threshold values. Added OSX-specific reference images.
     def test_mayaNurbsCurve(self):
         mayaUtils.openNewScene()
         self.setBasicCam(5)
         self.setHdStormRenderer()
 
-        # Use OSX-specific reference images on macOS
         imageVersion = 'osx' if platform.system() == 'Darwin' else None
 
         curveTrans = cmds.circle(name="mayaNurbsCurve")
