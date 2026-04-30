@@ -20,6 +20,11 @@
 # See accompanying README.md for currently supported list of label mapping.
 # only single platform exclusion is supported currently.
 # For specifying exclusion based on plugin dependency, look at: test_to_run.json
+
+# TEMPORARY: skip all cmdLineRender tests so Jenkins runs only the test we are
+# debugging (HYDRA-1766: testTransformMeshAdapter). REVERT BEFORE MERGE.
+return()
+
 if(NOT IS_MACOSX)
     set(STORM_RENDER_SCENES
         basic/sphere.ma
