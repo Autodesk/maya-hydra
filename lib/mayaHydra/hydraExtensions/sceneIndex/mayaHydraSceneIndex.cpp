@@ -1478,6 +1478,13 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
         return;
     }
 
+    // NURBS curves are handled by the render-item adapter path, which
+    // correctly tracks VP2 visibility. Creating a DAG shape adapter here
+    // would produce a duplicate prim.
+    if (dag.hasFn(MFn::kNurbsCurve)) {
+        return;
+    }
+
     if (IsUfeItemFromMayaUsd(dag)) {
         // UFE items that have a Hydra representation will be added to Hydra by maya-usd
         return;
