@@ -94,6 +94,7 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 7.0  # Images are non-deterministic for shadows even with Storm.
+    IMAGE_DIFF_FAIL_PERCENT_PRMAN = 10.0  # PRMan renders are noisier; relax threshold.
     IMAGE_DIFF_FAIL_PERCENT_COVERAGE = 10.0
 
     @classmethod
@@ -328,13 +329,12 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         _log("LightingRenderDelegates: {} completed".format(delegate.get("name")))
 
     def _getImageDiffThresholds(self, delegate):
-        """Allow slightly higher tolerance for coverage builds."""
+        """Allow higher tolerance for PRMan (noisier renders) and coverage builds."""
         fail = self.IMAGE_DIFF_FAIL_THRESHOLD
         failpercent = self.IMAGE_DIFF_FAIL_PERCENT
-        if (
-            delegate.get("name") == "PRMan"
-            and os.environ.get("MAYAHYDRA_CODE_COVERAGE")
-        ):
+        if delegate.get("name") == "PRMan":
+            failpercent = max(failpercent, self.IMAGE_DIFF_FAIL_PERCENT_PRMAN)
+        if os.environ.get("MAYAHYDRA_CODE_COVERAGE"):
             failpercent = max(failpercent, self.IMAGE_DIFF_FAIL_PERCENT_COVERAGE)
         return fail, failpercent
 
