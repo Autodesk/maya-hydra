@@ -19,6 +19,8 @@ import maya.mel
 
 import fixturesUtils
 import mtohUtils
+import platform
+import unittest
 
 from string import digits
 
@@ -66,6 +68,7 @@ class TestSnapshot(BasicRenderBaseTestCase):
 class TestMayaHydraRender(BasicRenderBaseTestCase):
     _file = __file__
 
+    @unittest.skipIf(platform.system() == "Darwin", 'HYDRA-1127 : wireframes are unstable on OSX.')
     def test_cube(self):
         imageVersion = maya.mel.eval("defaultShaderName").rstrip(digits)
 

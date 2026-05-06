@@ -23,7 +23,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testTransforms.py
     testRefinement.py
 	testNewSceneWithStage.py
-    testMayaShadingModes.py
+    testMayaShadingModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
 	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
@@ -46,9 +46,9 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testOpenPBRSurface.py
     testFlowViewportAPI.py
     testStagePayloadsReferences.py
-    testNurbsPrimitives.py
+    testNurbsPrimitives.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testCurveTools.py
-    testPolygonPrimitives.py
+    testPolygonPrimitives.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testFootPrintNode.py
     testBackgroundColor.py
     testGrid.py
