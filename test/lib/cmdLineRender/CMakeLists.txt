@@ -135,6 +135,34 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSett
     FAILPERCENT 1.0
 )
 
+# Stage UVChecker.png within this test’s temporary Maya project so it can be
+# resolved via the workspace root when using `-proj`.
+#
+# Expected test directory layout:
+# .../test/Temporary/mayaSphereMayaMaterialArnoldRelativePath/projects/default   ← what -proj points at
+# ├── images/mayaSphereMayaMaterialArnoldRelativePath.png
+# └── sourceImages/UVChecker.png
+set(_relpath_proj_dir
+    "${CMAKE_BINARY_DIR}/test/Temporary/mayaSphereMayaMaterialArnoldRelativePath/projects/default")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/scenes/texturing/UVChecker.png"
+    "${_relpath_proj_dir}/sourceImages/UVChecker.png"
+    COPYONLY
+)
+
+# Test relative path resolution for Maya scene files.
+# Scenes may be transferred across different environments (e.g., render farms),
+# so the `-proj` argument is used to define the project root for resolving asset paths.
+# This ensures that relative paths are correctly remapped at load time.
+#
+# Example of an absolute path embedded in a .ma file:
+#   setAttr ".ftn" -type "string" "D:/nonExistentPath//UVChecker.png";
+# The test verifies that such paths can be resolved relative to the specified project.
+mayaHydra_add_cmd_line_render_test(relativePathTest/mayaSphereMayaMaterialArnoldRelativePath.ma
+    RENDERER HdArnoldRendererPlugin
+    RENDERER_ARGS "-proj \"${_relpath_proj_dir}\""
+)
+
 if(NOT IS_MACOSX)
 # HYDRA-2031 this test fails only on macOS.
 add_test(
