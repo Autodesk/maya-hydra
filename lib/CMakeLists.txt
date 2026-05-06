@@ -12,7 +12,7 @@ add_subdirectory(hydra-viewport-toolbox)
 
 # FIXME HYDRA-2275 : Demote -Wmaybe-uninitialized from error to warning for HVT targets.
 # Some Linux machines/compilers are stricter than others about this.
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     foreach(_hvt_target hvt hvt_engine hvt_dataSource hvt_geometry hvt_sceneIndex hvt_shadow hvt_tasks hvt_utils)
         if(TARGET ${_hvt_target})
             target_compile_options(${_hvt_target} PRIVATE -Wno-error=maybe-uninitialized)

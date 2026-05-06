@@ -20,6 +20,12 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         )
 endif()
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    list(APPEND GNU_CLANG_FLAGS
+        -Wno-error=maybe-uninitialized # GCC false-positive workaround
+    )
+endif()
+
 set(CLANG_FLAGS
     -MP
     -frtti
