@@ -227,8 +227,8 @@ MStatus MtohViewCmd::doIt(const MArgList& args)
         if (db.getFlagArgument(_updateRenderGlobals, 0, attrFlag) == MS::kSuccess) {
             bool          userDefaults = db.isFlagSet(_userDefaultsId);
             const TfToken attrName(attrFlag.asChar());
-            auto&         inst = MtohRenderGlobals::GlobalChanged(
-                { attrName, false, userDefaults }, storeUserSettings);
+            MtohRenderGlobals::GlobalParams params = { attrName, false, userDefaults };
+            auto&         inst = MtohRenderGlobals::GlobalChanged(params, storeUserSettings);
             MtohRenderOverride::UpdateRenderGlobals(inst, attrName);
             return MS::kSuccess;
         }
