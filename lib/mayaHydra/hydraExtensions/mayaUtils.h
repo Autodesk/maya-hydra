@@ -181,6 +181,9 @@ bool IsDagPathALight(const MDagPath& dagPath);
  *
  * Works whether dagPath points to the camera shape or its parent transform.
  *
+ * Checks support for MFn::kCamera, which is more general than the exact
+ * type match requirement of IsDagPathOfGivenType().
+ *
  * @param[in] dagPath is a MDagPath
  *
  * @return true if the object is a camera, false otherwise
