@@ -287,7 +287,6 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             return
         rendererPlugin = delegate["plugin"]
         start = time.time()
-        last_log = 0
         while (time.time() - start) < timeoutSeconds:
             cmds.refresh(force=True)
             if cmds.mayaHydraTesting(converged=True, rendererName=rendererPlugin):
@@ -295,11 +294,6 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 _log("Convergence reached for {} after {:.2f}s".format(
                     delegate.get("name"), time.time() - start))
                 return
-            elapsed = time.time() - start
-            if elapsed - last_log >= 5:
-                last_log = elapsed
-                _log("Waiting for convergence: {} {:.1f}s/{}s".format(
-                    delegate.get("name"), elapsed, timeoutSeconds))
             time.sleep(0.5)
         # Timeout reached; some renderers (e.g. PRMan) never report convergence in interactive mode.
         _log("Convergence timeout for {} after {:.2f}s (continuing)".format(
