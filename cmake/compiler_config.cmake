@@ -20,6 +20,15 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         )
 endif()
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    list(APPEND GNU_CLANG_FLAGS
+        # GCC can emit false-positives for this warning.
+        # We hit this with a combination of inlined calls + a std::swap
+        # in USD's VtValue::UncheckedGet.
+        -Wno-error=maybe-uninitialized
+    )
+endif()
+
 set(CLANG_FLAGS
     -MP
     -frtti
