@@ -318,6 +318,62 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                     }
                 }
                 break;
+                case MGeometry::Semantic::kTexture: {
+                    // Textures:
+                    if (_primitive == MGeometry::Primitive::kTriangles
+                        || _primitive == MGeometry::Primitive::kTriangleStrip) {
+                        int uvsCount = 0;
+                        const unsigned int originalUvsCount = mvb->vertexCount();
+                        if (topoChanged) {
+                            uvsCount = originalUvsCount;
+                        } else {
+                            // Keep the previously-determined uvs count in case it was truncated.
+                            const size_t uvSize = _uvs.size();
+                            if (uvSize > 0 && uvSize <= originalUvsCount) {
+                                uvsCount = uvSize;
+                            } else {
+                                uvsCount = originalUvsCount;
+                            }
+                        }
+
+                        _uvs.clear();
+                        const auto* uvData =
+                            reinterpret_cast<const GfVec2f*>(mvb->map());
+                        if (TF_VERIFY(uvData)) {
+                            _uvs.assign(uvData, uvData + uvsCount);
+                        }
+                        mvb->unmap();
+                    }
+                }
+                break;
+                case MHWRender::MGeometry::kTangent: {
+                    // Tangents
+                    if (_primitive == MGeometry::Primitive::kTriangles
+                        || _primitive == MGeometry::Primitive::kTriangleStrip) {
+                        int tangentsCount = 0;
+                        const unsigned int originalTangentsCount = mvb->vertexCount();
+                        if (topoChanged) {
+                            tangentsCount = originalTangentsCount;
+                        } else {
+                            // Keep the previously-determined tangents count in case it was truncated.
+                            const size_t tangentSize = _tangents.size();
+                            if (tangentSize > 0 && tangentSize <= originalTangentsCount) {
+                                tangentsCount = tangentSize;
+                            } else {
+                                tangentsCount = originalTangentsCount;
+                            }
+                        }
+
+                        _tangents.clear();
+                        const auto* tangentData =
+                            reinterpret_cast<const GfVec3f*>(mvb->map());
+                        if (TF_VERIFY(tangentData)) {
+                            _tangents.assign(tangentData, tangentData + tangentsCount);
+                        }
+                        mvb->unmap();
+                    }
+                }
+                break;
                 default:
                 break;
             }
@@ -354,52 +410,19 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
             if (numNormals > 0 && (maxIndex < (int64_t)numNormals - 1)) {
                 _normals.resize(maxIndex + 1);
             }
+            const size_t numUvs = _uvs.size();
+            if (numUvs > 0 && (maxIndex < (int64_t)numUvs - 1)) {
+                _uvs.resize(maxIndex + 1);
+            }
+            const size_t numTangents = _tangents.size();
+            if (numTangents > 0 && (maxIndex < (int64_t)numTangents - 1)) {
+                _tangents.resize(maxIndex + 1);
+            }
 
             switch (GetPrimitive()) {
             case MHWRender::MGeometry::Primitive::kTriangles:
                 vertexCounts.resize(indexCount / 3);
                 vertexCounts.assign(indexCount / 3, 3);
-
-                // Get face varying data from Maya like uvs
-                if (indexCount > 0) {
-                    
-                    MVertexBuffer* mvb = nullptr;
-
-                    for (int vbIdx = 0; vbIdx < vertexBuffercount; vbIdx++) {
-                        mvb = geom->vertexBuffer(vbIdx);
-                        if (!mvb)
-                            continue;
-
-                        const MVertexBufferDescriptor& desc = mvb->descriptor();
-                        const auto semantic = desc.semantic();
-                        switch(semantic){
-                            case MGeometry::Semantic::kTexture: {
-                                // Hydra supports a uv coordinate for each face-index (face varying), though we could use its own set of indices which should be smaller.
-                                _uvs.clear();
-                                _uvs.resize(indices->size());
-                                float* uvs = (float*)mvb->map();
-                                for (int i = 0; i < indexCount; ++i){
-                                    _uvs[i].Set(&uvs[indicesData[i] * 2]);
-                                }
-                                mvb->unmap();
-                            }
-                            break;
-                            case MHWRender::MGeometry::kTangent:{
-                                // Hydra supports a tangent for each face-index (face varying), though we could use its own set of indices which should be smaller.
-                                _tangents.clear();
-                                _tangents.resize(indices->size());
-                                float* tangents = (float*)mvb->map();
-                                for (int i = 0; i < indexCount; ++i){
-                                    _tangents[i].Set(&tangents[indicesData[i] * 2]);
-                                }
-                                mvb->unmap();
-                            }
-                            break;
-                            default:
-                            break;
-                        }
-                    }
-                }
                 break;
             case MHWRender::MGeometry::Primitive::kTriangleStrip: {
                 // Convert triangle strip indices to individual triangles.
@@ -422,47 +445,9 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                         }
                     }
                     vertexIndices = std::move(expandedIndices);
-
-                    // Get face varying data (UVs, tangents) using the expanded triangle indices
-                    for (int vbIdx = 0; vbIdx < vertexBuffercount; vbIdx++) {
-                        MVertexBuffer* mvb = geom->vertexBuffer(vbIdx);
-                        if (!mvb)
-                            continue;
-
-                        const MVertexBufferDescriptor& desc = mvb->descriptor();
-                        const auto semantic = desc.semantic();
-                        switch (semantic) {
-                            case MGeometry::Semantic::kTexture: {
-                                _uvs.clear();
-                                const int faceVertexCount = numTriangles * 3;
-                                _uvs.resize(faceVertexCount);
-                                float* uvs = (float*)mvb->map();
-                                for (int i = 0; i < faceVertexCount; ++i) {
-                                    _uvs[i].Set(&uvs[vertexIndices[i] * 2]);
-                                }
-                                mvb->unmap();
-                            }
-                            break;
-                            case MHWRender::MGeometry::kTangent: {
-                                _tangents.clear();
-                                const int faceVertexCount = numTriangles * 3;
-                                _tangents.resize(faceVertexCount);
-                                float* tangents = (float*)mvb->map();
-                                for (int i = 0; i < faceVertexCount; ++i) {
-                                    _tangents[i].Set(&tangents[vertexIndices[i] * 2]);
-                                }
-                                mvb->unmap();
-                            }
-                            break;
-                            default:
-                            break;
-                        }
-                    }
                 } else {
                     vertexCounts.clear();
                     vertexIndices.clear();
-                    _uvs.clear();
-                    _tangents.clear();
                 }
                 break;
             }
@@ -603,15 +588,16 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
                 { UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point }//Vertices only
             };
         }
-    } 
-    else if (interpolation == HdInterpolationFaceVarying) {
-        // UVs and tangents are face varying in maya.
+        // Also use HdInterpolationVertex for UV/Tangent, same as Normal
+        // The vertex buffers in MRenderItem was already expanded as per-face-vertex
+        // E.g., A default Maya cube polygon mesh will give 24 face-vertices/normals/uvs/tangents vertex buffers
+        // Note: the default cube doesn't give 36 face vertices as VP2 deduplicated them.
         if (_primitive == MGeometry::Primitive::kTriangles
             || _primitive == MGeometry::Primitive::kTriangleStrip) {
-            localDescs = {
-                {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate},//uvs
-                {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate},//tangents
-            };
+            localDescs.push_back(
+                {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate}); //uvs
+            localDescs.push_back(
+                {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate}); //tangents
         }
     } else if (interpolation == HdInterpolationConstant) {
         switch(_primitive){
