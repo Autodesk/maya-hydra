@@ -36,12 +36,18 @@ typedef PXR_NS::TfRefPtr<const ExternalCameraResolvingSceneIndex>
 
 /// \class ExternalCameraResolvingSceneIndex
 ///
-/// A filtering scene index that resolves external camera paths in
-/// renderSettings prims.  For each render product under
-/// renderSettings.renderProducts, if the cameraPrim SdfPath contains
-/// a "__adskUsd__externalCamera" component, the path prefix up to and
-/// including that component is stripped, leaving the actual camera path.
-///
+/// The ExternalCameraResolvingSceneIndex is a filtering scene index that does
+/// the final external camera path resolution in renderSettings prims. For a
+/// flattened Hydra render settings prim, it will look at the camera path for
+/// all render products. If the special external camera path component
+/// "__adskUsd__externalCamera" sentinel value is present in the camera path,
+/// the path components following the sentinel value represent an application
+/// Ufe::Path to the camera, represented in SdfPath form.  The path prefix up
+/// to and including the sentinel component is stripped, leaving the actual
+/// application camera path.  It will then invoke the path mapper on that
+/// external camera application path to convert it to a Hydra scene SdfPath,
+/// which completes the external camera support.
+
 class ExternalCameraResolvingSceneIndex
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
     , public Fvp::InputSceneIndexUtils<ExternalCameraResolvingSceneIndex>

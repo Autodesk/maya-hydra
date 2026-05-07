@@ -208,6 +208,9 @@ void MayaHydraSceneIndexRegistry::_AddSceneIndexForNode(MObject& dagNode)
     //With this callback you can insert some scene indices which will be applied before the prototype scene indices.
     //This will be done inside Fvp::DataProducerSceneIndexInterfaceImp::get().addUsdStageSceneIndex later
     UsdImagingCreateSceneIndicesInfo createInfo;
+    // Insert the ExternalCameraOverrideSceneIndex into the scene index
+    // chain. This callback will be applied by the
+    // Fvp::DataProducerSceneIndexDataBase.
     createInfo.overridesSceneIndexCallback = [](HdSceneIndexBaseRefPtr const& inputSi) {
         return MayaHydra::MhExternalCameraOverrideSceneIndex::New(inputSi);
     };

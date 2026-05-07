@@ -32,6 +32,10 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace {
 
 const TfToken kExternalCameraToken("adskUsd:externalCamera");
+
+// Special Hydra SdfPath sentinel value used when setting the path to the
+// external camera. This will be detected and resolved later, by the
+// ExternalCameraResolvingSceneIndex.
 const SdfPath kExternalCameraPrefix("/__adskUsd__externalCamera");
 
 SdfPath SanitizeExternalPath(const std::string& rawValue)

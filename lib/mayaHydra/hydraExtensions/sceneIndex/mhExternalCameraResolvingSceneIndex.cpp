@@ -40,6 +40,10 @@ const TfToken kExternalCameraComponent("__adskUsd__externalCamera");
 SdfPath ResolveExternalCameraPath(const SdfPath& inputPath)
 {
     SdfPath appPath; // Application path to the external camera, in SdfPath form.
+
+    // Strip away all components up to and including the sentinel
+    // component. The output of this process is an application Ufe::Path,
+    // represented in SdfPath form.
     for (const SdfPath& prefix : inputPath.GetPrefixes()) {
         if (prefix.GetNameToken() == kExternalCameraComponent) {
             appPath = inputPath.ReplacePrefix(prefix, SdfPath::AbsoluteRootPath());
@@ -96,7 +100,7 @@ SdfPath ResolveExternalCameraPath(const SdfPath& inputPath)
     auto hydraPath = Fvp::ufePathToPrimSelections(appUfePath);
 
     // Camera is non-instanced, so there will be a single PrimSelection.
-    if (hydraPath.size() != 1) {
+    if (!TF_VERIFY(hydraPath.size() == 1)) {
         return inputPath;
     }
     return hydraPath[0].primPath;
@@ -195,6 +199,7 @@ ExternalCameraResolvingSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);
 
+    // If prim isn't a Hydra render settings prim, return it unchanged.
     if (!prim.dataSource
         || prim.primType != HdPrimTypeTokens->renderSettings) {
         return prim;
@@ -206,6 +211,8 @@ ExternalCameraResolvingSceneIndex::GetPrim(const SdfPath& primPath) const
         return prim;
     }
 
+    // If the render settings prim doesn't have render products, return it
+    // unchanged.
     auto renderProductsDs = HdVectorDataSource::Cast(
         renderSettingsDs->Get(HdRenderSettingsSchemaTokens->renderProducts));
     if (!renderProductsDs) {
