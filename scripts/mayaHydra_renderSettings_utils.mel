@@ -39,3 +39,8 @@ global proc mayaHydraSetRenderOutputFormat(string $of)
 {
     python("import mayaHydra.renderSettings.output as mhOutput; mhOutput.setOutputFormat(" + "\"" + $of + "\")");
 }
+
+global proc mayaHydraSetRenderCamera(string $cameraPath)
+{
+    python("import mayaHydra.renderSettings.camera as mhCamera; mhCamera.setCamera(" + "\"" + $cameraPath + "\")");
+}

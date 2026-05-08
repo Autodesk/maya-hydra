@@ -1,7 +1,8 @@
 set(PYTHON_FILES
     __init__.py
-    resolution.py
+    camera.py
     output.py
+    resolution.py
 )
 
 install(
