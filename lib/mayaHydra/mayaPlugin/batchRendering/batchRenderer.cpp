@@ -18,6 +18,7 @@
 #include "batchRendererHydraV1RenderSettings.h"
 #include "batchRendererHydraV2RenderSettings.h"
 #include "batchRendererMayaRenderSettings.h"
+#include "tokens.h"
 
 #include "pluginDebugCodes.h"
 #include "renderSettingsUtils.h"
@@ -396,6 +397,13 @@ void BatchRenderer::_InitHydraResources()
     _taskController->SetEnablePresentation(false);
     _renderDelegate->SetRenderSetting(
         HdRenderSettingsTokens->enableInteractive, VtValue(false));
+
+    // Tell render delegate to read render settings from the Hydra
+    // scene (Hydra v2 render settings), rather than from the render
+    // settings map (Hydra v1 render settings).  This is an
+    // Autodesk-specific convention which render delegate providers
+    // can use.
+    _renderDelegate->SetRenderSetting(BatchRenderTokens->renderSettingsSrc, VtValue(BatchRenderTokens->hydraSceneRenderSettingsSrc));
 
     // Support a USD stage providing the render settings through prims in the
     // Hydra scene.  Hydra Prman supports this when the
