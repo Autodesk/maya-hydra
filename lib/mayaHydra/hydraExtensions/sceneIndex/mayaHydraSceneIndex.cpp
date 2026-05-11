@@ -62,7 +62,8 @@ bool _UseTheShapeDagPath(const MDagPath& dagpath)
         || MayaHydra::IsDagPathACamera(dagpath);
 }
 
-// Check if this dag path is registered in Sprims (such as the Arnold sky dome light)
+// Check if this dag path is registered in Sprims, which includes lights
+// (such as the Arnold sky dome light) and cameras.
 bool _IsDagPathRegisteredInHydraSPrims(const MDagPath& dagpath)
 {
     return MayaHydra::IsDagPathALight(dagpath)

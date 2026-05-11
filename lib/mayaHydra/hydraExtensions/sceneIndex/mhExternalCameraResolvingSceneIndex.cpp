@@ -223,6 +223,7 @@ ExternalCameraResolvingSceneIndex::GetPrim(const SdfPath& primPath) const
         HdRenderSettingsSchemaTokens->renderSettings,
         HdRenderSettingsSchemaTokens->renderProducts);
 
+    // Resolve external cameras for all render products.
     prim.dataSource = HdContainerDataSourceEditor(prim.dataSource)
         .Set(productsLocator,
              _ResolvedRenderProductsDataSource::New(renderProductsDs))
