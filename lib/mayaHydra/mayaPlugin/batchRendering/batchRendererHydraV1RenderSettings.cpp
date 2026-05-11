@@ -142,7 +142,7 @@ MStatus BatchRendererHydraV1RenderSettings::Render(
 
     HdxRenderTaskParams params;
     if (!renderer._PrepareRender(
-            inputParams.width, inputParams.height, params)) {
+            inputParams.width, inputParams.height, params, inputParams.dataWindow)) {
         return MStatus::kFailure;
     }
 

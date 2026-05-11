@@ -117,6 +117,34 @@ mayaHydra_add_cmd_line_render_test(renderSettings/arnoldOutputFormat.ma
     RENDERER_ARGS "-x 720 -y 128 -of jpg"
 )
 
+# No crop region: full 64x64 reference render of the same scene used by the
+# stormCropRegion / stormCropRegion1x1 tests.  Acts as the uncropped
+# baseline so a regression that breaks `-reg` would still need to keep this
+# test green (i.e. cropped and uncropped renders cannot accidentally
+# converge).
+mayaHydra_add_cmd_line_render_test(renderSettings/stormNoCrop.ma
+    COPY_SCENE
+    RENDERER HdStormRendererPlugin
+    RENDERER_ARGS "-x 64 -y 64"
+)
+
+# Crop region: render only the inner 32x32 of a 64x64 image.  Bounds are
+# inclusive on all four sides, so [16, 47] x [16, 47] selects 32 pixels.
+mayaHydra_add_cmd_line_render_test(renderSettings/stormCropRegion.ma
+    COPY_SCENE
+    RENDERER HdStormRendererPlugin
+    RENDERER_ARGS "-x 64 -y 64 -reg 16 47 16 47"
+)
+
+# Single-pixel crop region: only pixel (32, 32) is rendered, every other
+# pixel is the AOV clear/black value.  Exercises the inclusive-bound math
+# in mayaHydra.renderSettings.crop._toDataWindowNDC for a 1x1 region.
+mayaHydra_add_cmd_line_render_test(renderSettings/stormCropRegion1x1.ma
+    COPY_SCENE
+    RENDERER HdStormRendererPlugin
+    RENDERER_ARGS "-x 64 -y 64 -reg 32 32 32 32"
+)
+
 # Failure with HdStorm on macOS entered as HYDRA-2139.
 if(NOT IS_MACOSX)
     mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
