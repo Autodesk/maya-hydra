@@ -55,9 +55,9 @@ def _toDataWindowNDC(left, right, bottom, top, width, height):
         raise RuntimeError(
             "Invalid render resolution %dx%d." % (width, height))
 
-    # Reject out-of-bounds coordinates before clamping so the error message
-    # is accurate (clamping first would turn an out-of-bounds input into a
-    # degenerate xmin==xmax and report a misleading "require left <= right").
+    # Reject out-of-bounds coordinates first so they produce a specific
+    # bounds error instead of falling through to the inclusive-ordering
+    # validation below.  This function does not clamp crop coordinates.
     if left < 0 or bottom < 0 or right >= width or top >= height:
         raise RuntimeError(
             "Crop region out of image bounds: left=%d right=%d bottom=%d top=%d "
