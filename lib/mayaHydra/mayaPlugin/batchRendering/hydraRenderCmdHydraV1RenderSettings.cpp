@@ -34,7 +34,9 @@
 #include <ufe/path.h>
 #include <ufe/pathString.h>
 
+#include <pxr/base/gf/rect2i.h>
 #include <pxr/base/gf/vec2i.h>
+#include <pxr/base/gf/vec4f.h>
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/scoped.h>
 #include <pxr/base/vt/value.h>
@@ -48,6 +50,7 @@
 #include <pxr/usd/usdRender/var.h>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -215,6 +218,64 @@ Ufe::Path GetUfeCameraPathFromUsdRenderProductOverride(
     }
 
     return ufeCameraPath;
+}
+
+// Convert UsdRenderProduct.dataWindowNDC (GfVec4f, [0,1] aperture coords,
+// Y-up) into an inclusive pixel rect at the given image resolution.
+GfRect2i DataWindowNDCToPixelRect(
+    const GfVec4f& ndc, unsigned int width, unsigned int height)
+{
+    auto roundToInt = [](float f) -> int {
+        return static_cast<int>(std::lroundf(f));
+    };
+    const int xmin = roundToInt(ndc[0] * static_cast<float>(width));
+    const int ymin = roundToInt(ndc[1] * static_cast<float>(height));
+    const int xmax = roundToInt(ndc[2] * static_cast<float>(width))
+                   - 1; // GfRect2i is INCLUSIVE on both ends.
+    const int ymax = roundToInt(ndc[3] * static_cast<float>(height))
+                   - 1;
+    return GfRect2i(GfVec2i(xmin, ymin), GfVec2i(xmax, ymax));
+}
+
+// Check if render product overrides the data window (`-reg` / crop region)
+// and update inputParams.dataWindow if it does.  Skips trivial values that
+// cover the whole image (default for an unauthored attribute).
+bool UpdateDataWindowNDCFromUsdRenderProduct(
+    const UsdRenderProduct& renderProduct,
+    BatchRenderer::InputParams& inputParams,
+    const UsdTimeCode& timeCode)
+{
+    const UsdAttribute attr = renderProduct.GetDataWindowNDCAttr();
+    if (!attr || !attr.HasAuthoredValue()) {
+        return false;
+    }
+    GfVec4f ndc;
+    if (!attr.Get(&ndc, timeCode)) {
+        return false;
+    }
+    // Explicitly authored full-image value (0,0,1,1) — treat as no crop.
+    if (ndc[0] <= 0.0f && ndc[1] <= 0.0f && ndc[2] >= 1.0f && ndc[3] >= 1.0f) {
+        return false;
+    }
+    if (inputParams.width == 0 || inputParams.height == 0) {
+        TF_WARN("UpdateDataWindowNDCFromUsdRenderProduct: zero resolution; "
+                "ignoring dataWindowNDC on %s.",
+                renderProduct.GetPrim().GetPath().GetText());
+        return false;
+    }
+    const GfRect2i rect = DataWindowNDCToPixelRect(
+        ndc, inputParams.width, inputParams.height);
+    inputParams.dataWindow = rect;
+    TF_DEBUG_MSG(
+        MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+        "Render product crop region (%s): NDC(%.4f, %.4f, %.4f, %.4f) -> "
+        "pixels [%d..%d] x [%d..%d] in %ux%u image.\n",
+        renderProduct.GetPrim().GetPath().GetText(),
+        ndc[0], ndc[1], ndc[2], ndc[3],
+        rect.GetMinX(), rect.GetMaxX(),
+        rect.GetMinY(), rect.GetMaxY(),
+        inputParams.width, inputParams.height);
+    return true;
 }
 
 // Check if render product overrides resolution and update inputParams if it does.
@@ -530,6 +591,13 @@ bool HydraRenderCmd::hydraRenderFromHydraV1RenderSettings()
 
                 // Check if render product overrides resolution
                 UpdateResolutionFromUsdRenderProduct(renderProduct, inputParams, usdTimeCode);
+
+                // Check if render product overrides the data window
+                // (`-reg` flag / crop region).  Reset to no-crop first so a
+                // value carried over from a previous product cannot leak.
+                inputParams.dataWindow.reset();
+                UpdateDataWindowNDCFromUsdRenderProduct(
+                    renderProduct, inputParams, usdTimeCode);
 
                 // Use the image name from the render product (replace frame number if needed)
                 // The image name pattern may contain frame placeholders that need to be resolved

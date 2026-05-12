@@ -69,6 +69,41 @@ This strategy is currently used by Hydra PRMan when the environment variable
 `HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS` is set to `true`.  Other render
 delegates may adopt this approach in the future.
 
+## Command-line Flags
+
+When running a batch render through the standard Maya `Render` command-line
+tool with a Hydra renderer (e.g. `-renderer HdStormRendererPlugin`), the
+following Maya Hydra-specific flags are honored in addition to the
+renderer-agnostic Maya flags.  These flags are wired in by the per-renderer
+description XMLs under `renderDesc/`, so any Hydra render delegate whose
+description includes the corresponding `<mel>` entries will honor them.
+
+| Flag | Parameters | Description |
+|------|-----------|-------------|
+| `-x` | `int` | Set the X resolution of the final image. |
+| `-y` | `int` | Set the Y resolution of the final image. |
+| `-reg` | `int int int int` | Set a crop region in pixel coordinates: `left right bottom top` (Y-up, origin bottom-left, **inclusive on all four sides**). The output image keeps the full `-x`/`-y` resolution; pixels outside the region are filled with the AOV's clear/black value. This matches the Maya Software renderer's `-reg` semantics. |
+| `-rd` | `path` | Directory in which to store image files. |
+| `-im` | `filename` | Image file output name. |
+| `-of` | `format` | Output image file format. |
+
+Internally `-reg` writes `UsdRenderProduct.dataWindowNDC` on every render
+product picked by `mayaHydra.renderSettings.renderProducts.getRenderProductsToApplySettings()`,
+so it applies uniformly to the Hydra V1 and Hydra V2 render-settings paths
+described above.  Pixel coordinates are converted to USD's normalized
+aperture coordinates [0, 1] using:
+
+```
+xmin =  left          / W
+ymin =  bottom        / H
+xmax = (right  + 1)   / W   # +1 because right is INCLUSIVE
+ymax = (top    + 1)   / H   # +1 because top   is INCLUSIVE
+```
+
+So `-reg 0 W-1 0 H-1` covers the full image, `-reg p p p p` selects exactly
+one pixel at `(p, p)`, and a region with `right < left` or `top < bottom`
+raises a Python `RuntimeError`.
+
 ## Strategy Selection
 
 The render settings strategy is determined at render time by

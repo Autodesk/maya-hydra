@@ -44,6 +44,7 @@
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
 
+#include <pxr/base/gf/rect2i.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/driver.h>
 #include <pxr/imaging/hd/engine.h>
@@ -61,6 +62,7 @@
 
 #include <atomic>
 #include <memory>
+#include <optional>
 
 PXR_NAMESPACE_OPEN_SCOPE
 class MayaHydraSceneIndexRegistry;
@@ -86,6 +88,12 @@ public:
         unsigned int       height{0};
         RenderVarsInfo     renderVarsInfo;
         Ufe::Path          ufeCameraPath; // Is used to get the Maya camera MDagPath to get the view and projection matrices for the task controller.
+
+        // Optional crop region (`-reg` flag, USD UsdRenderProduct.dataWindowNDC)
+        // expressed as an inclusive pixel rect (Y-up, origin bottom-left).  When
+        // set, the output AOV stays at full (width x height) but only pixels
+        // inside this rect are rendered; the rest keep the AOV clear value.
+        std::optional<PXR_NS::GfRect2i> dataWindow;
     };
 
     BatchRenderer(const MtohRendererDescription& desc);
@@ -120,7 +128,8 @@ private:
     bool              _PrepareRender(
         unsigned int width,
         unsigned int height,
-        PXR_NS::HdxRenderTaskParams& outParams);
+        PXR_NS::HdxRenderTaskParams& outParams,
+        const std::optional<PXR_NS::GfRect2i>& dataWindow = std::nullopt);
     void              _FinalizeHydraBatchRender(const PXR_NS::HdxRenderTaskParams& params);
     void              _ExecuteHydraBatchRenderFrame();
 
