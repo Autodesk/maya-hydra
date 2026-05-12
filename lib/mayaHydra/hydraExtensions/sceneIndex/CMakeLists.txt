@@ -22,6 +22,8 @@ target_sources(${TARGET_NAME}
     mhMayaUsdProxyShapeSceneIndexBase.cpp
     mhMayaUsdProxyShapeSceneIndex.cpp
     mhDirtyLeadObjectSceneIndex.cpp
+    mhExternalCameraOverrideSceneIndex.cpp
+    mhExternalCameraResolvingSceneIndex.cpp
     mhGenerativeProceduralResolvingSceneIndex.cpp
 )
 
@@ -46,6 +48,8 @@ set(HEADERS
     mhMayaUsdProxyShapeSceneIndexBase.h
     mhMayaUsdProxyShapeSceneIndex.h
     mhDirtyLeadObjectSceneIndex.h
+    mhExternalCameraOverrideSceneIndex.h
+    mhExternalCameraResolvingSceneIndex.h
     mhGenerativeProceduralResolvingSceneIndex.h
 )
 

@@ -203,7 +203,6 @@ public:
     bool IsHdSt() const { return _isHdSt; }
 
     Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
-    Fvp::PrimSelections UfePathToPrimSelectionsLit(const Ufe::Path& appPath) const;
 
     // Common function to return templated sample types
     template <typename T, typename Getter>
