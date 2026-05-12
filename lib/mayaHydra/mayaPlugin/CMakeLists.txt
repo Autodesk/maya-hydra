@@ -16,6 +16,7 @@ target_sources(${TARGET_NAME}
         batchRendering/hydraRenderCmdHydraV2RenderSettings.cpp
         batchRendering/hydraRenderCmdMayaRenderSettings.cpp
         batchRendering/renderVarUtils.cpp
+        batchRendering/tokens.cpp
         colorNotFoundException.cpp
         envSettings.cpp
         mayaColorPreferencesTranslator.cpp
