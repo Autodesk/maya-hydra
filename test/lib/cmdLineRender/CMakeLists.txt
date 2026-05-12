@@ -126,6 +126,8 @@ if(NOT IS_MACOSX)
     )
 endif()
 
+# Arnold cmdLine render does not produce output images on macOS. Tracked as HYDRA-2262.
+if(NOT IS_MACOSX)
 mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
     RENDERER HdArnoldRendererPlugin
     EXPECTED_IMAGES_DIR renderSettings/images/arnold
@@ -134,6 +136,7 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSett
     FAIL 0.05
     FAILPERCENT 1.0
 )
+endif()
 
 if(NOT IS_MACOSX)
 # HYDRA-2031 this test fails only on macOS.
