@@ -72,9 +72,11 @@ delegates may adopt this approach in the future.
 ## Command-line Flags
 
 When running a batch render through the standard Maya `Render` command-line
-tool with `-renderer HdStormRendererPlugin`, `-renderer HdArnoldRendererPlugin`
-or `-renderer HdPrmanLoaderRendererPlugin`, the following Maya Hydra-specific
-flags are honored in addition to the renderer-agnostic Maya flags:
+tool with a Hydra renderer (e.g. `-renderer HdStormRendererPlugin`), the
+following Maya Hydra-specific flags are honored in addition to the
+renderer-agnostic Maya flags.  These flags are wired in by the per-renderer
+description XMLs under `renderDesc/`, so any Hydra render delegate whose
+description includes the corresponding `<mel>` entries will honor them.
 
 | Flag | Parameters | Description |
 |------|-----------|-------------|
