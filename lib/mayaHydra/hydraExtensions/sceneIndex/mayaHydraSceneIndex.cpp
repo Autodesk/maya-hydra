@@ -62,7 +62,8 @@ bool _UseTheShapeDagPath(const MDagPath& dagpath)
         || MayaHydra::IsDagPathACamera(dagpath);
 }
 
-// Check if this dag path is registered in Sprims (such as the Arnold sky dome light)
+// Check if this dag path is registered in Sprims, which includes lights
+// (such as the Arnold sky dome light) and cameras.
 bool _IsDagPathRegisteredInHydraSPrims(const MDagPath& dagpath)
 {
     return MayaHydra::IsDagPathALight(dagpath)
@@ -1446,6 +1447,13 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
 
     MFnDagNode dagNode(dag);
     if (dagNode.isIntermediateObject()) {
+        return;
+    }
+
+    // NURBS curves are handled by the render-item adapter path, which
+    // correctly tracks VP2 visibility. Creating a DAG shape adapter here
+    // would produce a duplicate prim.
+    if (dag.hasFn(MFn::kNurbsCurve)) {
         return;
     }
 

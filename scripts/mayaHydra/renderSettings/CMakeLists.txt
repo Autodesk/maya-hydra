@@ -1,7 +1,9 @@
 set(PYTHON_FILES
     __init__.py
     camera.py
+    crop.py
     output.py
+    renderProducts.py
     resolution.py
 )
 

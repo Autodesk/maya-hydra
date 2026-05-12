@@ -38,6 +38,9 @@ const TfToken kExternalCameraToken("adskUsd:externalCamera");
 // ExternalCameraResolvingSceneIndex.
 const SdfPath kExternalCameraPrefix("/__adskUsd__externalCamera");
 
+// External camera paths are either through USD (already uses '/' as a
+// separator), or through Maya (uses '|' as a separator, converted to '/' for
+// SdfPath representation).  We also erase the UFE path segment ',' separator.
 SdfPath SanitizeExternalPath(const std::string& rawValue)
 {
     std::string pathStr = rawValue;
@@ -76,6 +79,8 @@ MhExternalCameraOverrideSceneIndex::GetPrim(const SdfPath& primPath) const
         return prim;
     }
 
+    // Do special external camera override processing only if the prim is a
+    // render product or a render setting prim.
     TfToken schemaToken;
     if (prim.primType == HdPrimTypeTokens->renderSettings) {
         schemaToken = UsdImagingUsdRenderSettingsSchemaTokens->__usdRenderSettings;
@@ -97,6 +102,8 @@ MhExternalCameraOverrideSceneIndex::GetPrim(const SdfPath& primPath) const
         return prim;
     }
 
+    // If we don't have an external camera data source, nothing to do, return
+    // the prim unchanged.
     auto externalCameraDs =
         HdTypedSampledDataSource<std::string>::Cast(
             namespacedSettingsDs->Get(kExternalCameraToken));
@@ -110,6 +117,8 @@ MhExternalCameraOverrideSceneIndex::GetPrim(const SdfPath& primPath) const
     HdDataSourceLocator cameraLocator(
         schemaToken, UsdImagingUsdRenderSettingsSchemaTokens->camera);
 
+    // Overwrite or add the internal camera data source with the SdfPath
+    // representation of the external camera path, with its sentinel prefix.
     prim.dataSource = HdContainerDataSourceEditor(prim.dataSource)
         .Set(cameraLocator,
              HdRetainedTypedSampledDataSource<SdfPath>::New(sanitizedPath))

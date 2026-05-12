@@ -49,6 +49,7 @@
     <sep desc="Resolution options"/>
     <mel n="x" s="mayaHydraSetRenderWidth(%1)" t="int" p="1" h="Set X resolution of the final image"/>
     <mel n="y" s="mayaHydraSetRenderHeight(%1)" t="int" p="1" h="Set Y resolution of the final image"/>
+    <mel n="reg" s="mayaHydraSetCropRegion(%1,%2,%3,%4)" p="4" t="int int int int" h="Set crop region pixel boundary of the final image:\n\tleft, right, bottom, top (inclusive on all four sides)"/>
     <sep/>
     <!-- ______________________________________________________________ -->
     <sep desc="General purpose flags:"/>
