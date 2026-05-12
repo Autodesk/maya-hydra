@@ -92,8 +92,21 @@ const std::pair<MObject&, HdDirtyBits> _dirtyBits[] {
     { MayaAttrs::mesh::uvPivot,
       // Tracking manual edits to uvs.
       HdChangeTracker::DirtyPrimvar },
-    { MayaAttrs::mesh::displaySmoothMesh, HdChangeTracker::DirtyDisplayStyle },
-    { MayaAttrs::mesh::smoothLevel, HdChangeTracker::DirtyDisplayStyle }
+    // displaySmoothMesh and smoothLevel drive HdDisplayStyle::refineLevel via
+    // GetDisplayStyle(). When refineLevel transitions across 0:
+    //   * GetMeshTopology() flips the subdivisionScheme between `none` and `catmullClark`,
+    //     thus DirtyTopology required.
+    //   * GetPrimvarDescriptors(faceVarying) starts/stops advertising `normals`,
+    //     DirtyPrimvar and DirtyNormals required.
+    //   * GetSubdivTags() returns empty tags when refineLevel < 1, DirtySubdivTags required.
+    { MayaAttrs::mesh::displaySmoothMesh,
+      HdChangeTracker::DirtyDisplayStyle | HdChangeTracker::DirtyTopology
+          | HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyNormals
+          | HdChangeTracker::DirtySubdivTags },
+    { MayaAttrs::mesh::smoothLevel,
+      HdChangeTracker::DirtyDisplayStyle | HdChangeTracker::DirtyTopology
+          | HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyNormals
+          | HdChangeTracker::DirtySubdivTags }
 };
 } // namespace
 
@@ -263,7 +276,7 @@ public:
         return VtValue(ret);
     }
 
-    /// Return vertex normals as a primvar value.
+    /// Return face-varying normals as a primvar value.
     VtValue GetNormals()
     {
         MStatus status;
@@ -272,13 +285,25 @@ public:
             return {};
         }
 
-        //Normals are per vertex
-        MFloatVectorArray normals;
-        constexpr bool angleWeighted = false;
-        mesh.getVertexNormals(angleWeighted, normals);
-        const auto* rawNormals = reinterpret_cast<const GfVec3f*>(&normals[0]);
-        VtVec3fArray ret;
-        ret.assign(rawNormals, rawNormals + mesh.numVertices());
+        MFloatVectorArray mayaNormals;
+        if (mesh.getNormals(mayaNormals) != MS::kSuccess) {
+            return {};
+        }
+
+        const unsigned int numFV = mesh.numFaceVertices(&status);
+        if (!status) {
+            return {};
+        }
+
+        // get normal indices for all vertices of faces
+        MIntArray normalCounts, normalIndices;
+        mesh.getNormalIds(normalCounts, normalIndices);
+
+        VtVec3fArray ret(numFV);
+        for (unsigned int i = 0; i < normalIndices.length(); ++i) {
+            const MFloatVector& n = mayaNormals[normalIndices[i]];
+            ret[i].Set(n.x, n.y, n.z);
+        }
         return VtValue(ret);
     }
 
@@ -361,17 +386,11 @@ public:
             }
         }
 
-        static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
-        return  (passNormalsToHydra) ?
-            HdMeshTopology(
-                        PxOsdOpenSubdivTokens->none,//For the OGS normals vertex buffer to be used, we need to use PxOsdOpenSubdivTokens->none
-                        UsdGeomTokens->rightHanded,
-                        faceVertexCounts,
-                        faceVertexIndices) :
-            HdMeshTopology(
-            (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes || GetDisplayStyle().refineLevel > 0)
-                ? PxOsdOpenSubdivTokens->catmullClark
-                : PxOsdOpenSubdivTokens->none,
+        return HdMeshTopology(
+            // If no subdivision, keep custom normals set from Maya by using normal vertex buffer
+            // from OGS. Otherwise, they will get overridden by catmullClark algo in Hydra.
+            (GetDisplayStyle().refineLevel > 0) ? PxOsdOpenSubdivTokens->catmullClark
+                                                : PxOsdOpenSubdivTokens->none,
             UsdGeomTokens->rightHanded,
             faceVertexCounts,
             faceVertexIndices);
@@ -463,36 +482,31 @@ public:
     HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation) override
     {
         // Base descriptors
-        HdPrimvarDescriptorVector descs = MayaHydraShapeAdapter::GetPrimvarDescriptors(interpolation);
+        HdPrimvarDescriptorVector descs
+            = MayaHydraShapeAdapter::GetPrimvarDescriptors(interpolation);
 
         // Local descriptors
         HdPrimvarDescriptorVector localDescs;
+
         if (interpolation == HdInterpolationVertex) {
-            static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
-            if (passNormalsToHydra) {
-                localDescs = {
-                    { UsdGeomTokens->points,
-                      interpolation,
-                      HdPrimvarRoleTokens->point }, // Vertices
-                    { UsdGeomTokens->normals,
-                      interpolation,
-                      HdPrimvarRoleTokens->normal } // Normals
-                };
-            } else {
-                localDescs = {
-                    { UsdGeomTokens->points,
-                      interpolation,
-                      HdPrimvarRoleTokens->point } // Vertices only
-                };
-            }
+            localDescs = { { UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point } };
         } else if (interpolation == HdInterpolationFaceVarying) {
-            // UVs and tangents are face varying in maya.
+            static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
+
+            if (passNormalsToHydra && GetDisplayStyle().refineLevel == 0) {
+                localDescs.push_back(
+                    { UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal });
+            }
             MFnMesh mesh(GetDagPath());
             if (mesh.numUVs() > 0) {
-                localDescs = {
-                    {MayaHydraAdapterTokens->st, interpolation, HdPrimvarRoleTokens->textureCoordinate},//uvs
-                    {MayaHydraAdapterTokens->tangents, interpolation, HdPrimvarRoleTokens->textureCoordinate},//tangents
-                };
+                localDescs.push_back(
+                    { MayaHydraAdapterTokens->st,
+                      interpolation,
+                      HdPrimvarRoleTokens->textureCoordinate });
+                localDescs.push_back(
+                    { MayaHydraAdapterTokens->tangents,
+                      interpolation,
+                      HdPrimvarRoleTokens->textureCoordinate });
             }
         }
 
