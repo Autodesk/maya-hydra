@@ -48,3 +48,8 @@ global proc mayaHydraSetCropRegion(int $left, int $right, int $bottom, int $top)
     python("import mayaHydra.renderSettings.crop as mhCrop; mhCrop.setRegion("
            + $left + ", " + $right + ", " + $bottom + ", " + $top + ")");
 }
+
+global proc mayaHydraSetRenderCamera(string $cameraPath)
+{
+    python("import mayaHydra.renderSettings.camera as mhCamera; mhCamera.setCamera(" + "\"" + $cameraPath + "\")");
+}
