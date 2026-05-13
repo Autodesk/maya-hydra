@@ -39,7 +39,6 @@ class TestMeshSubdivTags(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(clear=True)
         cmds.refresh()
 
-
     def test_SubdivTagsAreAuthored(self):
         self.setupCreasedCube()
         self.runCppTest("MeshSubdivTags.creasedCubeTags")
