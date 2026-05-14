@@ -13,21 +13,13 @@
 # limitations under the License.
 #
 
-from .utils import getRenderSettingsPrim
-
 import mayaUsd.ufe as mayaUsdUfe
 
-from pxr import Sdf, UsdRender
+from maya import cmds
 
-def setCamera(cameraPath):
-    rsPrim = getRenderSettingsPrim()
+def getRenderSettingsPrim():
+    # Get the UFE path to the render settings prim to use from the
+    # default USD render settings node.
+    rsPath = cmds.getAttr('UsdDefaultRenderSettings.activeSettingsPath')
 
-    if not rsPrim:
-        raise RuntimeError("Render settings prim %s not found." % str(rsPrim.GetPath()))
-
-    rsParentPrim = rsPrim.GetParent()
-
-    for child in rsParentPrim.GetChildren():
-        if child.IsA(UsdRender.Product):
-            attr = child.CreateAttribute("adskUsd:externalCamera", Sdf.ValueTypeNames.String)
-            attr.Set(cameraPath)
+    return mayaUsdUfe.ufePathToPrim(rsPath)
