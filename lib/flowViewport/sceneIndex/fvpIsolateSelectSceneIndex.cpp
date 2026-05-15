@@ -30,6 +30,8 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/lightSchema.h>
 
+#include <algorithm>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {

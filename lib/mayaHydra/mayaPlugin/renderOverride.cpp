@@ -144,6 +144,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstring>
 #include <exception>
 #include <limits>
 
@@ -2858,6 +2859,8 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
             // legacy component selector (e.g. "pMesh1.f[0]") that we don't
             // support yet.
             if (std::strchr(ufeStr, '.') != nullptr) {
+                TF_WARN("Isolate select: unsupported component selector '%s' "
+                        "skipped.", ufeStr);
                 continue;
             }
 
