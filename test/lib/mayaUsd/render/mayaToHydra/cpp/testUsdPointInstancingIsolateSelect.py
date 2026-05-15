@@ -227,5 +227,48 @@ class TestUsdPointInstancingIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
 
         disableIsolateSelect(modelPanel)
 
+    def test_isolateSelectPointInstancingPreSelected(self):
+        """Regression test for the bug where selecting multiple point instances
+        and then enabling isolate select (rather than using loadSelected=True
+        after enabling) caused the viewport to freeze.
+
+        The root cause was that Maya stores multiple selected instances of the
+        same PointInstancer as a single view-selected object whose
+        objectStrings array has one entry per instance (length > 1).  The old
+        code unconditionally skipped any entry with objectStrings.length() > 1,
+        producing an empty isolate selection.  An empty selection triggers
+        dirtying of every prim in the scene, which causes an apparent freeze
+        while Storm processes the massive dirty list.
+        """
+        scene = self.setupScene()
+
+        modelPanel = 'modelPanel4'
+
+        # Pre-select 2 point instances (without the instancer itself), then
+        # enable isolate select.  This is the workflow that triggered the bug:
+        # the instances ended up in a single component-style view-selected
+        # entry (objectStrings.length() > 1) and were silently dropped.
+        cmds.select(self.pointInstancerPath + '/1',
+                    self.pointInstancerPath + '/5')
+        enableIsolateSelect(modelPanel)
+
+        # Only the instancer prim and the two explicitly selected instances
+        # should be visible.  All Maya objects, non-instanced USD prims,
+        # native instances, the cube generator, and every other point instance
+        # (0, 2, 3, 4, 6-13) must be hidden.
+        visible = [
+            self.pointInstancerPath,
+            self.pointInstancerPath + '/1',
+            self.pointInstancerPath + '/5']
+        notVisible = scene.copy()
+        for p in visible:
+            notVisible.remove(p)
+
+        cmds.refresh()
+
+        self.assertVisibility(visible, notVisible)
+
+        disableIsolateSelect(modelPanel)
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
