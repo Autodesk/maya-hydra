@@ -29,7 +29,7 @@
 #include "tokens.h"
 
 #include <pxr/imaging/glf/contextCaps.h>
-#if HD_API_VERSION >= 98
+#if HD_API_VERSION >= 98 // PXR_VERSION > 2605
 #include <pxr/imaging/hd/rendererCreateArgsSchema.h>
 #endif
 #include <pxr/imaging/hd/rendererPlugin.h>
@@ -87,7 +87,7 @@ MtohInitializeRenderPlugins()
                 GlfContextCaps::InitInstance();
             }
 
-#if HD_API_VERSION >= 98
+#if HD_API_VERSION >= 98 // PXR_VERSION > 2605
             HdRenderDelegate* delegate
                 = plugin->IsSupported(HdRendererCreateArgsSchema(nullptr)) ? 
                     plugin->CreateRenderDelegate() : nullptr;
