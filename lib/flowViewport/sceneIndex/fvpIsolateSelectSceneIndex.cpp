@@ -619,10 +619,11 @@ IsolateSelectSceneIndex::_CollectInstancers(
         const auto& primSelections = primSelectionsEntry.second;
 
         // If any PrimSelection for this key carries nestedInstanceIndices, the
-        // key IS the point instancer path.  Collect it directly, regardless of
-        // what isPointInstancer() returns for the prim in the scene index — the
-        // prim's representation may have been modified by intermediate scene
-        // index filters and could be misclassified.
+        // key IS the point instancer path.  nestedInstanceIndices is set by the
+        // picking code at pick time with exact knowledge of what was selected, so
+        // it is the authoritative signal — more reliable than querying primType
+        // through the scene index at mask-building time, which may reflect a
+        // different scene state.
         const bool hasPointInstanceSelection = std::any_of(
             primSelections.begin(), primSelections.end(),
             [](const PrimSelection& ps) {
@@ -673,14 +674,13 @@ IsolateSelectSceneIndex::_CreateInstancerMasks(
         // instancing, empty for point instancing.
         auto instanceLocationsDs = instancerTopologySchema.GetInstanceLocations();
 
-        // Fetch the selections for this instancer path up front so we can
-        // detect point-instance selections (those carrying nestedInstanceIndices)
-        // independently of instanceLocationsDs.  An intermediate scene-index
-        // filter may have populated instanceLocations for a prim that is really
-        // a point instancer, which would cause the native-instancer branch to
-        // produce a wrong mask.  Whenever the selection itself carries
-        // nestedInstanceIndices we know it was built from point-instancer
-        // picking and must use the point-instancer branch.
+        // Fetch the selections for this instancer path up front so we can use
+        // nestedInstanceIndices as the authoritative discriminator between
+        // point-instancer and native-instancer selections.  The picking code
+        // sets nestedInstanceIndices when an instance of a PointInstancer is
+        // selected, so its presence is a reliable signal that the
+        // point-instancer branch must be used, independent of scene state at
+        // mask-building time.
         auto primSelections = isolateSelection->GetPrimSelections(instancerPath);
         const bool hasPointInstanceSelection = std::any_of(
             primSelections.begin(), primSelections.end(),
