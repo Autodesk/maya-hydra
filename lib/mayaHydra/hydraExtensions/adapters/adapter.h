@@ -182,6 +182,10 @@ public:
     /// Return the basis curves topology for this prim (if applicable).
     virtual HdBasisCurvesTopology GetBasisCurvesTopology() { return {}; }
     MAYAHYDRALIB_API
+    /// Return the OpenSubdiv tags (creases, corners, interpolation rules) for this prim
+    /// when subdivision is active. Default returns empty tags.
+    virtual PxOsdSubdivTags GetSubdivTags() { return {}; }
+    MAYAHYDRALIB_API
     /// Return the Hydra render tag for this prim.
     virtual TfToken GetRenderTag() const { return TfToken(); }
     MAYAHYDRALIB_API

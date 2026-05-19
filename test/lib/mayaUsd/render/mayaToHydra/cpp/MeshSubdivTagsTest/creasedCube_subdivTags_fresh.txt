@@ -1,0 +1,16 @@
+[cornerIndices]
+	[0]
+[cornerSharpnesses]
+	[4.00000]
+[creaseIndices]
+	[0, 1, 2, 3]
+[creaseLengths]
+	[2, 2]
+[creaseSharpnesses]
+	[2.50000, 2.50000]
+[faceVaryingLinearInterpolation]
+	cornersPlus1
+[interpolateBoundary]
+	edgeAndCorner
+[triangleSubdivisionRule]
+	catmullClark
