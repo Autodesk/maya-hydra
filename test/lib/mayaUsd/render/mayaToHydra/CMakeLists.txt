@@ -155,6 +155,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testTransformMeshAdapter.py
     cpp/testMeshAdapterTransform.py
     cpp/testMeshPrimvars.py
+    cpp/testMeshSubdivTags.py
 )
 
 # The following tests incorrectly depend on having the VP2 render delegate
