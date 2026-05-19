@@ -145,6 +145,14 @@ mayaHydra_add_cmd_line_render_test(renderSettings/stormCropRegion1x1.ma
     RENDERER_ARGS "-x 64 -y 64 -reg 32 32 32 32"
 )
 
+# Arnold crop region without USD render settings: exercises the Maya render
+# settings fallback path, where -reg is carried through mayaHydraRenderRegion
+# instead of UsdRenderProduct.dataWindowNDC.
+mayaHydra_add_cmd_line_render_test(renderSettings/arnoldCropRegion.ma
+    RENDERER HdArnoldRendererPlugin
+    RENDERER_ARGS "-x 160 -y 120 -reg 32 95 30 89"
+)
+
 # Failure with HdStorm on macOS entered as HYDRA-2139.
 if(NOT IS_MACOSX)
     mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
