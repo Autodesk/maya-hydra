@@ -22,6 +22,19 @@ import usdUtils
 from pxr import UsdGeom
 import testUtils
 
+def _setTranslate(prim, value):
+    # setupScene() runs once per test method but Maya/USD are shared across
+    # tests in the same class. USD's stage cache can keep the layer in
+    # memory between tests, so a previously-added translate op may still be
+    # present on the prim. AddTranslateOp() throws in that case (observed
+    # only in Coverage builds where object lifetimes differ).
+    xf = UsdGeom.Xformable(prim)
+    for op in xf.GetOrderedXformOps():
+        if op.GetOpType() == UsdGeom.XformOp.TypeTranslate:
+            op.Set(value)
+            return
+    xf.AddTranslateOp().Set(value)
+
 def enableIsolateSelect(modelPanel):
     # Surprisingly
     # 
@@ -79,11 +92,10 @@ class TestUsdPointInstancingIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
 
         # Move USD objects.  Can also use undoable Maya cmds.move(), but using
         # the USD APIs is simpler.
-        cylinder1.AddTranslateOp().Set(value=(0, 2, 0))
-        cone1.AddTranslateOp().Set(value=(2, 0, 0))
-        sphere1.AddTranslateOp().Set(value=(-2, 0, 0))
-        xformRef = UsdGeom.Xformable(ref)
-        xformRef.AddTranslateOp().Set(value=(0, 0, -2))
+        _setTranslate(cylinder1.GetPrim(), (0, 2, 0))
+        _setTranslate(cone1.GetPrim(), (2, 0, 0))
+        _setTranslate(sphere1.GetPrim(), (-2, 0, 0))
+        _setTranslate(ref, (0, 0, -2))
 
         cmds.polyTorus()
         cmds.polySphere()
