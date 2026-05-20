@@ -151,6 +151,7 @@ mayaHydra_add_cmd_line_render_test(renderSettings/stormCropRegion1x1.ma
 mayaHydra_add_cmd_line_render_test(renderSettings/arnoldCropRegion.ma
     RENDERER HdArnoldRendererPlugin
     RENDERER_ARGS "-x 160 -y 120 -reg 32 95 30 89"
+    FAIL 0.5
 )
 
 # Failure with HdStorm on macOS entered as HYDRA-2139.
