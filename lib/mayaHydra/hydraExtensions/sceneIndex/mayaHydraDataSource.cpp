@@ -41,6 +41,7 @@
 #include <pxr/imaging/hd/materialSchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/meshTopologySchema.h>
+#include <pxr/imaging/hd/subdivisionTagsSchema.h>
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/purposeSchema.h>
@@ -132,6 +133,7 @@ MayaHydraDataSource::Get(const TfToken& name)
     if (name == HdMeshSchemaTokens->mesh) {
         if (_type == HdPrimTypeTokens->mesh) {
             auto topology = _adapter->GetMeshTopology();
+            const auto subdivTags = _adapter->GetSubdivTags();
             return HdMeshSchema::Builder()
                 .SetTopology(
                     HdMeshTopologySchema::Builder()
@@ -144,6 +146,36 @@ MayaHydraDataSource::Get(const TfToken& name)
                         .Build())
                 .SetSubdivisionScheme(
                     HdRetainedTypedSampledDataSource<TfToken>::New(topology.GetScheme()))
+                .SetSubdivisionTags(
+                    HdSubdivisionTagsSchema::Builder()
+                        .SetFaceVaryingLinearInterpolation(
+                            HdRetainedTypedSampledDataSource<TfToken>::New(
+                                subdivTags.GetFaceVaryingInterpolationRule()))
+                        // PxOsdSubdivTags::VertexInterpolationRule and
+                        // HdSubdivisionTagsSchema::interpolateBoundary are the same value under two
+                        // different names
+                        .SetInterpolateBoundary(
+                            HdRetainedTypedSampledDataSource<TfToken>::New(
+                                subdivTags.GetVertexInterpolationRule()))
+                        .SetTriangleSubdivisionRule(
+                            HdRetainedTypedSampledDataSource<TfToken>::New(
+                                subdivTags.GetTriangleSubdivision()))
+                        .SetCornerIndices(
+                            HdRetainedTypedSampledDataSource<VtIntArray>::New(
+                                subdivTags.GetCornerIndices()))
+                        .SetCornerSharpnesses(
+                            HdRetainedTypedSampledDataSource<VtFloatArray>::New(
+                                subdivTags.GetCornerWeights()))
+                        .SetCreaseIndices(
+                            HdRetainedTypedSampledDataSource<VtIntArray>::New(
+                                subdivTags.GetCreaseIndices()))
+                        .SetCreaseLengths(
+                            HdRetainedTypedSampledDataSource<VtIntArray>::New(
+                                subdivTags.GetCreaseLengths()))
+                        .SetCreaseSharpnesses(
+                            HdRetainedTypedSampledDataSource<VtFloatArray>::New(
+                                subdivTags.GetCreaseWeights()))
+                        .Build())
                 .SetDoubleSided(
                     HdRetainedTypedSampledDataSource<bool>::New(_adapter->GetDoubleSided()))
                 .Build();

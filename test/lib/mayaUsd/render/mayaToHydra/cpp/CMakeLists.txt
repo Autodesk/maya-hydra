@@ -48,6 +48,7 @@ target_sources(${TARGET_NAME}
         testUsdAnim.cpp
         testUsdPicking.cpp
         testNurbsSurfaces.cpp
+        testMeshSubdivTags.cpp
         testGeomSubsetsPicking.cpp
         testSinglePicking.cpp
         testSceneIndexDirtying.cpp

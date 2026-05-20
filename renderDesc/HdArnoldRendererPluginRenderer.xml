@@ -49,11 +49,16 @@
     <sep desc="Resolution options"/>
     <mel n="x" s="mayaHydraSetRenderWidth(%1)" t="int" p="1" h="Set X resolution of the final image"/>
     <mel n="y" s="mayaHydraSetRenderHeight(%1)" t="int" p="1" h="Set Y resolution of the final image"/>
+    <mel n="reg" s="mayaHydraSetCropRegion(%1,%2,%3,%4)" p="4" t="int int int int" h="Set crop region pixel boundary of the final image:\n\tleft, right, bottom, top (inclusive on all four sides)"/>
     <sep/>
     <!-- ______________________________________________________________ -->
     <sep desc="General purpose flags:"/>
     <mel n="rd" p="1" s='mayaHydraSetRenderDirectory("%1")' t="path" h="Directory in which to store image files"/>
     <mel n="im" p="1" s='mayaHydraSetRenderImageName("%1")' t="filename" h="Image file output name"/>
     <mel n="of" p="1" s='mayaHydraSetRenderOutputFormat("%1")' t="format" h="Output image file format. See the Render Settings window to\n\tfind available formats"/>
+    <sep/>
+    <!-- ______________________________________________________________ -->
+    <sep desc="Camera options"/>
+    <mel n="cam" p="1" s='mayaHydraSetRenderCamera("%1")' t="name" h="Specify which camera to be rendered"/>
     <sep/>
 </renderer>

@@ -146,6 +146,15 @@ bool IsDagPathALight(const MDagPath& dagPath)
     return (typeName.indexW(_lightString) != -1); // Does the typename contains "Light"
 }
 
+bool IsDagPathACamera(const MDagPath& dagPath)
+{
+    if (!dagPath.isValid())
+        return false;
+    auto shapeDagPath = dagPath;
+    shapeDagPath.extendToShape();
+    return shapeDagPath.hasFn(MFn::kCamera);
+}
+
 std::string GetDomeLightTexture(const MFnDependencyNode& lightNode)
 {
     // Be aware that dome lights in HdStorm always need a texture to work correctly,

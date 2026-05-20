@@ -18,6 +18,7 @@
 #include "batchRendererHydraV1RenderSettings.h"
 #include "batchRendererHydraV2RenderSettings.h"
 #include "batchRendererMayaRenderSettings.h"
+#include "tokens.h"
 
 #include "pluginDebugCodes.h"
 #include "renderSettingsUtils.h"
@@ -35,8 +36,12 @@
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
 #include <pxr/pxr.h>
 
+#include <pxr/base/gf/range2f.h>
+#include <pxr/base/gf/vec2f.h>
+#include <pxr/base/gf/vec2i.h>
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/vt/value.h>
+#include <pxr/imaging/cameraUtil/framing.h>
 #include <pxr/imaging/glf/contextCaps.h>
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/imaging/hdx/renderTask.h>
@@ -47,6 +52,7 @@
 #include <maya/MSceneMessage.h>
 #include <maya/MStatus.h>
 
+#include <algorithm>
 #include <string>
 
 using namespace MayaHydra;
@@ -190,10 +196,10 @@ bool BatchRenderer::Initialize()
 bool BatchRenderer::_PrepareRender(
     unsigned int         width,
     unsigned int         height,
-    HdxRenderTaskParams& outParams)
+    HdxRenderTaskParams& outParams,
+    const std::optional<GfRect2i>& dataWindow)
 {
     _viewport = GfVec4d(0, 0, width, height);
-    _taskController->SetRenderViewport(_viewport);
 
     HdxRenderTaskParams params;
     params.enableLighting = true;
@@ -201,6 +207,48 @@ bool BatchRenderer::_PrepareRender(
     params.enableSceneMaterials = true;
 #endif
     params.cullStyle = HdCullStyleBackUnlessDoubleSided;
+
+    // Crop region (UsdRenderProduct.dataWindowNDC -> CameraUtilFraming):
+    // keep the AOV buffer at full image size and only restrict the data
+    // window so the render delegate writes the AOV clear value outside the
+    // crop.  HdxTaskController's framing/buffer-size APIs are separate from
+    // SetRenderViewport; calling SetFraming + SetRenderBufferSize disables
+    // the legacy viewport path while keeping the AOV buffer at full
+    // (width x height).
+    if (dataWindow.has_value()) {
+        // Sanitize the rect to image bounds; some delegates (e.g. HdPrman 26)
+        // crash on out-of-range data windows.
+        // Guard against zero resolution: imgMaxX/Y would be -1, making
+        // std::clamp(val, 0, -1) undefined behaviour (lo > hi).
+        if (width == 0 || height == 0) {
+            TF_WARN(
+                "BatchRenderer::_PrepareRender: zero image dimension (%ux%u); "
+                "ignoring crop region.",
+                width, height);
+            _taskController->SetRenderViewport(_viewport);
+            outParams = params;
+            return true;
+        }
+        const int imgMaxX = static_cast<int>(width)  - 1;
+        const int imgMaxY = static_cast<int>(height) - 1;
+        const int minX = std::clamp(dataWindow->GetMinX(), 0, imgMaxX);
+        const int minY = std::clamp(dataWindow->GetMinY(), 0, imgMaxY);
+        const int maxX = std::clamp(dataWindow->GetMaxX(), minX, imgMaxX);
+        const int maxY = std::clamp(dataWindow->GetMaxY(), minY, imgMaxY);
+        const GfRect2i  sanitized(GfVec2i(minX, minY), GfVec2i(maxX, maxY));
+        const GfRange2f displayWindow(
+            GfVec2f(0.0f, 0.0f),
+            GfVec2f(static_cast<float>(width), static_cast<float>(height)));
+        const CameraUtilFraming framing(displayWindow, sanitized);
+
+        _taskController->SetRenderBufferSize(GfVec2i(
+            static_cast<int>(width), static_cast<int>(height)));
+        _taskController->SetFraming(framing);
+        _taskController->SetOverrideWindowPolicy(
+            std::optional<CameraUtilConformWindowPolicy>(CameraUtilFit));
+    } else {
+        _taskController->SetRenderViewport(_viewport);
+    }
 
     outParams = params;
 
@@ -396,6 +444,13 @@ void BatchRenderer::_InitHydraResources()
     _taskController->SetEnablePresentation(false);
     _renderDelegate->SetRenderSetting(
         HdRenderSettingsTokens->enableInteractive, VtValue(false));
+
+    // Tell render delegate to read render settings from the Hydra
+    // scene (Hydra v2 render settings), rather than from the render
+    // settings map (Hydra v1 render settings).  This is an
+    // Autodesk-specific convention which render delegate providers
+    // can use.
+    _renderDelegate->SetRenderSetting(BatchRenderTokens->renderSettingsSrc, VtValue(BatchRenderTokens->hydraSceneRenderSettingsSrc));
 
     // Support a USD stage providing the render settings through prims in the
     // Hydra scene.  Hydra Prman supports this when the

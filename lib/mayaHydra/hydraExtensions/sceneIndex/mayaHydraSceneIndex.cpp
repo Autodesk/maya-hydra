@@ -58,14 +58,16 @@ namespace {
 // For some dag paths we use the shape to translate it to an Hydra path
 bool _UseTheShapeDagPath(const MDagPath& dagpath)
 {
-    // Only for the Arnold skydome light
-    return MAYAHYDRA_NS_DEF::IsDagPathAnArnoldSkyDomeLight(dagpath);
+    return MayaHydra::IsDagPathAnArnoldSkyDomeLight(dagpath)
+        || MayaHydra::IsDagPathACamera(dagpath);
 }
 
-// Check if this dag path is registered in Sprims (such as the Arnold sky dome light)
+// Check if this dag path is registered in Sprims, which includes lights
+// (such as the Arnold sky dome light) and cameras.
 bool _IsDagPathRegisteredInHydraSPrims(const MDagPath& dagpath)
 {
-    return MAYAHYDRA_NS_DEF::IsDagPathALight(dagpath);
+    return MayaHydra::IsDagPathALight(dagpath)
+        || MayaHydra::IsDagPathACamera(dagpath);
 }
 
 } // namespace
@@ -653,36 +655,6 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
 
     const SdfPath primPath = GetPrimPath((extendToShape) ? shapeDagPath : dagPath, isSprim);
 
-    TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
-        .Msg("    mapped to scene index path %s.\n", primPath.GetText());
-
-    return Fvp::PrimSelections({ Fvp::PrimSelection { primPath } });
-}
-
-Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelectionsLit(const Ufe::Path& appPath) const
-{
-    TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
-        .Msg(
-            "MayaHydraSceneIndex::UfePathToPrimSelectionsLit(const Ufe::Path& %s) called.\n",
-            Ufe::PathString::string(appPath).c_str());
-
-    // Same as UfePathToPrimSelections(), except returns the "Lighted"
-    // hierarchy.  Should not be required.  Having the path mapper call
-    // UfePathToPrimSelections() would allow factoring out into a single path
-    // mapper for Usd and Maya (see registration.cpp).
-    if (appPath.runTimeId() != UfeExtensions::getMayaRunTimeId()) {
-        return {};
-    }
-
-    // If the Maya node described by the appPath is in fact a path mapper
-    // registry entry, nothing to do, the path mapper for that entry will
-    // handle things.
-    if (Fvp::PathMapperRegistry::Instance().HasMapper(appPath)) {
-        return {};
-    }
-
-    SdfPath primPath = _rprimPath.AppendPath(toSdfPath(UfeExtensions::ufeToDagPath(appPath))
-                                                 .MakeRelativePath(SdfPath::AbsoluteRootPath()));
     TF_DEBUG(MAYAHYDRALIB_SCENE_INDEX)
         .Msg("    mapped to scene index path %s.\n", primPath.GetText());
 
@@ -1475,6 +1447,13 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
 
     MFnDagNode dagNode(dag);
     if (dagNode.isIntermediateObject()) {
+        return;
+    }
+
+    // NURBS curves are handled by the render-item adapter path, which
+    // correctly tracks VP2 visibility. Creating a DAG shape adapter here
+    // would produce a duplicate prim.
+    if (dag.hasFn(MFn::kNurbsCurve)) {
         return;
     }
 
