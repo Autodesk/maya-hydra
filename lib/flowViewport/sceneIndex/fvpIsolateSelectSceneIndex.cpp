@@ -30,6 +30,8 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/lightSchema.h>
 
+#include <algorithm>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
@@ -348,15 +350,23 @@ void IsolateSelectSceneIndex::ReplaceIsolateSelection(const SelectionConstPtr& n
 
 void IsolateSelectSceneIndex::_DirtyIsolateSelection(const SelectionConstPtr& newIsolateSelection)
 {
+    _DirtyIsolateSelection(_isolateSelection, newIsolateSelection);
+}
+
+void IsolateSelectSceneIndex::_BuildIsolateSelectionDirties(
+    const SelectionConstPtr&                          oldIsolateSelection,
+    const SelectionConstPtr&                          newIsolateSelection,
+    HdSceneIndexObserver::DirtiedPrimEntries*         dirtiedEntries) const
+{
     // Trivial case of going from disabled to disabled is an early out.
-    if (disabled(_isolateSelection, newIsolateSelection)) {
+    if (disabled(oldIsolateSelection, newIsolateSelection)) {
         return;
     }
 
     // If the old and new isolate selection are equal, nothing to do.  Only
     // handling trivial case of empty isolate select (i.e. hide everything) for
     // the moment.
-    if ((_isolateSelection && _isolateSelection->IsEmpty()) &&
+    if ((oldIsolateSelection && oldIsolateSelection->IsEmpty()) &&
         (newIsolateSelection && newIsolateSelection->IsEmpty())) {
         return;
     }
@@ -366,26 +376,31 @@ void IsolateSelectSceneIndex::_DirtyIsolateSelection(const SelectionConstPtr& ne
 
     // First clear old paths.  If we were disabled do nothing.  If there were
     // no selected paths the whole scene was invisible.
-    _InsertSelectedPaths(_isolateSelection, dirtyPaths);
+    _InsertSelectedPaths(oldIsolateSelection, dirtyPaths);
 
     // Then add new paths.  If we're disabled do nothing.  If there are no
     // selected paths the whole scene is invisible.
     _InsertSelectedPaths(newIsolateSelection, dirtyPaths);
 
-    HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
-
     // Dirty all cleared and added prim paths.
     for (const auto& primPath : dirtyPaths) {
-        _DirtyVisibility(primPath, &dirtiedEntries);
+        _DirtyVisibility(primPath, dirtiedEntries);
     }
+}
 
+void IsolateSelectSceneIndex::_DirtyIsolateSelection(
+    const SelectionConstPtr& oldIsolateSelection,
+    const SelectionConstPtr& newIsolateSelection)
+{
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
+    _BuildIsolateSelectionDirties(oldIsolateSelection, newIsolateSelection, &dirtiedEntries);
     _SendPrimsDirtied(dirtiedEntries);
 }
 
 void IsolateSelectSceneIndex::_InsertSelectedPaths(
     const SelectionConstPtr& selection,
     std::set<SdfPath>&       dirtyPaths
-)
+) const
 {
     if (!selection) {
         return;
@@ -439,20 +454,33 @@ void IsolateSelectSceneIndex::SetViewport(
         }
     }
 
-    _DirtyIsolateSelection(newIsolateSelection);
-
     // Collect all the instancers from the new isolate selection.
     auto instancers = _CollectInstancers(newIsolateSelection);
 
     // Create the instance mask for each instancer.
     auto newInstancerMasks = _CreateInstancerMasks(instancers, newIsolateSelection);
 
-    // Dirty the instancer masks.
-    _DirtyInstancerMasks(newInstancerMasks);
-
+    // Capture old state so the dirty helpers can still diff old vs. new, then
+    // update the members BEFORE sending any dirty notifications.  This ensures
+    // that GetPrim() calls triggered synchronously inside _SendPrimsDirtied
+    // (e.g. from Hydra consuming the mask-locator dirty that
+    // _DirtyVisibilityRecursive emits when it walks up to root-level siblings)
+    // already see the new selection and masks rather than the stale values.
+    auto oldIsolateSelection = _isolateSelection;
+    auto oldInstancerMasks   = _instancerMasks;
     _isolateSelection = newIsolateSelection;
-    _instancerMasks = newInstancerMasks;
-    _viewportId = viewportId;
+    _instancerMasks   = newInstancerMasks;
+    _viewportId       = viewportId;
+
+    // Send visibility and mask dirty notifications as a single batch so that
+    // Hydra processes them atomically.  Splitting into two separate
+    // _SendPrimsDirtied calls can cause Hydra to cache a partially-updated
+    // state between the two batches, which intermittently results in stale
+    // instance masks being displayed.
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
+    _BuildIsolateSelectionDirties(oldIsolateSelection, newIsolateSelection, &dirtiedEntries);
+    _BuildInstancerMaskDirties(oldInstancerMasks, newInstancerMasks, &dirtiedEntries);
+    _SendPrimsDirtied(dirtiedEntries);
 }
 
 void IsolateSelectSceneIndex::SetIsolateSelection(
@@ -588,13 +616,27 @@ IsolateSelectSceneIndex::_CollectInstancers(
 
     Instancers instancers;
     for (const auto& primSelectionsEntry : *isolateSelection) {
-        // If the prim itself is a point instancer, add it and continue.
-        if (isPointInstancer(GetInputSceneIndex(), primSelectionsEntry.first)) {
+        const auto& primSelections = primSelectionsEntry.second;
+
+        // If any PrimSelection for this key carries nestedInstanceIndices, the
+        // key IS the point instancer path.  nestedInstanceIndices is set by the
+        // picking code at pick time with exact knowledge of what was selected, so
+        // it is the authoritative signal — more reliable than querying primType
+        // through the scene index at mask-building time, which may reflect a
+        // different scene state.
+        const bool hasPointInstanceSelection = std::any_of(
+            primSelections.begin(), primSelections.end(),
+            [](const PrimSelection& ps) {
+                return !ps.nestedInstanceIndices.empty();
+            });
+
+        if (hasPointInstanceSelection
+                || isPointInstancer(GetInputSceneIndex(), primSelectionsEntry.first)) {
             instancers.emplace_back(primSelectionsEntry.first);
             continue;
         }
 
-        for (const auto& primSelection : primSelectionsEntry.second) {
+        for (const auto& primSelection : primSelections) {
             auto prim = GetInputSceneIndex()->GetPrim(primSelection.primPath);
             auto instanceSchema = HdInstanceSchema::GetFromParent(prim.dataSource);
             if (instanceSchema.IsDefined()) {
@@ -631,9 +673,22 @@ IsolateSelectSceneIndex::_CreateInstancerMasks(
         // says that instanceLocations is only meaningful for native
         // instancing, empty for point instancing.
         auto instanceLocationsDs = instancerTopologySchema.GetInstanceLocations();
-        if (!instanceLocationsDs) {
-            auto primSelections = isolateSelection->GetPrimSelections(instancerPath);
 
+        // Fetch the selections for this instancer path up front so we can use
+        // nestedInstanceIndices as the authoritative discriminator between
+        // point-instancer and native-instancer selections.  The picking code
+        // sets nestedInstanceIndices when an instance of a PointInstancer is
+        // selected, so its presence is a reliable signal that the
+        // point-instancer branch must be used, independent of scene state at
+        // mask-building time.
+        auto primSelections = isolateSelection->GetPrimSelections(instancerPath);
+        const bool hasPointInstanceSelection = std::any_of(
+            primSelections.begin(), primSelections.end(),
+            [](const PrimSelection& ps) {
+                return !ps.nestedInstanceIndices.empty();
+            });
+
+        if (!instanceLocationsDs || hasPointInstanceSelection) {
             // If the instancer is in our list of collected instancers, it must
             // have prim selections.
             if (!TF_VERIFY(!primSelections.empty(), "Empty prim selections for instancer %s", instancerPath.GetText())) {
@@ -643,8 +698,6 @@ IsolateSelectSceneIndex::_CreateInstancerMasks(
             std::set<int> visibleIndices;
             for (const auto& primSelection : primSelections) {
                 for (const auto& instancesSelection : primSelection.nestedInstanceIndices) {
-                    // When will instancesSelection.instanceIndices have more
-                    // than one index?
                     for (auto instanceIndex : instancesSelection.instanceIndices) {
                         visibleIndices.insert(instanceIndex);
                     }
@@ -680,28 +733,37 @@ void IsolateSelectSceneIndex::_DirtyInstancerMasks(
     const InstancerMasks& newInstancerMasks
 )
 {
+    _DirtyInstancerMasks(_instancerMasks, newInstancerMasks);
+}
+
+void IsolateSelectSceneIndex::_BuildInstancerMaskDirties(
+    const InstancerMasks&                             oldInstancerMasks,
+    const InstancerMasks&                             newInstancerMasks,
+    HdSceneIndexObserver::DirtiedPrimEntries*         dirtiedEntries) const
+{
     // Keep paths in a set to minimize dirtying.
     std::set<SdfPath> dirtyPaths;
 
-    // First clear old paths.
-    for (const auto& entry : _instancerMasks) {
+    for (const auto& entry : oldInstancerMasks) {
         dirtyPaths.insert(entry.first);
     }
-
-    // Then add new paths.
     for (const auto& entry : newInstancerMasks) {
         dirtyPaths.insert(entry.first);
     }
 
-    HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
-
-    // Dirty all cleared and added prim paths.
     for (const auto& primPath : dirtyPaths) {
-        _AddDirtyInstancerMaskEntry(primPath, &dirtiedEntries);
+        _AddDirtyInstancerMaskEntry(primPath, dirtiedEntries);
     }
+}
 
+void IsolateSelectSceneIndex::_DirtyInstancerMasks(
+    const InstancerMasks& oldInstancerMasks,
+    const InstancerMasks& newInstancerMasks
+)
+{
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
+    _BuildInstancerMaskDirties(oldInstancerMasks, newInstancerMasks, &dirtiedEntries);
     _SendPrimsDirtied(dirtiedEntries);
-
 }
 
 void IsolateSelectSceneIndex::_AddDirtyInstancerMaskEntry(

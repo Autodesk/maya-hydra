@@ -189,12 +189,15 @@ private:
         PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries* dirtiedEntries
     ) const;
 
-    void _DirtyIsolateSelection(const SelectionConstPtr& selection);
+    void _DirtyIsolateSelection(const SelectionConstPtr& newSelection);
+    void _DirtyIsolateSelection(
+        const SelectionConstPtr& oldSelection,
+        const SelectionConstPtr& newSelection);
 
     void _InsertSelectedPaths(
         const SelectionConstPtr&   selection,
         std::set<PXR_NS::SdfPath>& dirtyPaths
-    );
+    ) const;
 
     void _AddDependencies(const SelectionPtr& isolateSelection);
 
@@ -211,11 +214,27 @@ private:
         const SelectionConstPtr& isolateSelection) const;
 
     // Dirty the instancer masks.
-    void _DirtyInstancerMasks(const InstancerMasks& instancerMasks);
+    void _DirtyInstancerMasks(const InstancerMasks& newInstancerMasks);
+    void _DirtyInstancerMasks(
+        const InstancerMasks& oldInstancerMasks,
+        const InstancerMasks& newInstancerMasks);
     void _AddDirtyInstancerMaskEntry(
         const PXR_NS::SdfPath&                            primPath, 
         PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries* dirtiedEntries
-    ) const;    
+    ) const;
+
+    // Low-level builders: populate dirtiedEntries without calling
+    // _SendPrimsDirtied, so callers can batch multiple dirty sets into a
+    // single notification.
+    void _BuildIsolateSelectionDirties(
+        const SelectionConstPtr& oldSelection,
+        const SelectionConstPtr& newSelection,
+        PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries* dirtiedEntries) const;
+
+    void _BuildInstancerMaskDirties(
+        const InstancerMasks& oldInstancerMasks,
+        const InstancerMasks& newInstancerMasks,
+        PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries* dirtiedEntries) const;
 
     std::string  _viewportId;
 
