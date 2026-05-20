@@ -197,7 +197,18 @@ PiInstancerWhSiRefPtr PiInstancerWhSi::New(
 HdSceneIndexPrim PiInstancerWhSi::GetHighlightPrim(const SdfPath &selectionPath, const SdfPath &fullPrimPath) const
 {
     SelectionKey selectionKey = SelectionKeyFromPath(selectionPath);
-    auto primSelection = _selections.at(selectionKey)._primSelection;
+
+    // During scene-index teardown, HdDependencyForwardingSceneIndex::_PrimsRemoved
+    // can drive _UpdateDependencies → GetPrim on a path whose entry has already
+    // been erased from _selections, while BaseWhSi::_selectionPaths (consulted
+    // before dispatching here) is still populated.  Without this guard, .at()
+    // throws std::out_of_range from a destructor-side path and crashes Maya.
+    // Same defensive pattern as the .find() checks at the bottom of this file.
+    auto selectionIt = _selections.find(selectionKey);
+    if (selectionIt == _selections.end()) {
+        return {};
+    }
+    auto primSelection = selectionIt->second._primSelection;
 
     auto originalPath = fullPrimPath.ReplacePrefix(selectionPath, SdfPath::AbsoluteRootPath());
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(originalPath);
@@ -223,7 +234,8 @@ HdSceneIndexPrim PiInstancerWhSi::GetHighlightPrim(const SdfPath &selectionPath,
         HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
         
         PXR_NS::VtBoolArray instanceMask;
-        auto selectionData = _selections.at(selectionKey);
+        // selectionIt was validated at function entry; reuse it.
+        auto selectionData = selectionIt->second;
         size_t nbInstances = selectionData._selectedInstanceCount;
         
         if (selectionKey.second == kLeadHighlight && selectionData._leadInstanceIndex != -1) {
