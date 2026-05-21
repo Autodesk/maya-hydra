@@ -42,6 +42,8 @@
 
 from pxr import Gf
 
+import maya.cmds as cmds
+
 from . import renderProducts
 from . import resolution
 
@@ -88,7 +90,21 @@ def setRegion(left, right, bottom, top):
     Translates them to UsdRenderProduct.dataWindowNDC and applies the value
     to every render product picked by
     renderProducts.getRenderProductsToApplySettings()."""
-    resAttr = resolution.getResolutionAttr()
+    if not cmds.objExists("|renderSettings|renderSettingsShape"):
+        width = cmds.getAttr("defaultResolution.width")
+        height = cmds.getAttr("defaultResolution.height")
+        _toDataWindowNDC(left, right, bottom, top, width, height)
+        return
+
+    try:
+        resAttr = resolution.getResolutionAttr()
+    except RuntimeError as err:
+        if "No stage found" in str(err):
+            width = cmds.getAttr("defaultResolution.width")
+            height = cmds.getAttr("defaultResolution.height")
+            _toDataWindowNDC(left, right, bottom, top, width, height)
+            return
+        raise
     width, height = resAttr.Get()
 
     dataWindowNDC = _toDataWindowNDC(

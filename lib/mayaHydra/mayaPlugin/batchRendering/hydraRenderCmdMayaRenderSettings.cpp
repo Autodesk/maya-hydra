@@ -17,6 +17,7 @@
 
 #include "batchRenderer.h"
 #include "pluginDebugCodes.h"
+#include "renderRegionCommand.h"
 
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
 
@@ -111,6 +112,7 @@ bool HydraRenderCmd::hydraRenderFromMayaRenderSettings()
     BatchRenderer::InputParams inputParams;
     inputParams.width = mayaRenderSettings.width;
     inputParams.height = mayaRenderSettings.height;
+    inputParams.dataWindow = MayaHydraRenderRegionCommand::getRenderRegion();
     TF_DEBUG_MSG(
         MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
         "Initial render settings resolution: %u x %u\n",
