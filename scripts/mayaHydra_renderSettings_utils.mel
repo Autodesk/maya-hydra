@@ -45,6 +45,7 @@ global proc mayaHydraSetRenderOutputFormat(string $of)
 // matching the Maya `Render -reg L R B T` flag.
 global proc mayaHydraSetCropRegion(int $left, int $right, int $bottom, int $top)
 {
+    mayaHydraRenderRegion -e -r $left $bottom $right $top;
     python("import mayaHydra.renderSettings.crop as mhCrop; mhCrop.setRegion("
            + $left + ", " + $right + ", " + $bottom + ", " + $top + ")");
 }
