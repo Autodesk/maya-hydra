@@ -145,6 +145,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstring>
 #include <exception>
 #include <limits>
 
@@ -2821,10 +2822,18 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
     if (!view.viewSelected()) {
         TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
             .Msg("  isolate select disabled for panel=%s\n", viewName.asChar());
+        // Set state to Off BEFORE notifying.  DisableIsolateSelection triggers
+        // _SendPrimsDirtied, which can synchronously re-enter this callback via
+        // Hydra→Maya observers (more likely with larger dirty sets, i.e. when
+        // numViewSelectedObjects > 1).  If the re-entrant call reads state==On
+        // it falls through to the "stay on, notify" branch and rebuilds the
+        // isolate set from the still-stale view-selected list, leaving the
+        // outer disable in an inconsistent state.  Setting the state first
+        // makes any re-entry see Off and take the correct path.
+        found->second = IsolateSelectState::IsolateSelectOff;
         // DisableIsolateSelection also clears the per-viewport force-visible
         // paths inside the manager, so no separate Clear call is needed.
         isolateSelectMgr.DisableIsolateSelection(viewName.asChar());
-        found->second = IsolateSelectState::IsolateSelectOff;
         return;
     }
 
@@ -2870,35 +2879,52 @@ void MtohRenderOverride::_ViewSelectedChangedCb(
 
     // The M3dView returns the list of view selected objects as strings.
     // Loop over the view selected objects and try to create UFE paths from
-    // them.  If there is more than one element to the MStringArray, this
-    // indicates Maya components.  Currently not supporting components,
-    // including the case where a single element holds components.
+    // them.  When objectStrings has a single element it is a regular object
+    // selection.  When it has more than one element, Maya is using a component
+    // representation — this happens for point instances of the same
+    // PointInstancer when multiple are selected simultaneously (each string is
+    // the UFE path of one instance).  We handle both cases by iterating over
+    // all strings in the array.  The single-element case where that one string
+    // itself encodes a component range (e.g. "pMesh1.f[0:10]") is not yet
+    // supported and is logged as a warning.
     auto isolateSelection = std::make_shared<Fvp::Selection>();
     const auto nbObjects = view.numViewSelectedObjects();
     TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
         .Msg("  building isolate selection from %u view-selected object(s)\n", nbObjects);
+
     std::vector<Ufe::Path> selectedUfePaths;
     selectedUfePaths.reserve(nbObjects);
     for (unsigned int i = 0; i < nbObjects; ++i) {
         MStringArray objectStrings;
         TF_VERIFY(view.viewSelectedObject(i, objectStrings) == MS::kSuccess);
-        if (objectStrings.length() > 1) {
-            std::ostringstream oss;
-            oss << objectStrings;
-            TF_WARN("Unimplemented isolate select on Maya components %s", oss.str().c_str());
-            continue;
-        }
-        const char* ufeStr = objectStrings[0].asChar();
-        TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
-            .Msg("  [%u] viewSelectedObject UFE string: %s\n", i, ufeStr);
-        auto path = Ufe::PathString::path(ufeStr);
-        auto primSelections = Fvp::ufePathToPrimSelections(path);
-        _LogPrimSelectionsForViewSelectedIsolate(ufeStr, primSelections);
-        for (const auto& primSelection : primSelections) {
-            isolateSelection->Add(primSelection);
-        }
-        if (!path.empty()) {
-            selectedUfePaths.push_back(std::move(path));
+
+        // Iterate over every string in the array.  For a normal object there
+        // is exactly one string.  For multiple point instances from the same
+        // PointInstancer there is one UFE-path string per selected instance.
+        for (unsigned int j = 0; j < objectStrings.length(); ++j) {
+            const char* ufeStr = objectStrings[j].asChar();
+
+            // A string that contains a Maya-component separator ('.') is a
+            // legacy component selector (e.g. "pMesh1.f[0]") that we don't
+            // support yet.
+            if (std::strchr(ufeStr, '.') != nullptr) {
+                TF_WARN("Isolate select: unsupported component selector '%s' "
+                        "skipped.", ufeStr);
+                continue;
+            }
+
+            TF_DEBUG(FVP_ISOLATE_SELECT_VIEW_SELECTED)
+                .Msg("  [%u][%u] viewSelectedObject UFE string: %s\n", i, j, ufeStr);
+            auto path = Ufe::PathString::path(ufeStr);
+            auto primSelections = Fvp::ufePathToPrimSelections(path);
+
+            _LogPrimSelectionsForViewSelectedIsolate(ufeStr, primSelections);
+            for (const auto& primSelection : primSelections) {
+                isolateSelection->Add(primSelection);
+            }
+            if (!path.empty()) {
+                selectedUfePaths.push_back(std::move(path));
+            }
         }
     }
 

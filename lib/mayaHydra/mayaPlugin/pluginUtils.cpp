@@ -29,6 +29,9 @@
 #include "tokens.h"
 
 #include <pxr/imaging/glf/contextCaps.h>
+#if HD_API_VERSION >= 98 // PXR_VERSION > 2605
+#include <pxr/imaging/hd/rendererCreateArgsSchema.h>
+#endif
 #include <pxr/imaging/hd/rendererPlugin.h>
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/usdImaging/usdImagingGL/engine.h>
@@ -84,9 +87,15 @@ MtohInitializeRenderPlugins()
                 GlfContextCaps::InitInstance();
             }
 
+#if HD_API_VERSION >= 98 // PXR_VERSION > 2605
+            if (!plugin->IsSupported(HdRendererCreateArgsSchema(nullptr))) {
+                continue;
+            }
+#else
             if (!plugin->IsSupported()) {
                 continue;
             }
+#endif
 
             // CreateRenderDelegate may fail without GPU context (e.g. Arnold from
             // PXR_PLUGINPATH_NAME). Still register the override; delegate is created

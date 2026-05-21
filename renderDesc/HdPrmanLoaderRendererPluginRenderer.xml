@@ -42,7 +42,7 @@
         "h" the help description.
 -->
 <renderer desc="Hydra Prman renderer">
-    <melheader s='string $opt=""; string $rl=""; string $rp=""; float $resize=-1.; int $interactive=0; loadPlugin -quiet mayaUsdPlugin; loadPlugin -quiet mayaHydra;'/>
+    <melheader s='string $opt=""; string $rl=""; string $rp=""; float $resize=-1.; int $interactive=0; loadPlugin -quiet mayaUsdPlugin; loadPlugin -quiet mayaHydra; mayaHydraRenderRegion -e -c;'/>
     <meltrailer s='setMayaSoftwareLayers($rl, $rp); setImageSizePercent($resize);mayaBatchRenderProcedure($interactive, "", "", "HdPrmanLoaderRendererPlugin", $opt); '/>
     <sep/>
     <!-- ______________________________________________________________ -->

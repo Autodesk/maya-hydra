@@ -14,6 +14,7 @@
 #
 
 import mayaUsd.ufe as mayaUsdUfe
+import maya.cmds as cmds
 
 from pxr import Sdf, UsdRender, Gf
 
@@ -58,7 +59,14 @@ def getResolutionAttr():
 
 
 def setWidth(width):
-    resAttr = getResolutionAttr()
+    cmds.setAttr("defaultResolution.width", width)
+
+    try:
+        resAttr = getResolutionAttr()
+    except RuntimeError as err:
+        if "No stage found" in str(err):
+            return
+        raise
     w, h = resAttr.Get()
 
     # Passing a Python integer 2-tuple directly to Set() causes
@@ -68,7 +76,14 @@ def setWidth(width):
     resAttr.Set(newRes)
 
 def setHeight(height):
-    resAttr = getResolutionAttr()
+    cmds.setAttr("defaultResolution.height", height)
+
+    try:
+        resAttr = getResolutionAttr()
+    except RuntimeError as err:
+        if "No stage found" in str(err):
+            return
+        raise
     w, h = resAttr.Get()
 
     # See setWidth() Gf.Vec2i comments.

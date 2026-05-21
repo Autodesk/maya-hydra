@@ -51,7 +51,9 @@ bool isPointInstancer(const PXR_NS::HdSceneIndexPrim& prim)
 
     auto instanceLocations = instanceLocationsDs->GetTypedValue(0.0f);
 
-    return (instanceLocations.size() > 0);
+    // Per the documentation, instanceLocations is empty for point instancing
+    // and non-empty for native instancing.
+    return instanceLocations.empty();
 }
 
 } // namespace FVP_NS_DEF

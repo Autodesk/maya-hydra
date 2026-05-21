@@ -114,7 +114,10 @@ public:
     FVP_API
     PrimSelections GetPrimSelections(const PXR_NS::SdfPath& primPath) const;
 
+    FVP_API
     PrimSelectionsMap::const_iterator begin() const;
+
+    FVP_API
     PrimSelectionsMap::const_iterator end() const;
 
 private:

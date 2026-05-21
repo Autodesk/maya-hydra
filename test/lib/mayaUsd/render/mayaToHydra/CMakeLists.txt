@@ -131,6 +131,7 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
         cpp/testUsdPointInstancingIsolateSelect.py
         cpp/testUsdPointInstancingIsolateSelectBBox.py
         testIsolateSelectPerShape.py
+        testIsolateSelectMultipleInstances.py|depOnPlugins:bifrost
     )
 endif()
 
