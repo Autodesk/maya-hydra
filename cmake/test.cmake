@@ -324,7 +324,6 @@ function(_mayaHydra_setup_test_plugins)
          "${CMAKE_INSTALL_PREFIX}/scripts")
 
     # mayaUsdPlugin
-    set(_osx_use_pxr_usd_plugins FALSE)
     if(DEFINED MAYAUSD_LOCATION)
         list(APPEND MAYAHYDRA_VARNAME_PATH
              "${MAYAUSD_LOCATION}/lib")
@@ -343,57 +342,18 @@ function(_mayaHydra_setup_test_plugins)
         list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH 
              "${MAYAUSD_LOCATION}/lib/python")
         # USD plugin paths:
-        # - Windows: prepend OpenUSD for PRMan, then MayaUSD lib/usd.
-        # - macOS: prefer OpenUSD plugin path to avoid duplicate TfType definitions;
-        #   add only the AdskAssetResolver plugin from MayaUSD if present.
-        # - Linux: keep MayaUSD lib/usd (do not change Linux behavior).
+        # - Windows: prepend OpenUSD (for PRMan delegate discovery), then MayaUSD lib/usd.
+        # - macOS/Linux: use MayaUSD lib/usd only.
+        # Do NOT add PXR_USD_LOCATION/lib/usd on macOS: those plugins link against a
+        # different USD build than Maya's bundled USD, causing duplicate TF_DEBUG_ENVIRONMENT_SYMBOL
+        # registration (e.g. HGIMETAL_DEBUG_ERROR_STACKTRACE) that fatally crashes every test.
         if(IS_WINDOWS AND DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
             list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
                  "${PXR_USD_LOCATION}/lib/usd")
             message(STATUS "Using OpenUSD plugin path from PXR_USD_LOCATION: ${PXR_USD_LOCATION}/lib/usd")
         endif()
-        if(IS_MACOSX)
-            if(DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
-                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-                     "${PXR_USD_LOCATION}/lib/usd")
-                set(_osx_use_pxr_usd_plugins TRUE)
-                message(STATUS "Using OpenUSD plugin path from PXR_USD_LOCATION on macOS.")
-            else()
-                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-                     "${MAYAUSD_LOCATION}/lib/usd")
-            endif()
-        else()
-            list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-                 "${MAYAUSD_LOCATION}/lib/usd")
-        endif()
-        if(IS_MACOSX AND _osx_use_pxr_usd_plugins)
-            set(_mayausd_usd_root "${MAYAUSD_LOCATION}/lib/usd")
-            set(_mayausd_plugin_dirs "")
-
-            set(_adsk_resolver_path "${_mayausd_usd_root}/adskassetresolver/resources")
-            set(_adsk_resolver_path_alt "${_mayausd_usd_root}/adskAssetResolver/resources")
-            if(EXISTS "${_adsk_resolver_path}/plugInfo.json")
-                list(APPEND _mayausd_plugin_dirs "${_adsk_resolver_path}")
-            elseif(EXISTS "${_adsk_resolver_path_alt}/plugInfo.json")
-                list(APPEND _mayausd_plugin_dirs "${_adsk_resolver_path_alt}")
-            endif()
-
-            # Add MayaUSD schema/translator USD plugins without pulling in full MayaUSD lib/usd.
-            file(GLOB_RECURSE _mayausd_plug_infos "${_mayausd_usd_root}/*/plugInfo.json")
-            foreach(_plug_info ${_mayausd_plug_infos})
-                file(READ "${_plug_info}" _plug_info_contents LIMIT 20000)
-                if(_plug_info_contents MATCHES "mayaUsd_Schemas" OR _plug_info_contents MATCHES "mayaUsd_Translators")
-                    get_filename_component(_plug_dir "${_plug_info}" DIRECTORY)
-                    list(APPEND _mayausd_plugin_dirs "${_plug_dir}")
-                endif()
-            endforeach()
-
-            list(REMOVE_DUPLICATES _mayausd_plugin_dirs)
-            foreach(_plug_dir ${_mayausd_plugin_dirs})
-                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${_plug_dir}")
-                message(STATUS "Adding MayaUSD USD plugin path: ${_plug_dir}")
-            endforeach()
-        endif()
+        list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+             "${MAYAUSD_LOCATION}/lib/usd")
         list(APPEND MAYAHYDRA_VARNAME_MAYA_PLUG_IN_PATH
              "${MAYAUSD_LOCATION}/plugin/adsk/plugin")
         list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
@@ -717,17 +677,11 @@ function(_mayaHydra_setup_test_finalize_env test_name)
             "LC_ALL=en_US.UTF-8"
             "LANG=en_US.UTF-8")
         # Necessary for tests like DiffCore to find python.
-        # Do NOT prepend PXR_USD_LOCATION/lib here: the standalone OpenUSD may
-        # ship HdSt/Storm built with an incompatible Metal backend, causing
-        # shader compilation failures on Apple Silicon.  Maya's bundled USD
-        # libraries in MacOS/ are the correct ones to use.
-        if(_osx_use_pxr_usd_plugins AND DEFINED PXR_USD_LOCATION)
-            set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-                "DYLD_LIBRARY_PATH=${PXR_USD_LOCATION}/lib:${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
-        else()
-            set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-                "DYLD_LIBRARY_PATH=${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
-        endif()
+        # Do NOT prepend PXR_USD_LOCATION/lib: the standalone OpenUSD ships HdSt/Metal
+        # built against a different USD than Maya's bundled one, causing duplicate
+        # TF_DEBUG_ENVIRONMENT_SYMBOL registration crashes on every test.
+        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+            "DYLD_LIBRARY_PATH=${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
             "DYLD_FRAMEWORK_PATH=${MAYA_LOCATION}/Maya.app/Contents/Frameworks")
     endif()
