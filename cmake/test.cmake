@@ -874,12 +874,13 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # but cmd "/c" does not: the cmd shell no longer interprets the /c as a
     # flag argument.  Use PowerShell instead.
     # Cross-platform command runner: PowerShell on Windows, POSIX sh elsewhere.
-    set(IDIFF_ARGS  "${IDIFF_CMD} -fail ${FAIL} -failpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
+    # HYDRA-2304: We will consider WARN and FAIL as equivalent.
+    set(IDIFF_ARGS  "${IDIFF_CMD} -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
     if (WIN32)
         set(CMD PowerShell)
 		# Windows (PowerShell)
 		set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
-		set(IDIFF_ARGS "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
+        set(IDIFF_ARGS "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
         set(RM_ARGS "Remove-Item \"${RENDERED_IMAGE_DIR}/*\" -Recurse -Force -ErrorAction SilentlyContinue")
 		set(CMD_ARGS -Command "${RM_ARGS} \; ${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE")
     else()
