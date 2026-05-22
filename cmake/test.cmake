@@ -578,8 +578,11 @@ function(_mayaHydra_setup_test_finalize_env test_name)
     # Inherit PXR_PLUGINPATH_NAME and MAYA_PXR_PLUGINPATH_NAME from the
     # configure-time environment so locally-installed Hydra plugins
     # (e.g. HdArnold, HdPrman) are discovered when running tests.
-    # On OSX/Linux, filter out PRMan delegate paths to avoid TfType redefinition
-    # errors (UsdSkelImaging* already defined) when the parent CI sets them.
+    # On OSX/Linux, filter out PRMan and MtoA/Arnold paths to avoid TfType
+    # redefinition errors (UsdSkelImaging* already defined) when the CI machine's
+    # Arnold installation sets MAYA_PXR_PLUGINPATH_NAME to include its full USD
+    # plugin tree (linked against a different USD build than Maya's).
+    # Arnold's Hydra delegate is already added explicitly via MTOA_LOCATION above.
     foreach(_inherit_var PXR_PLUGINPATH_NAME MAYA_PXR_PLUGINPATH_NAME)
         if(DEFINED ENV{${_inherit_var}} AND NOT "$ENV{${_inherit_var}}" STREQUAL "")
             if(IS_WINDOWS)
@@ -589,7 +592,7 @@ function(_mayaHydra_setup_test_finalize_env test_name)
                 string(REPLACE ":" ";" _path_list "${_path_list}")
                 foreach(_path ${_path_list})
                     string(TOLOWER "${_path}" _path_lower)
-                    if(NOT _path_lower MATCHES "prman|hdprman|renderman|rman")
+                    if(NOT _path_lower MATCHES "prman|hdprman|renderman|rman|mtoa|arnold")
                         list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${_path}")
                     endif()
                 endforeach()
