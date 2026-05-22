@@ -129,6 +129,10 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
+    if (_primPathsToSelections.empty()) {
+        return;
+    }
+
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         // Forward dirty notifications to the highlight mesh

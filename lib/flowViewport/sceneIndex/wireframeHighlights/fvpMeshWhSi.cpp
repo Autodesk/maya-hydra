@@ -125,6 +125,10 @@ void MeshWhSi::ProcessDirtiedPrims(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
+    if (_primPathsToSelections.empty()) {
+        return;
+    }
+
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         // Propagate changes to the mesh and its children

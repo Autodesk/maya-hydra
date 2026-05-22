@@ -233,7 +233,6 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
 {
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
-        HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
         if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
             if (_IsSupportedPointInstancePrototype(GetInputSceneIndex(), entry.primPath)) {
                 // Selection changed on the prototype; rebuild the highlights
@@ -244,6 +243,7 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
                         _DeleteSelectionHighlight(selectionKey.first, selectionKey.second);
                     }
                 }
+                HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
                 HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
                 if (selectionsSchema.IsDefined()) {
                     for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements(); selectionId++) {
@@ -290,6 +290,7 @@ void PiPrototypeWhSi::ProcessDirtiedPrims(
         // Propagate notifications if this prim is a relevant prototype or a subprim of one
         auto itPrototype = FindSelfOrFirstParent(entry.primPath, _prototypePathsToSelections);
         if (itPrototype != _prototypePathsToSelections.end()) {
+            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
             for (const auto& selectionKey : itPrototype->second) {
                 auto selectionPath = SelectionPathFromKey(selectionKey);
                 auto dirtiedPath = entry.primPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), selectionPath);
