@@ -36,6 +36,8 @@
 
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/registry.h>
+#include <pxr/base/tf/debug.h>
+#include <pxr/imaging/hd/debugCodes.h>
 
 #include <mayaUsdAPI/utils.h>
 
@@ -212,6 +214,10 @@ void onFileOpenCheckOrCreateRenderSettings(void* /*clientData*/)
 
 void initialize()
 {
+    // HYDRA-1919: Maya DG API is not thread-safe. Disable Hydra's parallel
+    // RPrim sync until proper Maya EM integration lands.
+    PXR_NS::TfDebug::Enable(PXR_NS::HD_DISABLE_MULTITHREADED_RPRIM_SYNC);
+
     Fvp::InitializationParams fvpInitParams;
     if (MGlobal::mayaState() != MGlobal::kBatch) {
         // MayaColorPreferencesTranslator ctor will throw an exception
