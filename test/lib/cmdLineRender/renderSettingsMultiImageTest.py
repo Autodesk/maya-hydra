@@ -110,13 +110,18 @@ def _copy_scene_and_usd(scene_path, work_dir):
     return scene_copy
 
 
-def _run_render(render_exe, renderer, scene_copy, work_dir):
+def _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args=None):
     # render_exe has been validated by _validate_executable() in main(): it
     # is an absolute path to an existing executable regular file. Combined
     # with the argument list form (no shell=True), this satisfies Bandit
     # B603 / PYTH-INJC-30.
+    cmd = [str(render_exe), "-renderer", renderer]
+    if extra_renderer_args:
+        cmd.extend(extra_renderer_args.split())
+    # Scene file must be last; Render expects: Render -renderer Plugin [OPTIONS] sceneFile
+    cmd.append(str(scene_copy))
     result = subprocess.run(  # nosec B603
-        [str(render_exe), "-renderer", renderer, str(scene_copy)],
+        cmd,
         cwd=str(work_dir),
         capture_output=True,
         text=True,
@@ -194,7 +199,7 @@ def main(argv):
     if len(argv) < 8:
         print(
             "Usage: renderSettingsMultiImageTest.py <RenderExe> <Renderer> "
-            "<ScenePath> <ExpectedImagesDir> <IdiffPath> <Fail> <FailPercent>",
+            "<ScenePath> <ExpectedImagesDir> <IdiffPath> <Fail> <FailPercent> [RendererArgs]",
             file=sys.stderr,
         )
         return 1
@@ -210,6 +215,7 @@ def main(argv):
     idiff        = _validate_executable("idiff executable", argv[5])
     fail         = _validate_float("fail threshold", argv[6])
     failpercent  = _validate_float("failpercent threshold", argv[7])
+    extra_renderer_args = argv[8] if len(argv) > 8 else None
 
     base_dir = Path(os.environ.get("MAYA_APP_DIR") or tempfile.gettempdir())
     work_dir = base_dir / "projects" / "default"
@@ -218,7 +224,7 @@ def main(argv):
     scene_copy = _copy_scene_and_usd(scene_path, work_dir)
     _prepare_output_dir(work_dir)
 
-    if not _run_render(render_exe, renderer, scene_copy, work_dir):
+    if not _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args):
         return 1
 
     output_dir = _find_output_dir(work_dir)

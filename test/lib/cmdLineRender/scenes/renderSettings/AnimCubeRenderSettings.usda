@@ -1,0 +1,44 @@
+#usda 1.0
+(
+    defaultPrim = "Render"
+    renderSettingsPrimPath = "/Render/MainRender"
+    startTimeCode = 1
+    endTimeCode = 10
+)
+
+def Scope "Render"
+{
+    def RenderSettings "MainRender"
+    {
+        rel camera = </World/Camera>
+        float pixelAspectRatio = 1
+        rel products = </Render/BeautyProduct>
+        int2 resolution = (1920, 1080)
+    }
+
+    def RenderProduct "BeautyProduct"
+    {
+        token fileFormat = "png"
+        rel orderedVars = </Render/color>
+        token productName = "../images/AnimCubeRenderSettings.png"
+        token productType = "raster"
+    }
+
+    def RenderVar "color"
+    {
+        string sourceName = "color"
+    }
+}
+
+def Scope "World"
+{
+    def Camera "Camera"
+    {
+        float2 clippingRange = (0.1, 10000)
+        float focalLength = 50
+        float horizontalAperture = 36
+        float verticalAperture = 24
+        double3 xformOp:translate = (0, 0, 13.037088163697701)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
