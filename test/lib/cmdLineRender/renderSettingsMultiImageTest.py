@@ -15,6 +15,7 @@
 #
 
 import os
+import shlex
 import shutil
 # subprocess is required to launch Maya's Render executable and OpenImageIO's
 # idiff binary for this CTest unit test. Bandit B404 (PYTH-INJC-30) flags any
@@ -117,7 +118,9 @@ def _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args=
     # B603 / PYTH-INJC-30.
     cmd = [str(render_exe), "-renderer", renderer]
     if extra_renderer_args:
-        cmd.extend(extra_renderer_args.split())
+        # Use shlex.split() to properly handle quoted arguments (e.g., paths with
+        # spaces) and escaped whitespace, rather than naive str.split().
+        cmd.extend(shlex.split(extra_renderer_args))
     # Scene file must be last; Render expects: Render -renderer Plugin [OPTIONS] sceneFile
     cmd.append(str(scene_copy))
     result = subprocess.run(  # nosec B603
