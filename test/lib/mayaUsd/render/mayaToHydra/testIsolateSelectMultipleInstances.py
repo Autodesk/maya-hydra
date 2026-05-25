@@ -46,6 +46,8 @@ def disableIsolateSelect(modelPanel):
     mel.eval("enableIsolateSelect %s 0" % modelPanel)
 
 
+# skip at class level to avoid loading Bifrost.
+@unittest.skipIf(Usd.GetVersion()[1] == 24, "Bifrost errors with OpenUSD 0.24.11.")
 class TestIsolateSelectMultipleInstances(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
@@ -56,7 +58,6 @@ class TestIsolateSelectMultipleInstances(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 3
 
-    @unittest.skipIf(Usd.GetVersion()[1] == 24, "Bifrost errors with OpenUSD 0.24.11.")
     def test_isolateSelectMultipleInstances(self):
         """Regression test: pre-selecting multiple instances of the same
         PointInstancer together with a USD camera, then enabling isolate
