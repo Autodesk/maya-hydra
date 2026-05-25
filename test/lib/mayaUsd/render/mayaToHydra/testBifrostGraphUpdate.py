@@ -22,6 +22,9 @@ from pxr import Usd
 
 import unittest
 
+
+# skip at class level to avoid loading Bifrost.
+@unittest.skipIf(Usd.GetVersion()[1] == 24, "Bifrost errors with OpenUSD 0.24.11.")
 class TestBifrostGraphUpdate(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
     _requiredPlugins = ['bifrostGraph']
@@ -35,7 +38,6 @@ class TestBifrostGraphUpdate(mtohUtils.MayaHydraBaseTestCase):
                                  self.IMAGEDIFF_FAIL_THRESHOLD,
                                  self.IMAGEDIFF_FAIL_PERCENT)
 
-    @unittest.skipIf(Usd.GetVersion()[1] == 24, "Bifrost errors with OpenUSD 0.24.11.")
     def test_BifrostGraphUpdate(self):
         mayaUtils.openTestScene("testBifrost", "bifrost_node_update_hydra.ma")
         self.setHdStormRenderer()
