@@ -895,7 +895,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     else()
         # Use POSIX shell; '&&' ensures idiff runs only on successful render
         set(CMD /bin/sh)
-        set(CMD_ARGS -c "nice -n 10 sh -c 'rm -rf ${RENDERED_IMAGE_DIR}/*; ${RENDER_ARGS} && ${IDIFF_ARGS}'")
+        set(CMD_ARGS -c "rm -rf ${RENDERED_IMAGE_DIR}/*; nice -n 10 ${RENDER_ARGS} && ${IDIFF_ARGS}")
     endif()
 
     add_test(
