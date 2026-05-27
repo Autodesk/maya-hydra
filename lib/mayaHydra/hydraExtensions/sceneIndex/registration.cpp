@@ -50,6 +50,8 @@ namespace {
 
 constexpr char kMayaUsdProxyShapeNode[] = { "mayaUsdProxyShape" };
 
+// UFE path to the USD default render settings node (a UFE path of a single
+// segment with a single component, the name of the DG node).
 const Ufe::Path usdDefaultRenderSettingsNodePath(Ufe::PathSegment(
     Ufe::PathComponent(std::string(MayaHydra::kUsdDefaultRenderSettingsNodeName)),
     UfeExtensions::getMayaRunTimeId(), '\0'));
@@ -378,6 +380,9 @@ void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderSettingsNode()
         return;
     }
 
+    // Ensure that external cameras are supported for USD default render
+    // settings as they are when using MayaUsd proxy shape nodes to supply
+    // render settings.
     UsdImagingCreateSceneIndicesInfo createInfo;
     createInfo.stage = stage;
     createInfo.overridesSceneIndexCallback = [](HdSceneIndexBaseRefPtr const& inputSi) {
@@ -413,6 +418,8 @@ void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderSettingsNode()
     _usdDefaultRenderSettingsPathPrefix = prefix;
     _defaultRenderSettingsDataProducer = dataProducerSIData;
 
+    // Hydra path mapping for the USD default render settings is done through a
+    // simple prefix path mapper.
     auto pathMapper = std::make_shared<Fvp::PrefixPathMapper>(
         usdDefaultRenderSettingsNodePath, prefix);
     Fvp::PathMapperRegistry::Instance().Register(

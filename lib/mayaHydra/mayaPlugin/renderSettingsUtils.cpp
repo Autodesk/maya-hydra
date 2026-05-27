@@ -137,6 +137,12 @@ bool FindUsdRenderSettingsOnStage(
         return false;
     }
 
+    // USD documentation
+    // https://openusd.org/release/user_guides/schemas/usdRender/RenderSettings.html#properties
+    // says that if no render products are supplied, renderer should still
+    // output an image. At least one renderer (Hydra Arnold) does not do this
+    // and renders nothing.  Catch the no render products case and return
+    // false, so that Maya render settings default is used.
     auto hasProducts = [](const UsdRenderSettings& rs) {
         SdfPathVector targets;
         return rs.GetProductsRel().GetTargets(&targets) && !targets.empty();
@@ -229,6 +235,8 @@ Ufe::Path GetActiveRenderSettingsAppPath()
 
 SdfPath GetActiveRenderSettingsHydraPath()
 {
+    // Use path mapper to map the active render settings application path
+    // (Ufe::Path) to the Hydra SdfPath of its translation in the Hydra scene.
     auto ufePath = GetActiveRenderSettingsAppPath();
     auto hydraPath = Fvp::ufePathToPrimSelections(ufePath);
 
@@ -304,6 +312,8 @@ RenderTimes::RenderTimes(
 {
 }
 
+// Single point of truth for render times is Maya default render globals, for
+// all rendering types (Hydra v1 settings, Hydra v2 settings, Maya settings).
 RenderTimes GetRenderTimes()
 {
     MCommonRenderSettingsData mayaRenderSettings;
