@@ -172,6 +172,27 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSett
     FAILPERCENT 1.0
 )
 
+# Test frame range (5-9) with HdStorm (Failure with HdStorm on macOS entered as HYDRA-2139.)
+if(NOT IS_MACOSX)
+mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
+    EXPECTED_IMAGES_DIR renderSettings/images/storm_frames5to9
+    IMAGE_EXTENSION png
+    TEST_NAME_SUFFIX StormFrames5to9
+    RENDERER_ARGS "-s 5 -e 9"
+)
+endif()
+
+# Test frame range (5-9) with HdArnold
+mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
+    RENDERER HdArnoldRendererPlugin
+    EXPECTED_IMAGES_DIR renderSettings/images/arnold_frames5to9
+    IMAGE_EXTENSION png
+    TEST_NAME_SUFFIX ArnoldFrames5to9
+    FAIL 0.05
+    FAILPERCENT 1.0
+    RENDERER_ARGS "-s 5 -e 9"
+)
+
 # Stage UVChecker.png within this test’s temporary Maya project so it can be
 # resolved via the workspace root when using `-proj`.
 #

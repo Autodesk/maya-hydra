@@ -92,6 +92,24 @@ createNode mayaUsdProxyShape -n "AnimCubeCustomMultipleRSShape" -p "AnimCubeCust
 	setAttr ".forceCompute" yes;
 	setAttr ".usdStageLoadRules" -type "string" "/=all";
 	setAttr ".usdStageTargetLayer" -type "string" "./AnimCubeCustomMultipleRS.usda";
+createNode transform -n "renderSettings";
+	rename -uid "966F19E1-47EA-85D9-B300-ABBAE8FF9EA1";
+createNode mayaUsdProxyShape -n "renderSettingsShape" -p "renderSettings";
+	rename -uid "4E1B2869-4583-DAC2-B229-A68D85E8283B";
+	addAttr -r false -ci true -h true -sn "forceCompute" -ln "forceCompute" -min 0
+		-max 1 -at "bool";
+	addAttr -ci true -h true -sn "usdStageLoadRules" -ln "usdStageLoadRules" -dt "string";
+	addAttr -ci true -h true -sn "usdStageTargetLayer" -ln "usdStageTargetLayer" -dt "string";
+	setAttr -k off ".v";
+	setAttr ".covm[0]"  0 1 1;
+	setAttr ".cdvm[0]"  0 1 1;
+	setAttr ".fp" -type "string" "./AnimCubeRenderSettings.usda";
+	setAttr ".pp" -type "string" "";
+	setAttr ".epp" -type "string" "";
+	setAttr ".rcpl" 1;
+	setAttr ".forceCompute" yes;
+	setAttr ".usdStageLoadRules" -type "string" "/=all";
+	setAttr ".usdStageTargetLayer" -type "string" "./AnimCubeRenderSettings.usda";
 createNode transform -n "pointLight1";
 	rename -uid "94BC846B-47A9-0CD3-9F9A-C3806D770F22";
 	setAttr ".t" -type "double3" 3.5255635696464824 4.4263930973760726 0 ;
