@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 import os
+import platform
 import maya.cmds as cmds
 import shutil
 import subprocess
@@ -92,8 +93,6 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail,
      
     For more information, see https://github.com/OpenImageIO/oiio/blob/cb6475c0dd72b9c49d862d98c6cd2da4509d5f37/src/doc/idiff.rst#L1
     """
-    import platform
-
     imageDiff = os.environ['IMAGE_DIFF_TOOL']
     
     cmdArgs = []
@@ -133,7 +132,20 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail,
         #proc = subprocess.run(cmd, shell=False, env=os.environ.copy(), stdout=subprocess.PIPE)
         # When using flag 'capture_output=True' to capture both (stdout/stderr) the
         # random error disappeared.
-        proc = subprocess.run(cmd, capture_output=True, shell=False, env=os.environ.copy())
+        #
+        # On Windows 11 24H2 (Windows Terminal as the default console host),
+        # launching a console child like idiff.exe from a Maya UI process (which
+        # has no inherited console) hangs subprocess.run forever -- Windows
+        # fails the console-pipe handshake with ERROR_NO_DATA (0x800700E8).
+        # CREATE_NO_WINDOW skips that handshake.
+        creation_flags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            shell=False,
+            env=os.environ.copy(),
+            creationflags=creation_flags,
+        )
     except OSError as e:
         # If its not the random WinError 50 we re-raise it.
         if '[WinError 50]' not in str(e):

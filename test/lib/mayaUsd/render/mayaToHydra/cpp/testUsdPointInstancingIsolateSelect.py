@@ -22,6 +22,19 @@ import usdUtils
 from pxr import UsdGeom
 import testUtils
 
+def _setTranslate(prim, value):
+    # setupScene() runs once per test method but Maya/USD are shared across
+    # tests in the same class. USD's stage cache can keep the layer in
+    # memory between tests, so a previously-added translate op may still be
+    # present on the prim. AddTranslateOp() throws in that case (observed
+    # only in Coverage builds where object lifetimes differ).
+    xf = UsdGeom.Xformable(prim)
+    for op in xf.GetOrderedXformOps():
+        if op.GetOpType() == UsdGeom.XformOp.TypeTranslate:
+            op.Set(value)
+            return
+    xf.AddTranslateOp().Set(value)
+
 def enableIsolateSelect(modelPanel):
     # Surprisingly
     # 
@@ -79,11 +92,10 @@ class TestUsdPointInstancingIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
 
         # Move USD objects.  Can also use undoable Maya cmds.move(), but using
         # the USD APIs is simpler.
-        cylinder1.AddTranslateOp().Set(value=(0, 2, 0))
-        cone1.AddTranslateOp().Set(value=(2, 0, 0))
-        sphere1.AddTranslateOp().Set(value=(-2, 0, 0))
-        xformRef = UsdGeom.Xformable(ref)
-        xformRef.AddTranslateOp().Set(value=(0, 0, -2))
+        _setTranslate(cylinder1.GetPrim(), (0, 2, 0))
+        _setTranslate(cone1.GetPrim(), (2, 0, 0))
+        _setTranslate(sphere1.GetPrim(), (-2, 0, 0))
+        _setTranslate(ref, (0, 0, -2))
 
         cmds.polyTorus()
         cmds.polySphere()
@@ -224,6 +236,49 @@ class TestUsdPointInstancingIsolateSelect(mtohUtils.MayaHydraBaseTestCase):
             self.cubeGenPath + ',/cube_0_0_0']
 
         self.assertIsolateSelect(modelPanel, visible, scene)
+
+        disableIsolateSelect(modelPanel)
+
+    def test_isolateSelectPointInstancingPreSelected(self):
+        """Regression test for the bug where selecting multiple point instances
+        and then enabling isolate select (rather than using loadSelected=True
+        after enabling) caused the viewport to freeze.
+
+        The root cause was that Maya stores multiple selected instances of the
+        same PointInstancer as a single view-selected object whose
+        objectStrings array has one entry per instance (length > 1).  The old
+        code unconditionally skipped any entry with objectStrings.length() > 1,
+        producing an empty isolate selection.  An empty selection triggers
+        dirtying of every prim in the scene, which causes an apparent freeze
+        while Storm processes the massive dirty list.
+        """
+        scene = self.setupScene()
+
+        modelPanel = 'modelPanel4'
+
+        # Pre-select 2 point instances (without the instancer itself), then
+        # enable isolate select.  This is the workflow that triggered the bug:
+        # the instances ended up in a single component-style view-selected
+        # entry (objectStrings.length() > 1) and were silently dropped.
+        cmds.select(self.pointInstancerPath + '/1',
+                    self.pointInstancerPath + '/5')
+        enableIsolateSelect(modelPanel)
+
+        # Only the instancer prim and the two explicitly selected instances
+        # should be visible.  All Maya objects, non-instanced USD prims,
+        # native instances, the cube generator, and every other point instance
+        # (0, 2, 3, 4, 6-13) must be hidden.
+        visible = [
+            self.pointInstancerPath,
+            self.pointInstancerPath + '/1',
+            self.pointInstancerPath + '/5']
+        notVisible = scene.copy()
+        for p in visible:
+            notVisible.remove(p)
+
+        cmds.refresh()
+
+        self.assertVisibility(visible, notVisible)
 
         disableIsolateSelect(modelPanel)
 
