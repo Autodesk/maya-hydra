@@ -152,6 +152,9 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
     list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
          "${CMAKE_INSTALL_PREFIX}/renderDesc")
 
+    # Adjust PYTHONPATH to include the path to our Python modules
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
+
     _mayaHydra_setup_test_USD_paths()
     _mayaHydra_setup_test_finalize_env("${test_name}")
 
@@ -289,8 +292,6 @@ function(_mayaHydra_setup_test_plugins)
     list(APPEND MAYAHYDRA_VARNAME_MAYA_PLUG_IN_PATH
          "${CMAKE_INSTALL_PREFIX}/lib/maya")
     list(APPEND MAYAHYDRA_VARNAME_MAYA_SCRIPT_PATH
-         "${CMAKE_INSTALL_PREFIX}/scripts")
-    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
          "${CMAKE_INSTALL_PREFIX}/scripts")
 
     # mayaUsdPlugin
