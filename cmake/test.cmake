@@ -676,6 +676,15 @@ finally:
         set(COMMAND_CALL ${MAYA_PY_EXECUTABLE} ${SCRIPT})
     endif()
 
+    # Apply low process priority wrapping
+    if(WIN32)
+        # Windows: use START /BELOWNORMAL to reduce process priority
+        set(COMMAND_CALL CMD /C START /BELOWNORMAL /WAIT ${COMMAND_CALL})
+    elseif(UNIX)
+        # Unix-like systems (Linux, macOS): use nice to reduce priority
+        set(COMMAND_CALL nice -n 10 ${COMMAND_CALL})
+    endif()
+
     add_test(
         NAME "${test_name}"
         WORKING_DIRECTORY ${WORKING_DIR}
@@ -882,11 +891,11 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
 		set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
         set(IDIFF_ARGS "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
         set(RM_ARGS "Remove-Item \"${RENDERED_IMAGE_DIR}/*\" -Recurse -Force -ErrorAction SilentlyContinue")
-		set(CMD_ARGS -Command "${RM_ARGS} \; ${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE")
+        set(CMD_ARGS -Command "${RM_ARGS} \; \$ProgressPreference = 'SilentlyContinue'\; Start-Process -NoNewWindow -Wait -WindowStyle Hidden -Priority BelowNormal -FilePath pwsh.exe -ArgumentList '-Command \"${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE\"'\; exit \$LASTEXITCODE")
     else()
         # Use POSIX shell; '&&' ensures idiff runs only on successful render
         set(CMD /bin/sh)
-        set(CMD_ARGS -c "rm -rf ${RENDERED_IMAGE_DIR}/*; ${RENDER_ARGS} && ${IDIFF_ARGS}")
+        set(CMD_ARGS -c "nice -n 10 sh -c 'rm -rf ${RENDERED_IMAGE_DIR}/*; ${RENDER_ARGS} && ${IDIFF_ARGS}'")
     endif()
 
     add_test(
