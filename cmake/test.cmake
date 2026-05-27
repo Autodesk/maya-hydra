@@ -891,7 +891,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
 		set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
         set(IDIFF_ARGS "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
         set(RM_ARGS "Remove-Item \"${RENDERED_IMAGE_DIR}/*\" -Recurse -Force -ErrorAction SilentlyContinue")
-        set(CMD_ARGS -Command "${RM_ARGS} \; \$ProgressPreference = 'SilentlyContinue'\; Start-Process -NoNewWindow -Wait -WindowStyle Hidden -Priority BelowNormal -FilePath pwsh.exe -ArgumentList '-Command \"${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE\"'\; exit \$LASTEXITCODE")
+        set(CMD_ARGS -Command "${RM_ARGS} \; Start-Process -NoNewWindow -Wait -WindowStyle Hidden -Priority BelowNormal -FilePath pwsh.exe -ArgumentList '-Command \"${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE\"'\; exit \$LASTEXITCODE")
     else()
         # Use POSIX shell; '&&' ensures idiff runs only on successful render
         set(CMD /bin/sh)
