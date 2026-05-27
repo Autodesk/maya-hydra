@@ -678,8 +678,8 @@ finally:
 
     # Apply low process priority wrapping
     if(WIN32)
-        # Windows: use START /BELOWNORMAL to reduce process priority
-        set(COMMAND_CALL CMD /C START /BELOWNORMAL /WAIT ${COMMAND_CALL})
+        # Windows: use START /LOW to reduce process priority
+        set(COMMAND_CALL CMD /C START /LOW /WAIT ${COMMAND_CALL})
     elseif(UNIX)
         # Unix-like systems (Linux, macOS): use nice to reduce priority
         set(COMMAND_CALL nice -n 10 ${COMMAND_CALL})
