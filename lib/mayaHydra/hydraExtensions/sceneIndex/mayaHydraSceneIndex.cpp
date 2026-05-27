@@ -524,15 +524,19 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
                 isRenderItem_aiSkyDomeLightTriangleShape(ri));
         }
 
-        SdfPath material;
-        MObject shadingEngineNode;
-        if (!_GetRenderItemMaterial(ri, material, shadingEngineNode)) {
-            if (material != kInvalidMaterial) {
-                CreateMaterial(material, shadingEngineNode);
-            }
-        }
-
+        // _GetRenderItemMaterial is expensive: it ultimately calls
+        // MFnDagNode::getConnectedSetsAndMembers, which walks the Maya DG for
+        // every set the shape belongs to. That cost is wasted on frames where
+        // nothing material-related has changed (the common animation case).
         if (flags & MDataServerOperation::MViewportScene::MVS_changedEffect) {
+            SdfPath material;
+            MObject shadingEngineNode;
+            if (!_GetRenderItemMaterial(ri, material, shadingEngineNode)) {
+                if (material != kInvalidMaterial) {
+                    CreateMaterial(material, shadingEngineNode);
+                }
+            }
+
             ria->SetMaterial(material);
         }
 
