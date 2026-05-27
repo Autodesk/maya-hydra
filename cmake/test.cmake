@@ -66,7 +66,7 @@ endfunction()
 function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
     cmake_parse_arguments(ARG
         ""                                       # No boolean options.
-        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;IMAGE_EXTENSION;FAIL;FAILPERCENT;EXPECTED_IMAGES_DIR;TEST_NAME_SUFFIX"
+        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;IMAGE_EXTENSION;FAIL;FAILPERCENT;EXPECTED_IMAGES_DIR;TEST_NAME_SUFFIX;RENDERER_ARGS"
         "ENV"
         ${ARGN}
     )
@@ -138,6 +138,7 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
                 ${IDIFF_CMD}
                 ${FAIL}
                 ${FAILPERCENT}
+                ${ARG_RENDERER_ARGS}
     )
 
     _mayaHydra_setup_test_common_path_vars()
@@ -150,6 +151,9 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
     _mayaHydra_setup_test_plugins()
     list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
          "${CMAKE_INSTALL_PREFIX}/renderDesc")
+
+    # Adjust PYTHONPATH to include the path to our Python modules
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
 
     _mayaHydra_setup_test_USD_paths()
     _mayaHydra_setup_test_finalize_env("${test_name}")

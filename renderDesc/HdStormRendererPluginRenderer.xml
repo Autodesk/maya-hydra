@@ -52,6 +52,11 @@
     <mel n="reg" s="mayaHydraSetCropRegion(%1,%2,%3,%4)" p="4" t="int int int int" h="Set crop region pixel boundary of the final image:\n\tleft, right, bottom, top (inclusive on all four sides)"/>
     <sep/>
     <!-- ______________________________________________________________ -->
+    <sep desc="Frame numbering options"/>
+    <mel n="s" p="1" t="float" s="mayaHydraSetStartFrame(%1)" h="Starting frame for an animation sequence"/>
+    <mel n="e" p="1" t="float" s="mayaHydraSetEndFrame(%1)" h="End frame for an animation sequence"/>
+    <sep/>
+    <!-- ______________________________________________________________ -->
     <sep desc="General purpose flags:"/>
     <mel n="rd" p="1" s='mayaHydraSetRenderDirectory("%1")' t="path" h="Directory in which to store image files"/>
     <mel n="im" p="1" s='mayaHydraSetRenderImageName("%1")' t="filename" h="Image file output name"/>

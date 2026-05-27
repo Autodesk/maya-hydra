@@ -50,6 +50,16 @@ global proc mayaHydraSetCropRegion(int $left, int $right, int $bottom, int $top)
            + $left + ", " + $right + ", " + $bottom + ", " + $top + ")");
 }
 
+global proc mayaHydraSetStartFrame(float $frame)
+{
+    python("import mayaHydra.renderSettings.frames as mhFrames; mhFrames.setStartFrame(" + $frame + ")");
+}
+
+global proc mayaHydraSetEndFrame(float $frame)
+{
+    python("import mayaHydra.renderSettings.frames as mhFrames; mhFrames.setEndFrame(" + $frame + ")");
+}
+
 global proc mayaHydraSetRenderCamera(string $cameraPath)
 {
     python("import mayaHydra.renderSettings.camera as mhCamera; mhCamera.setCamera(" + "\"" + $cameraPath + "\")");

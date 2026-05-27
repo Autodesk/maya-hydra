@@ -83,6 +83,8 @@ description includes the corresponding `<mel>` entries will honor them.
 | `-x` | `int` | Set the X resolution of the final image. |
 | `-y` | `int` | Set the Y resolution of the final image. |
 | `-reg` | `int int int int` | Set a crop region in pixel coordinates: `left right bottom top` (Y-up, origin bottom-left, **inclusive on all four sides**). The output image keeps the full `-x`/`-y` resolution; pixels outside the region are filled with the AOV's clear/black value. This matches the Maya Software renderer's `-reg` semantics. |
+| `-s` | `float` | Starting frame for an animation sequence. |
+| `-e` | `float` | End frame for an animation sequence. |
 | `-rd` | `path` | Directory in which to store image files. |
 | `-im` | `filename` | Image file output name. |
 | `-of` | `format` | Output image file format. |
