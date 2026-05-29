@@ -250,7 +250,9 @@ add_subdirectory(scripts)
 #------------------------------------------------------------------------------
 # renderer descriptions
 #------------------------------------------------------------------------------
-add_subdirectory(renderDesc)
+if(MAYA_APP_VERSION VERSION_GREATER 2026)
+    add_subdirectory(renderDesc)
+endif()
 
 #------------------------------------------------------------------------------
 # install
