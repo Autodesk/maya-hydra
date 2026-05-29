@@ -26,7 +26,8 @@ option(BUILD_SHARED_LIBS "Build libraries as shared or static." ON)
 option(CODE_COVERAGE "Build and collect code coverage info." OFF)
 
 if(APPLE)
-    option(BUILD_UB2 "Build Universal Binary 2 (UB2) Intel64+arm64" OFF)
+    option(BUILD_UB2 "Build Universal Binary 2 (UB2) Intel64+arm64" OFF) # 
+    option(BUILD_ARM64 "Build arm64 only" OFF)                          # Either arm or UB2 can be built, but not both.
 endif()
 option(CMAKE_WANT_MATERIALX_BUILD "Enable building with MaterialX (experimental)." OFF)
 
@@ -52,13 +53,24 @@ set(MAYAHYDRA_GIT_BRANCH "Unknown_Git_branch" CACHE STRING "Build branch.")
 set(CMAKE_INSTALL_MESSAGE "NEVER")
 
 if(APPLE)
+    # If both BUILD_UB2 and BUILD_ARM64 were specified, throw error.
+    if(BUILD_UB2 AND BUILD_ARM64)
+        message(FATAL_ERROR "BUILD_UB2 and BUILD_ARM64 are mutually exclusive, specify either one or neither.")
+    endif()
+
     if(BUILD_UB2)
         message(STATUS "Building with Universal Binary 2")
         set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
-        set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
+        set(DEFAULT_OSX_DEPLOYMENT_TARGET 11.0)
+    elseif(BUILD_ARM64)
+        set(CMAKE_OSX_ARCHITECTURES "arm64")
+        set(DEFAULT_OSX_DEPLOYMENT_TARGET 14.0)
     else()
         set(CMAKE_OSX_ARCHITECTURES "x86_64")
-        set(CMAKE_OSX_DEPLOYMENT_TARGET 10.14)
+        set(DEFAULT_OSX_DEPLOYMENT_TARGET 10.14)
+    endif()
+    if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEFAULT_OSX_DEPLOYMENT_TARGET})
     endif()
 endif()
 
@@ -80,8 +92,13 @@ endif()
 include(cmake/utils.cmake)
 find_package(Maya 2024 REQUIRED)
 
-if(APPLE AND BUILD_UB2 AND NOT MAYA_MACOSX_BUILT_WITH_UB2)
-    message(WARNING  "Maya was NOT built with Universal Binary 2")
+if(Maya_FOUND AND APPLE)
+    if(BUILD_ARM64 AND NOT (MAYA_MACOSX_BUILT_WITH_ARM64 OR MAYA_MACOSX_BUILT_WITH_UB2))
+        # When forcing arm64 only build, Maya can be either arm64 or UB2.
+        message(FATAL_ERROR "Building MayaUsd with arm64, but Maya was NOT built with arm64 (or UB2)")
+    elseif(BUILD_UB2 AND NOT MAYA_MACOSX_BUILT_WITH_UB2)
+        message(FATAL_ERROR "Building MayaUsd with UB2, but Maya was NOT built with UB2")
+    endif()
 endif()
 
 include(cmake/mayahydra_version.info)

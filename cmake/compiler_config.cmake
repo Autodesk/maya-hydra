@@ -6,8 +6,6 @@ set(GNU_CLANG_FLAGS
     -Wall
     $<$<BOOL:${BUILD_STRICT_MODE}>:-Werror>
     $<$<CONFIG:DEBUG>:-fstack-check>
-    # optimization
-    -msse4.2
     # disable warnings
     -Wno-deprecated
     -Wno-deprecated-declarations
@@ -18,6 +16,15 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     list(APPEND GNU_CLANG_FLAGS
             -Wrange-loop-analysis
         )
+    # The flag -msse4.2 tells the compiler to use Intel-specific "Streaming SIMD Extensions."
+    # Because ARM-based processors (like the Apple M-series) do not support SSE, the compiler ignores the flag.
+    # That will cause build error since we have warnings as errors on.
+    if(NOT BUILD_ARM64)
+        list(APPEND GNU_CLANG_FLAGS
+            # optimization
+            -msse4.2
+        )
+    endif()
 endif()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -26,6 +33,8 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         # We hit this with a combination of inlined calls + a std::swap
         # in USD's VtValue::UncheckedGet.
         -Wno-error=maybe-uninitialized
+        # optimization
+        -msse4.2
     )
 endif()
 
