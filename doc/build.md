@@ -143,7 +143,8 @@ Name                        | Description                                       
 BUILD_TESTS                 | builds all unit tests.                                     | ON
 BUILD_STRICT_MODE           | enforces all warnings as errors.                           | ON
 BUILD_SHARED_LIBS			| build libraries as shared or static.						 | ON
-BUILD_UB2			        | build as Universal Binary 2 (OSX)                          | OFF
+BUILD_UB2                   | build Universal binary 2 (UB2) Intel64+arm64 (OSX only)<br><b>note</b>: mutually exclusive with BUILD_ARM64 | OFF
+BUILD_ARM64                 | build arm64 architecture (OSX only)<br><b>note</b>: mutually exclusive with BUILD_UB2 | OFF
 BUILD_WITH_PYTHON_3_VERSION | specify which Python 3 version to build with               | Determined based on Maya version
 Python_EXECUTABLE           | path to the Python executable to build with                | Determined automatically by CMake
 PYTHON_INCLUDE_DIR          | directory containing the Python header files               | Determined using the DPython_EXECUTABLE
