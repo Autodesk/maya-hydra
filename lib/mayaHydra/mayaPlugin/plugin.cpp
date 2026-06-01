@@ -26,7 +26,9 @@
 #include "renderRegionCommand.h"
 #include "profilingCommand.h"
 #include "setVisibleFramePassesCommand.h"
+#if MAYA_API_VERSION >= 20270000
 #include "batchRendering/hydraRenderCmd.h"
+#endif
 #include "envSettings.h"
 
 #include <mayaHydraLib/adapters/adapter.h>
@@ -364,6 +366,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
+#if MAYA_API_VERSION >= 20270000
     if (!plugin.registerCommand(
             HydraRenderCmd::name, HydraRenderCmd::creator, HydraRenderCmd::createSyntax)) {
         ret = MS::kFailure;
@@ -372,6 +375,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         ret.perror(msg.str().c_str());
         return ret;
     }
+#endif
 
     // Set the path where maya hydra is loaded to be used later
     //This must be called before the renderoverride is created
@@ -407,10 +411,12 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         return ret;
     }
 
+#if MAYA_API_VERSION >= 20270000
     // Register Hydra renderers as Maya production renderers.
     for (const auto& desc : MayaHydra::MtohGetRendererDescriptions()) {
         registerRenderer(desc);
     }
+#endif
 
     auto registerPluginLoadingCallback = [&](MSceneMessage::Message pluginLoadingMessage, MMessage::MStringArrayFunction callback) {
         MStatus callbackStatus;
@@ -504,12 +510,14 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     // Clear any registered callbacks
     MGlobal::executeCommand("callbacks -cc -owner mayaHydra;");
 
+#if MAYA_API_VERSION >= 20270000
     if (!plugin.deregisterCommand(HydraRenderCmd::name)) {
         ret = MS::kFailure;
         std::ostringstream msg;
         msg << "Error deregistering " << HydraRenderCmd::name << " command!";
         ret.perror(msg.str().c_str());
     }
+#endif
 
     if (!plugin.deregisterCommand(MtohViewCmd::name)) {
         ret = MS::kFailure;
