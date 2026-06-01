@@ -159,6 +159,19 @@ Ufe::Path GetUfeCameraPathFromUsdRenderSettings(const UsdRenderSettings& usdRend
         return Ufe::Path();
     }
 
+    UsdAttribute externalCameraAttr
+        = usdRenderSettings.GetPrim().GetAttribute(TfToken("adskUsd:externalCamera"));
+    if (externalCameraAttr) {
+        std::string externalCameraPathStr;
+        if (externalCameraAttr.Get(&externalCameraPathStr) && !externalCameraPathStr.empty()) {
+            TF_DEBUG_MSG(
+                MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+                "Render settings external camera: %s\n",
+                externalCameraPathStr.c_str());
+            return Ufe::PathString::path(externalCameraPathStr);
+        }
+    }
+
     UsdRelationship cameraRel = usdRenderSettings.GetCameraRel();
     SdfPathVector   cameraTargets;
     if (cameraRel.GetTargets(&cameraTargets) && !cameraTargets.empty()) {

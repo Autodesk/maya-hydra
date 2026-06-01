@@ -52,13 +52,24 @@ if(NOT IS_MACOSX)
 endif()
 
 foreach(scene ${STORM_RENDER_SCENES})
-    mayaHydra_add_cmd_line_render_test(${scene})
+    cmake_path(GET scene STEM sceneFileNameNoExt)
+    mayaHydra_add_cmd_line_render_test(${scene}
+        COPY_SCENE
+        RENDERED_IMAGE_SUBDIR projects/default/images
+        RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+        RENDERER_ARGS "-x 960 -y 540 -rd ../images -im ${sceneFileNameNoExt}"
+    )
 endforeach()
 
 foreach(scene ${ARNOLD_RENDER_SCENES})
+    cmake_path(GET scene STEM sceneFileNameNoExt)
     mayaHydra_add_cmd_line_render_test(${scene}
-    RENDERER HdArnoldRendererPlugin
-)
+        COPY_SCENE
+        RENDERER HdArnoldRendererPlugin
+        RENDERED_IMAGE_SUBDIR projects/default/images
+        RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+        RENDERER_ARGS "-x 160 -y 120 -rd ../images -im ${sceneFileNameNoExt}"
+    )
 endforeach()
 
 mayaHydra_add_cmd_line_render_test(renderSettings/stormResolution.ma
