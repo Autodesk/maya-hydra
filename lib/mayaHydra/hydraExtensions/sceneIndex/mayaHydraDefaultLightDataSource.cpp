@@ -48,7 +48,22 @@ public:
             HdTokens->lightLink,
             HdTokens->shadowLink,
             HdTokens->lightFilterLink,
-            HdTokens->isLight
+            HdTokens->isLight,
+            // Leaf light params actually served by _GetLightParamValue below.
+            // This list is independent of the Maya-light twin's: it includes
+            // `angle` (handled here) and omits `colorTemperature` (not handled
+            // here). Keep it a strict subset of what _GetLightParamValue returns
+            // so no advertised name resolves to an empty value.
+            HdLightTokens->color,
+            HdLightTokens->intensity,
+            HdLightTokens->diffuse,
+            HdLightTokens->specular,
+            HdLightTokens->exposure,
+            HdLightTokens->normalize,
+            HdLightTokens->angle,
+            HdLightTokens->shadowEnable,
+            HdLightTokens->shadowColor,
+            HdLightTokens->enableColorTemperature,
         };
         return result;
     }

@@ -153,6 +153,13 @@ MayaHydraCameraDataSource::GetNames()
     results.push_back(HdCameraSchemaTokens->focalLength);
     results.push_back(HdCameraSchemaTokens->clippingRange);
     results.push_back(HdCameraSchemaTokens->clippingPlanes);
+    // Camera params served by Get()/GetCameraParamValue but previously not
+    // advertised, so generic traversal could not discover them.
+    results.push_back(HdCameraSchemaTokens->focusDistance);
+    results.push_back(HdCameraSchemaTokens->fStop);
+    results.push_back(HdCameraSchemaTokens->shutterOpen);
+    results.push_back(HdCameraSchemaTokens->shutterClose);
+    results.push_back(HdCameraTokens->windowPolicy);
 
     return results;
 
@@ -211,6 +218,15 @@ MayaHydraCameraDataSource::Get(const TfToken& name)
         }
         return HdRetainedTypedSampledDataSource<VtArray<GfVec4d>>::New(
             array);
+    }
+    else if (name == HdCameraSchemaTokens->shutterOpen
+        || name == HdCameraSchemaTokens->shutterClose) {
+        // shutterOpen/shutterClose are served as doubles by GetCameraParamValue.
+        // They must be routed through a double-typed data source: the float
+        // branch below would fail the v.IsHolding<float>() check and silently
+        // coerce the value to 0.
+        return MayaHydraTypedCameraParamValueDataSource<double>::New(
+            _id, name, camAdapter);
     }
     else if (std::find(HdCameraSchemaTokens->allTokens.begin(),
         HdCameraSchemaTokens->allTokens.end(), name)
