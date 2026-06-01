@@ -148,11 +148,14 @@ mayaHydra_add_cmd_line_render_test(renderSettings/stormCropRegion1x1.ma
 # Arnold crop region without USD render settings: exercises the Maya render
 # settings fallback path, where -reg is carried through mayaHydraRenderRegion
 # instead of UsdRenderProduct.dataWindowNDC.
-mayaHydra_add_cmd_line_render_test(renderSettings/arnoldCropRegion.ma
-    RENDERER HdArnoldRendererPlugin
-    RENDERER_ARGS "-x 160 -y 120 -reg 32 95 30 89"
-    FAIL 0.5
-)
+#
+# Disabled, needs USD render settings, entered as HYDRA-2325
+#
+# mayaHydra_add_cmd_line_render_test(renderSettings/arnoldCropRegion.ma
+#     RENDERER HdArnoldRendererPlugin
+#     RENDERER_ARGS "-x 160 -y 120 -reg 32 95 30 89"
+#     FAIL 0.5
+# )
 
 # Failure with HdStorm on macOS entered as HYDRA-2139.
 if(NOT IS_MACOSX)
@@ -183,15 +186,18 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSett
 endif()
 
 # Test frame range (5-9) with HdArnold
-mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
-    RENDERER HdArnoldRendererPlugin
-    EXPECTED_IMAGES_DIR renderSettings/images/arnold_frames5to9
-    IMAGE_EXTENSION png
-    TEST_NAME_SUFFIX ArnoldFrames5to9
-    FAIL 0.05
-    FAILPERCENT 1.0
-    RENDERER_ARGS "-s 5 -e 9"
-)
+#
+# Disabled, reference images have watermark, entered as HYDRA-2325
+#
+# mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
+#     RENDERER HdArnoldRendererPlugin
+#     EXPECTED_IMAGES_DIR renderSettings/images/arnold_frames5to9
+#     IMAGE_EXTENSION png
+#     TEST_NAME_SUFFIX ArnoldFrames5to9
+#     FAIL 0.05
+#     FAILPERCENT 1.0
+#     RENDERER_ARGS "-s 5 -e 9"
+# )
 
 # Stage UVChecker.png within this test’s temporary Maya project so it can be
 # resolved via the workspace root when using `-proj`.
