@@ -15,4 +15,6 @@ set_property(TEST ${target} APPEND PROPERTY LABELS Debugging)
 set_property(TEST ${target} APPEND PROPERTY ENVIRONMENT "MAYA_MODULE_PATH=${CMAKE_INSTALL_PREFIX}")
 
 add_subdirectory(mayaUsd)
-add_subdirectory(cmdLineRender)
+if(MAYA_APP_VERSION VERSION_GREATER 2026)
+    add_subdirectory(cmdLineRender)
+endif()
