@@ -43,10 +43,6 @@ MayaHydraLightDataSource::GetNames()
         HdTokens->shadowLink,
         HdTokens->lightFilterLink,
         HdTokens->isLight,
-        // Leaf light params. These were always served by Get() (routed to
-        // MayaHydraLightAdapter::GetLightParamValue) but never advertised, so
-        // generic traversal (e.g. the Hydra Scene Browser) could not discover
-        // them. Advertising them here exposes them without changing Get().
         HdLightTokens->color,
         HdLightTokens->intensity,
         HdLightTokens->exposure,

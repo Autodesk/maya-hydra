@@ -13,14 +13,6 @@
 // limitations under the License.
 //
 
-// HYDRA-2028: light and camera leaf params were always served by Get() but not
-// advertised by GetNames(), so generic traversal (e.g. the Hydra Scene Browser)
-// could not discover them. These tests walk the light/camera container's
-// GetNames(), assert the newly-advertised leaf params are present, and that
-// Get() returns a non-null, correctly-typed data source for each — i.e. that
-// every advertised name is also served (no phantom entries) and that the typed
-// routing is schema-conformant (notably shutterOpen/shutterClose as double).
-
 #include "testUtils.h"
 
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
@@ -47,10 +39,8 @@ bool Contains(const TfTokenVector& names, const TfToken& token)
     return std::find(names.begin(), names.end(), token) != names.end();
 }
 
-// Retrieve the child container data source at `key` of a prim's data source.
-HdContainerDataSourceHandle GetChildContainer(
-    const HdContainerDataSourceHandle& parent,
-    const TfToken&                     key)
+HdContainerDataSourceHandle
+GetChildContainer(const HdContainerDataSourceHandle& parent, const TfToken& key)
 {
     if (!parent) {
         return nullptr;
@@ -99,11 +89,8 @@ TEST(DataSourceNames, LightContainerAdvertisesAndServesLeafParams)
         HdLightTokens->shadowColor,
     };
     const std::vector<TfToken> floatParams = {
-        HdLightTokens->intensity,
-        HdLightTokens->exposure,
-        HdLightTokens->diffuse,
-        HdLightTokens->specular,
-        HdLightTokens->colorTemperature,
+        HdLightTokens->intensity, HdLightTokens->exposure,         HdLightTokens->diffuse,
+        HdLightTokens->specular,  HdLightTokens->colorTemperature,
     };
     const std::vector<TfToken> boolParams = {
         HdLightTokens->normalize,
@@ -143,7 +130,7 @@ TEST(DataSourceNames, LightContainerAdvertisesAndServesLeafParams)
 }
 
 // What: the camera container advertises the additional params and serves each
-//       one with the schema-conformant type — float for fStop/focusDistance,
+//       one with the schema-conformant type: float for fStop/focusDistance and
 //       double for shutterOpen/shutterClose.
 // How: reach the persp camera's `camera` container, walk GetNames(), and cast
 //      each served data source to its expected typed handle.
@@ -154,8 +141,8 @@ TEST(DataSourceNames, CameraContainerAdvertisesAndServesParams)
     const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
     ASSERT_GT(sceneIndices.size(), 0u);
 
-    HdSceneIndexBaseRefPtr sceneIndexWithCamera = FindTerminalSceneIndexWithPrim(
-        sceneIndices, "perspShape", HdPrimTypeTokens->camera);
+    HdSceneIndexBaseRefPtr sceneIndexWithCamera
+        = FindTerminalSceneIndexWithPrim(sceneIndices, "perspShape", HdPrimTypeTokens->camera);
     ASSERT_TRUE(sceneIndexWithCamera) << "perspShape camera prim not found in any scene index";
 
     auto mayaSceneIndex = FindMayaHydraSceneIndex(sceneIndexWithCamera);
@@ -175,8 +162,15 @@ TEST(DataSourceNames, CameraContainerAdvertisesAndServesParams)
 
     const TfTokenVector names = cameraContainer->GetNames();
 
-    // Newly-advertised float params.
-    for (const TfToken& param : { HdCameraSchemaTokens->focusDistance, HdCameraSchemaTokens->fStop }) {
+    for (const TfToken& param : {
+             HdCameraSchemaTokens->horizontalAperture,
+             HdCameraSchemaTokens->verticalAperture,
+             HdCameraSchemaTokens->horizontalApertureOffset,
+             HdCameraSchemaTokens->verticalApertureOffset,
+             HdCameraSchemaTokens->focalLength,
+             HdCameraSchemaTokens->focusDistance,
+             HdCameraSchemaTokens->fStop,
+         }) {
         EXPECT_TRUE(Contains(names, param))
             << "camera param '" << param.GetText() << "' should be advertised by GetNames()";
         auto ds = HdFloatDataSource::Cast(cameraContainer->Get(param));
@@ -184,21 +178,37 @@ TEST(DataSourceNames, CameraContainerAdvertisesAndServesParams)
                         << "' should be served as a float data source";
     }
 
-    // shutterOpen/shutterClose are doubles in HdCameraSchema. They must be
-    // routed through a double-typed data source; the previous code routed every
-    // remaining schema member through float, which fails this cast and silently
-    // coerces the value to 0. This is the regression guard for that fix.
+    // projection is served as a TfToken (perspective/orthographic).
+    EXPECT_TRUE(Contains(names, HdCameraSchemaTokens->projection))
+        << "camera projection should be advertised by GetNames()";
+    EXPECT_TRUE(HdTokenDataSource::Cast(cameraContainer->Get(HdCameraSchemaTokens->projection)))
+        << "camera projection should be served as a TfToken data source";
+
+    // clippingRange is served as a GfVec2f (near, far).
+    EXPECT_TRUE(Contains(names, HdCameraSchemaTokens->clippingRange))
+        << "camera clippingRange should be advertised by GetNames()";
+    EXPECT_TRUE(HdVec2fDataSource::Cast(cameraContainer->Get(HdCameraSchemaTokens->clippingRange)))
+        << "camera clippingRange should be served as a GfVec2f data source";
+
+    // clippingPlanes is served as a VtArray<GfVec4d>.
+    EXPECT_TRUE(Contains(names, HdCameraSchemaTokens->clippingPlanes))
+        << "camera clippingPlanes should be advertised by GetNames()";
+    EXPECT_TRUE(
+        HdVec4dArrayDataSource::Cast(cameraContainer->Get(HdCameraSchemaTokens->clippingPlanes)))
+        << "camera clippingPlanes should be served as a VtArray<GfVec4d> data source";
+
+    // shutterOpen/shutterClose are doubles in HdCameraSchema.
     for (const TfToken& param :
          { HdCameraSchemaTokens->shutterOpen, HdCameraSchemaTokens->shutterClose }) {
         EXPECT_TRUE(Contains(names, param))
             << "camera param '" << param.GetText() << "' should be advertised by GetNames()";
         auto ds = HdDoubleDataSource::Cast(cameraContainer->Get(param));
         EXPECT_TRUE(ds) << "camera param '" << param.GetText()
-                        << "' must be served as a DOUBLE data source (schema-conformant), not float";
+                        << "' must be served as a double data source (schema-conformant)";
     }
 
     // windowPolicy is not an HdCameraSchema member; it is keyed on HdCameraTokens
-    // and already special-cased in Get(). Just confirm it is now advertised.
+    // and already special-cased in Get().
     EXPECT_TRUE(Contains(names, HdCameraTokens->windowPolicy))
         << "camera windowPolicy should be advertised by GetNames()";
     EXPECT_TRUE(cameraContainer->Get(HdCameraTokens->windowPolicy))

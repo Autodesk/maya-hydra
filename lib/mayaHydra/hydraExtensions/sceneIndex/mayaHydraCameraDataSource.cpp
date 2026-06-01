@@ -139,30 +139,25 @@ MayaHydraCameraDataSource::MayaHydraCameraDataSource(
 {
 }
 
-
-TfTokenVector
-MayaHydraCameraDataSource::GetNames()
+TfTokenVector MayaHydraCameraDataSource::GetNames()
 {
-    TfTokenVector results;
-
-    results.push_back(HdCameraSchemaTokens->projection);
-    results.push_back(HdCameraSchemaTokens->horizontalAperture);
-    results.push_back(HdCameraSchemaTokens->verticalAperture);
-    results.push_back(HdCameraSchemaTokens->horizontalApertureOffset);
-    results.push_back(HdCameraSchemaTokens->verticalApertureOffset);
-    results.push_back(HdCameraSchemaTokens->focalLength);
-    results.push_back(HdCameraSchemaTokens->clippingRange);
-    results.push_back(HdCameraSchemaTokens->clippingPlanes);
-    // Camera params served by Get()/GetCameraParamValue but previously not
-    // advertised, so generic traversal could not discover them.
-    results.push_back(HdCameraSchemaTokens->focusDistance);
-    results.push_back(HdCameraSchemaTokens->fStop);
-    results.push_back(HdCameraSchemaTokens->shutterOpen);
-    results.push_back(HdCameraSchemaTokens->shutterClose);
-    results.push_back(HdCameraTokens->windowPolicy);
+    TfTokenVector results = {
+        HdCameraSchemaTokens->projection,
+        HdCameraSchemaTokens->horizontalAperture,
+        HdCameraSchemaTokens->verticalAperture,
+        HdCameraSchemaTokens->horizontalApertureOffset,
+        HdCameraSchemaTokens->verticalApertureOffset,
+        HdCameraSchemaTokens->focalLength,
+        HdCameraSchemaTokens->clippingRange,
+        HdCameraSchemaTokens->clippingPlanes,
+        HdCameraSchemaTokens->focusDistance,
+        HdCameraSchemaTokens->fStop,
+        HdCameraSchemaTokens->shutterOpen,
+        HdCameraSchemaTokens->shutterClose,
+        HdCameraTokens->windowPolicy,
+    };
 
     return results;
-
 }
 
 HdDataSourceBaseHandle
