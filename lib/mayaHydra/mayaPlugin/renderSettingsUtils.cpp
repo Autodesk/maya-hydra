@@ -51,14 +51,20 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-/* For future use
-bool IsHydraArnoldRenderDelegate(const TfToken& rendererName)
+// Should the HdArnold renderer use Hydra v1 render settings (render settings
+// map, MayaHydra writes render product files) or Hydra v2 render settings
+// (render settings in Hydra scene, renderer writes render product files).
+bool HdArnoldUseHydraV2RenderSettings(const TfToken& rendererName)
 {
     const std::string rendererNameStr = rendererName.GetString();
     const bool isHdArnoldRenderer = rendererNameStr.rfind("HdArnoldRendererPlugin", 0) == 0;
-    return isHdArnoldRenderer;
+    if (!isHdArnoldRenderer) {
+        return false;
+    }
+
+    // Default is use Hydra v1 render settings.
+    return TfGetenvBool("MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS", false);
 }
-*/
 
 // returns true if the env var HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS is set to true
 // and the renderer is PRman
@@ -90,8 +96,7 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
     // Hardcoded at this time the logic to choose the RenderSettingsType.
 
     if (IsPrmanRenderSettingsDriveRenderPassEnabled(rendererName)
-        /*
-        || IsHydraArnoldRenderDelegate(rendererName)*/
+        || HdArnoldUseHydraV2RenderSettings(rendererName)
         ) {
         return RenderSettingsType::HydraV2;
     }
