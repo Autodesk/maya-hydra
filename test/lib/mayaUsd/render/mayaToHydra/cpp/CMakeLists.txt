@@ -35,6 +35,7 @@ target_sources(${TARGET_NAME}
         testMeshAdapterTransform.cpp
         testMayaNodesAttributesDirtying.cpp
         testLightPrimvars.cpp
+        testDataSourceNames.cpp
         testCustomDagNodeTranslation.cpp
         testCameraPrimvars.cpp
         testMeshPrimvars.cpp
