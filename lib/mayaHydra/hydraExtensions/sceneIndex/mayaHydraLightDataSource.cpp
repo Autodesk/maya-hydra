@@ -33,27 +33,21 @@ MayaHydraLightDataSource::MayaHydraLightDataSource(
 {
 }
 
-
-TfTokenVector
-MayaHydraLightDataSource::GetNames()
+TfTokenVector MayaHydraLightDataSource::GetNames()
 {
     TfTokenVector result = {
-        HdTokens->filters,
-        HdTokens->lightLink,
-        HdTokens->shadowLink,
-        HdTokens->lightFilterLink,
-        HdTokens->isLight,
         HdLightTokens->color,
         HdLightTokens->intensity,
         HdLightTokens->exposure,
         HdLightTokens->diffuse,
         HdLightTokens->specular,
         HdLightTokens->normalize,
-        HdLightTokens->enableColorTemperature,
-        HdLightTokens->colorTemperature,
         HdLightTokens->shadowColor,
         HdLightTokens->shadowEnable,
+        HdLightTokens->enableColorTemperature,
+        HdLightTokens->colorTemperature,
     };
+
     return result;
 }
 

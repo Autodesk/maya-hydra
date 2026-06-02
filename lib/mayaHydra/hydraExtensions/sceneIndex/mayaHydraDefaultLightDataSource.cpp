@@ -44,22 +44,18 @@ public:
     TfTokenVector GetNames() override
     {
         TfTokenVector result = {
-            HdTokens->filters,
-            HdTokens->lightLink,
-            HdTokens->shadowLink,
-            HdTokens->lightFilterLink,
-            HdTokens->isLight,
             HdLightTokens->color,
             HdLightTokens->intensity,
+            HdLightTokens->exposure,
             HdLightTokens->diffuse,
             HdLightTokens->specular,
-            HdLightTokens->exposure,
             HdLightTokens->normalize,
-            HdLightTokens->angle,
-            HdLightTokens->shadowEnable,
             HdLightTokens->shadowColor,
+            HdLightTokens->shadowEnable,
             HdLightTokens->enableColorTemperature,
+            HdLightTokens->angle,
         };
+        
         return result;
     }
 
