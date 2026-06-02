@@ -25,6 +25,12 @@ option(BUILD_STRICT_MODE "Enforce all warnings as errors." ON)
 option(BUILD_SHARED_LIBS "Build libraries as shared or static." ON)
 option(CODE_COVERAGE "Build and collect code coverage info." OFF)
 
+if (CODE_COVERAGE)
+    # Entered as HYDRA-2331.
+    set(BUILD_TESTS OFF)
+    message(STATUS "Code coverage enabled, tests will not be built.")
+endif()
+
 if(APPLE)
     option(BUILD_UB2 "Build Universal Binary 2 (UB2) Intel64+arm64" OFF) # 
     option(BUILD_ARM64 "Build arm64 only" OFF)                          # Either arm or UB2 can be built, but not both.
