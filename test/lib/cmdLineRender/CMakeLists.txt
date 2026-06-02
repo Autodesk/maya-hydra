@@ -52,13 +52,24 @@ if(NOT IS_MACOSX)
 endif()
 
 foreach(scene ${STORM_RENDER_SCENES})
-    mayaHydra_add_cmd_line_render_test(${scene})
+    cmake_path(GET scene STEM sceneFileNameNoExt)
+    mayaHydra_add_cmd_line_render_test(${scene}
+        COPY_SCENE
+        RENDERED_IMAGE_SUBDIR projects/default/images
+        RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+        RENDERER_ARGS "-x 960 -y 540 -rd ../images -im ${sceneFileNameNoExt}"
+    )
 endforeach()
 
 foreach(scene ${ARNOLD_RENDER_SCENES})
+    cmake_path(GET scene STEM sceneFileNameNoExt)
     mayaHydra_add_cmd_line_render_test(${scene}
-    RENDERER HdArnoldRendererPlugin
-)
+        COPY_SCENE
+        RENDERER HdArnoldRendererPlugin
+        RENDERED_IMAGE_SUBDIR projects/default/images
+        RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+        RENDERER_ARGS "-x 160 -y 120 -rd ../images -im ${sceneFileNameNoExt}"
+    )
 endforeach()
 
 mayaHydra_add_cmd_line_render_test(renderSettings/stormResolution.ma
@@ -148,11 +159,14 @@ mayaHydra_add_cmd_line_render_test(renderSettings/stormCropRegion1x1.ma
 # Arnold crop region without USD render settings: exercises the Maya render
 # settings fallback path, where -reg is carried through mayaHydraRenderRegion
 # instead of UsdRenderProduct.dataWindowNDC.
-mayaHydra_add_cmd_line_render_test(renderSettings/arnoldCropRegion.ma
-    RENDERER HdArnoldRendererPlugin
-    RENDERER_ARGS "-x 160 -y 120 -reg 32 95 30 89"
-    FAIL 0.5
-)
+#
+# Disabled, needs USD render settings, entered as HYDRA-2325
+#
+# mayaHydra_add_cmd_line_render_test(renderSettings/arnoldCropRegion.ma
+#     RENDERER HdArnoldRendererPlugin
+#     RENDERER_ARGS "-x 160 -y 120 -reg 32 95 30 89"
+#     FAIL 0.5
+# )
 
 # Failure with HdStorm on macOS entered as HYDRA-2139.
 if(NOT IS_MACOSX)
@@ -183,15 +197,18 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSett
 endif()
 
 # Test frame range (5-9) with HdArnold
-mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
-    RENDERER HdArnoldRendererPlugin
-    EXPECTED_IMAGES_DIR renderSettings/images/arnold_frames5to9
-    IMAGE_EXTENSION png
-    TEST_NAME_SUFFIX ArnoldFrames5to9
-    FAIL 0.05
-    FAILPERCENT 1.0
-    RENDERER_ARGS "-s 5 -e 9"
-)
+#
+# Disabled, reference images have watermark, entered as HYDRA-2325
+#
+# mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
+#     RENDERER HdArnoldRendererPlugin
+#     EXPECTED_IMAGES_DIR renderSettings/images/arnold_frames5to9
+#     IMAGE_EXTENSION png
+#     TEST_NAME_SUFFIX ArnoldFrames5to9
+#     FAIL 0.05
+#     FAILPERCENT 1.0
+#     RENDERER_ARGS "-s 5 -e 9"
+# )
 
 # Stage UVChecker.png within this test’s temporary Maya project so it can be
 # resolved via the workspace root when using `-proj`.
@@ -216,10 +233,11 @@ configure_file(
 # Example of an absolute path embedded in a .ma file:
 #   setAttr ".ftn" -type "string" "D:/nonExistentPath//UVChecker.png";
 # The test verifies that such paths can be resolved relative to the specified project.
-mayaHydra_add_cmd_line_render_test(relativePathTest/mayaSphereMayaMaterialArnoldRelativePath.ma
-    RENDERER HdArnoldRendererPlugin
-    RENDERER_ARGS "-proj \"${_relpath_proj_dir}\""
-)
+# Disabled for 0.8.2 release.  Entered as HYDRA-2329.
+# mayaHydra_add_cmd_line_render_test(relativePathTest/mayaSphereMayaMaterialArnoldRelativePath.ma
+#     RENDERER HdArnoldRendererPlugin
+#     RENDERER_ARGS "-proj \"${_relpath_proj_dir}\""
+# )
 
 if(NOT IS_MACOSX)
 # HYDRA-2031 this test fails only on macOS.

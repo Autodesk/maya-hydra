@@ -142,9 +142,10 @@ if(MayaUsd_FOUND)
 endif(MayaUsd_FOUND)
 
 # Code coverage is not computed for the Hydra scene browser.
-if (NOT CODE_COVERAGE)
-    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py)
-endif()
+# Disabled for 0.8.2 release.  Entered as HYDRA-2330.
+# if (NOT CODE_COVERAGE)
+#     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testSceneBrowser.py)
+# endif()
 
 # Interactive Unit test scripts for mesh adapter (launched with maya.exe instead of mayapy.exe)
 # Test use of mesh adapter code for mesh support, using environment variable.

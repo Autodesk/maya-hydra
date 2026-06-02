@@ -6,6 +6,7 @@ set(PYTHON_FILES
     output.py
     renderProducts.py
     resolution.py
+    utils.py
 )
 
 install(

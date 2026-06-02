@@ -1099,7 +1099,7 @@ SdfPath sceneIndexPathPrefix(
         return TfToken(name);}();
 
     // Create a unique scene index path prefix by starting with the
-    // Dag node name, and checking for uniqueness under the scene
+    // Maya node name, and checking for uniqueness under the scene
     // index plugin parent rprim.  If not unique, add an
     // incrementing numerical suffix until it is.
     const auto sceneIndexPluginPath = SdfPath::AbsoluteRootPath().AppendChild(sceneIndexPluginName);

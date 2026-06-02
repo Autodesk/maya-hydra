@@ -542,17 +542,13 @@ HdRenderIndex* BatchRenderer::renderIndex() const
     return _renderIndex;
 }
 
-void BatchRenderer::_SetActiveRenderSettingsPrimPath(const SdfPath& path)
+void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()
 {
     if (!TF_VERIFY(_sceneGlobalsSceneIndex, "Scene globals scene index not yet initialized")) {
         return;
     }
-    _sceneGlobalsSceneIndex->SetActiveRenderSettingsPrimPath(path);
-}
 
-void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()
-{
-    const auto hydraRsPath = GetActiveRenderSettingsPrimHydraPathFromScene();
+    const auto hydraRsPath = GetActiveRenderSettingsHydraPath();
     if (hydraRsPath.IsEmpty()) {
         TF_WARN("Invalid Hydra active render settings prim path.");
         return;
@@ -562,7 +558,7 @@ void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()
                  "Active render settings set to " +
                  hydraRsPath.GetAsString() + "\n");
 
-    _SetActiveRenderSettingsPrimPath(hydraRsPath);
+    _sceneGlobalsSceneIndex->SetActiveRenderSettingsPrimPath(hydraRsPath);
 }
 
 }
