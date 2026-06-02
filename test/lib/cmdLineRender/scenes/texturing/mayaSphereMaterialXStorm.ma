@@ -100,7 +100,7 @@ createNode transform -n "materialXStack1";
 createNode materialxStack -n "materialXStackShape1" -p "materialXStack1";
 	rename -uid "AF43123B-434E-DE22-7B59-05B0D0DD6298";
 	setAttr -k off ".v";
-	setAttr ".docs" -type "string" "[\n    {\n        \"filePath\": \"mayaSphereMaterialX.mtlx\",\n        \"name\": \"mayaSphereMaterialX\"\n    }\n]\n";
+	setAttr ".docs" -type "string" "[\n    {\n        \"filePath\": \"mayaSphereMaterialXStorm.mtlx\",\n        \"name\": \"mayaSphereMaterialX\"\n    }\n]\n";
 createNode lightLinker -s -n "lightLinker1";
 	rename -uid "96C5158D-4FC2-EE77-B7AC-0696E02A9316";
 	setAttr -s 3 ".lnk";
