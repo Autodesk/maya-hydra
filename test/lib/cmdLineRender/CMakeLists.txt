@@ -233,10 +233,11 @@ configure_file(
 # Example of an absolute path embedded in a .ma file:
 #   setAttr ".ftn" -type "string" "D:/nonExistentPath//UVChecker.png";
 # The test verifies that such paths can be resolved relative to the specified project.
-mayaHydra_add_cmd_line_render_test(relativePathTest/mayaSphereMayaMaterialArnoldRelativePath.ma
-    RENDERER HdArnoldRendererPlugin
-    RENDERER_ARGS "-proj \"${_relpath_proj_dir}\""
-)
+# Disabled for 0.8.2 release.  Entered as HYDRA-2329.
+# mayaHydra_add_cmd_line_render_test(relativePathTest/mayaSphereMayaMaterialArnoldRelativePath.ma
+#     RENDERER HdArnoldRendererPlugin
+#     RENDERER_ARGS "-proj \"${_relpath_proj_dir}\""
+# )
 
 if(NOT IS_MACOSX)
 # HYDRA-2031 this test fails only on macOS.
