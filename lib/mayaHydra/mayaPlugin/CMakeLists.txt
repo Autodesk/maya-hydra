@@ -26,7 +26,7 @@ target_sources(${TARGET_NAME}
         setVisibleFramePassesCommand.cpp
 )
 
-if(MAYA_APP_VERSION VERSION_GREATER 2026)
+if(MAYA_APP_VERSION VERSION_GREATER 2026 AND NOT CODE_COVERAGE)
     target_sources(${TARGET_NAME}
         PRIVATE
             batchRendering/batchRenderer.cpp
@@ -82,7 +82,7 @@ target_include_directories(${TARGET_NAME}
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSD_INCLUDE_DIR}>
 )
 
-if(MAYA_APP_VERSION VERSION_GREATER 2026)
+if(MAYA_APP_VERSION VERSION_GREATER 2026 AND NOT CODE_COVERAGE)
     target_include_directories(${TARGET_NAME}
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/batchRendering

@@ -267,7 +267,7 @@ add_subdirectory(scripts)
 #------------------------------------------------------------------------------
 # renderer descriptions
 #------------------------------------------------------------------------------
-if(MAYA_APP_VERSION VERSION_GREATER 2026)
+if(MAYA_APP_VERSION VERSION_GREATER 2026 AND NOT CODE_COVERAGE)
     add_subdirectory(renderDesc)
 endif()
 
