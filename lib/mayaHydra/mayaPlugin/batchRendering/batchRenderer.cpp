@@ -36,6 +36,7 @@
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
 #include <pxr/pxr.h>
 
+#include <pxr/base/tf/getenv.h>
 #include <pxr/base/gf/range2f.h>
 #include <pxr/base/gf/vec2f.h>
 #include <pxr/base/gf/vec2i.h>
@@ -450,7 +451,12 @@ void BatchRenderer::_InitHydraResources()
     // settings map (Hydra v1 render settings).  This is an
     // Autodesk-specific convention which render delegate providers
     // can use.
-    _renderDelegate->SetRenderSetting(BatchRenderTokens->renderSettingsSrc, VtValue(BatchRenderTokens->hydraSceneRenderSettingsSrc));
+    
+    // At time of writing (2026-06-02) only Hydra Arnold understands this
+    // token, requires further testing.
+    if (TfGetenvBool("MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS", false)) {
+        _renderDelegate->SetRenderSetting(BatchRenderTokens->renderSettingsSrc, VtValue(BatchRenderTokens->hydraSceneRenderSettingsSrc));
+    }
 
     // Support a USD stage providing the render settings through prims in the
     // Hydra scene.  Hydra Prman supports this when the
