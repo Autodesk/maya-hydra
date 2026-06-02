@@ -112,9 +112,13 @@ TEST(FlowViewport, dataProducerMergingSceneIndexAddRemove)
     ASSERT_TRUE(spherePrim.dataSource);
 
     // Remove the Maya scene index from the data producer merging scene index.
-    ASSERT_EQ(mergingSi->GetInputScenes().size(), 1u);
+    // NOTE: later versions of Maya 2027 have a USD default render settings
+    // node whose translation is an input of the mergingSi, so we check
+    // greater than or equal to 1.
+    const auto mergingSiNbInputs = mergingSi->GetInputScenes().size();
+    ASSERT_GE(mergingSiNbInputs, 1u);
     mergingSi->RemoveInputScene(mayaSi);
-    ASSERT_EQ(mergingSi->GetInputScenes().size(), 0u);
+    ASSERT_EQ(mergingSi->GetInputScenes().size(), mergingSiNbInputs-1);
 
     // Without the Maya scene index in the data producer merging scene index,
     // the sphere prim is no longer in the Hydra scene index scene.
@@ -129,7 +133,7 @@ TEST(FlowViewport, dataProducerMergingSceneIndexAddRemove)
     // sphere prim will reappear.  We know that the Maya scene index is added
     // with the absolute root path as scene root, so duplicate that here.
     mergingSi->AddInputScene(mayaSi, SdfPath::AbsoluteRootPath());
-    ASSERT_EQ(mergingSi->GetInputScenes().size(), 1u);
+    ASSERT_EQ(mergingSi->GetInputScenes().size(), mergingSiNbInputs);
     spherePrim = sceneIndices.front()->GetPrim(sceneIndexPath);
     ASSERT_TRUE(spherePrim.dataSource);
     spherePrim = mergingSi->GetPrim(sceneIndexPath);

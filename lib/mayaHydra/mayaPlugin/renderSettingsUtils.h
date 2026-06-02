@@ -89,8 +89,11 @@ bool FindUsdRenderSettingsOnStage(
 // Returns the path to the proxy shape node if found, empty path if not.
 Ufe::Path ExtractUsdRenderSettingsFromScene(PXR_NS::UsdRenderSettings& usdRenderSettings);
 
-// Get the path to the active Hydra render settings prim from the Maya scene.
-PXR_NS::SdfPath GetActiveRenderSettingsPrimHydraPathFromScene();
+// Get the UFE application path to the active render settings prim from the Maya scene.
+Ufe::Path GetActiveRenderSettingsAppPath();
+
+// Get the Hydra path to the active render settings prim from the Maya scene.
+PXR_NS::SdfPath GetActiveRenderSettingsHydraPath();
 
 // Get render output tokens from the active Hydra render settings prim.
 PXR_NS::TfTokenVector GetRenderOutputsFromActiveRenderSettings(
@@ -98,6 +101,20 @@ PXR_NS::TfTokenVector GetRenderOutputsFromActiveRenderSettings(
 
 // Get render times from the USD stage time range.
 std::vector<MTime> GetRenderTimesFromStage(const PXR_NS::UsdStageRefPtr& stage);
+
+struct RenderTimes
+{
+    const bool  isAnimated;
+    const MTime startTime;
+    const MTime endTime;
+    /// Frame increment, in frames.
+    const float timeIncr;
+
+    RenderTimes(bool isAnimated, const MTime& startTime, const MTime& endTime, float timeIncr);
+};
+
+// Get the render times from the Maya scene.
+RenderTimes GetRenderTimes();
 
 } // namespace MAYAHYDRA_NS_DEF
 

@@ -17,6 +17,7 @@
 
 #include "batchRenderer.h"
 #include "pluginDebugCodes.h"
+#include "renderSettingsUtils.h"
 #include "renderRegionCommand.h"
 
 #include <flowViewport/imageWriter/fvpImageBufferWriter.h>
@@ -93,13 +94,9 @@ bool HydraRenderCmd::hydraRenderFromMayaRenderSettings()
     MRenderUtil::getCommonRenderSettings(mayaRenderSettings);
     TF_DEBUG_MSG(
         MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-        "Maya render settings: %u x %u, animated=%d, frameStart=%.3f, frameEnd=%.3f, frameBy=%.3f\n",
+        "Maya render settings: %u x %u\n",
         mayaRenderSettings.width,
-        mayaRenderSettings.height,
-        mayaRenderSettings.isAnimated(),
-        MTime(mayaRenderSettings.frameStart).as(MTime::uiUnit()),
-        MTime(mayaRenderSettings.frameEnd).as(MTime::uiUnit()),
-        MTime(mayaRenderSettings.frameBy).as(MTime::uiUnit()));
+        mayaRenderSettings.height);
 
     // Parse the scene name
     std::filesystem::path scenePath { MFileIO::currentFile().asChar() };
@@ -140,26 +137,16 @@ bool HydraRenderCmd::hydraRenderFromMayaRenderSettings()
         "Renderable camera count (listCameras): %u\n",
         cameras.length());
 
-    // Loop over all render times.
-    auto timeStart  = mayaRenderSettings.frameStart;
-    auto timeEnd    = mayaRenderSettings.frameEnd;
-    auto timeIncr   = mayaRenderSettings.frameBy;
-
-    // If the file naming scheme does not correspond to an animation,
-    // use the current time.
-    if (!mayaRenderSettings.isAnimated()) {
-        timeStart = MAnimControl::currentTime();
-        timeIncr = 1.0f;
-        timeEnd = timeStart;
-    }
+    const auto renderTimes = GetRenderTimes();
     TF_DEBUG_MSG(
         MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-        "Render time range: start=%.3f end=%.3f by=%.3f\n",
-        timeStart.as(MTime::uiUnit()),
-        timeEnd.as(MTime::uiUnit()),
-        timeIncr);
+        "Render time range: start=%.3f end=%.3f by=%.3f animated=%d\n",
+        renderTimes.startTime.as(MTime::uiUnit()),
+        renderTimes.endTime.as(MTime::uiUnit()),
+        static_cast<double>(renderTimes.timeIncr),
+        renderTimes.isAnimated);
 
-    for (MTime time = timeStart; time <= timeEnd; time += timeIncr) {
+    for (MTime time = renderTimes.startTime; time <= renderTimes.endTime; time += renderTimes.timeIncr) {
 
         const double frameNb = time.as(MTime::uiUnit());
         TF_DEBUG_MSG(

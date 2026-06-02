@@ -24,8 +24,11 @@
 #include <maya/MPlug.h>
 
 #include <string>
+#include <string_view>
 
 namespace MAYAHYDRA_NS_DEF {
+
+inline constexpr std::string_view kUsdDefaultRenderSettingsNodeName = "UsdDefaultRenderSettings";
 
 // Names of color tables for indexed colors
 const std::string kActiveColorTableName = "active";

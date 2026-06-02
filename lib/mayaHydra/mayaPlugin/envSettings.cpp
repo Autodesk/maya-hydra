@@ -24,11 +24,6 @@ TF_DEFINE_ENV_SETTING(
     false,
     "Use single frame pass when using the same renderer for all passes.");
 
-TF_DEFINE_ENV_SETTING(
-    MAYA_HYDRA_ADD_RENDER_SETTINGS_TO_SCENE,
-    false,
-    "Use experimental support for adding USD render settings to Maya scenes.");
-
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -38,14 +33,6 @@ namespace MAYAHYDRA_NS_DEF {
         static const bool _useSingleFramePass
             = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_SINGLE_FRAME_PASS);
         return _useSingleFramePass;
-    }
-
-    bool addRenderSettingsToScene()
-    {
-        // Check the environment variable to determine if we should use a single frame pass
-        static const bool _addRenderSettingsToScene
-            = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_ADD_RENDER_SETTINGS_TO_SCENE);
-        return _addRenderSettingsToScene;
     }
 
 } // namespace MAYAHYDRA_NS_DEF

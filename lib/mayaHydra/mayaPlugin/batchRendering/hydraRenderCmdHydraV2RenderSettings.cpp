@@ -20,15 +20,10 @@
 #include "renderSettingsUtils.h"
 
 #include <maya/MAnimControl.h>
-#include <maya/MStatus.h>
 #include <maya/MTime.h>
 
 #include <pxr/pxr.h>
 #include <pxr/base/tf/diagnostic.h>
-#include <pxr/usd/usd/stage.h>
-#include <pxr/usd/usdRender/settings.h>
-
-#include <vector>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -41,28 +36,16 @@ bool HydraRenderCmd::hydraRenderFromHydraV2RenderSettings()
         return false;
     }
 
-    UsdRenderSettings usdRenderSettings;
-    const auto psPath = ExtractUsdRenderSettingsFromScene(usdRenderSettings);
-    if (psPath.empty()) {
-        TF_DEBUG_MSG(
-            MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-            "No USD render settings found in Maya USD proxy shapes.\n");
-        return false;
-    }
-
-    std::vector<MTime> renderTimes;
-    const auto renderSettingsStage = usdRenderSettings.GetPrim().GetStage();
-    if (renderSettingsStage) {
-        renderTimes = GetRenderTimesFromStage(renderSettingsStage);
-    }
-
+    const auto renderTimes = GetRenderTimes();
     TF_DEBUG_MSG(
         MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-        "Render times count: %zu\n",
-        renderTimes.size());
+        "Render time range: start=%.3f end=%.3f by=%.3f animated=%d\n",
+        renderTimes.startTime.as(MTime::uiUnit()),
+        renderTimes.endTime.as(MTime::uiUnit()),
+        static_cast<double>(renderTimes.timeIncr),
+        renderTimes.isAnimated);
 
-    //We must iterate over all render times.
-    for (const MTime& time : renderTimes) {
+    for (MTime time = renderTimes.startTime; time <= renderTimes.endTime; time += renderTimes.timeIncr) {
         if (MAnimControl::currentTime() != time) {
             MAnimControl::setCurrentTime(time);
         }

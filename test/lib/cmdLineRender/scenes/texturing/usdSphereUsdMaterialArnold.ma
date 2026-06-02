@@ -92,10 +92,10 @@ createNode mayaUsdProxyShape -n "usdSphereUsdMaterialStormShape" -p "usdSphereUs
 	setAttr -k off ".v";
 	setAttr ".covm[0]"  0 1 1;
 	setAttr ".cdvm[0]"  0 1 1;
-	setAttr ".fp" -type "string" "./usdSphereUsdMaterialStorm.usda";
+	setAttr ".fp" -type "string" "./usdSphereUsdMaterialArnold.usda";
 	setAttr ".epp" -type "string" "";
 	setAttr ".usdStageLoadRules" -type "string" "/=all";
-	setAttr ".usdStageTargetLayer" -type "string" "./usdSphereUsdMaterialStorm.usda";
+	setAttr ".usdStageTargetLayer" -type "string" "./usdSphereUsdMaterialArnold.usda";
 createNode lightLinker -s -n "lightLinker1";
 	rename -uid "8A32D7CC-4907-FBD3-6A40-BCB3279A21BF";
 	setAttr -s 4 ".lnk";

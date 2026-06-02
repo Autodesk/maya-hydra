@@ -14,6 +14,7 @@
 // limitations under the License.
 //
 
+#include "mayaHydraLib/mayaUtils.h"
 #include "mayaHydraLib/mixedUtils.h"
 #include "mayaHydraLib/sceneIndex/registration.h"
 #include "mayaHydraLib/sceneIndex/mhExternalCameraOverrideSceneIndex.h"
@@ -22,6 +23,8 @@
 
 #include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 #include <flowViewport/sceneIndex/fvpPrimRemovalEnforcingSceneIndex.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
+#include <flowViewport/selection/fvpPrefixPathMapper.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/fvpUtils.h>
 
@@ -46,6 +49,12 @@
 namespace {
 
 constexpr char kMayaUsdProxyShapeNode[] = { "mayaUsdProxyShape" };
+
+// UFE path to the USD default render settings node (a UFE path of a single
+// segment with a single component, the name of the DG node).
+const Ufe::Path usdDefaultRenderSettingsNodePath(Ufe::PathSegment(
+    Ufe::PathComponent(std::string(MayaHydra::kUsdDefaultRenderSettingsNodeName)),
+    UfeExtensions::getMayaRunTimeId(), '\0'));
 
 } // namespace
 
@@ -118,6 +127,8 @@ struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
             _AddSceneIndexForNode(dagNode);
         }
     }
+
+    _RegisterDefaultRenderSettingsNode();
 }
 
 // Retrieve information relevant to registration such as UFE compatibility of a particular scene
@@ -151,6 +162,7 @@ MayaHydraSceneIndexRegistry::~MayaHydraSceneIndexRegistry()
         MSceneMessage::removeCallback(_AfterOpenCBId);
     }
     _AfterOpenCBId = 0;
+    _UnregisterDefaultRenderSettingsNode();
     _RemoveAllSceneIndexNodes();
     _registrationsByObjectHandle.clear();
     _registrations.clear();
@@ -326,6 +338,8 @@ void MayaHydraSceneIndexRegistry::_ProcessNodesAfterOpen()
         _AddSceneIndexForNode(dagNode);
     }
     _nodesToProcessAfterOpenScene.clear();
+
+    _RegisterDefaultRenderSettingsNode();
 }
 
 void MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
@@ -340,6 +354,92 @@ void MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
             }
         }
     }
+}
+
+SdfPath MayaHydraSceneIndexRegistry::_usdDefaultRenderSettingsPathPrefix;
+
+SdfPath MayaHydraSceneIndexRegistry::GetUsdDefaultRenderSettingsPathPrefix()
+{
+    return _usdDefaultRenderSettingsPathPrefix;
+}
+
+void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderSettingsNode()
+{
+    if (_defaultRenderSettingsDataProducer) {
+        return;
+    }
+
+    MObject nodeObj;
+    if (!GetDependNodeFromNodeName(kUsdDefaultRenderSettingsNodeName.data(), nodeObj)) {
+        return;
+    }
+
+    MAYAUSDAPI_NS::ProxyStage proxyStage(nodeObj);
+    auto stage = proxyStage.getUsdStage();
+    if (!stage || stage->GetPseudoRoot().GetChildren().empty()) {
+        return;
+    }
+
+    // Ensure that external cameras are supported for USD default render
+    // settings as they are when using MayaUsd proxy shape nodes to supply
+    // render settings.
+    UsdImagingCreateSceneIndicesInfo createInfo;
+    createInfo.stage = stage;
+    createInfo.overridesSceneIndexCallback = [](HdSceneIndexBaseRefPtr const& inputSi) {
+        return MayaHydra::MhExternalCameraOverrideSceneIndex::New(inputSi);
+    };
+
+    SdfPath prefix = sceneIndexPathPrefix(
+        _dataProducerMergingSceneIndex, nodeObj);
+
+    HdSceneIndexBaseRefPtr finalSceneIndex = nullptr;
+    UsdImagingStageSceneIndexRefPtr stageSceneIndex = nullptr;
+    auto dataProducerSIData = Fvp::DataProducerSceneIndexInterfaceImp::get()
+        .addUsdStageSceneIndex(createInfo, finalSceneIndex, stageSceneIndex,
+                               prefix, /*dccNode=*/nullptr);
+
+    if (!dataProducerSIData || !finalSceneIndex || !stageSceneIndex) {
+        TF_CODING_ERROR("Failed to create USD stage scene index for UsdDefaultRenderSettings.");
+        return;
+    }
+
+    auto pfsi = HdPrefixingSceneIndex::New(finalSceneIndex, prefix);
+    auto externalCameraResolvingSi =
+        MayaHydra::ExternalCameraResolvingSceneIndex::New(pfsi);
+    auto primRemovalSi =
+        Fvp::PrimRemovalEnforcingSceneIndex::New(externalCameraResolvingSi);
+
+    dataProducerSIData->SetDataProducerSceneIndex(primRemovalSi);
+    dataProducerSIData->SetDataProducerLastSceneIndexChain(primRemovalSi);
+
+    Fvp::DataProducerSceneIndexInterfaceImp::get()
+        .addUsdStageDataProducerSceneIndexDataBaseToAllViews(dataProducerSIData);
+
+    _usdDefaultRenderSettingsPathPrefix = prefix;
+    _defaultRenderSettingsDataProducer = dataProducerSIData;
+
+    // Hydra path mapping for the USD default render settings is done through a
+    // simple prefix path mapper.
+    auto pathMapper = std::make_shared<Fvp::PrefixPathMapper>(
+        usdDefaultRenderSettingsNodePath, prefix);
+    Fvp::PathMapperRegistry::Instance().Register(
+        usdDefaultRenderSettingsNodePath, pathMapper);
+}
+
+void MayaHydraSceneIndexRegistry::_UnregisterDefaultRenderSettingsNode()
+{
+    if (!_defaultRenderSettingsDataProducer) {
+        return;
+    }
+
+    Fvp::PathMapperRegistry::Instance().Unregister(
+        usdDefaultRenderSettingsNodePath);
+
+    Fvp::DataProducerSceneIndexInterface::get()
+        .removeDataProducerSceneIndex(
+            _defaultRenderSettingsDataProducer->GetDataProducerLastSceneIndexChain());
+    _defaultRenderSettingsDataProducer = TfNullPtr;
+    _usdDefaultRenderSettingsPathPrefix = SdfPath();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

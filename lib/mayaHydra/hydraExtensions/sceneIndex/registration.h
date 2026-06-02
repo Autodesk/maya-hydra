@@ -20,6 +20,7 @@
 #include <mayaHydraLib/api.h>
 
 #include <flowViewport/flowViewport.h>
+#include <flowViewport/API/renderViewData/fvpDataProducerSceneIndexDataBase.h>
 
 #include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/pxr.h>
@@ -102,6 +103,9 @@ public:
     MAYAHYDRALIB_API
     void ApplyPendingUpdates();
 
+    MAYAHYDRALIB_API
+    static PXR_NS::SdfPath GetUsdDefaultRenderSettingsPathPrefix();
+
 private:
     void
     _AddSceneIndexForNode(MObject& dagNode); // dagNode non-const because of callback registration
@@ -133,6 +137,12 @@ private:
     };
     std::unordered_map<MObjectHandle, MayaHydraSceneIndexRegistrationPtr, _HashObjectHandle>
         _registrationsByObjectHandle;
+
+    void _RegisterDefaultRenderSettingsNode();
+    void _UnregisterDefaultRenderSettingsNode();
+
+    FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr _defaultRenderSettingsDataProducer;
+    static SdfPath _usdDefaultRenderSettingsPathPrefix;
 
     // Is rendering being done in an interactive or batch context?
     bool _interactive{true};

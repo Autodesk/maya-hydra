@@ -159,6 +159,19 @@ Ufe::Path GetUfeCameraPathFromUsdRenderSettings(const UsdRenderSettings& usdRend
         return Ufe::Path();
     }
 
+    UsdAttribute externalCameraAttr
+        = usdRenderSettings.GetPrim().GetAttribute(TfToken("adskUsd:externalCamera"));
+    if (externalCameraAttr) {
+        std::string externalCameraPathStr;
+        if (externalCameraAttr.Get(&externalCameraPathStr) && !externalCameraPathStr.empty()) {
+            TF_DEBUG_MSG(
+                MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+                "Render settings external camera: %s\n",
+                externalCameraPathStr.c_str());
+            return Ufe::PathString::path(externalCameraPathStr);
+        }
+    }
+
     UsdRelationship cameraRel = usdRenderSettings.GetCameraRel();
     SdfPathVector   cameraTargets;
     if (cameraRel.GetTargets(&cameraTargets) && !cameraTargets.empty()) {
@@ -443,29 +456,16 @@ bool HydraRenderCmd::hydraRenderFromHydraV1RenderSettings()
             "Render delegate unavailable; cannot apply USD render settings.\n");
     }
 
-    std::vector<MTime> renderTimes;
-
-    const auto renderSettingsStage = usdRenderSettings.GetPrim().GetStage();
-    if (renderSettingsStage) {
-        renderTimes = GetRenderTimesFromStage(renderSettingsStage);
-    }
-
-    // If there are no render times specified in the stage, use the
-    // current time.
-    if (renderTimes.empty()) {
-        TF_DEBUG_MSG(
-            MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-            "USD stage has no authored time range; rendering current frame.\n");
-        renderTimes.push_back(MAnimControl::currentTime());
-    }
-
+    const auto renderTimes = GetRenderTimes();
     TF_DEBUG_MSG(
         MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-        "Render times count: %zu\n",
-        renderTimes.size());
+        "Render time range: start=%.3f end=%.3f by=%.3f animated=%d\n",
+        renderTimes.startTime.as(MTime::uiUnit()),
+        renderTimes.endTime.as(MTime::uiUnit()),
+        static_cast<double>(renderTimes.timeIncr),
+        renderTimes.isAnimated);
 
-    // Loop over all render times.
-    for (const MTime& time : renderTimes) {
+    for (MTime time = renderTimes.startTime; time <= renderTimes.endTime; time += renderTimes.timeIncr) {
         if (MAnimControl::currentTime() != time) {
             MAnimControl::setCurrentTime(time);
         }
