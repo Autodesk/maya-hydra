@@ -14,6 +14,7 @@
 #
 
 from .utils import getRenderSettingsPrim
+from . import renderProducts
 
 import mayaUsd.ufe as mayaUsdUfe
 import maya.cmds as cmds
@@ -60,6 +61,12 @@ def setWidth(width):
     newRes = Gf.Vec2i(width, h)
     resAttr.Set(newRes)
 
+    def setProductResWidth(resAttr):
+        w, h = resAttr.Get()
+        resAttr.Set(Gf.Vec2i(width, h))
+
+    renderProducts.applyToResolution(setProductResWidth)
+
 def setHeight(height):
     cmds.setAttr("defaultResolution.height", height)
 
@@ -74,3 +81,9 @@ def setHeight(height):
     # See setWidth() Gf.Vec2i comments.
     newRes = Gf.Vec2i(w, height)
     resAttr.Set(newRes)
+
+    def setProductResHeight(resAttr):
+        w, h = resAttr.Get()
+        resAttr.Set(Gf.Vec2i(w, height))
+
+    renderProducts.applyToResolution(setProductResHeight)

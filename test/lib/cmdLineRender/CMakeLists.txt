@@ -78,6 +78,16 @@ mayaHydra_add_cmd_line_render_test(renderSettings/stormResolution.ma
     RENDERER_ARGS "-x 720 -y 480"
 )
 
+# Test a render using the fallback USD resolution settings
+mayaHydra_add_cmd_line_render_test(basic/sphereFallbackResolution.ma
+    cmake_path(GET scene STEM sceneFileNameNoExt)
+    COPY_SCENE
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+    RENDERER HdStormRendererPlugin
+    RENDERER_ARGS "-rd ../images -im ${sceneFileNameNoExt}"
+)
+
 # Use a small vertical resolution to avoid the Arnold watermark.
 mayaHydra_add_cmd_line_render_test(renderSettings/arnoldResolution.ma
     COPY_SCENE

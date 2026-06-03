@@ -88,8 +88,7 @@ bool ApplyUsdRenderSettingsToRenderDelegate(
 
         // HYDRA-2110: setting the resolution render setting onto
         // Hydra Arnold causes black frames to be rendered.
-        if (attr.HasAuthoredValue() && 
-            (attr.GetName() != UsdRenderTokens->resolution)) {
+        if (attr.GetName() != UsdRenderTokens->resolution) {
             renderDelegate->SetRenderSetting(TfToken(attr.GetName()), value);
         }
 
@@ -259,7 +258,7 @@ bool UpdateDataWindowNDCFromUsdRenderProduct(
     const UsdTimeCode& timeCode)
 {
     const UsdAttribute attr = renderProduct.GetDataWindowNDCAttr();
-    if (!attr || !attr.HasAuthoredValue()) {
+    if (!attr) {
         return false;
     }
     GfVec4f ndc;
@@ -298,21 +297,19 @@ bool UpdateResolutionFromUsdRenderProduct(
     const UsdTimeCode& timeCode)
 {
     UsdAttribute productResolutionAttr = renderProduct.GetResolutionAttr();
-    if (productResolutionAttr.HasAuthoredValue()) {
-        GfVec2i productResolution;
-        if (productResolutionAttr.Get(&productResolution, timeCode)) {
-            if (productResolution[0] > 0 && productResolution[1] > 0) {
-                inputParams.width = productResolution[0];
-                inputParams.height = productResolution[1];
-                TF_DEBUG_MSG(
-                    MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-                    "Render product resolution override (%s): %d x %d at time %.3f\n",
-                    renderProduct.GetPrim().GetPath().GetText(),
-                    productResolution[0],
-                    productResolution[1],
-                    timeCode.GetValue());
-                return true;
-            }
+    GfVec2i productResolution;
+    if (productResolutionAttr.Get(&productResolution, timeCode)) {
+        if (productResolution[0] > 0 && productResolution[1] > 0) {
+            inputParams.width = productResolution[0];
+            inputParams.height = productResolution[1];
+            TF_DEBUG_MSG(
+                MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+                "Render product resolution override (%s): %d x %d at time %.3f\n",
+                renderProduct.GetPrim().GetPath().GetText(),
+                productResolution[0],
+                productResolution[1],
+                timeCode.GetValue());
+            return true;
         }
     }
     TF_DEBUG_MSG(
@@ -335,17 +332,15 @@ GfVec2i GetResolutionFromUsdRenderSettings(const UsdRenderSettings& usdRenderSet
     
     // Try to get resolution from render settings.
     UsdAttribute resolutionAttr = usdRenderSettings.GetResolutionAttr();
-    if (resolutionAttr.HasAuthoredValue()) {
-        if (resolutionAttr.Get(&resolution)) {
-            TF_DEBUG_MSG(
-                MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-                "Resolution from render settings (%s): %d x %d\n",
-                usdRenderSettings.GetPrim().GetPath().GetText(),
-                resolution[0],
-                resolution[1]);
-            if (resolution[0] > 0 && resolution[1] > 0) {
-                return resolution;
-            }
+    if (resolutionAttr.Get(&resolution)) {
+        TF_DEBUG_MSG(
+            MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+            "Resolution from render settings (%s): %d x %d\n",
+            usdRenderSettings.GetPrim().GetPath().GetText(),
+            resolution[0],
+            resolution[1]);
+        if (resolution[0] > 0 && resolution[1] > 0) {
+            return resolution;
         }
     }
     
@@ -360,24 +355,22 @@ GfVec2i GetResolutionFromUsdRenderSettings(const UsdRenderSettings& usdRenderSet
                     UsdRenderProduct renderProduct(productPrim);
                     if (renderProduct) {
                         UsdAttribute productResolutionAttr = renderProduct.GetResolutionAttr();
-                        if (productResolutionAttr.HasAuthoredValue()) {
-                            GfVec2i productResolution;
-                            if (productResolutionAttr.Get(&productResolution)) {
-                                if (resolution[0] <= 0) {
-                                    resolution[0] = productResolution[0];
-                                }
-                                if (resolution[1] <= 0) {
-                                    resolution[1] = productResolution[1];
-                                }
-                                TF_DEBUG_MSG(
-                                    MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-                                    "Resolution from render product (%s): %d x %d\n",
-                                    productPath.GetText(),
-                                    resolution[0],
-                                    resolution[1]);
-                                if (resolution[0] > 0 && resolution[1] > 0) {
-                                    break;
-                                }
+                        GfVec2i productResolution;
+                        if (productResolutionAttr.Get(&productResolution)) {
+                            if (resolution[0] <= 0) {
+                                resolution[0] = productResolution[0];
+                            }
+                            if (resolution[1] <= 0) {
+                                resolution[1] = productResolution[1];
+                            }
+                            TF_DEBUG_MSG(
+                                MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+                                "Resolution from render product (%s): %d x %d\n",
+                                productPath.GetText(),
+                                resolution[0],
+                                resolution[1]);
+                            if (resolution[0] > 0 && resolution[1] > 0) {
+                                break;
                             }
                         }
                     }
