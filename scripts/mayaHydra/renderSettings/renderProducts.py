@@ -61,3 +61,15 @@ def applyToProductName(modifierFn):
                 "Could not obtain a product name attribute for render product "
                 "%s." % str(rp.GetPrim().GetPath()))
         pnAttr.Set(modifierFn(pnAttr.Get()))
+
+
+def applyToResolution(modifierFn):
+    """Apply modifierFn to the resolution attribute of every render product
+    returned by getRenderProductsToApplySettings()."""
+    for rp in getRenderProductsToApplySettings():
+        resAttr = rp.CreateResolutionAttr()
+        if not resAttr:
+            raise RuntimeError(
+                "Could not obtain a resolution attribute for render product "
+                "%s." % str(rp.GetPrim().GetPath()))
+        modifierFn(resAttr)
