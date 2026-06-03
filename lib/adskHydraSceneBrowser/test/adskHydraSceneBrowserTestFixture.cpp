@@ -196,7 +196,7 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
             auto vectorDataSource = PXR_NS::HdVectorDataSource::Cast(dataSourceEntry.dataSource)) {
             for (size_t iElement = 0; iElement < vectorDataSource->GetNumElements(); iElement++) {
                 size_t reversedElementIndex = vectorDataSource->GetNumElements() - 1 - iElement;
-                PXR_NS::TfToken dataSourceName = PXR_NS::TfToken(std::to_string(reversedElementIndex));
+                PXR_NS::TfToken dataSourceName = PXR_NS::TfToken("i" + std::to_string(reversedElementIndex));
                 PXR_NS::HdDataSourceBaseHandle dataSource
                     = vectorDataSource->GetElement(reversedElementIndex);
                 if (dataSource) {
