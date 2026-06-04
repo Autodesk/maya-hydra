@@ -90,7 +90,7 @@ mayaHydra_add_cmd_line_render_test(${scene}
 )
 
 # Test a render using a different camera than that from the fallback
-# USD resolution settings
+# USD resolution settings: Maya camera.
 set(scene basic/mayaCamera.ma)
 cmake_path(GET scene STEM sceneFileNameNoExt)
 mayaHydra_add_cmd_line_render_test(${scene}
@@ -99,6 +99,18 @@ mayaHydra_add_cmd_line_render_test(${scene}
     RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
     RENDERER HdStormRendererPlugin
     RENDERER_ARGS "-x 960 -y 540 -cam \"|camera1\" -rd ../images -im ${sceneFileNameNoExt}"
+)
+
+# Test a render using a different camera than that from the fallback
+# USD resolution settings: USD camera.
+set(scene basic/usdCamera.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+mayaHydra_add_cmd_line_render_test(${scene}
+    COPY_SCENE
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+    RENDERER HdStormRendererPlugin
+    RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -rd ../images -im ${sceneFileNameNoExt}"
 )
 
 # Use a small vertical resolution to avoid the Arnold watermark.
