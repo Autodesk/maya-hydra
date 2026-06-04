@@ -207,6 +207,20 @@ Ufe::Path GetUfeCameraPathFromUsdRenderProductOverride(
         return ufeCameraPath;
     }
 
+    UsdAttribute externalCameraAttr
+        = renderProduct.GetPrim().GetAttribute(TfToken("adskUsd:externalCamera"));
+    if (externalCameraAttr) {
+        std::string externalCameraPathStr;
+        if (externalCameraAttr.Get(&externalCameraPathStr) && !externalCameraPathStr.empty()) {
+            TF_DEBUG_MSG(
+                MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+                "Render product (%s) external camera: %s\n",
+                renderProduct.GetPrim().GetPath().GetText(),
+                externalCameraPathStr.c_str());
+            return Ufe::PathString::path(externalCameraPathStr);
+        }
+    }
+
     UsdRelationship productCameraRel = renderProduct.GetCameraRel();
     SdfPathVector   productCameraTargets;
     if (productCameraRel.GetTargets(&productCameraTargets)
