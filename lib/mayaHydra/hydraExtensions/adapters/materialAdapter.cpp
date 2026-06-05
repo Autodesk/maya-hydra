@@ -32,8 +32,10 @@
 #include <pxr/usd/sdf/types.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/stage.h>
+#ifdef WANT_MATERIALX_BUILD
 #include <pxr/imaging/hdMtlx/hdMtlx.h>
 #include <pxr/usd/usdMtlx/reader.h>
+#endif
 #include <pxr/usd/usdShade/material.h>
 #include <pxr/usdImaging/usdImaging/materialParamUtils.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
@@ -47,9 +49,11 @@
 #include <string>
 #include <vector>
 
+#ifdef WANT_MATERIALX_BUILD
 #include <MaterialXCore/Document.h>
 #include <MaterialXFormat/File.h>
 #include <MaterialXFormat/XmlIo.h>
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -66,6 +70,7 @@ const VtValue       _emptyValue;
 const TfToken       _emptyToken;
 const TfTokenVector _stSamplerCoords = { TfToken("st") };
 
+#ifdef WANT_MATERIALX_BUILD
 // Collect the node-definition identifiers referenced by 'doc' (including inside
 // nodegraphs) that cannot currently be resolved from the document itself.
 void _CollectUnresolvedNodeDefs(const MaterialX::DocumentPtr& doc, std::set<std::string>& out)
@@ -84,6 +89,7 @@ void _CollectUnresolvedNodeDefs(const MaterialX::DocumentPtr& doc, std::set<std:
         }
     }
 }
+#endif // WANT_MATERIALX_BUILD
 
 } // namespace
 
@@ -312,6 +318,7 @@ private:
 
     bool PopulateMaterialXNetworkMap(HdMaterialNetworkMap& networkMap)
     {
+#ifdef WANT_MATERIALX_BUILD
         // Get the dependency node
         MStatus status;
         MFnDependencyNode node(_surfaceShader, &status);
@@ -403,7 +410,7 @@ private:
         // definitions into the document. Doing so changes the network UsdMtlxRead
         // produces (wrong material terminal / corrupted graph) and breaks the material
         // in both the viewport and batch. If a custom definition cannot be resolved
-        // with these paths, the (Fix A) warning below reports it instead.
+        // with these paths, the warning below reports it instead.
         const MaterialX::FileSearchPath searchPaths = HdMtlxSearchPaths();
         try {
             MaterialX::readFromXmlString(mtlxDoc, mtlxDocStr.asChar(), searchPaths);
@@ -413,7 +420,7 @@ private:
             return false;
         }
 
-        // (Fix A) Warn about node definitions that still cannot be resolved.
+        // Warn about node definitions that still cannot be resolved.
         // UsdMtlxRead drops unresolved nodes together with the branches feeding them,
         // which silently diverges the viewport from a batch/USD render, so surface the
         // missing definitions and the search paths used to make the failure actionable.
@@ -498,6 +505,13 @@ private:
                  networkMap.map.size());
 
         return true;
+#else
+        // MaterialX support (hdMtlx / usdMtlx) is not available in this USD build,
+        // so there is no MaterialX network to build. Returning false makes the
+        // caller fall back to the standard Maya material network conversion.
+        (void)networkMap;
+        return false;
+#endif // WANT_MATERIALX_BUILD
     }
 
     VtValue GetMaterialResource() override

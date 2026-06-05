@@ -105,7 +105,7 @@ target_link_libraries(${TARGET_NAME}
         gf
         hd
         hdGp
-        hdMtlx
+        $<$<BOOL:${CMAKE_WANT_MATERIALX_BUILD}>:hdMtlx>
         hdx
         js
         kind
@@ -118,7 +118,7 @@ target_link_libraries(${TARGET_NAME}
         usdImaging
         usdImagingGL
         usdLux
-        usdMtlx
+        $<$<BOOL:${CMAKE_WANT_MATERIALX_BUILD}>:usdMtlx>
         usdRender
         usdRi
         usdShade
