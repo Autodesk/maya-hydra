@@ -56,8 +56,11 @@ public:
     MAYAHYDRALIB_API
     virtual void MarkDirty(HdDirtyBits dirtyBits) override;
 
+    // Return the shading engine assigned to this shape. Pass a mesh component in
+    // shadingComp to get the shading engine for that specific group of faces
+    // (per-face shading); leave it null to get the whole-object assignment.
     MAYAHYDRALIB_API
-    virtual MObject GetMaterial();
+    virtual MObject GetMaterial(const MObject& shadingComp = MObject::kNullObj);
     MAYAHYDRALIB_API
     virtual bool GetDoubleSided() const override { return true; };
     MAYAHYDRALIB_API

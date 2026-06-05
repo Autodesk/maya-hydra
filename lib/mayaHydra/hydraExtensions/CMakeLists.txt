@@ -105,6 +105,7 @@ target_link_libraries(${TARGET_NAME}
         gf
         hd
         hdGp
+        hdMtlx
         hdx
         js
         kind
@@ -117,6 +118,7 @@ target_link_libraries(${TARGET_NAME}
         usdImaging
         usdImagingGL
         usdLux
+        usdMtlx
         usdRender
         usdRi
         usdShade

@@ -32,16 +32,23 @@
 #include <pxr/usd/sdf/types.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/stage.h>
+#include <pxr/imaging/hdMtlx/hdMtlx.h>
 #include <pxr/usd/usdMtlx/reader.h>
 #include <pxr/usd/usdShade/material.h>
 #include <pxr/usdImaging/usdImaging/materialParamUtils.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
+#include <maya/MGlobal.h>
 #include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
 #include <maya/MPlugArray.h>
 
+#include <set>
+#include <string>
+#include <vector>
+
 #include <MaterialXCore/Document.h>
+#include <MaterialXFormat/File.h>
 #include <MaterialXFormat/XmlIo.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -58,6 +65,25 @@ TF_DEFINE_PRIVATE_TOKENS(
 const VtValue       _emptyValue;
 const TfToken       _emptyToken;
 const TfTokenVector _stSamplerCoords = { TfToken("st") };
+
+// Collect the node-definition identifiers referenced by 'doc' (including inside
+// nodegraphs) that cannot currently be resolved from the document itself.
+void _CollectUnresolvedNodeDefs(const MaterialX::DocumentPtr& doc, std::set<std::string>& out)
+{
+    std::vector<MaterialX::NodePtr> nodes = doc->getNodes();
+    for (const auto& nodeGraph : doc->getNodeGraphs()) {
+        const auto graphNodes = nodeGraph->getNodes();
+        nodes.insert(nodes.end(), graphNodes.begin(), graphNodes.end());
+    }
+    for (const auto& node : nodes) {
+        if (node && !node->getNodeDef()) {
+            const std::string def = node->getNodeDefString();
+            if (!def.empty()) {
+                out.insert(def);
+            }
+        }
+    }
+}
 
 } // namespace
 
@@ -241,6 +267,16 @@ private:
         auto       p = node.findPlug(MayaAttrs::shadingEngine::surfaceShader, true);
         MPlugArray conns;
         p.connectedTo(conns, true, false);
+
+        // LookdevX / MaterialX materials connect to the separate
+        // "materialXSurfaceShader" attribute rather than "surfaceShader".
+        if (conns.length() == 0) {
+            auto pMtlx = node.findPlug("materialXSurfaceShader", true);
+            if (!pMtlx.isNull()) {
+                pMtlx.connectedTo(conns, true, false);
+            }
+        }
+
         if (conns.length() > 0) {
             _surfaceShader = conns[0].node();
             MFnDependencyNode surfaceNode(_surfaceShader, &status);
@@ -280,65 +316,187 @@ private:
         MStatus status;
         MFnDependencyNode node(_surfaceShader, &status);
         if (!status) {
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                .Msg("PopulateMaterialXNetworkMap: Failed to get surface shader node\n");
             return false;
         }
 
         // Fetch the "renderDocument" attribute from the node
-        static const MString renderDocumentStr("renderDocument");  
+        static const MString renderDocumentStr("renderDocument");
         auto mtlxDocPlug = node.findPlug(renderDocumentStr, true);
         if (mtlxDocPlug.isNull()) {
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                .Msg("PopulateMaterialXNetworkMap: renderDocument plug not found on node %s\n",
+                     node.name().asChar());
             return false;
         }
 
         // Construct a MaterialX document
-        const MString mtlxDocStr = mtlxDocPlug.asString();
+        MString mtlxDocStr = mtlxDocPlug.asString();
+
         if (0 == mtlxDocStr.length()) {
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                .Msg("PopulateMaterialXNetworkMap: renderDocument is empty, attempting to force evaluation on node %s\n",
+                     node.name().asChar());
+
+            // In batch render mode, LookdevX may not have evaluated the node yet.
+            // Pull on the actual source plug that drives the shading engine's
+            // "materialXSurfaceShader" attribute — this is the definitive output of the
+            // LookdevX node and evaluating it triggers its compute function regardless of
+            // what the output attribute is named (it is not necessarily "outColor").
+            {
+                MStatus seStatus;
+                MFnDependencyNode seNode(GetNode(), &seStatus); // GetNode() = shading engine
+                if (seStatus) {
+                    MPlug sePlug = seNode.findPlug("materialXSurfaceShader", true);
+                    if (!sePlug.isNull()) {
+                        MPlug srcPlug = sePlug.source(); // output plug on the LookdevX node
+                        if (!srcPlug.isNull()) {
+                            try {
+                                MObject val;
+                                srcPlug.getValue(val);
+                                TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                                    .Msg("PopulateMaterialXNetworkMap: Triggered evaluation via source plug %s, retrying renderDocument\n",
+                                         srcPlug.name().asChar());
+                                mtlxDocStr = mtlxDocPlug.asString();
+                            } catch (...) {
+                                TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                                    .Msg("PopulateMaterialXNetworkMap: Source plug evaluation failed\n");
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Fallback: use MEL dgeval which forces the DG scheduler to compute the attribute.
+            if (0 == mtlxDocStr.length()) {
+                try {
+                    MString cmd("dgeval ");
+                    cmd += node.name();
+                    cmd += ".renderDocument";
+                    MGlobal::executeCommand(cmd, false, false);
+                    TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                        .Msg("PopulateMaterialXNetworkMap: Triggered evaluation via dgeval, retrying renderDocument\n");
+                    mtlxDocStr = mtlxDocPlug.asString();
+                } catch (...) {
+                    TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                        .Msg("PopulateMaterialXNetworkMap: dgeval attempt failed\n");
+                }
+            }
+
+            if (0 == mtlxDocStr.length()) {
+                TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                    .Msg("PopulateMaterialXNetworkMap: renderDocument still empty after evaluation attempt\n");
+                return false;
+            }
+        }
+
+        TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+            .Msg("PopulateMaterialXNetworkMap: renderDocument length = %d on node %s\n",
+                 (int)mtlxDocStr.length(), node.name().asChar());
+        auto mtlxDoc = MaterialX::createDocument();
+
+        // Pass explicit search paths so that any <xi:include> references in the
+        // renderDocument (e.g. custom LookdevX / shader libraries) are resolved.
+        // Use USD's HdMtlxSearchPaths() - the same paths the rest of Hydra/USD use -
+        // and intentionally do NOT inject extra libraries or copy custom node
+        // definitions into the document. Doing so changes the network UsdMtlxRead
+        // produces (wrong material terminal / corrupted graph) and breaks the material
+        // in both the viewport and batch. If a custom definition cannot be resolved
+        // with these paths, the (Fix A) warning below reports it instead.
+        const MaterialX::FileSearchPath searchPaths = HdMtlxSearchPaths();
+        try {
+            MaterialX::readFromXmlString(mtlxDoc, mtlxDocStr.asChar(), searchPaths);
+        } catch (const std::exception& e) {
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                .Msg("PopulateMaterialXNetworkMap: Failed to parse MaterialX XML: %s\n", e.what());
             return false;
         }
-        auto mtlxDoc = MaterialX::createDocument();
-        MaterialX::readFromXmlString(mtlxDoc, mtlxDocStr.asChar());
+
+        // (Fix A) Warn about node definitions that still cannot be resolved.
+        // UsdMtlxRead drops unresolved nodes together with the branches feeding them,
+        // which silently diverges the viewport from a batch/USD render, so surface the
+        // missing definitions and the search paths used to make the failure actionable.
+        {
+            std::set<std::string> unresolvedDefs;
+            _CollectUnresolvedNodeDefs(mtlxDoc, unresolvedDefs);
+            if (!unresolvedDefs.empty()) {
+                std::string defList;
+                for (const std::string& def : unresolvedDefs) {
+                    defList += (defList.empty() ? "" : ", ") + def;
+                }
+                TF_WARN(
+                    "MaterialX material '%s': %zu node definition(s) could not be "
+                    "resolved [%s]. These nodes and the branches feeding them will be "
+                    "dropped, so the viewport may not match a batch/USD render. Check "
+                    "the MaterialX library search paths (MATERIALX_SEARCH_PATH / "
+                    "PXR_MTLX_STDLIB_SEARCH_PATHS). Search paths used: %s",
+                    node.name().asChar(),
+                    unresolvedDefs.size(),
+                    defList.c_str(),
+                    searchPaths.asString().c_str());
+            }
+        }
 
         // Create a Usd Stage from the MaterialX document
         auto stage = UsdStage::CreateInMemory("tmp.usda", TfNullPtr);
         UsdMtlxRead(mtlxDoc, stage);
-        
+
         // Search for material group in the Usd Stage
         static const SdfPath basePath("/MaterialX/Materials");
         auto mtlxRange = stage->GetPrimAtPath(basePath).GetChildren();
         if (mtlxRange.empty()) {
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                .Msg("PopulateMaterialXNetworkMap: No materials found at /MaterialX/Materials\n");
             return false;
         }
 
         // There should be only one material. Fetch it.
         UsdShadeMaterial mtlxMaterial(*mtlxRange.begin());
         if (!mtlxMaterial) {
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                .Msg("PopulateMaterialXNetworkMap: Failed to get material from stage\n");
             return false;
         }
 
         // Get MaterialX output
         UsdShadeOutput mtlxOutput = mtlxMaterial.GetOutput(_tokens->mtlxSurface);
         if (!mtlxOutput) {
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                .Msg("PopulateMaterialXNetworkMap: Failed to get mtlx:surface output\n");
             return false;
         }
 
         // Get MaterialX shader outputs
-        UsdShadeAttributeVector mtlxShaderOutputs = 
+        UsdShadeAttributeVector mtlxShaderOutputs =
             UsdShadeUtils::GetValueProducingAttributes(mtlxOutput, /*shaderOutputsOnly*/true);
         if (mtlxShaderOutputs.empty()) {
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                .Msg("PopulateMaterialXNetworkMap: No shader outputs found\n");
             return false;
         }
-        
+
         // Finally get MaterialX shader
         UsdShadeShader mtlxShader(mtlxShaderOutputs[0].GetPrim());
         if (!mtlxShader) {
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+                .Msg("PopulateMaterialXNetworkMap: Failed to get shader prim\n");
             return false;
         }
+
+        TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+            .Msg("PopulateMaterialXNetworkMap: Successfully extracted MaterialX shader at path %s\n",
+                 mtlxShader.GetPrim().GetPath().GetText());
 
         // Convert the MaterialX shader to HdMaterialNetwork
         UsdImagingBuildHdMaterialNetworkFromTerminal(
             mtlxShader.GetPrim(), _tokens->surface, {_tokens->mtlx},
             {_tokens->mtlx}, &networkMap, UsdTimeCode());
-            
+
+        TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
+            .Msg("PopulateMaterialXNetworkMap: Built HdMaterialNetwork with %zu terminal entries\n",
+                 networkMap.map.size());
+
         return true;
     }
 

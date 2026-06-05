@@ -252,9 +252,10 @@ public:
             TF_CODING_ERROR("Number of tangents does not match number of face vertices" );
         }
 
-       const auto* tangentsArray = reinterpret_cast<const GfVec2f*>(&mayaTangents[0]);
-        VtVec2fArray ret;
-        ret.assign(tangentsArray, tangentsArray + numFacesVertices);
+        VtVec3fArray ret(tangentsCount);
+        for (size_t i = 0; i < tangentsCount; ++i) {
+            ret[i] = GfVec3f(mayaTangents[i].x, mayaTangents[i].y, mayaTangents[i].z);
+        }
         return VtValue(ret);
     }
 
@@ -506,7 +507,7 @@ public:
                 localDescs.push_back(
                     { MayaHydraAdapterTokens->tangents,
                       interpolation,
-                      HdPrimvarRoleTokens->textureCoordinate });
+                      HdPrimvarRoleTokens->vector });
             }
         }
 
