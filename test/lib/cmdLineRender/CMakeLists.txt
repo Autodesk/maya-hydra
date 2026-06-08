@@ -268,11 +268,20 @@ configure_file(
 # Example of an absolute path embedded in a .ma file:
 #   setAttr ".ftn" -type "string" "D:/nonExistentPath//UVChecker.png";
 # The test verifies that such paths can be resolved relative to the specified project.
-# Disabled for 0.8.2 release.  Entered as HYDRA-2329.
-# mayaHydra_add_cmd_line_render_test(relativePathTest/mayaSphereMayaMaterialArnoldRelativePath.ma
-#     RENDERER HdArnoldRendererPlugin
-#     RENDERER_ARGS "-proj \"${_relpath_proj_dir}\""
-# )
+set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/mayaSphereMayaMaterialArnoldRelativePath/projects/default/images)
+set(scene relativePathTest/mayaSphereMayaMaterialArnoldRelativePath.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+mayaHydra_add_cmd_line_render_test(${scene}
+    RENDERER HdArnoldRendererPlugin
+    # Must specify:
+    # - The resolution, otherwise the USD default render settings 2048x1080
+    #   will be used
+    # - The render directory and image name, otherwise the USD default render
+    #   settings ./default.png will be used, which places the rendered
+    #   output in the source tree in the Maya scene file directory, with
+    #   image name "default.png".
+    RENDERER_ARGS "-x 160 -y 120 -proj \"${_relpath_proj_dir}\" -rd \"${render_dir}\" -im ${sceneFileNameNoExt}"
+)
 
 if(NOT IS_MACOSX)
 # HYDRA-2031 this test fails only on macOS.
