@@ -1441,6 +1441,10 @@ void MayaHydraSceneIndex::OnDagNodeRemoved(const MObject& obj)
 // component / whole object) or from the kMeshPolygonComponent element list, and
 // is published as a faceSet HdGeomSubset with an HdMaterialBindingsSchema so the
 // render delegate shades those faces with the right material.
+// Subsets only apply to meshes, so non-mesh (incl. plugin) shapes are skipped.
+// When a mesh has both a whole-object assignment and per-face assignments, the
+// whole-object subset is skipped to avoid overlapping subsets with undefined
+// material precedence; the whole-object material remains the mesh's binding.
 void MayaHydraSceneIndex::_InsertGeomSubsetsForMesh(
     const MDagPath& dag, const SdfPath& meshPrimId)
 {
@@ -1458,11 +1462,36 @@ void MayaHydraSceneIndex::_InsertGeomSubsetsForMesh(
         return;
     }
 
-    MFnMesh mesh(dag);
+    // geomSubsets only apply to meshes; bail out for any other (incl. plugin) shape.
+    if (!dag.hasFn(MFn::kMesh)) {
+        return;
+    }
+    MStatus meshStatus;
+    MFnMesh mesh(dag, &meshStatus);
+    if (!meshStatus) {
+        return;
+    }
+
+    // A whole-object (null component) assignment covers every face. If the mesh
+    // also has per-face assignments, emitting a full-coverage subset would overlap
+    // them with undefined material precedence, so skip the whole-object subset when
+    // component assignments are present.
+    bool hasComponentAssignments = false;
+    for (const auto& sa : assignments) {
+        if (!sa.component.isNull()) {
+            hasComponentAssignments = true;
+            break;
+        }
+    }
+
     int subsetIndex = 0;
     static const TfToken purposes[] = { HdMaterialBindingsSchemaTokens->allPurpose };
 
     for (const auto& sa : assignments) {
+        if (hasComponentAssignments && sa.component.isNull()) {
+            continue;
+        }
+
         VtIntArray faceIndices;
 
         if (sa.component.isNull()) {
@@ -1480,6 +1509,10 @@ void MayaHydraSceneIndex::_InsertGeomSubsetsForMesh(
                 faceIndices[j] = elements[j];
             }
         } else {
+            // Defensive: for a mesh, getConnectedSetsAndMembers only ever yields a
+            // null component (whole object) or a face component
+            // (kMeshPolygonComponent). Any other component type is unexpected, so
+            // skip it rather than treat its element indices as face indices.
             continue;
         }
 

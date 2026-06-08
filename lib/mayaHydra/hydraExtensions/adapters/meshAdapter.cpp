@@ -248,8 +248,13 @@ public:
             return {};
         }
 
+        // Tangents are declared with face-varying interpolation, so Hydra expects
+        // exactly one value per face vertex. Returning a mismatched-length primvar
+        // would lead to incorrect shading or downstream errors, so bail out instead.
         if (tangentsCount != numFacesVertices){
-            TF_CODING_ERROR("Number of tangents does not match number of face vertices" );
+            TF_CODING_ERROR("Number of tangents (%zu) does not match number of face vertices (%zu)",
+                            tangentsCount, numFacesVertices);
+            return {};
         }
 
         VtVec3fArray ret(tangentsCount);

@@ -40,7 +40,6 @@
 #include <pxr/usdImaging/usdImaging/materialParamUtils.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
-#include <maya/MGlobal.h>
 #include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
 #include <maya/MPlugArray.h>
@@ -372,22 +371,6 @@ private:
                             }
                         }
                     }
-                }
-            }
-
-            // Fallback: use MEL dgeval which forces the DG scheduler to compute the attribute.
-            if (0 == mtlxDocStr.length()) {
-                try {
-                    MString cmd("dgeval ");
-                    cmd += node.name();
-                    cmd += ".renderDocument";
-                    MGlobal::executeCommand(cmd, false, false);
-                    TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
-                        .Msg("PopulateMaterialXNetworkMap: Triggered evaluation via dgeval, retrying renderDocument\n");
-                    mtlxDocStr = mtlxDocPlug.asString();
-                } catch (...) {
-                    TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
-                        .Msg("PopulateMaterialXNetworkMap: dgeval attempt failed\n");
                 }
             }
 
