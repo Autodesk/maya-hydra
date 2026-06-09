@@ -26,9 +26,7 @@ option(BUILD_SHARED_LIBS "Build libraries as shared or static." ON)
 option(CODE_COVERAGE "Build and collect code coverage info." OFF)
 
 if (CODE_COVERAGE)
-    # Entered as HYDRA-2331.
-    set(BUILD_TESTS OFF)
-    message(STATUS "Code coverage enabled, tests will not be built.")
+    message(STATUS "Code coverage enabled.")
 endif()
 
 if(APPLE)
@@ -273,7 +271,7 @@ add_subdirectory(scripts)
 #------------------------------------------------------------------------------
 # renderer descriptions
 #------------------------------------------------------------------------------
-if(MAYA_APP_VERSION VERSION_GREATER 2026 AND NOT CODE_COVERAGE)
+if(MAYA_APP_VERSION VERSION_GREATER 2026)
     add_subdirectory(renderDesc)
 endif()
 
