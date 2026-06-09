@@ -396,7 +396,7 @@ function(_mayaHydra_setup_test_plugins)
         # uses usd/bundle/<version>, older uses usd/hydra/<version>. Version is USD
         # without "." (e.g. 2511 for USD 0.25.11). Add only the path that contains
         # plugInfo.json.
-        if(DEFINED USD_VERSION)
+        if(IS_WINDOWS AND DEFINED USD_VERSION)
             string(REGEX REPLACE "^0\\.([0-9]+)\\.([0-9]+)$" "\\1\\2" MTOA_USD_VERSION_HYDRA "${USD_VERSION}")
             set(MTOA_HYDRA_BUNDLE "${MTOA_LOCATION}/usd/bundle/${MTOA_USD_VERSION_HYDRA}")
             set(MTOA_HYDRA_LEGACY "${MTOA_LOCATION}/usd/hydra/${MTOA_USD_VERSION_HYDRA}")
