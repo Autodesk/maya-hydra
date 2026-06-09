@@ -248,13 +248,19 @@ public:
             return {};
         }
 
+        // Tangents are declared with face-varying interpolation, so Hydra expects
+        // exactly one value per face vertex. Returning a mismatched-length primvar
+        // would lead to incorrect shading or downstream errors, so bail out instead.
         if (tangentsCount != numFacesVertices){
-            TF_CODING_ERROR("Number of tangents does not match number of face vertices" );
+            TF_CODING_ERROR("Number of tangents (%zu) does not match number of face vertices (%zu)",
+                            tangentsCount, numFacesVertices);
+            return {};
         }
 
-       const auto* tangentsArray = reinterpret_cast<const GfVec2f*>(&mayaTangents[0]);
-        VtVec2fArray ret;
-        ret.assign(tangentsArray, tangentsArray + numFacesVertices);
+        VtVec3fArray ret(tangentsCount);
+        for (size_t i = 0; i < tangentsCount; ++i) {
+            ret[i] = GfVec3f(mayaTangents[i].x, mayaTangents[i].y, mayaTangents[i].z);
+        }
         return VtValue(ret);
     }
 
@@ -506,7 +512,7 @@ public:
                 localDescs.push_back(
                     { MayaHydraAdapterTokens->tangents,
                       interpolation,
-                      HdPrimvarRoleTokens->textureCoordinate });
+                      HdPrimvarRoleTokens->vector });
             }
         }
 

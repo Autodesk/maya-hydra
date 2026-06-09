@@ -287,6 +287,10 @@ private:
     bool _GetRenderItem(int fastId, MayaHydraRenderItemAdapterPtr& adapter);
     void _AddPrimAncestors(const SdfPath& path);
     void _RemoveEmptyAncestors(const SdfPath& path);
+    // Create the material(s) for a mesh and, when it has more than one shading
+    // group, emit one HdGeomSubset (faceSet + material binding) per assignment so
+    // per-face/multi-material meshes shade correctly. See the .cpp for details.
+    void _InsertGeomSubsetsForMesh(const MDagPath& dag, const SdfPath& meshPrimId);
     void _AddRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
     void _RemoveRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
     bool

@@ -155,8 +155,10 @@ endif()
 set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshes.py
     testTransformMeshAdapter.py
+    testMeshAdapterVisibility.py
     cpp/testMeshAdapterTransform.py
     cpp/testMeshPrimvars.py
+    cpp/testMeshGeomSubsets.py
     cpp/testMeshSubdivTags.py
 )
 
