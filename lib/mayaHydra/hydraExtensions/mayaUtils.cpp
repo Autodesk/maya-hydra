@@ -18,7 +18,10 @@
 
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 
+#include <pxr/base/tf/diagnostic.h>
+
 #include <maya/MDagPath.h>
+#include <maya/MFnComponent.h>
 #include <maya/MFnDagNode.h>
 #include <maya/MMatrix.h>
 #include <maya/MObjectArray.h>
@@ -26,6 +29,8 @@
 #include <maya/MPlugArray.h>
 #include <maya/MSelectionList.h>
 #include <maya/MStringArray.h>
+
+PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
 
@@ -188,6 +193,68 @@ bool IsDagPathOfGivenType(const MDagPath& dagPath, const MString& type)
     auto shapeDagPath = dagPath;
     shapeDagPath.extendToShape();
     return type == MFnDependencyNode(shapeDagPath.node()).typeName();
+}
+
+// Collect every shading-group assignment on a shape.
+//
+// What: appends one ShadingAssignment per kShadingEngine connected to dagPath,
+// pairing each shading engine with the component (set of faces) it is assigned
+// to. The component is null for a whole-object assignment.
+// How: Maya exposes per-instance assignments through
+// MFnDagNode::getConnectedSetsAndMembers, which returns parallel arrays of sets
+// and their member components. We keep only the shading-engine sets. Callers use
+// this to build Hydra geomSubsets for per-face (multi-material) meshes.
+void GetAllShadingAssignments(const MDagPath& dagPath, std::vector<ShadingAssignment>& out)
+{
+    if (!dagPath.isValid())
+        return;
+
+    MFnDagNode dagNode(dagPath.node());
+    MObjectArray sets, comps;
+    dagNode.getConnectedSetsAndMembers(dagPath.instanceNumber(), sets, comps, /*renderableSetsOnly=*/true);
+    if (sets.length() != comps.length()) {
+        TF_WARN("GetAllShadingAssignments: sets/comps length mismatch on %s", dagPath.fullPathName().asChar());
+        return;
+    }
+    for (uint32_t i = 0; i < sets.length(); ++i) {
+        if (sets[i].apiType() == MFn::kShadingEngine) {
+            out.push_back({ comps[i], sets[i] });
+        }
+    }
+}
+
+// Find the single shading engine that applies to a shape (or to one of its
+// components).
+//
+// What: returns the kShadingEngine MObject assigned to dagPath. When
+// shadingComp is non-null, only the shading engine whose member component
+// matches shadingComp is returned (per-face shading, e.g. one render item of a
+// multi-material mesh); when it is null the first shading engine found is
+// returned (whole-object assignment). Returns kNullObj when nothing is assigned.
+// How: same getConnectedSetsAndMembers enumeration as GetAllShadingAssignments,
+// but short-circuits on the first matching shading engine. MFnComponent::isEqual
+// is used to match the requested component against each set's member component.
+MObject FindShadingEngine(const MDagPath& dagPath, const MObject& shadingComp)
+{
+    if (!dagPath.isValid())
+        return MObject::kNullObj;
+
+    MFnDagNode   dagNode(dagPath.node());
+    MObjectArray sets, comps;
+    dagNode.getConnectedSetsAndMembers(dagPath.instanceNumber(), sets, comps, /*renderableSetsOnly=*/true);
+    if (sets.length() != comps.length()) {
+        TF_WARN("FindShadingEngine: sets/comps length mismatch on %s", dagPath.fullPathName().asChar());
+        return MObject::kNullObj;
+    }
+    for (uint32_t i = 0; i < sets.length(); ++i) {
+        if (sets[i].apiType() == MFn::kShadingEngine) {
+            MObject comp = comps[i];
+            MObject shadingCompCopy = shadingComp;
+            if (shadingCompCopy.isNull() || comp.isNull() || MFnComponent(comp).isEqual(shadingCompCopy))
+                return sets[i];
+        }
+    }
+    return MObject::kNullObj;
 }
 
 } // namespace MAYAHYDRA_NS_DEF

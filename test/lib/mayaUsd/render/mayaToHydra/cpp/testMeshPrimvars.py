@@ -60,6 +60,14 @@ class TestMeshPrimvars(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(f="MeshPrimvars.ParamAttributesMatchGetLogic")
 
+    # What: tangents primvar must be a VtVec3fArray with the "vector" role.
+    # How: build the UV cube scene, then run the C++ tangents type/role test.
+    # Expect: tangents are VtVec3fArray, role vector, interpolation faceVarying.
+    def test_tangentsAreVec3WithVectorRole(self):
+        self.setupScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(f="MeshPrimvars.TangentsAreVec3WithVectorRole")
+
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

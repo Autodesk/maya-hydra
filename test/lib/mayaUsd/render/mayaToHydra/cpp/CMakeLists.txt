@@ -39,6 +39,7 @@ target_sources(${TARGET_NAME}
         testCustomDagNodeTranslation.cpp
         testCameraPrimvars.cpp
         testMeshPrimvars.cpp
+        testMeshGeomSubsets.cpp
         testFlowViewportAPIFilterPrims.cpp
         testSceneCorrectness.cpp
         testSelection.cpp
