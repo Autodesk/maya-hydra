@@ -406,11 +406,9 @@ void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderSettingsNode()
     auto pfsi = HdPrefixingSceneIndex::New(finalSceneIndex, prefix);
     auto externalCameraResolvingSi =
         MayaHydra::ExternalCameraResolvingSceneIndex::New(pfsi);
-    auto primRemovalSi =
-        Fvp::PrimRemovalEnforcingSceneIndex::New(externalCameraResolvingSi);
 
-    dataProducerSIData->SetDataProducerSceneIndex(primRemovalSi);
-    dataProducerSIData->SetDataProducerLastSceneIndexChain(primRemovalSi);
+    dataProducerSIData->SetDataProducerSceneIndex(externalCameraResolvingSi);
+    dataProducerSIData->SetDataProducerLastSceneIndexChain(externalCameraResolvingSi);
 
     Fvp::DataProducerSceneIndexInterfaceImp::get()
         .addUsdStageDataProducerSceneIndexDataBaseToAllViews(dataProducerSIData);
@@ -438,6 +436,9 @@ void MayaHydraSceneIndexRegistry::_UnregisterDefaultRenderSettingsNode()
     Fvp::DataProducerSceneIndexInterface::get()
         .removeDataProducerSceneIndex(
             _defaultRenderSettingsDataProducer->GetDataProducerLastSceneIndexChain());
+#ifdef CODE_COVERAGE_WORKAROUND
+    Fvp::leakSceneIndex(_defaultRenderSettingsDataProducer->GetDataProducerLastSceneIndexChain());
+#endif
     _defaultRenderSettingsDataProducer = TfNullPtr;
     _usdDefaultRenderSettingsPathPrefix = SdfPath();
 }

@@ -41,9 +41,6 @@
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/tokens.h>
 
-#ifdef CODE_COVERAGE_WORKAROUND
-#include <flowViewport/fvpUtils.h>
-#endif
 #include <flowViewport/tokens.h>
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
