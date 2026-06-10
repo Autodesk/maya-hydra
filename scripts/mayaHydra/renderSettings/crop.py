@@ -90,11 +90,6 @@ def setRegion(left, right, bottom, top):
     Translates them to UsdRenderProduct.dataWindowNDC and applies the value
     to every render product picked by
     renderProducts.getRenderProductsToApplySettings()."""
-    if not cmds.objExists("|renderSettings|renderSettingsShape"):
-        width = cmds.getAttr("defaultResolution.width")
-        height = cmds.getAttr("defaultResolution.height")
-        _toDataWindowNDC(left, right, bottom, top, width, height)
-        return
 
     try:
         resAttr = resolution.getResolutionAttr()

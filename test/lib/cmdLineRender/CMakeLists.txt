@@ -191,17 +191,15 @@ mayaHydra_add_cmd_line_render_test(renderSettings/stormCropRegion1x1.ma
     RENDERER_ARGS "-x 64 -y 64 -reg 32 32 32 32"
 )
 
-# Arnold crop region without USD render settings: exercises the Maya render
-# settings fallback path, where -reg is carried through mayaHydraRenderRegion
-# instead of UsdRenderProduct.dataWindowNDC.
-#
-# Disabled, needs USD render settings, entered as HYDRA-2325
-#
-# mayaHydra_add_cmd_line_render_test(renderSettings/arnoldCropRegion.ma
-#     RENDERER HdArnoldRendererPlugin
-#     RENDERER_ARGS "-x 160 -y 120 -reg 32 95 30 89"
-#     FAIL 0.5
-# )
+# Arnold crop region.  Test with USD default render settings.
+set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/arnoldCropRegion/projects/default/images)
+set(scene renderSettings/arnoldCropRegion.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+mayaHydra_add_cmd_line_render_test(${scene}
+    RENDERER HdArnoldRendererPlugin
+    RENDERER_ARGS "-x 160 -y 120 -reg 32 95 30 89 -rd \"${render_dir}\" -im ${sceneFileNameNoExt}"
+    FAIL 0.5
+)
 
 # Failure with HdStorm on macOS entered as HYDRA-2139.
 if(NOT IS_MACOSX)

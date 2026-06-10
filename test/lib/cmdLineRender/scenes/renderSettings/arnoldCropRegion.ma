@@ -4,6 +4,7 @@
 //Codeset: 1252
 requires maya "2026";
 requires "stereoCamera" "10.0";
+requires -nodeType "UsdDefaultSettings" -dataType "pxrUsdStageData" "mayaUsdPlugin" "0.38.0";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";
 fileInfo "product" "Maya 2026";
@@ -163,6 +164,12 @@ createNode script -n "sceneConfigurationScriptNode";
 	rename -uid "CDF66D18-4ADE-D54F-F63A-2ABBEB84577E";
 	setAttr ".b" -type "string" "playbackOptions -min 0 -max 36 -ast 0 -aet 36 ";
 	setAttr ".st" 6;
+createNode UsdDefaultSettings -n "UsdDefaultRenderSettings";
+	rename -uid "C9F2171D-4641-7293-89A0-CEBAAFFA1F1C";
+	setAttr ".srl" -type "string" "#usda 1.0\n(\n    renderSettingsPrimPath = \"/Render/SceneRenderSettings\"\n)\n\ndef Scope \"Render\"\n{\n    def RenderSettings \"SceneRenderSettings\"\n    {\n        custom string adskUsd:externalCamera = \"|persp\" (\n            displayName = \"External Camera\"\n        )\n        rel products = </Render/BeautyProduct>\n    }\n\n    def RenderVar \"color\"\n    {\n        uniform string sourceName = \"color\"\n    }\n\n    def RenderProduct \"BeautyProduct\"\n    {\n        rel orderedVars = </Render/color>\n        token productName = \"./default.png\"\n    }\n}\n\n";
+	setAttr ".ssl" -type "string" "#usda 1.0\n\n";
+	setAttr ".asp" -type "string" "UsdDefaultRenderSettings,/Render/SceneRenderSettings";
+lockNode -l 1 ;
 select -ne :time1;
 	setAttr ".o" 0;
 select -ne :hardwareRenderingGlobals;
