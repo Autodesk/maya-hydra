@@ -121,15 +121,19 @@ def loadTestsFromDict(namespace_dict):
             setattr(dummyModule, name, val)
     return unittest.TestLoader().loadTestsFromModule(dummyModule)
 
-def _force_maya_host_process_exit(exit_code, stage=""):
-    """End the hosting maya.exe process immediately (best-effort)."""
-    def _log(msg):
-        try:
-            sys.__stdout__.write(msg + "\n")
-            sys.__stdout__.flush()
-        except Exception:
-            pass
+def _log(msg):
+    """Write msg to the original stdout when MAYAHYDRA_TEST_DEBUG is set."""
+    if not os.environ.get("MAYAHYDRA_TEST_DEBUG"):
+        return
+    try:
+        sys.__stdout__.write(msg + "\n")
+        sys.__stdout__.flush()
+    except Exception:
+        pass
 
+
+def _forceMayaHostProcessExit(exit_code, stage=""):
+    """End the hosting maya.exe process immediately (best-effort)."""
     code = int(exit_code) & 0xFFFFFFFF
     if sys.platform == "win32":
         try:
@@ -167,7 +171,7 @@ def _force_maya_host_process_exit(exit_code, stage=""):
     os._exit(code)
 
 def runTests(globals_dict, stream=sys.__stderr__,
-             verbosity=1, coverage_quit_workaround=False):
+             verbosity=1):
     '''
     Run the unittests within the given namespace
 
@@ -179,74 +183,49 @@ def runTests(globals_dict, stream=sys.__stderr__,
     import maya.cmds as cmds
     suite = loadTestsFromDict(globals_dict)
     runner = unittest.TextTestRunner(stream=stream, verbosity=verbosity)
-    coverage_enabled = coverage_quit_workaround and os.environ.get("MAYAHYDRA_CODE_COVERAGE")
+    coverage_enabled = bool(os.environ.get("MAYAHYDRA_CODE_COVERAGE"))
     coverage_start = None
     if coverage_enabled:
         coverage_start = time.monotonic()
-        sys.__stdout__.write(
-            "MayaHydra: coverage timing start (pid={}, t={:.3f})\n".format(
-                os.getpid(), coverage_start)
-        )
-        sys.__stdout__.flush()
+        _log("MayaHydra: coverage timing start (pid={}, t={:.3f})".format(
+            os.getpid(), coverage_start))
     results = runner.run(suite)
     if coverage_enabled and coverage_start is not None:
-        sys.__stdout__.write(
-            "MayaHydra: coverage timing after tests (dt={:.3f}s)\n".format(
-                time.monotonic() - coverage_start)
-        )
-        sys.__stdout__.flush()
+        _log("MayaHydra: coverage timing after tests (dt={:.3f}s)".format(
+            time.monotonic() - coverage_start))
     if results.wasSuccessful():
         exitCode = 0
     else:
         exitCode = 1
 
-    # Coverage builds sometimes hang during Maya shutdown; add diagnostics.
-    coverage_dump_traceback_armed = False
-    if coverage_enabled:
-        # Hard-exit watchdog in case diagnostics or shutdown hang.
-        hard_exit_delay = int(os.environ.get("MAYAHYDRA_COVERAGE_HARD_EXIT_DELAY", "5"))
-        def _hard_exit_after_delay():
-            time.sleep(hard_exit_delay)
-            try:
-                sys.__stdout__.write(
-                    "MayaHydra: coverage hard-exit fired ({}s)\n".format(hard_exit_delay)
-                )
-                sys.__stdout__.flush()
-            except Exception:
-                pass
-            _force_maya_host_process_exit(exitCode, stage="(hard-exit)")
-        threading.Thread(
-            target=_hard_exit_after_delay,
-            name="MayaHydraCoverageHardExit",
-            daemon=True,
-        ).start()
-        sys.__stdout__.write(
-            "MayaHydra: coverage hard-exit scheduled ({}s)\n".format(hard_exit_delay)
-        )
-        sys.__stdout__.flush()
-        try:
-            import faulthandler
-            faulthandler.dump_traceback_later(120, repeat=True, file=sys.__stderr__)
-            coverage_dump_traceback_armed = True
-            sys.__stdout__.write("MayaHydra: coverage quit watchdog armed (120s)\n")
-        except Exception as e:
-            sys.__stdout__.write("MayaHydra: failed to arm quit watchdog: {}\n".format(e))
-        try:
-            sys.__stdout__.write("MayaHydra: pre-quit diagnostics\n")
-            sys.__stdout__.write("  MAYAHYDRA_CODE_COVERAGE={}\n".format(
-                os.environ.get("MAYAHYDRA_CODE_COVERAGE")))
-            sys.__stdout__.write("  listRenderers={}\n".format(
-                cmds.mayaHydra(listRenderers=True)))
-            sys.__stdout__.write("  listActiveRenderers={}\n".format(
-                cmds.mayaHydra(listActiveRenderers=True)))
-        except Exception as e:
-            sys.__stdout__.write("MayaHydra: pre-quit diagnostics failed: {}\n".format(e))
-        if coverage_start is not None:
-            sys.__stdout__.write(
-                "MayaHydra: coverage timing pre-quit (dt={:.3f}s)\n".format(
-                    time.monotonic() - coverage_start)
-            )
-        sys.__stdout__.flush()
+    # Arm a single-shot faulthandler watchdog so a hang during shutdown still
+    # produces a traceback on stderr (silent unless MAYAHYDRA_TEST_DEBUG).
+    try:
+        import faulthandler
+        faulthandler.dump_traceback_later(120, repeat=False, file=sys.__stderr__)
+        _log("MayaHydra: quit watchdog armed (120s)")
+    except Exception as e:
+        _log("MayaHydra: failed to arm quit watchdog: {}".format(e))
+
+    if coverage_start is not None:
+        _log("MayaHydra: coverage timing pre-quit (dt={:.3f}s)".format(
+            time.monotonic() - coverage_start))
+
+    # Hard-exit watchdog: fires _forceMayaHostProcessExit if the forced exit
+    # below stalls.
+    hard_exit_delay = int(os.environ.get(
+        "MAYAHYDRA_HARD_EXIT_DELAY",
+        os.environ.get("MAYAHYDRA_COVERAGE_HARD_EXIT_DELAY", "5")))
+    def _hard_exit_after_delay():
+        time.sleep(hard_exit_delay)
+        _log("MayaHydra: hard-exit fired ({}s)".format(hard_exit_delay))
+        _forceMayaHostProcessExit(exitCode, stage="(hard-exit)")
+    threading.Thread(
+        target=_hard_exit_after_delay,
+        name="MayaHydraHardExit",
+        daemon=True,
+    ).start()
+    _log("MayaHydra: hard-exit scheduled ({}s)".format(hard_exit_delay))
 
     # cmds.quit will not flush the streams - make sure we do so!
     # ...flush all of the standard ones just to be sure, as well as the stream
@@ -257,24 +236,19 @@ def runTests(globals_dict, stream=sys.__stderr__,
     sys.__stderr__.flush()
     stream.flush()
 
-    # Coverage builds may hang during Maya shutdown; force exit with test status.
-    if coverage_enabled:
-        if coverage_start is not None:
-            sys.__stdout__.write(
-                "MayaHydra: coverage timing before force-exit (dt={:.3f}s)\n".format(
-                    time.monotonic() - coverage_start)
-            )
-        sys.__stdout__.write(
-            "MayaHydra: coverage build forcing exit (exitCode={})\n".format(exitCode)
-        )
-        sys.__stdout__.flush()
-        # Leave the faulthandler watchdog armed: TerminateProcess should
-        # return instantly, but if anything stalls we still get a traceback.
-        _force_maya_host_process_exit(exitCode, stage="(force-exit)")
+    # Force the host process to exit immediately. Maya shutdown can hang during
+    # teardown in any build (not just coverage), so we always bypass it and exit
+    # with the test status. Leave the faulthandler watchdog armed: TerminateProcess
+    # should return instantly, but if anything stalls we still get a traceback.
+    if coverage_start is not None:
+        _log("MayaHydra: coverage timing before force-exit (dt={:.3f}s)".format(
+            time.monotonic() - coverage_start))
+    _log("MayaHydra: forcing exit (exitCode={})".format(exitCode))
+    _forceMayaHostProcessExit(exitCode, stage="(force-exit)")
 
-    # maya running interactively will absorb much of the output. comment out the
-    # following to prevent maya from exiting and open the script editor to look
-    # at failures.
+    # Unreachable in normal runs: the force-exit above ends the process. Kept so
+    # a developer can comment out that call (and the lines below) to keep maya
+    # running and inspect failures in the script editor.
     if cmds.about(batch=True):
         # In mayabatch 'quit -abort' does not reliably produce the proper exit
         # code, so use Python instead.

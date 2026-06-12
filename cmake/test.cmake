@@ -897,11 +897,15 @@ finally:
         list(APPEND MAYAHYDRA_VARNAME_PATH $ENV{PYTHONHOME})
     endif()
 
-    # Adjust PYTHONPATH to include the path to our test utilities.
-    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/test/testUtils")
-
-    # Adjust PYTHONPATH to include the path to our test.
-    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${CMAKE_CURRENT_SOURCE_DIR}")
+    # Prepend our test utilities and the per-test source directory so they win
+    # over copies shipped by installed packages (e.g. maya-usd's imageUtils),
+    # which were already added by _mayaHydra_setup_test_plugins(). The per-test
+    # source directory is inserted last so it ends up first in the list: a test
+    # module may shadow a testUtils module, and testUtils in turn shadows the
+    # installed copies. Everything else (USD, inherited PYTHONPATH) still comes
+    # after, as it is appended later.
+    list(INSERT MAYAHYDRA_VARNAME_PYTHONPATH 0 "${MAYA_HYDRA_DIR}/test/testUtils")
+    list(INSERT MAYAHYDRA_VARNAME_PYTHONPATH 0 "${CMAKE_CURRENT_SOURCE_DIR}")
 
     # Adjust PATH and PYTHONPATH to include USD.
     _mayaHydra_setup_test_USD_paths()

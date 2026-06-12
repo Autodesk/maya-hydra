@@ -241,5 +241,21 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
 
 endforeach()
 
+# Standalone Python unit tests for pure test utilities. These exercise logic
+# that does not need Maya (e.g. renderManUtils env/platform gating), so they run
+# under mayapy via unittest without initializing a standalone Maya session.
+set(PYTHON_UNIT_TEST_MODULES
+    testRenderManUtils.py
+)
+foreach(script ${PYTHON_UNIT_TEST_MODULES})
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaUsd_get_unittest_target(target ${test_filename})
+    mayaUsd_add_test(${target}
+        PYTHON_MODULE ${target}
+        NO_STANDALONE_INIT
+    )
+    apply_labels_to_test("${all_labels}" ${target})
+endforeach()
+
 # C++ unit tests
 add_subdirectory(cpp)

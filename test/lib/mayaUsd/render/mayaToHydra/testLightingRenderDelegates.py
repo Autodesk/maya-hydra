@@ -18,30 +18,14 @@ import os
 import platform
 import sys
 import time
-import tempfile
 from contextlib import contextmanager
 
 import maya.cmds as cmds
 
-# Ensure testUtils (with imageUtils) is on path *before* mtohUtils imports imageUtils.
-# Otherwise PYTHONPATH order (maya-usd install first) may load a different imageUtils.
-_test_utils = os.path.normpath(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "..", "..", "..", "..", "testUtils"
-))
-if os.path.isdir(_test_utils) and _test_utils not in sys.path:
-    sys.path.insert(0, _test_utils)
-
-
-def _log(msg):
-    """Write to original stdout so CI logs capture it (Maya may redirect sys.stdout)."""
-    sys.__stdout__.write(msg + "\n")
-    sys.__stdout__.flush()
-
-
 import fixturesUtils
 import mayaUtils
 import mtohUtils
+import renderManUtils
 from testUtils import PluginLoaded, getTestScene
 
 
@@ -85,12 +69,18 @@ RENDER_DELEGATES = [
     # },
     {
         "name": "PRMan",
-        "plugin": "HdPrmanLoaderRendererPlugin",
-        "override": "mayaHydraRenderOverride_HdPrmanLoaderRendererPlugin",
+        "plugin": renderManUtils.HD_PRMAN,
+        "override": renderManUtils.HD_PRMAN_OVERRIDE,
         "mayaPlugin": None,
         "convergenceTimeout": 15,  # Wait up to 15s for convergence before snapshot
-        "failThreshold": 0.2,   # PRMan renders are noisier; relax per-pixel threshold.
-        "failPercent": 10.0,    # PRMan renders are noisier; relax failure percentage.
+        # PRMan lighting in the interactive viewport is not deterministic: progressive
+        # sampling, tone-mapping, and the light transport model all differ from Storm,
+        # so a strict pixel-accurate comparison would always fail.  These thresholds
+        # are intentionally loose: the test is a smoke check that verifies a non-blank
+        # image is produced with the expected geometry and textures visible, not a
+        # photometric comparison of the lighting.
+        "failThreshold": 0.2,
+        "failPercent": 10.0,
     },
 ]
 
@@ -106,80 +96,39 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
     @classmethod
     def setUpClass(cls):
-        """Prime PRMan/USD search paths and enable useful logging early.
-
-        Some components may snapshot environment variables during initialization,
-        so we set key vars once at class setup time (before any renders).
-
-        - Maya Script Editor history: capture delegate output and dump to CI logs
-        - RenderMan config override: bump verbosity via a minimal rendermn.ini
-        """
         super(TestLightingRenderDelegates, cls).setUpClass()
 
-        scenePath = getTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
-        sceneDir = os.path.dirname(os.path.abspath(scenePath))
-
-        # Save env we will modify.
-        cls._saved_env = {
-            "RMAN_CONFIG_OVERRIDE": os.environ.get("RMAN_CONFIG_OVERRIDE"),
-            "RMAN_DUMP_DEFAULTS": os.environ.get("RMAN_DUMP_DEFAULTS"),
-            "RDIR": os.environ.get("RDIR"),
-        }
-
-        # RenderMan logging knobs (best-effort; harmless if ignored).
-        log_root = os.path.join(tempfile.gettempdir(), "mayaHydra_prman_logs")
-        os.makedirs(log_root, exist_ok=True)
-
-        # Minimal override file to bump prman log verbosity.
-        ini_path = os.path.join(log_root, "rendermn.ini")
-        try:
-            with open(ini_path, "w", encoding="utf-8") as f:
-                f.write("loglevel 4\n")
-        except Exception as e:
-            _log("Warning: failed to write rendermn.ini override: {}".format(e))
-
-        os.environ["RMAN_CONFIG_OVERRIDE"] = log_root
-        os.environ["RMAN_DUMP_DEFAULTS"] = "1"
-        # RDIR: alternate config dir (some RenderMan versions use this).
-        os.environ["RDIR"] = log_root
-
-        _log(
-            "PRMan setUpClass: sceneDir={} | RMAN_CONFIG_OVERRIDE={} | RDIR={} | RMAN_SHADERPATH={} | PRMAN_DELEGATE_PLUGIN_PATH={} | MayaHistory={}".format(
-                sceneDir,
-                os.environ.get("RMAN_CONFIG_OVERRIDE", ""),
-                os.environ.get("RDIR", ""),
-                os.environ.get("RMAN_SHADERPATH", ""),
-                os.environ.get("PRMAN_DELEGATE_PLUGIN_PATH", ""),
-                getattr(cls, "_script_editor_history_file", None),
-            )
-        )
+        if any(d["plugin"] == renderManUtils.HD_PRMAN for d in RENDER_DELEGATES):
+            cls._prman_saved_env = renderManUtils.setUp()
 
     @classmethod
     def tearDownClass(cls):
-        # Restore environment variables.
-        saved_env = getattr(cls, "_saved_env", None) or {}
-        for k, v in saved_env.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
+        renderManUtils.tearDown(getattr(cls, "_prman_saved_env", None))
 
         # MayaHydraBaseTestCase.tearDownClass runs cmds.file(new=True, force=True) and
         # unloads plugins; that can hang indefinitely after a failed PRMan test. Coverage
-        # runs use fixturesUtils.runTests(..., coverage_quit_workaround=True) and os._exit,
+        # runs use fixturesUtils.runTests() with os._exit (via MAYAHYDRA_CODE_COVERAGE),
         # so skipping base teardown is safe for this single-class module.
-        if os.environ.get("MAYAHYDRA_CODE_COVERAGE"):
-            _log(
+        if os.environ.get("MAYAHYDRA_CODE_COVERAGE") and any(
+            d["plugin"] == renderManUtils.HD_PRMAN for d in RENDER_DELEGATES
+        ):
+            sys.__stdout__.write(
                 "LightingRenderDelegates: skipping MayaHydraBaseTestCase.tearDownClass "
-                "(file new / unloadPlugin can hang after PRMan failure)"
+                "(file new / unloadPlugin can hang after PRMan failure)\n"
             )
+            sys.__stdout__.flush()
             return
 
         super(TestLightingRenderDelegates, cls).tearDownClass()
 
     @contextmanager
-    def _prmanContext(self):
-        """Per-render context for PRMan: set Maya workspace to scene dir (no chdir, so snapshots stay in output folder), dump Script Editor on exit."""
+    def _sceneWorkspaceContext(self):
+        """Temporarily set the Maya workspace root to the test scene directory.
+
+        Some renderers (e.g. PRMan) resolve relative output paths against the
+        workspace root, so this ensures render outputs land in the expected
+        location without changing the process working directory.
+        """
         saved_workspace = cmds.workspace(q=True, rd=True)
 
         try:
@@ -190,71 +139,22 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
             yield
         finally:
-            # Restore Maya workspace.
             try:
                 cmds.workspace(saved_workspace, o=True)
             except Exception as e:
-                _log("Warning: failed to restore Maya workspace: {}".format(e))
-
-    def _log_prman_diagnostics(self, stage):
-        """Log PRMan-related diagnostics to help debug delegate init failures."""
-        _log("PRMan diagnostics [{}]".format(stage))
-        keys = [
-            "MAYAHYDRA_CODE_COVERAGE",
-            "RMANTREE",
-            "RENDERMAN_LOCATION",
-            "PRMAN_DELEGATE_PLUGIN_PATH",
-            "PIXAR_LICENSE_FILE",
-            "RMAN_SHADERPATH",
-            "RMAN_CONFIG_OVERRIDE",
-            "RDIR",
-            "RMAN_DUMP_DEFAULTS",
-            "CUDA_VISIBLE_DEVICES",
-            "CUDA_DEVICE_ORDER",
-            "NV_GPU",
-        ]
-        for key in keys:
-            _log("  {}={}".format(key, os.environ.get(key, "")))
-
-        # Inspect delegate plugin path entries.
-        plugin_path = os.environ.get("PRMAN_DELEGATE_PLUGIN_PATH", "")
-        if plugin_path:
-            sep = ";" if platform.system() == "Windows" else ":"
-            for entry in [p for p in plugin_path.split(sep) if p]:
-                _log("  PRMAN_DELEGATE_PLUGIN_PATH entry: {} (exists={})".format(
-                    entry, os.path.isdir(entry)))
-                plug_info = os.path.join(entry, "plugInfo.json")
-                _log("    plugInfo.json: {} (exists={})".format(
-                    plug_info, os.path.isfile(plug_info)))
-
-        # Report renderer/override registration state.
-        try:
-            _log("  mayaHydra listRenderers: {}".format(cmds.mayaHydra(listRenderers=True)))
-        except Exception as e:
-            _log("  mayaHydra listRenderers failed: {}".format(e))
-        try:
-            _log("  mayaHydra listActiveRenderers: {}".format(
-                cmds.mayaHydra(listActiveRenderers=True)))
-        except Exception as e:
-            _log("  mayaHydra listActiveRenderers failed: {}".format(e))
-        try:
-            _log("  mayaHydra listRegisteredOverrides: {}".format(
-                cmds.mayaHydra(listRegisteredOverrides=True)))
-        except Exception as e:
-            _log("  mayaHydra listRegisteredOverrides failed: {}".format(e))
+                self.trace("Warning: failed to restore Maya workspace: {}\n".format(e))
 
     def _setRenderer(self, delegate):
         """Switch the viewport to the given Hydra renderer."""
-        if delegate.get("name") == "PRMan":
-            self._log_prman_diagnostics("before renderer switch")
+        if delegate.get("plugin") == renderManUtils.HD_PRMAN:
+            renderManUtils.logDiagnostics("before renderer switch")
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, rendererOverrideName=delegate["override"])
         cmds.refresh(force=True)
 
-        # Validate via mayaHydra (modelEditor query can be unreliable when MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1)
         activeRenderers = cmds.mayaHydra(listActiveRenderers=True)
-        if delegate.get("name") == "PRMan" and delegate["plugin"] not in activeRenderers:
-            self._log_prman_diagnostics("after renderer switch - not active")
+        if delegate.get("plugin") == renderManUtils.HD_PRMAN and delegate["plugin"] not in activeRenderers:
+            renderManUtils.logDiagnostics("after renderer switch - not active")
         self.assertIn(
             delegate["plugin"],
             activeRenderers,
@@ -282,8 +182,6 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         mode), we proceed anyway and take the snapshot."""
         timeoutSeconds = delegate.get("convergenceTimeout", 0)
         if timeoutSeconds <= 0:
-            _log("Convergence wait skipped for {} (timeoutSeconds={})".format(
-                delegate.get("name"), timeoutSeconds))
             return
         rendererPlugin = delegate["plugin"]
         start = time.time()
@@ -291,13 +189,8 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             cmds.refresh(force=True)
             if cmds.mayaHydraTesting(converged=True, rendererName=rendererPlugin):
                 cmds.refresh(force=True)
-                _log("Convergence reached for {} after {:.2f}s".format(
-                    delegate.get("name"), time.time() - start))
                 return
             time.sleep(0.5)
-        # Timeout reached; some renderers (e.g. PRMan) never report convergence in interactive mode.
-        _log("Convergence timeout for {} after {:.2f}s (continuing)".format(
-            delegate.get("name"), time.time() - start))
         cmds.refresh(force=True)
 
     def _setLightIntensities(self, activeLight, intensity):
@@ -316,7 +209,6 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         self._setRenderer(delegate)
         fail, failpercent = self._getImageDiffThresholds(delegate)
         for lightName in LIGHTS:
-            _log("LightingRenderDelegates: {} -> {}".format(delegate.get("name"), lightName))
             intensity = self._getIntensityForLight(lightName, delegate)
             self._setLightIntensities(lightName, intensity)
             cmds.refresh(force=True)
@@ -327,7 +219,6 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 fail,
                 failpercent,
             )
-        _log("LightingRenderDelegates: {} completed".format(delegate.get("name")))
 
     def _getImageDiffThresholds(self, delegate):
         """Read per-delegate thresholds, with a coverage-build bump on failpercent."""
@@ -343,61 +234,6 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         if required == "all":
             return True
         return platform.system().lower() == required.lower()
-
-    def _get_prman_allowed_platforms(self):
-        """Return the configured PRMan allowed platforms from the environment."""
-        raw = os.environ.get("MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS", "")
-        if not raw:
-            return []
-        normalized = raw.replace(";", ",")
-        platforms = [p.strip().lower() for p in normalized.split(",") if p.strip()]
-        return platforms
-
-    def _is_ci_build(self):
-        """Return True when running under Jenkins/CI."""
-        return bool(os.environ.get("JENKINS_URL") or os.environ.get("BUILD_ID"))
-
-    def _is_prman_platform_allowed(self):
-        """Return True if the current platform is allowed for PRMan."""
-        allowed = self._get_prman_allowed_platforms()
-        return platform.system().lower() in allowed
-
-    def _is_prman_renderer_available(self):
-        """Return True if PRMan renderer is available via mayaHydra."""
-        try:
-            renderers = cmds.mayaHydra(listRenderers=True) or []
-            self._prman_renderer_list = renderers
-        except Exception as e:
-            _log("PRMan availability check failed: {}".format(e))
-            self._prman_renderer_list = []
-            return False
-        return "HdPrmanLoaderRendererPlugin" in renderers
-
-    def _should_run_prman_delegate(self):
-        """Return True if PRMan delegate should run in this environment."""
-        allowed = self._get_prman_allowed_platforms()
-        if not allowed:
-            msg = "PRMan delegate skipped: MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS not set."
-            # On Windows CI, PRMan is expected to be installed.
-            if self._is_ci_build() and platform.system().lower() == "windows":
-                self.fail("PRMan delegate required on CI but {}"
-                          .format(msg.replace("skipped: ", "")))
-            _log(msg)
-            return False
-        if not self._is_prman_platform_allowed():
-            _log("PRMan delegate skipped: unsupported platform {} (allowed={}).".format(
-                platform.system(), ",".join(allowed)))
-            return False
-        if not self._is_prman_renderer_available():
-            renderers = getattr(self, "_prman_renderer_list", [])
-            if self._is_ci_build():
-                self.fail(
-                    "PRMan delegate required on CI but renderer not available. "
-                    "listRenderers={}".format(renderers)
-                )
-            _log("PRMan delegate skipped: renderer not available.")
-            return False
-        return True
 
     def loadScene(self):
         """Load the test scene and set the base renderer state."""
@@ -425,10 +261,10 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             for delegate in RENDER_DELEGATES:
                 if not self._delegateRunsOnPlatform(delegate):
                     continue
-                if delegate["name"] == "PRMan":
-                    if not self._should_run_prman_delegate():
+                if delegate["plugin"] == renderManUtils.HD_PRMAN:
+                    if not renderManUtils.shouldRunDelegate(fail_fn=self.fail):
                         continue
-                    with self._prmanContext():
+                    with self._sceneWorkspaceContext():
                         runDelegate(delegate)
                 else:
                     runDelegate(delegate)
@@ -443,17 +279,10 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             # exception in coverage builds — shutdown uses os._exit, so delegate
             # state does not need to be clean.
             try:
-                if (
+                if not (
                     os.environ.get("MAYAHYDRA_CODE_COVERAGE")
                     and sys.exc_info()[0] is not None
                 ):
-                    _log(
-                        "LightingRenderDelegates: skipping Storm reset in finally "
-                        "(coverage build, unwinding with {})".format(
-                            sys.exc_info()[0].__name__
-                        )
-                    )
-                else:
                     self._setRenderer(RENDER_DELEGATES[0])
             except Exception:
                 pass
@@ -461,4 +290,4 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
 if __name__ == "__main__":
     # Coverage builds can hang during Maya shutdown for this test; force exit with status.
-    fixturesUtils.runTests(globals(), coverage_quit_workaround=True)
+    fixturesUtils.runTests(globals())
