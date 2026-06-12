@@ -251,8 +251,7 @@ foreach(script ${PYTHON_UNIT_TEST_MODULES})
     get_testfile_and_labels(all_labels test_filename ${script})
     mayaUsd_get_unittest_target(target ${test_filename})
     mayaUsd_add_test(${target}
-        PYTHON_MODULE ${target}
-        NO_STANDALONE_INIT
+        PYTHON_SCRIPT "${MAYA_HYDRA_DIR}/test/testUtils/${test_filename}"
     )
     apply_labels_to_test("${all_labels}" ${target})
 endforeach()
