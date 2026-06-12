@@ -1565,6 +1565,12 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
         return;
     }
 
+    // Cameras can be invisible and still be renderable, so adapter creation
+    // must occur before the visibility check.
+    if (CreateCameraAdapter(dag)) {
+        return;
+    }
+
     // In batch mode (useMeshAdapter), MItDag visits every DAG node including
     // LOD meshes and corrective blend-shape targets that VP2 never makes render
     // items for.  Skip shapes that are not visible so that only the intended
@@ -1585,14 +1591,13 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
         return;
     }
 
-    // Custom lights don't have MFn::kLight.
+    // Invisible lights don't contribute to the scene, so light adapter
+    // creation after the visibility check above is correct.  Custom lights
+    // don't have MFn::kLight.
     if (CreateLightAdapter(dag)) {
         return;
     }
 
-    if (CreateCameraAdapter(dag)) {
-        return;
-    }
     // We are inserting a single prim and
     // instancer for every instanced mesh.
     if (dag.isInstanced() && dag.instanceNumber() > 0) {
