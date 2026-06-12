@@ -367,16 +367,22 @@ function(_mayaHydra_setup_test_plugins)
     endif()
 
     # Additional plugin paths (e.g. HdArnold) for tests that need them.
-    # On OSX/Linux, exclude PRMan and MtoA/Arnold paths to avoid TfType redefinition errors
-    # (same reasoning as the PXR_PLUGINPATH_NAME/MAYA_PXR_PLUGINPATH_NAME filter below).
+    # On macOS, exclude PRMan and MtoA/Arnold paths to avoid TfType redefinition errors.
+    # On Linux, only exclude PRMan paths (MtoA/Arnold tests are supported there).
     if(ADDITIONAL_PXR_PLUGINPATH_NAME)
         foreach(extra_path ${ADDITIONAL_PXR_PLUGINPATH_NAME})
             if(IS_WINDOWS)
                 list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
             else()
                 string(TOLOWER "${extra_path}" _path_lower)
-                if(NOT _path_lower MATCHES "prman|hdprman|renderman|rman|mtoa|arnold")
-                    list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
+                if(IS_MACOSX)
+                    if(NOT _path_lower MATCHES "prman|hdprman|renderman|rman|mtoa|arnold")
+                        list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
+                    endif()
+                else()
+                    if(NOT _path_lower MATCHES "prman|hdprman|renderman|rman")
+                        list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
+                    endif()
                 endif()
             endif()
         endforeach()
@@ -391,10 +397,11 @@ function(_mayaHydra_setup_test_plugins)
         # calling loadPlugin, but some of its extensions will fail to initialize,
         # leading to incorrect behavior and test failures. In those cases, it seems
         # like having a locally installed MtoA fixed it, but we can't rely on that.
-        # On macOS/Linux, skip the module path to avoid Arnold's bundled USD plugins
+        # On macOS, skip the module path to avoid Arnold's bundled USD plugins
         # (usd_hdGp, usd_imagingGL, etc.) conflicting with Maya's, causing duplicate
-        # TfType registration errors that crash every test.
-        if(IS_WINDOWS)
+        # TfType registration errors that crash every test. Linux does not exhibit
+        # this conflict so mtoa tests are supported there.
+        if(NOT IS_MACOSX)
             list(APPEND MAYAHYDRA_VARNAME_MAYA_MODULE_PATH
                  "${MTOA_LOCATION}")
         endif()
