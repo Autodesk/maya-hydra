@@ -243,6 +243,52 @@ endif()
 #     RENDERER_ARGS "-s 5 -e 9"
 # )
 
+# Test that USD render settings stored in a MayaUsdProxyShape node produce no
+# path mapper warnings errors.  Only checks Render stdout / stderr output,
+# no image comparison.
+set(_usdProxyShapeRenderSettings_dir
+    "${CMAKE_BINARY_DIR}/test/Temporary/usdProxyShapeRenderSettings/projects/default/images")
+function(_add_usdProxyShapeRenderSettings_test)
+    set(test_name usdProxyShapeRenderSettings)
+    set(SCENE_PATH
+        "${CMAKE_CURRENT_SOURCE_DIR}/scenes/renderSettings/usdProxyShapeRenderSettings.ma")
+
+    if(WIN32)
+        add_test(
+            NAME "${test_name}"
+            COMMAND PowerShell -Command
+                "& \"${RENDER_EXECUTABLE}\" -renderer \"HdArnoldRendererPlugin\" -rd \"${_usdProxyShapeRenderSettings_dir}\" \"${SCENE_PATH}\"; exit \$LASTEXITCODE"
+        )
+    else()
+        add_test(
+            NAME "${test_name}"
+            COMMAND ${RENDER_EXECUTABLE} -renderer HdArnoldRendererPlugin -rd "${_usdProxyShapeRenderSettings_dir}" "${SCENE_PATH}"
+        )
+    endif()
+
+    _mayaHydra_setup_test_common_path_vars()
+    list(APPEND ALL_PATH_VARS MAYA_RENDER_DESC_PATH)
+    _mayaHydra_setup_test_common_defaults("${test_name}")
+    _mayaHydra_setup_test_plugins()
+    list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
+         "${CMAKE_INSTALL_PREFIX}/renderDesc")
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
+    _mayaHydra_setup_test_USD_paths()
+    _mayaHydra_setup_test_finalize_env("${test_name}")
+
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "MAYA_IGNORE_DIALOGS=1")
+    set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
+
+    # Fail if any of these error/warning patterns appear in stdout or stderr.
+    # Each semicolon-separated entry is a separate regex checked independently.
+    set_tests_properties("${test_name}" PROPERTIES
+        FAIL_REGULAR_EXPRESSION
+            "Mapping for application path;Expected single path for active render settings;Invalid Hydra active render settings prim path"
+    )
+endfunction()
+_add_usdProxyShapeRenderSettings_test()
+
 # Stage UVChecker.png within this test’s temporary Maya project so it can be
 # resolved via the workspace root when using `-proj`.
 #

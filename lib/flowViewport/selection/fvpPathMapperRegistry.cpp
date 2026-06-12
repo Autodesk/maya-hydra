@@ -152,7 +152,9 @@ PrimSelections PathMapperRegistry::UfePathToPrimSelections(
             else {
                 primSelections = mapper->UfePathToPrimSelections(appPath);
                 if (primSelections.empty()) {
-                    TF_WARN("Mapping for path %s returned no prim path.", Ufe::PathString::string(appPath).c_str());
+                    // Maintenance warning: test usdProxyShapeRenderSettings
+                    // checks that this warning string is not emitted.
+                    TF_WARN("Mapping for application path %s returned no prim path.", Ufe::PathString::string(appPath).c_str());
                 }
             }
         }

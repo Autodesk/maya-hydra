@@ -246,6 +246,8 @@ SdfPath GetActiveRenderSettingsHydraPath()
     auto hydraPath = Fvp::ufePathToPrimSelections(ufePath);
 
     // Render settings are not instanced, so there will be a single path.
+    // Maintenance warning: test usdProxyShapeRenderSettings checks
+    // that this warning string is not emitted.
     if (!TF_VERIFY(hydraPath.size() == 1, "Expected single path for active render settings.")) {
         return {};
     }
