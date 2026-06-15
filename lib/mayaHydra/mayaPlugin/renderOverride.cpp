@@ -946,6 +946,14 @@ MStatus MtohRenderOverride::Render(
             if (isPass0) {
                 // Do not share the AOVs, for the first pass only
                 HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks();
+#if PXR_VERSION >= 2605
+                if (_sceneGlobalsSceneIndex) {
+                    const SdfPath& cameraPath = currentPass->params().renderParams.camera;
+                    if (!cameraPath.IsEmpty()) {
+                        _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
+                    }
+                }
+#endif
                 
                 /*Debug code left here if needed later
                 hvt::FramePass& framePassToDebug = *currentPass;
@@ -966,6 +974,14 @@ MStatus MtohRenderOverride::Render(
                             { PXR_NS::HdAovTokens->color, PXR_NS::HdAovTokens->depth }
                     );
                     HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(inputAOVs);
+#if PXR_VERSION >= 2605
+                    if (_sceneGlobalsSceneIndex) {
+                        const SdfPath& cameraPath = currentPass->params().renderParams.camera;
+                        if (!cameraPath.IsEmpty()) {
+                            _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
+                        }
+                    }
+#endif
 
                     /*Debug code left here if needed later
                     hvt::FramePass& framePassToDebug = *currentPass;
@@ -1277,7 +1293,7 @@ MStatus MtohRenderOverride::Render(
         if (isMayaCamera) { // TODO: Support USD Camera
             MFnCamera camera(camPath, &status);
             if (status == MStatus::kSuccess) {
-                if (_mayaHydraSceneIndex && !camera.isOrtho()) { // TODO: Support Persp Camera
+                if (_mayaHydraSceneIndex && !camera.isOrtho()) {
                     SdfPath cameraPath = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
                     // Apply on all passes
                     const int numFramePasses = _GetNumFramePasses();
@@ -1292,6 +1308,21 @@ MStatus MtohRenderOverride::Render(
                     }
                     if (vpDirty)
                         _mayaHydraSceneIndex->MarkSprimDirty(cameraPath, HdCamera::DirtyParams);
+#if PXR_VERSION >= 2605
+                    if (_sceneGlobalsSceneIndex && !cameraPath.IsEmpty()) {
+                        _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
+                    }
+#endif
+                } else if (camera.isOrtho()) {
+                    // Orthographic views use the free camera derived from viewport matrices.
+                    const int numFramePasses = _GetNumFramePasses();
+                    for (int i = 0; i < numFramePasses; ++i) {
+                        const hvt::FramePassPtr& currentPass = _GetFramePass(i);
+                        if (!currentPass) {
+                            continue;
+                        }
+                        currentPass->params().renderParams.camera = SdfPath();
+                    }
                 }
             }
         }
