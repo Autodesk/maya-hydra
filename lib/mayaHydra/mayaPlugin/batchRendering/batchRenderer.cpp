@@ -555,10 +555,8 @@ void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()
     }
 
     const auto hydraRsPath = GetActiveRenderSettingsHydraPath();
-    if (hydraRsPath.IsEmpty()) {
-        // Maintenance warning: test usdProxyShapeRenderSettings
-        // checks that this warning string is not emitted.
-        TF_WARN("Invalid Hydra active render settings prim path.");
+    if (!TF_VERIFY(!hydraRsPath.IsEmpty(), 
+                   "Invalid Hydra active render settings prim path.")) {
         return;
     }
 

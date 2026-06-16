@@ -244,7 +244,7 @@ endif()
 # )
 
 # Test that USD render settings stored in a MayaUsdProxyShape node produce no
-# path mapper warnings errors.  Only checks Render stdout / stderr output,
+# path mapper warnings errors.  Launches Render and checks for success,
 # no image comparison.
 set(_usdProxyShapeRenderSettings_dir
     "${CMAKE_BINARY_DIR}/test/Temporary/usdProxyShapeRenderSettings/projects/default/images")
@@ -278,14 +278,13 @@ function(_add_usdProxyShapeRenderSettings_test)
 
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "MAYA_IGNORE_DIALOGS=1")
+    # Set TF_VERIFY to generate a TF_FATAL_ERROR.
+    # PathMapperRegistry::UfePathToPrimSelections() use TF_VERIFY to check
+    # for path mapper failures, so this will cause the test to fail.
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "TF_FATAL_VERIFY=1")
     set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
 
-    # Fail if any of these error/warning patterns appear in stdout or stderr.
-    # Each semicolon-separated entry is a separate regex checked independently.
-    set_tests_properties("${test_name}" PROPERTIES
-        FAIL_REGULAR_EXPRESSION
-            "Mapping for application path;Expected single path for active render settings;Invalid Hydra active render settings prim path"
-    )
 endfunction()
 _add_usdProxyShapeRenderSettings_test()
 
