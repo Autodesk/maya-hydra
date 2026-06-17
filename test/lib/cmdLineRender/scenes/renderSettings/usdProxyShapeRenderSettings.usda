@@ -1,0 +1,52 @@
+#usda 1.0
+(
+    defaultPrim = "Render"
+    renderSettingsPrimPath = "/Render/MainRender"
+    startTimeCode = 1
+    endTimeCode = 10
+)
+
+def Scope "Cameras"
+{
+    def Camera "main_cam"
+    {
+        float2 clippingRange = (0.1, 10000)
+        float focalLength = 35
+        float focusDistance = 5
+        float horizontalAperture = 35.999928
+        float verticalAperture = 23.999952
+        float3 xformOp:rotateXYZ = (62.482925, 0, 43.994915)
+        double3 xformOp:translate = (3.8079010269722375, -3.943897492221248, 3.3559257702291783)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+}
+
+def Scope "Render"
+{
+    def RenderSettings "MainRender"
+    {
+        rel camera = </Cameras/main_cam>
+        float pixelAspectRatio = 1
+        rel products = [
+            </Render/ProductMainCam>,
+        ]
+        int2 resolution = (512, 512)
+    }
+
+    def RenderProduct "ProductMainCam"
+    {
+        rel camera = </Cameras/main_cam>
+        rel orderedVars = [</Render/Vars/color>]
+        token productName = "../images/mainCamFrame1.png"
+        uniform token productType = "raster"
+        uniform int2 resolution = (512, 512)
+    }
+
+    def Scope "Vars"
+    {
+        def RenderVar "color"
+        {
+            string sourceName = "color"
+        }
+    }
+}
