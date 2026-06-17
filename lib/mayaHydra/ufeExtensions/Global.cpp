@@ -63,7 +63,11 @@ MDagPath nameToDagPath(const std::string& name)
     // Not found?  Empty selection list.
     if (!selection.isEmpty()) {
         MStatus status = selection.getDagPath(0, dag);
-        CHECK_MSTATUS(status);
+        if (!status) {
+            dag = MDagPath();
+            TF_WARN(
+                "Failed to get dag path for '%s': %s", name.c_str(), status.errorString().asChar());
+        }
     }
     return dag;
 }
