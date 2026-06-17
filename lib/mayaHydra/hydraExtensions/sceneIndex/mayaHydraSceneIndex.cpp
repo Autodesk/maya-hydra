@@ -624,6 +624,14 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
     // the UFE path to a string, then does a Dag path lookup with the string.
 
     auto       dagPath = UfeExtensions::ufeToDagPath(appPath);
+    if (!dagPath.isValid()) {
+        TF_WARN(
+            "MayaHydraSceneIndex::UfePathToPrimSelections: Could not convert UFE path %s to a valid "
+            "Maya DAG path.",
+            Ufe::PathString::string(appPath).c_str());
+        return {};
+    }
+
     const bool extendToShape = _UseTheShapeDagPath(
         dagPath); // For Hydra some prims, we need to use the shape dag path not the transform, as
                   // this is what gets translated to an hydra path

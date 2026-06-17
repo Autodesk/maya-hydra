@@ -235,6 +235,12 @@ MhFlowViewportAPILocator* getLocator(const Ufe::Path& cubePath)
         return nullptr;
     }
     auto locatorDagPath = UfeExtensions::ufeToDagPath(cubePath.pop());
+    if (!locatorDagPath.isValid()) {
+        TF_WARN(
+            "Failed to convert UFE path %s to a valid Maya DAG path.",
+            Ufe::PathString::string(cubePath).c_str());
+        return nullptr;
+    }
     MFnDependencyNode fn(locatorDagPath.node());
     return dynamic_cast<MhFlowViewportAPILocator*>(fn.userNode());
 }
