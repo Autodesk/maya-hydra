@@ -151,9 +151,8 @@ PrimSelections PathMapperRegistry::UfePathToPrimSelections(
             }
             else {
                 primSelections = mapper->UfePathToPrimSelections(appPath);
-                if (primSelections.empty()) {
-                    TF_WARN("Mapping for path %s returned no prim path.", Ufe::PathString::string(appPath).c_str());
-                }
+                TF_VERIFY(!primSelections.empty(),
+                          "Mapping for application path %s returned no prim path.", Ufe::PathString::string(appPath).c_str());
             }
         }
     }
