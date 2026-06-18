@@ -37,12 +37,6 @@
 // limitations under the License.
 //
 
-/// Placeholder for
-///
-/// https://github.com/PixarAnimationStudios/OpenUSD/blob/release/pxr/imaging/hdx/selectionTracker.cpp
-///
-/// which is Hydra Storm-centric.  To be revised.  PPT, 27-Sep-2023.
-
 #include "flowViewport/selection/fvpSelectionTracker.h"
 
 #include "flowViewport/debugCodes.h"

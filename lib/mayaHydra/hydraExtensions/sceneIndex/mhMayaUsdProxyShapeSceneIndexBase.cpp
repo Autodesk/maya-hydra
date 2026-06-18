@@ -462,7 +462,7 @@ MayaUsdProxyShapeSceneIndexBase::UfePathToPrimSelections(const Ufe::Path& appPat
                 // propagated. Currently we skip instancers so that selecting an instancer A that is
                 // both drawing geometry but also prototyped and propagated for another instancer B
                 // will only mark the geometry-drawing instancer A as selected. This can be changed.
-                // For now (2024/05/28), this only affects selection highlighting.
+                // For now, this only affects selection highlighting.
                 if (propagatedPrim.primType != HdPrimTypeTokens->instancer) {
                     primSelections.push_back(
                         { propagatedPrimPath, primSelections.front().nestedInstanceIndices });

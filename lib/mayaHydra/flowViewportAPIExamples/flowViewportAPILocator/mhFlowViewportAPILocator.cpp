@@ -339,7 +339,7 @@ MhFlowViewportAPILocator* getLocator(const Ufe::Path& cubePath)
                 
                 // During translate manipulation the x, y, and z plugs are
                 // modified in turn, which causes 3x notification, unclear how
-                // to optimize this as of 6-Jun-2024.
+                // to optimize this.
                 Ufe::Transform3d::notify(flowViewportAPIMayaLocator->getCubeUfePath(cubeName));
             }
 
@@ -499,7 +499,7 @@ private:
 // Minimal Object3d interface for locator cubes.  It only implements show /
 // hide.  If framing is desired, the bounding box method could be implemented.
 //
-// Only visibility support is implemented as of 28-May-2024.  A sparse list of
+// Only visibility support is currently implemented.  A sparse list of
 // hidden cubes is stored in the Maya locator node.  If our name isn't in the
 // hidden list, we're visible.
     
@@ -1209,9 +1209,9 @@ MStatus initializePlugin( MObject obj )
     // handler is supported for scene item creation only.
     //
     // Supported UFE interfaces:
-    // - Object3d: only visibility supported as of 30-May-2024; bounding box 
+    // - Object3d: only visibility currently supported; bounding box 
     //   unsupported.
-    // - Transform3d: only translation supported as of 3-Jun-2024.
+    // - Transform3d: only translation currently supported.
     //
     Ufe::RunTimeMgr::Handlers ufeHandlers;
     ufeHandlers.hierarchyHandler = std::make_shared<CubeHierarchyHandler>();

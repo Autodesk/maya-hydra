@@ -69,7 +69,8 @@ typedef PXR_NS::TfRefPtr<const PrimRemovalEnforcingSceneIndex> PrimRemovalEnforc
 /// Result : The downstream observers of the scene index chain have an incorrect view
 /// of the scene.
 /// 
-/// In our case, when combined with the HdSceneIndexAdapterSceneDelegate's special handling
+/// In our case, when combined with OpenUSD's scene-index-to-delegate adapter bridge
+/// (HdSceneIndexAdapterSceneDelegate) and its special handling
 /// of geomSubsets, this can lead to HdChangeTracker trying to dirty a mesh prim that does not
 /// exist, leading to a failing TF_VERIFY : 
 /// https://github.com/PixarAnimationStudios/OpenUSD/blob/v25.08/pxr/imaging/hd/changeTracker.cpp#L141
