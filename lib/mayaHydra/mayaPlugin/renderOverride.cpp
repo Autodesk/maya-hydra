@@ -2005,7 +2005,7 @@ MStatus MtohRenderOverride::setup(const MString& destination)
         _operations.push_back(std::make_unique<MayaHydraPreRender>("HydraRenderOverride_PreScene"));
 
         // The main hydra render
-        // For the data server, This also invokes scene update then sync scene delegate after scene update
+        // For the data server, this also invokes scene update then syncs the scene index after scene update
         _operations.push_back(std::make_unique<MayaHydraRender>("HydraRenderOverride_DataServer", this));
 
         // Draw post scene elements (cameras, CVs, shapes not pushed into hydra)

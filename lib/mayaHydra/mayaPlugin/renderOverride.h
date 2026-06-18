@@ -144,8 +144,8 @@ public:
     /// Intended mostly for use in debugging and testing.
     static SdfPathVector RendererRprims(TfToken rendererName, bool visibleOnly = false);
 
-    /// Returns the scene delegate id for the given render delegate and
-    /// scene delegate names.
+    /// Returns the scene index root path for the given render delegate and
+    /// scene index name.
     ///
     /// Intended mostly for use in debugging and testing.
     static SdfPath RendererSceneDelegateId(TfToken rendererName, TfToken sceneDelegateName);

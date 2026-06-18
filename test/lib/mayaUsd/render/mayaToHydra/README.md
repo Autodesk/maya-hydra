@@ -135,4 +135,4 @@ The supported values for platform exclusion are: "osx", "win", "lin".
 
 # Utilities
 
-Utility files are located under [/test/testUtils](../../../../testUtils/). Note that at the time of writing this (2023/08/16), many of the utils files and their contents were inherited from the USD plugin, and are not all used.
+Utility files are located under [/test/testUtils](../../../../testUtils/). Many utils files and their contents were inherited from the USD plugin; not all are used by maya-hydra tests.
