@@ -53,12 +53,14 @@ class TestTexturedMode(mtohUtils.MayaHydraBaseTestCase):
             imageVersion
         )
 
-        cmds.modelEditor(panel, edit=True, displayTextures=True)
-        cmds.refresh()
-
         # HYDRA-2370: OpenPBR/MaterialX Storm shader compile failure
         # (AIRY_FRESNEL_ITERATIONS) on USD 26.05+. Re-enable when fixed.
+        # Wrap the entire enable/refresh/disable sequence so USD 26.05+ never
+        # triggers the failing shader compile path.
         if imageVersion is None:
+            cmds.modelEditor(panel, edit=True, displayTextures=True)
+            cmds.refresh()
+
             self.assertSnapshotClose(
                 "textured.png",
                 self.IMAGE_DIFF_FAIL_THRESHOLD,
@@ -66,8 +68,8 @@ class TestTexturedMode(mtohUtils.MayaHydraBaseTestCase):
                 imageVersion
             )
 
-        cmds.modelEditor(panel, edit=True, displayTextures=False)
-        cmds.refresh()
+            cmds.modelEditor(panel, edit=True, displayTextures=False)
+            cmds.refresh()
 
         self.assertSnapshotClose(
             "untextured.png",

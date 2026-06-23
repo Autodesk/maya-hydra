@@ -75,9 +75,10 @@ std::stack<DataSourceEntry> BuildInitialDataSourceStack(
 {
     std::stack<DataSourceEntry> dataSourceStack;
 
-#if PXR_VERSION >= 2511
-    // HduiDataSourceTreeWidget::SetPrimDataSource lists sorted container children
-    // as top-level items instead of the prim data source container itself.
+#if PXR_VERSION >= 2603
+    // From USD 26.03, HduiDataSourceTreeWidget::SetPrimDataSource lists sorted
+    // container children as top-level items instead of the prim data source
+    // container itself (introduced by OpenUSD commit 6be1d6ec75).
     if (PXR_NS::HdContainerDataSourceHandle container
         = PXR_NS::HdContainerDataSource::Cast(prim.dataSource)) {
         PushSortedContainerChildrenOnStack(
@@ -87,6 +88,8 @@ std::stack<DataSourceEntry> BuildInitialDataSourceStack(
             { primPath.GetNameToken(), prim.dataSource, PXR_NS::HdDataSourceLocator() });
     }
 #else
+    // USD < 26.03: SetPrimDataSource shows the prim data source container
+    // itself as the single top-level item, with text = primPath.GetNameToken().
     dataSourceStack.push(
         { primPath.GetNameToken(), prim.dataSource, PXR_NS::HdDataSourceLocator() });
 #endif
@@ -241,8 +244,21 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
         // Push child data sources on the stack
         if (auto containerDataSource
             = PXR_NS::HdContainerDataSource::Cast(dataSourceEntry.dataSource)) {
+#if PXR_VERSION >= 2603
+            // USD 26.03+: _BuildChildren uses sorted order (see 6be1d6ec75).
             PushSortedContainerChildrenOnStack(
                 containerDataSource, dataSourceEntry.locator, dataSourceStack);
+#else
+            // USD < 26.03: _BuildChildren uses GetNames() forward order; push
+            // in reversed order so stack pops in forward (matching) order.
+            PXR_NS::TfTokenVector childNames = containerDataSource->GetNames();
+            for (auto it = childNames.rbegin(); it != childNames.rend(); ++it) {
+                if (PXR_NS::HdDataSourceBaseHandle ds = containerDataSource->Get(*it)) {
+                    dataSourceStack.push(
+                        { *it, ds, dataSourceEntry.locator.Append(*it) });
+                }
+            }
+#endif
         } else if (
             auto vectorDataSource = PXR_NS::HdVectorDataSource::Cast(dataSourceEntry.dataSource)) {
             for (size_t iElement = 0; iElement < vectorDataSource->GetNumElements(); iElement++) {
