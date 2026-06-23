@@ -27,6 +27,7 @@
 #include <pxr/base/vt/value.h>
 #include <pxr/imaging/hd/materialSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
+#include <pxr/imaging/hd/primOriginSchema.h>
 
 #include <gtest/gtest.h>
 
@@ -37,8 +38,63 @@
 #include <QVBoxLayout>
 #include <iostream>
 #include <regex>
+#include <set>
 #include <stack>
 #include <vector>
+
+namespace {
+
+// Matches HduiDataSourceTreeWidget's name ordering.
+std::vector<PXR_NS::TfToken>
+GetSortedContainerChildNames(const PXR_NS::HdContainerDataSourceHandle& container)
+{
+    const PXR_NS::TfTokenVector names = container->GetNames();
+    const std::set<PXR_NS::TfToken, PXR_NS::TfDictionaryLessThan> sortedNames(
+        names.begin(), names.end());
+    return std::vector<PXR_NS::TfToken>(sortedNames.begin(), sortedNames.end());
+}
+
+void PushSortedContainerChildrenOnStack(
+    const PXR_NS::HdContainerDataSourceHandle&           container,
+    const PXR_NS::HdDataSourceLocator&                     parentLocator,
+    std::stack<DataSourceEntry>&                           dataSourceStack)
+{
+    const std::vector<PXR_NS::TfToken> sortedChildNames = GetSortedContainerChildNames(container);
+    for (auto itChildNames = sortedChildNames.rbegin(); itChildNames != sortedChildNames.rend();
+         ++itChildNames) {
+        const PXR_NS::TfToken& childName = *itChildNames;
+        if (PXR_NS::HdDataSourceBaseHandle childDataSource = container->Get(childName)) {
+            dataSourceStack.push(
+                { childName, childDataSource, parentLocator.Append(childName) });
+        }
+    }
+}
+
+std::stack<DataSourceEntry> BuildInitialDataSourceStack(
+    const PXR_NS::SdfPath& primPath, const PXR_NS::HdSceneIndexPrim& prim)
+{
+    std::stack<DataSourceEntry> dataSourceStack;
+
+#if PXR_VERSION >= 2511
+    // HduiDataSourceTreeWidget::SetPrimDataSource lists sorted container children
+    // as top-level items instead of the prim data source container itself.
+    if (PXR_NS::HdContainerDataSourceHandle container
+        = PXR_NS::HdContainerDataSource::Cast(prim.dataSource)) {
+        PushSortedContainerChildrenOnStack(
+            container, PXR_NS::HdDataSourceLocator(), dataSourceStack);
+    } else if (prim.dataSource) {
+        dataSourceStack.push(
+            { primPath.GetNameToken(), prim.dataSource, PXR_NS::HdDataSourceLocator() });
+    }
+#else
+    dataSourceStack.push(
+        { primPath.GetNameToken(), prim.dataSource, PXR_NS::HdDataSourceLocator() });
+#endif
+
+    return dataSourceStack;
+}
+
+} // namespace
 
 template <class ChildType> ChildType* FindFirstChild(QObject* qObject)
 {
@@ -132,31 +188,33 @@ void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(
         // Compare data source
         if (compareDataSourceHierarchy) {
             _primHierarchyWidget->setCurrentItem(primQtItem);
-            CompareDataSourceHierarchy( primPath,
-                { primPath.GetNameToken(), prim.dataSource, PXR_NS::HdDataSourceLocator() }, compareDataSourceValues);
+            CompareDataSourceHierarchy(primPath, BuildInitialDataSourceStack(primPath, prim),
+                compareDataSourceValues);
         }
 
         // Prepare next step (need to pop the stack before pushing the next elements)
         itPrimsTreeWidget++;
         primPathsStack.pop();
 
-        // Push child paths on the stack
-        PXR_NS::SdfPathVector childPaths = sceneIndex->GetChildPrimPaths(primPath);
-        for (auto itChildPaths = childPaths.rbegin(); itChildPaths != childPaths.rend();
-             itChildPaths++) {
+        // Push child paths on the stack in the same sorted order used by
+        // HduiSceneIndexTreeWidget.
+        const PXR_NS::SdfPathVector childPathVec = sceneIndex->GetChildPrimPaths(primPath);
+        const PXR_NS::SdfPathSet    sortedChildPaths(childPathVec.begin(), childPathVec.end());
+        for (auto itChildPaths = sortedChildPaths.rbegin(); itChildPaths != sortedChildPaths.rend();
+             ++itChildPaths) {
             primPathsStack.push(*itChildPaths);
         }
     }
 }
 
 void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
-    const PXR_NS::SdfPath& primPath,
-    DataSourceEntry        rootDataSourceEntry,
-    bool                   compareValues)
+    const PXR_NS::SdfPath&            primPath,
+    std::stack<DataSourceEntry>       initialDataSourceStack,
+    bool                              compareValues)
 {
     // Setup traversal data structures (depth-first search)
     QTreeWidgetItemIterator itDataSourceTreeWidget = GetIteratorForTree(_dataSourceHierarchyWidget);
-    std::stack<DataSourceEntry> dataSourceStack({ rootDataSourceEntry });
+    std::stack<DataSourceEntry> dataSourceStack = std::move(initialDataSourceStack);
 
     // Traverse hierarchy and compare (depth-first search)
     while (*itDataSourceTreeWidget && !dataSourceStack.empty()) {
@@ -183,15 +241,8 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
         // Push child data sources on the stack
         if (auto containerDataSource
             = PXR_NS::HdContainerDataSource::Cast(dataSourceEntry.dataSource)) {
-            PXR_NS::TfTokenVector childNames = containerDataSource->GetNames();
-            for (auto itChildNames = childNames.rbegin(); itChildNames != childNames.rend();
-                 itChildNames++) {
-                PXR_NS::TfToken                dataSourceName = *itChildNames;
-                PXR_NS::HdDataSourceBaseHandle dataSource = containerDataSource->Get(dataSourceName);
-                if (dataSource) {
-                    dataSourceStack.push({ dataSourceName, dataSource, dataSourceEntry.locator.Append(dataSourceName) });
-                }
-            }
+            PushSortedContainerChildrenOnStack(
+                containerDataSource, dataSourceEntry.locator, dataSourceStack);
         } else if (
             auto vectorDataSource = PXR_NS::HdVectorDataSource::Cast(dataSourceEntry.dataSource)) {
             for (size_t iElement = 0; iElement < vectorDataSource->GetNumElements(); iElement++) {
@@ -298,8 +349,31 @@ void AdskHydraSceneBrowserTestFixture::CompareValueContent(const PXR_NS::VtValue
         for (PXR_NS::SdfPath const& path : paths) {
             valueStream << path << "\n";
         }
-    }
-    else {
+    } else if (value.IsHolding<PXR_NS::HdPrimOriginSchema::OriginPath>()) {
+        // Special case for HdPrimOriginSchema::OriginPath: mirror the display
+        // logic in HduiDataSourceValueTreeView, which has always called
+        // .GetPath() directly to show just the wrapped SdfPath (e.g.
+        // "/USDCylinder").
+        //
+        // Before USD 26.05, HdPrimOriginSchema::OriginPath was not a
+        // registered core Vt value type, so VtValue::operator<< fell through
+        // to Vt_StreamOutGeneric and emitted the fallback format
+        // "<'HdPrimOriginSchema::OriginPath' @ 0x...>". That pattern was
+        // caught by MatchesFallbackTextOutput and the comparison was skipped.
+        //
+        // Starting with USD 26.05, "Hydra Scene Debugger now supports all
+        // registered core Vt value types rather than a hard-coded subset"
+        // (see OpenUSD CHANGELOG [26.05]). OriginPath became a registered
+        // type, so VtValue::operator<< now correctly calls
+        //   operator<<(stream, OriginPath const& p)
+        // which emits "HdPrimOriginSchema::OriginPath(<path>)". That string
+        // no longer matches the fallback regex, causing the exact-match
+        // EXPECT_EQ to fail against the widget's simpler ".GetPath()" output.
+        //
+        // The fix is to always compute expectedValue the same way the widget
+        // does, regardless of how operator<< formats the VtValue.
+        valueStream << value.UncheckedGet<PXR_NS::HdPrimOriginSchema::OriginPath>().GetPath();
+    } else {
         valueStream << value;
     }
 #endif

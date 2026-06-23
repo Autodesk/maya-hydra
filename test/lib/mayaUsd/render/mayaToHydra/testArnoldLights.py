@@ -42,8 +42,10 @@ class TestArnoldLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.
 
         # Dome lighting change in USD 25.11+
         imageVersion = None
-        if self._usdVersion >= (0, 25, 11):
-            imageVersion = "usd2511+"
+        if self._usdVersion >= (0, 26, 5):
+            imageVersion = "usd26.05+"
+        elif self._usdVersion >= (0, 25, 11):
+            imageVersion = "usd25.11"
 
         #All Lights mode
         cmds.modelEditor(panel, edit=True, displayLights="all")

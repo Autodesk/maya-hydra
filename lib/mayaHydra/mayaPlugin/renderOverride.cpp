@@ -1798,6 +1798,7 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     const bool pruneTextures = !(drawContext.getDisplayStyle() & MHWRender::MFrameContext::kTextured);
     _lastFilteringSceneIndexBeforeCustomFiltering = _pruneTexturesSceneIndex =
         Fvp::PruneTexturesSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, pruneTextures);
+    _currentlyTextured = !pruneTextures;
 
     // Add default material scene index
     _lastFilteringSceneIndexBeforeCustomFiltering = _defaultMaterialSceneIndex = Fvp::DefaultMaterialSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering,
