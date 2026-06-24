@@ -23,6 +23,7 @@
 #include <pxr/base/gf/vec2f.h>
 #include <pxr/base/gf/vec3d.h>
 #include <pxr/base/gf/vec3f.h>
+#include <pxr/base/tf/stringUtils.h>
 #include <pxr/base/vt/array.h>
 #include <pxr/base/vt/value.h>
 #include <pxr/imaging/hd/materialSchema.h>
@@ -44,7 +45,8 @@
 
 namespace {
 
-// Matches HduiDataSourceTreeWidget's name ordering.
+#if PXR_VERSION >= 2603
+// Matches HduiDataSourceTreeWidget's name ordering (USD 26.03+).
 std::vector<PXR_NS::TfToken>
 GetSortedContainerChildNames(const PXR_NS::HdContainerDataSourceHandle& container)
 {
@@ -69,6 +71,7 @@ void PushSortedContainerChildrenOnStack(
         }
     }
 }
+#endif
 
 std::stack<DataSourceEntry> BuildInitialDataSourceStack(
     const PXR_NS::SdfPath& primPath, const PXR_NS::HdSceneIndexPrim& prim)
@@ -199,14 +202,24 @@ void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(
         itPrimsTreeWidget++;
         primPathsStack.pop();
 
-        // Push child paths on the stack in the same sorted order used by
+        // Push child paths on the stack in the same order used by
         // HduiSceneIndexTreeWidget.
         const PXR_NS::SdfPathVector childPathVec = sceneIndex->GetChildPrimPaths(primPath);
-        const PXR_NS::SdfPathSet    sortedChildPaths(childPathVec.begin(), childPathVec.end());
+#if PXR_VERSION >= 2603
+        // USD 26.03+: children are listed in sorted order (see OpenUSD 6be1d6ec75).
+        const PXR_NS::SdfPathSet sortedChildPaths(childPathVec.begin(), childPathVec.end());
         for (auto itChildPaths = sortedChildPaths.rbegin(); itChildPaths != sortedChildPaths.rend();
              ++itChildPaths) {
             primPathsStack.push(*itChildPaths);
         }
+#else
+        // USD < 26.03: children follow GetChildPrimPaths() order; push in
+        // reversed order so stack pops in forward (matching) order.
+        for (auto itChildPaths = childPathVec.rbegin(); itChildPaths != childPathVec.rend();
+             ++itChildPaths) {
+            primPathsStack.push(*itChildPaths);
+        }
+#endif
     }
 }
 
