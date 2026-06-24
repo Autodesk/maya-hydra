@@ -378,30 +378,20 @@ void AdskHydraSceneBrowserTestFixture::CompareValueContent(const PXR_NS::VtValue
         for (PXR_NS::SdfPath const& path : paths) {
             valueStream << path << "\n";
         }
+#if PXR_VERSION < 2605
     } else if (value.IsHolding<PXR_NS::HdPrimOriginSchema::OriginPath>()) {
-        // Special case for HdPrimOriginSchema::OriginPath: mirror the display
-        // logic in HduiDataSourceValueTreeView, which has always called
-        // .GetPath() directly to show just the wrapped SdfPath (e.g.
-        // "/USDCylinder").
+        // Before USD 26.05, HduiDataSourceValueTreeView called .GetPath()
+        // directly, displaying just the wrapped SdfPath (e.g. "/USDCylinder").
+        // Mirror that here so expectedValue matches the widget output.
         //
-        // Before USD 26.05, HdPrimOriginSchema::OriginPath was not a
-        // registered core Vt value type, so VtValue::operator<< fell through
-        // to Vt_StreamOutGeneric and emitted the fallback format
-        // "<'HdPrimOriginSchema::OriginPath' @ 0x...>". That pattern was
-        // caught by MatchesFallbackTextOutput and the comparison was skipped.
-        //
-        // Starting with USD 26.05, "Hydra Scene Debugger now supports all
-        // registered core Vt value types rather than a hard-coded subset"
-        // (see OpenUSD CHANGELOG [26.05]). OriginPath became a registered
-        // type, so VtValue::operator<< now correctly calls
-        //   operator<<(stream, OriginPath const& p)
-        // which emits "HdPrimOriginSchema::OriginPath(<path>)". That string
-        // no longer matches the fallback regex, causing the exact-match
-        // EXPECT_EQ to fail against the widget's simpler ".GetPath()" output.
-        //
-        // The fix is to always compute expectedValue the same way the widget
-        // does, regardless of how operator<< formats the VtValue.
+        // Starting with USD 26.05, the Hydra Scene Browser uses
+        // VtValue::operator<< for all registered Vt types (see OpenUSD
+        // CHANGELOG [26.05]), so OriginPath now emits
+        // "HdPrimOriginSchema::OriginPath(<path>)". For 26.05+ we fall through
+        // to the generic "valueStream << value" branch below, which produces
+        // the same string as the widget.
         valueStream << value.UncheckedGet<PXR_NS::HdPrimOriginSchema::OriginPath>().GetPath();
+#endif
     } else {
         valueStream << value;
     }
