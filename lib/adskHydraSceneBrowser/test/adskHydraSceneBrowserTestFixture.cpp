@@ -378,20 +378,27 @@ void AdskHydraSceneBrowserTestFixture::CompareValueContent(const PXR_NS::VtValue
         for (PXR_NS::SdfPath const& path : paths) {
             valueStream << path << "\n";
         }
-#if PXR_VERSION < 2605
     } else if (value.IsHolding<PXR_NS::HdPrimOriginSchema::OriginPath>()) {
-        // Before USD 26.05, HduiDataSourceValueTreeView called .GetPath()
-        // directly, displaying just the wrapped SdfPath (e.g. "/USDCylinder").
-        // Mirror that here so expectedValue matches the widget output.
+        // Mirror HduiDataSourceValueTreeView: when OriginPath is a registered
+        // Vt type, operator<< outputs "HdPrimOriginSchema::OriginPath(<path>)"
+        // and the widget displays that same string. When OriginPath is not yet
+        // a registered Vt type, the widget calls .GetPath() directly. Detect
+        // at runtime so this works across USD builds regardless of what
+        // PXR_VERSION says.
         //
-        // Starting with USD 26.05, the Hydra Scene Browser uses
-        // VtValue::operator<< for all registered Vt types (see OpenUSD
-        // CHANGELOG [26.05]), so OriginPath now emits
-        // "HdPrimOriginSchema::OriginPath(<path>)". For 26.05+ we fall through
-        // to the generic "valueStream << value" branch below, which produces
-        // the same string as the widget.
-        valueStream << value.UncheckedGet<PXR_NS::HdPrimOriginSchema::OriginPath>().GetPath();
-#endif
+        // We cannot use MatchesFallbackTextOutput here: its regex excludes ':'
+        // so the unregistered fallback "<'HdPrimOriginSchema::OriginPath' @
+        // 0x...>" would not be detected. Instead check the prefix directly.
+        std::ostringstream probeStream;
+        probeStream << value;
+        const std::string probeOutput = probeStream.str();
+        if (probeOutput.rfind("HdPrimOriginSchema::OriginPath(", 0) == 0) {
+            // OriginPath is registered: widget uses VtValue streaming.
+            valueStream << probeOutput;
+        } else {
+            // OriginPath is not registered: widget calls .GetPath().
+            valueStream << value.UncheckedGet<PXR_NS::HdPrimOriginSchema::OriginPath>().GetPath();
+        }
     } else {
         valueStream << value;
     }
