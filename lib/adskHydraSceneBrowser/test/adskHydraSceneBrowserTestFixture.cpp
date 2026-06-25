@@ -113,14 +113,35 @@ template <class ChildType> ChildType* FindFirstChild(QObject* qObject)
     return nullptr;
 }
 
+int CountTreeItems(QTreeWidget* treeWidget)
+{
+    int count = 0;
+    for (QTreeWidgetItemIterator it(treeWidget); *it; ++it) {
+        ++count;
+    }
+    return count;
+}
+
 QTreeWidgetItemIterator GetIteratorForTree(QTreeWidget* treeWidget)
 {
-    // Expand all items so the iterator can traverse them
-    treeWidget->expandAll();
-    // Immediately process queued events, otherwise some events might linger and lead to a crash
-    // trying to access since-deleted items once the Qt event loop resumes and processes the events.
-    // (e.g. without this there is a crash involving a setExpanded() call)
-    QApplication::processEvents(QEventLoop::ProcessEventsFlag::EventLoopExec);
+    // Hdui_DataSourceTreeWidgetItem builds children lazily (on first expand).
+    // A static _expandedSet persists across prim selections: items whose
+    // locator is in the set schedule their expansion via QTimer::singleShot(0).
+    // processEvents() fires those timers and creates a new generation of child
+    // items — but expandAll() has already returned, so those new children are
+    // never expanded themselves.  Loop until the item count stabilises so that
+    // every generation of lazily-built children is fully expanded before the
+    // iterator is created.
+    int prevCount = -1;
+    int currCount = 0;
+    while (currCount != prevCount) {
+        prevCount = currCount;
+        treeWidget->expandAll();
+        // Process queued events: fires deferred QTimer::singleShot expansions
+        // and avoids crashes with since-deleted items (see original comment).
+        QApplication::processEvents(QEventLoop::ProcessEventsFlag::EventLoopExec);
+        currCount = CountTreeItems(treeWidget);
+    }
     return QTreeWidgetItemIterator(treeWidget);
 }
 
