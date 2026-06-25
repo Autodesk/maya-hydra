@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 
+import sys
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
@@ -23,7 +24,8 @@ class TestTexturedMode(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
-    IMAGE_DIFF_FAIL_PERCENT = 1.0
+    # M1 GPU produces marginally more pixel variance than other platforms
+    IMAGE_DIFF_FAIL_PERCENT = 1.5 if sys.platform == 'darwin' else 1.0
 
     def test_TexturedMode(self):
         """
