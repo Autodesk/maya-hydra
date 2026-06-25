@@ -24,7 +24,7 @@ class TestTexturedMode(mtohUtils.MayaHydraBaseTestCase):
     _file = __file__
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
-    # M1 GPU produces marginally more pixel variance than other platforms
+    # macOS GPUs can produce marginally more pixel variance than other platforms
     IMAGE_DIFF_FAIL_PERCENT = 1.5 if sys.platform == 'darwin' else 1.0
 
     def test_TexturedMode(self):

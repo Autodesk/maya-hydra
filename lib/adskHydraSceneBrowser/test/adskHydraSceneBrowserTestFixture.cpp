@@ -221,6 +221,11 @@ void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(
         }
 #endif
     }
+
+    // Ensure both sides are fully exhausted — if one has remaining items the
+    // traversal would have silently stopped short.
+    EXPECT_FALSE(*itPrimsTreeWidget) << "Qt prim tree has more items than expected by the scene index";
+    EXPECT_TRUE(primPathsStack.empty()) << "Scene index has more prims than present in the Qt prim tree";
 }
 
 void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
@@ -285,6 +290,14 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
             }
         }
     }
+
+    // Ensure both sides are fully exhausted — if one has remaining items the
+    // traversal would have silently stopped short (e.g. when the initial stack
+    // is empty on USD 26.03+ and the UI still has stale entries).
+    EXPECT_FALSE(*itDataSourceTreeWidget)
+        << "Qt data source tree has more items than expected for prim " << primPath.GetText();
+    EXPECT_TRUE(dataSourceStack.empty())
+        << "Expected more data source items than present in the Qt tree for prim " << primPath.GetText();
 }
 
 void AdskHydraSceneBrowserTestFixture::CompareDataSourceName(
