@@ -267,11 +267,21 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
     QTreeWidgetItemIterator itDataSourceTreeWidget = GetIteratorForTree(_dataSourceHierarchyWidget);
     std::stack<DataSourceEntry> dataSourceStack = std::move(initialDataSourceStack);
 
+    // Track traversal statistics for diagnostics.
+    int qtItemsVisited = 0;
+    std::string lastQtText;
+    std::string lastStackLocator;
+
     // Traverse hierarchy and compare (depth-first search)
     while (*itDataSourceTreeWidget && !dataSourceStack.empty()) {
         // Get the objects for the current step
         QTreeWidgetItem* dataSourceQtItem = *itDataSourceTreeWidget;
         DataSourceEntry  dataSourceEntry = dataSourceStack.top();
+
+        lastQtText = dataSourceQtItem->text(0).toStdString();
+        lastStackLocator = dataSourceEntry.locator.IsEmpty()
+            ? std::string("<root>")
+            : dataSourceEntry.locator.GetString();
 
         // Compare data source name
         CompareDataSourceName(primPath, dataSourceQtItem, dataSourceEntry);
@@ -288,6 +298,7 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
         // Prepare next step (need to pop the stack before pushing the next elements)
         itDataSourceTreeWidget++;
         dataSourceStack.pop();
+        ++qtItemsVisited;
 
         // Push child data sources on the stack
         if (auto containerDataSource
@@ -326,8 +337,33 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
     // is empty on USD 26.03+ and the UI still has stale entries).
     EXPECT_FALSE(*itDataSourceTreeWidget)
         << "Qt data source tree has more items than expected for prim " << primPath.GetText();
-    EXPECT_TRUE(dataSourceStack.empty())
-        << "Expected more data source items than present in the Qt tree for prim " << primPath.GetText();
+    if (!dataSourceStack.empty()) {
+        // Collect remaining stack locators (up to a reasonable limit) for diagnostics.
+        std::string remaining;
+        int shown = 0;
+        std::stack<DataSourceEntry> tmp = dataSourceStack;
+        while (!tmp.empty() && shown < 10) {
+            const std::string loc = tmp.top().locator.IsEmpty()
+                ? std::string("<root>")
+                : tmp.top().locator.GetString();
+            remaining += "\n  [" + std::to_string(shown) + "] " + loc;
+            tmp.pop();
+            ++shown;
+        }
+        if (!tmp.empty()) {
+            remaining += "\n  ... (" + std::to_string(tmp.size()) + " more)";
+        }
+        ADD_FAILURE() << "Expected more data source items than present in the Qt tree for prim "
+                      << primPath.GetText()
+                      << "\nItems matched before exhaustion: " << qtItemsVisited
+                      << "\nLast Qt item text seen: \"" << lastQtText << "\""
+                      << "\nLast stack locator: " << lastStackLocator
+                      << "\nFirst missing locator: "
+                      << (dataSourceStack.top().locator.IsEmpty()
+                              ? std::string("<root>")
+                              : dataSourceStack.top().locator.GetString())
+                      << "\nRemaining expected items (stack, top-first):" << remaining;
+    }
 }
 
 void AdskHydraSceneBrowserTestFixture::CompareDataSourceName(
