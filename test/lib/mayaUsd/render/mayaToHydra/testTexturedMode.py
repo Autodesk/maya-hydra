@@ -73,12 +73,12 @@ class TestTexturedMode(mtohUtils.MayaHydraBaseTestCase):
             cmds.modelEditor(panel, edit=True, displayTextures=False)
             cmds.refresh()
 
-        self.assertSnapshotClose(
-            "untextured.png",
-            self.IMAGE_DIFF_FAIL_THRESHOLD,
-            self.IMAGE_DIFF_FAIL_PERCENT,
-            imageVersion
-        )
+            self.assertSnapshotClose(
+                "untextured.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT,
+                imageVersion
+            )
 
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())

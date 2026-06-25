@@ -132,15 +132,24 @@ QTreeWidgetItemIterator GetIteratorForTree(QTreeWidget* treeWidget)
     // never expanded themselves.  Loop until the item count stabilises so that
     // every generation of lazily-built children is fully expanded before the
     // iterator is created.
+    static constexpr int kMaxExpansionIterations = 20;
     int prevCount = -1;
     int currCount = 0;
+    int iterations = 0;
     while (currCount != prevCount) {
+        EXPECT_LT(iterations, kMaxExpansionIterations)
+            << "Data source tree did not stabilise after " << kMaxExpansionIterations
+            << " expansion iterations — possible infinite loop in lazy item creation.";
+        if (iterations >= kMaxExpansionIterations) {
+            break;
+        }
         prevCount = currCount;
         treeWidget->expandAll();
         // Process queued events: fires deferred QTimer::singleShot expansions
         // and avoids crashes with since-deleted items (see original comment).
         QApplication::processEvents(QEventLoop::ProcessEventsFlag::EventLoopExec);
         currCount = CountTreeItems(treeWidget);
+        ++iterations;
     }
     return QTreeWidgetItemIterator(treeWidget);
 }
