@@ -114,7 +114,10 @@ target_link_libraries(${TARGET_NAME}
         ufeExtensions
         flowViewport
         hdGp
-        $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
+        # Clang/lld-link (Windows coverage builds) errors on duplicate inline UFE
+        # symbols when ufe_0 is linked directly; mayaHydraCppTests uses the same
+        # pattern of resolving UFE at runtime through Maya.
+        $<$<AND:$<BOOL:${UFE_FOUND}>,$<NOT:$<BOOL:${IS_CLANG}>>>:${UFE_LIBRARY}>
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSDAPI_LIBRARY}>
 )
 

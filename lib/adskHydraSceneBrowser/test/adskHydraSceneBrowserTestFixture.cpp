@@ -33,6 +33,7 @@
 #include <gtest/gtest.h>
 
 #include <QApplication>
+#include <QItemSelectionModel>
 #include <QSplitter>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
@@ -93,8 +94,10 @@ std::stack<DataSourceEntry> BuildInitialDataSourceStack(
 #else
     // USD < 26.03: SetPrimDataSource shows the prim data source container
     // itself as the single top-level item, with text = primPath.GetNameToken().
-    dataSourceStack.push(
-        { primPath.GetNameToken(), prim.dataSource, PXR_NS::HdDataSourceLocator() });
+    if (prim.dataSource) {
+        dataSourceStack.push(
+            { primPath.GetNameToken(), prim.dataSource, PXR_NS::HdDataSourceLocator() });
+    }
 #endif
 
     return dataSourceStack;
@@ -223,8 +226,23 @@ void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(
 
         // Compare data source
         if (compareDataSourceHierarchy) {
-            _primHierarchyWidget->setCurrentItem(primQtItem);
-            CompareDataSourceHierarchy(primPath, BuildInitialDataSourceStack(primPath, prim),
+            // Match HduiSceneIndexTreeWidget::SetSelectedPrimPath: setCurrentItem
+            // alone does not always emit itemSelectionChanged on all platforms.
+            _primHierarchyWidget->setCurrentItem(
+                primQtItem, 0, QItemSelectionModel::ClearAndSelect);
+
+            // Re-query at selection time, as HduiSceneIndexTreeWidget does in its
+            // itemSelectionChanged handler, then populate the data source tree
+            // directly so CompareDataSourceHierarchy does not depend on signal
+            // delivery order.
+            const PXR_NS::HdSceneIndexPrim selectedPrim = sceneIndex->GetPrim(primPath);
+            _dataSourceHierarchyWidget->SetPrimDataSource(
+                primPath, selectedPrim.dataSource);
+            QApplication::processEvents(QEventLoop::ProcessEventsFlag::AllEvents);
+
+            CompareDataSourceHierarchy(
+                primPath,
+                BuildInitialDataSourceStack(primPath, selectedPrim),
                 compareDataSourceValues);
         }
 
