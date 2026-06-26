@@ -62,7 +62,10 @@ target_link_libraries(${TARGET_NAME}
         hdx
         sdf
         usdImaging
-        ${UFE_LIBRARY}
+        # Clang/lld-link errors on duplicate inline UFE symbols when ufe_0 is
+        # linked directly into a plugin that also compiles UFE-heavy .cpp files;
+        # those plugins resolve UFE at runtime through Maya instead.
+        $<$<NOT:$<BOOL:${IS_CLANG}>>:${UFE_LIBRARY}>
         ${VIEWPORTTOOLBOX_VIEWPORTTOOLBOX_LIB}
         ${VIEWPORTTOOLBOX_VISUALSTYLES_LIB}
     PRIVATE
