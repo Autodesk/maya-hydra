@@ -114,12 +114,20 @@ target_link_libraries(${TARGET_NAME}
         ufeExtensions
         flowViewport
         hdGp
-        # Clang/lld-link (Windows coverage builds) errors on duplicate inline UFE
-        # symbols when ufe_0 is linked directly; mayaHydraCppTests uses the same
-        # pattern of resolving UFE at runtime through Maya.
-        $<$<AND:$<BOOL:${UFE_FOUND}>,$<NOT:$<BOOL:${IS_CLANG}>>>:${UFE_LIBRARY}>
+        $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSDAPI_LIBRARY}>
 )
+
+# lld-link (Windows/Clang coverage builds) treats UFE inline copy-ctors emitted
+# by renderSettingsUtils.cpp as duplicate symbols vs the same ctors exported from
+# ufe_0.dll. The duplicates are identical (same inline definition), so /force:multiple
+# safely resolves them by keeping the first definition.
+if(IS_CLANG AND IS_WINDOWS)
+    target_link_options(${TARGET_NAME}
+        PRIVATE
+            -Wl,/force:multiple
+    )
+endif()
 
 # -----------------------------------------------------------------------------
 # properties
