@@ -23,22 +23,87 @@
 #include <pxr/base/gf/vec2f.h>
 #include <pxr/base/gf/vec3d.h>
 #include <pxr/base/gf/vec3f.h>
+#include <pxr/base/tf/stringUtils.h>
 #include <pxr/base/vt/array.h>
 #include <pxr/base/vt/value.h>
 #include <pxr/imaging/hd/materialSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
+#include <pxr/imaging/hd/primOriginSchema.h>
 
 #include <gtest/gtest.h>
 
 #include <QApplication>
+#include <QItemSelectionModel>
 #include <QSplitter>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
 #include <iostream>
 #include <regex>
+#include <set>
 #include <stack>
 #include <vector>
+
+namespace {
+
+#if PXR_VERSION >= 2603
+// Matches HduiDataSourceTreeWidget's name ordering (USD 26.03+).
+std::vector<PXR_NS::TfToken>
+GetSortedContainerChildNames(const PXR_NS::HdContainerDataSourceHandle& container)
+{
+    const PXR_NS::TfTokenVector names = container->GetNames();
+    const std::set<PXR_NS::TfToken, PXR_NS::TfDictionaryLessThan> sortedNames(
+        names.begin(), names.end());
+    return std::vector<PXR_NS::TfToken>(sortedNames.begin(), sortedNames.end());
+}
+
+void PushSortedContainerChildrenOnStack(
+    const PXR_NS::HdContainerDataSourceHandle&           container,
+    const PXR_NS::HdDataSourceLocator&                     parentLocator,
+    std::stack<DataSourceEntry>&                           dataSourceStack)
+{
+    const std::vector<PXR_NS::TfToken> sortedChildNames = GetSortedContainerChildNames(container);
+    for (auto itChildNames = sortedChildNames.rbegin(); itChildNames != sortedChildNames.rend();
+         ++itChildNames) {
+        const PXR_NS::TfToken& childName = *itChildNames;
+        if (PXR_NS::HdDataSourceBaseHandle childDataSource = container->Get(childName)) {
+            dataSourceStack.push(
+                { childName, childDataSource, parentLocator.Append(childName) });
+        }
+    }
+}
+#endif
+
+std::stack<DataSourceEntry> BuildInitialDataSourceStack(
+    const PXR_NS::SdfPath& primPath, const PXR_NS::HdSceneIndexPrim& prim)
+{
+    std::stack<DataSourceEntry> dataSourceStack;
+
+#if PXR_VERSION >= 2603
+    // From USD 26.03, HduiDataSourceTreeWidget::SetPrimDataSource lists sorted
+    // container children as top-level items instead of the prim data source
+    // container itself (introduced by OpenUSD commit 6be1d6ec75).
+    if (PXR_NS::HdContainerDataSourceHandle container
+        = PXR_NS::HdContainerDataSource::Cast(prim.dataSource)) {
+        PushSortedContainerChildrenOnStack(
+            container, PXR_NS::HdDataSourceLocator(), dataSourceStack);
+    } else if (prim.dataSource) {
+        dataSourceStack.push(
+            { primPath.GetNameToken(), prim.dataSource, PXR_NS::HdDataSourceLocator() });
+    }
+#else
+    // USD < 26.03: SetPrimDataSource shows the prim data source container
+    // itself as the single top-level item, with text = primPath.GetNameToken().
+    if (prim.dataSource) {
+        dataSourceStack.push(
+            { primPath.GetNameToken(), prim.dataSource, PXR_NS::HdDataSourceLocator() });
+    }
+#endif
+
+    return dataSourceStack;
+}
+
+} // namespace
 
 template <class ChildType> ChildType* FindFirstChild(QObject* qObject)
 {
@@ -51,14 +116,44 @@ template <class ChildType> ChildType* FindFirstChild(QObject* qObject)
     return nullptr;
 }
 
+int CountTreeItems(QTreeWidget* treeWidget)
+{
+    int count = 0;
+    for (QTreeWidgetItemIterator it(treeWidget); *it; ++it) {
+        ++count;
+    }
+    return count;
+}
+
 QTreeWidgetItemIterator GetIteratorForTree(QTreeWidget* treeWidget)
 {
-    // Expand all items so the iterator can traverse them
-    treeWidget->expandAll();
-    // Immediately process queued events, otherwise some events might linger and lead to a crash
-    // trying to access since-deleted items once the Qt event loop resumes and processes the events.
-    // (e.g. without this there is a crash involving a setExpanded() call)
-    QApplication::processEvents(QEventLoop::ProcessEventsFlag::EventLoopExec);
+    // Hdui_DataSourceTreeWidgetItem builds children lazily (on first expand).
+    // A static _expandedSet persists across prim selections: items whose
+    // locator is in the set schedule their expansion via QTimer::singleShot(0).
+    // processEvents() fires those timers and creates a new generation of child
+    // items — but expandAll() has already returned, so those new children are
+    // never expanded themselves.  Loop until the item count stabilises so that
+    // every generation of lazily-built children is fully expanded before the
+    // iterator is created.
+    static constexpr int kMaxExpansionIterations = 20;
+    int prevCount = -1;
+    int currCount = 0;
+    int iterations = 0;
+    while (currCount != prevCount) {
+        EXPECT_LT(iterations, kMaxExpansionIterations)
+            << "Data source tree did not stabilise after " << kMaxExpansionIterations
+            << " expansion iterations — possible infinite loop in lazy item creation.";
+        if (iterations >= kMaxExpansionIterations) {
+            break;
+        }
+        prevCount = currCount;
+        treeWidget->expandAll();
+        // Process queued events: fires deferred QTimer::singleShot expansions
+        // and avoids crashes with since-deleted items (see original comment).
+        QApplication::processEvents(QEventLoop::ProcessEventsFlag::EventLoopExec);
+        currCount = CountTreeItems(treeWidget);
+        ++iterations;
+    }
     return QTreeWidgetItemIterator(treeWidget);
 }
 
@@ -131,38 +226,80 @@ void AdskHydraSceneBrowserTestFixture::ComparePrimHierarchy(
 
         // Compare data source
         if (compareDataSourceHierarchy) {
-            _primHierarchyWidget->setCurrentItem(primQtItem);
-            CompareDataSourceHierarchy( primPath,
-                { primPath.GetNameToken(), prim.dataSource, PXR_NS::HdDataSourceLocator() }, compareDataSourceValues);
+            // Match HduiSceneIndexTreeWidget::SetSelectedPrimPath: setCurrentItem
+            // alone does not always emit itemSelectionChanged on all platforms.
+            _primHierarchyWidget->setCurrentItem(
+                primQtItem, 0, QItemSelectionModel::ClearAndSelect);
+
+            // Re-query at selection time, as HduiSceneIndexTreeWidget does in its
+            // itemSelectionChanged handler, then populate the data source tree
+            // directly so CompareDataSourceHierarchy does not depend on signal
+            // delivery order.
+            const PXR_NS::HdSceneIndexPrim selectedPrim = sceneIndex->GetPrim(primPath);
+            _dataSourceHierarchyWidget->SetPrimDataSource(
+                primPath, selectedPrim.dataSource);
+            QApplication::processEvents(QEventLoop::ProcessEventsFlag::AllEvents);
+
+            CompareDataSourceHierarchy(
+                primPath,
+                BuildInitialDataSourceStack(primPath, selectedPrim),
+                compareDataSourceValues);
         }
 
         // Prepare next step (need to pop the stack before pushing the next elements)
         itPrimsTreeWidget++;
         primPathsStack.pop();
 
-        // Push child paths on the stack
-        PXR_NS::SdfPathVector childPaths = sceneIndex->GetChildPrimPaths(primPath);
-        for (auto itChildPaths = childPaths.rbegin(); itChildPaths != childPaths.rend();
-             itChildPaths++) {
+        // Push child paths on the stack in the same order used by
+        // HduiSceneIndexTreeWidget.
+        const PXR_NS::SdfPathVector childPathVec = sceneIndex->GetChildPrimPaths(primPath);
+#if PXR_VERSION >= 2603
+        // USD 26.03+: children are listed in sorted order (see OpenUSD 6be1d6ec75).
+        const PXR_NS::SdfPathSet sortedChildPaths(childPathVec.begin(), childPathVec.end());
+        for (auto itChildPaths = sortedChildPaths.rbegin(); itChildPaths != sortedChildPaths.rend();
+             ++itChildPaths) {
             primPathsStack.push(*itChildPaths);
         }
+#else
+        // USD < 26.03: children follow GetChildPrimPaths() order; push in
+        // reversed order so stack pops in forward (matching) order.
+        for (auto itChildPaths = childPathVec.rbegin(); itChildPaths != childPathVec.rend();
+             ++itChildPaths) {
+            primPathsStack.push(*itChildPaths);
+        }
+#endif
     }
+
+    // Ensure both sides are fully exhausted — if one has remaining items the
+    // traversal would have silently stopped short.
+    EXPECT_FALSE(*itPrimsTreeWidget) << "Qt prim tree has more items than expected by the scene index";
+    EXPECT_TRUE(primPathsStack.empty()) << "Scene index has more prims than present in the Qt prim tree";
 }
 
 void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
-    const PXR_NS::SdfPath& primPath,
-    DataSourceEntry        rootDataSourceEntry,
-    bool                   compareValues)
+    const PXR_NS::SdfPath&            primPath,
+    std::stack<DataSourceEntry>       initialDataSourceStack,
+    bool                              compareValues)
 {
     // Setup traversal data structures (depth-first search)
     QTreeWidgetItemIterator itDataSourceTreeWidget = GetIteratorForTree(_dataSourceHierarchyWidget);
-    std::stack<DataSourceEntry> dataSourceStack({ rootDataSourceEntry });
+    std::stack<DataSourceEntry> dataSourceStack = std::move(initialDataSourceStack);
+
+    // Track traversal statistics for diagnostics.
+    int qtItemsVisited = 0;
+    std::string lastQtText;
+    std::string lastStackLocator;
 
     // Traverse hierarchy and compare (depth-first search)
     while (*itDataSourceTreeWidget && !dataSourceStack.empty()) {
         // Get the objects for the current step
         QTreeWidgetItem* dataSourceQtItem = *itDataSourceTreeWidget;
         DataSourceEntry  dataSourceEntry = dataSourceStack.top();
+
+        lastQtText = dataSourceQtItem->text(0).toStdString();
+        lastStackLocator = dataSourceEntry.locator.IsEmpty()
+            ? std::string("<root>")
+            : dataSourceEntry.locator.GetString();
 
         // Compare data source name
         CompareDataSourceName(primPath, dataSourceQtItem, dataSourceEntry);
@@ -179,19 +316,26 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
         // Prepare next step (need to pop the stack before pushing the next elements)
         itDataSourceTreeWidget++;
         dataSourceStack.pop();
+        ++qtItemsVisited;
 
         // Push child data sources on the stack
         if (auto containerDataSource
             = PXR_NS::HdContainerDataSource::Cast(dataSourceEntry.dataSource)) {
+#if PXR_VERSION >= 2603
+            // USD 26.03+: _BuildChildren uses sorted order (see 6be1d6ec75).
+            PushSortedContainerChildrenOnStack(
+                containerDataSource, dataSourceEntry.locator, dataSourceStack);
+#else
+            // USD < 26.03: _BuildChildren uses GetNames() forward order; push
+            // in reversed order so stack pops in forward (matching) order.
             PXR_NS::TfTokenVector childNames = containerDataSource->GetNames();
-            for (auto itChildNames = childNames.rbegin(); itChildNames != childNames.rend();
-                 itChildNames++) {
-                PXR_NS::TfToken                dataSourceName = *itChildNames;
-                PXR_NS::HdDataSourceBaseHandle dataSource = containerDataSource->Get(dataSourceName);
-                if (dataSource) {
-                    dataSourceStack.push({ dataSourceName, dataSource, dataSourceEntry.locator.Append(dataSourceName) });
+            for (auto it = childNames.rbegin(); it != childNames.rend(); ++it) {
+                if (PXR_NS::HdDataSourceBaseHandle ds = containerDataSource->Get(*it)) {
+                    dataSourceStack.push(
+                        { *it, ds, dataSourceEntry.locator.Append(*it) });
                 }
             }
+#endif
         } else if (
             auto vectorDataSource = PXR_NS::HdVectorDataSource::Cast(dataSourceEntry.dataSource)) {
             for (size_t iElement = 0; iElement < vectorDataSource->GetNumElements(); iElement++) {
@@ -204,6 +348,39 @@ void AdskHydraSceneBrowserTestFixture::CompareDataSourceHierarchy(
                 }
             }
         }
+    }
+
+    // Ensure both sides are fully exhausted — if one has remaining items the
+    // traversal would have silently stopped short (e.g. when the initial stack
+    // is empty on USD 26.03+ and the UI still has stale entries).
+    EXPECT_FALSE(*itDataSourceTreeWidget)
+        << "Qt data source tree has more items than expected for prim " << primPath.GetText();
+    if (!dataSourceStack.empty()) {
+        // Collect remaining stack locators (up to a reasonable limit) for diagnostics.
+        std::string remaining;
+        int shown = 0;
+        std::stack<DataSourceEntry> tmp = dataSourceStack;
+        while (!tmp.empty() && shown < 10) {
+            const std::string loc = tmp.top().locator.IsEmpty()
+                ? std::string("<root>")
+                : tmp.top().locator.GetString();
+            remaining += "\n  [" + std::to_string(shown) + "] " + loc;
+            tmp.pop();
+            ++shown;
+        }
+        if (!tmp.empty()) {
+            remaining += "\n  ... (" + std::to_string(tmp.size()) + " more)";
+        }
+        ADD_FAILURE() << "Expected more data source items than present in the Qt tree for prim "
+                      << primPath.GetText()
+                      << "\nItems matched before exhaustion: " << qtItemsVisited
+                      << "\nLast Qt item text seen: \"" << lastQtText << "\""
+                      << "\nLast stack locator: " << lastStackLocator
+                      << "\nFirst missing locator: "
+                      << (dataSourceStack.top().locator.IsEmpty()
+                              ? std::string("<root>")
+                              : dataSourceStack.top().locator.GetString())
+                      << "\nRemaining expected items (stack, top-first):" << remaining;
     }
 }
 
@@ -298,8 +475,28 @@ void AdskHydraSceneBrowserTestFixture::CompareValueContent(const PXR_NS::VtValue
         for (PXR_NS::SdfPath const& path : paths) {
             valueStream << path << "\n";
         }
-    }
-    else {
+    } else if (value.IsHolding<PXR_NS::HdPrimOriginSchema::OriginPath>()) {
+        // Mirror HduiDataSourceValueTreeView: when OriginPath is a registered
+        // Vt type, operator<< outputs "HdPrimOriginSchema::OriginPath(<path>)"
+        // and the widget displays that same string. When OriginPath is not yet
+        // a registered Vt type, the widget calls .GetPath() directly. Detect
+        // at runtime so this works across USD builds regardless of what
+        // PXR_VERSION says.
+        //
+        // We cannot use MatchesFallbackTextOutput here: its regex excludes ':'
+        // so the unregistered fallback "<'HdPrimOriginSchema::OriginPath' @
+        // 0x...>" would not be detected. Instead check the prefix directly.
+        std::ostringstream probeStream;
+        probeStream << value;
+        const std::string probeOutput = probeStream.str();
+        if (probeOutput.rfind("HdPrimOriginSchema::OriginPath(", 0) == 0) {
+            // OriginPath is registered: widget uses VtValue streaming.
+            valueStream << probeOutput;
+        } else {
+            // OriginPath is not registered: widget calls .GetPath().
+            valueStream << value.UncheckedGet<PXR_NS::HdPrimOriginSchema::OriginPath>().GetPath();
+        }
+    } else {
         valueStream << value;
     }
 #endif

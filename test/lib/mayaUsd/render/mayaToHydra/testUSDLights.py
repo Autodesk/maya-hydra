@@ -29,10 +29,16 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
     IMAGE_DIFF_FAIL_PERCENT = 0.5
 
     def verifyLightingModes(self, shadowOn):
-        # Dome lighting change in USD 25.11+
+        # allLights / domeLight / flatLight changed in USD 25.11 and again in USD 26.05+.
+        # defaultLight / diskLight / distantLight / noLight only changed in USD 26.05+.
         imageVersion = None
-        if self._usdVersion >= (0, 25, 11):
-            imageVersion = "usd2511+"
+        if self._usdVersion >= (0, 26, 5):
+            imageVersion = "usd26.05+"
+        elif self._usdVersion >= (0, 25, 11):
+            imageVersion = "usd25.11"
+
+        # For images that only changed in USD 26.05+ (no separate usd25.11 baseline).
+        imageVersionNewOnly = "usd26.05+" if self._usdVersion >= (0, 26, 5) else None
 
         imageSuffix = "_shadowOn" if shadowOn else ""
         panel = mayaUtils.activeModelPanel()
@@ -48,7 +54,7 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
         #Default Light mode
         cmds.modelEditor(panel, edit=True, displayLights="default")
         cmds.refresh()
-        self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("defaultLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersionNewOnly)
 
         #Selected Light mode
         cmds.modelEditor(panel, edit=True, displayLights="selected")
@@ -56,11 +62,11 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
 
         cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DistantLight1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("distantLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("distantLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersionNewOnly)
 
         cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DiskLight1', r=True )
         cmds.refresh()
-        self.assertSnapshotClose("diskLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("diskLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersionNewOnly)
 
         cmds.select( '|testUSDLights:stage1|testUSDLights:stageShape1,/DomeLight1', r=True )
         cmds.refresh()
@@ -74,7 +80,7 @@ class TestUSDLights(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils.May
         #No Light mode
         cmds.modelEditor(panel, edit=True, displayLights="none")
         cmds.refresh()
-        self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+        self.assertSnapshotClose("noLight" + imageSuffix + ".png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT, imageVersionNewOnly)
 
     #Test usd lights (e.g., disk,distant,dome,etc.) with a maya native sphere and usd sphere.
     def test_USDLights(self):

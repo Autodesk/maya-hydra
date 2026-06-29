@@ -26,6 +26,8 @@
 
 #include <gtest/gtest.h>
 
+#include <stack>
+
 #include <dataSourceTreeWidget.h>
 #include <dataSourceValueTreeView.h>
 #include <sceneIndexDebuggerWidget.h>
@@ -54,8 +56,10 @@ protected:
         bool compareDataSourceHierarchy = false,
         bool compareDataSourceValues = false);
 
-    void
-    CompareDataSourceHierarchy(const PXR_NS::SdfPath& primPath, DataSourceEntry rootDataSourceEntry, bool compareValues = false);
+    void CompareDataSourceHierarchy(
+        const PXR_NS::SdfPath&      primPath,
+        std::stack<DataSourceEntry> initialDataSourceStack,
+        bool                        compareValues = false);
 
     void
     CompareDataSourceName(const PXR_NS::SdfPath& primPath, const QTreeWidgetItem* dataSourceQtItem, const DataSourceEntry& dataSourceEntry);
