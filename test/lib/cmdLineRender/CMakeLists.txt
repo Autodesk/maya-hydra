@@ -13,6 +13,8 @@
 # limitations under the License.
 #
 
+set(TEST_OUTPUT_ROOT ${CMAKE_BINARY_DIR}/test/Temporary)
+
 # Command line render unit test scripts, launched with Render.exe.
 # Unit test can be disabled with ctest labels.
 # Adding labels to the unit test follows this convention:
@@ -192,7 +194,7 @@ mayaHydra_add_cmd_line_render_test(renderSettings/stormCropRegion1x1.ma
 )
 
 # Arnold crop region.  Test with USD default render settings.
-set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/arnoldCropRegion/projects/default/images)
+set(render_dir ${TEST_OUTPUT_ROOT}/arnoldCropRegion/projects/default/images)
 set(scene renderSettings/arnoldCropRegion.ma)
 cmake_path(GET scene STEM sceneFileNameNoExt)
 mayaHydra_add_cmd_line_render_test(${scene}
@@ -247,7 +249,7 @@ endif()
 # path mapper warnings errors.  Launches Render and checks for success,
 # no image comparison.
 set(_usdProxyShapeRenderSettings_dir
-    "${CMAKE_BINARY_DIR}/test/Temporary/usdProxyShapeRenderSettings/projects/default/images")
+    "${TEST_OUTPUT_ROOT}/usdProxyShapeRenderSettings/projects/default/images")
 function(_add_usdProxyShapeRenderSettings_test)
     set(test_name usdProxyShapeRenderSettings)
     set(SCENE_PATH
@@ -296,7 +298,7 @@ _add_usdProxyShapeRenderSettings_test()
 # ├── images/mayaSphereMayaMaterialArnoldRelativePath.png
 # └── sourceImages/UVChecker.png
 set(_relpath_proj_dir
-    "${CMAKE_BINARY_DIR}/test/Temporary/mayaSphereMayaMaterialArnoldRelativePath/projects/default")
+    "${TEST_OUTPUT_ROOT}/mayaSphereMayaMaterialArnoldRelativePath/projects/default")
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/scenes/texturing/UVChecker.png"
     "${_relpath_proj_dir}/sourceImages/UVChecker.png"
@@ -311,7 +313,7 @@ configure_file(
 # Example of an absolute path embedded in a .ma file:
 #   setAttr ".ftn" -type "string" "D:/nonExistentPath//UVChecker.png";
 # The test verifies that such paths can be resolved relative to the specified project.
-set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/mayaSphereMayaMaterialArnoldRelativePath/projects/default/images)
+set(render_dir ${TEST_OUTPUT_ROOT}/mayaSphereMayaMaterialArnoldRelativePath/projects/default/images)
 set(scene relativePathTest/mayaSphereMayaMaterialArnoldRelativePath.ma)
 cmake_path(GET scene STEM sceneFileNameNoExt)
 mayaHydra_add_cmd_line_render_test(${scene}
@@ -382,3 +384,69 @@ foreach(script ${MAYABATCH_TEST_SCRIPT_FILES})
     apply_labels_to_test("${all_labels}" ${target})
 
 endforeach()
+
+# Hydra scene index dump tests.  Render with the -hsd flag to produce a text
+# dump of the Hydra scene index, then compare the dump against an expected
+# baseline using compareTextFiles.py.  Using a Python script rather than fc (or
+# fc /W) on Windows / diff on UNIX to normalize line ending differences, for
+# robustness.
+function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file expected_file)
+    set(SCENE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/scenes/${scene_file}")
+    set(COMPARE_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/compareTextFiles.py")
+
+    if(WIN32)
+        set(CMD PowerShell)
+        set(RM_ARGS "Remove-Item \"${dump_file}\" -Force -ErrorAction SilentlyContinue")
+        set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"HdArnoldRendererPlugin\" ${renderer_args} \"${SCENE_PATH}\"")
+        set(COMPARE_ARGS "& \"${Python3_EXECUTABLE}\" \"${COMPARE_SCRIPT}\" \"${dump_file}\" \"${expected_file}\"")
+        set(CMD_ARGS -Command "${RM_ARGS} \; ${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${COMPARE_ARGS} } \; exit \$LASTEXITCODE")
+    else()
+        set(CMD /bin/sh)
+        set(RENDER_ARGS "\"${RENDER_EXECUTABLE}\" -renderer HdArnoldRendererPlugin ${renderer_args} \"${SCENE_PATH}\"")
+        set(COMPARE_ARGS "\"${Python3_EXECUTABLE}\" \"${COMPARE_SCRIPT}\" \"${dump_file}\" \"${expected_file}\"")
+        set(CMD_ARGS -c "rm -f \"${dump_file}\"; ${RENDER_ARGS} && ${COMPARE_ARGS}")
+    endif()
+
+    add_test(
+        NAME "${test_name}"
+        COMMAND ${CMD} ${CMD_ARGS}
+    )
+
+    _mayaHydra_setup_test_common_path_vars()
+    list(APPEND ALL_PATH_VARS MAYA_RENDER_DESC_PATH)
+    _mayaHydra_setup_test_common_defaults("${test_name}")
+    _mayaHydra_setup_test_plugins()
+    list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
+         "${CMAKE_INSTALL_PREFIX}/renderDesc")
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
+    _mayaHydra_setup_test_USD_paths()
+    _mayaHydra_setup_test_finalize_env("${test_name}")
+
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "MAYA_IGNORE_DIALOGS=1")
+    set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
+endfunction()
+
+if(NOT IS_MACOSX)
+    set(_terminal_dump_file
+        "${TEST_OUTPUT_ROOT}/terminalSceneIndexDump/sceneIndexDump.txt")
+    set(render_dir ${TEST_OUTPUT_ROOT}/terminalSceneIndexDump/projects/default/images)
+    _add_scene_index_dump_test(
+        terminalSceneIndexDump
+        texturing/mayaSphereMayaMaterialArnold.ma
+        "-x 160 -y 120 -hsd \"${_terminal_dump_file}\" -rd \"${render_dir}\""
+        "${_terminal_dump_file}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/expected/terminalSceneIndexDump.txt"
+    )
+
+    set(_mayaHydra_dump_file
+        "${TEST_OUTPUT_ROOT}/mayaHydraSceneIndexDump/sceneIndexDump.txt")
+    set(render_dir ${TEST_OUTPUT_ROOT}/mayaHydraSceneIndexDump/projects/default/images)
+    _add_scene_index_dump_test(
+        mayaHydraSceneIndexDump
+        texturing/mayaSphereMayaMaterialArnold.ma
+        "-x 160 -y 120 -hsd \"${_mayaHydra_dump_file}\" -hsi MayaHydraSceneIndex -rd \"${render_dir}\""
+        "${_mayaHydra_dump_file}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/expected/mayaHydraSceneIndexDump.txt"
+    )
+endif()
