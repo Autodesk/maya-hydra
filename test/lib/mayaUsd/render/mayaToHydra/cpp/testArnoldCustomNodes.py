@@ -84,6 +84,9 @@ class TestArnoldCustomNodes(mtohUtils.MayaHydraBaseTestCase):
             self._standInShape = cmds.ls(shape, long=True)[0]
             cmds.setAttr(self._standInShape + ".dso",
                          "/path/to/test.ass", type="string")
+            # Prevent MtoA from loading the non-existent .ass file while
+            # HdArnold is active; the C++ test only verifies scene-index translation.
+            cmds.setAttr(self._standInShape + ".standInDrawOverride", 4)
         cmds.refresh()
 
     def _setupVolume(self):

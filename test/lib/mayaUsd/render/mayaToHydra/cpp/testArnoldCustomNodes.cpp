@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// C++ GTest suite for the HdArnoldMtoaSceneIndexPlugin (mtoaSIP).
+// C++ GTest suite for mtoaSIP (Hydra Arnold Scene Index Plugin).
 //
 // Tests must run with the Arnold renderer active so that mtoaSIP is inserted
 // into the scene index chain.  The Python driver (testArnoldCustomNodes.py) sets the
@@ -97,14 +97,13 @@ TEST(MtoaSIP, photometricLightTranslation)
     ASSERT_NE(prim.dataSource, nullptr);
 
     // Check inputs:intensity = 2.5
-    auto intensityDs = HdTypedSampledDataSource<float>::Cast(
-        prim.dataSource->Get(UsdLuxTokens->inputsIntensity));
+    auto intensityDs
+        = HdSampledDataSource::Cast(prim.dataSource->Get(UsdLuxTokens->inputsIntensity));
     ASSERT_TRUE(intensityDs) << "inputs:intensity not found on sphereLight";
     EXPECT_NEAR(GetFloatValue(intensityDs), 2.5f, 1e-5f);
 
     // aiExposure = 3.0 -> inputs:exposure
-    auto exposureDs
-        = HdTypedSampledDataSource<float>::Cast(prim.dataSource->Get(UsdLuxTokens->inputsExposure));
+    auto exposureDs = HdSampledDataSource::Cast(prim.dataSource->Get(UsdLuxTokens->inputsExposure));
     ASSERT_TRUE(exposureDs) << "inputs:exposure not found on sphereLight";
     EXPECT_NEAR(GetFloatValue(exposureDs), 3.0f, 1e-5f);
 

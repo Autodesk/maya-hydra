@@ -108,7 +108,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testLightPrimvars.py|depOnPlugins:mtoa
     cpp/testDataSourceNames.py
     cpp/testCustomDagNodeTranslation.py|depOnPlugins:mtoa
-    cpp/testArnoldCustomNodes.py|depOnPlugins:mtoa
     cpp/testCameraPrimvars.py
     cpp/testUsdStageInvalidate.py
     cpp/testCamera.py
@@ -135,6 +134,13 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
         cpp/testUsdPointInstancingIsolateSelectBBox.py
         testIsolateSelectPerShape.py
         testIsolateSelectMultipleInstances.py|depOnPlugins:bifrost
+    )
+endif()
+
+# mtoa custom nodes/attributes not supported on Maya 2026
+if(MAYA_APP_VERSION VERSION_GREATER 2026)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
+        cpp/testArnoldCustomNodes.py|depOnPlugins:mtoa
     )
 endif()
 
