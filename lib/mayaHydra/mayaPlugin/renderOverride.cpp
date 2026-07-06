@@ -1371,6 +1371,21 @@ MStatus MtohRenderOverride::Render(
             _mayaHydraSceneIndex->SetShadowsEnabled(enableShadows);
         }
 
+        if (_outline && _selection) {
+            HVT_NS::Outline::OutlineInputs inputs;
+            inputs.selectedPaths = _selection->GetFullySelectedPaths();
+            {
+                std::string pathList;
+                for (auto const& p : inputs.selectedPaths) {
+                    pathList += p.GetString() + " ";
+                }
+                TF_WARN("MtohRenderOverride: outline selectedPaths=[%s] count=%zu",
+                    pathList.c_str(), inputs.selectedPaths.size());
+            }
+            inputs.excludePaths = { MAYA_NATIVE_ROOT, _highlightHierarchyPrefix };
+            _outline->SetInputs(std::move(inputs));
+        }
+
 #ifndef MAYAHYDRALIB_OIT_ENABLED
         // This is required for HdStorm to display transparency.
         // We should fix this upstream, so HdStorm can setup
@@ -1398,6 +1413,13 @@ MtohRenderOverride* MtohRenderOverride::GetByName(TfToken rendererName)
         }
     }
     return nullptr;
+}
+
+HVT_NS::Outline::OutlineStyle MtohRenderOverride::_BuildOutlineStyle() const
+{
+    HVT_NS::Outline::OutlineStyle style;
+    style.selectedColor      = GfVec4f(1.0f, 0.0f, 0.0f, 1.0f); // red: debug confirmation
+    return style;
 }
 
 void MtohRenderOverride::_ClearMayaHydraSceneIndex()
@@ -1465,8 +1487,32 @@ void MtohRenderOverride::_InitHydraResources(
             getLayerSettings,
             firstRenderTaskPath,
             hvt::TaskManager::InsertionOrder::insertBefore);
+
+        // Install pixel-based outline on the main Storm pass (pass 0).
+        // Pass 0 is guaranteed to be Storm when _isUsingHdSt is true, and its render
+        // index contains all scene geometry, which the prim-ID tasks must be able to see.
+        // The secondary graphics pass (pass 1) only contains synthetic wireframe-highlight
+        // prims under /FlowViewportSelectionHighlights and cannot render prim IDs for USD prims.
+        {
+            constexpr int outlinePassIndex = 0;
+            const hvt::FramePassPtr& outlinePass = _GetFramePass(outlinePassIndex);
+            if (outlinePass) {
+                // Insert outline tasks before colorCorrectionTask so they execute (and are
+                // presented) before PresentTask. Inserting at end would place them after
+                // PresentTask, rendering the outline into a buffer that has already been
+                // blitted to screen and will be cleared at the start of the next frame.
+                const SdfPath ccPath =
+                    outlinePass->GetTaskManager()->GetTaskPath(TfToken("colorCorrectionTask"));
+                TF_WARN("MtohRenderOverride: outline install ccPath=%s", ccPath.GetText());
+                _outline = std::make_unique<HVT_NS::Outline::OutlineManager>();
+                _outline->Install(*outlinePass,
+                                  ccPath,
+                                  hvt::TaskManager::InsertionOrder::insertBefore);
+                _outline->SetStyle(_BuildOutlineStyle());
+            }
+        }
     }
-        
+
     //Set passes constant parameters
     for (int i=0;i< _GetNumFramePasses(); ++i) {
         const auto& currentPass = _GetFramePass(i);
@@ -1715,6 +1761,7 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _selection.reset();
     _wireframeColorInterfaceImp.reset();
     _leadObjectPathTracker.reset();
+    _outline.reset();
     _oldDisplayStyle = 0;
     _oldRefineLevel = 0;
 
@@ -1830,29 +1877,32 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 
     // Setup selection highlight scene indices
     {
+        static const bool disableForTesting = true;   // TODO: remove this after test
+        if (!disableForTesting) {
         //// At time of writing, wireframe selection highlighting of Maya native data
         //// is done by Maya at render item creation time, so avoid double wireframe
         //// selection highlighting by excluding MAYA_NATIVE_ROOT.
 
-#if PXR_VERSION >= 2405
-        _lastFilteringSceneIndexBeforeCustomFiltering = _geomSubsetWhSi = Fvp::GeomSubsetWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _geomSubsetWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
-#endif
+    #if PXR_VERSION >= 2405
+            _lastFilteringSceneIndexBeforeCustomFiltering = _geomSubsetWhSi = Fvp::GeomSubsetWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+            _geomSubsetWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+    #endif
 
-        _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _meshWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+            _lastFilteringSceneIndexBeforeCustomFiltering = _meshWhSi = Fvp::MeshWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+            _meshWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
 
-        _lastFilteringSceneIndexBeforeCustomFiltering = _niInstanceWhSi = Fvp::NiInstanceWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _niInstanceWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+            _lastFilteringSceneIndexBeforeCustomFiltering = _niInstanceWhSi = Fvp::NiInstanceWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+            _niInstanceWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
 
-        _lastFilteringSceneIndexBeforeCustomFiltering = _niPrototypeWhSi = Fvp::NiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _niPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+            _lastFilteringSceneIndexBeforeCustomFiltering = _niPrototypeWhSi = Fvp::NiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+            _niPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
 
-        _lastFilteringSceneIndexBeforeCustomFiltering = _piInstancerWhSi = Fvp::PiInstancerWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _piInstancerWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+            _lastFilteringSceneIndexBeforeCustomFiltering = _piInstancerWhSi = Fvp::PiInstancerWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+            _piInstancerWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
 
-        _lastFilteringSceneIndexBeforeCustomFiltering = _piPrototypeWhSi = Fvp::PiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
-        _piPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+            _lastFilteringSceneIndexBeforeCustomFiltering = _piPrototypeWhSi = Fvp::PiPrototypeWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
+            _piPrototypeWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
+        }
     }
 
     TF_AXIOM(_mayaViewportSceneIndex);

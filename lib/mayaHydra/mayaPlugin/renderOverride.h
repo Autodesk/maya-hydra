@@ -45,6 +45,8 @@
 #include <mayaHydraLib/pick/mhPickContext.h>
 #include <mayaHydraLib/pick/mhPickHitFwd.h>
 
+#include <hvt/tasks/outline/outlineManager.h>
+
 #include <flowViewport/fvpFramePassData.h>
 #include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
@@ -224,6 +226,7 @@ private:
     void _CreateSceneIndicesChainAfterMergingSceneIndex(const MHWRender::MDrawContext& drawContext);
     HdSceneIndexBaseRefPtr _CreatePassFilteringSceneIndex(Fvp::FramePassDataPtr& filteringData);
     VtValue _GetUsedGPUMemory() const;
+    HVT_NS::Outline::OutlineStyle _BuildOutlineStyle() const;
 
     void _PickByRegion(
         MayaHydra::PickHitVector& outHits,
@@ -409,6 +412,8 @@ private:
     std::shared_ptr<MAYAHYDRA_NS_DEF::MhWireframeColorInterfaceImp> _wireframeColorInterfaceImp {nullptr};
     std::shared_ptr<MAYAHYDRA_NS_DEF::MhLeadObjectPathTracker> _leadObjectPathTracker {nullptr};
     MAYAHYDRA_NS_DEF::MhDirtyLeadObjectSceneIndexRefPtr _dirtyLeadObjectSceneIndex{nullptr};
+
+    std::unique_ptr<HVT_NS::Outline::OutlineManager> _outline;
 
     /** This class creates the scene index data factories and set them up into the flow viewport library to be able to create DCC
     *   specific scene index data classes without knowing their content in Flow viewport.
