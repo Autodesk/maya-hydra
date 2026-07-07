@@ -14,6 +14,7 @@ target_sources(${TARGET_NAME}
         customDagAdapter.cpp
         imagePlaneMaterialAdapter.cpp
         renderItemAdapter.cpp
+        renderItemTopologyUtil.cpp
         directionalLightAdapter.cpp
         lightAdapter.cpp
         materialAdapter.cpp
@@ -39,6 +40,7 @@ set(HEADERS
     customDagAdapter.h
     imagePlaneMaterialAdapter.h
     renderItemAdapter.h
+    renderItemTopologyUtil.h
     lightAdapter.h
     materialAdapter.h
     materialNetworkConverter.h

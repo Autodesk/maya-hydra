@@ -19,7 +19,10 @@
 #include <mayaHydraLib/adapters/shapeAdapter.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#include <flowViewport/fvpDirtyNotifier.h>
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
+
+#include <functional>
 
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/tokens.h>
@@ -43,13 +46,18 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
-const std::array<std::pair<MObject&, HdDirtyBits>, 4> _dirtyBits { {
+using NurbsDirtyFn = std::function<void(Fvp::FvpDirtyNotifier&)>;
+
+const std::pair<MObject&, NurbsDirtyFn> _dirtyNotifiers[] {
     { MayaAttrs::nurbsCurve::controlPoints,
-      HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent },
-    { MayaAttrs::nurbsCurve::worldMatrix, HdChangeTracker::DirtyTransform },
-    { MayaAttrs::nurbsCurve::doubleSided, HdChangeTracker::DirtyDoubleSided },
-    { MayaAttrs::nurbsCurve::intermediateObject, HdChangeTracker::DirtyVisibility },
-} };
+      [](Fvp::FvpDirtyNotifier& n) { n.dirtyPoints().dirtyExtent(); } },
+    { MayaAttrs::nurbsCurve::worldMatrix,
+      [](Fvp::FvpDirtyNotifier& n) { n.dirtyTransform(); } },
+    { MayaAttrs::nurbsCurve::doubleSided,
+      [](Fvp::FvpDirtyNotifier& n) { n.dirtyDoubleSided(); } },
+    { MayaAttrs::nurbsCurve::intermediateObject,
+      [](Fvp::FvpDirtyNotifier& n) { n.dirtyVisibility(); } },
+};
 
 } // namespace
 
@@ -70,7 +78,7 @@ public:
 
     bool IsSupported() const override
     {
-        return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->basisCurves);
+        return GetMayaHydraSceneIndex()->IsRprimTypeSupported(HdPrimTypeTokens->basisCurves);
     }
 
     void Populate() override { GetMayaHydraSceneIndex()->InsertPrim(this, HdPrimTypeTokens->basisCurves, GetID()); }
@@ -182,17 +190,27 @@ public:
     TfToken GetRenderTag() const override { return Fvp::secondaryGraphicsRenderTagToken; }
 
 private:
+    static void _NotifyConnectivityChanged(MayaHydraNurbsCurveAdapter* adapter)
+    {
+        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+        Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(notifier);
+        notifier.flush();
+    }
+
     static void NodeDirtiedCallback(MObject& node, MPlug& plug, void* clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraNurbsCurveAdapter*>(clientData);
-        for (const auto& it : _dirtyBits) {
+        for (const auto& it : _dirtyNotifiers) {
             if (it.first == plug) {
-                adapter->MarkDirty(it.second);
+                if (plug == MayaAttrs::nurbsCurve::intermediateObject) {
+                    adapter->InvalidateVisibility();
+                }
+                Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+                it.second(notifier);
+                notifier.flush();
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_CURVE_PLUG_DIRTY)
                     .Msg(
-                        "Marking prim dirty with bits %u because %s plug was "
-                        "dirtied.\n",
-                        it.second,
+                        "Marking prim dirty because %s plug was dirtied.\n",
                         plug.partialName().asChar());
                 return;
             }
@@ -214,15 +232,17 @@ private:
         void*                          clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraNurbsCurveAdapter*>(clientData);
-        if (plug == MayaAttrs::mesh::instObjGroups) {
-            adapter->MarkDirty(HdChangeTracker::DirtyMaterialId);
+        if (plug == MayaAttrs::dagNode::instObjGroups) {
+            Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+            notifier.dirtyMaterialBinding();
+            notifier.flush();
         } else {
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_CURVE_UNHANDLED_PLUG_DIRTY)
                 .Msg(
                     "%s (%s) plug dirtying was not handled by "
                     "MayaHydraNurbsCurveAdapter::attributeChangedCallback.\n",
                     plug.name().asChar(),
-                    plug.name().asChar());
+                    plug.partialName().asChar());
         }
 
         adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
@@ -230,18 +250,15 @@ private:
 
     static void TopologyChangedCallback(MObject& node, void* clientData)
     {
-        auto* adapter = reinterpret_cast<MayaHydraNurbsCurveAdapter*>(clientData);
-        adapter->MarkDirty(
-            HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar
-            | HdChangeTracker::DirtyPoints);
+        TF_UNUSED(node);
+        _NotifyConnectivityChanged(reinterpret_cast<MayaHydraNurbsCurveAdapter*>(clientData));
     }
 
     static void ComponentIdChanged(MUintArray componentIds[], unsigned int count, void* clientData)
     {
-        auto* adapter = reinterpret_cast<MayaHydraNurbsCurveAdapter*>(clientData);
-        adapter->MarkDirty(
-            HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar
-            | HdChangeTracker::DirtyPoints);
+        TF_UNUSED(componentIds);
+        TF_UNUSED(count);
+        _NotifyConnectivityChanged(reinterpret_cast<MayaHydraNurbsCurveAdapter*>(clientData));
     }
 };
 

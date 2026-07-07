@@ -29,6 +29,8 @@
 
 #include "imagePlaneMaterialAdapter.h"
 
+#include <flowViewport/fvpDirtyNotifier.h>
+
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/materialNetworkConverter.h>
@@ -87,7 +89,9 @@ void _AttributeChangedCallback(
     if (attr == MayaAttrs::imagePlane::imageName
         || attr == MayaAttrs::imagePlane::useFrameExtension
         || attr == MayaAttrs::imagePlane::frameExtension) {
-        adapter->MarkDirty(HdMaterial::AllDirty);
+        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+        notifier.dirtyMaterial();
+        notifier.flush();
     }
 
     if (attr == MayaAttrs::imagePlane::useFrameExtension) {
@@ -103,9 +107,10 @@ void _AttributeChangedCallback(
 // UpdateTimeChangeCallback).
 void _TimeChangedCallback(void* clientData)
 {
-    auto* adapter
-        = reinterpret_cast<MayaHydraImagePlaneMaterialAdapter*>(clientData);
-    adapter->MarkDirty(HdMaterial::AllDirty);
+    auto* adapter = reinterpret_cast<MayaHydraImagePlaneMaterialAdapter*>(clientData);
+    Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+    notifier.dirtyMaterial();
+    notifier.flush();
 }
 
 } // anonymous namespace

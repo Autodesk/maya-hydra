@@ -105,9 +105,6 @@ public:
     HdCullStyle GetCullStyle() const override;
 
     MAYAHYDRALIB_API
-    virtual void MarkDirty(HdDirtyBits dirtyBits) override;
-
-    MAYAHYDRALIB_API
     VtValue Get(const TfToken& key) override;
 
     MAYAHYDRALIB_API

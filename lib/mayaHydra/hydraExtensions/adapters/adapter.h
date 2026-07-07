@@ -20,6 +20,8 @@
 
 #include <mayaHydraLib/api.h>
 
+#include <flowViewport/fvpDirtyNotifier.h>
+
 #include <pxr/imaging/hd/sceneDelegate.h>
 #include <pxr/pxr.h>
 #include <pxr/usd/sdf/path.h>
@@ -94,8 +96,6 @@ public:
     MAYAHYDRALIB_API
     /// Register Maya callbacks that dirty or invalidate this prim.
     virtual void CreateCallbacks();
-    /// Mark the prim as dirty for the given bitset.
-    virtual void MarkDirty(HdDirtyBits dirtyBits) = 0;
     /// Remove the prim from the scene index.
     virtual void RemovePrim() = 0;
     /// Insert the prim into the scene index.
@@ -108,22 +108,31 @@ public:
     /// Return whether the prim has been populated.
     bool IsPopulated() const { return _isPopulated; }
 
+    /// Return whether the Hydra prim for this adapter is an rprim (mesh, curves, points, …).
+    /// The result is resolved lazily on first call via the scene index and cached while
+    /// _isPopulated is true. Any call while _isPopulated is false (i.e. after RemovePrim() and
+    /// before the next Populate()) returns false and clears the cache so Populate() resolves
+    /// a fresh value. Returns false (without caching) when the render delegate is not yet
+    /// available.
+    bool IsRprim() const;
+
     // ---- Primvar dirtying flow (extension/dynamic attributes only) ----
-    // MarkPrimvarDirtyForAttributeChange: final MarkDirty call (primvar + extra bits).
+    // MarkPrimvarDirtyForAttributeChange: final FvpDirtyNotifier flush (primvar + extra locators).
     // No-op if the plug is not an extension or dynamic attribute.
     // MaybeMarkPrimvarDirtyForAttributeChange: normalize plug + apply policy.
     // ShouldMarkPrimvarDirtyForAttributeChange: per-adapter gating to avoid duplicates.
-    /// Final primvar dirtying step for an attribute change (primvar + consolidated bits).
+    /// Final primvar dirtying step for an attribute change (primvar locators + optional extras).
     /// No-op if the plug is not an extension or dynamic attribute.
     void MarkPrimvarDirtyForAttributeChange(const MPlug& plug);
 
-    /// Derived-class hook: override to add extra dirty bits for consolidation when a primvar-
-    /// affecting attr changes (e.g. light param attrs need DirtyParams|DirtyShadowParams).
-    /// Consolidating into one MarkDirty reduces redundant scene index notifications.
-    virtual HdDirtyBits GetConsolidatedDirtyBitsForPrimvarAttributeChange(const MPlug& plug) const
-    {
-        return 0;
-    }
+    /// Derived-class hook: override to add extra, type-specific dirty locators when a
+    /// primvar-affecting extension/dynamic attr changes (e.g. light param attrs also need
+    /// the light schema locator). The base MarkPrimvarDirtyForAttributeChange always covers
+    /// the primvar translation path via dirtyPrimvars(); the override adds only the
+    /// type-specific schema on top. Default is a no-op.
+    /// The changed plug is passed so overrides can gate on it (e.g. lights only add the light
+    /// schema for actual light-param attributes); plug may be invalid (kAttributeRemoved).
+    virtual void AddExtraDirtyForPrimvarAttributeChange(Fvp::FvpDirtyNotifier&, const MPlug&) { }
 
     /// Call from attribute-changed callbacks when an extension/dynamic attr change should
     /// mark primvars dirty. Resolves \p plug to the appropriate parent/root plug before
@@ -131,7 +140,7 @@ public:
     /// attributes (e.g. color.r), so callers may see multiple invocations that coalesce
     /// to the same top plug.
     /// Override ShouldMarkPrimvarDirtyForAttributeChange to return false when another callback
-    /// already marks DirtyPrimvar (e.g. mesh _dirtyBits, light param attr list) to avoid
+    /// already marks primvars dirty (e.g. mesh NodeDirtiedCallback, light param attr list) to avoid
     /// duplicate notifications.
     /// Orchestrates primvar dirtying for an attribute change:
     /// - normalizes to the top plug (compound/array element safety),
@@ -221,6 +230,9 @@ public:
     virtual bool Illuminated() const { return false; }
 
 protected:
+    /// Skip Hydra dirty notifications during file read or when the render index is unavailable.
+    static bool ShouldSkipHydraUpdates(MayaHydraSceneIndex* sceneIndex);
+
     SdfPath                  _id;
     std::vector<MCallbackId> _callbacks;
     MayaHydraSceneIndex*     _mayaHydraSceneIndex;
@@ -229,6 +241,11 @@ protected:
     bool                     _extAttrMapNeedUpdate { true };
 
     bool _isPopulated = false;
+
+    // Cache for IsRprim(): resolved once on the first call, then reused. Mutable because
+    // IsRprim() is logically const even though it lazily fills the cache.
+    mutable bool _isRprimResolved { false };
+    mutable bool _isRprimValue    { false };
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

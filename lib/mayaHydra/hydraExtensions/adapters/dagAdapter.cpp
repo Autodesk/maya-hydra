@@ -19,6 +19,8 @@
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#include <flowViewport/fvpDirtyNotifier.h>
+
 #include <pxr/base/gf/interval.h>
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/tokens.h>
@@ -60,8 +62,48 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 namespace {
 
+bool _PlugNodeOnMasterDagPath(const MObject& plugNode, const MDagPath& masterPath)
+{
+    if (plugNode.isNull() || !masterPath.isValid()) {
+        return false;
+    }
+    for (MDagPath path = masterPath; path.length() > 0; path.pop()) {
+        if (path.node() == plugNode) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void _DirtyInstancerPlugs(MayaHydraDagAdapter* adapter)
+{
+    // Dirty the rprim: its instance index and the instanceTransform primvar changed.
+    {
+        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+        notifier.dirtyInstancer().dirtyPrimvars();
+        notifier.flush();
+    }
+    // Dirty the instancer prim itself: topology and primvars (instanceTransform) changed.
+    if (adapter->IsInstanced()) {
+        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetInstancerID());
+        notifier.dirtyInstancer().dirtyPrimvars();
+        notifier.flush();
+    }
+}
+
+void _DirtyInstancerVisibilityPlug(MayaHydraDagAdapter* adapter, const MPlug& plug)
+{
+    // Per-instance visibility is expressed via instance indices / instanceTransform primvars,
+    // not the prototype rprim visibility schema (which reflects the master DAG path only).
+    _DirtyInstancerPlugs(adapter);
+    if (_PlugNodeOnMasterDagPath(plug.node(), adapter->GetDagPath())) {
+        MayaHydraDagAdapter::DirtyVisibilityRelatedPlug(adapter);
+    }
+}
+
 void _TransformNodeDirty(MObject& node, MPlug& plug, void* clientData)
 {
+    TF_UNUSED(node);
     auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_DAG_PLUG_DIRTY)
         .Msg(
@@ -69,30 +111,10 @@ void _TransformNodeDirty(MObject& node, MPlug& plug, void* clientData)
             "dirtied.\n",
             adapter->GetID().GetText(),
             plug.partialName().asChar());
-    if (plug == MayaAttrs::dagNode::visibility || plug == MayaAttrs::dagNode::intermediateObject
-        || plug == MayaAttrs::dagNode::overrideEnabled
-        || plug == MayaAttrs::dagNode::overrideVisibility) {
-        // Unfortunately, during this callback, we can't actually
-        // query the new object's visiblity - the plug dirty hasn't
-        // really propagated yet. So we just mark our own _visibility
-        // as dirty, and unconditionally dirty the hd bits
-
-        // If we're currently invisible, it's possible we were
-        // skipping transform updates (see below), so need to mark
-        // that dirty as well...
-        if (adapter->IsVisible(false)) {
-            // Transform can change while dag path is hidden.
-            adapter->InvalidateTransform();
-            adapter->MarkDirty(HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyTransform);
-        } else {
-            adapter->MarkDirty(HdChangeTracker::DirtyVisibility);
-        }
-        // We use IsVisible(checkDirty=false) because we need to make sure we
-        // DON'T update visibility from within this callback, since the change
-        // has't propagated yet
-    } else if (adapter->IsVisible(false)) {
-        adapter->InvalidateTransform();
-        adapter->MarkDirty(HdChangeTracker::DirtyTransform);
+    if (MayaHydraDagAdapter::IsVisibilityRelatedPlug(plug)) {
+        MayaHydraDagAdapter::DirtyVisibilityRelatedPlug(adapter);
+    } else {
+        MayaHydraDagAdapter::DirtyTransformIfVisible(adapter);
     }
 }
 
@@ -114,6 +136,7 @@ void _HierarchyChanged(MDagPath& child, MDagPath& parent, void* clientData)
 
 void _InstancerNodeDirty(MObject& node, MPlug& plug, void* clientData)
 {
+    TF_UNUSED(node);
     auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_DAG_PLUG_DIRTY)
         .Msg(
@@ -121,9 +144,15 @@ void _InstancerNodeDirty(MObject& node, MPlug& plug, void* clientData)
             "dirtied.\n",
             adapter->GetID().GetText(),
             plug.partialName().asChar());
-    adapter->MarkDirty(
-        HdChangeTracker::DirtyInstancer | HdChangeTracker::DirtyInstanceIndex
-        | HdChangeTracker::DirtyPrimvar);
+    if (MayaHydraDagAdapter::IsVisibilityRelatedPlug(plug)) {
+        if (adapter->IsInstanced()) {
+            _DirtyInstancerVisibilityPlug(adapter, plug);
+        } else {
+            MayaHydraDagAdapter::DirtyVisibilityRelatedPlug(adapter);
+        }
+        return;
+    }
+    _DirtyInstancerPlugs(adapter);
 }
 
 const auto _instancePrimvarDescriptors = HdPrimvarDescriptorVector {
@@ -208,19 +237,6 @@ void MayaHydraDagAdapter::CreateCallbacks()
     MayaHydraAdapter::CreateCallbacks();
 }
 
-void MayaHydraDagAdapter::MarkDirty(HdDirtyBits dirtyBits)
-{
-    if (dirtyBits != 0) {
-        GetMayaHydraSceneIndex()->MarkRprimDirty(GetID(), dirtyBits);
-        if (IsInstanced()) {
-            GetMayaHydraSceneIndex()->MarkInstancerDirty(GetInstancerID(), dirtyBits);
-        }
-        if (dirtyBits & HdChangeTracker::DirtyVisibility) {
-            _visibilityDirty = true;
-        }
-    }
-}
-
 void MayaHydraDagAdapter::RemovePrim()
 {
     if (!_isPopulated) {
@@ -228,9 +244,11 @@ void MayaHydraDagAdapter::RemovePrim()
     }
     GetMayaHydraSceneIndex()->RemovePrim(GetID());
     if (_isInstanced) {
-        GetMayaHydraSceneIndex()->GetRenderIndex().RemoveInstancer(GetID().AppendProperty(_tokens->instancer));
+        GetMayaHydraSceneIndex()->RemoveInstancer(GetID().AppendProperty(_tokens->instancer));
     }
     _isPopulated = false;
+    // Note: _isRprimResolved is reset automatically by IsRprim() whenever _isPopulated is false
+    // (see MayaHydraAdapter::IsRprim). No explicit reset needed here.
 }
 
 bool MayaHydraDagAdapter::UpdateVisibility()
@@ -338,6 +356,39 @@ VtValue MayaHydraDagAdapter::GetInstancePrimvar(const TfToken& key)
         return VtValue(ret);
     }
     return {};
+}
+
+bool MayaHydraDagAdapter::IsVisibilityRelatedPlug(const MPlug& plug)
+{
+    return plug == MayaAttrs::dagNode::visibility || plug == MayaAttrs::dagNode::intermediateObject
+        || plug == MayaAttrs::dagNode::overrideEnabled
+        || plug == MayaAttrs::dagNode::overrideVisibility;
+}
+
+void MayaHydraDagAdapter::DirtyVisibilityRelatedPlug(MayaHydraDagAdapter* adapter, bool coDirtyTransform)
+{
+    // Can't query the new visibility here — the plug dirty hasn't propagated yet.
+    // Mark _visibilityDirty so IsVisible() re-reads it on the next query.
+    adapter->InvalidateVisibility();
+    Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+    if (coDirtyTransform && adapter->IsVisible(false)) {
+        adapter->InvalidateTransform();
+        notifier.dirtyVisibility().dirtyTransform();
+    } else {
+        notifier.dirtyVisibility();
+    }
+    notifier.flush();
+}
+
+void MayaHydraDagAdapter::DirtyTransformIfVisible(MayaHydraDagAdapter* adapter)
+{
+    if (!adapter->IsVisible(false)) {
+        return;
+    }
+    adapter->InvalidateTransform();
+    Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+    notifier.dirtyTransform();
+    notifier.flush();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

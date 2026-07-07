@@ -290,6 +290,7 @@ public:
     const AddedPrimEntries&   GetAddedPrimEntries() { return _addedPrimEntries; }
     const RemovedPrimEntries& GetRemovedPrimEntries() { return _removedPrimEntries; }
     const DirtiedPrimEntries& GetDirtiedPrimEntries() { return _dirtiedPrimEntries; }
+    const DirtiedPrimEntries& GetDirtiedPrimEntries() const { return _dirtiedPrimEntries; }
     const RenamedPrimEntries& GetRenamedPrimEntries() { return _renamedPrimEntries; }
 
     void PrimsAdded(const HdSceneIndexBase& sender, const AddedPrimEntries& entries) override
@@ -320,6 +321,45 @@ private:
     RemovedPrimEntries _removedPrimEntries;
     RenamedPrimEntries _renamedPrimEntries;
 };
+
+/// Summary of mesh-relevant dirty locators for one prim since a start index.
+/// Used by tests to verify topology vs deformation emission; see also
+/// doc/render_delegate_topology_vs_deformation.md
+struct MeshDirtySignals
+{
+    bool anyForPrim = false;
+    bool meshTopology = false;
+    bool broadPrimvars = false;
+    bool extCompPrimvars = false;
+    bool points = false;
+    bool extent = false;
+    bool normals = false;
+    bool uvs = false;          // primvars/st — granular UV locator
+    bool tangents = false;     // primvars/tangents — granular tangents locator
+    bool subdivisionTags = false;
+    bool displayStyle = false; // displayStyle — emitted on smooth mesh / refine level changes
+    bool visibility = false;     // visibility schema — emitted on visibility / intermediateObject changes
+    bool instancer = false;        // instancedBy / instancerTopology — instance visibility or transform changes
+};
+
+/// Classify mesh dirty locators emitted for \p meshPrimPath since \p startIndex.
+MeshDirtySignals ClassifyMeshDirtySince(
+    const SceneIndexNotificationsAccumulator& accumulator,
+    size_t                                    startIndex,
+    const SdfPath&                            meshPrimPath);
+
+/// Human-readable dump of dirtied entries since \p startIndex. When \p primPath is
+/// non-empty, only entries for that prim are included.
+std::string DescribeDirtyPrimEntriesSince(
+    const SceneIndexNotificationsAccumulator& accumulator,
+    size_t                                    startIndex,
+    const SdfPath&                            primPath = SdfPath());
+
+/// Resolve a mesh rprim path and MayaHydraSceneIndex from a Maya shape DAG path.
+bool TryFindMeshPrim(
+    const std::string&      meshShapeFull,
+    SdfPath*                outPrimPath,
+    HdSceneIndexBaseRefPtr* outMayaSceneIndex);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

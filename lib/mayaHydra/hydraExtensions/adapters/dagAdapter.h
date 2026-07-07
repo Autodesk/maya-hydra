@@ -34,6 +34,7 @@
 #include <maya/MFnDagNode.h>
 #include <maya/MMatrix.h>
 #include <maya/MMessage.h>
+#include <maya/MPlug.h>
 
 #include <functional>
 
@@ -58,8 +59,6 @@ public:
     MAYAHYDRALIB_API
     virtual void CreateCallbacks() override;
     MAYAHYDRALIB_API
-    virtual void MarkDirty(HdDirtyBits dirtyBits) override;
-    MAYAHYDRALIB_API
     virtual void RemovePrim() override;
     MAYAHYDRALIB_API
     GfMatrix4d GetTransform() override;
@@ -70,6 +69,7 @@ public:
     bool            IsVisible(bool checkDirty = true);
     const MDagPath& GetDagPath() const { return _dagPath; }
     void            InvalidateTransform() { _invalidTransform = true; }
+    void            InvalidateVisibility() { _visibilityDirty = true; }
     bool            IsInstanced() const { return _isInstanced; }
     MAYAHYDRALIB_API
     SdfPath GetInstancerID() const;
@@ -81,6 +81,17 @@ public:
     VtValue GetInstancePrimvar(const TfToken& key);
 
     bool Illuminated() const override { return (MFnDependencyNode(_dagPath.node()).typeName().asChar() == TfToken("mesh")); }
+
+    /// True for visibility, intermediateObject, overrideEnabled, overrideVisibility.
+    static bool IsVisibilityRelatedPlug(const MPlug& plug);
+
+    /// Invalidate visibility cache and emit visibility locators. When \p coDirtyTransform is true
+    /// and the prim is currently visible, also invalidate transform and dirty the transform
+    /// locator (the plug dirty has not propagated yet — use IsVisible(false)).
+    static void DirtyVisibilityRelatedPlug(MayaHydraDagAdapter* adapter, bool coDirtyTransform = true);
+
+    /// When the prim is visible, invalidate transform and emit the transform locator.
+    static void DirtyTransformIfVisible(MayaHydraDagAdapter* adapter);
 
 protected:
     MAYAHYDRALIB_API

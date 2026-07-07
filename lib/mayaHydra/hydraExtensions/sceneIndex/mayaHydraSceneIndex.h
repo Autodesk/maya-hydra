@@ -17,8 +17,6 @@
 #ifndef MAYAHYDRASCENEINDEX_H
 #define MAYAHYDRASCENEINDEX_H
 
-#include "pxr/imaging/hd/dirtyBitsTranslator.h"
-
 #include <mayaHydraLib/adapters/cameraAdapter.h>
 #include <mayaHydraLib/adapters/customDagAdapter.h>
 #include <mayaHydraLib/adapters/lightAdapter.h>
@@ -115,11 +113,6 @@ public:
     // Remove a primitive from hydra scene
     void RemovePrim(const SdfPath& id);
 
-    void MarkRprimDirty(const SdfPath& id, HdDirtyBits dirtyBits);
-    void MarkSprimDirty(const SdfPath& id, HdDirtyBits dirtyBits);
-    void MarkBprimDirty(const SdfPath& id, HdDirtyBits dirtyBits);
-    void MarkInstancerDirty(const SdfPath& id, HdDirtyBits dirtyBits);
-
     // The scene index does not update the Hydra scene in real-time for every Maya operation.
     // Call this method to ensure the Hydra scene is fully up-to-date with the Maya scene.
     void FlushPendingUpdates();
@@ -187,7 +180,23 @@ public:
 
     GfInterval GetCurrentTimeSamplingInterval() const;
 
-    HdRenderIndex& GetRenderIndex() { return _renderIndex; }
+    /// Returns the render index pointer. May be null during destruction (after _Destroy() is
+    /// called) or before the render index is created. Prefer HasRenderDelegate()-guarded
+    /// wrappers (IsRprimTypeSupported, GetResourceRegistry, etc.) over calling this directly.
+    HdRenderIndex* GetRenderIndexPtr() { return _renderIndex; }
+
+    /// True when the render index exists and has an attached render delegate. Several
+    /// HdRenderIndex queries dereference _renderDelegate unconditionally.
+    bool HasRenderDelegate() const;
+
+    bool IsRprimTypeSupported(const TfToken& typeId) const;
+    bool IsSprimTypeSupported(const TfToken& typeId) const;
+    bool IsBprimTypeSupported(const TfToken& typeId) const;
+
+    HdResourceRegistrySharedPtr GetResourceRegistry() const;
+
+    /// No-op when the render delegate is not yet attached.
+    void RemoveInstancer(const SdfPath& id);
 
     SdfPath GetDelegateID(TfToken name);
 
@@ -245,9 +254,9 @@ public:
         return nSamples;
     }
 
-    /// Is using an environment variable to tell if we should pass normals to Hydra when using the
-    /// render item and mesh adapters
-    static bool passNormalsToHydra();
+    /// Returns true when Maya (OGS) supplies pre-computed normals to Hydra via the vertex buffer,
+    /// false when Hydra generates normals itself. Controlled by an environment variable.
+    static bool useMayaNormals();
 
     /// Is using an environment variable to tell if we should use the mesh adapter instead of the
     /// render item adapter for Maya meshes or when we are using batch production rendering it should be always on
@@ -298,13 +307,6 @@ private:
     _GetRenderItemMaterial(const MRenderItem& ri, SdfPath& material, MObject& shadingEngineNode);
     SdfPath _GetRenderItemPrimPath(const MRenderItem& ri);
     SdfPath GetMaterialPath(const MObject& obj);
-    using DirtyBitsToLocatorsFunc
-        = std::function<void(TfToken const&, const HdDirtyBits, HdDataSourceLocatorSet*)>;
-    void _MarkPrimDirty(
-        const SdfPath&          id,
-        HdDirtyBits             dirtyBits,
-        DirtyBitsToLocatorsFunc dirtyBitsToLocatorsFunc);
-
 #ifdef CODE_COVERAGE_WORKAROUND
     friend class MtohRenderOverride;
     friend class MAYAHYDRA_NS_DEF::BatchRenderer;
@@ -315,7 +317,7 @@ private:
     SdfPath         _ID;
     MayaHydraParams _params;
 
-    HdRenderIndex& _renderIndex;
+    HdRenderIndex* _renderIndex = nullptr;
 
     // Adapters
     AdapterMap<MayaHydraLightAdapterPtr>                   _lightAdapters;

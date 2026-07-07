@@ -104,6 +104,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testGeomSubsetsPicking.py
     cpp/testSinglePicking.py
     cpp/testSceneIndexDirtying.py
+    cpp/testFvpDirtyNotifier.py
     cpp/testMayaNodesAttributesDirtying.py|depOnPlugins:mtoa
     cpp/testLightPrimvars.py|depOnPlugins:mtoa
     cpp/testDataSourceNames.py
@@ -119,6 +120,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testWriteFile.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     cpp/testMaterialBlocking.py
     cpp/testPassFiltering.py
+    cpp/testRenderItemDirtyLocators.py
 )
 
 # These two test files are identical, except for disabled tests.  See
@@ -166,6 +168,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshAdapterVisibility.py
     cpp/testMeshAdapterTransform.py
     cpp/testMeshPrimvars.py
+    cpp/testMeshDirtyLocators.py
     cpp/testMeshGeomSubsets.py
     cpp/testMeshSubdivTags.py
 )

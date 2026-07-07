@@ -99,14 +99,28 @@ bool _IsLightParamAttribute(const MPlug& plug)
         MayaHydraAdapter::GetParamAttributeSet(kLightParamAttributeNames));
 }
 
+// Match HdDirtyBitsTranslator::SprimDirtyBitsToLocatorSet for HdLight::DirtyParams.
+void _dirtyBuiltInLightParams(MayaHydraLightAdapter* adapter)
+{
+    // dirtyPrimvars() is intentional: lights are sprims but support extension-attribute
+    // primvars (custom Maya attrs translated as constant primvars). The broad primvars
+    // locator ensures those are re-pulled alongside the light schema.
+    // dirtyVisibility() and dirtyCollections() match HdDirtyBitsTranslator::SprimDirtyBitsToLocatorSet
+    // for HdLight::DirtyParams.
+    Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+    notifier.dirtyLightParams().dirtyPrimvars().dirtyVisibility().dirtyCollections();
+    notifier.flush();
+}
+
 void _dirtyTransform(MObject& node, void* clientData)
 {
     TF_UNUSED(node);
     auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
     if (adapter->IsVisible()) {
         adapter->InvalidateTransform();
-        adapter->MarkDirty(
-            HdLight::DirtyTransform | HdLight::DirtyParams | HdLight::DirtyShadowParams);
+        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+        notifier.dirtyTransform().dirtyLightParams();
+        notifier.flush();
     }
 }
 
@@ -124,7 +138,7 @@ void _dirtyParamsPlug(MObject& node, MPlug& plug, void* clientData)
         if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(topPlug)) {
             adapter->MarkPrimvarDirtyForAttributeChange(topPlug);
         } else {
-            adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
+            _dirtyBuiltInLightParams(adapter);
         }
         return;
     }
@@ -170,7 +184,7 @@ void MayaHydraLightAdapter::_LightShapeAttributeChanged(
             if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(topPlug)) {
                 adapter->MarkPrimvarDirtyForAttributeChange(topPlug);
             } else {
-                adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
+                _dirtyBuiltInLightParams(adapter);
             }
         }
         return;
@@ -202,7 +216,7 @@ MayaHydraLightAdapter::~MayaHydraLightAdapter() { }
 
 bool MayaHydraLightAdapter::IsSupported() const
 {
-    return GetMayaHydraSceneIndex()->GetRenderIndex().IsSprimTypeSupported(LightType());
+    return GetMayaHydraSceneIndex()->IsSprimTypeSupported(LightType());
 }
 
 void MayaHydraLightAdapter::Populate()
@@ -213,17 +227,6 @@ void MayaHydraLightAdapter::Populate()
     if (IsVisible() && _isLightingOn) {
         GetMayaHydraSceneIndex()->InsertPrim(this, LightType(), GetID());
         _isPopulated = true;
-    }
-}
-
-void MayaHydraLightAdapter::MarkDirty(HdDirtyBits dirtyBits)
-{
-    if (_isPopulated && dirtyBits != 0) {
-        // We support extension-attribute primvars on lights, so keep DirtyPrimvar even though
-        // lights are sprims and normally only expose HdLight dirty bits.
-        const HdDirtyBits primvarBits = dirtyBits & HdChangeTracker::DirtyPrimvar;
-        dirtyBits = (dirtyBits & HdLight::AllDirty) | primvarBits;
-        GetMayaHydraSceneIndex()->MarkSprimDirty(GetID(), dirtyBits);
     }
 }
 
@@ -751,13 +754,8 @@ VtValue MayaHydraLightAdapter::GetLightMaterialNetwork() const
                                                                                   : "false");
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
                 .Msg(
-                    "  cameraVisibility: %s\n",
-                    lightNode.parameters[TfToken("cameraVisibility")].Get<bool>() ? "true"
-                                                                                  : "false");
-            TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
-                .Msg(
-                    "  primaryVisibility: %s\n",
-                    lightNode.parameters[TfToken("primaryVisibility")].Get<bool>() ? "true"
+                    "  visibility:camera: %s\n",
+                    lightNode.parameters[TfToken("visibility:camera")].Get<bool>() ? "true"
                                                                                    : "false");
 
             // Debug: Print final color value
@@ -907,35 +905,16 @@ bool MayaHydraLightAdapter::ShouldMarkPrimvarDirtyForAttributeChange(const MPlug
     return MayaHydraAdapter::ShouldMarkPrimvarDirtyForParamAttrs(plug, kLightParamAttributeNames);
 }
 
-HdDirtyBits MayaHydraLightAdapter::GetConsolidatedDirtyBitsForPrimvarAttributeChange(const MPlug& plug) const
+void MayaHydraLightAdapter::AddExtraDirtyForPrimvarAttributeChange(Fvp::FvpDirtyNotifier& notifier, const MPlug& plug)
 {
-    if (MayaHydraAdapter::IsParamAttribute(plug,
-            MayaHydraAdapter::GetParamAttributeSet(kLightParamAttributeNames))) {
-        return HdLight::DirtyParams | HdLight::DirtyShadowParams;
-    }
-    return 0;
-}
-
-void MayaHydraLightAdapter::MarkDirtyIfPlugAffectsLightParams(MayaHydraLightAdapter* adapter, const MPlug& plug)
-{
-    if (!adapter->IsVisible()) {
-        return;
-    }
-    if (plug.isChild()) {
-        return;
-    }
-    if (!MayaHydraAdapter::IsParamAttribute(plug,
-            MayaHydraAdapter::GetParamAttributeSet(kLightParamAttributeNames))) {
-        return;
-    }
-    adapter->InvalidateTransform();
-    if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
-        // Single MarkDirty call (primvar + params + shadows) via
-        // GetConsolidatedDirtyBitsForPrimvarAttributeChange
-        // to reduce redundant scene index notifications when updating ai attributes.
-        adapter->MarkPrimvarDirtyForAttributeChange(plug);
-    } else {
-        adapter->MarkDirty(HdLight::DirtyParams | HdLight::DirtyShadowParams);
+    // Lights expose extension-attribute primvars, but a light-param attribute change must also
+    // invalidate the light schema, visibility, and shadow collections — matching the full
+    // SprimDirtyBitsToLocatorSet(DirtyParams) expansion used by _dirtyBuiltInLightParams.
+    // The base class already added dirtyPrimvars() for the extension-attribute primvar path.
+    // IsParamAttribute safely returns false for an invalid plug (e.g. kAttributeRemoved).
+    if (MayaHydraAdapter::IsParamAttribute(
+            plug, MayaHydraAdapter::GetParamAttributeSet(kLightParamAttributeNames))) {
+        notifier.dirtyLightParams().dirtyVisibility().dirtyCollections();
     }
 }
 

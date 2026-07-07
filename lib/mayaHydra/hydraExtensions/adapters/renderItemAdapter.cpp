@@ -20,6 +20,7 @@
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/adapters/tokens.h>
+#include <mayaHydraLib/adapters/renderItemTopologyUtil.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/plug/plugin.h>
@@ -49,6 +50,39 @@ using namespace MayaHydra;
 
 #define PLUG_THIS_PLUGIN \
     PlugRegistry::GetInstance().GetPluginWithName(TF_PP_STRINGIZE(MFB_PACKAGE_NAME))
+
+namespace {
+
+unsigned int
+_GetPositionVertexCount(MGeometry* geom, int vertexBufferCount)
+{
+    if (!geom || vertexBufferCount <= 0) {
+        return 0;
+    }
+    for (int vbIdx = 0; vbIdx < vertexBufferCount; ++vbIdx) {
+        MVertexBuffer* mvb = geom->vertexBuffer(vbIdx);
+        if (!mvb) {
+            continue;
+        }
+        if (mvb->descriptor().semantic() == MGeometry::Semantic::kPosition) {
+            return mvb->vertexCount();
+        }
+    }
+    return 0;
+}
+
+void
+_EmitRenderItemTopologyDirtyLocators(
+    Fvp::FvpDirtyNotifier& notifier,
+    bool                   useMayaNormals)
+{
+    notifier.dirtyTopology().dirtyUVs().dirtyTangents();
+    if (useMayaNormals) {
+        notifier.dirtyNormals();
+    }
+}
+
+} // namespace
 
 /*
  * MayaHydraRenderItemAdapter is used to translate from a render item to hydra.
@@ -105,12 +139,12 @@ bool MayaHydraRenderItemAdapter::IsSupported() const
     switch (_primitive) {
     case MHWRender::MGeometry::Primitive::kTriangles:
     case MHWRender::MGeometry::Primitive::kTriangleStrip:
-        return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->mesh);
+        return GetMayaHydraSceneIndex()->IsRprimTypeSupported(HdPrimTypeTokens->mesh);
     case MHWRender::MGeometry::Primitive::kLines:
     case MHWRender::MGeometry::Primitive::kLineStrip:
-        return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->basisCurves);
+        return GetMayaHydraSceneIndex()->IsRprimTypeSupported(HdPrimTypeTokens->basisCurves);
     case MHWRender::MGeometry::Primitive::kPoints:
-        return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->points);
+        return GetMayaHydraSceneIndex()->IsRprimTypeSupported(HdPrimTypeTokens->points);
     default: return false;
     }
 }
@@ -165,56 +199,85 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     const bool visibChanged     = data._flags & MVS::MVS_changedVisibility;
     const bool effectChanged    = data._flags & MVS::MVS_changedEffect;
 
-    HdDirtyBits dirtyBits = 0;
+    // Dirty notification policy for this function — see
+    // doc/render_delegate_topology_vs_deformation.md for the full contract.
+    //   Granularity: emit one locator per changed datum; never use the broad primvars locator
+    //     for geometry edits — that would re-pull unchanged data in the render delegate.
+    //   Topology: on genuine connectivity change emit topology + face-varying primvar locators
+    //     (uvs, tangents, and conditionally normals). When Maya sets MVS_changedTopo alongside
+    //     MVS_changedGeometry but vertex count is unchanged, topology locators are suppressed
+    //     only if index connectivity is also unchanged (deformation-only). When connectivity
+    //     changes with the same vertex count, topology locators are still emitted.
+    //     The broad primvars locator is NOT emitted here — it would subsume primvars/normals
+    //     and defeat the useMayaNormals skip. Points are only dirty when geomChanged is true.
+    //   Extent: dirty only when the bounding box actually changes. Maya has no bbox-changed
+    //     flag, so we diff the freshly-read bbox against the stored _bounds before overwriting.
+    //     Checked in the geomChanged||topoChanged block (before the vertex-count workaround below),
+    //     separately from the per-primvar dirty block — this is intentional, not an oversight.
+    //   Normals: skip dirtyNormals() when useMayaNormals is false — Hydra generates
+    //     normals itself in that mode and a redundant notification would cause unnecessary work.
+    //     This guard is effective for BOTH the topoChanged and geomChanged paths because we use
+    //     granular per-primvar locators instead of the broad primvars locator on topology changes.
+    //
+    // Construct the notifier AFTER the early-exit guard above so an early return always leaves
+    // the notifier empty on an early return.
+    Fvp::FvpDirtyNotifier notifier(*GetMayaHydraSceneIndex(), GetID());
 
 #ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API
     MRenderItem::CullMode cullMode = data._ri.cullMode();
     if (cullMode != _cullMode) {
         //  MRenderItem uses CullNone to denote doubleSided
         if (IsDoubleSided(_cullMode) || IsDoubleSided(cullMode)) {
-            dirtyBits |= HdChangeTracker::DirtyDoubleSided;
+            notifier.dirtyDoubleSided();
         }
-        dirtyBits |= HdChangeTracker::DirtyCullStyle;
+        notifier.dirtyCullStyle();
         _cullMode = cullMode;
     }
 #endif
 
     if (data._wireframeColor != _wireframeColor) {
         _wireframeColor = data._wireframeColor;
-        dirtyBits |= HdChangeTracker::DirtyPrimvar; // displayColor primVar
+        // Constant-interpolation displayColor (no vertex color set present on this render item).
+        notifier.dirtyDisplayColor();
     }
 
     const bool hideOnPlayback = data._ri.isHideOnPlayback();
     if (hideOnPlayback != _isHideOnPlayback) {
         _isHideOnPlayback = hideOnPlayback;
-        dirtyBits |= HdChangeTracker::DirtyVisibility;
+        notifier.dirtyVisibility();
     }
 
     if (visibChanged) {
         _visible = visible;
-        dirtyBits |= HdChangeTracker::DirtyVisibility;
+        notifier.dirtyVisibility();
     }
 
     if (effectChanged) {
-        dirtyBits |= HdChangeTracker::DirtyMaterialId;
+        notifier.dirtyMaterialBinding();
     }
     if (matrixChanged) {
-        dirtyBits |= HdChangeTracker::DirtyTransform;
+        notifier.dirtyTransform();
     }
-    if (geomChanged) {
-        dirtyBits |= (HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent | HdChangeTracker::DirtyNormals);
-    }
-    if (topoChanged) {
-        dirtyBits |= (HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyExtent);
-    }
+    // Hoisted so it is in scope for both the topology dirty block and the per-primvar
+    // geomChanged block below. The static ensures the env var is read only once.
+    static const bool useMayaNormals = MayaHydraSceneIndex::useMayaNormals();
 
+    // Extent is checked here, under geomChanged||topoChanged, so it is always evaluated when
+    // positions or topology change — including the geomChanged case. The old code always dirtied
+    // extent on geomChanged; the new code diffs the actual bbox first and only emits dirtyExtent()
+    // when the value changed. This is intentional: if vertices moved without changing the bbox
+    // (e.g. internal vertices shuffled), there is nothing for the render delegate to re-read.
     MGeometry* geom = nullptr;
     if (geomChanged || topoChanged) {
         geom = data._ri.geometry();
         auto bbox = data._ri.boundingBox();
         const MPoint& min = bbox.min();
         const MPoint& max = bbox.max();
-        _bounds.SetRange(GfRange3d({min.x, min.y, min.z}, {max.x, max.y, max.z}));
+        const GfRange3d newRange({min.x, min.y, min.z}, {max.x, max.y, max.z});
+        if (newRange != _bounds.GetRange()) {
+            notifier.dirtyExtent();
+            _bounds.SetRange(newRange);
+        }
         // Apply the world matrix
         MMatrix matrix;
         data._ri.getMatrix(matrix);
@@ -222,8 +285,6 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     }
     VtIntArray vertexIndices;
     VtIntArray vertexCounts;
-
-    static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
         
     const int vertexBuffercount = geom ? geom->vertexBufferCount() : 0;
 
@@ -250,6 +311,21 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
             } break;
             default: break;
             }
+        }
+    }
+
+    // geomChanged means vertex buffers are re-read. Dirty one locator per primvar so the render
+    // delegate only re-pulls what actually changed. Normals are skipped when Hydra generates them.
+    // Emitted after the vertex-count workaround below which may have promoted topoChanged -> geomChanged.
+    if (geomChanged) {
+        notifier.dirtyPoints()
+            .dirtyUVs()       // st
+            .dirtyTangents(); // tangents
+            // .dirtyVertexColors() — uncomment once the kColor buffer read is wired in (see kColor case below).
+            // Do not emit the locator before the data is actually read: a dirty signal without a
+            // corresponding data update is a false promise to the render delegate.
+        if (useMayaNormals) {
+            notifier.dirtyNormals(); // skipped when Hydra generates normals
         }
     }
 
@@ -293,7 +369,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                 break;
                 case MGeometry::Semantic::kNormal: {
                     //Normals
-                    if (passNormalsToHydra){
+                    if (useMayaNormals){
                         MVertexBuffer* normals = mvb;
                         int normalsCount = 0;
                         const unsigned int originalNormalsCount = normals->vertexCount();
@@ -373,6 +449,12 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
                         mvb->unmap();
                     }
                 }
+                break;
+                case MGeometry::Semantic::kColor:
+                    // Vertex color sets (per-vertex displayColor) are not yet read from the
+                    // vertex buffer. When adding support: read the buffer here and store the
+                    // result, then uncomment notifier.dirtyVertexColors() in the geomChanged
+                    // block above so the render delegate is notified only once data is live.
                 break;
                 default:
                 break;
@@ -468,13 +550,29 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         }
     }
 
+    // Topology dirty locators are decided after index buffers are read so we can diff connectivity,
+    // not just vertex count, when Maya sets topoChanged alongside geomChanged (MAYA-134200).
+    const bool emitTopologyLocators = RenderItemShouldEmitTopologyLocators(
+        topoChanged,
+        geomChanged,
+        geom && vertexBuffercount > 0,
+        _positions.empty(),
+        _positions.size(),
+        _GetPositionVertexCount(geom, vertexBuffercount),
+        _topology.get(),
+        GetPrimitive(),
+        vertexIndices,
+        vertexCounts);
+    if (emitTopologyLocators) {
+        _EmitRenderItemTopologyDirtyLocators(notifier, useMayaNormals);
+    }
+
     if (topoChanged) {
         switch (GetPrimitive()) {
         case MGeometry::Primitive::kTriangleStrip:
         case MGeometry::Primitive::kTriangles:{
-            static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
             if (vertexCounts.size()) {
-                if (passNormalsToHydra) {
+                if (useMayaNormals) {
                     // For the OGS normals vertex buffer to be used, we need to use
                     // PxOsdOpenSubdivTokens->none
                     _topology.reset(new HdMeshTopology(
@@ -523,7 +621,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         }
     }
 
-    MarkDirty(dirtyBits);
+    notifier.flush();
 }
 
 HdMeshTopology MayaHydraRenderItemAdapter::GetMeshTopology()
@@ -560,13 +658,6 @@ VtValue MayaHydraRenderItemAdapter::Get(const TfToken& key)
     return MayaHydraAdapter::Get(key);
 }
 
-void MayaHydraRenderItemAdapter::MarkDirty(HdDirtyBits dirtyBits)
-{
-    if (dirtyBits != 0) {
-        GetMayaHydraSceneIndex()->MarkRprimDirty(GetID(), dirtyBits);
-    }
-}
-
 HdPrimvarDescriptorVector
 MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
 {
@@ -576,8 +667,8 @@ MayaHydraRenderItemAdapter::GetPrimvarDescriptors(HdInterpolation interpolation)
     // Local descriptors
     HdPrimvarDescriptorVector localDescs;
     if (interpolation == HdInterpolationVertex) {// Vertices
-        static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
-        if(passNormalsToHydra) {
+        static const bool useMayaNormals = MayaHydraSceneIndex::useMayaNormals();
+        if(useMayaNormals) {
             localDescs = {
                 { UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point },//Vertices
                 { UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal }//Normals
@@ -640,7 +731,9 @@ void MayaHydraRenderItemAdapter::SetPlaybackState(bool isPlaybackRunning)
     if (_isInPlayback != isPlaybackRunning) {
         _isInPlayback = isPlaybackRunning;
         if (_isHideOnPlayback) {
-            MarkDirty(HdChangeTracker::DirtyVisibility);
+            Fvp::FvpDirtyNotifier notifier(*GetMayaHydraSceneIndex(), GetID());
+            notifier.dirtyVisibility();
+            notifier.flush();
         }
     }
 }
