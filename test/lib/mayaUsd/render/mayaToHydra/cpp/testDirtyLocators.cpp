@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Integration tests: dirty locators for deformation vs topology edits (shared C++ source).
-// Python entry points: testMeshDirtyLocators.py (MeshDirtyLocators suite, mesh adapter mode,
-//   requires MAYA_HYDRA_USE_MESH_ADAPTER=1) and testRenderItemDirtyLocators.py
-//   (RenderItemDirtyLocators suite, render items mode, no env var required).
-// The ExtCompGate suite is mode-agnostic and runs under both Python wrappers.
-// Locator expectations follow doc/render_delegate_topology_vs_deformation.md
+// Shared Maya integration tests for deformation vs topology dirty locators. Builds a live
+// scene, performs edits via MEL, and classifies scene-index dirty notices against
+// doc/render_delegate_topology_vs_deformation.md. Python wrappers testMeshDirtyLocators.py
+// (mesh adapter) and testRenderItemDirtyLocators.py (render items) run these suites.
 
 #include "testUtils.h"
 

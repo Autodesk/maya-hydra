@@ -13,6 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+// Compares stored HdMeshTopology / HdBasisCurvesTopology against incoming MGeometry
+// primitive data and implements RenderItemShouldEmitTopologyLocators for the
+// render-item UpdateFromDelta path (see doc/render_delegate_topology_vs_deformation.md).
+//
 #include <mayaHydraLib/adapters/renderItemTopologyUtil.h>
 
 #include <pxr/imaging/hd/basisCurvesTopology.h>

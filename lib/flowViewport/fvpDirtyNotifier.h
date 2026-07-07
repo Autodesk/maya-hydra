@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+// FvpDirtyNotifier accumulates targeted HdDataSourceLocator dirty sets for one prim,
+// replacing the legacy HdDirtyBits -> HdDirtyBitsTranslator path. Callers chain
+// semantic dirty*() methods and explicitly flush() to notify HdRetainedSceneIndex.
+//
 #ifndef FVP_DIRTY_NOTIFIER_H
 #define FVP_DIRTY_NOTIFIER_H
 

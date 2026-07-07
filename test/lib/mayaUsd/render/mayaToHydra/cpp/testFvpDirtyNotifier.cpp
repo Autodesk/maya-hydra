@@ -12,17 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Locator-equivalence harness for the FvpDirtyNotifier migration.
-//
-// This test gates the migration away from HdDirtyBitsTranslator. For each
-// representative HdDirtyBits combination it runs the same bits through the legacy
-// HdDirtyBitsTranslator and compares the resulting HdDataSourceLocatorSet against
-// the equivalent FvpDirtyNotifier emission. Cases where the notifier is
-// deliberately narrower than the translator (the HdExtComputationPrimvarsSchema
-// omission for DirtyPrimvar, and the light params granularity) are asserted
-// against hand-built expected sets instead, so the intent is explicit.
-//
-// This is pure USD/Hd + flowViewport logic with no Maya dependency.
+// Migration gate for FvpDirtyNotifier: for each representative HdDirtyBits combination,
+// compares HdDirtyBitsTranslator output to the equivalent notifier emission. Deliberately
+// narrower cases (extComputation primvars, light params) assert explicit expected sets.
+// Pure USD/Hd + flowViewport logic with no Maya dependency.
 
 #include <gtest/gtest.h>
 

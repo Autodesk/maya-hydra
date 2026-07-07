@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# Python wrapper for the MeshDirtyLocators suite in testDirtyLocators.cpp. Builds a cube
+# scene with MAYA_HYDRA_USE_MESH_ADAPTER enabled and runs mesh-adapter dirty-locator cases
+# through mayaHydraCppTest.
+#
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils

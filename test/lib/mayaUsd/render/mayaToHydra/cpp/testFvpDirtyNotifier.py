@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# FvpDirtyNotifier locator-equivalence tests.
-# These are pure USD/Hd + flowViewport tests with no Maya scene dependency.
+# Python wrapper for testFvpDirtyNotifier.cpp. Loads mayaHydraCppTests and runs the
+# FvpDirtyNotifier GTest suite via mayaHydraCppTest (no scene setup required).
 #
 import maya.cmds as cmds
 import fixturesUtils

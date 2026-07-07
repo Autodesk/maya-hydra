@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Runs the RenderItemDirtyLocators and ExtCompGate C++ test suites in
-# render items mode (MAYA_HYDRA_USE_MESH_ADAPTER is NOT set).
-# The RenderItemDirtyLocators suite verifies that the render item adapter
-# emits the correct granular dirty locators for deformation, topology, and
-# dynamic attribute changes.  The ExtCompGate suite is mode-agnostic and
-# confirms that extComputationPrimvars is NOT emitted for camera (sprim) prims.
+# Python wrapper for testDirtyLocators.cpp in render-items mode (no mesh adapter env var).
+# Runs RenderItemDirtyLocators and ExtCompGate suites via mayaHydraCppTest to verify
+# granular dirty locators on the MRenderItem adapter path.
+#
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils

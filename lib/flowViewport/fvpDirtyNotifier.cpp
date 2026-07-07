@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+// Maps each FvpDirtyNotifier::dirty*() call to the matching Hydra schema locator;
+// static helpers bundle locators for connectivity and smooth-mesh display edits.
+// flush() forwards the deduplicated HdDataSourceLocatorSet via DirtyPrims().
+//
 #include "fvpDirtyNotifier.h"
 
 #include <pxr/base/tf/diagnostic.h>

@@ -13,6 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+// Topology dirty-policy helpers for the MayaHydra render-item adapter (MRenderItem path).
+// RenderItemTopologyConnectivityChanged compares stored HdTopology against new MGeometry
+// indices/counts; RenderItemShouldEmitTopologyLocators decides whether UpdateFromDelta
+// should emit topology locators or treat the edit as deformation-only.
+//
 #ifndef MAYAHYDRALIB_RENDER_ITEM_TOPOLOGY_UTIL_H
 #define MAYAHYDRALIB_RENDER_ITEM_TOPOLOGY_UTIL_H
 
