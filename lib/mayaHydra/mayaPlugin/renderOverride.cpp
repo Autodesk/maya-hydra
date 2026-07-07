@@ -1374,13 +1374,13 @@ MStatus MtohRenderOverride::Render(
         if (_outline && _selection) {
             HVT_NS::Outline::OutlineInputs inputs;
             inputs.selectedPaths = _selection->GetFullySelectedPaths();
-            {
-                std::string pathList;
-                for (auto const& p : inputs.selectedPaths) {
-                    pathList += p.GetString() + " ";
+            // Set the lead (last-selected) object only for multi-selection, so a lone
+            // object uses the regular selected color rather than the lead color.
+            if (_leadObjectPathTracker && inputs.selectedPaths.size() >= 2) {
+                const auto& leadSelections = _leadObjectPathTracker->getLeadObjectPrimSelections();
+                if (!leadSelections.empty()) {
+                    inputs.leadPath = leadSelections.front().primPath;
                 }
-                TF_WARN("MtohRenderOverride: outline selectedPaths=[%s] count=%zu",
-                    pathList.c_str(), inputs.selectedPaths.size());
             }
             inputs.excludePaths = { MAYA_NATIVE_ROOT, _highlightHierarchyPrefix };
             _outline->SetInputs(std::move(inputs));
@@ -1418,7 +1418,14 @@ MtohRenderOverride* MtohRenderOverride::GetByName(TfToken rendererName)
 HVT_NS::Outline::OutlineStyle MtohRenderOverride::_BuildOutlineStyle() const
 {
     HVT_NS::Outline::OutlineStyle style;
-    style.selectedColor      = GfVec4f(1.0f, 0.0f, 0.0f, 1.0f); // red: debug confirmation
+    style.selectedColor           = { 0.10f, 0.55f, 1.0f,  0.7f  }; // blue
+    style.selectedHoverColor      = { 1.0f,  0.64f, 0.12f, 1.0f  }; // orange
+    style.selectionLeadColor      = { 0.18f, 0.95f, 0.64f, 0.7f  }; // green
+    style.selectionLeadHoverColor = { 1.0f,  0.64f, 0.12f, 1.0f  }; // orange
+    style.overlayColor            = { 0.0f,  0.0f,  0.0f,  1.0f  }; // black
+    style.overlayHoverColor       = { 0.6f,  0.6f,  0.7f,  1.0f  }; // light gray
+    style.unselectedHoverColor    = { 1.0f,  0.64f, 0.12f, 1.0f  }; // orange
+    style.defaultColor            = { 0.2f,  0.2f,  0.2f,  1.0f  }; // gray
     return style;
 }
 
@@ -1503,7 +1510,6 @@ void MtohRenderOverride::_InitHydraResources(
                 // blitted to screen and will be cleared at the start of the next frame.
                 const SdfPath ccPath =
                     outlinePass->GetTaskManager()->GetTaskPath(TfToken("colorCorrectionTask"));
-                TF_WARN("MtohRenderOverride: outline install ccPath=%s", ccPath.GetText());
                 _outline = std::make_unique<HVT_NS::Outline::OutlineManager>();
                 _outline->Install(*outlinePass,
                                   ccPath,
