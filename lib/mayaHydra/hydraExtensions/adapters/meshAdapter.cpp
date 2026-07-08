@@ -135,35 +135,31 @@ struct MeshGeometryState
 };
 
 // Lambda table mapping a Maya mesh attribute to the granular dirty locators it should emit.
-// Each lambda receives useMayaNormals so the normals locator is only emitted when Hydra
-// is NOT generating normals itself — skipping it avoids unnecessary work in the render delegate.
 // Extent is dirtied conservatively on every point/topology change because the mesh adapter reads
 // bounds lazily (no bbox-changed flag to diff against, unlike the render-item adapter).
-using MeshDirtyFn = std::function<void(Fvp::FvpDirtyNotifier&, bool /*useMayaNormals*/)>;
-
-const MeshDirtyFn _dirtySmoothMeshDisplay = [](Fvp::FvpDirtyNotifier& n, bool useMayaNormals) {
-    Fvp::FvpDirtyNotifier::DirtySmoothMeshDisplayLocators(n, useMayaNormals);
-};
+using MeshDirtyFn = std::function<void(Fvp::FvpDirtyNotifier&)>;
 
 const std::pair<MObject&, MeshDirtyFn> _dirtyNotifiers[] {
     { MayaAttrs::mesh::worldMatrix,
-      [](Fvp::FvpDirtyNotifier& n, bool /*useMayaNormals*/) { n.dirtyTransform(); } },
+      [](Fvp::FvpDirtyNotifier& n) { n.dirtyTransform(); } },
     { MayaAttrs::mesh::doubleSided,
-      [](Fvp::FvpDirtyNotifier& n, bool /*useMayaNormals*/) { n.dirtyDoubleSided(); } },
+      [](Fvp::FvpDirtyNotifier& n) { n.dirtyDoubleSided(); } },
     { MayaAttrs::mesh::intermediateObject,
-      [](Fvp::FvpDirtyNotifier& n, bool /*useMayaNormals*/) { n.dirtyVisibility(); } },
+      [](Fvp::FvpDirtyNotifier& n) { n.dirtyVisibility(); } },
     // Tracking manual edits to uvs.
     { MayaAttrs::mesh::uvPivot,
-      [](Fvp::FvpDirtyNotifier& n, bool /*useMayaNormals*/) { n.dirtyUVs(); } },
+      [](Fvp::FvpDirtyNotifier& n) { n.dirtyUVs(); } },
     // displaySmoothMesh and smoothLevel drive HdDisplayStyle::refineLevel via GetDisplayStyle().
-    // When refineLevel transitions across 0:
-    //   * GetMeshTopology() flips the subdivisionScheme between `none` and `catmullClark` (topology).
-    //   * GetPrimvarDescriptors(faceVarying) starts/stops advertising `normals` (-> normals,
-    //     emitted granularly and guarded by useMayaNormals).
-    //   * GetSubdivTags() returns empty tags when refineLevel < 1 (-> subdivision tags).
-    // No other primvar changes, so we do NOT emit the broad primvars locator.
-    { MayaAttrs::mesh::displaySmoothMesh, _dirtySmoothMeshDisplay },
-    { MayaAttrs::mesh::smoothLevel, _dirtySmoothMeshDisplay },
+    // When refineLevel transitions across 0, GetMeshTopology() flips subdivisionScheme and
+    // GetSubdivTags() changes; emit displayStyle + topology + subdivisionTags only.
+    { MayaAttrs::mesh::displaySmoothMesh,
+      [](Fvp::FvpDirtyNotifier& n) {
+          Fvp::FvpDirtyNotifier::DirtySmoothMeshDisplayLocators(n);
+      } },
+    { MayaAttrs::mesh::smoothLevel,
+      [](Fvp::FvpDirtyNotifier& n) {
+          Fvp::FvpDirtyNotifier::DirtySmoothMeshDisplayLocators(n);
+      } },
 };
 
 } // namespace
@@ -635,7 +631,7 @@ private:
     {
         Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
         Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(
-            notifier, MayaHydraSceneIndex::useMayaNormals());
+            notifier, HdPrimTypeTokens->mesh);
         notifier.flush();
         adapter->RefreshGeometryState();
     }
@@ -657,10 +653,10 @@ private:
         if (!status) {
             return;
         }
-        const bool useMayaNormals = MayaHydraSceneIndex::useMayaNormals();
         if (plugAttr == MayaAttrs::mesh::inMesh || plugAttr == MayaAttrs::mesh::pnts) {
             Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
-            adapter->DirtyInMeshOrPnts(notifier, useMayaNormals);
+            adapter->DirtyInMeshOrPnts(
+                notifier, MayaHydraSceneIndex::useMayaNormals());
             notifier.flush();
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_MESH_PLUG_DIRTY)
                 .Msg(
@@ -676,7 +672,7 @@ private:
                     adapter->InvalidateVisibility();
                 }
                 Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
-                it.second(notifier, useMayaNormals);
+                it.second(notifier);
                 notifier.flush();
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_MESH_PLUG_DIRTY)
                     .Msg(

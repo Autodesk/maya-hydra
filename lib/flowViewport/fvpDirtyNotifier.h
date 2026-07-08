@@ -110,20 +110,29 @@ public:
     // Matches HdDirtyBitsTranslator::RprimDirtyBitsToLocatorSet for DirtyPrimvar on rprims.
     // Sprim DirtyPrimvar does not include this schema; emit only for rprim broad primvar invalidation.
     FVP_API FvpDirtyNotifier& dirtyExtComputationPrimvars();
-    FVP_API FvpDirtyNotifier& dirtyTopology();      // mesh > subdivisionScheme + meshTopology
+    /// Mesh-only: subdivisionScheme + meshTopology.
+    FVP_API FvpDirtyNotifier& dirtyMeshTopology();
+    /// BasisCurves-only: basisCurves/topology.
+    FVP_API FvpDirtyNotifier& dirtyBasisCurvesTopology();
+    /// Dispatches to dirtyMeshTopology() or dirtyBasisCurvesTopology() per \p primType.
+    /// Points and other rprim types have no topology schema locators; emits a warning and no-op.
+    FVP_API FvpDirtyNotifier& dirtyTopology(const PXR_NS::TfToken& primType);
     FVP_API FvpDirtyNotifier& dirtyExtent();        // extent
 
-    /// Canonical locator bundle for rprim connectivity/topology changes on the mesh-adapter
-    /// path (mesh, nurbs curve): topology + broad primvars + points + extent. Optionally
-    /// includes normals when \p useMayaNormals is true (mesh adapter only).
+    /// Canonical locator bundle for rprim connectivity/topology changes: topology +
+    /// broad primvars + points + extent. Emits mesh or basisCurves topology locators per
+    /// \p primType. Does not emit granular UV/tangent/normal locators — topology (or broad
+    /// primvars on the mesh-adapter path) is sufficient for render delegates to full-rebuild.
     /// extComputationPrimvars is intentionally NOT included — skinning/blendshape only.
     /// See doc/render_delegate_topology_vs_deformation.md
-    FVP_API static void DirtyRprimConnectivityLocators(FvpDirtyNotifier& notifier, bool useMayaNormals = false);
+    FVP_API static void DirtyRprimConnectivityLocators(
+        FvpDirtyNotifier& notifier,
+        const PXR_NS::TfToken& primType);
 
     /// Locator bundle when Maya mesh displaySmoothMesh or smoothLevel changes (refineLevel
-    /// crossing 0): displayStyle + topology + subdivision tags, and normals when
-    /// \p useMayaNormals is true. Does NOT emit the broad primvars locator.
-    FVP_API static void DirtySmoothMeshDisplayLocators(FvpDirtyNotifier& notifier, bool useMayaNormals = false);
+    /// crossing 0): displayStyle + topology + subdivision tags. Does NOT emit the broad
+    /// primvars locator or granular face-varying primvar locators.
+    FVP_API static void DirtySmoothMeshDisplayLocators(FvpDirtyNotifier& notifier);
 
     FVP_API FvpDirtyNotifier& dirtyDoubleSided();   // mesh > doubleSided
     FVP_API FvpDirtyNotifier& dirtyCullStyle();     // displayStyle > cullStyle

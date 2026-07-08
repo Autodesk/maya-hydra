@@ -32,8 +32,10 @@
 #include <pxr/imaging/hd/lightSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/materialSchema.h>
+#include <pxr/imaging/hd/basisCurvesTopologySchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/meshTopologySchema.h>
+#include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/subdivisionTagsSchema.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
@@ -140,27 +142,48 @@ FvpDirtyNotifier& FvpDirtyNotifier::dirtyExtComputationPrimvars()
     return _append(HdExtComputationPrimvarsSchema::GetDefaultLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyTopology()
+FvpDirtyNotifier& FvpDirtyNotifier::dirtyMeshTopology()
 {
     // The translator always emits both for DirtyTopology on a mesh.
     _append(HdMeshSchema::GetSubdivisionSchemeLocator());
     return _append(HdMeshTopologySchema::GetDefaultLocator());
 }
 
-void FvpDirtyNotifier::DirtyRprimConnectivityLocators(FvpDirtyNotifier& notifier, bool useMayaNormals)
+FvpDirtyNotifier& FvpDirtyNotifier::dirtyBasisCurvesTopology()
 {
-    notifier.dirtyTopology().dirtyPrimvars().dirtyPoints().dirtyExtent();
-    if (useMayaNormals) {
-        notifier.dirtyNormals();
-    }
+    return _append(HdBasisCurvesTopologySchema::GetDefaultLocator());
 }
 
-void FvpDirtyNotifier::DirtySmoothMeshDisplayLocators(FvpDirtyNotifier& notifier, bool useMayaNormals)
+FvpDirtyNotifier& FvpDirtyNotifier::dirtyTopology(const TfToken& primType)
 {
-    notifier.dirtyDisplayStyle().dirtyTopology().dirtySubdivision();
-    if (useMayaNormals) {
-        notifier.dirtyNormals();
+    if (primType == HdPrimTypeTokens->basisCurves) {
+        return dirtyBasisCurvesTopology();
     }
+    if (primType == HdPrimTypeTokens->mesh) {
+        return dirtyMeshTopology();
+    }
+    TF_WARN(
+        "FvpDirtyNotifier::dirtyTopology: unsupported prim type '%s'; "
+        "no topology locators emitted.",
+        primType.GetText());
+    return *this;
+}
+
+void FvpDirtyNotifier::DirtyRprimConnectivityLocators(
+    FvpDirtyNotifier& notifier,
+    const TfToken&     primType)
+{
+    if (primType == HdPrimTypeTokens->basisCurves) {
+        notifier.dirtyBasisCurvesTopology().dirtyPrimvars().dirtyPoints().dirtyExtent();
+        return;
+    }
+
+    notifier.dirtyMeshTopology().dirtyPrimvars().dirtyPoints().dirtyExtent();
+}
+
+void FvpDirtyNotifier::DirtySmoothMeshDisplayLocators(FvpDirtyNotifier& notifier)
+{
+    notifier.dirtyDisplayStyle().dirtyMeshTopology().dirtySubdivision();
 }
 
 FvpDirtyNotifier& FvpDirtyNotifier::dirtyExtent()

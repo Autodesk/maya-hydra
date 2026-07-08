@@ -74,11 +74,19 @@ _GetPositionVertexCount(MGeometry* geom, int vertexBufferCount)
 void
 _EmitRenderItemTopologyDirtyLocators(
     Fvp::FvpDirtyNotifier& notifier,
-    bool                   useMayaNormals)
+    MHWRender::MGeometry::Primitive primitive)
 {
-    notifier.dirtyTopology().dirtyUVs().dirtyTangents();
-    if (useMayaNormals) {
-        notifier.dirtyNormals();
+    switch (primitive) {
+    case MHWRender::MGeometry::Primitive::kTriangles:
+    case MHWRender::MGeometry::Primitive::kTriangleStrip:
+        notifier.dirtyMeshTopology();
+        break;
+    case MHWRender::MGeometry::Primitive::kLines:
+    case MHWRender::MGeometry::Primitive::kLineStrip:
+        notifier.dirtyBasisCurvesTopology();
+        break;
+    default:
+        break;
     }
 }
 
@@ -564,7 +572,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         vertexIndices,
         vertexCounts);
     if (emitTopologyLocators) {
-        _EmitRenderItemTopologyDirtyLocators(notifier, useMayaNormals);
+        _EmitRenderItemTopologyDirtyLocators(notifier, GetPrimitive());
     }
 
     if (topoChanged) {

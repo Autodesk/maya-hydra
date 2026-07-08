@@ -920,10 +920,9 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
         // from each adapter.
         _MapAdapter<MayaHydraRenderItemAdapter>(
             [](MayaHydraRenderItemAdapter* a) {
-                if (a->HasType(HdPrimTypeTokens->mesh) || a->HasType(HdPrimTypeTokens->basisCurves)
-                    || a->HasType(HdPrimTypeTokens->points)) {
+                if (a->HasType(HdPrimTypeTokens->mesh)) {
                     Fvp::FvpDirtyNotifier notifier(*a->GetMayaHydraSceneIndex(), a->GetID());
-                    notifier.dirtyTopology();
+                    notifier.dirtyMeshTopology();
                     notifier.flush();
                 }
             },
@@ -932,7 +931,7 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
             [](MayaHydraDagAdapter* a) {
                 if (a->HasType(HdPrimTypeTokens->mesh)) {
                     Fvp::FvpDirtyNotifier notifier(*a->GetMayaHydraSceneIndex(), a->GetID());
-                    notifier.dirtyTopology();
+                    notifier.dirtyMeshTopology();
                     notifier.flush();
                 }
             },

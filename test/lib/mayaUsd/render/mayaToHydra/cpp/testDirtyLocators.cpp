@@ -589,7 +589,9 @@ TEST(RenderItemDirtyLocators, DeformationVertexMoveEmitsGranularPrimvarsNotBroad
 //       changes: broadPrimvars would defeat the granular useMayaNormals skip; extCompPrimvars
 //       is reserved for skinning/blendshape computations, not connectivity changes.
 // How: extrude one face on the test cube and inspect dirty locators.
-// Expect: meshTopology=true, points=true; broadPrimvars=false, extCompPrimvars=false.
+// Expect: meshTopology=true, points=true; uvs/tangents may also appear when Maya sets
+//         geomChanged alongside topoChanged (vertex buffers re-read), but not from the
+//         topology locator helper itself. broadPrimvars=false, extCompPrimvars=false.
 TEST(RenderItemDirtyLocators, TopologyExtrudeEmitsTopologyNotBroadPrimvars)
 {
     const std::string meshShapeFull = GetOptionVarOrDefault(kMeshShapeOptionVar, kMeshShapeFallback);
@@ -617,12 +619,8 @@ TEST(RenderItemDirtyLocators, TopologyExtrudeEmitsTopologyNotBroadPrimvars)
     EXPECT_TRUE(signals.points)
         << "Topology change (vertex count change) should also dirty primvars/points\n"
         << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
-    EXPECT_TRUE(signals.uvs)
-        << "Topology change should dirty primvars/st\n"
-        << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
-    EXPECT_TRUE(signals.tangents)
-        << "Topology change should dirty primvars/tangents\n"
-        << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
+    // UVs/tangents may appear when geomChanged accompanies topoChanged (buffer re-read).
+    // The topology helper itself emits topology locators only.
     // Render item adapter intentionally does NOT emit broadPrimvars on topology changes.
     EXPECT_FALSE(signals.broadPrimvars)
         << "Render item topology change must not emit the broad primvars locator\n"
@@ -718,8 +716,8 @@ TEST(RenderItemDirtyLocators, UVEditViaGeomChangedEmitsPointsAndUVsNotTopology)
 //       Unlike the mesh adapter, this path emits topology + face-varying primvar locators only;
 //       displayStyle and subdivisionTags are mesh-adapter concerns.
 // How: set displaySmoothMesh=2 on the test cube and inspect dirty locators.
-// Expect: meshTopology + uvs (face-varying invalidation on topoChanged); no broadPrimvars,
-//         no displayStyle, no subdivisionTags.
+// Expect: meshTopology; no broadPrimvars, no displayStyle, no subdivisionTags.
+//         UV/tangent locators are not emitted on the topology path (geomChanged may add them).
 TEST(RenderItemDirtyLocators, SmoothMeshToggleEmitsTopologyNotDisplayStyle)
 {
     const std::string meshShapeFull = GetOptionVarOrDefault(kMeshShapeOptionVar, kMeshShapeFallback);
@@ -744,9 +742,6 @@ TEST(RenderItemDirtyLocators, SmoothMeshToggleEmitsTopologyNotDisplayStyle)
     EXPECT_TRUE(signals.anyForPrim) << "Expected dirty notices for the mesh prim";
     EXPECT_TRUE(signals.meshTopology)
         << "Smooth mesh toggle should dirty mesh topology (subdivisionScheme flip)\n"
-        << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
-    EXPECT_TRUE(signals.uvs)
-        << "Smooth mesh topo change should dirty face-varying primvars/st\n"
         << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
     EXPECT_FALSE(signals.broadPrimvars)
         << "Render item smooth mesh toggle must not emit the broad primvars locator\n"

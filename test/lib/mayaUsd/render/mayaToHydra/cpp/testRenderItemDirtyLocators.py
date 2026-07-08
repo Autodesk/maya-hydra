@@ -101,10 +101,10 @@ class TestRenderItemDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
                 f="RenderItemDirtyLocators.UVEditViaGeomChangedEmitsPointsAndUVsNotTopology")
 
     # What: smooth mesh preview toggles subdivision via render item topoChanged, not mesh-adapter
-    #       attribute handlers.  Expect topology + face-varying primvars; not displayStyle or
+    #       attribute handlers.  Topology helper emits mesh topology only; not displayStyle or
     #       subdivisionTags (those are mesh-adapter locators).
     # How: build a cube scene (render items mode), set displaySmoothMesh=2 via C++, inspect locators.
-    # Expect: meshTopology + uvs; no broadPrimvars, no displayStyle, no subdivisionTags.
+    # Expect: meshTopology; no broadPrimvars, no displayStyle, no subdivisionTags.
     def test_smoothMeshToggleEmitsTopologyNotDisplayStyle(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):

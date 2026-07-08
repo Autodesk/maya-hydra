@@ -38,6 +38,7 @@
 #include <pxr/imaging/hd/lightSchema.h>
 #include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/materialSchema.h>
+#include <pxr/imaging/hd/basisCurvesTopologySchema.h>
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
@@ -125,12 +126,31 @@ TEST(FvpDirtyNotifier, materialBindingMatchesTranslator)
         NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyMaterialBinding(); }));
 }
 
-TEST(FvpDirtyNotifier, topologyMatchesTranslator)
+TEST(FvpDirtyNotifier, meshTopologyMatchesTranslator)
 {
     // Rule 2: topology only - no primvars, no extent.
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->mesh, HdChangeTracker::DirtyTopology),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyTopology(); }));
+        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyMeshTopology(); }));
+}
+
+TEST(FvpDirtyNotifier, basisCurvesTopologyMatchesTranslator)
+{
+    EXPECT_EQ(
+        TranslatorRprimLocators(HdPrimTypeTokens->basisCurves, HdChangeTracker::DirtyTopology),
+        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyBasisCurvesTopology(); }));
+}
+
+TEST(FvpDirtyNotifier, dirtyTopologyDispatchesByPrimType)
+{
+    EXPECT_EQ(
+        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyMeshTopology(); }),
+        NotifierLocators(
+            [](Fvp::FvpDirtyNotifier& n) { n.dirtyTopology(HdPrimTypeTokens->mesh); }));
+    EXPECT_EQ(
+        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyBasisCurvesTopology(); }),
+        NotifierLocators(
+            [](Fvp::FvpDirtyNotifier& n) { n.dirtyTopology(HdPrimTypeTokens->basisCurves); }));
 }
 
 TEST(FvpDirtyNotifier, rprimConnectivityChangeOmitsNormalsByDefault)
@@ -145,24 +165,34 @@ TEST(FvpDirtyNotifier, rprimConnectivityChangeOmitsNormalsByDefault)
     EXPECT_EQ(
         expected,
         NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
-            Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(n);
+            Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(n, HdPrimTypeTokens->mesh);
         }));
 }
 
-TEST(FvpDirtyNotifier, rprimConnectivityChangeIncludesNormalsWhenRequested)
+TEST(FvpDirtyNotifier, rprimConnectivityChangeOmitsGranularFaceVaryingPrimvars)
+{
+    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
+        Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(n, HdPrimTypeTokens->mesh);
+    });
+    EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetNormalsLocator()));
+    EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("st"))));
+    EXPECT_FALSE(
+        actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("tangents"))));
+}
+
+TEST(FvpDirtyNotifier, basisCurvesConnectivityChangeOmitsMeshTopology)
 {
     HdDataSourceLocatorSet expected;
-    expected.append(HdMeshSchema::GetSubdivisionSchemeLocator());
-    expected.append(HdMeshTopologySchema::GetDefaultLocator());
+    expected.append(HdBasisCurvesTopologySchema::GetDefaultLocator());
     expected.append(HdPrimvarsSchema::GetDefaultLocator());
     expected.append(HdPrimvarsSchema::GetPointsLocator());
     expected.append(HdExtentSchema::GetDefaultLocator());
-    expected.append(HdPrimvarsSchema::GetNormalsLocator());
 
     EXPECT_EQ(
         expected,
         NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
-            Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(n, /*useMayaNormals=*/true);
+            Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(
+                n, HdPrimTypeTokens->basisCurves);
         }));
 }
 
@@ -181,20 +211,15 @@ TEST(FvpDirtyNotifier, smoothMeshDisplayOmitsNormalsByDefault)
         }));
 }
 
-TEST(FvpDirtyNotifier, smoothMeshDisplayIncludesNormalsWhenRequested)
+TEST(FvpDirtyNotifier, smoothMeshDisplayOmitsGranularFaceVaryingPrimvars)
 {
-    HdDataSourceLocatorSet expected;
-    expected.append(HdLegacyDisplayStyleSchema::GetDefaultLocator());
-    expected.append(HdMeshSchema::GetSubdivisionSchemeLocator());
-    expected.append(HdMeshTopologySchema::GetDefaultLocator());
-    expected.append(HdSubdivisionTagsSchema::GetDefaultLocator());
-    expected.append(HdPrimvarsSchema::GetNormalsLocator());
-
-    EXPECT_EQ(
-        expected,
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
-            Fvp::FvpDirtyNotifier::DirtySmoothMeshDisplayLocators(n, /*useMayaNormals=*/true);
-        }));
+    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
+        Fvp::FvpDirtyNotifier::DirtySmoothMeshDisplayLocators(n);
+    });
+    EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetNormalsLocator()));
+    EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("st"))));
+    EXPECT_FALSE(
+        actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("tangents"))));
 }
 
 TEST(FvpDirtyNotifier, extentMatchesTranslator)
@@ -305,46 +330,48 @@ TEST(FvpDirtyNotifier, materialSkipsPrimvarsOnAllDirty)
     EXPECT_EQ(expected, NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyMaterial(); }));
 }
 
-// ---- Render-item topoChanged: granular face-varying primvars, no broad primvars ----
+// ---- Render-item topoChanged: topology locators only ----
 //
-// The render-item adapter emits topology + dirtyUVs + dirtyTangents + dirtyExtComputationPrimvars
-// (+ dirtyNormals when useMayaNormals). The broad primvars locator (primvars/) must NOT be
-// emitted: it subsumes primvars/normals and would defeat the useMayaNormals guard.
+// Topology changes emit mesh/basisCurves topology locators only. Face-varying primvars
+// (st, tangents, normals) are not dirtied on the topology path — render delegates should
+// full-rebuild from topology (Pixar guidance: stable-topology vs deforming-geometry distinction).
 
-TEST(FvpDirtyNotifier, topoChangedWithNormalsExcludesBroadPrimvars)
+TEST(FvpDirtyNotifier, renderItemMeshTopoChangeEmitsTopologyOnly)
 {
-    // useMayaNormals = false: topology + uvs + tangents, NO normals, NO broad primvars.
-    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
-        n.dirtyTopology().dirtyUVs().dirtyTangents().dirtyExtComputationPrimvars();
-        // dirtyNormals() intentionally NOT called (useMayaNormals = false path)
-    });
+    HdDataSourceLocatorSet expected;
+    expected.append(HdMeshSchema::GetSubdivisionSchemeLocator());
+    expected.append(HdMeshTopologySchema::GetDefaultLocator());
 
-    // Broad primvars must be absent (exact match — Contains, not Intersects).
-    EXPECT_FALSE(actual.Contains(HdPrimvarsSchema::GetDefaultLocator()))
-        << "Broad primvars locator must not be emitted on topoChanged";
-    EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetNormalsLocator()))
-        << "Normals locator must be absent when useMayaNormals is false";
-    // Granular face-varying primvars must be present.
-    EXPECT_TRUE(actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("st"))))
-        << "UV locator must be present on topoChanged";
-    EXPECT_TRUE(actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("tangents"))))
-        << "Tangents locator must be present on topoChanged";
+    EXPECT_EQ(
+        expected,
+        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyMeshTopology(); }));
+
+    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
+        n.dirtyMeshTopology();
+    });
+    EXPECT_FALSE(actual.Contains(HdPrimvarsSchema::GetDefaultLocator()));
+    EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetNormalsLocator()));
+    EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("st"))));
+    EXPECT_FALSE(
+        actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("tangents"))));
 }
 
-TEST(FvpDirtyNotifier, topoChangedWithPassNormalsIncludesNormals)
+TEST(FvpDirtyNotifier, renderItemCurveTopoChangeOmitsMeshPrimvars)
 {
-    // useMayaNormals = true: topology + uvs + tangents + normals, still NO broad primvars.
-    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
-        n.dirtyTopology().dirtyUVs().dirtyTangents().dirtyExtComputationPrimvars();
-        n.dirtyNormals(); // useMayaNormals = true path
-    });
+    HdDataSourceLocatorSet expected;
+    expected.append(HdBasisCurvesTopologySchema::GetDefaultLocator());
 
-    EXPECT_FALSE(actual.Contains(HdPrimvarsSchema::GetDefaultLocator()))
-        << "Broad primvars locator must not be emitted on topoChanged";
-    EXPECT_TRUE(actual.Intersects(HdPrimvarsSchema::GetNormalsLocator()))
-        << "Normals locator must be present when useMayaNormals is true";
-    EXPECT_TRUE(actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("st"))))
-        << "UV locator must be present on topoChanged";
+    EXPECT_EQ(
+        expected,
+        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyBasisCurvesTopology(); }));
+
+    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
+        n.dirtyBasisCurvesTopology();
+    });
+    EXPECT_FALSE(actual.Intersects(HdMeshTopologySchema::GetDefaultLocator()));
+    EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("st"))));
+    EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("tangents"))));
+    EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetNormalsLocator()));
 }
 
 // ---- The render-item geomChanged invalidation shift (rules 1 + 4) ----

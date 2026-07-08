@@ -193,7 +193,8 @@ private:
     static void _NotifyConnectivityChanged(MayaHydraNurbsCurveAdapter* adapter)
     {
         Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
-        Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(notifier);
+        Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(
+            notifier, HdPrimTypeTokens->basisCurves);
         notifier.flush();
     }
 
