@@ -431,12 +431,19 @@ if(NOT IS_MACOSX)
     set(_terminal_dump_file
         "${TEST_OUTPUT_ROOT}/terminalSceneIndexDump/sceneIndexDump.txt")
     set(render_dir ${TEST_OUTPUT_ROOT}/terminalSceneIndexDump/projects/default/images)
+    if(MAYA_APP_VERSION VERSION_GREATER 2027)
+        set(_terminal_expected
+            "${CMAKE_CURRENT_SOURCE_DIR}/expected/terminalSceneIndexDump_next.txt")
+    else()
+        set(_terminal_expected
+            "${CMAKE_CURRENT_SOURCE_DIR}/expected/terminalSceneIndexDump_2027.txt")
+    endif()
     _add_scene_index_dump_test(
         terminalSceneIndexDump
         texturing/mayaSphereMayaMaterialArnold.ma
         "-x 160 -y 120 -hsd \"${_terminal_dump_file}\" -rd \"${render_dir}\""
         "${_terminal_dump_file}"
-        "${CMAKE_CURRENT_SOURCE_DIR}/expected/terminalSceneIndexDump.txt"
+        "${_terminal_expected}"
     )
 
     set(_mayaHydra_dump_file

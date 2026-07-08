@@ -176,7 +176,12 @@ void SceneIndexInspector::_WriteLeafDataSource(
     std::ostream&          outStream) const
 {
     std::string dataSourceDescription;
-    if (auto blockDataSource = HdBlockDataSource::Cast(dataSource)) {
+    // HdOverlayContainerDataSource::Get() will return a nullptr if its child
+    // is an HdBlockDataSource.  GetNames() will still include such a child.
+    if (!dataSource) {
+        dataSourceDescription = "Blocked or absent data source";
+    }
+    else if (auto blockDataSource = HdBlockDataSource::Cast(dataSource)) {
         dataSourceDescription = "BlockDataSource";
     } else if (auto sampledDataSource = HdSampledDataSource::Cast(dataSource)) {
         dataSourceDescription
