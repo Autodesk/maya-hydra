@@ -341,23 +341,23 @@ function(_mayaHydra_setup_test_plugins)
     # lookdevx
     if(DEFINED LOOKDEVX_LOCATION)
         list(APPEND MAYAHYDRA_VARNAME_PATH
-             "${LOOKDEVX_LOCATION}/bin")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/bin")
         list(APPEND MAYAHYDRA_VARNAME_PATH
-             "${LOOKDEVX_LOCATION}/plug-ins")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/plug-ins")
         list(APPEND MAYAHYDRA_VARNAME_MAYA_SCRIPT_PATH
-             "${LOOKDEVX_LOCATION}/scripts") #Contains some AE templates files
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/scripts") #Contains some AE templates files
         list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
-             "${LOOKDEVX_LOCATION}/scripts")#Contains some python scripts
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/scripts")#Contains some python scripts
         list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
-             "${LOOKDEVX_LOCATION}/python")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/python")
         list(APPEND MAYAHYDRA_VARNAME_MAYA_PLUG_IN_PATH
-             "${LOOKDEVX_LOCATION}/plug-ins")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/plug-ins")
         list(APPEND MAYAHYDRA_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
-             "${LOOKDEVX_LOCATION}/libraries-lookdevx")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/libraries-lookdevx")
         list(APPEND MAYAHYDRA_VARNAME_MATERIALX_SEARCH_PATH
-             "${LOOKDEVX_LOCATION}/libraries")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/libraries")
         list(APPEND MAYAHYDRA_VARNAME_MATERIALX_SEARCH_PATH
-             "${LOOKDEVX_LOCATION}/libraries-lookdevx")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/libraries-lookdevx")
     endif()
 
     if(DEFINED BIFROST_LOCATION)
