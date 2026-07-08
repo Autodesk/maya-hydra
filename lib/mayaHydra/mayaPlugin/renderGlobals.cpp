@@ -439,7 +439,8 @@ template <> void _GetFromPlug<int>(const MPlug& plug, int& out) { out = plug.asI
 
 template <> void _GetFromPlug<unsigned int>(const MPlug& plug, unsigned int& out)
 {
-    out = static_cast<unsigned int>(plug.asInt());
+    const int v = plug.asInt();
+    out = static_cast<unsigned int>(v < 0 ? 0 : v);
 }
 
 template <> void _GetFromPlug<float>(const MPlug& plug, float& out) { out = plug.asFloat(); }

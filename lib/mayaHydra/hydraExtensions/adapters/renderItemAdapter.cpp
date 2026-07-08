@@ -211,21 +211,23 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // doc/render_delegate_topology_vs_deformation.md for the full contract.
     //   Granularity: emit one locator per changed datum; never use the broad primvars locator
     //     for geometry edits — that would re-pull unchanged data in the render delegate.
-    //   Topology: on genuine connectivity change emit topology + face-varying primvar locators
-    //     (uvs, tangents, and conditionally normals). When Maya sets MVS_changedTopo alongside
-    //     MVS_changedGeometry but vertex count is unchanged, topology locators are suppressed
-    //     only if index connectivity is also unchanged (deformation-only). When connectivity
-    //     changes with the same vertex count, topology locators are still emitted.
-    //     The broad primvars locator is NOT emitted here — it would subsume primvars/normals
-    //     and defeat the useMayaNormals skip. Points are only dirty when geomChanged is true.
+    //   Topology: on genuine connectivity change emit topology locators only
+    //     (mesh/topology or basisCurves/topology via _EmitRenderItemTopologyDirtyLocators).
+    //     When Maya also sets MVS_changedGeometry alongside MVS_changedTopo, the separate
+    //     geomChanged path may dirty granular primvars (points/st/tangents and optionally normals).
+    //     The broad primvars locator is NOT emitted on the topology path — it would subsume
+    //     granular locators and defeat the useMayaNormals skip.
+    //     Topology locators are suppressed when Maya sets MVS_changedTopo alongside
+    //     MVS_changedGeometry but both vertex count and index connectivity are unchanged
+    //     (deformation-only). When connectivity changes with the same vertex count, topology
+    //     locators are still emitted.
     //   Extent: dirty only when the bounding box actually changes. Maya has no bbox-changed
     //     flag, so we diff the freshly-read bbox against the stored _bounds before overwriting.
     //     Checked in the geomChanged||topoChanged block (before the vertex-count workaround below),
     //     separately from the per-primvar dirty block — this is intentional, not an oversight.
     //   Normals: skip dirtyNormals() when useMayaNormals is false — Hydra generates
     //     normals itself in that mode and a redundant notification would cause unnecessary work.
-    //     This guard is effective for BOTH the topoChanged and geomChanged paths because we use
-    //     granular per-primvar locators instead of the broad primvars locator on topology changes.
+    //     The guard applies on the geomChanged path where granular primvar locators are emitted.
     //
     // Construct the notifier AFTER the early-exit guard above so an early return always leaves
     // the notifier empty on an early return.
