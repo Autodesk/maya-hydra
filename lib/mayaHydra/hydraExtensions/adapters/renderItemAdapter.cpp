@@ -180,9 +180,14 @@ void MayaHydraRenderItemAdapter::_InsertRprim(MayaHydraAdapter* adapter)
             GetID().GetText());
         break;
     }
+    _isPopulated = true;
 }
 
-void MayaHydraRenderItemAdapter::_RemoveRprim() { GetMayaHydraSceneIndex()->RemovePrim(GetID());} 
+void MayaHydraRenderItemAdapter::_RemoveRprim()
+{
+    GetMayaHydraSceneIndex()->RemovePrim(GetID());
+    _isPopulated = false;
+}
 
 // We receive in that function the changes made in the Maya viewport between the last frame rendered
 // and the current frame
@@ -297,6 +302,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     VtIntArray vertexCounts;
         
     const int vertexBuffercount = geom ? geom->vertexBufferCount() : 0;
+    const size_t storedPositionCountBeforeUpdate = _positions.size();
 
     //Temp workaround for a bug in Maya MAYA-134200
     if ((!geomChanged && topoChanged) && vertexBuffercount) { 
@@ -475,7 +481,8 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // Indices
     // Line strips do not make use of the index buffer, so we can skip this block.
     // See "Line strips indices are implicitly defined" comment.
-    if (topoChanged && vertexBuffercount && GetPrimitive() != MHWRender::MGeometry::Primitive::kLineStrip) {
+    if ((topoChanged || geomChanged) && vertexBuffercount
+        && GetPrimitive() != MHWRender::MGeometry::Primitive::kLineStrip) {
         // Assume first stream contains the positions.
         MIndexBuffer* indices = geom->indexBuffer(0);
         if (indices) {
@@ -566,8 +573,8 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         topoChanged,
         geomChanged,
         geom && vertexBuffercount > 0,
-        _positions.empty(),
-        _positions.size(),
+        storedPositionCountBeforeUpdate == 0 && _positions.empty(),
+        storedPositionCountBeforeUpdate,
         _GetPositionVertexCount(geom, vertexBuffercount),
         _topology.get(),
         GetPrimitive(),
@@ -577,32 +584,50 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         _EmitRenderItemTopologyDirtyLocators(notifier, GetPrimitive());
     }
 
-    if (topoChanged) {
+    // Keep cached topology in sync whenever index buffers were read, not only when Maya sets
+    // MVS_changedTopo. geomChanged-only connectivity edits (e.g. edge flip) may skip the topo flag
+    // while still changing the index buffer.
+    const bool indicesWereRead = (topoChanged || geomChanged) && vertexBuffercount > 0
+        && GetPrimitive() != MHWRender::MGeometry::Primitive::kLineStrip;
+    if (indicesWereRead && !vertexCounts.empty()) {
         switch (GetPrimitive()) {
         case MGeometry::Primitive::kTriangleStrip:
-        case MGeometry::Primitive::kTriangles:{
-            if (vertexCounts.size()) {
-                if (useMayaNormals) {
-                    // For the OGS normals vertex buffer to be used, we need to use
-                    // PxOsdOpenSubdivTokens->none
-                    _topology.reset(new HdMeshTopology(
-                        PxOsdOpenSubdivTokens->none, 
-                        UsdGeomTokens->rightHanded,
-                        vertexCounts,
-                        vertexIndices));
-                } else {
-                    _topology.reset(new HdMeshTopology(
-                        (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes
-                         || GetDisplayStyle().refineLevel > 0)
-                            ? PxOsdOpenSubdivTokens->catmullClark
-                            : PxOsdOpenSubdivTokens->none,
-                        UsdGeomTokens->rightHanded,
-                        vertexCounts,
-                        vertexIndices));
-                }
+        case MGeometry::Primitive::kTriangles: {
+            if (useMayaNormals) {
+                _topology.reset(new HdMeshTopology(
+                    PxOsdOpenSubdivTokens->none,
+                    UsdGeomTokens->rightHanded,
+                    vertexCounts,
+                    vertexIndices));
             } else {
-                _topology.reset();
+                _topology.reset(new HdMeshTopology(
+                    (GetMayaHydraSceneIndex()->GetParams().displaySmoothMeshes
+                     || GetDisplayStyle().refineLevel > 0)
+                        ? PxOsdOpenSubdivTokens->catmullClark
+                        : PxOsdOpenSubdivTokens->none,
+                    UsdGeomTokens->rightHanded,
+                    vertexCounts,
+                    vertexIndices));
             }
+            break;
+        }
+        case MGeometry::Primitive::kLines: {
+            _topology.reset(new HdBasisCurvesTopology(
+                HdTokens->linear,
+                {},
+                HdTokens->segmented,
+                vertexCounts,
+                vertexIndices));
+            break;
+        }
+        default: break;
+        }
+    } else if (topoChanged) {
+        switch (GetPrimitive()) {
+        case MGeometry::Primitive::kTriangleStrip:
+        case MGeometry::Primitive::kTriangles:
+            if (vertexCounts.empty()) {
+                _topology.reset();
             }
             break;
         case MGeometry::Primitive::kLines:

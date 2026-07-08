@@ -115,7 +115,7 @@ class TestMeshDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
                 f="MeshDirtyLocators.IntermediateObjectToggleEmitsVisibilityAndUpdatesSchema")
 
     # What: instanced shapes route visibility plug dirties through _InstancerNodeDirty.
-    # How: duplicate -rr, toggle master transform visibility via C++, inspect locators + schema.
+    # How: duplicate -rr -ilf, toggle master transform visibility via C++, inspect locators + schema.
     # Expect: instancer + visibility locators on each toggle; schema matches master visibility.
     def test_instancedTransformVisibilityToggleEmitsVisibilityAndUpdatesSchema(self):
         self.setupScene()
@@ -125,7 +125,7 @@ class TestMeshDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
                 f"InstancedTransformVisibilityToggleEmitsVisibilityAndUpdatesSchema")
 
     # What: duplicate-instance visibility dirty instancer locators, not prototype visibility.
-    # How: duplicate -rr, hide/show duplicate transform via C++, inspect locators + schema.
+    # How: duplicate -rr -ilf, hide/show duplicate transform via C++, inspect locators + schema.
     # Expect: instancer locators only; prototype visibility schema stays visible.
     def test_instancedNonMasterVisibilityToggleEmitsInstancerNotPrototypeVisibility(self):
         self.setupScene()

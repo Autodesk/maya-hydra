@@ -71,6 +71,9 @@ public:
     void            InvalidateTransform() { _invalidTransform = true; }
     void            InvalidateVisibility() { _visibilityDirty = true; }
     bool            IsInstanced() const { return _isInstanced; }
+    /// Re-read MDagPath::getAllPathsTo for this adapter's DAG node and update _isInstanced.
+    MAYAHYDRALIB_API
+    void RefreshInstancingState();
     MAYAHYDRALIB_API
     SdfPath GetInstancerID() const;
     MAYAHYDRALIB_API

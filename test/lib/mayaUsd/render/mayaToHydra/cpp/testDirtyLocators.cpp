@@ -213,7 +213,7 @@ void RunInstancedTransformVisibilityToggleTest()
 
     // Register _InstancerNodeDirty instead of _TransformNodeDirty on the dag adapter.
     ASSERT_EQ(MGlobal::executeCommand(
-                  ("duplicate -rr " + meshTransformName).c_str()),
+                  ("duplicate -rr -ilf " + meshTransformName).c_str()),
               MStatus::kSuccess);
     MGlobal::executeCommand("refresh");
 
@@ -268,7 +268,7 @@ void RunInstancedNonMasterVisibilityToggleTest()
         << "Mesh prim not found";
 
     ASSERT_EQ(MGlobal::executeCommand(
-                  ("duplicate -rr " + meshTransformName).c_str()),
+                  ("duplicate -rr -ilf " + meshTransformName).c_str()),
               MStatus::kSuccess);
     const std::string duplicateTransformName = meshTransformName + "1";
     MStringArray duplicatePaths;
@@ -320,8 +320,6 @@ void RunInstancedNonMasterVisibilityToggleTest()
 
 void RunRenderItemConnectivityChangeSameVertexCountTest()
 {
-    const std::string meshTransformFull
-        = GetOptionVarOrDefault(kMeshTransformOptionVar, kMeshTransformFallback);
     const std::string meshShapeFull = GetOptionVarOrDefault(kMeshShapeOptionVar, kMeshShapeFallback);
     SdfPath meshPrimPath;
     HdSceneIndexBaseRefPtr mayaSceneIndex;
@@ -329,13 +327,15 @@ void RunRenderItemConnectivityChangeSameVertexCountTest()
         << "Mesh prim not found";
 
     SceneIndexNotificationsAccumulator notifsAccumulator(mayaSceneIndex);
+    // Ensure render-item topology baseline is captured before measuring dirties from the edit.
+    MGlobal::executeCommand("refresh");
     size_t startIndex = notifsAccumulator.GetDirtiedPrimEntries().size();
 
     // Flip a cube edge: retriangulates a quad face without changing the position buffer size.
     // Maya may set topoChanged and geomChanged together; topology locators must still emit when
     // index connectivity changes while vertex count is unchanged.
     ASSERT_EQ(MGlobal::executeCommand(
-                  ("select -r " + meshTransformFull + ".e[4]").c_str()),
+                  ("select -r " + meshShapeFull + ".e[4]").c_str()),
               MStatus::kSuccess);
     ASSERT_EQ(MGlobal::executeCommand("polyFlipEdge"), MStatus::kSuccess);
     MGlobal::executeCommand("refresh");
@@ -555,7 +555,7 @@ TEST(MeshDirtyLocators, IntermediateObjectToggleEmitsVisibilityAndUpdatesSchema)
 
 // What: visibility changes on an instanced shape dirty instancer + prototype visibility via
 //       _InstancerNodeDirty when the master transform is toggled.
-// How: duplicate -rr to create instancing, then toggle master transform visibility.
+// How: duplicate -rr -ilf to create shape instancing, then toggle master transform visibility.
 // Expect: instancer + visibility locators on each toggle; schema matches master visibility.
 TEST(MeshDirtyLocators, InstancedTransformVisibilityToggleEmitsVisibilityAndUpdatesSchema)
 {
@@ -563,7 +563,7 @@ TEST(MeshDirtyLocators, InstancedTransformVisibilityToggleEmitsVisibilityAndUpda
 }
 
 // What: per-instance visibility on a duplicate transform dirty instancer locators only.
-// How: duplicate -rr, hide/show the duplicate transform while master stays visible.
+// How: duplicate -rr -ilf, hide/show the duplicate transform while master stays visible.
 // Expect: instancer locators on each toggle; prototype visibility schema unchanged.
 TEST(MeshDirtyLocators, InstancedNonMasterVisibilityToggleEmitsInstancerNotPrototypeVisibility)
 {

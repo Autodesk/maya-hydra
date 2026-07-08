@@ -768,6 +768,24 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
         _addedNodes.clear();
     }
 
+    if (useMeshAdapter()) {
+        for (const auto& entry : _shapeAdapters) {
+            const auto& adapter = entry.second;
+            if (!adapter) {
+                continue;
+            }
+            MDagPathArray dags;
+            if (!MDagPath::getAllPathsTo(adapter->GetDagPath().node(), dags)) {
+                continue;
+            }
+            // duplicateInstanced does not add DAG nodes; detect new instance paths here so
+            // callbacks are rebuilt with _InstancerNodeDirty on every ancestor.
+            if (dags.length() > 1 && !adapter->IsInstanced()) {
+                AddNewInstance(adapter->GetDagPath());
+            }
+        }
+    }
+
     if (!_customNodesToAdd.empty()) {
         for (const auto& obj : _customNodesToAdd) {
             if (obj.isNull()) {
@@ -1701,23 +1719,23 @@ void MayaHydraSceneIndex::AddNewInstance(const MDagPath& dag)
     if (!TfMapLookup(_shapeAdapters, id, &masterAdapter) || masterAdapter == nullptr) {
         return;
     }
-    // If dags is 1, we have to recreate the adapter.
-    if (dags.length() == 1 || !masterAdapter->IsInstanced()) {
+    if (dagsLength == 1) {
         RecreateAdapterOnIdle(id, masterDag.node());
-    } else {
-        // If dags is more than one, trigger rebuilding callbacks next call and
-        // mark dirty.
-        RebuildAdapterOnIdle(id, MayaHydraSceneIndex::RebuildFlagCallbacks);
-        {
-            Fvp::FvpDirtyNotifier notifier(*this, masterAdapter->GetID());
-            notifier.dirtyInstancer().dirtyPrimvars();
-            notifier.flush();
-        }
-        if (masterAdapter->IsInstanced()) {
-            Fvp::FvpDirtyNotifier instNotifier(*this, masterAdapter->GetInstancerID());
-            instNotifier.dirtyInstancer().dirtyPrimvars();
-            instNotifier.flush();
-        }
+        return;
+    }
+    // Node now has multiple DAG paths: rebuild callbacks (register _InstancerNodeDirty on every
+    // path) and dirty instancer topology / instance primvars.
+    RebuildAdapterOnIdle(id, MayaHydraSceneIndex::RebuildFlagCallbacks);
+    {
+        Fvp::FvpDirtyNotifier notifier(*this, masterAdapter->GetID());
+        notifier.dirtyInstancer().dirtyPrimvars();
+        notifier.flush();
+    }
+    const SdfPath instancerId = masterAdapter->GetInstancerID();
+    if (!instancerId.IsEmpty()) {
+        Fvp::FvpDirtyNotifier instNotifier(*this, instancerId);
+        instNotifier.dirtyInstancer().dirtyPrimvars();
+        instNotifier.flush();
     }
 }
 

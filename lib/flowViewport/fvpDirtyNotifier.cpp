@@ -80,7 +80,7 @@ void FvpDirtyNotifier::flush()
         return;
     }
     _sceneIndex.DirtyPrims({ { _primPath, _locators } });
-    _locators = {};
+    _locators = HdDataSourceLocatorSet();
 }
 
 FvpDirtyNotifier& FvpDirtyNotifier::_append(const HdDataSourceLocator& locator)

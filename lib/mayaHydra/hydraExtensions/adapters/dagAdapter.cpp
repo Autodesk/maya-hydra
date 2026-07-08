@@ -84,8 +84,9 @@ void _DirtyInstancerPlugs(MayaHydraDagAdapter* adapter)
         notifier.flush();
     }
     // Dirty the instancer prim itself: topology and primvars (instanceTransform) changed.
-    if (adapter->IsInstanced()) {
-        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetInstancerID());
+    const SdfPath instancerId = adapter->GetInstancerID();
+    if (!instancerId.IsEmpty()) {
+        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), instancerId);
         notifier.dirtyInstancer().dirtyPrimvars();
         notifier.flush();
     }
@@ -101,10 +102,47 @@ void _DirtyInstancerVisibilityPlug(MayaHydraDagAdapter* adapter, const MPlug& pl
     }
 }
 
-void _TransformNodeDirty(MObject& node, MPlug& plug, void* clientData)
+bool _IsRuntimeInstanced(const MayaHydraDagAdapter* adapter)
+{
+    MDagPathArray dags;
+    return MDagPath::getAllPathsTo(adapter->GetDagPath().node(), dags) && dags.length() > 1;
+}
+
+void _InstancerNodeDirty(MObject& node, MPlug& plug, void* clientData)
 {
     TF_UNUSED(node);
     auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
+    adapter->RefreshInstancingState();
+    TF_DEBUG(MAYAHYDRALIB_ADAPTER_DAG_PLUG_DIRTY)
+        .Msg(
+            "Dag instancer adapter marking prim (%s) dirty because %s plug was "
+            "dirtied.\n",
+            adapter->GetID().GetText(),
+            plug.partialName().asChar());
+    if (MayaHydraDagAdapter::IsVisibilityRelatedPlug(plug)) {
+        if (adapter->IsInstanced()) {
+            _DirtyInstancerVisibilityPlug(adapter, plug);
+        } else {
+            MayaHydraDagAdapter::DirtyVisibilityRelatedPlug(adapter);
+        }
+        return;
+    }
+    _DirtyInstancerPlugs(adapter);
+}
+
+void _TransformNodeDirty(MObject& node, MPlug& plug, void* clientData)
+{
+    auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
+    // Adapters created before duplicateInstanced keep _TransformNodeDirty on shared DAG nodes.
+    // Delegate to the instancer dirty policy once the node is instanced.
+    if (_IsRuntimeInstanced(adapter)) {
+        if (!adapter->IsInstanced()) {
+            adapter->GetMayaHydraSceneIndex()->RebuildAdapterOnIdle(
+                adapter->GetID(), MayaHydraSceneIndex::RebuildFlagCallbacks);
+        }
+        _InstancerNodeDirty(node, plug, clientData);
+        return;
+    }
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_DAG_PLUG_DIRTY)
         .Msg(
             "Dag adapter marking prim (%s) dirty because .%s plug was "
@@ -132,27 +170,6 @@ void _HierarchyChanged(MDagPath& child, MDagPath& parent, void* clientData)
     adapter->RemoveCallbacks();
     adapter->RemovePrim();
     adapter->GetMayaHydraSceneIndex()->RecreateAdapterOnIdle(adapter->GetID(), adapter->GetNode());
-}
-
-void _InstancerNodeDirty(MObject& node, MPlug& plug, void* clientData)
-{
-    TF_UNUSED(node);
-    auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
-    TF_DEBUG(MAYAHYDRALIB_ADAPTER_DAG_PLUG_DIRTY)
-        .Msg(
-            "Dag instancer adapter marking prim (%s) dirty because %s plug was "
-            "dirtied.\n",
-            adapter->GetID().GetText(),
-            plug.partialName().asChar());
-    if (MayaHydraDagAdapter::IsVisibilityRelatedPlug(plug)) {
-        if (adapter->IsInstanced()) {
-            _DirtyInstancerVisibilityPlug(adapter, plug);
-        } else {
-            MayaHydraDagAdapter::DirtyVisibilityRelatedPlug(adapter);
-        }
-        return;
-    }
-    _DirtyInstancerPlugs(adapter);
 }
 
 const auto _instancePrimvarDescriptors = HdPrimvarDescriptorVector {
@@ -202,6 +219,14 @@ MayaHydraDagAdapter::SampleTransform(size_t maxSampleCount, float* times, GfMatr
     });
 }
 
+void MayaHydraDagAdapter::RefreshInstancingState()
+{
+    MDagPathArray dags;
+    if (MDagPath::getAllPathsTo(GetDagPath().node(), dags)) {
+        _isInstanced = dags.length() > 1;
+    }
+}
+
 void MayaHydraDagAdapter::CreateCallbacks()
 {
     MStatus status;
@@ -213,6 +238,9 @@ void MayaHydraDagAdapter::CreateCallbacks()
     if (MDagPath::getAllPathsTo(GetDagPath().node(), dags)) {
         const auto numDags = dags.length();
         const bool instanced = numDags > 1;
+        // Refresh cached instancing state: adapters created before duplicateInstanced
+        // must pick up instancer dirty policy when callbacks are rebuilt.
+        _isInstanced = instanced;
         auto       dagNodeDirtyCallback = instanced ? _InstancerNodeDirty : _TransformNodeDirty;
         for (auto i = decltype(numDags) { 0 }; i < numDags; ++i) {
             auto dag = dags[i];
@@ -243,9 +271,10 @@ void MayaHydraDagAdapter::RemovePrim()
         return;
     }
     GetMayaHydraSceneIndex()->RemovePrim(GetID());
-    if (_isInstanced) {
-        GetMayaHydraSceneIndex()->RemoveInstancer(GetID().AppendProperty(_tokens->instancer));
-    }
+    // Instancing is expressed via instancedBy / instancerTopology locators on the prototype
+    // prim (see FvpDirtyNotifier::dirtyInstancer). MayaHydra never calls HdRenderIndex::
+    // InsertInstancer, so RemoveInstancer must not run here — it crashes on teardown when
+    // duplicate -ilf correctly sets _isInstanced.
     _isPopulated = false;
     // Note: _isRprimResolved is reset automatically by IsRprim() whenever _isPopulated is false
     // (see MayaHydraAdapter::IsRprim). No explicit reset needed here.
@@ -319,7 +348,8 @@ void MayaHydraDagAdapter::_AddHierarchyChangedCallbacks(MDagPath& dag)
 
 SdfPath MayaHydraDagAdapter::GetInstancerID() const
 {
-    if (!_isInstanced) {
+    MDagPathArray dags;
+    if (!MDagPath::getAllPathsTo(GetDagPath().node(), dags) || dags.length() <= 1) {
         return {};
     }
 

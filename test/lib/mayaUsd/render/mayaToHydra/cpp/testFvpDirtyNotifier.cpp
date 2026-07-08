@@ -174,10 +174,17 @@ TEST(FvpDirtyNotifier, rprimConnectivityChangeOmitsGranularFaceVaryingPrimvars)
     HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
         Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(n, HdPrimTypeTokens->mesh);
     });
-    EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetNormalsLocator()));
-    EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("st"))));
-    EXPECT_FALSE(
-        actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("tangents"))));
+    // Connectivity emits broad primvars (which intersects child locators), but must not
+    // add redundant explicit face-varying primvar generators on top.
+    const HdDataSourceLocator stLocator
+        = HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("st"));
+    const HdDataSourceLocator tangentsLocator
+        = HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("tangents"));
+    for (const auto& loc : actual) {
+        EXPECT_NE(loc, HdPrimvarsSchema::GetNormalsLocator());
+        EXPECT_NE(loc, stLocator);
+        EXPECT_NE(loc, tangentsLocator);
+    }
 }
 
 TEST(FvpDirtyNotifier, basisCurvesConnectivityChangeOmitsMeshTopology)

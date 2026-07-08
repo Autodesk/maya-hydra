@@ -56,7 +56,7 @@ TEST(RenderItemTopologyUtil, ConnectivityChangedWhenStoredTopologyMissing)
     const VtIntArray counts { 3 };
     const VtIntArray indices { 0, 1, 2 };
 
-    EXPECT_TRUE(RenderItemTopologyConnectivityChanged(
+    EXPECT_FALSE(RenderItemTopologyConnectivityChanged(
         nullptr, MGeometry::Primitive::kTriangles, indices, counts, 0));
     EXPECT_FALSE(RenderItemTopologyConnectivityChanged(
         nullptr, MGeometry::Primitive::kTriangles, {}, {}, 0));
@@ -120,6 +120,26 @@ TEST(RenderItemTopologyUtil, ShouldEmitWhenSameCountButConnectivityChanges)
 
     EXPECT_TRUE(RenderItemShouldEmitTopologyLocators(
         true,
+        true,
+        true,
+        false,
+        24,
+        24,
+        &stored,
+        MGeometry::Primitive::kTriangles,
+        newIndices,
+        counts));
+}
+
+TEST(RenderItemTopologyUtil, ShouldEmitWhenGeomOnlyAndConnectivityChanges)
+{
+    const VtIntArray counts { 3, 3 };
+    const VtIntArray storedIndices { 0, 1, 2, 2, 1, 3 };
+    const VtIntArray newIndices { 0, 1, 2, 0, 2, 3 };
+    const HdMeshTopology stored = MakeTriangleMeshTopology(counts, storedIndices);
+
+    EXPECT_TRUE(RenderItemShouldEmitTopologyLocators(
+        false,
         true,
         true,
         false,

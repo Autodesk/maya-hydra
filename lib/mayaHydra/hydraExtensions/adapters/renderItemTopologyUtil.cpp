@@ -31,8 +31,11 @@ bool RenderItemTopologyConnectivityChanged(
     const VtIntArray&    newCounts,
     size_t               lineStripVertexCount)
 {
+    // Without a stored baseline we cannot detect a connectivity delta on the geomChanged path.
+    // Initial sync relies on positionsHaveBeenReset / topo-only flags in
+    // RenderItemShouldEmitTopologyLocators.
     if (!storedTopology) {
-        return !newIndices.empty() || !newCounts.empty() || lineStripVertexCount > 0;
+        return false;
     }
     switch (primitive) {
     case MGeometry::Primitive::kTriangles:
@@ -70,14 +73,14 @@ bool RenderItemShouldEmitTopologyLocators(
     const VtIntArray&    newIndices,
     const VtIntArray&    newCounts)
 {
-    if (!topoChanged) {
+    if (!topoChanged && !geomChanged) {
         return false;
     }
-    if (!geomChanged) {
+    if (topoChanged && !geomChanged) {
         return true;
     }
     if (!hasGeomAndBuffers || positionsEmpty) {
-        return true;
+        return topoChanged;
     }
     if (storedPositionCount != currentVertexCount) {
         return true;
