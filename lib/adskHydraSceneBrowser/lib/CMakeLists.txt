@@ -78,8 +78,8 @@ macro(download file)
             "  Error : ${_download_code} - ${_download_message}")
     endif()
 
-    # A zero status only means the transfer completed; guard against an empty or
-    # truncated body (e.g. a proxy/CDN returning a 0-byte 200) as well.
+    # A zero status only means the transfer completed; guard against an empty body
+    # (e.g. a proxy/CDN returning a 0-byte 200) as well.
     file(SIZE "${_download_dest}" _download_size)
     if(_download_size EQUAL 0)
         file(REMOVE "${_download_dest}")
