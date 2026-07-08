@@ -121,7 +121,8 @@ public:
 
     /// Canonical locator bundle for rprim connectivity/topology changes: topology +
     /// broad primvars + points + extent. Emits mesh or basisCurves topology locators per
-    /// \p primType. Does not emit granular UV/tangent/normal locators — topology (or broad
+    /// \p primType; warns and no-ops for unsupported rprim types (e.g. points). Does not
+    /// emit granular UV/tangent/normal locators — topology (or broad
     /// primvars on the mesh-adapter path) is sufficient for render delegates to full-rebuild.
     /// extComputationPrimvars is intentionally NOT included — skinning/blendshape only.
     /// See doc/render_delegate_topology_vs_deformation.md

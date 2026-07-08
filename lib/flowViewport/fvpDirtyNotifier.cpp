@@ -177,8 +177,14 @@ void FvpDirtyNotifier::DirtyRprimConnectivityLocators(
         notifier.dirtyBasisCurvesTopology().dirtyPrimvars().dirtyPoints().dirtyExtent();
         return;
     }
-
-    notifier.dirtyMeshTopology().dirtyPrimvars().dirtyPoints().dirtyExtent();
+    if (primType == HdPrimTypeTokens->mesh) {
+        notifier.dirtyMeshTopology().dirtyPrimvars().dirtyPoints().dirtyExtent();
+        return;
+    }
+    TF_WARN(
+        "FvpDirtyNotifier::DirtyRprimConnectivityLocators: unsupported prim type '%s'; "
+        "no connectivity locators emitted.",
+        primType.GetText());
 }
 
 void FvpDirtyNotifier::DirtySmoothMeshDisplayLocators(FvpDirtyNotifier& notifier)

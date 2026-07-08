@@ -196,6 +196,13 @@ TEST(FvpDirtyNotifier, basisCurvesConnectivityChangeOmitsMeshTopology)
         }));
 }
 
+TEST(FvpDirtyNotifier, rprimConnectivityChangeUnsupportedPrimTypeNoOps)
+{
+    EXPECT_TRUE(NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
+        Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(n, HdPrimTypeTokens->points);
+    }).IsEmpty());
+}
+
 TEST(FvpDirtyNotifier, smoothMeshDisplayOmitsNormalsByDefault)
 {
     HdDataSourceLocatorSet expected;

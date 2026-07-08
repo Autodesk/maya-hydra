@@ -2530,7 +2530,7 @@ TfHashSet<SdfPath, SdfPath::Hash> MtohRenderOverride::_ExpandIsolateSelectionFor
     };
 
     // Native visual rprims (camera gizmos, light shapes) live in the frame-pass render index
-    // that feeds the viewport; MayaHydraSceneIndex::GetRenderIndex() may not list them.
+    // that feeds the viewport; MayaHydraSceneIndex::GetRenderIndexPtr() may not list them.
     HdRenderIndex* renderIndexForScan = renderIndex(0);
     if (!renderIndexForScan) {
         renderIndexForScan = _mayaHydraSceneIndex->GetRenderIndexPtr();
