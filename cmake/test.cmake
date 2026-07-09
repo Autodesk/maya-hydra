@@ -749,6 +749,7 @@ endfunction()
 #                           [RENDERED_IMAGE_SUBDIR <dir>]
 #                           [RENDERED_IMAGE_NAME <file_name>]
 #                           [RENDERER_ARGS <extra_args>]
+#                           [TEST_NAME_SUFFIX <suffix>]
 #                           [COPY_SCENE]
 #                           [ENV <varname>=<varvalue> ...])
 #
@@ -769,6 +770,7 @@ endfunction()
 #   RENDERED_IMAGE_NAME - Rendered image file name (default test name)
 #   RENDERER_ARGS      - Additional command line arguments to pass to the
 #                        renderer.
+#   TEST_NAME_SUFFIX   - Suffix to append to the Maya scene file name to create the test name.
 #   COPY_SCENE         - If set, copies the scene file to the temporary project
 #                        before rendering.
 #   ENV                - Set or append the indicated environment variables;
@@ -782,7 +784,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
 
     cmake_parse_arguments(ARG
         "COPY_SCENE"             # Boolean options.
-        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;RENDERED_IMAGE_SUBDIR;RENDERED_IMAGE_NAME;IMAGE_EXTENSION;FAIL;FAILPERCENT;RENDERER_ARGS" # one_value keywords
+        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;RENDERED_IMAGE_SUBDIR;RENDERED_IMAGE_NAME;IMAGE_EXTENSION;FAIL;FAILPERCENT;RENDERER_ARGS;TEST_NAME_SUFFIX" # one_value keywords
         "ENV"                                    # multi_value keywords
         ${ARGN}
     )
@@ -811,6 +813,9 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     get_testfile_and_labels(ALL_LABELS SCENE_FILE ${SCENE_FILE_LABELED})
     # Remove extension to define the test name
     mayaUsd_get_unittest_target(test_name ${SCENE_FILE})
+    if(ARG_TEST_NAME_SUFFIX)
+        set(test_name "${test_name}_${ARG_TEST_NAME_SUFFIX}")
+    endif()
 
     set(IMAGE_EXTENSION "png")
     if(ARG_IMAGE_EXTENSION)
@@ -865,6 +870,11 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     set(RENDERED_IMAGE_DIR "${RENDERED_IMAGE_ROOT_DIR}/${RENDERED_IMAGE_SUBDIR}")
     set(RENDERED_IMAGE_PATH "${RENDERED_IMAGE_DIR}/${RENDERED_IMAGE_NAME}.${IMAGE_EXTENSION}")
     cmake_path(REPLACE_EXTENSION SRC_SCENE_PATH ".${IMAGE_EXTENSION}" OUTPUT_VARIABLE EXPECTED_IMAGE_PATH)
+    if(ARG_TEST_NAME_SUFFIX)
+        cmake_path(GET EXPECTED_IMAGE_PATH STEM LAST_ONLY _expected_stem)
+        cmake_path(GET EXPECTED_IMAGE_PATH PARENT_PATH _expected_dir)
+        set(EXPECTED_IMAGE_PATH "${_expected_dir}/${_expected_stem}_${ARG_TEST_NAME_SUFFIX}.${IMAGE_EXTENSION}")
+    endif()
 
     # Always use the discovered idiff binary; do not fall back to PATH
     if (IMAGE_DIFF_TOOL)
