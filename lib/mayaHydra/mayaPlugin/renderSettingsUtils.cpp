@@ -98,6 +98,8 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
     if (IsPrmanRenderSettingsDriveRenderPassEnabled(rendererName)
         || HdArnoldUseHydraV2RenderSettings(rendererName)
         ) {
+        TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+                     "Using Hydra v2 render settings.\n");
         return RenderSettingsType::HydraV2;
     }
     
@@ -105,6 +107,8 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
     UsdRenderSettings dummyUsdRenderSettings;// Pass a dummy UsdRenderSettings to just check for presence
     const auto psPath = ExtractUsdRenderSettingsFromScene(dummyUsdRenderSettings); 
     if (!psPath.empty()) {
+        TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+                     "Using Hydra v1 render settings.\n");
         return RenderSettingsType::HydraV1;
     }
 

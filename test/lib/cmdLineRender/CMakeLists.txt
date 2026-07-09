@@ -72,6 +72,23 @@ foreach(scene ${ARNOLD_RENDER_SCENES})
     )
 endforeach()
 
+foreach(scene ${ARNOLD_RENDER_SCENES})
+    cmake_path(GET scene STEM sceneFileNameNoExt)
+    set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/${sceneFileNameNoExt}_v2_rs/projects/default/images)
+    mayaHydra_add_cmd_line_render_test(${scene}
+        COPY_SCENE
+        RENDERER HdArnoldRendererPlugin
+        RENDERED_IMAGE_SUBDIR projects/default/images
+        RENDERED_IMAGE_NAME ${sceneFileNameNoExt}_v2_rs
+        RENDERER_ARGS "-x 160 -y 120 -rd \"${render_dir}\" -im ${sceneFileNameNoExt}_v2_rs"
+        TEST_NAME_SUFFIX v2_rs
+        ENV
+            "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
+            "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
+            "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS"
+    )
+endforeach()
+
 mayaHydra_add_cmd_line_render_test(renderSettings/stormResolution.ma
     COPY_SCENE
     RENDERER HdStormRendererPlugin

@@ -175,7 +175,6 @@ public:
     void UpdateLightsShadowCollection();
 
     // Dag Node operations
-    void InsertDag(const MDagPath& dag);
     void OnDagNodeAdded(const MObject& obj);
     void OnDagNodeRemoved(const MObject& obj);
     void AddNewInstance(const MDagPath& dag);
@@ -283,7 +282,9 @@ private:
     /// producer API (checked via DataProducersNodeHashCodeToSdfPathRegistry).
     MayaHydraCustomDagAdapterPtr CreateCustomAdapter(const MDagPath& dagPath);
 
-    // Utilites
+    void InsertDag(const MDagPath& dag);
+
+    // Utilities
     bool _GetRenderItem(int fastId, MayaHydraRenderItemAdapterPtr& adapter);
     void _AddPrimAncestors(const SdfPath& path);
     void _RemoveEmptyAncestors(const SdfPath& path);
