@@ -3,19 +3,19 @@
     |___# ContainerDataSource : sceneGlobals
         |___SampledDataSource -> SdfPath : activeRenderPassPrim
         |___SampledDataSource -> SdfPath : activeRenderSettingsPrim
-        |___Unidentified data source type : primaryCameraPrim
+        |___Blocked or absent data source : primaryCameraPrim
         |___SampledDataSource -> double : currentFrame
         |___SampledDataSource -> double : timeCodesPerSecond
         |___SampledDataSource -> int : sceneStateId
 |___@ Prim : MayaData --- Type : 
 |   |___# ContainerDataSource : 
-|   |___@ Prim : _MayaHydra_HdArnoldRendererPlugin_00000296C0DCB7E0 --- Type : 
+|   |___@ Prim : _MayaHydra_HdArnoldRendererPlugin_000001E4D0A9EAA0 --- Type : 
 |   |   |___# ContainerDataSource : 
-|   |   |___@ Prim : _UsdImaging_HdArnoldRendererPlugin_00000296C0DCB7E0 --- Type : 
+|   |   |___@ Prim : _UsdImaging_HdArnoldRendererPlugin_000001E4D0A9EAA0 --- Type : 
 |   |       |___# ContainerDataSource : 
 |   |       |___@ Prim : aov_instanceId --- Type : renderBuffer
 |   |       |   |___# ContainerDataSource : 
-|   |       |       |___Unidentified data source type : primvars
+|   |       |       |___Blocked or absent data source : primvars
 |   |       |       |___# ContainerDataSource : renderBuffer
 |   |       |       |   |___SampledDataSource -> GfVec3i : dimensions
 |   |       |       |   |___SampledDataSource -> HdFormat : format
@@ -23,7 +23,7 @@
 |   |       |       |___SampledDataSource -> HdSceneDelegate * __ptr64 : sceneDelegate
 |   |       |___@ Prim : aov_elementId --- Type : renderBuffer
 |   |       |   |___# ContainerDataSource : 
-|   |       |       |___Unidentified data source type : primvars
+|   |       |       |___Blocked or absent data source : primvars
 |   |       |       |___# ContainerDataSource : renderBuffer
 |   |       |       |   |___SampledDataSource -> GfVec3i : dimensions
 |   |       |       |   |___SampledDataSource -> HdFormat : format
@@ -31,7 +31,7 @@
 |   |       |       |___SampledDataSource -> HdSceneDelegate * __ptr64 : sceneDelegate
 |   |       |___@ Prim : aov_primId --- Type : renderBuffer
 |   |       |   |___# ContainerDataSource : 
-|   |       |       |___Unidentified data source type : primvars
+|   |       |       |___Blocked or absent data source : primvars
 |   |       |       |___# ContainerDataSource : renderBuffer
 |   |       |       |   |___SampledDataSource -> GfVec3i : dimensions
 |   |       |       |   |___SampledDataSource -> HdFormat : format
@@ -39,7 +39,7 @@
 |   |       |       |___SampledDataSource -> HdSceneDelegate * __ptr64 : sceneDelegate
 |   |       |___@ Prim : aov_depth --- Type : renderBuffer
 |   |       |   |___# ContainerDataSource : 
-|   |       |       |___Unidentified data source type : primvars
+|   |       |       |___Blocked or absent data source : primvars
 |   |       |       |___# ContainerDataSource : renderBuffer
 |   |       |       |   |___SampledDataSource -> GfVec3i : dimensions
 |   |       |       |   |___SampledDataSource -> HdFormat : format
@@ -47,7 +47,7 @@
 |   |       |       |___SampledDataSource -> HdSceneDelegate * __ptr64 : sceneDelegate
 |   |       |___@ Prim : aov_color --- Type : renderBuffer
 |   |       |   |___# ContainerDataSource : 
-|   |       |       |___Unidentified data source type : primvars
+|   |       |       |___Blocked or absent data source : primvars
 |   |       |       |___# ContainerDataSource : renderBuffer
 |   |       |       |   |___SampledDataSource -> GfVec3i : dimensions
 |   |       |       |   |___SampledDataSource -> HdFormat : format
@@ -58,50 +58,50 @@
 |   |       |       |___# ContainerDataSource : task
 |   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
 |   |       |           |___SampledDataSource -> HdxBoundingBoxTaskParams : parameters
-|   |       |           |___Unidentified data source type : collection
-|   |       |           |___Unidentified data source type : renderTags
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
 |   |       |___@ Prim : pickFromRenderBufferTask --- Type : task
 |   |       |   |___# ContainerDataSource : 
 |   |       |       |___# ContainerDataSource : task
 |   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
 |   |       |           |___SampledDataSource -> HdxPickFromRenderBufferTaskParams : parameters
-|   |       |           |___Unidentified data source type : collection
-|   |       |           |___Unidentified data source type : renderTags
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
 |   |       |___@ Prim : presentTask --- Type : task
 |   |       |   |___# ContainerDataSource : 
 |   |       |       |___# ContainerDataSource : task
 |   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
 |   |       |           |___SampledDataSource -> HdxPresentTaskParams : parameters
-|   |       |           |___Unidentified data source type : collection
-|   |       |           |___Unidentified data source type : renderTags
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
 |   |       |___@ Prim : visualizeAovTask --- Type : task
 |   |       |   |___# ContainerDataSource : 
 |   |       |       |___# ContainerDataSource : task
 |   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
 |   |       |           |___SampledDataSource -> HdxVisualizeAovTaskParams : parameters
-|   |       |           |___Unidentified data source type : collection
-|   |       |           |___Unidentified data source type : renderTags
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
 |   |       |___@ Prim : colorCorrectionTask --- Type : task
 |   |       |   |___# ContainerDataSource : 
 |   |       |       |___# ContainerDataSource : task
 |   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
 |   |       |           |___SampledDataSource -> HdxColorCorrectionTaskParams : parameters
-|   |       |           |___Unidentified data source type : collection
-|   |       |           |___Unidentified data source type : renderTags
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
 |   |       |___@ Prim : colorizeSelectionTask --- Type : task
 |   |       |   |___# ContainerDataSource : 
 |   |       |       |___# ContainerDataSource : task
 |   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
 |   |       |           |___SampledDataSource -> HdxColorizeSelectionTaskParams : parameters
-|   |       |           |___Unidentified data source type : collection
-|   |       |           |___Unidentified data source type : renderTags
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
 |   |       |___@ Prim : aovInputTask --- Type : task
 |   |       |   |___# ContainerDataSource : 
 |   |       |       |___# ContainerDataSource : task
 |   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
 |   |       |           |___SampledDataSource -> HdxAovInputTaskParams : parameters
-|   |       |           |___Unidentified data source type : collection
-|   |       |           |___Unidentified data source type : renderTags
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
 |   |       |___@ Prim : renderTask_ --- Type : task
 |   |       |   |___# ContainerDataSource : 
 |   |       |       |___# ContainerDataSource : task
@@ -111,7 +111,7 @@
 |   |       |           |___SampledDataSource -> vector<TfToken,allocator<TfToken> > : renderTags
 |   |       |___@ Prim : camera --- Type : camera
 |   |           |___# ContainerDataSource : 
-|   |               |___Unidentified data source type : primvars
+|   |               |___Blocked or absent data source : primvars
 |   |               |___# ContainerDataSource : camera
 |   |               |   |___SampledDataSource -> TfToken : projection
 |   |               |   |___SampledDataSource -> float : horizontalAperture
@@ -162,7 +162,7 @@
 |   |       |___@ Prim : directionalLightShape1 --- Type : distantLight
 |   |           |___# ContainerDataSource : 
 |   |               |___# ContainerDataSource : __dependencies
-|   |               |___Unidentified data source type : primvars
+|   |               |___Blocked or absent data source : primvars
 |   |               |___# ContainerDataSource : material
 |   |               |   |___# ContainerDataSource : 
 |   |               |       |___# ContainerDataSource : nodes
@@ -213,16 +213,16 @@
 |   |               |   |___SampledDataSource -> bool : shadow:enable
 |   |               |   |___SampledDataSource -> bool : enableColorTemperature
 |   |               |   |___SampledDataSource -> float : colorTemperature
-|   |               |   |___Unidentified data source type : lightLink
-|   |               |   |___Unidentified data source type : shadowLink
-|   |               |   |___Unidentified data source type : lightFilterLink
+|   |               |   |___Blocked or absent data source : lightLink
+|   |               |   |___Blocked or absent data source : shadowLink
+|   |               |   |___Blocked or absent data source : lightFilterLink
 |   |               |___# ContainerDataSource : purpose
 |   |                   |___SampledDataSource -> TfToken : purpose
 |   |___@ Prim : materials --- Type : 
 |   |   |___# ContainerDataSource : 
 |   |   |___@ Prim : initialShadingGroup --- Type : material
 |   |       |___# ContainerDataSource : 
-|   |           |___Unidentified data source type : primvars
+|   |           |___Blocked or absent data source : primvars
 |   |           |___# ContainerDataSource : material
 |   |               |___# ContainerDataSource : 
 |   |                   |___# ContainerDataSource : nodes
@@ -353,14 +353,14 @@
 |                   |   |___# ContainerDataSource : 
 |                   |       |___SampledDataSource -> SdfPath : path
 |                   |___# ContainerDataSource : displayStyle
-|                   |   |___Unidentified data source type : refineLevel
+|                   |   |___Blocked or absent data source : refineLevel
 |                   |   |___SampledDataSource -> bool : flatShadingEnabled
 |                   |   |___SampledDataSource -> bool : displacementEnabled
 |                   |   |___SampledDataSource -> bool : occludedSelectionShowsThrough
 |                   |   |___SampledDataSource -> bool : pointsShadingEnabled
 |                   |   |___SampledDataSource -> bool : materialIsFinal
-|                   |   |___Unidentified data source type : shadingStyle
-|                   |   |___Unidentified data source type : reprSelector
+|                   |   |___Blocked or absent data source : shadingStyle
+|                   |   |___Blocked or absent data source : reprSelector
 |                   |   |___SampledDataSource -> TfToken : cullStyle
 |                   |___# ContainerDataSource : visibility
 |                   |   |___SampledDataSource -> bool : visibility
@@ -368,7 +368,7 @@
 |                   |   |___SampledDataSource -> GfMatrix4d : matrix
 |                   |___# ContainerDataSource : purpose
 |                   |   |___SampledDataSource -> TfToken : purpose
-|                   |___Unidentified data source type : categories
+|                   |___Blocked or absent data source : categories
 |___@ Prim : UsdDefaultSettings_PluginNode --- Type : 
     |___# ContainerDataSource : 
     |___@ Prim : UsdDefaultRenderSettings --- Type : 
@@ -377,19 +377,19 @@
             |   |___SampledDataSource -> SdfPath : activeRenderSettingsPrim
             |   |___SampledDataSource -> double : startTimeCode
             |   |___SampledDataSource -> double : endTimeCode
-            |___Unidentified data source type : usdMaterialBindings
-            |___Unidentified data source type : geomModel
-            |___Unidentified data source type : model
-            |___Unidentified data source type : skelBinding
-            |___Unidentified data source type : coordSysBinding
+            |___Blocked or absent data source : usdMaterialBindings
+            |___Blocked or absent data source : geomModel
+            |___Blocked or absent data source : model
+            |___Blocked or absent data source : skelBinding
+            |___Blocked or absent data source : coordSysBinding
             |___# ContainerDataSource : primvars
-            |___Unidentified data source type : purpose
+            |___Blocked or absent data source : purpose
             |___# ContainerDataSource : visibility
             |   |___SampledDataSource -> bool : visibility
             |___# ContainerDataSource : xform
             |   |___SampledDataSource -> GfMatrix4d : matrix
             |   |___SampledDataSource -> bool : resetXformStack
-            |___Unidentified data source type : materialBindings
+            |___Blocked or absent data source : materialBindings
         |___@ Prim : Render --- Type : 
             |___# ContainerDataSource : 
                 |___# ContainerDataSource : system
@@ -403,20 +403,20 @@
                 |   |___SampledDataSource -> TfToken : specifier
                 |   |___SampledDataSource -> TfToken : typeName
                 |   |___SampledDataSource -> bool : isLoaded
-                |   |___Unidentified data source type : apiSchemas
-                |   |___Unidentified data source type : kind
+                |   |___Blocked or absent data source : apiSchemas
+                |   |___Blocked or absent data source : kind
                 |___# ContainerDataSource : primOrigin
                 |   |___SampledDataSource -> HdPrimOriginSchema::OriginPath : scenePath
                 |___# ContainerDataSource : primvars
-                |___Unidentified data source type : usdMaterialBindings
-                |___Unidentified data source type : geomModel
-                |___Unidentified data source type : model
-                |___Unidentified data source type : skelBinding
-                |___Unidentified data source type : coordSysBinding
+                |___Blocked or absent data source : usdMaterialBindings
+                |___Blocked or absent data source : geomModel
+                |___Blocked or absent data source : model
+                |___Blocked or absent data source : skelBinding
+                |___Blocked or absent data source : coordSysBinding
                 |___# ContainerDataSource : xform
                 |   |___SampledDataSource -> GfMatrix4d : matrix
                 |   |___SampledDataSource -> bool : resetXformStack
-                |___Unidentified data source type : materialBindings
+                |___Blocked or absent data source : materialBindings
             |___@ Prim : SceneRenderSettings --- Type : renderSettings
             |   |___# ContainerDataSource : 
             |       |___# ContainerDataSource : renderSettings
@@ -460,19 +460,19 @@
             |       |   |___# ContainerDataSource : namespacedSettings
             |       |   |   |___SampledDataSource -> string : adskUsd:externalCamera
             |       |   |___SampledDataSource -> VtArray<SdfPath> : products
-            |       |___Unidentified data source type : usdMaterialBindings
-            |       |___Unidentified data source type : geomModel
-            |       |___Unidentified data source type : model
-            |       |___Unidentified data source type : skelBinding
-            |       |___Unidentified data source type : coordSysBinding
+            |       |___Blocked or absent data source : usdMaterialBindings
+            |       |___Blocked or absent data source : geomModel
+            |       |___Blocked or absent data source : model
+            |       |___Blocked or absent data source : skelBinding
+            |       |___Blocked or absent data source : coordSysBinding
             |       |___# ContainerDataSource : primvars
-            |       |___Unidentified data source type : purpose
+            |       |___Blocked or absent data source : purpose
             |       |___# ContainerDataSource : visibility
             |       |   |___SampledDataSource -> bool : visibility
             |       |___# ContainerDataSource : xform
             |       |   |___SampledDataSource -> GfMatrix4d : matrix
             |       |   |___SampledDataSource -> bool : resetXformStack
-            |       |___Unidentified data source type : materialBindings
+            |       |___Blocked or absent data source : materialBindings
             |       |___# ContainerDataSource : __dependencies
             |           |___# ContainerDataSource : renderSettings_depOn_usdRenderSettings_includedPurposes
             |           |   |___SampledDataSource -> SdfPath : dependedOnPrimPath
@@ -537,44 +537,44 @@
             |       |   |___SampledDataSource -> string : sourceName
             |       |   |___SampledDataSource -> TfToken : sourceType
             |       |   |___# ContainerDataSource : namespacedSettings
-            |       |___Unidentified data source type : usdMaterialBindings
-            |       |___Unidentified data source type : geomModel
-            |       |___Unidentified data source type : model
-            |       |___Unidentified data source type : skelBinding
-            |       |___Unidentified data source type : coordSysBinding
+            |       |___Blocked or absent data source : usdMaterialBindings
+            |       |___Blocked or absent data source : geomModel
+            |       |___Blocked or absent data source : model
+            |       |___Blocked or absent data source : skelBinding
+            |       |___Blocked or absent data source : coordSysBinding
             |       |___# ContainerDataSource : primvars
-            |       |___Unidentified data source type : purpose
+            |       |___Blocked or absent data source : purpose
             |       |___# ContainerDataSource : visibility
             |       |   |___SampledDataSource -> bool : visibility
             |       |___# ContainerDataSource : xform
             |       |   |___SampledDataSource -> GfMatrix4d : matrix
             |       |   |___SampledDataSource -> bool : resetXformStack
-            |       |___Unidentified data source type : materialBindings
+            |       |___Blocked or absent data source : materialBindings
             |___@ Prim : BeautyProduct --- Type : renderProduct
                 |___# ContainerDataSource : 
                     |___# ContainerDataSource : __usdRenderProduct
                     |   |___SampledDataSource -> GfVec2i : resolution
-                    |   |___Unidentified data source type : pixelAspectRatio
-                    |   |___Unidentified data source type : aspectRatioConformPolicy
-                    |   |___Unidentified data source type : dataWindowNDC
-                    |   |___Unidentified data source type : instantaneousShutter
-                    |   |___Unidentified data source type : disableMotionBlur
-                    |   |___Unidentified data source type : disableDepthOfField
+                    |   |___Blocked or absent data source : pixelAspectRatio
+                    |   |___Blocked or absent data source : aspectRatioConformPolicy
+                    |   |___Blocked or absent data source : dataWindowNDC
+                    |   |___Blocked or absent data source : instantaneousShutter
+                    |   |___Blocked or absent data source : disableMotionBlur
+                    |   |___Blocked or absent data source : disableDepthOfField
                     |   |___SampledDataSource -> TfToken : productType
                     |   |___SampledDataSource -> TfToken : productName
                     |   |___# ContainerDataSource : namespacedSettings
-                    |   |___Unidentified data source type : camera
+                    |   |___Blocked or absent data source : camera
                     |   |___SampledDataSource -> VtArray<SdfPath> : orderedVars
-                    |___Unidentified data source type : usdMaterialBindings
-                    |___Unidentified data source type : geomModel
-                    |___Unidentified data source type : model
-                    |___Unidentified data source type : skelBinding
-                    |___Unidentified data source type : coordSysBinding
+                    |___Blocked or absent data source : usdMaterialBindings
+                    |___Blocked or absent data source : geomModel
+                    |___Blocked or absent data source : model
+                    |___Blocked or absent data source : skelBinding
+                    |___Blocked or absent data source : coordSysBinding
                     |___# ContainerDataSource : primvars
-                    |___Unidentified data source type : purpose
+                    |___Blocked or absent data source : purpose
                     |___# ContainerDataSource : visibility
                     |   |___SampledDataSource -> bool : visibility
                     |___# ContainerDataSource : xform
                     |   |___SampledDataSource -> GfMatrix4d : matrix
                     |   |___SampledDataSource -> bool : resetXformStack
-                    |___Unidentified data source type : materialBindings
+                    |___Blocked or absent data source : materialBindings
