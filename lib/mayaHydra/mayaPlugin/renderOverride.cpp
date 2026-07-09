@@ -1293,36 +1293,18 @@ MStatus MtohRenderOverride::Render(
         if (isMayaCamera) { // TODO: Support USD Camera
             MFnCamera camera(camPath, &status);
             if (status == MStatus::kSuccess) {
-                if (_mayaHydraSceneIndex && !camera.isOrtho()) {
-                    SdfPath cameraPath = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
-                    // Apply on all passes
-                    const int numFramePasses = _GetNumFramePasses();
-                    for (int i = 0; i < numFramePasses; ++i)
-                    {
-                        const hvt::FramePassPtr& currentPass = _GetFramePass(i);
-                        if (!currentPass) {
-                            continue;
-                        }
-    
-                        currentPass->params().renderParams.camera = cameraPath;
+                // Leave renderParams.camera empty so HVT renders through its free camera
+                // (rebuilt each frame from params().viewInfo matrices). HVT used to ignore the
+                // supplied camera path, but since #173 it honors it -- and rendering from our
+                // MFnCamera-derived Sprim drifts from Maya's live matrices, which picking still
+                // uses, desyncing the image and selection. The free camera keeps them in sync.
+                const int numFramePasses = _GetNumFramePasses();
+                for (int i = 0; i < numFramePasses; ++i) {
+                    const hvt::FramePassPtr& currentPass = _GetFramePass(i);
+                    if (!currentPass) {
+                        continue;
                     }
-                    if (vpDirty)
-                        _mayaHydraSceneIndex->MarkSprimDirty(cameraPath, HdCamera::DirtyParams);
-#if PXR_VERSION >= 2605
-                    if (_sceneGlobalsSceneIndex && !cameraPath.IsEmpty()) {
-                        _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
-                    }
-#endif
-                } else if (camera.isOrtho()) {
-                    // Orthographic views use the free camera derived from viewport matrices.
-                    const int numFramePasses = _GetNumFramePasses();
-                    for (int i = 0; i < numFramePasses; ++i) {
-                        const hvt::FramePassPtr& currentPass = _GetFramePass(i);
-                        if (!currentPass) {
-                            continue;
-                        }
-                        currentPass->params().renderParams.camera = SdfPath();
-                    }
+                    currentPass->params().renderParams.camera = SdfPath();
                 }
             }
         }

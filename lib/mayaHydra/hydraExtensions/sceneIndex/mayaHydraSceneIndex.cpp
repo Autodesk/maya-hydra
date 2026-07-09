@@ -658,17 +658,6 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
     return Fvp::PrimSelections({ Fvp::PrimSelection { primPath } });
 }
 
-SdfPath MayaHydraSceneIndex::SetCameraViewport(const MDagPath& camPath, const GfVec4d& viewport)
-{
-    const SdfPath camID = GetPrimPath(camPath, true);
-    auto&&        cameraAdapter = TfMapLookupPtr(_cameraAdapters, camID);
-    if (cameraAdapter) {
-        (*cameraAdapter)->SetViewport(viewport);
-        return camID;
-    }
-    return {};
-}
-
 SdfPath MayaHydraSceneIndex::GetDelegateID(TfToken name) { return _ID; }
 
 MayaHydraSceneIndex::LightDagPathMap MayaHydraSceneIndex::GetGlobalLightPaths() const
