@@ -212,26 +212,39 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
 
 
 if __name__ == "__main__":
-    import platform
+    # HYDRA-2237: Work around a pre-existing Maya crash during process exit
+    # that is unrelated to what this test verifies (all results are fully
+    # reported by the runner before we terminate).  On Windows this is
+    # ufe_0.dll's static attrSubjects destructor crashing due to DLL unload
+    # ordering; on Linux/OSX the analogous static/shared-library teardown also
+    # crashes on some USD versions (e.g. USD 24.11).  We therefore report
+    # results and then force-terminate the process, skipping the crash-prone
+    # teardown entirely.
+    import os, sys, platform, unittest
+    suite = fixturesUtils.loadTestsFromDict(globals())
+    runner = unittest.TextTestRunner(stream=sys.__stderr__, verbosity=1)
+    results = runner.run(suite)
+    exitCode = 0 if results.wasSuccessful() else 1
+
+    # os._exit / TerminateProcess do not flush buffered output, so flush first.
+    for stream in (sys.stdout, sys.stderr, sys.__stdout__, sys.__stderr__):
+        try:
+            stream.flush()
+        except Exception:
+            pass
+
     if platform.system() == "Windows":
-        # Logged as HYDRA-2237: Workaround for pre-existing Maya crash during
-        # process exit: ufe_0.dll's static attrSubjects destructor
-        # crashes due to DLL unload ordering.  os._exit still triggers
-        # DllMain(DLL_PROCESS_DETACH) on Windows, so we must use
-        # TerminateProcess to kill the process without running any DLL
-        # teardown.  Test results are fully reported by the runner
-        # before this point.
-        import sys, unittest, ctypes, ctypes.wintypes
-        suite = fixturesUtils.loadTestsFromDict(globals())
-        runner = unittest.TextTestRunner(stream=sys.__stderr__, verbosity=1)
-        results = runner.run(suite)
-        exitCode = 0 if results.wasSuccessful() else 1
-        sys.__stdout__.flush()
-        sys.__stderr__.flush()
+        # os._exit still triggers DllMain(DLL_PROCESS_DETACH) on Windows, so we
+        # must use TerminateProcess to kill the process without running any DLL
+        # teardown.
+        import ctypes, ctypes.wintypes
         kernel32 = ctypes.windll.kernel32
         kernel32.GetCurrentProcess.restype = ctypes.wintypes.HANDLE
         kernel32.TerminateProcess.argtypes = [ctypes.wintypes.HANDLE,
                                               ctypes.wintypes.UINT]
         kernel32.TerminateProcess(kernel32.GetCurrentProcess(), exitCode)
     else:
-        fixturesUtils.runTests(globals())
+        # POSIX equivalent of the TerminateProcess workaround above: terminate
+        # immediately without running atexit handlers or static/shared-library
+        # destructors.
+        os._exit(exitCode)
