@@ -20,9 +20,9 @@ _NODE = 'defaultRenderGlobals'
 
 def _ensureStringAttr(attrName, value):
     exists = cmds.attributeQuery(attrName, node=_NODE, exists=True)
-    if not value and not exists:
-        return
     if not exists:
+        if not value:
+            return
         cmds.addAttr(_NODE, longName=attrName, dataType='string')
     cmds.setAttr('%s.%s' % (_NODE, attrName), value, type='string')
 

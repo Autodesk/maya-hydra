@@ -8,7 +8,7 @@
     |       |___# ContainerDataSource : 
     |       |___@ Prim : directionalLightShape1 --- Type : distantLight
     |           |___# ContainerDataSource : 
-    |               |___Unidentified data source type : primvars
+    |               |___Blocked or absent data source : primvars
     |               |___# ContainerDataSource : material
     |               |   |___# ContainerDataSource : 
     |               |       |___# ContainerDataSource : nodes
@@ -65,7 +65,7 @@
     |   |___# ContainerDataSource : 
     |   |___@ Prim : initialShadingGroup --- Type : material
     |       |___# ContainerDataSource : 
-    |           |___Unidentified data source type : primvars
+    |           |___Blocked or absent data source : primvars
     |           |___# ContainerDataSource : material
     |               |___# ContainerDataSource : 
     |                   |___# ContainerDataSource : nodes
@@ -181,14 +181,14 @@
                     |   |___# ContainerDataSource : 
                     |       |___SampledDataSource -> SdfPath : path
                     |___# ContainerDataSource : displayStyle
-                    |   |___Unidentified data source type : refineLevel
+                    |   |___Blocked or absent data source : refineLevel
                     |   |___SampledDataSource -> bool : flatShadingEnabled
                     |   |___SampledDataSource -> bool : displacementEnabled
                     |   |___SampledDataSource -> bool : occludedSelectionShowsThrough
                     |   |___SampledDataSource -> bool : pointsShadingEnabled
                     |   |___SampledDataSource -> bool : materialIsFinal
-                    |   |___Unidentified data source type : shadingStyle
-                    |   |___Unidentified data source type : reprSelector
+                    |   |___Blocked or absent data source : shadingStyle
+                    |   |___Blocked or absent data source : reprSelector
                     |   |___SampledDataSource -> TfToken : cullStyle
                     |___# ContainerDataSource : visibility
                     |   |___SampledDataSource -> bool : visibility
