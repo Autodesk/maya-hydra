@@ -247,18 +247,15 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSett
 endif()
 
 # Test frame range (5-9) with HdArnold
-#
-# Disabled, reference images have watermark, entered as HYDRA-2325
-#
-# mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
-#     RENDERER HdArnoldRendererPlugin
-#     EXPECTED_IMAGES_DIR renderSettings/images/arnold_frames5to9
-#     IMAGE_EXTENSION png
-#     TEST_NAME_SUFFIX ArnoldFrames5to9
-#     FAIL 0.05
-#     FAILPERCENT 1.0
-#     RENDERER_ARGS "-s 5 -e 9"
-# )
+mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
+    RENDERER HdArnoldRendererPlugin
+    EXPECTED_IMAGES_DIR renderSettings/images/arnold_frames5to9
+    IMAGE_EXTENSION png
+    TEST_NAME_SUFFIX ArnoldFrames5to9
+    FAIL 0.05
+    FAILPERCENT 1.0
+    RENDERER_ARGS "-s 5 -e 9"
+)
 
 # Test that USD render settings stored in a MayaUsdProxyShape node produce no
 # path mapper warnings errors.  Launches Render and checks for success,
