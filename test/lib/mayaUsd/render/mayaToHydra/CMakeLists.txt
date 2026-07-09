@@ -137,6 +137,13 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     )
 endif()
 
+# mtoa custom nodes/attributes not supported on Maya 2026 and earlier.
+if(MAYA_APP_VERSION VERSION_GREATER 2026)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
+        cpp/testArnoldCustomNodes.py|depOnPlugins:mtoa
+    )
+endif()
+
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.
 if(MayaUsd_FOUND)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testMayaUsdAPIUsage.py)

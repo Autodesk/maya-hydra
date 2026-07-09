@@ -336,6 +336,16 @@ function(_mayaHydra_setup_test_plugins)
         # like having a locally installed MtoA fixed it, but we can't rely on that.
         list(APPEND MAYAHYDRA_VARNAME_MAYA_MODULE_PATH
              "${MTOA_LOCATION}")
+        # Unit tests like testArnoldCustomNodes.cpp rely on mtoa's USD plugins such as 
+        # HdArnoldRendererPlugin and mtoaSIP to be registered so that maya-hydra can 
+        # find them during startup. Append the bundle path to PXR_PLUGINPATH_NAME.
+        if(DEFINED PXR_VERSION)
+            set(_MTOA_USD_BUNDLE "${MTOA_LOCATION}/usd/bundle/${PXR_VERSION}")
+            if(EXISTS "${_MTOA_USD_BUNDLE}")
+                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                     "${_MTOA_USD_BUNDLE}")
+            endif()
+        endif()
     endif()
     
     # lookdevx
