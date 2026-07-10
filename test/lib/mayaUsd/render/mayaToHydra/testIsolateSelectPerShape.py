@@ -46,6 +46,16 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 3
 
+    @classmethod
+    def tearDownClass(cls):
+        # HYDRA-2237: Skip the base tearDownClass (scene reset + plugin
+        # unload).  Resetting the scene while Arnold still has live render
+        # threads causes a SIGSEGV inside libai.so before runner.run() can
+        # return, so os._exit() in __main__ is never reached.  Since the
+        # process is terminated by os._exit() immediately after the runner
+        # returns, there is no need to clean up the scene or unload plugins.
+        pass
+
     def assertVisible(self, paths):
         for p in paths:
             cmds.mayaHydraCppTest(p, f="TestHydraPrim.isVisible")
