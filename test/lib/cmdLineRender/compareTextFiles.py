@@ -13,9 +13,8 @@
 # limitations under the License.
 #
 
-"""Compare two text files, normalizing line endings and sorting lines.
+"""Compare two text files, normalizing line endings.
 
-Lines are sorted before comparison so the check is order-independent.
 Exit 0 if the files match, 1 if they differ.  On mismatch a unified diff
 is printed to stdout so the CTest log contains actionable diagnostics.
 
@@ -64,9 +63,6 @@ def main():
                          for line in actual_lines]
     expected_normalized = [_mask_addresses(line.rstrip("\r\n") + "\n")
                            for line in expected_lines]
-
-    actual_normalized = sorted(actual_normalized)
-    expected_normalized = sorted(expected_normalized)
 
     if actual_normalized == expected_normalized:
         print("Files match.")
