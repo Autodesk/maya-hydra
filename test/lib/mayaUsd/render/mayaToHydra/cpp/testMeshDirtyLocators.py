@@ -16,6 +16,9 @@
 # scene with MAYA_HYDRA_USE_MESH_ADAPTER enabled and runs mesh-adapter dirty-locator cases
 # through mayaHydraCppTest.
 #
+import platform
+import unittest
+
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
@@ -46,6 +49,9 @@ class TestMeshDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
     # What: topology edits should dirty mesh topology and broad primvars.
     # How: build a cube scene, extrude a face via C++, inspect dirty locators.
     # Expect: topology + broad primvars + points; no extComputationPrimvars.
+    @unittest.skipIf(
+        platform.system() == "Darwin",
+        "HYDRA-2407: polyExtrudeFacet SIGSEGV on OSX Maya 2026+ with Hydra viewport active")
     def test_topologyExtrudeEmitsTopologyAndBroadPrimvars(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):

@@ -173,12 +173,6 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     cpp/testMeshSubdivTags.py
 )
 
-# HYDRA-2167: TopologyExtrude locator tests crash on OSX Maya 2027 only.
-if(IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027)
-    list(REMOVE_ITEM INTERACTIVE_TEST_SCRIPT_FILES cpp/testRenderItemDirtyLocators.py)
-    list(REMOVE_ITEM INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER cpp/testMeshDirtyLocators.py)
-endif()
-
 # The following tests incorrectly depend on having the VP2 render delegate
 # enabled.  We must fix this, to ensure that mayaHydra does not rely
 # on computations made by VP2 for its use.  Entered as HYDRA-1961.

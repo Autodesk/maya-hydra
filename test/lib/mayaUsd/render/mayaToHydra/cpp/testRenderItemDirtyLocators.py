@@ -16,6 +16,9 @@
 # Runs RenderItemDirtyLocators and ExtCompGate suites via mayaHydraCppTest to verify
 # granular dirty locators on the MRenderItem adapter path.
 #
+import platform
+import unittest
+
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
@@ -52,6 +55,9 @@ class TestRenderItemDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
     #       reserved for skinning/blendshape, not connectivity changes.
     # How: build a cube scene (render items mode), extrude a face via C++, inspect dirty locators.
     # Expect: meshTopology + points; no broadPrimvars, no extComputationPrimvars.
+    @unittest.skipIf(
+        platform.system() == "Darwin",
+        "HYDRA-2407: polyExtrudeFacet SIGSEGV on OSX Maya 2026+ with Hydra viewport active")
     def test_topologyExtrudeEmitsTopologyNotBroadPrimvars(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
