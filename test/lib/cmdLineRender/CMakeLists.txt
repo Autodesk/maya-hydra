@@ -427,7 +427,9 @@ function(_add_scene_index_dump_test test_name scene_file renderer_args dump_file
     set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
 endfunction()
 
-if(NOT IS_MACOSX)
+# Two following tests fail on Windows 2027 and later builds on build machines,
+# pass locally.  Entered as HYDRA-2408.
+if(IS_LINUX)
     set(_terminal_dump_file
         "${TEST_OUTPUT_ROOT}/terminalSceneIndexDump/sceneIndexDump.txt")
     set(render_dir ${TEST_OUTPUT_ROOT}/terminalSceneIndexDump/projects/default/images)
