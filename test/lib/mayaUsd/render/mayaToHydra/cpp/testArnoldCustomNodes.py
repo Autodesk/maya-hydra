@@ -38,10 +38,6 @@ class TestArnoldCustomNodes(mtohUtils.MayaHydraBaseTestCase):
     _requiredPlugins = ['mtoa']
     _setHdStormRenderer = False     # Need to use Arnold renderer for the tests
 
-    # def tearDown(self):
-    #     """Test will hang if Arnold renderer is not reset before Maya exits."""
-    #     self.setViewport2Renderer()
-
     def _setArnoldRenderer(self):
         """Activate the Arnold Hydra renderer so mtoaSIP is in the scene index chain."""
         self.activeEditor = cmds.playblast(activeEditor=1)
