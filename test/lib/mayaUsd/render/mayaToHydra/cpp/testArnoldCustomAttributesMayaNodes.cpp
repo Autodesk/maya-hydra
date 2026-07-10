@@ -93,32 +93,36 @@ TEST(ArnoldCustomAttributesMayaNodes, meshArnoldPrimvars)
 
     HdPrimvarsSchema primvarsSchema = HdPrimvarsSchema::GetFromParent(prim.dataSource);
 
-    EXPECT_EQ(
-        primvarsSchema.GetPrimvar(TfToken("arnold:subdiv_type"))
-            .GetPrimvarValue()
-            ->GetValue(0.0f)
-            .UncheckedGet<int>(),
-        1)
+    auto subdivTypeDs = primvarsSchema.GetPrimvar(TfToken("arnold:subdiv_type")).GetPrimvarValue();
+    ASSERT_TRUE(subdivTypeDs);
+    const VtValue subdivTypeVal = subdivTypeDs->GetValue(0.0f);
+    ASSERT_TRUE(subdivTypeVal.IsHolding<short>());
+    EXPECT_EQ(subdivTypeVal.UncheckedGet<short>(), 1)
         << "aiSubdivType should map to arnold:subdiv_type";
-    EXPECT_NEAR(
-        GetFloatValue(primvarsSchema.GetPrimvar(TfToken("arnold:disp_height")).GetPrimvarValue()),
-        0.25f,
-        1e-5f)
+
+    auto dispHeightDs = primvarsSchema.GetPrimvar(TfToken("arnold:disp_height")).GetPrimvarValue();
+    ASSERT_TRUE(dispHeightDs);
+    EXPECT_NEAR(GetFloatValue(dispHeightDs), 0.25f, 1e-5f)
         << "aiDispHeight should map to arnold:disp_height";
-    EXPECT_FALSE(primvarsSchema.GetPrimvar(TfToken("arnold:opaque"))
-                     .GetPrimvarValue()
-                     ->GetValue(0.0f)
-                     .UncheckedGet<bool>())
-        << "aiOpaque=0 should map to arnold:opaque";
-    EXPECT_TRUE(primvarsSchema.GetPrimvar(TfToken("arnold:matte"))
-                    .GetPrimvarValue()
-                    ->GetValue(0.0f)
-                    .UncheckedGet<bool>())
-        << "aiMatte=1 should map to arnold:matte";
-    EXPECT_FALSE(primvarsSchema.GetPrimvar(TfToken("arnold:self_shadows"))
-                     .GetPrimvarValue()
-                     ->GetValue(0.0f)
-                     .UncheckedGet<bool>())
+
+    auto opaqueDs = primvarsSchema.GetPrimvar(TfToken("arnold:opaque")).GetPrimvarValue();
+    ASSERT_TRUE(opaqueDs);
+    const VtValue opaqueVal = opaqueDs->GetValue(0.0f);
+    ASSERT_TRUE(opaqueVal.IsHolding<bool>());
+    EXPECT_FALSE(opaqueVal.UncheckedGet<bool>()) << "aiOpaque=0 should map to arnold:opaque";
+
+    auto matteDs = primvarsSchema.GetPrimvar(TfToken("arnold:matte")).GetPrimvarValue();
+    ASSERT_TRUE(matteDs);
+    const VtValue matteVal = matteDs->GetValue(0.0f);
+    ASSERT_TRUE(matteVal.IsHolding<bool>());
+    EXPECT_TRUE(matteVal.UncheckedGet<bool>()) << "aiMatte=1 should map to arnold:matte";
+
+    auto selfShadowsDs
+        = primvarsSchema.GetPrimvar(TfToken("arnold:self_shadows")).GetPrimvarValue();
+    ASSERT_TRUE(selfShadowsDs);
+    const VtValue selfShadowsVal = selfShadowsDs->GetValue(0.0f);
+    ASSERT_TRUE(selfShadowsVal.IsHolding<bool>());
+    EXPECT_FALSE(selfShadowsVal.UncheckedGet<bool>())
         << "aiSelfShadows=0 should map to arnold:self_shadows";
 }
 
@@ -149,16 +153,15 @@ TEST(ArnoldCustomAttributesMayaNodes, cameraArnoldPrimvars)
 
     HdPrimvarsSchema primvarsSchema = HdPrimvarsSchema::GetFromParent(prim.dataSource);
 
-    EXPECT_NEAR(
-        GetFloatValue(primvarsSchema.GetPrimvar(TfToken("arnold:exposure")).GetPrimvarValue()),
-        1.0f,
-        1e-5f)
+    auto exposureDs = primvarsSchema.GetPrimvar(TfToken("arnold:exposure")).GetPrimvarValue();
+    ASSERT_TRUE(exposureDs);
+    EXPECT_NEAR(GetFloatValue(exposureDs), 1.0f, 1e-5f)
         << "aiExposure should map to arnold:exposure";
-    EXPECT_NEAR(
-        GetFloatValue(
-            primvarsSchema.GetPrimvar(TfToken("arnold:focus_distance")).GetPrimvarValue()),
-        12.5f,
-        1e-5f)
+
+    auto focusDistanceDs
+        = primvarsSchema.GetPrimvar(TfToken("arnold:focus_distance")).GetPrimvarValue();
+    ASSERT_TRUE(focusDistanceDs);
+    EXPECT_NEAR(GetFloatValue(focusDistanceDs), 12.5f, 1e-5f)
         << "aiFocusDistance should map to arnold:focus_distance";
 }
 
@@ -193,11 +196,9 @@ TEST(ArnoldCustomAttributesMayaNodes, directionalLightAttributes)
 
     HdPrimvarsSchema primvarsSchema = HdPrimvarsSchema::GetFromParent(prim.dataSource);
 
-    EXPECT_NEAR(
-        GetFloatValue(primvarsSchema.GetPrimvar(TfToken("arnold:angle")).GetPrimvarValue()),
-        2.5f,
-        1e-5f)
-        << "aiAngle should map to arnold:angle";
+    auto angleDs = primvarsSchema.GetPrimvar(TfToken("arnold:angle")).GetPrimvarValue();
+    ASSERT_TRUE(angleDs);
+    EXPECT_NEAR(GetFloatValue(angleDs), 2.5f, 1e-5f) << "aiAngle should map to arnold:angle";
 
     MObject lightNode;
     ASSERT_TRUE(GetDependNodeFromNodeName(shapeNamePart.c_str(), lightNode));
@@ -205,22 +206,25 @@ TEST(ArnoldCustomAttributesMayaNodes, directionalLightAttributes)
     const MPlug       castVolShadowsPlug = lightDepNode.findPlug("aiCastVolumetricShadows", true);
     ASSERT_FALSE(castVolShadowsPlug.isNull());
     const bool expectedCastVolShadows = castVolShadowsPlug.asBool();
-    EXPECT_EQ(
-        primvarsSchema.GetPrimvar(TfToken("arnold:cast_volumetric_shadows"))
-            .GetPrimvarValue()
-            ->GetValue(0.0f)
-            .UncheckedGet<bool>(),
-        expectedCastVolShadows)
+
+    auto castVolShadowsDs
+        = primvarsSchema.GetPrimvar(TfToken("arnold:cast_volumetric_shadows")).GetPrimvarValue();
+    ASSERT_TRUE(castVolShadowsDs);
+    const VtValue castVolShadowsVal = castVolShadowsDs->GetValue(0.0f);
+    ASSERT_TRUE(castVolShadowsVal.IsHolding<bool>());
+    EXPECT_EQ(castVolShadowsVal.UncheckedGet<bool>(), expectedCastVolShadows)
         << "aiCastVolumetricShadows should map to arnold:cast_volumetric_shadows";
 
     HdLightSchema lightSchema = HdLightSchema::GetFromParent(prim.dataSource);
     ASSERT_TRUE(lightSchema);
     auto container = lightSchema.GetContainer();
     ASSERT_TRUE(container);
-    auto exposureDs = HdSampledDataSource::Cast(container->Get(HdLightTokens->exposure));
-    EXPECT_NEAR(GetFloatValue(exposureDs), 1.5f, 1e-5f)
+    auto lightExposureDs = HdSampledDataSource::Cast(container->Get(HdLightTokens->exposure));
+    ASSERT_TRUE(lightExposureDs);
+    EXPECT_NEAR(GetFloatValue(lightExposureDs), 1.5f, 1e-5f)
         << "aiExposure should map to light.exposure";
     auto colorTempDs = HdSampledDataSource::Cast(container->Get(HdLightTokens->colorTemperature));
+    ASSERT_TRUE(colorTempDs);
     EXPECT_NEAR(GetFloatValue(colorTempDs), 3200.0f, 1e-3f)
         << "aiColorTemperature should map to light.colorTemperature";
 }
@@ -253,21 +257,19 @@ TEST(ArnoldCustomAttributesMayaNodes, areaLightArnoldPrimvars)
 
     HdPrimvarsSchema primvarsSchema = HdPrimvarsSchema::GetFromParent(prim.dataSource);
 
-    EXPECT_EQ(
-        primvarsSchema.GetPrimvar(TfToken("arnold:resolution"))
-            .GetPrimvarValue()
-            ->GetValue(0.0f)
-            .UncheckedGet<int>(),
-        256)
+    auto resolutionDs = primvarsSchema.GetPrimvar(TfToken("arnold:resolution")).GetPrimvarValue();
+    ASSERT_TRUE(resolutionDs);
+    const VtValue resolutionVal = resolutionDs->GetValue(0.0f);
+    ASSERT_TRUE(resolutionVal.IsHolding<int>());
+    EXPECT_EQ(resolutionVal.UncheckedGet<int>(), 256)
         << "aiResolution should map to arnold:resolution";
-    EXPECT_NEAR(
-        GetFloatValue(primvarsSchema.GetPrimvar(TfToken("arnold:spread")).GetPrimvarValue()),
-        0.5f,
-        1e-5f)
-        << "aiSpread should map to arnold:spread";
-    EXPECT_NEAR(
-        GetFloatValue(primvarsSchema.GetPrimvar(TfToken("arnold:roundness")).GetPrimvarValue()),
-        0.25f,
-        1e-5f)
+
+    auto spreadDs = primvarsSchema.GetPrimvar(TfToken("arnold:spread")).GetPrimvarValue();
+    ASSERT_TRUE(spreadDs);
+    EXPECT_NEAR(GetFloatValue(spreadDs), 0.5f, 1e-5f) << "aiSpread should map to arnold:spread";
+
+    auto roundnessDs = primvarsSchema.GetPrimvar(TfToken("arnold:roundness")).GetPrimvarValue();
+    ASSERT_TRUE(roundnessDs);
+    EXPECT_NEAR(GetFloatValue(roundnessDs), 0.25f, 1e-5f)
         << "aiRoundness should map to arnold:roundness";
 }
