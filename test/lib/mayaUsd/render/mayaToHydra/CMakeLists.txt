@@ -141,6 +141,7 @@ endif()
 if(MAYA_APP_VERSION VERSION_GREATER 2026)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
         cpp/testArnoldCustomNodes.py|depOnPlugins:mtoa
+        cpp/testArnoldCustomAttributesMayaNodes.py|depOnPlugins:mtoa
     )
 endif()
 

@@ -66,4 +66,9 @@
     <sep desc="Camera options"/>
     <mel n="cam" p="1" s='mayaHydraSetRenderCamera("%1")' t="name" h="Specify which camera to be rendered"/>
     <sep/>
+    <!-- ______________________________________________________________ -->
+    <sep desc="Hydra debugging options"/>
+    <mel n="hsd" p="1" s='mayaHydraSceneDump("%1")' t="path" h="Full path to Hydra scene dump file for scene index specified by -hsi flag"/>
+    <mel n="hsi" p="1" s='mayaHydraSceneDumpSceneIndex("%1")' t="name" h="Name of Hydra scene index whose output will be\n\tdumped to file (default terminal scene index)"/>
+    <sep/>
 </renderer>

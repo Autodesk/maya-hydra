@@ -72,7 +72,7 @@ float GetFloatValue(const HdSampledDataSourceHandle& ds, float fallback = 0.0f)
 //       aiFilename="/path/to/test.ies", aiSamples=5) with Arnold renderer active.
 // Expect: prim type = sphereLight; inputs:intensity, inputs:exposure,
 //         inputs:shaping:ies:file are set; arnold:samples primvar exists (catch-all).
-TEST(MtoaSIP, photometricLightTranslation)
+TEST(ArnoldCustomNodes, photometricLightTranslation)
 {
     auto [argc, argv] = getTestingArgs();
     ASSERT_GE(argc, 1);
@@ -123,7 +123,7 @@ TEST(MtoaSIP, photometricLightTranslation)
 // What: mtoaSIP re-types aiStandIn to ArnoldProcedural and maps dso -> arnold:filename.
 // How:  Python creates aiStandIn (dso="/path/to/test.ass") with Arnold renderer.
 // Expect: prim type = ArnoldProcedural; arnold:filename = "/path/to/test.ass".
-TEST(MtoaSIP, standInTranslation)
+TEST(ArnoldCustomNodes, standInTranslation)
 {
     auto [argc, argv] = getTestingArgs();
     ASSERT_GE(argc, 1);
@@ -160,7 +160,7 @@ TEST(MtoaSIP, standInTranslation)
 // What: mtoaSIP re-types aiVolume to ArnoldVolume and maps filename -> arnold:filename.
 // How:  Python creates aiVolume (filename="/path/to/test.vdb") with Arnold renderer.
 // Expect: prim type = ArnoldVolume; arnold:filename = "/path/to/test.vdb".
-TEST(MtoaSIP, volumeTranslation)
+TEST(ArnoldCustomNodes, volumeTranslation)
 {
     auto [argc, argv] = getTestingArgs();
     ASSERT_GE(argc, 1);

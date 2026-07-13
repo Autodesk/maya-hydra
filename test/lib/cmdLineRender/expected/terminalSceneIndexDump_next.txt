@@ -1,0 +1,512 @@
+@ Prim :  --- Type : 
+|___# ContainerDataSource : 
+    |___# ContainerDataSource : sceneGlobals
+        |___SampledDataSource -> SdfPath : activeRenderPassPrim
+        |___SampledDataSource -> SdfPath : activeRenderSettingsPrim
+        |___Blocked or absent data source : primaryCameraPrim
+        |___SampledDataSource -> double : currentFrame
+        |___SampledDataSource -> double : timeCodesPerSecond
+        |___SampledDataSource -> int : sceneStateId
+|___@ Prim : MayaData --- Type : 
+|   |___# ContainerDataSource : 
+|   |___@ Prim : _MayaHydra_HdArnoldRendererPlugin_000001F44F099590 --- Type : 
+|   |   |___# ContainerDataSource : 
+|   |   |___@ Prim : _UsdImaging_HdArnoldRendererPlugin_000001F44F099590 --- Type : 
+|   |       |___# ContainerDataSource : 
+|   |       |___@ Prim : aov_instanceId --- Type : renderBuffer
+|   |       |   |___# ContainerDataSource : 
+|   |       |       |___Blocked or absent data source : primvars
+|   |       |       |___# ContainerDataSource : renderBuffer
+|   |       |       |   |___SampledDataSource -> GfVec3i : dimensions
+|   |       |       |   |___SampledDataSource -> HdFormat : format
+|   |       |       |   |___SampledDataSource -> bool : multiSampled
+|   |       |       |___SampledDataSource -> HdSceneDelegate * __ptr64 : sceneDelegate
+|   |       |___@ Prim : aov_elementId --- Type : renderBuffer
+|   |       |   |___# ContainerDataSource : 
+|   |       |       |___Blocked or absent data source : primvars
+|   |       |       |___# ContainerDataSource : renderBuffer
+|   |       |       |   |___SampledDataSource -> GfVec3i : dimensions
+|   |       |       |   |___SampledDataSource -> HdFormat : format
+|   |       |       |   |___SampledDataSource -> bool : multiSampled
+|   |       |       |___SampledDataSource -> HdSceneDelegate * __ptr64 : sceneDelegate
+|   |       |___@ Prim : aov_primId --- Type : renderBuffer
+|   |       |   |___# ContainerDataSource : 
+|   |       |       |___Blocked or absent data source : primvars
+|   |       |       |___# ContainerDataSource : renderBuffer
+|   |       |       |   |___SampledDataSource -> GfVec3i : dimensions
+|   |       |       |   |___SampledDataSource -> HdFormat : format
+|   |       |       |   |___SampledDataSource -> bool : multiSampled
+|   |       |       |___SampledDataSource -> HdSceneDelegate * __ptr64 : sceneDelegate
+|   |       |___@ Prim : aov_depth --- Type : renderBuffer
+|   |       |   |___# ContainerDataSource : 
+|   |       |       |___Blocked or absent data source : primvars
+|   |       |       |___# ContainerDataSource : renderBuffer
+|   |       |       |   |___SampledDataSource -> GfVec3i : dimensions
+|   |       |       |   |___SampledDataSource -> HdFormat : format
+|   |       |       |   |___SampledDataSource -> bool : multiSampled
+|   |       |       |___SampledDataSource -> HdSceneDelegate * __ptr64 : sceneDelegate
+|   |       |___@ Prim : aov_color --- Type : renderBuffer
+|   |       |   |___# ContainerDataSource : 
+|   |       |       |___Blocked or absent data source : primvars
+|   |       |       |___# ContainerDataSource : renderBuffer
+|   |       |       |   |___SampledDataSource -> GfVec3i : dimensions
+|   |       |       |   |___SampledDataSource -> HdFormat : format
+|   |       |       |   |___SampledDataSource -> bool : multiSampled
+|   |       |       |___SampledDataSource -> HdSceneDelegate * __ptr64 : sceneDelegate
+|   |       |___@ Prim : boundingBoxTask --- Type : task
+|   |       |   |___# ContainerDataSource : 
+|   |       |       |___# ContainerDataSource : task
+|   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
+|   |       |           |___SampledDataSource -> HdxBoundingBoxTaskParams : parameters
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
+|   |       |___@ Prim : pickFromRenderBufferTask --- Type : task
+|   |       |   |___# ContainerDataSource : 
+|   |       |       |___# ContainerDataSource : task
+|   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
+|   |       |           |___SampledDataSource -> HdxPickFromRenderBufferTaskParams : parameters
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
+|   |       |___@ Prim : presentTask --- Type : task
+|   |       |   |___# ContainerDataSource : 
+|   |       |       |___# ContainerDataSource : task
+|   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
+|   |       |           |___SampledDataSource -> HdxPresentTaskParams : parameters
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
+|   |       |___@ Prim : visualizeAovTask --- Type : task
+|   |       |   |___# ContainerDataSource : 
+|   |       |       |___# ContainerDataSource : task
+|   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
+|   |       |           |___SampledDataSource -> HdxVisualizeAovTaskParams : parameters
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
+|   |       |___@ Prim : colorCorrectionTask --- Type : task
+|   |       |   |___# ContainerDataSource : 
+|   |       |       |___# ContainerDataSource : task
+|   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
+|   |       |           |___SampledDataSource -> HdxColorCorrectionTaskParams : parameters
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
+|   |       |___@ Prim : colorizeSelectionTask --- Type : task
+|   |       |   |___# ContainerDataSource : 
+|   |       |       |___# ContainerDataSource : task
+|   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
+|   |       |           |___SampledDataSource -> HdxColorizeSelectionTaskParams : parameters
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
+|   |       |___@ Prim : aovInputTask --- Type : task
+|   |       |   |___# ContainerDataSource : 
+|   |       |       |___# ContainerDataSource : task
+|   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
+|   |       |           |___SampledDataSource -> HdxAovInputTaskParams : parameters
+|   |       |           |___Blocked or absent data source : collection
+|   |       |           |___Blocked or absent data source : renderTags
+|   |       |___@ Prim : renderTask_ --- Type : task
+|   |       |   |___# ContainerDataSource : 
+|   |       |       |___# ContainerDataSource : task
+|   |       |           |___SampledDataSource -> shared_ptr<HdLegacyTaskFactory> : factory
+|   |       |           |___SampledDataSource -> HdxRenderTaskParams : parameters
+|   |       |           |___SampledDataSource -> HdRprimCollection : collection
+|   |       |           |___SampledDataSource -> vector<TfToken,allocator<TfToken> > : renderTags
+|   |       |___@ Prim : camera --- Type : camera
+|   |           |___# ContainerDataSource : 
+|   |               |___Blocked or absent data source : primvars
+|   |               |___# ContainerDataSource : camera
+|   |               |   |___SampledDataSource -> TfToken : projection
+|   |               |   |___SampledDataSource -> float : horizontalAperture
+|   |               |   |___SampledDataSource -> float : verticalAperture
+|   |               |   |___SampledDataSource -> float : horizontalApertureOffset
+|   |               |   |___SampledDataSource -> float : verticalApertureOffset
+|   |               |   |___SampledDataSource -> float : focalLength
+|   |               |   |___SampledDataSource -> GfVec2f : clippingRange
+|   |               |   |___SampledDataSource -> VtArray<GfVec4d> : clippingPlanes
+|   |               |   |___SampledDataSource -> float : fStop
+|   |               |   |___SampledDataSource -> float : focusDistance
+|   |               |   |___SampledDataSource -> void : shutterOpen
+|   |               |   |___SampledDataSource -> void : shutterClose
+|   |               |   |___SampledDataSource -> void : exposure
+|   |               |   |___SampledDataSource -> void : exposureTime
+|   |               |   |___SampledDataSource -> void : exposureIso
+|   |               |   |___SampledDataSource -> void : exposureFStop
+|   |               |   |___SampledDataSource -> void : exposureResponsivity
+|   |               |   |___SampledDataSource -> void : linearExposureScale
+|   |               |   |___SampledDataSource -> void : focusOn
+|   |               |   |___SampledDataSource -> void : dofAspect
+|   |               |   |___# ContainerDataSource : splitDiopter
+|   |               |   |   |___SampledDataSource -> void : count
+|   |               |   |   |___SampledDataSource -> void : angle
+|   |               |   |   |___SampledDataSource -> void : offset1
+|   |               |   |   |___SampledDataSource -> void : width1
+|   |               |   |   |___SampledDataSource -> void : focusDistance1
+|   |               |   |   |___SampledDataSource -> void : offset2
+|   |               |   |   |___SampledDataSource -> void : width2
+|   |               |   |   |___SampledDataSource -> void : focusDistance2
+|   |               |   |___# ContainerDataSource : lensDistortion
+|   |               |       |___SampledDataSource -> void : type
+|   |               |       |___SampledDataSource -> void : k1
+|   |               |       |___SampledDataSource -> void : k2
+|   |               |       |___SampledDataSource -> void : center
+|   |               |       |___SampledDataSource -> void : anaSq
+|   |               |       |___SampledDataSource -> void : asym
+|   |               |       |___SampledDataSource -> void : scale
+|   |               |       |___SampledDataSource -> void : ior
+|   |               |___# ContainerDataSource : xform
+|   |               |   |___SampledDataSource -> GfMatrix4d : matrix
+|   |               |   |___SampledDataSource -> bool : resetXformStack
+|   |               |___SampledDataSource -> HdSceneDelegate * __ptr64 : sceneDelegate
+|   |___@ Prim : sprims --- Type : 
+|   |   |___# ContainerDataSource : 
+|   |   |___@ Prim : directionalLight1 --- Type : 
+|   |       |___# ContainerDataSource : 
+|   |       |___@ Prim : directionalLightShape1 --- Type : distantLight
+|   |           |___# ContainerDataSource : 
+|   |               |___Blocked or absent data source : __dependencies
+|   |               |___Blocked or absent data source : primvars
+|   |               |___# ContainerDataSource : material
+|   |               |   |___# ContainerDataSource : 
+|   |               |       |___# ContainerDataSource : nodes
+|   |               |       |   |___# ContainerDataSource : /MayaData/sprims/directionalLight1/directionalLightShape1
+|   |               |       |       |___# ContainerDataSource : parameters
+|   |               |       |       |   |___# ContainerDataSource : angle
+|   |               |       |       |   |   |___SampledDataSource -> float : value
+|   |               |       |       |   |___# ContainerDataSource : color
+|   |               |       |       |   |   |___SampledDataSource -> GfVec3f : value
+|   |               |       |       |   |___# ContainerDataSource : colorTemperature
+|   |               |       |       |   |   |___SampledDataSource -> float : value
+|   |               |       |       |   |___# ContainerDataSource : diffuse
+|   |               |       |       |   |   |___SampledDataSource -> float : value
+|   |               |       |       |   |___# ContainerDataSource : enableColorTemperature
+|   |               |       |       |   |   |___SampledDataSource -> bool : value
+|   |               |       |       |   |___# ContainerDataSource : exposure
+|   |               |       |       |   |   |___SampledDataSource -> float : value
+|   |               |       |       |   |___# ContainerDataSource : intensity
+|   |               |       |       |   |   |___SampledDataSource -> float : value
+|   |               |       |       |   |___# ContainerDataSource : normalize
+|   |               |       |       |   |   |___SampledDataSource -> bool : value
+|   |               |       |       |   |___# ContainerDataSource : shadow:color
+|   |               |       |       |   |   |___SampledDataSource -> GfVec3f : value
+|   |               |       |       |   |___# ContainerDataSource : shadow:enable
+|   |               |       |       |   |   |___SampledDataSource -> bool : value
+|   |               |       |       |   |___# ContainerDataSource : specular
+|   |               |       |       |   |   |___SampledDataSource -> float : value
+|   |               |       |       |   |___# ContainerDataSource : transform
+|   |               |       |       |   |   |___SampledDataSource -> GfMatrix4d : value
+|   |               |       |       |   |___# ContainerDataSource : visibility:camera
+|   |               |       |       |       |___SampledDataSource -> bool : value
+|   |               |       |       |___# ContainerDataSource : inputConnections
+|   |               |       |       |___SampledDataSource -> TfToken : nodeIdentifier
+|   |               |       |___# ContainerDataSource : terminals
+|   |               |           |___# ContainerDataSource : light
+|   |               |               |___SampledDataSource -> TfToken : upstreamNodePath
+|   |               |               |___SampledDataSource -> TfToken : upstreamNodeOutputName
+|   |               |___# ContainerDataSource : xform
+|   |               |   |___SampledDataSource -> GfMatrix4d : matrix
+|   |               |___# ContainerDataSource : light
+|   |               |   |___SampledDataSource -> GfVec3f : color
+|   |               |   |___SampledDataSource -> float : intensity
+|   |               |   |___SampledDataSource -> float : exposure
+|   |               |   |___SampledDataSource -> float : diffuse
+|   |               |   |___SampledDataSource -> float : specular
+|   |               |   |___SampledDataSource -> bool : normalize
+|   |               |   |___SampledDataSource -> GfVec3f : shadow:color
+|   |               |   |___SampledDataSource -> bool : shadow:enable
+|   |               |   |___SampledDataSource -> bool : enableColorTemperature
+|   |               |   |___SampledDataSource -> float : colorTemperature
+|   |               |   |___Blocked or absent data source : lightLink
+|   |               |   |___Blocked or absent data source : shadowLink
+|   |               |   |___Blocked or absent data source : lightFilterLink
+|   |               |___# ContainerDataSource : purpose
+|   |                   |___SampledDataSource -> TfToken : purpose
+|   |___@ Prim : materials --- Type : 
+|   |   |___# ContainerDataSource : 
+|   |   |___@ Prim : initialShadingGroup --- Type : material
+|   |       |___# ContainerDataSource : 
+|   |           |___Blocked or absent data source : primvars
+|   |           |___# ContainerDataSource : material
+|   |               |___# ContainerDataSource : 
+|   |                   |___# ContainerDataSource : nodes
+|   |                   |   |___# ContainerDataSource : /MayaData/materials/initialShadingGroup/place2dTexture1
+|   |                   |   |   |___# ContainerDataSource : parameters
+|   |                   |   |   |   |___# ContainerDataSource : varname
+|   |                   |   |   |       |___SampledDataSource -> TfToken : value
+|   |                   |   |   |___# ContainerDataSource : inputConnections
+|   |                   |   |   |___SampledDataSource -> TfToken : nodeIdentifier
+|   |                   |   |___# ContainerDataSource : /MayaData/materials/initialShadingGroup/file1
+|   |                   |   |   |___# ContainerDataSource : parameters
+|   |                   |   |   |   |___# ContainerDataSource : file
+|   |                   |   |   |   |   |___SampledDataSource -> SdfAssetPath : value
+|   |                   |   |   |   |___# ContainerDataSource : st
+|   |                   |   |   |   |   |___SampledDataSource -> GfVec2f : value
+|   |                   |   |   |   |___# ContainerDataSource : textureMemory
+|   |                   |   |   |   |   |___SampledDataSource -> float : value
+|   |                   |   |   |   |___# ContainerDataSource : wrapS
+|   |                   |   |   |   |   |___SampledDataSource -> TfToken : value
+|   |                   |   |   |   |___# ContainerDataSource : wrapT
+|   |                   |   |   |       |___SampledDataSource -> TfToken : value
+|   |                   |   |   |___# ContainerDataSource : inputConnections
+|   |                   |   |   |   |___# VectorDataSource : st
+|   |                   |   |   |       |___# ContainerDataSource : Element 0
+|   |                   |   |   |           |___SampledDataSource -> TfToken : upstreamNodePath
+|   |                   |   |   |           |___SampledDataSource -> TfToken : upstreamNodeOutputName
+|   |                   |   |   |___SampledDataSource -> TfToken : nodeIdentifier
+|   |                   |   |___# ContainerDataSource : /MayaData/materials/initialShadingGroup/openPBR_shader1
+|   |                   |       |___# ContainerDataSource : parameters
+|   |                   |       |   |___# ContainerDataSource : clearcoat
+|   |                   |       |   |   |___SampledDataSource -> float : value
+|   |                   |       |   |___# ContainerDataSource : clearcoatRoughness
+|   |                   |       |   |   |___SampledDataSource -> float : value
+|   |                   |       |   |___# ContainerDataSource : diffuseColor
+|   |                   |       |   |   |___SampledDataSource -> GfVec3f : value
+|   |                   |       |   |___# ContainerDataSource : displacement
+|   |                   |       |   |   |___SampledDataSource -> float : value
+|   |                   |       |   |___# ContainerDataSource : emissiveColor
+|   |                   |       |   |   |___SampledDataSource -> GfVec3f : value
+|   |                   |       |   |___# ContainerDataSource : ior
+|   |                   |       |   |   |___SampledDataSource -> float : value
+|   |                   |       |   |___# ContainerDataSource : metallic
+|   |                   |       |   |   |___SampledDataSource -> float : value
+|   |                   |       |   |___# ContainerDataSource : normal
+|   |                   |       |   |   |___SampledDataSource -> GfVec3f : value
+|   |                   |       |   |___# ContainerDataSource : occlusion
+|   |                   |       |   |   |___SampledDataSource -> float : value
+|   |                   |       |   |___# ContainerDataSource : opacity
+|   |                   |       |   |   |___SampledDataSource -> float : value
+|   |                   |       |   |___# ContainerDataSource : opacityMode
+|   |                   |       |   |   |___SampledDataSource -> string : value
+|   |                   |       |   |___# ContainerDataSource : opacityThreshold
+|   |                   |       |   |   |___SampledDataSource -> float : value
+|   |                   |       |   |___# ContainerDataSource : roughness
+|   |                   |       |   |   |___SampledDataSource -> float : value
+|   |                   |       |   |___# ContainerDataSource : specularColor
+|   |                   |       |   |   |___SampledDataSource -> GfVec3f : value
+|   |                   |       |   |___# ContainerDataSource : useSpecularWorkflow
+|   |                   |       |       |___SampledDataSource -> int : value
+|   |                   |       |___# ContainerDataSource : inputConnections
+|   |                   |       |   |___# VectorDataSource : diffuseColor
+|   |                   |       |       |___# ContainerDataSource : Element 0
+|   |                   |       |           |___SampledDataSource -> TfToken : upstreamNodePath
+|   |                   |       |           |___SampledDataSource -> TfToken : upstreamNodeOutputName
+|   |                   |       |___SampledDataSource -> TfToken : nodeIdentifier
+|   |                   |___# ContainerDataSource : terminals
+|   |                       |___# ContainerDataSource : surface
+|   |                           |___SampledDataSource -> TfToken : upstreamNodePath
+|   |                           |___SampledDataSource -> TfToken : upstreamNodeOutputName
+|   |___@ Prim : rprims --- Type : 
+|       |___# ContainerDataSource : 
+|       |___@ Prim : pSphere1 --- Type : 
+|           |___# ContainerDataSource : 
+|           |___@ Prim : pSphereShape1 --- Type : mesh
+|               |___# ContainerDataSource : 
+|                   |___Blocked or absent data source : __dependencies
+|                   |___# ContainerDataSource : mesh
+|                   |   |___# ContainerDataSource : topology
+|                   |   |   |___SampledDataSource -> VtArray<int> : faceVertexCounts
+|                   |   |   |___SampledDataSource -> VtArray<int> : faceVertexIndices
+|                   |   |   |___SampledDataSource -> TfToken : orientation
+|                   |   |___SampledDataSource -> TfToken : subdivisionScheme
+|                   |   |___# ContainerDataSource : subdivisionTags
+|                   |   |   |___SampledDataSource -> TfToken : faceVaryingLinearInterpolation
+|                   |   |   |___SampledDataSource -> TfToken : interpolateBoundary
+|                   |   |   |___SampledDataSource -> TfToken : triangleSubdivisionRule
+|                   |   |   |___SampledDataSource -> VtArray<int> : cornerIndices
+|                   |   |   |___SampledDataSource -> VtArray<float> : cornerSharpnesses
+|                   |   |   |___SampledDataSource -> VtArray<int> : creaseIndices
+|                   |   |   |___SampledDataSource -> VtArray<int> : creaseLengths
+|                   |   |   |___SampledDataSource -> VtArray<float> : creaseSharpnesses
+|                   |   |___SampledDataSource -> bool : doubleSided
+|                   |___# ContainerDataSource : extent
+|                   |   |___SampledDataSource -> GfVec3d : min
+|                   |   |___SampledDataSource -> GfVec3d : max
+|                   |___# ContainerDataSource : primvars
+|                   |   |___# ContainerDataSource : points
+|                   |   |   |___SampledDataSource -> VtArray<GfVec3f> : primvarValue
+|                   |   |   |___SampledDataSource -> TfToken : interpolation
+|                   |   |   |___SampledDataSource -> TfToken : role
+|                   |   |___# ContainerDataSource : normals
+|                   |   |   |___SampledDataSource -> VtArray<GfVec3f> : primvarValue
+|                   |   |   |___SampledDataSource -> TfToken : interpolation
+|                   |   |   |___SampledDataSource -> TfToken : role
+|                   |   |___# ContainerDataSource : st
+|                   |   |   |___SampledDataSource -> VtArray<GfVec2f> : primvarValue
+|                   |   |   |___SampledDataSource -> TfToken : interpolation
+|                   |   |   |___SampledDataSource -> TfToken : role
+|                   |   |___# ContainerDataSource : tangents
+|                   |       |___SampledDataSource -> VtArray<GfVec3f> : primvarValue
+|                   |       |___SampledDataSource -> TfToken : interpolation
+|                   |       |___SampledDataSource -> TfToken : role
+|                   |___# ContainerDataSource : materialBindings
+|                   |   |___# ContainerDataSource : 
+|                   |       |___SampledDataSource -> SdfPath : path
+|                   |___# ContainerDataSource : displayStyle
+|                   |   |___Blocked or absent data source : refineLevel
+|                   |   |___SampledDataSource -> bool : flatShadingEnabled
+|                   |   |___SampledDataSource -> bool : displacementEnabled
+|                   |   |___SampledDataSource -> bool : occludedSelectionShowsThrough
+|                   |   |___SampledDataSource -> bool : pointsShadingEnabled
+|                   |   |___SampledDataSource -> bool : materialIsFinal
+|                   |   |___Blocked or absent data source : shadingStyle
+|                   |   |___Blocked or absent data source : reprSelector
+|                   |   |___SampledDataSource -> TfToken : cullStyle
+|                   |___# ContainerDataSource : visibility
+|                   |   |___SampledDataSource -> bool : visibility
+|                   |___# ContainerDataSource : xform
+|                   |   |___SampledDataSource -> GfMatrix4d : matrix
+|                   |___# ContainerDataSource : purpose
+|                   |   |___SampledDataSource -> TfToken : purpose
+|                   |___Blocked or absent data source : categories
+|___@ Prim : UsdDefaultSettings_PluginNode --- Type : 
+    |___# ContainerDataSource : 
+    |___@ Prim : UsdDefaultRenderSettings --- Type : 
+        |___# ContainerDataSource : 
+            |___# ContainerDataSource : sceneGlobals
+            |   |___SampledDataSource -> SdfPath : activeRenderSettingsPrim
+            |   |___SampledDataSource -> double : startTimeCode
+            |   |___SampledDataSource -> double : endTimeCode
+            |___Blocked or absent data source : usdMaterialBindings
+            |___Blocked or absent data source : geomModel
+            |___Blocked or absent data source : model
+            |___Blocked or absent data source : skelBinding
+            |___Blocked or absent data source : coordSysBinding
+            |___# ContainerDataSource : primvars
+            |___Blocked or absent data source : purpose
+            |___# ContainerDataSource : visibility
+            |   |___SampledDataSource -> bool : visibility
+            |___# ContainerDataSource : xform
+            |   |___SampledDataSource -> GfMatrix4d : matrix
+            |   |___SampledDataSource -> bool : resetXformStack
+            |___Blocked or absent data source : materialBindings
+        |___@ Prim : Render --- Type : 
+            |___# ContainerDataSource : 
+                |___# ContainerDataSource : system
+                |   |___# ContainerDataSource : assetResolution
+                |       |___SampledDataSource -> ArResolverContext : resolverContext
+                |___# ContainerDataSource : __usdPrimInfo
+                |   |___SampledDataSource -> TfToken : specifier
+                |   |___SampledDataSource -> TfToken : typeName
+                |   |___SampledDataSource -> bool : isLoaded
+                |   |___Blocked or absent data source : apiSchemas
+                |   |___Blocked or absent data source : kind
+                |___# ContainerDataSource : primOrigin
+                |   |___SampledDataSource -> HdPrimOriginSchema::OriginPath : scenePath
+                |___# ContainerDataSource : visibility
+                |   |___SampledDataSource -> bool : visibility
+                |___Blocked or absent data source : usdMaterialBindings
+                |___Blocked or absent data source : geomModel
+                |___Blocked or absent data source : model
+                |___Blocked or absent data source : skelBinding
+                |___Blocked or absent data source : coordSysBinding
+                |___# ContainerDataSource : primvars
+                |___Blocked or absent data source : purpose
+                |___# ContainerDataSource : xform
+                |   |___SampledDataSource -> GfMatrix4d : matrix
+                |   |___SampledDataSource -> bool : resetXformStack
+                |___Blocked or absent data source : materialBindings
+            |___@ Prim : SceneRenderSettings --- Type : renderSettings
+            |   |___# ContainerDataSource : 
+            |       |___Blocked or absent data source : __dependencies
+            |       |___# ContainerDataSource : renderSettings
+            |       |   |___# VectorDataSource : renderProducts
+            |       |   |   |___# ContainerDataSource : Element 0
+            |       |   |       |___SampledDataSource -> SdfPath : path
+            |       |   |       |___SampledDataSource -> TfToken : type
+            |       |   |       |___SampledDataSource -> TfToken : name
+            |       |   |       |___SampledDataSource -> GfVec2i : resolution
+            |       |   |       |___# VectorDataSource : renderVars
+            |       |   |       |   |___# ContainerDataSource : Element 0
+            |       |   |       |       |___SampledDataSource -> SdfPath : path
+            |       |   |       |       |___SampledDataSource -> TfToken : dataType
+            |       |   |       |       |___SampledDataSource -> TfToken : sourceName
+            |       |   |       |       |___SampledDataSource -> TfToken : sourceType
+            |       |   |       |       |___# ContainerDataSource : namespacedSettings
+            |       |   |       |___SampledDataSource -> SdfPath : cameraPrim
+            |       |   |       |___SampledDataSource -> float : pixelAspectRatio
+            |       |   |       |___SampledDataSource -> TfToken : aspectRatioConformPolicy
+            |       |   |       |___SampledDataSource -> GfVec4f : dataWindowNDC
+            |       |   |       |___SampledDataSource -> bool : disableMotionBlur
+            |       |   |       |___SampledDataSource -> bool : disableDepthOfField
+            |       |   |       |___# ContainerDataSource : namespacedSettings
+            |       |   |___# ContainerDataSource : namespacedSettings
+            |       |   |   |___SampledDataSource -> string : adskUsd:externalCamera
+            |       |   |___SampledDataSource -> SdfPath : camera
+            |       |   |___SampledDataSource -> bool : disableMotionBlur
+            |       |   |___SampledDataSource -> bool : disableDepthOfField
+            |       |   |___SampledDataSource -> VtArray<TfToken> : includedPurposes
+            |       |   |___SampledDataSource -> VtArray<TfToken> : materialBindingPurposes
+            |       |   |___SampledDataSource -> TfToken : renderingColorSpace
+            |       |___# ContainerDataSource : __usdRenderSettings
+            |       |   |___SampledDataSource -> SdfPath : camera
+            |       |   |___SampledDataSource -> GfVec2i : resolution
+            |       |   |___SampledDataSource -> float : pixelAspectRatio
+            |       |   |___SampledDataSource -> TfToken : aspectRatioConformPolicy
+            |       |   |___SampledDataSource -> GfVec4f : dataWindowNDC
+            |       |   |___SampledDataSource -> bool : instantaneousShutter
+            |       |   |___SampledDataSource -> bool : disableMotionBlur
+            |       |   |___SampledDataSource -> bool : disableDepthOfField
+            |       |   |___SampledDataSource -> VtArray<TfToken> : includedPurposes
+            |       |   |___SampledDataSource -> VtArray<TfToken> : materialBindingPurposes
+            |       |   |___SampledDataSource -> TfToken : renderingColorSpace
+            |       |   |___# ContainerDataSource : namespacedSettings
+            |       |   |   |___SampledDataSource -> string : adskUsd:externalCamera
+            |       |   |___SampledDataSource -> VtArray<SdfPath> : products
+            |       |___Blocked or absent data source : usdMaterialBindings
+            |       |___Blocked or absent data source : geomModel
+            |       |___Blocked or absent data source : model
+            |       |___Blocked or absent data source : skelBinding
+            |       |___Blocked or absent data source : coordSysBinding
+            |       |___# ContainerDataSource : primvars
+            |       |___Blocked or absent data source : purpose
+            |       |___# ContainerDataSource : visibility
+            |       |   |___SampledDataSource -> bool : visibility
+            |       |___# ContainerDataSource : xform
+            |       |   |___SampledDataSource -> GfMatrix4d : matrix
+            |       |   |___SampledDataSource -> bool : resetXformStack
+            |       |___Blocked or absent data source : materialBindings
+            |___@ Prim : color --- Type : renderVar
+            |   |___# ContainerDataSource : 
+            |       |___# ContainerDataSource : __usdRenderVar
+            |       |   |___SampledDataSource -> TfToken : dataType
+            |       |   |___SampledDataSource -> string : sourceName
+            |       |   |___SampledDataSource -> TfToken : sourceType
+            |       |   |___# ContainerDataSource : namespacedSettings
+            |       |___Blocked or absent data source : usdMaterialBindings
+            |       |___Blocked or absent data source : geomModel
+            |       |___Blocked or absent data source : model
+            |       |___Blocked or absent data source : skelBinding
+            |       |___Blocked or absent data source : coordSysBinding
+            |       |___# ContainerDataSource : primvars
+            |       |___Blocked or absent data source : purpose
+            |       |___# ContainerDataSource : visibility
+            |       |   |___SampledDataSource -> bool : visibility
+            |       |___# ContainerDataSource : xform
+            |       |   |___SampledDataSource -> GfMatrix4d : matrix
+            |       |   |___SampledDataSource -> bool : resetXformStack
+            |       |___Blocked or absent data source : materialBindings
+            |___@ Prim : BeautyProduct --- Type : renderProduct
+                |___# ContainerDataSource : 
+                    |___# ContainerDataSource : __usdRenderProduct
+                    |   |___SampledDataSource -> GfVec2i : resolution
+                    |   |___Blocked or absent data source : pixelAspectRatio
+                    |   |___Blocked or absent data source : aspectRatioConformPolicy
+                    |   |___Blocked or absent data source : dataWindowNDC
+                    |   |___Blocked or absent data source : instantaneousShutter
+                    |   |___Blocked or absent data source : disableMotionBlur
+                    |   |___Blocked or absent data source : disableDepthOfField
+                    |   |___SampledDataSource -> TfToken : productType
+                    |   |___SampledDataSource -> TfToken : productName
+                    |   |___# ContainerDataSource : namespacedSettings
+                    |   |___Blocked or absent data source : camera
+                    |   |___SampledDataSource -> VtArray<SdfPath> : orderedVars
+                    |___Blocked or absent data source : usdMaterialBindings
+                    |___Blocked or absent data source : geomModel
+                    |___Blocked or absent data source : model
+                    |___Blocked or absent data source : skelBinding
+                    |___Blocked or absent data source : coordSysBinding
+                    |___# ContainerDataSource : primvars
+                    |___Blocked or absent data source : purpose
+                    |___# ContainerDataSource : visibility
+                    |   |___SampledDataSource -> bool : visibility
+                    |___# ContainerDataSource : xform
+                    |   |___SampledDataSource -> GfMatrix4d : matrix
+                    |   |___SampledDataSource -> bool : resetXformStack
+                    |___Blocked or absent data source : materialBindings

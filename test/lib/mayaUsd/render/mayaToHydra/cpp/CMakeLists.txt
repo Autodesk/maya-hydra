@@ -38,6 +38,7 @@ target_sources(${TARGET_NAME}
         testDataSourceNames.cpp
         testCustomDagNodeTranslation.cpp
         testArnoldCustomNodes.cpp
+        testArnoldCustomAttributesMayaNodes.cpp
         testCameraPrimvars.cpp
         testMeshPrimvars.cpp
         testMeshGeomSubsets.cpp

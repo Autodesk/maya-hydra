@@ -38,10 +38,6 @@ class TestArnoldCustomNodes(mtohUtils.MayaHydraBaseTestCase):
     _requiredPlugins = ['mtoa']
     _setHdStormRenderer = False     # Need to use Arnold renderer for the tests
 
-    # def tearDown(self):
-    #     """Test will hang if Arnold renderer is not reset before Maya exits."""
-    #     self.setViewport2Renderer()
-
     def _setArnoldRenderer(self):
         """Activate the Arnold Hydra renderer so mtoaSIP is in the scene index chain."""
         self.activeEditor = cmds.playblast(activeEditor=1)
@@ -108,7 +104,7 @@ class TestArnoldCustomNodes(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 self._photometricShape,
-                f="MtoaSIP.photometricLightTranslation")
+                f="ArnoldCustomNodes.photometricLightTranslation")
 
     def test_standInTranslation(self):
         self._setArnoldRenderer()
@@ -116,7 +112,7 @@ class TestArnoldCustomNodes(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 self._standInShape,
-                f="MtoaSIP.standInTranslation")
+                f="ArnoldCustomNodes.standInTranslation")
 
     def test_volumeTranslation(self):
         self._setArnoldRenderer()
@@ -124,7 +120,7 @@ class TestArnoldCustomNodes(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 self._volumeShape,
-                f="MtoaSIP.volumeTranslation")
+                f="ArnoldCustomNodes.volumeTranslation")
 
 
 if __name__ == '__main__':

@@ -24,12 +24,14 @@
 #include "renderSettingsUtils.h"
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
+#include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
 
 #ifdef CODE_COVERAGE_WORKAROUND
 #include <flowViewport/fvpUtils.h>
 #endif
 #include <flowViewport/tokens.h>
+#include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 #include <flowViewport/API/renderViewData/fvpRenderViewDataManager.h>
 #include <flowViewport/API/renderViewData/fvpFilteringSceneIndicesChainManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
@@ -54,12 +56,60 @@
 #include <maya/MStatus.h>
 
 #include <algorithm>
+#include <fstream>
+#include <iostream>
 #include <string>
 
 using namespace MayaHydra;
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
+
+// Look at defaultRenderGlobals.hydraSceneDumpPath attribute and
+// dump Hydra scene to that file path.  Hydra scene will be taken from
+// the output of the defaultRenderGlobals.hydraSceneDumpSceneIndex
+// scene index (default to the terminal scene index).
+void dumpHydraScene(const HdRenderIndex* renderIndex)
+{
+    MObject nodeObj;
+    MString dumpPath;
+    std::string sceneIndexName;
+    constexpr const char* kDefaultRenderGlobalsNodeName = "defaultRenderGlobals";    
+    if (GetDependNodeFromNodeName(kDefaultRenderGlobalsNodeName, nodeObj)) {
+        MFnDependencyNode depNode(nodeObj);
+        MPlug plug = depNode.findPlug("hydraSceneDumpPath", true);
+        if (!plug.isNull()) {
+            dumpPath = plug.asString();
+        }
+        MPlug siPlug = depNode.findPlug("hydraSceneDumpSceneIndex", true);
+        if (!siPlug.isNull()) {
+            sceneIndexName = siPlug.asString().asChar();
+        }
+    }
+
+    if (dumpPath.length() > 0) {
+        std::ofstream dumpFile(dumpPath.asChar());
+        if (dumpFile.is_open()) {
+            constexpr const char* kTerminalSceneIndexMsg = "terminal scene index";
+            auto si = renderIndex->GetTerminalSceneIndex();
+            if (!sceneIndexName.empty()) {
+                auto siHasName = Fvp::SceneIndexDisplayNamePred(sceneIndexName);
+                auto found = Fvp::findSceneIndexInTree(si, siHasName);
+                if (!found) {
+                    TF_WARN("Scene index %s not found for scene dump, using %s", sceneIndexName.c_str(), kTerminalSceneIndexMsg);
+                    sceneIndexName = kTerminalSceneIndexMsg;
+                } else {
+                    si = found;
+                }
+            } else {
+                sceneIndexName = kTerminalSceneIndexMsg;
+            }
+            Fvp::SceneIndexInspector inspector(si);
+            inspector.WriteHierarchy(dumpFile);
+            TF_STATUS("Hydra scene from scene index %s written to %s", sceneIndexName.c_str(), dumpPath.asChar());
+        }
+    }
+}
 
 // Fvp::RenderViewDataManager::AddRenderViewData connects a custom data
 // producer scene index chain with the Hydra Flow Viewport Toolkit merging
@@ -331,6 +381,8 @@ void BatchRenderer::_ExecuteHydraBatchRenderFrame()
     }
 
     _engine.Execute(_renderIndex, &tasks);
+
+    dumpHydraScene(_renderIndex);
 }
 
 void BatchRenderer::_ClearMayaHydraSceneIndex()

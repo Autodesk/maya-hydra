@@ -19,6 +19,7 @@
 
 #include <mayaHydraLib/mayaHydra.h>
 
+#include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 #include <flowViewport/sceneIndex/fvpSelectionSceneIndex.h>
 
 #include <pxr/base/gf/matrix4d.h>
@@ -101,16 +102,10 @@ bool MatricesAreClose(
     const MMatrix&    mayaMatrix,
     double            tolerance = DEFAULT_TOLERANCE);
 
-struct PrimEntry
-{
-    SdfPath          primPath;
-    HdSceneIndexPrim prim;
-};
-
-using FindPrimPredicate
-    = std::function<bool(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath)>;
-
-using PrimEntriesVector = std::vector<PrimEntry>;
+using Fvp::PrimEntry;
+using Fvp::FindPrimPredicate;
+using Fvp::PrimEntriesVector;
+using Fvp::SceneIndexInspector;
 
 /**
  * @brief Create a predicate that matches prims whose path contains primNamePart and whose type
@@ -183,81 +178,6 @@ std::string GetShapeNameFromFullPath(const std::string& fullPath);
  */
 std::string GetParentNameFromFullPath(const std::string& fullPath);
 
-class SceneIndexInspector
-{
-public:
-    SceneIndexInspector(HdSceneIndexBasePtr sceneIndex);
-    ~SceneIndexInspector();
-
-    /**
-     * @brief Retrieve the underlying scene index of this inspector
-     *
-     * The returned pointer is non-owning.
-     *
-     * @return A pointer to the underlying scene index of this inspector.
-     */
-    HdSceneIndexBasePtr GetSceneIndex();
-
-    /**
-     * @brief Retrieve all prims that match the given predicate, up until the maximum amount
-     *
-     * A maximum amount of 0 means unlimited (all matching prims will be returned).
-     *
-     * @param[in] predicate is the callable predicate used to determine whether a given prim is
-     * desired
-     * @param[in] maxPrims is the maximum amount of prims to be retrieved. The default value is 0
-     * (unlimited).
-     *
-     * @return A vector of the prim entries that matched the given predicate.
-     */
-    PrimEntriesVector FindPrims(FindPrimPredicate predicate, size_t maxPrims = 0) const;
-
-    /**
-     * @brief Print the scene index's hierarchy in a tree-like format
-     *
-     * Print the scene index's hierarchy in a tree-like format, down to the individual data
-     * source level.
-     *
-     * @param[out] outStream is the stream in which to print the hierarchy
-     */
-    void WriteHierarchy(std::ostream& outStream) const;
-
-private:
-    void _FindPrims(
-        FindPrimPredicate  predicate,
-        const SdfPath&     primPath,
-        PrimEntriesVector& primEntries,
-        size_t             maxPrims) const;
-
-    void _WritePrimHierarchy(
-        SdfPath       primPath,
-        std::string   selfPrefix,
-        std::string   childrenPrefix,
-        std::ostream& outStream) const;
-
-    void _WriteContainerDataSource(
-        HdContainerDataSourceHandle dataSource,
-        std::string                 dataSourceName,
-        std::string                 selfPrefix,
-        std::string                 childrenPrefix,
-        std::ostream&               outStream) const;
-
-    void _WriteVectorDataSource(
-        HdVectorDataSourceHandle dataSource,
-        std::string              dataSourceName,
-        std::string              selfPrefix,
-        std::string              childrenPrefix,
-        std::ostream&            outStream) const;
-
-    void _WriteLeafDataSource(
-        HdDataSourceBaseHandle dataSource,
-        std::string            dataSourceName,
-        std::string            selfPrefix,
-        std::ostream&          outStream) const;
-
-    HdSceneIndexBasePtr _sceneIndex;
-};
-
 class PrimNamePredicate
 {
 public:
@@ -317,35 +237,8 @@ private:
     const std::string _primName;
 };
 
-class SceneIndexDisplayNamePred {
-    const std::string _name;
-public:
-    SceneIndexDisplayNamePred(const std::string& name) : _name(name) {}
-
-    /**
-     * @brief Predicate to match a scene index display name string.
-     *
-     * @param[in] sceneIndex The scene index to test.
-     *
-     * @return True if the argument scene index matches the display name string, false otherwise.
-     */
-    bool operator()(const HdSceneIndexBaseRefPtr& sceneIndex) {
-        return sceneIndex->GetDisplayName() == _name;
-    }
-};
-
-/**
- * @brief Find the first scene index matching argument predicate in depth first search.
- *
- * @param[in] sceneIndex The root of the scene index tree to search.
- * @param[in] predicate The predicate that determines a match.
- *
- * @return Scene index pointer if the predicate succeeds, otherwise nullptr.
- */
-HdSceneIndexBaseRefPtr findSceneIndexInTree(
-    const HdSceneIndexBaseRefPtr&                             sceneIndex,
-    const std::function<bool(const HdSceneIndexBaseRefPtr&)>& predicate
-);
+using Fvp::SceneIndexDisplayNamePred;
+using Fvp::findSceneIndexInTree;
 
 /**
  * @brief Find the selection scene index in the scene index tree.
