@@ -2,6 +2,7 @@ set(PYTHON_FILES
     __init__.py
     camera.py
     crop.py
+    debug.py
     frames.py
     output.py
     renderProducts.py

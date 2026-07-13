@@ -64,3 +64,14 @@ global proc mayaHydraSetRenderCamera(string $cameraPath)
 {
     python("import mayaHydra.renderSettings.camera as mhCamera; mhCamera.setCamera(" + "\"" + $cameraPath + "\")");
 }
+
+global proc mayaHydraSceneDump(string $hydraSceneDumpPath)
+{
+    // Use Python raw string to support Windows path backslashes.
+    python("import mayaHydra.renderSettings.debug as mhDebug; mhDebug.setHydraSceneDumpPath(" + "r\"" + $hydraSceneDumpPath + "\")");
+}
+
+global proc mayaHydraSceneDumpSceneIndex(string $hydraSceneDumpSceneIndex)
+{
+    python("import mayaHydra.renderSettings.debug as mhDebug; mhDebug.setHydraSceneDumpSceneIndex(" + "\"" + $hydraSceneDumpSceneIndex + "\")");
+}
