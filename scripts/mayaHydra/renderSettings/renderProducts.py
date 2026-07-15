@@ -50,6 +50,20 @@ def getRenderProductsToApplySettings():
     return products
 
 
+def _applyModifierToAttribute(attr, modifierFn):
+    """Apply modifierFn to every authored value on attr.
+
+    USD render products can author productName as time samples (one path per
+    frame).  A plain attr.Set() only updates the default value, which Hydra
+    batch rendering ignores when time samples exist."""
+    timeSamples = attr.GetTimeSamples()
+    if timeSamples:
+        for t in timeSamples:
+            attr.Set(modifierFn(attr.Get(t)), t)
+    else:
+        attr.Set(modifierFn(attr.Get()))
+
+
 def applyToProductName(modifierFn):
     """Apply modifierFn to the productName attribute of every render product
     returned by getRenderProductsToApplySettings()."""
@@ -60,7 +74,7 @@ def applyToProductName(modifierFn):
             raise RuntimeError(
                 "Could not obtain a product name attribute for render product "
                 "%s." % str(rp.GetPrim().GetPath()))
-        pnAttr.Set(modifierFn(pnAttr.Get()))
+        _applyModifierToAttribute(pnAttr, modifierFn)
 
 
 def applyToResolution(modifierFn):
