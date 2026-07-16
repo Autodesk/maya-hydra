@@ -142,7 +142,9 @@ endif()
 # mtoa custom nodes/attributes not supported on Maya 2026 and earlier.
 if(MAYA_APP_VERSION VERSION_GREATER 2026)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
-        cpp/testArnoldCustomNodes.py|depOnPlugins:mtoa
+        # HYDRA-2415: aiStandIn/aiVolume custom-node teardown crashes Maya with the
+        # V2 locator-notification path while HdArnold is active (SIGSEGV / pure virtual).
+        #cpp/testArnoldCustomNodes.py|depOnPlugins:mtoa
         cpp/testArnoldCustomAttributesMayaNodes.py|depOnPlugins:mtoa
     )
 endif()

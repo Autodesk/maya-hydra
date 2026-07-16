@@ -24,8 +24,6 @@
 #    NOT tested here (have existing maya-hydra adapters that bypass mayaCustomDagNode):
 #            aiSkyDomeLight, aiAreaLight
 #
-import unittest
-
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
@@ -116,18 +114,6 @@ class TestArnoldCustomNodes(mtohUtils.MayaHydraBaseTestCase):
                 self._standInShape,
                 f="ArnoldCustomNodes.standInTranslation")
 
-    # TODO(HYDRA-2415): Re-enable once the custom-node data source / adapter
-    # lifetime is fixed for the V2 locator-notification path.
-    # Creating an aiVolume and refreshing while HdArnold is active crashes Maya
-    # on scene teardown (use-after-free): SIGSEGV / "Pure virtual function
-    # called" on macOS, exit code 0xc0000409 on Windows. This is the same V2
-    # custom-node teardown issue that already forced the other V2 tests
-    # (testCustomDagNodeTranslation, testMayaNodesAttributes*, testLightPrimvars)
-    # to be excluded from preflight. photometricLight and standIn translation
-    # remain enabled as they pass.
-    @unittest.skip(
-        "HYDRA-2415: aiVolume translation crashes Maya on scene teardown with "
-        "the V2 locator-notification path (use-after-free).")
     def test_volumeTranslation(self):
         self._setArnoldRenderer()
         self._setupVolume()
