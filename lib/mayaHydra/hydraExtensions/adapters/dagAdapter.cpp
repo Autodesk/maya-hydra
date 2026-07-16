@@ -102,12 +102,6 @@ void _DirtyInstancerVisibilityPlug(MayaHydraDagAdapter* adapter, const MPlug& pl
     }
 }
 
-bool _IsRuntimeInstanced(const MayaHydraDagAdapter* adapter)
-{
-    MDagPathArray dags;
-    return MDagPath::getAllPathsTo(adapter->GetDagPath().node(), dags) && dags.length() > 1;
-}
-
 void _InstancerNodeDirty(MObject& node, MPlug& plug, void* clientData)
 {
     TF_UNUSED(node);
@@ -133,13 +127,17 @@ void _InstancerNodeDirty(MObject& node, MPlug& plug, void* clientData)
 void _TransformNodeDirty(MObject& node, MPlug& plug, void* clientData)
 {
     auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
-    // Adapters created before duplicateInstanced keep _TransformNodeDirty on shared DAG nodes.
-    // Delegate to the instancer dirty policy once the node is instanced.
-    if (_IsRuntimeInstanced(adapter)) {
-        if (!adapter->IsInstanced()) {
-            adapter->GetMayaHydraSceneIndex()->RebuildAdapterOnIdle(
-                adapter->GetID(), MayaHydraSceneIndex::RebuildFlagCallbacks);
-        }
+    // Adapters created before duplicateInstanced keep _TransformNodeDirty registered on what is
+    // now a shared DAG node. Delegate to the instancer dirty policy once the node is instanced.
+    //
+    // Use the cached IsInstanced() state rather than querying MDagPath::getAllPathsTo() here:
+    // that query is expensive and unsafe to run synchronously on every single dirty-plug
+    // notification (this callback fires for every plug change on every ancestor path). The
+    // transition itself is already detected cheaply and reliably via the dedicated
+    // instance-added DAG message (see MayaHydraSceneIndex::AddNewInstance()), which calls
+    // RebuildAdapterOnIdle(RebuildFlagCallbacks) to swap this callback for _InstancerNodeDirty
+    // the next time adapters are rebuilt on idle.
+    if (adapter->IsInstanced()) {
         _InstancerNodeDirty(node, plug, clientData);
         return;
     }
