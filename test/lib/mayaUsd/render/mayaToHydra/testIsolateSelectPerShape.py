@@ -47,25 +47,6 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_PERCENT = 3
 
     @classmethod
-    def setUpClass(cls):
-        super(TestIsolateSelectPerShape, cls).setUpClass()
-        # This test renders exclusively through Hydra/Storm and never uses
-        # Arnold.  However mtoa is auto-loaded by the runtime, and once loaded
-        # Arnold installs a process-wide signal handler and spins up background
-        # threads.  One of those threads can SIGSEGV inside libai.so during the
-        # test (it surfaces at a viewport snapshot), killing the process before
-        # unittest can report results -- so the __main__ force-terminate and the
-        # tearDownClass guard never run.  Remove Arnold up front to avoid it.
-        # Unloading mtoa only succeeds on Linux (where the crash is observed);
-        # on Windows/macOS it cannot be unloaded, so we swallow the failure.
-        try:
-            if cmds.pluginInfo('mtoa', q=True, loaded=True):
-                cmds.file(new=True, force=True)
-                cmds.unloadPlugin('mtoa', force=True)
-        except RuntimeError:
-            pass
-
-    @classmethod
     def tearDownClass(cls):
         # When mtoa is loaded, the base tearDownClass scene reset can SIGSEGV
         # inside libai.so (Arnold background render threads still active).
