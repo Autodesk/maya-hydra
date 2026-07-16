@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Maps each FvpDirtyNotifier::dirty*() call to the matching Hydra schema locator;
+// Maps each DirtyNotifier::dirty*() call to the matching Hydra schema locator;
 // static helpers bundle locators for connectivity and smooth-mesh display edits.
 // flush() forwards the deduplicated HdDataSourceLocatorSet via DirtyPrims().
 //
@@ -45,45 +45,42 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
-namespace {
-// Tokens for the granular per-primvar convenience methods. These must match what
-// the Maya adapters advertise in GetPrimvarDescriptors (st, tangents, displayColor).
-// Intentionally kept as local constants: flowViewport must not depend upward on
-// MayaHydraAdapterTokens (that would invert the library hierarchy).
-const TfToken kStToken("st");
-const TfToken kTangentsToken("tangents");
-const TfToken kDisplayColorToken("displayColor");
-} // namespace
-
-FvpDirtyNotifier::FvpDirtyNotifier(HdRetainedSceneIndex& sceneIndex, const SdfPath& primPath)
-    : _sceneIndex(sceneIndex)
+DirtyNotifier::DirtyNotifier(HdRetainedSceneIndex& sceneIndex, const SdfPath& primPath)
+    : _sceneIndex(TfCreateWeakPtr(&sceneIndex))
     , _primPath(primPath)
 {
 }
 
-FvpDirtyNotifier::~FvpDirtyNotifier()
+DirtyNotifier::~DirtyNotifier()
 {
     if (!_locators.IsEmpty()) {
-        // TF_CODING_ERROR is compiled out in release builds, so use TF_WARN to ensure the
-        // message is visible in all configurations. Dirty state is intentionally NOT flushed
-        // here: an automatic flush in the destructor would hide the bug at the call site.
-        TF_WARN(
-            "FvpDirtyNotifier for prim (%s) destroyed with pending dirty locators; "
-            "flush() was never called. Dirty state is lost.",
+        TF_CODING_ERROR(
+            "DirtyNotifier for prim (%s) destroyed with pending dirty locators; "
+            "flush() was never called.",
             _primPath.GetText());
+        flush();
     }
 }
 
-void FvpDirtyNotifier::flush()
+void DirtyNotifier::flush()
 {
     if (_locators.IsEmpty()) {
         return;
     }
-    _sceneIndex.DirtyPrims({ { _primPath, _locators } });
+    if (_sceneIndex) {
+        _sceneIndex->DirtyPrims({ { _primPath, _locators } });
+        _locators = HdDataSourceLocatorSet();
+        return;
+    }
+    TF_CODING_ERROR(
+        "DirtyNotifier for prim (%s): scene index no longer valid; "
+        "dropping pending dirty locators. The scene index passed to the "
+        "constructor must outlive this DirtyNotifier.",
+        _primPath.GetText());
     _locators = HdDataSourceLocatorSet();
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::_append(const HdDataSourceLocator& locator)
+DirtyNotifier& DirtyNotifier::_append(const HdDataSourceLocator& locator)
 {
     _locators.append(locator);
     return *this;
@@ -91,70 +88,66 @@ FvpDirtyNotifier& FvpDirtyNotifier::_append(const HdDataSourceLocator& locator)
 
 // ---- Rprim / geometry ----
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyTransform()
+DirtyNotifier& DirtyNotifier::dirtyTransform()
 {
     return _append(HdXformSchema::GetDefaultLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyVisibility()
+DirtyNotifier& DirtyNotifier::dirtyVisibility()
 {
     return _append(HdVisibilitySchema::GetDefaultLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyPoints()
+DirtyNotifier& DirtyNotifier::dirtyPoints()
 {
     return _append(HdPrimvarsSchema::GetPointsLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyNormals()
+DirtyNotifier& DirtyNotifier::dirtyNormals()
 {
     return _append(HdPrimvarsSchema::GetNormalsLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyPrimvar(const TfToken& name)
+DirtyNotifier& DirtyNotifier::dirtyPrimvar(const TfToken& name)
 {
     return _append(HdPrimvarsSchema::GetDefaultLocator().Append(name));
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyUVs() { return dirtyPrimvar(kStToken); }
-
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyTangents() { return dirtyPrimvar(kTangentsToken); }
-
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyDisplayColor()
+DirtyNotifier& DirtyNotifier::dirtyDisplayColor()
 {
-    return dirtyPrimvar(kDisplayColorToken);
+    return dirtyPrimvar(HdTokens->displayColor);
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyVertexColors()
+DirtyNotifier& DirtyNotifier::dirtyVertexColors()
 {
     // Per-vertex color sets and the per-object display color are mutually exclusive but share
     // the primvars/displayColor locator — the interpolation mode is part of the primvar data.
-    return dirtyPrimvar(kDisplayColorToken);
+    return dirtyPrimvar(HdTokens->displayColor);
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyPrimvars()
+DirtyNotifier& DirtyNotifier::dirtyPrimvars()
 {
     return _append(HdPrimvarsSchema::GetDefaultLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyExtComputationPrimvars()
+DirtyNotifier& DirtyNotifier::dirtyExtComputationPrimvars()
 {
     return _append(HdExtComputationPrimvarsSchema::GetDefaultLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyMeshTopology()
+DirtyNotifier& DirtyNotifier::dirtyMeshTopology()
 {
     // The translator always emits both for DirtyTopology on a mesh.
     _append(HdMeshSchema::GetSubdivisionSchemeLocator());
     return _append(HdMeshTopologySchema::GetDefaultLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyBasisCurvesTopology()
+DirtyNotifier& DirtyNotifier::dirtyBasisCurvesTopology()
 {
     return _append(HdBasisCurvesTopologySchema::GetDefaultLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyTopology(const TfToken& primType)
+DirtyNotifier& DirtyNotifier::dirtyTopology(const TfToken& primType)
 {
     if (primType == HdPrimTypeTokens->basisCurves) {
         return dirtyBasisCurvesTopology();
@@ -163,14 +156,14 @@ FvpDirtyNotifier& FvpDirtyNotifier::dirtyTopology(const TfToken& primType)
         return dirtyMeshTopology();
     }
     TF_WARN(
-        "FvpDirtyNotifier::dirtyTopology: unsupported prim type '%s'; "
+        "DirtyNotifier::dirtyTopology: unsupported prim type '%s'; "
         "no topology locators emitted.",
         primType.GetText());
     return *this;
 }
 
-void FvpDirtyNotifier::DirtyRprimConnectivityLocators(
-    FvpDirtyNotifier& notifier,
+void DirtyNotifier::DirtyRprimConnectivityLocators(
+    DirtyNotifier& notifier,
     const TfToken&     primType)
 {
     if (primType == HdPrimTypeTokens->basisCurves) {
@@ -182,75 +175,75 @@ void FvpDirtyNotifier::DirtyRprimConnectivityLocators(
         return;
     }
     TF_WARN(
-        "FvpDirtyNotifier::DirtyRprimConnectivityLocators: unsupported prim type '%s'; "
+        "DirtyNotifier::DirtyRprimConnectivityLocators: unsupported prim type '%s'; "
         "no connectivity locators emitted.",
         primType.GetText());
 }
 
-void FvpDirtyNotifier::DirtySmoothMeshDisplayLocators(FvpDirtyNotifier& notifier)
+void DirtyNotifier::DirtySmoothMeshDisplayLocators(DirtyNotifier& notifier)
 {
     notifier.dirtyDisplayStyle().dirtyMeshTopology().dirtySubdivision();
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyExtent()
+DirtyNotifier& DirtyNotifier::dirtyExtent()
 {
     return _append(HdExtentSchema::GetDefaultLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyDoubleSided()
+DirtyNotifier& DirtyNotifier::dirtyDoubleSided()
 {
     return _append(HdMeshSchema::GetDoubleSidedLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyCullStyle()
+DirtyNotifier& DirtyNotifier::dirtyCullStyle()
 {
     return _append(HdLegacyDisplayStyleSchema::GetCullStyleLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtySubdivision()
+DirtyNotifier& DirtyNotifier::dirtySubdivision()
 {
     return _append(HdSubdivisionTagsSchema::GetDefaultLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyDisplayStyle()
+DirtyNotifier& DirtyNotifier::dirtyDisplayStyle()
 {
     return _append(HdLegacyDisplayStyleSchema::GetDefaultLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyMaterialBinding()
+DirtyNotifier& DirtyNotifier::dirtyMaterialBinding()
 {
     return _append(HdMaterialBindingsSchema::GetDefaultLocator());
 }
 
 // ---- Sprim / lights ----
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyLightParams()
+DirtyNotifier& DirtyNotifier::dirtyLightParams()
 {
     return _append(HdLightSchema::GetDefaultLocator());
 }
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyCollections()
+DirtyNotifier& DirtyNotifier::dirtyCollections()
 {
     return _append(HdCollectionsSchema::GetDefaultLocator());
 }
 
 // ---- Sprim / camera ----
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyCameraParams()
+DirtyNotifier& DirtyNotifier::dirtyCameraParams()
 {
     return _append(HdCameraSchema::GetDefaultLocator());
 }
 
 // ---- Sprim / material ----
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyMaterial()
+DirtyNotifier& DirtyNotifier::dirtyMaterial()
 {
     return _append(HdMaterialSchema::GetDefaultLocator());
 }
 
 // ---- Instancer ----
 
-FvpDirtyNotifier& FvpDirtyNotifier::dirtyInstancer()
+DirtyNotifier& DirtyNotifier::dirtyInstancer()
 {
     _append(HdInstancedBySchema::GetDefaultLocator());
     return _append(HdInstancerTopologySchema::GetDefaultLocator());

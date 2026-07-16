@@ -1,12 +1,14 @@
 # Render delegate guide: topology change vs deformation vs full mesh rebuild
 
-This document is for **render delegate authors** consuming MayaHydra scene-index dirty notices. It explains how to tell when a mesh needs a **full rebuild** (topology or connectivity changed) versus a **deformation-only update** (points/normals moved but connectivity is stable), including skinning, blend shapes, and other deformers.
+This document is for **render delegate authors** consuming MayaHydra scene-index dirty notices for **Maya-native geometry**. It explains how to tell when a mesh needs a **full rebuild** (topology or connectivity changed) versus a **deformation-only update** (points/normals moved but connectivity is stable), including skinning, blend shapes, and other deformers.
 
 ---
 
-## Two MayaHydra mesh paths
+## Two Maya-native mesh paths
 
-MayaHydra translates meshes through one of two adapters. **Emission policy differs**; the render-delegate contract (topology locators → rebuild) does not.
+MayaHydra translates **Maya mesh data** through one of two adapters. **Emission policy differs** between them; the render-delegate contract (topology locators → rebuild) does not.
+
+**Scope:** This section applies only to Maya-native meshes. USD meshes are translated to Hydra via **USD imaging** (`UsdImaging`), not these adapters. Custom data providers use their own dirtying rules.
 
 | Adapter | When used |
 |---------|-----------|
@@ -36,7 +38,7 @@ Hydra treats dirty points and other dirty primvars as **deformation-only when to
 
 ## Hydra 2.0 locators (what maya-hydra emits)
 
-MayaHydra uses [`FvpDirtyNotifier`](../lib/flowViewport/fvpDirtyNotifier.h) to emit `HdDataSourceLocator`s directly (Hydra 2.0 / scene index path).
+MayaHydra uses [`DirtyNotifier`](../lib/flowViewport/fvpDirtyNotifier.h) to emit `HdDataSourceLocator`s directly (Hydra 2.0 / scene index path).
 
 ### Topology change (full rebuild)
 
@@ -256,7 +258,7 @@ So a render delegate that rebuilds the mesh on every `primvars/points` dirty wil
 
 Implementation: [`meshAdapter.cpp`](../lib/mayaHydra/hydraExtensions/adapters/meshAdapter.cpp), [`renderItemAdapter.cpp`](../lib/mayaHydra/hydraExtensions/adapters/renderItemAdapter.cpp), [`renderItemTopologyUtil.cpp`](../lib/mayaHydra/hydraExtensions/adapters/renderItemTopologyUtil.cpp), [`fvpDirtyNotifier.cpp`](../lib/flowViewport/fvpDirtyNotifier.cpp), [`adapter.cpp`](../lib/mayaHydra/hydraExtensions/adapters/adapter.cpp) (extension/dynamic primvars).
 
-Unit tests for locator mapping: [`testFvpDirtyNotifier.cpp`](../test/lib/mayaUsd/render/mayaToHydra/cpp/testFvpDirtyNotifier.cpp).
+Unit tests for locator mapping: [`testDirtyNotifier.cpp`](../test/lib/mayaUsd/render/mayaToHydra/cpp/testDirtyNotifier.cpp).
 
 Integration tests (interactive Maya): [`testDirtyLocators.cpp`](../test/lib/mayaUsd/render/mayaToHydra/cpp/testDirtyLocators.cpp) — `MeshDirtyLocators` suite via [`testMeshDirtyLocators.py`](../test/lib/mayaUsd/render/mayaToHydra/cpp/testMeshDirtyLocators.py) (mesh adapter mode), `RenderItemDirtyLocators` suite via [`testRenderItemDirtyLocators.py`](../test/lib/mayaUsd/render/mayaToHydra/cpp/testRenderItemDirtyLocators.py) (render items mode).
 

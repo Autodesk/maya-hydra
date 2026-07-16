@@ -70,15 +70,11 @@ class TestMeshDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
 
     # What: a dynamic attribute change on a camera (sprim) must NOT emit extComputationPrimvars.
     #       Exercises the closed branch of the _maybeDirtyExtComputationPrimvars rprim gate.
-    # How: create a dedicated camera (mesh adapter skips invisible perspShape), then addAttr+setAttr
-    #      a dynamic float via C++ and inspect dirty locators.
+    # How: use the default persp camera, then addAttr+setAttr a dynamic float via C++ and
+    #      inspect dirty locators.
     # Expect: extCompPrimvars=false.
     def test_dynamicAttrOnCameraSkipsExtComputationPrimvars(self):
         self.setupScene()
-        _, camera_shape = cmds.camera()
-        camera_shape = cmds.ls(camera_shape, long=True)[0]
-        cmds.optionVar(stringValue=("mhCameraShape", camera_shape))
-        cmds.refresh()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 f="ExtCompGate.DynamicAttrOnCameraSkipsExtComputationPrimvars")

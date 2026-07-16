@@ -15,7 +15,7 @@
 //
 #include "cameraAdapter.h"
 
-#include <flowViewport/fvpDirtyNotifier.h>
+#include <mayaHydraLib/adapters/mhDirtyNotifier.h>
 
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
@@ -62,7 +62,7 @@ static void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)
     if (MayaHydraAdapter::IsParamAttribute(
             topPlug,
             MayaHydraAdapter::GetParamAttributeSet(kCameraParamAttributeNames))) {
-        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+        MayaHydra::DirtyNotifier notifier(adapter);
         notifier.dirtyCameraParams().dirtyPrimvars();
         notifier.flush();
     } else {
@@ -94,7 +94,7 @@ static void _cameraAttributeChanged(
         // dirtyPrimvars() is intentional: cameras are sprims but support extension-attribute
         // primvars (custom Maya attrs translated as constant primvars). The broad primvars
         // locator ensures those are re-pulled alongside the camera schema.
-        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+        MayaHydra::DirtyNotifier notifier(adapter);
         notifier.dirtyCameraParams().dirtyPrimvars();
         notifier.flush();
         return;
@@ -171,7 +171,7 @@ void MayaHydraCameraAdapter::CreateCallbacks()
         +[](MObject& transformNode, MDagMessage::MatrixModifiedFlags& modified, void* clientData) {
             auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
             adapter->InvalidateTransform();
-            Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+            MayaHydra::DirtyNotifier notifier(adapter);
             notifier.dirtyTransform();
             notifier.flush();
         },

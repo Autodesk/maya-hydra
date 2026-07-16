@@ -30,15 +30,18 @@
 
 #include <cstddef>
 
-PXR_NAMESPACE_OPEN_SCOPE
+namespace MAYAHYDRA_NS_DEF {
 
 /// Returns true when \p newIndices / \p newCounts differ from \p storedTopology.
+/// Only called from the narrow MAYA-134200 disambiguation branch in
+/// RenderItemShouldEmitTopologyLocators (topo + geom changed together, vertex count stable);
+/// see the cost/necessity comment above the definition in renderItemTopologyUtil.cpp.
 MAYAHYDRALIB_API
 bool RenderItemTopologyConnectivityChanged(
-    const HdTopology*           storedTopology,
+    const PXR_NS::HdTopology*   storedTopology,
     MGeometry::Primitive        primitive,
-    const VtIntArray&           newIndices,
-    const VtIntArray&           newCounts,
+    const PXR_NS::VtIntArray&   newIndices,
+    const PXR_NS::VtIntArray&   newCounts,
     size_t                      lineStripVertexCount);
 
 /// Policy for whether UpdateFromDelta should emit mesh/topology locators on the render item path.
@@ -50,11 +53,11 @@ bool RenderItemShouldEmitTopologyLocators(
     bool                        positionsEmpty,
     size_t                      storedPositionCount,
     unsigned int                currentVertexCount,
-    const HdTopology*           storedTopology,
+    const PXR_NS::HdTopology*   storedTopology,
     MGeometry::Primitive        primitive,
-    const VtIntArray&           newIndices,
-    const VtIntArray&           newCounts);
+    const PXR_NS::VtIntArray&   newIndices,
+    const PXR_NS::VtIntArray&   newCounts);
 
-PXR_NAMESPACE_CLOSE_SCOPE
+} // namespace MAYAHYDRA_NS_DEF
 
 #endif // MAYAHYDRALIB_RENDER_ITEM_TOPOLOGY_UTIL_H

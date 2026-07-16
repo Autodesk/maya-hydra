@@ -180,10 +180,9 @@ public:
 
     GfInterval GetCurrentTimeSamplingInterval() const;
 
-    /// Returns the render index pointer. May be null during destruction (after _Destroy() is
-    /// called) or before the render index is created. Prefer HasRenderDelegate()-guarded
-    /// wrappers (IsRprimTypeSupported, GetResourceRegistry, etc.) over calling this directly.
-    HdRenderIndex* GetRenderIndexPtr() { return _renderIndex; }
+    /// Returns the non-owning render index pointer. Must be non-null while the scene index
+    /// is live; TF_VERIFY on violation. During _Destroy(), use HasRenderDelegate() instead.
+    HdRenderIndex* GetRenderIndexPtr();
 
     /// True when the render index exists and has an attached render delegate. Several
     /// HdRenderIndex queries dereference _renderDelegate unconditionally.
@@ -195,7 +194,8 @@ public:
 
     HdResourceRegistrySharedPtr GetResourceRegistry() const;
 
-    /// No-op when the render delegate is not yet attached.
+    /// Requires an attached render delegate; TF_VERIFY on violation. Callers must guard with
+    /// ShouldSkipHydraUpdates() before calling (e.g. during file read or teardown).
     void RemoveInstancer(const SdfPath& id);
 
     SdfPath GetDelegateID(TfToken name);

@@ -137,28 +137,28 @@ struct MeshGeometryState
 // Lambda table mapping a Maya mesh attribute to the granular dirty locators it should emit.
 // Extent is dirtied conservatively on every point/topology change because the mesh adapter reads
 // bounds lazily (no bbox-changed flag to diff against, unlike the render-item adapter).
-using MeshDirtyFn = std::function<void(Fvp::FvpDirtyNotifier&)>;
+using MeshDirtyFn = std::function<void(Fvp::DirtyNotifier&)>;
 
 const std::pair<MObject&, MeshDirtyFn> _dirtyNotifiers[] {
     { MayaAttrs::mesh::worldMatrix,
-      [](Fvp::FvpDirtyNotifier& n) { n.dirtyTransform(); } },
+      [](Fvp::DirtyNotifier& n) { n.dirtyTransform(); } },
     { MayaAttrs::mesh::doubleSided,
-      [](Fvp::FvpDirtyNotifier& n) { n.dirtyDoubleSided(); } },
+      [](Fvp::DirtyNotifier& n) { n.dirtyDoubleSided(); } },
     { MayaAttrs::mesh::intermediateObject,
-      [](Fvp::FvpDirtyNotifier& n) { n.dirtyVisibility(); } },
+      [](Fvp::DirtyNotifier& n) { n.dirtyVisibility(); } },
     // Tracking manual edits to uvs.
     { MayaAttrs::mesh::uvPivot,
-      [](Fvp::FvpDirtyNotifier& n) { n.dirtyUVs(); } },
+      [](Fvp::DirtyNotifier& n) { n.dirtyPrimvar(MayaHydraAdapterTokens->st); } },
     // displaySmoothMesh and smoothLevel drive HdDisplayStyle::refineLevel via GetDisplayStyle().
     // When refineLevel transitions across 0, GetMeshTopology() flips subdivisionScheme and
     // GetSubdivTags() changes; emit displayStyle + topology + subdivisionTags only.
     { MayaAttrs::mesh::displaySmoothMesh,
-      [](Fvp::FvpDirtyNotifier& n) {
-          Fvp::FvpDirtyNotifier::DirtySmoothMeshDisplayLocators(n);
+      [](Fvp::DirtyNotifier& n) {
+          Fvp::DirtyNotifier::DirtySmoothMeshDisplayLocators(n);
       } },
     { MayaAttrs::mesh::smoothLevel,
-      [](Fvp::FvpDirtyNotifier& n) {
-          Fvp::FvpDirtyNotifier::DirtySmoothMeshDisplayLocators(n);
+      [](Fvp::DirtyNotifier& n) {
+          Fvp::DirtyNotifier::DirtySmoothMeshDisplayLocators(n);
       } },
 };
 
@@ -612,7 +612,7 @@ private:
     /// inMesh/pnts dirties fire for both geometry edits and UV-only edits. Compare against the
     /// last captured connectivity/points to emit granular UV locators when only face-varying data
     /// changed (e.g. polyEditUV when MPolyMessage::addUVSetChangedCallback does not run).
-    void DirtyInMeshOrPnts(Fvp::FvpDirtyNotifier& notifier, bool useMayaNormals)
+    void DirtyInMeshOrPnts(MayaHydra::DirtyNotifier& notifier, bool useMayaNormals)
     {
         if (_geometryState.valid && _geometryState.MatchesCurrent(GetDagPath())) {
             notifier.dirtyUVs();
@@ -629,8 +629,8 @@ private:
 
     static void _NotifyConnectivityChanged(MayaHydraMeshAdapter* adapter)
     {
-        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
-        Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(
+        MayaHydra::DirtyNotifier notifier(adapter);
+        Fvp::DirtyNotifier::DirtyRprimConnectivityLocators(
             notifier, HdPrimTypeTokens->mesh);
         notifier.flush();
         adapter->RefreshGeometryState();
@@ -654,7 +654,7 @@ private:
             return;
         }
         if (plugAttr == MayaAttrs::mesh::inMesh || plugAttr == MayaAttrs::mesh::pnts) {
-            Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+            MayaHydra::DirtyNotifier notifier(adapter);
             adapter->DirtyInMeshOrPnts(
                 notifier, MayaHydraSceneIndex::useMayaNormals());
             notifier.flush();
@@ -671,7 +671,7 @@ private:
                 if (plugAttr == MayaAttrs::mesh::intermediateObject) {
                     adapter->InvalidateVisibility();
                 }
-                Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+                MayaHydra::DirtyNotifier notifier(adapter);
                 it.second(notifier);
                 notifier.flush();
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_MESH_PLUG_DIRTY)
@@ -706,7 +706,7 @@ private:
         TF_UNUSED(otherPlug);
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
         if (plug == MayaAttrs::mesh::instObjGroups) {
-            Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+            MayaHydra::DirtyNotifier notifier(adapter);
             notifier.dirtyMaterialBinding();
             notifier.flush();
         } else {
@@ -744,7 +744,7 @@ private:
         void*                     clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
-        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+        MayaHydra::DirtyNotifier notifier(adapter);
         notifier.dirtyUVs(); // granular - only the UV set changed
         notifier.flush();
     }

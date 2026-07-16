@@ -1311,7 +1311,7 @@ MStatus MtohRenderOverride::Render(
                         currentPass->params().renderParams.camera = cameraPath;
                     }
                     if (vpDirty) {
-                        Fvp::FvpDirtyNotifier notifier(*_mayaHydraSceneIndex, cameraPath);
+                        Fvp::DirtyNotifier notifier(*_mayaHydraSceneIndex, cameraPath);
                         notifier.dirtyCameraParams();
                         notifier.flush();
                     }
@@ -2530,7 +2530,8 @@ TfHashSet<SdfPath, SdfPath::Hash> MtohRenderOverride::_ExpandIsolateSelectionFor
     };
 
     // Native visual rprims (camera gizmos, light shapes) live in the frame-pass render index
-    // that feeds the viewport; MayaHydraSceneIndex::GetRenderIndexPtr() may not list them.
+    // that feeds the viewport; fall back to the scene index render index when the frame-pass
+    // index is unavailable.
     HdRenderIndex* renderIndexForScan = renderIndex(0);
     if (!renderIndexForScan) {
         renderIndexForScan = _mayaHydraSceneIndex->GetRenderIndexPtr();

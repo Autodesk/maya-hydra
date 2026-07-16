@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 # Python wrapper for testFvpDirtyNotifier.cpp. Loads mayaHydraCppTests and runs the
-# FvpDirtyNotifier GTest suite via mayaHydraCppTest (no scene setup required).
+# DirtyNotifier GTest suite via mayaHydraCppTest (no scene setup required).
 #
 import maya.cmds as cmds
 import fixturesUtils
@@ -21,17 +21,17 @@ import mtohUtils
 from testUtils import PluginLoaded
 
 
-class TestFvpDirtyNotifier(mtohUtils.MayaHydraBaseTestCase):
+class TestDirtyNotifier(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
 
-    # What: FvpDirtyNotifier emissions must match HdDirtyBitsTranslator output for every
+    # What: DirtyNotifier emissions must match HdDirtyBitsTranslator output for every
     #       supported HdDirtyBits combination (the migration gate).
-    # How:  Run the full FvpDirtyNotifier GTest suite via mayaHydraCppTest.
+    # How:  Run the full DirtyNotifier GTest suite via mayaHydraCppTest.
     # Expect: all test cases in the suite pass.
     def test_locatorEquivalence(self):
         with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(f="FvpDirtyNotifier.*")
+            cmds.mayaHydraCppTest(f="DirtyNotifier.*")
 
 
 if __name__ == '__main__':

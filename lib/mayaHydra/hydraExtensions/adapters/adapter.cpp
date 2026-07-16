@@ -16,6 +16,7 @@
 #include "adapter.h"
 
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
+#include <mayaHydraLib/adapters/mhDirtyNotifier.h>
 #include <mayaHydraLib/adapters/materialNetworkConverter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/mayaUtils.h>
@@ -52,9 +53,9 @@ LockType dg_access_mutex;
 // When an extension/dynamic attribute set changes on an rprim, also dirty extComputationPrimvars
 // because the attribute may back a computation input. This is NOT emitted on topology changes
 // (see doc/render_delegate_topology_vs_deformation.md).
-void _maybeDirtyExtComputationPrimvars(MayaHydraAdapter& adapter, Fvp::FvpDirtyNotifier& notifier)
+void _maybeDirtyExtComputationPrimvars(MayaHydraAdapter& adapter, Fvp::DirtyNotifier& notifier)
 {
-    if (adapter.IsRprim()) {
+    if (adapter.IsRprimTypeSupportedForPrim()) {
         notifier.dirtyExtComputationPrimvars();
     }
 }
@@ -106,18 +107,22 @@ MayaHydraAdapter::MayaHydraAdapter(
 
 MayaHydraAdapter::~MayaHydraAdapter() { RemoveCallbacks(); }
 
-bool MayaHydraAdapter::IsRprim() const
+bool MayaHydraAdapter::IsRprimTypeSupportedForPrim() const
 {
     // If the prim is not in the scene index the cache is stale regardless of which adapter
     // subclass set it. Clearing here (rather than in every RemovePrim() override) is the
-    // single-point fix: any call to IsRprim() between RemovePrim() and the next Populate()
+    // single-point fix: any call to IsRprimTypeSupportedForPrim() between RemovePrim() and
+    // the next Populate()
     // returns false and resets the flag so the next Populate() re-resolves a fresh value.
     if (!_isPopulated) {
         _isRprimResolved = false;
         return false;
     }
     if (!_isRprimResolved) {
-        if (!_mayaHydraSceneIndex->HasRenderDelegate()) {
+        if (!TF_VERIFY(
+                _mayaHydraSceneIndex->HasRenderDelegate(),
+                "IsRprimTypeSupportedForPrim() called without a render delegate; callers must "
+                "guard with ShouldSkipHydraUpdates() first.")) {
             return false;
         }
         const HdSceneIndexPrim prim = _mayaHydraSceneIndex->GetPrim(_id);
@@ -273,7 +278,7 @@ void MayaHydraAdapter::MarkPrimvarDirtyForAttributeChange(const MPlug& plug)
         // The attribute set itself changed (add/remove), so many/unknown primvars may change at
         // once: the broad primvars locator is appropriate here.
         _extAttrMapNeedUpdate = true;
-        Fvp::FvpDirtyNotifier notifier(*GetMayaHydraSceneIndex(), GetID());
+        MayaHydra::DirtyNotifier notifier(this);
         notifier.dirtyPrimvars();
         _maybeDirtyExtComputationPrimvars(*this, notifier);
         AddExtraDirtyForPrimvarAttributeChange(notifier, plug);
@@ -287,7 +292,7 @@ void MayaHydraAdapter::MarkPrimvarDirtyForAttributeChange(const MPlug& plug)
         // primvars locator (many/unknown primvars change). Type-specific adapters add their
         // own schema on top via AddExtraDirtyForPrimvarAttributeChange (e.g. lights add the
         // light schema locator).
-        Fvp::FvpDirtyNotifier notifier(*GetMayaHydraSceneIndex(), GetID());
+        MayaHydra::DirtyNotifier notifier(this);
         notifier.dirtyPrimvars();
         _maybeDirtyExtComputationPrimvars(*this, notifier);
         AddExtraDirtyForPrimvarAttributeChange(notifier, plug);

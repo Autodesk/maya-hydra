@@ -12,14 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Migration gate for FvpDirtyNotifier: for each representative HdDirtyBits combination,
+// Migration gate for DirtyNotifier: for each representative HdDirtyBits combination,
 // compares HdDirtyBitsTranslator output to the equivalent notifier emission. Deliberately
 // narrower cases (extComputation primvars, light params) assert explicit expected sets.
-// Pure USD/Hd + flowViewport logic with no Maya dependency.
+// Most cases use Fvp::DirtyNotifier only; geomChanged UV/tangent paths use
+// MayaHydra::DirtyNotifier for dirtyUVs()/dirtyTangents().
 
 #include <gtest/gtest.h>
 
 #include <flowViewport/fvpDirtyNotifier.h>
+#include <mayaHydraLib/adapters/mhDirtyNotifier.h>
+#include <mayaHydraLib/adapters/tokens.h>
 
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/imaging/hd/changeTracker.h>
@@ -47,6 +50,7 @@
 #include <pxr/imaging/hd/xformSchema.h>
 
 #include <functional>
+#include <memory>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -57,12 +61,26 @@ const SdfPath kTestPrimPath("/dirtyNotifierTestPrim");
 // Apply a set of dirty*() calls to a fresh notifier and return the accumulated
 // locator set. Flushes afterwards so the explicit-flush contract is honored.
 HdDataSourceLocatorSet
-NotifierLocators(const std::function<void(Fvp::FvpDirtyNotifier&)>& applyDirty)
+NotifierLocators(const std::function<void(Fvp::DirtyNotifier&)>& applyDirty)
 {
     HdRetainedSceneIndexRefPtr sceneIndex = HdRetainedSceneIndex::New();
     HdDataSourceLocatorSet     result;
     {
-        Fvp::FvpDirtyNotifier notifier(*sceneIndex, kTestPrimPath);
+        Fvp::DirtyNotifier notifier(*sceneIndex, kTestPrimPath);
+        applyDirty(notifier);
+        result = notifier.GetLocators();
+        notifier.flush();
+    }
+    return result;
+}
+
+HdDataSourceLocatorSet
+MhNotifierLocators(const std::function<void(MayaHydra::DirtyNotifier&)>& applyDirty)
+{
+    HdRetainedSceneIndexRefPtr sceneIndex = HdRetainedSceneIndex::New();
+    HdDataSourceLocatorSet     result;
+    {
+        MayaHydra::DirtyNotifier notifier(*sceneIndex, kTestPrimPath);
         applyDirty(notifier);
         result = notifier.GetLocators();
         notifier.flush();
@@ -98,62 +116,62 @@ TranslatorSprimLocators(const TfToken& primType, HdDirtyBits bits)
 
 // ---- Cases that must match the legacy translator exactly ----
 
-TEST(FvpDirtyNotifier, transformMatchesTranslator)
+TEST(DirtyNotifier, transformMatchesTranslator)
 {
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->mesh, HdChangeTracker::DirtyTransform),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyTransform(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyTransform(); }));
 }
 
-TEST(FvpDirtyNotifier, visibilityMatchesTranslator)
+TEST(DirtyNotifier, visibilityMatchesTranslator)
 {
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->mesh, HdChangeTracker::DirtyVisibility),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyVisibility(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyVisibility(); }));
 }
 
-TEST(FvpDirtyNotifier, doubleSidedMatchesTranslator)
+TEST(DirtyNotifier, doubleSidedMatchesTranslator)
 {
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->mesh, HdChangeTracker::DirtyDoubleSided),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyDoubleSided(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyDoubleSided(); }));
 }
 
-TEST(FvpDirtyNotifier, materialBindingMatchesTranslator)
+TEST(DirtyNotifier, materialBindingMatchesTranslator)
 {
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->mesh, HdChangeTracker::DirtyMaterialId),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyMaterialBinding(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyMaterialBinding(); }));
 }
 
-TEST(FvpDirtyNotifier, meshTopologyMatchesTranslator)
+TEST(DirtyNotifier, meshTopologyMatchesTranslator)
 {
     // Rule 2: topology only - no primvars, no extent.
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->mesh, HdChangeTracker::DirtyTopology),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyMeshTopology(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyMeshTopology(); }));
 }
 
-TEST(FvpDirtyNotifier, basisCurvesTopologyMatchesTranslator)
+TEST(DirtyNotifier, basisCurvesTopologyMatchesTranslator)
 {
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->basisCurves, HdChangeTracker::DirtyTopology),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyBasisCurvesTopology(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyBasisCurvesTopology(); }));
 }
 
-TEST(FvpDirtyNotifier, dirtyTopologyDispatchesByPrimType)
+TEST(DirtyNotifier, dirtyTopologyDispatchesByPrimType)
 {
     EXPECT_EQ(
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyMeshTopology(); }),
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyMeshTopology(); }),
         NotifierLocators(
-            [](Fvp::FvpDirtyNotifier& n) { n.dirtyTopology(HdPrimTypeTokens->mesh); }));
+            [](Fvp::DirtyNotifier& n) { n.dirtyTopology(HdPrimTypeTokens->mesh); }));
     EXPECT_EQ(
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyBasisCurvesTopology(); }),
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyBasisCurvesTopology(); }),
         NotifierLocators(
-            [](Fvp::FvpDirtyNotifier& n) { n.dirtyTopology(HdPrimTypeTokens->basisCurves); }));
+            [](Fvp::DirtyNotifier& n) { n.dirtyTopology(HdPrimTypeTokens->basisCurves); }));
 }
 
-TEST(FvpDirtyNotifier, rprimConnectivityChangeOmitsNormalsByDefault)
+TEST(DirtyNotifier, rprimConnectivityChangeOmitsNormalsByDefault)
 {
     HdDataSourceLocatorSet expected;
     expected.append(HdMeshSchema::GetSubdivisionSchemeLocator());
@@ -164,15 +182,15 @@ TEST(FvpDirtyNotifier, rprimConnectivityChangeOmitsNormalsByDefault)
 
     EXPECT_EQ(
         expected,
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
-            Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(n, HdPrimTypeTokens->mesh);
+        NotifierLocators([](Fvp::DirtyNotifier& n) {
+            Fvp::DirtyNotifier::DirtyRprimConnectivityLocators(n, HdPrimTypeTokens->mesh);
         }));
 }
 
-TEST(FvpDirtyNotifier, rprimConnectivityChangeOmitsGranularFaceVaryingPrimvars)
+TEST(DirtyNotifier, rprimConnectivityChangeOmitsGranularFaceVaryingPrimvars)
 {
-    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
-        Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(n, HdPrimTypeTokens->mesh);
+    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::DirtyNotifier& n) {
+        Fvp::DirtyNotifier::DirtyRprimConnectivityLocators(n, HdPrimTypeTokens->mesh);
     });
     // Connectivity emits broad primvars (which intersects child locators), but must not
     // add redundant explicit face-varying primvar generators on top.
@@ -187,7 +205,7 @@ TEST(FvpDirtyNotifier, rprimConnectivityChangeOmitsGranularFaceVaryingPrimvars)
     }
 }
 
-TEST(FvpDirtyNotifier, basisCurvesConnectivityChangeOmitsMeshTopology)
+TEST(DirtyNotifier, basisCurvesConnectivityChangeOmitsMeshTopology)
 {
     HdDataSourceLocatorSet expected;
     expected.append(HdBasisCurvesTopologySchema::GetDefaultLocator());
@@ -197,20 +215,20 @@ TEST(FvpDirtyNotifier, basisCurvesConnectivityChangeOmitsMeshTopology)
 
     EXPECT_EQ(
         expected,
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
-            Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(
+        NotifierLocators([](Fvp::DirtyNotifier& n) {
+            Fvp::DirtyNotifier::DirtyRprimConnectivityLocators(
                 n, HdPrimTypeTokens->basisCurves);
         }));
 }
 
-TEST(FvpDirtyNotifier, rprimConnectivityChangeUnsupportedPrimTypeNoOps)
+TEST(DirtyNotifier, rprimConnectivityChangeUnsupportedPrimTypeNoOps)
 {
-    EXPECT_TRUE(NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
-        Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(n, HdPrimTypeTokens->points);
+    EXPECT_TRUE(NotifierLocators([](Fvp::DirtyNotifier& n) {
+        Fvp::DirtyNotifier::DirtyRprimConnectivityLocators(n, HdPrimTypeTokens->points);
     }).IsEmpty());
 }
 
-TEST(FvpDirtyNotifier, smoothMeshDisplayOmitsNormalsByDefault)
+TEST(DirtyNotifier, smoothMeshDisplayOmitsNormalsByDefault)
 {
     HdDataSourceLocatorSet expected;
     expected.append(HdLegacyDisplayStyleSchema::GetDefaultLocator());
@@ -220,15 +238,15 @@ TEST(FvpDirtyNotifier, smoothMeshDisplayOmitsNormalsByDefault)
 
     EXPECT_EQ(
         expected,
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
-            Fvp::FvpDirtyNotifier::DirtySmoothMeshDisplayLocators(n);
+        NotifierLocators([](Fvp::DirtyNotifier& n) {
+            Fvp::DirtyNotifier::DirtySmoothMeshDisplayLocators(n);
         }));
 }
 
-TEST(FvpDirtyNotifier, smoothMeshDisplayOmitsGranularFaceVaryingPrimvars)
+TEST(DirtyNotifier, smoothMeshDisplayOmitsGranularFaceVaryingPrimvars)
 {
-    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
-        Fvp::FvpDirtyNotifier::DirtySmoothMeshDisplayLocators(n);
+    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::DirtyNotifier& n) {
+        Fvp::DirtyNotifier::DirtySmoothMeshDisplayLocators(n);
     });
     EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetNormalsLocator()));
     EXPECT_FALSE(actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("st"))));
@@ -236,112 +254,112 @@ TEST(FvpDirtyNotifier, smoothMeshDisplayOmitsGranularFaceVaryingPrimvars)
         actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("tangents"))));
 }
 
-TEST(FvpDirtyNotifier, extentMatchesTranslator)
+TEST(DirtyNotifier, extentMatchesTranslator)
 {
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->mesh, HdChangeTracker::DirtyExtent),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyExtent(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyExtent(); }));
 }
 
-TEST(FvpDirtyNotifier, cullStyleMatchesTranslator)
+TEST(DirtyNotifier, cullStyleMatchesTranslator)
 {
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->mesh, HdChangeTracker::DirtyCullStyle),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyCullStyle(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyCullStyle(); }));
 }
 
-TEST(FvpDirtyNotifier, displayStyleMatchesTranslator)
+TEST(DirtyNotifier, displayStyleMatchesTranslator)
 {
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->mesh, HdChangeTracker::DirtyDisplayStyle),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyDisplayStyle(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyDisplayStyle(); }));
 }
 
-TEST(FvpDirtyNotifier, subdivisionMatchesTranslator)
+TEST(DirtyNotifier, subdivisionMatchesTranslator)
 {
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->mesh, HdChangeTracker::DirtySubdivTags),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtySubdivision(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtySubdivision(); }));
 }
 
-TEST(FvpDirtyNotifier, pointsMatchesTranslator)
+TEST(DirtyNotifier, pointsMatchesTranslator)
 {
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->mesh, HdChangeTracker::DirtyPoints),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyPoints(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyPoints(); }));
 }
 
-TEST(FvpDirtyNotifier, normalsMatchesTranslator)
+TEST(DirtyNotifier, normalsMatchesTranslator)
 {
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->mesh, HdChangeTracker::DirtyNormals),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyNormals(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyNormals(); }));
 }
 
-TEST(FvpDirtyNotifier, cameraParamsMatchesTranslator)
+TEST(DirtyNotifier, cameraParamsMatchesTranslator)
 {
     EXPECT_EQ(
         TranslatorSprimLocators(HdPrimTypeTokens->camera, HdCamera::DirtyParams),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyCameraParams(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyCameraParams(); }));
 }
 
-TEST(FvpDirtyNotifier, cameraTransformMatchesTranslator)
+TEST(DirtyNotifier, cameraTransformMatchesTranslator)
 {
     EXPECT_EQ(
         TranslatorSprimLocators(HdPrimTypeTokens->camera, HdCamera::DirtyTransform),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyTransform(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyTransform(); }));
 }
 
-TEST(FvpDirtyNotifier, materialMatchesTranslator)
+TEST(DirtyNotifier, materialMatchesTranslator)
 {
     // HdMaterial::DirtyVolume and HdChangeTracker::DirtyPrimvar share bit 6, so
     // AllDirty would make TranslatorSprimLocators also append primvars. Any other
     // material dirty bit maps to the material schema locator only.
     EXPECT_EQ(
         TranslatorSprimLocators(HdPrimTypeTokens->material, HdMaterial::DirtyParams),
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyMaterial(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyMaterial(); }));
 }
 
-TEST(FvpDirtyNotifier, instancerMatchesTranslator)
+TEST(DirtyNotifier, instancerMatchesTranslator)
 {
     HdDataSourceLocatorSet expected;
     HdDirtyBitsTranslator::InstancerDirtyBitsToLocatorSet(
         TfToken(),
         HdChangeTracker::DirtyInstancer | HdChangeTracker::DirtyInstanceIndex,
         &expected);
-    EXPECT_EQ(expected, NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyInstancer(); }));
+    EXPECT_EQ(expected, NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyInstancer(); }));
 }
 
 // ---- Cases where the notifier is deliberately narrower than the translator ----
 
-TEST(FvpDirtyNotifier, primvarsOmitsExtComputation)
+TEST(DirtyNotifier, primvarsOmitsExtComputation)
 {
     // The translator also emits HdExtComputationPrimvarsSchema for DirtyPrimvar,
     // but the Maya adapters do not use ext-computation primvars. The broad
     // dirtyPrimvars() must emit only the primvars locator.
     HdDataSourceLocatorSet expected;
     expected.append(HdPrimvarsSchema::GetDefaultLocator());
-    EXPECT_EQ(expected, NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyPrimvars(); }));
+    EXPECT_EQ(expected, NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyPrimvars(); }));
 }
 
-TEST(FvpDirtyNotifier, lightParamsIsGranular)
+TEST(DirtyNotifier, lightParamsIsGranular)
 {
     // dirtyLightParams() intentionally emits ONLY the light schema locator. The
     // translator additionally emits primvars/visibility/collections for
     // DirtyParams; those are the responsibility of the call site.
     HdDataSourceLocatorSet expected;
     expected.append(HdLightSchema::GetDefaultLocator());
-    EXPECT_EQ(expected, NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyLightParams(); }));
+    EXPECT_EQ(expected, NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyLightParams(); }));
 }
 
-TEST(FvpDirtyNotifier, materialSkipsPrimvarsOnAllDirty)
+TEST(DirtyNotifier, materialSkipsPrimvarsOnAllDirty)
 {
     // HdMaterial::DirtyVolume and HdChangeTracker::DirtyPrimvar share bit 6, so
     // the legacy AllDirty path spuriously appends primvars. dirtyMaterial() emits
     // only the material locator; extension-attribute primvars are dirtied separately.
     HdDataSourceLocatorSet expected;
     expected.append(HdMaterialSchema::GetDefaultLocator());
-    EXPECT_EQ(expected, NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyMaterial(); }));
+    EXPECT_EQ(expected, NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyMaterial(); }));
 }
 
 // ---- Render-item topoChanged: topology locators only ----
@@ -350,7 +368,7 @@ TEST(FvpDirtyNotifier, materialSkipsPrimvarsOnAllDirty)
 // (st, tangents, normals) are not dirtied on the topology path — render delegates should
 // full-rebuild from topology (Pixar guidance: stable-topology vs deforming-geometry distinction).
 
-TEST(FvpDirtyNotifier, renderItemMeshTopoChangeEmitsTopologyOnly)
+TEST(DirtyNotifier, renderItemMeshTopoChangeEmitsTopologyOnly)
 {
     HdDataSourceLocatorSet expected;
     expected.append(HdMeshSchema::GetSubdivisionSchemeLocator());
@@ -358,9 +376,9 @@ TEST(FvpDirtyNotifier, renderItemMeshTopoChangeEmitsTopologyOnly)
 
     EXPECT_EQ(
         expected,
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyMeshTopology(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyMeshTopology(); }));
 
-    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
+    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::DirtyNotifier& n) {
         n.dirtyMeshTopology();
     });
     EXPECT_FALSE(actual.Contains(HdPrimvarsSchema::GetDefaultLocator()));
@@ -370,16 +388,16 @@ TEST(FvpDirtyNotifier, renderItemMeshTopoChangeEmitsTopologyOnly)
         actual.Intersects(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("tangents"))));
 }
 
-TEST(FvpDirtyNotifier, renderItemCurveTopoChangeOmitsMeshPrimvars)
+TEST(DirtyNotifier, renderItemCurveTopoChangeOmitsMeshPrimvars)
 {
     HdDataSourceLocatorSet expected;
     expected.append(HdBasisCurvesTopologySchema::GetDefaultLocator());
 
     EXPECT_EQ(
         expected,
-        NotifierLocators([](Fvp::FvpDirtyNotifier& n) { n.dirtyBasisCurvesTopology(); }));
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyBasisCurvesTopology(); }));
 
-    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
+    HdDataSourceLocatorSet actual = NotifierLocators([](Fvp::DirtyNotifier& n) {
         n.dirtyBasisCurvesTopology();
     });
     EXPECT_FALSE(actual.Intersects(HdMeshTopologySchema::GetDefaultLocator()));
@@ -390,32 +408,35 @@ TEST(FvpDirtyNotifier, renderItemCurveTopoChangeOmitsMeshPrimvars)
 
 // ---- The render-item geomChanged invalidation shift (rules 1 + 4) ----
 
-TEST(FvpDirtyNotifier, geomChangedEmitsGranularPrimvars)
+TEST(DirtyNotifier, geomChangedEmitsGranularPrimvars)
 {
     // geomChanged re-reads all vertex buffers. With useMayaNormals true we
     // emit granular per-primvar locators (points, st, tangents, normals) instead
     // of the broad primvars locator, so the normals skip is real.
     HdDataSourceLocatorSet expected;
     expected.append(HdPrimvarsSchema::GetPointsLocator());
-    expected.append(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("st")));
-    expected.append(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("tangents")));
+    expected.append(HdPrimvarsSchema::GetDefaultLocator().Append(MayaHydraAdapterTokens->st));
+    expected.append(HdPrimvarsSchema::GetDefaultLocator().Append(MayaHydraAdapterTokens->tangents));
     expected.append(HdPrimvarsSchema::GetNormalsLocator());
 
-    EXPECT_EQ(expected, NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
-        n.dirtyPoints().dirtyUVs().dirtyTangents().dirtyNormals();
+    EXPECT_EQ(expected, MhNotifierLocators([](MayaHydra::DirtyNotifier& n) {
+        n.dirtyPoints();
+        n.dirtyUVs().dirtyTangents().dirtyNormals();
     }));
 }
 
-TEST(FvpDirtyNotifier, geomChangedSkipsNormalsWhenHydraGenerates)
+TEST(DirtyNotifier, geomChangedSkipsNormalsWhenHydraGenerates)
 {
     // Rule 4: when useMayaNormals is false, dirtyNormals() is not called.
     HdDataSourceLocatorSet expected;
     expected.append(HdPrimvarsSchema::GetPointsLocator());
-    expected.append(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("st")));
-    expected.append(HdPrimvarsSchema::GetDefaultLocator().Append(TfToken("tangents")));
+    expected.append(HdPrimvarsSchema::GetDefaultLocator().Append(MayaHydraAdapterTokens->st));
+    expected.append(HdPrimvarsSchema::GetDefaultLocator().Append(MayaHydraAdapterTokens->tangents));
 
-    HdDataSourceLocatorSet actual = NotifierLocators(
-        [](Fvp::FvpDirtyNotifier& n) { n.dirtyPoints().dirtyUVs().dirtyTangents(); });
+    HdDataSourceLocatorSet actual = MhNotifierLocators([](MayaHydra::DirtyNotifier& n) {
+        n.dirtyPoints();
+        n.dirtyUVs().dirtyTangents();
+    });
     EXPECT_EQ(expected, actual);
 
     EXPECT_FALSE(actual.Contains(HdPrimvarsSchema::GetDefaultLocator()))
@@ -426,22 +447,22 @@ TEST(FvpDirtyNotifier, geomChangedSkipsNormalsWhenHydraGenerates)
 
 // ---- Accumulation / dedup / flush behavior ----
 
-TEST(FvpDirtyNotifier, chainingAccumulatesAndDeduplicates)
+TEST(DirtyNotifier, chainingAccumulatesAndDeduplicates)
 {
     HdDataSourceLocatorSet expected;
     expected.append(HdXformSchema::GetDefaultLocator());
     expected.append(HdVisibilitySchema::GetDefaultLocator());
 
     // Calling dirtyTransform() twice must deduplicate.
-    EXPECT_EQ(expected, NotifierLocators([](Fvp::FvpDirtyNotifier& n) {
+    EXPECT_EQ(expected, NotifierLocators([](Fvp::DirtyNotifier& n) {
         n.dirtyTransform().dirtyVisibility().dirtyTransform();
     }));
 }
 
-TEST(FvpDirtyNotifier, flushClearsPendingLocators)
+TEST(DirtyNotifier, flushClearsPendingLocators)
 {
     HdRetainedSceneIndexRefPtr sceneIndex = HdRetainedSceneIndex::New();
-    Fvp::FvpDirtyNotifier      notifier(*sceneIndex, kTestPrimPath);
+    Fvp::DirtyNotifier      notifier(*sceneIndex, kTestPrimPath);
     notifier.dirtyTransform();
     EXPECT_FALSE(notifier.IsEmpty());
     notifier.flush();
@@ -449,4 +470,15 @@ TEST(FvpDirtyNotifier, flushClearsPendingLocators)
     // Second flush is a no-op and must not re-error.
     notifier.flush();
     EXPECT_TRUE(notifier.IsEmpty());
+}
+
+TEST(DirtyNotifier, flushAfterSceneIndexDestroyedDropsLocators)
+{
+    HdRetainedSceneIndexRefPtr sceneIndex = HdRetainedSceneIndex::New();
+    auto                       notifier = std::make_unique<Fvp::DirtyNotifier>(*sceneIndex, kTestPrimPath);
+    notifier->dirtyTransform();
+    EXPECT_FALSE(notifier->IsEmpty());
+    sceneIndex.Reset();
+    notifier->flush();
+    EXPECT_TRUE(notifier->IsEmpty());
 }

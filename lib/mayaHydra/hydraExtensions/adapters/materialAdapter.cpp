@@ -17,7 +17,7 @@
 //
 #include "materialAdapter.h"
 
-#include <flowViewport/fvpDirtyNotifier.h>
+#include <mayaHydraLib/adapters/mhDirtyNotifier.h>
 
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/materialNetworkConverter.h>
@@ -141,7 +141,7 @@ void MayaHydraMaterialAdapter::EnableXRayShadingMode(bool enable)
 {
     _enableXRayShadingMode = enable;
     if (_isPopulated) {
-        Fvp::FvpDirtyNotifier notifier(*GetMayaHydraSceneIndex(), GetID());
+        MayaHydra::DirtyNotifier notifier(this);
         notifier.dirtyMaterial();
         notifier.flush();
     }
@@ -239,7 +239,7 @@ private:
         }
         adapter->_CreateSurfaceMaterialCallback();
         {
-            Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+            MayaHydra::DirtyNotifier notifier(adapter);
             notifier.dirtyMaterial();
             notifier.flush();
         }
@@ -261,7 +261,7 @@ private:
             return;
         }
         {
-            Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+            MayaHydra::DirtyNotifier notifier(adapter);
             notifier.dirtyMaterial();
             notifier.flush();
         }

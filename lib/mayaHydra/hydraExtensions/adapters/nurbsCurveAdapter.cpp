@@ -19,7 +19,7 @@
 #include <mayaHydraLib/adapters/shapeAdapter.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
-#include <flowViewport/fvpDirtyNotifier.h>
+#include <mayaHydraLib/adapters/mhDirtyNotifier.h>
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 
 #include <functional>
@@ -46,17 +46,17 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
-using NurbsDirtyFn = std::function<void(Fvp::FvpDirtyNotifier&)>;
+using NurbsDirtyFn = std::function<void(Fvp::DirtyNotifier&)>;
 
 const std::pair<MObject&, NurbsDirtyFn> _dirtyNotifiers[] {
     { MayaAttrs::nurbsCurve::controlPoints,
-      [](Fvp::FvpDirtyNotifier& n) { n.dirtyPoints().dirtyExtent(); } },
+      [](Fvp::DirtyNotifier& n) { n.dirtyPoints().dirtyExtent(); } },
     { MayaAttrs::nurbsCurve::worldMatrix,
-      [](Fvp::FvpDirtyNotifier& n) { n.dirtyTransform(); } },
+      [](Fvp::DirtyNotifier& n) { n.dirtyTransform(); } },
     { MayaAttrs::nurbsCurve::doubleSided,
-      [](Fvp::FvpDirtyNotifier& n) { n.dirtyDoubleSided(); } },
+      [](Fvp::DirtyNotifier& n) { n.dirtyDoubleSided(); } },
     { MayaAttrs::nurbsCurve::intermediateObject,
-      [](Fvp::FvpDirtyNotifier& n) { n.dirtyVisibility(); } },
+      [](Fvp::DirtyNotifier& n) { n.dirtyVisibility(); } },
 };
 
 } // namespace
@@ -192,8 +192,8 @@ public:
 private:
     static void _NotifyConnectivityChanged(MayaHydraNurbsCurveAdapter* adapter)
     {
-        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
-        Fvp::FvpDirtyNotifier::DirtyRprimConnectivityLocators(
+        MayaHydra::DirtyNotifier notifier(adapter);
+        Fvp::DirtyNotifier::DirtyRprimConnectivityLocators(
             notifier, HdPrimTypeTokens->basisCurves);
         notifier.flush();
     }
@@ -206,7 +206,7 @@ private:
                 if (plug == MayaAttrs::nurbsCurve::intermediateObject) {
                     adapter->InvalidateVisibility();
                 }
-                Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+                MayaHydra::DirtyNotifier notifier(adapter);
                 it.second(notifier);
                 notifier.flush();
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_CURVE_PLUG_DIRTY)
@@ -234,7 +234,7 @@ private:
     {
         auto* adapter = reinterpret_cast<MayaHydraNurbsCurveAdapter*>(clientData);
         if (plug == MayaAttrs::dagNode::instObjGroups) {
-            Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+            MayaHydra::DirtyNotifier notifier(adapter);
             notifier.dirtyMaterialBinding();
             notifier.flush();
         } else {

@@ -20,7 +20,7 @@
 
 #include <mayaHydraLib/api.h>
 
-#include <flowViewport/fvpDirtyNotifier.h>
+#include <mayaHydraLib/adapters/mhDirtyNotifier.h>
 
 #include <pxr/imaging/hd/sceneDelegate.h>
 #include <pxr/pxr.h>
@@ -108,16 +108,15 @@ public:
     /// Return whether the prim has been populated.
     bool IsPopulated() const { return _isPopulated; }
 
-    /// Return whether the Hydra prim for this adapter is an rprim (mesh, curves, points, …).
-    /// The result is resolved lazily on first call via the scene index and cached while
-    /// _isPopulated is true. Any call while _isPopulated is false (i.e. after RemovePrim() and
-    /// before the next Populate()) returns false and clears the cache so Populate() resolves
-    /// a fresh value. Returns false (without caching) when the render delegate is not yet
-    /// available.
-    bool IsRprim() const;
+    /// Return whether the render delegate supports this adapter's populated prim type as an rprim
+    /// (mesh, curves, points, …). Resolved lazily on first call via the scene index and cached
+    /// while _isPopulated is true. Any call while _isPopulated is false (i.e. after RemovePrim()
+    /// and before the next Populate()) returns false and clears the cache so Populate() resolves
+    /// a fresh value. Requires a render delegate; callers must guard with ShouldSkipHydraUpdates().
+    bool IsRprimTypeSupportedForPrim() const;
 
     // ---- Primvar dirtying flow (extension/dynamic attributes only) ----
-    // MarkPrimvarDirtyForAttributeChange: final FvpDirtyNotifier flush (primvar + extra locators).
+    // MarkPrimvarDirtyForAttributeChange: final DirtyNotifier flush (primvar + extra locators).
     // No-op if the plug is not an extension or dynamic attribute.
     // MaybeMarkPrimvarDirtyForAttributeChange: normalize plug + apply policy.
     // ShouldMarkPrimvarDirtyForAttributeChange: per-adapter gating to avoid duplicates.
@@ -132,7 +131,7 @@ public:
     /// type-specific schema on top. Default is a no-op.
     /// The changed plug is passed so overrides can gate on it (e.g. lights only add the light
     /// schema for actual light-param attributes); plug may be invalid (kAttributeRemoved).
-    virtual void AddExtraDirtyForPrimvarAttributeChange(Fvp::FvpDirtyNotifier&, const MPlug&) { }
+    virtual void AddExtraDirtyForPrimvarAttributeChange(Fvp::DirtyNotifier&, const MPlug&) { }
 
     /// Call from attribute-changed callbacks when an extension/dynamic attr change should
     /// mark primvars dirty. Resolves \p plug to the appropriate parent/root plug before
@@ -242,8 +241,9 @@ protected:
 
     bool _isPopulated = false;
 
-    // Cache for IsRprim(): resolved once on the first call, then reused. Mutable because
-    // IsRprim() is logically const even though it lazily fills the cache.
+    // Cache for IsRprimTypeSupportedForPrim(): resolved once on the first call, then reused.
+    // Mutable because IsRprimTypeSupportedForPrim() is logically const even though it lazily
+    // fills the cache.
     mutable bool _isRprimResolved { false };
     mutable bool _isRprimValue    { false };
 };

@@ -39,7 +39,7 @@ const char* kMeshShapeFallback = "testCubeShape";
 const char* kMeshTransformOptionVar = "mhMeshTransform";
 const char* kMeshTransformFallback = "testCube";
 const char* kCameraShapeOptionVar = "mhCameraShape";
-const char* kCameraShapeFallback = "cameraShape1";
+const char* kCameraShapeFallback = "perspShape";
 
 // ---------------------------------------------------------------------------
 // Shared test-body helpers
@@ -633,7 +633,8 @@ TEST(RenderItemDirtyLocators, TopologyExtrudeEmitsTopologyNotBroadPrimvars)
 
 // What: adding/setting a dynamic attribute on a mesh (rprim) emits extComputationPrimvars.
 //       The render item adapter's attribute-changed callback calls
-//       MaybeMarkPrimvarDirtyForAttributeChange, which gates on IsRprim() — same as the mesh
+//       MaybeMarkPrimvarDirtyForAttributeChange, which gates on IsRprimTypeSupportedForPrim()
+//       — same as the mesh
 //       adapter path — so the behavior is identical in both modes.
 // How: addAttr+setAttr a dynamic float on the test cube shape; inspect dirty locators.
 // Expect: extCompPrimvars=true.
@@ -768,8 +769,8 @@ TEST(RenderItemDirtyLocators, SmoothMeshToggleEmitsTopologyNotDisplayStyle)
 // Expect: extCompPrimvars=false.  Attribute is removed at the end to avoid polluting other tests.
 TEST(ExtCompGate, DynamicAttrOnCameraSkipsExtComputationPrimvars)
 {
-    // Use a dedicated camera from the Python setup (mhCameraShape). Default perspShape is not
-    // translated under mesh adapter mode because InsertDag skips invisible DAG shapes.
+    // Default perspShape is always present after file -new; invisible cameras are still
+    // translated because they can be renderable (see InsertDag camera handling).
     const std::string cameraShapeFull
         = GetOptionVarOrDefault(kCameraShapeOptionVar, kCameraShapeFallback);
     const std::string camShapeName = GetShapeNameFromFullPath(cameraShapeFull);

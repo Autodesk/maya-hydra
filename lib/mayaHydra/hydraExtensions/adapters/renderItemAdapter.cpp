@@ -73,7 +73,7 @@ _GetPositionVertexCount(MGeometry* geom, int vertexBufferCount)
 
 void
 _EmitRenderItemTopologyDirtyLocators(
-    Fvp::FvpDirtyNotifier& notifier,
+    Fvp::DirtyNotifier& notifier,
     MHWRender::MGeometry::Primitive primitive)
 {
     switch (primitive) {
@@ -236,7 +236,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     //
     // Construct the notifier AFTER the early-exit guard above so an early return always leaves
     // the notifier empty on an early return.
-    Fvp::FvpDirtyNotifier notifier(*GetMayaHydraSceneIndex(), GetID());
+    MayaHydra::DirtyNotifier notifier(this);
 
 #ifdef MAYA_HAS_RENDER_ITEM_CULL_MODE_API
     MRenderItem::CullMode cullMode = data._ri.cullMode();
@@ -334,9 +334,9 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // delegate only re-pulls what actually changed. Normals are skipped when Hydra generates them.
     // Emitted after the vertex-count workaround below which may have promoted topoChanged -> geomChanged.
     if (geomChanged) {
-        notifier.dirtyPoints()
-            .dirtyUVs()       // st
-            .dirtyTangents(); // tangents
+        notifier.dirtyPoints();
+        notifier.dirtyUVs();
+        notifier.dirtyTangents();
             // .dirtyVertexColors() — uncomment once the kColor buffer read is wired in (see kColor case below).
             // Do not emit the locator before the data is actually read: a dirty signal without a
             // corresponding data update is a false promise to the render delegate.
@@ -766,7 +766,7 @@ void MayaHydraRenderItemAdapter::SetPlaybackState(bool isPlaybackRunning)
     if (_isInPlayback != isPlaybackRunning) {
         _isInPlayback = isPlaybackRunning;
         if (_isHideOnPlayback) {
-            Fvp::FvpDirtyNotifier notifier(*GetMayaHydraSceneIndex(), GetID());
+            MayaHydra::DirtyNotifier notifier(this);
             notifier.dirtyVisibility();
             notifier.flush();
         }

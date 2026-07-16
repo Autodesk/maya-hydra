@@ -38,11 +38,12 @@ class TestRenderItemDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
         cmds.optionVar(stringValue=("mhMeshTransform", mesh_transform))
         cmds.refresh()
 
-    # What: vertex deformation should dirty granular primvars but never broad primvars.
-    #       Render items mode may also emit mesh/topology when Maya flags topoChanged on
-    #       component moves — unlike the mesh adapter path.
+    # What: vertex deformation should dirty granular primvars but never broad primvars or
+    #       mesh topology.  Maya may set MVS_changedTopo alongside MVS_changedGeometry on
+    #       component moves, but the adapter suppresses topology locators when vertex count
+    #       and index connectivity are unchanged (see renderItemAdapter UpdateFromDelta).
     # How: build a cube scene (render items mode), move one vertex via C++, inspect dirty locators.
-    # Expect: points + uvs + meshTopology; no broad primvars, no extComputationPrimvars.
+    # Expect: points + uvs; no meshTopology, no broadPrimvars, no extComputationPrimvars.
     def test_deformationVertexMoveEmitsGranularPrimvarsNotBroadPrimvars(self):
         self.setupScene()
         with PluginLoaded('mayaHydraCppTests'):
@@ -66,7 +67,7 @@ class TestRenderItemDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
 
     # What: a dynamic attribute change on a mesh (rprim) must emit extComputationPrimvars,
     #       even in render items mode.  The render item adapter registers the same
-    #       attribute-changed callback as the mesh adapter, gated on IsRprim().
+    #       attribute-changed callback as the mesh adapter, gated on IsRprimTypeSupportedForPrim().
     # How: build a cube scene (render items mode), addAttr+setAttr a dynamic float via C++,
     #      inspect dirty locators.
     # Expect: extCompPrimvars=true.
@@ -118,17 +119,14 @@ class TestRenderItemDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
                 f="RenderItemDirtyLocators.SmoothMeshToggleEmitsTopologyNotDisplayStyle")
 
     # What: a dynamic attribute change on a camera (sprim) must NOT emit extComputationPrimvars.
-    #       The ExtCompGate test is mode-agnostic: the camera adapter gates on IsRprim()
+    #       The ExtCompGate test is mode-agnostic: the camera adapter gates on
+    #       IsRprimTypeSupportedForPrim()
     #       regardless of whether mesh adapter or render items mode is active.
-    # How: create a dedicated scene camera, then addAttr+setAttr a dynamic float via C++ and
+    # How: use the default persp camera, then addAttr+setAttr a dynamic float via C++ and
     #      inspect dirty locators.
     # Expect: extCompPrimvars=false.
     def test_dynamicAttrOnCameraSkipsExtComputationPrimvars(self):
         self.setupScene()
-        _, camera_shape = cmds.camera()
-        camera_shape = cmds.ls(camera_shape, long=True)[0]
-        cmds.optionVar(stringValue=("mhCameraShape", camera_shape))
-        cmds.refresh()
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 f="ExtCompGate.DynamicAttrOnCameraSkipsExtComputationPrimvars")

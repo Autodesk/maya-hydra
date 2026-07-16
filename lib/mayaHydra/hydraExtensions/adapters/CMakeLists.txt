@@ -5,6 +5,7 @@ target_sources(${TARGET_NAME}
     PRIVATE
         adapter.cpp
         adapterDebugCodes.cpp
+        mhDirtyNotifier.cpp
         adapterRegistry.cpp
         aiSkydomeLightAdapter.cpp
 		aiAreaLightAdapter.cpp
@@ -32,6 +33,7 @@ target_sources(${TARGET_NAME}
 set(HEADERS
     adapter.h
     adapterDebugCodes.h
+    mhDirtyNotifier.h
     adapterRegistry.h
     cameraAdapter.h
     meshAdapterTestUtils.h

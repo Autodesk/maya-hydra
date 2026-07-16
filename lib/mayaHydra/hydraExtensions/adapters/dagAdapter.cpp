@@ -19,7 +19,7 @@
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
-#include <flowViewport/fvpDirtyNotifier.h>
+#include <mayaHydraLib/adapters/mhDirtyNotifier.h>
 
 #include <pxr/base/gf/interval.h>
 #include <pxr/base/tf/type.h>
@@ -62,13 +62,13 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 namespace {
 
-bool _PlugNodeOnMasterDagPath(const MObject& plugNode, const MDagPath& masterPath)
+bool _IsNodeOnDagPath(const MObject& node, const MDagPath& path)
 {
-    if (plugNode.isNull() || !masterPath.isValid()) {
+    if (node.isNull() || !path.isValid()) {
         return false;
     }
-    for (MDagPath path = masterPath; path.length() > 0; path.pop()) {
-        if (path.node() == plugNode) {
+    for (MDagPath dagPath = path; dagPath.length() > 0; dagPath.pop()) {
+        if (dagPath.node() == node) {
             return true;
         }
     }
@@ -79,14 +79,14 @@ void _DirtyInstancerPlugs(MayaHydraDagAdapter* adapter)
 {
     // Dirty the rprim: its instance index and the instanceTransform primvar changed.
     {
-        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+        MayaHydra::DirtyNotifier notifier(adapter);
         notifier.dirtyInstancer().dirtyPrimvars();
         notifier.flush();
     }
     // Dirty the instancer prim itself: topology and primvars (instanceTransform) changed.
     const SdfPath instancerId = adapter->GetInstancerID();
     if (!instancerId.IsEmpty()) {
-        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), instancerId);
+        Fvp::DirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), instancerId);
         notifier.dirtyInstancer().dirtyPrimvars();
         notifier.flush();
     }
@@ -97,7 +97,7 @@ void _DirtyInstancerVisibilityPlug(MayaHydraDagAdapter* adapter, const MPlug& pl
     // Per-instance visibility is expressed via instance indices / instanceTransform primvars,
     // not the prototype rprim visibility schema (which reflects the master DAG path only).
     _DirtyInstancerPlugs(adapter);
-    if (_PlugNodeOnMasterDagPath(plug.node(), adapter->GetDagPath())) {
+    if (_IsNodeOnDagPath(plug.node(), adapter->GetDagPath())) {
         MayaHydraDagAdapter::DirtyVisibilityRelatedPlug(adapter);
     }
 }
@@ -272,12 +272,13 @@ void MayaHydraDagAdapter::RemovePrim()
     }
     GetMayaHydraSceneIndex()->RemovePrim(GetID());
     // Instancing is expressed via instancedBy / instancerTopology locators on the prototype
-    // prim (see FvpDirtyNotifier::dirtyInstancer). MayaHydra never calls HdRenderIndex::
+    // prim (see DirtyNotifier::dirtyInstancer). MayaHydra never calls HdRenderIndex::
     // InsertInstancer, so RemoveInstancer must not run here — it crashes on teardown when
     // duplicate -ilf correctly sets _isInstanced.
     _isPopulated = false;
-    // Note: _isRprimResolved is reset automatically by IsRprim() whenever _isPopulated is false
-    // (see MayaHydraAdapter::IsRprim). No explicit reset needed here.
+    // Note: _isRprimResolved is reset automatically by IsRprimTypeSupportedForPrim() whenever
+    // _isPopulated is false (see MayaHydraAdapter::IsRprimTypeSupportedForPrim). No explicit
+    // reset needed here.
 }
 
 bool MayaHydraDagAdapter::UpdateVisibility()
@@ -400,7 +401,7 @@ void MayaHydraDagAdapter::DirtyVisibilityRelatedPlug(MayaHydraDagAdapter* adapte
     // Can't query the new visibility here — the plug dirty hasn't propagated yet.
     // Mark _visibilityDirty so IsVisible() re-reads it on the next query.
     adapter->InvalidateVisibility();
-    Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+    MayaHydra::DirtyNotifier notifier(adapter);
     if (coDirtyTransform && adapter->IsVisible(false)) {
         adapter->InvalidateTransform();
         notifier.dirtyVisibility().dirtyTransform();
@@ -416,7 +417,7 @@ void MayaHydraDagAdapter::DirtyTransformIfVisible(MayaHydraDagAdapter* adapter)
         return;
     }
     adapter->InvalidateTransform();
-    Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+    MayaHydra::DirtyNotifier notifier(adapter);
     notifier.dirtyTransform();
     notifier.flush();
 }

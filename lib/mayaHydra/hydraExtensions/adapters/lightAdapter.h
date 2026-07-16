@@ -111,7 +111,7 @@ public:
     /// Add light schema + visibility + collections locators on top of the base primvar
     /// invalidation when an extension/dynamic light-param attribute changes, matching the
     /// full SprimDirtyBitsToLocatorSet(DirtyParams) expansion used for built-in params.
-    void AddExtraDirtyForPrimvarAttributeChange(Fvp::FvpDirtyNotifier& notifier, const MPlug& plug) override;
+    void AddExtraDirtyForPrimvarAttributeChange(Fvp::DirtyNotifier& notifier, const MPlug& plug) override;
 
     /// Return whether shadows are enabled for this light.
     bool GetShadowsEnabled(MFnLight& light) const;

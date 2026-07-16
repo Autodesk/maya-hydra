@@ -107,7 +107,7 @@ void _dirtyBuiltInLightParams(MayaHydraLightAdapter* adapter)
     // locator ensures those are re-pulled alongside the light schema.
     // dirtyVisibility() and dirtyCollections() match HdDirtyBitsTranslator::SprimDirtyBitsToLocatorSet
     // for HdLight::DirtyParams.
-    Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+    MayaHydra::DirtyNotifier notifier(adapter);
     notifier.dirtyLightParams().dirtyPrimvars().dirtyVisibility().dirtyCollections();
     notifier.flush();
 }
@@ -118,7 +118,7 @@ void _dirtyTransform(MObject& node, void* clientData)
     auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
     if (adapter->IsVisible()) {
         adapter->InvalidateTransform();
-        Fvp::FvpDirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
+        MayaHydra::DirtyNotifier notifier(adapter);
         notifier.dirtyTransform().dirtyLightParams();
         notifier.flush();
     }
@@ -905,7 +905,7 @@ bool MayaHydraLightAdapter::ShouldMarkPrimvarDirtyForAttributeChange(const MPlug
     return MayaHydraAdapter::ShouldMarkPrimvarDirtyForParamAttrs(plug, kLightParamAttributeNames);
 }
 
-void MayaHydraLightAdapter::AddExtraDirtyForPrimvarAttributeChange(Fvp::FvpDirtyNotifier& notifier, const MPlug& plug)
+void MayaHydraLightAdapter::AddExtraDirtyForPrimvarAttributeChange(Fvp::DirtyNotifier& notifier, const MPlug& plug)
 {
     // Lights expose extension-attribute primvars, but a light-param attribute change must also
     // invalidate the light schema, visibility, and shadow collections — matching the full

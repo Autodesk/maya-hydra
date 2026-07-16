@@ -22,8 +22,25 @@
 #include <pxr/imaging/hd/basisCurvesTopology.h>
 #include <pxr/imaging/hd/meshTopology.h>
 
-PXR_NAMESPACE_OPEN_SCOPE
+PXR_NAMESPACE_USING_DIRECTIVE
 
+namespace MAYAHYDRA_NS_DEF {
+
+// Cost / necessity: this is a linear scan over the stored vs. new
+// index/count arrays, so it is not free on a dense mesh. It is reached only through the narrow
+// branch in RenderItemShouldEmitTopologyLocators below where Maya sets BOTH MVS_changedTopo and
+// MVS_changedGeometry on the same update with an unchanged vertex count and a valid stored
+// baseline (every other case short-circuits before this call). That combination is the
+// MAYA-134200 corner case: MVS_changedTopo can be set on edits that do not actually change
+// connectivity (e.g. a vertex move sets it alongside MVS_changedGeometry — see "Render item
+// topology suppression" in doc/render_delegate_topology_vs_deformation.md), and Maya exposes no
+// cheaper signal (no connectivity generation counter, no "did the index buffer change" bit) to
+// disambiguate that from a real edit like an edge flip with the same vertex count. The stored
+// _topology and the freshly-read vertexIndices/vertexCounts compared here are the only sources
+// of truth available — there is no cheaper answer sitting elsewhere that this call would be
+// redundantly recomputing. In practice this does not hit the animation/deformation path
+// (skinning/blend shapes set geomChanged without topoChanged), only occasional topology-adjacent
+// Maya operations (extrude, merge, edge flip, smooth-level crossing) with a stable vertex count.
 bool RenderItemTopologyConnectivityChanged(
     const HdTopology*    storedTopology,
     MGeometry::Primitive primitive,
@@ -92,4 +109,4 @@ bool RenderItemShouldEmitTopologyLocators(
         storedTopology, primitive, newIndices, newCounts, storedPositionCount);
 }
 
-PXR_NAMESPACE_CLOSE_SCOPE
+} // namespace MAYAHYDRA_NS_DEF

@@ -287,11 +287,10 @@ public:
 
     HdSceneIndexBaseRefPtr GetObservedSceneIndex() { return _observedSceneIndex; }
 
-    const AddedPrimEntries&   GetAddedPrimEntries() { return _addedPrimEntries; }
-    const RemovedPrimEntries& GetRemovedPrimEntries() { return _removedPrimEntries; }
-    const DirtiedPrimEntries& GetDirtiedPrimEntries() { return _dirtiedPrimEntries; }
+    const AddedPrimEntries&   GetAddedPrimEntries() const { return _addedPrimEntries; }
+    const RemovedPrimEntries& GetRemovedPrimEntries() const { return _removedPrimEntries; }
     const DirtiedPrimEntries& GetDirtiedPrimEntries() const { return _dirtiedPrimEntries; }
-    const RenamedPrimEntries& GetRenamedPrimEntries() { return _renamedPrimEntries; }
+    const RenamedPrimEntries& GetRenamedPrimEntries() const { return _renamedPrimEntries; }
 
     void PrimsAdded(const HdSceneIndexBase& sender, const AddedPrimEntries& entries) override
     {
@@ -327,19 +326,19 @@ private:
 /// doc/render_delegate_topology_vs_deformation.md
 struct MeshDirtySignals
 {
-    bool anyForPrim = false;
-    bool meshTopology = false;
-    bool broadPrimvars = false;
-    bool extCompPrimvars = false;
-    bool points = false;
-    bool extent = false;
-    bool normals = false;
-    bool uvs = false;          // primvars/st — granular UV locator
-    bool tangents = false;     // primvars/tangents — granular tangents locator
-    bool subdivisionTags = false;
-    bool displayStyle = false; // displayStyle — emitted on smooth mesh / refine level changes
-    bool visibility = false;     // visibility schema — emitted on visibility / intermediateObject changes
-    bool instancer = false;        // instancedBy / instancerTopology — instance visibility or transform changes
+    bool anyForPrim{false};
+    bool meshTopology{false};
+    bool broadPrimvars{false};
+    bool extCompPrimvars{false};
+    bool points{false};
+    bool extent{false};
+    bool normals{false};
+    bool uvs{false};              // primvars/st — granular UV locator
+    bool tangents{false};         // primvars/tangents — granular tangents locator
+    bool subdivisionTags{false};
+    bool displayStyle{false};     // displayStyle — emitted on smooth mesh / refine level changes
+    bool visibility{false};       // visibility schema — emitted on visibility / intermediateObject changes
+    bool instancer{false};        // instancedBy / instancerTopology — instance visibility or transform changes
 };
 
 /// Classify mesh dirty locators emitted for \p meshPrimPath since \p startIndex.

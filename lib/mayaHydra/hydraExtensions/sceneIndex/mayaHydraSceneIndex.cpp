@@ -25,6 +25,7 @@
 #include <mayaHydraLib/profilingUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
 
+#include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/envSetting.h>
 #include <pxr/imaging/hd/geomSubsetSchema.h>
 #include <pxr/imaging/hd/materialBindingSchema.h>
@@ -35,6 +36,7 @@
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
 #include <maya/MDGMessage.h>
+#include <maya/MDagMessage.h>
 #include <maya/MDagPath.h>
 #include <maya/MDagPathArray.h>
 #include <maya/MFnDependencyNode.h>
@@ -49,7 +51,7 @@
 #include <maya/MString.h>
 #include <ufe/pathString.h>
 
-#include <flowViewport/fvpDirtyNotifier.h>
+#include <mayaHydraLib/adapters/mhDirtyNotifier.h>
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 #include <flowViewport/selection/fvpDataProducersNodeHashCodeToSdfPathRegistry.h>
 #include <flowViewport/selection/fvpPathMapper.h>
@@ -286,6 +288,14 @@ void _onDagNodeRemoved(MObject& obj, void* clientData)
     reinterpret_cast<MayaHydraSceneIndex*>(clientData)->OnDagNodeRemoved(obj);
 }
 
+// duplicateInstanced does not add DAG nodes, so it never triggers _onDagNodeAdded; this is the
+// only reliable signal that a shape gained a new instance path.
+void _instanceAdded(MDagPath& child, MDagPath& parent, void* clientData)
+{
+    TF_UNUSED(parent);
+    reinterpret_cast<MayaHydraSceneIndex*>(clientData)->AddNewInstance(child);
+}
+
 const MString defaultLightSet("defaultLightSet");
 
 void _connectionChanged(MPlug& srcPlug, MPlug& destPlug, bool made, void* clientData)
@@ -399,9 +409,13 @@ MayaHydraSceneIndex::~MayaHydraSceneIndex() { _Destroy(); }
 
 void MayaHydraSceneIndex::_Destroy()
 {
-    // Null the render index pointer before removing adapter callbacks. Any Maya
-    // callback that fires between here and RemoveCallbacks() will call
-    // HasRenderDelegate() → false and become a no-op, preventing use-after-free.
+    // Null the render index before any teardown below. All Maya callbacks fire on the
+    // main thread only, but removing one adapter's callbacks/prim here can synchronously
+    // re-enter another adapter that hasn't been torn down yet (e.g. node-deletion or
+    // file-read callbacks, same pattern as ShouldSkipHydraUpdates()). Nulling _renderIndex
+    // up front makes HasRenderDelegate() false for the rest of _Destroy(), so any such
+    // reentrant call becomes a no-op instead of touching a delegate that's already
+    // been Stop()ped.
     _renderIndex = nullptr;
 
     for (auto callback : _callbacks) {
@@ -586,6 +600,14 @@ void MayaHydraSceneIndex::Populate()
     if (status) {
         _callbacks.push_back(id);
     }
+    if (useMeshAdapter()) {
+        // Catches instance paths added via duplicateInstanced, which getAllPathsTo()-based
+        // detection previously had to poll for every frame in FlushPendingUpdates().
+        id = MDagMessage::addInstanceAddedCallback(_instanceAdded, this, &status);
+        if (status) {
+            _callbacks.push_back(id);
+        }
+    }
 }
 
 VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
@@ -700,9 +722,6 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
                         [](MayaHydraMaterialAdapter* a) { return a->UpdateMaterialTag(); },
                         _materialAdapters)) {
                     HdRenderIndex* renderIndex = GetRenderIndexPtr();
-                    if (!renderIndex) {
-                        continue;
-                    }
                     for (const auto& rprimId : renderIndex->GetRprimIds()) {
                         const auto* rprim = renderIndex->GetRprim(rprimId);
                         if (rprim != nullptr && rprim->GetMaterialId() == id) {
@@ -740,7 +759,7 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
         _camerasToAdd.clear();
     }
 
-    if (useMeshAdapter() && !_addedNodes.empty()) {
+    if (useMeshAdapter()) {
         for (const auto& obj : _addedNodes) {
             if (obj.isNull()) {
                 continue;
@@ -766,24 +785,6 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
             }
         }
         _addedNodes.clear();
-    }
-
-    if (useMeshAdapter()) {
-        for (const auto& entry : _shapeAdapters) {
-            const auto& adapter = entry.second;
-            if (!adapter) {
-                continue;
-            }
-            MDagPathArray dags;
-            if (!MDagPath::getAllPathsTo(adapter->GetDagPath().node(), dags)) {
-                continue;
-            }
-            // duplicateInstanced does not add DAG nodes; detect new instance paths here so
-            // callbacks are rebuilt with _InstancerNodeDirty on every ancestor.
-            if (dags.length() > 1 && !adapter->IsInstanced()) {
-                AddNewInstance(adapter->GetDagPath());
-            }
-        }
     }
 
     if (!_customNodesToAdd.empty()) {
@@ -939,7 +940,7 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
         _MapAdapter<MayaHydraRenderItemAdapter>(
             [](MayaHydraRenderItemAdapter* a) {
                 if (a->HasType(HdPrimTypeTokens->mesh)) {
-                    Fvp::FvpDirtyNotifier notifier(*a->GetMayaHydraSceneIndex(), a->GetID());
+                    MayaHydra::DirtyNotifier notifier(a);
                     notifier.dirtyMeshTopology();
                     notifier.flush();
                 }
@@ -948,7 +949,7 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
         _MapAdapter<MayaHydraDagAdapter>(
             [](MayaHydraDagAdapter* a) {
                 if (a->HasType(HdPrimTypeTokens->mesh)) {
-                    Fvp::FvpDirtyNotifier notifier(*a->GetMayaHydraSceneIndex(), a->GetID());
+                    MayaHydra::DirtyNotifier notifier(a);
                     notifier.dirtyMeshTopology();
                     notifier.flush();
                 }
@@ -962,7 +963,7 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
                 if (a->HasType(HdPrimTypeTokens->mesh) || a->HasType(HdPrimTypeTokens->basisCurves)
                     || a->HasType(HdPrimTypeTokens->points)) {
                     a->InvalidateTransform();
-                    Fvp::FvpDirtyNotifier notifier(*a->GetMayaHydraSceneIndex(), a->GetID());
+                    MayaHydra::DirtyNotifier notifier(a);
                     notifier.dirtyPoints().dirtyTransform();
                     notifier.flush();
                 }
@@ -971,7 +972,7 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
         _MapAdapter<MayaHydraDagAdapter>(
             [](MayaHydraDagAdapter* a) {
                 a->InvalidateTransform();
-                Fvp::FvpDirtyNotifier notifier(*a->GetMayaHydraSceneIndex(), a->GetID());
+                MayaHydra::DirtyNotifier notifier(a);
                 if (a->HasType(HdPrimTypeTokens->mesh)) {
                     notifier.dirtyPoints();
                 } else if (a->HasType(HdPrimTypeTokens->camera)) {
@@ -980,7 +981,7 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
                 notifier.dirtyTransform();
                 notifier.flush();
                 if (a->IsInstanced()) {
-                    Fvp::FvpDirtyNotifier instNotifier(
+                    Fvp::DirtyNotifier instNotifier(
                         *a->GetMayaHydraSceneIndex(), a->GetInstancerID());
                     instNotifier.dirtyTransform();
                     instNotifier.flush();
@@ -995,7 +996,7 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
     if (oldParams.textureMemoryPerTexture != params.textureMemoryPerTexture) {
         _MapAdapter<MayaHydraMaterialAdapter>(
             [](MayaHydraMaterialAdapter* a) {
-                Fvp::FvpDirtyNotifier notifier(*a->GetMayaHydraSceneIndex(), a->GetID());
+                MayaHydra::DirtyNotifier notifier(a);
                 notifier.dirtyMaterial();
                 notifier.flush();
             },
@@ -1004,7 +1005,7 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
     if (oldParams.maximumShadowMapResolution != params.maximumShadowMapResolution) {
         _MapAdapter<MayaHydraLightAdapter>(
             [](MayaHydraLightAdapter* a) {
-                Fvp::FvpDirtyNotifier notifier(*a->GetMayaHydraSceneIndex(), a->GetID());
+                MayaHydra::DirtyNotifier notifier(a);
                 notifier.dirtyLightParams();
                 notifier.flush();
             },
@@ -1206,6 +1207,12 @@ GfInterval MayaHydraSceneIndex::GetCurrentTimeSamplingInterval() const
     return GfInterval(_params.motionSampleStart, _params.motionSampleEnd);
 }
 
+HdRenderIndex* MayaHydraSceneIndex::GetRenderIndexPtr()
+{
+    TF_VERIFY(_renderIndex, "GetRenderIndexPtr() called after render index was cleared.");
+    return _renderIndex;
+}
+
 bool MayaHydraSceneIndex::HasRenderDelegate() const
 {
     return _renderIndex && _renderIndex->GetRenderDelegate() != nullptr;
@@ -1233,9 +1240,13 @@ HdResourceRegistrySharedPtr MayaHydraSceneIndex::GetResourceRegistry() const
 
 void MayaHydraSceneIndex::RemoveInstancer(const SdfPath& id)
 {
-    if (HasRenderDelegate()) {
-        _renderIndex->RemoveInstancer(id);
+    if (!TF_VERIFY(
+            HasRenderDelegate(),
+            "RemoveInstancer() called without a render delegate; callers must guard with "
+            "ShouldSkipHydraUpdates() first.")) {
+        return;
     }
+    _renderIndex->RemoveInstancer(id);
 }
 
 void MayaHydraSceneIndex::RebuildAdapterOnIdle(const SdfPath& id, uint32_t flags)
@@ -1310,14 +1321,12 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
             },
             _materialAdapters)) {
         HdRenderIndex* renderIndex = GetRenderIndexPtr();
-        if (renderIndex) {
-            for (const auto& rprimId : renderIndex->GetRprimIds()) {
-                const auto* rprim = renderIndex->GetRprim(rprimId);
-                if (rprim != nullptr && rprim->GetMaterialId() == id) {
-                    Fvp::FvpDirtyNotifier notifier(*this, rprimId);
-                    notifier.dirtyMaterialBinding();
-                    notifier.flush();
-                }
+        for (const auto& rprimId : renderIndex->GetRprimIds()) {
+            const auto* rprim = renderIndex->GetRprim(rprimId);
+            if (rprim != nullptr && rprim->GetMaterialId() == id) {
+                Fvp::DirtyNotifier notifier(*this, rprimId);
+                notifier.dirtyMaterialBinding();
+                notifier.flush();
             }
         }
         if (MObjectHandle(obj).isValid()) {
@@ -1644,7 +1653,6 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
     if (CreateLightAdapter(dag)) {
         return;
     }
-
     // We are inserting a single prim and
     // instancer for every instanced mesh.
     if (dag.isInstanced() && dag.instanceNumber() > 0) {
@@ -1727,13 +1735,13 @@ void MayaHydraSceneIndex::AddNewInstance(const MDagPath& dag)
     // path) and dirty instancer topology / instance primvars.
     RebuildAdapterOnIdle(id, MayaHydraSceneIndex::RebuildFlagCallbacks);
     {
-        Fvp::FvpDirtyNotifier notifier(*this, masterAdapter->GetID());
+        Fvp::DirtyNotifier notifier(*this, masterAdapter->GetID());
         notifier.dirtyInstancer().dirtyPrimvars();
         notifier.flush();
     }
     const SdfPath instancerId = masterAdapter->GetInstancerID();
     if (!instancerId.IsEmpty()) {
-        Fvp::FvpDirtyNotifier instNotifier(*this, instancerId);
+        Fvp::DirtyNotifier instNotifier(*this, instancerId);
         instNotifier.dirtyInstancer().dirtyPrimvars();
         instNotifier.flush();
     }
@@ -1779,7 +1787,7 @@ void MayaHydraSceneIndex::UpdateLightsShadowCollection()
     if (_renderCollectionChanged && _shadowsEnabled) {
         _MapAdapter<MayaHydraLightAdapter>(
             [](MayaHydraLightAdapter* a) {
-                Fvp::FvpDirtyNotifier notifier(*a->GetMayaHydraSceneIndex(), a->GetID());
+                MayaHydra::DirtyNotifier notifier(a);
                 notifier.dirtyCollections();
                 notifier.flush();
             },

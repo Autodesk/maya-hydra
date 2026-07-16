@@ -48,13 +48,18 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        # HYDRA-2237: Skip the base tearDownClass (scene reset + plugin
-        # unload).  Resetting the scene while Arnold still has live render
-        # threads causes a SIGSEGV inside libai.so before runner.run() can
-        # return, so os._exit() in __main__ is never reached.  Since the
-        # process is terminated by os._exit() immediately after the runner
-        # returns, there is no need to clean up the scene or unload plugins.
-        pass
+        # When mtoa is loaded, the base tearDownClass scene reset can SIGSEGV
+        # inside libai.so (Arnold background render threads still active).
+        # That crash happens before runner.run() returns, so the HYDRA-2237
+        # force-terminate in __main__ is never reached.  Skip cleanup only in
+        # that case; __main__ terminates the process immediately afterward.
+        try:
+            mtoaLoaded = cmds.pluginInfo('mtoa', q=True, loaded=True)
+        except RuntimeError:
+            mtoaLoaded = False
+        if mtoaLoaded:
+            return
+        super(TestIsolateSelectPerShape, cls).tearDownClass()
 
     def assertVisible(self, paths):
         for p in paths:
@@ -224,12 +229,12 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
 if __name__ == "__main__":
     # HYDRA-2237: Work around a pre-existing Maya crash during process exit
     # that is unrelated to what this test verifies (all results are fully
-    # reported by the runner before we terminate).  On Windows this is
-    # ufe_0.dll's static attrSubjects destructor crashing due to DLL unload
-    # ordering; on Linux/OSX the analogous static/shared-library teardown also
-    # crashes on some USD versions (e.g. USD 24.11).  We therefore report
-    # results and then force-terminate the process, skipping the crash-prone
-    # teardown entirely.
+    # reported by the runner before we terminate).  On Windows this is the
+    # UFE shared library's static attrSubjects destructor crashing due to DLL
+    # unload ordering; on Linux/OSX the analogous static/shared-library
+    # teardown also crashes on some USD versions (e.g. USD 24.11).  We
+    # therefore report results and then force-terminate the process, skipping
+    # the crash-prone teardown entirely.
     import os, sys, platform, unittest
     suite = fixturesUtils.loadTestsFromDict(globals())
     runner = unittest.TextTestRunner(stream=sys.__stderr__, verbosity=1)
@@ -237,11 +242,10 @@ if __name__ == "__main__":
     exitCode = 0 if results.wasSuccessful() else 1
 
     # os._exit / TerminateProcess do not flush buffered output, so flush first.
-    for stream in (sys.stdout, sys.stderr, sys.__stdout__, sys.__stderr__):
-        try:
-            stream.flush()
-        except Exception:
-            pass
+    sys.stdout.flush()
+    sys.stderr.flush()
+    sys.__stdout__.flush()
+    sys.__stderr__.flush()
 
     if platform.system() == "Windows":
         # os._exit still triggers DllMain(DLL_PROCESS_DETACH) on Windows, so we
