@@ -32,6 +32,9 @@ import tempfile
 from pathlib import Path
 
 
+DEFAULT_RENDERED_IMAGE_SUBDIR = "projects/default/images"
+
+
 def _validate_executable(label, raw_path):
     """Return a resolved absolute Path for an executable supplied on argv.
 
@@ -185,16 +188,16 @@ def _compare_images(idiff, fail, failpercent, expected_dir, output_dir):
     return success
 
 
-def _prepare_output_dir(work_dir):
-    output_dir = Path(work_dir) / "images"
+def _prepare_output_dir(base_dir, rendered_subdir):
+    output_dir = Path(base_dir) / rendered_subdir
     if output_dir.exists():
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     return output_dir
 
 
-def _find_output_dir(work_dir):
-    output_dir = Path(work_dir) / "images"
+def _find_output_dir(base_dir, rendered_subdir):
+    output_dir = Path(base_dir) / rendered_subdir
     return output_dir
 
 
@@ -202,7 +205,8 @@ def main(argv):
     if len(argv) < 8:
         print(
             "Usage: renderSettingsMultiImageTest.py <RenderExe> <Renderer> "
-            "<ScenePath> <ExpectedImagesDir> <IdiffPath> <Fail> <FailPercent> [RendererArgs]",
+            "<ScenePath> <ExpectedImagesDir> <IdiffPath> <Fail> <FailPercent> "
+            "[RenderedImageSubdir] [RendererArgs]",
             file=sys.stderr,
         )
         return 1
@@ -218,19 +222,20 @@ def main(argv):
     idiff        = _validate_executable("idiff executable", argv[5])
     fail         = _validate_float("fail threshold", argv[6])
     failpercent  = _validate_float("failpercent threshold", argv[7])
-    extra_renderer_args = argv[8] if len(argv) > 8 else None
+    rendered_subdir = argv[8] if len(argv) > 8 and argv[8] else DEFAULT_RENDERED_IMAGE_SUBDIR
+    extra_renderer_args = argv[9] if len(argv) > 9 else None
 
     base_dir = Path(os.environ.get("MAYA_APP_DIR") or tempfile.gettempdir())
     work_dir = base_dir / "projects" / "default"
     work_dir.mkdir(parents=True, exist_ok=True)
 
     scene_copy = _copy_scene_and_usd(scene_path, work_dir)
-    _prepare_output_dir(work_dir)
+    _prepare_output_dir(base_dir, rendered_subdir)
 
     if not _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args):
         return 1
 
-    output_dir = _find_output_dir(work_dir)
+    output_dir = _find_output_dir(base_dir, rendered_subdir)
     if not output_dir.exists():
         print(f"Output Images directory not found: {output_dir}", file=sys.stderr)
         return 1
