@@ -402,10 +402,9 @@ void MayaHydraDagAdapter::DirtyVisibilityRelatedPlug(MayaHydraDagAdapter* adapte
     MayaHydra::DirtyNotifier notifier(adapter);
     if (coDirtyTransform && adapter->IsVisible(false)) {
         adapter->InvalidateTransform();
-        notifier.dirtyVisibility().dirtyTransform();
-    } else {
-        notifier.dirtyVisibility();
+        notifier.dirtyTransform();
     }
+    notifier.dirtyVisibility();
     notifier.flush();
 }
 

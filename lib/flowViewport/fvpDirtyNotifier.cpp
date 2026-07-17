@@ -53,13 +53,7 @@ DirtyNotifier::DirtyNotifier(HdRetainedSceneIndex& sceneIndex, const SdfPath& pr
 
 DirtyNotifier::~DirtyNotifier()
 {
-    if (!_locators.IsEmpty()) {
-        TF_CODING_ERROR(
-            "DirtyNotifier for prim (%s) destroyed with pending dirty locators; "
-            "flush() was never called.",
-            _primPath.GetText());
-        flush();
-    }
+    flush();
 }
 
 void DirtyNotifier::flush()
