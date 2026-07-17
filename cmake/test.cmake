@@ -66,7 +66,7 @@ endfunction()
 function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
     cmake_parse_arguments(ARG
         ""                                       # No boolean options.
-        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;IMAGE_EXTENSION;FAIL;FAILPERCENT;EXPECTED_IMAGES_DIR;TEST_NAME_SUFFIX;RENDERER_ARGS"
+        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;IMAGE_EXTENSION;FAIL;FAILPERCENT;EXPECTED_IMAGES_DIR;TEST_NAME_SUFFIX;RENDERER_ARGS;RENDERED_IMAGE_SUBDIR"
         "ENV"
         ${ARGN}
     )
@@ -107,6 +107,11 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
         set(FAILPERCENT "${ARG_FAILPERCENT}")
     endif()
 
+    set(RENDERED_IMAGE_SUBDIR "projects/default/images")
+    if(ARG_RENDERED_IMAGE_SUBDIR)
+        set(RENDERED_IMAGE_SUBDIR "${ARG_RENDERED_IMAGE_SUBDIR}")
+    endif()
+
     set(SCENE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/scenes)
     set(SCENE_PATH ${SCENE_DIR}/${SCENE_FILE})
 
@@ -138,6 +143,7 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
                 ${IDIFF_CMD}
                 ${FAIL}
                 ${FAILPERCENT}
+                ${RENDERED_IMAGE_SUBDIR}
                 ${ARG_RENDERER_ARGS}
     )
 
