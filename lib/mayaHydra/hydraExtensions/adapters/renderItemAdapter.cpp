@@ -655,8 +655,6 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         default: break;
         }
     }
-
-    notifier.flush();
 }
 
 HdMeshTopology MayaHydraRenderItemAdapter::GetMeshTopology()
@@ -766,9 +764,7 @@ void MayaHydraRenderItemAdapter::SetPlaybackState(bool isPlaybackRunning)
     if (_isInPlayback != isPlaybackRunning) {
         _isInPlayback = isPlaybackRunning;
         if (_isHideOnPlayback) {
-            MayaHydra::DirtyNotifier notifier(this);
-            notifier.dirtyVisibility();
-            notifier.flush();
+            MayaHydra::DirtyNotifier(this).dirtyVisibility();
         }
     }
 }

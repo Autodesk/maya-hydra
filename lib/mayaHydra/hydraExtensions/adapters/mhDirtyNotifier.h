@@ -28,7 +28,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 class MayaHydraAdapter;
-class HdRetainedSceneIndex;
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -47,7 +46,9 @@ namespace MAYAHYDRA_NS_DEF {
 ///
 ///   Fvp::DirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID());
 ///
-/// All Fvp::DirtyNotifier dirty*() methods and flush() are inherited unchanged.
+/// All Fvp::DirtyNotifier dirty*() methods are inherited unchanged; pending locators
+/// are flushed automatically on destruction. Call flush() explicitly only when dirty
+/// notifications must be sent before the notifier goes out of scope.
 ///
 /// dirtyUVs() and dirtyTangents() are Maya-specific and live here (rather than
 /// in Fvp::DirtyNotifier) so that flowViewport does not embed Maya primvar name
@@ -58,10 +59,9 @@ public:
     MAYAHYDRALIB_API
     explicit DirtyNotifier(PXR_NS::MayaHydraAdapter* adapter);
 
-    /// Same as Fvp::DirtyNotifier(sceneIndex, primPath); exposes MayaHydra dirty*()
-    /// helpers (e.g. dirtyUVs) without an adapter pointer (unit tests, harnesses).
-    MAYAHYDRALIB_API
-    DirtyNotifier(PXR_NS::HdRetainedSceneIndex& sceneIndex, const PXR_NS::SdfPath& primPath);
+    /// Inherits Fvp::DirtyNotifier(sceneIndex, primPath) for unit tests and harnesses
+    /// that exercise MayaHydra dirty*() helpers (e.g. dirtyUVs) without an adapter.
+    using Fvp::DirtyNotifier::DirtyNotifier;
 
     /// Invalidates the UV primvar (primvars/st).
     MAYAHYDRALIB_API DirtyNotifier& dirtyUVs();

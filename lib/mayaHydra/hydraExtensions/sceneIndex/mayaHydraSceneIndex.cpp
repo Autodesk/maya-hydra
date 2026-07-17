@@ -940,18 +940,14 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
         _MapAdapter<MayaHydraRenderItemAdapter>(
             [](MayaHydraRenderItemAdapter* a) {
                 if (a->HasType(HdPrimTypeTokens->mesh)) {
-                    MayaHydra::DirtyNotifier notifier(a);
-                    notifier.dirtyMeshTopology();
-                    notifier.flush();
+                    MayaHydra::DirtyNotifier(a).dirtyMeshTopology();
                 }
             },
             _renderItemsAdapters);
         _MapAdapter<MayaHydraDagAdapter>(
             [](MayaHydraDagAdapter* a) {
                 if (a->HasType(HdPrimTypeTokens->mesh)) {
-                    MayaHydra::DirtyNotifier notifier(a);
-                    notifier.dirtyMeshTopology();
-                    notifier.flush();
+                    MayaHydra::DirtyNotifier(a).dirtyMeshTopology();
                 }
             },
             _shapeAdapters);
@@ -963,28 +959,25 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
                 if (a->HasType(HdPrimTypeTokens->mesh) || a->HasType(HdPrimTypeTokens->basisCurves)
                     || a->HasType(HdPrimTypeTokens->points)) {
                     a->InvalidateTransform();
-                    MayaHydra::DirtyNotifier notifier(a);
-                    notifier.dirtyPoints().dirtyTransform();
-                    notifier.flush();
+                    MayaHydra::DirtyNotifier(a).dirtyPoints().dirtyTransform();
                 }
             },
             _renderItemsAdapters);
         _MapAdapter<MayaHydraDagAdapter>(
             [](MayaHydraDagAdapter* a) {
                 a->InvalidateTransform();
-                MayaHydra::DirtyNotifier notifier(a);
-                if (a->HasType(HdPrimTypeTokens->mesh)) {
-                    notifier.dirtyPoints();
-                } else if (a->HasType(HdPrimTypeTokens->camera)) {
-                    notifier.dirtyCameraParams();
+                {
+                    MayaHydra::DirtyNotifier notifier(a);
+                    if (a->HasType(HdPrimTypeTokens->mesh)) {
+                        notifier.dirtyPoints();
+                    } else if (a->HasType(HdPrimTypeTokens->camera)) {
+                        notifier.dirtyCameraParams();
+                    }
+                    notifier.dirtyTransform();
                 }
-                notifier.dirtyTransform();
-                notifier.flush();
                 if (a->IsInstanced()) {
-                    Fvp::DirtyNotifier instNotifier(
-                        *a->GetMayaHydraSceneIndex(), a->GetInstancerID());
-                    instNotifier.dirtyTransform();
-                    instNotifier.flush();
+                    Fvp::DirtyNotifier(*a->GetMayaHydraSceneIndex(), a->GetInstancerID())
+                        .dirtyTransform();
                 }
             },
             _shapeAdapters,
@@ -996,18 +989,14 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
     if (oldParams.textureMemoryPerTexture != params.textureMemoryPerTexture) {
         _MapAdapter<MayaHydraMaterialAdapter>(
             [](MayaHydraMaterialAdapter* a) {
-                MayaHydra::DirtyNotifier notifier(a);
-                notifier.dirtyMaterial();
-                notifier.flush();
+                MayaHydra::DirtyNotifier(a).dirtyMaterial();
             },
             _materialAdapters);
     }
     if (oldParams.maximumShadowMapResolution != params.maximumShadowMapResolution) {
         _MapAdapter<MayaHydraLightAdapter>(
             [](MayaHydraLightAdapter* a) {
-                MayaHydra::DirtyNotifier notifier(a);
-                notifier.dirtyLightParams();
-                notifier.flush();
+                MayaHydra::DirtyNotifier(a).dirtyLightParams();
             },
             _lightAdapters);
     }
@@ -1324,9 +1313,7 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
         for (const auto& rprimId : renderIndex->GetRprimIds()) {
             const auto* rprim = renderIndex->GetRprim(rprimId);
             if (rprim != nullptr && rprim->GetMaterialId() == id) {
-                Fvp::DirtyNotifier notifier(*this, rprimId);
-                notifier.dirtyMaterialBinding();
-                notifier.flush();
+                Fvp::DirtyNotifier(*this, rprimId).dirtyMaterialBinding();
             }
         }
         if (MObjectHandle(obj).isValid()) {
@@ -1735,15 +1722,11 @@ void MayaHydraSceneIndex::AddNewInstance(const MDagPath& dag)
     // path) and dirty instancer topology / instance primvars.
     RebuildAdapterOnIdle(id, MayaHydraSceneIndex::RebuildFlagCallbacks);
     {
-        Fvp::DirtyNotifier notifier(*this, masterAdapter->GetID());
-        notifier.dirtyInstancer().dirtyPrimvars();
-        notifier.flush();
+        Fvp::DirtyNotifier(*this, masterAdapter->GetID()).dirtyInstancer().dirtyPrimvars();
     }
     const SdfPath instancerId = masterAdapter->GetInstancerID();
     if (!instancerId.IsEmpty()) {
-        Fvp::DirtyNotifier instNotifier(*this, instancerId);
-        instNotifier.dirtyInstancer().dirtyPrimvars();
-        instNotifier.flush();
+        Fvp::DirtyNotifier(*this, instancerId).dirtyInstancer().dirtyPrimvars();
     }
 }
 
@@ -1787,9 +1770,7 @@ void MayaHydraSceneIndex::UpdateLightsShadowCollection()
     if (_renderCollectionChanged && _shadowsEnabled) {
         _MapAdapter<MayaHydraLightAdapter>(
             [](MayaHydraLightAdapter* a) {
-                MayaHydra::DirtyNotifier notifier(a);
-                notifier.dirtyCollections();
-                notifier.flush();
+                MayaHydra::DirtyNotifier(a).dirtyCollections();
             },
             _lightAdapters);
     }

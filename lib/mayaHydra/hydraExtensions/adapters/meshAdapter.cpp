@@ -657,7 +657,6 @@ private:
             MayaHydra::DirtyNotifier notifier(adapter);
             adapter->DirtyInMeshOrPnts(
                 notifier, MayaHydraSceneIndex::useMayaNormals());
-            notifier.flush();
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_MESH_PLUG_DIRTY)
                 .Msg(
                     "Marking prim dirty because %s plug was dirtied.\n",
@@ -673,7 +672,6 @@ private:
                 }
                 MayaHydra::DirtyNotifier notifier(adapter);
                 it.second(notifier);
-                notifier.flush();
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_MESH_PLUG_DIRTY)
                     .Msg(
                         "Marking prim dirty because %s plug was dirtied.\n",
@@ -706,9 +704,7 @@ private:
         TF_UNUSED(otherPlug);
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
         if (plug == MayaAttrs::mesh::instObjGroups) {
-            MayaHydra::DirtyNotifier notifier(adapter);
-            notifier.dirtyMaterialBinding();
-            notifier.flush();
+            MayaHydra::DirtyNotifier(adapter).dirtyMaterialBinding();
         } else {
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_MESH_UNHANDLED_PLUG_DIRTY)
                 .Msg(
@@ -744,9 +740,7 @@ private:
         void*                     clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
-        MayaHydra::DirtyNotifier notifier(adapter);
-        notifier.dirtyUVs(); // granular - only the UV set changed
-        notifier.flush();
+        MayaHydra::DirtyNotifier(adapter).dirtyUVs(); // granular - only the UV set changed
     }
 
     // Maya has a bug with removing some MPolyMessage callbacks. Known

@@ -62,9 +62,7 @@ static void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)
     if (MayaHydraAdapter::IsParamAttribute(
             topPlug,
             MayaHydraAdapter::GetParamAttributeSet(kCameraParamAttributeNames))) {
-        MayaHydra::DirtyNotifier notifier(adapter);
-        notifier.dirtyCameraParams().dirtyPrimvars();
-        notifier.flush();
+        MayaHydra::DirtyNotifier(adapter).dirtyCameraParams().dirtyPrimvars();
     } else {
         adapter->MaybeMarkPrimvarDirtyForAttributeChange(topPlug);
     }
@@ -94,9 +92,7 @@ static void _cameraAttributeChanged(
         // dirtyPrimvars() is intentional: cameras are sprims but support extension-attribute
         // primvars (custom Maya attrs translated as constant primvars). The broad primvars
         // locator ensures those are re-pulled alongside the camera schema.
-        MayaHydra::DirtyNotifier notifier(adapter);
-        notifier.dirtyCameraParams().dirtyPrimvars();
-        notifier.flush();
+        MayaHydra::DirtyNotifier(adapter).dirtyCameraParams().dirtyPrimvars();
         return;
     }
     if (!adapter->ShouldMarkPrimvarDirtyForAttributeChange(topPlug)) {
@@ -171,9 +167,7 @@ void MayaHydraCameraAdapter::CreateCallbacks()
         +[](MObject& transformNode, MDagMessage::MatrixModifiedFlags& modified, void* clientData) {
             auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
             adapter->InvalidateTransform();
-            MayaHydra::DirtyNotifier notifier(adapter);
-            notifier.dirtyTransform();
-            notifier.flush();
+            MayaHydra::DirtyNotifier(adapter).dirtyTransform();
         },
         reinterpret_cast<void*>(this),
         &status);

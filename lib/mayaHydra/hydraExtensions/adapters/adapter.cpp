@@ -282,7 +282,6 @@ void MayaHydraAdapter::MarkPrimvarDirtyForAttributeChange(const MPlug& plug)
         notifier.dirtyPrimvars();
         _maybeDirtyExtComputationPrimvars(*this, notifier);
         AddExtraDirtyForPrimvarAttributeChange(notifier, plug);
-        notifier.flush();
         return;
     }
     MFnAttribute fnAttr(attrObj);
@@ -296,7 +295,6 @@ void MayaHydraAdapter::MarkPrimvarDirtyForAttributeChange(const MPlug& plug)
         notifier.dirtyPrimvars();
         _maybeDirtyExtComputationPrimvars(*this, notifier);
         AddExtraDirtyForPrimvarAttributeChange(notifier, plug);
-        notifier.flush();
     }
 }
 

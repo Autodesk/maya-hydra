@@ -89,9 +89,7 @@ void _AttributeChangedCallback(
     if (attr == MayaAttrs::imagePlane::imageName
         || attr == MayaAttrs::imagePlane::useFrameExtension
         || attr == MayaAttrs::imagePlane::frameExtension) {
-        MayaHydra::DirtyNotifier notifier(adapter);
-        notifier.dirtyMaterial();
-        notifier.flush();
+        MayaHydra::DirtyNotifier(adapter).dirtyMaterial();
     }
 
     if (attr == MayaAttrs::imagePlane::useFrameExtension) {
@@ -108,9 +106,7 @@ void _AttributeChangedCallback(
 void _TimeChangedCallback(void* clientData)
 {
     auto* adapter = reinterpret_cast<MayaHydraImagePlaneMaterialAdapter*>(clientData);
-    MayaHydra::DirtyNotifier notifier(adapter);
-    notifier.dirtyMaterial();
-    notifier.flush();
+    MayaHydra::DirtyNotifier(adapter).dirtyMaterial();
 }
 
 } // anonymous namespace

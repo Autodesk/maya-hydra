@@ -17,18 +17,12 @@
 #include <mayaHydraLib/adapters/tokens.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
-#include <pxr/imaging/hd/retainedSceneIndex.h>
-
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
 
 DirtyNotifier::DirtyNotifier(PXR_NS::MayaHydraAdapter* adapter)
     : Fvp::DirtyNotifier(*adapter->GetMayaHydraSceneIndex(), adapter->GetID())
-{}
-
-DirtyNotifier::DirtyNotifier(HdRetainedSceneIndex& sceneIndex, const SdfPath& primPath)
-    : Fvp::DirtyNotifier(sceneIndex, primPath)
 {}
 
 DirtyNotifier& DirtyNotifier::dirtyUVs()

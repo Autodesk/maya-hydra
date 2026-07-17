@@ -79,16 +79,13 @@ void _DirtyInstancerPlugs(MayaHydraDagAdapter* adapter)
 {
     // Dirty the rprim: its instance index and the instanceTransform primvar changed.
     {
-        MayaHydra::DirtyNotifier notifier(adapter);
-        notifier.dirtyInstancer().dirtyPrimvars();
-        notifier.flush();
+        MayaHydra::DirtyNotifier(adapter).dirtyInstancer().dirtyPrimvars();
     }
     // Dirty the instancer prim itself: topology and primvars (instanceTransform) changed.
     const SdfPath instancerId = adapter->GetInstancerID();
     if (!instancerId.IsEmpty()) {
         Fvp::DirtyNotifier notifier(*adapter->GetMayaHydraSceneIndex(), instancerId);
         notifier.dirtyInstancer().dirtyPrimvars();
-        notifier.flush();
     }
 }
 
@@ -405,7 +402,6 @@ void MayaHydraDagAdapter::DirtyVisibilityRelatedPlug(MayaHydraDagAdapter* adapte
         notifier.dirtyTransform();
     }
     notifier.dirtyVisibility();
-    notifier.flush();
 }
 
 void MayaHydraDagAdapter::DirtyTransformIfVisible(MayaHydraDagAdapter* adapter)
@@ -414,9 +410,7 @@ void MayaHydraDagAdapter::DirtyTransformIfVisible(MayaHydraDagAdapter* adapter)
         return;
     }
     adapter->InvalidateTransform();
-    MayaHydra::DirtyNotifier notifier(adapter);
-    notifier.dirtyTransform();
-    notifier.flush();
+    MayaHydra::DirtyNotifier(adapter).dirtyTransform();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

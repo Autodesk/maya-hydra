@@ -141,9 +141,7 @@ void MayaHydraMaterialAdapter::EnableXRayShadingMode(bool enable)
 {
     _enableXRayShadingMode = enable;
     if (_isPopulated) {
-        MayaHydra::DirtyNotifier notifier(this);
-        notifier.dirtyMaterial();
-        notifier.flush();
+        MayaHydra::DirtyNotifier(this).dirtyMaterial();
     }
 }
 
@@ -239,9 +237,7 @@ private:
         }
         adapter->_CreateSurfaceMaterialCallback();
         {
-            MayaHydra::DirtyNotifier notifier(adapter);
-            notifier.dirtyMaterial();
-            notifier.flush();
+            MayaHydra::DirtyNotifier(adapter).dirtyMaterial();
         }
     }
     static void _ShaderAttributeChangedCallback(
@@ -261,9 +257,7 @@ private:
             return;
         }
         {
-            MayaHydra::DirtyNotifier notifier(adapter);
-            notifier.dirtyMaterial();
-            notifier.flush();
+            MayaHydra::DirtyNotifier(adapter).dirtyMaterial();
         }
         if (adapter->GetMayaHydraSceneIndex()->IsHdSt()) {
             adapter->GetMayaHydraSceneIndex()->MaterialTagChanged(adapter->GetID());

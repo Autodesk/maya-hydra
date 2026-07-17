@@ -14,8 +14,8 @@
 //
 // DirtyNotifier accumulates targeted HdDataSourceLocator dirty sets for one prim,
 // replacing the legacy HdDirtyBits -> HdDirtyBitsTranslator path. Callers chain
-// semantic dirty*() methods. Call flush() explicitly; the destructor auto-flushes any
-// remaining locators and emits TF_CODING_ERROR when it does (debug builds).
+// semantic dirty*() methods; pending locators are flushed automatically on destruction.
+// flush() remains available for early emission and is idempotent.
 //
 #ifndef FVP_DIRTY_NOTIFIER_H
 #define FVP_DIRTY_NOTIFIER_H
@@ -41,9 +41,9 @@ namespace FVP_NS_DEF {
 /// DirtyNotifier replaces the opaque HdDirtyBits -> HdDirtyBitsTranslator path
 /// with direct, targeted HdDataSourceLocatorSet emission. Each named dirty*()
 /// method appends the appropriate locator(s) to an internal, auto-deduplicating
-/// HdDataSourceLocatorSet and returns *this for chaining. Call flush() to send pending
-/// locators; if the notifier is destroyed with pending locators, TF_CODING_ERROR is
-/// emitted (debug builds) and they are flushed automatically.
+/// HdDataSourceLocatorSet and returns *this for chaining. Pending locators are flushed
+/// automatically when the notifier is destroyed (RAII). Call flush() explicitly only
+/// when dirty notifications must be sent before the notifier goes out of scope.
 ///
 /// The API is intentionally GRANULAR: prefer the specific per-primvar locator so
 /// the render delegate only re-pulls what actually changed. The broad
@@ -55,7 +55,8 @@ namespace FVP_NS_DEF {
 /// Policy for topology vs deformation (which locators to emit, and how render
 /// delegates should interpret them): doc/render_delegate_topology_vs_deformation.md
 ///
-/// Call flush() explicitly at the call site; do not rely on the destructor.
+/// Typical usage is a single chained expression at end of scope; explicit flush() is
+/// optional and harmless if called twice.
 ///
 /// \note The constructor takes HdRetainedSceneIndex& rather than HdSceneIndexBase&.
 /// This is intentional: flush() calls DirtyPrims(), which is the public mutation API
@@ -70,9 +71,8 @@ namespace FVP_NS_DEF {
 class DirtyNotifier
 {
 public:
-    /// \p sceneIndex must remain valid until flush() has been called for every
-    /// accumulated dirty set (or until this notifier is destroyed with no pending
-    /// locators).
+    /// \p sceneIndex must remain valid until pending locators have been flushed
+    /// (explicitly or when this notifier is destroyed).
     FVP_API
     DirtyNotifier(PXR_NS::HdRetainedSceneIndex& sceneIndex, const PXR_NS::SdfPath& primPath);
 

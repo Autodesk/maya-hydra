@@ -195,7 +195,6 @@ private:
         MayaHydra::DirtyNotifier notifier(adapter);
         Fvp::DirtyNotifier::DirtyRprimConnectivityLocators(
             notifier, HdPrimTypeTokens->basisCurves);
-        notifier.flush();
     }
 
     static void NodeDirtiedCallback(MObject& node, MPlug& plug, void* clientData)
@@ -208,7 +207,6 @@ private:
                 }
                 MayaHydra::DirtyNotifier notifier(adapter);
                 it.second(notifier);
-                notifier.flush();
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_CURVE_PLUG_DIRTY)
                     .Msg(
                         "Marking prim dirty because %s plug was dirtied.\n",
@@ -234,9 +232,7 @@ private:
     {
         auto* adapter = reinterpret_cast<MayaHydraNurbsCurveAdapter*>(clientData);
         if (plug == MayaAttrs::dagNode::instObjGroups) {
-            MayaHydra::DirtyNotifier notifier(adapter);
-            notifier.dirtyMaterialBinding();
-            notifier.flush();
+            MayaHydra::DirtyNotifier(adapter).dirtyMaterialBinding();
         } else {
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_CURVE_UNHANDLED_PLUG_DIRTY)
                 .Msg(

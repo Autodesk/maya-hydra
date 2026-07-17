@@ -59,7 +59,7 @@ namespace {
 const SdfPath kTestPrimPath("/dirtyNotifierTestPrim");
 
 // Apply a set of dirty*() calls to a fresh notifier and return the accumulated
-// locator set. Flushes afterwards so the explicit-flush contract is honored.
+// locator set (read before the notifier is destroyed and auto-flushes).
 HdDataSourceLocatorSet
 NotifierLocators(const std::function<void(Fvp::DirtyNotifier&)>& applyDirty)
 {
@@ -69,7 +69,6 @@ NotifierLocators(const std::function<void(Fvp::DirtyNotifier&)>& applyDirty)
         Fvp::DirtyNotifier notifier(*sceneIndex, kTestPrimPath);
         applyDirty(notifier);
         result = notifier.GetLocators();
-        notifier.flush();
     }
     return result;
 }
@@ -83,7 +82,6 @@ MhNotifierLocators(const std::function<void(MayaHydra::DirtyNotifier&)>& applyDi
         MayaHydra::DirtyNotifier notifier(*sceneIndex, kTestPrimPath);
         applyDirty(notifier);
         result = notifier.GetLocators();
-        notifier.flush();
     }
     return result;
 }
@@ -469,6 +467,19 @@ TEST(DirtyNotifier, flushClearsPendingLocators)
     EXPECT_TRUE(notifier.IsEmpty());
     // Second flush is a no-op and must not re-error.
     notifier.flush();
+    EXPECT_TRUE(notifier.IsEmpty());
+}
+
+TEST(DirtyNotifier, destructorAutoFlushesPendingLocators)
+{
+    HdRetainedSceneIndexRefPtr sceneIndex = HdRetainedSceneIndex::New();
+    {
+        Fvp::DirtyNotifier notifier(*sceneIndex, kTestPrimPath);
+        notifier.dirtyTransform();
+        EXPECT_FALSE(notifier.IsEmpty());
+    }
+    // DirtyPrims was sent on destruction; a fresh notifier for the same prim starts empty.
+    Fvp::DirtyNotifier notifier(*sceneIndex, kTestPrimPath);
     EXPECT_TRUE(notifier.IsEmpty());
 }
 

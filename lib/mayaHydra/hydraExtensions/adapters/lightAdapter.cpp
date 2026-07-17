@@ -107,9 +107,11 @@ void _dirtyBuiltInLightParams(MayaHydraLightAdapter* adapter)
     // locator ensures those are re-pulled alongside the light schema.
     // dirtyVisibility() and dirtyCollections() match HdDirtyBitsTranslator::SprimDirtyBitsToLocatorSet
     // for HdLight::DirtyParams.
-    MayaHydra::DirtyNotifier notifier(adapter);
-    notifier.dirtyLightParams().dirtyPrimvars().dirtyVisibility().dirtyCollections();
-    notifier.flush();
+    MayaHydra::DirtyNotifier(adapter)
+        .dirtyLightParams()
+        .dirtyPrimvars()
+        .dirtyVisibility()
+        .dirtyCollections();
 }
 
 void _dirtyTransform(MObject& node, void* clientData)
@@ -118,9 +120,7 @@ void _dirtyTransform(MObject& node, void* clientData)
     auto* adapter = reinterpret_cast<MayaHydraDagAdapter*>(clientData);
     if (adapter->IsVisible()) {
         adapter->InvalidateTransform();
-        MayaHydra::DirtyNotifier notifier(adapter);
-        notifier.dirtyTransform().dirtyLightParams();
-        notifier.flush();
+        MayaHydra::DirtyNotifier(adapter).dirtyTransform().dirtyLightParams();
     }
 }
 

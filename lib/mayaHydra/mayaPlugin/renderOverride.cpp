@@ -1311,9 +1311,7 @@ MStatus MtohRenderOverride::Render(
                         currentPass->params().renderParams.camera = cameraPath;
                     }
                     if (vpDirty) {
-                        Fvp::DirtyNotifier notifier(*_mayaHydraSceneIndex, cameraPath);
-                        notifier.dirtyCameraParams();
-                        notifier.flush();
+                        Fvp::DirtyNotifier(*_mayaHydraSceneIndex, cameraPath).dirtyCameraParams();
                     }
 #if PXR_VERSION >= 2605
                     if (_sceneGlobalsSceneIndex && !cameraPath.IsEmpty()) {
