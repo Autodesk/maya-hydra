@@ -11,13 +11,13 @@ Before building the project, consult the following table to ensure you use the r
 | Required | ![](images/windows.png) | ![](images/mac.png) | ![](images/linux.png) |
 |:-:|:-:|:-:|:-:|
 | Operating System | Windows 10 <br> Windows 11 | High Sierra (10.13)<br>Mojave (10.14)<br>Catalina (10.15)<br>Big Sur (11.2.x) | Rocky Linux 8.6 / Linux® Red Hat® Enterprise 8.6 WS |
-| Compiler Requirement| Maya 2026 (VS 2022)<br>Maya PR (VS 2022) | Maya 2026 (Xcode 13.4 or higher)<br>Maya PR (Xcode 13.4 or higher) | Maya 2026 (gcc 11.2.1)<br>Maya PR (gcc 11.2.1) |
+| Compiler Requirement| Maya 2026 (VS 2022)<br>Maya 2027 (VS 2022)<br>Maya PR (VS 2022) | Maya 2026 (Xcode 13.4 or higher)<br>Maya 2027 (Xcode 14.3 or higher)<br>Maya PR (Xcode 14.3 or higher) | Maya 2026 (gcc 11.2.1)<br>Maya 2027 (gcc 11.2.1)<br>Maya PR (gcc 11.2.1) |
 | CMake Version (min/max) | 3.21...3.30 | 3.21...3.30 | 3.21...3.30 |
-| Python | 3.11.4, 3.13.7 | 3.11.4, 3.13.7 | 3.11.4, 3.13.7 |
+| Python | 3.11.4, 3.13.9, 3.13.9 | 3.11.4, 3.13.9, 3.13.9 | 3.11.4, 3.13.9, 3.13.9 |
 | Python Packages | PyYAML, PySide, PyOpenGL | PyYAML, PySide2, PyOpenGL | PyYAML, PySide, PyOpenGL |
 | Build generator | Visual Studio, Ninja (Recommended) | XCode, Ninja (Recommended) | Ninja (Recommended) |
 | Command processor | x64 Native Tools Command Prompt for VS 2022 | bash | bash |
-| Supported Maya Version | 2026, PR | 2026, PR | 2026, PR |
+| Supported Maya Version | 2026, 2027, PR | 2026, 2027, PR | 2026, 2027, PR |
 
 >Note: While mayaHydra may compile with older versions of Maya than those listed above, they are not officially supported and functionality may break. For more details about building for older Maya versions, [see this document.](./legacyBuilds.md)
 
