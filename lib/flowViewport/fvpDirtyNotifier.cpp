@@ -45,6 +45,10 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
 
+// See beginDirtyBatch / commitDirtyBatch methods.
+static HdSceneIndexObserver::DirtiedPrimEntries _sPendingDirtyEntries;
+static TfWeakPtr<HdRetainedSceneIndex> _sBatchingSceneIndex = nullptr;
+
 DirtyNotifier::DirtyNotifier(HdRetainedSceneIndex& sceneIndex, const SdfPath& primPath)
     : _sceneIndex(TfCreateWeakPtr(&sceneIndex))
     , _primPath(primPath)
@@ -61,17 +65,34 @@ void DirtyNotifier::flush()
     if (_locators.IsEmpty()) {
         return;
     }
-    if (_sceneIndex) {
+
+    if (_sBatchingSceneIndex) {
+        _sPendingDirtyEntries.push_back({ _primPath, _locators });
+    } else if (_sceneIndex) {
         _sceneIndex->DirtyPrims({ { _primPath, _locators } });
-        _locators = HdDataSourceLocatorSet();
-        return;
+    } else {
+        TF_CODING_ERROR(
+            "DirtyNotifier for prim (%s): scene index no longer valid; "
+            "dropping pending dirty locators. The scene index passed to the "
+            "constructor must outlive this DirtyNotifier.",
+            _primPath.GetText());
     }
-    TF_CODING_ERROR(
-        "DirtyNotifier for prim (%s): scene index no longer valid; "
-        "dropping pending dirty locators. The scene index passed to the "
-        "constructor must outlive this DirtyNotifier.",
-        _primPath.GetText());
+
     _locators = HdDataSourceLocatorSet();
+}
+
+void DirtyNotifier::beginDirtyBatch(PXR_NS::HdRetainedSceneIndex& batchingSceneIndex)
+{
+    _sBatchingSceneIndex = TfCreateWeakPtr(&batchingSceneIndex);
+}
+
+void DirtyNotifier::commitDirtyBatch()
+{
+    if (_sBatchingSceneIndex) {
+        _sBatchingSceneIndex->DirtyPrims(_sPendingDirtyEntries);
+        _sBatchingSceneIndex = nullptr;
+        _sPendingDirtyEntries.clear();
+    }
 }
 
 DirtyNotifier& DirtyNotifier::_append(const HdDataSourceLocator& locator)

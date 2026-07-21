@@ -466,6 +466,9 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         }
     }
 
+    // Start batching DirtyPrims notifications produced per render item.
+    Fvp::DirtyNotifier::beginDirtyBatch(*this);
+
     // My version, does minimal update
     // This loop could, in theory, be parallelized.  Unclear how large the gains would be, but maybe
     // nothing to lose unless there is some internal contention in USD.
@@ -562,6 +565,8 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColor);
         ria->UpdateFromDelta(data);
     }
+
+    Fvp::DirtyNotifier::commitDirtyBatch();
 }
 
 void MayaHydraSceneIndex::Populate()

@@ -167,6 +167,10 @@ public:
     // ---- Instancer ----
     FVP_API DirtyNotifier& dirtyInstancer();     // instancedBy + instancerTopology
 
+    // Batching is used to coalesce multiple DirtyPrims notifications.
+    FVP_API static void beginDirtyBatch(PXR_NS::HdRetainedSceneIndex& batchingSceneIndex);
+    FVP_API static void commitDirtyBatch();
+
 private:
     DirtyNotifier& _append(const PXR_NS::HdDataSourceLocator& locator);
 
