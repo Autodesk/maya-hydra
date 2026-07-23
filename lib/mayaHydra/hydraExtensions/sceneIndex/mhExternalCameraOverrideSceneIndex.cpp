@@ -24,6 +24,9 @@
 #include <pxr/usdImaging/usdImaging/usdRenderProductSchema.h>
 #include <pxr/usdImaging/usdImaging/usdRenderSettingsSchema.h>
 
+#include <ufeExtensions/Global.h>
+#include <ufe/pathString.h>
+
 #include <algorithm>
 #include <string>
 
@@ -38,17 +41,44 @@ const TfToken kExternalCameraToken("adskUsd:externalCamera");
 // ExternalCameraResolvingSceneIndex.
 const SdfPath kExternalCameraPrefix("/__adskUsd__externalCamera");
 
+// Sentinel SdfPath component used to preserve UFE multi-segment paths (Maya
+// DAG path ',' USD path) when storing external camera paths in Hydra.
+const std::string kUfeSegmentSentinel("__ufeSegment__");
+
 // External camera paths are either through USD (already uses '/' as a
 // separator), or through Maya (uses '|' as a separator, converted to '/' for
-// SdfPath representation).  We also erase the UFE path segment ',' separator.
+// SdfPath representation).  We also replace the UFE path segment ',' separator with
+// kUfeSegmentSentinel followed by UFE runTimeId.
+// ex: |stage1|stageShape1,/camera1
+//  -> /__adskUsd__externalCamera/stage1/stageShape1/__ufeSegment__<runTimeId>/camera1
 SdfPath SanitizeExternalPath(const std::string& rawValue)
 {
-    std::string pathStr = rawValue;
+    std::string mayaPath = rawValue;
+    std::string extCamPath;
+    Ufe::Rtid   rtId;
 
-    std::replace(pathStr.begin(), pathStr.end(), '|', '/');
-    pathStr.erase(std::remove(pathStr.begin(), pathStr.end(), ','), pathStr.end());
+    const auto commaPos = rawValue.find(',');
+    if (commaPos != std::string::npos) {
+        Ufe::Path ufePath = Ufe::PathString::path(rawValue);
+        rtId = ufePath.getSegments()
+                   .back()
+                   .runTimeId(); // runTimeId() returns the last segment's runTimeId.
+        mayaPath = rawValue.substr(0, commaPos);
+        extCamPath = rawValue.substr(commaPos + 1);
+    }
 
-    return kExternalCameraPrefix.AppendPath(SdfPath(pathStr).MakeRelativePath(SdfPath::AbsoluteRootPath()));
+    std::replace(mayaPath.begin(), mayaPath.end(), '|', '/');
+
+    SdfPath sanitizedPath = SdfPath(mayaPath).MakeRelativePath(SdfPath::AbsoluteRootPath());
+    if (!extCamPath.empty()) {
+        const std::string sentinelAndRtId
+            = kUfeSegmentSentinel + std::to_string(static_cast<unsigned int>(rtId));
+        sanitizedPath = sanitizedPath.AppendChild(TfToken(sentinelAndRtId));
+        sanitizedPath = sanitizedPath.AppendPath(
+            SdfPath(extCamPath).MakeRelativePath(SdfPath::AbsoluteRootPath()));
+    }
+
+    return kExternalCameraPrefix.AppendPath(sanitizedPath);
 }
 
 } // anonymous namespace

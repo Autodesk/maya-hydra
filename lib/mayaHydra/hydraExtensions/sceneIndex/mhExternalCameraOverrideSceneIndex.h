@@ -39,8 +39,8 @@ typedef PXR_NS::TfRefPtr<const MhExternalCameraOverrideSceneIndex>
 /// A filtering scene index that overrides the camera data source on
 /// renderSettings and renderProduct prims when an adskUsd:externalCamera key
 /// is present in their namespacedSettings.  The external camera path is
-/// sanitized ('|' -> '/', ',' stripped) and prefixed with
-/// "/__adskUsd__externalCamera" before being written into the camera field.
+/// sanitized ('|' -> '/', ',' replaced with __ufeSegment__<runTimeId>) and prefixed
+/// with "/__adskUsd__externalCamera" before being written into the camera field.
 ///
 class MhExternalCameraOverrideSceneIndex
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
