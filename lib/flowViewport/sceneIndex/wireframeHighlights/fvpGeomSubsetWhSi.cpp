@@ -145,6 +145,12 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
     _SendPrimsDirtied(highlightEntries);
 }
 
+bool GeomSubsetWhSi::NeedsDirtyProcessing(
+    const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntry &entry) const
+{ 
+    return !_primPathsToSelections.empty(); 
+}
+
 void GeomSubsetWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)
 {
     HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(primPath);

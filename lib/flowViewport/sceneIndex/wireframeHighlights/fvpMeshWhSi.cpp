@@ -143,6 +143,12 @@ void MeshWhSi::ProcessDirtiedPrims(
     _SendPrimsDirtied(highlightEntries);
 }
 
+bool MeshWhSi::NeedsDirtyProcessing(
+    const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntry &entry) const
+{ 
+    return !_primPathsToSelections.empty(); 
+}
+
 void MeshWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)
 {
     if (isFullySelected) {
