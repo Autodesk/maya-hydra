@@ -329,7 +329,7 @@ void PassFilteringSceneIndex::_PrimsRemoved(
         // Remove the prim and its children from our filtered prims data 
         for (auto it = _filteredPrims.begin(); it != _filteredPrims.end();) {
             if ((*it).HasPrefix(removedEntry.primPath)) {
-                it = _filteredPrims.erase(it);
+                _filteredPrims.erase(it++); // safe for TfHashSet
             } else {
                 it++;
             }
