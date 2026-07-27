@@ -180,12 +180,18 @@ public:
 
     GfInterval GetCurrentTimeSamplingInterval() const;
 
-    /// Returns the non-owning render index pointer. Must be non-null while the scene index
-    /// is live; TF_VERIFY on violation. During _Destroy(), use HasRenderDelegate() instead.
+    /// True while _Destroy() is in progress. Reentrant Maya callbacks during teardown must
+    /// no-op (see ShouldSkipHydraUpdates()); this is expected, not an error.
+    bool IsTearingDown() const { return _isTearingDown; }
+
+    /// Returns the non-owning render index pointer. Must not be called while tearing down;
+    /// TF_VERIFY on violation. Callers that may run from Maya callbacks should guard with
+    /// ShouldSkipHydraUpdates() first.
     HdRenderIndex* GetRenderIndexPtr();
 
-    /// True when the render index exists and has an attached render delegate. Several
-    /// HdRenderIndex queries dereference _renderDelegate unconditionally.
+    /// True when the render index exists and has an attached render delegate. Returns false
+    /// during teardown (expected). Several HdRenderIndex queries dereference _renderDelegate
+    /// unconditionally.
     bool HasRenderDelegate() const;
 
     bool IsRprimTypeSupported(const TfToken& typeId) const;
@@ -195,7 +201,7 @@ public:
     HdResourceRegistrySharedPtr GetResourceRegistry() const;
 
     /// Requires an attached render delegate; TF_VERIFY on violation. Callers must guard with
-    /// ShouldSkipHydraUpdates() before calling (e.g. during file read or teardown).
+    /// ShouldSkipHydraUpdates() before calling (e.g. during file read or scene-index teardown).
     void RemoveInstancer(const SdfPath& id);
 
     SdfPath GetDelegateID(TfToken name);
@@ -318,6 +324,7 @@ private:
     MayaHydraParams _params;
 
     HdRenderIndex* _renderIndex = nullptr;
+    bool           _isTearingDown = false;
 
     // Adapters
     AdapterMap<MayaHydraLightAdapterPtr>                   _lightAdapters;

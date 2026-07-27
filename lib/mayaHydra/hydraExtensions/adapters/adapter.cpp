@@ -82,7 +82,8 @@ void _nameChanged(MObject& node, const MString& str, void* clientData)
 
 } // namespace
 
-/// Skip Hydra dirty notifications during file read or when the render index is unavailable.
+/// Skip Hydra dirty notifications during file read, scene-index teardown, or when the
+/// render delegate is unavailable.
 bool MayaHydraAdapter::ShouldSkipHydraUpdates(MayaHydraSceneIndex* sceneIndex)
 {
     // During file read, plugins (e.g. mtoa) may add extension attributes that fire
@@ -90,7 +91,10 @@ bool MayaHydraAdapter::ShouldSkipHydraUpdates(MayaHydraSceneIndex* sceneIndex)
     if (MFileIO::isOpeningFile()) {
         return true;
     }
-    return sceneIndex == nullptr || !sceneIndex->HasRenderDelegate();
+    if (sceneIndex == nullptr || sceneIndex->IsTearingDown()) {
+        return true;
+    }
+    return !sceneIndex->HasRenderDelegate();
 }
 
 // MayaHydraAdapter is the base class for all adapters. An adapter is used to translate from Maya
@@ -119,6 +123,9 @@ bool MayaHydraAdapter::IsRprimTypeSupportedForPrim() const
         return false;
     }
     if (!_isRprimResolved) {
+        if (ShouldSkipHydraUpdates(_mayaHydraSceneIndex)) {
+            return false;
+        }
         if (!TF_VERIFY(
                 _mayaHydraSceneIndex->HasRenderDelegate(),
                 "IsRprimTypeSupportedForPrim() called without a render delegate; callers must "

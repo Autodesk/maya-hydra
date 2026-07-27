@@ -21,6 +21,7 @@
 #include <mayaHydraLib/adapters/tokens.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#include <pxr/base/arch/hash.h>
 #include <pxr/base/gf/interval.h>
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/changeTracker.h>
@@ -40,7 +41,6 @@
 #include <maya/MPlug.h>
 #include <maya/MPolyMessage.h>
 
-#include <cstring>
 #include <functional>
 #include <string>
 #include <unordered_set>
@@ -79,16 +79,25 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
-// Snapshot of mesh connectivity + point positions used to distinguish UV-only inMesh/pnts
-// dirties (polyEditUV and similar) from true geometry edits. Maya often dirties inMesh for
-// UV coordinate changes without firing MPolyMessage::addUVSetChangedCallback.
+// Snapshot of mesh connectivity + a hash of point positions used to distinguish UV-only
+// inMesh/pnts dirties (polyEditUV and similar) from true geometry edits. Maya often dirties
+// inMesh for UV coordinate changes without firing MPolyMessage::addUVSetChangedCallback.
 struct MeshGeometryState
 {
-    int           numVertices = -1;
-    int           numPolygons = -1;
-    int           numFaceVertices = -1;
-    VtVec3fArray points;
-    bool          valid = false;
+    int      numVertices = -1;
+    int      numPolygons = -1;
+    int      numFaceVertices = -1;
+    uint64_t pointsHash = 0;
+    bool     valid = false;
+
+    static uint64_t HashPoints(const GfVec3f* rawPoints, int numVertices)
+    {
+        if (!rawPoints || numVertices <= 0) {
+            return 0;
+        }
+        return ArchHash64(reinterpret_cast<const char*>(rawPoints),
+                          static_cast<size_t>(numVertices) * sizeof(GfVec3f));
+    }
 
     static MeshGeometryState Capture(const MDagPath& dagPath)
     {
@@ -103,7 +112,7 @@ struct MeshGeometryState
         state.numFaceVertices = mesh.numFaceVertices();
         const auto* rawPoints = reinterpret_cast<const GfVec3f*>(mesh.getRawPoints(&status));
         if (status && rawPoints) {
-            state.points.assign(rawPoints, rawPoints + state.numVertices);
+            state.pointsHash = HashPoints(rawPoints, state.numVertices);
             state.valid = true;
         }
         return state;
@@ -127,10 +136,11 @@ struct MeshGeometryState
         if (!status || !rawPoints) {
             return false;
         }
-        if (points.size() != static_cast<size_t>(numVertices)) {
-            return false;
-        }
-        return std::memcmp(rawPoints, points.cdata(), points.size() * sizeof(GfVec3f)) == 0;
+        // O(n) in vertex count: scan point positions to distinguish UV-only inMesh/pnts dirties
+        // from true geometry edits once O(1) connectivity counts match. This runs only on those
+        // dirty notifications (not per frame or Hydra pull); treating every such dirty as a
+        // geometry change would typically cost more (points, extent, subdivision, mesh re-read).
+        return HashPoints(rawPoints, numVertices) == pointsHash;
     }
 };
 

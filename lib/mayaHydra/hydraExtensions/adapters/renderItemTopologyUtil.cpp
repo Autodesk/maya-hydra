@@ -102,6 +102,12 @@ bool RenderItemShouldEmitTopologyLocators(
     if (storedPositionCount != currentVertexCount) {
         return true;
     }
+    // Line strips have no index buffer; connectivity is fully determined by vertex count.
+    // storedPositionCount == currentVertexCount was already verified above, so real topology
+    // changes (point count) were handled there. The MAYA-134200 "topo+geom flags set but
+    // connectivity unchanged" case does not apply here the way it does for meshes (e.g. edge
+    // flip with same vertex count). RenderItemTopologyConnectivityChanged's kLineStrip branch
+    // would always return false on this path; it remains for direct callers / API completeness.
     if (primitive == MGeometry::Primitive::kLineStrip) {
         return false;
     }

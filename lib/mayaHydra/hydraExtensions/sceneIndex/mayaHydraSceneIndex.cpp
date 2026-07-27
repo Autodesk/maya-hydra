@@ -409,14 +409,14 @@ MayaHydraSceneIndex::~MayaHydraSceneIndex() { _Destroy(); }
 
 void MayaHydraSceneIndex::_Destroy()
 {
-    // Null the render index before any teardown below. All Maya callbacks fire on the
-    // main thread only, but removing one adapter's callbacks/prim here can synchronously
-    // re-enter another adapter that hasn't been torn down yet (e.g. node-deletion or
-    // file-read callbacks, same pattern as ShouldSkipHydraUpdates()). Nulling _renderIndex
-    // up front makes HasRenderDelegate() false for the rest of _Destroy(), so any such
-    // reentrant call becomes a no-op instead of touching a delegate that's already
-    // been Stop()ped.
-    _renderIndex = nullptr;
+    // All Maya callbacks fire on the main thread only (no render thread here), but
+    // _Destroy() removes adapters incrementally, so removing adapter N's callbacks can
+    // synchronously re-enter adapter M (not yet reached) — same-thread reentrancy, not a
+    // race. E.g. node-deletion during file close, or extension-attribute callbacks during
+    // file read (see ShouldSkipHydraUpdates()). Set _isTearingDown so reentrant callers
+    // no-op via ShouldSkipHydraUpdates()/IsTearingDown() instead of touching Hydra state
+    // mid-teardown. A null _renderIndex outside teardown remains a TF_VERIFY error.
+    _isTearingDown = true;
 
     for (auto callback : _callbacks) {
         MMessage::removeCallback(callback);
@@ -712,6 +712,10 @@ MayaHydraSceneIndex::LightDagPathMap MayaHydraSceneIndex::GetGlobalLightPaths() 
 
 void MayaHydraSceneIndex::FlushPendingUpdates()
 {
+    if (_isTearingDown) {
+        return;
+    }
+
     _renderCollectionChanged = false;
 
     if (!_materialTagsChanged.empty()) {
@@ -1066,6 +1070,10 @@ HdBasisCurvesTopology MayaHydraSceneIndex::GetBasisCurvesTopology(const SdfPath&
 
 void MayaHydraSceneIndex::RemoveAdapter(const SdfPath& id)
 {
+    if (_isTearingDown) {
+        return;
+    }
+
     if (!_RemoveAdapter<MayaHydraAdapter>(
             id,
             [](MayaHydraAdapter* a) {
@@ -1084,6 +1092,10 @@ void MayaHydraSceneIndex::RemoveAdapter(const SdfPath& id)
 
 void MayaHydraSceneIndex::RecreateAdapterOnIdle(const SdfPath& id, const MObject& obj)
 {
+    if (_isTearingDown) {
+        return;
+    }
+
     std::lock_guard<std::mutex> lock(_adaptersToRecreateMutex);
 
     // We expect this to be a small number of objects, so using a simple linear
@@ -1198,13 +1210,18 @@ GfInterval MayaHydraSceneIndex::GetCurrentTimeSamplingInterval() const
 
 HdRenderIndex* MayaHydraSceneIndex::GetRenderIndexPtr()
 {
-    TF_VERIFY(_renderIndex, "GetRenderIndexPtr() called after render index was cleared.");
+    TF_VERIFY(!_isTearingDown, "GetRenderIndexPtr() called while tearing down.");
+    TF_VERIFY(_renderIndex, "GetRenderIndexPtr() called with null render index.");
     return _renderIndex;
 }
 
 bool MayaHydraSceneIndex::HasRenderDelegate() const
 {
-    return _renderIndex && _renderIndex->GetRenderDelegate() != nullptr;
+    if (_isTearingDown) {
+        return false;
+    }
+    TF_VERIFY(_renderIndex, "HasRenderDelegate() called with null render index.");
+    return _renderIndex->GetRenderDelegate() != nullptr;
 }
 
 bool MayaHydraSceneIndex::IsRprimTypeSupported(const TfToken& typeId) const
@@ -1229,6 +1246,9 @@ HdResourceRegistrySharedPtr MayaHydraSceneIndex::GetResourceRegistry() const
 
 void MayaHydraSceneIndex::RemoveInstancer(const SdfPath& id)
 {
+    if (_isTearingDown) {
+        return;
+    }
     if (!TF_VERIFY(
             HasRenderDelegate(),
             "RemoveInstancer() called without a render delegate; callers must guard with "
@@ -1240,6 +1260,10 @@ void MayaHydraSceneIndex::RemoveInstancer(const SdfPath& id)
 
 void MayaHydraSceneIndex::RebuildAdapterOnIdle(const SdfPath& id, uint32_t flags)
 {
+    if (_isTearingDown) {
+        return;
+    }
+
     std::lock_guard<std::mutex> lock(_adaptersToRebuildMutex);
 
     // We expect this to be a small number of objects, so using a simple linear
@@ -1411,6 +1435,10 @@ MayaHydraCustomDagAdapterPtr MayaHydraSceneIndex::CreateCustomAdapter(const MDag
 
 void MayaHydraSceneIndex::OnDagNodeAdded(const MObject& obj)
 {
+    if (_isTearingDown) {
+        return;
+    }
+
     if (obj.isNull())
         return;
 

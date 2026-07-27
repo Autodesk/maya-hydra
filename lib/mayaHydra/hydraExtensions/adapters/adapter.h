@@ -229,7 +229,8 @@ public:
     virtual bool Illuminated() const { return false; }
 
 protected:
-    /// Skip Hydra dirty notifications during file read or when the render index is unavailable.
+    /// Skip Hydra dirty notifications during file read, scene-index teardown, or when the
+    /// render delegate is unavailable.
     static bool ShouldSkipHydraUpdates(MayaHydraSceneIndex* sceneIndex);
 
     SdfPath                  _id;
