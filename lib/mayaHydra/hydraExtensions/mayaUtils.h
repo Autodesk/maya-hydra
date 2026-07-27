@@ -24,8 +24,12 @@
 #include <maya/MPlug.h>
 
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace MAYAHYDRA_NS_DEF {
+
+inline constexpr std::string_view kUsdDefaultRenderSettingsNodeName = "UsdDefaultRenderSettings";
 
 // Names of color tables for indexed colors
 const std::string kActiveColorTableName = "active";
@@ -224,6 +228,33 @@ std::string GetDomeLightTexture(const MFnDependencyNode& lightNode);
  * @return true if the object is a dag path of the given type, false otherwise
  */
 bool IsDagPathOfGivenType(const MDagPath& dagPath, const MString& type);
+
+/**
+ * @brief Find the shading engine (kShadingEngine) connected to a DAG path.
+ *
+ * When shadingComp is non-null, only returns the shading engine whose component
+ * matches shadingComp (per-face shading). When shadingComp is null, returns the
+ * first shading engine found (whole-object assignment).
+ *
+ * @param[in] dagPath     The DAG path of the shape.
+ * @param[in] shadingComp Optional component for per-face shading matching.
+ *
+ * @return The shading engine MObject, or MObject::kNullObj if none is found.
+ */
+MAYAHYDRALIB_API
+MObject FindShadingEngine(const MDagPath& dagPath, const MObject& shadingComp = MObject::kNullObj);
+
+/// One entry per shading group connected to a DAG path.
+/// component is MObject::kNullObj for whole-object assignments.
+struct ShadingAssignment {
+    MObject component;
+    MObject shadingEngine;
+};
+
+/// Return all shading assignments for dagPath.
+/// Uses getConnectedSetsAndMembers so per-face assignments are included.
+MAYAHYDRALIB_API
+void GetAllShadingAssignments(const MDagPath& dagPath, std::vector<ShadingAssignment>& out);
 
 } // namespace MAYAHYDRA_NS_DEF
 

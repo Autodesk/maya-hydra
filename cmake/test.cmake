@@ -78,7 +78,7 @@ endfunction()
 function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
     cmake_parse_arguments(ARG
         ""                                       # No boolean options.
-        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;IMAGE_EXTENSION;FAIL;FAILPERCENT;EXPECTED_IMAGES_DIR;TEST_NAME_SUFFIX"
+        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;IMAGE_EXTENSION;FAIL;FAILPERCENT;EXPECTED_IMAGES_DIR;TEST_NAME_SUFFIX;RENDERER_ARGS;RENDERED_IMAGE_SUBDIR"
         "ENV"
         ${ARGN}
     )
@@ -119,6 +119,11 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
         set(FAILPERCENT "${ARG_FAILPERCENT}")
     endif()
 
+    set(RENDERED_IMAGE_SUBDIR "projects/default/images")
+    if(ARG_RENDERED_IMAGE_SUBDIR)
+        set(RENDERED_IMAGE_SUBDIR "${ARG_RENDERED_IMAGE_SUBDIR}")
+    endif()
+
     set(SCENE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/scenes)
     set(SCENE_PATH ${SCENE_DIR}/${SCENE_FILE})
 
@@ -150,6 +155,8 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
                 ${IDIFF_CMD}
                 ${FAIL}
                 ${FAILPERCENT}
+                ${RENDERED_IMAGE_SUBDIR}
+                ${ARG_RENDERER_ARGS}
     )
 
     _mayaHydra_setup_test_common_path_vars()
@@ -162,6 +169,9 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
     _mayaHydra_setup_test_plugins()
     list(APPEND MAYAHYDRA_VARNAME_MAYA_RENDER_DESC_PATH
          "${CMAKE_INSTALL_PREFIX}/renderDesc")
+
+    # Adjust PYTHONPATH to include the path to our Python modules
+    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/scripts")
 
     _mayaHydra_setup_test_USD_paths()
     _mayaHydra_setup_test_finalize_env("${test_name}")
@@ -405,19 +415,30 @@ function(_mayaHydra_setup_test_plugins)
             list(APPEND MAYAHYDRA_VARNAME_MAYA_MODULE_PATH
                  "${MTOA_LOCATION}")
         endif()
-        # Hydra Arnold render delegate plugin path. Try both layouts: newer Arnold
-        # uses usd/bundle/<version>, older uses usd/hydra/<version>. Version is USD
-        # without "." (e.g. 2511 for USD 0.25.11). Add only the path that contains
-        # plugInfo.json.
-        if(IS_WINDOWS AND DEFINED USD_VERSION)
+        # Unit tests like testArnoldCustomNodes.cpp rely on mtoa's USD plugins such as
+        # HdArnoldRendererPlugin and mtoaSIP to be registered so that maya-hydra can
+        # find them during startup.
+        set(_MTOA_PLUGIN_PATH "")
+        if(DEFINED PXR_VERSION)
+            set(_MTOA_USD_BUNDLE "${MTOA_LOCATION}/usd/bundle/${PXR_VERSION}")
+            if(EXISTS "${_MTOA_USD_BUNDLE}")
+                set(_MTOA_PLUGIN_PATH "${_MTOA_USD_BUNDLE}")
+            endif()
+        endif()
+        # Fallback for legacy layouts using USD_VERSION (e.g. usd/hydra/<version>).
+        if("${_MTOA_PLUGIN_PATH}" STREQUAL "" AND IS_WINDOWS AND DEFINED USD_VERSION)
             string(REGEX REPLACE "^0\\.([0-9]+)\\.([0-9]+)$" "\\1\\2" MTOA_USD_VERSION_HYDRA "${USD_VERSION}")
             set(MTOA_HYDRA_BUNDLE "${MTOA_LOCATION}/usd/bundle/${MTOA_USD_VERSION_HYDRA}")
             set(MTOA_HYDRA_LEGACY "${MTOA_LOCATION}/usd/hydra/${MTOA_USD_VERSION_HYDRA}")
             if(EXISTS "${MTOA_HYDRA_BUNDLE}/plugInfo.json")
-                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${MTOA_HYDRA_BUNDLE}")
+                set(_MTOA_PLUGIN_PATH "${MTOA_HYDRA_BUNDLE}")
             elseif(EXISTS "${MTOA_HYDRA_LEGACY}/plugInfo.json")
-                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${MTOA_HYDRA_LEGACY}")
+                set(_MTOA_PLUGIN_PATH "${MTOA_HYDRA_LEGACY}")
             endif()
+        endif()
+        if(NOT "${_MTOA_PLUGIN_PATH}" STREQUAL "")
+            list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                 "${_MTOA_PLUGIN_PATH}")
         endif()
     endif()
 
@@ -500,23 +521,23 @@ function(_mayaHydra_setup_test_plugins)
     # lookdevx
     if(DEFINED LOOKDEVX_LOCATION)
         list(APPEND MAYAHYDRA_VARNAME_PATH
-             "${LOOKDEVX_LOCATION}/bin")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/bin")
         list(APPEND MAYAHYDRA_VARNAME_PATH
-             "${LOOKDEVX_LOCATION}/plug-ins")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/plug-ins")
         list(APPEND MAYAHYDRA_VARNAME_MAYA_SCRIPT_PATH
-             "${LOOKDEVX_LOCATION}/scripts") #Contains some AE templates files
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/scripts") #Contains some AE templates files
         list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
-             "${LOOKDEVX_LOCATION}/scripts")#Contains some python scripts
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/scripts")#Contains some python scripts
         list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
-             "${LOOKDEVX_LOCATION}/python")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/python")
         list(APPEND MAYAHYDRA_VARNAME_MAYA_PLUG_IN_PATH
-             "${LOOKDEVX_LOCATION}/plug-ins")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/plug-ins")
         list(APPEND MAYAHYDRA_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
-             "${LOOKDEVX_LOCATION}/libraries-lookdevx")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/libraries-lookdevx")
         list(APPEND MAYAHYDRA_VARNAME_MATERIALX_SEARCH_PATH
-             "${LOOKDEVX_LOCATION}/libraries")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/libraries")
         list(APPEND MAYAHYDRA_VARNAME_MATERIALX_SEARCH_PATH
-             "${LOOKDEVX_LOCATION}/libraries-lookdevx")
+             "${LOOKDEVX_LOCATION}/plug-ins/lookdevx/libraries-lookdevx")
     endif()
 
     if(DEFINED BIFROST_LOCATION)
@@ -959,6 +980,7 @@ endfunction()
 #                           [RENDERED_IMAGE_SUBDIR <dir>]
 #                           [RENDERED_IMAGE_NAME <file_name>]
 #                           [RENDERER_ARGS <extra_args>]
+#                           [TEST_NAME_SUFFIX <suffix>]
 #                           [COPY_SCENE]
 #                           [ENV <varname>=<varvalue> ...])
 #
@@ -979,6 +1001,7 @@ endfunction()
 #   RENDERED_IMAGE_NAME - Rendered image file name (default test name)
 #   RENDERER_ARGS      - Additional command line arguments to pass to the
 #                        renderer.
+#   TEST_NAME_SUFFIX   - Suffix to append to the Maya scene file name to create the test name.
 #   COPY_SCENE         - If set, copies the scene file to the temporary project
 #                        before rendering.
 #   ENV                - Set or append the indicated environment variables;
@@ -992,7 +1015,7 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
 
     cmake_parse_arguments(ARG
         "COPY_SCENE"             # Boolean options.
-        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;RENDERED_IMAGE_SUBDIR;RENDERED_IMAGE_NAME;IMAGE_EXTENSION;FAIL;FAILPERCENT;RENDERER_ARGS" # one_value keywords
+        "RENDERER;SCENE_FILE;WORKING_DIRECTORY;RENDERED_IMAGE_SUBDIR;RENDERED_IMAGE_NAME;IMAGE_EXTENSION;FAIL;FAILPERCENT;RENDERER_ARGS;TEST_NAME_SUFFIX" # one_value keywords
         "ENV"                                    # multi_value keywords
         ${ARGN}
     )
@@ -1021,6 +1044,9 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     get_testfile_and_labels(ALL_LABELS SCENE_FILE ${SCENE_FILE_LABELED})
     # Remove extension to define the test name
     mayaUsd_get_unittest_target(test_name ${SCENE_FILE})
+    if(ARG_TEST_NAME_SUFFIX)
+        set(test_name "${test_name}_${ARG_TEST_NAME_SUFFIX}")
+    endif()
 
     set(IMAGE_EXTENSION "png")
     if(ARG_IMAGE_EXTENSION)
@@ -1075,6 +1101,11 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     set(RENDERED_IMAGE_DIR "${RENDERED_IMAGE_ROOT_DIR}/${RENDERED_IMAGE_SUBDIR}")
     set(RENDERED_IMAGE_PATH "${RENDERED_IMAGE_DIR}/${RENDERED_IMAGE_NAME}.${IMAGE_EXTENSION}")
     cmake_path(REPLACE_EXTENSION SRC_SCENE_PATH ".${IMAGE_EXTENSION}" OUTPUT_VARIABLE EXPECTED_IMAGE_PATH)
+    if(ARG_TEST_NAME_SUFFIX)
+        cmake_path(GET EXPECTED_IMAGE_PATH STEM LAST_ONLY _expected_stem)
+        cmake_path(GET EXPECTED_IMAGE_PATH PARENT_PATH _expected_dir)
+        set(EXPECTED_IMAGE_PATH "${_expected_dir}/${_expected_stem}_${ARG_TEST_NAME_SUFFIX}.${IMAGE_EXTENSION}")
+    endif()
 
     # Always use the discovered idiff binary; do not fall back to PATH
     if (IMAGE_DIFF_TOOL)
@@ -1088,12 +1119,13 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     # but cmd "/c" does not: the cmd shell no longer interprets the /c as a
     # flag argument.  Use PowerShell instead.
     # Cross-platform command runner: PowerShell on Windows, POSIX sh elsewhere.
-    set(IDIFF_ARGS  "${IDIFF_CMD} -fail ${FAIL} -failpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
+    # HYDRA-2304: We will consider WARN and FAIL as equivalent.
+    set(IDIFF_ARGS  "${IDIFF_CMD} -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
     if (WIN32)
         set(CMD PowerShell)
 		# Windows (PowerShell)
 		set(RENDER_ARGS "& \"${RENDER_EXECUTABLE}\" -renderer \"${RENDERER}\" ${ARG_RENDERER_ARGS} \"${SCENE_PATH}\"")
-		set(IDIFF_ARGS "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
+        set(IDIFF_ARGS "& \"${IDIFF_CMD}\" -fail ${FAIL} -failpercent ${FAILPERCENT} -warn ${FAIL} -warnpercent ${FAILPERCENT} \"${RENDERED_IMAGE_PATH}\" \"${EXPECTED_IMAGE_PATH}\"")
         set(RM_ARGS "Remove-Item \"${RENDERED_IMAGE_DIR}/*\" -Recurse -Force -ErrorAction SilentlyContinue")
 		set(CMD_ARGS -Command "${RM_ARGS} \; ${RENDER_ARGS} \; if (\$LASTEXITCODE -eq 0) { ${IDIFF_ARGS} } \; exit \$LASTEXITCODE")
     else()
@@ -1135,9 +1167,19 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
 
     if(ARG_COPY_SCENE)
         configure_file(${SRC_SCENE_PATH} ${SCENE_PATH} COPYONLY)
-        cmake_path(REMOVE_EXTENSION SRC_SCENE_PATH OUTPUT_VARIABLE SRC_SCENE_PATH_USD)
-        cmake_path(REMOVE_EXTENSION SCENE_PATH OUTPUT_VARIABLE SCENE_PATH_USD)
-        configure_file("${SRC_SCENE_PATH_USD}.usda" "${SCENE_PATH_USD}.usda" COPYONLY)
+        cmake_path(REMOVE_EXTENSION SRC_SCENE_PATH OUTPUT_VARIABLE SRC_SCENE_PATH_NO_EXT)
+        cmake_path(REMOVE_EXTENSION SCENE_PATH OUTPUT_VARIABLE SCENE_PATH_NO_EXT)
+        if(EXISTS "${SRC_SCENE_PATH_NO_EXT}.usda")
+            configure_file("${SRC_SCENE_PATH_NO_EXT}.usda" "${SCENE_PATH_NO_EXT}.usda" COPYONLY)
+        endif()
+        if(EXISTS "${SRC_SCENE_PATH_NO_EXT}.mtlx")
+            configure_file("${SRC_SCENE_PATH_NO_EXT}.mtlx" "${SCENE_PATH_NO_EXT}.mtlx" COPYONLY)
+        endif()
+        cmake_path(GET SRC_SCENE_PATH PARENT_PATH SRC_SCENE_DIR)
+        cmake_path(GET SCENE_PATH PARENT_PATH SCENE_DIR)
+        if(EXISTS "${SRC_SCENE_DIR}/UVChecker.png")
+            configure_file("${SRC_SCENE_DIR}/UVChecker.png" "${SCENE_DIR}/UVChecker.png" COPYONLY)
+        endif()
     endif()
 
     # For render tests, we don't want interactive UI elements

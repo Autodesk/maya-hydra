@@ -82,7 +82,7 @@ MtohInitializeRenderPlugins()
                 continue;
             }
 
-            // XXX: As of 22.02, this needs to be called for Storm
+            // Storm requires GlfContextCaps initialization.
             if (pluginDesc.id == MtohTokens->HdStormRendererPlugin) {
                 GlfContextCaps::InitInstance();
             }
@@ -221,7 +221,7 @@ bool registerRenderer(const MtohRendererDescription& desc)
     //
     // HYDRA-2025: we need a mechanism so that a renderer can describe its
     // requirements to MayaHydra.  Could be a MayaHydra-specific JSON file.
-    // For now (27-Jan-2026) hard-code Storm requirement for an OpenGL context.
+    // Currently hard-code Storm requirement for an OpenGL context.
     //
     const bool needsGpu = (rn.GetString().find("Storm") != std::string::npos);
 

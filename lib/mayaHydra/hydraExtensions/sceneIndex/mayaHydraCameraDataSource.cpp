@@ -139,23 +139,25 @@ MayaHydraCameraDataSource::MayaHydraCameraDataSource(
 {
 }
 
-
-TfTokenVector
-MayaHydraCameraDataSource::GetNames()
+TfTokenVector MayaHydraCameraDataSource::GetNames()
 {
-    TfTokenVector results;
-
-    results.push_back(HdCameraSchemaTokens->projection);
-    results.push_back(HdCameraSchemaTokens->horizontalAperture);
-    results.push_back(HdCameraSchemaTokens->verticalAperture);
-    results.push_back(HdCameraSchemaTokens->horizontalApertureOffset);
-    results.push_back(HdCameraSchemaTokens->verticalApertureOffset);
-    results.push_back(HdCameraSchemaTokens->focalLength);
-    results.push_back(HdCameraSchemaTokens->clippingRange);
-    results.push_back(HdCameraSchemaTokens->clippingPlanes);
+    TfTokenVector results = {
+        HdCameraSchemaTokens->projection,
+        HdCameraSchemaTokens->horizontalAperture,
+        HdCameraSchemaTokens->verticalAperture,
+        HdCameraSchemaTokens->horizontalApertureOffset,
+        HdCameraSchemaTokens->verticalApertureOffset,
+        HdCameraSchemaTokens->focalLength,
+        HdCameraSchemaTokens->clippingRange,
+        HdCameraSchemaTokens->clippingPlanes,
+        HdCameraSchemaTokens->focusDistance,
+        HdCameraSchemaTokens->fStop,
+        HdCameraSchemaTokens->shutterOpen,
+        HdCameraSchemaTokens->shutterClose,
+        HdCameraTokens->windowPolicy,
+    };
 
     return results;
-
 }
 
 HdDataSourceBaseHandle
@@ -211,6 +213,15 @@ MayaHydraCameraDataSource::Get(const TfToken& name)
         }
         return HdRetainedTypedSampledDataSource<VtArray<GfVec4d>>::New(
             array);
+    }
+    else if (name == HdCameraSchemaTokens->shutterOpen
+        || name == HdCameraSchemaTokens->shutterClose) {
+        // shutterOpen/shutterClose are served as doubles by GetCameraParamValue.
+        // They must be routed through a double-typed data source: the float
+        // branch below would fail the v.IsHolding<float>() check and silently
+        // coerce the value to 0.
+        return MayaHydraTypedCameraParamValueDataSource<double>::New(
+            _id, name, camAdapter);
     }
     else if (std::find(HdCameraSchemaTokens->allTokens.begin(),
         HdCameraSchemaTokens->allTokens.end(), name)

@@ -28,6 +28,9 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
 
 #include <pxr/base/tf/envSetting.h>
+#include <pxr/imaging/hd/geomSubsetSchema.h>
+#include <pxr/imaging/hd/materialBindingSchema.h>
+#include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/rprim.h>
@@ -36,8 +39,9 @@
 #include <maya/MDGMessage.h>
 #include <maya/MDagPath.h>
 #include <maya/MDagPathArray.h>
-#include <maya/MFnComponent.h>
 #include <maya/MFnDependencyNode.h>
+#include <maya/MFnMesh.h>
+#include <maya/MFnSingleIndexedComponent.h>
 #include <maya/MNodeClass.h>
 #include <maya/MItDag.h>
 #include <maya/MMaterial.h>
@@ -341,27 +345,8 @@ SdfPath _GetMaterialPath(const SdfPath& base, const MObject& obj)
 
 bool GetShadingEngineNode(const MRenderItem& ri, MObject& shadingEngineNode)
 {
-    MDagPath dagPath = ri.sourceDagPath();
-    if (dagPath.isValid()) {
-        MFnDagNode   dagNode(dagPath.node());
-        MObjectArray sets, comps;
-        dagNode.getConnectedSetsAndMembers(dagPath.instanceNumber(), sets, comps, true);
-        assert(sets.length() == comps.length());
-        for (uint32_t i = 0; i < sets.length(); ++i) {
-            const MObject& object = sets[i];
-            if (object.apiType() == MFn::kShadingEngine) {
-                // To support per-face shading, find the shading node matched with the render item
-                const MObject& comp = comps[i];
-                MObject        shadingComp = ri.shadingComponent();
-                if (shadingComp.isNull() || comp.isNull()
-                    || MFnComponent(comp).isEqual(shadingComp)) {
-                    shadingEngineNode = object;
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
+    shadingEngineNode = FindShadingEngine(ri.sourceDagPath(), ri.shadingComponent());
+    return !shadingEngineNode.isNull();
 }
 
 std::mutex _adaptersToRecreateMutex;
@@ -524,15 +509,19 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
                 isRenderItem_aiSkyDomeLightTriangleShape(ri));
         }
 
-        SdfPath material;
-        MObject shadingEngineNode;
-        if (!_GetRenderItemMaterial(ri, material, shadingEngineNode)) {
-            if (material != kInvalidMaterial) {
-                CreateMaterial(material, shadingEngineNode);
-            }
-        }
-
+        // _GetRenderItemMaterial is expensive: it ultimately calls
+        // MFnDagNode::getConnectedSetsAndMembers, which walks the Maya DG for
+        // every set the shape belongs to. That cost is wasted on frames where
+        // nothing material-related has changed (the common animation case).
         if (flags & MDataServerOperation::MViewportScene::MVS_changedEffect) {
+            SdfPath material;
+            MObject shadingEngineNode;
+            if (!_GetRenderItemMaterial(ri, material, shadingEngineNode)) {
+                if (material != kInvalidMaterial) {
+                    CreateMaterial(material, shadingEngineNode);
+                }
+            }
+
             ria->SetMaterial(material);
         }
 
@@ -635,6 +624,14 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
     // the UFE path to a string, then does a Dag path lookup with the string.
 
     auto       dagPath = UfeExtensions::ufeToDagPath(appPath);
+    if (!dagPath.isValid()) {
+        TF_WARN(
+            "MayaHydraSceneIndex::UfePathToPrimSelections: Could not convert UFE path %s to a valid "
+            "Maya DAG path.",
+            Ufe::PathString::string(appPath).c_str());
+        return {};
+    }
+
     const bool extendToShape = _UseTheShapeDagPath(
         dagPath); // For Hydra some prims, we need to use the shape dag path not the transform, as
                   // this is what gets translated to an hydra path
@@ -1438,6 +1435,124 @@ void MayaHydraSceneIndex::OnDagNodeRemoved(const MObject& obj)
     }
 }
 
+// Create the material(s) bound to a mesh and, for multi-material meshes, the
+// Hydra geomSubsets that route each group of faces to its material.
+//
+// What: ensures a material adapter exists for every shading group assigned to
+// 'dag', then - only when there is more than one assignment - emits one
+// HdGeomSubset prim per assignment under 'meshPrimId', each carrying the face
+// indices it covers and a material binding to the corresponding material. A mesh
+// with a single (whole-object) assignment needs no subsets: the regular mesh
+// material binding already covers it, so we return after creating the material.
+// How: GetAllShadingAssignments enumerates the (component, shadingEngine) pairs.
+// For each assignment the face set is taken either from all polygons (null
+// component / whole object) or from the kMeshPolygonComponent element list, and
+// is published as a faceSet HdGeomSubset with an HdMaterialBindingsSchema so the
+// render delegate shades those faces with the right material.
+// Subsets only apply to meshes, so non-mesh (incl. plugin) shapes are skipped.
+// When a mesh has both a whole-object assignment and per-face assignments, the
+// whole-object subset is skipped to avoid overlapping subsets with undefined
+// material precedence; the whole-object material remains the mesh's binding.
+void MayaHydraSceneIndex::_InsertGeomSubsetsForMesh(
+    const MDagPath& dag, const SdfPath& meshPrimId)
+{
+    std::vector<ShadingAssignment> assignments;
+    GetAllShadingAssignments(dag, assignments);
+
+    for (const auto& sa : assignments) {
+        const auto materialId = GetMaterialPath(sa.shadingEngine);
+        if (TfMapLookupPtr(_materialAdapters, materialId) == nullptr) {
+            CreateMaterial(materialId, sa.shadingEngine);
+        }
+    }
+
+    if (assignments.size() <= 1) {
+        return;
+    }
+
+    // geomSubsets only apply to meshes; bail out for any other (incl. plugin) shape.
+    if (!dag.hasFn(MFn::kMesh)) {
+        return;
+    }
+    MStatus meshStatus;
+    MFnMesh mesh(dag, &meshStatus);
+    if (!meshStatus) {
+        return;
+    }
+
+    // A whole-object (null component) assignment covers every face. If the mesh
+    // also has per-face assignments, emitting a full-coverage subset would overlap
+    // them with undefined material precedence, so skip the whole-object subset when
+    // component assignments are present.
+    bool hasComponentAssignments = false;
+    for (const auto& sa : assignments) {
+        if (!sa.component.isNull()) {
+            hasComponentAssignments = true;
+            break;
+        }
+    }
+
+    int subsetIndex = 0;
+    static const TfToken purposes[] = { HdMaterialBindingsSchemaTokens->allPurpose };
+
+    for (const auto& sa : assignments) {
+        if (hasComponentAssignments && sa.component.isNull()) {
+            continue;
+        }
+
+        VtIntArray faceIndices;
+
+        if (sa.component.isNull()) {
+            const int numFaces = mesh.numPolygons();
+            faceIndices.resize(numFaces);
+            for (int f = 0; f < numFaces; ++f) {
+                faceIndices[f] = f;
+            }
+        } else if (sa.component.apiType() == MFn::kMeshPolygonComponent) {
+            MFnSingleIndexedComponent fnComp(sa.component);
+            MIntArray elements;
+            fnComp.getElements(elements);
+            faceIndices.resize(elements.length());
+            for (uint32_t j = 0; j < elements.length(); ++j) {
+                faceIndices[j] = elements[j];
+            }
+        } else {
+            // Defensive: for a mesh, getConnectedSetsAndMembers only ever yields a
+            // null component (whole object) or a face component
+            // (kMeshPolygonComponent). Any other component type is unexpected, so
+            // skip it rather than treat its element indices as face indices.
+            continue;
+        }
+
+        if (faceIndices.empty()) {
+            continue;
+        }
+
+        const SdfPath materialPath = GetMaterialPath(sa.shadingEngine);
+        const SdfPath subsetPath = meshPrimId.AppendChild(
+            TfToken("geomSubset_" + std::to_string(subsetIndex++)));
+
+        HdDataSourceBaseHandle materialBindingSources[] = {
+            HdMaterialBindingSchema::Builder()
+                .SetPath(HdRetainedTypedSampledDataSource<SdfPath>::New(materialPath))
+                .Build()
+        };
+
+        AddPrims({{ subsetPath,
+            HdPrimTypeTokens->geomSubset,
+            HdRetainedContainerDataSource::New(
+                HdGeomSubsetSchemaTokens->geomSubset,
+                HdGeomSubsetSchema::Builder()
+                    .SetType(HdGeomSubsetSchema::BuildTypeDataSource(
+                        HdGeomSubsetSchemaTokens->typeFaceSet))
+                    .SetIndices(HdRetainedTypedSampledDataSource<VtIntArray>::New(faceIndices))
+                    .Build(),
+                HdMaterialBindingsSchema::GetSchemaToken(),
+                HdMaterialBindingsSchema::BuildRetained(
+                    TfArraySize(purposes), purposes, materialBindingSources)) }});
+    }
+}
+
 void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
 {
     // We don't care about transforms.
@@ -1447,6 +1562,20 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
 
     MFnDagNode dagNode(dag);
     if (dagNode.isIntermediateObject()) {
+        return;
+    }
+
+    // Cameras can be invisible and still be renderable, so adapter creation
+    // must occur before the visibility check.
+    if (CreateCameraAdapter(dag)) {
+        return;
+    }
+
+    // In batch mode (useMeshAdapter), MItDag visits every DAG node including
+    // LOD meshes and corrective blend-shape targets that VP2 never makes render
+    // items for.  Skip shapes that are not visible so that only the intended
+    // renderable geometry reaches Hydra, matching viewport behaviour.
+    if (useMeshAdapter() && !dag.isVisible()) {
         return;
     }
 
@@ -1462,14 +1591,13 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
         return;
     }
 
-    // Custom lights don't have MFn::kLight.
+    // Invisible lights don't contribute to the scene, so light adapter
+    // creation after the visibility check above is correct.  Custom lights
+    // don't have MFn::kLight.
     if (CreateLightAdapter(dag)) {
         return;
     }
 
-    if (CreateCameraAdapter(dag)) {
-        return;
-    }
     // We are inserting a single prim and
     // instancer for every instanced mesh.
     if (dag.isInstanced() && dag.instanceNumber() > 0) {
@@ -1478,13 +1606,7 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
 
     auto adapter = CreateShapeAdapter(dag);
     if (adapter) {
-        auto material = adapter->GetMaterial();
-        if (material != MObject::kNullObj) {
-            const auto materialId = GetMaterialPath(material);
-            if (TfMapLookupPtr(_materialAdapters, materialId) == nullptr) {
-                CreateMaterial(materialId, material);
-            }
-        }
+        _InsertGeomSubsetsForMesh(dag, adapter->GetID());
         return;
     }
 

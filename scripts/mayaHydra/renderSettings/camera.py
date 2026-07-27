@@ -13,22 +13,19 @@
 # limitations under the License.
 #
 
+from .utils import getRenderSettingsPrim
+
 import mayaUsd.ufe as mayaUsdUfe
 
 from pxr import Sdf, UsdRender
 
 def setCamera(cameraPath):
-    rsStagePathStr = "|renderSettings|renderSettingsShape"
-    stage = mayaUsdUfe.getStage(rsStagePathStr)
+    rsPrim = getRenderSettingsPrim()
 
-    if not stage:
-        raise RuntimeError("No stage found at %s, setCamera() failed." % rsStagePathStr)
+    if not rsPrim:
+        raise RuntimeError("Render settings prim %s not found." % str(rsPrim.GetPath()))
 
-    rsParentPrimPath = Sdf.Path("/Render")
-    rsParentPrim = stage.GetPrimAtPath(rsParentPrimPath)
-
-    if not rsParentPrim:
-        raise RuntimeError("Render settings parent prim %s not found." % str(rsParentPrimPath))
+    rsParentPrim = rsPrim.GetParent()
 
     for child in rsParentPrim.GetChildren():
         if child.IsA(UsdRender.Product):

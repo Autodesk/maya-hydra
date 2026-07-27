@@ -7,16 +7,6 @@ add_library(${TARGET_NAME} SHARED)
 # -----------------------------------------------------------------------------
 target_sources(${TARGET_NAME} 
     PRIVATE
-        batchRendering/batchRenderer.cpp
-        batchRendering/batchRendererMayaRenderSettings.cpp
-        batchRendering/batchRendererHydraV1RenderSettings.cpp
-        batchRendering/batchRendererHydraV2RenderSettings.cpp
-        batchRendering/hydraRenderCmd.cpp
-        batchRendering/hydraRenderCmdHydraV1RenderSettings.cpp
-        batchRendering/hydraRenderCmdHydraV2RenderSettings.cpp
-        batchRendering/hydraRenderCmdMayaRenderSettings.cpp
-        batchRendering/renderVarUtils.cpp
-        batchRendering/tokens.cpp
         colorNotFoundException.cpp
         envSettings.cpp
         mayaColorPreferencesTranslator.cpp
@@ -35,6 +25,22 @@ target_sources(${TARGET_NAME}
         renderRegionCommand.cpp
         setVisibleFramePassesCommand.cpp
 )
+
+if(MAYA_APP_VERSION VERSION_GREATER 2026)
+    target_sources(${TARGET_NAME}
+        PRIVATE
+            batchRendering/batchRenderer.cpp
+            batchRendering/batchRendererMayaRenderSettings.cpp
+            batchRendering/batchRendererHydraV1RenderSettings.cpp
+            batchRendering/batchRendererHydraV2RenderSettings.cpp
+            batchRendering/hydraRenderCmd.cpp
+            batchRendering/hydraRenderCmdHydraV1RenderSettings.cpp
+            batchRendering/hydraRenderCmdHydraV2RenderSettings.cpp
+            batchRendering/hydraRenderCmdMayaRenderSettings.cpp
+            batchRendering/renderVarUtils.cpp
+            batchRendering/tokens.cpp
+    )
+endif()
 
 set(HEADERS
     pluginUtils.h
@@ -72,10 +78,16 @@ endif()
 target_include_directories(${TARGET_NAME} 
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/batchRendering
         $<$<BOOL:${UFE_FOUND}>:${UFE_INCLUDE_DIR}>
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSD_INCLUDE_DIR}>
 )
+
+if(MAYA_APP_VERSION VERSION_GREATER 2026)
+    target_include_directories(${TARGET_NAME}
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/batchRendering
+    )
+endif()
 
 if(DEFINED MAYAUSD_VERSION)
     target_compile_definitions(${TARGET_NAME}
@@ -105,6 +117,17 @@ target_link_libraries(${TARGET_NAME}
         $<$<BOOL:${UFE_FOUND}>:${UFE_LIBRARY}>
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSDAPI_LIBRARY}>
 )
+
+# lld-link (Windows/Clang coverage builds) treats UFE inline copy-ctors emitted
+# by renderSettingsUtils.cpp as duplicate symbols vs the same ctors exported from
+# ufe_0.dll. The duplicates are identical (same inline definition), so /force:multiple
+# safely resolves them by keeping the first definition.
+if(IS_CLANG AND IS_WINDOWS)
+    target_link_options(${TARGET_NAME}
+        PRIVATE
+            -Wl,/force:multiple
+    )
+endif()
 
 # -----------------------------------------------------------------------------
 # properties

@@ -18,27 +18,11 @@
 # -im, -of, ...) go through getRenderProductsToApplySettings() so that
 # filtering logic lives in one place.
 
+from .utils import getRenderSettingsPrim
+
 import mayaUsd.ufe as mayaUsdUfe
 
 from pxr import Sdf, UsdRender
-
-# Maya DAG path to the proxy shape that holds the render-settings USD stage.
-_RS_STAGE_PATH = "|renderSettings|renderSettingsShape"
-
-# USD prim path that is the parent of all render products in the
-# render-settings stage (Maya Hydra convention: products live at /Render/<Name>).
-_RS_RENDER_PRIM_PATH = Sdf.Path("/Render")
-
-
-def getRenderSettingsStage():
-    """Return the USD stage that holds the Maya Hydra render settings prim."""
-    stage = mayaUsdUfe.getStage(_RS_STAGE_PATH)
-    if not stage:
-        raise RuntimeError(
-            "No stage found at %s, getRenderSettingsStage() failed."
-            % _RS_STAGE_PATH)
-    return stage
-
 
 def getRenderProductsToApplySettings():
     """Return the UsdRender.Product schema objects on which Maya Hydra
@@ -51,19 +35,33 @@ def getRenderProductsToApplySettings():
     Only direct children of /Render are scanned.  This matches the Maya Hydra
     convention of placing render products at /Render/<Name>; products nested
     deeper would be silently skipped."""
-    stage = getRenderSettingsStage()
 
-    rsParentPrim = stage.GetPrimAtPath(_RS_RENDER_PRIM_PATH)
-    if not rsParentPrim:
-        raise RuntimeError(
-            "Render settings parent prim %s not found."
-            % str(_RS_RENDER_PRIM_PATH))
+    rsPrim = getRenderSettingsPrim()
+
+    if not rsPrim:
+        raise RuntimeError("Render settings prim %s not found." % str(rsPrim.GetPath()))
+
+    rsParentPrim = rsPrim.GetParent()
 
     products = []
     for child in rsParentPrim.GetChildren():
         if child.IsA(UsdRender.Product):
             products.append(UsdRender.Product(child))
     return products
+
+
+def _applyModifierToAttribute(attr, modifierFn):
+    """Apply modifierFn to every authored value on attr.
+
+    USD render products can author productName as time samples (one path per
+    frame).  A plain attr.Set() only updates the default value, which Hydra
+    batch rendering ignores when time samples exist."""
+    timeSamples = attr.GetTimeSamples()
+    if timeSamples:
+        for t in timeSamples:
+            attr.Set(modifierFn(attr.Get(t)), t)
+    else:
+        attr.Set(modifierFn(attr.Get()))
 
 
 def applyToProductName(modifierFn):
@@ -76,4 +74,16 @@ def applyToProductName(modifierFn):
             raise RuntimeError(
                 "Could not obtain a product name attribute for render product "
                 "%s." % str(rp.GetPrim().GetPath()))
-        pnAttr.Set(modifierFn(pnAttr.Get()))
+        _applyModifierToAttribute(pnAttr, modifierFn)
+
+
+def applyToResolution(modifierFn):
+    """Apply modifierFn to the resolution attribute of every render product
+    returned by getRenderProductsToApplySettings()."""
+    for rp in getRenderProductsToApplySettings():
+        resAttr = rp.CreateResolutionAttr()
+        if not resAttr:
+            raise RuntimeError(
+                "Could not obtain a resolution attribute for render product "
+                "%s." % str(rp.GetPrim().GetPath()))
+        modifierFn(resAttr)

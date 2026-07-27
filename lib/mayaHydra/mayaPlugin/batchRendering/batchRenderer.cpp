@@ -24,18 +24,21 @@
 #include "renderSettingsUtils.h"
 
 #include <mayaHydraLib/mayaHydraLibInterface.h>
+#include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
 
 #ifdef CODE_COVERAGE_WORKAROUND
 #include <flowViewport/fvpUtils.h>
 #endif
 #include <flowViewport/tokens.h>
+#include <flowViewport/sceneIndex/fvpSceneIndexUtils.h>
 #include <flowViewport/API/renderViewData/fvpRenderViewDataManager.h>
 #include <flowViewport/API/renderViewData/fvpFilteringSceneIndicesChainManager.h>
 #include <flowViewport/API/interfacesImp/fvpDataProducerSceneIndexInterfaceImp.h>
 #include <flowViewport/API/interfacesImp/fvpFilteringSceneIndexInterfaceImp.h>
 #include <pxr/pxr.h>
 
+#include <pxr/base/tf/getenv.h>
 #include <pxr/base/gf/range2f.h>
 #include <pxr/base/gf/vec2f.h>
 #include <pxr/base/gf/vec2i.h>
@@ -53,12 +56,60 @@
 #include <maya/MStatus.h>
 
 #include <algorithm>
+#include <fstream>
+#include <iostream>
 #include <string>
 
 using namespace MayaHydra;
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
+
+// Look at defaultRenderGlobals.hydraSceneDumpPath attribute and
+// dump Hydra scene to that file path.  Hydra scene will be taken from
+// the output of the defaultRenderGlobals.hydraSceneDumpSceneIndex
+// scene index (default to the terminal scene index).
+void dumpHydraScene(const HdRenderIndex* renderIndex)
+{
+    MObject nodeObj;
+    MString dumpPath;
+    std::string sceneIndexName;
+    constexpr const char* kDefaultRenderGlobalsNodeName = "defaultRenderGlobals";    
+    if (GetDependNodeFromNodeName(kDefaultRenderGlobalsNodeName, nodeObj)) {
+        MFnDependencyNode depNode(nodeObj);
+        MPlug plug = depNode.findPlug("hydraSceneDumpPath", true);
+        if (!plug.isNull()) {
+            dumpPath = plug.asString();
+        }
+        MPlug siPlug = depNode.findPlug("hydraSceneDumpSceneIndex", true);
+        if (!siPlug.isNull()) {
+            sceneIndexName = siPlug.asString().asChar();
+        }
+    }
+
+    if (dumpPath.length() > 0) {
+        std::ofstream dumpFile(dumpPath.asChar());
+        if (dumpFile.is_open()) {
+            constexpr const char* kTerminalSceneIndexMsg = "terminal scene index";
+            auto si = renderIndex->GetTerminalSceneIndex();
+            if (!sceneIndexName.empty()) {
+                auto siHasName = Fvp::SceneIndexDisplayNamePred(sceneIndexName);
+                auto found = Fvp::findSceneIndexInTree(si, siHasName);
+                if (!found) {
+                    TF_WARN("Scene index %s not found for scene dump, using %s", sceneIndexName.c_str(), kTerminalSceneIndexMsg);
+                    sceneIndexName = kTerminalSceneIndexMsg;
+                } else {
+                    si = found;
+                }
+            } else {
+                sceneIndexName = kTerminalSceneIndexMsg;
+            }
+            Fvp::SceneIndexInspector inspector(si);
+            inspector.WriteHierarchy(dumpFile);
+            TF_STATUS("Hydra scene from scene index %s written to %s", sceneIndexName.c_str(), dumpPath.asChar());
+        }
+    }
+}
 
 // Fvp::RenderViewDataManager::AddRenderViewData connects a custom data
 // producer scene index chain with the Hydra Flow Viewport Toolkit merging
@@ -330,6 +381,8 @@ void BatchRenderer::_ExecuteHydraBatchRenderFrame()
     }
 
     _engine.Execute(_renderIndex, &tasks);
+
+    dumpHydraScene(_renderIndex);
 }
 
 void BatchRenderer::_ClearMayaHydraSceneIndex()
@@ -450,7 +503,15 @@ void BatchRenderer::_InitHydraResources()
     // settings map (Hydra v1 render settings).  This is an
     // Autodesk-specific convention which render delegate providers
     // can use.
-    _renderDelegate->SetRenderSetting(BatchRenderTokens->renderSettingsSrc, VtValue(BatchRenderTokens->hydraSceneRenderSettingsSrc));
+    
+    // At time of writing (2026-06-02) only Hydra Arnold understands this
+    // token, requires further testing.
+    if (TfGetenvBool("MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS", false)) {
+        TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
+                     "Render setting " + BatchRenderTokens->renderSettingsSrc.GetString() + " set to " + BatchRenderTokens->hydraSceneRenderSettingsSrc.GetString() + "\n");
+
+        _renderDelegate->SetRenderSetting(BatchRenderTokens->renderSettingsSrc, VtValue(BatchRenderTokens->hydraSceneRenderSettingsSrc));
+    }
 
     // Support a USD stage providing the render settings through prims in the
     // Hydra scene.  Hydra Prman supports this when the
@@ -542,19 +603,15 @@ HdRenderIndex* BatchRenderer::renderIndex() const
     return _renderIndex;
 }
 
-void BatchRenderer::_SetActiveRenderSettingsPrimPath(const SdfPath& path)
+void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()
 {
     if (!TF_VERIFY(_sceneGlobalsSceneIndex, "Scene globals scene index not yet initialized")) {
         return;
     }
-    _sceneGlobalsSceneIndex->SetActiveRenderSettingsPrimPath(path);
-}
 
-void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()
-{
-    const auto hydraRsPath = GetActiveRenderSettingsPrimHydraPathFromScene();
-    if (hydraRsPath.IsEmpty()) {
-        TF_WARN("Invalid Hydra active render settings prim path.");
+    const auto hydraRsPath = GetActiveRenderSettingsHydraPath();
+    if (!TF_VERIFY(!hydraRsPath.IsEmpty(), 
+                   "Invalid Hydra active render settings prim path.")) {
         return;
     }
 
@@ -562,7 +619,7 @@ void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()
                  "Active render settings set to " +
                  hydraRsPath.GetAsString() + "\n");
 
-    _SetActiveRenderSettingsPrimPath(hydraRsPath);
+    _sceneGlobalsSceneIndex->SetActiveRenderSettingsPrimPath(hydraRsPath);
 }
 
 }

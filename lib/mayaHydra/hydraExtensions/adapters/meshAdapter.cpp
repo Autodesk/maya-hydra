@@ -68,8 +68,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 /**
  * This file contains the MayaHydraMeshAdapter class to translate from a Maya mesh to hydra.
- * Please note that, as of May 2023, this is optionally used by mayaHydra, with
- * a compile-time switch (see sceneDelegate.h).
+ * In the interactive viewport, mesh translation is selectable via the
+ * MAYA_HYDRA_USE_MESH_ADAPTER environment variable; see MayaHydraSceneIndex::useMeshAdapter().
  *
  * We can also translate from a MRenderitem to Hydra using the
  * MayaHydraRenderItemAdapter class.
@@ -111,9 +111,12 @@ const std::pair<MObject&, HdDirtyBits> _dirtyBits[] {
 } // namespace
 
 /**
- * \brief MayaHydraMeshAdapter is used to handle the translation from a Maya mesh to hydra.
- * Please note that, at this time, this is not used by the hydra plugin, we translate from a
- * renderitem to hydra using the MayaHydraRenderItemAdapter class.
+ * \brief MayaHydraMeshAdapter handles the translation from a Maya mesh to hydra.
+ * Batch/production rendering (non-interactive) always uses this mesh adapter. In the
+ * interactive viewport, the path is selectable: by default meshes are translated from
+ * MRenderItems via MayaHydraRenderItemAdapter, but setting the MAYA_HYDRA_USE_MESH_ADAPTER
+ * environment variable switches the viewport to use this mesh adapter instead.
+ * See MayaHydraSceneIndex::useMeshAdapter().
  */
 class MayaHydraMeshAdapter : public MayaHydraShapeAdapter
 {
@@ -248,13 +251,19 @@ public:
             return {};
         }
 
+        // Tangents are declared with face-varying interpolation, so Hydra expects
+        // exactly one value per face vertex. Returning a mismatched-length primvar
+        // would lead to incorrect shading or downstream errors, so bail out instead.
         if (tangentsCount != numFacesVertices){
-            TF_CODING_ERROR("Number of tangents does not match number of face vertices" );
+            TF_CODING_ERROR("Number of tangents (%zu) does not match number of face vertices (%zu)",
+                            tangentsCount, numFacesVertices);
+            return {};
         }
 
-       const auto* tangentsArray = reinterpret_cast<const GfVec2f*>(&mayaTangents[0]);
-        VtVec2fArray ret;
-        ret.assign(tangentsArray, tangentsArray + numFacesVertices);
+        VtVec3fArray ret(tangentsCount);
+        for (size_t i = 0; i < tangentsCount; ++i) {
+            ret[i] = GfVec3f(mayaTangents[i].x, mayaTangents[i].y, mayaTangents[i].z);
+        }
         return VtValue(ret);
     }
 
@@ -506,7 +515,7 @@ public:
                 localDescs.push_back(
                     { MayaHydraAdapterTokens->tangents,
                       interpolation,
-                      HdPrimvarRoleTokens->textureCoordinate });
+                      HdPrimvarRoleTokens->vector });
             }
         }
 

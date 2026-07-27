@@ -41,9 +41,6 @@
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/tokens.h>
 
-#ifdef CODE_COVERAGE_WORKAROUND
-#include <flowViewport/fvpUtils.h>
-#endif
 #include <flowViewport/tokens.h>
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
@@ -950,6 +947,14 @@ MStatus MtohRenderOverride::Render(
             if (isPass0) {
                 // Do not share the AOVs, for the first pass only
                 HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks();
+#if PXR_VERSION >= 2605
+                if (_sceneGlobalsSceneIndex) {
+                    const SdfPath& cameraPath = currentPass->params().renderParams.camera;
+                    if (!cameraPath.IsEmpty()) {
+                        _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
+                    }
+                }
+#endif
                 
                 /*Debug code left here if needed later
                 hvt::FramePass& framePassToDebug = *currentPass;
@@ -970,6 +975,14 @@ MStatus MtohRenderOverride::Render(
                             { PXR_NS::HdAovTokens->color, PXR_NS::HdAovTokens->depth }
                     );
                     HdTaskSharedPtrVector passTasks = currentPass->GetRenderTasks(inputAOVs);
+#if PXR_VERSION >= 2605
+                    if (_sceneGlobalsSceneIndex) {
+                        const SdfPath& cameraPath = currentPass->params().renderParams.camera;
+                        if (!cameraPath.IsEmpty()) {
+                            _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
+                        }
+                    }
+#endif
 
                     /*Debug code left here if needed later
                     hvt::FramePass& framePassToDebug = *currentPass;
@@ -1329,7 +1342,7 @@ MStatus MtohRenderOverride::Render(
         if (isMayaCamera) { // TODO: Support USD Camera
             MFnCamera camera(camPath, &status);
             if (status == MStatus::kSuccess) {
-                if (_mayaHydraSceneIndex && !camera.isOrtho()) { // TODO: Support Persp Camera
+                if (_mayaHydraSceneIndex && !camera.isOrtho()) {
                     SdfPath cameraPath = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
                     // Apply on all passes
                     const int numFramePasses = _GetNumFramePasses();
@@ -1344,6 +1357,21 @@ MStatus MtohRenderOverride::Render(
                     }
                     if (vpDirty)
                         _mayaHydraSceneIndex->MarkSprimDirty(cameraPath, HdCamera::DirtyParams);
+#if PXR_VERSION >= 2605
+                    if (_sceneGlobalsSceneIndex && !cameraPath.IsEmpty()) {
+                        _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
+                    }
+#endif
+                } else if (camera.isOrtho()) {
+                    // Orthographic views use the free camera derived from viewport matrices.
+                    const int numFramePasses = _GetNumFramePasses();
+                    for (int i = 0; i < numFramePasses; ++i) {
+                        const hvt::FramePassPtr& currentPass = _GetFramePass(i);
+                        if (!currentPass) {
+                            continue;
+                        }
+                        currentPass->params().renderParams.camera = SdfPath();
+                    }
                 }
             }
         }
@@ -1819,6 +1847,7 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     const bool pruneTextures = !(drawContext.getDisplayStyle() & MHWRender::MFrameContext::kTextured);
     _lastFilteringSceneIndexBeforeCustomFiltering = _pruneTexturesSceneIndex =
         Fvp::PruneTexturesSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering, pruneTextures);
+    _currentlyTextured = !pruneTextures;
 
     // Add default material scene index
     _lastFilteringSceneIndexBeforeCustomFiltering = _defaultMaterialSceneIndex = Fvp::DefaultMaterialSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering,
@@ -2026,7 +2055,7 @@ MStatus MtohRenderOverride::setup(const MString& destination)
         _operations.push_back(std::make_unique<MayaHydraPreRender>("HydraRenderOverride_PreScene"));
 
         // The main hydra render
-        // For the data server, This also invokes scene update then sync scene delegate after scene update
+        // For the data server, this also invokes scene update then syncs the scene index after scene update
         _operations.push_back(std::make_unique<MayaHydraRender>("HydraRenderOverride_DataServer", this));
 
         // Draw post scene elements (cameras, CVs, shapes not pushed into hydra)

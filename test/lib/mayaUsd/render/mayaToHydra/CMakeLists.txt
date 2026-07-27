@@ -105,6 +105,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testSceneIndexDirtying.py
     cpp/testMayaNodesAttributesDirtying.py|depOnPlugins:mtoa
     cpp/testLightPrimvars.py|depOnPlugins:mtoa
+    cpp/testDataSourceNames.py
     cpp/testCustomDagNodeTranslation.py|depOnPlugins:mtoa
     cpp/testCameraPrimvars.py
     cpp/testUsdStageInvalidate.py
@@ -135,6 +136,14 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     )
 endif()
 
+# mtoa custom nodes/attributes not supported on Maya 2026 and earlier.
+if(MAYA_APP_VERSION VERSION_GREATER 2026)
+    list(APPEND INTERACTIVE_TEST_SCRIPT_FILES
+        cpp/testArnoldCustomNodes.py|depOnPlugins:mtoa
+        cpp/testArnoldCustomAttributesMayaNodes.py|depOnPlugins:mtoa
+    )
+endif()
+
 #Add this test only if the MayaUsd_FOUND (so also MAYAUSDAPI_LIBRARY) has been found during compile time.
 if(MayaUsd_FOUND)
     list(APPEND INTERACTIVE_TEST_SCRIPT_FILES testMayaUsdAPIUsage.py)
@@ -153,8 +162,10 @@ endif()
 set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
     testMeshes.py
     testTransformMeshAdapter.py
+    testMeshAdapterVisibility.py
     cpp/testMeshAdapterTransform.py
     cpp/testMeshPrimvars.py
+    cpp/testMeshGeomSubsets.py
     cpp/testMeshSubdivTags.py
 )
 

@@ -17,11 +17,11 @@
 
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
+#include <mayaHydraLib/mayaUtils.h>
 
 #include <pxr/base/tf/type.h>
 
-#include <maya/MPlug.h>
-#include <maya/MPlugArray.h>
+#include <maya/MFnDagNode.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -70,39 +70,14 @@ void MayaHydraShapeAdapter::MarkDirty(HdDirtyBits dirtyBits)
     MayaHydraDagAdapter::MarkDirty(dirtyBits);
 }
 
-MObject MayaHydraShapeAdapter::GetMaterial()
+MObject MayaHydraShapeAdapter::GetMaterial(const MObject& shadingComp)
 {
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
         .Msg(
             "Called MayaHydraShapeAdapter::GetMaterial() - %s\n",
             GetDagPath().partialPathName().asChar());
 
-    MStatus    status;
-    MFnDagNode dagNode(GetDagPath(), &status);
-    if (!status) {
-        return MObject::kNullObj;
-    }
-
-    auto instObjGroups = dagNode.findPlug(MayaAttrs::dagNode::instObjGroups, true);
-    if (instObjGroups.isNull()) {
-        return MObject::kNullObj;
-    }
-
-    MPlugArray conns;
-    instObjGroups.elementByLogicalIndex(0).connectedTo(conns, false, true);
-
-    const auto numConnections = conns.length();
-    if (numConnections == 0) {
-        return MObject::kNullObj;
-    }
-    for (auto i = decltype(numConnections) { 0 }; i < numConnections; ++i) {
-        auto sg = conns[i].node();
-        if (sg.apiType() == MFn::kShadingEngine) {
-            return sg;
-        }
-    }
-
-    return MObject::kNullObj;
+    return MayaHydra::FindShadingEngine(GetDagPath(), shadingComp);
 }
 
 GfBBox3d MayaHydraShapeAdapter::GetBoundingBox()

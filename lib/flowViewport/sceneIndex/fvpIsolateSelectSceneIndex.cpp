@@ -585,7 +585,7 @@ void IsolateSelectSceneIndex::_AddDependencies(
 )
 {
     // Iterate over the input isolate selection, and find the dependencies.
-    // As of 27-Sep-2024 only instancer dependencies are supported.
+    // Currently only instancer dependencies are supported.
     if (!isolateSelection) {
         return;
     }

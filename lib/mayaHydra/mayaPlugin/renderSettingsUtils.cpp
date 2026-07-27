@@ -18,12 +18,19 @@
 
 #include "pluginDebugCodes.h"
 
+#include <mayaHydraLib/mayaUtils.h>
+#include <flowViewport/selection/fvpPathMapperRegistry.h>
+
 #include <mayaUsdAPI/utils.h>
 
+#include <maya/MAnimControl.h>
+#include <maya/MCommonRenderSettingsData.h>
+#include <maya/MRenderUtil.h>
 #include <maya/MTime.h>
 
 #include <ufe/runTimeMgr.h>
 #include <ufe/sceneSegmentHandler.h>
+#include <ufe/pathString.h>
 
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/getenv.h>
@@ -44,14 +51,20 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
 
-/* For future use
-bool IsHydraArnoldRenderDelegate(const TfToken& rendererName)
+// Should the HdArnold renderer use Hydra v1 render settings (render settings
+// map, MayaHydra writes render product files) or Hydra v2 render settings
+// (render settings in Hydra scene, renderer writes render product files).
+bool HdArnoldUseHydraV2RenderSettings(const TfToken& rendererName)
 {
     const std::string rendererNameStr = rendererName.GetString();
     const bool isHdArnoldRenderer = rendererNameStr.rfind("HdArnoldRendererPlugin", 0) == 0;
-    return isHdArnoldRenderer;
+    if (!isHdArnoldRenderer) {
+        return false;
+    }
+
+    // Default is use Hydra v1 render settings.
+    return TfGetenvBool("MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS", false);
 }
-*/
 
 // returns true if the env var HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS is set to true
 // and the renderer is PRman
@@ -71,19 +84,10 @@ namespace MAYAHYDRA_NS_DEF {
 
 Ufe::Path ExtractUsdRenderSettingsFromScene(UsdRenderSettings& usdRenderSettings)
 {
-    // Find all mayaUsdProxyShape nodes in the scene
-    Ufe::SceneItemList proxyShapes = GetAllMayaUsdProxyShapes();
-
-    // Process each proxy shape
-    for (const auto& ps : proxyShapes) {
-        const auto psPath = ps->path();
-        const auto stage = MayaUsdAPI::getStage(psPath);
-        if (FindUsdRenderSettingsOnStage(stage, usdRenderSettings)) {
-            return psPath;
-        }
-    }
-
-    return Ufe::Path();
+    const auto rsAppPath = GetActiveRenderSettingsAppPath();
+    const auto stage     = MayaUsdAPI::getStage(rsAppPath);
+    return FindUsdRenderSettingsOnStage(stage, usdRenderSettings) ?
+        rsAppPath : Ufe::Path();
 }
 
 // Read the RenderSettingsType from the render delegate (renderer)
@@ -92,9 +96,10 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
     // Hardcoded at this time the logic to choose the RenderSettingsType.
 
     if (IsPrmanRenderSettingsDriveRenderPassEnabled(rendererName)
-        /*
-        || IsHydraArnoldRenderDelegate(rendererName)*/
+        || HdArnoldUseHydraV2RenderSettings(rendererName)
         ) {
+        TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+                     "Using Hydra v2 render settings.\n");
         return RenderSettingsType::HydraV2;
     }
     
@@ -102,9 +107,12 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
     UsdRenderSettings dummyUsdRenderSettings;// Pass a dummy UsdRenderSettings to just check for presence
     const auto psPath = ExtractUsdRenderSettingsFromScene(dummyUsdRenderSettings); 
     if (!psPath.empty()) {
+        TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
+                     "Using Hydra v1 render settings.\n");
         return RenderSettingsType::HydraV1;
     }
 
+    TF_WARN("No USD render settings found, or USD render settings had no render products.  Falling back to rendering with Maya render settings.");
     return RenderSettingsType::Maya;
 }
         
@@ -138,10 +146,21 @@ bool FindUsdRenderSettingsOnStage(
         return false;
     }
 
+    // USD documentation
+    // https://openusd.org/release/user_guides/schemas/usdRender/RenderSettings.html#properties
+    // says that if no render products are supplied, renderer should still
+    // output an image. At least one renderer (Hydra Arnold) does not do this
+    // and renders nothing.  Catch the no render products case and return
+    // false, so that Maya render settings default is used.
+    auto hasProducts = [](const UsdRenderSettings& rs) {
+        SdfPathVector targets;
+        return rs.GetProductsRel().GetTargets(&targets) && !targets.empty();
+    };
+
     // This is when at the global level of a usd file/stage is defined the render settings in renderSettingsPrimPath such as :
     //  renderSettingsPrimPath = "/Render/Settings"
     outSettings = UsdRenderSettings::GetStageRenderSettings(stage);
-    if (outSettings.GetPrim().IsValid()) {
+    if (outSettings.GetPrim().IsValid() && hasProducts(outSettings)) {
         return true;
     }
 
@@ -149,7 +168,7 @@ bool FindUsdRenderSettingsOnStage(
     for (UsdPrim prim : range) {
         if (prim.GetTypeName() == TfToken("RenderSettings")) {
             outSettings = UsdRenderSettings(prim);
-            if (outSettings.GetPrim().IsValid()) {
+            if (outSettings.GetPrim().IsValid() && hasProducts(outSettings)) {
                 return true;
             }
         }
@@ -195,25 +214,46 @@ std::vector<MTime> GetRenderTimesFromStage(const UsdStageRefPtr& stage)
     return times;
 }
 
-SdfPath GetActiveRenderSettingsPrimHydraPathFromScene()
+Ufe::Path GetActiveRenderSettingsAppPath()
 {
-    UsdRenderSettings usdRenderSettings;
-    auto psPath = ExtractUsdRenderSettingsFromScene(usdRenderSettings);
-    if (psPath.empty()) {
-        TF_WARN("No USD render settings found in scene");
+    constexpr const char* attrName   = "activeSettingsPath";
+
+    // Get the active render settings from the activeSettingsPath attribute
+    // on the UsdDefaultRenderSettings node.
+    MObject nodeObj;
+    if (!TF_VERIFY(GetDependNodeFromNodeName(kUsdDefaultRenderSettingsNodeName.data(), nodeObj), "Could not find %s node.", kUsdDefaultRenderSettingsNodeName.data())) {
         return {};
     }
 
-    const auto usdRsPath = usdRenderSettings.GetPrim().GetPath();
-
-    if (usdRsPath.IsEmpty()) {
-        TF_WARN("Invalid path for USD render settings.");
+    MFnDependencyNode depNode(nodeObj);
+    MPlug plug = depNode.findPlug(attrName, true);
+    if (!TF_VERIFY(!plug.isNull(), "Could not find %s attribute on %s.", attrName, kUsdDefaultRenderSettingsNodeName.data())) {
         return {};
     }
 
-    const auto hydraRsPath = usdRsPath.ReplacePrefix(SdfPath::AbsoluteRootPath(), SdfPath("/MayaUsdProxyShape_PluginNode").AppendElementString(psPath.back().string()));
+    MString pathStr = plug.asString();
+    if (!TF_VERIFY(pathStr.length() > 0, "%s attribute on %s is empty.", attrName, kUsdDefaultRenderSettingsNodeName.data())) {
+        // Attribute is empty, provide a sensible fallback, the USD default
+        // render settings themselves.
+        constexpr const char* rsPrimPath = "/Render/SceneRenderSettings";
+        pathStr = MString((std::string(kUsdDefaultRenderSettingsNodeName) + "," + rsPrimPath).c_str());
+    }
 
-    return hydraRsPath;
+    return Ufe::PathString::path(pathStr.asChar());
+}
+
+SdfPath GetActiveRenderSettingsHydraPath()
+{
+    // Use path mapper to map the active render settings application path
+    // (Ufe::Path) to the Hydra SdfPath of its translation in the Hydra scene.
+    auto ufePath = GetActiveRenderSettingsAppPath();
+    auto hydraPath = Fvp::ufePathToPrimSelections(ufePath);
+
+    // Render settings are not instanced, so there will be a single path.
+    if (!TF_VERIFY(hydraPath.size() == 1, "Expected single path for active render settings.")) {
+        return {};
+    }
+    return hydraPath[0].primPath;
 }
 
 TfTokenVector GetRenderOutputsFromActiveRenderSettings(const HdRenderIndex* renderIndex)
@@ -267,6 +307,37 @@ TfTokenVector GetRenderOutputsFromActiveRenderSettings(const HdRenderIndex* rend
     }
 #endif
     return renderOutputs;
+}
+
+RenderTimes::RenderTimes(
+    bool         isAnimatedIn,
+    const MTime& startTimeIn,
+    const MTime& endTimeIn,
+    float        timeIncrIn)
+    : isAnimated(isAnimatedIn)
+    , startTime(startTimeIn)
+    , endTime(endTimeIn)
+    , timeIncr(timeIncrIn)
+{
+}
+
+// Single point of truth for render times is Maya default render globals, for
+// all rendering types (Hydra v1 settings, Hydra v2 settings, Maya settings).
+RenderTimes GetRenderTimes()
+{
+    MCommonRenderSettingsData mayaRenderSettings;
+    MRenderUtil::getCommonRenderSettings(mayaRenderSettings);
+
+    if (!mayaRenderSettings.isAnimated()) {
+        const auto currentTime = MAnimControl::currentTime();
+        return RenderTimes(false, currentTime, currentTime, 1.0f);
+    }
+
+    return RenderTimes(
+        true,
+        mayaRenderSettings.frameStart,
+        mayaRenderSettings.frameEnd,
+        mayaRenderSettings.frameBy);
 }
 
 } // namespace MAYAHYDRA_NS_DEF

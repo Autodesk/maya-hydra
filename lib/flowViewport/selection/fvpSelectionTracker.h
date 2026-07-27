@@ -56,17 +56,12 @@ namespace FVP_NS_DEF {
 using SelectionTrackerSharedPtr =
     std::shared_ptr<class SelectionTracker>;
 
-/// Placeholder for
-///
-/// https://github.com/PixarAnimationStudios/OpenUSD/blob/release/pxr/imaging/hdx/selectionTracker.h
-///
-/// which is Hydra Storm-centric.  To be revised.  PPT, 27-Sep-2023.
-
 /// \class SelectionTracker
 ///
-/// The selection tracker owns the HdSelection and the selection scene index
-/// observer that maintains the selection up to date.  
-/// 
+/// Owns the HdSelection and the selection scene index observer that maintains
+/// the selection up to date. Differs from the Storm-centric OpenUSD counterpart:
+/// https://github.com/PixarAnimationStudios/OpenUSD/blob/release/pxr/imaging/hdx/selectionTracker.h
+///
 /// HdxSelectionTask takes SelectionTracker as a task parameter, to inject
 /// the selection into the list of tasks.
 

@@ -35,9 +35,13 @@ target_sources(${TARGET_NAME}
         testMeshAdapterTransform.cpp
         testMayaNodesAttributesDirtying.cpp
         testLightPrimvars.cpp
+        testDataSourceNames.cpp
         testCustomDagNodeTranslation.cpp
+        testArnoldCustomNodes.cpp
+        testArnoldCustomAttributesMayaNodes.cpp
         testCameraPrimvars.cpp
         testMeshPrimvars.cpp
+        testMeshGeomSubsets.cpp
         testFlowViewportAPIFilterPrims.cpp
         testSceneCorrectness.cpp
         testSelection.cpp

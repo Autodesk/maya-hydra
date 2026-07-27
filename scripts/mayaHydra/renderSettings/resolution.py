@@ -13,6 +13,9 @@
 # limitations under the License.
 #
 
+from .utils import getRenderSettingsPrim
+from . import renderProducts
+
 import mayaUsd.ufe as mayaUsdUfe
 import maya.cmds as cmds
 
@@ -22,30 +25,13 @@ DEFAULT_WIDTH  = 960
 DEFAULT_HEIGHT = 540
 
 def getResolutionAttr():
-    # Open the render settings stage.
-    rsStagePathStr = "|renderSettings|renderSettingsShape"
-    stage = mayaUsdUfe.getStage(rsStagePathStr)
+    rsPrim = getRenderSettingsPrim()
 
-    if not stage:
-        raise RuntimeError("No stage found at %s, getResolutionAttr() failed." % rsStagePathStr)
-
-    # Get the render settings prim.  Could also use
-    #
-    # rs = UsdRender.Settings.GetStageRenderSettings(stage)
-    #
-    # to get the render settings schema object from stage metadata.
-    rsParentPrimPath = Sdf.Path("/Render")
-    rsParentPrim = stage.GetPrimAtPath(rsParentPrimPath)
-    
-    if not rsParentPrim:
-        raise RuntimeError("Render settings parent prim %s not found." % str(rsParentPrimPath))
+    if not rsPrim:
+        raise RuntimeError("Render settings prim %s not found." % str(rsPrim.GetPath()))
 
     # rs is a UsdRender.Settings schema object.
-    rs = None
-    for child in rsParentPrim.GetChildren():
-        if child.IsA(UsdRender.Settings):
-            rs = UsdRender.Settings(child)
-            break
+    rs = UsdRender.Settings(rsPrim)
 
     if not rs:
         raise RuntimeError("No render settings found under %s." % str(rsParentPrimPath))
@@ -75,6 +61,12 @@ def setWidth(width):
     newRes = Gf.Vec2i(width, h)
     resAttr.Set(newRes)
 
+    def setProductResWidth(resAttr):
+        w, h = resAttr.Get()
+        resAttr.Set(Gf.Vec2i(width, h))
+
+    renderProducts.applyToResolution(setProductResWidth)
+
 def setHeight(height):
     cmds.setAttr("defaultResolution.height", height)
 
@@ -89,3 +81,9 @@ def setHeight(height):
     # See setWidth() Gf.Vec2i comments.
     newRes = Gf.Vec2i(w, height)
     resAttr.Set(newRes)
+
+    def setProductResHeight(resAttr):
+        w, h = resAttr.Get()
+        resAttr.Set(Gf.Vec2i(w, height))
+
+    renderProducts.applyToResolution(setProductResHeight)

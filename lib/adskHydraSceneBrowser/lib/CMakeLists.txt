@@ -52,10 +52,41 @@ string(REGEX REPLACE "(\\.|^)([1-9])(\\.|$)" "\\10\\2\\3" USD_minor_patch_versio
 set(DOWNLOAD_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/src/download")
 set(PATCH_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/src/patch")
 
+# Download a single hdui source/header file from OpenUSD, failing the configure
+# stage loudly if the transfer does not succeed. The upstream file(DOWNLOAD) call
+# used to run without any error handling, so a transient network failure or a
+# truncated response silently produced an empty file. That empty translation unit
+# then compiled cleanly but dropped every symbol it should have defined, surfacing
+# much later as a confusing link error (undefined vtable/symbols) instead of a
+# clear configure-time failure.
 macro(download file)
-    file(DOWNLOAD 
-    "https://raw.githubusercontent.com/PixarAnimationStudios/OpenUSD/v${USD_minor_patch_version}/extras/imaging/examples/hdui/${file}" 
-    "${DOWNLOAD_LOCATION}/${file}")
+    set(_download_url "https://raw.githubusercontent.com/PixarAnimationStudios/OpenUSD/v${USD_minor_patch_version}/extras/imaging/examples/hdui/${file}")
+    set(_download_dest "${DOWNLOAD_LOCATION}/${file}")
+    file(DOWNLOAD
+        "${_download_url}"
+        "${_download_dest}"
+        STATUS _download_status
+        TLS_VERIFY ON)
+
+    list(GET _download_status 0 _download_code)
+    list(GET _download_status 1 _download_message)
+    if(NOT _download_code EQUAL 0)
+        file(REMOVE "${_download_dest}")
+        message(FATAL_ERROR
+            "Failed to download '${file}' for ${TARGET_NAME}.\n"
+            "  URL   : ${_download_url}\n"
+            "  Error : ${_download_code} - ${_download_message}")
+    endif()
+
+    # A zero status only means the transfer completed; guard against an empty body
+    # (e.g. a proxy/CDN returning a 0-byte 200) as well.
+    file(SIZE "${_download_dest}" _download_size)
+    if(_download_size EQUAL 0)
+        file(REMOVE "${_download_dest}")
+        message(FATAL_ERROR
+            "Downloaded '${file}' for ${TARGET_NAME} is empty.\n"
+            "  URL : ${_download_url}")
+    endif()
 endmacro()
 
 # Insert an include directive at the top a file.

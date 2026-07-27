@@ -25,6 +25,8 @@
 
 // Flow Viewport Toolkit headers.
 #include "flowViewport/sceneIndex/fvpSceneIndexUtils.h"
+#include <flowViewport/selection/fvpPathMapperFwd.h>
+#include <flowViewport/selection/fvpSelectionTypes.h>
 
 //Usd/Hydra headers
 #include <pxr/base/tf/declarePtrs.h>
@@ -35,6 +37,7 @@
 //Maya headers
 #include <maya/MObjectHandle.h>
 
+#include <ufe/observer.h>
 #include <ufe/path.h>
 
 #include <memory>
@@ -65,12 +68,23 @@ public:
     New(const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
         const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
         const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
-        const MObjectHandle&                   dagNodeHandle
+        const MObjectHandle&                   dagNodeHandle,
+        const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
+        const Ufe::Path&                       sceneIndexAppPath
     );
 
     // From HdSceneIndexBase
     HdSceneIndexPrim GetPrim(const SdfPath& primPath) const override;
     SdfPathVector GetChildPrimPaths(const SdfPath& primPath) const override;
+
+    MAYAHYDRALIB_API
+    Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
+
+    const Ufe::Path& GetSceneIndexAppPath() const { return _sceneIndexAppPath; }
+    void             SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath)
+    {
+        _sceneIndexAppPath = sceneIndexAppPath;
+    }
 
     virtual ~MayaUsdProxyShapeSceneIndexBase();
 
@@ -106,8 +120,12 @@ protected:
         const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
         const HdSceneIndexBaseRefPtr&          sceneIndexChainLastElement,
         const UsdImagingStageSceneIndexRefPtr& usdImagingStageSceneIndex,
-        const MObjectHandle&                   dagNodeHandle
+        const MObjectHandle&                   dagNodeHandle,
+        const PXR_NS::SdfPath&                 sceneIndexPathPrefix,
+        const Ufe::Path&                       sceneIndexAppPath
     );
+
+    const SdfPath                   _sceneIndexPathPrefix;
 
 private:
 
@@ -119,6 +137,10 @@ private:
     MAYAUSDAPI_NS::ProxyStage       _proxyStage;
     std::atomic<bool>               _populated { false };
     MObjectHandle                   _dagNodeHandle;
+    Ufe::Path                       _sceneIndexAppPath;
+    const Fvp::PathMapperConstPtr   _usdPathMapper{};
+    const Ufe::Observer::Ptr        _appSceneObserver{};
+    bool                            _unregisterPathMapper{false};
     TfNotice::Key                   _stageSetNoticeKey;
     TfNotice::Key                   _stageInvalidateNoticeKey;
     TfNotice::Key                   _objectsChangedNoticeKey;

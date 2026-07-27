@@ -21,11 +21,6 @@
 
 #include <mayaHydraLib/sceneIndex/mhMayaUsdProxyShapeSceneIndexBase.h>
 
-// Flow Viewport Toolkit headers.
-#include <flowViewport/selection/fvpPathMapper.h>
-
-#include <ufe/observer.h>
-
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -55,14 +50,6 @@ public:
 
     ~MayaUsdProxyShapeSceneIndex() override;
 
-    Fvp::PrimSelections UfePathToPrimSelections(const Ufe::Path& appPath) const;
-
-    const Ufe::Path& GetSceneIndexAppPath() const { return _sceneIndexAppPath; }
-    void             SetSceneIndexAppPath(const Ufe::Path& sceneIndexAppPath)
-    {
-        _sceneIndexAppPath = sceneIndexAppPath;
-    }
-
 private:
     MayaUsdProxyShapeSceneIndex(
         const MAYAUSDAPI_NS::ProxyStage&       proxyStage,
@@ -75,14 +62,7 @@ private:
     void _Destroy() override;
     void _DestroyDerived();
 
-    // Path mapper support.
-    const SdfPath                   _sceneIndexPathPrefix;
-    Ufe::Path                       _sceneIndexAppPath;
-    const Ufe::Observer::Ptr        _appSceneObserver{};
-    const Fvp::PathMapperConstPtr   _usdPathMapper{};
-
     bool _unregisterPickHandler{false};
-    bool _unregisterPathMapper{false};
 };
 
 } // namespace MAYAHYDRA_NS_DEF

@@ -175,7 +175,6 @@ public:
     void UpdateLightsShadowCollection();
 
     // Dag Node operations
-    void InsertDag(const MDagPath& dag);
     void OnDagNodeAdded(const MObject& obj);
     void OnDagNodeRemoved(const MObject& obj);
     void AddNewInstance(const MDagPath& dag);
@@ -283,10 +282,16 @@ private:
     /// producer API (checked via DataProducersNodeHashCodeToSdfPathRegistry).
     MayaHydraCustomDagAdapterPtr CreateCustomAdapter(const MDagPath& dagPath);
 
-    // Utilites
+    void InsertDag(const MDagPath& dag);
+
+    // Utilities
     bool _GetRenderItem(int fastId, MayaHydraRenderItemAdapterPtr& adapter);
     void _AddPrimAncestors(const SdfPath& path);
     void _RemoveEmptyAncestors(const SdfPath& path);
+    // Create the material(s) for a mesh and, when it has more than one shading
+    // group, emit one HdGeomSubset (faceSet + material binding) per assignment so
+    // per-face/multi-material meshes shade correctly. See the .cpp for details.
+    void _InsertGeomSubsetsForMesh(const MDagPath& dag, const SdfPath& meshPrimId);
     void _AddRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
     void _RemoveRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
     bool

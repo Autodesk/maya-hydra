@@ -1,5 +1,93 @@
 # Changelog
 
+## [v0.8.2] - 2026-06-04
+
+**Features:**
+* Merge production / batch rendering work from the internal `production_rendering_poc` branch (Hydra command-line pipeline, `hydraRender` command, production renderer registration) [#418](https://github.com/Autodesk/maya-hydra/pull/418)
+* Image planes support [#412](https://github.com/Autodesk/maya-hydra/pull/412)
+* Support viewport picking for procedurals [#413](https://github.com/Autodesk/maya-hydra/pull/413)
+* Support outliner selection highlighting for Hydra Generative Procedurals [#406](https://github.com/Autodesk/maya-hydra/pull/406)
+* Support transforms at object level for Hydra Generative Procedurals [#415](https://github.com/Autodesk/maya-hydra/pull/415)
+* Support visibility changes for procedurals [#419](https://github.com/Autodesk/maya-hydra/pull/419)
+* Generic translation of custom Maya plugin nodes to Hydra [#400](https://github.com/Autodesk/maya-hydra/pull/400)
+* Support of external cameras through scene index filters [#427](https://github.com/Autodesk/maya-hydra/pull/427)
+* Configure render delegate to use scene render settings [#428](https://github.com/Autodesk/maya-hydra/pull/428)
+* Default render settings node support; render start / end in `defaultRenderGlobals` [#441](https://github.com/Autodesk/maya-hydra/pull/441)
+* Allowed fallback values for USD render settings attributes [#450](https://github.com/Autodesk/maya-hydra/pull/450)
+* Expose more data through `DataSource`'s `GetNames()` [#447](https://github.com/Autodesk/maya-hydra/pull/447)
+* Pass subdiv info to Hydra and change vertex normals to face normals in `MeshAdapter` [#430](https://github.com/Autodesk/maya-hydra/pull/430)
+* Bypass `NurbsCurveAdapter` when using mesh adapter [#420](https://github.com/Autodesk/maya-hydra/pull/420)
+* Use vertex interpolation for UV and tangent [#426](https://github.com/Autodesk/maya-hydra/pull/426)
+* Add support for `-s` (start frame) and `-e` (end frame) flags to command-line batch rendering [#440](https://github.com/Autodesk/maya-hydra/pull/440)
+* Add `-reg` L/R/B/T crop-region support to Maya Hydra batch rendering [#429](https://github.com/Autodesk/maya-hydra/pull/429)
+* Add `-warn` and `-warnpercent` idiff args to batch rendering [#435](https://github.com/Autodesk/maya-hydra/pull/435)
+* Add MayaHydra environment variable control for HdArnold use of Hydra v2 render settings [#443](https://github.com/Autodesk/maya-hydra/pull/443)
+
+**Fixed:**
+* Fix isolate-select visibility for USD light gizmos and USD camera gizmos [#410](https://github.com/Autodesk/maya-hydra/pull/410)
+* Fix when selecting multiple instances and doing isolate select (incorrect result / crash) [#432](https://github.com/Autodesk/maya-hydra/pull/432)
+* Fix crop region with render command line [#434](https://github.com/Autodesk/maya-hydra/pull/434)
+* Handle duplicate `fastIds` in render item removal list [#414](https://github.com/Autodesk/maya-hydra/pull/414)
+* Fixed custom attributes creation followed by undo/redo [#401](https://github.com/Autodesk/maya-hydra/pull/401)
+* Fix or suppress certain warnings on Linux [#425](https://github.com/Autodesk/maya-hydra/pull/425)
+* Fixed expected output for vector data sources [#449](https://github.com/Autodesk/maya-hydra/pull/449)
+* Fixes for consistency across render delegates (HYDRA-2229)
+
+**Performance:**
+* Do not query material when nothing changed [#438](https://github.com/Autodesk/maya-hydra/pull/438)
+
+**Build / Dependencies:**
+* HdArnold v2 render settings support off by default [#448](https://github.com/Autodesk/maya-hydra/pull/448)
+* Remove support for command line rendering in Maya 2026 [#446](https://github.com/Autodesk/maya-hydra/pull/446)
+* Added option to build ARM64 only on macOS [#445](https://github.com/Autodesk/maya-hydra/pull/445)
+* Use new API for `HdRendererPlugin::IsSupported` [#431](https://github.com/Autodesk/maya-hydra/pull/431)
+* Use `PXR_NAMESPACE_USING_DIRECTIVE` macro [#403](https://github.com/Autodesk/maya-hydra/pull/403)
+* Check `CONFIGURABLE_DECIMAL_STREAMING_AVAILABLE` [#404](https://github.com/Autodesk/maya-hydra/pull/404)
+* Add `colorSpace` to call to `BuildRetained` [#405](https://github.com/Autodesk/maya-hydra/pull/405)
+
+**Tests:**
+* Skip test at class level for Bifrost with USD 0.24.11 [#439](https://github.com/Autodesk/maya-hydra/pull/439)
+* Skip some tests on OSX [#421](https://github.com/Autodesk/maya-hydra/pull/421)
+* Add `-proj` command-line render unit test [#423](https://github.com/Autodesk/maya-hydra/pull/423)
+* Test timeout error fix [#433](https://github.com/Autodesk/maya-hydra/pull/433)
+
+## [v0.8.1] - 2026-04-08
+
+**Added:**
+* Add MayaHydra profiling utilities [#395](https://github.com/Autodesk/maya-hydra/pull/395)
+
+**Fixed:**
+* Fix PRMan lighting with Maya lights [#377](https://github.com/Autodesk/maya-hydra/pull/377)
+* Handle invalid primitives from MRenderItems [#378](https://github.com/Autodesk/maya-hydra/pull/378)
+* Fix extra notifications when changing custom attribute values on cameras and lights [#390](https://github.com/Autodesk/maya-hydra/pull/390)
+* Fix material bindings lost with Hydra Generative Procedurals [#394](https://github.com/Autodesk/maya-hydra/pull/394)
+* Clear USD trace when beginning a new trace [#396](https://github.com/Autodesk/maya-hydra/pull/396)
+* Fix the shadows enabled parameter under Hydra Arnold and PRMan [#409](https://github.com/Autodesk/maya-hydra/pull/409)	
+
+**Performance:**
+* Fix tumble performance drop [#384](https://github.com/Autodesk/maya-hydra/pull/384)
+
+**Features:**
+* Pass current frame information to Hydra [#381](https://github.com/Autodesk/maya-hydra/pull/381)
+* Support more custom attributes from Maya in Hydra translation [#383](https://github.com/Autodesk/maya-hydra/pull/383)
+* Support translation of Maya extension attributes to Hydra for lights, cameras, and meshes [#398](https://github.com/Autodesk/maya-hydra/pull/398)
+
+**Build / Dependencies:**
+* Update version to 0.8.1 [#375](https://github.com/Autodesk/maya-hydra/pull/375)
+* Add `HDGP_INCLUDE_DEFAULT_RESOLVER` by default [#397](https://github.com/Autodesk/maya-hydra/pull/397)
+
+**Tests:**
+* Remove camera sequencer popup in testUSDLights scene [#385](https://github.com/Autodesk/maya-hydra/pull/385)
+* Update image comparison threshold on macOS [#386](https://github.com/Autodesk/maya-hydra/pull/386)
+* Fix environment variables for LookdevX unit test [#387](https://github.com/Autodesk/maya-hydra/pull/387)
+* Fix unsupported primitive in testViewportFilters [#389](https://github.com/Autodesk/maya-hydra/pull/389)
+* Add test skipping based on hydraFixLevel [#392](https://github.com/Autodesk/maya-hydra/pull/392)
+* Make Bifrost update test conditional on USD versions above 0.24.x [#391](https://github.com/Autodesk/maya-hydra/pull/391)
+
+**Miscellaneous:**
+* Remove non-HVT code path [#376](https://github.com/Autodesk/maya-hydra/pull/376)
+* Merge `release_v0.8.0` into dev [#399](https://github.com/Autodesk/maya-hydra/pull/399)
+
 ## [v0.8.0] - 2026-02-10
 
 **Features:**
