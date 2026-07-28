@@ -2265,10 +2265,30 @@ bool MtohRenderOverride::select(
 
     //isOneMayaNodeInComponentsPickingMode will be true if one of the picked node is in components picking mode
     bool isOneMayaNodeInComponentsPickingMode = false;
+    const unsigned int ufeSnSizeBefore = _ufeSn ? _ufeSn->size() : 0;
+    const unsigned int mayaSnLengthBefore = selectionList.length();
     _PopulateSelectionList(outHits, selectInfo, selectionList, worldSpaceHitPts, isOneMayaNodeInComponentsPickingMode);
     if (isOneMayaNodeInComponentsPickingMode){
         return false;//When being in components picking on a node, returning false will use maya/OGS for components selection
     }
+
+    // If a marquee selection is done with GeomSubset picking enabled, and there are more than 1 pick hits,
+    // only GeomSubsets will be considered for picking. If the user forgets they have GeomSubset picking on, 
+    // this can lead to situations where they do a marquee select on USD data and nothing is selected.
+    // Warn the user about this so they are aware and potentially adjust their GeomSubset selection mode.
+    if (geomSubsetsPickMode == GeomSubsetsPickModeTokens->Faces
+        && !singlePick
+        && !pointSnappingActive
+        && !outHits.empty()
+        && _ufeSn && _ufeSn->size() == ufeSnSizeBefore
+        && selectionList.length() == mayaSnLengthBefore)
+    {
+        MGlobal::displayWarning(
+            "Marquee selection found pick hits but no selectable data. Note that for USD data, marquee selections with "
+            "GeomSubset picking enabled only select GeomSubsets and not the base geometry prims. "
+            "Please adjust the USD GeomSubset selection mode if necessary.");
+    }
+
     return true;
 }
 
