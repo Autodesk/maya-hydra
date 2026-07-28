@@ -17,6 +17,8 @@
 import os
 import shutil
 import sys
+import time
+import threading
 import unittest
 
 def _setUpClass(modulePathName, pluginName, initializeStandalone):
@@ -119,6 +121,55 @@ def loadTestsFromDict(namespace_dict):
             setattr(dummyModule, name, val)
     return unittest.TestLoader().loadTestsFromModule(dummyModule)
 
+def _log(msg):
+    """Write msg to the original stdout when MAYAHYDRA_TEST_DEBUG is set."""
+    if not os.environ.get("MAYAHYDRA_TEST_DEBUG"):
+        return
+    try:
+        sys.__stdout__.write(msg + "\n")
+        sys.__stdout__.flush()
+    except Exception:
+        pass
+
+
+def _forceMayaHostProcessExit(exit_code, stage=""):
+    """End the hosting maya.exe process immediately (best-effort)."""
+    code = int(exit_code) & 0xFFFFFFFF
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            k32 = ctypes.windll.kernel32
+            handle = k32.GetCurrentProcess()
+            ok = k32.TerminateProcess(handle, code)
+            if ok:
+                _log("MayaHydra: TerminateProcess(GetCurrentProcess) ok {}".format(stage))
+            else:
+                err = k32.GetLastError()
+                _log("MayaHydra: TerminateProcess(GetCurrentProcess) failed {} (err={})".format(
+                    stage, err))
+                # Try OpenProcess as a fallback.
+                PROCESS_TERMINATE = 0x0001
+                h2 = k32.OpenProcess(PROCESS_TERMINATE, False, os.getpid())
+                if h2:
+                    ok2 = k32.TerminateProcess(h2, code)
+                    if ok2:
+                        _log("MayaHydra: TerminateProcess(OpenProcess) ok {}".format(stage))
+                    else:
+                        err2 = k32.GetLastError()
+                        _log("MayaHydra: TerminateProcess(OpenProcess) failed {} (err={})".format(
+                            stage, err2))
+                    k32.CloseHandle(h2)
+                else:
+                    err3 = k32.GetLastError()
+                    _log("MayaHydra: OpenProcess(PROCESS_TERMINATE) failed {} (err={})".format(
+                        stage, err3))
+                # Last resort: ExitProcess (may deadlock on DLL detach).
+                _log("MayaHydra: ExitProcess fallback {}".format(stage))
+                k32.ExitProcess(code)
+        except Exception:
+            pass
+    os._exit(code)
+
 def runTests(globals_dict, stream=sys.__stderr__,
              verbosity=1):
     '''
@@ -132,11 +183,49 @@ def runTests(globals_dict, stream=sys.__stderr__,
     import maya.cmds as cmds
     suite = loadTestsFromDict(globals_dict)
     runner = unittest.TextTestRunner(stream=stream, verbosity=verbosity)
+    coverage_enabled = bool(os.environ.get("MAYAHYDRA_CODE_COVERAGE"))
+    coverage_start = None
+    if coverage_enabled:
+        coverage_start = time.monotonic()
+        _log("MayaHydra: coverage timing start (pid={}, t={:.3f})".format(
+            os.getpid(), coverage_start))
     results = runner.run(suite)
+    if coverage_enabled and coverage_start is not None:
+        _log("MayaHydra: coverage timing after tests (dt={:.3f}s)".format(
+            time.monotonic() - coverage_start))
     if results.wasSuccessful():
         exitCode = 0
     else:
         exitCode = 1
+
+    # Arm a single-shot faulthandler watchdog so a hang during shutdown still
+    # produces a traceback on stderr (silent unless MAYAHYDRA_TEST_DEBUG).
+    try:
+        import faulthandler
+        faulthandler.dump_traceback_later(120, repeat=False, file=sys.__stderr__)
+        _log("MayaHydra: quit watchdog armed (120s)")
+    except Exception as e:
+        _log("MayaHydra: failed to arm quit watchdog: {}".format(e))
+
+    if coverage_start is not None:
+        _log("MayaHydra: coverage timing pre-quit (dt={:.3f}s)".format(
+            time.monotonic() - coverage_start))
+
+    # Hard-exit watchdog: fires _forceMayaHostProcessExit if the forced exit
+    # below stalls.
+    hard_exit_delay = int(os.environ.get(
+        "MAYAHYDRA_HARD_EXIT_DELAY",
+        os.environ.get("MAYAHYDRA_COVERAGE_HARD_EXIT_DELAY", "5")))
+    def _hard_exit_after_delay():
+        time.sleep(hard_exit_delay)
+        _log("MayaHydra: hard-exit fired ({}s)".format(hard_exit_delay))
+        _forceMayaHostProcessExit(exitCode, stage="(hard-exit)")
+    threading.Thread(
+        target=_hard_exit_after_delay,
+        name="MayaHydraHardExit",
+        daemon=True,
+    ).start()
+    _log("MayaHydra: hard-exit scheduled ({}s)".format(hard_exit_delay))
 
     # cmds.quit will not flush the streams - make sure we do so!
     # ...flush all of the standard ones just to be sure, as well as the stream
@@ -147,9 +236,19 @@ def runTests(globals_dict, stream=sys.__stderr__,
     sys.__stderr__.flush()
     stream.flush()
 
-    # maya running interactively will absorb much of the output. comment out the
-    # following to prevent maya from exiting and open the script editor to look
-    # at failures.
+    # Force the host process to exit immediately. Maya shutdown can hang during
+    # teardown in any build (not just coverage), so we always bypass it and exit
+    # with the test status. Leave the faulthandler watchdog armed: TerminateProcess
+    # should return instantly, but if anything stalls we still get a traceback.
+    if coverage_start is not None:
+        _log("MayaHydra: coverage timing before force-exit (dt={:.3f}s)".format(
+            time.monotonic() - coverage_start))
+    _log("MayaHydra: forcing exit (exitCode={})".format(exitCode))
+    _forceMayaHostProcessExit(exitCode, stage="(force-exit)")
+
+    # Unreachable in normal runs: the force-exit above ends the process. Kept so
+    # a developer can comment out that call (and the lines below) to keep maya
+    # running and inspect failures in the script editor.
     if cmds.about(batch=True):
         # In mayabatch 'quit -abort' does not reliably produce the proper exit
         # code, so use Python instead.

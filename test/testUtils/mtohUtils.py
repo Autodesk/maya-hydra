@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 import os
+import platform
 import unittest
 
 import maya.cmds as cmds
@@ -26,7 +27,6 @@ from imageUtils import ImageDiffingTestCase
 from testUtils import PluginLoaded
 from pxr import Usd
 
-import platform
 # subprocess is required to invoke the Windows taskkill utility from
 # tearDownClass() to terminate ADPClientService, which can otherwise hold a
 # handle on the temporary test directory and prevent cleanup. Bandit B404
@@ -59,6 +59,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
 
     #The OpenUSD version
     _usdVersion = None
+    _usdEnvLogged = False
 
     # Unloading mayaHydraFlowViewportAPILocator crashes Maya (HYDRA-1304).
     # Unloading mtoa succeeds on Linux, but fails on Windows and macOS
@@ -107,10 +108,183 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
                 cls._pluginsToUnload.append(p)
                 cmds.loadPlugin(p, quiet=True)
 
-        #Set the usd version
+        # Set the usd version
         cls._usdVersion = Usd.GetVersion()
+        cls._logUsdEnvironment()
+
+        # Enable Script Editor history capture for image diff debugging.
+        cls._enable_script_editor_history_capture()
+
+    @classmethod
+    def _enable_script_editor_history_capture(cls):
+        """Capture Script Editor output to a file for debugging diffs."""
+        try:
+            cls._saved_script_editor = {
+                "writeHistory": cmds.scriptEditorInfo(q=True, writeHistory=True),
+                "historyFilename": cmds.scriptEditorInfo(q=True, historyFilename=True),
+            }
+            history_file = os.path.join(cls._testDir, "maya_scriptEditor_history.txt")
+            cmds.scriptEditorInfo(edit=True, writeHistory=True, historyFilename=history_file)
+            cls._script_editor_history_file = history_file
+        except Exception:
+            cls._saved_script_editor = None
+            cls._script_editor_history_file = None
+
+    @classmethod
+    def _restore_script_editor_history_capture(cls):
+        """Restore Script Editor capture settings."""
+        try:
+            saved = getattr(cls, "_saved_script_editor", None)
+            if saved:
+                cmds.scriptEditorInfo(
+                    edit=True,
+                    writeHistory=saved.get("writeHistory", False),
+                    historyFilename=saved.get("historyFilename", ""),
+                )
+        except Exception:
+            pass
+
+    def _dump_script_editor_history(self, title):
+        """Dump Script Editor history to stdout for CI visibility."""
+        if getattr(self, "_script_editor_dumped", False):
+            return
+        path = getattr(self.__class__, "_script_editor_history_file", None)
+        if not path or not os.path.isfile(path):
+            return
+        self._script_editor_dumped = True
+        try:
+            sys.__stdout__.write("\n===== BEGIN {} ({}) =====\n".format(title, path))
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                for ln in f:
+                    sys.__stdout__.write(ln)
+            sys.__stdout__.write("===== END {} =====\n".format(title))
+            sys.__stdout__.flush()
+        except Exception:
+            pass
+
+    @classmethod
+    def _logUsdEnvironment(cls):
+        """Log USD-related environment details for debugging."""
+        if cls._usdEnvLogged:
+            return
+        cls._usdEnvLogged = True
+        keys = [
+            "PXR_USD_LOCATION",
+            "USD_INSTALL_LOCATION",
+            "PXR_PLUGINPATH_NAME",
+            "MAYA_PXR_PLUGINPATH_NAME",
+            "PXR_OVERRIDE_PLUGINPATH_NAME",
+            "LD_LIBRARY_PATH",
+            "DYLD_LIBRARY_PATH",
+            "TF_DEBUG",
+            "RMANTREE",
+            "PRMAN_DELEGATE_PLUGIN_PATH",
+        ]
+        env_parts = []
+        for key in keys:
+            env_parts.append("{}={}".format(key, os.environ.get(key, "")))
+        sys.__stdout__.write("USD env: {}\n".format(" | ".join(env_parts)))
+        sys.__stdout__.write("USD version: {}\n".format(cls._usdVersion))
+        try:
+            sep = ";" if platform.system() == "Windows" else ":"
+            plugin_path = os.environ.get("PXR_PLUGINPATH_NAME", "")
+            plugin_entries = [p for p in plugin_path.split(sep) if p]
+            sys.__stdout__.write("USD plugin path entries ({}):\n".format(len(plugin_entries)))
+            for idx, p in enumerate(plugin_entries):
+                sys.__stdout__.write("  {}: {}\n".format(idx, p))
+        except Exception as e:
+            sys.__stdout__.write("USD plugin path entries: (unavailable) {}\n".format(e))
+        plugin_path = None
+        try:
+            plugin_path = cmds.pluginInfo(MAYAUSD_PLUGIN_NAME, q=True, path=True)
+            sys.__stdout__.write("mayaUsdPlugin path: {}\n".format(plugin_path))
+        except Exception as e:
+            sys.__stdout__.write("mayaUsdPlugin path: (unavailable) {}\n".format(e))
+        try:
+            from pxr import Plug
+
+            registry = Plug.Registry()
+            plugins = registry.GetAllPlugins()
+            sys.__stdout__.write("USD plugins discovered: {}\n".format(len(plugins)))
+
+            name_to_paths = {}
+            for plugin in plugins:
+                name = getattr(plugin, "name", None)
+                if not name and hasattr(plugin, "GetName"):
+                    name = plugin.GetName()
+                path = getattr(plugin, "path", None)
+                if not path and hasattr(plugin, "GetPath"):
+                    path = plugin.GetPath()
+                if not name:
+                    continue
+                name_to_paths.setdefault(name, []).append(path or "")
+
+            dup_names = {
+                name: paths for name, paths in name_to_paths.items()
+                if len(set([p for p in paths if p])) > 1
+            }
+            if dup_names:
+                sys.__stdout__.write("USD plugin duplicates detected:\n")
+                for name in sorted(dup_names.keys()):
+                    sys.__stdout__.write("  {}\n".format(name))
+                    for p in dup_names[name]:
+                        if p:
+                            sys.__stdout__.write("    {}\n".format(p))
+            else:
+                sys.__stdout__.write("USD plugin duplicates detected: none\n")
+        except Exception as e:
+            sys.__stdout__.write("USD plugin registry logging failed: {}\n".format(e))
+        try:
+            if platform.system() == "Darwin":
+                def _print_rpaths(label, path):
+                    if not path or not os.path.isfile(path):
+                        sys.__stdout__.write("{} rpath: (missing) {}\n".format(label, path))
+                        return
+                    try:
+                        output = subprocess.check_output(
+                            ["otool", "-l", path],
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                        )
+                        lines = []
+                        capture = False
+                        for line in output.splitlines():
+                            if "cmd LC_RPATH" in line:
+                                capture = True
+                                lines.append(line.strip())
+                            elif capture and "path " in line:
+                                lines.append(line.strip())
+                                capture = False
+                        sys.__stdout__.write("{} rpath:\n".format(label))
+                        for ln in lines:
+                            sys.__stdout__.write("  {}\n".format(ln))
+                    except Exception as err:
+                        sys.__stdout__.write("{} rpath: (error) {}\n".format(label, err))
+
+                if plugin_path:
+                    _print_rpaths("mayaUsdPlugin", plugin_path)
+                try:
+                    mtoa_path = cmds.pluginInfo("mtoa", q=True, path=True)
+                    _print_rpaths("mtoa", mtoa_path)
+                except Exception:
+                    pass
+        except Exception as e:
+            sys.__stdout__.write("rpath dump failed: {}\n".format(e))
+        sys.__stdout__.flush()
         
     def setUp(self):
+        self._script_editor_dumped = False
+        # Enable Maya Script Editor history capture for all tests (dumped on image failure).
+        try:
+            prev_write = cmds.scriptEditorInfo(q=True, writeHistory=True)
+            prev_file = cmds.scriptEditorInfo(q=True, historyFilename=True) or ""
+            self._saved_script_editor = {"writeHistory": prev_write, "historyFilename": prev_file}
+            if not prev_write:
+                history_file = os.path.join(self._testDir, "maya_scriptEditor_history.txt")
+                cmds.scriptEditorInfo(edit=True, writeHistory=True, historyFilename=history_file)
+        except Exception:
+            self._saved_script_editor = None
+
         # Maya is not closed/reset between each test of a test suite,
         # so open a new file before each test to minimize leftovers
         # from previous tests.
@@ -127,8 +301,22 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         # method documentation).  Restore modified status to false.
         cmds.file(modified=False)
 
+    def tearDown(self):
+        # Restore Script Editor capture if we enabled it in setUp.
+        try:
+            saved = getattr(self, "_saved_script_editor", None)
+            if saved and not saved.get("writeHistory", True):
+                cmds.scriptEditorInfo(
+                    edit=True,
+                    writeHistory=saved["writeHistory"],
+                    historyFilename=saved.get("historyFilename", ""),
+                )
+        except Exception:
+            pass
+
     @classmethod
     def tearDownClass(cls):
+        cls._restore_script_editor_history_capture()
         # Clean out the scene to allow all plugins to unload cleanly.
         cmds.file(new=True, force=True)
         for p in reversed(cls._pluginsToUnload):
@@ -138,7 +326,7 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         if platform.system() == "Windows":
             # On Windows, ADPClientService can linger around after a test ends and Maya closes,
             # keeping a handle open into the temporary test directory that holds preferences,
-            # settings, etc. This prevents us from deleting the temporary test directory, and 
+            # settings, etc. This prevents us from deleting the temporary test directory, and
             # thus from cleaning the build. To avoid this, kill the process immediately.
             # So far (2024-03-25), this has only been observed when using LookdevX.
             # Note that the force (/f) flag seems necessary, omitting it did not end up killing
@@ -285,41 +473,69 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
         return refImage
 
     def assertImagesClose(self, image1, image2, fail, failpercent, image1Version=None, image2Version=None, 
-                hardfail=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                hardfail=None, failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         imagePath1 = self.resolveRefImage(image1, image1Version)
         imagePath2 = self.resolveRefImage(image2, image2Version)
-        super(MayaHydraBaseTestCase, self).assertImagesClose(imagePath1, imagePath2, fail, failpercent, hardfail, 
-                            warn, warnpercent, hardwarn, perceptual)
+        try:
+            super(MayaHydraBaseTestCase, self).assertImagesClose(
+                imagePath1, imagePath2, fail, failpercent, hardfail=hardfail,
+                failrelative=failrelative, warn=warn, warnpercent=warnpercent,
+                hardwarn=hardwarn, perceptual=perceptual)
+        except AssertionError:
+            self._dump_script_editor_history("Maya Script Editor history (image diff)")
+            raise
         
     def assertImagesEqual(self, image1, image2, image1Version=None, image2Version=None):
         imagePath1 = self.resolveRefImage(image1, image1Version)
         imagePath2 = self.resolveRefImage(image2, image2Version)
-        super(MayaHydraBaseTestCase, self).assertImagesEqual(imagePath1, imagePath2)
+        try:
+            super(MayaHydraBaseTestCase, self).assertImagesEqual(imagePath1, imagePath2)
+        except AssertionError:
+            self._dump_script_editor_history("Maya Script Editor history (image diff)")
+            raise
 
     def assertSnapshotClose(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         refImagePath = self.resolveRefImage(refImage, imageVersion)
-        super(MayaHydraBaseTestCase, self).assertSnapshotClose(refImagePath, fail, failpercent, hardfail,
-                            warn, warnpercent, hardwarn, perceptual, imageVersion=imageVersion)
+        try:
+            super(MayaHydraBaseTestCase, self).assertSnapshotClose(
+                refImagePath, fail, failpercent, hardfail=hardfail,
+                failrelative=failrelative, warn=warn, warnpercent=warnpercent,
+                hardwarn=hardwarn, perceptual=perceptual, imageVersion=imageVersion)
+        except AssertionError:
+            self._dump_script_editor_history("Maya Script Editor history (image diff)")
+            raise
 
     def assertSnapshotEqual(self, refImage, imageVersion=None):
         '''Use of this method is discouraged, as renders can vary slightly between renderer architectures.'''
         refImagePath = self.resolveRefImage(refImage, imageVersion)
-        super(MayaHydraBaseTestCase, self).assertSnapshotEqual(refImagePath)
+        try:
+            super(MayaHydraBaseTestCase, self).assertSnapshotEqual(refImagePath)
+        except AssertionError:
+            self._dump_script_editor_history("Maya Script Editor history (image diff)")
+            raise
     
     def assertSnapshotSilhouetteClose(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         refImagePath = self.resolveRefImage(refImage, imageVersion)
-        super(MayaHydraBaseTestCase, self).assertSnapshotSilhouetteClose(refImagePath, fail, failpercent, hardfail,
-                            warn, warnpercent, hardwarn, perceptual)
+        try:
+            super(MayaHydraBaseTestCase, self).assertSnapshotSilhouetteClose(
+                refImagePath, fail, failpercent, hardfail=hardfail,
+                failrelative=failrelative, warn=warn, warnpercent=warnpercent,
+                hardwarn=hardwarn, perceptual=perceptual)
+        except AssertionError:
+            self._dump_script_editor_history("Maya Script Editor history (image diff)")
+            raise
 
     def assertSnapshotAndCompareVp2(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
         self.setHdStormRenderer()
-        self.assertSnapshotClose(refImage, fail, failpercent, imageVersion, hardfail, warn, warnpercent, hardwarn, perceptual)
+        self.assertSnapshotClose(refImage, fail, failpercent, imageVersion, hardfail=hardfail,
+            failrelative=failrelative, warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, perceptual=perceptual)
 
         self.setViewport2Renderer()
-        self.assertSnapshotSilhouetteClose(refImage, fail, failpercent, imageVersion, hardfail, warn, warnpercent, hardwarn, perceptual)
+        self.assertSnapshotSilhouetteClose(refImage, fail, failpercent, imageVersion, hardfail=hardfail,
+            failrelative=failrelative, warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, perceptual=perceptual)
 
         self.setHdStormRenderer()
 
