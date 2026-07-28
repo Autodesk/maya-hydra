@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 
+import platform
 import maya.cmds as cmds
 import fixturesUtils
 import mtohUtils
@@ -27,6 +28,14 @@ class TestFlowPluginsHierarchicalProperties(mtohUtils.MayaHydraBaseTestCase):
 
     IMAGE_DIFF_FAIL_THRESHOLD = 0.05
     IMAGE_DIFF_FAIL_PERCENT = 1
+    IMAGE_DIFF_FAIL_PERCENT_OSX = 3.0
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestFlowPluginsHierarchicalProperties, cls).setUpClass()
+        if platform.system() == "Darwin":
+            # Metal produces slightly different silhouettes on macOS.
+            cls.IMAGE_DIFF_FAIL_PERCENT = cls.IMAGE_DIFF_FAIL_PERCENT_OSX
 
     def keyframeAttribute(self, object, attr, value):
         cmds.setAttr(object + "." + attr, value)

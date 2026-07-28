@@ -239,6 +239,12 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         return {};
     }
 
+    // clippingRange is required for all cameras (ortho and perspective)
+    if (paramName == HdCameraTokens->clippingRange) {
+        const double cameraNear = camera.nearClippingPlane();
+        const double cameraFar = camera.farClippingPlane();
+        return VtValue(GfRange1f(float(cameraNear), float(cameraFar)));
+    }
     if (paramName == HdCameraTokens->shutterOpen) {
         // No motion samples, instantaneous shutter
         if (!GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled())
@@ -273,11 +279,6 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         if (hadError(status))
             return {};
         return VtValue(float(focalLength)); /// focalLength is in mm, so no conversion needed
-    }
-    if (paramName == HdCameraTokens->clippingRange) {
-        const double cameraNear = camera.nearClippingPlane();
-        const double cameraFar = camera.farClippingPlane();
-        return VtValue(GfRange1f(cameraNear, cameraFar));
     }
     if (paramName == HdCameraTokens->fStop) {
         // For USD/Hydra fStop=0 should disable depthOfField

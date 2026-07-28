@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 import os
+import pathlib
 import platform
 import maya.cmds as cmds
 import shutil
@@ -66,17 +67,19 @@ def snapshot(outputPath, width=400, height=None):
     #Enable undo again
     cmds.undoInfo(stateWithoutFlush=True)
 
-def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail, 
-                warn, warnpercent, hardwarn, perceptual):    
+def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail=None,
+                failrelative=None, warn=None, warnpercent=None, hardwarn=None,
+                perceptual=False):    
     """ Returns the completed process instance after running idiff or None if
         execution of process failed.
     
     imagePath1   -- First image to compare.
     imagePath2   -- Second image to compare.
     verbose      -- If enabled, the image diffing command will be printed to log.
-    fail         -- The threshold for the acceptable difference (relatively to the mean of 
-                    the two values) of a pixel for failure.    
+    fail         -- The threshold for absolute pixel difference for failure.
     failpercent  -- The percentage of pixels that can be different before failure.
+    failrelative -- If set, uses relative difference (scaled by mean of two values). Use 0 for
+                    strict pixel-per-pixel absolute comparison only.
     hardfail     -- Triggers a failure if any pixels are above this threshold (if the absolute 
                     difference is below this threshold).
     warn         -- The threshold for the acceptable difference of a pixel for a warning.
@@ -106,6 +109,8 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail,
         cmdArgs.extend(['-fail', str(fail)])
     if failpercent is not None:
         cmdArgs.extend(['-failpercent', str(failpercent)])
+    if failrelative is not None:
+        cmdArgs.extend(['-failrelative', str(failrelative)])
     if hardfail is not None:
         cmdArgs.extend(['-hardfail', str(hardfail)])
     if perceptual:
@@ -160,6 +165,50 @@ def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail,
 
     return None # Running of imageDiff failed.
 
+def _generateDiffImage(imagePath1, imagePath2, outputPath):
+    """Generate a visual diff image. Prefers oiiotool --absdiff --maxchan; falls back to idiff.
+    Returns output path if successful, else None."""
+    import sys
+    image_diff_tool = os.environ.get('IMAGE_DIFF_TOOL')
+    if not image_diff_tool:
+        return None
+    os.makedirs(os.path.dirname(outputPath), exist_ok=True)
+
+    # Prefer oiiotool: --absdiff --maxchan --powc 0.5 --mulc 40 --clamp:max=1
+    oiiotool_exe = (
+        os.environ.get('OIIOTOOL') or
+        (os.path.join(os.path.dirname(image_diff_tool),
+          'oiiotool.exe' if sys.platform == 'win32' else 'oiiotool')
+         if os.path.dirname(image_diff_tool) else None) or
+        (shutil.which('oiiotool') if shutil.which else None)
+    )
+    if oiiotool_exe and os.path.isfile(oiiotool_exe):
+        cmd = [
+            oiiotool_exe, imagePath1, imagePath2,
+            '--absdiff', '--maxchan', '--powc', '0.5', '--mulc', '40',
+            '--clamp:max=1', '-o', outputPath
+        ]
+        env = os.environ.copy()
+        oiio_dir = os.path.dirname(oiiotool_exe)
+        if oiio_dir:
+            env['PATH'] = oiio_dir + os.pathsep + env.get('PATH', '')
+        try:
+            proc = subprocess.run(cmd, capture_output=True, shell=False, env=env)
+            if proc.returncode == 0 and os.path.isfile(outputPath):
+                return outputPath
+        except OSError:
+            pass
+
+    # Fallback: idiff -o -abs -scale 1
+    cmd = [image_diff_tool, '-o', outputPath, '-abs', '-scale', '1', imagePath1, imagePath2]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, shell=False, env=os.environ.copy())
+        if proc.returncode in (0, 1, 2) and os.path.isfile(outputPath):
+            return outputPath
+    except OSError:
+        pass
+    return None
+
 def convertToSilhouette(imagePath):
     # 2024-06-13 : Tried to use oiiotool instead of PySide for this to be more efficient,
     # however it did not work under certain circumstances, for example when trying to
@@ -193,10 +242,11 @@ class ImageDiffingTestCase:
         return snapshotDir
 
     def assertImagesClose(self, imagePath1, imagePath2, fail, failpercent, hardfail=None,
-                    warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                    failrelative=None, warn=None, warnpercent=None, hardwarn=None,
+                    perceptual=False):
         """ 
         The method will return idiff's return code if the comparison passes with 
-        a return code of 0 or 1. 
+        a return code of 0 or 1.
         0 -- OK: the images match within the warning and error thresholds.
         1 -- Warning: the errors differ a little, but within error thresholds.
         
@@ -209,6 +259,7 @@ class ImageDiffingTestCase:
         cmds.undoInfo(stateWithoutFlush=False)
         proc = imageDiff(imagePath1, imagePath2, verbose=True, 
                             fail=fail, failpercent=failpercent, hardfail=hardfail,
+                            failrelative=failrelative,
                             warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, 
                             perceptual=perceptual)
         if proc is None:
@@ -217,14 +268,104 @@ class ImageDiffingTestCase:
         #Enable undo again
         cmds.undoInfo(stateWithoutFlush=True)
         if proc.returncode not in (0, 1):
-            self.fail(str(proc.stdout))
+            abs1 = os.path.abspath(imagePath1).replace('\\', '/')
+            abs2 = os.path.abspath(imagePath2).replace('\\', '/')
+
+            artifact_base = os.environ.get('JENKINS_ARTIFACT_BASE', '').rstrip('/')
+            # Prefer explicit workspace; fall back to WORKSPACE (Jenkins); then infer from paths
+            workspace = os.environ.get('JENKINS_ARTIFACT_WORKSPACE', '') or os.environ.get('WORKSPACE', '')
+            if workspace:
+                workspace = os.path.normpath(workspace)
+
+            if artifact_base:
+                def _resolve(p):
+                    try:
+                        return str(pathlib.Path(p).resolve())
+                    except (OSError, RuntimeError):
+                        return os.path.normpath(p.replace('/', os.sep))
+
+                def _artifact_url(abs_path, workspace_dir):
+                    if not workspace_dir:
+                        return None
+                    try:
+                        resolved_path = _resolve(abs_path)
+                        resolved_ws = _resolve(workspace_dir)
+                        rel = os.path.relpath(resolved_path, resolved_ws)
+                        if rel.startswith('..'):
+                            return None
+                        return artifact_base + '/' + rel.replace('\\', '/')
+                    except ValueError:
+                        return None
+
+                # Try workspace first; if relpath fails (e.g. different drives on Windows),
+                # use common ancestor of both image paths as fallback workspace
+                url1 = _artifact_url(abs1, workspace) if workspace else None
+                url2 = _artifact_url(abs2, workspace) if workspace else None
+                if (url1 is None or url2 is None) and abs1 and abs2:
+                    try:
+                        r1 = _resolve(abs1)
+                        r2 = _resolve(abs2)
+                        common = os.path.commonpath([r1, r2])
+                        if common:
+                            if url1 is None:
+                                url1 = _artifact_url(abs1, common)
+                            if url2 is None:
+                                url2 = _artifact_url(abs2, common)
+                    except (ValueError, OSError):
+                        pass
+
+                browse_url = artifact_base + '/'
+                diff_path = None
+                _, ext1 = os.path.splitext(os.path.basename(abs1))
+                base2, ext2 = os.path.splitext(os.path.basename(abs2))
+                ext = ext1 or ext2 or '.png'
+                diff_output = os.path.join(os.path.dirname(abs2), base2 + '_diff' + ext)
+                diff_path = _generateDiffImage(abs1, abs2, diff_output)
+                if diff_path:
+                    diff_abs = os.path.abspath(diff_path).replace('\\', '/')
+                    url_diff = _artifact_url(diff_abs, workspace) if workspace else None
+                    if url_diff is None and abs1 and abs2:
+                        try:
+                            r_diff = _resolve(diff_abs)
+                            r1 = _resolve(abs1)
+                            r2 = _resolve(abs2)
+                            common = os.path.commonpath([r1, r2])
+                            if common:
+                                url_diff = _artifact_url(diff_abs, common)
+                        except (ValueError, OSError):
+                            pass
+                else:
+                    url_diff = None
+
+                msg = str(proc.stdout) + "\n\nImage comparison failed.\n"
+                if url1:
+                    msg += "  Baseline: {}\n".format(url1)
+                if url2:
+                    msg += "  Actual:   {}\n".format(url2)
+                if url_diff:
+                    msg += "  Diff:     {}\n".format(url_diff)
+                msg += "  Browse:   {}\n".format(browse_url)
+            else:
+                msg = str(proc.stdout) + "\n\nImage comparison failed.\n"
+                msg += "  Baseline: {}\n".format(abs1)
+                msg += "  Actual:   {}\n".format(abs2)
+                _, ext1 = os.path.splitext(os.path.basename(abs1))
+                base2, ext2 = os.path.splitext(os.path.basename(abs2))
+                ext = ext1 or ext2 or '.png'
+                diff_output = os.path.join(os.path.dirname(abs2), base2 + '_diff' + ext)
+                diff_path = _generateDiffImage(abs1, abs2, diff_output)
+                if diff_path:
+                    msg += "  Diff:     {}\n".format(os.path.abspath(diff_path).replace('\\', '/'))
+
+            self.fail(msg)
         return proc.returncode
     
     def assertImagesEqual(self, imagePath1, imagePath2):
         self.assertImagesClose(imagePath1, imagePath2, fail=None, failpercent=None)
     
     def assertSnapshotClose(self, refImagePath, fail, failpercent, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False, *, imageVersion=None):
+                failrelative=None, warn=None, warnpercent=None, hardwarn=None,
+                perceptual=False, *, imageVersion=None):
         if imageVersion is not None:
             snapImagePath = os.path.join(self.getSnapshotDir(), imageVersion, os.path.basename(refImagePath))
         else:
@@ -233,6 +374,7 @@ class ImageDiffingTestCase:
         
         return self.assertImagesClose(refImagePath, snapImagePath, 
                fail=fail, failpercent=failpercent, hardfail=hardfail,
+               failrelative=failrelative,
                warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, 
                perceptual=perceptual)
         
@@ -241,7 +383,8 @@ class ImageDiffingTestCase:
         return self.assertSnapshotClose(refImagePath, fail=None, failpercent=None)
 
     def assertSnapshotSilhouetteClose(self, refImagePath, fail, failpercent, hardfail=None, 
-                warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                failrelative=None, warn=None, warnpercent=None, hardwarn=None,
+                perceptual=False):
         refImageName, refImageExtension = os.path.splitext(os.path.basename(refImagePath))
 
         refSilhouetteImagePath = os.path.join(self.getSnapshotDir(), refImageName + "_ReferenceSilhouette" + refImageExtension)
@@ -254,5 +397,6 @@ class ImageDiffingTestCase:
 
         return self.assertImagesClose(refSilhouetteImagePath, snapSilhouetteImagePath, 
                fail=fail, failpercent=failpercent, hardfail=hardfail,
+               failrelative=failrelative,
                warn=warn, warnpercent=warnpercent, hardwarn=hardwarn, 
                perceptual=perceptual)

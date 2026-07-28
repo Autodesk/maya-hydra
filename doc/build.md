@@ -243,7 +243,19 @@ CMAKE_SKIP_RPATH=TRUE
 ```
 To allow your tests to run, you can inject LD_LIBRARY_PATH into any of the mayaHydra_add_test calls by setting the ADDITIONAL_LD_LIBRARY_PATH cmake variable to $ENV{LD_LIBRARY_PATH} or similar.
 
-There is a related ADDITIONAL_PXR_PLUGINPATH_NAME cmake var which can be used if schemas are installed in a non-standard location
+There is a related `ADDITIONAL_PXR_PLUGINPATH_NAME` CMake variable which appends paths to `PXR_PLUGINPATH_NAME` for tests. Use it when Hydra render delegate plugins (e.g. HdArnold) are installed in a non-standard location:
+
+```
+cmake -DADDITIONAL_PXR_PLUGINPATH_NAME="C:/path/to/arnold-usd/install/plugin" ...
+```
+
+The same variable can be set in the environment before running CMake (e.g. from a build pipeline) so the path is picked up automatically.
+
+**Arnold (MtoA):** When `MTOA_LOCATION` and `USD_VERSION` are defined, the HdArnold plugin path is added only if `plugInfo.json` is found: `${MTOA_LOCATION}/usd/bundle/<version>` (newer Arnold) is tried first, then `${MTOA_LOCATION}/usd/hydra/<version>` (older).
+
+**RenderMan (PRMan):** For HdPrman tests, provide the RenderMan locations via CMake cache variables (`-DRMANTREE=...`, `-DRENDERMAN_LOCATION=...` (optional), `-DPIXAR_LICENSE_FILE=...` (license server, format: `port@hostname`), `-DPRMAN_DELEGATE_PLUGIN_PATH=...` (path containing HdPrman `plugInfo.json`)) or via environment variables of the same names. CMake variables take precedence. On Windows, the test harness adds `${RMANTREE}/bin` and `${RMANTREE}/lib` to `PATH` when `RMANTREE` is set.
+
+**Local development:** If `PXR_PLUGINPATH_NAME` or `MAYA_PXR_PLUGINPATH_NAME` is set in your environment when you run CMake, those paths are automatically appended to the test environment. This allows locally-installed Hydra plugins (e.g. HdArnold, HdPrman) to be discovered when running tests. On Windows, use forward slashes or escaped backslashes in the path.
 
 ### Using Visual Studio as the generator
 

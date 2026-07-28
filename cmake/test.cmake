@@ -1,5 +1,17 @@
 set(MAYA_HYDRA_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
+# Paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold plugin).
+# Sources (first wins): -DADDITIONAL_PXR_PLUGINPATH_NAME=... or $ENV{ADDITIONAL_PXR_PLUGINPATH_NAME}
+# On Windows use forward slashes or escaped backslashes.
+if(NOT DEFINED ADDITIONAL_PXR_PLUGINPATH_NAME)
+    set(ADDITIONAL_PXR_PLUGINPATH_NAME "" CACHE STRING
+        "Semicolon-separated paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold)")
+endif()
+if(NOT ADDITIONAL_PXR_PLUGINPATH_NAME AND DEFINED ENV{ADDITIONAL_PXR_PLUGINPATH_NAME})
+    set(ADDITIONAL_PXR_PLUGINPATH_NAME "$ENV{ADDITIONAL_PXR_PLUGINPATH_NAME}" CACHE STRING
+        "Semicolon-separated paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold)" FORCE)
+endif()
+
 if(MayaUsd_FOUND)
     if(IS_MACOSX OR IS_LINUX) 
         #When MayaUsd_FOUND is true, MAYAUSDAPI_LIBRARY exists as it is required. 
@@ -208,11 +220,6 @@ function(mayaUsd_get_unittest_target unittest_target unittest_basename)
     get_filename_component(unittest_name ${unittest_basename} NAME_WE)
     set(${unittest_target} "${unittest_name}" PARENT_SCOPE)
 endfunction()
-
-# -----------------------------------------------------------------------------
-# Shared helper functions for test setup
-# -----------------------------------------------------------------------------
-
 # Set up common path environment variables for Maya Hydra tests
 function(_mayaHydra_setup_test_common_path_vars)
     set(ALL_PATH_VARS
@@ -274,12 +281,38 @@ endfunction()
 function(_mayaHydra_setup_test_common_defaults test_name)
     set(ALL_TEST_VARS
         IMAGE_DIFF_TOOL
+        OIIOTOOL
         MAYA_HAS_RENDER_ITEM_CULL_MODE_API
     )
+    # Configure default PRMan allowed platforms for tests.
+    list(APPEND ALL_TEST_VARS MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS)
+    if(IS_WINDOWS)
+        set(MAYAHYDRA_VARNAME_MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS "windows")
+    else()
+        set(MAYAHYDRA_VARNAME_MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS "")
+    endif()
 
     set(MAYAHYDRA_VARNAME_IMAGE_DIFF_TOOL "${IMAGE_DIFF_TOOL}")
+    set(MAYAHYDRA_VARNAME_OIIOTOOL "${OIIOTOOL}")
 
     set(MAYAHYDRA_VARNAME_MAYA_HAS_RENDER_ITEM_CULL_MODE_API "${MAYA_HAS_RENDER_ITEM_CULL_MODE_API}")
+
+    if(CODE_COVERAGE)
+        list(APPEND ALL_TEST_VARS MAYAHYDRA_CODE_COVERAGE)
+        set(MAYAHYDRA_VARNAME_MAYAHYDRA_CODE_COVERAGE "1")
+    endif()
+
+    if(IS_MACOSX)
+        # Dump failing HdSt shader sources to help diagnose Metal compilation issues.
+        set(_tf_debug "$ENV{TF_DEBUG}")
+        if(_tf_debug)
+            set(_tf_debug "${_tf_debug},HDST_DUMP_FAILING_SHADER_SOURCEFILE")
+        else()
+            set(_tf_debug "HDST_DUMP_FAILING_SHADER_SOURCEFILE")
+        endif()
+        list(APPEND ALL_TEST_VARS TF_DEBUG)
+        set(MAYAHYDRA_VARNAME_TF_DEBUG "${_tf_debug}")
+    endif()
 
     foreach(testvar ${ALL_TEST_VARS})
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
@@ -318,6 +351,17 @@ function(_mayaHydra_setup_test_plugins)
         endif()
         list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH 
              "${MAYAUSD_LOCATION}/lib/python")
+        # USD plugin paths:
+        # - Windows: prepend OpenUSD (for PRMan delegate discovery), then MayaUSD lib/usd.
+        # - macOS/Linux: use MayaUSD lib/usd only.
+        # Do NOT add PXR_USD_LOCATION/lib/usd on macOS: those plugins link against a
+        # different USD build than Maya's bundled USD, causing duplicate TF_DEBUG_ENVIRONMENT_SYMBOL
+        # registration (e.g. HGIMETAL_DEBUG_ERROR_STACKTRACE) that fatally crashes every test.
+        if(IS_WINDOWS AND DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
+            list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                 "${PXR_USD_LOCATION}/lib/usd")
+            message(STATUS "Using OpenUSD plugin path from PXR_USD_LOCATION: ${PXR_USD_LOCATION}/lib/usd")
+        endif()
         list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
              "${MAYAUSD_LOCATION}/lib/usd")
         list(APPEND MAYAHYDRA_VARNAME_MAYA_PLUG_IN_PATH
@@ -331,28 +375,149 @@ function(_mayaHydra_setup_test_plugins)
         list(APPEND MAYAHYDRA_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
              "${MAYAUSD_LOCATION}/libraries")
     endif()
+
+    # Additional plugin paths (e.g. HdArnold) for tests that need them.
+    # On macOS, exclude PRMan and MtoA/Arnold paths to avoid TfType redefinition errors.
+    # On Linux, only exclude PRMan paths (MtoA/Arnold tests are supported there).
+    if(ADDITIONAL_PXR_PLUGINPATH_NAME)
+        foreach(extra_path ${ADDITIONAL_PXR_PLUGINPATH_NAME})
+            if(IS_WINDOWS)
+                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
+            else()
+                string(TOLOWER "${extra_path}" _path_lower)
+                if(IS_MACOSX)
+                    if(NOT _path_lower MATCHES "prman|hdprman|renderman|rman|mtoa|arnold")
+                        list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
+                    endif()
+                else()
+                    if(NOT _path_lower MATCHES "prman|hdprman|renderman|rman")
+                        list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${extra_path}")
+                    endif()
+                endif()
+            endif()
+        endforeach()
+        message(STATUS "ADDITIONAL_PXR_PLUGINPATH_NAME for tests: ${ADDITIONAL_PXR_PLUGINPATH_NAME}")
+    endif()
     
     # mtoa
     if(DEFINED MTOA_LOCATION)
         # It seems like we need to use MAYA_MODULE_PATH for MtoA to work properly.
         # Even if we emulate the .mod file by manually setting the same env vars
-        # to the same values, MtoA itself will appear to load successfully when 
+        # to the same values, MtoA itself will appear to load successfully when
         # calling loadPlugin, but some of its extensions will fail to initialize,
         # leading to incorrect behavior and test failures. In those cases, it seems
         # like having a locally installed MtoA fixed it, but we can't rely on that.
+        # NOTE: an earlier attempt guarded this (and the plugin-path addition below)
+        # behind `NOT IS_MACOSX` to work around a suspected duplicate HdGp TfType
+        # registration on macOS (HYDRA-2383). A verified green macOS preflight run
+        # (build #700) with this guard removed showed mtoa loading and all tests
+        # passing, so the guard was a red herring for that failure mode; keep this
+        # unconditional on all platforms and let Maya's native .mod-based module
+        # resolution handle mtoa consistently everywhere.
         list(APPEND MAYAHYDRA_VARNAME_MAYA_MODULE_PATH
              "${MTOA_LOCATION}")
-        # Unit tests like testArnoldCustomNodes.cpp rely on mtoa's USD plugins such as 
-        # HdArnoldRendererPlugin and mtoaSIP to be registered so that maya-hydra can 
-        # find them during startup. Append the bundle path to PXR_PLUGINPATH_NAME.
+        # Unit tests like testArnoldCustomNodes.cpp rely on mtoa's USD plugins such as
+        # HdArnoldRendererPlugin and mtoaSIP to be registered so that maya-hydra can
+        # find them during startup.
+        set(_MTOA_PLUGIN_PATH "")
         if(DEFINED PXR_VERSION)
             set(_MTOA_USD_BUNDLE "${MTOA_LOCATION}/usd/bundle/${PXR_VERSION}")
             if(EXISTS "${_MTOA_USD_BUNDLE}")
-                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-                     "${_MTOA_USD_BUNDLE}")
+                set(_MTOA_PLUGIN_PATH "${_MTOA_USD_BUNDLE}")
             endif()
         endif()
+        # Fallback for legacy layouts using USD_VERSION (e.g. usd/hydra/<version>).
+        if("${_MTOA_PLUGIN_PATH}" STREQUAL "" AND IS_WINDOWS AND DEFINED USD_VERSION)
+            string(REGEX REPLACE "^0\\.([0-9]+)\\.([0-9]+)$" "\\1\\2" MTOA_USD_VERSION_HYDRA "${USD_VERSION}")
+            set(MTOA_HYDRA_BUNDLE "${MTOA_LOCATION}/usd/bundle/${MTOA_USD_VERSION_HYDRA}")
+            set(MTOA_HYDRA_LEGACY "${MTOA_LOCATION}/usd/hydra/${MTOA_USD_VERSION_HYDRA}")
+            if(EXISTS "${MTOA_HYDRA_BUNDLE}/plugInfo.json")
+                set(_MTOA_PLUGIN_PATH "${MTOA_HYDRA_BUNDLE}")
+            elseif(EXISTS "${MTOA_HYDRA_LEGACY}/plugInfo.json")
+                set(_MTOA_PLUGIN_PATH "${MTOA_HYDRA_LEGACY}")
+            endif()
+        endif()
+        if(NOT "${_MTOA_PLUGIN_PATH}" STREQUAL "")
+            list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                 "${_MTOA_PLUGIN_PATH}")
+        endif()
     endif()
+
+    # prman: delegate path (extracted package, not merged into USD) and runtime
+    # Platform selection driven by .yaml; if vars are set, configure test env.
+    # Sources (first wins): -DVar=... or $ENV{Var} (ENV fallback for CI/standard RenderMan setup)
+    if((NOT DEFINED PRMAN_DELEGATE_PLUGIN_PATH OR "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "") AND DEFINED ENV{PRMAN_DELEGATE_PLUGIN_PATH} AND NOT "$ENV{PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
+        set(PRMAN_DELEGATE_PLUGIN_PATH "$ENV{PRMAN_DELEGATE_PLUGIN_PATH}" CACHE PATH "Path containing HdPrman plugInfo.json" FORCE)
+    endif()
+    if((NOT DEFINED RMANTREE OR "${RMANTREE}" STREQUAL "") AND DEFINED ENV{RMANTREE} AND NOT "$ENV{RMANTREE}" STREQUAL "")
+        set(RMANTREE "$ENV{RMANTREE}" CACHE PATH "RenderMan installation root" FORCE)
+    endif()
+    if((NOT DEFINED RENDERMAN_LOCATION OR "${RENDERMAN_LOCATION}" STREQUAL "") AND DEFINED ENV{RENDERMAN_LOCATION} AND NOT "$ENV{RENDERMAN_LOCATION}" STREQUAL "")
+        set(RENDERMAN_LOCATION "$ENV{RENDERMAN_LOCATION}" CACHE PATH "RenderMan location (optional)" FORCE)
+    endif()
+    if((NOT DEFINED PIXAR_LICENSE_FILE OR "${PIXAR_LICENSE_FILE}" STREQUAL "") AND DEFINED ENV{PIXAR_LICENSE_FILE} AND NOT "$ENV{PIXAR_LICENSE_FILE}" STREQUAL "")
+        set(PIXAR_LICENSE_FILE "$ENV{PIXAR_LICENSE_FILE}" CACHE STRING "Pixar license server (port@hostname)" FORCE)
+    endif()
+    # Only enable PRMan on Windows: tests and plugins are supported there.
+    # On OSX/Linux, loading PRMan artifacts causes TfType redefinition errors
+    # (UsdSkelImaging* already defined) due to conflicting USD plugin loads.
+    if(IS_WINDOWS)
+        if(DEFINED PRMAN_DELEGATE_PLUGIN_PATH AND NOT "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
+            list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
+                 "${PRMAN_DELEGATE_PLUGIN_PATH}")
+            list(APPEND ALL_TEST_VARS PRMAN_DELEGATE_PLUGIN_PATH)
+            set(MAYAHYDRA_VARNAME_PRMAN_DELEGATE_PLUGIN_PATH "${PRMAN_DELEGATE_PLUGIN_PATH}")
+        endif()
+        if(DEFINED RMANTREE AND NOT "${RMANTREE}" STREQUAL "")
+            list(APPEND ALL_TEST_VARS RMANTREE)
+            set(MAYAHYDRA_VARNAME_RMANTREE "${RMANTREE}")
+            list(APPEND MAYAHYDRA_VARNAME_PATH "${RMANTREE}/bin")
+            list(APPEND MAYAHYDRA_VARNAME_PATH "${RMANTREE}/lib")
+        endif()
+        if(DEFINED RENDERMAN_LOCATION AND NOT "${RENDERMAN_LOCATION}" STREQUAL "")
+            list(APPEND ALL_TEST_VARS RENDERMAN_LOCATION)
+            set(MAYAHYDRA_VARNAME_RENDERMAN_LOCATION "${RENDERMAN_LOCATION}")
+        endif()
+        if(DEFINED PIXAR_LICENSE_FILE AND NOT "${PIXAR_LICENSE_FILE}" STREQUAL "")
+            list(APPEND ALL_TEST_VARS PIXAR_LICENSE_FILE)
+            set(MAYAHYDRA_VARNAME_PIXAR_LICENSE_FILE "${PIXAR_LICENSE_FILE}")
+        endif()
+        # RMAN_SHADERPATH: hdPrman/rmanOslParser needs this to find OSL shaders (UsdPreviewSurfaceParameters.oso, etc.)
+        # Artifact layout: plugin/usd/resources/shaders with .oso files
+        if(DEFINED PRMAN_DELEGATE_PLUGIN_PATH AND NOT "${PRMAN_DELEGATE_PLUGIN_PATH}" STREQUAL "")
+            set(RMAN_SHADERPATH "${PRMAN_DELEGATE_PLUGIN_PATH}/usd/resources/shaders")
+            if(DEFINED RMANTREE AND NOT "${RMANTREE}" STREQUAL "")
+                # Prepend RenderMan lib/shaders; use platform path separator
+                set(RMAN_SHADERPATH "${RMANTREE}/lib/shaders;${RMAN_SHADERPATH}")
+            endif()
+            list(APPEND ALL_TEST_VARS RMAN_SHADERPATH)
+            set(MAYAHYDRA_VARNAME_RMAN_SHADERPATH "${RMAN_SHADERPATH}")
+        elseif(DEFINED RMANTREE AND NOT "${RMANTREE}" STREQUAL "")
+            # Fallback: only RMANTREE, no delegate shaders
+            set(RMAN_SHADERPATH "${RMANTREE}/lib/shaders")
+            list(APPEND ALL_TEST_VARS RMAN_SHADERPATH)
+            set(MAYAHYDRA_VARNAME_RMAN_SHADERPATH "${RMAN_SHADERPATH}")
+        endif()
+    else()
+        # Explicitly clear PRMan env vars on non-Windows to avoid accidental loads.
+        list(APPEND ALL_TEST_VARS PRMAN_DELEGATE_PLUGIN_PATH RMANTREE RENDERMAN_LOCATION PIXAR_LICENSE_FILE RMAN_SHADERPATH)
+        set(MAYAHYDRA_VARNAME_PRMAN_DELEGATE_PLUGIN_PATH "")
+        set(MAYAHYDRA_VARNAME_RMANTREE "")
+        set(MAYAHYDRA_VARNAME_RENDERMAN_LOCATION "")
+        set(MAYAHYDRA_VARNAME_PIXAR_LICENSE_FILE "")
+        set(MAYAHYDRA_VARNAME_RMAN_SHADERPATH "")
+    endif()
+    # Escape semicolons in RMAN_SHADERPATH so set_property ENVIRONMENT receives
+    # a single value (path1;path2) instead of splitting on CMake list separator.
+    if("RMAN_SHADERPATH" IN_LIST ALL_TEST_VARS)
+        separate_argument_list(MAYAHYDRA_VARNAME_RMAN_SHADERPATH)
+    endif()
+    foreach(testvar PRMAN_DELEGATE_PLUGIN_PATH RMANTREE RENDERMAN_LOCATION PIXAR_LICENSE_FILE RMAN_SHADERPATH)
+        if("${testvar}" IN_LIST ALL_TEST_VARS)
+            set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+                "${testvar}=${MAYAHYDRA_VARNAME_${testvar}}")
+        endif()
+    endforeach()
     
     # lookdevx
     if(DEFINED LOOKDEVX_LOCATION)
@@ -415,6 +580,10 @@ function(_mayaHydra_setup_test_USD_paths)
     else()
         set(USD_INSTALL_LOCATION ${PXR_USD_LOCATION})
     endif()
+    # Export OpenUSD location for runtime debugging and plugin discovery.
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "PXR_USD_LOCATION=${USD_INSTALL_LOCATION}"
+        "USD_INSTALL_LOCATION=${USD_INSTALL_LOCATION}")
     # Inherit any existing PYTHONPATH, but keep it at the end.
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
         "${USD_INSTALL_LOCATION}/lib/python")
@@ -440,6 +609,23 @@ function(_mayaHydra_setup_test_finalize_env test_name)
     # system entries.
     list(APPEND MAYAHYDRA_VARNAME_PATH $ENV{PATH})
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH $ENV{PYTHONPATH})
+
+    # NOTE: an earlier attempt inherited PXR_PLUGINPATH_NAME/MAYA_PXR_PLUGINPATH_NAME
+    # from the configure-time environment (filtering out PRMan/MtoA/Arnold-looking
+    # paths by substring match) to pick up locally-installed Hydra plugins. That
+    # substring filter was a likely leak point: any ambient CI-machine path that
+    # didn't literally contain "mtoa"/"arnold"/etc. would slip through unfiltered
+    # and could duplicate-register plugins already added explicitly above (e.g. via
+    # MTOA_LOCATION). A verified green macOS preflight run (build #700) with this
+    # inheritance removed entirely showed all tests passing, so it was dropped:
+    # explicit paths (MTOA_LOCATION, PRMAN_DELEGATE_PLUGIN_PATH, etc.) are already
+    # added above where applicable; there is no need to also inherit ambient env.
+
+    # Maya USD's Plug may read MAYA_PXR_PLUGINPATH_NAME (when built with
+    # PXR_OVERRIDE_PLUGINPATH_NAME=MAYA_PXR_PLUGINPATH_NAME). Set it to the same
+    # value so HdArnold and other Hydra plugins are discovered regardless.
+    list(APPEND ALL_PATH_VARS MAYA_PXR_PLUGINPATH_NAME)
+    set(MAYAHYDRA_VARNAME_MAYA_PXR_PLUGINPATH_NAME ${MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}})
 
     # convert the internally-processed envs from cmake list
     foreach(pathvar ${ALL_PATH_VARS})
@@ -509,7 +695,15 @@ function(_mayaHydra_setup_test_finalize_env test_name)
         "MAYA_DISABLE_CER=1")
 
     if(IS_MACOSX)
-        # Necessary for tests like DiffCore to find python
+        # LC_ALL/LANG: Use UTF-8 locale. Qt requires UTF-8; LC_ALL=C causes Qt to try
+        # switching to "UTF-8" which fails on macOS. en_US.UTF-8 is standard on macOS.
+        set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+            "LC_ALL=en_US.UTF-8"
+            "LANG=en_US.UTF-8")
+        # Necessary for tests like DiffCore to find python.
+        # Do NOT prepend PXR_USD_LOCATION/lib: the standalone OpenUSD ships HdSt/Metal
+        # built against a different USD than Maya's bundled one, causing duplicate
+        # TF_DEBUG_ENVIRONMENT_SYMBOL registration crashes on every test.
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
             "DYLD_LIBRARY_PATH=${MAYA_LOCATION}/MacOS:$ENV{DYLD_LIBRARY_PATH}")
         set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
@@ -521,6 +715,10 @@ endfunction()
 if (OIIO_idiff_BINARY)
     set(IMAGE_DIFF_TOOL ${OIIO_idiff_BINARY} CACHE STRING "Use idiff for image comparison")
 endif()
+if (OIIO_oiiotool_BINARY)
+    set(OIIOTOOL ${OIIO_oiiotool_BINARY} CACHE STRING "Use oiiotool for diff images (--absdiff --maxchan)")
+endif()
+
 
 #
 # mayaUsd_add_test( <test_name>
@@ -720,11 +918,15 @@ finally:
         list(APPEND MAYAHYDRA_VARNAME_PATH $ENV{PYTHONHOME})
     endif()
 
-    # Adjust PYTHONPATH to include the path to our test utilities.
-    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${MAYA_HYDRA_DIR}/test/testUtils")
-
-    # Adjust PYTHONPATH to include the path to our test.
-    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${CMAKE_CURRENT_SOURCE_DIR}")
+    # Prepend our test utilities and the per-test source directory so they win
+    # over copies shipped by installed packages (e.g. maya-usd's imageUtils),
+    # which were already added by _mayaHydra_setup_test_plugins(). The per-test
+    # source directory is inserted last so it ends up first in the list: a test
+    # module may shadow a testUtils module, and testUtils in turn shadows the
+    # installed copies. Everything else (USD, inherited PYTHONPATH) still comes
+    # after, as it is appended later.
+    list(INSERT MAYAHYDRA_VARNAME_PYTHONPATH 0 "${MAYA_HYDRA_DIR}/test/testUtils")
+    list(INSERT MAYAHYDRA_VARNAME_PYTHONPATH 0 "${CMAKE_CURRENT_SOURCE_DIR}")
 
     # Adjust PATH and PYTHONPATH to include USD.
     _mayaHydra_setup_test_USD_paths()
