@@ -29,10 +29,6 @@ endif()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     list(APPEND GNU_CLANG_FLAGS
-        # GCC can emit false-positives for this warning.
-        # We hit this with a combination of inlined calls + a std::swap
-        # in USD's VtValue::UncheckedGet.
-        -Wno-error=maybe-uninitialized
         # optimization
         -msse4.2
     )
