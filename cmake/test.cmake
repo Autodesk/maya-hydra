@@ -407,14 +407,15 @@ function(_mayaHydra_setup_test_plugins)
         # calling loadPlugin, but some of its extensions will fail to initialize,
         # leading to incorrect behavior and test failures. In those cases, it seems
         # like having a locally installed MtoA fixed it, but we can't rely on that.
-        # On macOS, skip the module path to avoid Arnold's bundled USD plugins
-        # (usd_hdGp, usd_imagingGL, etc.) conflicting with Maya's, causing duplicate
-        # TfType registration errors that crash every test. Linux does not exhibit
-        # this conflict so mtoa tests are supported there.
-        if(NOT IS_MACOSX)
-            list(APPEND MAYAHYDRA_VARNAME_MAYA_MODULE_PATH
-                 "${MTOA_LOCATION}")
-        endif()
+        # NOTE: an earlier attempt guarded this (and the plugin-path addition below)
+        # behind `NOT IS_MACOSX` to work around a suspected duplicate HdGp TfType
+        # registration on macOS (HYDRA-2383). A verified green macOS preflight run
+        # (build #700) with this guard removed showed mtoa loading and all tests
+        # passing, so the guard was a red herring for that failure mode; keep this
+        # unconditional on all platforms and let Maya's native .mod-based module
+        # resolution handle mtoa consistently everywhere.
+        list(APPEND MAYAHYDRA_VARNAME_MAYA_MODULE_PATH
+             "${MTOA_LOCATION}")
         # Unit tests like testArnoldCustomNodes.cpp rely on mtoa's USD plugins such as
         # HdArnoldRendererPlugin and mtoaSIP to be registered so that maya-hydra can
         # find them during startup.
@@ -609,30 +610,16 @@ function(_mayaHydra_setup_test_finalize_env test_name)
     list(APPEND MAYAHYDRA_VARNAME_PATH $ENV{PATH})
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH $ENV{PYTHONPATH})
 
-    # Inherit PXR_PLUGINPATH_NAME and MAYA_PXR_PLUGINPATH_NAME from the
-    # configure-time environment so locally-installed Hydra plugins
-    # (e.g. HdArnold, HdPrman) are discovered when running tests.
-    # On OSX/Linux, filter out PRMan and MtoA/Arnold paths to avoid TfType
-    # redefinition errors (UsdSkelImaging* already defined) when the CI machine's
-    # Arnold installation sets MAYA_PXR_PLUGINPATH_NAME to include its full USD
-    # plugin tree (linked against a different USD build than Maya's).
-    # Arnold's Hydra delegate is already added explicitly via MTOA_LOCATION above.
-    foreach(_inherit_var PXR_PLUGINPATH_NAME MAYA_PXR_PLUGINPATH_NAME)
-        if(DEFINED ENV{${_inherit_var}} AND NOT "$ENV{${_inherit_var}}" STREQUAL "")
-            if(IS_WINDOWS)
-                list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} $ENV{${_inherit_var}})
-            else()
-                set(_path_list "$ENV{${_inherit_var}}")
-                string(REPLACE ":" ";" _path_list "${_path_list}")
-                foreach(_path ${_path_list})
-                    string(TOLOWER "${_path}" _path_lower)
-                    if(NOT _path_lower MATCHES "prman|hdprman|renderman|rman|mtoa|arnold")
-                        list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME} "${_path}")
-                    endif()
-                endforeach()
-            endif()
-        endif()
-    endforeach()
+    # NOTE: an earlier attempt inherited PXR_PLUGINPATH_NAME/MAYA_PXR_PLUGINPATH_NAME
+    # from the configure-time environment (filtering out PRMan/MtoA/Arnold-looking
+    # paths by substring match) to pick up locally-installed Hydra plugins. That
+    # substring filter was a likely leak point: any ambient CI-machine path that
+    # didn't literally contain "mtoa"/"arnold"/etc. would slip through unfiltered
+    # and could duplicate-register plugins already added explicitly above (e.g. via
+    # MTOA_LOCATION). A verified green macOS preflight run (build #700) with this
+    # inheritance removed entirely showed all tests passing, so it was dropped:
+    # explicit paths (MTOA_LOCATION, PRMAN_DELEGATE_PLUGIN_PATH, etc.) are already
+    # added above where applicable; there is no need to also inherit ambient env.
 
     # Maya USD's Plug may read MAYA_PXR_PLUGINPATH_NAME (when built with
     # PXR_OVERRIDE_PLUGINPATH_NAME=MAYA_PXR_PLUGINPATH_NAME). Set it to the same
