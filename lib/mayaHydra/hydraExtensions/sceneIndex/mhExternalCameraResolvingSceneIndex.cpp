@@ -28,7 +28,7 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/usd/sdf/path.h>
 
-#include <ufe/path.h>
+#include <ufe/pathString.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 using namespace UfeExtensions;
@@ -37,18 +37,6 @@ namespace {
 
 const TfToken kExternalCameraComponent("__adskUsd__externalCamera");
 const std::string kUfeSegmentSentinel("__ufeSegment__");
-
-Ufe::PathSegment MayaAppPathToUfePathSegment(const SdfPath& mayaAppPath)
-{
-    Ufe::PathSegment::Components components;
-    components.push_back(Ufe::PathComponent("world"));
-    for (const SdfPath& prefix : mayaAppPath.GetPrefixes()) {
-        if (!prefix.IsAbsoluteRootPath()) {
-            components.push_back(prefix.GetNameToken().GetString());
-        }
-    }
-    return Ufe::PathSegment(std::move(components), getMayaRunTimeId(), '|');
-}
 
 SdfPath ResolveExternalCameraPath(const SdfPath& inputPath)
 {
@@ -104,28 +92,19 @@ SdfPath ResolveExternalCameraPath(const SdfPath& inputPath)
     // multiple reader behavior), which has been considered in the past, but
     // this requires UFE versus Maya TBB configuration management.
 
-    Ufe::Path appUfePath;
-    SdfPath  mayaAppPath;
-    SdfPath  extCamPath;
-    Ufe::Rtid rtId;
-    for (const SdfPath& prefix : appPath.GetPrefixes()) {
-        const std::string& name = prefix.GetNameToken().GetString();
-        if (TfStringStartsWith(name, kUfeSegmentSentinel)) {
-            const std::string rtIdStr = name.substr(kUfeSegmentSentinel.size());
-            rtId = static_cast<Ufe::Rtid>(std::stoul(rtIdStr));
-            mayaAppPath = prefix.GetParentPath();
-            extCamPath = appPath.ReplacePrefix(prefix, SdfPath::AbsoluteRootPath());
-            break;  // We assume only 2 segments.
-        }
-    }
+    const auto appPathStr = appPath.GetString();
+    const auto segmentEnd = appPathStr.find(kUfeSegmentSentinel);
 
-    if (!extCamPath.IsEmpty() && rtId) {
-        appUfePath = Ufe::Path(Ufe::Path::Segments {
-            MayaAppPathToUfePathSegment(mayaAppPath),
-            sdfPathToUfePathSegment(extCamPath, rtId) });
-    } else {
-        appUfePath = Ufe::Path(MayaAppPathToUfePathSegment(appPath));
+    // Maya path: replace '/' with '|'
+    auto pathStr = appPathStr.substr(0, segmentEnd);
+    std::replace(pathStr.begin(), pathStr.end(), '/', '|');
+
+    if (segmentEnd != std::string::npos) {
+        // Assume the second segment is a USD path, and already has '/' path
+        // component separator.  Remove segment separator sentinel.
+        pathStr += "," + appPathStr.substr(segmentEnd + kUfeSegmentSentinel.length());
     }
+    auto appUfePath = Ufe::PathString::path(pathStr);
     auto hydraPath = Fvp::ufePathToPrimSelections(appUfePath);
 
     // Camera is non-instanced, so there will be a single PrimSelection.
