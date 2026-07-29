@@ -504,12 +504,17 @@ VtValue MtohRenderOverride::_GetUsedGPUMemory() const
 
 int MtohRenderOverride::GetUsedGPUMemory()
 {
-    int totalGPUMemory = 0;
+    size_t totalGPUMemory = 0;
     std::lock_guard<std::mutex> lock(_allInstancesMutex);
     for (auto* instance : _allInstances) {
-        totalGPUMemory += instance->_GetUsedGPUMemory().UncheckedGet<int>();
+        const VtValue usedGpuMemory = instance->_GetUsedGPUMemory();
+        if (usedGpuMemory.IsHolding<size_t>()) {
+            totalGPUMemory += usedGpuMemory.UncheckedGet<size_t>();
+        } else if (usedGpuMemory.IsHolding<int>()) {
+            totalGPUMemory += usedGpuMemory.UncheckedGet<int>();
+        }
     }
-    return totalGPUMemory / (1024*1024);
+    return static_cast<int>(totalGPUMemory / (1024u * 1024u));
 }
 
 std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
