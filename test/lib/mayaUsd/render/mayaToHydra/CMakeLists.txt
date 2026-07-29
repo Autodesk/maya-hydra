@@ -36,8 +36,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
 	testMaterialXOnNative.py|depOnPlugins:lookdevx
     testArnoldLights.py|depOnPlugins:mtoa
 	testMayaLightingModes.py|depOnPlugins:mtoa
-    # Failing, HYDRA-2031.
-	# testLightingByRenderDelegate.py|depOnPlugins:mtoa
+    testLightingRenderDelegates.py|depOnPlugins:prman|skipOnPlatform:osx # HYDRA-2209: re-enable on OSX
 	testBifrostGraphUpdate.py|depOnPlugins:bifrost
 	#End of tests that have a dependency on other plugins
     testLookThrough.py
@@ -186,7 +185,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER
 # on computations made by VP2 for its use.  Entered as HYDRA-1961.
 set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE
 	testViewportFilters.py|depOnPlugins:mtoa
-    testFlowPluginsHierarchicalProperties.py
+    testFlowPluginsHierarchicalProperties.py|skipOnPlatform:osx # HYDRA-2209: BasisCurvesLinearDomain fragment errors on OSX
     testBoundingBox.py
 	#Disabled tests on OSX
 	testDataProducerSelHighlight.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
@@ -262,6 +261,21 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
     # Add a ctest label to these tests for easy filtering.
     apply_labels_to_test("${all_labels}" ${target})
 
+endforeach()
+
+# Standalone Python unit tests for pure test utilities. These exercise logic
+# that does not need Maya (e.g. renderManUtils env/platform gating), so they run
+# under mayapy via unittest without initializing a standalone Maya session.
+set(PYTHON_UNIT_TEST_MODULES
+    testRenderManUtils.py
+)
+foreach(script ${PYTHON_UNIT_TEST_MODULES})
+    get_testfile_and_labels(all_labels test_filename ${script})
+    mayaUsd_get_unittest_target(target ${test_filename})
+    mayaUsd_add_test(${target}
+        PYTHON_SCRIPT "${MAYA_HYDRA_DIR}/test/testUtils/${test_filename}"
+    )
+    apply_labels_to_test("${all_labels}" ${target})
 endforeach()
 
 # C++ unit tests

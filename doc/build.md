@@ -11,13 +11,13 @@ Before building the project, consult the following table to ensure you use the r
 | Required | ![](images/windows.png) | ![](images/mac.png) | ![](images/linux.png) |
 |:-:|:-:|:-:|:-:|
 | Operating System | Windows 10 <br> Windows 11 | High Sierra (10.13)<br>Mojave (10.14)<br>Catalina (10.15)<br>Big Sur (11.2.x) | Rocky Linux 8.6 / Linux® Red Hat® Enterprise 8.6 WS |
-| Compiler Requirement| Maya 2026 (VS 2022)<br>Maya PR (VS 2022) | Maya 2026 (Xcode 13.4 or higher)<br>Maya PR (Xcode 13.4 or higher) | Maya 2026 (gcc 11.2.1)<br>Maya PR (gcc 11.2.1) |
+| Compiler Requirement| Maya 2026 (VS 2022)<br>Maya 2027 (VS 2022)<br>Maya PR (VS 2022) | Maya 2026 (Xcode 13.4 or higher)<br>Maya 2027 (Xcode 14.3 or higher)<br>Maya PR (Xcode 14.3 or higher) | Maya 2026 (gcc 11.2.1)<br>Maya 2027 (gcc 11.2.1)<br>Maya PR (gcc 11.2.1) |
 | CMake Version (min/max) | 3.21...3.30 | 3.21...3.30 | 3.21...3.30 |
-| Python | 3.11.4, 3.13.7 | 3.11.4, 3.13.7 | 3.11.4, 3.13.7 |
+| Python | 3.11.4, 3.13.9, 3.13.9 | 3.11.4, 3.13.9, 3.13.9 | 3.11.4, 3.13.9, 3.13.9 |
 | Python Packages | PyYAML, PySide, PyOpenGL | PyYAML, PySide2, PyOpenGL | PyYAML, PySide, PyOpenGL |
 | Build generator | Visual Studio, Ninja (Recommended) | XCode, Ninja (Recommended) | Ninja (Recommended) |
 | Command processor | x64 Native Tools Command Prompt for VS 2022 | bash | bash |
-| Supported Maya Version | 2026, PR | 2026, PR | 2026, PR |
+| Supported Maya Version | 2026, 2027, PR | 2026, 2027, PR | 2026, 2027, PR |
 
 >Note: While mayaHydra may compile with older versions of Maya than those listed above, they are not officially supported and functionality may break. For more details about building for older Maya versions, [see this document.](./legacyBuilds.md)
 
@@ -243,7 +243,19 @@ CMAKE_SKIP_RPATH=TRUE
 ```
 To allow your tests to run, you can inject LD_LIBRARY_PATH into any of the mayaHydra_add_test calls by setting the ADDITIONAL_LD_LIBRARY_PATH cmake variable to $ENV{LD_LIBRARY_PATH} or similar.
 
-There is a related ADDITIONAL_PXR_PLUGINPATH_NAME cmake var which can be used if schemas are installed in a non-standard location
+There is a related `ADDITIONAL_PXR_PLUGINPATH_NAME` CMake variable which appends paths to `PXR_PLUGINPATH_NAME` for tests. Use it when Hydra render delegate plugins (e.g. HdArnold) are installed in a non-standard location:
+
+```
+cmake -DADDITIONAL_PXR_PLUGINPATH_NAME="C:/path/to/arnold-usd/install/plugin" ...
+```
+
+The same variable can be set in the environment before running CMake (e.g. from a build pipeline) so the path is picked up automatically.
+
+**Arnold (MtoA):** When `MTOA_LOCATION` and `USD_VERSION` are defined, the HdArnold plugin path is added only if `plugInfo.json` is found: `${MTOA_LOCATION}/usd/bundle/<version>` (newer Arnold) is tried first, then `${MTOA_LOCATION}/usd/hydra/<version>` (older).
+
+**RenderMan (PRMan):** For HdPrman tests, provide the RenderMan locations via CMake cache variables (`-DRMANTREE=...`, `-DRENDERMAN_LOCATION=...` (optional), `-DPIXAR_LICENSE_FILE=...` (license server, format: `port@hostname`), `-DPRMAN_DELEGATE_PLUGIN_PATH=...` (path containing HdPrman `plugInfo.json`)) or via environment variables of the same names. CMake variables take precedence. On Windows, the test harness adds `${RMANTREE}/bin` and `${RMANTREE}/lib` to `PATH` when `RMANTREE` is set.
+
+**Local development:** If `PXR_PLUGINPATH_NAME` or `MAYA_PXR_PLUGINPATH_NAME` is set in your environment when you run CMake, those paths are automatically appended to the test environment. This allows locally-installed Hydra plugins (e.g. HdArnold, HdPrman) to be discovered when running tests. On Windows, use forward slashes or escaped backslashes in the path.
 
 ### Using Visual Studio as the generator
 

@@ -229,6 +229,8 @@ if(NOT IS_MACOSX)
     )
 endif()
 
+# Arnold cmdLine render does not produce output images on macOS. Tracked as HYDRA-2262.
+if(NOT IS_MACOSX)
 mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettings.ma
     RENDERER HdArnoldRendererPlugin
     EXPECTED_IMAGES_DIR renderSettings/images/arnold
@@ -237,6 +239,7 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSett
     FAIL 0.05
     FAILPERCENT 1.0
 )
+endif()
 
 # Test frame range (5-9) with HdStorm (Failure with HdStorm on macOS entered as HYDRA-2139.)
 if(NOT IS_MACOSX)
@@ -257,6 +260,25 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSett
     FAIL 0.05
     FAILPERCENT 1.0
     RENDERER_ARGS "-s 5 -e 9"
+)
+
+mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettingsSingleCam.ma
+    EXPECTED_IMAGES_DIR renderSettings/images/storm_frames5to9
+    RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
+    IMAGE_EXTENSION png
+    TEST_NAME_SUFFIX StormRenderDir
+    RENDERER_ARGS "-rd images/aSubDirectory"
+)
+
+mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettingsSingleCam.ma
+    RENDERER HdArnoldRendererPlugin
+    EXPECTED_IMAGES_DIR renderSettings/images/arnold_frames5to9
+    RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
+    IMAGE_EXTENSION png
+    TEST_NAME_SUFFIX ArnoldRenderDir
+    FAIL 0.05
+    FAILPERCENT 1.0
+    RENDERER_ARGS "-rd images/aSubDirectory"
 )
 
 # Test that USD render settings stored in a MayaUsdProxyShape node produce no

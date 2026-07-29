@@ -63,21 +63,21 @@ target_link_libraries(${TARGET_NAME}
 # -----------------------------------------------------------------------------
 # run-time search paths
 # -----------------------------------------------------------------------------
-if(IS_MACOSX OR IS_LINUX) 
-    mayaUsd_init_rpath(rpath "lib/maya")
-    if(DEFINED MAYAUSD_TO_USD_RELATIVE_PATH)
-        mayaUsd_add_rpath(rpath "../../${MAYAUSD_TO_USD_RELATIVE_PATH}/lib")
+if(IS_MACOSX OR IS_LINUX)
+    # This plugin is installed to lib/usd/customNodeTranslationSceneIndex/, so
+    # the rpath origin must match that install path (not lib/maya/).
+    mayaUsd_init_rpath(rpath "lib/usd/customNodeTranslationSceneIndex")
+    if(DEFINED MAYAHYDRA_TO_USD_RELATIVE_PATH)
+        mayaUsd_add_rpath(rpath "../../../${MAYAHYDRA_TO_USD_RELATIVE_PATH}/lib")
         if (IS_LINUX)
-            mayaUsd_add_rpath(rpath "../../${MAYAUSD_TO_USD_RELATIVE_PATH}/lib64")
+            mayaUsd_add_rpath(rpath "../../../${MAYAHYDRA_TO_USD_RELATIVE_PATH}/lib64")
         endif()
         if(IS_MACOSX)
-            mayaUsd_add_rpath(rpath "../../../../Maya.app/Contents/MacOS")
+            mayaUsd_add_rpath(rpath "../../../../../Maya.app/Contents/MacOS")
         endif()
     elseif(DEFINED PXR_USD_LOCATION)
         mayaUsd_add_rpath(rpath "${PXR_USD_LOCATION}/lib")
     endif()
-    
-    mayaUsd_add_rpath(rpath "../")
     mayaUsd_install_rpath(rpath ${TARGET_NAME})
 endif()
 
