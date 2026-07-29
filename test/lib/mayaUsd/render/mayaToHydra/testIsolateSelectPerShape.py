@@ -212,26 +212,4 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
 
 
 if __name__ == "__main__":
-    import platform
-    if platform.system() == "Windows":
-        # Logged as HYDRA-2237: Workaround for pre-existing Maya crash during
-        # process exit: ufe_0.dll's static attrSubjects destructor
-        # crashes due to DLL unload ordering.  os._exit still triggers
-        # DllMain(DLL_PROCESS_DETACH) on Windows, so we must use
-        # TerminateProcess to kill the process without running any DLL
-        # teardown.  Test results are fully reported by the runner
-        # before this point.
-        import sys, unittest, ctypes, ctypes.wintypes
-        suite = fixturesUtils.loadTestsFromDict(globals())
-        runner = unittest.TextTestRunner(stream=sys.__stderr__, verbosity=1)
-        results = runner.run(suite)
-        exitCode = 0 if results.wasSuccessful() else 1
-        sys.__stdout__.flush()
-        sys.__stderr__.flush()
-        kernel32 = ctypes.windll.kernel32
-        kernel32.GetCurrentProcess.restype = ctypes.wintypes.HANDLE
-        kernel32.TerminateProcess.argtypes = [ctypes.wintypes.HANDLE,
-                                              ctypes.wintypes.UINT]
-        kernel32.TerminateProcess(kernel32.GetCurrentProcess(), exitCode)
-    else:
-        fixturesUtils.runTests(globals())
+    fixturesUtils.runTests(globals())
