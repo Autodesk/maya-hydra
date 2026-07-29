@@ -21,6 +21,7 @@
 #include <mayaHydraLib/adapters/tokens.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
+#include <pxr/base/arch/hash.h>
 #include <pxr/base/gf/interval.h>
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/changeTracker.h>
@@ -40,6 +41,7 @@
 #include <maya/MPlug.h>
 #include <maya/MPolyMessage.h>
 
+#include <functional>
 #include <string>
 #include <unordered_set>
 
@@ -77,37 +79,99 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
-const std::pair<MObject&, HdDirtyBits> _dirtyBits[] {
-    { MayaAttrs::mesh::pnts,
-      // This is useful when the user edits the mesh.
-      HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent | HdChangeTracker::DirtyNormals
-          | HdChangeTracker::DirtySubdivTags },
-    { MayaAttrs::mesh::inMesh,
-      // We are tracking topology changes and uv changes separately
-      HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyExtent | HdChangeTracker::DirtyNormals
-          | HdChangeTracker::DirtySubdivTags },
-    { MayaAttrs::mesh::worldMatrix, HdChangeTracker::DirtyTransform },
-    { MayaAttrs::mesh::doubleSided, HdChangeTracker::DirtyDoubleSided },
-    { MayaAttrs::mesh::intermediateObject, HdChangeTracker::DirtyVisibility },
-    { MayaAttrs::mesh::uvPivot,
-      // Tracking manual edits to uvs.
-      HdChangeTracker::DirtyPrimvar },
-    // displaySmoothMesh and smoothLevel drive HdDisplayStyle::refineLevel via
-    // GetDisplayStyle(). When refineLevel transitions across 0:
-    //   * GetMeshTopology() flips the subdivisionScheme between `none` and `catmullClark`,
-    //     thus DirtyTopology required.
-    //   * GetPrimvarDescriptors(faceVarying) starts/stops advertising `normals`,
-    //     DirtyPrimvar and DirtyNormals required.
-    //   * GetSubdivTags() returns empty tags when refineLevel < 1, DirtySubdivTags required.
-    { MayaAttrs::mesh::displaySmoothMesh,
-      HdChangeTracker::DirtyDisplayStyle | HdChangeTracker::DirtyTopology
-          | HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyNormals
-          | HdChangeTracker::DirtySubdivTags },
-    { MayaAttrs::mesh::smoothLevel,
-      HdChangeTracker::DirtyDisplayStyle | HdChangeTracker::DirtyTopology
-          | HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyNormals
-          | HdChangeTracker::DirtySubdivTags }
+// Snapshot of mesh connectivity + a hash of point positions used to distinguish UV-only
+// inMesh/pnts dirties (polyEditUV and similar) from true geometry edits. Maya often dirties
+// inMesh for UV coordinate changes without firing MPolyMessage::addUVSetChangedCallback.
+struct MeshGeometryState
+{
+    int      numVertices = -1;
+    int      numPolygons = -1;
+    int      numFaceVertices = -1;
+    uint64_t pointsHash = 0;
+    bool     valid = false;
+
+    static uint64_t HashPoints(const GfVec3f* rawPoints, int numVertices)
+    {
+        if (!rawPoints || numVertices <= 0) {
+            return 0;
+        }
+        return ArchHash64(reinterpret_cast<const char*>(rawPoints),
+                          static_cast<size_t>(numVertices) * sizeof(GfVec3f));
+    }
+
+    static MeshGeometryState Capture(const MDagPath& dagPath)
+    {
+        MeshGeometryState state;
+        MStatus           status;
+        MFnMesh             mesh(dagPath, &status);
+        if (!status) {
+            return state;
+        }
+        state.numVertices = mesh.numVertices();
+        state.numPolygons = mesh.numPolygons();
+        state.numFaceVertices = mesh.numFaceVertices();
+        const auto* rawPoints = reinterpret_cast<const GfVec3f*>(mesh.getRawPoints(&status));
+        if (status && rawPoints) {
+            state.pointsHash = HashPoints(rawPoints, state.numVertices);
+            state.valid = true;
+        }
+        return state;
+    }
+
+    bool MatchesCurrent(const MDagPath& dagPath) const
+    {
+        if (!valid) {
+            return false;
+        }
+        MStatus status;
+        MFnMesh mesh(dagPath, &status);
+        if (!status) {
+            return false;
+        }
+        if (mesh.numVertices() != numVertices || mesh.numPolygons() != numPolygons
+            || mesh.numFaceVertices() != numFaceVertices) {
+            return false;
+        }
+        const auto* rawPoints = reinterpret_cast<const GfVec3f*>(mesh.getRawPoints(&status));
+        if (!status || !rawPoints) {
+            return false;
+        }
+        // O(n) in vertex count: scan point positions to distinguish UV-only inMesh/pnts dirties
+        // from true geometry edits once O(1) connectivity counts match. This runs only on those
+        // dirty notifications (not per frame or Hydra pull); treating every such dirty as a
+        // geometry change would typically cost more (points, extent, subdivision, mesh re-read).
+        return HashPoints(rawPoints, numVertices) == pointsHash;
+    }
 };
+
+// Lambda table mapping a Maya mesh attribute to the granular dirty locators it should emit.
+// Extent is dirtied conservatively on every point/topology change because the mesh adapter reads
+// bounds lazily (no bbox-changed flag to diff against, unlike the render-item adapter).
+using MeshDirtyFn = std::function<void(Fvp::DirtyNotifier&)>;
+
+const std::pair<MObject&, MeshDirtyFn> _dirtyNotifiers[] {
+    { MayaAttrs::mesh::worldMatrix,
+      [](Fvp::DirtyNotifier& n) { n.dirtyTransform(); } },
+    { MayaAttrs::mesh::doubleSided,
+      [](Fvp::DirtyNotifier& n) { n.dirtyDoubleSided(); } },
+    { MayaAttrs::mesh::intermediateObject,
+      [](Fvp::DirtyNotifier& n) { n.dirtyVisibility(); } },
+    // Tracking manual edits to uvs.
+    { MayaAttrs::mesh::uvPivot,
+      [](Fvp::DirtyNotifier& n) { n.dirtyPrimvar(MayaHydraAdapterTokens->st); } },
+    // displaySmoothMesh and smoothLevel drive HdDisplayStyle::refineLevel via GetDisplayStyle().
+    // When refineLevel transitions across 0, GetMeshTopology() flips subdivisionScheme and
+    // GetSubdivTags() changes; emit displayStyle + topology + subdivisionTags only.
+    { MayaAttrs::mesh::displaySmoothMesh,
+      [](Fvp::DirtyNotifier& n) {
+          Fvp::DirtyNotifier::DirtySmoothMeshDisplayLocators(n);
+      } },
+    { MayaAttrs::mesh::smoothLevel,
+      [](Fvp::DirtyNotifier& n) {
+          Fvp::DirtyNotifier::DirtySmoothMeshDisplayLocators(n);
+      } },
+};
+
 } // namespace
 
 /**
@@ -138,6 +202,7 @@ public:
         }
         GetMayaHydraSceneIndex()->InsertPrim(this, HdPrimTypeTokens->mesh, GetID());
         _isPopulated = true;
+        _geometryState = MeshGeometryState::Capture(GetDagPath());
     }
 
     /// Track callbacks that require special removal handling.
@@ -199,7 +264,7 @@ public:
     /// Return whether mesh prims are supported by the render index.
     bool IsSupported() const override
     {
-        return GetMayaHydraSceneIndex()->GetRenderIndex().IsRprimTypeSupported(HdPrimTypeTokens->mesh);
+        return GetMayaHydraSceneIndex()->IsRprimTypeSupported(HdPrimTypeTokens->mesh);
     }
 
     /// Return face-varying UVs as a primvar value.
@@ -500,9 +565,9 @@ public:
         if (interpolation == HdInterpolationVertex) {
             localDescs = { { UsdGeomTokens->points, interpolation, HdPrimvarRoleTokens->point } };
         } else if (interpolation == HdInterpolationFaceVarying) {
-            static const bool passNormalsToHydra = MayaHydraSceneIndex::passNormalsToHydra();
+            static const bool useMayaNormals = MayaHydraSceneIndex::useMayaNormals();
 
-            if (passNormalsToHydra && GetDisplayStyle().refineLevel == 0) {
+            if (useMayaNormals && GetDisplayStyle().refineLevel == 0) {
                 localDescs.push_back(
                     { UsdGeomTokens->normals, interpolation, HdPrimvarRoleTokens->normal });
             }
@@ -548,12 +613,39 @@ public:
     {
         // Always return true so AttributeChangedCallback marks primvars dirty. NodeDirtyPlugCallback
         // may not fire when resetting to default, causing primvar removal to only appear after
-        // selecting away and back. Duplicate MarkDirty from NodeDirtiedCallback is idempotent.
+        // selecting away and back. Duplicate dirty notifications from NodeDirtiedCallback are idempotent.
         TF_UNUSED(plug);
         return true;
     }
 
 private:
+    /// inMesh/pnts dirties fire for both geometry edits and UV-only edits. Compare against the
+    /// last captured connectivity/points to emit granular UV locators when only face-varying data
+    /// changed (e.g. polyEditUV when MPolyMessage::addUVSetChangedCallback does not run).
+    void DirtyInMeshOrPnts(MayaHydra::DirtyNotifier& notifier, bool useMayaNormals)
+    {
+        if (_geometryState.valid && _geometryState.MatchesCurrent(GetDagPath())) {
+            notifier.dirtyUVs();
+            return;
+        }
+        notifier.dirtyPoints().dirtyExtent().dirtySubdivision();
+        if (useMayaNormals) {
+            notifier.dirtyNormals();
+        }
+        _geometryState = MeshGeometryState::Capture(GetDagPath());
+    }
+
+    void RefreshGeometryState() { _geometryState = MeshGeometryState::Capture(GetDagPath()); }
+
+    static void _NotifyConnectivityChanged(MayaHydraMeshAdapter* adapter)
+    {
+        MayaHydra::DirtyNotifier notifier(adapter);
+        Fvp::DirtyNotifier::DirtyRprimConnectivityLocators(
+            notifier, HdPrimTypeTokens->mesh);
+        notifier.flush();
+        adapter->RefreshGeometryState();
+    }
+
     /// Handle node dirtied callbacks for mesh parameter changes.
     static void NodeDirtiedCallback(MObject& node, MPlug& plug, void* clientData)
     {
@@ -571,14 +663,28 @@ private:
         if (!status) {
             return;
         }
-        for (const auto& it : _dirtyBits) {
+        if (plugAttr == MayaAttrs::mesh::inMesh || plugAttr == MayaAttrs::mesh::pnts) {
+            MayaHydra::DirtyNotifier notifier(adapter);
+            adapter->DirtyInMeshOrPnts(
+                notifier, MayaHydraSceneIndex::useMayaNormals());
+            TF_DEBUG(MAYAHYDRALIB_ADAPTER_MESH_PLUG_DIRTY)
+                .Msg(
+                    "Marking prim dirty because %s plug was dirtied.\n",
+                    plug.partialName().asChar());
+            return;
+        }
+        for (const auto& it : _dirtyNotifiers) {
             if (it.first == plugAttr) {
-                adapter->MarkDirty(it.second);
+                // Visibility plug is not yet readable in this callback; invalidate cache so
+                // GetVisible() re-queries the DAG on the next Hydra pull (see dagAdapter).
+                if (plugAttr == MayaAttrs::mesh::intermediateObject) {
+                    adapter->InvalidateVisibility();
+                }
+                MayaHydra::DirtyNotifier notifier(adapter);
+                it.second(notifier);
                 TF_DEBUG(MAYAHYDRALIB_ADAPTER_MESH_PLUG_DIRTY)
                     .Msg(
-                        "Marking prim dirty with bits %u because %s plug was "
-                        "dirtied.\n",
-                        it.second,
+                        "Marking prim dirty because %s plug was dirtied.\n",
                         plug.partialName().asChar());
                 return;
             }
@@ -608,14 +714,14 @@ private:
         TF_UNUSED(otherPlug);
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
         if (plug == MayaAttrs::mesh::instObjGroups) {
-            adapter->MarkDirty(HdChangeTracker::DirtyMaterialId);
+            MayaHydra::DirtyNotifier(adapter).dirtyMaterialBinding();
         } else {
             TF_DEBUG(MAYAHYDRALIB_ADAPTER_MESH_UNHANDLED_PLUG_DIRTY)
                 .Msg(
                     "%s (%s) plug dirtying was not handled by "
                     "MayaHydraMeshAdapter::attributeChangedCallback.\n",
                     plug.name().asChar(),
-                    plug.name().asChar());
+                    plug.partialName().asChar());
         }
 
         adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
@@ -624,19 +730,16 @@ private:
     /// Handle topology changes from the poly API callbacks.
     static void TopologyChangedCallback(MObject& node, void* clientData)
     {
-        auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
-        adapter->MarkDirty(
-            HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar
-            | HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyNormals);
+        TF_UNUSED(node);
+        _NotifyConnectivityChanged(reinterpret_cast<MayaHydraMeshAdapter*>(clientData));
     }
 
     /// Handle component id changes from the poly API callbacks.
     static void ComponentIdChanged(MUintArray componentIds[], unsigned int count, void* clientData)
     {
-        auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
-        adapter->MarkDirty(
-            HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPrimvar
-            | HdChangeTracker::DirtyPoints);
+        TF_UNUSED(componentIds);
+        TF_UNUSED(count);
+        _NotifyConnectivityChanged(reinterpret_cast<MayaHydraMeshAdapter*>(clientData));
     }
 
     /// Handle UV set changes and mark primvars dirty.
@@ -647,7 +750,7 @@ private:
         void*                     clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraMeshAdapter*>(clientData);
-        adapter->MarkDirty(HdChangeTracker::DirtyPrimvar);
+        MayaHydra::DirtyNotifier(adapter).dirtyUVs(); // granular - only the UV set changed
     }
 
     // Maya has a bug with removing some MPolyMessage callbacks. Known
@@ -656,7 +759,8 @@ private:
     //     MPolyMessage::addUVSetChangedCallback
     // To work around this, we register these callbacks specially, and only
     // remove them if the underlying node is currently valid.
-    MCallbackIdArray _buggyCallbacks;
+    MCallbackIdArray   _buggyCallbacks;
+    MeshGeometryState _geometryState;
 };
 
 TF_REGISTRY_FUNCTION(TfType)

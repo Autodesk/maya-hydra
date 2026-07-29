@@ -46,6 +46,21 @@ class TestIsolateSelectPerShape(mtohUtils.MayaHydraBaseTestCase):
     IMAGE_DIFF_FAIL_THRESHOLD = 0.1
     IMAGE_DIFF_FAIL_PERCENT = 3
 
+    @classmethod
+    def tearDownClass(cls):
+        # When mtoa is loaded, the base tearDownClass scene reset can SIGSEGV
+        # inside libai.so (Arnold background render threads still active).
+        # That crash happens before runner.run() returns, so the HYDRA-2237
+        # force-terminate in __main__ is never reached.  Skip cleanup only in
+        # that case; __main__ terminates the process immediately afterward.
+        try:
+            mtoaLoaded = cmds.pluginInfo('mtoa', q=True, loaded=True)
+        except RuntimeError:
+            mtoaLoaded = False
+        if mtoaLoaded:
+            return
+        super(TestIsolateSelectPerShape, cls).tearDownClass()
+
     def assertVisible(self, paths):
         for p in paths:
             cmds.mayaHydraCppTest(p, f="TestHydraPrim.isVisible")

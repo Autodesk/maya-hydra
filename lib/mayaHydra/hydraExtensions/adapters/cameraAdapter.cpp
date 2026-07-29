@@ -15,6 +15,8 @@
 //
 #include "cameraAdapter.h"
 
+#include <mayaHydraLib/adapters/mhDirtyNotifier.h>
+
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
@@ -60,8 +62,7 @@ static void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)
     if (MayaHydraAdapter::IsParamAttribute(
             topPlug,
             MayaHydraAdapter::GetParamAttributeSet(kCameraParamAttributeNames))) {
-        adapter->MarkDirty(
-            HdCamera::DirtyParams | HdCamera::DirtyWindowPolicy | HdChangeTracker::DirtyPrimvar);
+        MayaHydra::DirtyNotifier(adapter).dirtyCameraParams().dirtyPrimvars();
     } else {
         adapter->MaybeMarkPrimvarDirtyForAttributeChange(topPlug);
     }
@@ -88,8 +89,10 @@ static void _cameraAttributeChanged(
     if (MayaHydraAdapter::IsParamAttribute(
             topPlug,
             MayaHydraAdapter::GetParamAttributeSet(kCameraParamAttributeNames))) {
-        adapter->MarkDirty(
-            HdCamera::DirtyParams | HdCamera::DirtyWindowPolicy | HdChangeTracker::DirtyPrimvar);
+        // dirtyPrimvars() is intentional: cameras are sprims but support extension-attribute
+        // primvars (custom Maya attrs translated as constant primvars). The broad primvars
+        // locator ensures those are re-pulled alongside the camera schema.
+        MayaHydra::DirtyNotifier(adapter).dirtyCameraParams().dirtyPrimvars();
         return;
     }
     if (!adapter->ShouldMarkPrimvarDirtyForAttributeChange(topPlug)) {
@@ -131,7 +134,7 @@ TfToken MayaHydraCameraAdapter::CameraType() { return HdPrimTypeTokens->camera; 
 
 bool MayaHydraCameraAdapter::IsSupported() const
 {
-    return GetMayaHydraSceneIndex()->GetRenderIndex().IsSprimTypeSupported(CameraType());
+    return GetMayaHydraSceneIndex()->IsSprimTypeSupported(CameraType());
 }
 
 void MayaHydraCameraAdapter::Populate()
@@ -141,17 +144,6 @@ void MayaHydraCameraAdapter::Populate()
     }
     GetMayaHydraSceneIndex()->InsertPrim(this, CameraType(), GetID());
     _isPopulated = true;
-}
-
-void MayaHydraCameraAdapter::MarkDirty(HdDirtyBits dirtyBits)
-{
-    if (_isPopulated && dirtyBits != 0) {
-        // We support extension-attribute primvars on cameras, so keep DirtyPrimvar even though
-        // cameras are sprims and normally only expose HdCamera dirty bits.
-        const HdDirtyBits primvarBits = dirtyBits & HdChangeTracker::DirtyPrimvar;
-        dirtyBits = (dirtyBits & HdCamera::AllDirty) | primvarBits;
-        GetMayaHydraSceneIndex()->MarkSprimDirty(GetID(), dirtyBits);
-    }
 }
 
 void MayaHydraCameraAdapter::CreateCallbacks()
@@ -175,7 +167,7 @@ void MayaHydraCameraAdapter::CreateCallbacks()
         +[](MObject& transformNode, MDagMessage::MatrixModifiedFlags& modified, void* clientData) {
             auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
             adapter->InvalidateTransform();
-            adapter->MarkDirty(HdCamera::DirtyTransform);
+            MayaHydra::DirtyNotifier(adapter).dirtyTransform();
         },
         reinterpret_cast<void*>(this),
         &status);

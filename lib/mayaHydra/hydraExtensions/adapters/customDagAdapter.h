@@ -106,12 +106,6 @@ public:
     MAYAHYDRALIB_API
     void Populate() override;
 
-    /// Converts HdDirtyBits into HdDataSourceLocator-based dirtying.
-    /// Handles DirtyTransform and DirtyVisibility via standard locators.
-    /// Per-attribute dirtying is handled separately by the attribute-changed callback.
-    MAYAHYDRALIB_API
-    void MarkDirty(HdDirtyBits dirtyBits) override;
-
     /// Registers Maya callbacks for this adapter. Unlike the base class which
     /// registers a transform-dirty callback on every node in the DAG path
     /// (including the shape), this override separates concerns:
@@ -128,9 +122,7 @@ public:
     MAYAHYDRALIB_API
     void RemovePrim() override;
 
-    /// Queries visibility directly from the DAG path. Overrides the base class
-    /// implementation because the base class relies on a private _visibilityDirty
-    /// flag that this adapter's MarkDirty override cannot set.
+    /// Queries visibility directly from the DAG path.
     MAYAHYDRALIB_API
     bool GetVisible() override;
 

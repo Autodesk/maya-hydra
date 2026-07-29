@@ -53,8 +53,6 @@ public:
     virtual HdDisplayStyle GetDisplayStyle() override;
     MAYAHYDRALIB_API
     virtual PxOsdSubdivTags GetSubdivTags() override;
-    MAYAHYDRALIB_API
-    virtual void MarkDirty(HdDirtyBits dirtyBits) override;
 
     // Return the shading engine assigned to this shape. Pass a mesh component in
     // shadingComp to get the shading engine for that specific group of faces

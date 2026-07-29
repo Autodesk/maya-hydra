@@ -49,10 +49,6 @@ public:
     bool IsSupported() const override;
 
     MAYAHYDRALIB_API
-    /// Mark this camera prim dirty with the given bits.
-    void MarkDirty(HdDirtyBits dirtyBits) override;
-
-    MAYAHYDRALIB_API
     /// Insert the camera prim into the scene index.
     void Populate() override;
 

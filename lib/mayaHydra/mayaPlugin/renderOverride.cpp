@@ -41,6 +41,7 @@
 #include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/tokens.h>
 
+#include <flowViewport/fvpDirtyNotifier.h>
 #include <flowViewport/tokens.h>
 #include <flowViewport/colorPreferences/fvpColorPreferences.h>
 #include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
@@ -655,7 +656,10 @@ TfTokenVector MtohRenderOverride::GetAvailableFramePassAovs(int passIndex)
             // may interfere with the current renderer, just copy the same implementation here
             TfTokenVector currAovs;
             const auto    renderIndex = instance->renderIndex(passIndex);
-            if (renderIndex && renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
+            HdRenderDelegate* renderDelegate
+                = renderIndex ? renderIndex->GetRenderDelegate() : nullptr;
+            if (renderIndex && renderDelegate
+                && renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
 
                 static const TfToken candidates[] = { HdAovTokens->primId,
                                                       HdAovTokens->depth,
@@ -667,7 +671,7 @@ TfTokenVector MtohRenderOverride::GetAvailableFramePassAovs(int passIndex)
 
                 currAovs = { HdAovTokens->color };
                 for (auto const& aov : candidates) {
-                    if (renderIndex->GetRenderDelegate()->GetDefaultAovDescriptor(aov).format
+                    if (renderDelegate->GetDefaultAovDescriptor(aov).format
                         != HdFormatInvalid) {
                         currAovs.push_back(aov);
                     }
@@ -1355,8 +1359,9 @@ MStatus MtohRenderOverride::Render(
     
                         currentPass->params().renderParams.camera = cameraPath;
                     }
-                    if (vpDirty)
-                        _mayaHydraSceneIndex->MarkSprimDirty(cameraPath, HdCamera::DirtyParams);
+                    if (vpDirty) {
+                        Fvp::DirtyNotifier(*_mayaHydraSceneIndex, cameraPath).dirtyCameraParams();
+                    }
 #if PXR_VERSION >= 2605
                     if (_sceneGlobalsSceneIndex && !cameraPath.IsEmpty()) {
                         _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
@@ -1737,6 +1742,18 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
 
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("MtohRenderOverride::ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
+
+    // Stop render delegates before tearing down scene indices or render indices.
+    // Matches hvt::ViewportEngine::CreateRenderer(), which calls Stop() before
+    // replacing a render index.
+    for (int i = 0; i < _GetNumFramePasses(); ++i) {
+        const auto& renderIndexProxy = _framePassesData[i]->_renderIndexProxy;
+        if (renderIndexProxy && renderIndexProxy->RenderIndex()) {
+            if (HdRenderDelegate* renderDelegate = renderIndexProxy->RenderIndex()->GetRenderDelegate()) {
+                renderDelegate->Stop();
+            }
+        }
+    }
 
     //We don't have any viewport using Hydra any more
     Fvp::RenderViewDataManager::Get().RemoveAllRenderViewData();
@@ -2560,10 +2577,11 @@ TfHashSet<SdfPath, SdfPath::Hash> MtohRenderOverride::_ExpandIsolateSelectionFor
     };
 
     // Native visual rprims (camera gizmos, light shapes) live in the frame-pass render index
-    // that feeds the viewport; MayaHydraSceneIndex::GetRenderIndex() may not list them.
+    // that feeds the viewport; fall back to the scene index render index when the frame-pass
+    // index is unavailable.
     HdRenderIndex* renderIndexForScan = renderIndex(0);
     if (!renderIndexForScan) {
-        renderIndexForScan = &_mayaHydraSceneIndex->GetRenderIndex();
+        renderIndexForScan = _mayaHydraSceneIndex->GetRenderIndexPtr();
     }
 
     bool needDefaultUfeProxyCamera = false;
@@ -2575,9 +2593,11 @@ TfHashSet<SdfPath, SdfPath::Hash> MtohRenderOverride::_ExpandIsolateSelectionFor
     std::vector<SdfPath> nativeRprims;
     {
         TfHashSet<SdfPath, SdfPath::Hash> seen;
-        for (const SdfPath& id : renderIndexForScan->GetRprimIds()) {
-            if (id.HasPrefix(MAYA_NATIVE_ROOT) && seen.insert(id).second) {
-                nativeRprims.push_back(id);
+        if (renderIndexForScan) {
+            for (const SdfPath& id : renderIndexForScan->GetRprimIds()) {
+                if (id.HasPrefix(MAYA_NATIVE_ROOT) && seen.insert(id).second) {
+                    nativeRprims.push_back(id);
+                }
             }
         }
         for (const SdfPath& p :

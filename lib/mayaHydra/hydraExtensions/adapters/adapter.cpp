@@ -16,6 +16,7 @@
 #include "adapter.h"
 
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
+#include <mayaHydraLib/adapters/mhDirtyNotifier.h>
 #include <mayaHydraLib/adapters/materialNetworkConverter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/mayaUtils.h>
@@ -23,9 +24,11 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/tf/type.h>
+#include <pxr/imaging/hd/renderIndex.h>
 
 #include <maya/MNodeMessage.h>
 #include <maya/MFnAttribute.h>
+#include <maya/MFileIO.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -46,6 +49,16 @@ namespace {
 
 using LockType = std::recursive_mutex;
 LockType dg_access_mutex;
+
+// When an extension/dynamic attribute set changes on an rprim, also dirty extComputationPrimvars
+// because the attribute may back a computation input. This is NOT emitted on topology changes
+// (see doc/render_delegate_topology_vs_deformation.md).
+void _maybeDirtyExtComputationPrimvars(MayaHydraAdapter& adapter, Fvp::DirtyNotifier& notifier)
+{
+    if (adapter.IsRprimTypeSupportedForPrim()) {
+        notifier.dirtyExtComputationPrimvars();
+    }
+}
 
 void _preRemoval(MObject& node, void* clientData)
 {
@@ -69,6 +82,21 @@ void _nameChanged(MObject& node, const MString& str, void* clientData)
 
 } // namespace
 
+/// Skip Hydra dirty notifications during file read, scene-index teardown, or when the
+/// render delegate is unavailable.
+bool MayaHydraAdapter::ShouldSkipHydraUpdates(MayaHydraSceneIndex* sceneIndex)
+{
+    // During file read, plugins (e.g. mtoa) may add extension attributes that fire
+    // adapter callbacks before Hydra resources are in a consistent state.
+    if (MFileIO::isOpeningFile()) {
+        return true;
+    }
+    if (sceneIndex == nullptr || sceneIndex->IsTearingDown()) {
+        return true;
+    }
+    return !sceneIndex->HasRenderDelegate();
+}
+
 // MayaHydraAdapter is the base class for all adapters. An adapter is used to translate from Maya
 // data to hydra data.
 MayaHydraAdapter::MayaHydraAdapter(
@@ -82,6 +110,34 @@ MayaHydraAdapter::MayaHydraAdapter(
 }
 
 MayaHydraAdapter::~MayaHydraAdapter() { RemoveCallbacks(); }
+
+bool MayaHydraAdapter::IsRprimTypeSupportedForPrim() const
+{
+    // If the prim is not in the scene index the cache is stale regardless of which adapter
+    // subclass set it. Clearing here (rather than in every RemovePrim() override) is the
+    // single-point fix: any call to IsRprimTypeSupportedForPrim() between RemovePrim() and
+    // the next Populate()
+    // returns false and resets the flag so the next Populate() re-resolves a fresh value.
+    if (!_isPopulated) {
+        _isRprimResolved = false;
+        return false;
+    }
+    if (!_isRprimResolved) {
+        if (ShouldSkipHydraUpdates(_mayaHydraSceneIndex)) {
+            return false;
+        }
+        if (!TF_VERIFY(
+                _mayaHydraSceneIndex->HasRenderDelegate(),
+                "IsRprimTypeSupportedForPrim() called without a render delegate; callers must "
+                "guard with ShouldSkipHydraUpdates() first.")) {
+            return false;
+        }
+        const HdSceneIndexPrim prim = _mayaHydraSceneIndex->GetPrim(_id);
+        _isRprimValue    = _mayaHydraSceneIndex->IsRprimTypeSupported(prim.primType);
+        _isRprimResolved = true;
+    }
+    return _isRprimValue;
+}
 
 void MayaHydraAdapter::AddCallback(MCallbackId callbackId) { _callbacks.push_back(callbackId); }
 
@@ -191,10 +247,13 @@ bool MayaHydraAdapter::AttributeMessageAffectsExtensionPrimvars(MNodeMessage::At
 // Normalize the plug, filter non extension/dynamic attrs, then mark primvars dirty if allowed.
 void MayaHydraAdapter::MaybeMarkPrimvarDirtyForAttributeChange(const MPlug& plug)
 {
+    if (ShouldSkipHydraUpdates(_mayaHydraSceneIndex)) {
+        return;
+    }
     // Trace to top-level plug: when a compound/array element's child changes
     // (e.g. aiLookAt[0].child(0)), Maya may only fire for the child. We must
     // still mark primvars dirty so the scene browser refreshes when resetting
-    // to default (primvar removal). Duplicate MarkDirty calls are idempotent.
+    // to default (primvar removal). Duplicate dirty notifications are idempotent.
     MPlug topPlug = MayaHydra::GetTopPlug(plug);
     MStatus attrStatus;
     topPlug.attribute(&attrStatus);
@@ -216,25 +275,33 @@ void MayaHydraAdapter::MaybeMarkPrimvarDirtyForAttributeChange(const MPlug& plug
 // Mark primvars dirty for an extension/dynamic attribute change and coalesce extra bits.
 void MayaHydraAdapter::MarkPrimvarDirtyForAttributeChange(const MPlug& plug)
 {
+    if (ShouldSkipHydraUpdates(_mayaHydraSceneIndex)) {
+        return;
+    }
     MStatus status;
     MObject attrObj = plug.attribute(&status);
     if (!status) {
         // Plug may be invalid during kAttributeRemoved; still refresh cached extension/dynamic map.
+        // The attribute set itself changed (add/remove), so many/unknown primvars may change at
+        // once: the broad primvars locator is appropriate here.
         _extAttrMapNeedUpdate = true;
-        MPlug emptyPlug;
-        MarkDirty(
-            HdChangeTracker::DirtyPrimvar
-            | GetConsolidatedDirtyBitsForPrimvarAttributeChange(emptyPlug));
+        MayaHydra::DirtyNotifier notifier(this);
+        notifier.dirtyPrimvars();
+        _maybeDirtyExtComputationPrimvars(*this, notifier);
+        AddExtraDirtyForPrimvarAttributeChange(notifier, plug);
         return;
     }
     MFnAttribute fnAttr(attrObj);
     if (fnAttr.isExtension() || fnAttr.isDynamic()) {
         _extAttrMapNeedUpdate = true;
-        // Notify the change tracker. Include extra bits from subclass (e.g. light param attrs
-        // need DirtyParams|DirtyShadowParams) to consolidate into one MarkDirty and avoid
-        // redundant scene index notifications.
-        MarkDirty(
-            HdChangeTracker::DirtyPrimvar | GetConsolidatedDirtyBitsForPrimvarAttributeChange(plug));
+        // Extension/dynamic attributes are exposed as constant primvars; emit the broad
+        // primvars locator (many/unknown primvars change). Type-specific adapters add their
+        // own schema on top via AddExtraDirtyForPrimvarAttributeChange (e.g. lights add the
+        // light schema locator).
+        MayaHydra::DirtyNotifier notifier(this);
+        notifier.dirtyPrimvars();
+        _maybeDirtyExtComputationPrimvars(*this, notifier);
+        AddExtraDirtyForPrimvarAttributeChange(notifier, plug);
     }
 }
 

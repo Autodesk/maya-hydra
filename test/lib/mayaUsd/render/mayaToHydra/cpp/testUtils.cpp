@@ -23,6 +23,14 @@
 #include <flowViewport/selection/fvpPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 
+#include <mayaHydraLib/adapters/tokens.h>
+
+#include <pxr/imaging/hd/extComputationPrimvarsSchema.h>
+#include <pxr/imaging/hd/extentSchema.h>
+#include <pxr/imaging/hd/meshSchema.h>
+#include <pxr/imaging/hd/meshTopologySchema.h>
+#include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/subdivisionTagsSchema.h>
 #include <pxr/imaging/hd/instancedBySchema.h>
 #include <pxr/imaging/hd/instancerTopologySchema.h>
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
@@ -45,6 +53,7 @@
 #include <QApplication>
 
 #include <algorithm>
+#include <sstream>
 #include <cctype>
 #include <exception>
 #include <iostream>
@@ -206,6 +215,152 @@ HdSceneIndexBaseRefPtr FindMayaHydraSceneIndex(
     auto producers = mergingSi->GetInputScenes();
     auto found = std::find_if(producers.begin(), producers.end(), isMayaProducer);
     return (found != producers.end()) ? *found : nullptr;
+}
+
+MeshDirtySignals ClassifyMeshDirtySince(
+    const SceneIndexNotificationsAccumulator& accumulator,
+    size_t                                    startIndex,
+    const SdfPath&                            meshPrimPath)
+{
+    MeshDirtySignals signals;
+    const auto& entries = accumulator.GetDirtiedPrimEntries();
+
+    const auto meshTopologyLocator = HdMeshTopologySchema::GetDefaultLocator();
+    const auto subdivSchemeLocator = HdMeshSchema::GetSubdivisionSchemeLocator();
+    const auto broadPrimvarsLocator = HdPrimvarsSchema::GetDefaultLocator();
+    const auto extCompLocator = HdExtComputationPrimvarsSchema::GetDefaultLocator();
+    const auto pointsLocator = HdPrimvarsSchema::GetPointsLocator();
+    const auto extentLocator = HdExtentSchema::GetDefaultLocator();
+    const auto normalsLocator = HdPrimvarsSchema::GetNormalsLocator();
+    const auto uvsLocator = broadPrimvarsLocator.Append(MayaHydraAdapterTokens->st);
+    const auto tangentsLocator = broadPrimvarsLocator.Append(MayaHydraAdapterTokens->tangents);
+    const auto subdivTagsLocator = HdSubdivisionTagsSchema::GetDefaultLocator();
+    const auto displayStyleLocator = HdLegacyDisplayStyleSchema::GetDefaultLocator();
+    const auto visibilityLocator = HdVisibilitySchema::GetDefaultLocator();
+    const auto instancedByLocator = HdInstancedBySchema::GetDefaultLocator();
+    const auto instancerTopologyLocator = HdInstancerTopologySchema::GetDefaultLocator();
+
+    for (size_t i = startIndex; i < entries.size(); ++i) {
+        if (entries[i].primPath != meshPrimPath) {
+            continue;
+        }
+        signals.anyForPrim = true;
+        const HdDataSourceLocatorSet& locators = entries[i].dirtyLocators;
+        if (locators.Intersects(meshTopologyLocator)
+            || locators.Contains(subdivSchemeLocator)) {
+            signals.meshTopology = true;
+        }
+        if (locators.Contains(broadPrimvarsLocator)) {
+            signals.broadPrimvars = true;
+        }
+        if (locators.Intersects(extCompLocator)) {
+            signals.extCompPrimvars = true;
+        }
+        if (locators.Intersects(pointsLocator)) {
+            signals.points = true;
+        }
+        if (locators.Intersects(extentLocator)) {
+            signals.extent = true;
+        }
+        if (locators.Intersects(normalsLocator)) {
+            signals.normals = true;
+        }
+        if (locators.Intersects(uvsLocator)) {
+            signals.uvs = true;
+        }
+        if (locators.Intersects(tangentsLocator)) {
+            signals.tangents = true;
+        }
+        if (locators.Intersects(subdivTagsLocator)) {
+            signals.subdivisionTags = true;
+        }
+        if (locators.Intersects(displayStyleLocator)) {
+            signals.displayStyle = true;
+        }
+        if (locators.Intersects(visibilityLocator)) {
+            signals.visibility = true;
+        }
+        if (locators.Intersects(instancedByLocator)
+            || locators.Intersects(instancerTopologyLocator)) {
+            signals.instancer = true;
+        }
+    }
+    return signals;
+}
+
+std::string DescribeDirtyPrimEntriesSince(
+    const SceneIndexNotificationsAccumulator& accumulator,
+    size_t                                    startIndex,
+    const SdfPath&                            primPath)
+{
+    std::ostringstream out;
+    const auto&        entries = accumulator.GetDirtiedPrimEntries();
+    out << "Dirty entries since index " << startIndex;
+    if (!primPath.IsEmpty()) {
+        out << " for prim " << primPath.GetString();
+    }
+    out << ":\n";
+    for (size_t i = startIndex; i < entries.size(); ++i) {
+        if (!primPath.IsEmpty() && entries[i].primPath != primPath) {
+            continue;
+        }
+        out << "  [" << i << "] " << entries[i].primPath.GetAsString() << " locators: ";
+        const HdDataSourceLocatorSet& locators = entries[i].dirtyLocators;
+        if (locators.IsEmpty()) {
+            out << "<empty>";
+        } else {
+            bool first = true;
+            for (auto it = locators.begin(); it != locators.end(); ++it) {
+                if (!first) {
+                    out << ", ";
+                }
+                first = false;
+                out << it->GetString();
+            }
+        }
+        out << "\n";
+    }
+    return out.str();
+}
+
+bool TryFindMeshPrim(
+    const std::string&      meshShapeFull,
+    SdfPath*                outPrimPath,
+    HdSceneIndexBaseRefPtr* outMayaSceneIndex)
+{
+    if (!outPrimPath || !outMayaSceneIndex) {
+        return false;
+    }
+    *outPrimPath = SdfPath();
+    *outMayaSceneIndex = nullptr;
+
+    const std::string         shapeNamePart = GetShapeNameFromFullPath(meshShapeFull);
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    if (sceneIndices.empty()) {
+        return false;
+    }
+
+    HdSceneIndexBaseRefPtr sceneIndexWithMesh = FindTerminalSceneIndexWithPrim(
+        sceneIndices, shapeNamePart, HdPrimTypeTokens->mesh);
+    if (!sceneIndexWithMesh) {
+        return false;
+    }
+
+    auto mayaSceneIndex = FindMayaHydraSceneIndex(sceneIndexWithMesh);
+    if (!mayaSceneIndex) {
+        return false;
+    }
+
+    SceneIndexInspector inspector(mayaSceneIndex);
+    PrimEntriesVector   foundPrims
+        = inspector.FindPrims(CreatePrimPredicate(shapeNamePart, HdPrimTypeTokens->mesh), 1);
+    if (foundPrims.empty()) {
+        return false;
+    }
+
+    *outPrimPath = foundPrims.front().primPath;
+    *outMayaSceneIndex = mayaSceneIndex;
+    return true;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

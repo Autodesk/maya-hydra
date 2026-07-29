@@ -5,6 +5,7 @@ target_sources(${TARGET_NAME}
     PRIVATE
         adapter.cpp
         adapterDebugCodes.cpp
+        mhDirtyNotifier.cpp
         adapterRegistry.cpp
         aiSkydomeLightAdapter.cpp
 		aiAreaLightAdapter.cpp
@@ -14,6 +15,7 @@ target_sources(${TARGET_NAME}
         customDagAdapter.cpp
         imagePlaneMaterialAdapter.cpp
         renderItemAdapter.cpp
+        renderItemTopologyUtil.cpp
         directionalLightAdapter.cpp
         lightAdapter.cpp
         materialAdapter.cpp
@@ -31,6 +33,7 @@ target_sources(${TARGET_NAME}
 set(HEADERS
     adapter.h
     adapterDebugCodes.h
+    mhDirtyNotifier.h
     adapterRegistry.h
     cameraAdapter.h
     meshAdapterTestUtils.h
@@ -39,6 +42,7 @@ set(HEADERS
     customDagAdapter.h
     imagePlaneMaterialAdapter.h
     renderItemAdapter.h
+    renderItemTopologyUtil.h
     lightAdapter.h
     materialAdapter.h
     materialNetworkConverter.h

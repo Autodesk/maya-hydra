@@ -37,8 +37,6 @@
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
 
-#include <mayaHydraLib/adapters/mayaAttrs.h>
-
 #include <maya/MDagPath.h>
 #include <maya/MDagPathArray.h>
 #include <maya/MFnAttribute.h>
@@ -137,12 +135,11 @@ void _CustomNodeAttrChanged(
 // changes are handled separately by _CustomNodeAttrChanged.
 void _CustomShapePlugDirty(MObject& node, MPlug& plug, void* clientData)
 {
+    TF_UNUSED(node);
     auto* adapter = reinterpret_cast<MayaHydraCustomDagAdapter*>(clientData);
-    if (plug == MayaAttrs::dagNode::visibility
-        || plug == MayaAttrs::dagNode::intermediateObject
-        || plug == MayaAttrs::dagNode::overrideEnabled
-        || plug == MayaAttrs::dagNode::overrideVisibility) {
-        adapter->MarkDirty(HdChangeTracker::DirtyVisibility);
+    if (MayaHydraDagAdapter::IsVisibilityRelatedPlug(plug)) {
+        // Shape node: visibility only — no co-dirty transform (unlike parent transforms).
+        MayaHydraDagAdapter::DirtyVisibilityRelatedPlug(adapter, /*coDirtyTransform=*/false);
     }
 }
 
@@ -151,21 +148,12 @@ void _CustomShapePlugDirty(MObject& node, MPlug& plug, void* clientData)
 // DirtyVisibility, all other plugs fire DirtyTransform.
 void _CustomParentTransformDirty(MObject& node, MPlug& plug, void* clientData)
 {
+    TF_UNUSED(node);
     auto* adapter = reinterpret_cast<MayaHydraCustomDagAdapter*>(clientData);
-    if (plug == MayaAttrs::dagNode::visibility
-        || plug == MayaAttrs::dagNode::intermediateObject
-        || plug == MayaAttrs::dagNode::overrideEnabled
-        || plug == MayaAttrs::dagNode::overrideVisibility) {
-        if (adapter->IsVisible(false)) {
-            adapter->InvalidateTransform();
-            adapter->MarkDirty(
-                HdChangeTracker::DirtyVisibility | HdChangeTracker::DirtyTransform);
-        } else {
-            adapter->MarkDirty(HdChangeTracker::DirtyVisibility);
-        }
-    } else if (adapter->IsVisible(false)) {
-        adapter->InvalidateTransform();
-        adapter->MarkDirty(HdChangeTracker::DirtyTransform);
+    if (MayaHydraDagAdapter::IsVisibilityRelatedPlug(plug)) {
+        MayaHydraDagAdapter::DirtyVisibilityRelatedPlug(adapter);
+    } else {
+        MayaHydraDagAdapter::DirtyTransformIfVisible(adapter);
     }
 }
 
@@ -195,28 +183,6 @@ void MayaHydraCustomDagAdapter::Populate()
         MayaHydraAdapterTokens->mayaCustomDagNode,
         GetID());
     _isPopulated = true;
-}
-
-void MayaHydraCustomDagAdapter::MarkDirty(HdDirtyBits dirtyBits)
-{
-    if (dirtyBits == 0) {
-        return;
-    }
-
-    HdDataSourceLocatorSet locators;
-    if (dirtyBits & HdChangeTracker::DirtyTransform) {
-        locators.append(HdXformSchema::GetDefaultLocator());
-    }
-    if (dirtyBits & HdChangeTracker::DirtyVisibility) {
-        locators.append(HdVisibilitySchema::GetDefaultLocator());
-    }
-    if (dirtyBits & HdChangeTracker::DirtyPrimvar) {
-        locators.append(HdPrimvarsSchema::GetDefaultLocator());
-    }
-
-    if (!locators.IsEmpty()) {
-        GetMayaHydraSceneIndex()->DirtyPrims({{ GetID(), locators }});
-    }
 }
 
 void MayaHydraCustomDagAdapter::CreateCallbacks()
