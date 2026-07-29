@@ -67,9 +67,6 @@ public:
     /// Insert the light prim into the scene index.
     void Populate() override;
     MAYAHYDRALIB_API
-    /// Mark this light prim dirty with the given bits.
-    void MarkDirty(HdDirtyBits dirtyBits) override;
-    MAYAHYDRALIB_API
     /// Remove the light prim from the scene index.
     virtual void RemovePrim() override;
     MAYAHYDRALIB_API
@@ -111,18 +108,16 @@ public:
 
     /// Suppress primvar dirtying for built-in light params that already dirty schema bits.
     bool ShouldMarkPrimvarDirtyForAttributeChange(const MPlug& plug) const override;
-    /// Add extra dirty bits for light-param primvar changes.
-    HdDirtyBits GetConsolidatedDirtyBitsForPrimvarAttributeChange(const MPlug& plug) const override;
+    /// Add light schema + visibility + collections locators on top of the base primvar
+    /// invalidation when an extension/dynamic light-param attribute changes, matching the
+    /// full SprimDirtyBitsToLocatorSet(DirtyParams) expansion used for built-in params.
+    void AddExtraDirtyForPrimvarAttributeChange(Fvp::DirtyNotifier& notifier, const MPlug& plug) override;
 
     /// Return whether shadows are enabled for this light.
     bool GetShadowsEnabled(MFnLight& light) const;
 
     /// Compute GlfSimpleLight position/direction from a Maya light.
     void GetGlfSimpleLightPosAndDirFromMFnLight(MFnLight& light, GlfSimpleLight& outSimpleLight);
-
-    /// For plug dirty callbacks: marks DirtyParams/DirtyShadowParams only when the plug affects
-    /// light params. Primvar-only attrs (e.g. aiShadowDensity) skip this to avoid over-dirtying.
-    static void MarkDirtyIfPlugAffectsLightParams(MayaHydraLightAdapter* adapter, const MPlug& plug);
 
     /// For unit tests: returns the param attribute names that trigger DirtyParams.
     /// Use with LightPrimvars.ParamAttributesMatchGetLogic to ensure the list stays in sync.

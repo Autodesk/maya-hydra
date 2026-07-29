@@ -437,6 +437,12 @@ template <> void _GetFromPlug<bool>(const MPlug& plug, bool& out) { out = plug.a
 
 template <> void _GetFromPlug<int>(const MPlug& plug, int& out) { out = plug.asInt(); }
 
+template <> void _GetFromPlug<unsigned int>(const MPlug& plug, unsigned int& out)
+{
+    const int v = plug.asInt();
+    out = static_cast<unsigned int>(v < 0 ? 0 : v);
+}
+
 template <> void _GetFromPlug<float>(const MPlug& plug, float& out) { out = plug.asFloat(); }
 
 template <> void _GetFromPlug<std::string>(const MPlug& plug, std::string& out)
@@ -475,6 +481,11 @@ template <typename T> bool _SetOptionVar(const MString& attrName, const T& value
 bool _SetOptionVar(const MString& attrName, const bool& value)
 {
     return _SetOptionVar(attrName, int(value));
+}
+
+bool _SetOptionVar(const MString& attrName, const unsigned int& value)
+{
+    return _SetOptionVar(attrName, static_cast<int>(value));
 }
 
 bool _SetOptionVar(const MString& attrName, const float& value)
@@ -578,9 +589,10 @@ void _GetColorAttribute(
 
 bool _IsSupportedAttribute(const VtValue& v)
 {
-    return v.IsHolding<bool>() || v.IsHolding<int>() || v.IsHolding<float>()
-        || v.IsHolding<GfVec3f>() || v.IsHolding<GfVec4f>() || v.IsHolding<TfToken>()
-        || v.IsHolding<std::string>() || v.IsHolding<TfEnum>() || v.IsHolding<SdfAssetPath>();
+    return v.IsHolding<bool>() || v.IsHolding<int>() || v.IsHolding<unsigned int>()
+        || v.IsHolding<float>() || v.IsHolding<GfVec3f>() || v.IsHolding<GfVec4f>()
+        || v.IsHolding<TfToken>() || v.IsHolding<std::string>() || v.IsHolding<TfEnum>()
+        || v.IsHolding<SdfAssetPath>();
 }
 
 TfToken _MangleString(
@@ -965,6 +977,12 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
             } else if (attr.defaultValue.IsHolding<int>()) {
                 _CreateIntAttribute(
                     node, filter.mayaString(), attr.defaultValue.UncheckedGet<int>(), userDefaults);
+            } else if (attr.defaultValue.IsHolding<unsigned int>()) {
+                _CreateIntAttribute(
+                    node,
+                    filter.mayaString(),
+                    static_cast<int>(attr.defaultValue.UncheckedGet<unsigned int>()),
+                    userDefaults);
             } else if (attr.defaultValue.IsHolding<float>()) {
                 _CreateFloatAttribute(
                     node,
@@ -1161,6 +1179,10 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<int>()) {
                 auto v = attr.defaultValue.UncheckedGet<int>();
+                _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
+                settings[filter.attrName()] = v;
+            } else if (attr.defaultValue.IsHolding<unsigned int>()) {
+                auto v = attr.defaultValue.UncheckedGet<unsigned int>();
                 _GetAttribute(node, filter.mayaString(), v, storeUserSetting);
                 settings[filter.attrName()] = v;
             } else if (attr.defaultValue.IsHolding<float>()) {

@@ -19,6 +19,7 @@ target_sources(${TARGET_NAME}
         mayaHydraCppTestsCmd.cpp
         testColorPreferences.cpp
         testCppFramework.cpp
+        testFvpDirtyNotifier.cpp
         testHydraPrim.cpp
         testMayaHydraSceneIndex.cpp
         testMayaSceneFlattening.cpp
@@ -41,6 +42,8 @@ target_sources(${TARGET_NAME}
         testArnoldCustomAttributesMayaNodes.cpp
         testCameraPrimvars.cpp
         testMeshPrimvars.cpp
+        testDirtyLocators.cpp
+        testRenderItemTopologyUtil.cpp
         testMeshGeomSubsets.cpp
         testFlowViewportAPIFilterPrims.cpp
         testSceneCorrectness.cpp

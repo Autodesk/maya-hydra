@@ -8,6 +8,7 @@ add_library(${TARGET_NAME} SHARED)
 target_sources(${TARGET_NAME} 
     PRIVATE
         debugCodes.cpp
+        fvpDirtyNotifier.cpp
         fvpInstruments.cpp
         fvpPrimUtils.cpp
         fvpUtils.cpp
@@ -20,6 +21,7 @@ target_sources(${TARGET_NAME}
 set(HEADERS
     api.h
     debugCodes.h
+    fvpDirtyNotifier.h
     fvpInstruments.h
     fvpPrimUtils.h
     fvpUtils.h

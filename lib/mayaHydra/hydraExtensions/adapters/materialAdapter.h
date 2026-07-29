@@ -47,8 +47,6 @@ public:
     bool HasType(const TfToken& typeId) const override;
 
     MAYAHYDRALIB_API
-    void MarkDirty(HdDirtyBits dirtyBits) override;
-    MAYAHYDRALIB_API
     void RemovePrim() override;
     MAYAHYDRALIB_API
     void Populate() override;

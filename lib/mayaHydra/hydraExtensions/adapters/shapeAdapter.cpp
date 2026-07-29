@@ -65,11 +65,6 @@ HdDisplayStyle MayaHydraShapeAdapter::GetDisplayStyle() { return { 0, false, fal
 
 PxOsdSubdivTags MayaHydraShapeAdapter::GetSubdivTags() { return {}; }
 
-void MayaHydraShapeAdapter::MarkDirty(HdDirtyBits dirtyBits)
-{
-    MayaHydraDagAdapter::MarkDirty(dirtyBits);
-}
-
 MObject MayaHydraShapeAdapter::GetMaterial(const MObject& shadingComp)
 {
     TF_DEBUG(MAYAHYDRALIB_ADAPTER_GET)
