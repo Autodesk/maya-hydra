@@ -261,34 +261,6 @@ LightParamNoticeSummary SummarizeLightParamNoticesSince(
     return summary;
 }
 
-// Human-readable dump to debug unexpected dirty entries or locators.
-std::string DescribeDirtyEntriesSince(
-    SceneIndexNotificationsAccumulator& accumulator,
-    size_t                              startIndex)
-{
-    std::ostringstream out;
-    const auto&        entries = accumulator.GetDirtiedPrimEntries();
-    out << "Dirty entries since index " << startIndex << ":\n";
-    for (size_t i = startIndex; i < entries.size(); ++i) {
-        out << "  [" << i << "] " << entries[i].primPath.GetAsString() << " locators: ";
-        const HdDataSourceLocatorSet& locators = entries[i].dirtyLocators;
-        if (locators.IsEmpty()) {
-            out << "<empty>";
-        } else {
-            bool first = true;
-            for (auto it = locators.begin(); it != locators.end(); ++it) {
-                if (!first) {
-                    out << ", ";
-                }
-                first = false;
-                out << it->GetString();
-            }
-        }
-        out << "\n";
-    }
-    return out.str();
-}
-
 // Validate a light param update: exactly one notice, light schema plus USD extra locators,
 // and no extComputationPrimvars.
 void ExpectLightParamNotice(
@@ -320,7 +292,7 @@ void ExpectLightParamNotice(
         << summary.extCompPrimvarsCount;
 
     if (summary.totalEntries != 1u || summary.hasUnexpectedLocator || summary.hasUnexpectedPrim) {
-        ADD_FAILURE() << DescribeDirtyEntriesSince(accumulator, startIndex);
+        ADD_FAILURE() << DescribeDirtyPrimEntriesSince(accumulator, startIndex);
     }
 }
 
@@ -342,7 +314,7 @@ void ExpectSingleNoticeCommon(
         << "Expected exactly one notice for " << valueLabel << ", got " << summary.matchingEntries;
 
     if (summary.totalEntries != 1u || summary.hasUnexpectedLocator || summary.hasUnexpectedPrim) {
-        ADD_FAILURE() << DescribeDirtyEntriesSince(accumulator, startIndex);
+        ADD_FAILURE() << DescribeDirtyPrimEntriesSince(accumulator, startIndex);
     }
 }
 

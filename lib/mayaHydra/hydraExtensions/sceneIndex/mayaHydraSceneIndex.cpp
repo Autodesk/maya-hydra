@@ -16,8 +16,6 @@
 
 #include "mayaHydraSceneIndex.h"
 
-#include "pxr/imaging/hd/dirtyBitsTranslator.h"
-
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/debugCodes.h>
@@ -27,6 +25,7 @@
 #include <mayaHydraLib/profilingUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraDataSource.h>
 
+#include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/envSetting.h>
 #include <pxr/imaging/hd/geomSubsetSchema.h>
 #include <pxr/imaging/hd/materialBindingSchema.h>
@@ -37,6 +36,7 @@
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
 #include <maya/MDGMessage.h>
+#include <maya/MDagMessage.h>
 #include <maya/MDagPath.h>
 #include <maya/MDagPathArray.h>
 #include <maya/MFnDependencyNode.h>
@@ -51,6 +51,7 @@
 #include <maya/MString.h>
 #include <ufe/pathString.h>
 
+#include <mayaHydraLib/adapters/mhDirtyNotifier.h>
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 #include <flowViewport/selection/fvpDataProducersNodeHashCodeToSdfPathRegistry.h>
 #include <flowViewport/selection/fvpPathMapper.h>
@@ -287,6 +288,14 @@ void _onDagNodeRemoved(MObject& obj, void* clientData)
     reinterpret_cast<MayaHydraSceneIndex*>(clientData)->OnDagNodeRemoved(obj);
 }
 
+// duplicateInstanced does not add DAG nodes, so it never triggers _onDagNodeAdded; this is the
+// only reliable signal that a shape gained a new instance path.
+void _instanceAdded(MDagPath& child, MDagPath& parent, void* clientData)
+{
+    TF_UNUSED(parent);
+    reinterpret_cast<MayaHydraSceneIndex*>(clientData)->AddNewInstance(child);
+}
+
 const MString defaultLightSet("defaultLightSet");
 
 void _connectionChanged(MPlug& srcPlug, MPlug& destPlug, bool made, void* clientData)
@@ -377,7 +386,7 @@ private:
 MayaHydraSceneIndex::MayaHydraSceneIndex(MayaHydraInitData& initData, bool interactive)
     : _ID(initData.delegateID.AppendChild(
           TfToken(TfStringPrintf("_Index_MayaHydraSceneIndex_%p", this))))
-    , _renderIndex(initData.renderIndex)
+    , _renderIndex(&initData.renderIndex)
     , _isHdSt(initData.isHdSt)
     , _rprimPath(initData.delegateID.AppendPath(SdfPath(std::string("rprims"))))
     , _sprimPath(initData.delegateID.AppendPath(SdfPath(std::string("sprims"))))
@@ -400,6 +409,15 @@ MayaHydraSceneIndex::~MayaHydraSceneIndex() { _Destroy(); }
 
 void MayaHydraSceneIndex::_Destroy()
 {
+    // All Maya callbacks fire on the main thread only (no render thread here), but
+    // _Destroy() removes adapters incrementally, so removing adapter N's callbacks can
+    // synchronously re-enter adapter M (not yet reached) — same-thread reentrancy, not a
+    // race. E.g. node-deletion during file close, or extension-attribute callbacks during
+    // file read (see ShouldSkipHydraUpdates()). Set _isTearingDown so reentrant callers
+    // no-op via ShouldSkipHydraUpdates()/IsTearingDown() instead of touching Hydra state
+    // mid-teardown. A null _renderIndex outside teardown remains a TF_VERIFY error.
+    _isTearingDown = true;
+
     for (auto callback : _callbacks) {
         MMessage::removeCallback(callback);
     }
@@ -582,6 +600,14 @@ void MayaHydraSceneIndex::Populate()
     if (status) {
         _callbacks.push_back(id);
     }
+    if (useMeshAdapter()) {
+        // Catches instance paths added via duplicateInstanced, which getAllPathsTo()-based
+        // detection previously had to poll for every frame in FlushPendingUpdates().
+        id = MDagMessage::addInstanceAddedCallback(_instanceAdded, this, &status);
+        if (status) {
+            _callbacks.push_back(id);
+        }
+    }
 }
 
 VtValue MayaHydraSceneIndex::GetMaterialResource(const SdfPath& id)
@@ -686,6 +712,10 @@ MayaHydraSceneIndex::LightDagPathMap MayaHydraSceneIndex::GetGlobalLightPaths() 
 
 void MayaHydraSceneIndex::FlushPendingUpdates()
 {
+    if (_isTearingDown) {
+        return;
+    }
+
     _renderCollectionChanged = false;
 
     if (!_materialTagsChanged.empty()) {
@@ -695,9 +725,9 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
                         id,
                         [](MayaHydraMaterialAdapter* a) { return a->UpdateMaterialTag(); },
                         _materialAdapters)) {
-                    auto& renderIndex = GetRenderIndex();
-                    for (const auto& rprimId : renderIndex.GetRprimIds()) {
-                        const auto* rprim = renderIndex.GetRprim(rprimId);
+                    HdRenderIndex* renderIndex = GetRenderIndexPtr();
+                    for (const auto& rprimId : renderIndex->GetRprimIds()) {
+                        const auto* rprim = renderIndex->GetRprim(rprimId);
                         if (rprim != nullptr && rprim->GetMaterialId() == id) {
                             RebuildAdapterOnIdle(
                                 rprim->GetId(), MayaHydraSceneIndex::RebuildFlagPrim);
@@ -733,7 +763,7 @@ void MayaHydraSceneIndex::FlushPendingUpdates()
         _camerasToAdd.clear();
     }
 
-    if (useMeshAdapter() && !_addedNodes.empty()) {
+    if (useMeshAdapter()) {
         for (const auto& obj : _addedNodes) {
             if (obj.isNull()) {
                 continue;
@@ -892,42 +922,6 @@ void MayaHydraSceneIndex::_RemoveEmptyAncestors(const SdfPath& path)
     }
 }
 
-void MayaHydraSceneIndex::MarkRprimDirty(const SdfPath& id, HdDirtyBits dirtyBits)
-{
-    _MarkPrimDirty(id, dirtyBits, HdDirtyBitsTranslator::RprimDirtyBitsToLocatorSet);
-}
-
-void MayaHydraSceneIndex::MarkSprimDirty(const SdfPath& id, HdDirtyBits dirtyBits)
-{
-    _MarkPrimDirty(id, dirtyBits, HdDirtyBitsTranslator::SprimDirtyBitsToLocatorSet);
-}
-
-void MayaHydraSceneIndex::MarkBprimDirty(const SdfPath& id, HdDirtyBits dirtyBits)
-{
-    _MarkPrimDirty(id, dirtyBits, HdDirtyBitsTranslator::BprimDirtyBitsToLocatorSet);
-}
-
-void MayaHydraSceneIndex::MarkInstancerDirty(const SdfPath& id, HdDirtyBits dirtyBits)
-{
-    _MarkPrimDirty(id, dirtyBits, HdDirtyBitsTranslator::InstancerDirtyBitsToLocatorSet);
-}
-
-void MayaHydraSceneIndex::_MarkPrimDirty(
-    const SdfPath&          id,
-    HdDirtyBits             dirtyBits,
-    DirtyBitsToLocatorsFunc dirtyBitsToLocatorsFunc)
-{
-    HdSceneIndexPrim       prim = GetPrim(id);
-    HdDataSourceLocatorSet locators;
-    dirtyBitsToLocatorsFunc(prim.primType, dirtyBits, &locators);
-    if (dirtyBits & HdChangeTracker::DirtyPrimvar) {
-        locators.append(HdPrimvarsSchema::GetDefaultLocator());
-    }
-    if (!locators.IsEmpty()) {
-        DirtyPrims({ { id, locators } });
-    }
-}
-
 void MayaHydraSceneIndex::RemovePrim(const SdfPath& id)
 {
     RemovePrims({ id });
@@ -949,16 +943,15 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
         // from each adapter.
         _MapAdapter<MayaHydraRenderItemAdapter>(
             [](MayaHydraRenderItemAdapter* a) {
-                if (a->HasType(HdPrimTypeTokens->mesh) || a->HasType(HdPrimTypeTokens->basisCurves)
-                    || a->HasType(HdPrimTypeTokens->points)) {
-                    a->MarkDirty(HdChangeTracker::DirtyTopology);
+                if (a->HasType(HdPrimTypeTokens->mesh)) {
+                    MayaHydra::DirtyNotifier(a).dirtyMeshTopology();
                 }
             },
             _renderItemsAdapters);
         _MapAdapter<MayaHydraDagAdapter>(
             [](MayaHydraDagAdapter* a) {
                 if (a->HasType(HdPrimTypeTokens->mesh)) {
-                    a->MarkDirty(HdChangeTracker::DirtyTopology);
+                    MayaHydra::DirtyNotifier(a).dirtyMeshTopology();
                 }
             },
             _shapeAdapters);
@@ -970,19 +963,26 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
                 if (a->HasType(HdPrimTypeTokens->mesh) || a->HasType(HdPrimTypeTokens->basisCurves)
                     || a->HasType(HdPrimTypeTokens->points)) {
                     a->InvalidateTransform();
-                    a->MarkDirty(HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyTransform);
+                    MayaHydra::DirtyNotifier(a).dirtyPoints().dirtyTransform();
                 }
             },
             _renderItemsAdapters);
         _MapAdapter<MayaHydraDagAdapter>(
             [](MayaHydraDagAdapter* a) {
-                if (a->HasType(HdPrimTypeTokens->mesh)) {
-                    a->MarkDirty(HdChangeTracker::DirtyPoints);
-                } else if (a->HasType(HdPrimTypeTokens->camera)) {
-                    a->MarkDirty(HdCamera::DirtyParams);
-                }
                 a->InvalidateTransform();
-                a->MarkDirty(HdChangeTracker::DirtyTransform);
+                {
+                    MayaHydra::DirtyNotifier notifier(a);
+                    if (a->HasType(HdPrimTypeTokens->mesh)) {
+                        notifier.dirtyPoints();
+                    } else if (a->HasType(HdPrimTypeTokens->camera)) {
+                        notifier.dirtyCameraParams();
+                    }
+                    notifier.dirtyTransform();
+                }
+                if (a->IsInstanced()) {
+                    Fvp::DirtyNotifier(*a->GetMayaHydraSceneIndex(), a->GetInstancerID())
+                        .dirtyTransform();
+                }
             },
             _shapeAdapters,
             _lightAdapters,
@@ -992,12 +992,17 @@ void MayaHydraSceneIndex::SetParams(const MayaHydraParams& params)
     // We need to trigger rebuilding shaders.
     if (oldParams.textureMemoryPerTexture != params.textureMemoryPerTexture) {
         _MapAdapter<MayaHydraMaterialAdapter>(
-            [](MayaHydraMaterialAdapter* a) { a->MarkDirty(HdMaterial::AllDirty); },
+            [](MayaHydraMaterialAdapter* a) {
+                MayaHydra::DirtyNotifier(a).dirtyMaterial();
+            },
             _materialAdapters);
     }
     if (oldParams.maximumShadowMapResolution != params.maximumShadowMapResolution) {
         _MapAdapter<MayaHydraLightAdapter>(
-            [](MayaHydraLightAdapter* a) { a->MarkDirty(HdLight::AllDirty); }, _lightAdapters);
+            [](MayaHydraLightAdapter* a) {
+                MayaHydra::DirtyNotifier(a).dirtyLightParams();
+            },
+            _lightAdapters);
     }
 
     _params = params;
@@ -1065,6 +1070,10 @@ HdBasisCurvesTopology MayaHydraSceneIndex::GetBasisCurvesTopology(const SdfPath&
 
 void MayaHydraSceneIndex::RemoveAdapter(const SdfPath& id)
 {
+    if (_isTearingDown) {
+        return;
+    }
+
     if (!_RemoveAdapter<MayaHydraAdapter>(
             id,
             [](MayaHydraAdapter* a) {
@@ -1083,6 +1092,10 @@ void MayaHydraSceneIndex::RemoveAdapter(const SdfPath& id)
 
 void MayaHydraSceneIndex::RecreateAdapterOnIdle(const SdfPath& id, const MObject& obj)
 {
+    if (_isTearingDown) {
+        return;
+    }
+
     std::lock_guard<std::mutex> lock(_adaptersToRecreateMutex);
 
     // We expect this to be a small number of objects, so using a simple linear
@@ -1195,8 +1208,62 @@ GfInterval MayaHydraSceneIndex::GetCurrentTimeSamplingInterval() const
     return GfInterval(_params.motionSampleStart, _params.motionSampleEnd);
 }
 
+HdRenderIndex* MayaHydraSceneIndex::GetRenderIndexPtr()
+{
+    TF_VERIFY(!_isTearingDown, "GetRenderIndexPtr() called while tearing down.");
+    TF_VERIFY(_renderIndex, "GetRenderIndexPtr() called with null render index.");
+    return _renderIndex;
+}
+
+bool MayaHydraSceneIndex::HasRenderDelegate() const
+{
+    if (_isTearingDown) {
+        return false;
+    }
+    TF_VERIFY(_renderIndex, "HasRenderDelegate() called with null render index.");
+    return _renderIndex->GetRenderDelegate() != nullptr;
+}
+
+bool MayaHydraSceneIndex::IsRprimTypeSupported(const TfToken& typeId) const
+{
+    return HasRenderDelegate() && _renderIndex->IsRprimTypeSupported(typeId);
+}
+
+bool MayaHydraSceneIndex::IsSprimTypeSupported(const TfToken& typeId) const
+{
+    return HasRenderDelegate() && _renderIndex->IsSprimTypeSupported(typeId);
+}
+
+bool MayaHydraSceneIndex::IsBprimTypeSupported(const TfToken& typeId) const
+{
+    return HasRenderDelegate() && _renderIndex->IsBprimTypeSupported(typeId);
+}
+
+HdResourceRegistrySharedPtr MayaHydraSceneIndex::GetResourceRegistry() const
+{
+    return HasRenderDelegate() ? _renderIndex->GetResourceRegistry() : nullptr;
+}
+
+void MayaHydraSceneIndex::RemoveInstancer(const SdfPath& id)
+{
+    if (_isTearingDown) {
+        return;
+    }
+    if (!TF_VERIFY(
+            HasRenderDelegate(),
+            "RemoveInstancer() called without a render delegate; callers must guard with "
+            "ShouldSkipHydraUpdates() first.")) {
+        return;
+    }
+    _renderIndex->RemoveInstancer(id);
+}
+
 void MayaHydraSceneIndex::RebuildAdapterOnIdle(const SdfPath& id, uint32_t flags)
 {
+    if (_isTearingDown) {
+        return;
+    }
+
     std::lock_guard<std::mutex> lock(_adaptersToRebuildMutex);
 
     // We expect this to be a small number of objects, so using a simple linear
@@ -1266,11 +1333,11 @@ void MayaHydraSceneIndex::RecreateAdapter(const SdfPath& id, const MObject& obj)
                 a->RemovePrim();
             },
             _materialAdapters)) {
-        auto& renderIndex = GetRenderIndex();
-        for (const auto& rprimId : renderIndex.GetRprimIds()) {
-            const auto* rprim = renderIndex.GetRprim(rprimId);
+        HdRenderIndex* renderIndex = GetRenderIndexPtr();
+        for (const auto& rprimId : renderIndex->GetRprimIds()) {
+            const auto* rprim = renderIndex->GetRprim(rprimId);
             if (rprim != nullptr && rprim->GetMaterialId() == id) {
-                MarkRprimDirty(rprimId, HdChangeTracker::DirtyMaterialId);
+                Fvp::DirtyNotifier(*this, rprimId).dirtyMaterialBinding();
             }
         }
         if (MObjectHandle(obj).isValid()) {
@@ -1368,6 +1435,10 @@ MayaHydraCustomDagAdapterPtr MayaHydraSceneIndex::CreateCustomAdapter(const MDag
 
 void MayaHydraSceneIndex::OnDagNodeAdded(const MObject& obj)
 {
+    if (_isTearingDown) {
+        return;
+    }
+
     if (obj.isNull())
         return;
 
@@ -1597,7 +1668,6 @@ void MayaHydraSceneIndex::InsertDag(const MDagPath& dag)
     if (CreateLightAdapter(dag)) {
         return;
     }
-
     // We are inserting a single prim and
     // instancer for every instanced mesh.
     if (dag.isInstanced() && dag.instanceNumber() > 0) {
@@ -1672,16 +1742,19 @@ void MayaHydraSceneIndex::AddNewInstance(const MDagPath& dag)
     if (!TfMapLookup(_shapeAdapters, id, &masterAdapter) || masterAdapter == nullptr) {
         return;
     }
-    // If dags is 1, we have to recreate the adapter.
-    if (dags.length() == 1 || !masterAdapter->IsInstanced()) {
+    if (dagsLength == 1) {
         RecreateAdapterOnIdle(id, masterDag.node());
-    } else {
-        // If dags is more than one, trigger rebuilding callbacks next call and
-        // mark dirty.
-        RebuildAdapterOnIdle(id, MayaHydraSceneIndex::RebuildFlagCallbacks);
-        masterAdapter->MarkDirty(
-            HdChangeTracker::DirtyInstancer | HdChangeTracker::DirtyInstanceIndex
-            | HdChangeTracker::DirtyPrimvar);
+        return;
+    }
+    // Node now has multiple DAG paths: rebuild callbacks (register _InstancerNodeDirty on every
+    // path) and dirty instancer topology / instance primvars.
+    RebuildAdapterOnIdle(id, MayaHydraSceneIndex::RebuildFlagCallbacks);
+    {
+        Fvp::DirtyNotifier(*this, masterAdapter->GetID()).dirtyInstancer().dirtyPrimvars();
+    }
+    const SdfPath instancerId = masterAdapter->GetInstancerID();
+    if (!instancerId.IsEmpty()) {
+        Fvp::DirtyNotifier(*this, instancerId).dirtyInstancer().dirtyPrimvars();
     }
 }
 
@@ -1707,7 +1780,7 @@ VtValue MayaHydraSceneIndex::GetShadingStyle(SdfPath const& id)
     return VtValue();
 }
 
-bool MayaHydraSceneIndex::passNormalsToHydra()
+bool MayaHydraSceneIndex::useMayaNormals()
 {
     static const bool val = TfGetEnvSetting(MAYA_HYDRA_PASS_NORMALS_TO_HYDRA);
     return val;
@@ -1724,7 +1797,9 @@ void MayaHydraSceneIndex::UpdateLightsShadowCollection()
     // Mark shadowCollection as dirty if any render prim is added/removed
     if (_renderCollectionChanged && _shadowsEnabled) {
         _MapAdapter<MayaHydraLightAdapter>(
-            [](MayaHydraLightAdapter* a) { a->MarkDirty(HdLight::DirtyCollection); },
+            [](MayaHydraLightAdapter* a) {
+                MayaHydra::DirtyNotifier(a).dirtyCollections();
+            },
             _lightAdapters);
     }
 }

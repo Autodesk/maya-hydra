@@ -17,6 +17,8 @@
 //
 #include "materialAdapter.h"
 
+#include <mayaHydraLib/adapters/mhDirtyNotifier.h>
+
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/materialNetworkConverter.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
@@ -107,21 +109,12 @@ MayaHydraMaterialAdapter::MayaHydraMaterialAdapter(
 
 bool MayaHydraMaterialAdapter::IsSupported() const
 {
-    return GetMayaHydraSceneIndex()->GetRenderIndex().IsSprimTypeSupported(HdPrimTypeTokens->material);
+    return GetMayaHydraSceneIndex()->IsSprimTypeSupported(HdPrimTypeTokens->material);
 }
 
 bool MayaHydraMaterialAdapter::HasType(const TfToken& typeId) const
 {
     return typeId == HdPrimTypeTokens->material;
-}
-
-void MayaHydraMaterialAdapter::MarkDirty(HdDirtyBits dirtyBits)
-{
-    // We support extension-attribute primvars on materials, so keep DirtyPrimvar even though
-    // materials are sprims and normally only expose HdMaterial dirty bits.
-    const HdDirtyBits primvarBits = dirtyBits & HdChangeTracker::DirtyPrimvar;
-    dirtyBits = (dirtyBits & HdMaterial::AllDirty) | primvarBits;
-    GetMayaHydraSceneIndex()->MarkSprimDirty(GetID(), dirtyBits);
 }
 
 void MayaHydraMaterialAdapter::RemovePrim()
@@ -147,7 +140,9 @@ void MayaHydraMaterialAdapter::Populate()
 void MayaHydraMaterialAdapter::EnableXRayShadingMode(bool enable)
 {
     _enableXRayShadingMode = enable;
-    MarkDirty(HdMaterial::DirtyParams);
+    if (_isPopulated) {
+        MayaHydra::DirtyNotifier(this).dirtyMaterial();
+    }
 }
 
 VtValue MayaHydraMaterialAdapter::GetMaterialResource()
@@ -233,12 +228,17 @@ private:
         void*                          clientData)
     {
         auto* adapter = reinterpret_cast<MayaHydraShadingEngineAdapter*>(clientData);
+        if (MayaHydraAdapter::ShouldSkipHydraUpdates(adapter->GetMayaHydraSceneIndex())) {
+            return;
+        }
         if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
             adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
             return;
         }
         adapter->_CreateSurfaceMaterialCallback();
-        adapter->MarkDirty(HdMaterial::AllDirty);
+        {
+            MayaHydra::DirtyNotifier(adapter).dirtyMaterial();
+        }
     }
     static void _ShaderAttributeChangedCallback(
         MNodeMessage::AttributeMessage msg,
@@ -249,11 +249,16 @@ private:
         TF_UNUSED(msg);
         TF_UNUSED(otherPlug);
         auto* adapter = reinterpret_cast<MayaHydraShadingEngineAdapter*>(clientData);
+        if (MayaHydraAdapter::ShouldSkipHydraUpdates(adapter->GetMayaHydraSceneIndex())) {
+            return;
+        }
         if (MayaHydraAdapter::IsExtensionOrDynamicAttribute(plug)) {
             adapter->MaybeMarkPrimvarDirtyForAttributeChange(plug);
             return;
         }
-        adapter->MarkDirty(HdMaterial::AllDirty);
+        {
+            MayaHydra::DirtyNotifier(adapter).dirtyMaterial();
+        }
         if (adapter->GetMayaHydraSceneIndex()->IsHdSt()) {
             adapter->GetMayaHydraSceneIndex()->MaterialTagChanged(adapter->GetID());
         }
