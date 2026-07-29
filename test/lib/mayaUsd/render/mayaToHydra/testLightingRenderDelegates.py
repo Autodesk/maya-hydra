@@ -235,10 +235,32 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
             return True
         return platform.system().lower() == required.lower()
 
+    def _setupSnapshotViewport(self):
+        """Pin the snapshot camera and display flags used when baselines were captured.
+
+        The test scene stores camera1 on the Persp panel in its embedded UI config,
+        but that config is not always restored in batch/standalone Maya (depends on
+        Maya version and $gUseScenePanelConfig). Without an explicit lookThru, the
+        active editor can keep a default persp view and snapshot comparisons fail
+        with a large framing mismatch rather than lighting noise.
+        """
+        panel = cmds.playblast(activeEditor=True)
+        cmds.lookThru(panel, "camera1")
+        cmds.modelEditor(
+            panel,
+            edit=True,
+            displayLights="all",
+            displayTextures=True,
+            shadows=True,
+            grid=False,
+        )
+        cmds.refresh(force=True)
+
     def loadScene(self):
         """Load the test scene and set the base renderer state."""
         mayaUtils.openTestScene("testLightingRenderDelegates", "testLightingRenderDelegates.ma")
         self.setHdStormRenderer()
+        self._setupSnapshotViewport()
 
     def test_EachLight_PerRenderDelegate(self):
         """For each render delegate, enable each Maya light one by one and compare snapshots to baseline."""
