@@ -95,6 +95,16 @@ void DirtyNotifier::commitDirtyBatch()
     }
 }
 
+DirtyNotifier::DirtyBatchGuard::DirtyBatchGuard(HdRetainedSceneIndex& batchingSceneIndex)
+{
+    DirtyNotifier::beginDirtyBatch(batchingSceneIndex);
+}
+
+DirtyNotifier::DirtyBatchGuard::~DirtyBatchGuard()
+{
+    DirtyNotifier::commitDirtyBatch();
+}
+
 DirtyNotifier& DirtyNotifier::_append(const HdDataSourceLocator& locator)
 {
     _locators.append(locator);
