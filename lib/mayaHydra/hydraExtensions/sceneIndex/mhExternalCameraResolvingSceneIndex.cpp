@@ -28,7 +28,7 @@
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/usd/sdf/path.h>
 
-#include <ufe/path.h>
+#include <ufe/pathString.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 using namespace UfeExtensions;
@@ -36,6 +36,7 @@ using namespace UfeExtensions;
 namespace {
 
 const TfToken kExternalCameraComponent("__adskUsd__externalCamera");
+const std::string kUfeSegmentSentinel("__ufeSegment__");
 
 SdfPath ResolveExternalCameraPath(const SdfPath& inputPath)
 {
@@ -91,12 +92,19 @@ SdfPath ResolveExternalCameraPath(const SdfPath& inputPath)
     // multiple reader behavior), which has been considered in the past, but
     // this requires UFE versus Maya TBB configuration management.
 
-    Ufe::PathSegment::Components components;
-    components.push_back(Ufe::PathComponent("world"));
-    for (const SdfPath& prefix : appPath.GetPrefixes()) {
-        components.push_back(prefix.GetNameToken().GetString());
+    const auto appPathStr = appPath.GetString();
+    const auto segmentEnd = appPathStr.find(kUfeSegmentSentinel);
+
+    // Maya path: replace '/' with '|'
+    auto pathStr = appPathStr.substr(0, segmentEnd);
+    std::replace(pathStr.begin(), pathStr.end(), '/', '|');
+
+    if (segmentEnd != std::string::npos) {
+        // Assume the second segment is a USD path, and already has '/' path
+        // component separator.  Remove segment separator sentinel.
+        pathStr += "," + appPathStr.substr(segmentEnd + kUfeSegmentSentinel.length());
     }
-    Ufe::Path appUfePath(Ufe::PathSegment(components, getMayaRunTimeId(), '|'));
+    auto appUfePath = Ufe::PathString::path(pathStr);
     auto hydraPath = Fvp::ufePathToPrimSelections(appUfePath);
 
     // Camera is non-instanced, so there will be a single PrimSelection.

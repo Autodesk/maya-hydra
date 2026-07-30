@@ -117,6 +117,7 @@ mayaHydra_add_cmd_line_render_test(${scene}
     RENDERED_IMAGE_SUBDIR projects/default/images
     RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
     RENDERER HdStormRendererPlugin
+    TEST_NAME_SUFFIX Storm
     RENDERER_ARGS "-x 960 -y 540 -cam \"|camera1\" -rd ../images -im ${sceneFileNameNoExt}"
 )
 
@@ -129,7 +130,37 @@ mayaHydra_add_cmd_line_render_test(${scene}
     RENDERED_IMAGE_SUBDIR projects/default/images
     RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
     RENDERER HdStormRendererPlugin
+    TEST_NAME_SUFFIX Storm
     RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -rd ../images -im ${sceneFileNameNoExt}"
+)
+
+# Test -cam with USD camera in HdArnold.
+set(scene basic/usdCamera.ma)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+mayaHydra_add_cmd_line_render_test(${scene}
+    COPY_SCENE
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+    RENDERER HdArnoldRendererPlugin
+    TEST_NAME_SUFFIX Arnold
+    RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -rd ../images -im ${sceneFileNameNoExt}"
+)
+
+# Test the same as above but with Hydra V2 render settings.
+set(scene basic/usdCamera.ma)
+set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/${sceneFileNameNoExt}_Arnold_v2_rs/projects/default/images)
+cmake_path(GET scene STEM sceneFileNameNoExt)
+mayaHydra_add_cmd_line_render_test(${scene}
+    COPY_SCENE
+    RENDERER HdArnoldRendererPlugin
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}_Arnold_v2_rs
+    RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -rd \"${render_dir}\" -im ${sceneFileNameNoExt}_Arnold_v2_rs"
+    TEST_NAME_SUFFIX Arnold_v2_rs
+    ENV
+        "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
+        "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
+        "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS"
 )
 
 # Use a small vertical resolution to avoid the Arnold watermark.
