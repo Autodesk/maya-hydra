@@ -186,12 +186,6 @@ class RenderManUtilsTestCase(unittest.TestCase):
         self.assertEqual(os.environ["HD_PRMAN_DISABLE_ADAPTIVE_SAMPLING"], "0")
         self.assertEqual(os.environ["HD_PRMAN_MAX_SAMPLES"], "64")
 
-    def test_estimateRenderSettleSeconds_matches_max_settle_constant(self):
-        self.assertEqual(
-            renderManUtils.estimateRenderSettleSeconds(),
-            renderManUtils.PRMAN_TEST_MAX_SETTLE_SECONDS,
-        )
-
     # -- waitForInteractiveConvergence ---------------------------------------
 
     def test_waitForInteractiveConvergence_returns_true_when_converged(self):

@@ -101,14 +101,6 @@ def setUp():
     return saved_env
 
 
-# Return the max seconds to wait for PRMan convergence after resize.
-#
-# Prefer waitForInteractiveConvergence(), which polls mayaHydraTesting and exits
-# early when convergence is reported. This value is only the timeout cap.
-def estimateRenderSettleSeconds():
-    return PRMAN_TEST_MAX_SETTLE_SECONDS
-
-
 # Poll mayaHydraTesting(converged=True) at capture resolution, refreshing each
 # iteration, and return as soon as convergence is reported (or timeout).
 #
