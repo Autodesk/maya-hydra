@@ -70,9 +70,9 @@ class TestMeshDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
             cmds.mayaHydraCppTest(
                 f="MeshDirtyLocators.DeformationVertexMoveEmitsPointsNotTopology")
 
-    # What: inMesh dirty with unchanged points (skin/time-change path) must emit primvars/points.
-    # How: setupSkinnedScene at frame 1; C++ dgdirty inMesh with unchanged points.
-    # Expect: points + extent. Fails if MeshGeometryState emits UV-only locators on inMesh.
+    # What: inMesh dirty with unchanged points (skinning/time-change path) must still emit primvars/points.
+    # How: setupSkinnedScene at frame 1; C++ dgdirty inMesh while point positions are unchanged.
+    # Expect: points + extent; must not emit UV-only locators (primvars/st only).
     def test_skinnedMeshDeformationEmitsPoints(self):
         self.setupSkinnedScene()
         with PluginLoaded('mayaHydraCppTests'):

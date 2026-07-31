@@ -21,10 +21,8 @@
 
 #include <pxr/imaging/hd/tokens.h>
 
-#include <maya/MAnimControl.h>
 #include <maya/MGlobal.h>
 #include <maya/MStringArray.h>
-#include <maya/MTime.h>
 
 #include <gtest/gtest.h>
 
@@ -363,17 +361,18 @@ void RunSkinnedMeshDeformationEmitsPointsTest()
     ASSERT_TRUE(TryFindMeshPrim(meshShapeFull, &meshPrimPath, &mayaSceneIndex))
         << "Mesh prim not found (ensure MAYA_HYDRA_USE_MESH_ADAPTER=1 and skinned test scene)";
 
-    // Evaluate frame 1 so the mesh adapter's cached geometry state matches live point positions.
+    // Evaluate frame 1 so the skinned mesh is in a known evaluated state before issuing dgdirty.
     ASSERT_EQ(MGlobal::viewFrame(1.0), MS::kSuccess);
     MGlobal::executeCommand("refresh");
 
     SceneIndexNotificationsAccumulator notifsAccumulator(mayaSceneIndex);
     const size_t startIndex = notifsAccumulator.GetDirtiedPrimEntries().size();
 
-    // Reproduce the batch-render skin bug deterministically: inMesh is dirtied while evaluated
-    // point positions still match the adapter's cached geometry state, so MatchesCurrent (when
-    // present) returns true and only primvars/st is emitted. Joint rotation or a fully evaluated
-    // time change updates points before MatchesCurrent runs and would not catch the regression.
+    // Reproduce the batch-render skin bug deterministically: dgdirty inMesh while evaluated
+    // point positions are unchanged. NodeDirtiedCallback must not read mesh data during DG dirty
+    // propagation; it should always dirty points/extent, not UV-only locators (primvars/st).
+    // Joint rotation or a full time-change evaluation would move points first and would not
+    // catch a UV-only misclassification on inMesh/pnts.
     ASSERT_EQ(MGlobal::executeCommand(
                   ("dgdirty " + meshShapeFull + ".inMesh").c_str()),
               MStatus::kSuccess);
@@ -385,7 +384,7 @@ void RunSkinnedMeshDeformationEmitsPointsTest()
     EXPECT_TRUE(signals.anyForPrim) << "Expected dirty notices for the skinned mesh prim";
     EXPECT_TRUE(signals.points)
         << "inMesh dirty with unchanged point positions must still emit primvars/points "
-           "(MeshGeometryState UV-only misclassification otherwise)\n"
+           "(UV-only locators on inMesh/pnts would miss deformation)\n"
         << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
     EXPECT_TRUE(signals.extent)
         << "inMesh deformation path should dirty extent\n"
@@ -409,11 +408,11 @@ TEST(MeshDirtyLocators, DeformationVertexMoveEmitsPointsNotTopology)
     RunDeformationVertexMoveTest();
 }
 
-// What: skinned / stale-read inMesh dirty must emit primvars/points, not UV-only locators.
-// How: skinned scene at frame 1, then dgdirty inMesh with unchanged point positions.
+// What: skinned inMesh dirty with unchanged point positions must emit primvars/points, not UV-only locators.
+// How: skinned scene at frame 1, then dgdirty inMesh while point positions are unchanged.
 // Expect: points + extent; no mesh topology.
-// Regression: MeshGeometryState::MatchesCurrent in NodeDirtiedCallback treated stale skin
-//             inMesh dirties as UV-only (primvars/st without primvars/points).
+// Regression: inMesh/pnts dirties must always emit points/extent without reading mesh data during
+//             DG dirty propagation (prior logic could emit UV-only locators on stale skin inMesh).
 TEST(MeshDirtyLocators, SkinnedMeshDeformationEmitsPoints)
 {
     RunSkinnedMeshDeformationEmitsPointsTest();

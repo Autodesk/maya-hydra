@@ -552,10 +552,10 @@ public:
     }
 
 private:
-    /// inMesh/pnts dirties fire for geometry edits, skinning/deformation, and UV-only edits.
+    /// inMesh/pnts dirties fire for geometry edits, skinning/deformation, and can also be triggered by UV-only edits.
     /// Do not read mesh data here: NodeDirtiedCallback runs during DG dirty propagation and
     /// MFnMesh evaluation can recurse (e.g. skin cluster + joint hierarchy at time change).
-    /// UV-only edits are handled by MPolyMessage::addUVSetChangedCallback and uvPivot.
+    /// UV-only edits may also be reported via UVSetChangedCallback or uvPivot, which can dirty only primvars/st.
     void DirtyInMeshOrPnts(MayaHydra::DirtyNotifier& notifier, bool useMayaNormals)
     {
         notifier.dirtyPoints().dirtyExtent().dirtySubdivision();
