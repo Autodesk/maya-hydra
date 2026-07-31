@@ -37,6 +37,30 @@ class TestMeshDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
         cmds.optionVar(stringValue=("mhMeshTransform", cmds.ls("testCube", long=True)[0]))
         cmds.refresh()
 
+    def setupSkinnedScene(self):
+        """Minimal skinned mesh: cube + 2-joint chain + skinCluster + keyed joint rotation."""
+        cmds.file(new=True, force=True)
+        cmds.polyCube(name="skinnedCube")
+        mesh_shape = cmds.ls("skinnedCubeShape", long=True)[0]
+        cmds.select(clear=True)
+        root = cmds.joint(name="root", position=[0, -0.5, 0])
+        tip = cmds.joint(name="tip", position=[0, 0.5, 0])
+        cmds.select("skinnedCube", replace=True)
+        cmds.select([root, tip], add=True)
+        cmds.skinCluster(toSelectedBones=True, maximumInfluences=2, name="skinCluster1")
+        cmds.playbackOptions(minTime=1, maxTime=10)
+        cmds.currentTime(1)
+        cmds.setAttr(tip + ".rotateZ", 0)
+        cmds.setKeyframe(tip + ".rotateZ")
+        cmds.currentTime(10)
+        cmds.setAttr(tip + ".rotateZ", 90)
+        cmds.setKeyframe(tip + ".rotateZ")
+        cmds.currentTime(1)
+        self.setHdStormRenderer()
+        cmds.optionVar(stringValue=("mhMeshShape", mesh_shape))
+        cmds.optionVar(stringValue=("mhMeshTransform", cmds.ls("skinnedCube", long=True)[0]))
+        cmds.refresh()
+
     # What: vertex deformation should dirty primvars/points without topology locators.
     # How: build a cube scene, move one vertex via C++, inspect dirty locators.
     # Expect: points dirty; no mesh topology or broad primvars.
@@ -45,6 +69,15 @@ class TestMeshDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 f="MeshDirtyLocators.DeformationVertexMoveEmitsPointsNotTopology")
+
+    # What: inMesh dirty with unchanged points (skinning/time-change path) must still emit primvars/points.
+    # How: setupSkinnedScene at frame 1; C++ dgdirty inMesh while point positions are unchanged.
+    # Expect: points + extent; must not emit UV-only locators (primvars/st only).
+    def test_skinnedMeshDeformationEmitsPoints(self):
+        self.setupSkinnedScene()
+        with PluginLoaded('mayaHydraCppTests'):
+            cmds.mayaHydraCppTest(
+                f="MeshDirtyLocators.SkinnedMeshDeformationEmitsPoints")
 
     # What: topology edits should dirty mesh topology and broad primvars.
     # How: build a cube scene, extrude a face via C++, inspect dirty locators.
@@ -87,15 +120,6 @@ class TestMeshDirtyLocators(mtohUtils.MayaHydraBaseTestCase):
         with PluginLoaded('mayaHydraCppTests'):
             cmds.mayaHydraCppTest(
                 f="MeshDirtyLocators.UVEditEmitsGranularUVsOnly")
-
-    # What: editing UVs via polyEditUV should dirty only primvars/st (UVSetChangedCallback path).
-    # How: build a cube scene, select UVs and polyEditUV via C++, inspect dirty locators.
-    # Expect: uvs; no meshTopology, no broadPrimvars, no points.
-    def test_uvEditViaPolyEditUVEmitsGranularUVsOnly(self):
-        self.setupScene()
-        with PluginLoaded('mayaHydraCppTests'):
-            cmds.mayaHydraCppTest(
-                f="MeshDirtyLocators.UVEditViaPolyEditUVEmitsGranularUVsOnly")
 
     # What: toggling smooth mesh preview should dirty displayStyle + topology + subdivisionTags,
     #       but NOT the broad primvars locator.

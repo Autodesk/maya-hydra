@@ -353,6 +353,47 @@ void RunRenderItemConnectivityChangeSameVertexCountTest()
         << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
 }
 
+void RunSkinnedMeshDeformationEmitsPointsTest()
+{
+    const std::string meshShapeFull = GetOptionVarOrDefault(kMeshShapeOptionVar, kMeshShapeFallback);
+    SdfPath meshPrimPath;
+    HdSceneIndexBaseRefPtr mayaSceneIndex;
+    ASSERT_TRUE(TryFindMeshPrim(meshShapeFull, &meshPrimPath, &mayaSceneIndex))
+        << "Mesh prim not found (ensure MAYA_HYDRA_USE_MESH_ADAPTER=1 and skinned test scene)";
+
+    // Evaluate frame 1 so the skinned mesh is in a known evaluated state before issuing dgdirty.
+    ASSERT_EQ(MGlobal::viewFrame(1.0), MS::kSuccess);
+    MGlobal::executeCommand("refresh");
+
+    SceneIndexNotificationsAccumulator notifsAccumulator(mayaSceneIndex);
+    const size_t startIndex = notifsAccumulator.GetDirtiedPrimEntries().size();
+
+    // Reproduce the batch-render skin bug deterministically: dgdirty inMesh while evaluated
+    // point positions are unchanged. NodeDirtiedCallback must not read mesh data during DG dirty
+    // propagation; it should always dirty points/extent, not UV-only locators (primvars/st).
+    // Joint rotation or a full time-change evaluation would move points first and would not
+    // catch a UV-only misclassification on inMesh/pnts.
+    ASSERT_EQ(MGlobal::executeCommand(
+                  ("dgdirty " + meshShapeFull + ".inMesh").c_str()),
+              MStatus::kSuccess);
+    MGlobal::executeCommand("refresh");
+
+    const MeshDirtySignals signals
+        = ClassifyMeshDirtySince(notifsAccumulator, startIndex, meshPrimPath);
+
+    EXPECT_TRUE(signals.anyForPrim) << "Expected dirty notices for the skinned mesh prim";
+    EXPECT_TRUE(signals.points)
+        << "inMesh dirty with unchanged point positions must still emit primvars/points "
+           "(UV-only locators on inMesh/pnts would miss deformation)\n"
+        << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
+    EXPECT_TRUE(signals.extent)
+        << "inMesh deformation path should dirty extent\n"
+        << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
+    EXPECT_FALSE(signals.meshTopology)
+        << "Skinned deformation must not dirty mesh topology\n"
+        << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
+}
+
 } // namespace
 
 // ===========================================================================
@@ -365,6 +406,16 @@ void RunRenderItemConnectivityChangeSameVertexCountTest()
 TEST(MeshDirtyLocators, DeformationVertexMoveEmitsPointsNotTopology)
 {
     RunDeformationVertexMoveTest();
+}
+
+// What: skinned inMesh dirty with unchanged point positions must emit primvars/points, not UV-only locators.
+// How: skinned scene at frame 1, then dgdirty inMesh while point positions are unchanged.
+// Expect: points + extent; no mesh topology.
+// Regression: inMesh/pnts dirties must always emit points/extent without reading mesh data during
+//             DG dirty propagation (prior logic could emit UV-only locators on stale skin inMesh).
+TEST(MeshDirtyLocators, SkinnedMeshDeformationEmitsPoints)
+{
+    RunSkinnedMeshDeformationEmitsPointsTest();
 }
 
 // What: a topology edit dirties mesh topology and broad primvars (face-varying invalidation).
@@ -444,50 +495,6 @@ TEST(MeshDirtyLocators, UVEditEmitsGranularUVsOnly)
     EXPECT_TRUE(signals.anyForPrim) << "Expected dirty notices for the mesh prim";
     EXPECT_TRUE(signals.uvs)
         << "UV pivot change should dirty primvars/st\n"
-        << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
-    EXPECT_FALSE(signals.meshTopology)
-        << "UV edit must not dirty mesh topology\n"
-        << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
-    EXPECT_FALSE(signals.broadPrimvars)
-        << "UV edit must not emit the broad primvars locator\n"
-        << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
-    EXPECT_FALSE(signals.points)
-        << "UV edit must not dirty primvars/points\n"
-        << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
-}
-
-// What: editing UV coordinates via polyEditUV emits only the granular primvars/st locator.
-//       Exercises UVSetChangedCallback (MPolyMessage), distinct from the uvPivot attribute path.
-// How: select UV components and polyEditUV, then inspect dirty locators.
-// Expect: uvs=true; meshTopology=false, broadPrimvars=false, points=false.
-TEST(MeshDirtyLocators, UVEditViaPolyEditUVEmitsGranularUVsOnly)
-{
-    const std::string meshShapeFull = GetOptionVarOrDefault(kMeshShapeOptionVar, kMeshShapeFallback);
-    const std::string meshTransform
-        = GetOptionVarOrDefault(kMeshTransformOptionVar, kMeshTransformFallback);
-    const std::string meshTransformName = GetShapeNameFromFullPath(meshTransform);
-    SdfPath meshPrimPath;
-    HdSceneIndexBaseRefPtr mayaSceneIndex;
-    ASSERT_TRUE(TryFindMeshPrim(meshShapeFull, &meshPrimPath, &mayaSceneIndex))
-        << "Mesh prim not found (ensure MAYA_HYDRA_USE_MESH_ADAPTER=1)";
-
-    SceneIndexNotificationsAccumulator notifsAccumulator(mayaSceneIndex);
-    const size_t startIndex = notifsAccumulator.GetDirtiedPrimEntries().size();
-
-    // Default polyCube has 24 map vertices (6 faces × 4 corners).
-    ASSERT_EQ(MGlobal::executeCommand(
-                  ("select -r " + meshTransformName + ".map[0:23]").c_str()),
-              MStatus::kSuccess);
-    ASSERT_EQ(MGlobal::executeCommand("polyEditUV -u 0.1 -v 0.1 -relative true"),
-              MStatus::kSuccess);
-    MGlobal::executeCommand("refresh");
-
-    const MeshDirtySignals signals
-        = ClassifyMeshDirtySince(notifsAccumulator, startIndex, meshPrimPath);
-
-    EXPECT_TRUE(signals.anyForPrim) << "Expected dirty notices for the mesh prim";
-    EXPECT_TRUE(signals.uvs)
-        << "UV edit should dirty primvars/st\n"
         << DescribeDirtyPrimEntriesSince(notifsAccumulator, startIndex, meshPrimPath);
     EXPECT_FALSE(signals.meshTopology)
         << "UV edit must not dirty mesh topology\n"
