@@ -62,30 +62,49 @@ set(PATCH_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/src/patch")
 macro(download file)
     set(_download_url "https://raw.githubusercontent.com/PixarAnimationStudios/OpenUSD/v${USD_minor_patch_version}/extras/imaging/examples/hdui/${file}")
     set(_download_dest "${DOWNLOAD_LOCATION}/${file}")
-    file(DOWNLOAD
-        "${_download_url}"
-        "${_download_dest}"
-        STATUS _download_status
-        TLS_VERIFY ON)
+    set(_download_max_attempts 3)
+    set(_download_succeeded FALSE)
 
-    list(GET _download_status 0 _download_code)
-    list(GET _download_status 1 _download_message)
-    if(NOT _download_code EQUAL 0)
-        file(REMOVE "${_download_dest}")
+    foreach(_download_attempt RANGE 1 ${_download_max_attempts})
+        if(EXISTS "${_download_dest}")
+            file(REMOVE "${_download_dest}")
+        endif()
+
+        file(DOWNLOAD
+            "${_download_url}"
+            "${_download_dest}"
+            STATUS _download_status
+            TLS_VERIFY ON)
+
+        list(GET _download_status 0 _download_code)
+        list(GET _download_status 1 _download_message)
+        if(_download_code EQUAL 0)
+            # A zero status only means the transfer completed; guard against an empty body
+            # (e.g. a proxy/CDN returning a 0-byte 200) as well.
+            file(SIZE "${_download_dest}" _download_size)
+            if(_download_size GREATER 0)
+                set(_download_succeeded TRUE)
+                break()
+            endif()
+            set(_download_code 1)
+            set(_download_message "Downloaded file is empty")
+        endif()
+
+        if(_download_attempt LESS _download_max_attempts)
+            message(STATUS
+                "Download attempt ${_download_attempt}/${_download_max_attempts} for '${file}' failed "
+                "(${_download_code} - ${_download_message}); retrying...")
+        endif()
+    endforeach()
+
+    if(NOT _download_succeeded)
+        if(EXISTS "${_download_dest}")
+            file(REMOVE "${_download_dest}")
+        endif()
         message(FATAL_ERROR
-            "Failed to download '${file}' for ${TARGET_NAME}.\n"
+            "Failed to download '${file}' for ${TARGET_NAME} after ${_download_max_attempts} attempts.\n"
             "  URL   : ${_download_url}\n"
             "  Error : ${_download_code} - ${_download_message}")
-    endif()
-
-    # A zero status only means the transfer completed; guard against an empty body
-    # (e.g. a proxy/CDN returning a 0-byte 200) as well.
-    file(SIZE "${_download_dest}" _download_size)
-    if(_download_size EQUAL 0)
-        file(REMOVE "${_download_dest}")
-        message(FATAL_ERROR
-            "Downloaded '${file}' for ${TARGET_NAME} is empty.\n"
-            "  URL : ${_download_url}")
     endif()
 endmacro()
 
