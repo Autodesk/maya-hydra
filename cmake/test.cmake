@@ -12,8 +12,10 @@ if(NOT ADDITIONAL_PXR_PLUGINPATH_NAME AND DEFINED ENV{ADDITIONAL_PXR_PLUGINPATH_
         "Semicolon-separated paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold)" FORCE)
 endif()
 
-# When the cut stage copies OpenUSD next to the MayaHydra install, tests must
-# reference that tree consistently (PATH, plugin path, MaterialX, etc.).
+# Define the single proper USD install location. When the "cut" build stage is used, or when the
+# POST_ZIPS option is enabled in Jenkins, a copy of the USD build will be done so that it exists 
+# besides mayaHydra and can be packaged together with it. We therefore want to point only to that
+# USD build, and not the Artifactory one to avoid DLL load conflicts.
 if(DEFINED MAYAHYDRA_TO_USD_RELATIVE_PATH)
     set(MAYAHYDRA_USD_INSTALL_LOCATION "${CMAKE_INSTALL_PREFIX}/${MAYAHYDRA_TO_USD_RELATIVE_PATH}")
 else()
@@ -584,19 +586,19 @@ endfunction()
 function(_mayaHydra_setup_test_USD_paths)
     # These should come last (esp PYTHONPATH, in case another module is overriding
     # with pkgutil)
-    set(USD_INSTALL_LOCATION "${MAYAHYDRA_USD_INSTALL_LOCATION}")
+
     # Export OpenUSD location for runtime debugging and plugin discovery.
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-        "PXR_USD_LOCATION=${USD_INSTALL_LOCATION}"
-        "USD_INSTALL_LOCATION=${USD_INSTALL_LOCATION}")
+        "PXR_USD_LOCATION=${MAYAHYDRA_USD_INSTALL_LOCATION}"
+        "USD_INSTALL_LOCATION=${MAYAHYDRA_USD_INSTALL_LOCATION}")
     # Inherit any existing PYTHONPATH, but keep it at the end.
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
-        "${USD_INSTALL_LOCATION}/lib/python")
+        "${MAYAHYDRA_USD_INSTALL_LOCATION}/lib/python")
     if(IS_WINDOWS)
         list(APPEND MAYAHYDRA_VARNAME_PATH
-            "${USD_INSTALL_LOCATION}/bin")
+            "${MAYAHYDRA_USD_INSTALL_LOCATION}/bin")
         list(APPEND MAYAHYDRA_VARNAME_PATH
-            "${USD_INSTALL_LOCATION}/lib")
+            "${MAYAHYDRA_USD_INSTALL_LOCATION}/lib")
     endif()
 
     set(ALL_PATH_VARS PATH PYTHONPATH)
@@ -614,39 +616,6 @@ function(_mayaHydra_setup_test_finalize_env test_name)
     # system entries.
     list(APPEND MAYAHYDRA_VARNAME_PATH $ENV{PATH})
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH $ENV{PYTHONPATH})
-    #if(DEFINED MAYAHYDRA_TO_USD_RELATIVE_PATH AND DEFINED PXR_USD_LOCATION)
-    #    # Drop artifactory OpenUSD entries from inherited PATH/PYTHONPATH so tests
-    #    # do not load two USD builds when using the cut-copied install tree.
-    #    if(IS_WINDOWS)
-    #        string(REPLACE "\\" "/" _inherited_path "$ENV{PATH}")
-    #        string(REPLACE "\\" "/" _pxr_usd_path "${PXR_USD_LOCATION}")
-    #        foreach(_suffix "/bin" "/lib" "/lib64")
-    #            string(REPLACE "${_pxr_usd_path}${_suffix};" "" _inherited_path "${_inherited_path}")
-    #            string(REPLACE ";${_pxr_usd_path}${_suffix}" "" _inherited_path "${_inherited_path}")
-    #            if("${_inherited_path}" STREQUAL "${_pxr_usd_path}${_suffix}")
-    #                set(_inherited_path "")
-    #            endif()
-    #        endforeach()
-    #        list(APPEND MAYAHYDRA_VARNAME_PATH "${_inherited_path}")
-    #    else()
-    #        list(APPEND MAYAHYDRA_VARNAME_PATH $ENV{PATH})
-    #    endif()
-    #    if(IS_WINDOWS)
-    #        string(REPLACE "\\" "/" _inherited_pythonpath "$ENV{PYTHONPATH}")
-    #        string(REPLACE "\\" "/" _pxr_usd_python "${PXR_USD_LOCATION}/lib/python")
-    #        string(REPLACE "${_pxr_usd_python};" "" _inherited_pythonpath "${_inherited_pythonpath}")
-    #        string(REPLACE ";${_pxr_usd_python}" "" _inherited_pythonpath "${_inherited_pythonpath}")
-    #        if("${_inherited_pythonpath}" STREQUAL "${_pxr_usd_python}")
-    #            set(_inherited_pythonpath "")
-    #        endif()
-    #        list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH "${_inherited_pythonpath}")
-    #    else()
-    #        list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH $ENV{PYTHONPATH})
-    #    endif()
-    #else()
-    #    list(APPEND MAYAHYDRA_VARNAME_PATH $ENV{PATH})
-    #    list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH $ENV{PYTHONPATH})
-    #endif()
 
     # NOTE: an earlier attempt inherited PXR_PLUGINPATH_NAME/MAYA_PXR_PLUGINPATH_NAME
     # from the configure-time environment (filtering out PRMan/MtoA/Arnold-looking
