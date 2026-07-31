@@ -268,6 +268,7 @@ endforeach()
 # under mayapy via unittest without initializing a standalone Maya session.
 set(PYTHON_UNIT_TEST_MODULES
     testRenderManUtils.py
+    testImageUtils.py
 )
 foreach(script ${PYTHON_UNIT_TEST_MODULES})
     get_testfile_and_labels(all_labels test_filename ${script})

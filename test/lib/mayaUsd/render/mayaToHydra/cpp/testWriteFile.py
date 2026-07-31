@@ -15,28 +15,12 @@
 
 import maya.cmds as cmds
 import fixturesUtils
+import imageUtils
 import mtohUtils
 
 import os
 
-class WriteFile(object):
-    '''
-    Context manager to write a render to a file with a specified resolution.
-    '''
-    def __init__(self, outputFile, width, height):
-        self.outputFile = outputFile
-        self.width      = width
-        self.height     = height
-
-    def __enter__(self):
-        '''Returns True.'''
-        cmds.mayaHydraCppTest(self.outputFile, f="TestWriteFile.setFileName")
-        cmds.mayaHydraCppTest(self.width, self.height, f="TestWriteFile.setImageSize")
-        return True
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        cmds.mayaHydraCppTest(f="TestWriteFile.unsetImageSize")
-        cmds.mayaHydraCppTest("", f="TestWriteFile.setFileName")
+WriteFile = imageUtils.WriteFile
 
 
 class TestWriteFile(mtohUtils.MayaHydraBaseTestCase):

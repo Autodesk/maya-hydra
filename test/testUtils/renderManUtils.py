@@ -20,12 +20,29 @@ import os
 import platform
 import sys
 import tempfile
+import time
 
 
 HD_PRMAN = "HdPrmanLoaderRendererPlugin"
 HD_PRMAN_OVERRIDE = "mayaHydraRenderOverride_" + HD_PRMAN
 
-_PRMAN_ENV_KEYS = ("RMAN_CONFIG_OVERRIDE", "RDIR")
+# Low fixed sample count for deterministic viewport smoke tests. Must be set
+# (via HD_PRMAN_MAX_SAMPLES, see setUp()) before the delegate is first loaded.
+PRMAN_TEST_MAX_SAMPLES = 16
+
+# Upper bound on post-resize settle before hydraSnapshot captures PRMan (seconds).
+PRMAN_TEST_MAX_SETTLE_SECONDS = 5.0
+
+# Sleep interval between refresh/convergence-check iterations in
+# waitForInteractiveConvergence().
+PRMAN_TEST_SETTLE_POLL_INTERVAL = 0.25
+
+_PRMAN_ENV_KEYS = (
+    "RMAN_CONFIG_OVERRIDE",
+    "RDIR",
+    "HD_PRMAN_DISABLE_ADAPTIVE_SAMPLING",
+    "HD_PRMAN_MAX_SAMPLES",
+)
 
 
 def _testDebugEnabled():
@@ -39,6 +56,17 @@ def setUp():
     Redirects RMAN_CONFIG_OVERRIDE / RDIR to a temporary directory so test
     runs are isolated from the user's RenderMan config.
 
+    Also disables adaptive sampling and caps max samples so viewport tests are
+    less noisy. HD_PRMAN_* env vars must be set before MayaHydraBaseTestCase
+    setUpClass() loads HdPrman: they seed HdPrmanRenderDelegate's render
+    setting descriptors at construction time (see HdPrmanRenderDelegate
+    ctor / HD_PRMAN_MAX_SAMPLES, HD_PRMAN_DISABLE_ADAPTIVE_SAMPLING in
+    hdPrman). Setting the equivalent defaultRenderGlobals.*__convergedSamplesPerPixel
+    attribute afterwards does *not* work as a substitute or complement: Maya
+    only re-applies render-globals attribute changes to the delegate via the
+    "mtohRenderOverride_ApplySetting" AE callback / mayaHydra -updateRenderGlobals
+    command, neither of which fires for a plain cmds.setAttr from a script.
+
     Returns:
         A dict mapping each modified env-var name to its original value
         (or None when it was unset).  Pass this dict to tearDown() to
@@ -51,13 +79,19 @@ def setUp():
 
     os.environ["RMAN_CONFIG_OVERRIDE"] = log_root
     os.environ["RDIR"] = log_root
+    os.environ["HD_PRMAN_DISABLE_ADAPTIVE_SAMPLING"] = "1"
+    os.environ["HD_PRMAN_MAX_SAMPLES"] = str(PRMAN_TEST_MAX_SAMPLES)
 
     if _testDebugEnabled():
         sys.__stdout__.write(
             "PRMan setUp: RMAN_CONFIG_OVERRIDE={} | RDIR={}"
+            " | HD_PRMAN_DISABLE_ADAPTIVE_SAMPLING={}"
+            " | HD_PRMAN_MAX_SAMPLES={}"
             " | RMAN_SHADERPATH={} | PRMAN_DELEGATE_PLUGIN_PATH={}\n".format(
                 log_root,
                 log_root,
+                os.environ["HD_PRMAN_DISABLE_ADAPTIVE_SAMPLING"],
+                os.environ["HD_PRMAN_MAX_SAMPLES"],
                 os.environ.get("RMAN_SHADERPATH", ""),
                 os.environ.get("PRMAN_DELEGATE_PLUGIN_PATH", ""),
             )
@@ -65,6 +99,83 @@ def setUp():
         sys.__stdout__.flush()
 
     return saved_env
+
+
+# Return the max seconds to wait for PRMan convergence after resize.
+#
+# Prefer waitForInteractiveConvergence(), which polls mayaHydraTesting and exits
+# early when convergence is reported. This value is only the timeout cap.
+def estimateRenderSettleSeconds():
+    return PRMAN_TEST_MAX_SETTLE_SECONDS
+
+
+# Poll mayaHydraTesting(converged=True) at capture resolution, refreshing each
+# iteration, and return as soon as convergence is reported (or timeout).
+#
+# Call after setImageSize. mayaHydraTesting(converged=True) only reflects
+# MtohRenderOverride's cached _isConverged flag, which is recomputed inside
+# Execute() -- i.e. only when the viewport is actually redrawn. Maya's
+# background re-render for a not-yet-converged renderer is driven by an
+# MTimerMessage callback, which (like all Maya idle/timer callbacks) requires
+# the application event loop to be pumped; a plain time.sleep() in this poll
+# loop does not do that. So this function refreshes on every iteration -- the
+# same pattern the Storm convergence wait has always used -- to actually drive
+# progressive accumulation and make _isConverged observable, rather than
+# spinning on a flag that would otherwise never update. Combined with
+# HD_PRMAN_DISABLE_ADAPTIVE_SAMPLING and HD_PRMAN_MAX_SAMPLES (set before
+# delegate load), PRMan should report convergence quickly once the fixed
+# sample cap is hit, so this can return well before timeout_seconds.
+#
+# Parameters:
+#   renderer_name         -- Hydra plugin id (default HD_PRMAN).
+#   timeout_seconds       -- max wait (default PRMAN_TEST_MAX_SETTLE_SECONDS).
+#   poll_interval_seconds -- sleep between polls (default PRMAN_TEST_SETTLE_POLL_INTERVAL).
+#
+# Returns:
+#   True if converged before timeout, False if timed out (caller should capture anyway).
+#
+# Usage:
+#   renderManUtils.waitForInteractiveConvergence()
+#   captureRefresh()
+def waitForInteractiveConvergence(
+    renderer_name=None,
+    timeout_seconds=None,
+    poll_interval_seconds=None,
+):
+    import maya.cmds as cmds
+
+    if renderer_name is None:
+        renderer_name = HD_PRMAN
+    if timeout_seconds is None:
+        timeout_seconds = PRMAN_TEST_MAX_SETTLE_SECONDS
+    if poll_interval_seconds is None:
+        poll_interval_seconds = PRMAN_TEST_SETTLE_POLL_INTERVAL
+
+    start = time.time()
+    while True:
+        # Drives MtohRenderOverride::Execute(), which is the only place
+        # _isConverged gets recomputed -- see comment above.
+        cmds.refresh(force=True)
+        if cmds.mayaHydraTesting(converged=True, rendererName=renderer_name):
+            if _testDebugEnabled():
+                sys.__stdout__.write(
+                    "PRMan converged after {:.2f}s\n".format(time.time() - start)
+                )
+                sys.__stdout__.flush()
+            return True
+
+        if (time.time() - start) >= timeout_seconds:
+            break
+        time.sleep(poll_interval_seconds)
+
+    if _testDebugEnabled():
+        sys.__stdout__.write(
+            "PRMan did not report convergence within {:.1f}s; capturing anyway\n".format(
+                timeout_seconds
+            )
+        )
+        sys.__stdout__.flush()
+    return False
 
 
 def logDiagnostics(stage):
@@ -93,6 +204,8 @@ def logDiagnostics(stage):
         "RMAN_SHADERPATH",
         "RMAN_CONFIG_OVERRIDE",
         "RDIR",
+        "HD_PRMAN_DISABLE_ADAPTIVE_SAMPLING",
+        "HD_PRMAN_MAX_SAMPLES",
         "CUDA_VISIBLE_DEVICES",
         "CUDA_DEVICE_ORDER",
         "NV_GPU",

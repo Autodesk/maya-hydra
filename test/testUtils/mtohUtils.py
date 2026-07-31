@@ -494,14 +494,30 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             self._dump_script_editor_history("Maya Script Editor history (image diff)")
             raise
 
+    # Capture the viewport and compare against a baseline (MayaHydra wrapper).
+    #
+    # Resolves refImage against test data dirs, delegates to
+    # ImageDiffingTestCase.assertSnapshotClose; dumps Script Editor history on failure.
+    #
+    # Capture-related parameters (see imageUtils.assertSnapshotClose):
+    #   useHydraWriter -- capture via hydraSnapshot instead of playblast.
+    #   hydraSettleFn  -- settleFn(captureRefresh) for hydraSnapshot when
+    #                     useHydraWriter is True; must call captureRefresh once.
+    #
+    # Usage:
+    #   self.assertSnapshotClose("Storm_areaLight1.png", 0.1, 7.0)
+    #   self.assertSnapshotClose("PRMan_areaLight1.png", 0.2, 10.0,
+    #       useHydraWriter=True, hydraSettleFn=self._settlePrmanBeforeSnapshot)
     def assertSnapshotClose(self, refImage, fail, failpercent, imageVersion=None, hardfail=None, 
-                failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False):
+                failrelative=None, warn=None, warnpercent=None, hardwarn=None, perceptual=False,
+                useHydraWriter=False, hydraSettleFn=None):
         refImagePath = self.resolveRefImage(refImage, imageVersion)
         try:
             super(MayaHydraBaseTestCase, self).assertSnapshotClose(
                 refImagePath, fail, failpercent, hardfail=hardfail,
                 failrelative=failrelative, warn=warn, warnpercent=warnpercent,
-                hardwarn=hardwarn, perceptual=perceptual, imageVersion=imageVersion)
+                hardwarn=hardwarn, perceptual=perceptual, imageVersion=imageVersion,
+                useHydraWriter=useHydraWriter, hydraSettleFn=hydraSettleFn)
         except AssertionError:
             self._dump_script_editor_history("Maya Script Editor history (image diff)")
             raise

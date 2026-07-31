@@ -33,8 +33,99 @@ KNOWN_FORMATS = {
     'png': 32,
 }
 
+# Minimum mean Rec.709 luminance (0-1) for hydraSnapshot captures. Catches blank
+# PRMan/playblast failures where geometry and lighting never reach the AOV.
+SNAPSHOT_MIN_MEAN_LUMINANCE = 0.02
+
+
+# Context manager that routes viewport output through ImageBufferWriter.
+#
+# Playblast reads Maya's model-editor framebuffer. Progressive delegates such as
+# PRMan render into Hydra AOVs instead, so playblast can be blank locally even
+# when the viewport looks correct. ImageBufferWriter reads the same Hydra buffer
+# the override presents. Requires the mayaHydraCppTests plugin (TestWriteFile.*).
+#
+# __init__ parameters:
+#   outputFile -- path for the captured image (TestWriteFile.setFileName).
+#   width      -- capture width in pixels (TestWriteFile.setImageSize).
+#   height     -- capture height in pixels (TestWriteFile.setImageSize).
+#
+# Usage:
+#   with WriteFile(output_path, 400, 400):
+#       cmds.refresh(force=True)
+class WriteFile(object):
+
+    def __init__(self, outputFile, width, height):
+        self.outputFile = outputFile
+        self.width = width
+        self.height = height
+
+    def __enter__(self):
+        cmds.mayaHydraCppTest(self.outputFile, f="TestWriteFile.setFileName")
+        cmds.mayaHydraCppTest(self.width, self.height, f="TestWriteFile.setImageSize")
+        # setImageSize resizes the render buffers, which restarts progressive
+        # delegates (e.g. PRMan) from zero samples at the new resolution. Any
+        # settling done before this resize is for the old resolution and does
+        # not carry over. Callers that need settle time should use hydraSnapshot's
+        # settleFn(captureRefresh) so settling and the final capture happen
+        # after the resize, in the right order.
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        cmds.mayaHydraCppTest(f="TestWriteFile.unsetImageSize")
+        cmds.mayaHydraCppTest("", f="TestWriteFile.setFileName")
+        return False
+
+
+# Capture the Hydra viewport color AOV to an image file.
+#
+# Prefer over snapshot()/playblast for progressive Hydra delegates (e.g. PRMan)
+# that render into AOVs rather than the model-editor framebuffer.
+#
+# Parameters:
+#   outputPath -- destination image path; parent dirs created; made absolute.
+#   width      -- capture width in pixels (default 400).
+#   height     -- capture height in pixels (default: same as width).
+#   settleFn   -- optional callable(captureRefresh) invoked after buffer resize.
+#                 Must call captureRefresh() exactly once for the file write.
+#                 For PRMan: poll for convergence (refreshing each iteration),
+#                 then captureRefresh() (see _settlePrmanBeforeSnapshot).
+#                 hydraSnapshot never adds a second capture refresh when
+#                 settleFn is provided.
+#
+# Usage:
+#   hydraSnapshot(snap_path, settleFn=self._settlePrmanBeforeSnapshot)
+def hydraSnapshot(outputPath, width=400, height=None, settleFn=None):
+    if height is None:
+        height = width
+
+    outputPath = os.path.abspath(outputPath)
+    os.makedirs(os.path.dirname(outputPath), exist_ok=True)
+
+    def _captureRefresh():
+        cmds.refresh(force=True)
+
+    cmds.undoInfo(stateWithoutFlush=False)
+    try:
+        with WriteFile(outputPath, width, height):
+            if settleFn:
+                settleFn(_captureRefresh)
+            else:
+                _captureRefresh()
+    finally:
+        cmds.undoInfo(stateWithoutFlush=True)
+
+
+# Capture the active model editor via playblast.
+#
+# Parameters:
+#   outputPath -- destination image path; parent dirs created; made absolute.
+#   width      -- playblast width in pixels (default 400).
+#   height     -- playblast height in pixels (default: same as width).
+#
+# Usage:
+#   snapshot(snap_path)
 def snapshot(outputPath, width=400, height=None):
-    #Disable undo so that when we call undo it doesn't undo any operation from self.assertSnapshotClose
     cmds.undoInfo(stateWithoutFlush=False)
 
     if height is None:
@@ -66,6 +157,61 @@ def snapshot(outputPath, width=400, height=None):
 
     #Enable undo again
     cmds.undoInfo(stateWithoutFlush=True)
+
+# Return mean Rec.709 luminance (0-1) over opaque pixels in an image file.
+#
+# Parameters:
+#   imagePath -- readable image path (.png, .jpg, etc.).
+#
+# Usage:
+#   mean = imageMeanLuminance(snap_path)
+def imageMeanLuminance(imagePath):
+    import struct
+
+    from PySide6.QtGui import QImage
+
+    image = QImage(imagePath)
+    if image.isNull():
+        raise RuntimeError("Failed to load image: {}".format(imagePath))
+
+    # Unpack the raw RGBA8888 buffer instead of calling QImage.pixelColor()
+    # once per pixel: pixelColor() allocates a QColor and crosses the
+    # Python/C++ binding on every call, which dominates wall time at typical
+    # capture resolutions (e.g. ~0.25s at 400x400) -- this runs on every
+    # PRMan light capture, directly adding to test time. RGBA8888 is 4
+    # bytes/pixel, so each scanline is exactly width*4 bytes with no padding
+    # and the whole buffer can be unpacked in one pass.
+    image = image.convertToFormat(QImage.Format.Format_RGBA8888)
+    pixelCount = image.width() * image.height()
+    buf = bytes(image.constBits())[:pixelCount * 4]
+
+    total = 0.0
+    count = 0
+    for r, g, b, a in struct.iter_unpack("4B", buf):
+        if a:
+            total += 0.2126 * r + 0.7152 * g + 0.0722 * b
+            count += 1
+    if count == 0:
+        return 0.0
+    return (total / count) / 255.0
+
+# Fail when a snapshot is effectively blank (e.g. empty Hydra AOV / playblast miss).
+#
+# Parameters:
+#   imagePath            -- captured snapshot to inspect.
+#   min_mean_luminance   -- minimum acceptable mean luminance (default
+#                           SNAPSHOT_MIN_MEAN_LUMINANCE).
+#
+# Usage:
+#   assertImageNonBlank(snap_path)
+def assertImageNonBlank(imagePath, min_mean_luminance=SNAPSHOT_MIN_MEAN_LUMINANCE):
+    mean = imageMeanLuminance(imagePath)
+    if mean < min_mean_luminance:
+        raise AssertionError(
+            "Snapshot appears blank (mean luminance {:.4f} < {:.4f}): {}".format(
+                mean, min_mean_luminance, imagePath
+            )
+        )
 
 def imageDiff(imagePath1, imagePath2, verbose, fail, failpercent, hardfail=None,
                 failrelative=None, warn=None, warnpercent=None, hardwarn=None,
@@ -363,14 +509,34 @@ class ImageDiffingTestCase:
     def assertImagesEqual(self, imagePath1, imagePath2):
         self.assertImagesClose(imagePath1, imagePath2, fail=None, failpercent=None)
     
+    # Capture the viewport, then compare against a baseline image.
+    #
+    # Takes a snapshot into the test temp dir and runs idiff against refImagePath.
+    # Capture options are forwarded to snapshot() or hydraSnapshot().
+    #
+    # Capture-related parameters:
+    #   useHydraWriter -- when True, capture via hydraSnapshot (required for PRMan).
+    #   hydraSettleFn  -- settleFn(captureRefresh) for hydraSnapshot when
+    #                     useHydraWriter is True; must call captureRefresh once.
+    # When useHydraWriter is True, assertImageNonBlank runs on the capture first.
+    #
+    # Usage:
+    #   self.assertSnapshotClose("Storm_pointLight1.png", 0.1, 7.0)
+    #   self.assertSnapshotClose("PRMan_pointLight1.png", 0.2, 10.0,
+    #       useHydraWriter=True, hydraSettleFn=self._settlePrmanBeforeSnapshot)
     def assertSnapshotClose(self, refImagePath, fail, failpercent, hardfail=None, 
                 failrelative=None, warn=None, warnpercent=None, hardwarn=None,
-                perceptual=False, *, imageVersion=None):
+                perceptual=False, *, imageVersion=None,
+                useHydraWriter=False, hydraSettleFn=None):
         if imageVersion is not None:
             snapImagePath = os.path.join(self.getSnapshotDir(), imageVersion, os.path.basename(refImagePath))
         else:
             snapImagePath = os.path.join(self.getSnapshotDir(), os.path.basename(refImagePath))
-        snapshot(snapImagePath)
+        if useHydraWriter:
+            hydraSnapshot(snapImagePath, settleFn=hydraSettleFn)
+            assertImageNonBlank(snapImagePath)
+        else:
+            snapshot(snapImagePath)
         
         return self.assertImagesClose(refImagePath, snapImagePath, 
                fail=fail, failpercent=failpercent, hardfail=hardfail,

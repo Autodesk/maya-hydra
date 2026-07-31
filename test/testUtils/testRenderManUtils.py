@@ -24,16 +24,27 @@ session.
 """
 
 import os
+import sys
 import unittest
 from unittest import mock
 
 import renderManUtils
 
 
-# Environment variables the gating logic reads. They are cleared before each
-# test so the baseline is deterministic even on a CI machine (which sets
-# JENKINS_URL / BUILD_ID for real).
-_ENV_KEYS = ("MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS", "JENKINS_URL", "BUILD_ID")
+# Environment variables the gating/debug-logging logic reads. They are cleared
+# before each test so the baseline is deterministic even on a CI machine (which
+# sets JENKINS_URL / BUILD_ID for real) or a developer machine with
+# MAYAHYDRA_TEST_DEBUG set. In particular, leaving MAYAHYDRA_TEST_DEBUG set
+# would make _testDebugEnabled() true, causing the extra time.time() call in
+# waitForInteractiveConvergence()'s debug-logging branch to consume an
+# unplanned value from a test's mocked time.time() side_effect list and raise
+# StopIteration.
+_ENV_KEYS = (
+    "MAYAHYDRA_PRMAN_ALLOWED_PLATFORMS",
+    "JENKINS_URL",
+    "BUILD_ID",
+    "MAYAHYDRA_TEST_DEBUG",
+)
 
 
 class RenderManUtilsTestCase(unittest.TestCase):
@@ -153,6 +164,99 @@ class RenderManUtilsTestCase(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 renderManUtils.shouldRunDelegate(fail_fn=fakeFail)
         self.assertEqual(len(calls), 1)
+
+    # -- setUp / tearDown ----------------------------------------------------
+
+    def test_setUp_configures_non_adaptive_sampling_env(self):
+        saved = renderManUtils.setUp()
+        try:
+            self.assertEqual(os.environ["HD_PRMAN_DISABLE_ADAPTIVE_SAMPLING"], "1")
+            self.assertEqual(
+                os.environ["HD_PRMAN_MAX_SAMPLES"],
+                str(renderManUtils.PRMAN_TEST_MAX_SAMPLES),
+            )
+        finally:
+            renderManUtils.tearDown(saved)
+
+    def test_tearDown_restores_sampling_env(self):
+        os.environ["HD_PRMAN_DISABLE_ADAPTIVE_SAMPLING"] = "0"
+        os.environ["HD_PRMAN_MAX_SAMPLES"] = "64"
+        saved = renderManUtils.setUp()
+        renderManUtils.tearDown(saved)
+        self.assertEqual(os.environ["HD_PRMAN_DISABLE_ADAPTIVE_SAMPLING"], "0")
+        self.assertEqual(os.environ["HD_PRMAN_MAX_SAMPLES"], "64")
+
+    def test_estimateRenderSettleSeconds_matches_max_settle_constant(self):
+        self.assertEqual(
+            renderManUtils.estimateRenderSettleSeconds(),
+            renderManUtils.PRMAN_TEST_MAX_SETTLE_SECONDS,
+        )
+
+    # -- waitForInteractiveConvergence ---------------------------------------
+
+    def test_waitForInteractiveConvergence_returns_true_when_converged(self):
+        mock_cmds = mock.MagicMock()
+        mock_cmds.mayaHydraTesting.return_value = True
+        mock_maya = mock.MagicMock()
+        mock_maya.cmds = mock_cmds
+        with mock.patch.dict(sys.modules, {"maya": mock_maya, "maya.cmds": mock_cmds}), \
+             mock.patch.object(renderManUtils.time, "time", side_effect=[0.0, 0.1]), \
+             mock.patch.object(renderManUtils.time, "sleep") as mock_sleep:
+            self.assertTrue(renderManUtils.waitForInteractiveConvergence())
+        mock_cmds.mayaHydraTesting.assert_called_once_with(
+            converged=True, rendererName=renderManUtils.HD_PRMAN
+        )
+        mock_sleep.assert_not_called()
+
+    def test_waitForInteractiveConvergence_refreshes_before_checking_convergence(self):
+        # Regression: mayaHydraTesting(converged=True) only reflects the last
+        # Execute() call. Without an explicit refresh each poll iteration, the
+        # flag can never change and this would always spin for the full
+        # timeout instead of detecting convergence early.
+        mock_cmds = mock.MagicMock()
+        mock_cmds.mayaHydraTesting.return_value = True
+        mock_maya = mock.MagicMock()
+        mock_maya.cmds = mock_cmds
+        with mock.patch.dict(sys.modules, {"maya": mock_maya, "maya.cmds": mock_cmds}), \
+             mock.patch.object(renderManUtils.time, "time", side_effect=[0.0, 0.1]), \
+             mock.patch.object(renderManUtils.time, "sleep") as mock_sleep:
+            self.assertTrue(renderManUtils.waitForInteractiveConvergence())
+        mock_cmds.refresh.assert_called_once_with(force=True)
+        # The refresh must happen before the convergence check is trusted.
+        self.assertLess(
+            mock_cmds.method_calls.index(mock.call.refresh(force=True)),
+            mock_cmds.method_calls.index(
+                mock.call.mayaHydraTesting(
+                    converged=True, rendererName=renderManUtils.HD_PRMAN
+                )
+            ),
+        )
+        mock_sleep.assert_not_called()
+
+    def test_waitForInteractiveConvergence_times_out_without_convergence(self):
+        mock_cmds = mock.MagicMock()
+        mock_cmds.mayaHydraTesting.return_value = False
+        mock_maya = mock.MagicMock()
+        mock_maya.cmds = mock_cmds
+        # start, then one time.time() timeout-check per loop iteration, until timeout
+        times = [0.0]
+        t = 0.0
+        while t <= 5.0:
+            t += 0.25
+            times.append(t)
+        with mock.patch.dict(sys.modules, {"maya": mock_maya, "maya.cmds": mock_cmds}), \
+             mock.patch.object(renderManUtils.time, "time", side_effect=times), \
+             mock.patch.object(renderManUtils.time, "sleep") as mock_sleep:
+            self.assertFalse(
+                renderManUtils.waitForInteractiveConvergence(
+                    timeout_seconds=5.0, poll_interval_seconds=0.25
+                )
+            )
+        self.assertGreater(mock_cmds.mayaHydraTesting.call_count, 1)
+        # Regression: each poll iteration must refresh, or convergence can
+        # never be observed and the loop degenerates into a fixed sleep.
+        self.assertEqual(mock_cmds.refresh.call_count, mock_cmds.mayaHydraTesting.call_count)
+        self.assertGreater(mock_sleep.call_count, 0)
 
 
 if __name__ == "__main__":

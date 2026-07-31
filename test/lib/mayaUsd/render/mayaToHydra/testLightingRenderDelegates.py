@@ -43,7 +43,13 @@ LIGHT_INTENSITIES = {
 
 
 # Render delegates: display name, Hydra plugin, override name, Maya plugin to load.
-# convergenceTimeout: seconds to wait for progressive renderers before taking a snapshot.
+# convergenceTimeout: seconds to poll mayaHydraTesting(converged=True) before playblast
+# snapshot (0 = skip). Only read via _waitForConvergence(), which _runLightSnapshots()
+# calls for playblast-captured delegates (i.e. not PRMan -- see use_hydra_writer in
+# _runLightSnapshots). PRMan does not use this field at all: it is always captured via
+# hydraSnapshot/useHydraWriter and settles via hydraSettleFn (see
+# _settlePrmanBeforeSnapshot / renderManUtils.waitForInteractiveConvergence), so it has
+# no convergenceTimeout entry below.
 # platform: "all" (default) or "windows" to restrict image comparison to that platform.
 # failThreshold: per-pixel difference threshold passed to idiff -fail (default 0.1).
 # failPercent: percentage of failing pixels passed to idiff -failpercent (default 7.0).
@@ -72,7 +78,9 @@ RENDER_DELEGATES = [
         "plugin": renderManUtils.HD_PRMAN,
         "override": renderManUtils.HD_PRMAN_OVERRIDE,
         "mayaPlugin": None,
-        "convergenceTimeout": 15,  # Wait up to 15s for convergence before snapshot
+        # No convergenceTimeout: PRMan is always captured via hydraSnapshot and
+        # settles via hydraSettleFn (see _settlePrmanBeforeSnapshot), so
+        # _waitForConvergence() is never called for it.
         # PRMan lighting in the interactive viewport is not deterministic: progressive
         # sampling, tone-mapping, and the light transport model all differ from Storm,
         # so a strict pixel-accurate comparison would always fail.  These thresholds
@@ -96,10 +104,13 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestLightingRenderDelegates, cls).setUpClass()
-
+        # Env vars must be set before HdPrman is first loaded by Maya/USD.
         if any(d["plugin"] == renderManUtils.HD_PRMAN for d in RENDER_DELEGATES):
             cls._prman_saved_env = renderManUtils.setUp()
+            if "mayaHydraCppTests" not in cls._requiredPlugins:
+                cls._requiredPlugins.append("mayaHydraCppTests")
+
+        super(TestLightingRenderDelegates, cls).setUpClass()
 
     @classmethod
     def tearDownClass(cls):
@@ -146,14 +157,15 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
 
     def _setRenderer(self, delegate):
         """Switch the viewport to the given Hydra renderer."""
-        if delegate.get("plugin") == renderManUtils.HD_PRMAN:
+        is_prman = delegate.get("plugin") == renderManUtils.HD_PRMAN
+        if is_prman:
             renderManUtils.logDiagnostics("before renderer switch")
         panel = mayaUtils.activeModelPanel()
         cmds.modelEditor(panel, edit=True, rendererOverrideName=delegate["override"])
         cmds.refresh(force=True)
 
         activeRenderers = cmds.mayaHydra(listActiveRenderers=True)
-        if delegate.get("plugin") == renderManUtils.HD_PRMAN and delegate["plugin"] not in activeRenderers:
+        if is_prman and delegate["plugin"] not in activeRenderers:
             renderManUtils.logDiagnostics("after renderer switch - not active")
         self.assertIn(
             delegate["plugin"],
@@ -176,10 +188,14 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         return LIGHT_INTENSITIES[lightName][delegate["name"]]
 
     def _waitForConvergence(self, delegate):
-        """Wait for progressive renderers to converge before taking a snapshot.
-        Uses mayaHydraTesting(converged=True). Skips when convergenceTimeout is 0 (e.g. Storm).
-        If the renderer does not report convergence within the timeout (e.g. PRMan in interactive
-        mode), we proceed anyway and take the snapshot."""
+        """Wait for progressive renderers to converge before a playblast snapshot.
+
+        Uses mayaHydraTesting(converged=True). Skips when convergenceTimeout is 0
+        or absent (e.g. Storm, which converges immediately). Not called at all for
+        PRMan, which is captured via hydraSnapshot/hydraSettleFn instead -- see
+        use_hydra_writer in _runLightSnapshots and _settlePrmanBeforeSnapshot.
+        If the renderer does not report convergence within the timeout, proceeds anyway.
+        """
         timeoutSeconds = delegate.get("convergenceTimeout", 0)
         if timeoutSeconds <= 0:
             return
@@ -192,6 +208,21 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
                 return
             time.sleep(0.5)
         cmds.refresh(force=True)
+
+    # Settle PRMan after setImageSize, then capture via captureRefresh().
+    #
+    # Pass as assertSnapshotClose(hydraSettleFn=...) for PRMan. Polls
+    # mayaHydraTesting(converged=True) at capture resolution, refreshing on
+    # every iteration so convergence can actually be detected (see
+    # renderManUtils.waitForInteractiveConvergence), then captureRefresh()
+    # writes the file.
+    #
+    # Usage:
+    #   self.assertSnapshotClose(baseline, fail, failpercent,
+    #       useHydraWriter=True, hydraSettleFn=self._settlePrmanBeforeSnapshot)
+    def _settlePrmanBeforeSnapshot(self, captureRefresh):
+        renderManUtils.waitForInteractiveConvergence()
+        captureRefresh()
 
     def _setLightIntensities(self, activeLight, intensity):
         """Set all lights to 0 except activeLight, which gets the given intensity."""
@@ -208,16 +239,25 @@ class TestLightingRenderDelegates(mtohUtils.MayaHydraBaseTestCase):
         and JENKINS_ARTIFACT_WORKSPACE (or WORKSPACE) are set in CI."""
         self._setRenderer(delegate)
         fail, failpercent = self._getImageDiffThresholds(delegate)
+        use_hydra_writer = delegate.get("plugin") == renderManUtils.HD_PRMAN
         for lightName in LIGHTS:
             intensity = self._getIntensityForLight(lightName, delegate)
             self._setLightIntensities(lightName, intensity)
             cmds.refresh(force=True)
-            self._waitForConvergence(delegate)
+            if not use_hydra_writer:
+                self._waitForConvergence(delegate)
             baselineName = "{}_{}.png".format(delegate["name"], lightName)
             self.assertSnapshotClose(
                 baselineName,
                 fail,
                 failpercent,
+                useHydraWriter=use_hydra_writer,
+                # setImageSize (called inside hydraSnapshot, before the capture
+                # refresh) resizes the render buffers, which restarts PRMan's
+                # progressive render at the new resolution. Settling must
+                # happen after that resize, not before it, or the capture
+                # sees zero samples. See _settlePrmanBeforeSnapshot.
+                hydraSettleFn=self._settlePrmanBeforeSnapshot if use_hydra_writer else None,
             )
 
     def _getImageDiffThresholds(self, delegate):
