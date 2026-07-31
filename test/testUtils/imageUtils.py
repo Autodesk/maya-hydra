@@ -183,7 +183,13 @@ def imageMeanLuminance(imagePath):
     # and the whole buffer can be unpacked in one pass.
     image = image.convertToFormat(QImage.Format.Format_RGBA8888)
     pixelCount = image.width() * image.height()
-    buf = bytes(image.constBits())[:pixelCount * 4]
+    byteCount = image.sizeInBytes()
+    ptr = image.constBits()
+    # Older PySide6 builds return a Shiboken buffer without an implicit size;
+    # setsize() must be called before bytes() or the buffer may be empty/short.
+    if hasattr(ptr, "setsize"):
+        ptr.setsize(byteCount)
+    buf = bytes(ptr)[:pixelCount * 4]
 
     total = 0.0
     count = 0
