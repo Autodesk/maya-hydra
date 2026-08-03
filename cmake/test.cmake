@@ -12,6 +12,17 @@ if(NOT ADDITIONAL_PXR_PLUGINPATH_NAME AND DEFINED ENV{ADDITIONAL_PXR_PLUGINPATH_
         "Semicolon-separated paths to append to PXR_PLUGINPATH_NAME for tests (e.g. HdArnold)" FORCE)
 endif()
 
+# Define the single proper USD install location. When the "cut" build stage is used, or when the
+# POST_ZIPS option is enabled in Jenkins, a copy of the USD build will be done so that it exists 
+# besides mayaHydra and can be packaged together with it. We therefore want to point only to that
+# USD build, and not the Artifactory one to avoid DLL load conflicts.
+if(DEFINED MAYAHYDRA_TO_USD_RELATIVE_PATH)
+    set(MAYAHYDRA_USD_INSTALL_LOCATION "${CMAKE_INSTALL_PREFIX}/${MAYAHYDRA_TO_USD_RELATIVE_PATH}")
+else()
+    set(MAYAHYDRA_USD_INSTALL_LOCATION "${PXR_USD_LOCATION}")
+endif()
+message(STATUS "MAYAHYDRA_USD_INSTALL_LOCATION for tests: ${MAYAHYDRA_USD_INSTALL_LOCATION}")
+
 if(MayaUsd_FOUND)
     if(IS_MACOSX OR IS_LINUX) 
         #When MayaUsd_FOUND is true, MAYAUSDAPI_LIBRARY exists as it is required. 
@@ -21,7 +32,7 @@ if(MayaUsd_FOUND)
         #So add MAYAUSDAPI_LIBRARY_PATH to the ADDITIONAL_LD_LIBRARY_PATH which is used to run the tests
         # Also, add paths to USD libraries, which render delegates link against.
         set(CURRENT_ADDITIONAL_LD_LIBRARY_PATH $ENV{ADDITIONAL_LD_LIBRARY_PATH})
-        set(ADDITIONAL_LD_LIBRARY_PATH "${CURRENT_ADDITIONAL_LD_LIBRARY_PATH}:${MAYAUSDAPI_LIBRARY_PATH}:${PXR_USD_LOCATION}/lib64:${PXR_USD_LOCATION}/lib")
+        set(ADDITIONAL_LD_LIBRARY_PATH "${CURRENT_ADDITIONAL_LD_LIBRARY_PATH}:${MAYAUSDAPI_LIBRARY_PATH}:${MAYAHYDRA_USD_INSTALL_LOCATION}/lib64:${MAYAHYDRA_USD_INSTALL_LOCATION}/lib")
 
         # Export the new value to the environment
         set(ENV{ADDITIONAL_LD_LIBRARY_PATH} ${ADDITIONAL_LD_LIBRARY_PATH})
@@ -266,7 +277,7 @@ function(_mayaHydra_setup_test_common_path_vars)
         # because both use incompatible versions of libpng. This is done by 
         # setting LD_LIBRARY_PATH to IDIFF_LD_LIBRARY_PATH only when we run 
         # idiff using Python's subprocess module.
-        set(MAYAHYDRA_VARNAME_IDIFF_LD_LIBRARY_PATH "${ADDITIONAL_LD_LIBRARY_PATH}:${PXR_USD_LOCATION}/lib64:${PXR_USD_LOCATION}/lib" PARENT_SCOPE)
+        set(MAYAHYDRA_VARNAME_IDIFF_LD_LIBRARY_PATH "${ADDITIONAL_LD_LIBRARY_PATH}:${MAYAHYDRA_USD_INSTALL_LOCATION}/lib64:${MAYAHYDRA_USD_INSTALL_LOCATION}/lib" PARENT_SCOPE)
     
         # Maya uses a very old version of GLEW, so we need support for
         # pre-loading a newer version from elsewhere.
@@ -354,13 +365,13 @@ function(_mayaHydra_setup_test_plugins)
         # USD plugin paths:
         # - Windows: prepend OpenUSD (for PRMan delegate discovery), then MayaUSD lib/usd.
         # - macOS/Linux: use MayaUSD lib/usd only.
-        # Do NOT add PXR_USD_LOCATION/lib/usd on macOS: those plugins link against a
+        # Do NOT add OpenUSD lib/usd on macOS: those plugins link against a
         # different USD build than Maya's bundled USD, causing duplicate TF_DEBUG_ENVIRONMENT_SYMBOL
         # registration (e.g. HGIMETAL_DEBUG_ERROR_STACKTRACE) that fatally crashes every test.
-        if(IS_WINDOWS AND DEFINED PXR_USD_LOCATION AND EXISTS "${PXR_USD_LOCATION}/lib/usd")
+        if(IS_WINDOWS AND EXISTS "${MAYAHYDRA_USD_INSTALL_LOCATION}/lib/usd")
             list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
-                 "${PXR_USD_LOCATION}/lib/usd")
-            message(STATUS "Using OpenUSD plugin path from PXR_USD_LOCATION: ${PXR_USD_LOCATION}/lib/usd")
+                 "${MAYAHYDRA_USD_INSTALL_LOCATION}/lib/usd")
+            message(STATUS "Using OpenUSD plugin path from USD install: ${MAYAHYDRA_USD_INSTALL_LOCATION}/lib/usd")
         endif()
         list(APPEND MAYAHYDRA_VARNAME_${PXR_OVERRIDE_PLUGINPATH_NAME}
              "${MAYAUSD_LOCATION}/lib/usd")
@@ -371,7 +382,7 @@ function(_mayaHydra_setup_test_plugins)
         list(APPEND MAYAHYDRA_VARNAME_MAYA_SCRIPT_PATH
              "${MAYAUSD_LOCATION}/plugin/adsk/scripts")
         list(APPEND MAYAHYDRA_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
-             "${PXR_USD_LOCATION}/libraries")
+             "${MAYAHYDRA_USD_INSTALL_LOCATION}/libraries")
         list(APPEND MAYAHYDRA_VARNAME_PXR_MTLX_STDLIB_SEARCH_PATHS
              "${MAYAUSD_LOCATION}/libraries")
     endif()
@@ -575,23 +586,19 @@ endfunction()
 function(_mayaHydra_setup_test_USD_paths)
     # These should come last (esp PYTHONPATH, in case another module is overriding
     # with pkgutil)
-   if (DEFINED MAYAHYDRA_TO_USD_RELATIVE_PATH)
-        set(USD_INSTALL_LOCATION "${CMAKE_INSTALL_PREFIX}/${MAYAHYDRA_TO_USD_RELATIVE_PATH}")
-    else()
-        set(USD_INSTALL_LOCATION ${PXR_USD_LOCATION})
-    endif()
+
     # Export OpenUSD location for runtime debugging and plugin discovery.
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
-        "PXR_USD_LOCATION=${USD_INSTALL_LOCATION}"
-        "USD_INSTALL_LOCATION=${USD_INSTALL_LOCATION}")
+        "PXR_USD_LOCATION=${MAYAHYDRA_USD_INSTALL_LOCATION}"
+        "USD_INSTALL_LOCATION=${MAYAHYDRA_USD_INSTALL_LOCATION}")
     # Inherit any existing PYTHONPATH, but keep it at the end.
     list(APPEND MAYAHYDRA_VARNAME_PYTHONPATH
-        "${USD_INSTALL_LOCATION}/lib/python")
+        "${MAYAHYDRA_USD_INSTALL_LOCATION}/lib/python")
     if(IS_WINDOWS)
         list(APPEND MAYAHYDRA_VARNAME_PATH
-            "${USD_INSTALL_LOCATION}/bin")
+            "${MAYAHYDRA_USD_INSTALL_LOCATION}/bin")
         list(APPEND MAYAHYDRA_VARNAME_PATH
-            "${USD_INSTALL_LOCATION}/lib")
+            "${MAYAHYDRA_USD_INSTALL_LOCATION}/lib")
     endif()
 
     set(ALL_PATH_VARS PATH PYTHONPATH)
