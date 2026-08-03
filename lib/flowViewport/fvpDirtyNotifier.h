@@ -95,6 +95,8 @@ public:
     // ---- Rprim / geometry ----
     FVP_API DirtyNotifier& dirtyTransform();
     FVP_API DirtyNotifier& dirtyVisibility();
+    /// Invalidates the purpose render tag (HdPurposeSchema).
+    FVP_API DirtyNotifier& dirtyPurpose();
 
     // ---- Primvars: GRANULAR by design ----
     // Prefer the specific per-primvar locator so the render delegate only re-pulls

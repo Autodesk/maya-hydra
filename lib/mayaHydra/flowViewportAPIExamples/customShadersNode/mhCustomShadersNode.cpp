@@ -84,6 +84,7 @@ def Mesh "Mesh1" (
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
 // Maya Hydra headers
+#include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexUtils.h>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -314,21 +315,6 @@ void _CreateAndAddPrim(
 
     // Add the prim in the retained scene index
     retainedSceneIndex->AddPrims({ addedPrim });
-}
-
-// Get the color attribute value which is a double3
-void GetDouble3AttributeValue(double3& outVal, const MObject& node, const MObject& attr)
-{
-    MPlug plug(node, attr);
-    if (plug.isNull()) {
-        return;
-    }
-
-    MObject oDouble3;
-    plug.getValue(oDouble3);
-
-    MFnNumericData fnData(oDouble3);
-    fnData.getData(outVal[0], outVal[1], outVal[2]);
 }
 
 //Class to hold a material data source
@@ -582,19 +568,10 @@ void MhCustomShaders::_CreateAndAddMaterials()
                  customColorMaterialDataSource } });
 }
 
-// Retrieve value of the color attribute from the maya node
 GfVec3f MhCustomShaders::_GetColor() const
 {
-    const MObject obj = thisMObject();
-    MPlug plug(obj, MhCustomShaders::mColor);
-    if (!plug.isNull())
-    {
-        double3 color;
-        GetDouble3AttributeValue(color, obj, MhCustomShaders::mColor);
-        return {(float)color[0], (float)color[1], (float)color[2]};
-    }
-
-    return GfVec3f(0.f,0.f,1.f);
+    return MAYAHYDRA_NS_DEF::GetGfVec3fAttributeValue(
+        thisMObject(), MhCustomShaders::mColor, GfVec3f(0.f, 0.f, 1.f));
 }
 
 MStatus MhCustomShaders::compute( const MPlug& plug, MDataBlock& dataBlock)

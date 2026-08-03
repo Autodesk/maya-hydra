@@ -27,7 +27,6 @@
 
 //Maya Hydra headers
 #include <mayaHydraLib/mixedUtils.h>
-#include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/pick/mhPickHandler.h>
 #include <mayaHydraLib/pick/mhPickHit.h>
@@ -365,16 +364,6 @@ MhFlowViewportAPILocator* getLocator(const Ufe::Path& cubePath)
 
         MFnMatrixData fnData(oMatrix);
 	    outVal = fnData.matrix();
-    }
-
-    void GetDouble3AttributeValue(double3& outVal, const MObject& node, const MObject& attr)
-    {
-        MPlug plug(node, attr);
-        MObject oDouble3;
-        plug.getValue(oDouble3);
-
-        MFnNumericData fnData(oDouble3);
-        fnData.getData( outVal[0], outVal[1], outVal[2] );
     }
 
     std::string GetStringAttributeValue(const MPlug& plug)
@@ -818,20 +807,14 @@ void MhFlowViewportAPILocator::setCubeGridParametersFromAttributes()
     GetMatrixAttributeValue(mat, mObj, MhFlowViewportAPILocator::mCubeInitialTransform);
     memcpy(_cubeGridParams._initialTransform.GetArray(), mat[0], sizeof(double) * 16);//convert from MMatrix to GfMatrix4d
 
-    double3 color;
-    GetDouble3AttributeValue(color, mObj, MhFlowViewportAPILocator::mCubeColor);
-    _cubeGridParams._color.data()[0]        = color[0];//Implicit conversion from double to float
-    _cubeGridParams._color.data()[1]        = color[1];
-    _cubeGridParams._color.data()[2]        = color[2];
+    _cubeGridParams._color = MAYAHYDRA_NS_DEF::GetGfVec3fAttributeValue(
+        mObj, MhFlowViewportAPILocator::mCubeColor, GfVec3f(0.f, 1.0f, 0.f));
 
     GetAttributeValue(_cubeGridParams._opacity, mObj, MhFlowViewportAPILocator::mCubeOpacity);
     GetAttributeValue(_cubeGridParams._useInstancing, mObj, MhFlowViewportAPILocator::mCubesUseInstancing);
 
-    double3 deltaTrans;
-    GetDouble3AttributeValue(deltaTrans, mObj, MhFlowViewportAPILocator::mCubesDeltaTrans);
-    _cubeGridParams._deltaTrans.data()[0]   = deltaTrans[0];//Implicit conversion from double to float
-    _cubeGridParams._deltaTrans.data()[1]   = deltaTrans[1];
-    _cubeGridParams._deltaTrans.data()[2]   = deltaTrans[2];
+    _cubeGridParams._deltaTrans = MAYAHYDRA_NS_DEF::GetGfVec3fAttributeValue(
+        mObj, MhFlowViewportAPILocator::mCubesDeltaTrans, GfVec3f(5.0f, 5.0f, 5.0f));
 
     _cubeGridParams._hidden = split(GetStringAttributeValue(MPlug(mObj, mHiddenCubes)));
 

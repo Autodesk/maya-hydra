@@ -53,6 +53,18 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
         cmds.move(7.714, 5.786, 7.714, 'persp')
         cmds.refresh()
 
+    # Create a MhFootPrint with .size keyed from 1.0 at frame 1 to 5.0 at frame 10.
+    def _createKeyedSizeFootPrint(self):
+        footPrintNodeName = cmds.createNode("MhFootPrint")
+        cmds.select(clear=True)
+        cmds.playbackOptions(minTime=1, maxTime=10)
+        cmds.setAttr(footPrintNodeName + '.size', 1.0)
+        cmds.setKeyframe(footPrintNodeName + '.size', time=1)
+        cmds.currentTime(10, edit=True)
+        cmds.setAttr(footPrintNodeName + '.size', 5.0)
+        cmds.setKeyframe(footPrintNodeName + '.size', time=10)
+        return footPrintNodeName
+
     #Test adding primitives
     def test_AddingPrimitives(self):
         with PluginLoaded('mayaHydraFootPrintNode'):
@@ -131,6 +143,225 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
             #Switch back to Storm
             self.setHdStormRenderer()
             self.assertSnapshotClose("footPrint_VP2AndThenBackToStorm.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+    # Step .size through several values (mimics AE slider scrub) and verify the
+    # viewport updates at each step via targeted Hydra dirty locators.
+    def test_sizeScrubUpdatesViewport(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            self.setupScene()
+
+            footPrintNodeName = cmds.createNode("MhFootPrint")
+            cmds.select(clear=True)
+            self.setBasicCam(0.5)
+
+            cmds.setAttr(footPrintNodeName + '.size', 1.0)
+            cmds.refresh()
+            self.assertSnapshotClose("footPrint_sizeScrub_1.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+            cmds.setAttr(footPrintNodeName + '.size', 2.0)
+            cmds.refresh()
+            self.assertSnapshotClose("footPrint_sizeScrub_2.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+            cmds.setAttr(footPrintNodeName + '.size', 4.0)
+            cmds.refresh()
+            self.assertSnapshotClose("footPrint_sizeScrub_4.png", self.IMAGE_DIFF_FAIL_THRESHOLD, self.IMAGE_DIFF_FAIL_PERCENT)
+
+    # Keyed size must follow the timeline when scrubbing and reflect setAttr at the
+    # current frame before a new key is set (regression for timeChanged sync and
+    # fsNormal setAttr on driven plugs).
+    def test_keyedSizeTimelineUpdatesViewport(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            self.setupScene()
+            self.setBasicCam(0.5)
+
+            footPrintNodeName = self._createKeyedSizeFootPrint()
+
+            cmds.currentTime(1, edit=True)
+            cmds.refresh()
+            self.assertSnapshotClose(
+                "footPrint_keyedSizeTimeline_frame1.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
+
+            cmds.currentTime(5, edit=True)
+            cmds.refresh()
+            self.assertSnapshotClose(
+                "footPrint_keyedSizeTimeline_frame5.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
+
+            cmds.currentTime(10, edit=True)
+            cmds.refresh()
+            self.assertSnapshotClose(
+                "footPrint_keyedSizeTimeline_frame10.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
+
+            cmds.currentTime(5, edit=True)
+            cmds.setAttr(footPrintNodeName + '.size', 7.0)
+            cmds.refresh()
+            self.assertSnapshotClose(
+                "footPrint_keyedSizeTimeline_frame5_setAttrNoKey.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
+
+    # Keyed size must stay at the current-time value when another attribute changes.
+    # Regression: changing color re-read size in the default MDG context (time 0) and
+    # pushed the wrong scale to Hydra.
+    def test_keyedSizePreservedWhenColorChanges(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            self.setupScene()
+
+            footPrintNodeName = cmds.createNode("MhFootPrint")
+            cmds.select(clear=True)
+            self.setBasicCam(0.5)
+
+            cmds.setAttr(footPrintNodeName + '.size', 1.0)
+            cmds.setKeyframe(footPrintNodeName + '.size', time=1)
+            cmds.setAttr(footPrintNodeName + '.size', 8.0)
+            cmds.setKeyframe(footPrintNodeName + '.size', time=10)
+
+            cmds.currentTime(5, edit=True)
+            cmds.setAttr(footPrintNodeName + '.color', 0.0, 0.0, 1.0, type="double3")
+            cmds.refresh()
+            self.assertSnapshotClose(
+                "footPrint_keyedSize_frame5_blue.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
+
+            cmds.setAttr(footPrintNodeName + '.color', 1.0, 0.0, 0.0, type="double3")
+            cmds.refresh()
+            self.assertSnapshotClose(
+                "footPrint_keyedSize_frame5_red.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
+
+            cmds.currentTime(1, edit=True)
+            cmds.refresh()
+            self.assertSnapshotClose(
+                "footPrint_keyedSize_frame1.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
+
+    # Keyed size and color must both follow the timeline when scrubbing.
+    def test_keyedSizeAndColorTimelineUpdatesViewport(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            self.setupScene()
+
+            footPrintNodeName = cmds.createNode("MhFootPrint")
+            cmds.select(clear=True)
+            self.setBasicCam(0.5)
+
+            cmds.setAttr(footPrintNodeName + '.size', 1.0)
+            cmds.setKeyframe(footPrintNodeName + '.size', time=1)
+            cmds.currentTime(10, edit=True)
+            cmds.setAttr(footPrintNodeName + '.size', 5.0)
+            cmds.setKeyframe(footPrintNodeName + '.size', time=10)
+
+            cmds.currentTime(1, edit=True)
+            cmds.setAttr(footPrintNodeName + '.color', 0.0, 0.0, 1.0, type="double3")
+            cmds.setKeyframe(footPrintNodeName + '.color', time=1)
+            cmds.currentTime(10, edit=True)
+            cmds.setAttr(footPrintNodeName + '.color', 1.0, 0.0, 0.0, type="double3")
+            cmds.setKeyframe(footPrintNodeName + '.color', time=10)
+
+            cmds.currentTime(1, edit=True)
+            cmds.refresh()
+            self.assertSnapshotClose(
+                "footPrint_keyedSizeColorTimeline_frame1.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
+
+            cmds.currentTime(5, edit=True)
+            cmds.refresh()
+            self.assertSnapshotClose(
+                "footPrint_keyedSizeColorTimeline_frame5.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
+
+            cmds.currentTime(10, edit=True)
+            cmds.refresh()
+            self.assertSnapshotClose(
+                "footPrint_keyedSizeColorTimeline_frame10.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
+
+    # Keyed color must reflect setAttr at the current frame before a new key is set
+    # (same regression class as test_keyedSizeTimelineUpdatesViewport, but for the
+    # color plug instead of size).
+    def test_keyedColorTimelineUpdatesViewport(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            self.setupScene()
+
+            footPrintNodeName = cmds.createNode("MhFootPrint")
+            cmds.select(clear=True)
+            self.setBasicCam(0.5)
+
+            cmds.setAttr(footPrintNodeName + '.color', 0.0, 0.0, 1.0, type="double3")
+            cmds.setKeyframe(footPrintNodeName + '.color', time=1)
+            cmds.currentTime(10, edit=True)
+            cmds.setAttr(footPrintNodeName + '.color', 1.0, 0.0, 0.0, type="double3")
+            cmds.setKeyframe(footPrintNodeName + '.color', time=10)
+
+            cmds.currentTime(5, edit=True)
+            cmds.refresh()
+            self.assertSnapshotClose(
+                "footPrint_keyedColorTimeline_frame5.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
+
+            cmds.setAttr(footPrintNodeName + '.color', 0.0, 1.0, 0.0, type="double3")
+            cmds.refresh()
+            self.assertSnapshotClose(
+                "footPrint_keyedColorTimeline_frame5_setAttrNoKey.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
+
+    # Regression: setting a key at the current frame, with the same value that
+    # was just set via setAttr (no key yet at that frame), must not reset the
+    # displayed size back to the value keyed at an earlier frame.
+    #
+    # Repro: key size=1.0 at frame 1. Move to frame 120 (no key there yet) and
+    # setAttr size=5.0: the viewport correctly shows size 5 (manual override on
+    # the driven plug, see syncHydraFromNodeFromAttributeSet). Then set a key
+    # at frame 120 with that same size=5.0 value: the viewport must still show
+    # size 5.
+    #
+    # Root cause (fixed): preEvaluation() was invoked for MDGContexts that are
+    # not the actual current time (Maya recomputes anim curve tangents at
+    # frame 1 while adding the new key at frame 120), and treated that as a
+    # "current time changed to frame 1" event, overwriting the cached size
+    # with the frame-1 value. preEvaluation() now ignores contexts whose time
+    # doesn't match MAnimControl::currentTime().
+    def test_keyedSizeThenAddKeyAtCurrentFrameDoesNotResetSize(self):
+        with PluginLoaded('mayaHydraFootPrintNode'):
+            self.setupScene()
+            self.setBasicCam(0.5)
+
+            footPrintNodeName = cmds.createNode("MhFootPrint")
+            cmds.select(clear=True)
+            cmds.playbackOptions(minTime=1, maxTime=120)
+
+            cmds.setAttr(footPrintNodeName + '.size', 1.0)
+            cmds.setKeyframe(footPrintNodeName + '.size', time=1)
+
+            cmds.currentTime(120, edit=True)
+            cmds.setAttr(footPrintNodeName + '.size', 5.0)
+            cmds.refresh()
+            # setAttr alone (no key yet at frame 120) must show the overridden size.
+            self.assertSnapshotClose(
+                "footPrint_keyedSizeTimeline_frame10.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
+
+            # Setting a key with the same value at the same frame must not change
+            # what's displayed in the viewport.
+            cmds.setKeyframe(footPrintNodeName + '.size', time=120)
+            cmds.refresh()
+            self.assertSnapshotClose(
+                "footPrint_keyedSizeTimeline_frame10.png",
+                self.IMAGE_DIFF_FAIL_THRESHOLD,
+                self.IMAGE_DIFF_FAIL_PERCENT)
 
     #Test multiple nodes
     def test_MultipleNodes(self):
