@@ -48,7 +48,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (renderSettingsSrc) \
     (settingsMapRenderSettingsSrc) \
     (hydraSceneRenderSettingsSrc) \
-    (adsk_ocioPath)  // Autodesk-specific OCIO config path (no standard Hydra token).
+    (ocioConfigPath)
 // clang-format on
 
 TF_DECLARE_PUBLIC_TOKENS(BatchRenderTokens, , BATCH_RENDER_TOKENS);

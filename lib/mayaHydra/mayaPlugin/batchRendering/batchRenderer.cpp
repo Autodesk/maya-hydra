@@ -517,10 +517,10 @@ void BatchRenderer::_InitHydraResources()
     if (!ocioConfigFilePath.empty()) {
         TF_DEBUG_MSG(
             MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
-            "Render setting " + BatchRenderTokens->adsk_ocioPath.GetString() + " set to "
+            "Render setting " + BatchRenderTokens->ocioConfigPath.GetString() + " set to "
                 + ocioConfigFilePath + "\n");
 
-        _renderDelegate->SetRenderSetting(BatchRenderTokens->adsk_ocioPath, VtValue(ocioConfigFilePath));
+        _renderDelegate->SetRenderSetting(BatchRenderTokens->ocioConfigPath, VtValue(ocioConfigFilePath));
     }
 
     // Tell render delegate to read render settings from the Hydra
