@@ -17,15 +17,8 @@
 """Standalone unit tests for imageUtils helpers that do not need Maya."""
 
 import os
-import sys
 import tempfile
 import unittest
-from unittest import mock
-
-# imageUtils imports maya.cmds at module load; stub Maya for standalone runs.
-if "maya.cmds" not in sys.modules:
-    sys.modules.setdefault("maya", mock.MagicMock())
-    sys.modules.setdefault("maya.cmds", mock.MagicMock())
 
 from PySide6.QtGui import QImage, QColor
 

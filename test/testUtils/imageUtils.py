@@ -16,7 +16,6 @@
 import os
 import pathlib
 import platform
-import maya.cmds as cmds
 import shutil
 import subprocess
 
@@ -61,6 +60,7 @@ class WriteFile(object):
         self.height = height
 
     def __enter__(self):
+        import maya.cmds as cmds
         cmds.mayaHydraCppTest(self.outputFile, f="TestWriteFile.setFileName")
         cmds.mayaHydraCppTest(self.width, self.height, f="TestWriteFile.setImageSize")
         # setImageSize resizes the render buffers, which restarts progressive
@@ -72,6 +72,7 @@ class WriteFile(object):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        import maya.cmds as cmds
         cmds.mayaHydraCppTest(f="TestWriteFile.unsetImageSize")
         cmds.mayaHydraCppTest("", f="TestWriteFile.setFileName")
         return False
@@ -96,6 +97,8 @@ class WriteFile(object):
 # Usage:
 #   hydraSnapshot(snap_path, settleFn=self._settlePrmanBeforeSnapshot)
 def hydraSnapshot(outputPath, width=400, height=None, settleFn=None):
+    import maya.cmds as cmds
+
     if height is None:
         height = width
 
@@ -126,6 +129,8 @@ def hydraSnapshot(outputPath, width=400, height=None, settleFn=None):
 # Usage:
 #   snapshot(snap_path)
 def snapshot(outputPath, width=400, height=None):
+    import maya.cmds as cmds
+
     cmds.undoInfo(stateWithoutFlush=False)
 
     if height is None:
@@ -407,6 +412,8 @@ class ImageDiffingTestCase:
         3 -- The images were not the same size and could not be compared.
         4 -- File error: could not find or open input files, etc.
         """
+        import maya.cmds as cmds
+
         #Disable undo
         cmds.undoInfo(stateWithoutFlush=False)
         proc = imageDiff(imagePath1, imagePath2, verbose=True, 
