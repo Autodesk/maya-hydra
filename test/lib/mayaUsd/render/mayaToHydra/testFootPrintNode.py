@@ -206,8 +206,8 @@ class TestFootPrintNode(mtohUtils.MayaHydraBaseTestCase): #Subclassing mtohUtils
                 self.IMAGE_DIFF_FAIL_PERCENT)
 
     # Keyed size must stay at the current-time value when another attribute changes.
-    # Regression: changing color re-read size in the default MDG context (time 0) and
-    # pushed the wrong scale to Hydra.
+    # Regression: changing color re-read size in the default MDG context (time 0),
+    # updated cached state with the wrong scale, and marked dirty locators.
     def test_keyedSizePreservedWhenColorChanges(self):
         with PluginLoaded('mayaHydraFootPrintNode'):
             self.setupScene()

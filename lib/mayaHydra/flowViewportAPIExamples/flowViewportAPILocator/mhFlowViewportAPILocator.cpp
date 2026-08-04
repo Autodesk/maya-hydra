@@ -807,13 +807,13 @@ void MhFlowViewportAPILocator::setCubeGridParametersFromAttributes()
     GetMatrixAttributeValue(mat, mObj, MhFlowViewportAPILocator::mCubeInitialTransform);
     memcpy(_cubeGridParams._initialTransform.GetArray(), mat[0], sizeof(double) * 16);//convert from MMatrix to GfMatrix4d
 
-    _cubeGridParams._color = MAYAHYDRA_NS_DEF::GetGfVec3fAttributeValue(
+    _cubeGridParams._color = MayaHydra::GetGfVec3fAttributeValue(
         mObj, MhFlowViewportAPILocator::mCubeColor, GfVec3f(0.f, 1.0f, 0.f));
 
     GetAttributeValue(_cubeGridParams._opacity, mObj, MhFlowViewportAPILocator::mCubeOpacity);
     GetAttributeValue(_cubeGridParams._useInstancing, mObj, MhFlowViewportAPILocator::mCubesUseInstancing);
 
-    _cubeGridParams._deltaTrans = MAYAHYDRA_NS_DEF::GetGfVec3fAttributeValue(
+    _cubeGridParams._deltaTrans = MayaHydra::GetGfVec3fAttributeValue(
         mObj, MhFlowViewportAPILocator::mCubesDeltaTrans, GfVec3f(5.0f, 5.0f, 5.0f));
 
     _cubeGridParams._hidden = split(GetStringAttributeValue(MPlug(mObj, mHiddenCubes)));

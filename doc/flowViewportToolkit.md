@@ -72,7 +72,7 @@ An example of data producer scene index can be found in [DataProducerSceneIndexE
 
 ## Updating DataProducer prims
 
-After adding mesh (or other) prims through a data producer scene index, **do not remove and re-add them** when a Maya attribute changes. Add each prim once, keep the prim paths stable, and push updates through Hydra 2.0 **data-source locators** so render delegates re-pull only what changed.
+After adding mesh (or other) prims through a data producer scene index, **do not remove and re-add them** when a Maya attribute changes. Add each prim once, keep the prim paths stable, update your cached data-source values, and emit the appropriate Hydra 2.0 **dirty locators** so render delegates re-pull only what changed.
 
 Use [`Fvp::DirtyNotifier`](../lib/flowViewport/fvpDirtyNotifier.h) on your `HdRetainedSceneIndex` with **granular** locators, for example:
 

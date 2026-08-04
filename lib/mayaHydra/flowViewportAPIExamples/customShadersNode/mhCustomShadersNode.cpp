@@ -570,7 +570,7 @@ void MhCustomShaders::_CreateAndAddMaterials()
 
 GfVec3f MhCustomShaders::_GetColor() const
 {
-    return MAYAHYDRA_NS_DEF::GetGfVec3fAttributeValue(
+    return MayaHydra::GetGfVec3fAttributeValue(
         thisMObject(), MhCustomShaders::mColor, GfVec3f(0.f, 0.f, 1.f));
 }
 

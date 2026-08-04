@@ -92,6 +92,18 @@ void nodeRemovedFromModel(MObject& node, void* clientData);
 
 // Sampled data source that reads live values from caller-owned storage so Hydra
 // re-pulls updated matrices/colors after targeted dirty locators are emitted.
+//
+// Lifetime (plain T* — caller retains ownership):
+// - Storage is a field on FootPrintMeshPrimState (_solePrimState / _heelPrimState
+//   on MhFootPrint); New() stores the address of that member, not a temporary.
+// - Each data source is owned by a prim entry in _retainedSceneIndex for the
+//   node's lifetime.
+// - Hydra may read through _value only while _retainedSceneIndex is registered
+//   (addedToModelCb … removedFromModelCb / ~MhFootPrint); both unregister paths
+//   call removeDataProducerSceneIndex before the node or its state is destroyed.
+// - ~MhFootPrint() also Reset()s _retainedSceneIndex so data sources (and their
+//   raw pointers) are dropped before _solePrimState/_heelPrimState are destroyed.
+//   Updates mutate those fields in place so the stored pointer stays valid.
 template<typename T>
 class _MutableTypedSampledDataSource : public HdTypedSampledDataSource<T>
 {
@@ -133,9 +145,8 @@ private:
 // Lifetime: _MutableTypedSampledDataSource instances built over these fields
 // hold raw pointers into the owning MhFootPrint's _solePrimState/_heelPrimState
 // (see below). Those data sources must stop being queried before this struct
-// is destroyed, which is why MhFootPrint::~MhFootPrint() explicitly unregisters
-// _retainedSceneIndex from Hydra before any member (including this one) is torn
-// down; see the ordering note on _retainedSceneIndex.
+// is destroyed, which is why ~MhFootPrint() unregisters _retainedSceneIndex from
+// Hydra and Reset()s it before member teardown.
 struct FootPrintMeshPrimState
 {
     GfMatrix4d    xform;
@@ -288,11 +299,7 @@ private:
     /// Heel path to be used in the retained hydra scene index for the heel primitive
     SdfPath                     _heelPath;
 
-    /// Live mesh state read by the data sources added to _retainedSceneIndex
-    /// (see FootPrintMeshPrimState). Must outlive any Hydra read of those data
-    /// sources, i.e. must be destroyed after _retainedSceneIndex is unregistered
-    /// and destroyed; _retainedSceneIndex is declared last in this class (and so
-    /// destroyed first) specifically to preserve that order.
+    /// Live mesh state read by mutable data sources in _retainedSceneIndex.
     FootPrintMeshPrimState      _solePrimState;
     FootPrintMeshPrimState      _heelPrimState;
 
@@ -302,12 +309,10 @@ private:
     bool   _cachedDrawAsSecondaryGraphics = false;
     bool   _cachedSyncTimeValid = false;
     MTime  _cachedSyncTime;
-    /// True right after a kAttributeSet sync on the size/color/purpose plug (resp.),
-    /// at the same timeline time, until EM's next preEvaluation pass consumes it.
-    /// Guards against preEvaluation's dirty-plug branch immediately re-reading the
-    /// plug through the EM context: if that plug is still connected (e.g. to an
-    /// animCurve), that re-read would evaluate through the connection and silently
-    /// discard a setAttr override made on the driven plug without a new key.
+    /// After kAttributeSet, EM also marks the plug dirty and calls preEvaluation()
+    /// for the same frame. Skip that duplicate resync once — re-reading a still-
+    /// connected plug in EM's context would evaluate through the connection and
+    /// discard the setAttr override we already synced from fsNormal.
     bool   _sizeManualOverridePendingPreEval = false;
     bool   _colorManualOverridePendingPreEval = false;
     bool   _purposeManualOverridePendingPreEval = false;
@@ -325,14 +330,9 @@ private:
     SdfPath _pathPrefix;
     Ufe::Path _appPath{};
 
-    /// Hydra retained scene index holding the 2 foot print primitives. Declared
-    /// last (and so destroyed first, before _solePrimState/_heelPrimState above)
-    /// as defense in depth: ~MhFootPrint() already explicitly unregisters this
-    /// scene index from Hydra before any member is torn down, but keeping the
-    /// declaration order consistent with that lifetime dependency means a future
-    /// member added between _solePrimState/_heelPrimState and here can't
-    /// accidentally end up destroyed while Hydra could still be reading the mesh
-    /// state through this scene index's data sources.
+    /// Hydra retained scene index holding the 2 foot print primitives.
+    /// Teardown: removeDataProducerSceneIndex in removedFromModelCb() and
+    /// ~MhFootPrint(), then Reset() in ~MhFootPrint() before member destruction.
     HdRetainedSceneIndexRefPtr  _retainedSceneIndex  {nullptr};
 };
 
@@ -480,6 +480,7 @@ namespace
             } else {
                 footPrint->syncHydraFromNodeAtCurrentTime(&plug);
             }
+            // Keying/connect/disconnect may change whether we need timeChanged for scrub.
             footPrint->_UpdateTimeChangedCallback();
         }
     }
@@ -621,6 +622,9 @@ MhFootPrint::~MhFootPrint()
     
     Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
     dataProducerSceneIndexInterface.removeDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allRenderViews);
+    // Drop data sources (and their raw pointers into _sole/_heelPrimState) before
+    // member destruction; do not rely on declaration order.
+    _retainedSceneIndex.Reset();
 }
 
 // Initialize sole/heel mesh state from size, color, and purpose.
@@ -781,7 +785,8 @@ void MhFootPrint::_UpdatePrimScale(FootPrintMeshPrimState& state, float size) co
     state.extentMax = GfVec3d(corner2.x * size, corner2.y * size, corner2.z * size);
 }
 
-// Read Maya attrs and push size/color/purpose changes to Hydra.
+// Read Maya attrs, update cached prim state, and mark dirty locators so Hydra
+// re-pulls size/color/purpose from the data sources.
 void MhFootPrint::syncHydraFromNode(const MPlug* changedPlug)
 {
     if (!_retainedSceneIndex || !_primsAdded) {
@@ -879,9 +884,9 @@ bool MhFootPrint::_HasAnyConnectedTimelineAttribute() const
     const MPlug   sizePlug(obj, mSize);
     const MPlug   colorPlug(obj, mColor);
     const MPlug   purposePlug(obj, mDrawAsSecondaryGraphics);
-    return MAYAHYDRA_NS_DEF::PlugOrChildIsConnected(sizePlug)
-        || MAYAHYDRA_NS_DEF::PlugOrChildIsConnected(colorPlug)
-        || MAYAHYDRA_NS_DEF::PlugOrChildIsConnected(purposePlug);
+    return MayaHydra::PlugOrChildIsConnected(sizePlug)
+        || MayaHydra::PlugOrChildIsConnected(colorPlug)
+        || MayaHydra::PlugOrChildIsConnected(purposePlug);
 }
 
 // Sync connected display attrs when the timeline frame changes.
@@ -903,7 +908,9 @@ void MhFootPrint::onTimeChanged()
     syncHydraFromNodeAtCurrentTime(/*changedPlug=*/nullptr);
 }
 
-// Register or remove the timeChanged callback when display attrs are connected.
+// Register timeChanged only while display attrs are connected to time-varying
+// sources. Scrubbing does not always dirty this locator or fire attributeChanged,
+// so we re-sync Hydra from MAnimControl::currentTime() on each frame change.
 void MhFootPrint::_UpdateTimeChangedCallback()
 {
     MStatus status;
@@ -972,7 +979,7 @@ TfToken MhFootPrint::_GetPurposeToken() const
 // Read the color attribute as a GfVec3f.
 GfVec3f MhFootPrint::_GetColor() const
 {
-    return MAYAHYDRA_NS_DEF::GetGfVec3fAttributeValue(
+    return MayaHydra::GetGfVec3fAttributeValue(
         thisMObject(), MhFootPrint::mColor, GfVec3f(0.f, 0.f, 1.f));
 }
 
@@ -986,11 +993,12 @@ MStatus MhFootPrint::preEvaluation(
     // the timeline's actual current time, e.g. Maya internally evaluating
     // other frames while recomputing anim curve tangents when a new key is
     // added. Treating such a call as a real "current time changed" event would
-    // read size/color/purpose at that other frame and push it to Hydra,
-    // clobbering the value actually being displayed (regression: setting a key
-    // at the current frame with the already-correct value could reset the
-    // displayed size back to a value keyed at another frame). So bail out
-    // early for any non-normal context whose time isn't the current time.
+    // read size/color/purpose at that other frame, update cached state, and
+    // mark dirty locators, clobbering the value actually being displayed
+    // (regression: setting a key at the current frame with the already-correct
+    // value could reset the displayed size back to a value keyed at another
+    // frame). So bail out early for any non-normal context whose time isn't
+    // the current time.
     const MTime currentTime = MAnimControl::currentTime();
     MStatus contextStatus;
     if (!context.isNormal(&contextStatus) && contextStatus) {
