@@ -500,7 +500,8 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
 
         int                           fastId = ri.InternalObjectId();
         MayaHydraRenderItemAdapterPtr ria = nullptr;
-        if (!_GetRenderItem(fastId, ria)) {
+        const bool isNewRenderitem = !_GetRenderItem(fastId, ria);
+        if (isNewRenderitem) {
             const SdfPath slowId = _GetRenderItemPrimPath(ri);
 
             // Maya/MtoA adds texturedSkyDome mesh object for VP2.
@@ -543,13 +544,12 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             ria->SetMaterial(material);
         }
 
-        MColor wireframeColor;
-
-        MDagPath dagPath = ri.sourceDagPath();
-        if (dagPath.isValid()) {
-            wireframeColor = MGeometryUtilities::wireframeColor(
-                dagPath); // This is a color managed VP2 color, it will need to be unmanaged at some
-            // point
+        if ((flags & MDataServerOperation::MViewportScene::MVS_changedWireColor) || isNewRenderitem) {
+            MDagPath dagPath = ri.sourceDagPath();
+            if (dagPath.isValid()) {
+                // This is a color managed VP2 color, it will need to be unmanaged at some point
+                ria->SetWireframeColor(MGeometryUtilities::wireframeColor(dagPath));
+            }
         }
 
         // Call UpdateTransform before UpdateFromDelta, as UpdateTransform
@@ -559,7 +559,7 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         if (flags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
             ria->UpdateTransform(ri);
         }
-        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColor);
+        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags);
         ria->UpdateFromDelta(data);
     }
 }
