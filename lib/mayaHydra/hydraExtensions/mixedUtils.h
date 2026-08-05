@@ -21,6 +21,7 @@
 #include <mayaHydraLib/api.h>
 
 #include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/usd/sdf/path.h>
 #include <pxr/imaging/hd/sceneIndex.h>
@@ -270,6 +271,21 @@ PXR_NS::GfVec4f getPreferencesColor(const PXR_NS::TfToken& token);
  */
 MAYAHYDRALIB_API
 PXR_NS::TfToken GetGeomSubsetsPickMode();
+
+/**
+ * @brief Read a double3 numeric attribute and convert it to GfVec3f.
+ *
+ * @param[in] node The node that owns the attribute.
+ * @param[in] attr The MObject of the attribute definition.
+ * @param[in] defaultValue Value returned when the attribute is missing or unreadable.
+ *
+ * @return The attribute value converted to GfVec3f, or defaultValue on failure.
+ */
+MAYAHYDRALIB_API
+PXR_NS::GfVec3f GetGfVec3fAttributeValue(
+    const MObject& node,
+    const MObject& attr,
+    const PXR_NS::GfVec3f& defaultValue = PXR_NS::GfVec3f(0.f, 0.f, 0.f));
 
 /**
  * @brief Get extension/dynamic attributes from a Maya node for translation to Hydra primvars.

@@ -23,6 +23,7 @@
 #include <maya/MDagPath.h>
 #include <maya/MFnComponent.h>
 #include <maya/MFnDagNode.h>
+#include <maya/MFnNumericData.h>
 #include <maya/MMatrix.h>
 #include <maya/MObjectArray.h>
 #include <maya/MPlug.h>
@@ -255,6 +256,39 @@ MObject FindShadingEngine(const MDagPath& dagPath, const MObject& shadingComp)
         }
     }
     return MObject::kNullObj;
+}
+
+MStatus GetDouble3AttributeValue(double3& outVal, const MObject& node, const MObject& attr)
+{
+    MPlug plug(node, attr);
+    if (plug.isNull()) {
+        return MS::kFailure;
+    }
+
+    MObject oDouble3;
+    MStatus status = plug.getValue(oDouble3);
+    if (!status) {
+        return status;
+    }
+
+    MFnNumericData fnData(oDouble3, &status);
+    if (!status) {
+        return status;
+    }
+
+    return fnData.getData(outVal[0], outVal[1], outVal[2]);
+}
+
+bool PlugOrChildIsConnected(const MPlug& plug)
+{
+    if (plug.isNull()) {
+        return false;
+    }
+    if (plug.isConnected()) {
+        return true;
+    }
+    MStatus status;
+    return plug.isCompound(&status) && status && plug.numConnectedChildren() > 0;
 }
 
 } // namespace MAYAHYDRA_NS_DEF
