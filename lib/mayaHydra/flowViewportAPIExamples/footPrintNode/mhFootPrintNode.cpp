@@ -38,6 +38,8 @@
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MSceneMessage.h>
 #include <maya/MNodeMessage.h>
+#include <maya/MEventMessage.h>
+#include <maya/MMessage.h>
 #include <maya/MObjectHandle.h>
 #include <maya/MGlobal.h>
 #include <maya/MFnDagNode.h>
@@ -45,8 +47,15 @@
 #include <maya/MDagPath.h>
 #include <maya/MSelectionList.h>
 #include <maya/MPointArray.h>
+#include <maya/MEvaluationNode.h>
+#include <maya/MDGContext.h>
+#include <maya/MDGContextGuard.h>
+#include <maya/MAnimControl.h>
+#include <maya/MTime.h>
 
 // MayaHydra headers.
+#include <mayaHydraLib/mayaUtils.h>
+#include <mayaHydraLib/mixedUtils.h>
 #include <mayaHydraLib/pick/mhPickHandler.h>
 #include <mayaHydraLib/pick/mhPickHit.h>
 #include <mayaHydraLib/pick/mhPickHandlerRegistry.h>
@@ -58,12 +67,15 @@
 #include <flowViewport/selection/fvpPrefixPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
+#include <flowViewport/fvpDirtyNotifier.h>
 
 //Hydra headers
 #include <pxr/base/vt/array.h>
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/imaging/hdx/pickTask.h>
 #include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/dataSource.h>
+#include <pxr/imaging/hd/dataSourceTypeDefs.h>
 #include <pxr/imaging/hd/retainedSceneIndex.h>
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/meshSchema.h>
@@ -78,13 +90,79 @@ namespace {
 void nodeAddedToModel(MObject& node, void* clientData);
 void nodeRemovedFromModel(MObject& node, void* clientData);
 
-// Pick handler for the footprint node.
+// Sampled data source that reads live values from caller-owned storage so Hydra
+// re-pulls updated matrices/colors after targeted dirty locators are emitted.
+//
+// Lifetime (plain T* — caller retains ownership):
+// - Storage is a field on FootPrintMeshPrimState (_solePrimState / _heelPrimState
+//   on MhFootPrint); New() stores the address of that member, not a temporary.
+// - Each data source is owned by a prim entry in _retainedSceneIndex for the
+//   node's lifetime.
+// - Hydra may read through _value only while _retainedSceneIndex is registered
+//   (addedToModelCb … removedFromModelCb / ~MhFootPrint); both unregister paths
+//   call removeDataProducerSceneIndex before the node or its state is destroyed.
+// - ~MhFootPrint() also Reset()s _retainedSceneIndex so data sources (and their
+//   raw pointers) are dropped before _solePrimState/_heelPrimState are destroyed.
+//   Updates mutate those fields in place so the stored pointer stays valid.
+template<typename T>
+class _MutableTypedSampledDataSource : public HdTypedSampledDataSource<T>
+{
+public:
+    using Handle = typename HdTypedSampledDataSource<T>::Handle;
 
+    static Handle New(T* value) { return Handle(new _MutableTypedSampledDataSource(value)); }
+
+    // Return the current live value.
+    T GetTypedValue(HdSampledDataSource::Time /*shutterOffset*/) override { return *_value; }
+
+    // Wrap the stored value as a VtValue for Hydra data source queries.
+    VtValue GetValue(HdSampledDataSource::Time shutterOffset) override
+    {
+        return VtValue(GetTypedValue(shutterOffset));
+    }
+
+    // Report a single uniform sample so Hydra re-reads after dirty locators.
+    bool GetContributingSampleTimesForInterval(
+        HdSampledDataSource::Time /*startTime*/,
+        HdSampledDataSource::Time /*endTime*/,
+        std::vector<HdSampledDataSource::Time>* /*outSampleTimes*/) override
+    {
+        // Uniform value for the frame — match HdRetainedTypedSampledDataSource so
+        // Hydra calls GetValue(0) after dirty locators instead of caching samples.
+        return false;
+    }
+
+private:
+    explicit _MutableTypedSampledDataSource(T* value) : _value(value) {}
+
+    T* _value;
+};
+
+// Live Hydra mesh state for one footprint part (sole or heel). Holds the mutable
+// values that our custom data sources read on re-pull after dirty locators are
+// emitted; topology (points, face indices) stays static in AddPrims.
+//
+// Lifetime: _MutableTypedSampledDataSource instances built over these fields
+// hold raw pointers into the owning MhFootPrint's _solePrimState/_heelPrimState
+// (see below). Those data sources must stop being queried before this struct
+// is destroyed, which is why ~MhFootPrint() unregisters _retainedSceneIndex from
+// Hydra and Reset()s it before member teardown.
+struct FootPrintMeshPrimState
+{
+    GfMatrix4d    xform;
+    GfVec3d       extentMin;
+    GfVec3d       extentMax;
+    VtVec3fArray  displayColors;
+    TfToken       purpose;
+};
+
+// Pick handler for the footprint node.
 class FootPrintPickHandler : public MayaHydra::PickHandler {
 public:
 
     FootPrintPickHandler(MObject& footPrintObj) : _footPrintObj(footPrintObj) {}
 
+    // Map a Hydra pick hit to the owning Maya footprint shape.
     bool handlePickHit(
         const Input& pickInput, Output& pickOutput
     ) const override
@@ -127,12 +205,32 @@ public:
     //Is called when the MObject has been constructed and is valid
     void    postConstructor() override;
 
-    MStatus   		compute( const MPlug& plug, MDataBlock& data ) override;
+    MStatus compute( const MPlug& plug, MDataBlock& data ) override;
+
+    // Called before this node is evaluated by Evaluation Manager (playback / driven attrs).
+    MStatus preEvaluation(
+        const MDGContext& context,
+        const MEvaluationNode& evaluationNode) override;
 
     bool            isBounded() const override;
     MBoundingBox    boundingBox() const override;
 
-    void updateFootPrintPrims();
+    /// Update Hydra mesh prims from Maya attributes via targeted dirty locators.
+    /// When \p changedPlug is set, only that footprint attribute is synced so
+    /// unrelated attrs (e.g. keyed size) are not re-read in the wrong MDG context.
+    void syncHydraFromNode(const MPlug* changedPlug = nullptr);
+    /// Same as syncHydraFromNode but reads attrs at the current timeline time.
+    void syncHydraFromNodeAtCurrentTime(const MPlug* changedPlug = nullptr);
+    /// Read attrs from normal DG context after kAttributeSet on a driven plug.
+    /// Uses fsNormal so a setAttr at the current frame without a new key reflects
+    /// the edited datablock value instead of the anim-curve evaluation.
+    void syncHydraFromNodeFromAttributeSet(const MPlug* changedPlug);
+    /// Sync display attrs when the timeline frame changes (scrub / playback).
+    void onTimeChanged();
+    void _UpdateTimeChangedCallback();
+    void _UpdateCachedSyncTimeFromTimeline();
+    /// True when size, color, or purpose is connected (keys or DG-driven by another node).
+    bool _HasAnyConnectedTimelineAttribute() const;
     
     static  void *      creator();
     static  MStatus     initialize();
@@ -144,6 +242,11 @@ public:
     void removedFromModelCb();
 
     Ufe::Path getUfePath() const;
+
+    static bool IsFootPrintAttributePlug(const MPlug& plug);
+    static bool IsSizeAttributePlug(const MPlug& plug);
+    static bool IsColorAttributePlug(const MPlug& plug);
+    static bool IsPurposeAttributePlug(const MPlug& plug);
 
     //Attributes
     static MObject     mSize;
@@ -163,10 +266,30 @@ private:
     // it appears in the secondary graphics pass of maya hydra.
     // This is used as an example to show how to set primitives as secondary graphics
     bool _GetDrawAsSecondaryGraphics() const;
+    TfToken _GetPurposeToken() const;
+
+    void _InitPrimState(
+        FootPrintMeshPrimState& state,
+        float size,
+        const GfVec3f& displayColor,
+        const TfToken& purpose) const;
+
+    void _UpdatePrimScale(FootPrintMeshPrimState& state, float size) const;
+
     ///Create the Hydra foot print primitives
     void _CreateAndAddFootPrintPrimitives();
-    ///Remove the Hydra foot print primitives
-    void _RemoveFootPrintPrimitives();
+    void _AddFootPrintPrim(
+        const SdfPath&              primPath,
+        FootPrintMeshPrimState&     state,
+        const VtArray<GfVec3f>&     points,
+        const VtIntArray&           faceVertexCount,
+        const VtIntArray&           faceVertexIndices);
+
+    void _DirtyPrimChanges(
+        const SdfPath& path,
+        bool sizeChanged,
+        bool colorChanged,
+        bool purposeChanged);
 
     ///Counter to make the hydra primitives unique
     static std::atomic_int _counter;
@@ -176,24 +299,47 @@ private:
     /// Heel path to be used in the retained hydra scene index for the heel primitive
     SdfPath                     _heelPath;
 
-    ///Hydra retained scene index to add the 2 foot print primitives
-    HdRetainedSceneIndexRefPtr  _retainedSceneIndex  {nullptr};
+    /// Live mesh state read by mutable data sources in _retainedSceneIndex.
+    FootPrintMeshPrimState      _solePrimState;
+    FootPrintMeshPrimState      _heelPrimState;
+
+    bool   _primsAdded = false;
+    float  _cachedSize = -1.0f;
+    GfVec3f _cachedColor { -1.0f, -1.0f, -1.0f };
+    bool   _cachedDrawAsSecondaryGraphics = false;
+    bool   _cachedSyncTimeValid = false;
+    MTime  _cachedSyncTime;
+    /// After kAttributeSet, EM also marks the plug dirty and calls preEvaluation()
+    /// for the same frame. Skip that duplicate resync once — re-reading a still-
+    /// connected plug in EM's context would evaluate through the connection and
+    /// discard the setAttr override we already synced from fsNormal.
+    bool   _sizeManualOverridePendingPreEval = false;
+    bool   _colorManualOverridePendingPreEval = false;
+    bool   _purposeManualOverridePendingPreEval = false;
 
     ///To hold the afterOpenCallback Id to be able to react when a File Open has happened.
     MCallbackId                 _cbAfterOpenId = 0;
-    ///To hold the attributeChangedCallback Id to be able to react when the 3D grid creation parameters attributes from this node change.
+    ///To hold the attributeChangedCallback Id to be able to react when the footprint creation parameters attributes from this node change.
     MCallbackId                 _cbAttributeChangedId = 0;
+    /// timeChanged event: connected display attrs are not always re-evaluated during scrub.
+    MCallbackId                 _cbTimeChangedId = 0;
 
     MCallbackId _nodeAddedToModelCbId{0};
     MCallbackId _nodeRemovedFromModelCbId{0};
 
     SdfPath _pathPrefix;
     Ufe::Path _appPath{};
+
+    /// Hydra retained scene index holding the 2 foot print primitives.
+    /// Teardown: removeDataProducerSceneIndex in removedFromModelCb() and
+    /// ~MhFootPrint(), then Reset() in ~MhFootPrint() before member destruction.
+    HdRetainedSceneIndexRefPtr  _retainedSceneIndex  {nullptr};
 };
 
 namespace 
 {
-    // Foot print data
+    // Canonical footprint mesh data in local space (Y-up, unit-scale footprint).
+    // solePoints: 21 vertices; heelPoints: 17 vertices. Size is applied via xform scale.
     static const VtArray<GfVec3f> solePoints = { 
                                {  0.00f, 0.0f, -0.70f },
                                {  0.04f, 0.0f, -0.69f },
@@ -238,7 +384,7 @@ namespace
                                { -0.00f, 0.0f,  0.06f } 
                             };
     
-    //Number of sole triangles is soleVertsCount - 2
+    // Sole: 19 triangle faces (fan from vertex 0); one faceVertexCount entry per face, each 3.
     static const VtIntArray soleFaceVertexCounts    =   {
                                                         3, 3, 3, 3, 3,
                                                         3, 3, 3, 3, 3,
@@ -246,13 +392,14 @@ namespace
                                                         3, 3, 3, 3
                                                     };
 
-    //Number of heel triangles is heelVertsCount - 2
+    // Heel: 15 triangle faces (fan from vertex 0); one faceVertexCount entry per face, each 3.
     static const VtIntArray heelFaceVertexCounts    =   {
                                                         3, 3, 3, 3, 3,
                                                         3, 3, 3, 3, 3,
                                                         3, 3, 3, 3, 3
                                                     };
 
+    // Per-face vertex indices into solePoints (3 indices per triangle, 19 faces).
     static const VtIntArray soleFaceVertexIndices   = {
                                                         2,  1,  0,
                                                         3,  2,  0,
@@ -275,6 +422,7 @@ namespace
                                                         20, 19, 0
                                                        };
 
+    // Per-face vertex indices into heelPoints (3 indices per triangle, 15 faces).
     static const VtIntArray heelFaceVertexIndices   = {
                                                         2,  1,  0,
                                                         3,  2,  0,
@@ -293,157 +441,59 @@ namespace
                                                         16, 15, 0
                                                       };
 
-    //For the maya bounding box
+    // Axis-aligned bounds of the unit-scale footprint in local space (used for Maya boundingBox and Hydra extent).
     static const MPoint corner1( -0.17, 0.0, -0.7 );
     static const MPoint corner2( 0.17, 0.0, 0.3 );
-    
-    //Create the Hydra primitive and add it to the retained scene index
-    void _CreateAndAddPrim(
-        const HdRetainedSceneIndexRefPtr& retainedSceneIndex,
-        const SdfPath&                    primPath,
-        const VtArray<GfVec3f>&           points,
-        const VtIntArray&                 faceVertexCount,
-        const VtIntArray&                 faceVertexIndices,
-        const GfVec3f&                    scale,
-        const GfVec3f&                    displayColor,
-        bool                              drawAsSecondaryGraphics)
+
+    // True when the attribute message can change footprint display values.
+    bool attributeMessageAffectsFootPrintAttributes(MNodeMessage::AttributeMessage msg)
     {
-        using _PointArrayDs = HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>;
-        using _IntArrayDs   = HdRetainedTypedSampledDataSource<VtIntArray>;
-
-        const _IntArrayDs::Handle fvcDs = _IntArrayDs::New(faceVertexCount);
-        const _IntArrayDs::Handle fviDs = _IntArrayDs::New(faceVertexIndices);
-        
-        const VtIntArray vertexColorArray(points.size(), 0);//Is an index in the vertex color array, 1 per vertex,but  we only have one same color for all verts (index 0)
-
-        const HdContainerDataSourceHandle meshDs =
-                HdMeshSchema::Builder()
-                    .SetTopology(HdMeshTopologySchema::Builder()
-                        .SetFaceVertexCounts(fvcDs)
-                        .SetFaceVertexIndices(fviDs)
-                        .Build())
-                   .SetDoubleSided(HdRetainedTypedSampledDataSource<bool>::New(true))//Make the mesh double sided
-                   .Build();
-
-        const HdContainerDataSourceHandle primvarsDs =
-            HdRetainedContainerDataSource::New(
-
-                //Create the vertices positions
-                HdPrimvarsSchemaTokens->points,
-                HdPrimvarSchema::Builder()
-                    .SetPrimvarValue(_PointArrayDs::New(points))
-                    .SetInterpolation(HdPrimvarSchema::
-                        BuildInterpolationDataSource(
-                            HdPrimvarSchemaTokens->vertex))
-                    .SetRole(HdPrimvarSchema::
-                        BuildRoleDataSource(
-                            HdPrimvarSchemaTokens->point))
-                    .Build(),
-
-                //Create the vertex colors
-                HdTokens->displayColor,
-                HdPrimvarSchema::Builder()
-                    .SetIndexedPrimvarValue(
-                        HdRetainedTypedSampledDataSource<VtVec3fArray>::New(
-                            VtVec3fArray{
-                                displayColor, 
-                            }))
-                    .SetIndices(
-                        HdRetainedTypedSampledDataSource<VtIntArray>::New(
-                                 vertexColorArray
-                        )
-                    )
-                    .SetInterpolation(
-                        HdPrimvarSchema::BuildInterpolationDataSource(
-                            HdPrimvarSchemaTokens->varying))
-                    .SetRole(
-                        HdPrimvarSchema::BuildRoleDataSource(
-                            HdPrimvarSchemaTokens->color))//vertex color
-                    .Build()
-            );
-
-        //Apply the size of the prim as a scale matrix
-        GfMatrix4d transform;
-        transform.SetIdentity();
-        transform.SetScale(scale);
-        
-        const float scaleArray[3] = {scale.data()[0], scale.data()[1], scale.data()[2]};
-
-        //Create the primitive
-        HdRetainedSceneIndex::AddedPrimEntry addedPrim;
-        addedPrim.primPath   = primPath;
-        addedPrim.primType   = HdPrimTypeTokens->mesh;
-        addedPrim.dataSource = HdRetainedContainerDataSource::New(
-            //Create a matrix
-            HdXformSchemaTokens->xform,
-            HdXformSchema::Builder()
-                    .SetMatrix(HdRetainedTypedSampledDataSource<GfMatrix4d>::New(
-                    transform)).Build(),
-
-            //Create an extent attribute to support the viewport bounding box display style, 
-            //if no extent attribute is added, it will not be displayed at all in bounding box display style
-            HdExtentSchemaTokens->extent,
-            HdExtentSchema::Builder()
-                .SetMin(HdRetainedTypedSampledDataSource<GfVec3d>::New(GfVec3d(corner1.x*scaleArray[0], corner1.y*scaleArray[1], corner1.z*scaleArray[2])))
-                .SetMax(HdRetainedTypedSampledDataSource<GfVec3d>::New(GfVec3d(corner2.x*scaleArray[0], corner2.y*scaleArray[1], corner2.z*scaleArray[2])))
-                .Build(),
-
-            // Create a purpose render tag which is a way to specify how the primitive will be drawn.
-            // If the drawAsSecondaryGraphics is true, it will be drawn in the secondary graphics
-            // render pass.
-            HdPurposeSchemaTokens->purpose,
-            HdPurposeSchema::Builder()
-                .SetPurpose(HdRetainedTypedSampledDataSource<TfToken>::New(
-                    (drawAsSecondaryGraphics) ? Fvp::secondaryGraphicsRenderTagToken //Will be drawn as secondary graphics which can be in a separate render pass
-                                              : HdRenderTagTokens->geometry)) ////Will be drawn in the main render pass
-                .Build(),
-            
-            //create a mesh
-            HdMeshSchemaTokens->mesh,
-            meshDs,
-            HdPrimvarsSchemaTokens->primvars,
-            primvarsDs
-        );
-
-        //Add the prim in the retained scene index
-        retainedSceneIndex->AddPrims({addedPrim});
+        const MNodeMessage::AttributeMessage mask = static_cast<MNodeMessage::AttributeMessage>(
+            MNodeMessage::kAttributeSet | MNodeMessage::kAttributeRemoved
+            | MNodeMessage::kAttributeAdded | MNodeMessage::kAttributeRenamed);
+        return (msg & mask) != 0;
     }
 
-    //Callback when an attribute of the maya node changes
-    void attributeChangedCallback(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug & otherPlug, void* footPrintData)
+    // Sync Hydra when a footprint attribute is set, added, removed, or renamed.
+    void attributeChangedCallback(
+        MNodeMessage::AttributeMessage msg,
+        MPlug& plug,
+        MPlug& /*otherPlug*/,
+        void* footPrintData)
     {
-        if (! footPrintData){
+        if (!footPrintData || !MhFootPrint::IsFootPrintAttributePlug(plug)) {
             return;
         }
 
-        MhFootPrint* footPrint = reinterpret_cast<MhFootPrint*>(footPrintData);
-
-        MPlug parentPlug = plug.parent();
-        if (
-            (plug       == MhFootPrint::mSize)  ||
-            (parentPlug == MhFootPrint::mColor) ||
-            (plug       == MhFootPrint::mColor) || 
-            (plug       == MhFootPrint::mDrawAsSecondaryGraphics)
-           ){
-                footPrint->updateFootPrintPrims();
-        }
-    }
-
-    //Get the color attribute value which is a double3
-    void GetDouble3AttributeValue(double3& outVal, const MObject& node, const MObject& attr)
-    {
-        MPlug plug(node, attr);
-        if (plug.isNull()){
+        // kAttributeEval alone does not carry a user edit; skip it.
+        if ((msg & MNodeMessage::kAttributeEval)
+            && !(msg & MNodeMessage::kAttributeSet)) {
             return;
         }
 
-        MObject oDouble3;
-        plug.getValue(oDouble3);
-
-        MFnNumericData fnData(oDouble3);
-        fnData.getData( outVal[0], outVal[1], outVal[2] );
+        if (attributeMessageAffectsFootPrintAttributes(msg)) {
+            auto* footPrint = reinterpret_cast<MhFootPrint*>(footPrintData);
+            // kAttributeSet: read the plug from the datablock (fsNormal).
+            // Other messages: read the plug at the current timeline time.
+            if (msg & MNodeMessage::kAttributeSet) {
+                footPrint->syncHydraFromNodeFromAttributeSet(&plug);
+            } else {
+                footPrint->syncHydraFromNodeAtCurrentTime(&plug);
+            }
+            // Keying/connect/disconnect may change whether we need timeChanged for scrub.
+            footPrint->_UpdateTimeChangedCallback();
+        }
     }
 
+    // Forward Maya timeChanged events to the footprint node.
+    void timeChangedCallback(void* clientData)
+    {
+        if (auto* footPrint = reinterpret_cast<MhFootPrint*>(clientData)) {
+            footPrint->onTimeChanged();
+        }
+    }
+
+// Register the footprint with Hydra when the node enters the scene.
 void nodeAddedToModel(MObject& node, void* /* clientData */)
 {
     auto fpNode = reinterpret_cast<MhFootPrint*>(MFnDagNode(node).userNode());
@@ -454,6 +504,7 @@ void nodeAddedToModel(MObject& node, void* /* clientData */)
     fpNode->addedToModelCb();
 }
 
+// Unregister the footprint from Hydra when the node leaves the scene.
 void nodeRemovedFromModel(MObject& node, void* /* clientData */)
 {
     auto fpNode = reinterpret_cast<MhFootPrint*>(MFnDagNode(node).userNode());
@@ -477,34 +528,79 @@ MString	MhFootPrint::nodeClassification("hydraAPIExample/geometry/footPrint");
 MObject MhFootPrint::mWorldS;
 
 namespace {
-    //Callback after a File Open
-    void afterOpenCallback (void *clientData) 
+    // Re-sync Hydra from saved datablock values after a scene file is opened.
+    void afterOpenCallback (void *clientData)
     {
         if (! clientData){
             return;
         }
 
-        //Trigger a call to compute so that everything is initialized
-        MhFootPrint* footPrintInstance = reinterpret_cast<MhFootPrint*>(clientData);
-        footPrintInstance->updateFootPrintPrims();
-        // No need to call footPrintInstance->addedToModelCb(), as reading the
-        // file will add the node to the model.
+        auto* footPrint = reinterpret_cast<MhFootPrint*>(clientData);
+        {
+            MDGContextGuard guard(MDGContext::fsNormal);
+            footPrint->syncHydraFromNode(/*changedPlug=*/nullptr);
+        }
+        footPrint->_UpdateCachedSyncTimeFromTimeline();
+        footPrint->_UpdateTimeChangedCallback();
+        // No need to call footPrint->addedToModelCb(), as reading the file will
+        // add the node to the model.
     }
 }
 
+/* static */
+// True when the plug is the size attribute.
+bool MhFootPrint::IsSizeAttributePlug(const MPlug& plug)
+{
+    MStatus status;
+    return plug.attribute(&status) == MhFootPrint::mSize && status;
+}
+
+/* static */
+// True when the plug is the color attribute or one of its child plugs.
+bool MhFootPrint::IsColorAttributePlug(const MPlug& plug)
+{
+    MStatus status;
+    const MObject attr = plug.attribute(&status);
+    if (!status) {
+        return false;
+    }
+    if (attr == MhFootPrint::mColor) {
+        return true;
+    }
+    const MPlug parentPlug = plug.parent();
+    return parentPlug.attribute(&status) == MhFootPrint::mColor && status;
+}
+
+/* static */
+// True when the plug is drawAsSecondaryGraphics, which maps to the Hydra
+// purpose render tag (see _GetPurposeToken()).
+bool MhFootPrint::IsPurposeAttributePlug(const MPlug& plug)
+{
+    MStatus status;
+    return plug.attribute(&status) == MhFootPrint::mDrawAsSecondaryGraphics && status;
+}
+
+/* static */
+// True when the plug drives footprint size, color, or purpose.
+bool MhFootPrint::IsFootPrintAttributePlug(const MPlug& plug)
+{
+    return IsSizeAttributePlug(plug)
+        || IsColorAttributePlug(plug)
+        || IsPurposeAttributePlug(plug);
+}
+
+// Set up paths, callbacks, retained scene index, and initial Hydra prims.
 void MhFootPrint::postConstructor()
 {
-    //We have a valid MObject in this function
     _solePath = SdfPath(std::string("/sole_") + std::to_string(_counter));
     _heelPath = SdfPath(std::string("/heel_") + std::to_string(_counter));
     _counter++;
 
-    //Add a callback after a load scene
-    _cbAfterOpenId = MSceneMessage::addCallback(MSceneMessage::kAfterOpen, afterOpenCallback, ((void*)this)) ;
+    _cbAfterOpenId = MSceneMessage::addCallback(MSceneMessage::kAfterOpen, afterOpenCallback, ((void*)this));
 
-    //Add the callback when an attribute of this node changes
     MObject obj = thisMObject();
-    _cbAttributeChangedId = MNodeMessage::addAttributeChangedCallback(obj, attributeChangedCallback, ((void*)this));
+    _cbAttributeChangedId = MNodeMessage::addAttributeChangedCallback(
+        obj, attributeChangedCallback, ((void*)this));
 
     _retainedSceneIndex = HdRetainedSceneIndex::New();
 
@@ -514,64 +610,332 @@ void MhFootPrint::postConstructor()
     _nodeRemovedFromModelCbId = MModelMessage::addNodeRemovedFromModelCallback(obj, nodeRemovedFromModel);
 }
 
+// Remove callbacks and unregister the retained scene index from Hydra.
 MhFootPrint::~MhFootPrint()
 {
-    //Remove the callbacks
-    for(auto cbId : {_cbAfterOpenId, _cbAttributeChangedId, _nodeAddedToModelCbId, _nodeRemovedFromModelCbId}) {
+    for (auto cbId : {_cbAfterOpenId, _cbAttributeChangedId, _cbTimeChangedId,
+                      _nodeAddedToModelCbId, _nodeRemovedFromModelCbId}) {
         if (cbId) {
             CHECK_MSTATUS(MMessage::removeCallback(cbId));
         }
     }
     
-    //Remove our retained scene index from hydra
     Fvp::DataProducerSceneIndexInterface& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
     dataProducerSceneIndexInterface.removeDataProducerSceneIndex(_retainedSceneIndex, PXR_NS::FvpViewportAPITokens->allRenderViews);
+    // Drop data sources (and their raw pointers into _sole/_heelPrimState) before
+    // member destruction; do not rely on declaration order.
+    _retainedSceneIndex.Reset();
 }
 
-//Create the Hydra foot print primitives in the retained scene index
-void MhFootPrint::_CreateAndAddFootPrintPrimitives() 
-{ 
-    //Get the value of the size and color attributes
-    const float fSize                   = _GetSizeInCentimeters();
-    const GfVec3f displayColor          = _GetColor();
-    const GfVec3f scale                 = {fSize,fSize,fSize};//convert size into a 3d uniform scale which we'll convert into a scale matrix
-    const bool drawAsSecondaryGraphics  = _GetDrawAsSecondaryGraphics();
+// Initialize sole/heel mesh state from size, color, and purpose.
+void MhFootPrint::_InitPrimState(
+    FootPrintMeshPrimState& state,
+    float size,
+    const GfVec3f& displayColor,
+    const TfToken& purpose) const
+{
+    _UpdatePrimScale(state, size);
+    state.displayColors = VtVec3fArray{ displayColor };
+    state.purpose = purpose;
+}
 
-    _CreateAndAddPrim(
-        _retainedSceneIndex,
+// Build one mesh prim and add it to the retained scene index.
+void MhFootPrint::_AddFootPrintPrim(
+    const SdfPath&              primPath,
+    FootPrintMeshPrimState&     state,
+    const VtArray<GfVec3f>&     points,
+    const VtIntArray&           faceVertexCount,
+    const VtIntArray&           faceVertexIndices)
+{
+    using _PointArrayDs = HdRetainedTypedSampledDataSource<VtArray<GfVec3f>>;
+    using _IntArrayDs   = HdRetainedTypedSampledDataSource<VtIntArray>;
+
+    const _IntArrayDs::Handle fvcDs = _IntArrayDs::New(faceVertexCount);
+    const _IntArrayDs::Handle fviDs = _IntArrayDs::New(faceVertexIndices);
+
+    const VtIntArray vertexColorArray(points.size(), 0);//Is an index in the vertex color array, 1 per vertex,but  we only have one same color for all verts (index 0)
+
+    const HdContainerDataSourceHandle meshDs =
+        HdMeshSchema::Builder()
+            .SetTopology(
+                HdMeshTopologySchema::Builder()
+                    .SetFaceVertexCounts(fvcDs)
+                    .SetFaceVertexIndices(fviDs)
+                    .Build())
+            .SetDoubleSided(HdRetainedTypedSampledDataSource<bool>::New(true))//Make the mesh double sided
+            .Build();
+
+    const HdContainerDataSourceHandle primvarsDs =
+        HdRetainedContainerDataSource::New(
+            //Create the vertices positions
+            HdPrimvarsSchemaTokens->points,
+            HdPrimvarSchema::Builder()
+                .SetPrimvarValue(_PointArrayDs::New(points))
+                .SetInterpolation(
+                    HdPrimvarSchema::BuildInterpolationDataSource(
+                        HdPrimvarSchemaTokens->vertex))
+                .SetRole(
+                    HdPrimvarSchema::BuildRoleDataSource(
+                        HdPrimvarSchemaTokens->point))
+                .Build(),
+            //Create the vertex colors
+            HdTokens->displayColor,
+            HdPrimvarSchema::Builder()
+                .SetIndexedPrimvarValue(
+                    _MutableTypedSampledDataSource<VtVec3fArray>::New(&state.displayColors))
+                .SetIndices(_IntArrayDs::New(vertexColorArray))
+                .SetInterpolation(
+                    HdPrimvarSchema::BuildInterpolationDataSource(
+                        HdPrimvarSchemaTokens->varying))
+                .SetRole(
+                    HdPrimvarSchema::BuildRoleDataSource(
+                        HdPrimvarSchemaTokens->color))//vertex color
+                .Build());
+
+    //Create the primitive
+    HdRetainedSceneIndex::AddedPrimEntry addedPrim;
+    addedPrim.primPath   = primPath;
+    addedPrim.primType   = HdPrimTypeTokens->mesh;
+    addedPrim.dataSource = HdRetainedContainerDataSource::New(
+        //Create a matrix
+        HdXformSchemaTokens->xform,
+        HdXformSchema::Builder()
+            .SetMatrix(_MutableTypedSampledDataSource<GfMatrix4d>::New(&state.xform))
+            .Build(),
+        //Create an extent attribute to support the viewport bounding box display style, 
+        //if no extent attribute is added, it will not be displayed at all in bounding box display style
+        HdExtentSchemaTokens->extent,
+        HdExtentSchema::Builder()
+            .SetMin(_MutableTypedSampledDataSource<GfVec3d>::New(&state.extentMin))
+            .SetMax(_MutableTypedSampledDataSource<GfVec3d>::New(&state.extentMax))
+            .Build(),
+        // Create a purpose render tag which is a way to specify how the primitive will be drawn.
+        // If the drawAsSecondaryGraphics is true, it will be drawn in the secondary graphics
+        // render pass.
+        HdPurposeSchemaTokens->purpose,
+        HdPurposeSchema::Builder()
+            .SetPurpose(_MutableTypedSampledDataSource<TfToken>::New(&state.purpose))
+            .Build(),
+        //create a mesh
+        HdMeshSchemaTokens->mesh,
+        meshDs,
+        HdPrimvarsSchemaTokens->primvars,
+        primvarsDs);
+
+    //Add the prim in the retained scene index
+    _retainedSceneIndex->AddPrims({ addedPrim });
+}
+
+// Create sole and heel prims from current Maya attribute values.
+void MhFootPrint::_CreateAndAddFootPrintPrimitives()
+{
+    const float fSize = _GetSizeInCentimeters();
+    const GfVec3f displayColor = _GetColor();
+    const TfToken purpose = _GetPurposeToken();
+
+    _InitPrimState(_solePrimState, fSize, displayColor, purpose);
+    _InitPrimState(_heelPrimState, fSize, displayColor, purpose);
+
+    _AddFootPrintPrim(
         _solePath,
+        _solePrimState,
         solePoints,
         soleFaceVertexCounts,
-        soleFaceVertexIndices,
-        scale,
-        displayColor,
-        drawAsSecondaryGraphics);
+        soleFaceVertexIndices);
 
-    _CreateAndAddPrim(
-        _retainedSceneIndex,
+    _AddFootPrintPrim(
         _heelPath,
+        _heelPrimState,
         heelPoints,
         heelFaceVertexCounts,
-        heelFaceVertexIndices,
-        scale,
-        displayColor,
-        drawAsSecondaryGraphics);
+        heelFaceVertexIndices);
+
+    _primsAdded = true;
+    _cachedSize = fSize;
+    _cachedColor = displayColor;
+    _cachedDrawAsSecondaryGraphics = _GetDrawAsSecondaryGraphics();
+    _UpdateCachedSyncTimeFromTimeline();
 }
 
-//Remove the 2 primitives from the retained scene index
-void MhFootPrint::_RemoveFootPrintPrimitives() 
-{ 
-    _retainedSceneIndex->RemovePrims({_solePath, _heelPath});
+// Notify Hydra which parts of a prim changed.
+void MhFootPrint::_DirtyPrimChanges(
+    const SdfPath& path,
+    bool sizeChanged,
+    bool colorChanged,
+    bool purposeChanged)
+{
+    Fvp::DirtyNotifier notifier(*_retainedSceneIndex, path);
+    if (sizeChanged) {
+        notifier.dirtyTransform().dirtyExtent();
+    }
+    if (colorChanged) {
+        notifier.dirtyVertexColors();
+    }
+    if (purposeChanged) {
+        notifier.dirtyPurpose();
+    }
 }
 
-//To update we need to remove the previous primitives and create new ones
-void MhFootPrint::updateFootPrintPrims() 
-{ 
-    _RemoveFootPrintPrimitives();
-    _CreateAndAddFootPrintPrimitives();
+// Update xform scale and extent from the new size value.
+void MhFootPrint::_UpdatePrimScale(FootPrintMeshPrimState& state, float size) const
+{
+    state.xform.SetIdentity();
+    state.xform.SetScale(GfVec3d(size, size, size));
+    state.extentMin = GfVec3d(corner1.x * size, corner1.y * size, corner1.z * size);
+    state.extentMax = GfVec3d(corner2.x * size, corner2.y * size, corner2.z * size);
 }
 
-// Retrieve value of the size attribute from the node
+// Read Maya attrs, update cached prim state, and mark dirty locators so Hydra
+// re-pulls size/color/purpose from the data sources.
+void MhFootPrint::syncHydraFromNode(const MPlug* changedPlug)
+{
+    if (!_retainedSceneIndex || !_primsAdded) {
+        return;
+    }
+
+    const bool syncSize = !changedPlug || IsSizeAttributePlug(*changedPlug);
+    const bool syncColor = !changedPlug || IsColorAttributePlug(*changedPlug);
+    const bool syncPurpose = !changedPlug || IsPurposeAttributePlug(*changedPlug);
+
+    bool sizeChanged = false;
+    bool colorChanged = false;
+    bool purposeChanged = false;
+
+    float fSize = _cachedSize;
+    GfVec3f displayColor = _cachedColor;
+    bool drawAsSecondaryGraphics = _cachedDrawAsSecondaryGraphics;
+    TfToken purpose = _solePrimState.purpose;
+
+    if (syncSize) {
+        fSize = _GetSizeInCentimeters();
+        sizeChanged = !GfIsClose(_cachedSize, fSize, 1e-6f);
+    }
+    if (syncColor) {
+        displayColor = _GetColor();
+        colorChanged = _cachedColor != displayColor;
+    }
+    if (syncPurpose) {
+        drawAsSecondaryGraphics = _GetDrawAsSecondaryGraphics();
+        purpose = _GetPurposeToken();
+        purposeChanged = _cachedDrawAsSecondaryGraphics != drawAsSecondaryGraphics;
+    }
+
+    if (!sizeChanged && !colorChanged && !purposeChanged) {
+        return;
+    }
+
+    if (sizeChanged) {
+        _UpdatePrimScale(_solePrimState, fSize);
+        _UpdatePrimScale(_heelPrimState, fSize);
+        _cachedSize = fSize;
+    }
+
+    if (colorChanged) {
+        _solePrimState.displayColors = VtVec3fArray{ displayColor };
+        _heelPrimState.displayColors = VtVec3fArray{ displayColor };
+        _cachedColor = displayColor;
+    }
+
+    if (purposeChanged) {
+        _solePrimState.purpose = purpose;
+        _heelPrimState.purpose = purpose;
+        _cachedDrawAsSecondaryGraphics = drawAsSecondaryGraphics;
+    }
+
+    _DirtyPrimChanges(_solePath, sizeChanged, colorChanged, purposeChanged);
+    _DirtyPrimChanges(_heelPath, sizeChanged, colorChanged, purposeChanged);
+}
+
+// Sync Hydra using attribute values at the current timeline time.
+void MhFootPrint::syncHydraFromNodeAtCurrentTime(const MPlug* changedPlug)
+{
+    MDGContextGuard guard(MAnimControl::currentTime());
+    syncHydraFromNode(changedPlug);
+    _UpdateCachedSyncTimeFromTimeline();
+}
+
+// Sync Hydra using the plug value stored in the datablock (fsNormal).
+void MhFootPrint::syncHydraFromNodeFromAttributeSet(const MPlug* changedPlug)
+{
+    MDGContextGuard guard(MDGContext::fsNormal);
+    syncHydraFromNode(changedPlug);
+    _UpdateCachedSyncTimeFromTimeline();
+
+    // Setting a driven plug also marks it dirty for Evaluation Manager's own
+    // bookkeeping, which triggers a preEvaluation call for the same frame right
+    // after this one. Flag that we already have the authoritative value so that
+    // call doesn't clobber it (see _sizeManualOverridePendingPreEval and friends).
+    if (!changedPlug || IsSizeAttributePlug(*changedPlug)) {
+        _sizeManualOverridePendingPreEval = true;
+    }
+    if (!changedPlug || IsColorAttributePlug(*changedPlug)) {
+        _colorManualOverridePendingPreEval = true;
+    }
+    if (!changedPlug || IsPurposeAttributePlug(*changedPlug)) {
+        _purposeManualOverridePendingPreEval = true;
+    }
+}
+
+// True when size, color, or purpose is connected and may vary with the timeline
+// (animation curves, driven keys, or DG connections from other time-varying nodes).
+bool MhFootPrint::_HasAnyConnectedTimelineAttribute() const
+{
+    const MObject obj = thisMObject();
+    const MPlug   sizePlug(obj, mSize);
+    const MPlug   colorPlug(obj, mColor);
+    const MPlug   purposePlug(obj, mDrawAsSecondaryGraphics);
+    return MayaHydra::PlugOrChildIsConnected(sizePlug)
+        || MayaHydra::PlugOrChildIsConnected(colorPlug)
+        || MayaHydra::PlugOrChildIsConnected(purposePlug);
+}
+
+// Sync connected display attrs when the timeline frame changes.
+void MhFootPrint::onTimeChanged()
+{
+    if (!_retainedSceneIndex || !_primsAdded) {
+        return;
+    }
+
+    if (!_HasAnyConnectedTimelineAttribute()) {
+        return;
+    }
+
+    const MTime currentTime = MAnimControl::currentTime();
+    if (_cachedSyncTimeValid && _cachedSyncTime == currentTime) {
+        return;
+    }
+
+    syncHydraFromNodeAtCurrentTime(/*changedPlug=*/nullptr);
+}
+
+// Register timeChanged only while display attrs are connected to time-varying
+// sources. Scrubbing does not always dirty this locator or fire attributeChanged,
+// so we re-sync Hydra from MAnimControl::currentTime() on each frame change.
+void MhFootPrint::_UpdateTimeChangedCallback()
+{
+    MStatus status;
+    const bool needsCallback = _HasAnyConnectedTimelineAttribute();
+
+    if (needsCallback && _cbTimeChangedId == 0) {
+        _cbTimeChangedId = MEventMessage::addEventCallback(
+            "timeChanged", timeChangedCallback, this, &status);
+        if (!status) {
+            _cbTimeChangedId = 0;
+        }
+    } else if (!needsCallback && _cbTimeChangedId != 0) {
+        MMessage::removeCallback(_cbTimeChangedId);
+        _cbTimeChangedId = 0;
+    }
+}
+
+// Store the timeline time used for the last Hydra sync.
+void MhFootPrint::_UpdateCachedSyncTimeFromTimeline()
+{
+    _cachedSyncTime = MAnimControl::currentTime();
+    _cachedSyncTimeValid = true;
+}
+
+// Read the size attribute in centimeters.
 float MhFootPrint::_GetSizeInCentimeters() const
 {
     const MObject obj = thisMObject();
@@ -589,6 +953,7 @@ float MhFootPrint::_GetSizeInCentimeters() const
     return 1.0f;
 }
 
+// Read the drawAsSecondaryGraphics attribute.
 bool MhFootPrint::_GetDrawAsSecondaryGraphics() const
 {
     const MObject obj = thisMObject();
@@ -603,25 +968,120 @@ bool MhFootPrint::_GetDrawAsSecondaryGraphics() const
     return false;
 }
 
-    // Retrieve value of the color attribute from the node
-GfVec3f MhFootPrint::_GetColor() const
+// Map drawAsSecondaryGraphics to the Hydra purpose render tag.
+TfToken MhFootPrint::_GetPurposeToken() const
 {
-    const MObject obj = thisMObject();
-    MPlug plug(obj, MhFootPrint::mColor);
-    if (!plug.isNull())
-    {
-        double3 color;
-        GetDouble3AttributeValue(color, obj, MhFootPrint::mColor);
-        return {(float)color[0], (float)color[1], (float)color[2]};
-    }
-
-    return GfVec3f(0.f,0.f,1.f);
+    return _GetDrawAsSecondaryGraphics()
+        ? Fvp::secondaryGraphicsRenderTagToken
+        : HdRenderTagTokens->geometry;
 }
 
+// Read the color attribute as a GfVec3f.
+GfVec3f MhFootPrint::_GetColor() const
+{
+    return MayaHydra::GetGfVec3fAttributeValue(
+        thisMObject(), MhFootPrint::mColor, GfVec3f(0.f, 0.f, 1.f));
+}
+
+// Sync Hydra before EM evaluation, but only for contexts matching the actual
+// current timeline time (see the early-out below for why).
+MStatus MhFootPrint::preEvaluation(
+    const MDGContext& context,
+    const MEvaluationNode& evaluationNode)
+{
+    // preEvaluation can be invoked for MDGContexts that do not correspond to
+    // the timeline's actual current time, e.g. Maya internally evaluating
+    // other frames while recomputing anim curve tangents when a new key is
+    // added. Treating such a call as a real "current time changed" event would
+    // read size/color/purpose at that other frame, update cached state, and
+    // mark dirty locators, clobbering the value actually being displayed
+    // (regression: setting a key at the current frame with the already-correct
+    // value could reset the displayed size back to a value keyed at another
+    // frame). So bail out early for any non-normal context whose time isn't
+    // the current time.
+    const MTime currentTime = MAnimControl::currentTime();
+    MStatus contextStatus;
+    if (!context.isNormal(&contextStatus) && contextStatus) {
+        MTime contextTime;
+        if (context.getTime(contextTime) == MS::kSuccess && contextTime != currentTime) {
+            return MS::kSuccess;
+        }
+    }
+
+    MDGContextGuard guard(context);
+
+    const MObject obj = thisMObject();
+    const MPlug   sizePlug(obj, mSize);
+    const MPlug   colorPlug(obj, mColor);
+    const MPlug   purposePlug(obj, mDrawAsSecondaryGraphics);
+
+    MStatus status;
+    const bool timeChanged =
+        !_cachedSyncTimeValid || (_cachedSyncTime != currentTime);
+    // Re-sync a dirty plug unless we already synced it from a literal setAttr
+    // value moments ago (see syncHydraFromNodeFromAttributeSet): re-reading a
+    // still-connected plug here would evaluate through the connection and
+    // discard that override.
+    auto resyncIfNotAlreadyOverridden =
+        [this](const MPlug& plug, bool& overridePending) {
+            if (overridePending) {
+                overridePending = false;
+            } else {
+                syncHydraFromNode(&plug);
+            }
+        };
+
+    if (timeChanged) {
+        _sizeManualOverridePendingPreEval = false;
+        _colorManualOverridePendingPreEval = false;
+        _purposeManualOverridePendingPreEval = false;
+        syncHydraFromNode(/*changedPlug=*/nullptr);
+        _cachedSyncTime = currentTime;
+        _cachedSyncTimeValid = true;
+    } else {
+        if (evaluationNode.dirtyPlugExists(mSize, &status) && status) {
+            resyncIfNotAlreadyOverridden(sizePlug, _sizeManualOverridePendingPreEval);
+        }
+        if (evaluationNode.dirtyPlugExists(mColor, &status) && status) {
+            resyncIfNotAlreadyOverridden(colorPlug, _colorManualOverridePendingPreEval);
+        }
+        if (evaluationNode.dirtyPlugExists(mDrawAsSecondaryGraphics, &status) && status) {
+            resyncIfNotAlreadyOverridden(purposePlug, _purposeManualOverridePendingPreEval);
+        }
+    }
+
+    return MS::kSuccess;
+}
+
+// Handle worldS evaluation and keep Hydra scale in sync with size.
 MStatus MhFootPrint::compute( const MPlug& plug, MDataBlock& dataBlock)
 {
     if (plug == mWorldS) 
     {
+        // Read size from this compute's own datablock rather than re-querying the
+        // plug through a separate current-time MDGContext: building a distinct
+        // MDGContext (even one for the same MTime) forces Maya to re-evaluate the
+        // plug through any incoming connection (e.g. an animCurve), discarding a
+        // setAttr override made on the driven plug at the current frame before a
+        // new key is set. The datablock we were handed already reflects the
+        // correct, up-to-date value for this evaluation.
+        if (_retainedSceneIndex && _primsAdded) {
+            const MDataHandle sizeHandle = dataBlock.inputValue(mSize);
+            const float fSize = static_cast<float>(sizeHandle.asDistance().asCentimeters());
+            if (!GfIsClose(_cachedSize, fSize, 1e-6f)) {
+                _UpdatePrimScale(_solePrimState, fSize);
+                _UpdatePrimScale(_heelPrimState, fSize);
+                _cachedSize = fSize;
+                _DirtyPrimChanges(
+                    _solePath,
+                    /*sizeChanged=*/true, /*colorChanged=*/false, /*purposeChanged=*/false);
+                _DirtyPrimChanges(
+                    _heelPath,
+                    /*sizeChanged=*/true, /*colorChanged=*/false, /*purposeChanged=*/false);
+            }
+            _UpdateCachedSyncTimeFromTimeline();
+        }
+
         if (plug.isElement())
         {
             MArrayDataHandle outputArrayHandle = dataBlock.outputArrayValue( mWorldS );
@@ -635,17 +1095,21 @@ MStatus MhFootPrint::compute( const MPlug& plug, MDataBlock& dataBlock)
     return MS::kUnknownParameter;;
 }
 
+// Footprint geometry always has a bounded extent.
 bool MhFootPrint::isBounded() const
 {
     return true;
 }
 
+// Return the Maya bounding box scaled by the current size.
 MBoundingBox MhFootPrint::boundingBox() const
 {
+    MDGContextGuard guard(MAnimControl::currentTime());
     const double multiplier = _GetSizeInCentimeters();
     return MBoundingBox( corner1 * multiplier, corner2 * multiplier);//corner1 and 2 are the bounding box corner of our geometry
 }
 
+// Factory: create the node when the mayaHydra plugin is loaded.
 void* MhFootPrint::creator()
 {
     static const MString errorString("You need to load the mayaHydra plugin before creating this node.");
@@ -661,6 +1125,7 @@ void* MhFootPrint::creator()
     return new MhFootPrint();
 }
 
+// Return the UFE path for this footprint shape.
 Ufe::Path MhFootPrint::getUfePath() const
 {
     MDagPath dagPath;
@@ -668,13 +1133,12 @@ Ufe::Path MhFootPrint::getUfePath() const
     return Ufe::Path(UfeExtensions::dagPathToUfePathSegment(dagPath));
 }
 
+// Publish the retained scene index, pick handler, and path mapper.
 void MhFootPrint::addedToModelCb()
 {
     _pathPrefix = SdfPath(TfStringPrintf("/MhFootPrint_%p", this));
 
-    //Add the callback when an attribute of this node changes
     MObject obj = thisMObject();
-    _cbAttributeChangedId = MNodeMessage::addAttributeChangedCallback(obj, attributeChangedCallback, ((void*)this));
 
     //Data producer scene index interface is used to add the retained scene index to all render views with all render delegates
     auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
@@ -689,10 +1153,22 @@ void MhFootPrint::addedToModelCb()
     _appPath = getUfePath();
     auto pathMapper = std::make_shared<Fvp::PrefixPathMapper>(_appPath, _pathPrefix);
     TF_AXIOM(Fvp::PathMapperRegistry::Instance().Register(_appPath, pathMapper));
+
+    {
+        syncHydraFromNodeAtCurrentTime();
+    }
+
+    _UpdateTimeChangedCallback();
 }
 
+// Unpublish Hydra resources when the node is removed from the scene.
 void MhFootPrint::removedFromModelCb()
 {
+    if (_cbTimeChangedId != 0) {
+        MMessage::removeCallback(_cbTimeChangedId);
+        _cbTimeChangedId = 0;
+    }
+
     // Unregister our path mapper.  Use stored UFE path, as at this point
     // our locator node is no longer in the Maya scene, so we cannot obtain
     // an MDagPath for it.
@@ -700,12 +1176,6 @@ void MhFootPrint::removedFromModelCb()
 
     // Unregister our pick handler.
     TF_AXIOM(MayaHydra::PickHandlerRegistry::Instance().Unregister(_pathPrefix));
-
-    //Remove the callback
-    if (_cbAttributeChangedId){
-        CHECK_MSTATUS(MMessage::removeCallback(_cbAttributeChangedId));
-        _cbAttributeChangedId = 0;
-    }
 
     //Remove the data producer scene index.
     auto& dataProducerSceneIndexInterface = Fvp::DataProducerSceneIndexInterface::get();
@@ -733,6 +1203,7 @@ void MhFootPrint::removedFromModelCb()
     CHECK_MSTATUS ( attr.setReadable(true) );   \
     CHECK_MSTATUS ( attr.setWritable(false) );
 
+// Define footprint node attributes and DG relationships.
 MStatus MhFootPrint::initialize()
 {
     MFnUnitAttribute    unitFn;
@@ -766,6 +1237,7 @@ MStatus MhFootPrint::initialize()
     return MS::kSuccess;
 }
 
+// Register the MhFootPrint node with Maya.
 MStatus initializePlugin( MObject obj )
 {
     MFnPlugin plugin( obj, PLUGIN_COMPANY, "2025.0", "Any");
@@ -786,6 +1258,7 @@ MStatus initializePlugin( MObject obj )
     return status;
 }
 
+// Deregister the MhFootPrint node from Maya.
 MStatus uninitializePlugin( MObject obj)
 {
     MStatus   status;
@@ -798,3 +1271,4 @@ MStatus uninitializePlugin( MObject obj)
     }
     return status;
 }
+

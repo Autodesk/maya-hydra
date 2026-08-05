@@ -45,6 +45,7 @@
 #include <pxr/imaging/hd/meshSchema.h>
 #include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/subdivisionTagsSchema.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
@@ -126,6 +127,13 @@ TEST(DirtyNotifier, visibilityMatchesTranslator)
     EXPECT_EQ(
         TranslatorRprimLocators(HdPrimTypeTokens->mesh, HdChangeTracker::DirtyVisibility),
         NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyVisibility(); }));
+}
+
+TEST(DirtyNotifier, purposeEmitsPurposeSchemaLocator)
+{
+    EXPECT_EQ(
+        HdDataSourceLocatorSet(HdPurposeSchema::GetDefaultLocator()),
+        NotifierLocators([](Fvp::DirtyNotifier& n) { n.dirtyPurpose(); }));
 }
 
 TEST(DirtyNotifier, doubleSidedMatchesTranslator)

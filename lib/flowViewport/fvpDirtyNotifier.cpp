@@ -37,6 +37,7 @@
 #include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/subdivisionTagsSchema.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
@@ -90,6 +91,11 @@ DirtyNotifier& DirtyNotifier::dirtyTransform()
 DirtyNotifier& DirtyNotifier::dirtyVisibility()
 {
     return _append(HdVisibilitySchema::GetDefaultLocator());
+}
+
+DirtyNotifier& DirtyNotifier::dirtyPurpose()
+{
+    return _append(HdPurposeSchema::GetDefaultLocator());
 }
 
 DirtyNotifier& DirtyNotifier::dirtyPoints()

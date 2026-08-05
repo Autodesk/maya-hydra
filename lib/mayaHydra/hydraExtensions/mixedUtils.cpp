@@ -21,6 +21,7 @@
 
 #include <mayaHydraLib/adapters/mayaAttrs.h>
 #include <mayaHydraLib/hydraUtils.h>
+#include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/tokens.h>
 #include <mayaHydraLib/debugCodes.h>
 
@@ -1905,6 +1906,22 @@ static void GetAttributesFromNodeImpl(
                 break;
             }
     }
+}
+
+PXR_NS::GfVec3f GetGfVec3fAttributeValue(
+    const MObject& node,
+    const MObject& attr,
+    const PXR_NS::GfVec3f& defaultValue)
+{
+    double3 value {};
+    if (GetDouble3AttributeValue(value, node, attr) != MS::kSuccess) {
+        return defaultValue;
+    }
+
+    return PXR_NS::GfVec3f(
+        static_cast<float>(value[0]),
+        static_cast<float>(value[1]),
+        static_cast<float>(value[2]));
 }
 
 void GetExtensionAndDynamicAttributesFromNode(
