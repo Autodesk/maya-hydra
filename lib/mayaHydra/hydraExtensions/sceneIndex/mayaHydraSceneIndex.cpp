@@ -358,6 +358,24 @@ bool GetShadingEngineNode(const MRenderItem& ri, MObject& shadingEngineNode)
     return !shadingEngineNode.isNull();
 }
 
+bool UpdateRenderItemWireframeColor(
+    const MRenderItem&                   ri,
+    const MayaHydraRenderItemAdapterPtr& ria)
+{
+    MColor wireColor;
+    MDagPath dagPath = ri.sourceDagPath();
+    if (dagPath.isValid()) {
+        // This is a color managed VP2 color, it will need to be unmanaged at some point
+        wireColor = MGeometryUtilities::wireframeColor(dagPath);
+    }
+
+    if (wireColor != ria->GetWireframeColor()) {
+        ria->SetWireframeColor(wireColor);
+        return true;
+    }
+    return false;
+}
+
 std::mutex _adaptersToRecreateMutex;
 std::mutex _adaptersToRebuildMutex;
 
@@ -544,12 +562,14 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             ria->SetMaterial(material);
         }
 
-        if ((flags & MDataServerOperation::MViewportScene::MVS_changedWireColor) || isNewRenderitem) {
-            MDagPath dagPath = ri.sourceDagPath();
-            if (dagPath.isValid()) {
-                // This is a color managed VP2 color, it will need to be unmanaged at some point
-                ria->SetWireframeColor(MGeometryUtilities::wireframeColor(dagPath));
-            }
+#ifdef MAYA_HAS_MVS_CHANGED_WIRE_COLOR_API
+        bool wireColorDirty = isNewRenderitem ||
+            (flags & MDataServerOperation::MViewportScene::MVS_changedWireColor);
+#else
+        bool wireColorDirty = true;
+#endif
+        if (wireColorDirty) {
+            wireColorDirty = UpdateRenderItemWireframeColor(ri, ria);
         }
 
         // Call UpdateTransform before UpdateFromDelta, as UpdateTransform
@@ -559,7 +579,7 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         if (flags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
             ria->UpdateTransform(ri);
         }
-        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags);
+        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireColorDirty);
         ria->UpdateFromDelta(data);
     }
 }
