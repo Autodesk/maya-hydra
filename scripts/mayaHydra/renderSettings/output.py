@@ -52,7 +52,8 @@ def setImageName(im):
 def setOutputFormat(of):
     # Set the Maya render setting.
     mel.eval('setMayaSoftwareImageFormat("' + of + '")')
-    cmds.setAttr('defaultArnoldDriver.aiTranslator', of, type='string')
+    if cmds.objExists('defaultArnoldDriver'):
+        cmds.setAttr('defaultArnoldDriver.aiTranslator', of, type='string')
 
     def setRenderProductName(productName):
         return str(Path(productName).with_suffix('.' + of))

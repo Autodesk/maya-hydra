@@ -187,6 +187,10 @@ function(mayaHydra_add_cmd_line_render_multi_image_test SCENE_FILE_LABELED)
     _mayaHydra_setup_test_USD_paths()
     _mayaHydra_setup_test_finalize_env("${test_name}")
 
+    if("${RENDERER}" STREQUAL "HdPrmanLoaderRendererPlugin")
+        _mayaHydra_append_prman_production_render_env("${test_name}")
+    endif()
+
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "MAYA_IGNORE_DIALOGS=1")
 
@@ -964,6 +968,26 @@ finally:
     endif()
 endfunction()
 
+# PRMan production rendering (Render.exe / cmdLineRender) uses an isolated
+# RenderMan config directory and Hydra V2 render settings (PRMan drives the
+# render pass).  Clear HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS on individual
+# tests to exercise the Hydra V1 render-settings path.  Viewport tests must
+# not call this helper.
+function(_mayaHydra_append_prman_production_render_env test_name)
+    string(REGEX REPLACE "[:<>\|]" "_" SANITIZED_TEST_NAME ${test_name})
+    set(_prman_config_dir
+        "${CMAKE_BINARY_DIR}/test/Temporary/${SANITIZED_TEST_NAME}/prman_config")
+    file(MAKE_DIRECTORY "${_prman_config_dir}")
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1")
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS=1")
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "RMAN_CONFIG_OVERRIDE=${_prman_config_dir}")
+    set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
+        "RDIR=${_prman_config_dir}")
+endfunction()
+
 #
 # mayaHydra_add_cmd_line_render_test( <scene_file_labeled>
 #                           [RENDERER <renderer_name>]
@@ -1158,6 +1182,10 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
     
     # Set environment variables as test properties.
     _mayaHydra_setup_test_finalize_env("${test_name}")
+
+    if("${RENDERER}" STREQUAL "HdPrmanLoaderRendererPlugin")
+        _mayaHydra_append_prman_production_render_env("${test_name}")
+    endif()
 
     if(ARG_COPY_SCENE)
         configure_file(${SRC_SCENE_PATH} ${SCENE_PATH} COPYONLY)
