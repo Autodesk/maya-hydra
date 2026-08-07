@@ -1,6 +1,12 @@
 {
   "files_to_include": [],
-  "files_to_exclude": [],
+  "_comment_files_to_exclude": "HYDRA-2404: MaterialX shaders don't work with USD 26.05 (prmanResolution, prmanRenderDir, prmanImageName, prmanOutputFormat)",
+  "files_to_exclude": [
+    "prmanResolution",
+    "prmanRenderDir",
+    "prmanImageName",
+    "prmanOutputFormat"
+  ],
   "plugins_to_include": [],
   "plugins_to_exclude": [],
   "platforms_to_exclude": ["osx"]
