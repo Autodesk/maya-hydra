@@ -250,7 +250,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     }
 #endif
 
-    if (data._wireColorDirty) {
+    if (data._wireframeColorDirty) {
         // Constant-interpolation displayColor (no vertex color set present on this render item).
         notifier.dirtyDisplayColor();
     }

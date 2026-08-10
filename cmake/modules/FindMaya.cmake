@@ -16,7 +16,7 @@
 # Cache variables:
 # MAYA_HAS_RENDER_ITEM_CULL_MODE_API Presence of MRenderItem has CullMode API
 # MAYA_HAS_VIEW_SELECTED_OBJECT_API Presence of M3dView::viewSelectedObject
-# MAYA_HAS_MVS_CHANGED_WIRE_COLOR_API Presence of MDataServerOperation::MViewportScene::MVS_changedWireColor
+# MAYA_HAS_MVS_CHANGED_WIREFRAME_COLOR_API Presence of MDataServerOperation::MViewportScene::MVS_changedWireframeColor
 # MAYA_LINUX_BUILT_WITH_CXX11_ABI Maya Linux was built with new cxx11 ABI.
 # MAYA_MACOSX_BUILT_WITH_UB2 Maya OSX was built with Universal Binary 2.
 # MAYA_MACOSX_BUILT_WITH_ARM64 Maya OSX was built with arm64 only.
@@ -347,12 +347,12 @@ if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/M3dView.h")
     endif()
 endif()
 
-set(MAYA_HAS_MVS_CHANGED_WIRE_COLOR_API FALSE CACHE INTERNAL "hasMVSChangedWireColor")
+set(MAYA_HAS_MVS_CHANGED_WIREFRAME_COLOR_API FALSE CACHE INTERNAL "hasMVSChangedWireframeColor")
 if(MAYA_INCLUDE_DIRS AND EXISTS "${MAYA_INCLUDE_DIR}/maya/MViewport2Renderer.h")
-    file(STRINGS ${MAYA_INCLUDE_DIR}/maya/MViewport2Renderer.h MAYA_HAS_API REGEX "MVS_changedWireColor")
+    file(STRINGS ${MAYA_INCLUDE_DIR}/maya/MViewport2Renderer.h MAYA_HAS_API REGEX "MVS_changedWireframeColor")
     if(MAYA_HAS_API)
-        set(MAYA_HAS_MVS_CHANGED_WIRE_COLOR_API TRUE CACHE INTERNAL "hasMVSChangedWireColor")
-        message(STATUS "MDataServerOperation::MViewportScene has MVS_changedWireColor API")
+        set(MAYA_HAS_MVS_CHANGED_WIREFRAME_COLOR_API TRUE CACHE INTERNAL "hasMVSChangedWireframeColor")
+        message(STATUS "MDataServerOperation::MViewportScene has MVS_changedWireframeColor API")
     endif()
 endif()
 

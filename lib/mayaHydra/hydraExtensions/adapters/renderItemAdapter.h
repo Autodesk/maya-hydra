@@ -145,16 +145,16 @@ public:
         UpdateFromDeltaData(
             MRenderItem&             ri,
             unsigned int             flags,
-            const bool               wireColorDirty)
+            const bool               wireframeColorDirty)
             : _ri(ri)
             , _flags(flags)
-            , _wireColorDirty(wireColorDirty)
+            , _wireframeColorDirty(wireframeColorDirty)
         {
         }
 
         MRenderItem&             _ri;
         unsigned int             _flags;
-        const bool               _wireColorDirty;
+        const bool               _wireframeColorDirty;
     };
 
     /// We receive in that function the changes made in the Maya viewport between the last frame

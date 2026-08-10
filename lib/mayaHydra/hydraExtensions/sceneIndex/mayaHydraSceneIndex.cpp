@@ -362,15 +362,15 @@ bool UpdateRenderItemWireframeColor(
     const MRenderItem&                   ri,
     const MayaHydraRenderItemAdapterPtr& ria)
 {
-    MColor wireColor;
+    MColor wireframeColor;
     MDagPath dagPath = ri.sourceDagPath();
     if (dagPath.isValid()) {
         // This is a color managed VP2 color, it will need to be unmanaged at some point
-        wireColor = MGeometryUtilities::wireframeColor(dagPath);
+        wireframeColor = MGeometryUtilities::wireframeColor(dagPath);
     }
 
-    if (wireColor != ria->GetWireframeColor()) {
-        ria->SetWireframeColor(wireColor);
+    if (wireframeColor != ria->GetWireframeColor()) {
+        ria->SetWireframeColor(wireframeColor);
         return true;
     }
     return false;
@@ -562,14 +562,14 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             ria->SetMaterial(material);
         }
 
-#ifdef MAYA_HAS_MVS_CHANGED_WIRE_COLOR_API
-        bool wireColorDirty = isNewRenderitem ||
-            (flags & MDataServerOperation::MViewportScene::MVS_changedWireColor);
+#ifdef MAYA_HAS_MVS_CHANGED_WIREFRAME_COLOR_API
+        bool wireframeColorDirty = isNewRenderitem ||
+            (flags & MDataServerOperation::MViewportScene::MVS_changedWireframeColor);
 #else
-        bool wireColorDirty = true;
+        bool wireframeColorDirty = true;
 #endif
-        if (wireColorDirty) {
-            wireColorDirty = UpdateRenderItemWireframeColor(ri, ria);
+        if (wireframeColorDirty) {
+            wireframeColorDirty = UpdateRenderItemWireframeColor(ri, ria);
         }
 
         // Call UpdateTransform before UpdateFromDelta, as UpdateTransform
@@ -579,7 +579,7 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         if (flags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
             ria->UpdateTransform(ri);
         }
-        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireColorDirty);
+        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColorDirty);
         ria->UpdateFromDelta(data);
     }
 }
