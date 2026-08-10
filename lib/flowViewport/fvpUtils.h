@@ -96,6 +96,10 @@ PXR_NS::HdDataSourceBaseHandle createSelectionDataSource(const PrimSelection& se
 
 template<typename PathContainer>
 auto FindSelfOrFirstParent(const PXR_NS::SdfPath& path, const PathContainer& container) -> decltype(container.cend()) {
+    if (container.empty()) {
+        return container.cend();
+    }
+    
     PXR_NS::SdfPath currPath = path;
     while (!currPath.IsEmpty()) {
         auto foundIt = container.find(currPath);

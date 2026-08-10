@@ -466,6 +466,9 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         }
     }
 
+    // Coalesce DirtyPrims notifications produced per render item.
+    const Fvp::DirtyNotifier::DirtyBatchGuard dirtyBatchGuard(*this);
+
     // My version, does minimal update
     // This loop could, in theory, be parallelized.  Unclear how large the gains would be, but maybe
     // nothing to lose unless there is some internal contention in USD.
