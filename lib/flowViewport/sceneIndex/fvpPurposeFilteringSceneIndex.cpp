@@ -253,9 +253,14 @@ void PurposeFilteringSceneIndex::_PrimsDirtied(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
+    static const HdDataSourceLocator purposeLocator = HdPurposeSchema::GetDefaultLocator();
+
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
+    dirtiedEntries.reserve(entries.size());
     for (const auto& entry : entries) {
-        _UpdateFilteringForTree(entry.primPath);
+        if (entry.dirtyLocators.Intersects(purposeLocator)) {
+            _UpdateFilteringForTree(entry.primPath);
+        }
         if (!_IsAncestorFilteredOutInclusive(entry.primPath)) {
             dirtiedEntries.emplace_back(entry);
         }

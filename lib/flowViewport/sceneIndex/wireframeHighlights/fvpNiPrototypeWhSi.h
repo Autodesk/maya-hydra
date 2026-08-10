@@ -79,6 +79,10 @@ protected:
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
 
+    FVP_API
+    bool NeedsDirtyProcessing(
+        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntry& entry) const override;
+
 private:
     std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _selectionPathsToPrototypePrefixes;
     std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _selectionPathsToPrototypePaths;

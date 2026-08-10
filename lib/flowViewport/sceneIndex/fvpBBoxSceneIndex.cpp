@@ -428,14 +428,21 @@ void BboxSceneIndex::_PrimsDirtied(
         return;
     }
 
+    // When bbox mode is off (the common case), nothing needs translating.
+    if (!_enabled) {
+        _SendPrimsDirtied(entries);
+        return;
+    }
+
     HdSceneIndexObserver::DirtiedPrimEntries transformedEntries;
+    transformedEntries.reserve(entries.size());
 
     for (const auto& entry : entries) {
         HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
 
         // Only transform entries for prims that we're actually converting
-        if (prim.dataSource && _enabled && !_isExcluded(entry.primPath)
-            && _IsSupportedPrimType(prim.primType)) {
+        if (prim.dataSource && _IsSupportedPrimType(prim.primType)
+            && !_isExcluded(entry.primPath)) {
 
             // Transform the dirty locators to basisCurves equivalents
             HdDataSourceLocatorSet transformedLocators;

@@ -171,6 +171,10 @@ protected:
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) = 0;
 
+    FVP_API
+    virtual bool NeedsDirtyProcessing(
+        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntry &entry) const { return true; }
+
     // Optional helper method that can be overriden by derived classes;
     // this can help with handling highlights for when a parent prim is selected/deselected.
     FVP_API

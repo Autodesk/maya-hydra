@@ -199,12 +199,20 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
+    if (_primPathsToSelections.empty() && _prototypePathsToSelectionPaths.empty()) {
+        return;
+    }
+
+    static const HdDataSourceLocatorSet instanceStructureLocators = {
+        HdInstanceSchema::GetDefaultLocator(),
+        HdDataSourceLocator(HdXformSchemaTokens->xform, HdXformSchemaTokens->matrix),
+    };
+
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         // If instance structure was dirtied, rebuild the highlight
-        bool instanceStructureDirtied = entry.dirtyLocators.Intersects(HdInstanceSchema::GetDefaultLocator()) ||
-            entry.dirtyLocators.Intersects(HdDataSourceLocator(HdXformSchemaTokens->xform, HdXformSchemaTokens->matrix));
-        if (_primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end() && instanceStructureDirtied) {
+        bool instanceStructureDirtied = entry.dirtyLocators.Intersects(instanceStructureLocators);
+        if (instanceStructureDirtied && _primPathsToSelections.find(entry.primPath) != _primPathsToSelections.end()) {
             _DeleteSelectionHighlight(entry.primPath);
             _CreateSelectionHighlight(entry.primPath);
         }
@@ -218,6 +226,12 @@ void NiInstanceWhSi::ProcessDirtiedPrims(
         }
     }
     _SendPrimsDirtied(highlightEntries);
+}
+
+bool NiInstanceWhSi::NeedsDirtyProcessing(
+    const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntry &entry) const
+{ 
+    return (!_primPathsToSelections.empty()) || (!_prototypePathsToSelectionPaths.empty()); 
 }
 
 void NiInstanceWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)

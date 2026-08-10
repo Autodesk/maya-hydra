@@ -456,6 +456,14 @@ void PiInstancerWhSi::ProcessDirtiedPrims(
     _SendPrimsDirtied(highlightEntries);
 }
 
+bool PiInstancerWhSi::NeedsDirtyProcessing(
+    const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntry &entry) const
+{ 
+    return entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator()) 
+        || (!_instancerPathsToSelections.empty())
+        || (!_prototypePathsToSelections.empty());
+}
+
 void PiInstancerWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)
 {
     if (isFullySelected) {

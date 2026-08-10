@@ -296,39 +296,26 @@ void PruningSceneIndex::_PrimsDirtied(
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
-    HdSceneIndexObserver::RemovedPrimEntries removedEntries;
-    HdSceneIndexObserver::AddedPrimEntries addedEntries;
+    if (_filtersByPrunedPath.empty()) {
+        // Nothing is pruned -> forward as-is.
+        _SendPrimsDirtied(entries);
+        return;
+    }
+
+    // We don't need to update prim's pruning state and send prim removed/added 
+    // notifications here because this is already done in _EnableFilter/_DisableFilter.
+    // Theoretically, pruning state can also change on edits to _excludedSceneRoots
+    // but this one is currently only set during initialization. If ever we need to 
+    // update it dynamically, the code to update the prims pruning state will be added
+    // there and not in this time-critical method. 
+
     HdSceneIndexObserver::DirtiedPrimEntries editedEntries;
-
+    editedEntries.reserve(entries.size());
     for (const auto& dirtiedEntry : entries) {
-        bool wasInitiallyPruned = _IsAncestorPrunedInclusive(dirtiedEntry.primPath);
-
-        HdSceneIndexPrim dirtiedPrim = GetInputSceneIndex()->GetPrim(dirtiedEntry.primPath);
-
-        for (const auto& pruningToken : GetActiveFilters()) {
-            if (_PrunePrim(dirtiedEntry.primPath, dirtiedPrim, pruningToken)) {
-                _InsertEntry(dirtiedEntry.primPath, pruningToken);
-            } else {
-                _RemoveEntry(dirtiedEntry.primPath, pruningToken);
-            }
+        if (_IsAncestorPrunedInclusive(dirtiedEntry.primPath)) {
+            continue;
         }
-
-        bool isNowPruned = _IsAncestorPrunedInclusive(dirtiedEntry.primPath);
-
-        if (!wasInitiallyPruned && isNowPruned) {
-            removedEntries.emplace_back(dirtiedEntry.primPath);
-        } else if (wasInitiallyPruned && !isNowPruned) {
-            addedEntries.emplace_back(dirtiedEntry.primPath, dirtiedPrim.primType);
-        } else {
-            editedEntries.emplace_back(dirtiedEntry);
-        }
-    }
-
-    if (!removedEntries.empty()) {
-        _SendPrimsRemoved(removedEntries);
-    }
-    if (!addedEntries.empty()) {
-        _SendPrimsAdded(addedEntries);
+        editedEntries.emplace_back(dirtiedEntry);
     }
     if (!editedEntries.empty()) {
         _SendPrimsDirtied(editedEntries);

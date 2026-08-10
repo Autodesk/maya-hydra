@@ -129,6 +129,10 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
+    if (_primPathsToSelections.empty()) {
+        return;
+    }
+
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         // Forward dirty notifications to the highlight mesh
@@ -139,6 +143,12 @@ void GeomSubsetWhSi::ProcessDirtiedPrims(
         }
     }
     _SendPrimsDirtied(highlightEntries);
+}
+
+bool GeomSubsetWhSi::NeedsDirtyProcessing(
+    const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntry &entry) const
+{ 
+    return !_primPathsToSelections.empty(); 
 }
 
 void GeomSubsetWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)

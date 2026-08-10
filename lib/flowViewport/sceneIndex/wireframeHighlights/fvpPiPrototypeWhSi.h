@@ -92,6 +92,10 @@ protected:
         const PXR_NS::HdSceneIndexBase &sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
 
+    FVP_API
+    bool NeedsDirtyProcessing(
+        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntry& entry) const override;
+
 private:
     struct SelectionData {
         PrimSelection _primSelection;
