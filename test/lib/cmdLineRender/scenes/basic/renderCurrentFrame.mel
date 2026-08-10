@@ -1,0 +1,4 @@
+loadPlugin -quiet mayaHydra;
+file -open "renderCurrentFrame.ma";
+currentTime 8;
+hydraRender -cf -r HdArnoldRendererPlugin;
