@@ -47,7 +47,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define BATCH_RENDER_TOKENS \
     (renderSettingsSrc) \
     (settingsMapRenderSettingsSrc) \
-    (hydraSceneRenderSettingsSrc)
+    (hydraSceneRenderSettingsSrc) \
+    (ocioConfigPath)
 // clang-format on
 
 TF_DECLARE_PUBLIC_TOKENS(BatchRenderTokens, , BATCH_RENDER_TOKENS);

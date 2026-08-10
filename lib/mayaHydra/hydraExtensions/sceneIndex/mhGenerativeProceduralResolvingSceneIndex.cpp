@@ -153,8 +153,16 @@ void MhGenerativeProceduralResolvingSceneIndex::_PrimsDirtied(
     if (!_IsObserved())
         return;
 
+    // No generative procedurals registered -> pass through.
+    if (_generativeProceduralPaths.empty()) {
+        _SendPrimsDirtied(entries);
+        return;
+    }
+
     static const HdDataSourceLocatorSet xformLocatorSet { HdXformSchema::GetDefaultLocator() };
     static const HdDataSourceLocatorSet visibilityLocatorSet { HdVisibilitySchema::GetDefaultLocator() };
+    static const HdDataSourceLocator    xformLocator      = HdXformSchema::GetDefaultLocator();
+    static const HdDataSourceLocator    visibilityLocator = HdVisibilitySchema::GetDefaultLocator();
 
     HdSceneIndexObserver::DirtiedPrimEntries expandedEntries;
     expandedEntries.reserve(entries.size());
@@ -165,10 +173,10 @@ void MhGenerativeProceduralResolvingSceneIndex::_PrimsDirtied(
         if (_generativeProceduralPaths.find(entry.primPath) == _generativeProceduralPaths.end())
             continue;
 
-        if (entry.dirtyLocators.Intersects(HdXformSchema::GetDefaultLocator()))
+        if (entry.dirtyLocators.Intersects(xformLocator))
             _DirtyDescendantsLocator(entry.primPath, xformLocatorSet, expandedEntries);
 
-        if (entry.dirtyLocators.Intersects(HdVisibilitySchema::GetDefaultLocator()))
+        if (entry.dirtyLocators.Intersects(visibilityLocator))
             _DirtyDescendantsLocator(entry.primPath, visibilityLocatorSet, expandedEntries);
     }
 

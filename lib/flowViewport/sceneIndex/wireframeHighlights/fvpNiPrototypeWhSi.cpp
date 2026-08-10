@@ -242,6 +242,12 @@ void NiPrototypeWhSi::ProcessDirtiedPrims(
     _SendPrimsDirtied(highlightEntries);
 }
 
+bool NiPrototypeWhSi::NeedsDirtyProcessing(
+    const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntry &entry) const
+{ 
+    return entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator()) || (!_prototypePathsToSelections.empty()); 
+}
+
 void NiPrototypeWhSi::_CreateSelectionHighlight(const PXR_NS::SdfPath& prototypePath, std::string selectionId)
 {
     if (selectionId.empty() || selectionId.find_first_not_of("0123456789") != std::string::npos) {
