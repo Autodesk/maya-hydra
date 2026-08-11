@@ -358,6 +358,24 @@ bool GetShadingEngineNode(const MRenderItem& ri, MObject& shadingEngineNode)
     return !shadingEngineNode.isNull();
 }
 
+bool UpdateRenderItemWireframeColor(
+    const MRenderItem&                   ri,
+    const MayaHydraRenderItemAdapterPtr& ria)
+{
+    MColor wireframeColor;
+    MDagPath dagPath = ri.sourceDagPath();
+    if (dagPath.isValid()) {
+        // This is a color managed VP2 color, it will need to be unmanaged at some point
+        wireframeColor = MGeometryUtilities::wireframeColor(dagPath);
+    }
+
+    if (wireframeColor != ria->GetWireframeColor()) {
+        ria->SetWireframeColor(wireframeColor);
+        return true;
+    }
+    return false;
+}
+
 std::mutex _adaptersToRecreateMutex;
 std::mutex _adaptersToRebuildMutex;
 
@@ -503,7 +521,8 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
 
         int                           fastId = ri.InternalObjectId();
         MayaHydraRenderItemAdapterPtr ria = nullptr;
-        if (!_GetRenderItem(fastId, ria)) {
+        const bool isNewRenderitem = !_GetRenderItem(fastId, ria);
+        if (isNewRenderitem) {
             const SdfPath slowId = _GetRenderItemPrimPath(ri);
 
             // Maya/MtoA adds texturedSkyDome mesh object for VP2.
@@ -546,13 +565,14 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             ria->SetMaterial(material);
         }
 
-        MColor wireframeColor;
-
-        MDagPath dagPath = ri.sourceDagPath();
-        if (dagPath.isValid()) {
-            wireframeColor = MGeometryUtilities::wireframeColor(
-                dagPath); // This is a color managed VP2 color, it will need to be unmanaged at some
-            // point
+#ifdef MAYA_HAS_MVS_CHANGED_WIREFRAME_COLOR_API
+        bool wireframeColorDirty = isNewRenderitem ||
+            (flags & MDataServerOperation::MViewportScene::MVS_changedWireframeColor);
+#else
+        bool wireframeColorDirty = true;
+#endif
+        if (wireframeColorDirty) {
+            wireframeColorDirty = UpdateRenderItemWireframeColor(ri, ria);
         }
 
         // Call UpdateTransform before UpdateFromDelta, as UpdateTransform
@@ -562,7 +582,7 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         if (flags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
             ria->UpdateTransform(ri);
         }
-        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColor);
+        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColorDirty);
         ria->UpdateFromDelta(data);
     }
 }
