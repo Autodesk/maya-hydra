@@ -120,6 +120,9 @@ public:
     const MColor& GetWireframeColor() const { return _wireframeColor; }
 
     MAYAHYDRALIB_API
+    void SetWireframeColor(const MColor& color) { _wireframeColor = color; }
+
+    MAYAHYDRALIB_API
     GfMatrix4d GetTransform() override { return _transform[0]; }
 
     MAYAHYDRALIB_API
@@ -142,16 +145,16 @@ public:
         UpdateFromDeltaData(
             MRenderItem&             ri,
             unsigned int             flags,
-            const MColor&            wireframeColor)
+            const bool               wireframeColorDirty)
             : _ri(ri)
             , _flags(flags)
-            , _wireframeColor(wireframeColor)
+            , _wireframeColorDirty(wireframeColorDirty)
         {
         }
 
         MRenderItem&             _ri;
         unsigned int             _flags;
-        const MColor&            _wireframeColor;
+        const bool               _wireframeColorDirty;
     };
 
     /// We receive in that function the changes made in the Maya viewport between the last frame
