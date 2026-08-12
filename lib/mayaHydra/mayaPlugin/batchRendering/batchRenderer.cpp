@@ -51,6 +51,8 @@
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
 
+#include <maya/MAnimControl.h>
+#include <maya/MEventMessage.h>
 #include <maya/MMessage.h>
 #include <maya/MSceneMessage.h>
 #include <maya/MStatus.h>
@@ -470,17 +472,31 @@ void BatchRenderer::_InitHydraResources()
     }
     
     //Create internal scene indices chain
-    _inputSceneIndexOfFilteringSceneIndicesChain
+    auto inputSceneIndexOfFilteringSceneIndicesChain
         = _dataProducerMergingSceneIndexProxy->GetMergingSceneIndex();
 
     //Put BlockPrimRemovalPropagationSceneIndex first as it can block/unblock the prim removal propagation on the whole scene indices chain
-    _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(_inputSceneIndexOfFilteringSceneIndicesChain);
+    _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(inputSceneIndexOfFilteringSceneIndicesChain);
     _pruningSceneIndex = Fvp::PruningSceneIndex::New(_blockPrimRemovalPropagationSceneIndex);
     _pruningSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya filtering is handled by VP2/OGS.
-    _inputSceneIndexOfFilteringSceneIndicesChain = _pruningSceneIndex;
-
-    _CreateSceneIndicesChainAfterMergingSceneIndex();
     
+    _CreateSceneIndicesChainAfterMergingSceneIndex(inputSceneIndexOfFilteringSceneIndicesChain);
+
+    if (_sceneGlobalsSceneIndex) {
+        const MTime currentTime = MAnimControl::currentTime();
+        const double currentFrame = currentTime.value();
+        _SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
+
+        if (_timeChangeCallbackId == 0) {
+            MStatus status;
+            _timeChangeCallbackId = MEventMessage::addEventCallback(
+                "timeChanged", _TimeChangedCallback, this, &status);
+            if (!status) {
+                TF_WARN("BatchRenderer: Failed to register time change callback");
+            }
+        }
+    }
+
     if (auto* renderDelegate = _GetRenderDelegate()) {
         // Pull in any options that may have changed due file-open.
         // If the currentScene has defaultRenderGlobals we'll absorb those new settings,
@@ -532,6 +548,13 @@ void BatchRenderer::_ClearHydraResources()
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
         .Msg("BatchRenderer::_ClearHydraResources(%s)\n", _rendererDesc.rendererName.GetText());
 
+    if (_timeChangeCallbackId) {
+        MMessage::removeCallback(_timeChangeCallbackId);
+        _timeChangeCallbackId = 0;
+    }
+
+    _sceneGlobalsSceneIndex.Reset();
+
     // Only remove information for our dummy batch render viewport, to avoid
     // affecting interactive viewports.
     Fvp::RenderViewDataManager::Get().RemoveRenderViewData(kBatchRenderDummyPanelName);
@@ -575,18 +598,51 @@ void BatchRenderer::_ClearHydraResources()
     _initializationAttempted = false;
 }
 
-void BatchRenderer::_CreateSceneIndicesChainAfterMergingSceneIndex()
+void BatchRenderer::_CreateSceneIndicesChainAfterMergingSceneIndex(
+    const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndexOfFilteringSceneIndicesChain
+)
 {
     //This function is where happens the ordering of filtering scene indices that are after the merging scene index
-    //We use as its input scene index : _inputSceneIndexOfFilteringSceneIndicesChain
-    _lastFilteringSceneIndexBeforeCustomFiltering = _inputSceneIndexOfFilteringSceneIndicesChain;
+    //We use as its input scene index the argument inputSceneIndexOfFilteringSceneIndicesChain
+    _lastFilteringSceneIndexBeforeCustomFiltering = inputSceneIndexOfFilteringSceneIndicesChain;
 
     _lastFilteringSceneIndexBeforeCustomFiltering = _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+
+    // The scene globals scene index must be upstream of the frame number
+    // resolving scene index, so that dirtying time on the scene globals will
+    // also dirty render product names that need frame number resolution.
+    _lastFilteringSceneIndexBeforeCustomFiltering = _frameNbResolvingSceneIndex = Fvp::FrameNbResolvingSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+
     TF_AXIOM(_mayaHydraSceneIndex);
 
 #ifdef CODE_COVERAGE_WORKAROUND
     Fvp::leakSceneIndex(_lastFilteringSceneIndexBeforeCustomFiltering);
 #endif
+}
+
+void BatchRenderer::_TimeChangedCallback(void* data)
+{
+    auto* instance = reinterpret_cast<BatchRenderer*>(data);
+    if (!TF_VERIFY(instance)) {
+        return;
+    }
+    if (!instance->_initializationSucceeded) {
+        return;
+    }
+    if (!instance->_sceneGlobalsSceneIndex) {
+        return;
+    }
+    const MTime currentTime = MAnimControl::currentTime();
+    const double currentFrame = currentTime.value();
+    instance->_SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
+}
+
+void BatchRenderer::_SetCurrentFrameInHydraGlobalSceneIndex(double currentFrame)
+{
+    if (!TF_VERIFY(_sceneGlobalsSceneIndex, "Scene globals scene index not yet initialized")) {
+        return;
+    }
+    _sceneGlobalsSceneIndex->SetCurrentFrame(currentFrame);
 }
 
 void BatchRenderer::_ClearHydraCallback(void* data)

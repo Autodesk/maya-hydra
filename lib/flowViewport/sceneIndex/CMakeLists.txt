@@ -7,6 +7,7 @@ target_sources(${TARGET_NAME}
     fvpSceneIndexUtils.cpp
     fvpSelectionSceneIndex.cpp
     fvpDisplayStyleOverrideSceneIndex.cpp
+    fvpFrameNbResolvingSceneIndex.cpp
     fvpPruneTexturesSceneIndex.cpp
     fvpPruningSceneIndex.cpp
     fvpBBoxSceneIndex.cpp
@@ -25,6 +26,7 @@ set(HEADERS
     fvpSceneIndexUtils.h
     fvpSelectionSceneIndex.h
     fvpDisplayStyleOverrideSceneIndex.h
+    fvpFrameNbResolvingSceneIndex.h
     fvpPruneTexturesSceneIndex.h
     fvpPruningSceneIndex.h
     fvpBBoxSceneIndex.h

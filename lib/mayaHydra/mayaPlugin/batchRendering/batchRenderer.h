@@ -41,6 +41,7 @@
 
 #include <flowViewport/selection/fvpSelectionTracker.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpFrameNbResolvingSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
 
@@ -123,7 +124,9 @@ private:
     void              _SetActiveRenderSettingsPrimFromScene();
 
     void              _SetRenderPurposeTags(const PXR_NS::MayaHydraParams& delegateParams);
-    void              _CreateSceneIndicesChainAfterMergingSceneIndex();
+    void              _CreateSceneIndicesChainAfterMergingSceneIndex(
+        const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndexOfFilteringSceneIndicesChain
+    );
     bool              _PrepareRender(
         unsigned int width,
         unsigned int height,
@@ -134,6 +137,9 @@ private:
 
     // Callbacks
     static void _ClearHydraCallback(void* data);
+    static void _TimeChangedCallback(void* data);
+
+    void _SetCurrentFrameInHydraGlobalSceneIndex(double currentFrame);
 
     MtohRendererDescription _rendererDesc;
 
@@ -152,13 +158,13 @@ private:
     std::unique_ptr<PXR_NS::HdxTaskController> _taskController;
     PXR_NS::HdPluginRenderDelegateUniqueHandle _renderDelegate = nullptr;
     PXR_NS::HdSceneIndexBaseRefPtr            _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
-    PXR_NS::HdSceneIndexBaseRefPtr            _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
     PXR_NS::HdRenderIndex*                    _renderIndex = nullptr;
     // Required by selection task.
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     PXR_NS::HdsiSceneGlobalsSceneIndexRefPtr  _sceneGlobalsSceneIndex;
+    Fvp::FrameNbResolvingSceneIndexRefPtr     _frameNbResolvingSceneIndex {};
     Fvp::DataProducerMergingSceneIndexProxyPtr _dataProducerMergingSceneIndexProxy { nullptr };
 
     PXR_NS::HdRprimCollection                 _renderCollection {
@@ -183,6 +189,9 @@ private:
     const bool _isUsingHdSt = false;
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
+
+    // Maya is the single point of truth for time, so update on change.
+    MCallbackId _timeChangeCallbackId = 0;
 };
 
 }
