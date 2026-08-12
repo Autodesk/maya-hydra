@@ -207,6 +207,9 @@ bool registerRenderer(const MtohRendererDescription& desc)
            << " -showBatchRenderProcedure " << dq << "batchRender -showImage true" << dq
            << " -renderSequenceProcedure mayaRenderSequence"
            << " -supportColorManagement true"
+           // Need these to list Hydra-based renderers in USD Render Setup.
+           << " -capability isHydra"
+           << " -capabilityValue true"
            // To avoid breaking the render settings UI we add the Common tab,
            // even though we don't use it.
            << " -addGlobalsTab Common createMayaSoftwareCommonGlobalsTab updateMayaSoftwareCommonGlobalsTab"
