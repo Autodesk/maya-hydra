@@ -158,9 +158,6 @@ public:
         return nullptr;
     }
 
-    // Update viewport info to camera
-    SdfPath SetCameraViewport(const MDagPath& camPath, const GfVec4d& viewport);
-
     // Enable or disable shadows
     void SetShadowsEnabled(const bool enabled) { _shadowsEnabled = enabled; }
 

@@ -73,10 +73,6 @@ public:
     void CreateCallbacks() override;
 
     MAYAHYDRALIB_API
-    /// Update the cached viewport rectangle for this camera.
-    void SetViewport(const GfVec4d& viewport);
-
-    MAYAHYDRALIB_API
     /// Return the render tag for secondary graphics.
     TfToken GetRenderTag() const override { return Fvp::secondaryGraphicsRenderTagToken; }
 
@@ -90,12 +86,6 @@ public:
 protected:
     /// Return the Hydra camera type token.
     static TfToken CameraType();
-
-    /// The use of a pointer here helps us track whether this camera is (or has ever been)
-    /// the active viewport camera.  NOTE: it's possible that _viewport will be out of date
-    /// after switching to a new camera and resizing the viewport, but _viewport will eventually
-    /// be re-synched before any output/pixels of the stale size is requested.
-    std::unique_ptr<GfVec4d> _viewport;
 };
 
 using MayaHydraCameraAdapterPtr = std::shared_ptr<MayaHydraCameraAdapter>;

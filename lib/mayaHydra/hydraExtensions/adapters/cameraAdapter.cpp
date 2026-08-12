@@ -344,12 +344,4 @@ const std::unordered_set<std::string>& MayaHydraCameraAdapter::GetCameraParamAtt
     return MayaHydraAdapter::GetParamAttributeSet(kCameraParamAttributeNames);
 }
 
-void MayaHydraCameraAdapter::SetViewport(const GfVec4d& viewport)
-{
-    if (!_viewport) {
-        _viewport.reset(new GfVec4d);
-    }
-    *_viewport = viewport;
-}
-
 PXR_NAMESPACE_CLOSE_SCOPE
