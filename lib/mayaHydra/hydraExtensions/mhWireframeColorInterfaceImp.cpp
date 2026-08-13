@@ -34,13 +34,18 @@ namespace MAYAHYDRA_NS_DEF {
 
 MhWireframeColorInterfaceImp::MhWireframeColorInterfaceImp(const std::shared_ptr<Fvp::Selection>& selection
                                                          , const std::weak_ptr<MhLeadObjectPathTracker>& leadObjectPathTracker) 
-    : _activeWireframeColor (getPreferencesColor(FvpColorPreferencesTokens->wireframeSelectionSecondary))
-    , _leadWireframeColor (getPreferencesColor(FvpColorPreferencesTokens->wireframeSelection))
-    , _dormantWireframeColor (getPreferencesColor(FvpColorPreferencesTokens->polymeshDormant))
-    , _selection(selection)
+    : _selection(selection)
     , _leadObjectPathTracker(leadObjectPathTracker)
-{ 
+{
     TF_AXIOM(_selection);
+    RefreshColors();
+}
+
+void MhWireframeColorInterfaceImp::RefreshColors()
+{
+    _activeWireframeColor = getPreferencesColor(FvpColorPreferencesTokens->wireframeSelectionSecondary);
+    _leadWireframeColor   = getPreferencesColor(FvpColorPreferencesTokens->wireframeSelection);
+    _dormantWireframeColor = getPreferencesColor(FvpColorPreferencesTokens->polymeshDormant);
 }
 
 MhWireframeColorInterfaceImp::SelectionState MhWireframeColorInterfaceImp::_getSelectionState(const PXR_NS::SdfPath& primPath) const
@@ -85,7 +90,12 @@ GfVec4f MhWireframeColorInterfaceImp::_getWireframeColor(const SelectionState& s
     return _dormantWireframeColor;
 }
 
-GfVec4f MhWireframeColorInterfaceImp::getWireframeColor(const SdfPath& primPath) const { 
+// The returned color depends on selection state, and it is pulled in ReprSelectorSceneIndex::GetPrim
+// only when the prim is dirtied. That is only safe because a selection change invalidates the prims
+// involved -- see MhDirtyLeadObjectSceneIndex::dirtySelectionRelatedPrims() and its caller in
+// MtohRenderOverride::Render(). Remove that invalidation and this silently returns stale colors for
+// every prim except the lead object, which looks like "some objects keep the wrong color".
+GfVec4f MhWireframeColorInterfaceImp::getWireframeColor(const SdfPath& primPath) const {
     std::string pathString = primPath.GetString();
     
     if (pathString.find("Highlight_Lead") != std::string::npos) {

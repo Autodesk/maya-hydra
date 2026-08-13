@@ -21,6 +21,11 @@
 
 namespace MAYAHYDRA_NS_DEF {
     bool useSingleFramePass();
+
+    /// Whether viewport hover highlighting is enabled (default true).
+    /// Set MAYA_HYDRA_ENABLE_HOVER=0 to disable the viewport hover feature
+    /// entirely (no mouse tracking, no hover-driven refreshes, no hover picks).
+    bool enableHover();
 }
 
 #endif // MAYAHYDRA_ENV_SETTINGS_H

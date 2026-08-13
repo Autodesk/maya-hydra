@@ -754,7 +754,20 @@ bool MayaHydraRenderItemAdapter::GetVisible()
         return false;
     }
 
+    // See SetSelectionHighlightSuppressed().
+    if (_selectionHighlightSuppressed) {
+        return false;
+    }
+
     return _visible;
+}
+
+void MayaHydraRenderItemAdapter::SetSelectionHighlightSuppressed(bool suppressed)
+{
+    if (_selectionHighlightSuppressed != suppressed) {
+        _selectionHighlightSuppressed = suppressed;
+        MayaHydra::DirtyNotifier(this).dirtyVisibility();
+    }
 }
 
 void MayaHydraRenderItemAdapter::SetPlaybackState(bool isPlaybackRunning)

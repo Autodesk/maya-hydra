@@ -52,11 +52,17 @@
 #include <ufe/pathString.h>
 
 #include <mayaHydraLib/adapters/mhDirtyNotifier.h>
+
+#include <flowViewport/colorPreferences/fvpColorPreferencesTokens.h>
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 #include <flowViewport/selection/fvpDataProducersNodeHashCodeToSdfPathRegistry.h>
 #include <flowViewport/selection/fvpPathMapper.h>
 #include <flowViewport/selection/fvpPathMapperRegistry.h>
 #include <ufeExtensions/Global.h>
+
+#include <array>
+#include <cstring>
+#include <optional>
 
 namespace {
 
@@ -127,6 +133,110 @@ bool filterMesh(const MRenderItem& ri, bool useMeshAdapter)
                             // using the name is more appropriate.
         (ri.name() == "StandardShadedItem")
                             : false;
+}
+
+// The names VP2 gives the persistent wireframe item it uses as the object-level selection highlight,
+// one per surface type. VP2 does not create a dedicated item when an object is selected: it keeps this
+// one item per shape and recolors it, so the *selected* state has to come from the source object's
+// display status (below) rather than from the item.
+//
+// An allowlist, deliberately, rather than a category test. Every line item VP2 sends for a shape is
+// kLines and a DecorationItem, and for a *selected* shape they all carry drawMode 0x7 as well -- so the
+// highlight wire is indistinguishable from the NURBS hull, the NURBS origin curves and the smooth-mesh
+// preview cage in every field except the name. Matching by category hid all of them in turn, plus
+// bounding boxes, each time making geometry the user had explicitly asked for disappear.
+//
+// The failure directions are what settle it. An incomplete allowlist means an unrecognised wire is
+// *kept*, so the object shows both its wire and the outline -- redundant, but nothing is lost. An
+// over-broad category match makes geometry vanish. The name is also the only property that cannot go
+// stale on the adapter: _primitive is captured at construction and VP2 does reuse an item while changing
+// its primitive.
+//
+// Subdivision surfaces are deliberately absent: no name has been observed for them, so they fall through
+// to the safe side and simply show both cues.
+const std::array<const char*, 2> kSelectionHighlightWireNames = {
+    "DormantPolyWire",     // polygon mesh
+    "DormantIsoparmWire"   // NURBS surface
+};
+
+// Takes the item name rather than the MRenderItem, so the same classification applies to an
+// already-translated adapter, which retains the name but has no MRenderItem.
+bool isLegacySelectionHighlightItem(const char* itemName, const MDagPath& itemDagPath)
+{
+    if (!itemName) {
+        return false;
+    }
+    const bool isHighlightWire = std::any_of(
+        kSelectionHighlightWireNames.begin(),
+        kSelectionHighlightWireNames.end(),
+        [itemName](const char* candidate) { return std::strcmp(itemName, candidate) == 0; });
+    if (!isHighlightWire) {
+        return false;
+    }
+
+    if (!itemDagPath.isValid()) {
+        return false;
+    }
+
+    // VP2 usually hands us the shape, but resolve a transform to its shape rather than rejecting the
+    // item: an item we fail to recognize keeps VP2's selection color and double-highlights.
+    MDagPath shapeDagPath = itemDagPath;
+    if (!shapeDagPath.hasFn(MFn::kShape)) {
+        shapeDagPath.extendToShape();
+    }
+
+    // Queried on the shape, not on whatever path VP2 handed us. The two agree in practice -- selecting a
+    // transform makes its shape kActive/kLead, which is what makes MGeometryUtilities::wireframeColor()
+    // return the selection color for these items -- but they would diverge for a directly selected
+    // shape.
+    //
+    // kHilite is excluded: that wire is component feedback, not an object-level highlight.
+    const MHWRender::DisplayStatus displayStatus
+        = MHWRender::MGeometryUtilities::displayStatus(shapeDagPath);
+    return (MHWRender::kActive == displayStatus) || (MHWRender::kLead == displayStatus);
+}
+
+// What to do with VP2's wireframe item for a selected shape.
+enum class LegacyHighlightTreatment
+{
+    keep, //!< Leave it exactly as VP2 sent it.
+    hide  //!< The pixel outline replaces it entirely.
+};
+
+// Treatment for an item already known to be the wire of a selected shape.
+//
+// The rule is deliberately blunt: whenever the viewport draws wireframes at all, VP2's behaviour is
+// left completely untouched and the outline is simply an addition. Otherwise the wire is hidden,
+// because it would be the *only* wireframe on screen and would compete with the outline.
+//
+// "Otherwise" is shaded and textured mode, and also bounding-box mode -- harmless there because the
+// bounding box itself is a NonMaterialSceneItem and so never a candidate (see
+// isLegacySelectionHighlightItem), leaving it free to carry the selection colour as usual.
+//
+// An earlier version also had a "de-highlight" treatment that recoloured the wire to the object's
+// dormant colour in wireframe-on-shaded, so the outline was the sole cue. It was dropped: sourcing a
+// correct dormant colour per shape type turned out to be the single largest source of bugs in this
+// feature (Maya exposes a dormant RGB preference for polygon meshes only, so NURBS surfaces and
+// subdivs had no correct value available), and showing both cues is consistent, predictable, and
+// matches what a user asking for wireframe-on-shaded already expects to see.
+LegacyHighlightTreatment legacyHighlightTreatmentFor(
+    const MayaHydraSceneIndex::RenderItemUpdateOptions& options)
+{
+    return options.viewportDrawsWireframes ? LegacyHighlightTreatment::keep
+                                           : LegacyHighlightTreatment::hide;
+}
+
+LegacyHighlightTreatment legacyHighlightTreatment(
+    const char*                                         itemName,
+    const MDagPath&                                     itemDagPath,
+    const MayaHydraSceneIndex::RenderItemUpdateOptions& options)
+{
+    // Test the cheap flag before the name comparison and the DAG queries.
+    if (!options.suppressLegacyMayaNativeHighlight
+        || !isLegacySelectionHighlightItem(itemName, itemDagPath)) {
+        return LegacyHighlightTreatment::keep;
+    }
+    return legacyHighlightTreatmentFor(options);
 }
 
 bool isRenderItem_aiSkyDomeLightTriangleShape(const MRenderItem& renderItem)
@@ -444,7 +554,9 @@ void MayaHydraSceneIndex::_Destroy()
     Fvp::PathMapperRegistry::Instance().SetFallbackMapper(nullptr);
 }
 
-void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewportScene& scene)
+void MayaHydraSceneIndex::UpdateRenderItems(
+    const MDataServerOperation::MViewportScene& scene,
+    const RenderItemUpdateOptions&              options)
 {
     MH_PROFILE_FUNCTION();
 
@@ -454,15 +566,12 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         int fastId = scene.mRemovals[i];
         if (fastId == kInvalidId)
             continue;
+        // The removal list can contain duplicate fastIds.  After the first
+        // removal succeeds, subsequent duplicates will not be found, and
+        // _GetRenderItem simply reports failure.
         MayaHydraRenderItemAdapterPtr ria = nullptr;
         if (_GetRenderItem(fastId, ria)) {
             _RemoveRenderItem(ria);
-        }
-        // The removal list can contain duplicate fastIds.  After the first
-        // removal succeeds, subsequent duplicates will not be found — skip
-        // them.
-        if (ria == nullptr) {
-            continue;
         }
     }
 
@@ -497,6 +606,18 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         if (filterMesh(ri, useMeshAdapter())) {
             continue;
         }
+
+        // Legacy Maya-native selection highlighting is drawn by VP2 itself, by making the shape's
+        // wireframe item visible in the selection color. When something else owns the highlight, that
+        // wire must stop acting as one, or the object is highlighted twice. Only in shaded/textured
+        // mode though; see legacyHighlightTreatmentFor().
+        //
+        // This is a visibility decision, not a topology one: VP2 reuses the same item across
+        // select/deselect, so it is adjusted through the adapter rather than by dropping and
+        // recreating its Hydra prim every time the selection changes.
+        const LegacyHighlightTreatment treatment = legacyHighlightTreatment(
+            ri.name().asChar(), ri.sourceDagPath(), options);
+        const bool suppressSelectionHighlightItem = LegacyHighlightTreatment::hide == treatment;
 
         int                           fastId = ri.InternalObjectId();
         MayaHydraRenderItemAdapterPtr ria = nullptr;
@@ -561,6 +682,32 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         }
         const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColor);
         ria->UpdateFromDelta(data);
+
+        // After UpdateFromDelta, so that a visibility change coming from VP2 in this same delta does
+        // not overwrite the suppression.
+        ria->SetSelectionHighlightSuppressed(suppressSelectionHighlightItem);
+    }
+}
+
+void MayaHydraSceneIndex::RefreshRenderItemLegacyHighlightTreatment(
+    const RenderItemUpdateOptions& options)
+{
+    MH_PROFILE_FUNCTION();
+
+    for (auto& entry : _renderItemsAdaptersFast) {
+        const MayaHydraRenderItemAdapterPtr& ria = entry.second;
+        if (!ria) {
+            continue;
+        }
+
+        // Only selected surfaces' wires are ever adjusted, so leave everything else untouched rather
+        // than doing a DAG query for every render item in the scene.
+        const LegacyHighlightTreatment treatment
+            = legacyHighlightTreatment(ria->Name(), ria->GetDagPath(), options);
+
+        // Visibility only. Nothing needs recolouring: the wire keeps whatever colour VP2 last gave it,
+        // which is correct in every treatment now that de-highlighting is gone.
+        ria->SetSelectionHighlightSuppressed(LegacyHighlightTreatment::hide == treatment);
     }
 }
 

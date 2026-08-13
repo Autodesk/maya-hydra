@@ -25,7 +25,12 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define MTOH_TOKENS \
     (HdStormRendererPlugin) \
     (mtohMaximumShadowMapResolution) \
-    (mayaHydraRefinementLevel)
+    (mayaHydraRefinementLevel) \
+    (mayaHydraSelectionHighlightMode) \
+    (mayaHydraEnableInteractiveHitTest) \
+    (mayaHydraEnableHoverOutline) \
+    (mayaHydraDisableSelectionHighlight) \
+    (mayaHydraEnableDefaultOutlines)
 // clang-format on
 
 // This is not an exported API.

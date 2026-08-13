@@ -99,10 +99,31 @@ public:
     // ------------------------------------------------------------------------
     // Maya Hydra scene producer implementations
 
+    /// How the caller wants VP2's legacy selection-highlight wireframes handled for this update.
+    struct RenderItemUpdateOptions
+    {
+        /// Something other than VP2 owns selection highlighting -- the pixel outline, or nothing at
+        /// all when highlighting is disabled -- so the wireframe VP2 makes visible for a selected
+        /// shape must not act as the highlight.
+        bool suppressLegacyMayaNativeHighlight = false;
+
+        /// A wireframe is drawn for every object: pure wireframe or wireframe-on-shaded.
+        bool viewportDrawsWireframes = false;
+    };
+
     // Method to update render item data translation. Code in this method should pertain
     // ONLY to render items, such that if there is no render item data to be translated,
     // this method should not need to be called.
-    void UpdateRenderItems(const MDataServerOperation::MViewportScene& scene);
+    void UpdateRenderItems(
+        const MDataServerOperation::MViewportScene& scene,
+        const RenderItemUpdateOptions&              options);
+
+    /// Re-evaluate the legacy selection-highlight treatment for every render item already translated.
+    ///
+    /// UpdateRenderItems can only decide this for items Maya re-sends, and Maya does not re-send
+    /// unchanged render items when the display style changes, so the treatment would stay stale until
+    /// the next selection change. Call this whenever the options change without a VP2 delta.
+    void RefreshRenderItemLegacyHighlightTreatment(const RenderItemUpdateOptions& options);
 
     // Populate data from Maya
     void Populate();

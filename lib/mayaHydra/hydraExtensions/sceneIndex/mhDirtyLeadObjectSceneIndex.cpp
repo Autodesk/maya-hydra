@@ -55,6 +55,20 @@ void MhDirtyLeadObjectSceneIndex::dirtyLeadObjectRelatedSelections(const Fvp::Pr
     }
 }
 
+void MhDirtyLeadObjectSceneIndex::dirtySelectionRelatedPrims(const SdfPathVector& primPaths)
+{
+    HdSceneIndexObserver::DirtiedPrimEntries dirtiedPrimEntries;
+    for (const auto& primPath : primPaths) {
+        // Reuses the lead-object traversal: a selected path can be a hierarchy root, and instancers
+        // have to reach their prototypes, which is exactly the same walk.
+        _DirtyPrimSelectionRecursively(Fvp::PrimSelection { primPath }, dirtiedPrimEntries);
+    }
+
+    if (! dirtiedPrimEntries.empty()){
+        _SendPrimsDirtied(dirtiedPrimEntries);
+    }
+}
+
 void MhDirtyLeadObjectSceneIndex::_DirtyPrimSelectionRecursively(const Fvp::PrimSelection& primSelection, HdSceneIndexObserver::DirtiedPrimEntries& inoutDirtiedPrimEntries)const
 {
     //path can be a hierachy of prim paths so we need to get all children prim paths

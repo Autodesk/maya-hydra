@@ -101,7 +101,22 @@ public:
     GfVec4f         colorSelectionHighlightColor = GfVec4f(1.0f, 1.0f, 0.0f, 0.5f);
     bool            colorSelectionHighlight = true;
     bool            wireframeSelectionHighlight = true;
-    float           outlineSelectionWidth = 4.f;
+    // Selection-highlighting mechanism: true uses the pixel-based Outline feature (for both
+    // USD/Fvp and Maya-native data); false uses the legacy wireframe-highlighting behavior.
+    bool            useOutlineSelectionHighlighting = true;
+    // Interactive hover options (both default off). enableInteractiveHitTest gates whether the
+    // per-mouse-move HdxPickTask ("hit test") runs; enableHoverOutline gates whether the resolved
+    // hovered prim path is pushed to the outline (drawn). Hover outline requires the hit test.
+    bool            enableInteractiveHitTest = false;
+    bool            enableHoverOutline = false;
+    // Test/diagnostic floor: when true the UFE selection is still tracked, but neither the legacy
+    // wireframe scene indices nor the Outline manager are installed (selection tracked, nothing
+    // drawn). Used to measure the cost of generating separate objects / drawing the outline.
+    bool            disableSelectionHighlight = false;
+    // Draw a faint outline on every prim in the scene (OutlineStyle::enableDefaultOutlines). This
+    // forces the outline manager's whole-scene prim-id pass every frame, so it scales with scene
+    // size/complexity. Opt-in (default off) as it is expensive on heavy scenes.
+    bool            enableDefaultOutlines = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

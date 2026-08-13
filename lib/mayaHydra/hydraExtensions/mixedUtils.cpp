@@ -78,6 +78,8 @@
 #include <maya/MStringArray.h>
 #include <maya/MVectorArray.h>
 
+#include <atomic>
+
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -1115,8 +1117,24 @@ SdfPath sceneIndexPathPrefix(
 // Read a color preference token into a GfVec4f.
 PXR_NS::GfVec4f getPreferencesColor(const PXR_NS::TfToken& token)
 {
-    PXR_NS::GfVec4f color;
-    Fvp::ColorPreferences::getInstance().getColor(token, color);
+    // Seeded with mid-gray rather than left default-constructed: GfVec4f's default constructor is
+    // defaulted over a raw float array, so it leaves the data uninitialized, and getColor() does
+    // legitimately fail -- for a preference no translator tracks, and for any call made after
+    // Fvp::ColorPreferences::setTranslator(nullptr) on plugin unload. Returning garbage from those
+    // cases produced random wireframe colors that were impossible to attribute.
+    PXR_NS::GfVec4f color(0.5f, 0.5f, 0.5f, 1.0f);
+    if (!Fvp::ColorPreferences::getInstance().getColor(token, color)) {
+        // Warned once per session, not once per call: batch mode has no color preference translator
+        // at all by design (see initialize() in plugin.cpp), so every call fails there and a
+        // per-call warning would flood the log.
+        static std::atomic<bool> warned { false };
+        if (!warned.exchange(true)) {
+            TF_WARN(
+                "No color preference found for '%s', using a fallback color. Further occurrences "
+                "will not be reported.",
+                token.GetText());
+        }
+    }
     return color;
 }
 

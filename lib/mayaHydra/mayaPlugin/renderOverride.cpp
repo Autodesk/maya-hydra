@@ -29,6 +29,10 @@
 #include "renderOverrideUtils.h"
 #include "renderSettingsUtils.h"
 
+#ifdef MAYAHYDRA_HAS_QT
+#include "mhHoverEventFilter.h"
+#endif
+
 #include <mayaHydraLib/mayaHydraLibInterface.h>
 #include <mayaHydraLib/sceneIndex/registration.h>
 #include <mayaHydraLib/sceneIndex/mhGenerativeProceduralResolvingSceneIndex.h>
@@ -141,6 +145,7 @@
 #include <maya/MFileIO.h>
 #include <maya/MTypes.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstring>
@@ -276,6 +281,27 @@ private:
     MtohRenderOverride& _renderOverride;
 };
 
+// Observes Flow Viewport color preference changes and forwards them to the render
+// override, so the outline style can be refreshed live when the user edits Maya's
+// selection colors.
+class MtohRenderOverride::ColorPreferencesObserver : public Ufe::Observer
+{
+public:
+    ColorPreferencesObserver(MtohRenderOverride& renderOverride)
+        : Ufe::Observer(), _renderOverride(renderOverride)
+    {}
+
+    void operator()(const Ufe::Notification& /* notification */) override
+    {
+        // ColorPreferences only rebroadcasts ColorChanged notifications, so any
+        // notification received here means a color preference has changed.
+        _renderOverride.ColorPreferencesChanged();
+    }
+
+private:
+    MtohRenderOverride& _renderOverride;
+};
+
 // MtohRenderOverride is a rendering override class for the viewport to use Hydra instead of VP2.0.
 MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
     : MHWRender::MRenderOverride(desc.overrideName.GetText())
@@ -287,6 +313,7 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
     , _fvpSelectionTracker(new Fvp::SelectionTracker)
     , _ufeSn(Ufe::NamedSelection::get("MayaSelectTool"))
     , _mayaSelectionObserver(std::make_shared<SelectionObserver>(*this))
+    , _colorPreferencesObserver(std::make_shared<ColorPreferencesObserver>(*this))
     , _isUsingHdSt(desc.rendererName == MtohTokens->HdStormRendererPlugin)
 {
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RESOURCES)
@@ -313,6 +340,9 @@ MtohRenderOverride::MtohRenderOverride(const MtohRendererDescription& desc)
     auto sn = Ufe::GlobalSelection::get();
     TF_AXIOM(sn);
     sn->addObserver(_mayaSelectionObserver);
+
+    // Observe host color preference changes so the outline style stays in sync.
+    Fvp::ColorPreferences::getInstance().addObserver(_colorPreferencesObserver);
 
     // Setup the playblast watch.
     // _playBlasting is forced to true here so we can just use _PlayblastingChanged below
@@ -364,6 +394,10 @@ MtohRenderOverride::~MtohRenderOverride()
         if (auto sn = Ufe::GlobalSelection::get()) {
             sn->removeObserver(_mayaSelectionObserver);
         }
+    }
+
+    if (_colorPreferencesObserver) {
+        Fvp::ColorPreferences::getInstance().removeObserver(_colorPreferencesObserver);
     }
 
     if (_timerCallback) {
@@ -463,7 +497,35 @@ void MtohRenderOverride::UpdateRenderGlobals(
         }
     } 
     else {
-        if (attrName.GetString().find("Purpose") != 0) {
+        // Switching the selection-highlight mode requires a resource rebuild, as the mode
+        // is consumed at initialization time. _globals is a reference to the shared
+        // singleton the caller already refreshed, so we only flag each instance to clear
+        // and reinitialize on its next render. The VP2 render-item re-send ("ogs -reset")
+        // is issued from Render() once that rebuild has completed, so it cannot race the
+        // clear/reinit (an out-of-order reset was leaving RenderViewData referencing a
+        // destroyed render index, an intermittent use-after-free on renderer switch).
+        // Attributes that change which selection-highlight scene indices / outline
+        // manager get installed -- the mode enum (mayaHydraSelectionHighlightMode) and the
+        // disable-highlight floor (mayaHydraDisableSelectionHighlight) -- are consumed at
+        // resource-init time, so flag each instance to clear and reinitialize. Other
+        // mayaHydra* toggles read per-frame in Render() (e.g. the interactive hit-test and
+        // hover-outline options) need no rebuild; the caller's refresh applies them.
+        if (attrName.GetString().find("SelectionHighlight") != std::string::npos) {
+            std::lock_guard<std::mutex> lock(_allInstancesMutex);
+            for (auto* instance : _allInstances) {
+                instance->_needsClear = true;
+            }
+        }
+        else if (attrName.GetString().find("DefaultOutlines") != std::string::npos) {
+            // enableDefaultOutlines is an OutlineStyle field; a style refresh is enough (the
+            // OutlineManager starts/stops the whole-scene default pass from the style), so flag the
+            // style dirty rather than forcing a full resource rebuild.
+            std::lock_guard<std::mutex> lock(_allInstancesMutex);
+            for (auto* instance : _allInstances) {
+                instance->_outlineStyleDirty = true;
+            }
+        }
+        else if (attrName.GetString().find("Purpose") != std::string::npos) {
             //One of the render purpose attributes just changed
             //Get purpose render tag from attribute name
             const PXR_NS::TfToken purposeRenderTag
@@ -853,11 +915,15 @@ MStatus MtohRenderOverride::Render(
     TF_DEBUG(MAYAHYDRALIB_RENDEROVERRIDE_RENDER).Msg("MtohRenderOverride::Render()\n");
     // We can use the mayaHydraSetVisibleFramePasses command to set the visible passes
 
+    // Filled in below, once the display style for this frame is known, and read by the renderFrame
+    // lambda (which only runs after that point).
+    MayaHydraSceneIndex::RenderItemUpdateOptions renderItemOptions;
+
     auto renderFrame = [&](bool markTime = false) {
         MH_PROFILE_SCOPE("MtohRenderOverride::Render renderFrame lambda");
         if (scene.changed()) {
             if (_mayaHydraSceneIndex) {
-                _mayaHydraSceneIndex->UpdateRenderItems(scene);
+                _mayaHydraSceneIndex->UpdateRenderItems(scene, renderItemOptions);
             }
         }
 
@@ -1089,7 +1155,9 @@ MStatus MtohRenderOverride::Render(
     }
 
     _DetectMayaDefaultLighting(drawContext);
-    if (_needsClear.exchange(false)) {
+    // _needsClear is only set by a selection-highlight mode switch (see UpdateRenderGlobals).
+    const bool clearedForModeSwitch = _needsClear.exchange(false);
+    if (clearedForModeSwitch) {
         constexpr bool fullReset = false;
         ClearHydraResources(fullReset);
     }
@@ -1105,6 +1173,15 @@ MStatus MtohRenderOverride::Render(
         if (!_initializationSucceeded) {
             return MStatus::kFailure;
         }
+    }
+
+    if (clearedForModeSwitch) {
+        // The rebuild above recreated the Maya scene index, dropping all VP2 render-item
+        // adapters. Maya's data server only re-sends *changed* render items, so unchanged
+        // native objects would vanish; force a full re-send now that the clear/reinit has
+        // completed. Issuing it here (rather than from the attribute callback) keeps it
+        // ordered after the rebuild, so it cannot race the teardown.
+        MGlobal::executeCommandOnIdle("ogs -reset");
     }
 
     _SetRenderPurposeTags(delegateParams);
@@ -1239,6 +1316,44 @@ MStatus MtohRenderOverride::Render(
     const bool usingBBoxMode = (currentDisplayStyle & MHWRender::MFrameContext::kBoundingBox) != 0;
     _bboxSceneIndex->Enable(usingBBoxMode);
     
+    // Legacy selection highlighting must stop acting as the highlight when the pixel outline owns it,
+    // or when highlighting is disabled outright. Goes through the same helper as the outline manager
+    // install and the legacy Fvp selection-highlight scene indices, so the three cannot disagree and
+    // leave the selection with no highlight at all.
+    renderItemOptions.suppressLegacyMayaNativeHighlight = _SuppressLegacySelectionHighlight();
+    // kWireFrame is set in pure wireframe and wireframe-on-shaded alike, and the treatment no longer
+    // distinguishes them: whenever a wireframe is drawn at all, VP2's is left exactly as it was and the
+    // outline is simply added on top. Only fully shaded/textured modes hide the lone selection wire.
+    //
+    // kShadeActiveOnly counts as drawing wireframes: in "Shade Selected Items" every *unselected*
+    // object is drawn as wireframe, so this is not an all-shaded mode and VP2's behaviour should be
+    // left alone. Whether Maya also sets kWireFrame there is not something to rely on.
+    renderItemOptions.viewportDrawsWireframes
+        = (currentDisplayStyle
+           & (MHWRender::MFrameContext::kWireFrame | MHWRender::MFrameContext::kShadeActiveOnly))
+        != 0;
+
+    // A prim's wireframe color is pulled once and only re-pulled when the prim is dirtied, so a
+    // selection change has to invalidate the prims involved or their color goes stale.
+    // MhDirtyLeadObjectSceneIndex otherwise dirties only the lead object, which is why a marquee
+    // selection used to leave every non-lead prim showing the wrong color, and why deselecting a group
+    // left some prims stuck on the selection color until individually re-selected.
+    //
+    // Done here rather than in SelectionChanged() for two reasons: the Fvp selection is guaranteed to
+    // have been updated by now, and scene index mutation belongs on the render thread.
+    //
+    // Dirties the union of the previous and current selection rather than the exact delta: prims still
+    // selected are re-dirtied harmlessly, and the cost is bounded by the size of the selection rather
+    // than the size of the scene.
+    if (_selection && _dirtyLeadObjectSceneIndex && _selectionColorsDirty.exchange(false)) {
+        SdfPathVector currentlySelected = _selection->GetFullySelectedPaths();
+        SdfPathVector pathsToDirty      = currentlySelected;
+        pathsToDirty.insert(
+            pathsToDirty.end(), _previouslySelectedPaths.begin(), _previouslySelectedPaths.end());
+        _dirtyLeadObjectSceneIndex->dirtySelectionRelatedPrims(pathsToDirty);
+        _previouslySelectedPaths = std::move(currentlySelected);
+    }
+
     // Set Required Hydra Repr (Wireframe/WireframeOnShaded/Shaded)
     // Hydra supports Wireframe and WireframeOnSurfaceRefined repr for wireframe on shaded mode.
     // Refinement level for Hydra is set in Hydra Render Globals
@@ -1266,6 +1381,26 @@ MStatus MtohRenderOverride::Render(
                                                      /*needsReprChanged=*/false, delegateParams.refineLevel);
 
         _oldRefineLevel = delegateParams.refineLevel;
+    }
+
+    // Maya does not re-send unchanged render items on a display style change, so UpdateRenderItems
+    // cannot fix up their treatment. This walks the render item adapters, so trigger it only on the
+    // bits the treatment depends on -- toggling X-ray or backface culling changes the display style
+    // without changing whether wireframes are drawn.
+    const unsigned int treatmentRelevantStyleBits
+        = static_cast<unsigned int>(MHWRender::MFrameContext::kWireFrame)
+        | static_cast<unsigned int>(MHWRender::MFrameContext::kGouraudShaded)
+        | static_cast<unsigned int>(MHWRender::MFrameContext::kTextured)
+        // Flat shading is a shaded mode like Gouraud, and "shade active only" decides whether
+        // unselected objects are drawn as wireframe. Both change the treatment, and omitting them meant
+        // a switch that only altered these bits -- Smooth Shade All to Flat Shade Selected Items, say --
+        // left every adapter on the previous style's treatment, so objects stayed hidden or shown from
+        // whichever mode came before. That is what made it look intermittent and order-dependent.
+        | static_cast<unsigned int>(MHWRender::MFrameContext::kFlatShaded)
+        | static_cast<unsigned int>(MHWRender::MFrameContext::kShadeActiveOnly);
+    if (_mayaHydraSceneIndex
+        && ((currentDisplayStyle ^ _oldDisplayStyle) & treatmentRelevantStyleBits) != 0) {
+        _mayaHydraSceneIndex->RefreshRenderItemLegacyHighlightTreatment(renderItemOptions);
     }
 
     // Set MSAA as per Maya AntiAliasing settings
@@ -1395,6 +1530,88 @@ MStatus MtohRenderOverride::Render(
             _mayaHydraSceneIndex->SetShadowsEnabled(enableShadows);
         }
 
+        // Every dirty flag below is consumed only when there is an outline to push it to, so that a
+        // change flagged while the outline is absent (Legacy mode, a non-Storm delegate, mid-rebuild)
+        // is not swallowed. The short-circuit is what does that -- keep outlineLive on the left of
+        // each exchange().
+        const bool outlineLive = _outline && _selection;
+
+        // Rebuild and push the outline style only when a color preference changed
+        // (flagged by ColorPreferencesChanged / outline (re)creation).
+        if (outlineLive && _outlineStyleDirty.exchange(false)) {
+            _outline->SetStyle(_BuildOutlineStyle());
+        }
+        
+        // A stationary cursor can end up over a different prim purely because the view moved --
+        // playback, an animated camera, a scripted camera move, a viewport resize -- and no mouse
+        // event is delivered to flag it. Compare the view-projection matrix so those cases dirty the
+        // hover too, instead of leaving the outline on the prim that used to be under the cursor.
+        // Only while genuinely hovering, so a non-hovering viewport pays nothing.
+        HoverState* hover = _GetHoverState(_currentPanelName);
+        if (hover && hover->active.load() && _globals.enableInteractiveHitTest) {
+            const MMatrix viewProjMatrix
+                = drawContext.getMatrix(MHWRender::MFrameContext::kViewProjMtx);
+            if (viewProjMatrix != hover->lastViewProjMatrix) {
+                hover->lastViewProjMatrix = viewProjMatrix;
+                hover->dirty.store(true);
+            }
+        }
+
+        // Rebuild and push the outline inputs when the selection changed (flagged by
+        // SelectionChanged / outline (re)creation) or when the hover changed (cursor moved, or the
+        // view moved under it), avoiding a per-frame GetFullySelectedPaths() allocation and
+        // SetInputs call on an otherwise unchanged frame.
+        const bool selectionChanged = outlineLive && _outlineInputsDirty.exchange(false);
+        const bool hoverChanged     = outlineLive && hover && hover->dirty.exchange(false);
+
+        // With one OutlineManager shared by every panel, the manager holds whatever the last panel
+        // pushed -- so while hover is on, each panel must push its own inputs every frame or it draws
+        // the previous panel's hover. The dirty-flag optimisation stays valid for the selection-only
+        // case, since selection is global and every panel wants the same paths.
+        const bool hoverEnabled
+            = _globals.enableInteractiveHitTest && _globals.enableHoverOutline;
+        if (outlineLive && (selectionChanged || hoverChanged || hoverEnabled)) {
+            HVT_NS::Outline::OutlineInputs inputs;
+            inputs.selectedPaths = _selection->GetFullySelectedPaths();
+            // Set the lead (last-selected) object
+            if (_leadObjectPathTracker) {
+                const auto& leadSelections = _leadObjectPathTracker->getLeadObjectPrimSelections();
+                if (!leadSelections.empty()) {
+                    inputs.leadPath = leadSelections.front().primPath;
+                }
+            }
+            // Only the transient highlight prims are excluded. excludePaths affects the default
+            // (whole-scene) outline bucket alone, so excluding MAYA_NATIVE_ROOT here -- as this used
+            // to -- meant enableDefaultOutlines silently covered USD prims only.
+            inputs.excludePaths = { _highlightHierarchyPrefix };
+
+            // Path-based hover: pick the prim under the cursor and feed it as a hover
+            // path, so it is rendered into the base buffer and outlined across its whole
+            // visible silhouette (occlusion-aware), exactly like a host-supplied hover
+            // path. The pick is small (frustum-culled to the cursor) and runs only while
+            // genuinely hovering (cursor inside, no button held). See _ResolveHoverPath().
+            //
+            // Two independent, default-off options gate the two halves:
+            //   enableInteractiveHitTest -> run the per-move HdxPickTask ("hit test").
+            //   enableHoverOutline       -> push the resolved path so the outline is drawn.
+            // Running the pick without pushing the path lets the hit-test cost be measured in
+            // isolation; drawing requires the hit test to have resolved a path first.
+            if (hover && hover->active.load() && _globals.enableInteractiveHitTest) {
+                const SdfPath hoverPath = _ResolveHoverPath(drawContext);
+                if (!hoverPath.IsEmpty() && _globals.enableHoverOutline) {
+                    inputs.hoverPaths = { hoverPath };
+                    // A hovered prim already in the selection uses the selected-hover color.
+                    inputs.isHoverSelected =
+                        std::any_of(inputs.selectedPaths.begin(), inputs.selectedPaths.end(),
+                            [&hoverPath](const SdfPath& sel) {
+                                return hoverPath == sel || hoverPath.HasPrefix(sel);
+                            });
+                }
+            }
+
+            _outline->SetInputs(std::move(inputs));
+        }
+
 #ifndef MAYAHYDRALIB_OIT_ENABLED
         // This is required for HdStorm to display transparency.
         // We should fix this upstream, so HdStorm can setup
@@ -1422,6 +1639,58 @@ MtohRenderOverride* MtohRenderOverride::GetByName(TfToken rendererName)
         }
     }
     return nullptr;
+}
+
+bool MtohRenderOverride::_UseOutlineSelectionHighlighting() const
+{
+    return _isUsingHdSt && _globals.useOutlineSelectionHighlighting
+        && !_globals.disableSelectionHighlight;
+}
+
+bool MtohRenderOverride::_SuppressLegacySelectionHighlight() const
+{
+    return _UseOutlineSelectionHighlighting() || _globals.disableSelectionHighlight;
+}
+
+HVT_NS::Outline::OutlineStyle MtohRenderOverride::_BuildOutlineStyle() const
+{
+    HVT_NS::Outline::OutlineStyle style;
+    style.selectedColor           = { 0.10f, 0.55f, 1.0f,  0.7f  }; // blue
+    style.selectedHoverColor      = { 1.0f,  0.64f, 0.12f, 1.0f  }; // orange
+    style.selectionLeadColor      = { 0.18f, 0.95f, 0.64f, 0.7f  }; // green
+    style.selectionLeadHoverColor = { 1.0f,  0.64f, 0.12f, 1.0f  }; // orange
+    style.overlayColor            = { 0.0f,  0.0f,  0.0f,  1.0f  }; // black
+    style.overlayHoverColor       = { 0.6f,  0.6f,  0.7f,  1.0f  }; // light gray
+    style.unselectedHoverColor    = { 1.0f,  0.64f, 0.12f, 1.0f  }; // orange
+    style.defaultColor            = { 0.1f,  0.1f,  0.1f,  1.0f  }; // gray
+
+    // Faint per-prim (whole-scene) outlines are opt-in: they force the outline manager's
+    // whole-scene prim-id pass every frame, which is expensive on heavy scenes. Set explicitly from
+    // the render global rather than relying on the toolbox default, which is also false but is the
+    // toolbox's choice to change (it was true before HVT 45efce4).
+    style.enableDefaultOutlines   = _globals.enableDefaultOutlines;
+
+
+    // Override the outline colors with the host's color preferences when available, so the outline
+    // highlight matches Maya's selection colors. The values above act as fallbacks for any
+    // preference that cannot be resolved. Only the colors with a clear preference equivalent are
+    // overridden.
+    //
+    // The preference replaces the fallback in full, alpha included -- deliberately, so the outline
+    // shows exactly the color the user configured. The fallbacks' 0.7 alpha is therefore a property
+    // of the fallbacks only, not a target the preference is blended into.
+    Fvp::ColorPreferences& colorPrefs = Fvp::ColorPreferences::getInstance();
+    GfVec4f prefColor;
+    // Non-lead selected prims use the secondary (active) selection color.
+    if (colorPrefs.getColor(FvpColorPreferencesTokens->wireframeSelectionSecondary, prefColor)) {
+        style.selectedColor = prefColor;
+    }
+    // The lead selection prim uses the primary selection color.
+    if (colorPrefs.getColor(FvpColorPreferencesTokens->wireframeSelection, prefColor)) {
+        style.selectionLeadColor = prefColor;
+    }
+
+    return style;
 }
 
 void MtohRenderOverride::_ClearMayaHydraSceneIndex()
@@ -1489,8 +1758,37 @@ void MtohRenderOverride::_InitHydraResources(
             getLayerSettings,
             firstRenderTaskPath,
             hvt::TaskManager::InsertionOrder::insertBefore);
+
+        // Install pixel-based outline on the main Storm pass (pass 0).
+        // Pass 0 is guaranteed to be Storm when _isUsingHdSt is true, and its render
+        // index contains all scene geometry, which the prim-ID tasks must be able to see.
+        // The secondary graphics pass (pass 1) holds secondary-graphics prims (wireframe
+        // highlights, bounding boxes, light/camera gizmos, NURBS curves, viewport
+        // decorations) and cannot render prim IDs for USD prims, so it is not a candidate
+        // for the outline tasks.
+        {
+            constexpr int outlinePassIndex = 0;
+            const hvt::FramePassPtr& outlinePass = _GetFramePass(outlinePassIndex);
+            // Only install the outline when the Outline selection-highlight mode is active, and
+            // never when selection highlighting is disabled (test/diagnostic floor).
+            if (outlinePass && _UseOutlineSelectionHighlighting()) {
+                // Insert outline tasks before colorCorrectionTask so they execute (and are
+                // presented) before PresentTask. Inserting at end would place them after
+                // PresentTask, rendering the outline into a buffer that has already been
+                // blitted to screen and will be cleared at the start of the next frame.
+                const SdfPath ccPath =
+                    outlinePass->GetTaskManager()->GetTaskPath(TfToken("colorCorrectionTask"));
+                _outline = std::make_unique<HVT_NS::Outline::OutlineManager>();
+                _outline->Install(*outlinePass,
+                                  ccPath,
+                                  hvt::TaskManager::InsertionOrder::insertBefore);
+                _outline->SetStyle(_BuildOutlineStyle());
+                // Freshly (re)created outline: push the current selection on the next Render.
+                _outlineInputsDirty = true;
+            }
+        }
     }
-        
+
     //Set passes constant parameters
     for (int i=0;i< _GetNumFramePasses(); ++i) {
         const auto& currentPass = _GetFramePass(i);
@@ -1751,6 +2049,18 @@ void MtohRenderOverride::ClearHydraResources(bool fullReset)
     _selection.reset();
     _wireframeColorInterfaceImp.reset();
     _leadObjectPathTracker.reset();
+    // Must stay ahead of the frame pass teardown below: HVT documents that the frame pass outlives
+    // the OutlineManager installed into it (see the \pre on OutlineManager::Install), because the
+    // manager caches the pass and reads it on every commit. Do not move this after the pass cleanup.
+    _outline.reset();
+    // Reset the legacy wireframe selection-highlight scene indices so stale RefPtrs do not
+    // survive across a clear/reinit cycle (e.g. when toggling the selection-highlight mode).
+    _geomSubsetWhSi.Reset();
+    _meshWhSi.Reset();
+    _niInstanceWhSi.Reset();
+    _niPrototypeWhSi.Reset();
+    _piInstancerWhSi.Reset();
+    _piPrototypeWhSi.Reset();
     _oldDisplayStyle = 0;
     _oldRefineLevel = 0;
 
@@ -1864,12 +2174,17 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
     _reprSelectorSceneIndex->addExcludedSceneRoot(MAYA_NATIVE_ROOT);
     _reprSelectorSceneIndex->SetReprType(Fvp::ReprSelectorSceneIndex::RepSelectorType::Default, false, _globals.delegateParams.refineLevel);
 
-    // Setup selection highlight scene indices
-    {
-        //// At time of writing, wireframe selection highlighting of Maya native data
-        //// is done by Maya at render item creation time, so avoid double wireframe
-        //// selection highlighting by excluding MAYA_NATIVE_ROOT.
-
+    // Setup selection highlight scene indices.
+    //
+    // The legacy wireframe selection-highlight scene indices are only used when the pixel outline is
+    // not the highlight mechanism (Outline mode off, or a non-Storm delegate that cannot host the
+    // outline tasks), and never when selection highlighting is disabled outright (test/diagnostic
+    // floor).
+    //
+    // At time of writing, wireframe selection highlighting of Maya native data is done by Maya at
+    // render item creation time, so avoid double wireframe selection highlighting by excluding
+    // MAYA_NATIVE_ROOT.
+    if (!_UseOutlineSelectionHighlighting() && !_globals.disableSelectionHighlight) {
 #if PXR_VERSION >= 2405
         _lastFilteringSceneIndexBeforeCustomFiltering = _geomSubsetWhSi = Fvp::GeomSubsetWhSi::New(_lastFilteringSceneIndexBeforeCustomFiltering, _highlightHierarchyPrefix, _wireframeColorInterfaceImp);
         _geomSubsetWhSi->AddExcludedPath(MAYA_NATIVE_ROOT);
@@ -1907,6 +2222,12 @@ void MtohRenderOverride::_CreateSceneIndicesChainAfterMergingSceneIndex(const MH
 
 void MtohRenderOverride::_RemovePanel(MString panelName)
 {
+    // Stop tracking the mouse for this panel BEFORE tearing anything down. This
+    // uninstalls the event filter and clears the hover state, so no queued mouse
+    // move can schedule a refresh or push hover inputs into a half-removed scene
+    // index chain while RemoveRenderViewData() below cascades prim removals.
+    _RemoveHoverEventFilter(panelName);
+
     auto foundPanelCallbacks = _FindPanelCallbacks(panelName);
     if (foundPanelCallbacks != _renderPanelCallbacks.end()) {
         MMessage::removeCallbacks(foundPanelCallbacks->second);
@@ -1918,6 +2239,214 @@ void MtohRenderOverride::_RemovePanel(MString panelName)
         constexpr bool fullReset = false;
         ClearHydraResources(fullReset);
     }
+}
+
+MtohRenderOverride::HoverState* MtohRenderOverride::_GetHoverState(const MString& panelName)
+{
+    const auto it = _hoverStates.find(std::string(panelName.asChar()));
+    return it == _hoverStates.end() ? nullptr : it->second.get();
+}
+
+void MtohRenderOverride::_InstallHoverEventFilter(const MString& panelName)
+{
+#ifdef MAYAHYDRA_HAS_QT
+    if (!MayaHydra::enableHover()) {
+        return;
+    }
+
+    const std::string key(panelName.asChar());
+    if (_hoverEventFilters.find(key) != _hoverEventFilters.end()) {
+        return; // Already installed for this panel.
+    }
+
+    M3dView view;
+    if (M3dView::getM3dViewFromModelPanel(panelName, view) != MStatus::kSuccess) {
+        return;
+    }
+
+    QWidget* widget = view.widget();
+    if (!widget) {
+        return;
+    }
+
+    // Created before the filter, so the first mouse event already has somewhere to write.
+    _hoverStates.emplace(key, std::make_unique<HoverState>());
+
+    auto filter = std::make_unique<MayaHydra::MhHoverEventFilter>(
+        widget,
+        [this, key](int deviceX, int deviceY, bool active) {
+            _SetHoverPosition(MString(key.c_str()), deviceX, deviceY, active);
+        });
+    _hoverEventFilters.emplace(key, std::move(filter));
+#else
+    (void)panelName;
+#endif
+}
+
+void MtohRenderOverride::_RemoveHoverEventFilter(const MString& panelName)
+{
+    // Drop this panel's hover state so a subsequent Render() cannot push a stale cursor into the
+    // OutlineManager (e.g. during teardown or renderer switch). Other panels are untouched.
+    _hoverStates.erase(std::string(panelName.asChar()));
+
+#ifdef MAYAHYDRA_HAS_QT
+    _hoverEventFilters.erase(std::string(panelName.asChar()));
+#else
+    (void)panelName;
+#endif
+}
+
+void MtohRenderOverride::_SetHoverPosition(
+    const MString& panelName, int deviceX, int deviceY, bool active)
+{
+    // Ignore mouse activity unless Hydra is fully up. This prevents scheduling a
+    // viewport refresh (and the Render()/outline sync it drives) while resources are
+    // being (re)created or torn down -- e.g. during a renderer switch, which is when
+    // removing the scene index chain is most fragile.
+    if (!_initializationSucceeded) {
+        return;
+    }
+
+    HoverState* hover = _GetHoverState(panelName);
+    if (!hover) {
+        return;
+    }
+
+    // Nothing consumes hover state unless the interactive hit test is on -- Render() gates both the
+    // view-change check and the pick on this same global. Without this, the default configuration
+    // (both hover options off) still scheduled a viewport refresh for every mouse move over a Hydra
+    // viewport, redrawing continuously to produce no visible change.
+    //
+    // The event filter stays installed either way, so enabling the option takes effect on the next
+    // mouse move without having to reinstall anything.
+    if (!_globals.enableInteractiveHitTest) {
+        // Drop any state left over from when it was enabled, so re-enabling does not briefly resolve
+        // a hover at a stale cursor position. Only acts on the disabling transition.
+        if (hover->active.exchange(false)) {
+            hover->deviceX.store(-1);
+            hover->deviceY.store(-1);
+            hover->dirty.store(true);
+        }
+        return;
+    }
+
+    // Coalesce redundant updates so a stationary cursor doesn't force refreshes.
+    if (hover->active.load() == active && hover->deviceX.load() == (active ? deviceX : -1)
+        && hover->deviceY.load() == (active ? deviceY : -1)) {
+        return;
+    }
+
+    hover->deviceX.store(active ? deviceX : -1);
+    hover->deviceY.store(active ? deviceY : -1);
+    hover->active.store(active);
+    hover->dirty.store(true);
+
+    // Schedule a viewport refresh so Render() runs and re-resolves the hover.
+    M3dView view;
+    if (M3dView::getM3dViewFromModelPanel(panelName, view) == MStatus::kSuccess) {
+        view.scheduleRefresh();
+    }
+}
+
+SdfPath MtohRenderOverride::_ResolveHoverPath(const MHWRender::MDrawContext& drawContext)
+{
+    // The panel being drawn, not "the" hover state: the cursor is in one panel and every other panel
+    // rendering this frame must resolve no hover at all.
+    const HoverState* hover = _GetHoverState(_currentPanelName);
+    if (!hover || !hover->active.load()) {
+        return SdfPath();
+    }
+    const int deviceX = hover->deviceX.load();
+    const int deviceY = hover->deviceY.load();
+    if (deviceX < 0 || deviceY < 0) {
+        return SdfPath();
+    }
+
+    // The outline is installed on frame pass 0 (see setup()); pick against that pass so
+    // hover matches the geometry the outline sees (not secondary-graphics gizmos).
+    constexpr int outlinePassIndex = 0;
+    const hvt::FramePassPtr& outlinePass = _GetFramePass(outlinePassIndex);
+    if (!outlinePass) {
+        return SdfPath();
+    }
+
+    MStatus status;
+    const MMatrix viewMatrix = drawContext.getMatrix(MHWRender::MFrameContext::kViewMtx, &status);
+    if (status != MStatus::kSuccess) {
+        return SdfPath();
+    }
+    const MMatrix projMatrix =
+        drawContext.getMatrix(MHWRender::MFrameContext::kProjectionMtx, &status);
+    if (status != MStatus::kSuccess) {
+        return SdfPath();
+    }
+    int view_x = 0, view_y = 0, view_w = 0, view_h = 0;
+    if (drawContext.getViewportDimensions(view_x, view_y, view_w, view_h) != MStatus::kSuccess
+        || view_w <= 0 || view_h <= 0) {
+        return SdfPath();
+    }
+
+    // The cursor arrives in Qt's top-left-origin device pixels; Maya's pick region is bottom-left
+    // origin, so flip against the viewport height. Measured on a real viewport, the widget height the
+    // Qt position is relative to and the Hydra viewport height agree exactly, and the viewport origin
+    // is (0,0) -- so flipping here rather than in the event filter is arithmetically identical, and
+    // this is the smaller change.
+    //
+    // The bounds check covers both ends, unlike the original which had no upper bound: a flipped
+    // coordinate past the top of the viewport would otherwise produce a nonsensical pick matrix.
+    const int flippedY = view_h - 1 - deviceY;
+    if (deviceX < view_x || deviceX >= view_x + view_w || flippedY < view_y
+        || flippedY >= view_y + view_h) {
+        return SdfPath();
+    }
+    const unsigned int sel_x = static_cast<unsigned int>(deviceX);
+    const unsigned int sel_y = static_cast<unsigned int>(flippedY);
+    constexpr unsigned int sel_w = 1;
+    constexpr unsigned int sel_h = 1;
+
+    // Compute a pick matrix that expands the 1x1 cursor region to the full viewport,
+    // mirroring _PickByRegion().
+    MMatrix adjustedProjMatrix;
+    {
+        const double center_x = sel_x + sel_w * 0.5;
+        const double center_y = sel_y + sel_h * 0.5;
+
+        MMatrix pickMatrix;
+        pickMatrix[0][0] = view_w / double(sel_w);
+        pickMatrix[1][1] = view_h / double(sel_h);
+        pickMatrix[3][0] = (view_w - 2.0 * (center_x - view_x)) / double(sel_w);
+        pickMatrix[3][1] = (view_h - 2.0 * (center_y - view_y)) / double(sel_h);
+
+        adjustedProjMatrix = projMatrix * pickMatrix;
+    }
+
+    HdxPickTaskContextParams pickParams;
+    pickParams.resolution.Set(sel_w, sel_h);
+    pickParams.pickTarget = HdxPickTokens->pickPrimsAndInstances;
+    pickParams.resolveMode = HdxPickTokens->resolveNearestToCenter;
+    pickParams.doUnpickablesOcclude = false;
+    pickParams.viewMatrix.Set(viewMatrix.matrix);
+    pickParams.projectionMatrix.Set(adjustedProjMatrix.matrix);
+    pickParams.collection = _renderCollection;
+    pickParams.collection.SetExcludePaths({ _highlightHierarchyPrefix });
+
+    HdxPickHitVector hits;
+    pickParams.outHits = &hits;
+    outlinePass->Pick(pickParams);
+
+    if (hits.empty()) {
+        return SdfPath(); // background / no prim under the cursor
+    }
+
+    // resolveNearestToCenter yields the hit closest to the cursor; guard with a depth
+    // compare in case more than one is returned.
+    const HdxPickHit* nearest = &hits.front();
+    for (const HdxPickHit& hit : hits) {
+        if (hit.normalizedDepth < nearest->normalizedDepth) {
+            nearest = &hit;
+        }
+    }
+    return nearest->objectId;
 }
 
 void MtohRenderOverride::SelectionChanged(
@@ -1985,6 +2514,45 @@ void MtohRenderOverride::SelectionChanged(
     // their own selection tracker.  The selection tracker makes the selection
     // and selection-derived data availabel to a selection task or selection
     // tasks through the task context data.  PPT, 18-Sep-2023
+
+    // The outline inputs are derived from the selection; flag them for a refresh on the
+    // next Render.
+    _outlineInputsDirty = true;
+
+    // So are the prims' wireframe colors, which only re-pull when dirtied. See where this is consumed
+    // in Render() for why the invalidation happens there rather than here.
+    _selectionColorsDirty = true;
+}
+
+void MtohRenderOverride::ColorPreferencesChanged()
+{
+    // The outline style is derived from the host color preferences; flag it for a rebuild
+    // on the next Render and request a redraw so the change is reflected immediately.
+    _outlineStyleDirty = true;
+
+    // The legacy wireframe highlighting caches the same preferences, so refresh those too --
+    // otherwise a color edit applied to the outline but not to the Legacy mode wireframes, which
+    // stayed on the values read when the scene index chain was built.
+    //
+    // This only updates the cache. The highlight prims re-pull their displayColor when something
+    // dirties them, and a color preference change does not; the new colors therefore appear on the
+    // next event that does (in practice the next selection change) rather than instantly. Making it
+    // immediate needs a dirty-all entry point on Fvp::BaseWhSi, which does not exist yet.
+    if (_wireframeColorInterfaceImp) {
+        _wireframeColorInterfaceImp->RefreshColors();
+    }
+
+    // Refresh only the panels this override drives, rather than issuing "refresh -f". Every
+    // MtohRenderOverride registers its own color-preference observer, so a global refresh per
+    // instance meant one preference edit queued N full refreshes of every viewport. Same mechanism
+    // _SetHoverPosition() uses.
+    for (const auto& panelAndCallbacks : _renderPanelCallbacks) {
+        M3dView view;
+        if (M3dView::getM3dViewFromModelPanel(panelAndCallbacks.first, view)
+            == MStatus::kSuccess) {
+            view.scheduleRefresh();
+        }
+    }
 }
 
 MHWRender::DrawAPI MtohRenderOverride::supportedDrawAPIs() const
@@ -1995,6 +2563,10 @@ MHWRender::DrawAPI MtohRenderOverride::supportedDrawAPIs() const
 MStatus MtohRenderOverride::setup(const MString& destination)
 {
     MStatus status;
+
+    // Maya calls setup() with the destination panel before each of that panel's renders, so this is
+    // how Render() knows which panel's hover state to use.
+    _currentPanelName = destination;
 
     auto panelNameAndCallbacks = _FindPanelCallbacks(destination);
     if (panelNameAndCallbacks == _renderPanelCallbacks.end()) {
@@ -2021,6 +2593,10 @@ MStatus MtohRenderOverride::setup(const MString& destination)
 
         _renderPanelCallbacks.emplace_back(destination, newCallbacks);
     }
+
+    // Track the mouse over this panel's viewport for hover highlighting
+    // (idempotent; no-op when Qt is unavailable or hover is disabled).
+    _InstallHoverEventFilter(destination);
 
 #ifdef MAYA_HAS_VIEW_SELECTED_OBJECT_API
     if (!_viewSelectedChangedCb) {

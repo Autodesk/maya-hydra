@@ -55,6 +55,9 @@ public:
     Ufe::Path getLeadObjectUfePath() const {return _leadObjectUfePath;}
 
     MAYAHYDRALIB_API
+    const Fvp::PrimSelections& getLeadObjectPrimSelections() const {return _leadObjectPrimSelections;}
+
+    MAYAHYDRALIB_API
     void setLeadObjectUfePath(const Ufe::Path& newLeadObjectUfePath);
 
     MAYAHYDRALIB_API

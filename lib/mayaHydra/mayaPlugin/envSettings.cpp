@@ -24,6 +24,11 @@ TF_DEFINE_ENV_SETTING(
     false,
     "Use single frame pass when using the same renderer for all passes.");
 
+TF_DEFINE_ENV_SETTING(
+    MAYA_HYDRA_ENABLE_HOVER,
+    true,
+    "Enable viewport hover highlighting (outline of the object under the cursor).");
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace MAYAHYDRA_NS_DEF {
@@ -33,6 +38,13 @@ namespace MAYAHYDRA_NS_DEF {
         static const bool _useSingleFramePass
             = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_SINGLE_FRAME_PASS);
         return _useSingleFramePass;
+    }
+
+    bool enableHover()
+    {
+        static const bool _enableHover
+            = PXR_NS::TfGetEnvSetting(PXR_NS::MAYA_HYDRA_ENABLE_HOVER);
+        return _enableHover;
     }
 
 } // namespace MAYAHYDRA_NS_DEF

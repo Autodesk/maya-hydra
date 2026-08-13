@@ -35,8 +35,16 @@ typedef PXR_NS::TfRefPtr<const MhDirtyLeadObjectSceneIndex> MhDirtyLeadObjectSce
 
 
 /// \class MhDirtyLeadObjectSceneIndex
-/// This class is responsible for dirtying the current and previous maya selection lead objects prim
-/// path when a change in the lead object selection has happened.
+/// This class is responsible for invalidating the wireframe colors of prims whose selection state
+/// changed, so they re-pull a color that reflects it.
+///
+/// Two entry points, both needed: dirtyLeadObjectRelatedSelections() for a change of *which* object is
+/// the lead, and dirtySelectionRelatedPrims() for a change of *what* is selected. The second exists
+/// because the wireframe color is only re-pulled when a prim is dirtied, and nothing else does it on a
+/// selection change -- without it, only the lead object ever showed the right color, so a marquee
+/// selection left every non-lead prim stale.
+///
+/// The name is now narrower than the responsibility; kept for the moment to avoid churn.
 class MhDirtyLeadObjectSceneIndex : public PXR_NS::HdSingleInputFilteringSceneIndexBase
     , public Fvp::InputSceneIndexUtils<MhDirtyLeadObjectSceneIndex>
 {
@@ -61,6 +69,13 @@ public:
 
     MAYAHYDRALIB_API
     void dirtyLeadObjectRelatedSelections(const Fvp::PrimSelections& previousLeadObjectPrimSelections, const Fvp::PrimSelections& currentLeadObjectPrimSelections);
+
+    /// Invalidate the wireframe colors of \p primPaths, for prims whose selection state just changed.
+    ///
+    /// Call with the prims that were selected *or* deselected -- both need re-pulling, one to pick up
+    /// the selection color and one to drop it. Bounded by the size of the selection, not the scene.
+    MAYAHYDRALIB_API
+    void dirtySelectionRelatedPrims(const PXR_NS::SdfPathVector& primPaths);
 
 protected:
     

@@ -113,6 +113,12 @@ public:
     MAYAHYDRALIB_API
     void SetPlaybackState(bool isPlaybackRunning);
 
+    /// Hide this render item because it is only drawing legacy selection highlighting, which another
+    /// mechanism (the pixel outline) owns. VP2 reuses one wire item per shape across select/deselect,
+    /// so this is re-evaluated on every update rather than decided once at creation.
+    MAYAHYDRALIB_API
+    void SetSelectionHighlightSuppressed(bool suppressed);
+
     MAYAHYDRALIB_API
     bool GetVisible() override;
 
@@ -219,6 +225,7 @@ private:
     MColor                      _wireframeColor = { 1.f, 1.f, 1.f, 1.f };
     bool                        _isHideOnPlayback = false;
     bool                        _isInPlayback = false;
+    bool                        _selectionHighlightSuppressed = false;
     bool                        _isArnoldSkyDomeLightTriangleShape = false;
     GfBBox3d                    _bounds;//Bounding box
     TfToken                     _purposeRenderTag;
