@@ -114,6 +114,9 @@ public:
     void SetPlaybackState(bool isPlaybackRunning);
 
     MAYAHYDRALIB_API
+    void SetWireframeSelectionHighlightEnabled(bool enabled);
+
+    MAYAHYDRALIB_API
     bool GetVisible() override;
 
     MAYAHYDRALIB_API
@@ -222,6 +225,7 @@ private:
     MColor                      _wireframeColor = { 1.f, 1.f, 1.f, 1.f };
     bool                        _isHideOnPlayback = false;
     bool                        _isInPlayback = false;
+    bool                        _wireframeSelectionHighlightEnabled = true;
     bool                        _isArnoldSkyDomeLightTriangleShape = false;
     GfBBox3d                    _bounds;//Bounding box
     TfToken                     _purposeRenderTag;

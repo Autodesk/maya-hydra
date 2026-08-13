@@ -744,6 +744,24 @@ void MtohRenderGlobals::BuildOptionsMenu(
            << ','                                                         // Attribute name
            << quote(MtohTokens->mtohMaximumShadowMapResolution.GetText()) // Label
            << ", $fromAE);\n";
+
+        // Enum attribute: renders as a dropdown (Outline Selection / Legacy Selection).
+        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
+           << ',' << quote("Selection highlight mode (Outline or Legacy)") << ',' // Description
+           << quote(_MangleName(MtohTokens->mayaHydraSelectionHighlightMode).GetString())
+           << ','                                                          // Attribute name
+           << quote(MtohTokens->mayaHydraSelectionHighlightMode.GetText()) // Label
+           << ", $fromAE);\n";
+
+        // Bool attribute: renders as a checkbox.
+        ss << "\tmtohRenderOverride_AddAttribute(" << quote(rendererDesc.rendererName.GetString())
+           << ',' << quote("Outline the object under the cursor. Requires the Outline selection "
+                           "highlight mode.")
+           << ','                                                             // Description
+           << quote(_MangleName(MtohTokens->mayaHydraOutlineHoverHighlighting).GetString())
+           << ','                                                             // Attribute name
+           << quote(MtohTokens->mayaHydraOutlineHoverHighlighting.GetText()) // Label
+           << ", $fromAE);\n";
     }
 
     {
@@ -955,6 +973,46 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
             return mayaObject;
         }
     }
+    if (filter(MtohTokens->mayaHydraSelectionHighlightMode)) {
+#if PXR_VERSION <= 2411
+        // USD 24.11's HgiGL corrupts non-zero integer prim ids sampled in the outline compute
+        // shader, so the Outline selection-highlight mode cannot work. Offer Legacy only.
+        static const TfTokenVector kSelectionHighlightModes = { TfToken("Legacy Selection") };
+#else
+        static const TfTokenVector kSelectionHighlightModes
+            = { TfToken("Outline Selection"), TfToken("Legacy Selection") };
+#endif
+        _CreateEnumAttribute(
+            node,
+            filter.mayaString(),
+            kSelectionHighlightModes,
+            kSelectionHighlightModes[0], // default = first entry (Legacy on 24.11, Outline otherwise)
+            userDefaults);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraOutlineHoverHighlighting)) {
+        _CreateBoolAttribute(
+            node,
+            filter.mayaString(),
+            defGlobals.outlineHoverHighlighting,
+            userDefaults);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
+    // Script-only: deliberately absent from BuildOptionsMenu.
+    if (filter(MtohTokens->mayaHydraEnableDefaultOutlines)) {
+        _CreateBoolAttribute(
+            node,
+            filter.mayaString(),
+            defGlobals.enableDefaultOutlines,
+            userDefaults);
+        if (filter.attributeFilter()) {
+            return mayaObject;
+        }
+    }
 
     for (const auto& rit : MtohGetRendererSettings()) {
         const auto rendererName = rit.first;
@@ -1154,6 +1212,34 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
             filter.mayaString(),
             globals.delegateParams.refineLevel,
             storeUserSetting);
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraSelectionHighlightMode)) {
+#if PXR_VERSION <= 2411
+        // On USD 24.11 the Outline mode is unsupported (see above / renderGlobals.cpp enum
+        // creation), so fall back to Legacy when the attribute is unset.
+        TfToken mode("Legacy Selection");
+#else
+        TfToken mode("Outline Selection");
+#endif
+        _GetAttribute(node, filter.mayaString(), mode, storeUserSetting);
+        globals.outlineSelectionHighlight = (mode == TfToken("Outline Selection"));
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraOutlineHoverHighlighting)) {
+        _GetAttribute(
+            node, filter.mayaString(), globals.outlineHoverHighlighting, storeUserSetting);
+        if (filter.attributeFilter()) {
+            return globals;
+        }
+    }
+    if (filter(MtohTokens->mayaHydraEnableDefaultOutlines)) {
+        _GetAttribute(
+            node, filter.mayaString(), globals.enableDefaultOutlines, storeUserSetting);
         if (filter.attributeFilter()) {
             return globals;
         }

@@ -21,7 +21,7 @@ target_sources(${TARGET_NAME}
     mayaHydraMayaFilteringSceneIndexDataConcreteFactory.cpp
     mhMayaUsdProxyShapeSceneIndexBase.cpp
     mhMayaUsdProxyShapeSceneIndex.cpp
-    mhDirtyLeadObjectSceneIndex.cpp
+    mhDirtySelectionColorsSceneIndex.cpp
     mhExternalCameraOverrideSceneIndex.cpp
     mhExternalCameraResolvingSceneIndex.cpp
     mhGenerativeProceduralResolvingSceneIndex.cpp
@@ -47,7 +47,7 @@ set(HEADERS
     mayaHydraMayaFilteringSceneIndexDataConcreteFactory.h
     mhMayaUsdProxyShapeSceneIndexBase.h
     mhMayaUsdProxyShapeSceneIndex.h
-    mhDirtyLeadObjectSceneIndex.h
+    mhDirtySelectionColorsSceneIndex.h
     mhExternalCameraOverrideSceneIndex.h
     mhExternalCameraResolvingSceneIndex.h
     mhGenerativeProceduralResolvingSceneIndex.h

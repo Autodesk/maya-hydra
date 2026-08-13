@@ -118,6 +118,28 @@ target_link_libraries(${TARGET_NAME}
         $<$<BOOL:${MayaUsd_FOUND}>:${MAYAUSDAPI_LIBRARY}>
 )
 
+# -----------------------------------------------------------------------------
+# hover highlighting (Qt)
+# -----------------------------------------------------------------------------
+# The mouse-move source for hover highlighting is a Qt event filter on the
+# viewport widget. Qt6 is found only when the Maya devkit ships it, so a build
+# without Qt is expected: everything else works, minus hover highlighting.
+if(Qt6_FOUND)
+    target_sources(${TARGET_NAME}
+        PRIVATE
+            hoverEventFilter.cpp
+    )
+    target_link_libraries(${TARGET_NAME}
+        PRIVATE
+            Qt6::Core
+            Qt6::Widgets
+    )
+    target_compile_definitions(${TARGET_NAME}
+        PRIVATE
+            MAYAHYDRA_HAS_QT=1
+    )
+endif()
+
 # lld-link (Windows/Clang coverage builds) treats UFE inline copy-ctors emitted
 # by renderSettingsUtils.cpp as duplicate symbols vs the same ctors exported from
 # ufe_0.dll. The duplicates are identical (same inline definition), so /force:multiple

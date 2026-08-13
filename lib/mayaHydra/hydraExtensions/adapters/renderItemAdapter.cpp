@@ -753,7 +753,19 @@ bool MayaHydraRenderItemAdapter::GetVisible()
         return false;
     }
 
+    if (!_wireframeSelectionHighlightEnabled) {
+        return false;
+    }
+
     return _visible;
+}
+
+void MayaHydraRenderItemAdapter::SetWireframeSelectionHighlightEnabled(bool enabled)
+{
+    if (_wireframeSelectionHighlightEnabled != enabled) {
+        _wireframeSelectionHighlightEnabled = enabled;
+        MayaHydra::DirtyNotifier(this).dirtyVisibility();
+    }
 }
 
 void MayaHydraRenderItemAdapter::SetPlaybackState(bool isPlaybackRunning)

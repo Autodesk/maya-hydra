@@ -101,7 +101,12 @@ public:
     GfVec4f         colorSelectionHighlightColor = GfVec4f(1.0f, 1.0f, 0.0f, 0.5f);
     bool            colorSelectionHighlight = true;
     bool            wireframeSelectionHighlight = true;
-    float           outlineSelectionWidth = 4.f;
+    // The pixel outline replaces the legacy wireframe highlighting rather than adding to it.
+    bool            outlineSelectionHighlight = true;
+    bool            outlineHoverHighlighting = false;
+    // Forces the outline manager's whole-scene prim-id pass every frame, so its cost scales with the
+    // scene. Not exposed in the UI.
+    bool            enableDefaultOutlines = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
