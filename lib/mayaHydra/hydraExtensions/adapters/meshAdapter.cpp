@@ -21,7 +21,6 @@
 #include <mayaHydraLib/adapters/tokens.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
-#include <pxr/base/arch/hash.h>
 #include <pxr/base/gf/interval.h>
 #include <pxr/base/tf/type.h>
 #include <pxr/imaging/hd/changeTracker.h>
@@ -78,71 +77,6 @@ PXR_NAMESPACE_OPEN_SCOPE
  */
 
 namespace {
-
-// Snapshot of mesh connectivity + a hash of point positions used to distinguish UV-only
-// inMesh/pnts dirties (polyEditUV and similar) from true geometry edits. Maya often dirties
-// inMesh for UV coordinate changes without firing MPolyMessage::addUVSetChangedCallback.
-struct MeshGeometryState
-{
-    int      numVertices = -1;
-    int      numPolygons = -1;
-    int      numFaceVertices = -1;
-    uint64_t pointsHash = 0;
-    bool     valid = false;
-
-    static uint64_t HashPoints(const GfVec3f* rawPoints, int numVertices)
-    {
-        if (!rawPoints || numVertices <= 0) {
-            return 0;
-        }
-        return ArchHash64(reinterpret_cast<const char*>(rawPoints),
-                          static_cast<size_t>(numVertices) * sizeof(GfVec3f));
-    }
-
-    static MeshGeometryState Capture(const MDagPath& dagPath)
-    {
-        MeshGeometryState state;
-        MStatus           status;
-        MFnMesh             mesh(dagPath, &status);
-        if (!status) {
-            return state;
-        }
-        state.numVertices = mesh.numVertices();
-        state.numPolygons = mesh.numPolygons();
-        state.numFaceVertices = mesh.numFaceVertices();
-        const auto* rawPoints = reinterpret_cast<const GfVec3f*>(mesh.getRawPoints(&status));
-        if (status && rawPoints) {
-            state.pointsHash = HashPoints(rawPoints, state.numVertices);
-            state.valid = true;
-        }
-        return state;
-    }
-
-    bool MatchesCurrent(const MDagPath& dagPath) const
-    {
-        if (!valid) {
-            return false;
-        }
-        MStatus status;
-        MFnMesh mesh(dagPath, &status);
-        if (!status) {
-            return false;
-        }
-        if (mesh.numVertices() != numVertices || mesh.numPolygons() != numPolygons
-            || mesh.numFaceVertices() != numFaceVertices) {
-            return false;
-        }
-        const auto* rawPoints = reinterpret_cast<const GfVec3f*>(mesh.getRawPoints(&status));
-        if (!status || !rawPoints) {
-            return false;
-        }
-        // O(n) in vertex count: scan point positions to distinguish UV-only inMesh/pnts dirties
-        // from true geometry edits once O(1) connectivity counts match. This runs only on those
-        // dirty notifications (not per frame or Hydra pull); treating every such dirty as a
-        // geometry change would typically cost more (points, extent, subdivision, mesh re-read).
-        return HashPoints(rawPoints, numVertices) == pointsHash;
-    }
-};
 
 // Lambda table mapping a Maya mesh attribute to the granular dirty locators it should emit.
 // Extent is dirtied conservatively on every point/topology change because the mesh adapter reads
@@ -202,7 +136,6 @@ public:
         }
         GetMayaHydraSceneIndex()->InsertPrim(this, HdPrimTypeTokens->mesh, GetID());
         _isPopulated = true;
-        _geometryState = MeshGeometryState::Capture(GetDagPath());
     }
 
     /// Track callbacks that require special removal handling.
@@ -619,23 +552,17 @@ public:
     }
 
 private:
-    /// inMesh/pnts dirties fire for both geometry edits and UV-only edits. Compare against the
-    /// last captured connectivity/points to emit granular UV locators when only face-varying data
-    /// changed (e.g. polyEditUV when MPolyMessage::addUVSetChangedCallback does not run).
+    /// inMesh/pnts dirties fire for geometry edits, skinning/deformation, and can also be triggered by UV-only edits.
+    /// Do not read mesh data here: NodeDirtiedCallback runs during DG dirty propagation and
+    /// MFnMesh evaluation can recurse (e.g. skin cluster + joint hierarchy at time change).
+    /// UV-only edits may also be reported via UVSetChangedCallback or uvPivot, which can dirty only primvars/st.
     void DirtyInMeshOrPnts(MayaHydra::DirtyNotifier& notifier, bool useMayaNormals)
     {
-        if (_geometryState.valid && _geometryState.MatchesCurrent(GetDagPath())) {
-            notifier.dirtyUVs();
-            return;
-        }
         notifier.dirtyPoints().dirtyExtent().dirtySubdivision();
         if (useMayaNormals) {
             notifier.dirtyNormals();
         }
-        _geometryState = MeshGeometryState::Capture(GetDagPath());
     }
-
-    void RefreshGeometryState() { _geometryState = MeshGeometryState::Capture(GetDagPath()); }
 
     static void _NotifyConnectivityChanged(MayaHydraMeshAdapter* adapter)
     {
@@ -643,7 +570,6 @@ private:
         Fvp::DirtyNotifier::DirtyRprimConnectivityLocators(
             notifier, HdPrimTypeTokens->mesh);
         notifier.flush();
-        adapter->RefreshGeometryState();
     }
 
     /// Handle node dirtied callbacks for mesh parameter changes.
@@ -759,8 +685,7 @@ private:
     //     MPolyMessage::addUVSetChangedCallback
     // To work around this, we register these callbacks specially, and only
     // remove them if the underlying node is currently valid.
-    MCallbackIdArray   _buggyCallbacks;
-    MeshGeometryState _geometryState;
+    MCallbackIdArray _buggyCallbacks;
 };
 
 TF_REGISTRY_FUNCTION(TfType)

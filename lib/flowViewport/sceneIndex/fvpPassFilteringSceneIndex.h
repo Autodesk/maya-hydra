@@ -109,7 +109,7 @@ protected:
     Fvp::FramePassConstDataPtr _framePassData;
 
 private:
-    PXR_NS::SdfPathSet _filteredPrims;
+    PXR_NS::TfHashSet<PXR_NS::SdfPath, PXR_NS::SdfPath::Hash> _filteredPrims;
 
     // Used to track the materials required by the prims that will actually be rendered in the pass 
     std::map<PXR_NS::SdfPath, PXR_NS::SdfPath> _primsToMaterialPaths;

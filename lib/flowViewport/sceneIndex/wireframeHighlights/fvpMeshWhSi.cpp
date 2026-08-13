@@ -125,6 +125,10 @@ void MeshWhSi::ProcessDirtiedPrims(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
+    if (_primPathsToSelections.empty()) {
+        return;
+    }
+
     HdSceneIndexObserver::DirtiedPrimEntries highlightEntries;
     for (const auto& entry : entries) {
         // Propagate changes to the mesh and its children
@@ -137,6 +141,12 @@ void MeshWhSi::ProcessDirtiedPrims(
         }
     }
     _SendPrimsDirtied(highlightEntries);
+}
+
+bool MeshWhSi::NeedsDirtyProcessing(
+    const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntry &entry) const
+{ 
+    return !_primPathsToSelections.empty(); 
 }
 
 void MeshWhSi::ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected)

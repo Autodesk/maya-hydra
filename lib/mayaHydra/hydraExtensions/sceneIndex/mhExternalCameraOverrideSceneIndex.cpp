@@ -38,17 +38,35 @@ const TfToken kExternalCameraToken("adskUsd:externalCamera");
 // ExternalCameraResolvingSceneIndex.
 const SdfPath kExternalCameraPrefix("/__adskUsd__externalCamera");
 
+// Sentinel SdfPath component used to preserve UFE multi-segment paths (Maya
+// DAG path ',' USD path) when storing external camera paths in Hydra.
+const std::string kUfeSegmentSentinel("__ufeSegment__");
+
 // External camera paths are either through USD (already uses '/' as a
 // separator), or through Maya (uses '|' as a separator, converted to '/' for
-// SdfPath representation).  We also erase the UFE path segment ',' separator.
-SdfPath SanitizeExternalPath(const std::string& rawValue)
+// SdfPath representation).  We also replace the UFE path segment ',' separator with
+// kUfeSegmentSentinel followed by UFE runTimeId.
+// ex: |stage1|stageShape1,/camera1
+//  -> /__adskUsd__externalCamera/stage1/stageShape1__ufeSegment__/camera1
+// Note: For now, we assume the second segment is a USD path.
+// This may not always be the case, the second segment could be a path from a custom plugin.
+// Need to handle this case in the future.
+SdfPath SanitizeExternalPath(const std::string& ufePathStr)
 {
-    std::string pathStr = rawValue;
+    const auto segmentEnd = ufePathStr.find(',');
 
+    // Maya path: replace '|' with '/'
+    auto pathStr = ufePathStr.substr(0, segmentEnd);
     std::replace(pathStr.begin(), pathStr.end(), '|', '/');
-    pathStr.erase(std::remove(pathStr.begin(), pathStr.end(), ','), pathStr.end());
 
-    return kExternalCameraPrefix.AppendPath(SdfPath(pathStr).MakeRelativePath(SdfPath::AbsoluteRootPath()));
+    if (segmentEnd != std::string::npos) {
+        // Assume the second segment is a USD path, and already has '/' path
+        // component separator.  Append segment separator sentinel and USD path.
+        pathStr += kUfeSegmentSentinel + ufePathStr.substr(segmentEnd + 1);
+    }
+
+    return kExternalCameraPrefix.AppendPath(
+        SdfPath(pathStr).MakeRelativePath(SdfPath::AbsoluteRootPath()));
 }
 
 } // anonymous namespace

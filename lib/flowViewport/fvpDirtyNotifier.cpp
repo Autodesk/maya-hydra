@@ -37,6 +37,7 @@
 #include <pxr/imaging/hd/meshTopologySchema.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/subdivisionTagsSchema.h>
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
@@ -44,6 +45,10 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace FVP_NS_DEF {
+
+// See beginDirtyBatch / commitDirtyBatch methods.
+static HdSceneIndexObserver::DirtiedPrimEntries _sPendingDirtyEntries;
+static TfWeakPtr<HdRetainedSceneIndex> _sBatchingSceneIndex = nullptr;
 
 DirtyNotifier::DirtyNotifier(HdRetainedSceneIndex& sceneIndex, const SdfPath& primPath)
     : _sceneIndex(TfCreateWeakPtr(&sceneIndex))
@@ -61,17 +66,44 @@ void DirtyNotifier::flush()
     if (_locators.IsEmpty()) {
         return;
     }
-    if (_sceneIndex) {
+
+    if (_sBatchingSceneIndex) {
+        _sPendingDirtyEntries.push_back({ _primPath, _locators });
+    } else if (_sceneIndex) {
         _sceneIndex->DirtyPrims({ { _primPath, _locators } });
-        _locators = HdDataSourceLocatorSet();
-        return;
+    } else {
+        TF_CODING_ERROR(
+            "DirtyNotifier for prim (%s): scene index no longer valid; "
+            "dropping pending dirty locators. The scene index passed to the "
+            "constructor must outlive this DirtyNotifier.",
+            _primPath.GetText());
     }
-    TF_CODING_ERROR(
-        "DirtyNotifier for prim (%s): scene index no longer valid; "
-        "dropping pending dirty locators. The scene index passed to the "
-        "constructor must outlive this DirtyNotifier.",
-        _primPath.GetText());
+
     _locators = HdDataSourceLocatorSet();
+}
+
+void DirtyNotifier::beginDirtyBatch(PXR_NS::HdRetainedSceneIndex& batchingSceneIndex)
+{
+    _sBatchingSceneIndex = TfCreateWeakPtr(&batchingSceneIndex);
+}
+
+void DirtyNotifier::commitDirtyBatch()
+{
+    if (_sBatchingSceneIndex) {
+        _sBatchingSceneIndex->DirtyPrims(_sPendingDirtyEntries);
+        _sBatchingSceneIndex = nullptr;
+        _sPendingDirtyEntries.clear();
+    }
+}
+
+DirtyNotifier::DirtyBatchGuard::DirtyBatchGuard(HdRetainedSceneIndex& batchingSceneIndex)
+{
+    DirtyNotifier::beginDirtyBatch(batchingSceneIndex);
+}
+
+DirtyNotifier::DirtyBatchGuard::~DirtyBatchGuard()
+{
+    DirtyNotifier::commitDirtyBatch();
 }
 
 DirtyNotifier& DirtyNotifier::_append(const HdDataSourceLocator& locator)
@@ -90,6 +122,11 @@ DirtyNotifier& DirtyNotifier::dirtyTransform()
 DirtyNotifier& DirtyNotifier::dirtyVisibility()
 {
     return _append(HdVisibilitySchema::GetDefaultLocator());
+}
+
+DirtyNotifier& DirtyNotifier::dirtyPurpose()
+{
+    return _append(HdPurposeSchema::GetDefaultLocator());
 }
 
 DirtyNotifier& DirtyNotifier::dirtyPoints()
