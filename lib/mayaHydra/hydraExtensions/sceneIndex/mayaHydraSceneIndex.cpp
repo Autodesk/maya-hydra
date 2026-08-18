@@ -337,6 +337,8 @@ void _connectionChanged(MPlug& srcPlug, MPlug& destPlug, bool made, void* client
 
 SdfPath _GetMaterialPath(const SdfPath& base, const MObject& obj)
 {
+    MayaHydra::DgAccessLock dgLock;
+
     MStatus           status;
     MFnDependencyNode node(obj, &status);
     if (!status) {
