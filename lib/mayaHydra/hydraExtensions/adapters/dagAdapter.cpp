@@ -195,6 +195,7 @@ GfMatrix4d MayaHydraDagAdapter::GetTransform()
             _dagPath.partialPathName().asChar());
 
     if (_invalidTransform) {
+        MayaHydra::DgAccessLock dgLock;
         if (IsInstanced()) {
             _transform.SetIdentity();
         } else {
@@ -210,12 +211,15 @@ size_t
 MayaHydraDagAdapter::SampleTransform(size_t maxSampleCount, float* times, GfMatrix4d* samples)
 {
     return GetMayaHydraSceneIndex()->SampleValues(maxSampleCount, times, samples, [&]() -> GfMatrix4d {
+        MayaHydra::DgAccessLock dgLock;
         return GetGfMatrixFromMaya(_dagPath.inclusiveMatrix());
     });
 }
 
 void MayaHydraDagAdapter::RefreshInstancingState()
 {
+    MayaHydra::DgAccessLock dgLock;
+
     MDagPathArray dags;
     if (MDagPath::getAllPathsTo(GetDagPath().node(), dags)) {
         _isInstanced = dags.length() > 1;
@@ -278,6 +282,8 @@ void MayaHydraDagAdapter::RemovePrim()
 
 bool MayaHydraDagAdapter::UpdateVisibility()
 {
+    MayaHydra::DgAccessLock dgLock;
+
     if (ARCH_UNLIKELY(!GetDagPath().isValid())) {
         return false;
     }
@@ -303,6 +309,9 @@ VtIntArray MayaHydraDagAdapter::GetInstanceIndices(const SdfPath& prototypeId)
     if (!IsInstanced()) {
         return {};
     }
+
+    MayaHydra::DgAccessLock dgLock;
+
     MDagPathArray dags;
     if (!MDagPath::getAllPathsTo(GetDagPath().node(), dags)) {
         return {};
@@ -344,6 +353,8 @@ void MayaHydraDagAdapter::_AddHierarchyChangedCallbacks(MDagPath& dag)
 
 SdfPath MayaHydraDagAdapter::GetInstancerID() const
 {
+    MayaHydra::DgAccessLock dgLock;
+
     MDagPathArray dags;
     if (!MDagPath::getAllPathsTo(GetDagPath().node(), dags) || dags.length() <= 1) {
         return {};
@@ -367,6 +378,8 @@ bool MayaHydraDagAdapter::_GetVisibility() const { return GetDagPath().isVisible
 VtValue MayaHydraDagAdapter::GetInstancePrimvar(const TfToken& key)
 {
     if (key == _tokens->instanceTransform) {
+        MayaHydra::DgAccessLock dgLock;
+
         MDagPathArray dags;
         if (!MDagPath::getAllPathsTo(GetDagPath().node(), dags)) {
             return {};

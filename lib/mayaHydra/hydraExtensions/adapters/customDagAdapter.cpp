@@ -250,6 +250,8 @@ bool MayaHydraCustomDagAdapter::GetVisible()
 
 VtDictionary MayaHydraCustomDagAdapter::GetNonDefaultMayaAttributes() const
 {
+    MayaHydra::DgAccessLock dgLock;
+
     VtDictionary attrs;
     GetNonDefaultMayaAttributesFromNode(GetNode(), attrs);
     return attrs;

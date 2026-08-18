@@ -194,6 +194,8 @@ VtValue MayaHydraCameraAdapter::Get(const TfToken& key) { return MayaHydraShapeA
 
 VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
 {
+    MayaHydra::DgAccessLock dgLock;
+
     constexpr double inchToMM = 25.4;
 
     MStatus status;

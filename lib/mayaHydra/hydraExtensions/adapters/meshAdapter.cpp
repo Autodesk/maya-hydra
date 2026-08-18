@@ -203,6 +203,8 @@ public:
     /// Return face-varying UVs as a primvar value.
     VtValue GetUVs()
     {
+        MayaHydra::DgAccessLock dgLock;
+
         MStatus status;
         MFnMesh mesh(GetDagPath(), &status);
         if (ARCH_UNLIKELY(!status)) {
@@ -234,6 +236,8 @@ public:
     /// Return face-varying tangents as a primvar value.
     VtValue GetTangents()
     {
+        MayaHydra::DgAccessLock dgLock;
+
         MStatus status;
         MFnMesh mesh(GetDagPath(), &status);
         if (ARCH_UNLIKELY(!status)) {
@@ -268,6 +272,8 @@ public:
     /// Return vertex positions as a primvar value.
     VtValue GetPoints()
     {
+        MayaHydra::DgAccessLock dgLock;
+
         MStatus status;
         MFnMesh mesh(GetDagPath(), &status);
         if (ARCH_UNLIKELY(!status)) {
@@ -286,6 +292,8 @@ public:
     /// Return face-varying normals as a primvar value.
     VtValue GetNormals()
     {
+        MayaHydra::DgAccessLock dgLock;
+
         MStatus status;
         MFnMesh mesh(GetDagPath(), &status);
         if (ARCH_UNLIKELY(!status)) {
@@ -379,6 +387,8 @@ public:
     /// Build the mesh topology from the Maya mesh.
     HdMeshTopology GetMeshTopology() override
     {
+        MayaHydra::DgAccessLock dgLock;
+
         MFnMesh    mesh(GetDagPath());
         const auto numPolygons = mesh.numPolygons();
         VtIntArray faceVertexCounts;
@@ -406,6 +416,8 @@ public:
     /// Return display style based on smooth mesh settings.
     HdDisplayStyle GetDisplayStyle() override
     {
+        MayaHydra::DgAccessLock dgLock;
+
         MStatus           status;
         MFnDependencyNode node(GetNode(), &status);
         if (ARCH_UNLIKELY(!status)) {
@@ -424,6 +436,8 @@ public:
     /// Return subdivision tags (creases/corners) for smooth meshes.
     PxOsdSubdivTags GetSubdivTags() override
     {
+        MayaHydra::DgAccessLock dgLock;
+
         PxOsdSubdivTags tags;
         if (GetDisplayStyle().refineLevel < 1) {
             return tags;
@@ -488,6 +502,8 @@ public:
     /// Return primvar descriptors for the requested interpolation.
     HdPrimvarDescriptorVector GetPrimvarDescriptors(HdInterpolation interpolation) override
     {
+        MayaHydra::DgAccessLock dgLock;
+
         // Base descriptors
         HdPrimvarDescriptorVector descs
             = MayaHydraShapeAdapter::GetPrimvarDescriptors(interpolation);
@@ -525,6 +541,8 @@ public:
     /// Return whether the mesh is double-sided.
     bool GetDoubleSided() const override
     {
+        MayaHydra::DgAccessLock dgLock;
+
         MFnMesh mesh(GetDagPath());
         auto    p = mesh.findPlug(MayaAttrs::mesh::doubleSided, true);
         if (ARCH_UNLIKELY(p.isNull())) {

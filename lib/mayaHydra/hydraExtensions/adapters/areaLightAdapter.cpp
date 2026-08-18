@@ -48,6 +48,8 @@ public:
                 paramName.GetText(),
                 GetDagPath().partialPathName().asChar());
 
+        MayaHydra::DgAccessLock dgLock;
+
         auto sizeScaled = [=](int index) {
             constexpr float             defaultSizeForAreaLights[2] { 2.0f, 2.0f };
             double                      scale[3] = { 1.0, 1.0, 1.0 };

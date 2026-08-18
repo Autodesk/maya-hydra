@@ -72,11 +72,14 @@ MObject MayaHydraShapeAdapter::GetMaterial(const MObject& shadingComp)
             "Called MayaHydraShapeAdapter::GetMaterial() - %s\n",
             GetDagPath().partialPathName().asChar());
 
+    MayaHydra::DgAccessLock dgLock;
     return MayaHydra::FindShadingEngine(GetDagPath(), shadingComp);
 }
 
 GfBBox3d MayaHydraShapeAdapter::GetBoundingBox()
 {
+    MayaHydra::DgAccessLock dgLock;
+
     MFnDagNode   node(GetDagPath());
     MBoundingBox objBB = node.boundingBox();
     MPoint       minPt = objBB.min();

@@ -87,6 +87,8 @@ public:
 protected:
     void _CalculateLightParams(GlfSimpleLight& light) override
     {
+        MayaHydra::DgAccessLock dgLock;
+
         MStatus      status;
         MFnSpotLight mayaLight(GetDagPath(), &status);
         if (TF_VERIFY(status)) {
@@ -104,6 +106,8 @@ protected:
                 GetDagPath().partialPathName().asChar());
 
         if (key == HdLightTokens->shadowParams) {
+            MayaHydra::DgAccessLock dgLock;
+
             HdxShadowParams shadowParams;
             MFnSpotLight    mayaLight(GetDagPath());
             if (!GetShadowsEnabled(mayaLight)
@@ -129,6 +133,8 @@ protected:
                 "Called MayaHydraSpotLightAdapter::GetLightParamValue(%s) - %s\n",
                 paramName.GetText(),
                 GetDagPath().partialPathName().asChar());
+
+        MayaHydra::DgAccessLock dgLock;
 
         MStatus      status;
         MFnSpotLight light(GetDagPath(), &status);

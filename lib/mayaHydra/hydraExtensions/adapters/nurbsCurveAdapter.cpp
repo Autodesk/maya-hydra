@@ -125,6 +125,8 @@ public:
                 GetDagPath().partialPathName().asChar());
 
         if (key == HdTokens->points) {
+            MayaHydra::DgAccessLock dgLock;
+
             MFnNurbsCurve curve(GetDagPath());
             MStatus       status;
             MPointArray   pointArray;
@@ -147,6 +149,8 @@ public:
 
     HdBasisCurvesTopology GetBasisCurvesTopology() override
     {
+        MayaHydra::DgAccessLock dgLock;
+
         MFnNurbsCurve curve(GetDagPath());
         const auto    pointCount = curve.numCVs();
 

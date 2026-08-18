@@ -21,6 +21,7 @@
 #include <mayaHydraLib/api.h>
 
 #include <mayaHydraLib/adapters/mhDirtyNotifier.h>
+#include <mayaHydraLib/mhDgAccessLock.h>
 
 #include <pxr/imaging/hd/sceneDelegate.h>
 #include <pxr/pxr.h>

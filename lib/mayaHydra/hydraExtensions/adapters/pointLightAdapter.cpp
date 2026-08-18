@@ -23,8 +23,6 @@
 #include <pxr/pxr.h>
 #include <pxr/usd/usdLux/tokens.h>
 
-#include <maya/MFnPointLight.h>
-
 #include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -58,7 +56,6 @@ public:
                 paramName.GetText(),
                 GetDagPath().partialPathName().asChar());
 
-        MFnPointLight light(GetDagPath());
         if ((paramName == HdLightTokens->radius) || (paramName == UsdLuxTokens->inputsRadius)) {
             // For point lights, use a default radius if the render delegate asks for it
             constexpr float radius = 0.01f; // Default radius for point lights

@@ -266,6 +266,8 @@ private:
 
     void _CacheNodeAndTypes()
     {
+        MayaHydra::DgAccessLock dgLock;
+
         _surfaceShader = MObject::kNullObj;
         _surfaceShaderType = _emptyToken;
         MStatus           status;
@@ -507,6 +509,8 @@ private:
         TF_DEBUG(MAYAHYDRALIB_ADAPTER_MATERIALS)
             .Msg("MayaHydraShadingEngineAdapter::GetMaterialResource(): %s\n", GetID().GetText());
         
+        MayaHydra::DgAccessLock dgLock;
+
         HdMaterialNetworkMap materialXNetworkMap;
         if (PopulateMaterialXNetworkMap(materialXNetworkMap)) {
             return VtValue(materialXNetworkMap);

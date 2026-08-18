@@ -77,6 +77,8 @@ public:
                 GetDagPath().partialPathName().asChar());
 
         if (key == HdLightTokens->shadowParams) {
+            MayaHydra::DgAccessLock dgLock;
+
             HdxShadowParams     shadowParams;
             MFnDirectionalLight mayaLight(GetDagPath());
             if (!GetShadowsEnabled(mayaLight)) {
@@ -96,6 +98,8 @@ public:
     VtValue GetLightParamValue(const TfToken& paramName) override
     {
         if ((paramName == HdLightTokens->angle) || (paramName == UsdLuxTokens->inputsAngle)) {
+            MayaHydra::DgAccessLock dgLock;
+
             MStatus           status;
             MFnDependencyNode lightNode(GetNode(), &status);
             if (ARCH_UNLIKELY(!status)) {

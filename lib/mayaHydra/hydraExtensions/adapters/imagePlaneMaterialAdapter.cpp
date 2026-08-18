@@ -166,7 +166,11 @@ void MayaHydraImagePlaneMaterialAdapter::CreateCallbacks()
 
 VtValue MayaHydraImagePlaneMaterialAdapter::GetMaterialResource()
 {
-    std::string imagePath = GetImagePlaneTexturePath(GetNode());
+    std::string imagePath;
+    {
+        MayaHydra::DgAccessLock dgLock;
+        imagePath = GetImagePlaneTexturePath(GetNode());
+    }
     if (imagePath.empty()) {
         return GetPreviewMaterialResource(GetID());
     }

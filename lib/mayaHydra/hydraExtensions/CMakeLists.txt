@@ -12,6 +12,7 @@ target_sources(${TARGET_NAME}
         mayaHydraLibInterfaceImp.cpp
         mayaUtils.cpp
         mhBuildInfo.cpp
+        mhDgAccessLock.cpp
         mixedUtils.cpp
         mhWireframeColorInterfaceImp.cpp
         mhLeadObjectPathTracker.cpp
@@ -27,6 +28,7 @@ set(HEADERS
     mayaHydraLibInterface.h
     mayaHydraLibInterfaceImp.h
     mayaUtils.h
+    mhDgAccessLock.h
     mixedUtils.h
     mhWireframeColorInterfaceImp.h
     mhLeadObjectPathTracker.h

@@ -340,6 +340,8 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
             GetDagPath().partialPathName().asChar());
 
     if (key == HdLightTokens->params) {
+        MayaHydra::DgAccessLock dgLock;
+
         MFnLight       mayaLight(GetDagPath());
         GlfSimpleLight light;
         const auto     color = mayaLight.color();
@@ -397,6 +399,8 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
         coll.SetRootPaths(lightedPaths);
         return VtValue(coll);
     } else if (key == HdLightTokens->shadowParams) {
+        MayaHydra::DgAccessLock dgLock;
+
         HdxShadowParams shadowParams;
         MFnLight        mayaLight(GetDagPath());
         if (!GetShadowsEnabled(mayaLight)) {
@@ -412,6 +416,8 @@ VtValue MayaHydraLightAdapter::Get(const TfToken& key)
 
 MayaHydraLightAdapter::MayaLightParams MayaHydraLightAdapter::GetMayaLightParams() const
 {
+    MayaHydra::DgAccessLock dgLock;
+
     MayaLightParams   params;
     MStatus           status;
     MFnDependencyNode lightDepNode(GetNode(), &status);
@@ -493,6 +499,8 @@ VtValue MayaHydraLightAdapter::GetLightParamValue(const TfToken& paramName)
             paramName.GetText(),
             GetDagPath().partialPathName().asChar());
 
+    MayaHydra::DgAccessLock dgLock;
+
     MFnLight light(GetDagPath());
 
     // Get Maya parameters (including Arnold attributes with "ai" prefix)
@@ -550,6 +558,8 @@ VtValue MayaHydraLightAdapter::GetLightMaterialNetwork() const
         .Msg(
             "Called MayaHydraLightAdapter::GetLightMaterialNetwork() - %s\n",
             GetDagPath().partialPathName().asChar());
+
+    MayaHydra::DgAccessLock dgLock;
 
     // Additional debugging for dome lights
     const bool isSkyDomeLight = IsDagPathAnArnoldSkyDomeLight(GetDagPath());
