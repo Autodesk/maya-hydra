@@ -40,19 +40,19 @@ bool findSphereMeshPredicate(const HdSceneIndexBasePtr& sceneIndex, const SdfPat
     return primPath.GetString().find("StandardShadedItem") != std::string::npos;
 };
 
-bool findSphereWireframePredicate(const HdSceneIndexBasePtr& sceneIndex, const SdfPath& primPath) {
-    return primPath.GetString().find("DormantPolyWire") != std::string::npos;
-};
-
 } // namespace
 
+// Pass routing for ordinary (non-highlight) prims: materials, meshes and lights. Kept separate from
+// testLegacyHighlightPassRouting, which asserts on FlowViewportSelectionHighlights prims that only
+// exist in legacy selection-highlight mode -- this test's prims exist, and are expected to route the
+// same way, regardless of selection-highlight mode.
 TEST(PassFiltering, testPassFiltering)
 {
     std::vector<HdSceneIndexBasePtr> passSceneIndices = {
         GetPassSceneIndex(0),
         GetPassSceneIndex(1)
     };
-    
+
     // Checks that a prim is present in the given passes, and filtered out in the others.
     auto testPrim = [&](const SdfPath& primPath, const TfToken& primType, std::set<int> passIndices) {
         for (size_t iPassIndex = 0; iPassIndex < passSceneIndices.size(); iPassIndex++) {
@@ -68,66 +68,35 @@ TEST(PassFiltering, testPassFiltering)
     ASSERT_EQ(sphereMeshPrims.size(), 1u);
     auto sphereMeshPath = sphereMeshPrims.front().primPath;
 
-    auto sphereWireframePrims = SceneIndexInspector(passSceneIndices[1]).FindPrims(findSphereWireframePredicate);
-    ASSERT_EQ(sphereWireframePrims.size(), 1u);
-    auto sphereWireframePath = sphereWireframePrims.front().primPath;
-
     // Maya mesh prim
     testPrim(
-        SdfPath("/MayaHydraViewportRenderer/materials/openPBRSurface1SG"), 
+        SdfPath("/MayaHydraViewportRenderer/materials/openPBRSurface1SG"),
         HdPrimTypeTokens->material,
         {0}
     );
     testPrim(
-        sphereMeshPath, 
+        sphereMeshPath,
         HdPrimTypeTokens->mesh,
         {0}
-    );
-    testPrim(
-        sphereWireframePath, 
-        HdPrimTypeTokens->basisCurves,
-        {1}
     );
 
     // USD prim using a material without displacement
     testPrim(
-        SdfPath("/MayaUsdProxyShape_PluginNode/stageShape1/mtl/open_pbr_surface1"), 
+        SdfPath("/MayaUsdProxyShape_PluginNode/stageShape1/mtl/open_pbr_surface1"),
         HdPrimTypeTokens->material,
         {0} // Should not be in the secondary graphics pass
-    );
-    testPrim(
-        SdfPath("/FlowViewportSelectionHighlights/MayaUsdProxyShape_PluginNode/stageShape1/pTorus1/Highlight_/MayaUsdProxyShape_PluginNode/stageShape1/pTorus1"), 
-        HdPrimTypeTokens->mesh,
-        {1}
-    );
-
-    // USD prim using a material with displacement
-    testPrim(
-        SdfPath("/MayaUsdProxyShape_PluginNode/GeomSubsetWireframeHighlightDisplacementTestSceneShape/mtl/UsdPreviewSurface1"), 
-        HdPrimTypeTokens->material,
-        {0,1} // Should be in both passes
-    );
-    testPrim(
-        SdfPath("/MayaUsdProxyShape_PluginNode/GeomSubsetWireframeHighlightDisplacementTestSceneShape/mtl/UsdPreviewSurface2"), 
-        HdPrimTypeTokens->material,
-        {0,1} // Should be in both passes
-    );
-    testPrim(
-        SdfPath("/FlowViewportSelectionHighlights/MayaUsdProxyShape_PluginNode/GeomSubsetWireframeHighlightDisplacementTestSceneShape/SphereInstancer/Highlight_Full/MayaUsdProxyShape_PluginNode/GeomSubsetWireframeHighlightDisplacementTestSceneShape/SphereInstancer"), 
-        HdPrimTypeTokens->instancer,
-        {1}
     );
 
     // Maya light
     testPrim(
-        SdfPath("/MayaHydraViewportRenderer/sprims/areaLight1/areaLightShape1"), 
+        SdfPath("/MayaHydraViewportRenderer/sprims/areaLight1/areaLightShape1"),
         HdPrimTypeTokens->rectLight,
         {0}
     );
 
     // USD light
     testPrim(
-        SdfPath("/MayaUsdProxyShape_PluginNode/stageShape1/DistantLight1"), 
+        SdfPath("/MayaUsdProxyShape_PluginNode/stageShape1/DistantLight1"),
         HdPrimTypeTokens->distantLight,
         {0}
     );

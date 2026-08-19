@@ -26,6 +26,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaShadingModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
+    testOutlineHover.py
 	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
     #testMayaLights.py
     testUSDLights.py
@@ -119,6 +120,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     cpp/testWriteFile.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     cpp/testMaterialBlocking.py
     cpp/testPassFiltering.py
+    cpp/testLegacyHighlightPassRouting.py
     cpp/testRenderItemDirtyLocators.py
 )
 
@@ -196,9 +198,60 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
     cpp/testHydraGenerativeProcedural.py
 )
 
+# Every interactive test runs in both selection highlighting modes, so that both
+# shipping modes stay covered. The primary run uses outline, the mode the plugin
+# ships as its default, and a _legacy counterpart runs the wireframe highlight.
+#
+# A test only needs its own reference images per mode when its output actually
+# depends on the mode: MayaHydraBaseTestCase uses a "<mode>" subfolder when the
+# test supplies one and the shared images otherwise. So a mode-independent test
+# needs no entry in any list and no second set of images - and if it turns out to
+# be mode-sensitive after all, one of its two runs fails against the shared image
+# instead of silently losing coverage.
+#
+# Outline is only offered on USD > 24.11: below that the render global has a
+# single "Legacy Selection" entry, because HgiGL corrupts the prim ids the outline
+# compute shader samples. Every primary run is then the legacy one.
+if(USD_VERSION VERSION_GREATER "0.24.11")
+    set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE TRUE)
+else()
+    set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE FALSE)
+endif()
+
+# These scripts cannot run in outline mode, so their primary run is forced to
+# legacy and they get no _legacy counterpart.
+set(OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES
+    testGeomSubsetsWireframeHighlight.py # TODO: To support when implementing HYDRA-2458 (geometry subsets)
+    testNativeInstancingWireframeHighlight.py # TODO: To support when implementing HYDRA-2456 (single instances)
+    testPointInstancingWireframeHighlight.py # TODO: To support when implementing HYDRA-2456 (single instances)
+    # TODO: revisit with HYDRA-2457 (wireframe-on-shaded). Outline skips translating a selected
+    # object's wireframe render item until it is actually needed, so toggling wireframeOnShaded adds
+    # a new prim in outline mode instead of just dirtying an existing one, as legacy does.
+    cpp/testSceneIndexDirtying.py
+    # Intentionally excluded: asserts the legacy highlight prim's material binding is blocked.
+    # Outline never creates a highlight prim to bind a material to in the first place.
+    cpp/testMaterialBlocking.py
+    # Intentionally excluded: asserts pass routing of the legacy dormant-wireframe and
+    # FlowViewportSelectionHighlights prims specifically, which only exist in legacy mode. The
+    # mode-agnostic pass-routing assertions were split out into testPassFiltering, which runs in
+    # both modes.
+    cpp/testLegacyHighlightPassRouting.py
+)
+
+# The ENV entry pinning a primary run's mode, empty when it can use the default.
+function(mayaHydra_primary_mode_env out_var test_filename)
+    if(MAYAHYDRA_OUTLINE_MODE_AVAILABLE AND
+       NOT ${test_filename} IN_LIST OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES)
+        set(${out_var} "" PARENT_SCOPE)
+    else()
+        set(${out_var} "MAYAHYDRA_SELECTION_HIGHLIGHT_MODE=legacy" PARENT_SCOPE)
+    endif()
+endfunction()
+
 # Use mesh adapter for mesh support instead of MRenderItem. using Interactive (Maya.exe with UI)
 foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
     get_testfile_and_labels(all_labels test_filename ${script})
+    mayaHydra_primary_mode_env(mode_env ${test_filename})
     mayaUsd_get_unittest_target(target ${test_filename})
     set(target "${target}_meshAdapter")
     mayaUsd_add_test(${target}
@@ -207,6 +260,7 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
         ENV
             "MAYA_HYDRA_USE_MESH_ADAPTER=1"
             "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+            ${mode_env}
     )
 
     # Assign a CTest label to these tests for easy filtering.
@@ -217,12 +271,14 @@ endforeach()
 # Leave VP2 render delegate enabled and use interactive Maya with UI.
 foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE})
     get_testfile_and_labels(all_labels test_filename ${script})
+    mayaHydra_primary_mode_env(mode_env ${test_filename})
     mayaUsd_get_unittest_target(target ${test_filename})
     mayaUsd_add_test(${target}
         INTERACTIVE
         PYTHON_SCRIPT ${test_filename}
         ENV
             "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
+            ${mode_env}
     )
 
     # Assign a CTest label to these tests for easy filtering.
@@ -233,12 +289,14 @@ endforeach()
 #  Test for Hydra Generative Procedurals using Interactive (Maya.exe with UI)
 foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL})
     get_testfile_and_labels(all_labels test_filename ${script})
+    mayaHydra_primary_mode_env(mode_env ${test_filename})
     mayaUsd_get_unittest_target(target ${test_filename})
     mayaUsd_add_test(${target}
         INTERACTIVE
         PYTHON_SCRIPT ${test_filename}
         ENV
             "HDGP_INCLUDE_DEFAULT_RESOLVER=1"
+            ${mode_env}
     )
 
     # Assign a CTest label to these tests for easy filtering.
@@ -249,6 +307,7 @@ endforeach()
 # Use Maya.exe with UI, interactive tests.
 foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})    
     get_testfile_and_labels(all_labels test_filename ${script})
+    mayaHydra_primary_mode_env(mode_env ${test_filename})
     mayaUsd_get_unittest_target(target ${test_filename})
     mayaUsd_add_test(${target}
         INTERACTIVE
@@ -256,11 +315,59 @@ foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
         ENV
             "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
             "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
+            ${mode_env}
     )
 
     # Add a ctest label to these tests for easy filtering.
     apply_labels_to_test("${all_labels}" ${target})
 
+endforeach()
+
+# The legacy counterpart of each interactive test. A script whose primary run is
+# already the legacy one gets none, so nothing is registered twice.
+#   name_suffix - appended before "_legacy", to keep the target unique for
+#                 scripts registered by more than one configuration.
+#   ARGN        - the ENV entries of the configuration being mirrored.
+function(mayaHydra_add_legacy_mode_test script name_suffix)
+    if(NOT MAYAHYDRA_OUTLINE_MODE_AVAILABLE)
+        return()
+    endif()
+    get_testfile_and_labels(all_labels test_filename ${script})
+    if(${test_filename} IN_LIST OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES)
+        return()
+    endif()
+    mayaUsd_get_unittest_target(target ${test_filename})
+    set(target "${target}${name_suffix}_legacy")
+    mayaUsd_add_test(${target}
+        INTERACTIVE
+        PYTHON_SCRIPT ${test_filename}
+        ENV
+            "MAYAHYDRA_SELECTION_HIGHLIGHT_MODE=legacy"
+            ${ARGN}
+    )
+    apply_labels_to_test("${all_labels}" ${target})
+endfunction()
+
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES})
+    mayaHydra_add_legacy_mode_test(${script} ""
+        "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
+        "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1")
+endforeach()
+
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_MESH_ADAPTER})
+    mayaHydra_add_legacy_mode_test(${script} "_meshAdapter"
+        "MAYA_HYDRA_USE_MESH_ADAPTER=1"
+        "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1")
+endforeach()
+
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_VP2_RENDER_DELEGATE})
+    mayaHydra_add_legacy_mode_test(${script} ""
+        "MAYA_DEFAULT_SURFACE_SHADER=standardSurface")
+endforeach()
+
+foreach(script ${INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL})
+    mayaHydra_add_legacy_mode_test(${script} ""
+        "HDGP_INCLUDE_DEFAULT_RESOLVER=1")
 endforeach()
 
 # Standalone Python unit tests for pure test utilities. These exercise logic
