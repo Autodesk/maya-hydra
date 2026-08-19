@@ -35,6 +35,22 @@ import shiboken6
 HOVER_ATTR_NAME = "mayaHydraOutlineHoverHighlighting"
 HOVER_ATTR = "defaultRenderGlobals.{}".format(HOVER_ATTR_NAME)
 
+# Hover state is cached as absolute device pixel coordinates (renderOverride.cpp's
+# _SetHoverPosition()/HoverState), and _ResolveHoverPath() bounds-checks them against whatever
+# render's viewport dimensions are current. So the viewport panel's pixel size has to match between
+# firing and capture, and has to be reproducible across machines for the reference images to compare
+# cleanly -- neither holds for the panel's ambient size, hence forcing it to a fixed target.
+TARGET_VIEWPORT_SIZE = (400, 400)
+
+# First guess for the main window size; how much of it the panel actually gets depends on the
+# machine/theme/DPI/layout, so _forceDeterministicMainWindowSize() corrects toward the target
+# empirically rather than assuming this reaches it directly.
+_INITIAL_MAIN_WINDOW_SIZE = (
+    TARGET_VIEWPORT_SIZE[0] + 1200, TARGET_VIEWPORT_SIZE[1] + 700)
+
+_MAX_SIZE_CONVERGENCE_ATTEMPTS = 8
+_SIZE_CONVERGENCE_TOLERANCE = 1
+
 class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
     # MayaHydraBaseTestCase.setUpClass requirement.
     _file = __file__
@@ -46,13 +62,10 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
         """Compare snapshot and collect failures instead of stopping on first failure, so one bad
         frame in this long sequence does not hide failures in the rest of it.
 
-        Captures at the viewport's actual measured widget size rather than
-        assertSnapshotClose()'s hardcoded 400x400 default: hover pixel math
-        (_worldToViewportPixel()) has to target whatever size the capture actually uses, or the two
-        silently disagree about where anything is on screen -- selection highlighting doesn't care
-        (it's identity-based, not pixel-based), which is why the hover cue specifically would be
-        missing from captured images even when lead/non-lead selection works fine at a mismatched
-        capture size.
+        Captures at the viewport panel's actual size (forced to TARGET_VIEWPORT_SIZE by
+        buildScene(), see the comment there) instead of a capture size independent of it -- a
+        mismatch pushes hover's cached device-pixel coordinates out of bounds, silently dropping the
+        hover cue rather than rescaling it.
         """
         try:
             widget = self._viewWidget(self._activeView())
@@ -99,7 +112,39 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
         cmds.refresh(force=True)
         self._hoverEnabled = True
 
+    def _forceDeterministicMainWindowSize(self):
+        mainWindowPtr = omui.MQtUtil.mainWindow()
+        if not mainWindowPtr:
+            return
+        mainWindow = shiboken6.wrapInstance(int(mainWindowPtr), QWidget)
+
+        def resizeAndSettle(size):
+            mainWindow.resize(*size)
+            QApplication.processEvents()
+            cmds.refresh(force=True)
+
+        # Correct by whatever gap remains each attempt, rather than assuming a single fixed offset
+        # between window size and panel size: that relationship need not be linear (e.g. a
+        # fixed-width side panel can leave the panel's width unmoved by the window's width).
+        size = list(_INITIAL_MAIN_WINDOW_SIZE)
+        for _ in range(_MAX_SIZE_CONVERGENCE_ATTEMPTS):
+            resizeAndSettle(size)
+            panel = self._viewWidget(self._activeView())
+            diffW = TARGET_VIEWPORT_SIZE[0] - panel.width()
+            diffH = TARGET_VIEWPORT_SIZE[1] - panel.height()
+            if abs(diffW) <= _SIZE_CONVERGENCE_TOLERANCE and abs(diffH) <= _SIZE_CONVERGENCE_TOLERANCE:
+                return
+            size[0] += diffW
+            size[1] += diffH
+
+        self.fail(
+            "Could not converge the viewport panel to {}x{} after {} attempts (last size "
+            "{}x{}).".format(
+                TARGET_VIEWPORT_SIZE[0], TARGET_VIEWPORT_SIZE[1],
+                _MAX_SIZE_CONVERGENCE_ATTEMPTS, panel.width(), panel.height()))
+
     def buildScene(self):
+        self._forceDeterministicMainWindowSize()
         self.setHdStormRenderer()
         cmds.refresh(force=True)
 
@@ -256,6 +301,7 @@ class TestOutlineHover(mtohUtils.MayaHydraBaseTestCase):
         cmds.select(clear=True)
         self.enableHover()
 
+        self.hoverEmptyBackground()
         cmds.select(s1)
         self.compareSnapshot("reverse_select_s1_lead_only.png")
 

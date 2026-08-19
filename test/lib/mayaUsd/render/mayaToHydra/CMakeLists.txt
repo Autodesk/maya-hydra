@@ -224,6 +224,7 @@ set(OUTLINE_MODE_EXCLUDED_TEST_SCRIPT_FILES
     testGeomSubsetsWireframeHighlight.py # TODO: To support when implementing HYDRA-2458 (geometry subsets)
     testNativeInstancingWireframeHighlight.py # TODO: To support when implementing HYDRA-2456 (single instances)
     testPointInstancingWireframeHighlight.py # TODO: To support when implementing HYDRA-2456 (single instances)
+    testStageInstanceablePrimsSelHighlight.py # TODO: To support when implementing HYDRA-2456 (single instances)
     # TODO: revisit with HYDRA-2457 (wireframe-on-shaded). Outline skips translating a selected
     # object's wireframe render item until it is actually needed, so toggling wireframeOnShaded adds
     # a new prim in outline mode instead of just dirtying an existing one, as legacy does.
