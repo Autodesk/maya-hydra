@@ -403,6 +403,8 @@ void _connectionChanged(MPlug& srcPlug, MPlug& destPlug, bool made, void* client
 
 SdfPath _GetMaterialPath(const SdfPath& base, const MObject& obj)
 {
+    MayaHydra::DgAccessLock dgLock;
+
     MStatus           status;
     MFnDependencyNode node(obj, &status);
     if (!status) {
@@ -556,6 +558,7 @@ void MayaHydraSceneIndex::UpdateRenderItems(
     // This loop could, in theory, be parallelized.  Unclear how large the gains would be, but maybe
     // nothing to lose unless there is some internal contention in USD.
     for (size_t i = 0; i < scene.mCount; i++) {
+        using MVS = MDataServerOperation::MViewportScene;
         auto       flags = scene.mFlags[i];
         const bool unchanged = (0 == flags);
 
@@ -665,8 +668,10 @@ void MayaHydraSceneIndex::UpdateRenderItems(
         }
 
 #ifdef MAYA_HAS_MVS_CHANGED_WIREFRAME_COLOR_API
+        // Some custom render items (Ufe cameras) don't send the dirty wireframe color notification
+        // but they change wireframe color by resetting their effect so we catch it this way.
         bool wireframeColorDirty = isNewRenderitem ||
-            (flags & MDataServerOperation::MViewportScene::MVS_changedWireframeColor);
+            (flags & (MVS::MVS_changedWireframeColor | MVS::MVS_changedEffect));
 #else
         bool wireframeColorDirty = true;
 #endif

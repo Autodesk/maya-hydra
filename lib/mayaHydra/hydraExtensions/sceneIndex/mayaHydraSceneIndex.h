@@ -253,6 +253,9 @@ public:
         // For sample size of 1 tStep is unused and we match USD and to provide t=shutterOpen
         // sample.
         const double tStep = maxSampleCount > 1 ? (shutter.GetSize() / (maxSampleCount - 1)) : 0;
+
+        MayaHydra::DgAccessLock dgLock;
+
         const MTime  mayaTime = MAnimControl::currentTime();
         size_t       nSamples = 0;
         double       relTime = shutter.GetMin();

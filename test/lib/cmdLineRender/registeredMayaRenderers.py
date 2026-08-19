@@ -35,6 +35,20 @@ class RegisteredMayaRenderers(mtohUtils.MayaHydraBaseTestCase):
         for r in expected:
             self.assertIn(r, registeredRenderers)
 
+    def test_hydraBasedRenderers(self):
+        """
+        Test that registered renderers are Hydra-based.
+        """
+        hydraBasedRenderers = ['HdStormRendererPlugin', 'HdArnoldRendererPlugin']
+
+        for r in hydraBasedRenderers:
+            if not cmds.renderer(r, exists=True):
+                continue
+            val = cmds.renderer(r, query=True, capability="isHydra")
+            # capability query returns a string value; "false" is also truthy.
+            # Compare with the string "true".
+            self.assertEqual(val, "true", msg=f"{r} is not Hydra-based (got {val!r})")
+
 if __name__ == '__main__':
     fixturesUtils.runTests(globals())
 
