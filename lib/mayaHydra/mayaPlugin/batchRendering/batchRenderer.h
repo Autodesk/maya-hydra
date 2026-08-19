@@ -38,6 +38,7 @@
 #include <mayaHydraLib/mayaHydraParams.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexDataFactoriesSetup.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+#include <mayaHydraLib/sceneIndex/mhRenderingColorSpaceResolvingSceneIndex.h>
 
 #include <flowViewport/selection/fvpSelectionTracker.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
@@ -159,6 +160,7 @@ private:
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     PXR_NS::HdsiSceneGlobalsSceneIndexRefPtr  _sceneGlobalsSceneIndex;
+    MAYAHYDRA_NS_DEF::MhRenderingColorSpaceResolvingSceneIndexRefPtr _renderingColorSpaceSceneIndex;
     Fvp::DataProducerMergingSceneIndexProxyPtr _dataProducerMergingSceneIndexProxy { nullptr };
 
     PXR_NS::HdRprimCollection                 _renderCollection {

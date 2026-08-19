@@ -606,7 +606,12 @@ void BatchRenderer::_CreateSceneIndicesChainAfterMergingSceneIndex()
     //We use as its input scene index : _inputSceneIndexOfFilteringSceneIndicesChain
     _lastFilteringSceneIndexBeforeCustomFiltering = _inputSceneIndexOfFilteringSceneIndicesChain;
 
-    _lastFilteringSceneIndexBeforeCustomFiltering = _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+    _sceneGlobalsSceneIndex
+        = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+
+    _lastFilteringSceneIndexBeforeCustomFiltering = _renderingColorSpaceSceneIndex
+        = MhRenderingColorSpaceResolvingSceneIndex::New(_sceneGlobalsSceneIndex);
+
     TF_AXIOM(_mayaHydraSceneIndex);
 
 #ifdef CODE_COVERAGE_WORKAROUND
