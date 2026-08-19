@@ -77,6 +77,9 @@ _GetSelectionHighlightMask(const HdInstancerTopologySchema& originalInstancerTop
         for (size_t iInstanceIndices = 0; iInstanceIndices < nestedInstanceIndices.GetNumElements(); iInstanceIndices++) {
             auto instanceIndices = nestedInstanceIndices.GetElement(0);
             for (const auto& instanceIndex : instanceIndices.GetInstanceIndices()->GetTypedValue(0)) {
+                if (instanceIndex < 0 || static_cast<size_t>(instanceIndex) >= nbInstances) {
+                    continue;
+                }
                 if (selectedInstanceIndicies.empty() || selectedInstanceIndicies[instanceIndex]) {
                     selectionHighlightMask[instanceIndex] = originalMask.empty() ? true : originalMask[instanceIndex];
                 }
@@ -130,7 +133,8 @@ void _SeparateLeadAndActiveInstances(
     const PXR_NS::SdfPath& instancerPath,
     const std::shared_ptr<FVP_NS_DEF::WireframeColorInterface>& wireframeColorInterface,
     int& leadInstanceIndex,
-    std::set<int>& activeInstanceIndices
+    std::set<int>& activeInstanceIndices,
+    size_t nbInstances
 ) {
     leadInstanceIndex = -1;
     activeInstanceIndices.clear();
@@ -145,6 +149,9 @@ void _SeparateLeadAndActiveInstances(
         for (size_t iInstanceIndices = 0; iInstanceIndices < nestedInstanceIndices.GetNumElements(); iInstanceIndices++) {
             auto instanceIndices = nestedInstanceIndices.GetElement(0);
             for (const auto& instanceIndex : instanceIndices.GetInstanceIndices()->GetTypedValue(0)) {
+                if (instanceIndex < 0 || static_cast<size_t>(instanceIndex) >= nbInstances) {
+                    continue;
+                }
                 allSelectedInstances.insert(instanceIndex);
                 leadInstanceIndex = instanceIndex;
             }
@@ -238,13 +245,17 @@ HdSceneIndexPrim PiInstancerWhSi::GetHighlightPrim(const SdfPath &selectionPath,
         auto selectionData = selectionIt->second;
         size_t nbInstances = selectionData._selectedInstanceCount;
         
-        if (selectionKey.second == kLeadHighlight && selectionData._leadInstanceIndex != -1) {
+        if (selectionKey.second == kLeadHighlight
+            && selectionData._leadInstanceIndex >= 0
+            && static_cast<size_t>(selectionData._leadInstanceIndex) < nbInstances) {
             instanceMask = PXR_NS::VtBoolArray(nbInstances, false);
             instanceMask[selectionData._leadInstanceIndex] = true;
         } else if (selectionKey.second == kActiveHighlight && !selectionData._activeInstanceIndices.empty()) {
             instanceMask = PXR_NS::VtBoolArray(nbInstances, false);
             for (int activeIndex : selectionData._activeInstanceIndices) {
-                instanceMask[activeIndex] = true;
+                if (activeIndex >= 0 && static_cast<size_t>(activeIndex) < nbInstances) {
+                    instanceMask[activeIndex] = true;
+                }
             }
         }
         prim.dataSource = _GetSelectionHighlightInstancerDataSource(prim.dataSource, selectionsSchema, instanceMask, nbInstances);
@@ -511,8 +522,8 @@ void PiInstancerWhSi::_CreateSelectionHighlight(
     int leadInstanceIndex;
     std::set<int> activeInstanceIndices;
     size_t nbInstances = _CountNbInstances(instancerPrim);
-    _SeparateLeadAndActiveInstances(selectionsSchema, instancerPath, _wireframeColorInterface, 
-                                   leadInstanceIndex, activeInstanceIndices);
+    _SeparateLeadAndActiveInstances(selectionsSchema, instancerPath, _wireframeColorInterface,
+                                   leadInstanceIndex, activeInstanceIndices, nbInstances);
     
     // Lead instance highlighting if there are selected instances. Create active highlight
     // if there is more than one instance selected
