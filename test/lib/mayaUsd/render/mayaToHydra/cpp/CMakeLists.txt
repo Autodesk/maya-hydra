@@ -77,6 +77,13 @@ if (MAYA_HAS_VIEW_SELECTED_OBJECT_API)
     )
 endif()
 
+if (MAYA_APP_VERSION VERSION_GREATER 2026)
+    target_sources(${TARGET_NAME}
+        PRIVATE
+        testRenderingColorSpaceResolving.cpp
+    )
+endif()
+
 # -----------------------------------------------------------------------------
 # compiler configuration
 # -----------------------------------------------------------------------------

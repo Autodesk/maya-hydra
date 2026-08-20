@@ -39,6 +39,13 @@ public:
 
     MStatus doIt(const MArgList& args) override;
 
+    // Only returns true when -testKeepAlive was passed, so Maya retains this
+    // command (and its BatchRenderer) instead of deleting it right after
+    // doIt() returns. Lets tests inspect the terminal scene index while the
+    // batch renderer is still alive. Not used by real batch renders.
+    bool    isUndoable() const override { return _testKeepAlive; }
+    MStatus undoIt() override { return MS::kSuccess; }
+
 private:
 
     HydraRenderCmd();
@@ -51,10 +58,11 @@ private:
     bool hydraRenderFromMayaRenderSettings();
     bool hydraRenderFromHydraV1RenderSettings();
     bool hydraRenderFromHydraV2RenderSettings();
-    
+
     std::unique_ptr<BatchRenderer>  _batchRenderer;
     std::unique_ptr<GLRenderWindow> _renderWindow;
     bool                            _gpuEnabled{false};
+    bool                            _testKeepAlive{false};
 };
 
 }

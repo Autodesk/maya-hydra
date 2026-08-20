@@ -94,6 +94,9 @@ constexpr auto _layerLong = "-layer";
 constexpr auto _gpuEnabledFlag = "-gpu";
 constexpr auto _gpuEnabledFlagLong = "-gpuEnabled";
 
+constexpr auto _testKeepAliveFlag = "-tka";
+constexpr auto _testKeepAliveFlagLong = "-testKeepAlive";
+
 using namespace MAYAHYDRA_NS_DEF;
 
 constexpr auto _helpText = R"HELP(For details on args usage please see 
@@ -149,6 +152,7 @@ MSyntax HydraRenderCmd::createSyntax()
     syntax.addFlag(_gpuEnabledFlag, _gpuEnabledFlagLong, MSyntax::kBoolean);
     syntax.addFlag(_frameShort, _frameLong, MSyntax::kDouble);
     syntax.addFlag(_layer, _layerLong, MSyntax::kString);
+    syntax.addFlag(_testKeepAliveFlag, _testKeepAliveFlagLong, MSyntax::kBoolean);
 
     return syntax;
 }
@@ -248,6 +252,10 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
 
     if (db.isFlagSet(_gpuEnabledFlag)) {
         CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_gpuEnabledFlag, 0, _gpuEnabled));
+    }
+
+    if (db.isFlagSet(_testKeepAliveFlag)) {
+        CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_testKeepAliveFlag, 0, _testKeepAlive));
     }
 
     // Create the batch renderer.  The second and third arguments of
