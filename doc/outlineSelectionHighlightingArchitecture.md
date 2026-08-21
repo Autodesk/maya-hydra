@@ -44,7 +44,8 @@ return _isUsingHdSt && _globals.outlineSelectionHighlight;
   buffers and a GL compute shader for the mask, and gate themselves on Storm internally. A
   non-Storm delegate therefore keeps the legacy wireframe highlighting, whatever the global says.
 - **Not offered on USD 24.11**, where HgiGL corrupts the non-zero integer prim IDs the outline mask
-  shader samples. On that version the enum lists *Legacy Selection* only, and it is the default.
+  shader samples, **nor on macOS**, where outline selection highlighting is unsupported. In those
+  configurations the enum lists *Legacy Selection* only, and it is the default.
 
 Switching mode changes the scene index chain, so it cannot be done in place: `UpdateRenderGlobals()`
 flags `_needsClear`, and `Render()` runs `ClearHydraResources()` / `_InitHydraResources()` and then
@@ -348,7 +349,8 @@ thread.
 - **Storm only.** Other render delegates keep the legacy wireframe highlighting. Supporting a
   non-rasterizing delegate would mean a separate Storm pass rasterizing selected geometry alongside
   the beauty render and compositing the two — an HVT project, not a flag.
-- **Not available on USD 24.11**, where HgiGL corrupts the prim IDs the mask compute shader samples.
+- **Not available on USD 24.11**, where HgiGL corrupts the prim IDs the mask compute shader samples,
+  **or on macOS**, where outline selection highlighting is unsupported.
 - **Wireframe-on-shaded shows both cues.** Deliberate: the alternative was recolouring VP2's wire,
   and there is no correct dormant colour to recolour it to for non-mesh shapes.
 - **`enableDefaultOutlines` is off by default.** This is an HVT outline feature — a faint outline on

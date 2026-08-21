@@ -26,7 +26,7 @@ set(INTERACTIVE_TEST_SCRIPT_FILES
     testMayaShadingModes.py|skipOnPlatform:osx # HYDRA-1127 : refinedWire not working on OSX
     testMayaDisplayLayers.py
     testMayaIsolateSelect.py
-    testOutlineHover.py
+    testOutlineHover.py|skipOnPlatform:osx # Outline selection highlighting is not available on macOS
 	#HYDRA-1940 temporarily disable this test which doesn't pass on Maya 2026
     #testMayaLights.py
     testUSDLights.py
@@ -209,10 +209,12 @@ set(INTERACTIVE_TEST_SCRIPT_FILES_ENABLE_GENERATIVE_PROCEDURAL
 # be mode-sensitive after all, one of its two runs fails against the shared image
 # instead of silently losing coverage.
 #
-# Outline is only offered on USD > 24.11: below that the render global has a
-# single "Legacy Selection" entry, because HgiGL corrupts the prim ids the outline
-# compute shader samples. Every primary run is then the legacy one.
-if(USD_VERSION VERSION_GREATER "0.24.11")
+# Outline is not offered everywhere: on USD <= 24.11 HgiGL corrupts the prim ids the
+# outline compute shader samples, and it is unsupported on macOS. In both cases the
+# render global has a single "Legacy Selection" entry, so every primary run is the
+# legacy one and there are no _legacy counterparts. Keep this in sync with
+# MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT in lib/mayaHydra/mayaPlugin/renderGlobals.cpp.
+if(USD_VERSION VERSION_GREATER "0.24.11" AND NOT IS_MACOSX)
     set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE TRUE)
 else()
     set(MAYAHYDRA_OUTLINE_MODE_AVAILABLE FALSE)

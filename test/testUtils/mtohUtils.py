@@ -45,12 +45,12 @@ MAYAUSD_PLUGIN_NAME = 'mayaUsdPlugin'
 
 # Selection highlighting mode support.
 #
-# The mode is a defaultRenderGlobals enum attribute, and its entries depend on
-# the USD version: on USD > 24.11 it is
-# {"Outline Selection", "Legacy Selection"}, while on USD <= 24.11 only
-# {"Legacy Selection"} is offered, because 24.11's HgiGL cannot support the
-# outline compute shader (see renderGlobals.cpp). The enum indices therefore
-# differ between USD versions, so the index is resolved by name rather than
+# The mode is a defaultRenderGlobals enum attribute, and its entries depend on the
+# configuration: usually it is {"Outline Selection", "Legacy Selection"}, but only
+# {"Legacy Selection"} is offered on USD <= 24.11, because 24.11's HgiGL cannot
+# support the outline compute shader, and on macOS, where outline selection
+# highlighting is unsupported (see renderGlobals.cpp). The enum indices therefore
+# differ between configurations, so the index is resolved by name rather than
 # hardcoded.
 SELECTION_HIGHLIGHT_MODE_NAME = "mayaHydraSelectionHighlightMode"
 SELECTION_HIGHLIGHT_MODE_NODE = "defaultRenderGlobals"
@@ -100,15 +100,30 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
     _pluginsCantUnload = ['mayaHydraFlowViewportAPILocator', 'mtoa', 'modelingToolkit', 'mayaUsdPlugin']
 
     @classmethod
+    def outlineSelectionHighlightSupported(cls):
+        '''Whether the outline mode is offered at all in this configuration.
+
+        Mirrors the MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT gate in
+        lib/mayaHydra/mayaPlugin/renderGlobals.cpp.
+        '''
+        if platform.system() == "Darwin":
+            return False
+        return Usd.GetVersion() > (0, 24, 11)
+
+    @classmethod
     def selectionHighlightMode(cls):
         '''Return the selection highlighting mode this run should use.
 
-        Taken from the MAYAHYDRA_SELECTION_HIGHLIGHT_MODE environment variable,
-        defaulting to outline, which is what the plugin ships as its default.
+        Taken from the MAYAHYDRA_SELECTION_HIGHLIGHT_MODE environment variable.
+        With no variable set, this is outline, the mode the plugin ships as its
+        default, except where outline is not offered at all - see
+        outlineSelectionHighlightSupported().
         '''
         mode = os.environ.get(SELECTION_HIGHLIGHT_MODE_ENV_VAR, '').strip().lower()
         if not mode:
-            return SELECTION_HIGHLIGHT_MODE_OUTLINE
+            return (SELECTION_HIGHLIGHT_MODE_OUTLINE
+                    if cls.outlineSelectionHighlightSupported()
+                    else SELECTION_HIGHLIGHT_MODE_LEGACY)
         if mode not in SELECTION_HIGHLIGHT_MODE_ENUM_NAMES:
             raise ValueError(
                 "Unknown {} value {!r}; expected one of {}.".format(
@@ -416,13 +431,15 @@ class MayaHydraBaseTestCase(unittest.TestCase, ImageDiffingTestCase):
             listEnum=True)[0].split(':')
 
         if wantedEnumName not in enumNames:
-            # On USD <= 24.11 only "Legacy Selection" is offered, so an outline
-            # run cannot be honoured. Skipping avoids silently comparing outline
+            # Where outline is not offered - USD <= 24.11, or macOS - only
+            # "Legacy Selection" exists, so an explicitly requested outline run
+            # cannot be honoured. Skipping avoids silently comparing outline
             # reference images against a legacy render.
             self.skipTest(
                 "Selection highlighting mode {!r} ({!r}) is not available on "
-                "USD {}; available modes: {}.".format(
-                    mode, wantedEnumName, str(self._usdVersion), enumNames))
+                "{} with USD {}; available modes: {}.".format(
+                    mode, wantedEnumName, platform.system(),
+                    str(self._usdVersion), enumNames))
 
         wantedIndex = enumNames.index(wantedEnumName)
         if cmds.getAttr(SELECTION_HIGHLIGHT_MODE_ATTR) == wantedIndex:

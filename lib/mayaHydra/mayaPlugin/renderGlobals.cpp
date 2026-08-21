@@ -40,6 +40,17 @@
 // This file is where we build the UI and expose to MEL the global parameters from this plug-in and
 // the parameters from the chosen render delegate.
 
+// The Outline selection-highlight mode is not offered in these configurations: the
+// mayaHydraSelectionHighlightMode enum lists "Legacy Selection" only, and it is the default.
+//  - USD <= 24.11: HgiGL corrupts the non-zero integer prim ids the outline compute shader samples.
+//  - macOS: outline selection highlighting is not supported.
+// Keep this in sync with MayaHydraBaseTestCase.outlineSelectionHighlightSupported() in
+// test/testUtils/mtohUtils.py and MAYAHYDRA_OUTLINE_MODE_AVAILABLE in
+// test/lib/mayaUsd/render/mayaToHydra/CMakeLists.txt.
+#if PXR_VERSION <= 2411 || defined(__APPLE__)
+#define MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
+#endif
+
 PXR_NAMESPACE_OPEN_SCOPE
 // Bring the MayaHydra namespace into scope.
 // The following code currently lives inside the pxr namespace, but it would make more sense to 
@@ -974,9 +985,7 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
         }
     }
     if (filter(MtohTokens->mayaHydraSelectionHighlightMode)) {
-#if PXR_VERSION <= 2411
-        // USD 24.11's HgiGL corrupts non-zero integer prim ids sampled in the outline compute
-        // shader, so the Outline selection-highlight mode cannot work. Offer Legacy only.
+#ifdef MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
         static const TfTokenVector kSelectionHighlightModes = { TfToken("Legacy Selection") };
 #else
         static const TfTokenVector kSelectionHighlightModes
@@ -986,7 +995,7 @@ MObject MtohRenderGlobals::CreateAttributes(const GlobalParams& params)
             node,
             filter.mayaString(),
             kSelectionHighlightModes,
-            kSelectionHighlightModes[0], // default = first entry (Legacy on 24.11, Outline otherwise)
+            kSelectionHighlightModes[0], // default = first entry, Legacy where Outline is unavailable
             userDefaults);
         if (filter.attributeFilter()) {
             return mayaObject;
@@ -1217,9 +1226,7 @@ MtohRenderGlobals::GetInstance(const GlobalParams& params, bool storeUserSetting
         }
     }
     if (filter(MtohTokens->mayaHydraSelectionHighlightMode)) {
-#if PXR_VERSION <= 2411
-        // On USD 24.11 the Outline mode is unsupported (see above / renderGlobals.cpp enum
-        // creation), so fall back to Legacy when the attribute is unset.
+#ifdef MAYAHYDRA_NO_OUTLINE_SELECTION_HIGHLIGHT
         TfToken mode("Legacy Selection");
 #else
         TfToken mode("Outline Selection");
