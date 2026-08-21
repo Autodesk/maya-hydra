@@ -48,14 +48,11 @@ std::string resolveFrameNumber(const std::string& input, double currentFrame)
             }
             const size_t runLen = i - runStart;
 
-            if (runLen >= frameStr.size()) {
-                // Zero-pad on the left.
+            if (frameStr.size() < runLen) {
+                // Zero-pad on the left to reach the minimum field width.
                 result.append(runLen - frameStr.size(), '0');
-                result.append(frameStr);
-            } else {
-                // Truncate: take the rightmost runLen digits.
-                result.append(frameStr, frameStr.size() - runLen, runLen);
             }
+            result.append(frameStr);
         } else {
             result.push_back(input[i]);
             ++i;

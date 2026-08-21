@@ -35,10 +35,12 @@ typedef PXR_NS::TfRefPtr<const FrameNbResolvingSceneIndex>
 /// render product names.  For renderSettings prims, it inspects each render
 /// product's name data source.  Contiguous runs of '#' characters are
 /// replaced with the current frame number (from HdSceneGlobalsSchema),
-/// zero-padded or truncated to match the width of the '#' run.
+/// zero-padded to the width of the '#' run (treated as a minimum field
+/// width; the frame number is never truncated).
 ///
 /// For example, given frame 57 and product name "####frame#.jpg", the
-/// resolved name is "0057frame7.jpg".
+/// resolved name is "0057frame57.jpg".  Given frame 12345 and "###.exr",
+/// the resolved name is "12345.exr" (no truncation).
 ///
 class FrameNbResolvingSceneIndex
     : public PXR_NS::HdSingleInputFilteringSceneIndexBase
@@ -62,17 +64,22 @@ public:
     ~FrameNbResolvingSceneIndex() override = default;
 
 protected:
+
+    FVP_API
     FrameNbResolvingSceneIndex(
         const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex);
 
+    FVP_API
     void _PrimsAdded(
         const PXR_NS::HdSceneIndexBase&                       sender,
         const PXR_NS::HdSceneIndexObserver::AddedPrimEntries& entries) override;
 
+    FVP_API
     void _PrimsRemoved(
         const PXR_NS::HdSceneIndexBase&                         sender,
         const PXR_NS::HdSceneIndexObserver::RemovedPrimEntries& entries) override;
 
+    FVP_API
     void _PrimsDirtied(
         const PXR_NS::HdSceneIndexBase&                         sender,
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries& entries) override;
