@@ -21,7 +21,9 @@
 
 #include <maya/MApiNamespace.h>
 #include <maya/MFnDependencyNode.h>
+#include <maya/MObject.h>
 #include <maya/MPlug.h>
+#include <maya/MTypes.h>
 
 #include <string>
 #include <string_view>
@@ -152,6 +154,33 @@ bool SetNodeAttribute(MObject node, std::string attrName, AttrType newValue)
     }
     return plug.setValue(newValue);
 }
+
+/**
+ * @brief Read a double3 numeric attribute from a dependency node.
+ *
+ * @param[out] outVal The attribute value.
+ * @param[in] node The node that owns the attribute.
+ * @param[in] attr The MObject of the attribute definition.
+ *
+ * @return MS::kSuccess when the value was read, MS::kFailure otherwise.
+ */
+MAYAHYDRALIB_API
+MStatus GetDouble3AttributeValue(double3& outVal, const MObject& node, const MObject& attr);
+
+/**
+ * @brief True when the plug itself, or, for compound plugs, any of its children is connected.
+ *
+ * MPlug::isConnected() only reports the queried plug: a keyframe set on a compound
+ * attribute (e.g. setKeyframe on a double3 "color") connects anim curves to the
+ * individual children (colorR/G/B), not to the compound plug, so isConnected()
+ * alone would miss it.
+ *
+ * @param[in] plug The plug to test.
+ *
+ * @return True if the plug or one of its children is connected, false otherwise.
+ */
+MAYAHYDRALIB_API
+bool PlugOrChildIsConnected(const MPlug& plug);
 
 /**
  * @brief Get if this MDagPath is an Arnold sky dome light.

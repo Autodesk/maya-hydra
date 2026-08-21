@@ -95,6 +95,8 @@ public:
     // ---- Rprim / geometry ----
     FVP_API DirtyNotifier& dirtyTransform();
     FVP_API DirtyNotifier& dirtyVisibility();
+    /// Invalidates the purpose render tag (HdPurposeSchema).
+    FVP_API DirtyNotifier& dirtyPurpose();
 
     // ---- Primvars: GRANULAR by design ----
     // Prefer the specific per-primvar locator so the render delegate only re-pulls
@@ -166,6 +168,21 @@ public:
 
     // ---- Instancer ----
     FVP_API DirtyNotifier& dirtyInstancer();     // instancedBy + instancerTopology
+
+    // Batching is used to coalesce multiple DirtyPrims notifications.
+    FVP_API static void beginDirtyBatch(PXR_NS::HdRetainedSceneIndex& batchingSceneIndex);
+    FVP_API static void commitDirtyBatch();
+
+    /// RAII guard: begins dirty batching in the constructor and commits in the destructor.
+    class DirtyBatchGuard
+    {
+    public:
+        FVP_API explicit DirtyBatchGuard(PXR_NS::HdRetainedSceneIndex& batchingSceneIndex);
+        FVP_API ~DirtyBatchGuard();
+
+        DirtyBatchGuard(const DirtyBatchGuard&)            = delete;
+        DirtyBatchGuard& operator=(const DirtyBatchGuard&) = delete;
+    };
 
 private:
     DirtyNotifier& _append(const PXR_NS::HdDataSourceLocator& locator);

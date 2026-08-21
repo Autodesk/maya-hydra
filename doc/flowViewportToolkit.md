@@ -70,6 +70,31 @@ You provide :
  - a rendererNames which are the Hydra renderer (render delegate)  names to which this scene index should be added. This is only used when viewId above is set to *PXR_NS::FvpViewportAPITokens->allRenderViews*, meaning you want to add this scene index to all viewports that are using these renderers. Note : to apply to multiple renderers, use a separator such as : "GL, Arnold". We are actually looking for the render delegate's name in this string. Set this parameter to *PXR_NS::FvpViewportAPITokens->allRenderers* to add your scene index to all viewports whatever their renderer is.
 An example of data producer scene index can be found in [DataProducerSceneIndexExample](../lib/flowViewport/API/samples/fvpDataProducerSceneIndexExample.cpp).
 
+## Updating DataProducer prims
+
+After adding mesh (or other) prims through a data producer scene index, **do not remove and re-add them** when a Maya attribute changes. Add each prim once, keep the prim paths stable, update your cached data-source values, and emit the appropriate Hydra 2.0 **dirty locators** so render delegates re-pull only what changed.
+
+Use [`Fvp::DirtyNotifier`](../lib/flowViewport/fvpDirtyNotifier.h) on your `HdRetainedSceneIndex` with **granular** locators, for example:
+
+- Uniform scale / local transform: `dirtyTransform()` and `dirtyExtent()`
+- Per-vertex or indexed display color: `dirtyVertexColors()` (or `dirtyDisplayColor()` for constant color)
+- Render pass / purpose tag: `dirtyPurpose()`
+
+See [render delegate topology vs deformation](render_delegate_topology_vs_deformation.md) for when to emit topology or broad `primvars` locators versus deformation-only updates.
+
+**Maya attribute change detection:** `MNodeMessage::addAttributeChangedCallback` alone is often not enough for timeline scrub, Evaluation Manager playback, or `setAttr` at the current frame without a new key. Funnel every notification path you use into one idempotent sync function that compares cached values, updates your data sources, then emits the minimal dirty locator set.
+
+Common pieces (use the subset your node needs):
+
+1. **`addAttributeChangedCallback`** with a message-type filter (`kAttributeSet`, add/remove/rename). Filter out `kAttributeEval`-only messages.
+2. **`preEvaluation()`** on the owning node when Evaluation Manager can drive your display attributes.
+3. A **`timeChanged`** event callback when connected display attributes must follow the timeline during scrub or playback (keys or DG-driven inputs).
+4. **`addNodeDirtyPlugCallback`** on the plugs you care about — optional for many DataProducer examples, but used on the adapter path when plug-dirty updates do not arrive as `kAttributeSet` (see [`MayaHydraMeshAdapter`](../lib/mayaHydra/hydraExtensions/adapters/meshAdapter.cpp)).
+
+Reference implementations: [`MhFootPrint`](../lib/mayaHydra/flowViewportAPIExamples/footPrintNode/mhFootPrintNode.cpp) (DataProducer path; items 1–3 above) and [`MayaHydraMeshAdapter`](../lib/mayaHydra/hydraExtensions/adapters/meshAdapter.cpp) (adapter path; items 1, 2, and 4).
+
+**Note:** passing a `dccNode` to `addDataProducerSceneIndex` makes MayaHydra apply parent **transform** and **visibility** each frame via `UsdImagingRootOverridesSceneIndex`. Custom shape attributes (size, color, etc.) remain the plugin author's responsibility.
+
 ## Get Hydra viewports information
 The interface to get Hydra viewports information is called *[InformationInterface](../lib/flowViewport/API/fvpInformationInterface.h)*.
 To get an instance of the InformationInterface class, please use :

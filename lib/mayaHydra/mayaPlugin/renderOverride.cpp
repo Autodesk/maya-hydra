@@ -505,12 +505,17 @@ VtValue MtohRenderOverride::_GetUsedGPUMemory() const
 
 int MtohRenderOverride::GetUsedGPUMemory()
 {
-    int totalGPUMemory = 0;
+    size_t totalGPUMemory = 0;
     std::lock_guard<std::mutex> lock(_allInstancesMutex);
     for (auto* instance : _allInstances) {
-        totalGPUMemory += instance->_GetUsedGPUMemory().UncheckedGet<int>();
+        const VtValue usedGpuMemory = instance->_GetUsedGPUMemory();
+        if (usedGpuMemory.IsHolding<size_t>()) {
+            totalGPUMemory += usedGpuMemory.UncheckedGet<size_t>();
+        } else if (usedGpuMemory.IsHolding<int>()) {
+            totalGPUMemory += usedGpuMemory.UncheckedGet<int>();
+        }
     }
-    return totalGPUMemory / (1024*1024);
+    return static_cast<int>(totalGPUMemory / (1024u * 1024u));
 }
 
 std::map<std::string, int> MtohRenderOverride::GetSceneStatistics()
@@ -1337,55 +1342,20 @@ MStatus MtohRenderOverride::Render(
         currentPass->params().viewInfo.framing = PXR_NS::CameraUtilFraming(displayWindow, renderRegion);
     }
     
-    MStatus  status;
-    MDagPath camPath = getFrameContext()->getCurrentCameraPath(&status);
-    if (status == MStatus::kSuccess) {
-        MString   ufeCameraPathString = getFrameContext()->getCurrentUfeCameraPath(&status);
-        Ufe::Path ufeCameraPath = Ufe::PathString::path(ufeCameraPathString.asChar());
-        bool isMayaCamera = ufeCameraPath.runTimeId() == UfeExtensions::getMayaRunTimeId();
-        if (isMayaCamera) { // TODO: Support USD Camera
-            MFnCamera camera(camPath, &status);
-            if (status == MStatus::kSuccess) {
-                if (_mayaHydraSceneIndex && !camera.isOrtho()) {
-                    SdfPath cameraPath = _mayaHydraSceneIndex->SetCameraViewport(camPath, _viewport);
-                    // Apply on all passes
-                    const int numFramePasses = _GetNumFramePasses();
-                    for (int i = 0; i < numFramePasses; ++i)
-                    {
-                        const hvt::FramePassPtr& currentPass = _GetFramePass(i);
-                        if (!currentPass) {
-                            continue;
-                        }
-    
-                        currentPass->params().renderParams.camera = cameraPath;
-                    }
-                    if (vpDirty) {
-                        Fvp::DirtyNotifier(*_mayaHydraSceneIndex, cameraPath).dirtyCameraParams();
-                    }
-#if PXR_VERSION >= 2605
-                    if (_sceneGlobalsSceneIndex && !cameraPath.IsEmpty()) {
-                        _sceneGlobalsSceneIndex->SetPrimaryCameraPrimPath(cameraPath);
-                    }
-#endif
-                } else if (camera.isOrtho()) {
-                    // Orthographic views use the free camera derived from viewport matrices.
-                    const int numFramePasses = _GetNumFramePasses();
-                    for (int i = 0; i < numFramePasses; ++i) {
-                        const hvt::FramePassPtr& currentPass = _GetFramePass(i);
-                        if (!currentPass) {
-                            continue;
-                        }
-                        currentPass->params().renderParams.camera = SdfPath();
-                    }
-                }
-            }
+    // Leave renderParams.camera empty so HVT renders through its free camera
+    // (rebuilt each frame from params().viewInfo matrices). We used to supply
+    // a custom camera path to HVT here, but HVT ignored it up until PR #173 :
+    // https://github.com/Autodesk/hydra-viewport-toolbox/pull/173
+    // When that PR came into effect, our custom camera path was now used, but 
+    // it turns out it provided the wrong values, and desynced the render from
+    // the picking. So we now mark the camera path empty to intentionally use
+    // the previous behaviour.
+    for (int i = 0; i < numFramePasses; ++i) {
+        const hvt::FramePassPtr& currentPass = _GetFramePass(i);
+        if (!currentPass) {
+            continue;
         }
-    } else {
-        TF_WARN(
-            "MFrameContext::getCurrentCameraPath failure (%d): '%s'"
-            "\nUsing viewport matrices.",
-            int(status.statusCode()),
-            status.errorString().asChar());
+        currentPass->params().renderParams.camera = SdfPath();
     }
 
     // Update all registered plugin before render.

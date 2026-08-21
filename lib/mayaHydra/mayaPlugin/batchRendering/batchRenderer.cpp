@@ -51,6 +51,9 @@
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
 
+#include <ufeExtensions/Global.h>
+#include <ufe/colorManagementHandler.h>
+
 #include <maya/MAnimControl.h>
 #include <maya/MEventMessage.h>
 #include <maya/MMessage.h>
@@ -111,6 +114,17 @@ void dumpHydraScene(const HdRenderIndex* renderIndex)
             TF_STATUS("Hydra scene from scene index %s written to %s", sceneIndexName.c_str(), dumpPath.asChar());
         }
     }
+}
+
+std::string getOCIOConfigFilePath()
+{
+    const auto colorManagement
+        = Ufe::ColorManagementHandler::colorManagementHandler(UfeExtensions::getMayaRunTimeId());
+    if (!colorManagement || !colorManagement->isColorManagementEnabled()) {
+        return {};
+    }
+
+    return colorManagement->getConfigFilePath();
 }
 
 // Fvp::RenderViewDataManager::AddRenderViewData connects a custom data
@@ -513,6 +527,17 @@ void BatchRenderer::_InitHydraResources()
     _taskController->SetEnablePresentation(false);
     _renderDelegate->SetRenderSetting(
         HdRenderSettingsTokens->enableInteractive, VtValue(false));
+
+    const std::string ocioConfigFilePath = getOCIOConfigFilePath();
+
+    if (!ocioConfigFilePath.empty()) {
+        TF_DEBUG_MSG(
+            MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
+            "Render setting " + BatchRenderTokens->ocioConfigPath.GetString() + " set to "
+                + ocioConfigFilePath + "\n");
+
+        _renderDelegate->SetRenderSetting(BatchRenderTokens->ocioConfigPath, VtValue(ocioConfigFilePath));
+    }
 
     // Tell render delegate to read render settings from the Hydra
     // scene (Hydra v2 render settings), rather than from the render

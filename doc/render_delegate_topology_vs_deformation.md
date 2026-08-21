@@ -237,8 +237,7 @@ So a render delegate that rebuilds the mesh on every `primvars/points` dirty wil
 | Event | Emission pattern |
 |-------|------------------|
 | Poly topology / component id change (`MPolyMessage` callbacks) | Topology + broad `primvars` + `primvars/points` + `extent` |
-| `inMesh` / `pnts` dirty — UV-only (connectivity + points unchanged) | Granular `primvars/st` only |
-| `inMesh` / `pnts` dirty — geometry changed | `primvars/points` + `extent` + `subdivisionTags` (+ `primvars/normals` if enabled); **no** topology locators (topology edits rely on `MPolyMessage` callbacks above) |
+| `inMesh` / `pnts` dirty (geometry edit, skinning/deformation, or UV-only) | `primvars/points` + `extent` + `subdivisionTags` (+ `primvars/normals` if enabled); **no** topology locators (topology edits rely on `MPolyMessage` callbacks above). UV-only edits that do not fire `inMesh`/`pnts` use the rows below. |
 | UV set change (`MPolyMessage::addUVSetChangedCallback`) | Granular `primvars/st` |
 | `uvPivot` attribute change | Granular `primvars/st` |
 | Smooth mesh toggle (`displaySmoothMesh` / `smoothLevel`) | `displayStyle` + topology + `subdivisionTags`; **no** broad `primvars`, **no** granular UV/tangent/normal on topology path |

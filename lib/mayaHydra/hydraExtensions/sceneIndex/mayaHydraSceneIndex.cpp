@@ -337,6 +337,8 @@ void _connectionChanged(MPlug& srcPlug, MPlug& destPlug, bool made, void* client
 
 SdfPath _GetMaterialPath(const SdfPath& base, const MObject& obj)
 {
+    MayaHydra::DgAccessLock dgLock;
+
     MStatus           status;
     MFnDependencyNode node(obj, &status);
     if (!status) {
@@ -356,6 +358,24 @@ bool GetShadingEngineNode(const MRenderItem& ri, MObject& shadingEngineNode)
 {
     shadingEngineNode = FindShadingEngine(ri.sourceDagPath(), ri.shadingComponent());
     return !shadingEngineNode.isNull();
+}
+
+bool UpdateRenderItemWireframeColor(
+    const MRenderItem&                   ri,
+    const MayaHydraRenderItemAdapterPtr& ria)
+{
+    MColor wireframeColor;
+    MDagPath dagPath = ri.sourceDagPath();
+    if (dagPath.isValid()) {
+        // This is a color managed VP2 color, it will need to be unmanaged at some point
+        wireframeColor = MGeometryUtilities::wireframeColor(dagPath);
+    }
+
+    if (wireframeColor != ria->GetWireframeColor()) {
+        ria->SetWireframeColor(wireframeColor);
+        return true;
+    }
+    return false;
 }
 
 std::mutex _adaptersToRecreateMutex;
@@ -466,10 +486,14 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         }
     }
 
+    // Coalesce DirtyPrims notifications produced per render item.
+    const Fvp::DirtyNotifier::DirtyBatchGuard dirtyBatchGuard(*this);
+
     // My version, does minimal update
     // This loop could, in theory, be parallelized.  Unclear how large the gains would be, but maybe
     // nothing to lose unless there is some internal contention in USD.
     for (size_t i = 0; i < scene.mCount; i++) {
+        using MVS = MDataServerOperation::MViewportScene;
         auto flags = scene.mFlags[i];
         if (flags == 0) {
             continue;
@@ -500,7 +524,8 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
 
         int                           fastId = ri.InternalObjectId();
         MayaHydraRenderItemAdapterPtr ria = nullptr;
-        if (!_GetRenderItem(fastId, ria)) {
+        const bool isNewRenderitem = !_GetRenderItem(fastId, ria);
+        if (isNewRenderitem) {
             const SdfPath slowId = _GetRenderItemPrimPath(ri);
 
             // Maya/MtoA adds texturedSkyDome mesh object for VP2.
@@ -543,13 +568,16 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             ria->SetMaterial(material);
         }
 
-        MColor wireframeColor;
-
-        MDagPath dagPath = ri.sourceDagPath();
-        if (dagPath.isValid()) {
-            wireframeColor = MGeometryUtilities::wireframeColor(
-                dagPath); // This is a color managed VP2 color, it will need to be unmanaged at some
-            // point
+#ifdef MAYA_HAS_MVS_CHANGED_WIREFRAME_COLOR_API
+        // Some custom render items (Ufe cameras) don't send the dirty wireframe color notification
+        // but they change wireframe color by resetting their effect so we catch it this way.
+        bool wireframeColorDirty = isNewRenderitem ||
+            (flags & (MVS::MVS_changedWireframeColor | MVS::MVS_changedEffect));
+#else
+        bool wireframeColorDirty = true;
+#endif
+        if (wireframeColorDirty) {
+            wireframeColorDirty = UpdateRenderItemWireframeColor(ri, ria);
         }
 
         // Call UpdateTransform before UpdateFromDelta, as UpdateTransform
@@ -559,7 +587,7 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         if (flags & MDataServerOperation::MViewportScene::MVS_changedMatrix) {
             ria->UpdateTransform(ri);
         }
-        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColor);
+        const MayaHydraRenderItemAdapter::UpdateFromDeltaData data(ri, flags, wireframeColorDirty);
         ria->UpdateFromDelta(data);
     }
 }
@@ -682,17 +710,6 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
         .Msg("    mapped to scene index path %s.\n", primPath.GetText());
 
     return Fvp::PrimSelections({ Fvp::PrimSelection { primPath } });
-}
-
-SdfPath MayaHydraSceneIndex::SetCameraViewport(const MDagPath& camPath, const GfVec4d& viewport)
-{
-    const SdfPath camID = GetPrimPath(camPath, true);
-    auto&&        cameraAdapter = TfMapLookupPtr(_cameraAdapters, camID);
-    if (cameraAdapter) {
-        (*cameraAdapter)->SetViewport(viewport);
-        return camID;
-    }
-    return {};
 }
 
 SdfPath MayaHydraSceneIndex::GetDelegateID(TfToken name) { return _ID; }

@@ -600,6 +600,11 @@ TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshPrimDataSource, con
     while (iFaceCounts < originalFaceVertexCounts.size() && iFaceIndices < originalFaceVertexIndices.size()) {
         int currFaceCount = originalFaceVertexCounts[iFaceCounts];
 
+        const size_t remainingFaceVertexIndices = originalFaceVertexIndices.size() - iFaceIndices;
+        if (currFaceCount < 0 || static_cast<size_t>(currFaceCount) > remainingFaceVertexIndices) {
+            return meshPrimDataSource;
+        }
+
         if (faceIndicesToKeep.find(iFaceCounts) != faceIndicesToKeep.end()) {
             trimmedFaceVertexCounts.push_back(currFaceCount);
             for (int faceIndicesOffset = 0; faceIndicesOffset < currFaceCount; faceIndicesOffset++) {
@@ -612,7 +617,7 @@ TrimMeshForGeomSubset(const HdContainerDataSourceHandle& meshPrimDataSource, con
         }
 
         iFaceCounts++;
-        iFaceIndices += currFaceCount;
+        iFaceIndices += static_cast<size_t>(currFaceCount);
     }
     auto faceVertexCountsLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexCounts);
     auto faceVertexIndicesLocator = HdMeshTopologySchema::GetDefaultLocator().Append(HdMeshTopologySchemaTokens->faceVertexIndices);
@@ -763,34 +768,51 @@ void BaseWhSi::_PrimsDirtied(
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
     _SendPrimsDirtied(entries);
+
+    static const HdDataSourceLocator materialLocator   = HdMaterialSchema::GetDefaultLocator();
+    static const HdDataSourceLocator selectionsLocator = HdSelectionsSchema::GetDefaultLocator();
+
     HdSceneIndexObserver::DirtiedPrimEntries filteredEntries;
     std::vector<SdfPath> selectionChangePaths;
     for (const auto& entry : entries) {
-        if (entry.dirtyLocators.Intersects(HdMaterialSchema::GetDefaultLocator())) {
+        if (entry.dirtyLocators.Intersects(materialLocator)) {
             _materialDisplacementCache.erase(entry.primPath);
         }
-        if (!IsExcludedPath(entry.primPath)) {
+
+        // perform those two fast checks before executing IsExcludedPath
+        const bool needsDirtyProcessing = NeedsDirtyProcessing(entry);
+        const bool needsSelectionUpdate = entry.dirtyLocators.Intersects(selectionsLocator);
+        if (!needsDirtyProcessing && !needsSelectionUpdate) {
+            continue;
+        }
+
+        if (IsExcludedPath(entry.primPath)) {
+            continue;
+        }
+
+        if (needsDirtyProcessing) {
             filteredEntries.emplace_back(entry);
-            if (entry.dirtyLocators.Intersects(HdSelectionsSchema::GetDefaultLocator())) {
-                HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
-                bool wasFullySelected = _fullySelectedPaths.find(entry.primPath) != _fullySelectedPaths.end();
-                bool isFullySelected = false;
-                HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
-                if (selectionsSchema.IsDefined()) {
-                    for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements() && !isFullySelected; selectionId++) {
-                        if (selectionsSchema.GetElement(selectionId).GetFullySelected() && !selectionsSchema.GetElement(selectionId).GetNestedInstanceIndices()) {
-                            isFullySelected = true;
-                        }
+        }
+
+        if (needsSelectionUpdate) {
+            HdSceneIndexPrim prim = GetInputSceneIndex()->GetPrim(entry.primPath);
+            bool wasFullySelected = _fullySelectedPaths.find(entry.primPath) != _fullySelectedPaths.end();
+            bool isFullySelected = false;
+            HdSelectionsSchema selectionsSchema = HdSelectionsSchema::GetFromParent(prim.dataSource);
+            if (selectionsSchema.IsDefined()) {
+                for (size_t selectionId = 0; selectionId < selectionsSchema.GetNumElements() && !isFullySelected; selectionId++) {
+                    if (selectionsSchema.GetElement(selectionId).GetFullySelected() && !selectionsSchema.GetElement(selectionId).GetNestedInstanceIndices()) {
+                        isFullySelected = true;
                     }
                 }
-                if (isFullySelected) {
-                    _fullySelectedPaths.emplace(entry.primPath);
-                } else {
-                    _fullySelectedPaths.erase(entry.primPath);
-                }
-                if (wasFullySelected != isFullySelected) {
-                    selectionChangePaths.push_back(entry.primPath);
-                }
+            }
+            if (isFullySelected) {
+                _fullySelectedPaths.emplace(entry.primPath);
+            } else {
+                _fullySelectedPaths.erase(entry.primPath);
+            }
+            if (wasFullySelected != isFullySelected) {
+                selectionChangePaths.push_back(entry.primPath);
             }
         }
     }

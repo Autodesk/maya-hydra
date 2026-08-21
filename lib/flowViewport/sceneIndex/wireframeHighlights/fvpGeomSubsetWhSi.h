@@ -82,6 +82,10 @@ protected:
         const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
 
     FVP_API
+    bool NeedsDirtyProcessing(
+        const PXR_NS::HdSceneIndexObserver::DirtiedPrimEntry& entry) const override;
+
+    FVP_API
     void ProcessFullySelectedChange(const PXR_NS::SdfPath& primPath, bool isFullySelected) override;
 
 private:
