@@ -40,9 +40,7 @@
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <flowViewport/selection/fvpSelectionTracker.h>
-#include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpFrameNbResolvingSceneIndex.h>
-#include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
 
 #include <pxr/base/gf/rect2i.h>
@@ -161,8 +159,6 @@ private:
     PXR_NS::HdRenderIndex*                    _renderIndex = nullptr;
     // Required by selection task.
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
-    Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
-    Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     PXR_NS::HdsiSceneGlobalsSceneIndexRefPtr  _sceneGlobalsSceneIndex;
     Fvp::FrameNbResolvingSceneIndexRefPtr     _frameNbResolvingSceneIndex {};
     Fvp::DataProducerMergingSceneIndexProxyPtr _dataProducerMergingSceneIndexProxy { nullptr };

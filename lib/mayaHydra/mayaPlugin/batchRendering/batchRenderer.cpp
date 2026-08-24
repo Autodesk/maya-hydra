@@ -489,11 +489,6 @@ void BatchRenderer::_InitHydraResources()
     auto inputSceneIndexOfFilteringSceneIndicesChain
         = _dataProducerMergingSceneIndexProxy->GetMergingSceneIndex();
 
-    //Put BlockPrimRemovalPropagationSceneIndex first as it can block/unblock the prim removal propagation on the whole scene indices chain
-    _blockPrimRemovalPropagationSceneIndex = Fvp::BlockPrimRemovalPropagationSceneIndex::New(inputSceneIndexOfFilteringSceneIndicesChain);
-    _pruningSceneIndex = Fvp::PruningSceneIndex::New(_blockPrimRemovalPropagationSceneIndex);
-    _pruningSceneIndex->AddExcludedSceneRoot(MAYA_NATIVE_ROOT); // Maya filtering is handled by VP2/OGS.
-    
     _CreateSceneIndicesChainAfterMergingSceneIndex(inputSceneIndexOfFilteringSceneIndicesChain);
 
     if (_sceneGlobalsSceneIndex) {
