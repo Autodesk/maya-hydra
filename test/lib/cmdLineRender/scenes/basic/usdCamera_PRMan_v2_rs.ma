@@ -1,5 +1,5 @@
 //Maya ASCII 2027 scene
-//Name: usdCamera.ma
+//Name: usdCamera_PRMan_v2_rs.ma
 //Last modified: Thu, Jun 04, 2026 12:52:50 PM
 //Codeset: 1252
 requires maya "2027";
@@ -127,9 +127,9 @@ createNode mayaUsdProxyShape -n "stageShape1" -p "stage1";
 	setAttr -k off ".v";
 	setAttr ".covm[0]"  0 1 1;
 	setAttr ".cdvm[0]"  0 1 1;
-	setAttr ".fp" -type "string" "usdCamera.usda";
+	setAttr ".fp" -type "string" "usdCamera_PRMan_v2_rs.usda";
 	setAttr ".usdStageLoadRules" -type "string" "/=all";
-	setAttr ".usdStageTargetLayer" -type "string" "./usdCamera.usda";
+	setAttr ".usdStageTargetLayer" -type "string" "./usdCamera_PRMan_v2_rs.usda";
 createNode lightLinker -s -n "lightLinker1";
 	rename -uid "8C18168D-4F52-680C-4851-02A669433F14";
 	setAttr -s 4 ".lnk";
@@ -150,7 +150,7 @@ createNode renderLayer -n "defaultRenderLayer";
 	setAttr ".g" yes;
 createNode UsdDefaultSettings -n "UsdDefaultRenderSettings";
 	rename -uid "9A04913B-4AC9-402E-8225-7C8D0D72B952";
-	setAttr ".srl" -type "string" "#usda 1.0\n(\n    renderSettingsPrimPath = \"/Render/SceneRenderSettings\"\n)\n\ndef Scope \"Render\"\n{\n    def RenderSettings \"SceneRenderSettings\"\n    {\n        custom string adskUsd:externalCamera = \"|persp\" (\n            displayName = \"External Camera\"\n        )\n        rel products = </Render/BeautyProduct>\n    }\n\n    def RenderVar \"color\"\n    {\n        uniform string sourceName = \"color\"\n    }\n\n    def RenderProduct \"BeautyProduct\"\n    {\n        rel orderedVars = </Render/color>\n        token productName = \"./default.png\"\n    }\n}\n\n";
+	setAttr ".srl" -type "string" "#usda 1.0\n(\n    renderSettingsPrimPath = \"/Render/SceneRenderSettings\"\n)\n\ndef Scope \"Render\"\n{\n    def RenderSettings \"SceneRenderSettings\"\n    {\n        custom string adskUsd:externalCamera = \"|persp\" (\n            displayName = \"External Camera\"\n        )\n        rel products = </Render/BeautyProduct>\n        int ri:hider:incremental = 0\n    }\n\n    def RenderVar \"Ci\"\n    {\n        uniform string sourceName = \"Ci\"\n    }\n\n    def RenderProduct \"BeautyProduct\"\n    {\n        rel orderedVars = </Render/Ci>\n        token productName = \"./default.png\"\n    }\n}\n\n";
 	setAttr ".ssl" -type "string" "#usda 1.0\n\n";
 	setAttr ".asp" -type "string" "UsdDefaultRenderSettings,/Render/SceneRenderSettings";
 lockNode -l 1 ;
@@ -450,4 +450,4 @@ connectAttr "OpenPBR_Surface2.msg" ":defaultShaderList1.s" -na;
 connectAttr "defaultRenderLayer.msg" ":defaultRenderingList1.r" -na;
 connectAttr "directionalLightShape1.ltd" ":lightList1.l" -na;
 connectAttr "directionalLight1.iog" ":defaultLightSet.dsm" -na;
-// End of usdCamera.ma
+// End of usdCamera_PRMan_v2_rs.ma

@@ -26,6 +26,7 @@
 
 #include <pxr/usd/sdr/registry.h>
 #include <pxr/usd/sdr/shaderProperty.h>
+#include <pxr/usd/sdf/tokens.h>
 #include <pxr/usd/usdHydra/tokens.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
 
@@ -1106,6 +1107,23 @@ void MayaHydraMaterialNetworkConverter::ConvertParameter(
     }
 
     material.parameters[paramName] = val;
+
+    // Publish file.cs as colorSpace:<param> metadata (TfToken), matching
+    // UsdImaging/materialParamUtils.cpp.
+    if (material.identifier == UsdImagingTokens->UsdUVTexture
+        && paramName == MayaHydraAdapterTokens->file) {
+        MStatus csStatus;
+        MPlug   csPlug = node.findPlug(MayaAttrs::file::colorSpace, true, &csStatus);
+        if (csStatus && !csPlug.isNull()) {
+            const MString cs = csPlug.asString();
+            if (cs.length() > 0) {
+                const TfToken colorSpaceParamName(SdfPath::JoinIdentifier(
+                    SdfFieldKeys->ColorSpace, paramName));
+                material.parameters[colorSpaceParamName] =
+                    VtValue(TfToken(cs.asChar()));
+            }
+        }
+    }
 
     /*plugArray contains all dependents MPlug we should consider for connections.
     Usually it contains 1 or 2 MPlug (2 is when dealing with a weighted attribute),

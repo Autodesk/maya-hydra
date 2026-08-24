@@ -128,6 +128,7 @@ MObject wrapU;
 MObject wrapV;
 MObject mirrorU;
 MObject mirrorV;
+MObject colorSpace;
 
 } // namespace file
 
@@ -261,6 +262,12 @@ MStatus initialize()
         SET_ATTR_OBJ(wrapV);
         SET_ATTR_OBJ(mirrorU);
         SET_ATTR_OBJ(mirrorV);
+        // Maya names this plug "cs", not "colorSpace"; SET_ATTR_OBJ would look up
+        // file.colorSpace via #attr stringification.
+        setAttrObj(colorSpace, nodeClass, "cs");
+        if (!TF_VERIFY(status)) {
+            return status;
+        }
     }
 
     {

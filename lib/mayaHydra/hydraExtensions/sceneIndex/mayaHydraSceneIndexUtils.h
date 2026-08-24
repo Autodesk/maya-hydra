@@ -78,16 +78,9 @@ _ToMaterialNetworkSchema(
                     SdfPath::StripPrefixNamespace(p.first, 
                         HdMaterialNodeParameterSchemaTokens->colorSpace);
 
-                // Colorspace metadata. Maya may publish colorSpace:<param> as a
-                // string (e.g. file.cs OCIO label) rather than TfToken; accept
-                // both so downstream render delegates can read it as a token.
+                // Colorspace metadata
                 if (res.second) {
-                    if (p.second.IsHolding<TfToken>()) {
-                        paramsInfo[res.first].colorSpace = p.second.Get<TfToken>();
-                    } else if (p.second.IsHolding<std::string>()) {
-                        paramsInfo[res.first].colorSpace =
-                            TfToken(p.second.Get<std::string>());
-                    }
+                    paramsInfo[res.first].colorSpace = p.second.Get<TfToken>();
                 }
                 // Value 
                 else {

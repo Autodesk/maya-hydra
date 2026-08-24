@@ -454,17 +454,16 @@ if(IS_WINDOWS)
     set_property(TEST "usdCamera_PRMan" APPEND PROPERTY ENVIRONMENT
         "HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS=")
 
-    # Same as above (Hydra V2) with render-settings debug logging enabled.
-    set(scene basic/usdCamera.ma)
-    set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/${sceneFileNameNoExt}_PRMan_v2_rs/projects/default/images)
+    # Hydra V2: PRMan reads USD RenderVar prims directly and requires "Ci".
+    set(scene basic/usdCamera_PRMan_v2_rs.ma)
     cmake_path(GET scene STEM sceneFileNameNoExt)
+    set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/${sceneFileNameNoExt}/projects/default/images)
     mayaHydra_add_cmd_line_render_test(${scene}|depOnPlugins:prman
         COPY_SCENE
         RENDERER HdPrmanLoaderRendererPlugin
         RENDERED_IMAGE_SUBDIR projects/default/images
-        RENDERED_IMAGE_NAME ${sceneFileNameNoExt}_PRMan_v2_rs
-        TEST_NAME_SUFFIX PRMan_v2_rs
-        RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -rd \"${render_dir}\" -im ${sceneFileNameNoExt}_PRMan_v2_rs"
+        RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+        RENDERER_ARGS "-x 960 -y 540 -cam \"|stage1|stageShape1,/camera1\" -rd \"${render_dir}\" -im ${sceneFileNameNoExt}"
         ENV
             "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS"
     )
