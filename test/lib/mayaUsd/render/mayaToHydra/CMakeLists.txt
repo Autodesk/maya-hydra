@@ -278,22 +278,5 @@ foreach(script ${PYTHON_UNIT_TEST_MODULES})
     apply_labels_to_test("${all_labels}" ${target})
 endforeach()
 
-if(MAYA_APP_VERSION VERSION_GREATER 2026)
-    set(BATCH_RENDER_TEST_SCRIPT_FILES
-        cpp/testRenderingColorSpaceResolving.py
-    )
-    foreach(script ${BATCH_RENDER_TEST_SCRIPT_FILES})
-        get_testfile_and_labels(all_labels test_filename ${script})
-        mayaUsd_get_unittest_target(target ${test_filename})
-        mayaUsd_add_test(${target}
-            PYTHON_SCRIPT ${test_filename}
-            ENV
-                "MAYA_DEFAULT_SURFACE_SHADER=standardSurface"
-                "MAYAUSD_DISABLE_VP2_RENDER_DELEGATE=1"
-        )
-        apply_labels_to_test("${all_labels}" ${target})
-    endforeach()
-endif()
-
 # C++ unit tests
 add_subdirectory(cpp)

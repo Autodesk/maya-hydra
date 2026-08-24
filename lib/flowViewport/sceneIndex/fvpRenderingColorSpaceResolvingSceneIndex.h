@@ -27,6 +27,8 @@ namespace FVP_NS_DEF {
 class RenderingColorSpaceResolvingSceneIndex;
 typedef PXR_NS::TfRefPtr<RenderingColorSpaceResolvingSceneIndex>
     RenderingColorSpaceResolvingSceneIndexRefPtr;
+typedef PXR_NS::TfRefPtr<const RenderingColorSpaceResolvingSceneIndex>
+    RenderingColorSpaceResolvingSceneIndexConstRefPtr;
 
 /// \class RenderingColorSpaceResolvingSceneIndex
 ///
@@ -44,9 +46,23 @@ public:
     using PXR_NS::HdSingleInputFilteringSceneIndexBase::_GetInputSceneIndex;
 
     FVP_API
-    virtual std::string GetRenderingColorSpaceFromDCC() const = 0;
+    PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath& primPath) const override;
+
+    PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath& primPath) const override
+    {
+        return GetInputSceneIndex()->GetChildPrimPaths(primPath);
+    }
+
     FVP_API
-    virtual bool        IsKnownColorSpace(const std::string& colorSpace) const = 0;
+    virtual bool UseAuthoredRenderingColorSpace(
+        const PXR_NS::TfToken&    authoredRenderingColorSpace,
+        const std::string&        applicationRenderingColorSpace) const = 0;
+
+    FVP_API
+    virtual std::string GetApplicationRenderingColorSpace() const = 0;
+
+    FVP_API
+    virtual bool IsKnownColorSpace(const std::string& colorSpace) const = 0;
 
     ~RenderingColorSpaceResolvingSceneIndex() override = default;
 

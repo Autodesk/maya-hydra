@@ -23,11 +23,9 @@ import mtohUtils
 from testUtils import PluginLoaded
 
 # The four scenes live alongside the other cmdLineRender renderSettings scenes.
-_SCENES_DIR = os.path.normpath(
-    os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..", "..", "..", "..",
-        "cmdLineRender", "scenes", "renderSettings"))
+_SCENES_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "scenes", "renderSettings")
 
 
 def _scenePath(sceneFileName):
@@ -57,16 +55,15 @@ class TestRenderingColorSpaceResolving(mtohUtils.MayaHydraBaseTestCase):
 
         cmds.file(scenePath, open=True, force=True)
 
-        # Keep the BatchRenderer alive after doIt() returns.
-        cmds.hydraRender(renderer="HdArnoldRendererPlugin", testKeepAlive=True)
+        cmds.hydraRender(renderer="HdArnoldRendererPlugin")
 
         try:
             with PluginLoaded('mayaHydraCppTests'):
                 cmds.mayaHydraCppTest(
                     f="TestRenderingColorSpaceResolving.%s" % testCase)
         finally:
-            # Release the retained BatchRenderer / Hydra resources.
-            cmds.flushUndo()
+            # Release the retained BatchRenderer / Hydra resources kept alive for unit tests.
+            cmds.mayaHydraTesting(releaseBatchRenderer=True)
 
     # renderingColorSpace not authored -> silently fall back to Maya's prefs (ACEScg).
     def test_Unauthored(self):

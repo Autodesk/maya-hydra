@@ -136,6 +136,9 @@ const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaData");
 
 namespace MAYAHYDRA_NS_DEF {
 
+// Static member initialization for batch rendering unit tests.
+std::unique_ptr<BatchRenderer> BatchRenderer::_retainedForTest;
+
 BatchRenderer::BatchRenderer(const MtohRendererDescription& desc)
     : _rendererDesc(desc)
     , _sceneIndexRegistry(nullptr)
@@ -626,6 +629,22 @@ void BatchRenderer::_ClearHydraCallback(void* data)
         return;
     }
     instance->_ClearHydraResources();
+}
+
+
+bool BatchRenderer::TestModeEnabled()
+{
+    return TfGetenvBool("MAYA_HYDRA_BATCH_RENDER_TEST_MODE", false);
+}
+
+void BatchRenderer::RetainForTest(std::unique_ptr<BatchRenderer> batchRenderer)
+{
+    _retainedForTest = std::move(batchRenderer);
+}
+
+void BatchRenderer::ReleaseRetainedForTest()
+{
+    _retainedForTest.reset();
 }
 
 HdRenderIndex* BatchRenderer::renderIndex() const

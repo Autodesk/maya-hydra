@@ -43,21 +43,19 @@ public:
     New(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex);
 
     MAYAHYDRALIB_API
-    PXR_NS::HdSceneIndexPrim GetPrim(const PXR_NS::SdfPath& primPath) const override;
-
-    PXR_NS::SdfPathVector GetChildPrimPaths(const PXR_NS::SdfPath& primPath) const override
-    {
-        return GetInputSceneIndex()->GetChildPrimPaths(primPath);
-    }
+    bool UseAuthoredRenderingColorSpace(
+        const PXR_NS::TfToken& authoredRenderingColorSpace,
+        const std::string&     applicationRenderingColorSpace) const override;
 
     MAYAHYDRALIB_API
-    std::string GetRenderingColorSpaceFromDCC() const override;
+    std::string GetApplicationRenderingColorSpace() const override;
+
     MAYAHYDRALIB_API
     bool IsKnownColorSpace(const std::string& colorSpace) const override;
 
     ~MhRenderingColorSpaceResolvingSceneIndex() override = default;
 
-protected:
+private:
     MhRenderingColorSpaceResolvingSceneIndex(const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndex);
 };
 
