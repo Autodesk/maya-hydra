@@ -156,7 +156,12 @@ MSyntax HydraRenderCmd::createSyntax()
 HydraRenderCmd::HydraRenderCmd() 
 {}
 
-HydraRenderCmd::~HydraRenderCmd() = default;
+HydraRenderCmd::~HydraRenderCmd()
+{
+    if (_batchRenderer && BatchRenderer::TestModeEnabled()) {
+        BatchRenderer::RetainForTest(std::move(_batchRenderer));
+    }
+}
 
 bool HydraRenderCmd::parseDatabase(const MArgDatabase& db)
 {

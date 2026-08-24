@@ -24,6 +24,7 @@ target_sources(${TARGET_NAME}
     mhDirtyLeadObjectSceneIndex.cpp
     mhExternalCameraOverrideSceneIndex.cpp
     mhExternalCameraResolvingSceneIndex.cpp
+    mhRenderingColorSpaceResolvingSceneIndex.cpp
     mhGenerativeProceduralResolvingSceneIndex.cpp
 )
 
@@ -50,6 +51,7 @@ set(HEADERS
     mhDirtyLeadObjectSceneIndex.h
     mhExternalCameraOverrideSceneIndex.h
     mhExternalCameraResolvingSceneIndex.h
+    mhRenderingColorSpaceResolvingSceneIndex.h
     mhGenerativeProceduralResolvingSceneIndex.h
 )
 

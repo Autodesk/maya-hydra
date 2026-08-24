@@ -51,7 +51,7 @@ private:
     bool hydraRenderFromMayaRenderSettings();
     bool hydraRenderFromHydraV1RenderSettings();
     bool hydraRenderFromHydraV2RenderSettings();
-    
+
     std::unique_ptr<BatchRenderer>  _batchRenderer;
     std::unique_ptr<GLRenderWindow> _renderWindow;
     bool                            _gpuEnabled{false};
