@@ -300,6 +300,9 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSett
 #
 # As of 2026-Aug-17, HdArnold crashes for multi-frame renders in Hydra v2
 # render settings mode, to be investigated.
+#
+# HYDRA-2506: skip on macOS for Maya 2027.
+if(NOT (IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027))
 mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/frameNbResolution.ma
     RENDERER HdArnoldRendererPlugin
     EXPECTED_IMAGES_DIR renderSettings/images/arnold_frameNbResolution
@@ -313,6 +316,7 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/frameNbResolution.
         "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
         "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
 )
+endif()
 
 mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettingsSingleCam.ma
     EXPECTED_IMAGES_DIR renderSettings/images/storm_frames5to9
