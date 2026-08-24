@@ -26,6 +26,7 @@
 
 #include <pxr/usd/sdr/registry.h>
 #include <pxr/usd/sdr/shaderProperty.h>
+#include <pxr/usd/sdf/schema.h>
 #include <pxr/usd/sdf/tokens.h>
 #include <pxr/usd/usdHydra/tokens.h>
 #include <pxr/usdImaging/usdImaging/tokens.h>
