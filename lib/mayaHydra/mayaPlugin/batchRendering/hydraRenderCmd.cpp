@@ -34,6 +34,7 @@
 #include <maya/MRenderUtil.h>
 #include <maya/MFnRenderLayer.h>
 #include <maya/MFileIO.h>
+#include <maya/MTime.h>
 
 #include <pxr/pxr.h>
 #include <pxr/base/tf/diagnostic.h>
@@ -260,6 +261,20 @@ MStatus HydraRenderCmd::doIt(const MArgList& args)
     // display name, respectively.
     _batchRenderer = std::make_unique<BatchRenderer>(
         MtohRendererDescription(rendererName, {}, {}));
+
+    if (db.isFlagSet(_currentFrame)) {
+        const auto currentTime = MAnimControl::currentTime();
+        _batchRenderer->SetRenderTimes(
+            RenderTimes(false, currentTime, currentTime, 1.0f));
+    }
+
+    if (db.isFlagSet(_frameShort)) {
+        double frameValue = 0.0;
+        CHECK_MSTATUS_AND_RETURN_IT(db.getFlagArgument(_frameShort, 0, frameValue));
+        const MTime frameTime(frameValue, MTime::uiUnit());
+        _batchRenderer->SetRenderTimes(
+            RenderTimes(false, frameTime, frameTime, 1.0f));
+    }
 
     // Initialize Hydra renderer.
     if (initialize()) {

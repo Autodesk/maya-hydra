@@ -137,7 +137,7 @@ bool HydraRenderCmd::hydraRenderFromMayaRenderSettings()
         "Renderable camera count (listCameras): %u\n",
         cameras.length());
 
-    const auto renderTimes = GetRenderTimes();
+    const auto renderTimes = _batchRenderer->GetRenderTimes();
     TF_DEBUG_MSG(
         MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
         "Render time range: start=%.3f end=%.3f by=%.3f animated=%d\n",

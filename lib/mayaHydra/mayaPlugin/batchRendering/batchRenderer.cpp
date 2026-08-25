@@ -671,4 +671,20 @@ void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()
     _sceneGlobalsSceneIndex->SetActiveRenderSettingsPrimPath(hydraRsPath);
 }
 
+void BatchRenderer::SetRenderTimes(const RenderTimes& renderTimes)
+{
+    // Cannot assign, as all RenderTimes data members are const.
+    _renderTimes.emplace(
+        renderTimes.isAnimated, 
+        renderTimes.startTime,
+        renderTimes.endTime,
+        renderTimes.timeIncr
+    );
+}
+
+RenderTimes BatchRenderer::GetRenderTimes() const
+{
+    return _renderTimes.has_value() ? *_renderTimes : ::GetRenderTimes();
+}
+
 }
