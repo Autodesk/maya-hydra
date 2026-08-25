@@ -194,6 +194,8 @@ VtValue MayaHydraCameraAdapter::Get(const TfToken& key) { return MayaHydraShapeA
 
 VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
 {
+    MayaHydra::DgAccessLock dgLock;
+
     constexpr double inchToMM = 25.4;
 
     MStatus status;
@@ -342,14 +344,6 @@ bool MayaHydraCameraAdapter::ShouldMarkPrimvarDirtyForAttributeChange(const MPlu
 const std::unordered_set<std::string>& MayaHydraCameraAdapter::GetCameraParamAttributeNamesForTest()
 {
     return MayaHydraAdapter::GetParamAttributeSet(kCameraParamAttributeNames);
-}
-
-void MayaHydraCameraAdapter::SetViewport(const GfVec4d& viewport)
-{
-    if (!_viewport) {
-        _viewport.reset(new GfVec4d);
-    }
-    *_viewport = viewport;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -368,6 +368,18 @@ foreach(i RANGE ${_rs_last})
     )
 endforeach()
 
+set(ARNOLD_MAYABATCH_RENDER_SCENES
+    basic/renderCurrentFrame.ma
+    basic/renderFrame.ma
+)
+
+foreach(scene ${ARNOLD_MAYABATCH_RENDER_SCENES})
+    mayaHydra_add_mayabatch_render_test(${scene}
+        COPY_SCENE
+    )
+endforeach()
+
+
 # Test a render using the fallback USD resolution settings
 set(scene basic/sphereFallbackResolution.ma)
 cmake_path(GET scene STEM sceneFileNameNoExt)
@@ -621,26 +633,31 @@ endif()
 #
 # As there are no plans to support Hydra production rendering on Maya 2026,
 # we will not investigate this problem.
-
-# registeredMayaRenderers fails on Linux and macOS.
-if(IS_LINUX
-   OR IS_MACOSX
-   OR (IS_WINDOWS AND MAYA_APP_VERSION VERSION_EQUAL 2026))
-set(MAYABATCH_TEST_SCRIPT_FILES "")
-else()
-set(MAYABATCH_TEST_SCRIPT_FILES
-    registeredMayaRenderers.py
-)
+if(MAYA_APP_VERSION VERSION_GREATER 2026)
+    set(MAYABATCH_TEST_SCRIPT_FILES
+        testRenderingColorSpaceResolving.py|depOnPlugins:mtoa
+    )
+    # registeredMayaRenderers fails on Linux and macOS.
+    if(IS_WINDOWS)
+        list(APPEND MAYABATCH_TEST_SCRIPT_FILES
+            registeredMayaRenderers.py
+        )
+    endif()
 endif()
 
 foreach(script ${MAYABATCH_TEST_SCRIPT_FILES})    
     get_testfile_and_labels(all_labels test_filename ${script})
     list(APPEND all_labels "cmdLineRender")
     mayaUsd_get_unittest_target(target ${test_filename})
+
+    set(test_env "DISPLAY=:0")
+    if(test_filename STREQUAL "testRenderingColorSpaceResolving.py")
+        list(APPEND test_env "MAYA_HYDRA_BATCH_RENDER_TEST_MODE=1")
+    endif()
+
     mayaUsd_add_test(${target}
         PYTHON_SCRIPT ${test_filename}
-        ENV
-            "DISPLAY=:0"
+        ENV ${test_env}
     )
 
     # Add a ctest label to these tests for easy filtering.
@@ -722,3 +739,6 @@ if(IS_LINUX)
         "${CMAKE_CURRENT_SOURCE_DIR}/expected/mayaHydraSceneIndexDump.txt"
     )
 endif()
+
+# C++ unit tests
+add_subdirectory(cpp)

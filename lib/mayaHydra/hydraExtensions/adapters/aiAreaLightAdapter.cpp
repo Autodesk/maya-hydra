@@ -45,6 +45,8 @@ public:
     {
         const TfToken& defaultLightType = HdPrimTypeTokens->rectLight;
 
+        MayaHydra::DgAccessLock dgLock;
+
         // Get the light type
         MStatus           status;
         MFnDependencyNode depNode(GetNode(), &status);
@@ -79,6 +81,8 @@ public:
                 "Called MayaHydraAiAreaLightAdapter::GetLightParamValue(%s) - %s\n",
                 paramName.GetText(),
                 GetDagPath().partialPathName().asChar());
+
+        MayaHydra::DgAccessLock dgLock;
 
         MStatus           status;
         MFnDependencyNode depNode(GetNode(), &status);

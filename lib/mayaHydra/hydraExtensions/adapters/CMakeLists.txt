@@ -59,6 +59,13 @@ if (MAYA_HAS_RENDER_ITEM_CULL_MODE_API)
     )
 endif()
 
+if (MAYA_HAS_MVS_CHANGED_WIREFRAME_COLOR_API)
+    target_compile_definitions(${TARGET_NAME}
+        PRIVATE
+            MAYA_HAS_MVS_CHANGED_WIREFRAME_COLOR_API=1
+    )
+endif()
+
 # -----------------------------------------------------------------------------
 # promoted headers
 # -----------------------------------------------------------------------------

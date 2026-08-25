@@ -18,6 +18,8 @@
 #include "flowViewport/tokens.h"
 
 #include <pxr/imaging/hd/legacyDisplayStyleSchema.h>
+#include <pxr/imaging/hd/materialBindingsSchema.h>
+#include <pxr/imaging/hd/purposeSchema.h>
 #include <pxr/imaging/hd/repr.h>
 #include <pxr/imaging/hd/sceneIndexPrimView.h>
 #include <pxr/imaging/hd/tokens.h>
@@ -47,6 +49,16 @@ bool isPrefixedBySdfPath(const SdfPath& pathToCheck, const SdfPathVector& paths)
 bool isRprimType(const TfToken& primType)
 {
     return std::find(HdRprimTypeTokens->allTokens.begin(), HdRprimTypeTokens->allTokens.end(), primType) != HdRprimTypeTokens->allTokens.end();
+}
+
+const HdDataSourceLocatorSet& _GetFilterAffectingLocators()
+{
+    static const HdDataSourceLocatorSet locators = {
+        HdPurposeSchema::GetDefaultLocator(),
+        HdMaterialBindingsSchema::GetDefaultLocator(),
+        HdLegacyDisplayStyleSchema::GetDefaultLocator(),
+    };
+    return locators;
 }
 
 } // namespace
@@ -317,7 +329,7 @@ void PassFilteringSceneIndex::_PrimsRemoved(
         // Remove the prim and its children from our filtered prims data 
         for (auto it = _filteredPrims.begin(); it != _filteredPrims.end();) {
             if ((*it).HasPrefix(removedEntry.primPath)) {
-                it = _filteredPrims.erase(it);
+                _filteredPrims.erase(it++); // safe for TfHashSet
             } else {
                 it++;
             }
@@ -355,22 +367,24 @@ void PassFilteringSceneIndex::_PrimsDirtied(
     const HdSceneIndexBase &sender,
     const HdSceneIndexObserver::DirtiedPrimEntries &entries)
 {
-    // 1. Update the scene filtering
-    HdSceneIndexObserver::AddedPrimEntries updatedEntries;
-    for (const auto& entry : entries) {
-        auto updatedPrims = _UpdateFilteringStatus(entry.primPath);
-        updatedEntries.insert(updatedEntries.end(), updatedPrims.begin(), updatedPrims.end());
-    }
-    if (!updatedEntries.empty()) {
-        _SendPrimsAdded(updatedEntries);
-    }
+    const HdDataSourceLocatorSet& filterLocators = _GetFilterAffectingLocators();
 
-    // 2. Send out the dirty notifications on the non-filtered prims
+    HdSceneIndexObserver::AddedPrimEntries addedEntries;
     HdSceneIndexObserver::DirtiedPrimEntries dirtiedEntries;
+    dirtiedEntries.reserve(entries.size());
+
     for (const auto& entry : entries) {
+        if (entry.dirtyLocators.Intersects(filterLocators)) {
+            auto addedPrims = _UpdateFilteringStatus(entry.primPath);
+            addedEntries.insert(addedEntries.end(), addedPrims.begin(), addedPrims.end());
+        }
         if (!_IsFilteredOut(entry.primPath)) {
             dirtiedEntries.emplace_back(entry);
         }
+    }
+
+    if (!addedEntries.empty()) {
+        _SendPrimsAdded(addedEntries);
     }
     if (!dirtiedEntries.empty()) {
         _SendPrimsDirtied(dirtiedEntries);

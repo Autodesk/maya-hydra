@@ -17,6 +17,9 @@
 #include "testingCommand.h"
 
 #include "renderOverride.h"
+#if MAYA_API_VERSION >= 20270000
+#include "batchRenderer.h"
+#endif
 
 #include <maya/MArgList.h>
 #include <maya/MArgParser.h>
@@ -32,12 +35,17 @@
  * 
  * Current functionality:
  * - Checking for convergence
+ * - Releasing the batch renderer retained for unit tests
  */
 
 /* Examples
     // Query convergence for a given renderer
     MEL : mayaHydraTesting -cv -rn "HdStormRendererPlugin"
     Python : maya.cmds.mayaHydraTesting(converged=True, rendererName="HdStormRendererPlugin")
+
+    // Release the batch renderer retained for unit tests
+    MEL : mayaHydraTesting -rbr
+    Python : maya.cmds.mayaHydraTesting(releaseBatchRenderer=True)
 */
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -53,6 +61,11 @@ constexpr auto kConverged = "-cv";
 constexpr auto kConvergedLong = "-converged";
 constexpr auto kRendererName = "-rn";
 constexpr auto kRendererNameLong = "-rendererName";
+#if MAYA_API_VERSION >= 20270000
+// Maya rejects short flag names longer than three characters.
+constexpr auto kReleaseBatchRenderer = "-rbr";
+constexpr auto kReleaseBatchRendererLong = "-releaseBatchRenderer";
+#endif
 
 } // namespace
 
@@ -64,6 +77,10 @@ MSyntax MayaHydraTestingCommand::createSyntax()
     syntax.addFlag(kConverged, kConvergedLong);
 
     syntax.addFlag(kRendererName, kRendererNameLong, MSyntax::kString);
+
+#if MAYA_API_VERSION >= 20270000
+    syntax.addFlag(kReleaseBatchRenderer, kReleaseBatchRendererLong);
+#endif
 
     return syntax;
 }
@@ -103,6 +120,12 @@ MStatus MayaHydraTestingCommand::doIt(const MArgList& args)
             setResult(haveConverged);
         }
     }
+
+#if MAYA_API_VERSION >= 20270000
+    if (argData.isFlagSet(kReleaseBatchRenderer)) {
+        BatchRenderer::ReleaseRetainedForTest();
+    }
+#endif
 
     return MS::kSuccess;
 }

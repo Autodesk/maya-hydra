@@ -32,12 +32,14 @@
 
 #include "batchRenderTypes.h"
 #include "renderGlobals.h"
+#include "renderSettingsUtils.h"
 #include "pluginUtils.h"
 
 #include <mayaHydraLib/api.h>
 #include <mayaHydraLib/mayaHydraParams.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndexDataFactoriesSetup.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
+#include <mayaHydraLib/sceneIndex/mhRenderingColorSpaceResolvingSceneIndex.h>
 
 #include <flowViewport/selection/fvpSelectionTracker.h>
 #include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
@@ -104,9 +106,21 @@ public:
     MStatus RenderFromHydraV2RenderSettings();
     PXR_NS::TfToken GetRendererName() const { return _rendererDesc.rendererName; }
 
+    // Unit tests inspect the Hydra scene once the hydraRender command has
+    // completed, which is past the point where the batch renderer would
+    // normally be destroyed.  In test mode, the ownership is handed over to
+    // RetainForTest(), keeping the renderer and therefore its render index and
+    // whole scene index chain intact.  ReleaseRetainedForTest() destroys it.
+    static bool TestModeEnabled();
+    static void RetainForTest(std::unique_ptr<BatchRenderer> batchRenderer);
+    static void ReleaseRetainedForTest();
+
     bool Initialize();
 
     PXR_NS::HdRenderIndex* renderIndex() const;
+
+    RenderTimes GetRenderTimes() const;
+    void SetRenderTimes(const RenderTimes& renderTimes);
 
 private:
 
@@ -159,7 +173,11 @@ private:
     Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
     Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     PXR_NS::HdsiSceneGlobalsSceneIndexRefPtr  _sceneGlobalsSceneIndex;
+    MayaHydra::MhRenderingColorSpaceResolvingSceneIndexRefPtr _renderingColorSpaceSceneIndex;
     Fvp::DataProducerMergingSceneIndexProxyPtr _dataProducerMergingSceneIndexProxy { nullptr };
+
+    // Batch renderer kept alive for unit tests, see RetainForTest().
+    static std::unique_ptr<BatchRenderer> _retainedForTest;
 
     PXR_NS::HdRprimCollection                 _renderCollection {
         PXR_NS::HdTokens->geometry,
@@ -183,6 +201,8 @@ private:
     const bool _isUsingHdSt = false;
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
+
+    std::optional<RenderTimes> _renderTimes;
 };
 
 }

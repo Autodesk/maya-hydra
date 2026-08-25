@@ -136,6 +136,9 @@ const SdfPath MAYA_NATIVE_ROOT = SdfPath("/MayaData");
 
 namespace MAYAHYDRA_NS_DEF {
 
+// Static member initialization for batch rendering unit tests.
+std::unique_ptr<BatchRenderer> BatchRenderer::_retainedForTest;
+
 BatchRenderer::BatchRenderer(const MtohRendererDescription& desc)
     : _rendererDesc(desc)
     , _sceneIndexRegistry(nullptr)
@@ -606,7 +609,12 @@ void BatchRenderer::_CreateSceneIndicesChainAfterMergingSceneIndex()
     //We use as its input scene index : _inputSceneIndexOfFilteringSceneIndicesChain
     _lastFilteringSceneIndexBeforeCustomFiltering = _inputSceneIndexOfFilteringSceneIndicesChain;
 
-    _lastFilteringSceneIndexBeforeCustomFiltering = _sceneGlobalsSceneIndex = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+    _sceneGlobalsSceneIndex
+        = HdsiSceneGlobalsSceneIndex::New(_lastFilteringSceneIndexBeforeCustomFiltering);
+
+    _lastFilteringSceneIndexBeforeCustomFiltering = _renderingColorSpaceSceneIndex
+        = MhRenderingColorSpaceResolvingSceneIndex::New(_sceneGlobalsSceneIndex);
+
     TF_AXIOM(_mayaHydraSceneIndex);
 
 #ifdef CODE_COVERAGE_WORKAROUND
@@ -621,6 +629,22 @@ void BatchRenderer::_ClearHydraCallback(void* data)
         return;
     }
     instance->_ClearHydraResources();
+}
+
+
+bool BatchRenderer::TestModeEnabled()
+{
+    return TfGetenvBool("MAYA_HYDRA_BATCH_RENDER_TEST_MODE", false);
+}
+
+void BatchRenderer::RetainForTest(std::unique_ptr<BatchRenderer> batchRenderer)
+{
+    _retainedForTest = std::move(batchRenderer);
+}
+
+void BatchRenderer::ReleaseRetainedForTest()
+{
+    _retainedForTest.reset();
 }
 
 HdRenderIndex* BatchRenderer::renderIndex() const
@@ -645,6 +669,22 @@ void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()
                  hydraRsPath.GetAsString() + "\n");
 
     _sceneGlobalsSceneIndex->SetActiveRenderSettingsPrimPath(hydraRsPath);
+}
+
+void BatchRenderer::SetRenderTimes(const RenderTimes& renderTimes)
+{
+    // Cannot assign, as all RenderTimes data members are const.
+    _renderTimes.emplace(
+        renderTimes.isAnimated, 
+        renderTimes.startTime,
+        renderTimes.endTime,
+        renderTimes.timeIncr
+    );
+}
+
+RenderTimes BatchRenderer::GetRenderTimes() const
+{
+    return _renderTimes.has_value() ? *_renderTimes : ::GetRenderTimes();
 }
 
 }

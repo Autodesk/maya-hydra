@@ -99,6 +99,8 @@ public:
 
     VtValue GetLightParamValue(const TfToken& paramName) override
     {
+        MayaHydra::DgAccessLock dgLock;
+
         MStatus           status;
         MFnDependencyNode light(GetNode(), &status);
         if (ARCH_UNLIKELY(!status)) {
