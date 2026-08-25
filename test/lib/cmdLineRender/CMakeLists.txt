@@ -305,7 +305,7 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSett
 )
 
 mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettingsSingleCam.ma
-    EXPECTED_IMAGES_DIR renderSettings/images/storm_frames5to9
+    EXPECTED_IMAGES_DIR renderSettings/images/storm_singleCam_frames5to9
     RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
     IMAGE_EXTENSION png
     TEST_NAME_SUFFIX StormRenderDir
@@ -314,7 +314,7 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSett
 
 mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettingsSingleCam.ma
     RENDERER HdArnoldRendererPlugin
-    EXPECTED_IMAGES_DIR renderSettings/images/arnold_frames5to9
+    EXPECTED_IMAGES_DIR renderSettings/images/arnold_singleCam_frames5to9
     RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
     IMAGE_EXTENSION png
     TEST_NAME_SUFFIX ArnoldRenderDir

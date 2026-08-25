@@ -24,17 +24,17 @@
 #include <mayaUsdAPI/utils.h>
 
 #include <maya/MAnimControl.h>
-#include <maya/MCommonRenderSettingsData.h>
-#include <maya/MRenderUtil.h>
 #include <maya/MTime.h>
 
 #include <ufe/runTimeMgr.h>
 #include <ufe/sceneSegmentHandler.h>
 #include <ufe/pathString.h>
 
+#include <pxr/base/gf/vec2d.h>
 #include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/tf/getenv.h>
 #include <pxr/base/tf/token.h>
+#include <pxr/base/vt/array.h>
 #include <pxr/imaging/hd/renderIndex.h>
 #include <pxr/imaging/hd/renderSettings.h>
 #include <pxr/imaging/hd/tokens.h>
@@ -321,23 +321,32 @@ RenderTimes::RenderTimes(
 {
 }
 
-// Single point of truth for render times is Maya default render globals, for
-// all rendering types (Hydra v1 settings, Hydra v2 settings, Maya settings).
 RenderTimes GetRenderTimes()
 {
-    MCommonRenderSettingsData mayaRenderSettings;
-    MRenderUtil::getCommonRenderSettings(mayaRenderSettings);
+    UsdRenderSettings usdRenderSettings;
+    const auto rsPath = ExtractUsdRenderSettingsFromScene(usdRenderSettings);
 
-    if (!mayaRenderSettings.isAnimated()) {
-        const auto currentTime = MAnimControl::currentTime();
-        return RenderTimes(false, currentTime, currentTime, 1.0f);
+    if (!rsPath.empty()) {
+        const UsdPrim rsPrim = usdRenderSettings.GetPrim();
+        const UsdAttribute framesAttr = rsPrim.GetAttribute(TfToken("adsk:frames"));
+        if (framesAttr) {
+            VtArray<GfVec2d> framesArray;
+            if (framesAttr.Get(&framesArray) && !framesArray.empty()) {
+                const double startFrame = framesArray[0][0];
+                const double endFrame   = framesArray[0][1];
+                const bool isAnimated = (startFrame != endFrame);
+                return RenderTimes(
+                    isAnimated,
+                    MTime(startFrame, MTime::uiUnit()),
+                    MTime(endFrame, MTime::uiUnit()),
+                    1.0f);
+            }
+        }
     }
 
-    return RenderTimes(
-        true,
-        mayaRenderSettings.frameStart,
-        mayaRenderSettings.frameEnd,
-        mayaRenderSettings.frameBy);
+    // Fallback: single frame at current time.
+    const auto currentTime = MAnimControl::currentTime();
+    return RenderTimes(false, currentTime, currentTime, 1.0f);
 }
 
 } // namespace MAYAHYDRA_NS_DEF
