@@ -333,7 +333,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
 
     // geomChanged means vertex buffers are re-read. Dirty one locator per primvar so the render
     // delegate only re-pulls what actually changed. Normals are skipped when Hydra generates them.
-    // Emitted after the vertex-count workaround above which may have promoted topoChanged -> geomChanged.
+    // Emitted after the vertex-count workaround above, which may have turned a topo-only update into also setting geomChanged.
     if (geomChanged) {
         notifier.dirtyPoints();
         notifier.dirtyUVs();
