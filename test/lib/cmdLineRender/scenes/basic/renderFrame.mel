@@ -1,0 +1,3 @@
+loadPlugin -quiet mayaHydra;
+file -open "renderFrame.ma";
+hydraRender -f 3 -r HdArnoldRendererPlugin;

@@ -32,6 +32,7 @@
 
 #include "batchRenderTypes.h"
 #include "renderGlobals.h"
+#include "renderSettingsUtils.h"
 #include "pluginUtils.h"
 
 #include <mayaHydraLib/api.h>
@@ -118,6 +119,9 @@ public:
 
     PXR_NS::HdRenderIndex* renderIndex() const;
 
+    RenderTimes GetRenderTimes() const;
+    void SetRenderTimes(const RenderTimes& renderTimes);
+
 private:
 
     friend class BatchRendererMayaRenderSettings;
@@ -197,6 +201,8 @@ private:
     const bool _isUsingHdSt = false;
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
+
+    std::optional<RenderTimes> _renderTimes;
 };
 
 }
