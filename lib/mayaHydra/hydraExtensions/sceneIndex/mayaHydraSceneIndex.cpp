@@ -487,7 +487,7 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
     for (size_t i = 0; i < scene.mCount; i++) {
         using MVS = MDataServerOperation::MViewportScene;
         auto flags = scene.mFlags[i];
-        if (flags == 0) {
+        if ((flags & (MVS::MVS_ALL | MVS::MVS_new)) == 0) {
             continue;
         }
 
