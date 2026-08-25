@@ -91,6 +91,17 @@ foreach(scene ${ARNOLD_RENDER_SCENES})
     )
 endforeach()
 
+set(ARNOLD_MAYABATCH_RENDER_SCENES
+    basic/renderCurrentFrame.ma
+    basic/renderFrame.ma
+)
+
+foreach(scene ${ARNOLD_MAYABATCH_RENDER_SCENES})
+    mayaHydra_add_mayabatch_render_test(${scene}
+        COPY_SCENE
+    )
+endforeach()
+
 mayaHydra_add_cmd_line_render_test(renderSettings/stormResolution.ma
     COPY_SCENE
     RENDERER HdStormRendererPlugin

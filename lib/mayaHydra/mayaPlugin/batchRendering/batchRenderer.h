@@ -32,6 +32,7 @@
 
 #include "batchRenderTypes.h"
 #include "renderGlobals.h"
+#include "renderSettingsUtils.h"
 #include "pluginUtils.h"
 
 #include <mayaHydraLib/api.h>
@@ -116,6 +117,9 @@ public:
     bool Initialize();
 
     PXR_NS::HdRenderIndex* renderIndex() const;
+
+    RenderTimes GetRenderTimes() const;
+    void SetRenderTimes(const RenderTimes& renderTimes);
 
 private:
 
@@ -202,6 +206,8 @@ private:
 
     // Maya is the single point of truth for time, so update on change.
     MCallbackId _timeChangeCallbackId = 0;
+
+    std::optional<RenderTimes> _renderTimes;
 };
 
 }
