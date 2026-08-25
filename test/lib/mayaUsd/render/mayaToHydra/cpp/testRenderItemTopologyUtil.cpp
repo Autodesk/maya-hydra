@@ -132,14 +132,18 @@ TEST(RenderItemTopologyUtil, ShouldEmitWhenSameCountButConnectivityChanges)
         counts));
 }
 
-TEST(RenderItemTopologyUtil, ShouldEmitWhenGeomOnlyAndConnectivityChanges)
+// Accepted limitation, not a deformation case: the inputs describe a real connectivity change that
+// Maya reported without MVS_changedTopo. UpdateFromDelta no longer reads the index buffer on the
+// geometry-only path (that read-back was the HYDRA-2417 playback regression), so this change is
+// deliberately not detected. Genuine connectivity edits do set MVS_changedTopo.
+TEST(RenderItemTopologyUtil, ShouldSuppressGeomOnlyConnectivityChange)
 {
     const VtIntArray counts { 3, 3 };
     const VtIntArray storedIndices { 0, 1, 2, 2, 1, 3 };
     const VtIntArray newIndices { 0, 1, 2, 0, 2, 3 };
     const HdMeshTopology stored = MakeTriangleMeshTopology(counts, storedIndices);
 
-    EXPECT_TRUE(RenderItemShouldEmitTopologyLocators(
+    EXPECT_FALSE(RenderItemShouldEmitTopologyLocators(
         false,
         true,
         true,
