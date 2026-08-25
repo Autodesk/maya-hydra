@@ -121,7 +121,9 @@ This applies to:
 
 Maya may set `MVS_changedTopo` alongside `MVS_changedGeometry` for operations that do not change connectivity (e.g. moving a vertex). The render item adapter suppresses topology locators when **both** vertex count and index connectivity are unchanged ([`RenderItemShouldEmitTopologyLocators`](../lib/mayaHydra/hydraExtensions/adapters/renderItemTopologyUtil.cpp)).
 
-When connectivity changes with the same vertex count (e.g. edge flip), topology locators **are** emitted. Render delegates should not treat `primvars/points` alone as topology-stable if `mesh/topology` is also in the same notice.
+When connectivity changes with the same vertex count (e.g. edge flip), topology locators **are** emitted — **provided Maya set `MVS_changedTopo`**. Detection is conditional on that flag: the index buffer is not read back on a geometry-only update, because mapping it, scanning it and copying it on every deformation frame was a playback regression (HYDRA-2417). Genuine connectivity edits (extrude, merge, edge flip, smooth-level crossing) do set the flag, so in practice this is not a gap — but a render item whose vertex count or connectivity changed while Maya reported only `MVS_changedGeometry` would keep its cached topology.
+
+Render delegates should not treat `primvars/points` alone as topology-stable if `mesh/topology` is also in the same notice.
 
 ---
 

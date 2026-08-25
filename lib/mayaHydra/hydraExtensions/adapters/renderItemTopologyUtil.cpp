@@ -30,7 +30,8 @@ namespace MAYAHYDRA_NS_DEF {
 // index/count arrays, so it is not free on a dense mesh. It is reached only through the narrow
 // branch in RenderItemShouldEmitTopologyLocators below where Maya sets BOTH MVS_changedTopo and
 // MVS_changedGeometry on the same update with an unchanged vertex count and a valid stored
-// baseline (every other case short-circuits before this call). That combination is the
+// baseline (every other case short-circuits before this call — the geometry-only path is what the
+// !topoChanged early return enforces, since indices are not read there). That combination is the
 // MAYA-134200 corner case: MVS_changedTopo can be set on edits that do not actually change
 // connectivity (e.g. a vertex move sets it alongside MVS_changedGeometry — see "Render item
 // topology suppression" in doc/render_delegate_topology_vs_deformation.md), and Maya exposes no
@@ -90,14 +91,22 @@ bool RenderItemShouldEmitTopologyLocators(
     const VtIntArray&    newIndices,
     const VtIntArray&    newCounts)
 {
-    if (!topoChanged && !geomChanged) {
+    // Nothing changed, or geometry only. On the geometry-only path UpdateFromDelta does not read
+    // the index buffer (that per-frame read-back was the HYDRA-2417 playback regression), so
+    // newIndices/newCounts are empty and the connectivity comparison below would report a spurious
+    // change on every deformation frame. Detecting a connectivity change here therefore relies on
+    // Maya setting MVS_changedTopo, which it does for genuine connectivity edits (extrude, merge,
+    // edge flip, smooth-level crossing).
+    if (!topoChanged) {
         return false;
     }
-    if (topoChanged && !geomChanged) {
+    // topoChanged is true from here on: emit unless the topo + geom combination can be shown below
+    // to be deformation-only.
+    if (!geomChanged) {
         return true;
     }
     if (!hasGeomAndBuffers || positionsEmpty) {
-        return topoChanged;
+        return true;
     }
     if (storedPositionCount != currentVertexCount) {
         return true;
