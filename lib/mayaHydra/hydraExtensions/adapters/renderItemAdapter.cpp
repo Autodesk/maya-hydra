@@ -225,7 +225,9 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     //     Topology locators are suppressed when Maya sets MVS_changedTopo alongside
     //     MVS_changedGeometry but both vertex count and index connectivity are unchanged
     //     (deformation-only). When connectivity changes with the same vertex count, topology
-    //     locators are still emitted.
+    //     locators are still emitted — but only when Maya set MVS_changedTopo, because the index
+    //     buffer is not read on the geometry-only path (see the Indices block below). Detecting
+    //     connectivity edits therefore relies on that flag, which Maya sets for genuine ones.
     //   Extent: dirty only when the bounding box actually changes. Maya has no bbox-changed
     //     flag, so we diff the freshly-read bbox against the stored _bounds before overwriting.
     //     Checked in the geomChanged||topoChanged block (before the vertex-count workaround below),
@@ -331,7 +333,7 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
 
     // geomChanged means vertex buffers are re-read. Dirty one locator per primvar so the render
     // delegate only re-pulls what actually changed. Normals are skipped when Hydra generates them.
-    // Emitted after the vertex-count workaround below which may have promoted topoChanged -> geomChanged.
+    // Emitted after the vertex-count workaround above, which may have turned a topo-only update into also setting geomChanged.
     if (geomChanged) {
         notifier.dirtyPoints();
         notifier.dirtyUVs();
@@ -480,7 +482,11 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
     // Indices
     // Line strips do not make use of the index buffer, so we can skip this block.
     // See "Line strips indices are implicitly defined" comment.
-    if ((topoChanged || geomChanged) && vertexBuffercount
+    // Gated on topoChanged, never on geomChanged alone: mapping the index buffer, scanning it for
+    // the highest referenced index and copying it into a VtIntArray on every deformation frame is
+    // the HYDRA-2417 playback regression. Deformation leaves connectivity untouched, so on those
+    // frames there is nothing here to recompute.
+    if (topoChanged && vertexBuffercount
         && GetPrimitive() != MHWRender::MGeometry::Primitive::kLineStrip) {
         // Assume first stream contains the positions.
         MIndexBuffer* indices = geom->indexBuffer(0);
@@ -583,10 +589,10 @@ void MayaHydraRenderItemAdapter::UpdateFromDelta(const UpdateFromDeltaData& data
         _EmitRenderItemTopologyDirtyLocators(notifier, GetPrimitive());
     }
 
-    // Keep cached topology in sync whenever index buffers were read, not only when Maya sets
-    // MVS_changedTopo. geomChanged-only connectivity edits (e.g. edge flip) may skip the topo flag
-    // while still changing the index buffer.
-    const bool indicesWereRead = (topoChanged || geomChanged) && vertexBuffercount > 0
+    // Mirrors the Indices block gate above: the cached _topology is rebuilt only when indices were
+    // actually read. On a deformation frame the cached _topology is retained and stays correct,
+    // because connectivity is unchanged.
+    const bool indicesWereRead = topoChanged && vertexBuffercount > 0
         && GetPrimitive() != MHWRender::MGeometry::Primitive::kLineStrip;
     if (indicesWereRead && !vertexCounts.empty()) {
         switch (GetPrimitive()) {
