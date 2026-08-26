@@ -222,4 +222,39 @@ HdSceneIndexBaseRefPtr findSceneIndexInTree(
     return {};
 }
 
+namespace {
+
+void _writeSceneIndexTreeHelper(
+    const HdSceneIndexBaseRefPtr& sceneIndex,
+    const std::string&            selfPrefix,
+    const std::string&            childrenPrefix,
+    std::ostream&                 outStream)
+{
+    outStream << selfPrefix << sceneIndex->GetDisplayName() << "\n";
+
+    auto filteringSi = TfDynamic_cast<HdFilteringSceneIndexBaseRefPtr>(sceneIndex);
+    if (!filteringSi) {
+        return;
+    }
+
+    auto inputScenes = filteringSi->GetInputScenes();
+    for (size_t i = 0; i < inputScenes.size(); ++i) {
+        bool isLast = (i == inputScenes.size() - 1);
+        _writeSceneIndexTreeHelper(
+            inputScenes[i],
+            childrenPrefix + (isLast ? "\\___" : "|___"),
+            childrenPrefix + (isLast ? "    " : "|   "),
+            outStream);
+    }
+}
+
+} // anonymous namespace
+
+void writeSceneIndexTree(
+    const HdSceneIndexBaseRefPtr& sceneIndex,
+    std::ostream&                 outStream)
+{
+    _writeSceneIndexTreeHelper(sceneIndex, "", "", outStream);
+}
+
 } // namespace FVP_NS_DEF
