@@ -182,6 +182,19 @@ PXR_NS::HdSceneIndexBaseRefPtr findSceneIndexInTree(
     const std::function<bool(const PXR_NS::HdSceneIndexBaseRefPtr&)>& predicate
 );
 
+/// Write the scene index tree structure to a stream, showing the display
+/// name of each scene index.  The tree is walked depth-first via
+/// HdFilteringSceneIndexBase::GetInputScenes().
+///
+/// \param sceneIndex  The root of the scene index tree (typically the
+///                    terminal scene index from HdRenderIndex).
+/// \param outStream   The output stream to write the tree to.
+FVP_API
+void writeSceneIndexTree(
+    const PXR_NS::HdSceneIndexBaseRefPtr& sceneIndex,
+    std::ostream&                         outStream
+);
+
 }
 
 #endif
