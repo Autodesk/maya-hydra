@@ -15,36 +15,48 @@
 
 set(TEST_OUTPUT_ROOT ${CMAKE_BINARY_DIR}/test/Temporary)
 
-# CMake list() ignores empty elements by default (CMP0007 OLD). Use "." as a
-# placeholder for an empty test dependency label and normalize when reading.
-function(_mayaHydra_normalize_cmd_line_render_dep_label dep_label_var)
-    if(${dep_label_var} STREQUAL ".")
-        set(${dep_label_var} "" PARENT_SCOPE)
+# The command line render tests come in per-renderer variants that share the
+# same body but differ in a couple of arguments (resolution, image name).  Each
+# variant is emitted by calling a small _mayaHydra_add_*_variant() function once
+# per renderer, guarded by the platform conditional that variant needs.  The two
+# helpers below derive everything else from the renderer "folder" name so the
+# call sites only pass what genuinely varies.
+
+# Map a renderer folder name (storm/arnold/prman) to its Hydra plugin and the
+# CamelCase suffix used in scene file stems and test names.  This is an explicit
+# map rather than string(TOUPPER ...) because PRMan's suffix is irregular
+# (PRMan, not Prman).
+function(_mayaHydra_renderer_for_folder folder out_renderer out_suffix)
+    if(folder STREQUAL "storm")
+        set(${out_renderer} HdStormRendererPlugin PARENT_SCOPE)
+        set(${out_suffix} Storm PARENT_SCOPE)
+    elseif(folder STREQUAL "arnold")
+        set(${out_renderer} HdArnoldRendererPlugin PARENT_SCOPE)
+        set(${out_suffix} Arnold PARENT_SCOPE)
+    elseif(folder STREQUAL "prman")
+        set(${out_renderer} HdPrmanLoaderRendererPlugin PARENT_SCOPE)
+        set(${out_suffix} PRMan PARENT_SCOPE)
+    else()
+        message(FATAL_ERROR "Unknown renderer folder: ${folder}")
     endif()
 endfunction()
 
-# Register one <folder, renderer, suffix, dep_label, res_arg> row describing a
-# per-renderer texturing test variant. Using a single macro call per row (as
-# opposed to one list(APPEND ...) per column) keeps the parallel
-# _tex_* lists below from drifting out of sync with each other.
-macro(_mayaHydra_register_texturing_variant folder renderer suffix dep_label res_arg)
-    list(APPEND _tex_folders ${folder})
-    list(APPEND _tex_renderers ${renderer})
-    list(APPEND _tex_suffixes ${suffix})
-    list(APPEND _tex_dep_labels ${dep_label})
-    list(APPEND _tex_res_args ${res_arg})
-endmacro()
-
-# Same as above, for the render settings production test variants
-# (_rs_* lists), which additionally carry a "new image name" column.
-macro(_mayaHydra_register_render_settings_variant folder renderer suffix dep_label res_arg new_image_name)
-    list(APPEND _rs_folders ${folder})
-    list(APPEND _rs_renderers ${renderer})
-    list(APPEND _rs_suffixes ${suffix})
-    list(APPEND _rs_dep_labels ${dep_label})
-    list(APPEND _rs_res_args ${res_arg})
-    list(APPEND _rs_new_image_names ${new_image_name})
-endmacro()
+# Tag prman tests with a ctest label ("prman") so a pipeline can select or
+# deselect the whole PRMan group in one place via tests-to-run.json, which
+# build.py turns into "ctest -L prman" / "-LE prman".  This is a group-selection
+# handle, not a check for whether the plugin is installed (PRMan is expected to
+# be present on the Windows preflight).  The other renderers are a baseline part
+# of the suite and never need to be selected as a group, so they get an empty
+# label.  Deriving the label here with a single conditional (instead of carrying
+# an extra column through parallel lists) is what lets us avoid the "CMake
+# list() drops empty elements" placeholder.
+function(_mayaHydra_dep_label_for_folder folder out_label)
+    if(folder STREQUAL "prman")
+        set(${out_label} "|depOnPlugins:prman" PARENT_SCOPE)
+    else()
+        set(${out_label} "" PARENT_SCOPE)
+    endif()
+endfunction()
 
 # Command line render unit test scripts, launched with Render.exe.
 # Unit test can be disabled with ctest labels.
@@ -59,82 +71,56 @@ if(NOT IS_MACOSX)
     )
 endif()
 
-# Texturing production tests. Scene + baseline live under texturing/<renderer>/.
-if(IS_WINDOWS)
-    _mayaHydra_register_texturing_variant(storm HdStormRendererPlugin Storm "." "-x 960 -y 540")
-endif()
-if(NOT IS_MACOSX)
-    _mayaHydra_register_texturing_variant(arnold HdArnoldRendererPlugin Arnold "." "-x 160 -y 120")
-endif()
-if(IS_WINDOWS)
-    _mayaHydra_register_texturing_variant(prman HdPrmanLoaderRendererPlugin PRMan "|depOnPlugins:prman" "-x 160 -y 120")
-endif()
-
+# Texturing production tests. Scene + baseline live under texturing/<folder>/.
+# The MaterialX scene only exists past Maya 2026, so it is appended to the shared
+# stem list conditionally rather than duplicated as a separate block.
 set(_tex_scene_stems
     mayaSphereMayaMaterial
     usdSphereMaterialX
     usdSphereUsdMaterial
 )
 
-list(LENGTH _tex_folders _tex_count)
-if(_tex_count GREATER 0)
-    math(EXPR _tex_last "${_tex_count} - 1")
-    foreach(i RANGE ${_tex_last})
-        list(GET _tex_folders ${i} _tex_folder)
-        list(GET _tex_renderers ${i} _tex_renderer)
-        list(GET _tex_suffixes ${i} _tex_suffix)
-        list(GET _tex_dep_labels ${i} _tex_dep_label)
-        _mayaHydra_normalize_cmd_line_render_dep_label(_tex_dep_label)
-        list(GET _tex_res_args ${i} _tex_res_arg)
+function(_mayaHydra_add_texturing_variant folder res_arg)
+    _mayaHydra_renderer_for_folder(${folder} renderer suffix)
+    _mayaHydra_dep_label_for_folder(${folder} dep_label)
 
-        foreach(_tex_stem ${_tex_scene_stems})
-            set(_tex_scene_name "${_tex_stem}${_tex_suffix}")
-            set(scene "texturing/${_tex_folder}/${_tex_scene_name}.ma")
-            cmake_path(GET scene STEM sceneFileNameNoExt)
-            if(_tex_folder STREQUAL "prman")
-                set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/${sceneFileNameNoExt}/projects/default/images)
-                mayaHydra_add_cmd_line_render_test(${scene}${_tex_dep_label}
-                    COPY_SCENE
-                    RENDERER ${_tex_renderer}
-                    RENDERED_IMAGE_SUBDIR projects/default/images
-                    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
-                    RENDERER_ARGS "${_tex_res_arg} -rd \"${render_dir}\" -im ${sceneFileNameNoExt}"
-                )
-            else()
-                mayaHydra_add_cmd_line_render_test(${scene}${_tex_dep_label}
-                    COPY_SCENE
-                    RENDERER ${_tex_renderer}
-                    RENDERED_IMAGE_SUBDIR projects/default/images
-                    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
-                    RENDERER_ARGS "${_tex_res_arg} -rd ../images -im ${sceneFileNameNoExt}"
-                )
-            endif()
-        endforeach()
+    set(stems ${_tex_scene_stems})
+    if(MAYA_APP_VERSION VERSION_GREATER 2026)
+        list(APPEND stems mayaSphereMaterialX)
+    endif()
 
-        if(MAYA_APP_VERSION VERSION_GREATER 2026)
-            set(_tex_scene_name "mayaSphereMaterialX${_tex_suffix}")
-            set(scene "texturing/${_tex_folder}/${_tex_scene_name}.ma")
-            cmake_path(GET scene STEM sceneFileNameNoExt)
-            if(_tex_folder STREQUAL "prman")
-                set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/${sceneFileNameNoExt}/projects/default/images)
-                mayaHydra_add_cmd_line_render_test(${scene}${_tex_dep_label}
-                    COPY_SCENE
-                    RENDERER ${_tex_renderer}
-                    RENDERED_IMAGE_SUBDIR projects/default/images
-                    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
-                    RENDERER_ARGS "${_tex_res_arg} -rd \"${render_dir}\" -im ${sceneFileNameNoExt}"
-                )
-            else()
-                mayaHydra_add_cmd_line_render_test(${scene}${_tex_dep_label}
-                    COPY_SCENE
-                    RENDERER ${_tex_renderer}
-                    RENDERED_IMAGE_SUBDIR projects/default/images
-                    RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
-                    RENDERER_ARGS "${_tex_res_arg} -rd ../images -im ${sceneFileNameNoExt}"
-                )
-            endif()
+    foreach(stem ${stems})
+        set(scene "texturing/${folder}/${stem}${suffix}.ma")
+        cmake_path(GET scene STEM sceneFileNameNoExt)
+        if(folder STREQUAL "prman")
+            set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/${sceneFileNameNoExt}/projects/default/images)
+            mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
+                COPY_SCENE
+                RENDERER ${renderer}
+                RENDERED_IMAGE_SUBDIR projects/default/images
+                RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+                RENDERER_ARGS "${res_arg} -rd \"${render_dir}\" -im ${sceneFileNameNoExt}"
+            )
+        else()
+            mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
+                COPY_SCENE
+                RENDERER ${renderer}
+                RENDERED_IMAGE_SUBDIR projects/default/images
+                RENDERED_IMAGE_NAME ${sceneFileNameNoExt}
+                RENDERER_ARGS "${res_arg} -rd ../images -im ${sceneFileNameNoExt}"
+            )
         endif()
     endforeach()
+endfunction()
+
+if(IS_WINDOWS)
+    _mayaHydra_add_texturing_variant(storm "-x 960 -y 540")
+endif()
+if(NOT IS_MACOSX)
+    _mayaHydra_add_texturing_variant(arnold "-x 160 -y 120")
+endif()
+if(IS_WINDOWS)
+    _mayaHydra_add_texturing_variant(prman "-x 160 -y 120")
 endif()
 
 foreach(scene ${STORM_RENDER_SCENES})
@@ -184,99 +170,86 @@ if(NOT IS_MACOSX)
     endif()
 endif()
 
-# Render settings production tests. Scene + baseline live under renderSettings/<renderer>/.
-_mayaHydra_register_render_settings_variant(storm HdStormRendererPlugin Storm "." "-x 720 -y 480" aNewStormImageName)
-_mayaHydra_register_render_settings_variant(arnold HdArnoldRendererPlugin Arnold "." "-x 720 -y 128" aNewArnoldImageName)
-if(IS_WINDOWS)
-    _mayaHydra_register_render_settings_variant(prman HdPrmanLoaderRendererPlugin PRMan "|depOnPlugins:prman" "-x 720 -y 128" aNewPRManImageName)
-endif()
+# Render settings production tests. Scene + baseline live under renderSettings/<folder>/.
+function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
+    _mayaHydra_renderer_for_folder(${folder} renderer suffix)
+    _mayaHydra_dep_label_for_folder(${folder} dep_label)
 
-list(LENGTH _rs_folders _rs_count)
-math(EXPR _rs_last "${_rs_count} - 1")
-foreach(i RANGE ${_rs_last})
-    list(GET _rs_folders ${i} _rs_folder)
-    list(GET _rs_renderers ${i} _rs_renderer)
-    list(GET _rs_suffixes ${i} _rs_suffix)
-    list(GET _rs_dep_labels ${i} _rs_dep_label)
-    _mayaHydra_normalize_cmd_line_render_dep_label(_rs_dep_label)
-    list(GET _rs_res_args ${i} _rs_res_arg)
-    list(GET _rs_new_image_names ${i} _rs_new_image_name)
+    set(animcube_scene "renderSettings/${folder}/AnimCubeRenderSettings.ma")
+    set(singlecam_scene "renderSettings/${folder}/AnimCubeRenderSettingsSingleCam.ma")
 
-    set(_rs_animcube_scene "renderSettings/${_rs_folder}/AnimCubeRenderSettings.ma")
-    set(_rs_singlecam_scene "renderSettings/${_rs_folder}/AnimCubeRenderSettingsSingleCam.ma")
-
-    set(_rs_scene "renderSettings/${_rs_folder}/${_rs_folder}Resolution.ma")
-    if(_rs_folder STREQUAL "prman")
-        set(render_dir ${TEST_OUTPUT_ROOT}/${_rs_folder}Resolution/projects/default/images)
-        mayaHydra_add_cmd_line_render_test(${_rs_scene}${_rs_dep_label}
+    set(scene "renderSettings/${folder}/${folder}Resolution.ma")
+    if(folder STREQUAL "prman")
+        set(render_dir ${TEST_OUTPUT_ROOT}/${folder}Resolution/projects/default/images)
+        mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
             COPY_SCENE
-            RENDERER ${_rs_renderer}
-            RENDERER_ARGS "${_rs_res_arg} -rd \"${render_dir}\" -im ${_rs_folder}Resolution"
+            RENDERER ${renderer}
+            RENDERER_ARGS "${res_arg} -rd \"${render_dir}\" -im ${folder}Resolution"
         )
     else()
-        mayaHydra_add_cmd_line_render_test(${_rs_scene}${_rs_dep_label}
+        mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
             COPY_SCENE
-            RENDERER ${_rs_renderer}
-            RENDERER_ARGS "${_rs_res_arg} -rd ../images -im ${_rs_folder}Resolution"
+            RENDERER ${renderer}
+            RENDERER_ARGS "${res_arg} -rd ../images -im ${folder}Resolution"
         )
     endif()
 
-    set(_rs_scene "renderSettings/${_rs_folder}/${_rs_folder}RenderDir.ma")
-    if(_rs_folder STREQUAL "prman")
-        set(render_dir ${TEST_OUTPUT_ROOT}/${_rs_folder}RenderDir/projects/default/images/aSubDirectory)
+    set(scene "renderSettings/${folder}/${folder}RenderDir.ma")
+    if(folder STREQUAL "prman")
+        set(render_dir ${TEST_OUTPUT_ROOT}/${folder}RenderDir/projects/default/images/aSubDirectory)
         file(MAKE_DIRECTORY "${render_dir}")
-        mayaHydra_add_cmd_line_render_test(${_rs_scene}${_rs_dep_label}
+        mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
             COPY_SCENE
-            RENDERER ${_rs_renderer}
+            RENDERER ${renderer}
             RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
-            RENDERER_ARGS "${_rs_res_arg} -rd \"${render_dir}\" -im ${_rs_folder}RenderDir"
+            RENDERER_ARGS "${res_arg} -rd \"${render_dir}\" -im ${folder}RenderDir"
         )
     else()
-        mayaHydra_add_cmd_line_render_test(${_rs_scene}${_rs_dep_label}
+        mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
             COPY_SCENE
-            RENDERER ${_rs_renderer}
+            RENDERER ${renderer}
             RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
-            RENDERER_ARGS "${_rs_res_arg} -rd ../images/aSubDirectory"
+            RENDERER_ARGS "${res_arg} -rd ../images/aSubDirectory"
         )
     endif()
 
-    set(_rs_scene "renderSettings/${_rs_folder}/${_rs_folder}ImageName.ma")
-    if(_rs_folder STREQUAL "prman")
-        set(render_dir ${TEST_OUTPUT_ROOT}/${_rs_folder}ImageName/projects/default/images)
-        mayaHydra_add_cmd_line_render_test(${_rs_scene}${_rs_dep_label}
+    set(scene "renderSettings/${folder}/${folder}ImageName.ma")
+    if(folder STREQUAL "prman")
+        set(render_dir ${TEST_OUTPUT_ROOT}/${folder}ImageName/projects/default/images)
+        mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
             COPY_SCENE
-            RENDERER ${_rs_renderer}
-            RENDERED_IMAGE_NAME ${_rs_new_image_name}
-            RENDERER_ARGS "${_rs_res_arg} -rd \"${render_dir}\" -im ${_rs_new_image_name}"
+            RENDERER ${renderer}
+            RENDERED_IMAGE_NAME ${new_image_name}
+            RENDERER_ARGS "${res_arg} -rd \"${render_dir}\" -im ${new_image_name}"
         )
     else()
-        mayaHydra_add_cmd_line_render_test(${_rs_scene}${_rs_dep_label}
+        mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
             COPY_SCENE
-            RENDERER ${_rs_renderer}
-            RENDERED_IMAGE_NAME ${_rs_new_image_name}
-            RENDERER_ARGS "${_rs_res_arg} -rd ../images -im ${_rs_new_image_name}"
+            RENDERER ${renderer}
+            RENDERED_IMAGE_NAME ${new_image_name}
+            RENDERER_ARGS "${res_arg} -rd ../images -im ${new_image_name}"
         )
     endif()
 
-    set(_rs_scene "renderSettings/${_rs_folder}/${_rs_folder}OutputFormat.ma")
-    if(_rs_folder STREQUAL "prman")
-        set(render_dir ${TEST_OUTPUT_ROOT}/${_rs_folder}OutputFormat/projects/default/images)
-        mayaHydra_add_cmd_line_render_test(${_rs_scene}${_rs_dep_label}
+    set(scene "renderSettings/${folder}/${folder}OutputFormat.ma")
+    if(folder STREQUAL "prman")
+        set(render_dir ${TEST_OUTPUT_ROOT}/${folder}OutputFormat/projects/default/images)
+        mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
             COPY_SCENE
-            RENDERER ${_rs_renderer}
+            RENDERER ${renderer}
             IMAGE_EXTENSION exr
-            RENDERER_ARGS "${_rs_res_arg} -rd \"${render_dir}\" -im ${_rs_folder}OutputFormat -of exr"
+            RENDERER_ARGS "${res_arg} -rd \"${render_dir}\" -im ${folder}OutputFormat -of exr"
         )
     else()
-        mayaHydra_add_cmd_line_render_test(${_rs_scene}${_rs_dep_label}
+        mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
             COPY_SCENE
-            RENDERER ${_rs_renderer}
+            RENDERER ${renderer}
             IMAGE_EXTENSION jpg
-            RENDERER_ARGS "${_rs_res_arg} -rd ../images -im ${_rs_folder}OutputFormat -of jpg"
+            RENDERER_ARGS "${res_arg} -rd ../images -im ${folder}OutputFormat -of jpg"
         )
     endif()
 
-    if(_rs_folder STREQUAL "storm")
+    if(folder STREQUAL "storm")
         # No crop region: full 64x64 reference render of the same scene used by the
         # stormCropRegion / stormCropRegion1x1 tests.  Acts as the uncropped
         # baseline so a regression that breaks `-reg` would still need to keep this
@@ -303,70 +276,76 @@ foreach(i RANGE ${_rs_last})
             RENDERER_ARGS "-x 64 -y 64 -reg 32 32 32 32 -rd ../images -im stormCropRegion1x1"
         )
     else()
-        set(render_dir ${TEST_OUTPUT_ROOT}/${_rs_folder}CropRegion/projects/default/images)
-        set(_rs_scene "renderSettings/${_rs_folder}/${_rs_folder}CropRegion.ma")
-        cmake_path(GET _rs_scene STEM sceneFileNameNoExt)
-        mayaHydra_add_cmd_line_render_test(${_rs_scene}${_rs_dep_label}
-            RENDERER ${_rs_renderer}
+        set(render_dir ${TEST_OUTPUT_ROOT}/${folder}CropRegion/projects/default/images)
+        set(scene "renderSettings/${folder}/${folder}CropRegion.ma")
+        cmake_path(GET scene STEM sceneFileNameNoExt)
+        mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
+            RENDERER ${renderer}
             RENDERER_ARGS "-x 160 -y 120 -reg 32 95 30 89 -rd \"${render_dir}\" -im ${sceneFileNameNoExt}"
             FAIL 0.5
         )
     endif()
 
-    # Failure with HdStorm on macOS entered as HYDRA-2139. ("prman" never
-    # appears in _rs_folders on macOS, so this reduces to NOT IS_MACOSX for
-    # storm/arnold and is always true for prman.)
+    # Failure with HdStorm on macOS entered as HYDRA-2139. (prman never runs on
+    # macOS, so this reduces to NOT IS_MACOSX for storm/arnold and is always
+    # true for prman.)
     if(NOT IS_MACOSX)
-        set(_rs_multi_fail_args "")
-        if(NOT _rs_folder STREQUAL "storm")
-            set(_rs_multi_fail_args FAIL 0.05 FAILPERCENT 1.0)
+        set(multi_fail_args "")
+        if(NOT folder STREQUAL "storm")
+            set(multi_fail_args FAIL 0.05 FAILPERCENT 1.0)
         endif()
-        mayaHydra_add_cmd_line_render_multi_image_test(${_rs_animcube_scene}${_rs_dep_label}
-            RENDERER ${_rs_renderer}
-            EXPECTED_IMAGES_DIR renderSettings/${_rs_folder}/images
+        mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+            RENDERER ${renderer}
+            EXPECTED_IMAGES_DIR renderSettings/${folder}/images
             IMAGE_EXTENSION png
-            TEST_NAME_SUFFIX ${_rs_suffix}
-            ${_rs_multi_fail_args}
+            TEST_NAME_SUFFIX ${suffix}
+            ${multi_fail_args}
         )
     endif()
 
     # Test frame range (5-9).  Failure with HdStorm on macOS entered as HYDRA-2139.
-    if(_rs_folder STREQUAL "storm")
+    if(folder STREQUAL "storm")
         if(NOT IS_MACOSX)
-            mayaHydra_add_cmd_line_render_multi_image_test(${_rs_animcube_scene}${_rs_dep_label}
-                RENDERER ${_rs_renderer}
-                EXPECTED_IMAGES_DIR renderSettings/${_rs_folder}/images/frames5to9
+            mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+                RENDERER ${renderer}
+                EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
                 IMAGE_EXTENSION png
-                TEST_NAME_SUFFIX ${_rs_suffix}Frames5to9
+                TEST_NAME_SUFFIX ${suffix}Frames5to9
                 RENDERER_ARGS "-s 5 -e 9"
             )
         endif()
     else()
-        mayaHydra_add_cmd_line_render_multi_image_test(${_rs_animcube_scene}${_rs_dep_label}
-            RENDERER ${_rs_renderer}
-            EXPECTED_IMAGES_DIR renderSettings/${_rs_folder}/images/frames5to9
+        mayaHydra_add_cmd_line_render_multi_image_test(${animcube_scene}${dep_label}
+            RENDERER ${renderer}
+            EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
             IMAGE_EXTENSION png
-            TEST_NAME_SUFFIX ${_rs_suffix}Frames5to9
+            TEST_NAME_SUFFIX ${suffix}Frames5to9
             FAIL 0.05
             FAILPERCENT 1.0
             RENDERER_ARGS "-s 5 -e 9"
         )
     endif()
 
-    set(_rs_singlecam_fail_args FAIL 0.05 FAILPERCENT 1.0)
-    if(_rs_folder STREQUAL "storm")
-        set(_rs_singlecam_fail_args "")
+    set(singlecam_fail_args FAIL 0.05 FAILPERCENT 1.0)
+    if(folder STREQUAL "storm")
+        set(singlecam_fail_args "")
     endif()
-    mayaHydra_add_cmd_line_render_multi_image_test(${_rs_singlecam_scene}${_rs_dep_label}
-        RENDERER ${_rs_renderer}
-        EXPECTED_IMAGES_DIR renderSettings/${_rs_folder}/images/frames5to9
+    mayaHydra_add_cmd_line_render_multi_image_test(${singlecam_scene}${dep_label}
+        RENDERER ${renderer}
+        EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
         RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
         IMAGE_EXTENSION png
-        TEST_NAME_SUFFIX ${_rs_suffix}RenderDir
-        ${_rs_singlecam_fail_args}
+        TEST_NAME_SUFFIX ${suffix}RenderDir
+        ${singlecam_fail_args}
         RENDERER_ARGS "-rd images/aSubDirectory"
     )
-endforeach()
+endfunction()
+
+_mayaHydra_add_render_settings_variant(storm "-x 720 -y 480" aNewStormImageName)
+_mayaHydra_add_render_settings_variant(arnold "-x 720 -y 128" aNewArnoldImageName)
+if(IS_WINDOWS)
+    _mayaHydra_add_render_settings_variant(prman "-x 720 -y 128" aNewPRManImageName)
+endif()
 
 set(ARNOLD_MAYABATCH_RENDER_SCENES
     basic/renderCurrentFrame.ma
@@ -559,39 +538,23 @@ endif()
 # .../test/Temporary/<sceneStem>/projects/default   ← what -proj points at
 # ├── images/<sceneStem>.png
 # └── sourceImages/UVChecker.png
-set(_relpath_folders arnold)
-set(_relpath_scene_stems mayaSphereMayaMaterialArnoldRelativePath)
-set(_relpath_renderers HdArnoldRendererPlugin)
-set(_relpath_dep_labels ".")
-if(IS_WINDOWS)
-    list(APPEND _relpath_folders prman)
-    list(APPEND _relpath_scene_stems mayaSphereMayaMaterialPRManRelativePath)
-    list(APPEND _relpath_renderers HdPrmanLoaderRendererPlugin)
-    list(APPEND _relpath_dep_labels "|depOnPlugins:prman")
-endif()
+function(_mayaHydra_add_relpath_variant folder)
+    _mayaHydra_renderer_for_folder(${folder} renderer suffix)
+    _mayaHydra_dep_label_for_folder(${folder} dep_label)
+    set(scene_stem "mayaSphereMayaMaterial${suffix}RelativePath")
 
-list(LENGTH _relpath_folders _relpath_count)
-math(EXPR _relpath_last "${_relpath_count} - 1")
-foreach(i RANGE ${_relpath_last})
-    list(GET _relpath_folders ${i} _relpath_folder)
-    list(GET _relpath_scene_stems ${i} _relpath_scene_stem)
-    list(GET _relpath_renderers ${i} _relpath_renderer)
-    list(GET _relpath_dep_labels ${i} _relpath_dep_label)
-    _mayaHydra_normalize_cmd_line_render_dep_label(_relpath_dep_label)
-
-    set(_relpath_proj_dir
-        "${TEST_OUTPUT_ROOT}/${_relpath_scene_stem}/projects/default")
+    set(proj_dir "${TEST_OUTPUT_ROOT}/${scene_stem}/projects/default")
     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/scenes/texturing/storm/UVChecker.png"
-        "${_relpath_proj_dir}/sourceImages/UVChecker.png"
+        "${proj_dir}/sourceImages/UVChecker.png"
         COPYONLY
     )
 
-    set(render_dir ${TEST_OUTPUT_ROOT}/${_relpath_scene_stem}/projects/default/images)
-    set(scene relativePathTest/${_relpath_folder}/${_relpath_scene_stem}.ma)
+    set(render_dir ${TEST_OUTPUT_ROOT}/${scene_stem}/projects/default/images)
+    set(scene relativePathTest/${folder}/${scene_stem}.ma)
     cmake_path(GET scene STEM sceneFileNameNoExt)
-    mayaHydra_add_cmd_line_render_test(${scene}${_relpath_dep_label}
-        RENDERER ${_relpath_renderer}
+    mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
+        RENDERER ${renderer}
         # Must specify:
         # - The resolution, otherwise the USD default render settings 2048x1080
         #   will be used
@@ -599,9 +562,14 @@ foreach(i RANGE ${_relpath_last})
         #   settings ./default.png will be used, which places the rendered
         #   output in the source tree in the Maya scene file directory, with
         #   image name "default.png".
-        RENDERER_ARGS "-x 160 -y 120 -proj \"${_relpath_proj_dir}\" -rd \"${render_dir}\" -im ${sceneFileNameNoExt}"
+        RENDERER_ARGS "-x 160 -y 120 -proj \"${proj_dir}\" -rd \"${render_dir}\" -im ${sceneFileNameNoExt}"
     )
-endforeach()
+endfunction()
+
+_mayaHydra_add_relpath_variant(arnold)
+if(IS_WINDOWS)
+    _mayaHydra_add_relpath_variant(prman)
+endif()
 
 if(NOT IS_MACOSX)
 # HYDRA-2031 this test fails only on macOS.
