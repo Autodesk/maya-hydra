@@ -93,9 +93,6 @@ PXR_NS::SdfPath GetActiveRenderSettingsHydraPath();
 PXR_NS::TfTokenVector GetRenderOutputsFromActiveRenderSettings(
     const PXR_NS::HdRenderIndex* renderIndex);
 
-// Get the render times from the Maya scene when not overridden explicitly.
-std::vector<MTime> GetRenderTimesFromStage(const PXR_NS::UsdStageRefPtr& stage);
-
 struct RenderTimes
 {
     const bool  isAnimated;
