@@ -222,10 +222,11 @@ bool HydraRenderCmd::hydraRender()
         return hydraRenderFromHydraV2RenderSettings();
     }
 
-    TF_RUNTIME_ERROR(
-        "No USD render settings found in the scene, and the render delegate "
-        "does not drive the render pass. Batch rendering requires USD render "
-        "settings or a render-delegate-owned render pass.");
+TF_RUNTIME_ERROR(
+    "Batch rendering requires USD render settings (with at least one render product) "
+    "or a render-delegate-owned render pass. No usable USD render settings were found, "
+    "and render delegate '%s' does not drive the render pass.",
+    _batchRenderer->GetRendererName().GetText());
     return false;
 }
 
