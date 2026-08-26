@@ -42,12 +42,7 @@ namespace MAYAHYDRA_NS_DEF {
 
 /*! \brief Determines how render settings are sourced for batch rendering.
  *
- *  MayaHydra supports three render settings strategies:
- *
- *  - **Maya**: Traditional Maya render settings (defaultRenderGlobals,
- *    defaultResolution, etc.) are read and translated into Hydra task
- *    controller parameters.  The batch renderer manages the render loop,
- *    convergence, and image output.
+ *  MayaHydra supports two render settings strategies:
  *
  *  - **HydraV1**: The batch renderer reads USD render settings prims
  *    (UsdRenderSettings, UsdRenderProduct, UsdRenderVar) from a USD
@@ -70,7 +65,6 @@ namespace MAYAHYDRA_NS_DEF {
 enum class RenderSettingsType
 {
     Unknown = 0,
-    Maya,
     HydraV1,
     HydraV2,
 };
@@ -113,7 +107,7 @@ struct RenderTimes
     RenderTimes(bool isAnimated, const MTime& startTime, const MTime& endTime, float timeIncr);
 };
 
-// Get the render times from the Maya scene.
+// Get the render times from the Maya scene when not overridden explicitly.
 RenderTimes GetRenderTimes();
 
 } // namespace MAYAHYDRA_NS_DEF

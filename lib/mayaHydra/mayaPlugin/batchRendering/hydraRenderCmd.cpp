@@ -29,11 +29,6 @@
 #include <maya/MAnimControl.h>
 #include <maya/MGlobal.h>
 #include <maya/MSyntax.h>
-#include <maya/MFnCamera.h>
-#include <maya/MCommonRenderSettingsData.h>
-#include <maya/MRenderUtil.h>
-#include <maya/MFnRenderLayer.h>
-#include <maya/MFileIO.h>
 #include <maya/MTime.h>
 
 #include <pxr/pxr.h>
@@ -227,7 +222,11 @@ bool HydraRenderCmd::hydraRender()
         return hydraRenderFromHydraV2RenderSettings();
     }
 
-    return hydraRenderFromMayaRenderSettings();
+    TF_RUNTIME_ERROR(
+        "No USD render settings found in the scene, and the render delegate "
+        "does not drive the render pass. Batch rendering requires USD render "
+        "settings or a render-delegate-owned render pass.");
+    return false;
 }
 
 MStatus HydraRenderCmd::doIt(const MArgList& args)

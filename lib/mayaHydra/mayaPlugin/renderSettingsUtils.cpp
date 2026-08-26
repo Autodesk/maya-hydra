@@ -24,8 +24,6 @@
 #include <mayaUsdAPI/utils.h>
 
 #include <maya/MAnimControl.h>
-#include <maya/MCommonRenderSettingsData.h>
-#include <maya/MRenderUtil.h>
 #include <maya/MTime.h>
 
 #include <ufe/runTimeMgr.h>
@@ -112,8 +110,8 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
         return RenderSettingsType::HydraV1;
     }
 
-    TF_WARN("No USD render settings found, or USD render settings had no render products.  Falling back to rendering with Maya render settings.");
-    return RenderSettingsType::Maya;
+    TF_WARN("No USD render settings found, or USD render settings had no render products.");
+    return RenderSettingsType::Unknown;
 }
         
 Ufe::SceneItemList GetAllMayaUsdProxyShapes()
@@ -150,8 +148,7 @@ bool FindUsdRenderSettingsOnStage(
     // https://openusd.org/release/user_guides/schemas/usdRender/RenderSettings.html#properties
     // says that if no render products are supplied, renderer should still
     // output an image. At least one renderer (Hydra Arnold) does not do this
-    // and renders nothing.  Catch the no render products case and return
-    // false, so that Maya render settings default is used.
+    // and renders nothing.  Catch the no render products case and return false.
     auto hasProducts = [](const UsdRenderSettings& rs) {
         SdfPathVector targets;
         return rs.GetProductsRel().GetTargets(&targets) && !targets.empty();
@@ -321,23 +318,12 @@ RenderTimes::RenderTimes(
 {
 }
 
-// Single point of truth for render times is Maya default render globals, for
-// all rendering types (Hydra v1 settings, Hydra v2 settings, Maya settings).
+// Default render times when not overridden by command flags or the batch
+// renderer. Renders the current frame only.
 RenderTimes GetRenderTimes()
 {
-    MCommonRenderSettingsData mayaRenderSettings;
-    MRenderUtil::getCommonRenderSettings(mayaRenderSettings);
-
-    if (!mayaRenderSettings.isAnimated()) {
-        const auto currentTime = MAnimControl::currentTime();
-        return RenderTimes(false, currentTime, currentTime, 1.0f);
-    }
-
-    return RenderTimes(
-        true,
-        mayaRenderSettings.frameStart,
-        mayaRenderSettings.frameEnd,
-        mayaRenderSettings.frameBy);
+    const auto currentTime = MAnimControl::currentTime();
+    return RenderTimes(false, currentTime, currentTime, 1.0f);
 }
 
 } // namespace MAYAHYDRA_NS_DEF
