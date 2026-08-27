@@ -50,10 +50,10 @@ namespace {
 
 constexpr char kMayaUsdProxyShapeNode[] = { "mayaUsdProxyShape" };
 
-// UFE path to the USD default render settings node (a UFE path of a single
+// UFE path to the USD default render description node (a UFE path of a single
 // segment with a single component, the name of the DG node).
-const Ufe::Path usdDefaultRenderSettingsNodePath(Ufe::PathSegment(
-    Ufe::PathComponent(std::string(MayaHydra::kUsdDefaultRenderSettingsNodeName)),
+const Ufe::Path usdDefaultRenderDescriptionNodePath(Ufe::PathSegment(
+    Ufe::PathComponent(std::string(MayaHydra::kUsdDefaultRenderDescriptionNodeName)),
     UfeExtensions::getMayaRunTimeId(), '\0'));
 
 } // namespace
@@ -128,7 +128,7 @@ struct MayaUsdSceneIndexRegistration : public MayaHydraSceneIndexRegistration
         }
     }
 
-    _RegisterDefaultRenderSettingsNode();
+    _RegisterDefaultRenderDescriptionNode();
 }
 
 // Retrieve information relevant to registration such as UFE compatibility of a particular scene
@@ -162,7 +162,7 @@ MayaHydraSceneIndexRegistry::~MayaHydraSceneIndexRegistry()
         MSceneMessage::removeCallback(_AfterOpenCBId);
     }
     _AfterOpenCBId = 0;
-    _UnregisterDefaultRenderSettingsNode();
+    _UnregisterDefaultRenderDescriptionNode();
     _RemoveAllSceneIndexNodes();
     _registrationsByObjectHandle.clear();
     _registrations.clear();
@@ -339,7 +339,7 @@ void MayaHydraSceneIndexRegistry::_ProcessNodesAfterOpen()
     }
     _nodesToProcessAfterOpenScene.clear();
 
-    _RegisterDefaultRenderSettingsNode();
+    _RegisterDefaultRenderDescriptionNode();
 }
 
 void MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
@@ -356,21 +356,21 @@ void MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
     }
 }
 
-SdfPath MayaHydraSceneIndexRegistry::_usdDefaultRenderSettingsPathPrefix;
+SdfPath MayaHydraSceneIndexRegistry::_usdDefaultRenderDescriptionPathPrefix;
 
-SdfPath MayaHydraSceneIndexRegistry::GetUsdDefaultRenderSettingsPathPrefix()
+SdfPath MayaHydraSceneIndexRegistry::GetUsdDefaultRenderDescriptionPathPrefix()
 {
-    return _usdDefaultRenderSettingsPathPrefix;
+    return _usdDefaultRenderDescriptionPathPrefix;
 }
 
-void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderSettingsNode()
+void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderDescriptionNode()
 {
-    if (_defaultRenderSettingsDataProducer) {
+    if (_defaultRenderDescriptionDataProducer) {
         return;
     }
 
     MObject nodeObj;
-    if (!GetDependNodeFromNodeName(kUsdDefaultRenderSettingsNodeName.data(), nodeObj)) {
+    if (!GetDependNodeFromNodeName(kUsdDefaultRenderDescriptionNodeName.data(), nodeObj)) {
         return;
     }
 
@@ -399,7 +399,7 @@ void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderSettingsNode()
                                prefix, /*dccNode=*/nullptr);
 
     if (!dataProducerSIData || !finalSceneIndex || !stageSceneIndex) {
-        TF_CODING_ERROR("Failed to create USD stage scene index for UsdDefaultRenderSettings.");
+        TF_CODING_ERROR("Failed to create USD stage scene index for UsdDefaultRenderDescription.");
         return;
     }
 
@@ -413,34 +413,34 @@ void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderSettingsNode()
     Fvp::DataProducerSceneIndexInterfaceImp::get()
         .addUsdStageDataProducerSceneIndexDataBaseToAllViews(dataProducerSIData);
 
-    _usdDefaultRenderSettingsPathPrefix = prefix;
-    _defaultRenderSettingsDataProducer = dataProducerSIData;
+    _usdDefaultRenderDescriptionPathPrefix = prefix;
+    _defaultRenderDescriptionDataProducer = dataProducerSIData;
 
-    // Hydra path mapping for the USD default render settings is done through a
-    // simple prefix path mapper.
+    // Hydra path mapping for the USD default render description is done
+    // through a simple prefix path mapper.
     auto pathMapper = std::make_shared<Fvp::PrefixPathMapper>(
-        usdDefaultRenderSettingsNodePath, prefix);
+        usdDefaultRenderDescriptionNodePath, prefix);
     Fvp::PathMapperRegistry::Instance().Register(
-        usdDefaultRenderSettingsNodePath, pathMapper);
+        usdDefaultRenderDescriptionNodePath, pathMapper);
 }
 
-void MayaHydraSceneIndexRegistry::_UnregisterDefaultRenderSettingsNode()
+void MayaHydraSceneIndexRegistry::_UnregisterDefaultRenderDescriptionNode()
 {
-    if (!_defaultRenderSettingsDataProducer) {
+    if (!_defaultRenderDescriptionDataProducer) {
         return;
     }
 
     Fvp::PathMapperRegistry::Instance().Unregister(
-        usdDefaultRenderSettingsNodePath);
+        usdDefaultRenderDescriptionNodePath);
 
     Fvp::DataProducerSceneIndexInterface::get()
         .removeDataProducerSceneIndex(
-            _defaultRenderSettingsDataProducer->GetDataProducerLastSceneIndexChain());
+            _defaultRenderDescriptionDataProducer->GetDataProducerLastSceneIndexChain());
 #ifdef CODE_COVERAGE_WORKAROUND
-    Fvp::leakSceneIndex(_defaultRenderSettingsDataProducer->GetDataProducerLastSceneIndexChain());
+    Fvp::leakSceneIndex(_defaultRenderDescriptionDataProducer->GetDataProducerLastSceneIndexChain());
 #endif
-    _defaultRenderSettingsDataProducer = TfNullPtr;
-    _usdDefaultRenderSettingsPathPrefix = SdfPath();
+    _defaultRenderDescriptionDataProducer = TfNullPtr;
+    _usdDefaultRenderDescriptionPathPrefix = SdfPath();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
