@@ -53,7 +53,7 @@ constexpr char kMayaUsdProxyShapeNode[] = { "mayaUsdProxyShape" };
 // UFE path to the USD default render settings node (a UFE path of a single
 // segment with a single component, the name of the DG node).
 const Ufe::Path usdDefaultRenderSettingsNodePath(Ufe::PathSegment(
-    Ufe::PathComponent(std::string(MayaHydra::kUsdDefaultRenderSettingsNodeName)),
+    Ufe::PathComponent(std::string(MayaHydra::kUsdDefaultRenderDescriptionNodeName)),
     UfeExtensions::getMayaRunTimeId(), '\0'));
 
 } // namespace
@@ -358,7 +358,7 @@ void MayaHydraSceneIndexRegistry::ApplyPendingUpdates()
 
 SdfPath MayaHydraSceneIndexRegistry::_usdDefaultRenderSettingsPathPrefix;
 
-SdfPath MayaHydraSceneIndexRegistry::GetUsdDefaultRenderSettingsPathPrefix()
+SdfPath MayaHydraSceneIndexRegistry::GetUsdDefaultRenderDescriptionPathPrefix()
 {
     return _usdDefaultRenderSettingsPathPrefix;
 }
@@ -370,7 +370,7 @@ void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderSettingsNode()
     }
 
     MObject nodeObj;
-    if (!GetDependNodeFromNodeName(kUsdDefaultRenderSettingsNodeName.data(), nodeObj)) {
+    if (!GetDependNodeFromNodeName(kUsdDefaultRenderDescriptionNodeName.data(), nodeObj)) {
         return;
     }
 
@@ -399,7 +399,7 @@ void MayaHydraSceneIndexRegistry::_RegisterDefaultRenderSettingsNode()
                                prefix, /*dccNode=*/nullptr);
 
     if (!dataProducerSIData || !finalSceneIndex || !stageSceneIndex) {
-        TF_CODING_ERROR("Failed to create USD stage scene index for UsdDefaultRenderSettings.");
+        TF_CODING_ERROR("Failed to create USD stage scene index for UsdDefaultRenderDescription.");
         return;
     }
 

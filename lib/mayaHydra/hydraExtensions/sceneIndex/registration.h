@@ -104,7 +104,7 @@ public:
     void ApplyPendingUpdates();
 
     MAYAHYDRALIB_API
-    static PXR_NS::SdfPath GetUsdDefaultRenderSettingsPathPrefix();
+    static PXR_NS::SdfPath GetUsdDefaultRenderDescriptionPathPrefix();
 
 private:
     void

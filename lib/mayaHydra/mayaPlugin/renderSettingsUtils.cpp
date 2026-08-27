@@ -216,27 +216,27 @@ std::vector<MTime> GetRenderTimesFromStage(const UsdStageRefPtr& stage)
 
 Ufe::Path GetActiveRenderSettingsAppPath()
 {
-    constexpr const char* attrName   = "activeSettingsPath";
+    constexpr const char* attrName   = "activeRenderDescriptionPath";
 
-    // Get the active render settings from the activeSettingsPath attribute
-    // on the UsdDefaultRenderSettings node.
+    // Get the active render settings from the activeRenderDescriptionPath attribute
+    // on the UsdDefaultRenderDescription node.
     MObject nodeObj;
-    if (!TF_VERIFY(GetDependNodeFromNodeName(kUsdDefaultRenderSettingsNodeName.data(), nodeObj), "Could not find %s node.", kUsdDefaultRenderSettingsNodeName.data())) {
+    if (!TF_VERIFY(GetDependNodeFromNodeName(kUsdDefaultRenderDescriptionNodeName.data(), nodeObj), "Could not find %s node.", kUsdDefaultRenderDescriptionNodeName.data())) {
         return {};
     }
 
     MFnDependencyNode depNode(nodeObj);
     MPlug plug = depNode.findPlug(attrName, true);
-    if (!TF_VERIFY(!plug.isNull(), "Could not find %s attribute on %s.", attrName, kUsdDefaultRenderSettingsNodeName.data())) {
+    if (!TF_VERIFY(!plug.isNull(), "Could not find %s attribute on %s.", attrName, kUsdDefaultRenderDescriptionNodeName.data())) {
         return {};
     }
 
     MString pathStr = plug.asString();
-    if (!TF_VERIFY(pathStr.length() > 0, "%s attribute on %s is empty.", attrName, kUsdDefaultRenderSettingsNodeName.data())) {
+    if (!TF_VERIFY(pathStr.length() > 0, "%s attribute on %s is empty.", attrName, kUsdDefaultRenderDescriptionNodeName.data())) {
         // Attribute is empty, provide a sensible fallback, the USD default
         // render settings themselves.
         constexpr const char* rsPrimPath = "/Render/SceneRenderSettings";
-        pathStr = MString((std::string(kUsdDefaultRenderSettingsNodeName) + "," + rsPrimPath).c_str());
+        pathStr = MString((std::string(kUsdDefaultRenderDescriptionNodeName) + "," + rsPrimPath).c_str());
     }
 
     return Ufe::PathString::path(pathStr.asChar());
