@@ -48,7 +48,6 @@ private:
     bool render();
     bool hydraRender();
     bool hydraPreRender();
-    bool hydraRenderFromMayaRenderSettings();
     bool hydraRenderFromHydraV1RenderSettings();
     bool hydraRenderFromHydraV2RenderSettings();
 
