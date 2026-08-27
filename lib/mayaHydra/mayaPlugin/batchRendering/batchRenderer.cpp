@@ -17,7 +17,6 @@
 #include "batchRenderer.h"
 #include "batchRendererHydraV1RenderSettings.h"
 #include "batchRendererHydraV2RenderSettings.h"
-#include "batchRendererMayaRenderSettings.h"
 #include "tokens.h"
 
 #include "pluginDebugCodes.h"
@@ -191,13 +190,6 @@ HdRenderDelegate* BatchRenderer::_GetRenderDelegate()
     return _renderIndex ? _renderIndex->GetRenderDelegate() : nullptr;
 }
 
-MStatus BatchRenderer::RenderFromMayaRenderSettings(
-    const InputParams& inputParams)
-{
-    // Delegate the Maya render-settings path to the dedicated implementation.
-    return BatchRendererMayaRenderSettings::Render(*this, inputParams);
-}
-  
 MStatus BatchRenderer::RenderFromHydraV1RenderSettings(
     const InputParams& inputParams)
 {
