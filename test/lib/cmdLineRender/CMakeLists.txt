@@ -72,10 +72,9 @@ if(NOT IS_MACOSX)
 endif()
 
 # Texturing production tests. Scene + baseline live under texturing/<folder>/.
-# The MaterialX scene only exists past Maya 2026, so it is appended to the shared
-# stem list conditionally rather than duplicated as a separate block.
 set(_tex_scene_stems
     mayaSphereMayaMaterial
+    mayaSphereMaterialX
     usdSphereMaterialX
     usdSphereUsdMaterial
 )
@@ -84,15 +83,13 @@ function(_mayaHydra_add_texturing_variant folder res_arg)
     _mayaHydra_renderer_for_folder(${folder} renderer suffix)
     _mayaHydra_dep_label_for_folder(${folder} dep_label)
 
-    set(stems ${_tex_scene_stems})
-    if(MAYA_APP_VERSION VERSION_GREATER 2026)
-        list(APPEND stems mayaSphereMaterialX)
-    endif()
-
-    foreach(stem ${stems})
+    foreach(stem ${_tex_scene_stems})
         set(scene "texturing/${folder}/${stem}${suffix}.ma")
         cmake_path(GET scene STEM sceneFileNameNoExt)
         if(folder STREQUAL "prman")
+            # PRMan resolves -rd relative to the workspace root, not the copied
+            # project/scene layout, so Storm/Arnold's "../images" would write
+            # outside the temp dir that idiff checks.
             set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/${sceneFileNameNoExt}/projects/default/images)
             mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
                 COPY_SCENE
@@ -151,23 +148,6 @@ if(NOT IS_MACOSX)
                 "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS"
         )
     endforeach()
-    if(MAYA_APP_VERSION VERSION_GREATER 2026)
-        set(scene texturing/arnold/mayaSphereMaterialXArnold.ma)
-        cmake_path(GET scene STEM sceneFileNameNoExt)
-        set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/${sceneFileNameNoExt}_v2_rs/projects/default/images)
-        mayaHydra_add_cmd_line_render_test(${scene}
-            COPY_SCENE
-            RENDERER HdArnoldRendererPlugin
-            RENDERED_IMAGE_SUBDIR projects/default/images
-            RENDERED_IMAGE_NAME ${sceneFileNameNoExt}_v2_rs
-            RENDERER_ARGS "-x 160 -y 120 -rd \"${render_dir}\" -im ${sceneFileNameNoExt}_v2_rs"
-            TEST_NAME_SUFFIX v2_rs
-            ENV
-                "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
-                "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
-                "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS"
-        )
-    endif()
 endif()
 
 # Render settings production tests. Scene + baseline live under renderSettings/<folder>/.
@@ -180,6 +160,9 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
 
     set(scene "renderSettings/${folder}/${folder}Resolution.ma")
     if(folder STREQUAL "prman")
+        # PRMan resolves -rd relative to the workspace root, not the copied
+        # project/scene layout, so Storm/Arnold's "../images" would write
+        # outside the temp dir that idiff checks.
         set(render_dir ${TEST_OUTPUT_ROOT}/${folder}Resolution/projects/default/images)
         mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
             COPY_SCENE
@@ -196,6 +179,9 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
 
     set(scene "renderSettings/${folder}/${folder}RenderDir.ma")
     if(folder STREQUAL "prman")
+        # PRMan resolves -rd relative to the workspace root, not the copied
+        # project/scene layout, so Storm/Arnold's "../images" would write
+        # outside the temp dir that idiff checks.
         set(render_dir ${TEST_OUTPUT_ROOT}/${folder}RenderDir/projects/default/images/aSubDirectory)
         file(MAKE_DIRECTORY "${render_dir}")
         mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
@@ -215,6 +201,9 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
 
     set(scene "renderSettings/${folder}/${folder}ImageName.ma")
     if(folder STREQUAL "prman")
+        # PRMan resolves -rd relative to the workspace root, not the copied
+        # project/scene layout, so Storm/Arnold's "../images" would write
+        # outside the temp dir that idiff checks.
         set(render_dir ${TEST_OUTPUT_ROOT}/${folder}ImageName/projects/default/images)
         mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
             COPY_SCENE
@@ -233,6 +222,9 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
 
     set(scene "renderSettings/${folder}/${folder}OutputFormat.ma")
     if(folder STREQUAL "prman")
+        # PRMan resolves -rd relative to the workspace root, not the copied
+        # project/scene layout, so Storm/Arnold's "../images" would write
+        # outside the temp dir that idiff checks.
         set(render_dir ${TEST_OUTPUT_ROOT}/${folder}OutputFormat/projects/default/images)
         mayaHydra_add_cmd_line_render_test(${scene}${dep_label}
             COPY_SCENE
@@ -432,6 +424,9 @@ if(IS_WINDOWS)
     # Test -cam with USD camera in PRMan (Hydra V1 render settings, same path as Storm).
     set(scene basic/usdCamera.ma)
     cmake_path(GET scene STEM sceneFileNameNoExt)
+    # PRMan resolves -rd relative to the workspace root, not the copied
+    # project/scene layout, so Storm/Arnold's "../images" would write
+    # outside the temp dir that idiff checks.
     set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/${sceneFileNameNoExt}_PRMan/projects/default/images)
     mayaHydra_add_cmd_line_render_test(${scene}|depOnPlugins:prman
         COPY_SCENE
@@ -448,6 +443,9 @@ if(IS_WINDOWS)
     # Hydra V2: PRMan reads USD RenderVar prims directly and requires "Ci".
     set(scene basic/usdCamera_PRMan_v2_rs.ma)
     cmake_path(GET scene STEM sceneFileNameNoExt)
+    # PRMan resolves -rd relative to the workspace root, not the copied
+    # project/scene layout, so Storm/Arnold's "../images" would write
+    # outside the temp dir that idiff checks.
     set(render_dir ${CMAKE_BINARY_DIR}/test/Temporary/${sceneFileNameNoExt}/projects/default/images)
     mayaHydra_add_cmd_line_render_test(${scene}|depOnPlugins:prman
         COPY_SCENE
@@ -526,6 +524,9 @@ function(_add_usdProxyShapeRenderSettings_test test_name renderer output_subdir 
 
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "MAYA_IGNORE_DIALOGS=1")
+    # Set TF_VERIFY to generate a TF_FATAL_ERROR.
+    # PathMapperRegistry::UfePathToPrimSelections() use TF_VERIFY to check
+    # for path mapper failures, so this will cause the test to fail.
     set_property(TEST "${test_name}" APPEND PROPERTY ENVIRONMENT
         "TF_FATAL_VERIFY=1")
     set_property(TEST "${test_name}" APPEND PROPERTY LABELS cmdLineRender)
@@ -620,23 +621,16 @@ set_tests_properties(
 endif()
 
 # Production rendering tests that require a Maya executable (mayabatch).
-# Skip on Windows for Maya 2026, fails with
-#
-# import maya.api._OpenMaya_py2
-# ImportError: DLL load failed while importing _OpenMaya_py2: The operating system cannot run %1.
-#
-# As there are no plans to support Hydra production rendering on Maya 2026,
-# we will not investigate this problem.
-if(MAYA_APP_VERSION VERSION_GREATER 2026)
-    set(MAYABATCH_TEST_SCRIPT_FILES
-        testRenderingColorSpaceResolving.py|depOnPlugins:mtoa
+# cmdLineRender is only registered for Maya > 2026 (see test/lib/CMakeLists.txt)
+# because Hydra production rendering is not supported on Maya 2026.
+set(MAYABATCH_TEST_SCRIPT_FILES
+    testRenderingColorSpaceResolving.py|depOnPlugins:mtoa
+)
+# registeredMayaRenderers fails on Linux and macOS.
+if(IS_WINDOWS)
+    list(APPEND MAYABATCH_TEST_SCRIPT_FILES
+        registeredMayaRenderers.py
     )
-    # registeredMayaRenderers fails on Linux and macOS.
-    if(IS_WINDOWS)
-        list(APPEND MAYABATCH_TEST_SCRIPT_FILES
-            registeredMayaRenderers.py
-        )
-    endif()
 endif()
 
 foreach(script ${MAYABATCH_TEST_SCRIPT_FILES})    
