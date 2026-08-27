@@ -112,8 +112,8 @@ RenderSettingsType ReadRenderSettingsTypeFromRenderDelegate(const TfToken& rende
         return RenderSettingsType::HydraV1;
     }
 
-    TF_WARN("No USD render settings found, or USD render settings had no render products.  Falling back to rendering with Maya render settings.");
-    return RenderSettingsType::Maya;
+    TF_WARN("No USD render settings found, or USD render settings had no render products.");
+    return RenderSettingsType::Unknown;
 }
         
 Ufe::SceneItemList GetAllMayaUsdProxyShapes()
@@ -175,43 +175,6 @@ bool FindUsdRenderSettingsOnStage(
     }
 
     return false;
-}
-
-std::vector<MTime> GetRenderTimesFromStage(const UsdStageRefPtr& stage)
-{
-    std::vector<MTime> times;
-    if (!stage || !stage->HasAuthoredTimeCodeRange()) {
-        TF_DEBUG_MSG(
-            MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-            "USD stage has no authored time range; returning empty.\n");
-        return {};
-    }
-
-    const double startTimeCode = stage->GetStartTimeCode();
-    const double endTimeCode = stage->GetEndTimeCode();
-    const double timeCodesPerSecond = stage->GetTimeCodesPerSecond();
-    const double framesPerSecond = stage->GetFramesPerSecond();
-
-    TF_DEBUG_MSG(
-        MAYAHYDRAPLUGIN_BATCHRENDER_CMD,
-        "USD time range from stage: start=%f end=%f tcps=%f fps=%f\n",
-        startTimeCode,
-        endTimeCode,
-        timeCodesPerSecond,
-        framesPerSecond);
-
-    if (endTimeCode < startTimeCode) {
-        TF_WARN("GetRenderTimesFromStage: USD time range invalid; "
-                "endTimeCode < startTimeCode.\n");
-        return times;
-    }
-
-    const double timeStep = 1.0;
-    for (double timeCode = startTimeCode; timeCode <= endTimeCode; timeCode += timeStep) {
-        times.emplace_back(timeCode, MTime::uiUnit());
-    }
-
-    return times;
 }
 
 Ufe::Path GetActiveRenderSettingsAppPath()
@@ -322,7 +285,7 @@ RenderTimes::RenderTimes(
 }
 
 // Single point of truth for render times is Maya default render globals, for
-// all rendering types (Hydra v1 settings, Hydra v2 settings, Maya settings).
+// all Hydra rendering types (Hydra v1 render settings, Hydra v2 render settings).
 RenderTimes GetRenderTimes()
 {
     MCommonRenderSettingsData mayaRenderSettings;
@@ -333,11 +296,18 @@ RenderTimes GetRenderTimes()
         return RenderTimes(false, currentTime, currentTime, 1.0f);
     }
 
+    // Guard against a non-positive frame increment: consumers iterate
+    // for (t = start; t <= end; t += timeIncr), so a zero or negative
+    // frameBy would loop forever. Fall back to a 1-frame step.
+    const float frameBy = mayaRenderSettings.frameBy > 0.0
+        ? static_cast<float>(mayaRenderSettings.frameBy)
+        : 1.0f;
+
     return RenderTimes(
         true,
         mayaRenderSettings.frameStart,
         mayaRenderSettings.frameEnd,
-        mayaRenderSettings.frameBy);
+        frameBy);
 }
 
 } // namespace MAYAHYDRA_NS_DEF

@@ -30,13 +30,11 @@ if(MAYA_APP_VERSION VERSION_GREATER 2026)
     target_sources(${TARGET_NAME}
         PRIVATE
             batchRendering/batchRenderer.cpp
-            batchRendering/batchRendererMayaRenderSettings.cpp
             batchRendering/batchRendererHydraV1RenderSettings.cpp
             batchRendering/batchRendererHydraV2RenderSettings.cpp
             batchRendering/hydraRenderCmd.cpp
             batchRendering/hydraRenderCmdHydraV1RenderSettings.cpp
             batchRendering/hydraRenderCmdHydraV2RenderSettings.cpp
-            batchRendering/hydraRenderCmdMayaRenderSettings.cpp
             batchRendering/renderVarUtils.cpp
             batchRendering/tokens.cpp
     )

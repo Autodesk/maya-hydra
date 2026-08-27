@@ -74,7 +74,6 @@ namespace MAYAHYDRA_NS_DEF {
 
 using HgiUniquePtr = std::unique_ptr<class PXR_NS::Hgi>;
 
-class BatchRendererMayaRenderSettings;
 class BatchRendererHydraV1RenderSettings;
 class BatchRendererHydraV2RenderSettings;
 
@@ -100,7 +99,6 @@ public:
     BatchRenderer(const MtohRendererDescription& desc);
     ~BatchRenderer();
 
-    MStatus RenderFromMayaRenderSettings(const InputParams& inputParams);
     MStatus RenderFromHydraV1RenderSettings(const InputParams& inputParams);
     MStatus RenderFromHydraV2RenderSettings();
     PXR_NS::TfToken GetRendererName() const { return _rendererDesc.rendererName; }
@@ -123,7 +121,6 @@ public:
 
 private:
 
-    friend class BatchRendererMayaRenderSettings;
     friend class BatchRendererHydraV1RenderSettings;
     friend class BatchRendererHydraV2RenderSettings;
 
