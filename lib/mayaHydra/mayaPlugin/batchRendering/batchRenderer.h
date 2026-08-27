@@ -42,8 +42,7 @@
 #include <mayaHydraLib/sceneIndex/mhRenderingColorSpaceResolvingSceneIndex.h>
 
 #include <flowViewport/selection/fvpSelectionTracker.h>
-#include <flowViewport/sceneIndex/fvpBlockPrimRemovalPropagationSceneIndex.h>
-#include <flowViewport/sceneIndex/fvpPruningSceneIndex.h>
+#include <flowViewport/sceneIndex/fvpFrameNbResolvingSceneIndex.h>
 #include <flowViewport/sceneIndex/fvpDataProducerMergingSceneIndexProxy.h>
 
 #include <pxr/base/gf/rect2i.h>
@@ -75,7 +74,6 @@ namespace MAYAHYDRA_NS_DEF {
 
 using HgiUniquePtr = std::unique_ptr<class PXR_NS::Hgi>;
 
-class BatchRendererMayaRenderSettings;
 class BatchRendererHydraV1RenderSettings;
 class BatchRendererHydraV2RenderSettings;
 
@@ -101,7 +99,6 @@ public:
     BatchRenderer(const MtohRendererDescription& desc);
     ~BatchRenderer();
 
-    MStatus RenderFromMayaRenderSettings(const InputParams& inputParams);
     MStatus RenderFromHydraV1RenderSettings(const InputParams& inputParams);
     MStatus RenderFromHydraV2RenderSettings();
     PXR_NS::TfToken GetRendererName() const { return _rendererDesc.rendererName; }
@@ -124,7 +121,6 @@ public:
 
 private:
 
-    friend class BatchRendererMayaRenderSettings;
     friend class BatchRendererHydraV1RenderSettings;
     friend class BatchRendererHydraV2RenderSettings;
 
@@ -137,7 +133,9 @@ private:
     void              _SetActiveRenderSettingsPrimFromScene();
 
     void              _SetRenderPurposeTags(const PXR_NS::MayaHydraParams& delegateParams);
-    void              _CreateSceneIndicesChainAfterMergingSceneIndex();
+    void              _CreateSceneIndicesChainAfterMergingSceneIndex(
+        const PXR_NS::HdSceneIndexBaseRefPtr& inputSceneIndexOfFilteringSceneIndicesChain
+    );
     bool              _PrepareRender(
         unsigned int width,
         unsigned int height,
@@ -148,6 +146,9 @@ private:
 
     // Callbacks
     static void _ClearHydraCallback(void* data);
+    static void _TimeChangedCallback(void* data);
+
+    void _SetCurrentFrameInHydraGlobalSceneIndex(double currentFrame);
 
     MtohRendererDescription _rendererDesc;
 
@@ -166,13 +167,11 @@ private:
     std::unique_ptr<PXR_NS::HdxTaskController> _taskController;
     PXR_NS::HdPluginRenderDelegateUniqueHandle _renderDelegate = nullptr;
     PXR_NS::HdSceneIndexBaseRefPtr            _lastFilteringSceneIndexBeforeCustomFiltering {nullptr};
-    PXR_NS::HdSceneIndexBaseRefPtr            _inputSceneIndexOfFilteringSceneIndicesChain {nullptr};
     PXR_NS::HdRenderIndex*                    _renderIndex = nullptr;
     // Required by selection task.
     Fvp::SelectionTrackerSharedPtr            _fvpSelectionTracker;
-    Fvp::BlockPrimRemovalPropagationSceneIndexRefPtr  _blockPrimRemovalPropagationSceneIndex;
-    Fvp::PruningSceneIndexRefPtr                      _pruningSceneIndex;
     PXR_NS::HdsiSceneGlobalsSceneIndexRefPtr  _sceneGlobalsSceneIndex;
+    Fvp::FrameNbResolvingSceneIndexRefPtr     _frameNbResolvingSceneIndex {};
     MayaHydra::MhRenderingColorSpaceResolvingSceneIndexRefPtr _renderingColorSpaceSceneIndex;
     Fvp::DataProducerMergingSceneIndexProxyPtr _dataProducerMergingSceneIndexProxy { nullptr };
 
@@ -201,6 +200,9 @@ private:
     const bool _isUsingHdSt = false;
     bool       _initializationAttempted = false;
     bool       _initializationSucceeded = false;
+
+    // Maya is the single point of truth for time, so update on change.
+    MCallbackId _timeChangeCallbackId = 0;
 
     std::optional<RenderTimes> _renderTimes;
 };
