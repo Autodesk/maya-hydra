@@ -104,7 +104,7 @@ public:
     void ApplyPendingUpdates();
 
     MAYAHYDRALIB_API
-    static PXR_NS::SdfPath GetUsdDefaultRenderSettingsPathPrefix();
+    static PXR_NS::SdfPath GetUsdDefaultRenderDescriptionPathPrefix();
 
 private:
     void
@@ -138,11 +138,11 @@ private:
     std::unordered_map<MObjectHandle, MayaHydraSceneIndexRegistrationPtr, _HashObjectHandle>
         _registrationsByObjectHandle;
 
-    void _RegisterDefaultRenderSettingsNode();
-    void _UnregisterDefaultRenderSettingsNode();
+    void _RegisterDefaultRenderDescriptionNode();
+    void _UnregisterDefaultRenderDescriptionNode();
 
-    FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr _defaultRenderSettingsDataProducer;
-    static SdfPath _usdDefaultRenderSettingsPathPrefix;
+    FVP_NS_DEF::DataProducerSceneIndexDataBaseRefPtr _defaultRenderDescriptionDataProducer;
+    static SdfPath _usdDefaultRenderDescriptionPathPrefix;
 
     // Is rendering being done in an interactive or batch context?
     bool _interactive{true};
