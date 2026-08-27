@@ -487,14 +487,17 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
     for (size_t i = 0; i < scene.mCount; i++) {
         using MVS = MDataServerOperation::MViewportScene;
         auto flags = scene.mFlags[i];
-        if ((flags & (MVS::MVS_ALL | MVS::MVS_new)) == 0) {
+        if (flags == 0) {
             continue;
         }
 
         auto& ri = *scene.mItems[i];
         int fastId = ri.InternalObjectId();
+        MayaHydraRenderItemAdapterPtr ria = nullptr;
+        const bool isNewRenderitem = !_GetRenderItem(fastId, ria);
 
-        if (flags & MVS::MVS_new) {
+        if (isNewRenderitem) {
+            // First check if the new render item should have a null adapter
             bool createNullRenderItemAdapter = false;
 
             // ProxyGeometryItems are a special type of dummy render item created internally by Maya
@@ -517,22 +520,21 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             if (filterMesh(ri, useMeshAdapter())) {
                 createNullRenderItemAdapter = true;
             }
-
-            if (createNullRenderItemAdapter) {
-                _renderItemsAdaptersFast.insert({ fastId, nullptr });
-            }
-        }
-
-        MayaHydraRenderItemAdapterPtr ria = nullptr;
-        const bool isNewRenderitem = !_GetRenderItem(fastId, ria);
-        if (isNewRenderitem) {
+        
             const SdfPath slowId = _GetRenderItemPrimPath(ri);
 
             // Maya/MtoA adds texturedSkyDome mesh object for VP2.
             // We do not want that to be translated to Hydra
             if (slowId.IsEmpty() || IsTexturedSkyDomeRenderItem(slowId)) {
+                createNullRenderItemAdapter = true;
+            }
+            
+            if (createNullRenderItemAdapter) {
+                _renderItemsAdaptersFast.insert({ fastId, nullptr });
                 continue;
             }
+
+            // Otherwise create a valid adapter
             // MAYA-128021: We do not currently support maya instances.
             MDagPath dagPath(ri.sourceDagPath());
             ria = std::make_shared<MayaHydraRenderItemAdapter>(
