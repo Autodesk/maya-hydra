@@ -1215,6 +1215,82 @@ function(mayaHydra_add_cmd_line_render_test SCENE_FILE_LABELED)
 
 endfunction()
 
+# Wraps mayaHydra_add_cmd_line_render_test() for a test that is known to run
+# under Hydra V2 render settings (PRMan by default via
+# _mayaHydra_append_prman_production_render_env, or Arnold when the caller
+# passes ENV MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1).  The Hydra V2
+# render-settings path does not resolve a relative USD render product
+# productName (unlike Hydra V1's ResolveRenderProductImagePath()), so a
+# relative -rd such as "../images" does not land where idiff looks.  This
+# function resolves -rd to an absolute path under the test's own output
+# folder and delegates to mayaHydra_add_cmd_line_render_test().
+#
+#   OUTPUT_NAME            - Folder name under CMAKE_BINARY_DIR/test/Temporary
+#                             identifying this test (must match the
+#                             convention already used by every call site: the
+#                             eventual sanitized test name).
+#   RENDERER_ARGS           - Renderer args WITHOUT -rd; this function
+#                             appends the resolved absolute -rd.
+#   RENDERED_IMAGE_SUBDIR    - default "projects/default/images"; also used
+#                             to build the -rd path, and forwarded unchanged.
+#   PRECREATE_DIR            - If set, MAKE_DIRECTORY the resolved -rd path
+#                             before registering the test.
+#   All other keywords (RENDERER, RENDERED_IMAGE_NAME, IMAGE_EXTENSION, FAIL,
+#   FAILPERCENT, TEST_NAME_SUFFIX, ENV, COPY_SCENE) are forwarded unchanged.
+function(_mayaHydra_add_hydra_v2_cmd_line_render_test SCENE_FILE_LABELED)
+    cmake_parse_arguments(ARG
+        "COPY_SCENE;PRECREATE_DIR"
+        "OUTPUT_NAME;RENDERER;RENDERED_IMAGE_SUBDIR;RENDERED_IMAGE_NAME;IMAGE_EXTENSION;FAIL;FAILPERCENT;RENDERER_ARGS;TEST_NAME_SUFFIX"
+        "ENV"
+        ${ARGN}
+    )
+
+    if(NOT ARG_OUTPUT_NAME)
+        message(FATAL_ERROR "_mayaHydra_add_hydra_v2_cmd_line_render_test: OUTPUT_NAME is required.")
+    endif()
+
+    set(_subdir "projects/default/images")
+    if(ARG_RENDERED_IMAGE_SUBDIR)
+        set(_subdir "${ARG_RENDERED_IMAGE_SUBDIR}")
+    endif()
+    set(_render_dir "${CMAKE_BINARY_DIR}/test/Temporary/${ARG_OUTPUT_NAME}/${_subdir}")
+
+    if(ARG_PRECREATE_DIR)
+        file(MAKE_DIRECTORY "${_render_dir}")
+    endif()
+
+    set(_forward_args RENDERER_ARGS "${ARG_RENDERER_ARGS} -rd \"${_render_dir}\"")
+    if(ARG_RENDERER)
+        list(APPEND _forward_args RENDERER ${ARG_RENDERER})
+    endif()
+    if(ARG_RENDERED_IMAGE_SUBDIR)
+        list(APPEND _forward_args RENDERED_IMAGE_SUBDIR ${ARG_RENDERED_IMAGE_SUBDIR})
+    endif()
+    if(ARG_RENDERED_IMAGE_NAME)
+        list(APPEND _forward_args RENDERED_IMAGE_NAME ${ARG_RENDERED_IMAGE_NAME})
+    endif()
+    if(ARG_IMAGE_EXTENSION)
+        list(APPEND _forward_args IMAGE_EXTENSION ${ARG_IMAGE_EXTENSION})
+    endif()
+    if(ARG_FAIL)
+        list(APPEND _forward_args FAIL ${ARG_FAIL})
+    endif()
+    if(ARG_FAILPERCENT)
+        list(APPEND _forward_args FAILPERCENT ${ARG_FAILPERCENT})
+    endif()
+    if(ARG_TEST_NAME_SUFFIX)
+        list(APPEND _forward_args TEST_NAME_SUFFIX ${ARG_TEST_NAME_SUFFIX})
+    endif()
+    if(ARG_COPY_SCENE)
+        list(APPEND _forward_args COPY_SCENE)
+    endif()
+    if(ARG_ENV)
+        list(APPEND _forward_args ENV ${ARG_ENV})
+    endif()
+
+    mayaHydra_add_cmd_line_render_test(${SCENE_FILE_LABELED} ${_forward_args})
+endfunction()
+
 # Discover the mayabatch executable (Windows only; macOS/Linux use maya -batch).
 if(IS_WINDOWS)
     find_program(MAYA_BATCH_EXECUTABLE mayabatch
