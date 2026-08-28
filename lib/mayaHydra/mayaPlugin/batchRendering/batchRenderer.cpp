@@ -242,6 +242,11 @@ bool BatchRenderer::Initialize()
             _lastFilteringSceneIndexBeforeCustomFiltering);
     }
 
+    // The render view attaches the registered USD-stage data producers to the
+    // merging scene index. Resolve only after that attachment so the active
+    // render settings or render pass can be retrieved from the scene index.
+    _SetActiveRenderDescriptionFromScene();
+
     MayaHydraParams delegateParams = _globals.delegateParams;
     delegateParams.displaySmoothMeshes = true; // This is the default.
 
@@ -548,8 +553,6 @@ void BatchRenderer::_InitHydraResources()
     // Hydra scene.  Hydra Prman supports this when the
     // HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS=true environment variable
     // is set.
-    _SetActiveRenderSettingsPrimFromScene();
-
     _initializationSucceeded = true;
 }
 
@@ -693,23 +696,36 @@ HdRenderIndex* BatchRenderer::renderIndex() const
     return _renderIndex;
 }
 
-void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()
+// Set ActiveRenderSettingsPrimPath and ActiveRenderPassPrimPath on the scene globals scene index.
+void BatchRenderer::_SetActiveRenderDescriptionFromScene()
 {
     if (!TF_VERIFY(_sceneGlobalsSceneIndex, "Scene globals scene index not yet initialized")) {
         return;
     }
 
-    const auto hydraRsPath = GetActiveRenderSettingsHydraPath();
-    if (!TF_VERIFY(!hydraRsPath.IsEmpty(), 
+    const auto activeRenderDescription
+        = ResolveActiveRenderDescription(*_sceneGlobalsSceneIndex);
+
+    if (!TF_VERIFY(!activeRenderDescription.renderSettingsPath.IsEmpty(),
                    "Invalid Hydra active render settings prim path.")) {
         return;
     }
 
     TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
                  "Active render settings set to " +
-                 hydraRsPath.GetAsString() + "\n");
+                 activeRenderDescription.renderSettingsPath.GetAsString() + "\n");
 
-    _sceneGlobalsSceneIndex->SetActiveRenderSettingsPrimPath(hydraRsPath);
+    _sceneGlobalsSceneIndex->SetActiveRenderSettingsPrimPath(
+        activeRenderDescription.renderSettingsPath);
+
+    TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
+                 "Active render pass set to " +
+                 (activeRenderDescription.renderPassPath.IsEmpty()
+                      ? std::string("none")
+                      : activeRenderDescription.renderPassPath.GetAsString()) + "\n");
+
+    _sceneGlobalsSceneIndex->SetActiveRenderPassPrimPath(
+        activeRenderDescription.renderPassPath);
 }
 
 void BatchRenderer::SetRenderTimes(const RenderTimes& renderTimes)

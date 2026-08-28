@@ -36,7 +36,9 @@
 #include <pxr/base/tf/getenv.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/imaging/hd/renderIndex.h>
+#include <pxr/imaging/hd/renderPassSchema.h>
 #include <pxr/imaging/hd/renderSettings.h>
+#include <pxr/imaging/hd/sceneIndex.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/utils.h>
 #include <pxr/usd/usd/prim.h>
@@ -84,7 +86,7 @@ namespace MAYAHYDRA_NS_DEF {
 
 Ufe::Path ExtractUsdRenderSettingsFromScene(UsdRenderSettings& usdRenderSettings)
 {
-    const auto rsAppPath = GetActiveRenderSettingsAppPath();
+    const auto rsAppPath = GetActiveRenderDescriptionAppPath();
     const auto stage     = MayaUsdAPI::getStage(rsAppPath);
     return FindUsdRenderSettingsOnStage(stage, usdRenderSettings) ?
         rsAppPath : Ufe::Path();
@@ -177,12 +179,12 @@ bool FindUsdRenderSettingsOnStage(
     return false;
 }
 
-Ufe::Path GetActiveRenderSettingsAppPath()
+Ufe::Path GetActiveRenderDescriptionAppPath()
 {
     constexpr const char* attrName   = "activeRenderDescriptionPath";
 
-    // Get the active render settings from the activeRenderDescriptionPath attribute
-    // on the UsdDefaultRenderDescription node.
+    // Get the active render description from the activeRenderDescriptionPath
+    // attribute on the UsdDefaultRenderDescription node.
     MObject nodeObj;
     if (!TF_VERIFY(GetDependNodeFromNodeName(kUsdDefaultRenderDescriptionNodeName.data(), nodeObj), "Could not find %s node.", kUsdDefaultRenderDescriptionNodeName.data())) {
         return {};
@@ -194,29 +196,100 @@ Ufe::Path GetActiveRenderSettingsAppPath()
         return {};
     }
 
-    MString pathStr = plug.asString();
+    const MString pathStr = plug.asString();
     if (!TF_VERIFY(pathStr.length() > 0, "%s attribute on %s is empty.", attrName, kUsdDefaultRenderDescriptionNodeName.data())) {
         // Attribute is empty, provide a sensible fallback, the USD default
         // render settings themselves.
-        constexpr const char* rsPrimPath = "/Render/SceneRenderSettings";
-        pathStr = MString((std::string(kUsdDefaultRenderDescriptionNodeName) + "," + rsPrimPath).c_str());
+        return GetDefaultRenderSettingsAppPath();
     }
 
     return Ufe::PathString::path(pathStr.asChar());
 }
 
-SdfPath GetActiveRenderSettingsHydraPath()
+Ufe::Path GetDefaultRenderSettingsAppPath()
 {
-    // Use path mapper to map the active render settings application path
+    constexpr const char* rsPrimPath = "/Render/SceneRenderSettings";
+    return Ufe::PathString::path(
+        std::string(kUsdDefaultRenderDescriptionNodeName) + "," + rsPrimPath);
+}
+
+SdfPath GetDefaultRenderSettingsHydraPath()
+{
+    const auto appPath = GetDefaultRenderSettingsAppPath();
+    if (appPath.empty()) {
+        return {};
+    }
+    return Fvp::sceneIndexPath(appPath);
+}
+
+SdfPath GetActiveRenderDescriptionHydraPath()
+{
+    // Use path mapper to map the active render description application path
     // (Ufe::Path) to the Hydra SdfPath of its translation in the Hydra scene.
-    auto ufePath = GetActiveRenderSettingsAppPath();
+    auto ufePath = GetActiveRenderDescriptionAppPath();
     auto hydraPath = Fvp::ufePathToPrimSelections(ufePath);
 
-    // Render settings are not instanced, so there will be a single path.
-    if (!TF_VERIFY(hydraPath.size() == 1, "Expected single path for active render settings.")) {
+    // Render settings and render passes are not instanced, so there will be a
+    // single path.
+    if (!TF_VERIFY(hydraPath.size() == 1, "Expected single path for active render description.")) {
         return {};
     }
     return hydraPath[0].primPath;
+}
+
+// 1. If the attribute points to a UsdRenderSettings prim, use it directly.
+// 2. If the attribute points to a UsdRenderPass prim:
+//    2.1 If its renderSource points to a valid UsdRenderSettings prim, use
+//         both the pass and its render settings.
+//    2.2 If renderSource is missing or invalid, use the default USD render
+//         settings and warn.
+//    2.3 If the render pass does not exist, use the default USD render
+//         settings and warn.
+ActiveRenderDescription ResolveActiveRenderDescription(const HdSceneIndexBase& sceneIndex)
+{
+    ActiveRenderDescription result;
+
+    const SdfPath activePath = GetActiveRenderDescriptionHydraPath();
+
+    // Case 2.3: GetActiveRenderDescriptionHydraPath() returns an empty path if
+    // the activeRenderSettingsPrimPath or the activeRenderPassPrimPath is invalid.
+    if (activePath.IsEmpty()) {
+        TF_WARN(
+            "activeRenderDescriptionPath points to a UsdRenderSettings prim or a UsdRenderPass prim "
+            "that does not exist. In the latter, Render pass collections will not be applied, and the default "
+            "render settings will be used to render.");
+        result.renderSettingsPath = GetDefaultRenderSettingsHydraPath();
+        return result;
+    }
+
+    const HdSceneIndexPrim activePrim = sceneIndex.GetPrim(activePath);
+
+    // Case 1.
+    if (activePrim.primType == HdPrimTypeTokens->renderSettings) {
+        result.renderSettingsPath = activePath;
+        return result;
+    }
+
+    const HdPathDataSourceHandle renderSourceDs
+        = HdRenderPassSchema::GetFromParent(activePrim.dataSource).GetRenderSource();
+    const SdfPath renderSourcePath
+        = renderSourceDs ? renderSourceDs->GetTypedValue(0.0f) : SdfPath();
+
+    // Case 2.1. the renderSource invalid check for 2.2 is performed here.
+    if (!renderSourcePath.IsEmpty()
+        && sceneIndex.GetPrim(renderSourcePath).primType == HdPrimTypeTokens->renderSettings) {
+        result.renderPassPath = activePath;
+        result.renderSettingsPath = renderSourcePath;
+        return result;
+    }
+
+    // Case 2.2.
+    TF_WARN("activeRenderDescriptionPath points to a UsdRenderPass prim that does not have "
+            "valid renderSource targeting a UsdRenderSettings prim. The default render "
+            "settings will be used to render.");
+    result.renderPassPath = activePath;
+    result.renderSettingsPath = GetDefaultRenderSettingsHydraPath();
+    return result;
 }
 
 TfTokenVector GetRenderOutputsFromActiveRenderSettings(const HdRenderIndex* renderIndex)

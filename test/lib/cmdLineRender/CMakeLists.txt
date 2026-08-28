@@ -463,6 +463,7 @@ endif()
 # we will not investigate this problem.
 if(MAYA_APP_VERSION VERSION_GREATER 2026)
     set(MAYABATCH_TEST_SCRIPT_FILES
+        testActiveRenderDescriptionSceneGlobals.py|depOnPlugins:mtoa
         testRenderingColorSpaceResolving.py|depOnPlugins:mtoa
     )
     # registeredMayaRenderers fails on Linux and macOS.
@@ -478,14 +479,11 @@ foreach(script ${MAYABATCH_TEST_SCRIPT_FILES})
     list(APPEND all_labels "cmdLineRender")
     mayaUsd_get_unittest_target(target ${test_filename})
 
-    set(test_env "DISPLAY=:0")
-    if(test_filename STREQUAL "testRenderingColorSpaceResolving.py")
-        list(APPEND test_env "MAYA_HYDRA_BATCH_RENDER_TEST_MODE=1")
-    endif()
-
     mayaUsd_add_test(${target}
         PYTHON_SCRIPT ${test_filename}
-        ENV ${test_env}
+        ENV
+            "DISPLAY=:0"
+            "MAYA_HYDRA_BATCH_RENDER_TEST_MODE=1"
     )
 
     # Add a ctest label to these tests for easy filtering.
