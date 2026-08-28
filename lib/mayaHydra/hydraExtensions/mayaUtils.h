@@ -31,7 +31,7 @@
 
 namespace MAYAHYDRA_NS_DEF {
 
-inline constexpr std::string_view kUsdDefaultRenderSettingsNodeName = "UsdDefaultRenderSettings";
+inline constexpr std::string_view kUsdDefaultRenderDescriptionNodeName = "UsdDefaultRenderDescription";
 
 // Names of color tables for indexed colors
 const std::string kActiveColorTableName = "active";
