@@ -60,9 +60,13 @@ special way, e.g. object contour, modified object color, or object overlay.
 
 The former approach is handled by having a plugin provide a selection
 highlighting filtering scene index to the Flow Viewport Toolkit, and is the
-topic of this document at time of writing.  The latter is handled by having 
-a plugin provide a selection highlighting task to the Flow Viewport Toolkit, 
-and is currently unimplemented.
+topic of this document.  The latter is handled by tasks rather than scene
+indices, and is implemented for the Hydra Storm render delegate using the
+Hydra Viewport Toolbox outline tasks; see
+[Outline Selection Highlighting Architecture](outlineSelectionHighlightingArchitecture.md).
+The two are mostly mutually exclusive per viewport: whichever mechanism is in
+charge, the other is suppressed for the common case, though not absolutely —
+see that document's Limitations section for the exceptions.
 
 ## Added Geometry Plugin Software Architecture Requirements
 
@@ -270,10 +274,12 @@ SelectionSceneIndex o-- Selection : Read / Write
 
 ## Limitations
 
-- Little investigation of pixel-based selection highlighting capability.
-    - Needs task-based approach.
-    - Needs selection tracker object to make selection and data derived from
-      the selection available to tasks through the task context data
+- Pixel-based selection highlighting is no longer unexplored: it is implemented
+  for Hydra Storm through the Hydra Viewport Toolbox outline tasks, with the
+  selection pushed to the tasks from the render override rather than through a
+  selection tracker object.  See
+  [Outline Selection Highlighting Architecture](outlineSelectionHighlightingArchitecture.md).
+  It remains Storm-only, since the outline tasks need a rasterizer for prim IDs.
 
 - No selection highlighting across scene indices: selection state propagates
   down app scene hierarchy, so that when an ancestor is selected, a
@@ -285,6 +291,10 @@ SelectionSceneIndex o-- Selection : Read / Write
 ## Selection Highlighting for Maya data
 
 For Maya-native data, the Flow Viewport Toolkit highlighting mechanisms are not used. Instead, the internal OGS highlighting render items are translated over to Hydra and used for highlighting.
+
+In Outline selection-highlight mode that OGS highlight item would compete with the outline, so it is
+suppressed instead of translated — see
+[Outline Selection Highlighting Architecture](outlineSelectionHighlightingArchitecture.md#maya-native-prims-vp2-already-drew-it).
 
 Here is a selection example :
 
