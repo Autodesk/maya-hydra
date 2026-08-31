@@ -337,6 +337,48 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
         ${singlecam_fail_args}
         RENDERER_ARGS "-rd images/aSubDirectory"
     )
+
+    # Frame number resolution in render product names (frame 9).  Token expansion
+    # in productName requires Hydra v2 render settings (Arnold env or PRMan production
+    # render env).  Storm uses Hydra v1 here and does not resolve # tokens, so it is
+    # intentionally excluded (the pre-HYDRA-2460 test was Arnold-only for the same reason).
+    #
+    # As of 2026-Aug-17, HdArnold crashes for multi-frame renders in Hydra v2
+    # render settings mode (-s 9 -e 11); single-frame (-s 9 -e 9) is used instead.
+    set(_add_frame_nb_resolution FALSE)
+    if(folder STREQUAL "arnold" AND NOT (IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027))
+        set(_add_frame_nb_resolution TRUE)
+    elseif(folder STREQUAL "prman" AND IS_WINDOWS)
+        set(_add_frame_nb_resolution TRUE)
+    endif()
+
+    if(_add_frame_nb_resolution)
+        set(frame_nb_scene "renderSettings/${folder}/frameNbResolution.ma")
+        if(folder STREQUAL "arnold")
+            mayaHydra_add_cmd_line_render_multi_image_test(${frame_nb_scene}${dep_label}
+                RENDERER ${renderer}
+                EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frameNbResolution
+                IMAGE_EXTENSION png
+                TEST_NAME_SUFFIX ${suffix}
+                FAIL 0.05
+                FAILPERCENT 1.0
+                RENDERER_ARGS "-s 9 -e 9"
+                ENV
+                    "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
+                    "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
+            )
+        else()
+            mayaHydra_add_cmd_line_render_multi_image_test(${frame_nb_scene}${dep_label}
+                RENDERER ${renderer}
+                EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frameNbResolution
+                IMAGE_EXTENSION png
+                TEST_NAME_SUFFIX ${suffix}
+                FAIL 0.05
+                FAILPERCENT 1.0
+                RENDERER_ARGS "-s 9 -e 9"
+            )
+        endif()
+    endif()
 endfunction()
 
 _mayaHydra_add_render_settings_variant(storm "-x 720 -y 480" aNewStormImageName)
@@ -461,32 +503,6 @@ if(IS_WINDOWS)
     )
 
 endif()
-
-# Test frame number resolution in render product names (Arnold only, frames
-# 9-11).  Testing with a single renderer is sufficient.  Frame number
-# resolution depends on the frame number being writting in the Hydra v2 scene
-# globals, and therefore requires Hydra v2 support.
-#
-# As of 2026-Aug-17, HdArnold crashes for multi-frame renders in Hydra v2
-# render settings mode, to be investigated.
-#
-# HYDRA-2506: skip on macOS for Maya 2027.
-if(NOT (IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027))
-mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/frameNbResolution.ma
-    RENDERER HdArnoldRendererPlugin
-    EXPECTED_IMAGES_DIR renderSettings/images/arnold_frameNbResolution
-    IMAGE_EXTENSION png
-    TEST_NAME_SUFFIX Arnold
-    FAIL 0.05
-    FAILPERCENT 1.0
-#   RENDERER_ARGS "-s 9 -e 11"
-    RENDERER_ARGS "-s 9 -e 9"
-    ENV
-        "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
-        "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
-)
-endif()
-
 
 # Test that USD render settings stored in a MayaUsdProxyShape node produce no
 # path mapper warnings errors.  Launches Render and checks for success,
