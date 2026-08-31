@@ -308,7 +308,7 @@ private:
     // per-face/multi-material meshes shade correctly. See the .cpp for details.
     void _InsertGeomSubsetsForMesh(const MDagPath& dag, const SdfPath& meshPrimId);
     void _AddRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
-    void _RemoveRenderItem(const MayaHydraRenderItemAdapterPtr& ria);
+    void _RemoveRenderItem(int fastId);
     bool
     _GetRenderItemMaterial(const MRenderItem& ri, SdfPath& material, MObject& shadingEngineNode);
     SdfPath _GetRenderItemPrimPath(const MRenderItem& ri);

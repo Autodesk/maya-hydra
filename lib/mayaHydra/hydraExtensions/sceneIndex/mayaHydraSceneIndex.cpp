@@ -474,16 +474,8 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         int fastId = scene.mRemovals[i];
         if (fastId == kInvalidId)
             continue;
-        MayaHydraRenderItemAdapterPtr ria = nullptr;
-        if (_GetRenderItem(fastId, ria)) {
-            _RemoveRenderItem(ria);
-        }
-        // The removal list can contain duplicate fastIds.  After the first
-        // removal succeeds, subsequent duplicates will not be found — skip
-        // them.
-        if (ria == nullptr) {
-            continue;
-        }
+
+        _RemoveRenderItem(fastId);
     }
 
     // Coalesce DirtyPrims notifications produced per render item.
@@ -500,39 +492,49 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
         }
 
         auto& ri = *scene.mItems[i];
-
-        // ProxyGeometryItems are a special type of dummy render item created internally by Maya
-        // to implement and handle MPxDrawOverride. We do not need to translate these to Hydra.
-        const MString riName = ri.name();
-        if (riName == "ProxyGeometryItem") {
-            continue;
-        }
-
-        // VP2 image planes emit a DepthPrepass render item that uses a special
-        // shader writing only to the depth buffer with alpha-tested discard.
-        // Hydra has no equivalent; rendering it as a regular textured mesh
-        // creates a second overlapping layer that causes visual artifacts.
-        if (riName == "imagePlane_ColorImage_DepthPrepass") {
-            continue;
-        }
-
-        // Meshes can optionally be handled by the mesh adapter, rather than by
-        // render items.
-        if (filterMesh(ri, useMeshAdapter())) {
-            continue;
-        }
-
-        int                           fastId = ri.InternalObjectId();
+        int fastId = ri.InternalObjectId();
         MayaHydraRenderItemAdapterPtr ria = nullptr;
         const bool isNewRenderitem = !_GetRenderItem(fastId, ria);
+
         if (isNewRenderitem) {
+            // First check if the new render item should have a null adapter
+            bool createNullRenderItemAdapter = false;
+
+            // ProxyGeometryItems are a special type of dummy render item created internally by Maya
+            // to implement and handle MPxDrawOverride. We do not need to translate these to Hydra.
+            const MString riName = ri.name();
+            if (riName == "ProxyGeometryItem") {
+                createNullRenderItemAdapter = true;
+            }
+
+            // VP2 image planes emit a DepthPrepass render item that uses a special
+            // shader writing only to the depth buffer with alpha-tested discard.
+            // Hydra has no equivalent; rendering it as a regular textured mesh
+            // creates a second overlapping layer that causes visual artifacts.
+            if (riName == "imagePlane_ColorImage_DepthPrepass") {
+                createNullRenderItemAdapter = true;
+            }
+
+            // Meshes can optionally be handled by the mesh adapter, rather than by
+            // render items.
+            if (filterMesh(ri, useMeshAdapter())) {
+                createNullRenderItemAdapter = true;
+            }
+        
             const SdfPath slowId = _GetRenderItemPrimPath(ri);
 
             // Maya/MtoA adds texturedSkyDome mesh object for VP2.
             // We do not want that to be translated to Hydra
             if (slowId.IsEmpty() || IsTexturedSkyDomeRenderItem(slowId)) {
+                createNullRenderItemAdapter = true;
+            }
+            
+            if (createNullRenderItemAdapter) {
+                _renderItemsAdaptersFast.insert({ fastId, nullptr });
                 continue;
             }
+
+            // Otherwise create a valid adapter
             // MAYA-128021: We do not currently support maya instances.
             MDagPath dagPath(ri.sourceDagPath());
             ria = std::make_shared<MayaHydraRenderItemAdapter>(
@@ -550,6 +552,10 @@ void MayaHydraSceneIndex::UpdateRenderItems(const MDataServerOperation::MViewpor
             // Update the render item adapter if this render item is an aiSkydomeLight shape
             ria->SetIsRenderITemAnaiSkydomeLightTriangleShape(
                 isRenderItem_aiSkyDomeLightTriangleShape(ri));
+        } else if (ria == nullptr) {
+            // This is a case of null render item adapter.
+            // Used for render items that don't need to be transfered to Hydra.
+            continue;
         }
 
         // _GetRenderItemMaterial is expensive: it ultimately calls
@@ -1133,11 +1139,10 @@ bool MayaHydraSceneIndex::_GetRenderItem(int fastId, MayaHydraRenderItemAdapterP
     // class and best to avoid in any performance- critical area. Simply workaround for the
     // prototype is an additional lookup index based on InternalObjectID.  Long term goal would be
     // that the plug-in rarely, if ever, deals with TdagPath.
-    MayaHydraRenderItemAdapterPtr* result = TfMapLookupPtr(_renderItemsAdaptersFast, fastId);
-
-    if (result != nullptr) {
-        // adapter already exists, return it
-        ria = *result;
+    auto it = _renderItemsAdaptersFast.find(fastId);
+    if (it != _renderItemsAdaptersFast.end()) {
+        // entry already exists, return it
+        ria = it->second;
         return true;
     }
 
@@ -1151,11 +1156,17 @@ void MayaHydraSceneIndex::_AddRenderItem(const MayaHydraRenderItemAdapterPtr& ri
     _renderItemsAdapters.insert({ primPath, ria });
 }
 
-void MayaHydraSceneIndex::_RemoveRenderItem(const MayaHydraRenderItemAdapterPtr& ria)
+void MayaHydraSceneIndex::_RemoveRenderItem(int fastId)
 {
-    const SdfPath& primPath = ria->GetID();
-    _renderItemsAdaptersFast.erase(ria->GetFastID());
-    _renderItemsAdapters.erase(primPath);
+    MayaHydraRenderItemAdapterPtr ria = nullptr;
+    if (_GetRenderItem(fastId, ria)) {
+        if (ria != nullptr) {
+            const SdfPath& primPath = ria->GetID();
+            _renderItemsAdapters.erase(primPath);
+        }
+        
+        _renderItemsAdaptersFast.erase(fastId);
+    }
 }
 
 void MayaHydraSceneIndex::GetLightedPrimPaths(SdfPathVector& lightedPrimPaths)
