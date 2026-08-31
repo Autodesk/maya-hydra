@@ -20,6 +20,6 @@ from maya import cmds
 def getRenderSettingsPrim():
     # Get the UFE path to the render settings prim to use from the
     # default USD render settings node.
-    rsPath = cmds.getAttr('UsdDefaultRenderSettings.activeSettingsPath')
+    rsPath = cmds.getAttr('UsdDefaultRenderDescription.activeRenderDescriptionPath')
 
     return mayaUsdUfe.ufePathToPrim(rsPath)

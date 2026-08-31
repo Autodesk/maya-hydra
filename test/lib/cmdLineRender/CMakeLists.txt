@@ -304,6 +304,31 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSett
     RENDERER_ARGS "-s 5 -e 9"
 )
 
+# Test frame number resolution in render product names (Arnold only, frames
+# 9-11).  Testing with a single renderer is sufficient.  Frame number
+# resolution depends on the frame number being writting in the Hydra v2 scene
+# globals, and therefore requires Hydra v2 support.
+#
+# As of 2026-Aug-17, HdArnold crashes for multi-frame renders in Hydra v2
+# render settings mode, to be investigated.
+#
+# HYDRA-2506: skip on macOS for Maya 2027.
+if(NOT (IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027))
+mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/frameNbResolution.ma
+    RENDERER HdArnoldRendererPlugin
+    EXPECTED_IMAGES_DIR renderSettings/images/arnold_frameNbResolution
+    IMAGE_EXTENSION png
+    TEST_NAME_SUFFIX Arnold
+    FAIL 0.05
+    FAILPERCENT 1.0
+#   RENDERER_ARGS "-s 9 -e 11"
+    RENDERER_ARGS "-s 9 -e 9"
+    ENV
+        "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
+        "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
+)
+endif()
+
 mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSettingsSingleCam.ma
     EXPECTED_IMAGES_DIR renderSettings/images/storm_singleCam_frames5to9
     RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
