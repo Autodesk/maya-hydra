@@ -1,0 +1,97 @@
+#usda 1.0
+(
+    defaultPrim = "Render"
+    renderSettingsPrimPath = "/Render/MainRender"
+    startTimeCode = 1
+    endTimeCode = 10
+)
+
+def Scope "Cameras"
+{
+    def Camera "main_cam"
+    {
+        float2 clippingRange = (0.1, 10000)
+        float focalLength = 35
+        float focusDistance = 5
+        float horizontalAperture = 35.999928
+        float verticalAperture = 23.999952
+        float3 xformOp:rotateXYZ = (62.482925, 0, 43.994915)
+        double3 xformOp:translate = (3.8079010269722375, -3.943897492221248, 3.3559257702291783)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Camera "second_cam"
+    {
+        float2 clippingRange = (0.1, 10000)
+        float focalLength = 20
+        float focusDistance = 5
+        float horizontalAperture = 35.999928
+        float verticalAperture = 23.999952
+        float3 xformOp:rotateXYZ = (77.90114, 1.8477291, -22.117052)
+        double3 xformOp:translate = (-2.046467287095833, -6.962612043589754, 2.00237962266086)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+}
+
+def Scope "Render"
+{
+    def RenderSettings "MainRender"
+    {
+        rel camera = </Cameras/main_cam>
+        float pixelAspectRatio = 1
+        rel products = [
+            </Render/ProductMainCam>,
+            </Render/ProductSecondCam>,
+        ]
+        int2 resolution = (512, 512)
+    }
+
+    def RenderProduct "ProductMainCam"
+    {
+        rel camera = </Cameras/main_cam>
+        rel orderedVars = [</Render/Vars/Ci>]
+        uniform token productName.timeSamples = {
+            1: "./images/mainCamFrame1.png",
+            2: "./images/mainCamFrame2.png",
+            3: "./images/mainCamFrame3.png",
+            4: "./images/mainCamFrame4.png",
+            5: "./images/mainCamFrame5.png",
+            6: "./images/mainCamFrame6.png",
+            7: "./images/mainCamFrame7.png",
+            8: "./images/mainCamFrame8.png",
+            9: "./images/mainCamFrame9.png",
+            10: "./images/mainCamFrame10.png",
+        }
+        uniform token productType = "raster"
+        uniform int2 resolution = (512, 512)
+    }
+
+    def RenderProduct "ProductSecondCam"
+    {
+        rel camera = </Cameras/second_cam>
+        rel orderedVars = [</Render/Vars/Ci>]
+        uniform token productName.timeSamples = {
+            1: "./images/secondCamFrame1.png",
+            2: "./images/secondCamFrame2.png",
+            3: "./images/secondCamFrame3.png",
+            4: "./images/secondCamFrame4.png",
+            5: "./images/secondCamFrame5.png",
+            6: "./images/secondCamFrame6.png",
+            7: "./images/secondCamFrame7.png",
+            8: "./images/secondCamFrame8.png",
+            9: "./images/secondCamFrame9.png",
+            10: "./images/secondCamFrame10.png",
+        }
+        uniform token productType = "raster"
+        uniform int2 resolution = (1024, 768)
+    }
+
+    def Scope "Vars"
+    {
+                # PRMan requires sourceName "Ci" for the beauty AOV; Storm/Arnold use "color".
+        def RenderVar "Ci"
+        {
+            string sourceName = "Ci"
+        }
+    }
+}
