@@ -49,10 +49,26 @@ def setImageName(im):
     # selector.
     renderProducts.applyToProductName(setRenderProductName)
 
-def setOutputFormat(of):
-    # Set the Maya render setting.
+def _applyMayaOutputFormat(of):
     mel.eval('setMayaSoftwareImageFormat("' + of + '")')
-    cmds.setAttr('defaultArnoldDriver.aiTranslator', of, type='string')
+
+
+def _applyArnoldOutputFormat(of):
+    # Renderer-specific glue: Arnold stores output format on defaultArnoldDriver,
+    # not only on defaultRenderGlobals. setMayaSoftwareImageFormat alone is not
+    # enough for Arnold batch renders. Register additional delegate hooks in
+    # _MAYA_FORMAT_HOOKS rather than adding inline objExists checks here.
+    if cmds.objExists('defaultArnoldDriver'):
+        cmds.setAttr('defaultArnoldDriver.aiTranslator', of, type='string')
+
+
+_MAYA_FORMAT_HOOKS = (_applyArnoldOutputFormat,)
+
+
+def setOutputFormat(of):
+    _applyMayaOutputFormat(of)
+    for hook in _MAYA_FORMAT_HOOKS:
+        hook(of)
 
     def setRenderProductName(productName):
         return str(Path(productName).with_suffix('.' + of))

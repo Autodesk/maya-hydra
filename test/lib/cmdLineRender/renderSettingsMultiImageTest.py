@@ -166,12 +166,19 @@ def _compare_images(idiff, fail, failpercent, expected_dir, output_dir):
         # is an absolute path to an existing executable regular file.
         # Combined with the argument list form (no shell=True), this
         # satisfies Bandit B603 / PYTH-INJC-30.
+        # Match single-image cmdLineRender tests (HYDRA-2304): treat WARN like FAIL
+        # so idiff's default ~1e-6 warning threshold does not fail "roughly same"
+        # images that already pass -fail / -failpercent.
         result = subprocess.run(  # nosec B603
             [
                 str(idiff),
                 "-fail",
                 str(fail),
                 "-failpercent",
+                str(failpercent),
+                "-warn",
+                str(fail),
+                "-warnpercent",
                 str(failpercent),
                 str(output),
                 str(expected),

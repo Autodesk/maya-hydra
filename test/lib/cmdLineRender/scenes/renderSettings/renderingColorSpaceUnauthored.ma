@@ -94,7 +94,7 @@ createNode mayaUsdProxyShape -n "renderSettingsShape" -p "renderSettings";
 	setAttr ".rcpl" 1;
 	setAttr ".forceCompute" yes;
 	setAttr ".usdStageLoadRules" -type "string" "/=all";
-	setAttr ".usdStageTargetLayer" -type "string" "./renderingColorSpaceMatching.usda";
+	setAttr ".usdStageTargetLayer" -type "string" "./renderingColorSpaceUnauthored.usda";
 createNode transform -n "directionalLight1";
 	rename -uid "6E632FE3-4C03-D2BF-5523-72846E05C92C";
 createNode directionalLight -n "directionalLightShape1" -p "directionalLight1";
