@@ -30,6 +30,7 @@
 #include <maya/MDagMessage.h>
 #include <maya/MFnAttribute.h>
 #include <maya/MFnCamera.h>
+#include <maya/MFnDependencyNode.h>
 #include <maya/MNodeMessage.h>
 #include <maya/MPlug.h>
 
@@ -37,13 +38,47 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
+// Depth of field can be enabled either by Maya's own camera attribute or by the
+// Arnold camera extension, which is what the UI toggles when only Arnold DOF is
+// turned on. Either one counts as enabled.
+static bool _IsDofEnabledOnCamera(MFnCamera& camera)
+{
+    MStatus status;
+    if (camera.isDepthOfField(&status) && !status.error())
+        return true;
+
+    MFnDependencyNode dep(camera.object());
+    MPlug aiDofPlug = dep.findPlug("aiEnableDOF", false, &status);
+    if (!status.error() && !aiDofPlug.isNull() && aiDofPlug.asBool())
+        return true;
+
+    return false;
+}
+
+// The Arnold focus distance, when the extension attribute is present and set to a
+// usable value. Returns 0 to mean "not set", leaving Maya's own focusDistance to
+// be used instead.
+static float _ReadArnoldFocusDistanceIfSet(MFnCamera& camera)
+{
+    MStatus status;
+    MFnDependencyNode dep(camera.object());
+    MPlug aiFocusPlug = dep.findPlug("aiFocusDistance", false, &status);
+    if (status.error() || aiFocusPlug.isNull())
+        return 0.0f;
+    const double v = aiFocusPlug.asDouble(&status);
+    if (status.error() || !(v > 0.0))
+        return 0.0f;
+    return static_cast<float>(v);
+}
+
 // Attributes that affect HdCamera params (from GetCameraParamValue). When these change,
 // we mark DirtyParams | DirtyPrimvar in one call to avoid duplicates.
 static const char* const kCameraParamAttributeNames[] = {
     "nearClipPlane", "farClipPlane", "shutterAngle", "focusDistance", "focalLength",
     "fStop", "horizontalFilmAperture", "verticalFilmAperture", "lensSqueezeRatio",
     "shakeEnabled", "horizontalFilmOffset", "horizontalShake", "verticalFilmOffset",
-    "verticalShake", "filmFit", "depthOfField", "orthographic",
+    "verticalShake", "filmFit", "depthOfField", "aiEnableDOF", "aiFocusDistance",
+    "orthographic",
 };
 
 static void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)
@@ -165,9 +200,18 @@ void MayaHydraCameraAdapter::CreateCallbacks()
     auto xformChanged = MDagMessage::addWorldMatrixModifiedCallback(
         dag,
         +[](MObject& transformNode, MDagMessage::MatrixModifiedFlags& modified, void* clientData) {
+            TF_UNUSED(transformNode);
+            TF_UNUSED(modified);
             auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
             adapter->InvalidateTransform();
-            MayaHydra::DirtyNotifier(adapter).dirtyTransform();
+            // Tumbling the viewport updates the world matrix without touching the
+            // fStop / focusDistance plugs. The transform locator alone does not
+            // refresh the HdCamera params, which leaves depth-of-field state stale
+            // for consumers that read it from the camera prim.
+            MayaHydra::DirtyNotifier(adapter)
+                .dirtyTransform()
+                .dirtyCameraParams()
+                .dirtyPrimvars();
         },
         reinterpret_cast<void*>(this),
         &status);
@@ -263,6 +307,8 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
         return {};
     }
     if (paramName == HdCameraTokens->focusDistance) {
+        if (const float aiFocus = _ReadArnoldFocusDistanceIfSet(camera); aiFocus > 0.0f)
+            return VtValue(aiFocus);
         auto focusDistance = camera.focusDistance(&status);
         if (hadError(status))
             return {};
@@ -276,7 +322,7 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
     }
     if (paramName == HdCameraTokens->fStop) {
         // For USD/Hydra fStop=0 should disable depthOfField
-        if (!camera.isDepthOfField())
+        if (!_IsDofEnabledOnCamera(camera))
             return VtValue(0.f);
         const auto fStop = camera.fStop(&status);
         if (hadError(status))
