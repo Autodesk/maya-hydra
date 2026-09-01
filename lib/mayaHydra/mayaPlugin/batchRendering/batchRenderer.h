@@ -130,7 +130,8 @@ private:
     void              _ClearHydraResources();
     PXR_NS::HdRenderDelegate* _GetRenderDelegate();   
     void              _ClearMayaHydraSceneIndex();
-    void              _SetActiveRenderDescriptionFromScene();
+    void              _SetActiveRenderSettingsPrimFromScene();
+    void              _SetActiveRenderPassPrimFromScene();
 
     void              _SetRenderPurposeTags(const PXR_NS::MayaHydraParams& delegateParams);
     void              _CreateSceneIndicesChainAfterMergingSceneIndex(
