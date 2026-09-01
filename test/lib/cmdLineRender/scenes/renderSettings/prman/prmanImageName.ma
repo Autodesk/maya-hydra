@@ -89,12 +89,12 @@ createNode mayaUsdProxyShape -n "renderSettingsShape" -p "renderSettings";
 	setAttr -k off ".v";
 	setAttr ".covm[0]"  0 1 1;
 	setAttr ".cdvm[0]"  0 1 1;
-	setAttr ".fp" -type "string" "./renderingColorSpaceUnauthored.usda";
+	setAttr ".fp" -type "string" "./prmanImageName.usda";
 	setAttr ".epp" -type "string" "";
 	setAttr ".rcpl" 1;
 	setAttr ".forceCompute" yes;
 	setAttr ".usdStageLoadRules" -type "string" "/=all";
-	setAttr ".usdStageTargetLayer" -type "string" "./renderingColorSpaceUnauthored.usda";
+	setAttr ".usdStageTargetLayer" -type "string" "./prmanImageName.usda";
 createNode transform -n "directionalLight1";
 	rename -uid "6E632FE3-4C03-D2BF-5523-72846E05C92C";
 createNode directionalLight -n "directionalLightShape1" -p "directionalLight1";
@@ -166,20 +166,20 @@ createNode script -n "sceneConfigurationScriptNode";
 	rename -uid "E4B14BBA-446B-1FE2-3039-4D95805401E5";
 	setAttr ".b" -type "string" "playbackOptions -min 0 -max 36 -ast 0 -aet 36 ";
 	setAttr ".st" 6;
-createNode aiOptions -s -n "defaultArnoldRenderOptions";
+createNode aiOptions -s -n "defaultPRManRenderOptions";
 	rename -uid "4F845FB4-4B71-91FB-24B1-48A51609517E";
 	setAttr ".version" -type "string" "5.6.0";
-createNode aiAOVFilter -s -n "defaultArnoldFilter";
+createNode aiAOVFilter -s -n "defaultPRManFilter";
 	rename -uid "8AC3EA95-4F0C-6585-D8EF-FE9D649D1A82";
 	setAttr ".ai_translator" -type "string" "gaussian";
-createNode aiAOVDriver -s -n "defaultArnoldDriver";
+createNode aiAOVDriver -s -n "defaultPRManDriver";
 	rename -uid "5F51D275-447F-665A-02AD-26AA323FFBCF";
 	setAttr ".ai_translator" -type "string" "exr";
-createNode aiAOVDriver -s -n "defaultArnoldDisplayDriver";
+createNode aiAOVDriver -s -n "defaultPRManDisplayDriver";
 	rename -uid "C020F69F-4980-94C3-0C5B-A385262228B4";
 	setAttr ".ai_translator" -type "string" "maya";
 	setAttr ".output_mode" 0;
-createNode aiImagerDenoiserOidn -s -n "defaultArnoldDenoiser";
+createNode aiImagerDenoiserOidn -s -n "defaultPRManDenoiser";
 	rename -uid "92173420-44D3-A0C4-FE91-B8BB6737C035";
 createNode UsdDefaultSettings -n "UsdDefaultRenderDescription";
 	setAttr ".srl" -type "string" "#usda 1.0\n(\n    renderSettingsPrimPath = \"/Render/SceneRenderSettings\"\n)\n\ndef Scope \"Render\"\n{\n    def RenderSettings \"SceneRenderSettings\"\n    {\n        custom string adskUsd:externalCamera = \"|persp\" (\n            displayName = \"External Camera\"\n        )\n    }\n}\n\n";
@@ -281,12 +281,12 @@ relationship "shadowLink" ":lightLinker1" ":initialShadingGroup.message" ":defau
 relationship "shadowLink" ":lightLinker1" ":initialParticleSE.message" ":defaultLightSet.message";
 connectAttr "layerManager.dli[0]" "defaultLayer.id";
 connectAttr "renderLayerManager.rlmi[0]" "defaultRenderLayer.rlid";
-connectAttr ":defaultArnoldDenoiser.msg" ":defaultArnoldRenderOptions.imagers" -na
+connectAttr ":defaultPRManDenoiser.msg" ":defaultPRManRenderOptions.imagers" -na
 		;
-connectAttr ":defaultArnoldDisplayDriver.msg" ":defaultArnoldRenderOptions.drivers"
+connectAttr ":defaultPRManDisplayDriver.msg" ":defaultPRManRenderOptions.drivers"
 		 -na;
-connectAttr ":defaultArnoldFilter.msg" ":defaultArnoldRenderOptions.filt";
-connectAttr ":defaultArnoldDriver.msg" ":defaultArnoldRenderOptions.drvr";
+connectAttr ":defaultPRManFilter.msg" ":defaultPRManRenderOptions.filt";
+connectAttr ":defaultPRManDriver.msg" ":defaultPRManRenderOptions.drvr";
 connectAttr "defaultRenderLayer.msg" ":defaultRenderingList1.r" -na;
 connectAttr "directionalLightShape1.ltd" ":lightList1.l" -na;
 connectAttr "directionalLight1.iog" ":defaultLightSet.dsm" -na;
