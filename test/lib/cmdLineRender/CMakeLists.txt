@@ -331,7 +331,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
     endif()
     mayaHydra_add_cmd_line_render_multi_image_test(${singlecam_scene}${dep_label}
         RENDERER ${renderer}
-        EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
+        EXPECTED_IMAGES_DIR renderSettings/${folder}/images/singleCam_frames5to9
         RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
         IMAGE_EXTENSION png
         TEST_NAME_SUFFIX ${suffix}RenderDir
