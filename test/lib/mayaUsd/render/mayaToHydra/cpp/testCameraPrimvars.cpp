@@ -188,3 +188,107 @@ TEST(CameraPrimvars, ParamAttributesMatchGetLogic)
                "kCameraParamAttributeNames in cameraAdapter.cpp.";
     }
 }
+
+namespace {
+
+HdSceneIndexBaseRefPtr FindSceneIndexWithCamera(
+    const std::string& shapeNamePart,
+    SdfPath*           outCameraPrimPath)
+{
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    if (sceneIndices.empty()) {
+        return nullptr;
+    }
+
+    HdSceneIndexBaseRefPtr sceneIndexWithCamera = FindTerminalSceneIndexWithPrim(
+        sceneIndices, shapeNamePart, HdPrimTypeTokens->camera);
+    if (!sceneIndexWithCamera) {
+        return nullptr;
+    }
+
+    auto mayaSceneIndex = FindMayaHydraSceneIndex(sceneIndexWithCamera);
+    if (!mayaSceneIndex) {
+        return nullptr;
+    }
+
+    SceneIndexInspector inspector(mayaSceneIndex);
+    PrimEntriesVector foundPrims
+        = inspector.FindPrims(CreatePrimPredicate(shapeNamePart, HdPrimTypeTokens->camera), 1);
+    if (foundPrims.empty()) {
+        return nullptr;
+    }
+
+    *outCameraPrimPath = foundPrims.front().primPath;
+    return sceneIndexWithCamera;
+}
+
+template <typename T>
+T ReadCameraSampledValue(
+    const HdSceneIndexBaseRefPtr& sceneIndex,
+    const SdfPath&                cameraPrimPath,
+    const TfToken&                name)
+{
+    HdSceneIndexPrim prim = sceneIndex->GetPrim(cameraPrimPath);
+    if (!prim.dataSource) {
+        ADD_FAILURE() << "Camera prim has no data source";
+        return T();
+    }
+    // The camera fields are nested inside the prim's camera container.
+    HdCameraSchema cameraSchema = HdCameraSchema::GetFromParent(prim.dataSource);
+    if (!cameraSchema) {
+        ADD_FAILURE() << "Camera prim has no camera container";
+        return T();
+    }
+    HdSampledDataSourceHandle ds
+        = HdSampledDataSource::Cast(cameraSchema.GetContainer()->Get(name));
+    if (!ds) {
+        ADD_FAILURE() << "Missing camera datasource for " << name.GetString();
+        return T();
+    }
+    VtValue v = ds->GetValue(0.0f);
+    EXPECT_TRUE(v.IsHolding<T>()) << "Unexpected type for " << name.GetString();
+    return v.IsHolding<T>() ? v.UncheckedGet<T>() : T();
+}
+
+} // namespace
+
+// What: DOF camera attrs published on HdCameraSchema round-trip through scene index.
+// How: read focusDistance/fStop/depthOfField; toggle depthOfField off.
+// Expect: fStop becomes 0 when DOF disabled.
+TEST(CameraPrimvars, DepthOfFieldSchemaFieldsRoundTrip)
+{
+    const std::string cameraShapeFull = GetOptionVarOrDefault(kCameraShapeOptionVar, kCameraShapeFallback);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(cameraShapeFull);
+
+    SdfPath cameraPrimPath;
+    HdSceneIndexBaseRefPtr sceneIndex = FindSceneIndexWithCamera(shapeNamePart, &cameraPrimPath);
+    ASSERT_TRUE(sceneIndex) << "Camera prim not found in scene index";
+
+    // Enable DOF with known values.
+    MGlobal::executeCommand(("setAttr \"" + cameraShapeFull + ".depthOfField\" 1").c_str());
+    MGlobal::executeCommand(("setAttr \"" + cameraShapeFull + ".focusDistance\" 9.0").c_str());
+    MGlobal::executeCommand(("setAttr \"" + cameraShapeFull + ".fStop\" 5.6").c_str());
+    MGlobal::executeCommand("refresh");
+
+    const float focusDistance = ReadCameraSampledValue<float>(sceneIndex, cameraPrimPath,
+        HdCameraSchemaTokens->focusDistance);
+    const float fStop = ReadCameraSampledValue<float>(sceneIndex, cameraPrimPath,
+        HdCameraSchemaTokens->fStop);
+    const bool depthOfField = ReadCameraSampledValue<bool>(sceneIndex, cameraPrimPath,
+        TfToken("depthOfField"));
+
+    EXPECT_NEAR(focusDistance, 9.0f, 0.01f);
+    EXPECT_NEAR(fStop, 5.6f, 0.01f);
+    EXPECT_TRUE(depthOfField);
+
+    MGlobal::executeCommand(("setAttr \"" + cameraShapeFull + ".depthOfField\" 0").c_str());
+    MGlobal::executeCommand("refresh");
+
+    const float fStopDisabled = ReadCameraSampledValue<float>(sceneIndex, cameraPrimPath,
+        HdCameraSchemaTokens->fStop);
+    const bool depthOfFieldDisabled = ReadCameraSampledValue<bool>(sceneIndex, cameraPrimPath,
+        TfToken("depthOfField"));
+
+    EXPECT_FLOAT_EQ(fStopDisabled, 0.0f);
+    EXPECT_FALSE(depthOfFieldDisabled);
+}

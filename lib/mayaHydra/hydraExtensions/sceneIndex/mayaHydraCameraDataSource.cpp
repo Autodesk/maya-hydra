@@ -155,6 +155,10 @@ TfTokenVector MayaHydraCameraDataSource::GetNames()
         HdCameraSchemaTokens->shutterOpen,
         HdCameraSchemaTokens->shutterClose,
         HdCameraTokens->windowPolicy,
+        // Maya-specific camera attribute, not part of the standard HdCameraSchema.
+        // The adapter already serves it; advertising it here makes the camera's
+        // depth-of-field state discoverable on the prim.
+        TfToken("depthOfField"),
     };
 
     return results;
