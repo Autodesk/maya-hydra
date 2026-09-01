@@ -17,10 +17,15 @@
 #include "mayaHydraPrimvarDataSource.h"
 
 #include <mayaHydraLib/adapters/adapter.h>
+#include <mayaHydraLib/adapters/shapeAdapter.h>
+#include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/imaging/hd/retainedDataSource.h>
 #include <pxr/imaging/hd/primvarSchema.h>
 #include <pxr/imaging/hd/primvarsSchema.h>
+
+#include <cmath>
+#include <limits>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -75,16 +80,69 @@ MayaHydraPrimvarValueDataSource::MayaHydraPrimvarValueDataSource(
 {
 }
 
+void MayaHydraPrimvarValueDataSource::_EnsureSamples()
+{
+    if (_sampled) {
+        return;
+    }
+    _sampled = true;
+
+    // Motion blur disabled: take the pre-motion-blur path and skip the extra
+    // primvar sampling entirely. GetValue / GetContributingSampleTimesForInterval
+    // fall back to the single live value (_adapter->Get) when _count <= 1, so a
+    // static / motion-blur-off scene does no SamplePrimvar work.
+    MayaHydraSceneIndex* sceneIndex = _adapter ? _adapter->GetMayaHydraSceneIndex() : nullptr;
+    if (!sceneIndex || !sceneIndex->GetParams().motionSamplesEnabled()) {
+        _count = 0;
+        return;
+    }
+
+    // Only shape adapters can multi-sample primvars (e.g. deforming mesh
+    // points). The adapter's SamplePrimvar returns a single sample unless
+    // motion samples are enabled, so this stays cheap on static scenes.
+    MayaHydraShapeAdapter* shapeAdapter = dynamic_cast<MayaHydraShapeAdapter*>(_adapter);
+    if (!shapeAdapter) {
+        _count = 0;
+        return;
+    }
+    _count = shapeAdapter->SamplePrimvar(_primvarName, kMotionKeys, _times, _samples);
+}
+
 VtValue MayaHydraPrimvarValueDataSource::GetValue(Time shutterOffset)
 {
-    return _adapter->Get(_primvarName);
+    _EnsureSamples();
+    if (_count <= 1) {
+        return _adapter->Get(_primvarName);
+    }
+    // Consumers query at exactly the contributing times reported below.
+    size_t best = 0;
+    float  bestDist = std::numeric_limits<float>::max();
+    for (size_t i = 0; i < _count; ++i) {
+        const float d = std::abs(_times[i] - static_cast<float>(shutterOffset));
+        if (d < bestDist) {
+            bestDist = d;
+            best = i;
+        }
+    }
+    return _samples[best];
 }
 
 bool MayaHydraPrimvarValueDataSource::GetContributingSampleTimesForInterval(
     Time startTime, Time endTime,
     std::vector<Time>* outSampleTimes)
 {
-    return false;
+    _EnsureSamples();
+    if (_count <= 1) {
+        return false;
+    }
+    if (outSampleTimes) {
+        outSampleTimes->clear();
+        outSampleTimes->reserve(_count);
+        for (size_t i = 0; i < _count; ++i) {
+            outSampleTimes->push_back(_times[i]);
+        }
+    }
+    return true;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -133,11 +133,47 @@ void MayaHydraRenderItemAdapter::UpdateTransform(const MRenderItem& ri)
     MMatrix matrix;
     if (ri.getMatrix(matrix) == MStatus::kSuccess) {
         _transform[0] = GetGfMatrixFromMaya(matrix);
+        _transform[1] = _transform[0];
+        _transform[2] = _transform[0];
+
         if (GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled()) {
-            MDGContextGuard guard(MAnimControl::currentTime() + 1.0);
-            _transform[1] = GetGfMatrixFromMaya(matrix);
-        } else {
-            _transform[1] = _transform[0];
+            // Capture the shutter-open and shutter-close transform keys, centred on
+            // the current frame.
+            //
+            // MRenderItem::getMatrix() is a Viewport 2.0 snapshot evaluated at the
+            // current frame; it does not re-evaluate under MDGContextGuard, so
+            // re-reading it at another shutter time yields the same matrix and no
+            // motion is ever captured. Instead sample the source DAG node's world
+            // transform, which does respond to the time context, and apply those
+            // world-space deltas to the render item's matrix. With a symmetric
+            // shutter this gives a symmetric, two-sided blur rather than a
+            // one-sided centre-to-close streak.
+            MDagPath dag = ri.sourceDagPath();
+            if (!dag.isValid()) {
+                dag = _dagPath;
+            }
+            if (dag.isValid()) {
+                const GfMatrix4d centerDag    = GetGfMatrixFromMaya(dag.inclusiveMatrix());
+                const GfMatrix4d centerDagInv = centerDag.GetInverse();
+                const GfInterval shutter
+                    = GetMayaHydraSceneIndex()->GetCurrentTimeSamplingInterval();
+                const MTime now = MAnimControl::currentTime();
+
+                GfMatrix4d openDag;
+                {
+                    MDGContextGuard guard(now + shutter.GetMin());
+                    openDag = GetGfMatrixFromMaya(dag.inclusiveMatrix());
+                }
+                GfMatrix4d closeDag;
+                {
+                    MDGContextGuard guard(now + shutter.GetMax());
+                    closeDag = GetGfMatrixFromMaya(dag.inclusiveMatrix());
+                }
+                // World-space deltas, row-vector convention matching Gf and Maya:
+                // worldKey = worldCentre * (centreDag^-1 * keyDag).
+                _transform[1] = _transform[0] * centerDagInv * closeDag;
+                _transform[2] = _transform[0] * centerDagInv * openDag;
+            }
         }
     }
 }
