@@ -87,19 +87,15 @@ void MayaHydraPrimvarValueDataSource::_EnsureSamples()
     }
     _sampled = true;
 
-    // Motion blur disabled: take the pre-motion-blur path and skip the extra
-    // primvar sampling entirely. GetValue / GetContributingSampleTimesForInterval
-    // fall back to the single live value (_adapter->Get) when _count <= 1, so a
-    // static / motion-blur-off scene does no SamplePrimvar work.
+    // With motion blur off, GetValue and GetContributingSampleTimesForInterval fall
+    // back to the single live value, so no SamplePrimvar work is done.
     MayaHydraSceneIndex* sceneIndex = _adapter ? _adapter->GetMayaHydraSceneIndex() : nullptr;
     if (!sceneIndex || !sceneIndex->GetParams().motionSamplesEnabled()) {
         _count = 0;
         return;
     }
 
-    // Only shape adapters can multi-sample primvars (e.g. deforming mesh
-    // points). The adapter's SamplePrimvar returns a single sample unless
-    // motion samples are enabled, so this stays cheap on static scenes.
+    // Only shape adapters can multi-sample primvars, e.g. deforming mesh points.
     MayaHydraShapeAdapter* shapeAdapter = dynamic_cast<MayaHydraShapeAdapter*>(_adapter);
     if (!shapeAdapter) {
         _count = 0;

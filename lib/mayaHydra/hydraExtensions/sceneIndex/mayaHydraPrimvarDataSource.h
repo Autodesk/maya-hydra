@@ -83,14 +83,11 @@ public:
         std::vector<Time>* outSampleTimes) override;
 
 private:
-    // Number of motion keys requested for deformation motion blur. Three keys
-    // (shutter open, centre, close) let a consumer interpolate a curved motion
-    // path rather than a straight line between two endpoints.
+    // Three keys (open, centre, close) let a consumer interpolate a curved motion path
+    // rather than a straight line between the endpoints.
     static constexpr size_t kMotionKeys = 3;
 
-    // Lazily samples the primvar across the shutter via the shape adapter's
-    // SamplePrimvar (which itself returns a single sample unless motion samples
-    // are enabled). Caches the result for reuse by GetValue / contributing-times.
+    // Samples the primvar across the shutter on first use and caches the result.
     void _EnsureSamples();
 
     TfToken _primvarName;

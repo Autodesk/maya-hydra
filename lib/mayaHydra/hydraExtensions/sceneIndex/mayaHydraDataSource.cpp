@@ -59,12 +59,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
-// Time-sampled transform matrix data source used for motion blur. When motion
-// samples are enabled it returns multiple matrix keys across the shutter
-// interval (sampled under MDGContextGuard via MayaHydraDagAdapter::SampleTransform),
-// so a render delegate can build transform and camera motion blur.
-// When motion samples are off it behaves like a single instantaneous sample,
-// matching the previous HdRetainedTypedSampledDataSource<GfMatrix4d> behaviour.
+// Transform matrix data source for motion blur: publishes several matrix keys across
+// the shutter when motion samples are enabled, and a single sample otherwise.
 class MayaHydraTransformMatrixDataSource final : public HdMatrixDataSource
 {
 public:
@@ -84,13 +80,9 @@ public:
 
     GfMatrix4d GetTypedValue(Time shutterOffset) override
     {
-        // The rendered frame is always pulled at shutter offset 0. Return the
-        // live adapter transform there (never a motion sample): the samples are
-        // re-evaluated under MDGContextGuard from the animation, so they ignore
-        // interactive edits like tumbling an animated camera, which would freeze
-        // the rendered geometry while the live camera (lighting) keeps moving.
-        // Reading live here also keeps the rendered view immune to a bad sample.
-        // Only the non-zero shutter-open / shutter-close offsets use the keys.
+        // Offset 0 is the rendered frame: return the live transform, never a sample.
+        // The samples come from the animation and so ignore interactive edits such as
+        // tumbling an animated camera.
         if (shutterOffset == 0.0) {
             return _adapter->GetTransform();
         }
@@ -98,8 +90,8 @@ public:
         if (_count <= 1) {
             return _adapter->GetTransform();
         }
-        // Consumers query at exactly the contributing times reported below, so
-        // a nearest-time match is exact for them (and a sane fallback otherwise).
+        // Consumers query at the contributing times reported below, so nearest-time
+        // matching is exact for them.
         size_t best = 0;
         float  bestDist = std::numeric_limits<float>::max();
         for (size_t i = 0; i < _count; ++i) {
@@ -143,17 +135,14 @@ private:
             return;
         }
 
-        // DAG-backed prims (mesh / light / camera adapters) sample the inclusive
-        // matrix across the shutter under MDGContextGuard.
+        // DAG-backed prims (mesh / light / camera) re-evaluate under MDGContextGuard.
         if (MayaHydraDagAdapter* dagAdapter = dynamic_cast<MayaHydraDagAdapter*>(_adapter)) {
             _count = dagAdapter->SampleTransform(kMotionKeys, _times, _samples);
             return;
         }
 
-        // Render items are not DAG adapters; UpdateTransform already captured
-        // shutter-open / shutter-close transform keys for them. Publish them as a
-        // symmetric two-sample motion span (open at shutter min, close at shutter
-        // max) when the keys actually differ.
+        // Render items are not DAG adapters: UpdateTransform captured their shutter
+        // keys, so publish those as a two-sample span when they differ.
         if (MayaHydraRenderItemAdapter* riAdapter
             = dynamic_cast<MayaHydraRenderItemAdapter*>(_adapter)) {
             const GfMatrix4d open  = riAdapter->GetOpenTransform();
@@ -341,12 +330,9 @@ MayaHydraDataSource::Get(const TfToken& name)
        return _GetMaterialBindingDataSource();
     }
     else if (name == HdXformSchemaTokens->xform) {
-        // Multi-sample matrix data source: returns several matrix keys across
-        // the shutter when motion samples are enabled (transform/camera motion
-        // blur). When motion blur is disabled, fall back to the pre-motion-blur
-        // single retained sample so static scenes pay no per-query allocation of
-        // the sampling wrapper. SetParams re-queries this on a motion-param
-        // change, so toggling motion blur on still installs the sampling source.
+        // Fall back to a retained sample when motion blur is off, so static scenes pay
+        // nothing for the sampling wrapper. SetParams re-queries this when the motion
+        // params change, so toggling motion blur on still installs the sampling source.
         HdMatrixDataSourceHandle matrixDs;
         if (_sceneIndex && _sceneIndex->GetParams().motionSamplesEnabled()) {
             matrixDs = MayaHydraTransformMatrixDataSource::New(_sceneIndex, _adapter);

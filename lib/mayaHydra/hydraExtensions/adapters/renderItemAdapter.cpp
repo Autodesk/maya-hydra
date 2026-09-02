@@ -137,17 +137,9 @@ void MayaHydraRenderItemAdapter::UpdateTransform(const MRenderItem& ri)
         _transform[2] = _transform[0];
 
         if (GetMayaHydraSceneIndex()->GetParams().motionSamplesEnabled()) {
-            // Capture the shutter-open and shutter-close transform keys, centred on
-            // the current frame.
-            //
-            // MRenderItem::getMatrix() is a Viewport 2.0 snapshot evaluated at the
-            // current frame; it does not re-evaluate under MDGContextGuard, so
-            // re-reading it at another shutter time yields the same matrix and no
-            // motion is ever captured. Instead sample the source DAG node's world
-            // transform, which does respond to the time context, and apply those
-            // world-space deltas to the render item's matrix. With a symmetric
-            // shutter this gives a symmetric, two-sided blur rather than a
-            // one-sided centre-to-close streak.
+            // MRenderItem::getMatrix() is a Viewport 2.0 snapshot of the current frame
+            // and does not re-evaluate under MDGContextGuard, so sample the source DAG
+            // node's world transform instead and apply those deltas to the item's matrix.
             MDagPath dag = ri.sourceDagPath();
             if (!dag.isValid()) {
                 dag = _dagPath;

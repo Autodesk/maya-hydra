@@ -125,9 +125,8 @@ public:
     MAYAHYDRALIB_API
     GfMatrix4d GetTransform() override { return _transform[0]; }
 
-    /// Shutter-open / shutter-close transform keys captured in UpdateTransform when
-    /// motion samples are enabled. Both equal GetTransform() otherwise, which the
-    /// transform matrix data source reads as "no motion" and skips publishing.
+    /// Shutter transform keys captured in UpdateTransform. Both equal GetTransform()
+    /// when motion samples are off, which the matrix data source reads as no motion.
     MAYAHYDRALIB_API
     GfMatrix4d GetOpenTransform() const { return _transform[2]; }
 
@@ -225,17 +224,9 @@ private:
     VtVec2fArray                _uvs = {}; //Are face varying
     MGeometry::Primitive        _primitive;
     MString                     _name;
-    // [0] = shutter centre (current frame, used for placement and GetTransform),
-    // [1] = shutter close, [2] = shutter open. The open and close keys are only
-    // populated when motion samples are enabled and the transform is animated
-    // over the shutter; otherwise all three hold the centre transform.
-    //
-    // Initialised to identity because UpdateTransform only writes these when
-    // MRenderItem::getMatrix() succeeds. A reader that reaches the open and
-    // close keys before then would otherwise compare two uninitialised
-    // matrices, find them unequal, and publish them as a motion span, which
-    // transforms the geometry to an arbitrary place. Identity makes that same
-    // early read report no motion instead.
+    // [0] = shutter centre (current frame), [1] = shutter close, [2] = shutter open.
+    // Identity-initialised: UpdateTransform only writes the keys when getMatrix()
+    // succeeds, and comparing uninitialised keys would publish a bogus motion span.
     GfMatrix4d _transform[3] = { GfMatrix4d(1.0), GfMatrix4d(1.0), GfMatrix4d(1.0) };
     int                         _fastId = 0;
     bool                        _visible = false;
