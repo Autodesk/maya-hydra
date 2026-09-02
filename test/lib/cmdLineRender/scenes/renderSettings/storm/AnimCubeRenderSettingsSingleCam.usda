@@ -98,6 +98,7 @@ def Scope "Render"
         rel camera = </Cameras/main_cam>
         rel products = </Render/ProductMainCam>
         int2 resolution = (2048, 2048)
+        custom double2[] adsk:frames = [(5,9)]
     }
 
     def RenderProduct "ProductMainCam"

@@ -1,7 +1,7 @@
 #usda 1.0
 (
     defaultPrim = "AnimCube"
-	startTimeCode = 1
+    startTimeCode = 1
     endTimeCode = 10
     renderSettingsPrimPath = "/Render/Settings"
     upAxis = "Z"
@@ -128,6 +128,7 @@ def Scope "Render"
             </Render/ProductSecondCam>,
         ]
         int2 resolution = (2048, 2048)
+        custom double2[] adsk:frames = [(1,10)]
     }
 
     def RenderProduct "ProductMainCam"

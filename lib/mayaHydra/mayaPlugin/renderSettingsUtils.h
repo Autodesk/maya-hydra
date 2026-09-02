@@ -89,6 +89,12 @@ Ufe::Path GetActiveRenderSettingsAppPath();
 // Get the Hydra path to the active render settings prim from the Maya scene.
 PXR_NS::SdfPath GetActiveRenderSettingsHydraPath();
 
+// Get the UFE application path to the active render pass prim from the Maya scene.
+Ufe::Path GetActiveRenderPassAppPath();
+
+// Get the Hydra path to the active render pass prim from the Maya scene.
+PXR_NS::SdfPath GetActiveRenderPassHydraPath();
+
 // Get render output tokens from the active Hydra render settings prim.
 PXR_NS::TfTokenVector GetRenderOutputsFromActiveRenderSettings(
     const PXR_NS::HdRenderIndex* renderIndex);

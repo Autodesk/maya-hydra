@@ -548,6 +548,7 @@ void BatchRenderer::_InitHydraResources()
     // Hydra scene.  Hydra Prman supports this when the
     // HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS=true environment variable
     // is set.
+    _SetActiveRenderPassPrimFromScene();
     _SetActiveRenderSettingsPrimFromScene();
 
     _initializationSucceeded = true;
@@ -691,6 +692,24 @@ void BatchRenderer::ReleaseRetainedForTest()
 HdRenderIndex* BatchRenderer::renderIndex() const
 {
     return _renderIndex;
+}
+
+void BatchRenderer::_SetActiveRenderPassPrimFromScene()
+{
+    if (!TF_VERIFY(_sceneGlobalsSceneIndex, "Scene globals scene index not yet initialized")) {
+        return;
+    }
+
+    const auto hydraRpPath = GetActiveRenderPassHydraPath();
+    if (hydraRpPath.IsEmpty()) {
+        return;
+    }
+
+    TF_DEBUG_MSG(MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,
+                 "Active render pass set to " +
+                 hydraRpPath.GetAsString() + "\n");
+
+    _sceneGlobalsSceneIndex->SetActiveRenderPassPrimPath(hydraRpPath);
 }
 
 void BatchRenderer::_SetActiveRenderSettingsPrimFromScene()

@@ -284,10 +284,8 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
         endif()
     endif()
 
-    # Failure with HdStorm on macOS entered as HYDRA-2139. (prman never runs on
-    # macOS, so this reduces to NOT IS_MACOSX for storm/arnold and is always
-    # true for prman.)
-    if(NOT IS_MACOSX)
+    # Failure with HdStorm on macOS entered as HYDRA-2139.
+    if(NOT IS_MACOSX OR NOT folder STREQUAL "storm")
         set(multi_fail_args "")
         if(NOT folder STREQUAL "storm")
             set(multi_fail_args FAIL 0.05 FAILPERCENT 1.0)
@@ -330,7 +328,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
     endif()
     mayaHydra_add_cmd_line_render_multi_image_test(${singlecam_scene}${dep_label}
         RENDERER ${renderer}
-        EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
+        EXPECTED_IMAGES_DIR renderSettings/${folder}/images/singleCam_frames5to9
         RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
         IMAGE_EXTENSION png
         TEST_NAME_SUFFIX ${suffix}RenderDir
@@ -346,6 +344,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
     # As of 2026-Aug-17, HdArnold crashes for multi-frame renders in Hydra v2
     # render settings mode (-s 9 -e 11); single-frame (-s 9 -e 9) is used instead.
     set(_add_frame_nb_resolution FALSE)
+    # HYDRA-2506: skip on macOS for Maya 2027.
     if(folder STREQUAL "arnold" AND NOT (IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027))
         set(_add_frame_nb_resolution TRUE)
     elseif(folder STREQUAL "prman" AND IS_WINDOWS)
@@ -386,6 +385,14 @@ _mayaHydra_add_render_settings_variant(arnold "-x 720 -y 128" aNewArnoldImageNam
 if(IS_WINDOWS)
     _mayaHydra_add_render_settings_variant(prman "-x 720 -y 128" aNewPRManImageName)
 endif()
+
+# Test that HdArnold can render a basic render pass.
+mayaHydra_add_cmd_line_render_test(renderSettings/arnold/arnoldSimpleRenderPass.ma
+    COPY_SCENE
+    RENDERER HdArnoldRendererPlugin
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERER_ARGS "-x 160 -y 120"
+)
 
 set(ARNOLD_MAYABATCH_RENDER_SCENES
     basic/renderCurrentFrame.ma
@@ -644,6 +651,7 @@ endif()
 # because Hydra production rendering is not supported on Maya 2026.
 set(MAYABATCH_TEST_SCRIPT_FILES
     testRenderingColorSpaceResolving.py|depOnPlugins:mtoa
+    testActiveRenderDescriptionSceneGlobals.py|depOnPlugins:mtoa
 )
 # registeredMayaRenderers fails on Linux and macOS.
 if(IS_WINDOWS)
@@ -652,13 +660,22 @@ if(IS_WINDOWS)
     )
 endif()
 
+# Important: All tests in MAYABATCH_TEST_SCRIPT_FILES_TEST_MODE MUST release
+# the batch renderer by calling cmds.mayaHydraTesting(releaseBatchRenderer=True).
+# The batchRenderer object destruction is deferred so tests can inspect the hydra scene index tree.
+# See the example in testActiveRenderDescriptionSceneGlobals.py
+set(MAYABATCH_TEST_SCRIPT_FILES_TEST_MODE
+    testRenderingColorSpaceResolving.py
+    testActiveRenderDescriptionSceneGlobals.py
+)
+
 foreach(script ${MAYABATCH_TEST_SCRIPT_FILES})    
     get_testfile_and_labels(all_labels test_filename ${script})
     list(APPEND all_labels "cmdLineRender")
     mayaUsd_get_unittest_target(target ${test_filename})
 
     set(test_env "DISPLAY=:0")
-    if(test_filename STREQUAL "testRenderingColorSpaceResolving.py")
+    if(test_filename IN_LIST MAYABATCH_TEST_SCRIPT_FILES_TEST_MODE)
         list(APPEND test_env "MAYA_HYDRA_BATCH_RENDER_TEST_MODE=1")
     endif()
 
