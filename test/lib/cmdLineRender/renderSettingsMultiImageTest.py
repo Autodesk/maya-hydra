@@ -258,8 +258,8 @@ def main(argv):
     _prepare_output_dir(base_dir, rendered_subdir)
 
     render_succeeded = _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args)
-    _dump_base_dir_listing(base_dir)
     if not render_succeeded:
+        _dump_base_dir_listing(base_dir)
         return 1
 
     output_dir = _find_output_dir(base_dir, rendered_subdir)
