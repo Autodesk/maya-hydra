@@ -284,11 +284,8 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
         endif()
     endif()
 
-    # Failure with HdStorm on macOS entered as HYDRA-2139. (prman never runs on
-    # macOS, so this reduces to NOT IS_MACOSX for storm/arnold and is always
-    # true for prman.)  Arnold cmdLine render does not produce output images on
-    # macOS. Tracked as HYDRA-2518.
-    if(NOT IS_MACOSX)
+    # Failure with HdStorm on macOS entered as HYDRA-2139.
+    if(NOT IS_MACOSX OR NOT folder STREQUAL "storm")
         set(multi_fail_args "")
         if(NOT folder STREQUAL "storm")
             set(multi_fail_args FAIL 0.05 FAILPERCENT 1.0)
