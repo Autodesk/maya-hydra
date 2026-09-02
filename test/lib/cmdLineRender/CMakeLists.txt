@@ -15,6 +15,27 @@
 
 set(TEST_OUTPUT_ROOT ${CMAKE_BINARY_DIR}/test/Temporary)
 
+# HYDRA-2518 TEMPORARY: isolate the macOS preflight down to a single test
+# (AnimCubeRenderSettings_Arnold) so a blind preflight run returns focused
+# evidence instead of being buried in the rest of the suite's output. All
+# OSX Maya 2028 unit tests are already disabled elsewhere, so this scaffold
+# only needs to fire for Maya 2027 -- there is no point registering it for
+# 2028, since nothing on that combination runs anyway. Remove this whole
+# block (and the return() below) once HYDRA-2518 is diagnosed.
+if(IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027)
+    mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/arnold/AnimCubeRenderSettings.ma
+        RENDERER HdArnoldRendererPlugin
+        EXPECTED_IMAGES_DIR renderSettings/arnold/images
+        IMAGE_EXTENSION png
+        TEST_NAME_SUFFIX Arnold
+        FAIL 0.05
+        FAILPERCENT 1.0
+        ENV
+            "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,HDST_DUMP_FAILING_SHADER_SOURCEFILE"
+    )
+    return()
+endif()
+
 # The command line render tests come in per-renderer variants that share the
 # same body but differ in a couple of arguments (resolution, image name).  Each
 # variant is emitted by calling a small _mayaHydra_add_*_variant() function once
