@@ -203,6 +203,10 @@ public:
 
     SdfPath GetDelegateID(TfToken name);
 
+    /// Scene index path of the camera prim published for \p camPath, or an empty path when
+    /// no camera adapter has been created for it yet.
+    SdfPath GetCameraPrimPath(const MDagPath& camPath) const;
+
     HdMeshTopology GetMeshTopology(const SdfPath& id);
 
     HdBasisCurvesTopology GetBasisCurvesTopology(const SdfPath& id);
