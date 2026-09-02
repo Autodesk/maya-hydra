@@ -1351,11 +1351,9 @@ MStatus MtohRenderOverride::Render(
     // the picking. So for Storm we mark the camera path empty to intentionally use
     // the previous behaviour.
     //
-    // Other render delegates cannot use the free camera: it is internal to HVT and is not
-    // published as a prim, so a delegate that resolves its view matrix from a camera prim
-    // has nothing to bind and falls back to a default-constructed camera whose view matrix
-    // is identity. That renders the scene from the world origin, which is usually an empty
-    // frame. Bind the viewport camera prim for them.
+    // Other delegates resolve their view matrix from a camera prim, and HVT's free camera
+    // is not published as one, so they fall back to an identity view (rendering from the
+    // world origin) unless the viewport camera prim is bound here.
     const bool needsCameraPrim = !_isUsingHdSt;
 
     SdfPath cameraPath;
@@ -2429,11 +2427,8 @@ void MtohRenderOverride::_TimeChangedCallback(void* data)
     // Update frame in Hydra scene globals scene index
     instance->_SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
 
-    // Refresh animated cameras. A render delegate that binds a camera prim is driven
-    // by that prim rather than the live viewport matrix, and Maya's per-node
-    // world-matrix / plug-dirty callbacks don't fire reliably under the Evaluation
-    // Manager during playback, so without this the camera stays frozen while the
-    // geometry moves. Only cameras whose transform actually changed are dirtied.
+    // A delegate bound to a camera prim is driven by that prim, and Maya's world-matrix
+    // callbacks don't fire reliably under the Evaluation Manager during playback.
     if (instance->_mayaHydraSceneIndex) {
         instance->_mayaHydraSceneIndex->RefreshCamerasOnTimeChange();
     }

@@ -219,9 +219,8 @@ bool MayaHydraDagAdapter::UpdateTransformIfChanged()
         }
     }
 
-    // Exact comparison (matching how the value-equality early-outs elsewhere
-    // work): an animated transform produces a different matrix each frame, while
-    // a static one is bit-identical and gets skipped.
+    // Exact comparison: an animated transform differs every frame, a static one is
+    // bit-identical.
     const bool changed = _invalidTransform || newTransform != _transform;
 
     _transform = newTransform;
