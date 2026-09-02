@@ -273,7 +273,6 @@ Ufe::Path GetActiveRenderSettingsAppPath()
                 + MayaUsdAPI::usdPathToUfePathSegment(settingsPrim.GetPath());
             }
         }
-
     }
 
     // Case 2.3.
@@ -310,7 +309,6 @@ Ufe::Path GetActiveRenderPassAppPath()
     if (prim.IsA<UsdRenderPass>()) {
         return path;
     }
-
     return {};
 }
 
