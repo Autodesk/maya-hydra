@@ -48,6 +48,7 @@
 #include <cstdlib>
 #include <string>
 
+using namespace MayaHydra;
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
@@ -80,7 +81,48 @@ bool IsPrmanRenderSettingsDriveRenderPassEnabled(const TfToken& rendererName)
     return TfGetenvBool("HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS", false);
 }
 
+static UsdPrim _ReadActiveRenderDescriptionPrim(Ufe::Path& outPath)
+{
+    constexpr const char* attrName = "activeRenderDescriptionPath";
+
+    MObject nodeObj;
+    if (!TF_VERIFY(GetDependNodeFromNodeName(kUsdDefaultRenderDescriptionNodeName.data(), nodeObj), "Could not find %s node.", kUsdDefaultRenderDescriptionNodeName.data())) {
+        return {};
+    }
+
+    MFnDependencyNode depNode(nodeObj);
+    MPlug plug = depNode.findPlug(attrName, true);
+    if (!TF_VERIFY(!plug.isNull(), "Could not find %s attribute on %s.", attrName, kUsdDefaultRenderDescriptionNodeName.data())) {
+        return {};
+    }
+
+    MString pathStr = plug.asString();
+    if (!TF_VERIFY(pathStr.length() > 0, "%s attribute on %s is empty.", attrName, kUsdDefaultRenderDescriptionNodeName.data())) {
+        return {};
+    }
+
+    // Ufe::PathString::path() will throw Ufe::InvalidPath when the string 
+    // does not resolve to an existing UFE item (e.g. a render pass
+    // path that does not exist, such as "/Render/Passes/doesNotExist").
+    // Catch it and return an invalid prim so that the default USD render
+    // settings are used.
+    try {
+        outPath = Ufe::PathString::path(pathStr.asChar());
+    } catch (const std::exception& e) {
+        TF_WARN(
+            "%s attribute on %s does not resolve to a valid UFE item: %s (%s).",
+            attrName,
+            kUsdDefaultRenderDescriptionNodeName.data(),
+            pathStr.asChar(),
+            e.what());
+        return {};
+    }
+
+    return MayaUsdAPI::ufePathToPrim(outPath);
 }
+
+} // namespace
+
 namespace MAYAHYDRA_NS_DEF {
 
 Ufe::Path ExtractUsdRenderSettingsFromScene(UsdRenderSettings& usdRenderSettings)
@@ -185,51 +227,11 @@ Ufe::Path GetDefaultRenderSettingsAppPath()
         std::string(kUsdDefaultRenderDescriptionNodeName) + "," + rsPrimPath);
 }
 
-static bool _ReadActiveRenderDescriptionPrim(Ufe::Path& outPath, UsdPrim& outPrim)
-{
-    constexpr const char* attrName = "activeRenderDescriptionPath";
-
-    MObject nodeObj;
-    if (!TF_VERIFY(GetDependNodeFromNodeName(kUsdDefaultRenderDescriptionNodeName.data(), nodeObj), "Could not find %s node.", kUsdDefaultRenderDescriptionNodeName.data())) {
-        return false;
-    }
-
-    MFnDependencyNode depNode(nodeObj);
-    MPlug plug = depNode.findPlug(attrName, true);
-    if (!TF_VERIFY(!plug.isNull(), "Could not find %s attribute on %s.", attrName, kUsdDefaultRenderDescriptionNodeName.data())) {
-        return false;
-    }
-
-    MString pathStr = plug.asString();
-    if (!TF_VERIFY(pathStr.length() > 0, "%s attribute on %s is empty.", attrName, kUsdDefaultRenderDescriptionNodeName.data())) {
-        return false;
-    }
-
-    // Ufe::PathString::path() will throw Ufe::InvalidPath when the string 
-    // does not resolve to an existing UFE item (e.g. a render pass
-    // path that does not exist, such as "/Render/Passes/doesNotExist").
-    // Catch it and return false so that the default USD render settings are used.
-    try {
-        outPath = Ufe::PathString::path(pathStr.asChar());
-    } catch (const std::exception& e) {
-        TF_WARN(
-            "%s attribute on %s does not resolve to a valid UFE item: %s (%s).",
-            attrName,
-            kUsdDefaultRenderDescriptionNodeName.data(),
-            pathStr.asChar(),
-            e.what());
-        return false;
-    }
-    outPrim = MayaUsdAPI::ufePathToPrim(outPath);
-
-    return true;
-}
-
 Ufe::Path GetActiveRenderSettingsAppPath()
 {
-    Ufe::Path path;
-    UsdPrim   prim;
-    if (!_ReadActiveRenderDescriptionPrim(path, prim) || !prim.IsValid()) {
+    Ufe::Path     path;
+    const UsdPrim prim = _ReadActiveRenderDescriptionPrim(path);
+    if (!prim.IsValid()) {
         return GetDefaultRenderSettingsAppPath();
     }
 
@@ -297,9 +299,9 @@ SdfPath GetActiveRenderSettingsHydraPath()
 
 Ufe::Path GetActiveRenderPassAppPath()
 {
-    Ufe::Path path;
-    UsdPrim   prim;
-    if (!_ReadActiveRenderDescriptionPrim(path, prim) || !prim.IsValid()) {
+    Ufe::Path     path;
+    const UsdPrim prim = _ReadActiveRenderDescriptionPrim(path);
+    if (!prim.IsValid()) {
         return {};
     }
 
