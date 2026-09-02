@@ -17,9 +17,35 @@ import mayaUsd.ufe as mayaUsdUfe
 
 from maya import cmds
 
-def getRenderSettingsPrim():
-    # Get the UFE path to the render settings prim to use from the
-    # default USD render settings node.
-    rsPath = cmds.getAttr('UsdDefaultRenderDescription.activeRenderDescriptionPath')
+from pxr import UsdRender
 
-    return mayaUsdUfe.ufePathToPrim(rsPath)
+def getRenderSettingsPrim():
+    rsPath = cmds.getAttr('UsdDefaultRenderDescription.activeRenderDescriptionPath')
+    defaultRenderSettingsPath = "UsdDefaultRenderDescription,/Render/SceneRenderSettings"
+
+    # 2.3 If the active render description prim points to a render pass / settings
+    # that does not exist, use the default USD render settings.
+    try:
+        renderDescriptionPrim = mayaUsdUfe.ufePathToPrim(rsPath)
+    except RuntimeError:
+        return mayaUsdUfe.ufePathToPrim(defaultRenderSettingsPath)
+
+    # 1. If the attribute points to a UsdRenderSettings prim, use it directly.
+    if renderDescriptionPrim.IsA(UsdRender.Settings):
+        return renderDescriptionPrim
+
+    # 2. If the attribute points to a UsdRenderPass prim, resolve its
+    # renderSource relationship to the referenced UsdRenderSettings prim.
+    if renderDescriptionPrim.IsA(UsdRender.Pass):
+        targets = UsdRender.Pass(renderDescriptionPrim).GetRenderSourceRel().GetTargets()
+
+        # 2.1 Use the render settings only when renderSource has exactly one
+        # valid UsdRenderSettings target.
+        if len(targets) == 1:
+            renderSettingsPrim = renderDescriptionPrim.GetStage().GetPrimAtPath(targets[0])
+            if renderSettingsPrim.IsValid() and renderSettingsPrim.IsA(UsdRender.Settings):
+                return renderSettingsPrim
+
+    # 2.2 An invalid renderSource falls back to
+    # the default render settings provided by UsdDefaultRenderDescription.
+    return mayaUsdUfe.ufePathToPrim(defaultRenderSettingsPath)

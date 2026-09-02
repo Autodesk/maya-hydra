@@ -42,11 +42,13 @@
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usdRender/tokens.h>
+#include <pxr/usd/usdRender/pass.h>
 
 #include <algorithm>
 #include <cstdlib>
 #include <string>
 
+using namespace MayaHydra;
 PXR_NAMESPACE_USING_DIRECTIVE
 
 namespace {
@@ -79,7 +81,48 @@ bool IsPrmanRenderSettingsDriveRenderPassEnabled(const TfToken& rendererName)
     return TfGetenvBool("HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS", false);
 }
 
+static UsdPrim _ReadActiveRenderDescriptionPrim(Ufe::Path& outPath)
+{
+    constexpr const char* attrName = "activeRenderDescriptionPath";
+
+    MObject nodeObj;
+    if (!TF_VERIFY(GetDependNodeFromNodeName(kUsdDefaultRenderDescriptionNodeName.data(), nodeObj), "Could not find %s node.", kUsdDefaultRenderDescriptionNodeName.data())) {
+        return {};
+    }
+
+    MFnDependencyNode depNode(nodeObj);
+    MPlug plug = depNode.findPlug(attrName, true);
+    if (!TF_VERIFY(!plug.isNull(), "Could not find %s attribute on %s.", attrName, kUsdDefaultRenderDescriptionNodeName.data())) {
+        return {};
+    }
+
+    MString pathStr = plug.asString();
+    if (!TF_VERIFY(pathStr.length() > 0, "%s attribute on %s is empty.", attrName, kUsdDefaultRenderDescriptionNodeName.data())) {
+        return {};
+    }
+
+    // Ufe::PathString::path() will throw Ufe::InvalidPath when the string 
+    // does not resolve to an existing UFE item (e.g. a render pass
+    // path that does not exist, such as "/Render/Passes/doesNotExist").
+    // Catch it and return an invalid prim so that the default USD render
+    // settings are used.
+    try {
+        outPath = Ufe::PathString::path(pathStr.asChar());
+    } catch (const std::exception& e) {
+        TF_WARN(
+            "%s attribute on %s does not resolve to a valid UFE item: %s (%s).",
+            attrName,
+            kUsdDefaultRenderDescriptionNodeName.data(),
+            pathStr.asChar(),
+            e.what());
+        return {};
+    }
+
+    return MayaUsdAPI::ufePathToPrim(outPath);
 }
+
+} // namespace
+
 namespace MAYAHYDRA_NS_DEF {
 
 Ufe::Path ExtractUsdRenderSettingsFromScene(UsdRenderSettings& usdRenderSettings)
@@ -177,32 +220,67 @@ bool FindUsdRenderSettingsOnStage(
     return false;
 }
 
+Ufe::Path GetDefaultRenderSettingsAppPath()
+{
+    constexpr const char* rsPrimPath = "/Render/SceneRenderSettings";
+    return Ufe::PathString::path(
+        std::string(kUsdDefaultRenderDescriptionNodeName) + "," + rsPrimPath);
+}
+
 Ufe::Path GetActiveRenderSettingsAppPath()
 {
-    constexpr const char* attrName   = "activeRenderDescriptionPath";
-
-    // Get the active render settings from the activeRenderDescriptionPath attribute
-    // on the UsdDefaultRenderDescription node.
-    MObject nodeObj;
-    if (!TF_VERIFY(GetDependNodeFromNodeName(kUsdDefaultRenderDescriptionNodeName.data(), nodeObj), "Could not find %s node.", kUsdDefaultRenderDescriptionNodeName.data())) {
-        return {};
+    Ufe::Path     path;
+    const UsdPrim prim = _ReadActiveRenderDescriptionPrim(path);
+    if (!prim.IsValid()) {
+        return GetDefaultRenderSettingsAppPath();
     }
 
-    MFnDependencyNode depNode(nodeObj);
-    MPlug plug = depNode.findPlug(attrName, true);
-    if (!TF_VERIFY(!plug.isNull(), "Could not find %s attribute on %s.", attrName, kUsdDefaultRenderDescriptionNodeName.data())) {
-        return {};
+    // 1. If the attribute points to a UsdRenderSettings prim, use it directly.
+    // 2. If the attribute points to a UsdRenderPass prim:
+    //    2.1 If its renderSource points to a valid UsdRenderSettings prim, use
+    //         both the pass and its render settings.
+    //    2.2 If renderSource is missing or invalid, use the pass but with
+    //         the default USD render settings and warn.
+    //    2.3 If the render pass does not exist, use the default USD render
+    //         settings and warn.
+
+    // Case 1.
+    if (prim.IsA<UsdRenderSettings>()) {
+        return path;
     }
 
-    MString pathStr = plug.asString();
-    if (!TF_VERIFY(pathStr.length() > 0, "%s attribute on %s is empty.", attrName, kUsdDefaultRenderDescriptionNodeName.data())) {
-        // Attribute is empty, provide a sensible fallback, the USD default
-        // render settings themselves.
-        constexpr const char* rsPrimPath = "/Render/SceneRenderSettings";
-        pathStr = MString((std::string(kUsdDefaultRenderDescriptionNodeName) + "," + rsPrimPath).c_str());
+    // Case 2.
+    if (prim.IsA<UsdRenderPass>()) {
+        const UsdRenderPass renderPass(prim);
+
+        SdfPathVector targets;
+        renderPass.GetRenderSourceRel().GetTargets(&targets);
+
+        if (!targets.empty()) {
+            const UsdPrim settingsPrim =
+                prim.GetStage()->GetPrimAtPath(targets.front());
+
+            // Case 2.2
+            if (!settingsPrim.IsValid()) {
+                TF_WARN("The activeRenderDescriptionPath points to a UsdRenderPass prim that does not have "
+                        "valid renderSource. The default USD render settings will be used.");
+                return GetDefaultRenderSettingsAppPath();
+            }
+
+            // Case 2.1.
+            // ex: |renderSettings|renderSettingsShape,/Render/Passes/foreground
+            //  -> |renderSettings|renderSettingsShape,/Render/MainRender
+            if (settingsPrim.IsA<UsdRenderSettings>()) {
+                return path.popSegment()
+                + MayaUsdAPI::usdPathToUfePathSegment(settingsPrim.GetPath());
+            }
+        }
     }
 
-    return Ufe::PathString::path(pathStr.asChar());
+    // Case 2.3.
+    TF_WARN("The activeRenderDescriptionPath does not resolve to a UsdRenderSettings "
+            "or UsdRenderPass prim. The default USD render settings will be used.");
+    return GetDefaultRenderSettingsAppPath();
 }
 
 SdfPath GetActiveRenderSettingsHydraPath()
@@ -217,6 +295,36 @@ SdfPath GetActiveRenderSettingsHydraPath()
         return {};
     }
     return hydraPath[0].primPath;
+}
+
+Ufe::Path GetActiveRenderPassAppPath()
+{
+    Ufe::Path     path;
+    const UsdPrim prim = _ReadActiveRenderDescriptionPrim(path);
+    if (!prim.IsValid()) {
+        return {};
+    }
+
+    // If the active render description prim points to a render pass, we simply return its path.
+    // Its renderSource (activeRenderSettingsPrimPath) will be resolved in
+    // GetActiveRenderSettingsAppPath().
+    if (prim.IsA<UsdRenderPass>()) {
+        return path;
+    }
+    return {};
+}
+
+SdfPath GetActiveRenderPassHydraPath()
+{
+    // Use path mapper to map the active render pass application path
+    // (Ufe::Path) to the Hydra SdfPath of its translation in the Hydra scene.
+    auto ufePath = GetActiveRenderPassAppPath();
+    auto hydraPath = Fvp::ufePathToPrimSelections(ufePath);
+
+    if (!TF_VERIFY(hydraPath.size() <= 1, "Expected at most one path for active render pass.")) {
+        return {};
+    }
+    return hydraPath.empty() ? SdfPath() : hydraPath[0].primPath;
 }
 
 TfTokenVector GetRenderOutputsFromActiveRenderSettings(const HdRenderIndex* renderIndex)
