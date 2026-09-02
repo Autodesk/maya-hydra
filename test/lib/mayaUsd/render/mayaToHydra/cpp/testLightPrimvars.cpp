@@ -37,6 +37,7 @@ namespace {
 
 const char* kLightShapeOptionVar = "mhLightShape";
 const char* kLightShapeFallback = "aiSkyDomeLightShape1";
+const char* kSpotLightShapeFallback = "spotLightShape1";
 
 // Search for a primvars-dirty entry whose primvar value matches an expected float.
 bool FindDirtyPrimWithPrimvarValueSince(
@@ -293,6 +294,61 @@ TEST(LightPrimvars, IntensityUpdateNoDuplicatePrimvarsDirty)
     EXPECT_EQ(primvarsDirtyCount, 1u)
         << "Updating aiExposure (intensity) should trigger exactly one primvars dirty "
            "notification, got " << primvarsDirtyCount << " (duplicate notifications)";
+}
+
+// What: Maya's depth-map shadow attributes reach the shadow:* light params.
+// How: read shadow:resolution / shadow:bias / shadow:blur off a spot light prim.
+// Expect: resolution and bias match the authored values; blur is filter size / resolution.
+TEST(LightPrimvars, ShadowMapParamsRoundTrip)
+{
+    const std::string lightShapeFull
+        = GetOptionVarOrDefault(kLightShapeOptionVar, kSpotLightShapeFallback);
+    const std::string shapeNamePart = GetShapeNameFromFullPath(lightShapeFull);
+
+    const SceneIndicesVector& sceneIndices = GetTerminalSceneIndices();
+    ASSERT_GT(sceneIndices.size(), 0u);
+
+    HdSceneIndexBaseRefPtr sceneIndexWithLight = FindTerminalSceneIndexWithPrim(
+        sceneIndices, shapeNamePart, HdPrimTypeTokens->simpleLight);
+    ASSERT_TRUE(sceneIndexWithLight) << "Spot light prim not found in scene index";
+
+    SceneIndexInspector inspector(sceneIndexWithLight);
+    PrimEntriesVector   foundPrims = inspector.FindPrims(
+        CreatePrimPredicate(shapeNamePart, HdPrimTypeTokens->simpleLight), 1);
+    ASSERT_GE(foundPrims.size(), 1u);
+
+    HdSceneIndexPrim prim = foundPrims.front().prim;
+    ASSERT_NE(prim.dataSource, nullptr);
+
+    // The shadow:* params are not HdLightSchema members, but they still live in the
+    // light container, which is where a render delegate resolves light params from.
+    HdLightSchema lightSchema = HdLightSchema::GetFromParent(prim.dataSource);
+    ASSERT_TRUE(lightSchema) << "Light prim has no light container";
+
+    auto readParam = [&lightSchema](const char* name) -> VtValue {
+        HdSampledDataSourceHandle ds
+            = HdSampledDataSource::Cast(lightSchema.GetContainer()->Get(TfToken(name)));
+        if (!ds) {
+            ADD_FAILURE() << "Missing light datasource for " << name;
+            return VtValue();
+        }
+        return ds->GetValue(0.0f);
+    };
+
+    // dmapResolution is 1024, under the 2048 default clamp.
+    VtValue resolution = readParam("shadow:resolution");
+    ASSERT_TRUE(resolution.IsHolding<int>()) << "shadow:resolution should be an int";
+    EXPECT_EQ(resolution.UncheckedGet<int>(), 1024);
+
+    // dmapBias is 0.02, served as a positive depth bias.
+    VtValue bias = readParam("shadow:bias");
+    ASSERT_TRUE(bias.IsHolding<float>()) << "shadow:bias should be a float";
+    EXPECT_FLOAT_EQ(bias.UncheckedGet<float>(), 0.02f);
+
+    // dmapFilterSize is 4, normalized by the 1024 resolution.
+    VtValue blur = readParam("shadow:blur");
+    ASSERT_TRUE(blur.IsHolding<float>()) << "shadow:blur should be a float";
+    EXPECT_FLOAT_EQ(blur.UncheckedGet<float>(), 4.0f / 1024.0f);
 }
 
 // What: light param attributes list must match the adapter's attribute usage.

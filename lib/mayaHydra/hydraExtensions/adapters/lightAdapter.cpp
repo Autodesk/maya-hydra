@@ -42,6 +42,7 @@
 
 #include <flowViewport/fvpPurposeRenderTagsForPasses.h>
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <unordered_set>
@@ -91,6 +92,16 @@ static const char* const kLightParamAttributeNames[] = {
     "aiExposure", "aiDiffuse", "aiSpecular", "aiNormalize", "aiEnableTemperature",
     "aiColorTemperature", "format", "aiCastVolumetricShadows", "aiVolumeSamples", "aiCastShadows",
 };
+
+// Shadow-map quality parameters. These are not part of the core UsdLux schema, so
+// render delegates query them under these "shadow:*" names. The "inputs:" variants
+// are matched as well, in case a namespacing scene index requests them.
+static const TfToken kShadowResolutionToken("shadow:resolution");
+static const TfToken kShadowResolutionInputToken("inputs:shadow:resolution");
+static const TfToken kShadowBiasToken("shadow:bias");
+static const TfToken kShadowBiasInputToken("inputs:shadow:bias");
+static const TfToken kShadowBlurToken("shadow:blur");
+static const TfToken kShadowBlurInputToken("inputs:shadow:blur");
 
 bool _IsLightParamAttribute(const MPlug& plug)
 {
@@ -547,6 +558,43 @@ VtValue MayaHydraLightAdapter::GetLightParamValue(const TfToken& paramName)
         || (paramName == UsdLuxTokens->inputsShadowEnable)) {
         const bool shadowsEnabled = GetShadowsEnabled(light);
         return VtValue(shadowsEnabled);
+    } else if (
+        (paramName == kShadowResolutionToken) || (paramName == kShadowResolutionInputToken)) {
+        const MPlug plug
+            = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapResolution, true);
+        if (plug.isNull()) {
+            return {};
+        }
+        // Clamp to the delegate's shadow-map limit, as _CalculateShadowParams does.
+        int       resolution = plug.asInt();
+        const int maxResolution = GetMayaHydraSceneIndex()->GetParams().maximumShadowMapResolution;
+        if (maxResolution > 0) {
+            resolution = std::min(resolution, maxResolution);
+        }
+        return VtValue(resolution);
+    } else if ((paramName == kShadowBiasToken) || (paramName == kShadowBiasInputToken)) {
+        const MPlug plug = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapBias, true);
+        if (plug.isNull()) {
+            return {};
+        }
+        // Maya authors dmapBias as a small positive value, which matches the positive
+        // depth bias expected here; the Storm path negates it separately for
+        // HdxShadowParams in _CalculateShadowParams.
+        return VtValue(std::max(plug.asFloat(), 0.0f));
+    } else if ((paramName == kShadowBlurToken) || (paramName == kShadowBlurInputToken)) {
+        const MPlug filterPlug
+            = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapFilterSize, true);
+        if (filterPlug.isNull()) {
+            return {};
+        }
+        const MPlug resPlug
+            = light.findPlug(MayaAttrs::nonExtendedLightShapeNode::dmapResolution, true);
+        const float resolution = resPlug.isNull() ? 0.0f : static_cast<float>(resPlug.asInt());
+        // Match the Storm path: blur is the filter size normalized by the shadow-map
+        // resolution (see _CalculateShadowParams).
+        const float blur
+            = resolution > 0.0f ? static_cast<float>(filterPlug.asInt()) / resolution : 0.0f;
+        return VtValue(blur);
     }
     return {};
 }
