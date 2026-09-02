@@ -16,23 +16,13 @@
 #ifndef MAYAHYDRALIB_CAMERA_EXPOSURE_H
 #define MAYAHYDRALIB_CAMERA_EXPOSURE_H
 
-// ---------------------------------------------------------------------------
-// Physical-camera exposure attributes (auto-added to the Maya camera shape).
+// Physical-camera exposure attributes, auto-added to the Maya camera shape. Names,
+// value tables and the EV formula live here so every scene-index path translating a
+// Maya camera reports the same exposure.
 //
-// The attribute names, value tables, enum field order and the EV formula are
-// defined once here so that every scene-index path which translates a Maya
-// camera shares them, and a camera reports the same exposure no matter which
-// path produced its prim.
-//
-// f-stop / shutter / ISO are full-stop drop-downs (MFnEnumAttribute) with a
-// trailing "Custom" field; when "Custom" is selected the companion float is
-// read instead. The enum field order MUST match the corresponding value table
-// below; the trailing "Custom" field has index == table size.
-//
-// Everything is header-inline: the functions are `inline` and the name
-// constants and tables are `inline constexpr`, so each is a single entity
-// across translation units (ODR-safe).
-// ---------------------------------------------------------------------------
+// f-stop / shutter / ISO are full-stop drop-downs with a trailing "Custom" field. The
+// enum field order MUST match the corresponding value table below, and "Custom" has
+// index == table size, in which case the companion float is read instead.
 
 #include <maya/MDagPath.h>
 #include <maya/MFnDependencyNode.h>
@@ -47,8 +37,7 @@
 
 namespace MayaHydraCameraExposure {
 
-// Long names stay unique for setAttr / scripting; short names are the DG
-// short-name aliases.
+// Long names stay unique for setAttr / scripting; short names are the DG aliases.
 inline constexpr const char* kAttrUsePhysicalCamera      = "mayaHydraUsePhysicalCamera";
 inline constexpr const char* kAttrUsePhysicalCameraShort = "mhUsePhysCam";
 inline constexpr const char* kAttrFStopPreset            = "mayaHydraExposureFStopPreset";
@@ -96,11 +85,10 @@ inline constexpr float kISOValues[] = { 100.0f, 200.0f, 400.0f, 800.0f, 1600.0f,
 inline constexpr short kISOCount   = 7;
 inline constexpr short kISODefault = 2; // 400
 
-// Convert physical photographic exposure parameters to a single linear scene
-// scale using the standard photographic formula:
+// Standard photographic exposure, as a linear scene scale:
 //   EV100        = log2( N^2 / t ) - log2( S / 100 )
 //   linear scale = 2^( -EV100 + evComp )
-// Returns 1.0 when any input is non-positive (safe pass-through default).
+// Returns 1.0 when any input is non-positive.
 inline float ComputeLinearExposureScale(float fStop, float shutterTime, float iso, float evComp)
 {
     if (!(fStop > 0.0f) || !(shutterTime > 0.0f) || !(iso > 0.0f)) {
@@ -110,9 +98,7 @@ inline float ComputeLinearExposureScale(float fStop, float shutterTime, float is
     return std::exp2(-ev100 + evComp);
 }
 
-// Resolve one exposure control: read the enum preset index; if it selects a
-// real stop return the value from the table, otherwise ("Custom" == count, or
-// out of range) read the companion float attribute.
+// An index outside the table means "Custom": read the companion float instead.
 inline float ResolveStop(
     MFnDependencyNode& dep,
     const char*        presetAttr,
@@ -134,9 +120,8 @@ inline float ResolveStop(
     return table[defaultIdx];
 }
 
-// Compute the camera's linearExposureScale from its physical-camera attributes.
-// When usePhysicalCamera is false (or the attributes are absent) returns 1.0 so
-// scenes that do not opt in to physical units render unchanged.
+// Returns 1.0 when usePhysicalCamera is off or the attributes are absent, so scenes
+// that do not opt in to physical units render unchanged.
 inline float ComputeCameraLinearExposureScale(const MDagPath& dag)
 {
     MStatus           status;
@@ -188,8 +173,6 @@ inline void EnsureEnumAttr(
     fn.addField("Custom", count);
     fn.setStorable(true);
     fn.setKeyable(true);
-    // The long name stays unique for setAttr / scripting, so the friendly label
-    // is applied as a nice-name override.
     fn.setNiceNameOverride(uiName);
     dep.addAttribute(attr);
 }
@@ -238,15 +221,10 @@ inline void EnsureBoolAttr(
     dep.addAttribute(attr);
 }
 
-// Add the physical-camera exposure attributes to the camera shape if they are
-// missing. Each add is guarded by a presence check so this is idempotent and
-// does its work at most once per camera. Referenced / locked nodes cannot take
-// plain dynamic attributes, so they are skipped; the reader then simply reports
-// a 1.0 (pass-through) exposure scale.
+// Idempotent. Referenced or locked nodes cannot take dynamic attributes and are
+// skipped, in which case the reader reports a pass-through 1.0.
 //
-// NOTE: This authors DG attributes, so it must not run during Hydra evaluation
-// or draw. Call it from adapter setup, never from the per-frame data-source
-// pull.
+// Authors DG attributes, so call this from adapter setup, never from a per-frame pull.
 inline void EnsureExposureAttributes(const MObject& node)
 {
     MStatus           status;

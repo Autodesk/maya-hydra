@@ -154,8 +154,7 @@ TfTokenVector MayaHydraCameraDataSource::GetNames()
         HdCameraSchemaTokens->fStop,
         HdCameraSchemaTokens->shutterOpen,
         HdCameraSchemaTokens->shutterClose,
-        // Exposure scale computed from the camera's physical-camera attributes.
-        // Get() types it through the HdCameraSchema allTokens branch below.
+        // Typed through the HdCameraSchema allTokens branch in Get() below.
         HdCameraSchemaTokens->linearExposureScale,
         HdCameraTokens->windowPolicy,
     };
