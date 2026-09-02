@@ -2428,6 +2428,15 @@ void MtohRenderOverride::_TimeChangedCallback(void* data)
 
     // Update frame in Hydra scene globals scene index
     instance->_SetCurrentFrameInHydraGlobalSceneIndex(currentFrame);
+
+    // Refresh animated cameras. A render delegate that binds a camera prim is driven
+    // by that prim rather than the live viewport matrix, and Maya's per-node
+    // world-matrix / plug-dirty callbacks don't fire reliably under the Evaluation
+    // Manager during playback, so without this the camera stays frozen while the
+    // geometry moves. Only cameras whose transform actually changed are dirtied.
+    if (instance->_mayaHydraSceneIndex) {
+        instance->_mayaHydraSceneIndex->RefreshCamerasOnTimeChange();
+    }
 }
 
 void MtohRenderOverride::_RendererChangedCallback(

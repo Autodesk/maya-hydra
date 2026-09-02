@@ -207,6 +207,28 @@ GfMatrix4d MayaHydraDagAdapter::GetTransform()
     return _transform;
 }
 
+bool MayaHydraDagAdapter::UpdateTransformIfChanged()
+{
+    GfMatrix4d newTransform;
+    {
+        MayaHydra::DgAccessLock dgLock;
+        if (IsInstanced()) {
+            newTransform.SetIdentity();
+        } else {
+            newTransform = GetGfMatrixFromMaya(_dagPath.inclusiveMatrix());
+        }
+    }
+
+    // Exact comparison (matching how the value-equality early-outs elsewhere
+    // work): an animated transform produces a different matrix each frame, while
+    // a static one is bit-identical and gets skipped.
+    const bool changed = _invalidTransform || newTransform != _transform;
+
+    _transform = newTransform;
+    _invalidTransform = false;
+    return changed;
+}
+
 size_t
 MayaHydraDagAdapter::SampleTransform(size_t maxSampleCount, float* times, GfMatrix4d* samples)
 {

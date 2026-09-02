@@ -62,6 +62,13 @@ public:
     virtual void RemovePrim() override;
     MAYAHYDRALIB_API
     GfMatrix4d GetTransform() override;
+    // Re-evaluate the world transform from Maya, refresh the cache, and return
+    // whether it actually changed. Lets callers emit DirtyTransform only on a real
+    // change (e.g. the time-change handler during playback, when Maya's
+    // world-matrix callbacks don't fire under the Evaluation Manager) instead of
+    // re-syncing every frame.
+    MAYAHYDRALIB_API
+    bool UpdateTransformIfChanged();
     MAYAHYDRALIB_API
     size_t SampleTransform(size_t maxSampleCount, float* times, GfMatrix4d* samples);
     MAYAHYDRALIB_API

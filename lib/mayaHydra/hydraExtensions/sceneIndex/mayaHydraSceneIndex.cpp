@@ -718,6 +718,22 @@ Fvp::PrimSelections MayaHydraSceneIndex::UfePathToPrimSelections(const Ufe::Path
     return Fvp::PrimSelections({ Fvp::PrimSelection { primPath } });
 }
 
+void MayaHydraSceneIndex::RefreshCamerasOnTimeChange()
+{
+    // Re-evaluate each camera's world transform and dirty only the ones that
+    // actually moved, so static cameras don't trigger a per-frame camera re-sync.
+    // UpdateTransformIfChanged refreshes the adapter's cached transform in place, so
+    // the subsequent DirtyTransform pull returns the already-updated value without a
+    // second DAG evaluation.
+    _MapAdapter<MayaHydraCameraAdapter>(
+        [](MayaHydraCameraAdapter* a) {
+            if (a->UpdateTransformIfChanged()) {
+                MayaHydra::DirtyNotifier(a).dirtyTransform();
+            }
+        },
+        _cameraAdapters);
+}
+
 SdfPath MayaHydraSceneIndex::GetCameraPrimPath(const MDagPath& camPath) const
 {
     const SdfPath camID = GetPrimPath(camPath, true);
