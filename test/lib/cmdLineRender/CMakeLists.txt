@@ -40,6 +40,27 @@ if(IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027)
             "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
             "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,HDST_DUMP_FAILING_SHADER_SOURCEFILE"
     )
+
+    # HYDRA-2506 TEMPORARY bisection: AnimCubeRenderSettings.ma (arnold) is
+    # already known to pass on this same macOS/Maya-2027 configuration
+    # without Hydra V2 render settings (see HYDRA-2518). Re-render it here
+    # with the same two env vars that frameNbResolution_Arnold uses to turn
+    # on the Hydra V2 render-settings/scene-index path, to determine whether
+    # the failure above is specific to frameNbResolution.ma or is a general
+    # "Arnold + Hydra V2 render settings" problem on macOS. Remove this test
+    # once that question is answered.
+    mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/arnold/AnimCubeRenderSettings.ma
+        RENDERER HdArnoldRendererPlugin
+        EXPECTED_IMAGES_DIR renderSettings/arnold/images
+        IMAGE_EXTENSION png
+        TEST_NAME_SUFFIX ArnoldV2RSBisect
+        FAIL 0.05
+        FAILPERCENT 1.0
+        ENV
+            "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
+            "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
+            "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,HDST_DUMP_FAILING_SHADER_SOURCEFILE"
+    )
     return()
 endif()
 
