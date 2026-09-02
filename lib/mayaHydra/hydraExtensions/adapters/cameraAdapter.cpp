@@ -20,11 +20,13 @@
 #include <mayaHydraLib/adapters/adapterDebugCodes.h>
 #include <mayaHydraLib/adapters/adapterRegistry.h>
 #include <mayaHydraLib/adapters/mayaAttrs.h>
+#include <mayaHydraLib/adapters/mayaHydraCameraExposure.h>
 #include <mayaHydraLib/mayaUtils.h>
 #include <mayaHydraLib/sceneIndex/mayaHydraSceneIndex.h>
 
 #include <pxr/base/gf/interval.h>
 #include <pxr/imaging/hd/camera.h>
+#include <pxr/imaging/hd/cameraSchema.h>
 #include <pxr/imaging/hd/changeTracker.h>
 
 #include <maya/MDagMessage.h>
@@ -38,12 +40,19 @@ PXR_NAMESPACE_OPEN_SCOPE
 namespace {
 
 // Attributes that affect HdCamera params (from GetCameraParamValue). When these change,
-// we mark DirtyParams | DirtyPrimvar in one call to avoid duplicates.
+// we mark DirtyParams | DirtyPrimvar in one call to avoid duplicates. The
+// physical-camera exposure attribute names come from the shared exposure header
+// so this list and the attribute authoring/reading cannot drift.
 static const char* const kCameraParamAttributeNames[] = {
     "nearClipPlane", "farClipPlane", "shutterAngle", "focusDistance", "focalLength",
     "fStop", "horizontalFilmAperture", "verticalFilmAperture", "lensSqueezeRatio",
     "shakeEnabled", "horizontalFilmOffset", "horizontalShake", "verticalFilmOffset",
     "verticalShake", "filmFit", "depthOfField", "orthographic",
+    // Editing any of these must re-pull HdCameraSchema::linearExposureScale.
+    MayaHydraCameraExposure::kAttrUsePhysicalCamera, MayaHydraCameraExposure::kAttrFStopPreset,
+    MayaHydraCameraExposure::kAttrFStopCustom, MayaHydraCameraExposure::kAttrShutterPreset,
+    MayaHydraCameraExposure::kAttrShutterCustom, MayaHydraCameraExposure::kAttrISOPreset,
+    MayaHydraCameraExposure::kAttrISOCustom, MayaHydraCameraExposure::kAttrEVComp,
 };
 
 static void _cameraPlugDirty(MObject& node, MPlug& plug, void* clientData)
@@ -142,6 +151,10 @@ void MayaHydraCameraAdapter::Populate()
     if (_isPopulated) {
         return;
     }
+    // Author the physical-camera exposure attributes on the camera shape here,
+    // at adapter setup, rather than during the per-frame data-source pull, so
+    // the DG is never modified mid-evaluation.
+    MayaHydraCameraExposure::EnsureExposureAttributes(GetDagPath().node());
     GetMayaHydraSceneIndex()->InsertPrim(this, CameraType(), GetID());
     _isPopulated = true;
 }
@@ -223,6 +236,12 @@ VtValue MayaHydraCameraAdapter::GetCameraParamValue(const TfToken& paramName)
             status.errorString().asChar());
         return false;
     };
+
+    // Served from the camera shape's physical-camera attributes rather than
+    // from MFnCamera, so it is handled before the MFnCamera lookup below.
+    if (paramName == HdCameraSchemaTokens->linearExposureScale) {
+        return VtValue(MayaHydraCameraExposure::ComputeCameraLinearExposureScale(GetDagPath()));
+    }
 
     MFnCamera camera(GetDagPath(), &status);
     if (hadError(status))
