@@ -205,8 +205,23 @@ static bool _ReadActiveRenderDescriptionPrim(Ufe::Path& outPath, UsdPrim& outPri
         return false;
     }
 
-    outPath = Ufe::PathString::path(pathStr.asChar());
+    // Ufe::PathString::path() will throw Ufe::InvalidPath when the string 
+    // does not resolve to an existing UFE item (e.g. a render pass
+    // path that does not exist, such as "/Render/Passes/doesNotExist").
+    // Catch it and return false so that the default USD render settings are used.
+    try {
+        outPath = Ufe::PathString::path(pathStr.asChar());
+    } catch (const std::exception& e) {
+        TF_WARN(
+            "%s attribute on %s does not resolve to a valid UFE item: %s (%s).",
+            attrName,
+            kUsdDefaultRenderDescriptionNodeName.data(),
+            pathStr.asChar(),
+            e.what());
+        return false;
+    }
     outPrim = MayaUsdAPI::ufePathToPrim(outPath);
+
     return true;
 }
 
@@ -214,7 +229,7 @@ Ufe::Path GetActiveRenderSettingsAppPath()
 {
     Ufe::Path path;
     UsdPrim   prim;
-    if (!_ReadActiveRenderDescriptionPrim(path, prim)) {
+    if (!_ReadActiveRenderDescriptionPrim(path, prim) || !prim.IsValid()) {
         return GetDefaultRenderSettingsAppPath();
     }
 
@@ -243,6 +258,13 @@ Ufe::Path GetActiveRenderSettingsAppPath()
             const UsdPrim settingsPrim =
                 prim.GetStage()->GetPrimAtPath(targets.front());
 
+            // Case 2.2
+            if (!settingsPrim.IsValid()) {
+                TF_WARN("The activeRenderDescriptionPath points to a UsdRenderPass prim that does not have "
+                        "valid renderSource. The default USD render settings will be used.");
+                return GetDefaultRenderSettingsAppPath();
+            }
+
             // Case 2.1.
             // ex: |renderSettings|renderSettingsShape,/Render/Passes/foreground
             //  -> |renderSettings|renderSettingsShape,/Render/MainRender
@@ -252,10 +274,6 @@ Ufe::Path GetActiveRenderSettingsAppPath()
             }
         }
 
-        // Case 2.2.
-        TF_WARN("The activeRenderDescriptionPath points to a UsdRenderPass prim that does not have "
-                "valid renderSource. The default USD render settings will be used.");
-        return GetDefaultRenderSettingsAppPath();
     }
 
     // Case 2.3.
@@ -282,7 +300,7 @@ Ufe::Path GetActiveRenderPassAppPath()
 {
     Ufe::Path path;
     UsdPrim   prim;
-    if (!_ReadActiveRenderDescriptionPrim(path, prim)) {
+    if (!_ReadActiveRenderDescriptionPrim(path, prim) || !prim.IsValid()) {
         return {};
     }
 

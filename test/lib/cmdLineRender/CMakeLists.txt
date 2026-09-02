@@ -348,6 +348,15 @@ mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/AnimCubeRenderSett
     RENDERER_ARGS "-rd images/aSubDirectory"
 )
 
+# Test that HdArnold can render a basic render pass.
+mayaHydra_add_cmd_line_render_test(renderSettings/activeRenderDescriptionValidPass.ma
+    COPY_SCENE
+    RENDERER HdArnoldRendererPlugin
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERED_IMAGE_NAME activeRenderDescriptionValidPass
+    RENDERER_ARGS "-x 160 -y 120"
+)
+
 # Test that USD render settings stored in a MayaUsdProxyShape node produce no
 # path mapper warnings errors.  Launches Render and checks for success,
 # no image comparison.

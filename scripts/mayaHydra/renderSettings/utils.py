@@ -21,7 +21,14 @@ from pxr import UsdRender
 
 def getRenderSettingsPrim():
     rsPath = cmds.getAttr('UsdDefaultRenderDescription.activeRenderDescriptionPath')
-    renderDescriptionPrim = mayaUsdUfe.ufePathToPrim(rsPath)
+    defaultRenderSettingsPath = "UsdDefaultRenderDescription,/Render/SceneRenderSettings"
+
+    # 2.3 If the active render description prim points to a render pass / settings
+    # that does not exist, use the default USD render settings.
+    try:
+        renderDescriptionPrim = mayaUsdUfe.ufePathToPrim(rsPath)
+    except RuntimeError:
+        return mayaUsdUfe.ufePathToPrim(defaultRenderSettingsPath)
 
     # 1. If the attribute points to a UsdRenderSettings prim, use it directly.
     if renderDescriptionPrim.IsA(UsdRender.Settings):
@@ -36,10 +43,9 @@ def getRenderSettingsPrim():
         # valid UsdRenderSettings target.
         if len(targets) == 1:
             renderSettingsPrim = renderDescriptionPrim.GetStage().GetPrimAtPath(targets[0])
-            if renderSettingsPrim.IsA(UsdRender.Settings):
+            if renderSettingsPrim.IsValid() and renderSettingsPrim.IsA(UsdRender.Settings):
                 return renderSettingsPrim
 
-    # 2.2 / 2.3. An invalid renderSource falls back to
+    # 2.2 An invalid renderSource falls back to
     # the default render settings provided by UsdDefaultRenderDescription.
-    defaultRenderSettingsPath = "UsdDefaultRenderDescription,/Render/SceneRenderSettings"
     return mayaUsdUfe.ufePathToPrim(defaultRenderSettingsPath)
