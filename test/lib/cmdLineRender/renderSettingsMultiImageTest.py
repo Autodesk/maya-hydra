@@ -208,6 +208,24 @@ def _find_output_dir(base_dir, rendered_subdir):
     return output_dir
 
 
+def _dump_base_dir_listing(base_dir):
+    """Recursively list base_dir with file sizes.
+
+    Separates "nothing was written at all" from "written to a different
+    directory" and from "written under a different name or extension",
+    which a single "Missing output image" line cannot distinguish. Scoped to
+    one test's own MAYA_APP_DIR-derived directory, so it stays small.
+    """
+    base_dir = Path(base_dir)
+    print(f"Recursive listing of {base_dir}:", file=sys.stderr)
+    if not base_dir.exists():
+        print("  (directory does not exist)", file=sys.stderr)
+        return
+    for path in sorted(base_dir.rglob("*")):
+        if path.is_file():
+            print(f"  {path} ({path.stat().st_size} bytes)", file=sys.stderr)
+
+
 def main(argv):
     if len(argv) < 8:
         print(
@@ -239,7 +257,9 @@ def main(argv):
     scene_copy = _copy_scene_and_usd(scene_path, work_dir)
     _prepare_output_dir(base_dir, rendered_subdir)
 
-    if not _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args):
+    render_succeeded = _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args)
+    if not render_succeeded:
+        _dump_base_dir_listing(base_dir)
         return 1
 
     output_dir = _find_output_dir(base_dir, rendered_subdir)
