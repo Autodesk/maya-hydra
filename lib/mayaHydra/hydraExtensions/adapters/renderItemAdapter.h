@@ -229,7 +229,14 @@ private:
     // [1] = shutter close, [2] = shutter open. The open and close keys are only
     // populated when motion samples are enabled and the transform is animated
     // over the shutter; otherwise all three hold the centre transform.
-    GfMatrix4d                  _transform[3];
+    //
+    // Initialised to identity because UpdateTransform only writes these when
+    // MRenderItem::getMatrix() succeeds. A reader that reaches the open and
+    // close keys before then would otherwise compare two uninitialised
+    // matrices, find them unequal, and publish them as a motion span, which
+    // transforms the geometry to an arbitrary place. Identity makes that same
+    // early read report no motion instead.
+    GfMatrix4d _transform[3] = { GfMatrix4d(1.0), GfMatrix4d(1.0), GfMatrix4d(1.0) };
     int                         _fastId = 0;
     bool                        _visible = false;
     MColor                      _wireframeColor = { 1.f, 1.f, 1.f, 1.f };
