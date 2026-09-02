@@ -38,9 +38,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
-// Depth of field can be enabled either by Maya's own camera attribute or by the
-// Arnold camera extension, which is what the UI toggles when only Arnold DOF is
-// turned on. Either one counts as enabled.
+// Either Maya's own attribute or the Arnold camera extension counts as enabled: the
+// UI toggles only the latter when Arnold DOF is turned on.
 static bool _IsDofEnabledOnCamera(MFnCamera& camera)
 {
     MStatus status;
@@ -55,9 +54,7 @@ static bool _IsDofEnabledOnCamera(MFnCamera& camera)
     return false;
 }
 
-// The Arnold focus distance, when the extension attribute is present and set to a
-// usable value. Returns 0 to mean "not set", leaving Maya's own focusDistance to
-// be used instead.
+// Returns 0 for "not set", leaving Maya's own focusDistance to be used instead.
 static float _ReadArnoldFocusDistanceIfSet(MFnCamera& camera)
 {
     MStatus status;
@@ -204,10 +201,8 @@ void MayaHydraCameraAdapter::CreateCallbacks()
             TF_UNUSED(modified);
             auto* adapter = reinterpret_cast<MayaHydraCameraAdapter*>(clientData);
             adapter->InvalidateTransform();
-            // Tumbling the viewport updates the world matrix without touching the
-            // fStop / focusDistance plugs. The transform locator alone does not
-            // refresh the HdCamera params, which leaves depth-of-field state stale
-            // for consumers that read it from the camera prim.
+            // Tumbling moves the world matrix without touching the fStop / focusDistance
+            // plugs, so the transform locator alone would leave DOF state stale.
             MayaHydra::DirtyNotifier(adapter)
                 .dirtyTransform()
                 .dirtyCameraParams()
