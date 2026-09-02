@@ -15,6 +15,34 @@
 
 set(TEST_OUTPUT_ROOT ${CMAKE_BINARY_DIR}/test/Temporary)
 
+# HYDRA-2506 TEMPORARY: isolate the macOS preflight down to a single test
+# (frameNbResolution's Arnold variant) so a blind preflight run returns
+# focused evidence for the test currently excluded on macOS Maya 2027 (see
+# the folder STREQUAL "arnold" condition further down in this file). This is
+# registered directly here, bypassing that exclusion and every other test in
+# this file, rather than changing the exclusion itself, so the exclusion's
+# own logic is untouched and the rest of the suite cannot mask the result.
+# All OSX Maya 2028 unit tests are already disabled elsewhere, so this
+# scaffold only needs to fire for Maya 2027 -- there is no point registering
+# it for 2028, since nothing on that combination runs anyway. Remove this
+# whole block (and the return() below) once HYDRA-2506 is diagnosed.
+if(IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027)
+    mayaHydra_add_cmd_line_render_multi_image_test(renderSettings/arnold/frameNbResolution.ma
+        RENDERER HdArnoldRendererPlugin
+        EXPECTED_IMAGES_DIR renderSettings/arnold/images/frameNbResolution
+        IMAGE_EXTENSION png
+        TEST_NAME_SUFFIX Arnold
+        FAIL 0.05
+        FAILPERCENT 1.0
+        RENDERER_ARGS "-s 9 -e 9"
+        ENV
+            "MAYA_HYDRA_HD_ARNOLD_HYDRA_V2_RENDER_SETTINGS=1"
+            "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1"
+            "TF_DEBUG=MAYAHYDRAPLUGIN_BATCHRENDER_RENDER_SETTINGS,HDST_DUMP_FAILING_SHADER_SOURCEFILE"
+    )
+    return()
+endif()
+
 # The command line render tests come in per-renderer variants that share the
 # same body but differ in a couple of arguments (resolution, image name).  Each
 # variant is emitted by calling a small _mayaHydra_add_*_variant() function once

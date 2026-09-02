@@ -126,16 +126,18 @@ def _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args=
         cmd.extend(shlex.split(extra_renderer_args))
     # Scene file must be last; Render expects: Render -renderer Plugin [OPTIONS] sceneFile
     cmd.append(str(scene_copy))
+    # [DEBUG-2506] Stream stdout/stderr through to the parent instead of
+    # capturing them: capture_output=True buffers the whole render log in
+    # memory until the child exits, so a ctest --timeout kill on a slow
+    # render would discard the buffer and leave the ctest log empty. Printing
+    # unconditionally (rather than only on failure) means the log survives a
+    # timeout kill and shows how far the render got.
+    print(f"[DEBUG-2506] Render command: {cmd}", file=sys.stderr)
     result = subprocess.run(  # nosec B603
         cmd,
         cwd=str(work_dir),
-        capture_output=True,
-        text=True,
     )
-    if result.returncode != 0:
-        print("Render failed:", file=sys.stderr)
-        print(result.stdout, file=sys.stderr)
-        print(result.stderr, file=sys.stderr)
+    print(f"[DEBUG-2506] Render exit code: {result.returncode}", file=sys.stderr)
     return result.returncode == 0
 
 
@@ -161,6 +163,15 @@ def _compare_images(idiff, fail, failpercent, expected_dir, output_dir):
             print(f"Missing output image for baseline: {expected}", file=sys.stderr)
             success = False
             continue
+
+        # [DEBUG-2506] Print the matched output file size next to the
+        # baseline size: the cheapest way to spot an all-black or truncated
+        # render before reading idiff's error numbers.
+        print(
+            f"[DEBUG-2506] {expected.name}: output size={output.stat().st_size} "
+            f"baseline size={expected.stat().st_size}",
+            file=sys.stderr,
+        )
 
         # idiff has been validated by _validate_executable() in main(): it
         # is an absolute path to an existing executable regular file.
@@ -191,6 +202,11 @@ def _compare_images(idiff, fail, failpercent, expected_dir, output_dir):
             print(result.stdout, file=sys.stderr)
             print(result.stderr, file=sys.stderr)
             success = False
+        else:
+            # [DEBUG-2506] Print idiff's stdout on success too, so a
+            # passing-but-marginal comparison is still visible.
+            print(f"[DEBUG-2506] idiff succeeded for {expected.name}:", file=sys.stderr)
+            print(result.stdout, file=sys.stderr)
 
     return success
 
@@ -206,6 +222,24 @@ def _prepare_output_dir(base_dir, rendered_subdir):
 def _find_output_dir(base_dir, rendered_subdir):
     output_dir = Path(base_dir) / rendered_subdir
     return output_dir
+
+
+def _dump_base_dir_listing(base_dir):
+    """[DEBUG-2506] Recursively list base_dir with file sizes.
+
+    Separates "nothing was written at all" from "written to a different
+    directory" and from "written under a different name or extension",
+    which a single "Missing output image" line cannot distinguish. Scoped to
+    one test's own MAYA_APP_DIR-derived directory, so it stays small.
+    """
+    base_dir = Path(base_dir)
+    print(f"[DEBUG-2506] Recursive listing of {base_dir}:", file=sys.stderr)
+    if not base_dir.exists():
+        print("[DEBUG-2506]   (directory does not exist)", file=sys.stderr)
+        return
+    for path in sorted(base_dir.rglob("*")):
+        if path.is_file():
+            print(f"[DEBUG-2506]   {path} ({path.stat().st_size} bytes)", file=sys.stderr)
 
 
 def main(argv):
@@ -239,7 +273,18 @@ def main(argv):
     scene_copy = _copy_scene_and_usd(scene_path, work_dir)
     _prepare_output_dir(base_dir, rendered_subdir)
 
-    if not _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args):
+    # [DEBUG-2506] Dump the two environment variables that determine where
+    # base_dir is and which renderer gets discovered, since a wrong value
+    # for either would make the render silently write nowhere useful.
+    print(f"[DEBUG-2506] MAYA_APP_DIR={os.environ.get('MAYA_APP_DIR')}", file=sys.stderr)
+    print(
+        f"[DEBUG-2506] MAYA_RENDER_DESC_PATH={os.environ.get('MAYA_RENDER_DESC_PATH')}",
+        file=sys.stderr,
+    )
+
+    render_succeeded = _run_render(render_exe, renderer, scene_copy, work_dir, extra_renderer_args)
+    _dump_base_dir_listing(base_dir)
+    if not render_succeeded:
         return 1
 
     output_dir = _find_output_dir(base_dir, rendered_subdir)

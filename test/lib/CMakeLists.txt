@@ -14,7 +14,13 @@ set_property(TEST ${target} APPEND PROPERTY DISABLED True)
 set_property(TEST ${target} APPEND PROPERTY LABELS Debugging)
 set_property(TEST ${target} APPEND PROPERTY ENVIRONMENT "MAYA_MODULE_PATH=${CMAKE_INSTALL_PREFIX}")
 
-add_subdirectory(mayaUsd)
+# HYDRA-2506 TEMPORARY: drop all viewport tests on macOS to isolate the
+# macOS preflight down to the single cmdLineRender test under diagnosis.
+# Remove this guard (restoring the unconditional add_subdirectory(mayaUsd))
+# once the diagnosis is complete.
+if(NOT IS_MACOSX)
+    add_subdirectory(mayaUsd)
+endif()
 if(MAYA_APP_VERSION VERSION_GREATER 2026)
     add_subdirectory(cmdLineRender)
 endif()
