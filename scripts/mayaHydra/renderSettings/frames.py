@@ -14,22 +14,40 @@
 #
 
 import logging
-import maya.cmds as cmds
-import maya.mel as mel
+
+from pxr import Gf, Sdf, Vt
+
+from .utils import getRenderSettingsPrim
 
 _log = logging.getLogger(__name__)
 
+_FRAMES_ATTR = "adsk:frames"
 
-def _unlock_and_enable_animation():
-    mel.eval("removeRenderLayerAdjustmentAndUnlock defaultRenderGlobals.animation")
-    cmds.setAttr("defaultRenderGlobals.animation", 1)
+
+def _getFramesPair(prim):
+    """Return (start, end) from the first element of adsk:frames, or None."""
+    attr = prim.GetAttribute(_FRAMES_ATTR)
+    if attr and attr.HasAuthoredValue():
+        frames = attr.Get()
+        if frames is not None and len(frames) > 0:
+            return (frames[0][0], frames[0][1])
+    return None
+
+
+def _setFramesPair(prim, start, end):
+    """Write a single-element double2[] to adsk:frames on the prim."""
+    attr = prim.GetAttribute(_FRAMES_ATTR)
+    if not attr:
+        attr = prim.CreateAttribute(
+            _FRAMES_ATTR, Sdf.ValueTypeNames.Double2Array, custom=True)
+    attr.Set(Vt.Vec2dArray([Gf.Vec2d(start, end)]))
 
 
 def setStartFrame(frame):
-    """Enable animation mode and set defaultRenderGlobals.startFrame.
+    """Set the start frame on the active render settings prim's adsk:frames.
 
-    Mirrors the Arnold native -s flag: enables animation mode and removes
-    render-layer overrides so the command-line value is not masked.
+    If adsk:frames is already authored, updates only the start value of the
+    first element.  If not authored, creates a single (start, start) entry.
 
     Raises RuntimeError if the frame is invalid (non-numeric) or if it
     exceeds the current end frame."""
@@ -39,26 +57,27 @@ def setStartFrame(frame):
         raise RuntimeError(
             "Start frame must be numeric, got: %s" % frame)
 
-    # Validate against current end frame to catch obvious user errors.
-    # mayaBatchRenderProcedure iterates from start to end, so start > end
-    # would silently render 0 frames.
-    end_frame = cmds.getAttr("defaultRenderGlobals.endFrame")
-    if frame_val > end_frame:
-        raise RuntimeError(
-            "Start frame (%s) cannot exceed end frame (%s)."
-            % (frame_val, end_frame))
+    prim = getRenderSettingsPrim()
+    existing = _getFramesPair(prim)
 
-    _unlock_and_enable_animation()
-    mel.eval("removeRenderLayerAdjustmentAndUnlock defaultRenderGlobals.startFrame")
-    cmds.setAttr("defaultRenderGlobals.startFrame", frame_val)
+    if existing is not None:
+        _start, end = existing
+        if frame_val > end:
+            raise RuntimeError(
+                "Start frame (%s) cannot exceed end frame (%s)."
+                % (frame_val, end))
+        _setFramesPair(prim, frame_val, end)
+    else:
+        _setFramesPair(prim, frame_val, frame_val)
+
     _log.info("Set start frame to %.4g", frame_val)
 
 
 def setEndFrame(frame):
-    """Enable animation mode and set defaultRenderGlobals.endFrame.
+    """Set the end frame on the active render settings prim's adsk:frames.
 
-    Mirrors the Arnold native -e flag: enables animation mode and removes
-    render-layer overrides so the command-line value is not masked.
+    If adsk:frames is already authored, updates only the end value of the
+    first element.  If not authored, creates a single (end, end) entry.
 
     Raises RuntimeError if the frame is invalid (non-numeric) or if it
     is below the current start frame."""
@@ -68,16 +87,17 @@ def setEndFrame(frame):
         raise RuntimeError(
             "End frame must be numeric, got: %s" % frame)
 
-    # Validate against current start frame to catch obvious user errors.
-    # mayaBatchRenderProcedure iterates from start to end, so start > end
-    # would silently render 0 frames.
-    start_frame = cmds.getAttr("defaultRenderGlobals.startFrame")
-    if frame_val < start_frame:
-        raise RuntimeError(
-            "End frame (%s) cannot be less than start frame (%s)."
-            % (frame_val, start_frame))
+    prim = getRenderSettingsPrim()
+    existing = _getFramesPair(prim)
 
-    _unlock_and_enable_animation()
-    mel.eval("removeRenderLayerAdjustmentAndUnlock defaultRenderGlobals.endFrame")
-    cmds.setAttr("defaultRenderGlobals.endFrame", frame_val)
+    if existing is not None:
+        start, _end = existing
+        if frame_val < start:
+            raise RuntimeError(
+                "End frame (%s) cannot be less than start frame (%s)."
+                % (frame_val, start))
+        _setFramesPair(prim, start, frame_val)
+    else:
+        _setFramesPair(prim, frame_val, frame_val)
+
     _log.info("Set end frame to %.4g", frame_val)
