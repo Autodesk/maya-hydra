@@ -93,9 +93,9 @@ static const char* const kLightParamAttributeNames[] = {
     "aiColorTemperature", "format", "aiCastVolumetricShadows", "aiVolumeSamples", "aiCastShadows",
 };
 
-// Shadow-map quality parameters. These are not part of the core UsdLux schema, so
-// render delegates query them under these "shadow:*" names. The "inputs:" variants
-// are matched as well, in case a namespacing scene index requests them.
+// Shadow-map quality parameters. Not part of the core UsdLux schema, so delegates query
+// them under these "shadow:*" names; the "inputs:" variants cover a namespacing scene
+// index.
 static const TfToken kShadowResolutionToken("shadow:resolution");
 static const TfToken kShadowResolutionInputToken("inputs:shadow:resolution");
 static const TfToken kShadowBiasToken("shadow:bias");
@@ -577,9 +577,8 @@ VtValue MayaHydraLightAdapter::GetLightParamValue(const TfToken& paramName)
         if (plug.isNull()) {
             return {};
         }
-        // Maya authors dmapBias as a small positive value, which matches the positive
-        // depth bias expected here; the Storm path negates it separately for
-        // HdxShadowParams in _CalculateShadowParams.
+        // dmapBias is authored positive, matching the depth bias expected here. The Storm
+        // path negates it separately for HdxShadowParams in _CalculateShadowParams.
         return VtValue(std::max(plug.asFloat(), 0.0f));
     } else if ((paramName == kShadowBlurToken) || (paramName == kShadowBlurInputToken)) {
         const MPlug filterPlug
