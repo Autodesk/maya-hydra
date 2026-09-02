@@ -386,6 +386,14 @@ if(IS_WINDOWS)
     _mayaHydra_add_render_settings_variant(prman "-x 720 -y 128" aNewPRManImageName)
 endif()
 
+# Test that HdArnold can render a basic render pass.
+mayaHydra_add_cmd_line_render_test(renderSettings/arnold/arnoldSimpleRenderPass.ma
+    COPY_SCENE
+    RENDERER HdArnoldRendererPlugin
+    RENDERED_IMAGE_SUBDIR projects/default/images
+    RENDERER_ARGS "-x 160 -y 120"
+)
+
 set(ARNOLD_MAYABATCH_RENDER_SCENES
     basic/renderCurrentFrame.ma
     basic/renderFrame.ma
@@ -643,6 +651,7 @@ endif()
 # because Hydra production rendering is not supported on Maya 2026.
 set(MAYABATCH_TEST_SCRIPT_FILES
     testRenderingColorSpaceResolving.py|depOnPlugins:mtoa
+    testActiveRenderDescriptionSceneGlobals.py|depOnPlugins:mtoa
 )
 # registeredMayaRenderers fails on Linux and macOS.
 if(IS_WINDOWS)
@@ -651,13 +660,22 @@ if(IS_WINDOWS)
     )
 endif()
 
+# Important: All tests in MAYABATCH_TEST_SCRIPT_FILES_TEST_MODE MUST release
+# the batch renderer by calling cmds.mayaHydraTesting(releaseBatchRenderer=True).
+# The batchRenderer object destruction is deferred so tests can inspect the hydra scene index tree.
+# See the example in testActiveRenderDescriptionSceneGlobals.py
+set(MAYABATCH_TEST_SCRIPT_FILES_TEST_MODE
+    testRenderingColorSpaceResolving.py
+    testActiveRenderDescriptionSceneGlobals.py
+)
+
 foreach(script ${MAYABATCH_TEST_SCRIPT_FILES})    
     get_testfile_and_labels(all_labels test_filename ${script})
     list(APPEND all_labels "cmdLineRender")
     mayaUsd_get_unittest_target(target ${test_filename})
 
     set(test_env "DISPLAY=:0")
-    if(test_filename STREQUAL "testRenderingColorSpaceResolving.py")
+    if(test_filename IN_LIST MAYABATCH_TEST_SCRIPT_FILES_TEST_MODE)
         list(APPEND test_env "MAYA_HYDRA_BATCH_RENDER_TEST_MODE=1")
     endif()
 

@@ -10,6 +10,7 @@ set(_maya_hydra_cpp_test_utils_dir
 
 target_sources(${_maya_hydra_cpp_tests_target}
     PRIVATE
+        testActiveRenderDescriptionSceneGlobals.cpp
         testRenderingColorSpaceResolving.cpp
 )
 
