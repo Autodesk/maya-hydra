@@ -192,6 +192,16 @@ def _compare_images(idiff, fail, failpercent, expected_dir, output_dir):
             print(result.stderr, file=sys.stderr)
             success = False
 
+    expected_names = {p.name for p in expected_images}
+    output_files = sorted(p for p in output_dir.iterdir() if p.is_file())
+    unexpected = [p for p in output_files if p.name not in expected_names]
+    if unexpected:
+        print("Unexpected output images found (output has files not in "
+              "expected directory):", file=sys.stderr)
+        for u in unexpected:
+            print(f"  {u.name}", file=sys.stderr)
+        success = False
+
     return success
 
 

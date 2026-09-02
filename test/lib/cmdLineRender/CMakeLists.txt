@@ -328,7 +328,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
     endif()
     mayaHydra_add_cmd_line_render_multi_image_test(${singlecam_scene}${dep_label}
         RENDERER ${renderer}
-        EXPECTED_IMAGES_DIR renderSettings/${folder}/images/frames5to9
+        EXPECTED_IMAGES_DIR renderSettings/${folder}/images/singleCam_frames5to9
         RENDERED_IMAGE_SUBDIR projects/default/images/aSubDirectory
         IMAGE_EXTENSION png
         TEST_NAME_SUFFIX ${suffix}RenderDir
@@ -344,6 +344,7 @@ function(_mayaHydra_add_render_settings_variant folder res_arg new_image_name)
     # As of 2026-Aug-17, HdArnold crashes for multi-frame renders in Hydra v2
     # render settings mode (-s 9 -e 11); single-frame (-s 9 -e 9) is used instead.
     set(_add_frame_nb_resolution FALSE)
+    # HYDRA-2506: skip on macOS for Maya 2027.
     if(folder STREQUAL "arnold" AND NOT (IS_MACOSX AND MAYA_APP_VERSION VERSION_EQUAL 2027))
         set(_add_frame_nb_resolution TRUE)
     elseif(folder STREQUAL "prman" AND IS_WINDOWS)

@@ -128,6 +128,7 @@ def Scope "Render"
             </Render/ProductSecondCam>,
         ]
         int2 resolution = (2048, 2048)
+        custom double2[] adsk:frames = [(1,10)]
     }
 
     def RenderProduct "ProductMainCam"
@@ -176,7 +177,7 @@ def Scope "Render"
 
     def Scope "Vars"
     {
-                # PRMan requires sourceName "Ci" for the beauty AOV; Storm/Arnold use "color".
+        # PRMan requires sourceName "Ci" for the beauty AOV; Storm/Arnold use "color".
         def RenderVar "Ci"
         {
             string sourceName = "Ci"
